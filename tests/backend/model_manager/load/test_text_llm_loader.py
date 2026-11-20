@@ -26,6 +26,7 @@ from transformers import (
     Qwen3_5VisionConfig,
 )
 
+from invokeai.backend.model_manager.configs.roles import view_as
 from invokeai.backend.model_manager.configs.text_llm import TextLLM_Checkpoint_Config, TextLLM_Diffusers_Config
 from invokeai.backend.model_manager.load.model_loaders import text_llm as loader_module
 from invokeai.backend.model_manager.load.model_loaders.text_llm import (
@@ -33,11 +34,12 @@ from invokeai.backend.model_manager.load.model_loaders.text_llm import (
     TextLLMModelLoader,
     qwen3_5_vl_from_state_dict,
 )
-from invokeai.backend.model_manager.taxonomy import SubModelType
+from invokeai.backend.model_manager.taxonomy import ModelType, SubModelType
 from invokeai.backend.quantization.int8_convrot import Int8ConvrotLinear
 from invokeai.backend.qwen3_5.qwen3_5_encoder import load_bundled_qwen3_5_tokenizer
 from tests.backend.model_manager.load.state_dicts import flux3_pup_bf16_keys, flux3_pup_int8_convrot_keys
 from tests.fixtures.loader_seams import Seam, prepare
+from tests.fixtures.model_roles import encoder_file
 from tests.fixtures.quantized_payloads import comfy_quant_marker, quantize_convrot
 
 Keys = dict[str, tuple[list[int], str]]
@@ -315,6 +317,30 @@ class TestTheCheckpointLoader:
         with pytest.raises(ValueError, match="quantization side channel"):
             run.load(_config(tmp_path), None)
         assert run.reserved == []
+
+
+class TestAnEncoderRecordServingAsATextLLM:
+    """A whole-model file installed as a Qwen3.5 encoder serves as a Text LLM: its view loads through this loader."""
+
+    @staticmethod
+    def _view(tmp_path: Path):
+        record = encoder_file("enc").model_copy(update={"path": str(_config(tmp_path).path)})
+        return view_as(record, ModelType.TextLLM)
+
+    def test_the_view_loads_the_whole_model_and_serves_its_own_tokenizer(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        reference = _reference()
+        state_dict = {key: value.detach().clone() for key, value in reference.state_dict().items()}
+        run = prepare(SEAM, monkeypatch, state_dict=state_dict, geometry=_tiny_geometry)
+        view = self._view(tmp_path)
+        assert isinstance(view, TextLLM_Checkpoint_Config)
+
+        model = run.load(view, None)
+        tokenizer = run.load(view, SubModelType.Tokenizer)
+
+        torch.testing.assert_close(_text_logits(model), _text_logits(reference))
+        assert tokenizer is not load_bundled_qwen3_5_tokenizer()
 
 
 # -- The text side a single file cannot carry, pinned against the release's own tokenizer and processor. -----------

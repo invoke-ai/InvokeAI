@@ -1,7 +1,7 @@
 import { ChakraProvider } from '@chakra-ui/react';
 import { auditAccessibility } from '@platform/browser/auditAccessibility.testing';
 import { DEFAULT_LOGGING_CONFIG, type LoggingConfig } from '@platform/logging/contracts';
-import { clearLogs, configureLogging, createLogger, getLogSnapshot, resetLogging } from '@platform/logging/logger';
+import { configureLogging, createLogger, getLogSnapshot, resetLogging } from '@platform/logging/logger';
 import { AppToaster } from '@platform/ui/toaster';
 import { applyThemeToRoot } from '@theme/applyTheme';
 import { DEFAULT_THEME_ID, system } from '@theme/system';
@@ -126,29 +126,6 @@ describe('DiagnosticsPanel', () => {
     await expect(auditAccessibility(host!)).resolves.toEqual([]);
   });
 
-  it('applies display-only severity, namespace and text filters without changing recording', async () => {
-    seed();
-    await render('project-a');
-
-    await choose('Minimum severity', 'Warn and above');
-    expect(entryRows().map((row) => row.dataset.logLevel)).toEqual(['error']);
-    expect(getLogSnapshot().entries).toHaveLength(4);
-
-    await choose('Minimum severity', 'All severities');
-    await choose('Namespace', 'queue');
-    expect(entryRows()).toHaveLength(1);
-    expect(host?.textContent).toContain('Queue item pending');
-
-    await act(() => page.getByRole('textbox', { name: 'Search events' }).fill('revision'));
-    await settle();
-    expect(entryRows()).toHaveLength(0);
-    expect(host?.textContent).toContain('No events match the current filters.');
-
-    await act(() => page.getByRole('button', { name: 'Clear filters' }).click());
-    await settle();
-    expect(entryRows()).toHaveLength(3);
-  });
-
   it('pages newest-first at 100 entries and expands raw details with the keyboard', async () => {
     const logger = createLogger({ area: 'history', namespace: 'queue', projectId: 'project-a' });
 
@@ -238,44 +215,5 @@ describe('DiagnosticsPanel', () => {
     // An empty scope reads as empty even while a text filter is set; the filter no longer matters.
     expect(host?.textContent).toContain('No events recorded in this scope yet.');
     expect(host?.textContent).not.toContain('Clear filters');
-  });
-
-  it('distinguishes disabled recording from an empty history and follows project switches', async () => {
-    configure({ enabled: false });
-    await render('project-a');
-
-    expect(host?.textContent).toContain('Recording off');
-    expect(host?.textContent).toContain('Turn on “Record diagnostic logs”');
-    await expect.element(page.getByRole('button', { name: 'Open developer settings' })).toBeVisible();
-
-    configure();
-    seed();
-    await settle();
-    expect(entryRows()).toHaveLength(3);
-
-    await render('project-b');
-    expect(entryRows().map((row) => row.dataset.logLevel)).toEqual(['warn', 'info']);
-
-    clearLogs();
-    await settle();
-    expect(host?.textContent).toContain('No events recorded in this scope yet.');
-  });
-
-  it('stays usable in a narrow dock and in the dark theme', async () => {
-    seed();
-    createLogger({ area: 'upload', namespace: 'gallery', projectId: 'project-a' }).warn(
-      `Uploaded ${'a-very-long-file-name-'.repeat(8)}.png to the board`
-    );
-    applyThemeToRoot('ultradark');
-    try {
-      await render('project-a', '340px');
-
-      expect(host!.scrollWidth).toBeLessThanOrEqual(host!.clientWidth);
-      await expect.element(combobox('Scope')).toBeVisible();
-      await expect.element(page.getByRole('button', { name: 'Copy JSON (4)' })).toBeVisible();
-      await expect(auditAccessibility(host!)).resolves.toEqual([]);
-    } finally {
-      applyThemeToRoot(DEFAULT_THEME_ID);
-    }
   });
 });

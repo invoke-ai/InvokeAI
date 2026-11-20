@@ -6,8 +6,8 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 /**
- * Share rail visibility/progress coverage across topbar and floating Preview: offline/idle hides, unstepped runs
- * sweep, stepped runs fill.
+ * Share rail visibility/progress coverage across topbar and floating Preview: offline/idle hides, unstepped runs sweep,
+ * stepped runs fill.
  */
 
 const state = vi.hoisted(() => ({

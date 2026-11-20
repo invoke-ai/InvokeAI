@@ -215,10 +215,9 @@ export const pruneSessionProject = async (projectId: string, signal?: AbortSigna
 };
 
 /**
- * Cheap pre-mount peek for the /app route guard: would any tabs open?
- * `null` means "could not tell" (no blob yet, a pre-split blob, or the
- * backend is unreachable) — the guard must not redirect on null, only on a
- * definite empty session.
+ * Cheap pre-mount peek for the /app route guard: would any tabs open? `null` means "could not tell" (no blob yet, a
+ * pre-split blob, or the backend is unreachable) — the guard must not redirect on null, only on a definite empty
+ * session.
  */
 export const peekOpenProjectIds = async (
   dependencies: {

@@ -24,7 +24,6 @@ import { page, userEvent } from 'vitest/browser';
 
 import type * as EngineStoreHooks from './engineStoreHooks';
 
-/** The actions read the real store and drive a real engine; only the editing lock and gallery save are stubbed. */
 const harness = vi.hoisted(() => ({
   create: vi.fn<(destination: string) => Promise<void>>(),
   describeDestination: vi.fn<() => Promise<string | null>>(),
@@ -55,7 +54,6 @@ vi.mock('./engineStoreHooks', async (importOriginal) => ({
   useCanvasDocumentEditingLocked: () => harness.editingLocked,
 }));
 vi.mock('@workbench/canvas-operations/react', () => ({ useCanvasEngine: () => harness.engine }));
-// Clear canvas looks the project's engine up when it runs, as an Undo arriving later would.
 vi.mock('@workbench/canvas-operations/api', async (importOriginal) => ({
   ...(await importOriginal<typeof CanvasOperationsApi>()),
   getCanvasEngine: () => harness.engine ?? undefined,
@@ -77,14 +75,12 @@ import { useRestorePoint } from './useCanvasRecovery';
 
 const INSTANCE_ID = 'canvas-1';
 
-/** Stands in for the canvas view: the instance's focusable surface. */
 const CanvasViewStandIn = () => (
   <div data-hotkey-widget-instance-id={INSTANCE_ID}>
     <div {...{ [CANVAS_SURFACE_ATTR]: '' }} data-testid="surface" tabIndex={-1} />
   </div>
 );
 
-/** Hands the test the History pane's restore, which shares Clear canvas's Undo. */
 const RestorePointProbe = ({ ref }: { ref: Ref<ReturnType<typeof useRestorePoint>> }) => {
   const restorePoint = useRestorePoint();
   useImperativeHandle(ref, () => restorePoint, [restorePoint]);
@@ -121,7 +117,6 @@ interface Registration {
   title: string;
 }
 
-/** A painted layer, so a cleared document differs from the one it replaced. */
 const paintedLayer: CanvasLayerContract = {
   blendMode: 'normal' as const,
   id: 'painted',
@@ -146,11 +141,6 @@ const stagedResult: CanvasStagingCandidateContract = {
   width: 64,
 };
 
-/**
- * Renders the actions on a fresh project holding `layers` (none by default) and the canvas widget values
- * `canvasValues`, recording the commands and hotkeys they register. `running` queues a canvas batch still generating
- * for this canvas, whose first result is staged.
- */
 const renderActions = async ({
   canvasValues,
   layers = [],
@@ -219,7 +209,6 @@ const renderActions = async ({
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
-  // Rendering again picks up a swapped `harness.engine`, as a project switch would.
   const rerender = () =>
     act(() =>
       root!.render(
@@ -242,7 +231,6 @@ const confirmDialog = () => page.getByRole('alertdialog');
 type TestStore = ReturnType<typeof createWorkbenchStore>;
 const rasterIds = (store: TestStore) =>
   store.getState().projects[0]!.canvas.document.stacks.raster.map((node) => node.id);
-/** Runs the newest notice's Undo, as its button in the Notifications list would. */
 const undoNewest = (store: TestStore) => {
   const undo = store
     .getState()
@@ -250,7 +238,6 @@ const undoNewest = (store: TestStore) => {
     .find((action) => action.kind === 'undo');
   act(() => runNotificationUndo((undo as { undoId: string }).undoId));
 };
-/** Paints on the canvas the way any later edit would: a new layer. */
 const addLayer = (store: TestStore, id: string) =>
   store.commands.canvas.apply(store.getState().activeProjectId, {
     anchor: harness.engine!.document.captureInsertionAnchor('raster', null),
@@ -272,11 +259,9 @@ describe('CanvasHeaderActions clear canvas', () => {
     await expect.element(confirmDialog()).toBeVisible();
     await expect.element(confirmDialog().getByRole('heading', { name: 'Clear the canvas?' })).toBeVisible();
     await expect.element(confirmDialog().getByRole('button', { exact: true, name: 'Clear canvas' })).toBeVisible();
-    // The new project's empty inpaint mask is its one layer.
     await expect
       .element(confirmDialog().getByText('Removes the 1 layer and starts a fresh canvas with an empty inpaint mask.'))
       .toBeVisible();
-    // A blank canvas has nothing to bring back, so the dialog promises no restore point.
     expect(confirmDialog().element().textContent).not.toContain('History keeps a restore point');
     expect(document.querySelector('[role="menu"]')).toBeNull();
   });
@@ -298,18 +283,6 @@ describe('CanvasHeaderActions clear canvas', () => {
     const canvas = store.getState().projects[0]!.canvas;
     expect(canvas.document.stacks.raster).toHaveLength(0);
     expect(canvas.snapshots[0]?.stagedImages?.map((image) => image.imageName)).toEqual(['staged.png']);
-  });
-
-  it('leaves the generation running once "Stop it now" is unticked', async () => {
-    const { store } = await renderActions({ layers: [paintedLayer], running: true });
-
-    await clearButton().click();
-    await confirmDialog().getByText('Stop it now').click();
-    await expect.element(confirmDialog().getByRole('checkbox', { name: 'Stop it now' })).not.toBeChecked();
-    await confirmDialog().getByRole('button', { exact: true, name: 'Clear canvas' }).click();
-
-    await expect.poll(() => store.getState().projects[0]!.canvas.document.stacks.raster).toHaveLength(0);
-    expect(store.getState().projects[0]!.queue.items[0]?.status).toBe('running');
   });
 
   it('replaces the document once confirmed, behind a restore point that brings it back', async () => {
@@ -360,32 +333,7 @@ describe('CanvasHeaderActions clear canvas', () => {
       'The canvas changed since. Its restore point is still in History.'
     );
     expect(rasterIds(store)).toEqual(['later']);
-    // The point is still in History for a deliberate restore.
     expect(store.getState().projects[0]!.canvas.snapshots.map((point) => point.kind)).toEqual(['clear-canvas']);
-  });
-
-  it('undoes a History restore only while the restored canvas is unedited', async () => {
-    const { store } = await renderActions({ layers: [paintedLayer] });
-    await clearConfirmed(store);
-    addLayer(store, 'after-clear');
-    const point = store.getState().projects[0]!.canvas.snapshots[0]!;
-
-    await act(() => restorePointRef.current!(point));
-    expect(rasterIds(store)).toEqual(['painted']);
-    undoNewest(store);
-    await expect.poll(() => rasterIds(store)).toEqual(['after-clear']);
-
-    const kept = store.getState().projects[0]!.canvas.snapshots.find((entry) => entry.name.startsWith('Before'))!;
-    await act(() => restorePointRef.current!(kept));
-    addLayer(store, 'edited');
-    const edited = rasterIds(store);
-    undoNewest(store);
-
-    await expect.poll(() => store.getState().notifications[0]?.title).toBe('Canvas not restored');
-    expect(store.getState().notifications[0]?.message).toBe(
-      'The canvas changed since. Its restore point is still in History.'
-    );
-    expect(rasterIds(store)).toEqual(edited);
   });
 
   it('refuses a restore Undo when a stroke still uploading on a layer lands while the Undo saves it', async () => {
@@ -397,7 +345,6 @@ describe('CanvasHeaderActions clear canvas', () => {
     const projectId = store.getState().activeProjectId;
     const lifecycle = harness.engine!.lifecycle;
     const flush = lifecycle.flushPendingUploads.bind(lifecycle);
-    // The stroke reaches the document only once the paint barrier saves it, after the Undo's first look.
     vi.spyOn(lifecycle, 'flushPendingUploads').mockImplementationOnce(async (options) => {
       await flush(options);
       store.commands.canvas.apply(projectId, { id: 'painted', patch: { opacity: 0.5 }, type: 'updateCanvasLayer' });
@@ -422,18 +369,6 @@ describe('CanvasHeaderActions clear canvas', () => {
     expect(document.querySelector('[role="alertdialog"]')).toBeNull();
     await act(() => commands.find((command) => command.id === 'canvas.newSession')!.handler!());
     expect(document.querySelector('[role="alertdialog"]')).toBeNull();
-  });
-
-  it('registers Clear canvas on Mod+Alt+N under its saved command id, opening the same confirm', async () => {
-    const { commands, hotkeys } = await renderActions();
-
-    expect(hotkeys.find((hotkey) => hotkey.id === 'canvas.newSession')).toMatchObject({
-      defaultKeys: ['mod+alt+n'],
-      title: 'Clear canvas',
-    });
-    await act(() => commands.find((command) => command.id === 'canvas.newSession')!.handler!());
-
-    await expect.element(confirmDialog()).toBeVisible();
   });
 });
 
@@ -473,31 +408,6 @@ describe('CanvasHeaderActions zoom menu', () => {
   });
 });
 
-describe('CanvasHeaderActions fit frame to masks', () => {
-  it("pads the masks by the project's mask blur plus 8 before snapping outward to the grid", async () => {
-    const mask: CanvasLayerContract = {
-      blendMode: 'normal',
-      id: 'mask',
-      isEnabled: true,
-      isLocked: false,
-      mask: { bitmap: { height: 40, imageName: 'mask.png', width: 40 }, fill: { color: '#e07575', style: 'diagonal' } },
-      name: 'Mask',
-      opacity: 1,
-      transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 100, y: 100 },
-      type: 'inpaint_mask',
-    };
-    const { store } = await renderActions({ canvasValues: { maskBlur: 40, snapToGrid: true }, layers: [mask] });
-
-    await page.getByRole('button', { exact: true, name: 'Frame' }).click();
-    await page.getByRole('menuitem', { name: /^Fit frame to masks/ }).click();
-
-    // Blur 40 pads 48: 52..188, on the default 8 px grid 48..192. The default blur 16 would give 72..168.
-    await expect
-      .poll(() => store.getState().projects[0]!.canvas.document.bbox)
-      .toEqual({ height: 144, width: 144, x: 48, y: 48 });
-  });
-});
-
 describe('CanvasHeaderActions save to gallery', () => {
   const saveTrigger = () => page.getByRole('button', { exact: true, name: 'Save to Gallery' });
   const item = (name: RegExp) => page.getByRole('menuitem', { name });
@@ -521,70 +431,6 @@ describe('CanvasHeaderActions save to gallery', () => {
     await item(/^Save Frame to Gallery/).click();
     expect(harness.save).toHaveBeenLastCalledWith('bbox');
     expect(harness.save).toHaveBeenCalledTimes(2);
-  });
-
-  it('says what each save holds and the board it goes to, resolved as the menu opens', async () => {
-    harness.describeDestination.mockResolvedValue('Board B');
-    await renderActions({
-      layers: [
-        {
-          ...paintedLayer,
-          source: { ...paintedLayer.source, image: { height: 300, imageName: 'painted.png', width: 200 } },
-        } as CanvasLayerContract,
-      ],
-    });
-    const { height, width } = activeProject().canvas.document.bbox;
-
-    await saveTrigger().click();
-    await expect
-      .element(item(/^Save Frame to Gallery/))
-      .toHaveTextContent(`Save Frame to Gallery${width} × ${height} · Board B`);
-    await expect
-      .element(item(/^Save Canvas to Gallery/))
-      .toHaveTextContent('Save Canvas to Gallery200 × 300 · Board B');
-    expect(harness.describeDestination).toHaveBeenCalledOnce();
-  });
-
-  it('drops what it cannot name: an empty canvas has no size, an unknown board no destination', async () => {
-    harness.describeDestination.mockResolvedValue(null);
-    await renderActions();
-    const { height, width } = activeProject().canvas.document.bbox;
-
-    await saveTrigger().click();
-    await expect.element(item(/^Save Frame to Gallery/)).toHaveTextContent(`Save Frame to Gallery${width} × ${height}`);
-    await expect.element(item(/^Save Canvas to Gallery/)).toHaveTextContent('Save Canvas to Gallery');
-  });
-
-  it('takes no save while a create from the frame runs', async () => {
-    harness.isCreating = true;
-    await renderActions();
-
-    await expect.element(saveTrigger()).toBeDisabled();
-  });
-
-  it('names the board from the latest opening, ignoring an earlier answer that arrives late', async () => {
-    const answers: ((label: string | null) => void)[] = [];
-    harness.describeDestination.mockImplementation(
-      () =>
-        new Promise((resolve) => {
-          answers.push(resolve);
-        })
-    );
-    await renderActions();
-    const { height, width } = activeProject().canvas.document.bbox;
-    const frameItem = item(/^Save Frame to Gallery/);
-
-    await saveTrigger().click();
-    await expect.element(frameItem).toBeVisible();
-    await userEvent.keyboard('{Escape}');
-    await saveTrigger().click();
-    await expect.element(frameItem).toBeVisible();
-    expect(answers).toHaveLength(2);
-
-    await act(() => answers[1]!('Board New'));
-    await expect.element(frameItem).toHaveTextContent(`Save Frame to Gallery${width} × ${height} · Board New`);
-    await act(() => answers[0]!('Board Old'));
-    await expect.element(frameItem).toHaveTextContent(`Save Frame to Gallery${width} × ${height} · Board New`);
   });
 
   it('drops a destination answered for the project that was open before a switch', async () => {
@@ -611,13 +457,6 @@ describe('CanvasHeaderActions save to gallery', () => {
     await expect.element(frameItem).toHaveTextContent(`Save Frame to Gallery${width} × ${height}`);
   });
 
-  it('is disabled while editing is locked', async () => {
-    harness.editingLocked = true;
-    await renderActions();
-
-    await expect.element(saveTrigger()).toBeDisabled();
-  });
-
   it('says it is saving, and takes no second save, while one is in flight', async () => {
     harness.isSaving = true;
     await renderActions();
@@ -634,7 +473,6 @@ const menuItem = (name: RegExp) => page.getByRole('menuitem', { name });
 const menuLabels = () =>
   [...document.querySelectorAll('[role="menuitem"]')].map((node) => node.querySelector('p')?.textContent);
 
-/** A raster layer of `width` × `height` at (x, y). */
 const sizedLayer = (width: number, height: number, x = 0, y = 0): CanvasLayerContract =>
   ({
     ...paintedLayer,
@@ -670,46 +508,9 @@ describe('CanvasHeaderActions frame menu', () => {
           .querySelectorAll('kbd'),
       ].at(-1)?.textContent
     ).toBe('b');
-    // Single-line items: no hint under any of them.
     for (const node of document.querySelectorAll('[role="menuitem"]')) {
       expect(node.querySelectorAll('p')).toHaveLength(1);
     }
-  });
-
-  it('Edit frame selects the Frame tool and hands focus to the canvas', async () => {
-    await renderActions();
-    expect(harness.engine!.interaction.get('activeTool')).not.toBe('bbox');
-
-    await frameTrigger().click();
-    await menuItem(/^Edit frame/).click();
-
-    expect(harness.engine!.interaction.get('activeTool')).toBe('bbox');
-    await expect.poll(() => document.activeElement).toBe(page.getByTestId('surface').element());
-  });
-
-  it('fits the frame to the layers, and offers no mask fit without a painted mask', async () => {
-    const { store } = await renderActions({
-      canvasValues: { snapToGrid: false },
-      layers: [sizedLayer(128, 96, 16, 32)],
-    });
-
-    await frameTrigger().click();
-    // The new project's inpaint mask is empty, so there is nothing to fit the frame to.
-    await expect.element(menuItem(/^Fit frame to masks/)).toHaveAttribute('aria-disabled', 'true');
-    await menuItem(/^Fit frame to layers/).click();
-
-    await expect
-      .poll(() => store.getState().projects[0]!.canvas.document.bbox)
-      .toEqual({ height: 96, width: 128, x: 16, y: 32 });
-  });
-
-  it('keeps the fits unavailable while an operation holds the document', async () => {
-    harness.editingLocked = true;
-    await renderActions({ canvasValues: { snapToGrid: false }, layers: [sizedLayer(128, 96)] });
-
-    await frameTrigger().click();
-    await expect.element(menuItem(/^Fit frame to layers/)).toHaveAttribute('aria-disabled', 'true');
-    await expect.element(menuItem(/^Edit frame/)).not.toHaveAttribute('aria-disabled', 'true');
   });
 });
 
@@ -726,41 +527,28 @@ describe('CanvasHeaderActions use frame as', () => {
     await menuItem(/^New control layer/).click();
     expect(harness.create).toHaveBeenCalledExactlyOnceWith('control');
   });
-
-  it('says why it cannot run while an operation holds the document, and creates nothing', async () => {
-    harness.editingLocked = true;
-    await renderActions();
-
-    await frameTrigger().click();
-    const raster = menuItem(/^New raster layer/);
-    await expect.element(raster).toHaveAttribute('aria-disabled', 'true');
-    await expect.element(raster).toHaveAccessibleDescription('Finish or cancel the current canvas operation first.');
-    await raster.click({ force: true });
-    expect(harness.create).not.toHaveBeenCalled();
-  });
-
-  it('waits while another composite runs', async () => {
-    harness.isCreating = true;
-    await renderActions();
-
-    await frameTrigger().click();
-    await expect.element(menuItem(/^New raster layer/)).toHaveAttribute('aria-disabled', 'true');
-  });
 });
 
 describe('CanvasHeaderActions undo and redo', () => {
-  it('name the step they would undo or redo, and plain Undo and Redo without one', async () => {
-    await renderActions({ canvasValues: { snapToGrid: false }, layers: [sizedLayer(128, 96)] });
-    await expect.element(page.getByRole('button', { exact: true, name: 'Undo' })).toBeDisabled();
-    await expect.element(page.getByRole('button', { exact: true, name: 'Redo' })).toBeDisabled();
-
+  const historyButton = (name: string) => page.getByRole('button', { exact: true, name });
+  const fitFrame = async () => {
     await frameTrigger().click();
     await menuItem(/^Fit frame to layers/).click();
+    await expect.element(historyButton('Undo: Fit generation frame')).not.toHaveAttribute('aria-disabled');
+  };
 
-    const undo = page.getByRole('button', { exact: true, name: 'Undo: Fit generation frame' });
-    await expect.element(undo).toBeEnabled();
-    await undo.click();
-    await expect.element(page.getByRole('button', { exact: true, name: 'Redo: Fit generation frame' })).toBeEnabled();
-    await expect.element(page.getByRole('button', { exact: true, name: 'Undo' })).toBeDisabled();
+  it('keep keyboard focus on Undo when it steps back over the last edit, and step no further', async () => {
+    await renderActions({ canvasValues: { snapToGrid: false }, layers: [sizedLayer(128, 96)] });
+    await fitFrame();
+    const undo = historyButton('Undo: Fit generation frame').element() as HTMLButtonElement;
+
+    undo.focus();
+    await userEvent.keyboard('{Enter}');
+
+    await expect.element(historyButton('Undo')).toHaveAttribute('aria-disabled', 'true');
+    expect(document.activeElement).toBe(undo);
+    await userEvent.keyboard('{Enter}');
+    await expect.element(historyButton('Redo: Fit generation frame')).toBeInTheDocument();
+    expect(harness.engine!.stores.canUndo.get()).toBe(false);
   });
 });

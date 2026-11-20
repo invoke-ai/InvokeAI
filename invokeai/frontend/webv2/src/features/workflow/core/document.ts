@@ -136,10 +136,40 @@ const isFormLike = (value: unknown): boolean =>
 
 const METADATA_KEYS = ['author', 'contact', 'description', 'name', 'notes', 'tags', 'workflowVersion'] as const;
 
+const normalizePersistedNode = (node: unknown): unknown => {
+  if (!isRecord(node) || node.type !== 'current_image' || !isRecord(node.data)) {
+    return node;
+  }
+
+  const label = typeof node.data.label === 'string' ? node.data.label : 'Current Image';
+  const clampedW = clampCurrentImageWidth(node.data.width);
+  const clampedH = clampCurrentImageHeight(node.data.height);
+  const width = clampedW === CURRENT_IMAGE_DEFAULT_WIDTH ? undefined : clampedW;
+  const height = clampedH === CURRENT_IMAGE_DEFAULT_HEIGHT ? undefined : clampedH;
+
+  if (
+    node.data.label === label &&
+    node.data.width === width &&
+    node.data.height === height &&
+    (width !== undefined || !('width' in node.data)) &&
+    (height !== undefined || !('height' in node.data))
+  ) {
+    return node;
+  }
+
+  return {
+    ...node,
+    data: {
+      label,
+      ...(height === undefined ? {} : { height }),
+      ...(width === undefined ? {} : { width }),
+    },
+  };
+};
+
 /**
- * Reads a persisted version-2 document. Authored content (nodes, edges, form) must carry the structure the editor
- * and the linear form read, or the document is refused (`null`), never quietly replaced; missing metadata strings
- * are the only thing filled in.
+ * Reads a persisted version-2 document. Authored content lacking the editor's structure is refused (`null`), never
+ * replaced; only missing metadata strings are filled in.
  */
 export const readPersistedProjectGraph = (candidate: unknown): ProjectGraphState | null => {
   if (
@@ -156,11 +186,29 @@ export const readPersistedProjectGraph = (candidate: unknown): ProjectGraphState
     return null;
   }
 
-  if (METADATA_KEYS.every((key) => typeof candidate[key] === 'string') && typeof candidate.updatedAt === 'string') {
+  let nodesChanged = false;
+  const normalizedNodes = candidate.nodes.map((node) => {
+    const next = normalizePersistedNode(node);
+
+    if (next !== node) {
+      nodesChanged = true;
+    }
+
+    return next;
+  });
+
+  if (
+    !nodesChanged &&
+    METADATA_KEYS.every((key) => typeof candidate[key] === 'string') &&
+    typeof candidate.updatedAt === 'string'
+  ) {
     return candidate as unknown as ProjectGraphState;
   }
 
-  const filled: Record<string, unknown> = { ...candidate };
+  const filled: Record<string, unknown> = {
+    ...candidate,
+    ...(nodesChanged ? { nodes: normalizedNodes } : {}),
+  };
 
   for (const key of METADATA_KEYS) {
     if (typeof filled[key] !== 'string') {
@@ -175,10 +223,7 @@ export const readPersistedProjectGraph = (candidate: unknown): ProjectGraphState
   return filled as unknown as ProjectGraphState;
 };
 
-/**
- * The only pre-version-2 shape ever persisted was the Phase-1 placeholder: no nodes, nothing authored. It becomes a
- * blank under its own id; any other unrecognised graph is refused (`null`) rather than replaced.
- */
+/** Before version 2 only the empty Phase-1 placeholder was persisted; any other unrecognised graph is refused. */
 export const readLegacyPlaceholderGraph = (candidate: unknown): ProjectGraphState | null => {
   if (!isRecord(candidate)) {
     return createProjectGraph(createWorkflowId('workflow'));
@@ -251,8 +296,6 @@ export const buildConnectorNode = (position: XYPosition): WorkflowConnectorNode 
   type: 'connector',
 });
 
-// #region Form manipulation
-
 const getRootContainer = (form: WorkflowForm): ContainerFormElement => {
   const root = form.elements[form.rootElementId];
 
@@ -315,11 +358,7 @@ const removeFormElement = (form: WorkflowForm, elementId: string): WorkflowForm 
   return { ...form, elements };
 };
 
-/**
- * Reparents an element to `parentId` at `index` (the drag-and-drop primitive).
- * No-ops when the move is impossible: unknown ids, non-container targets, or
- * dropping a container into its own subtree.
- */
+/** No-ops on unknown ids, non-container targets, or a container dropped into its own subtree. */
 const moveFormElementTo = (form: WorkflowForm, elementId: string, parentId: string, index: number): WorkflowForm => {
   const element = form.elements[elementId];
   const nextParent = form.elements[parentId];
@@ -409,8 +448,6 @@ const removeNodeFieldElements = (form: WorkflowForm, removedNodeIds: Set<string>
     .filter((element) => element.type === 'node-field' && removedNodeIds.has(element.data.fieldIdentifier.nodeId))
     .reduce((nextForm, element) => removeFormElement(nextForm, element.id), form);
 
-// #region Node updates
-
 export type WorkflowNodeUpdateStatus = 'current' | 'updatable' | 'incompatible' | 'newer';
 
 type Version = [number, number, number];
@@ -424,10 +461,7 @@ const parseVersion = (version: string): Version | null => {
 
 const compareVersions = (a: Version, b: Version): number => a[0] - b[0] || a[1] - b[1] || a[2] - b[2];
 
-/**
- * Whether a stored node can take its template's version. Only a same-major template merges safely: a template
- * bumps its major when a value-preserving merge would leave the node invalid (the legacy rule).
- */
+/** Only a same-major template merges safely: a major bump means a value-preserving merge would leave it invalid. */
 export const getNodeUpdateStatus = (
   node: WorkflowInvocationNode,
   template: InvocationTemplate
@@ -502,11 +536,7 @@ export const migrateMiniMaxH3NumFramesValue = (
   }
 };
 
-/**
- * Fresh template defaults underneath the node's own values: existing labels, values, and node settings win, new
- * inputs start at their defaults, inputs the template no longer declares are dropped (dynamic and extra inputs
- * aside). The id is kept so edges survive.
- */
+/** Template defaults under the node's own values; undeclared inputs drop (dynamic and extra aside); the id stays. */
 const updateInvocationNodeToTemplate = (
   node: WorkflowInvocationNode,
   template: InvocationTemplate,
@@ -556,8 +586,8 @@ const updateInvocationNodeToTemplate = (
     migrateImageCollectionInputValues(inputs, template, connectedInputNames.has('collection'));
   }
 
-  // `minimax_h3_denoise` 1.3.0 turned the free frame count into a choice list; a count still on the grid becomes
-  // that choice, anything else falls back to the default.
+  // `minimax_h3_denoise` 1.3.0 turned the free frame count into a choice list; a count still on the grid becomes that
+  // choice, anything else falls back to the default.
   if (node.data.type === 'minimax_h3_denoise' && sourceVersion && compareVersions(sourceVersion, [1, 3, 0]) < 0) {
     migrateMiniMaxH3NumFramesValue(inputs, template);
   }
@@ -574,12 +604,10 @@ export interface WorkflowNodesUpdate {
   updatedNodeIds: string[];
   /** Nodes whose template is newer by a major or older than the node; they need deleting and re-adding. */
   skippedNodeIds: string[];
-  /** Edges and form elements that pointed at inputs the updated templates no longer declare. */
   droppedEdgeIds: string[];
   droppedFormElementIds: string[];
 }
 
-/** Nodes an `updateNodes` action would move; drives the update-all count and the per-node menu item. */
 export const getUpdatableNodeIds = (document: Pick<ProjectGraphState, 'nodes'>, templates: InvocationTemplates) =>
   document.nodes.flatMap((node) => {
     const template = isInvocationNode(node) ? templates[node.data.type] : undefined;
@@ -587,10 +615,7 @@ export const getUpdatableNodeIds = (document: Pick<ProjectGraphState, 'nodes'>, 
     return isInvocationNode(node) && template && getNodeUpdateStatus(node, template) === 'updatable' ? [node.id] : [];
   });
 
-/**
- * Moves the given nodes (every invocation node by default) to their templates' versions, dropping edges and form
- * elements that pointed at inputs the templates no longer declare. Returns the same document when nothing changed.
- */
+/** Returns the same document when nothing changed. */
 export const updateWorkflowNodes = (
   document: ProjectGraphState,
   templates: InvocationTemplates,
@@ -698,18 +723,15 @@ export const updateWorkflowNodes = (
   };
 };
 
-// #endregion
-
 export type ProjectGraphAction =
   | { type: 'addNode'; node: WorkflowNode }
   | { type: 'addNodeAndEdge'; node: WorkflowNode; edge: WorkflowEdge | WorkflowEdge[] }
   | { type: 'addGraphElements'; nodes: WorkflowNode[]; edges: WorkflowEdge[] }
   | { type: 'removeNodes'; nodeIds: string[] }
   | { type: 'setNodePosition'; nodeId: string; position: XYPosition }
-  /** Moves several nodes at once as one undoable step (an automatic arrangement); unknown ids are ignored. */
   | { type: 'setNodePositions'; positions: Record<string, XYPosition> }
   | { type: 'setNodeLabel'; nodeId: string; label: string }
-  | { type: 'setCurrentImageNodeSize'; nodeId: string; width?: number; height?: number }
+  | { type: 'setCurrentImageNodeSize'; nodeId: string; width: number | undefined; height: number | undefined }
   | { type: 'setNodeNotes'; nodeId: string; notes: string }
   | { type: 'setNodeIsOpen'; nodeId: string; isOpen: boolean }
   | { type: 'setNodeIsIntermediate'; nodeId: string; isIntermediate: boolean }
@@ -732,7 +754,6 @@ export type ProjectGraphAction =
   /** Moves stepping-mode seeds past a queued submission; each field is fenced on the value and mode it was planned from. */
   | { type: 'advanceSeedFields'; advances: readonly WorkflowSeedFieldAdvance[] }
   | { type: 'addEdge'; edge: WorkflowEdge }
-  /** Replaces `edgeId` with `edge` as one undoable step (dragging an edge end to a new handle). */
   | { type: 'reconnectEdge'; edgeId: string; edge: WorkflowEdge }
   | { type: 'removeEdges'; edgeIds: string[] }
   | { type: 'exposeField'; fieldIdentifier: FieldIdentifier }
@@ -811,8 +832,7 @@ const getUndoMergeKey = (action: ProjectGraphAction): string | undefined => {
     case 'setFieldLabel':
       return `${action.type}:${action.nodeId}:${action.fieldName}`;
     case 'setFieldValue':
-      // Typed text and dragged numbers stream, as do the rows of a scalar list; a pick (model, board,
-      // switch, image list) is one step of its own.
+      // Typing and dragging stream; a pick (model, board, switch, image list) is its own step.
       if (action.fieldName === 'workflow_id') {
         return undefined;
       }
@@ -821,7 +841,6 @@ const getUndoMergeKey = (action: ProjectGraphAction): string | undefined => {
         return `${action.type}:${action.nodeId}:${action.fieldName}`;
       }
 
-      // Generator settings are typed too; switching the variant starts a new step.
       const variant = getGeneratorVariant(action.value);
 
       return variant ? `${action.type}:${action.nodeId}:${action.fieldName}:${variant}` : undefined;
@@ -940,8 +959,7 @@ const applyProjectGraphAction = (document: ProjectGraphState, action: ProjectGra
         return document;
       }
 
-      // Guard against id collisions (a stale paste after an undo): existing
-      // ids win, incoming duplicates are dropped along with their edges.
+      // Guards id collisions (a stale paste after undo): existing ids win; duplicates drop with their edges.
       const existingNodeIds = new Set(document.nodes.map((node) => node.id));
       const nodes = action.nodes.filter((node) => !existingNodeIds.has(node.id));
 
@@ -957,8 +975,7 @@ const applyProjectGraphAction = (document: ProjectGraphState, action: ProjectGra
       const filledInputs = new Set<string>();
       const edges = action.edges.filter((edge) => {
         const target = acceptedNodesById.get(edge.target);
-        // Pasted nodes can be fed by nodes already in the document (paste with connections), but never by an
-        // existing node that merely shares a dropped duplicate's id, and never by a node that no longer exists.
+        // Pasted nodes may be fed by existing nodes, never by one that only shares a dropped duplicate's id or is gone.
         const sourceExists =
           acceptedNodesById.has(edge.source) || (existingNodeIds.has(edge.source) && !droppedNodeIds.has(edge.source));
 
@@ -1324,9 +1341,6 @@ const applyProjectGraphAction = (document: ProjectGraphState, action: ProjectGra
   }
 };
 
-// #endregion
-
-/** Ordered, render-ready view of the form tree starting at the root. */
 export const getFormChildren = (form: WorkflowForm, containerId?: string): WorkflowFormElement[] => {
   const container = form.elements[containerId ?? form.rootElementId];
 

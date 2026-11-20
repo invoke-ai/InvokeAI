@@ -21,7 +21,6 @@ vi.mock('./useProjectCardActions', () => ({
   }),
 }));
 
-// The host owns the lazy mount and the threading of the user's choice; the dialog's own behaviour has its own test.
 vi.mock('@workbench/projects/components/DeleteProjectDialog', () => ({
   DeleteProjectDialog: ({
     isOpen,
@@ -60,7 +59,6 @@ const { ProjectActionsMenuProvider, useProjectActionsMenu, useProjectActionsMenu
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-// The delete dialog reads the board list to say what happens to the project's boards.
 const queryClient = new QueryClient();
 
 const makeSummary = (id: string): ProjectSummary =>
@@ -75,7 +73,6 @@ const makeSummary = (id: string): ProjectSummary =>
 
 const NOOP_TOGGLE_PIN = () => {};
 
-/** The card shape the launchpad project cards share: right-click anchor plus a dots trigger. */
 const Card = ({ id }: { id: string }) => {
   const menu = useProjectActionsMenu();
   const summary = useMemo(() => makeSummary(id), [id]);
@@ -222,7 +219,6 @@ describe('ProjectActionsMenuHost', () => {
     await act(() => userEvent.click(item));
 
     expect(peekIntermediatesFocus()).toEqual({ projectId: 'one' });
-    // Revealing the manager's entry puts focus in it on the page.
     expect(navigate).toHaveBeenCalledWith({
       params: { section: 'intermediates' },
       search: { setting: 'intermediatesManager' },
@@ -232,8 +228,6 @@ describe('ProjectActionsMenuHost', () => {
   });
 
   it('moves the one menu across cards instead of racing sibling layers', async () => {
-    // A single host prevents Zag from treating the next card's menu as nested under the still-closing previous
-    // menu.
     host = document.createElement('div');
     document.body.append(host);
     root = createRoot(host);
@@ -266,12 +260,10 @@ describe('ProjectActionsMenuHost', () => {
     expect(dotsButton('one').getAttribute('aria-expanded')).toBe('false');
     expect(dotsButton('two').getAttribute('aria-expanded')).toBe('true');
 
-    // Re-right-clicking the open card's own body keeps its menu open too.
     await rightClick(cardTwo);
     expect(openMenus()).toHaveLength(1);
     expect(dotsButton('two').getAttribute('aria-expanded')).toBe('true');
 
-    // A second dots click closes; pointerdown dismissal must not cause click to reopen.
     await leftClick(dotsButton('one'));
     expect(openMenus()).toHaveLength(1);
     expect(dotsButton('one').getAttribute('aria-expanded')).toBe('true');

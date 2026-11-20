@@ -21,15 +21,11 @@ import {
   isInvocationNode,
 } from './types';
 
-/**
- * Round-trip legacy WorkflowV3 files, metadata, and library records; recover unknown elements and dangling edges
- * as warnings.
- */
+/** Round-trips legacy WorkflowV3 files; unknown elements and dangling edges recover as warnings. */
 
 const zXYPosition = z.object({ x: z.number().catch(0), y: z.number().catch(0) }).catch({ x: 0, y: 0 });
 
-// Legacy schemas strip seedMode; reimport then defaults to fixed rather than treating the missing extension as
-// corruption.
+// Legacy schemas strip seedMode; a reimport defaults to fixed instead of treating it as corruption.
 const zFieldInstance = z.object({
   description: z.string().optional().catch(undefined),
   descriptionOverride: z.boolean().optional().catch(undefined),
@@ -157,8 +153,7 @@ const zFormElement = z.discriminatedUnion('type', [
         fieldIdentifier: zFieldIdentifier,
         showDescription: z.boolean().catch(false),
         showShuffle: z.boolean().optional(),
-        // The legacy editor keeps its per-element settings (component, bounds, shuffle) here; they
-        // are carried through untouched so a workflow saved from webv2 still opens the same there.
+        // The legacy editor's per-element settings, carried untouched so a webv2 save still opens the same there.
         settings: z.looseObject({ showShuffle: z.boolean().optional() }).optional(),
       })
       .transform(({ settings, showShuffle, ...data }) => ({
@@ -195,8 +190,7 @@ const zWorkflowJson = z.looseObject({
   description: z.string().catch(''),
   edges: z.array(z.unknown()).catch([]),
   exposedFields: z.array(zFieldIdentifier).catch([]),
-  // Workflows that predate the form builder store `form: null`; a malformed
-  // form also degrades to "absent" rather than failing the whole parse.
+  // Pre-form-builder workflows store `form: null`; a malformed form also degrades to absent.
   form: z
     .object({
       elements: z.record(z.string(), z.unknown()),
@@ -268,7 +262,6 @@ const parseForm = (
     }
   }
 
-  // Drop node-field elements that point at nodes which did not survive parsing.
   for (const element of Object.values(form.elements)) {
     if (element.type !== 'node-field' || nodeIds.has(element.data.fieldIdentifier.nodeId)) {
       continue;
@@ -435,10 +428,7 @@ export const parseWorkflowJson = (raw: unknown): ParsedWorkflow => {
   return { document, warnings };
 };
 
-/**
- * A load's warnings as the one notice it shows: each distinct warning once, in the order first seen, with a count when
- * it repeats (a file with many unrecognized nodes says so once). Null when there is nothing to say.
- */
+/** Each distinct warning once, in first-seen order with a repeat count; null when there is nothing to say. */
 export const summarizeWorkflowLoadWarnings = (warnings: readonly string[]): string | null => {
   const counts = new Map<string, number>();
 
@@ -468,11 +458,8 @@ const serializeInvocationNode = (node: Extract<WorkflowNode, { type: 'invocation
 };
 
 /**
- * A Call Saved Workflow node that is still switching (`callSavedWorkflowFieldsFrom`) holds the previous workflow's
- * dynamic inputs under the new selection. The JSON has no switch state, so a reopen would treat those inputs as the
- * selection's own: a refresh keeps their values and a failed load keeps their connections. A portable document
- * therefore writes such a node as a fresh selection: no dynamic inputs, templates, connections or form fields, which a
- * reopen builds from the selected workflow itself.
+ * A Call Saved Workflow node still switching holds the previous workflow's dynamic inputs, which JSON cannot mark, so
+ * it is written as a fresh selection that a reopen rebuilds from the selected workflow.
  */
 const toPortableDocument = (document: ProjectGraphState): ProjectGraphState =>
   document.nodes.reduce(
@@ -483,10 +470,7 @@ const toPortableDocument = (document: ProjectGraphState): ProjectGraphState =>
     document
   );
 
-/**
- * Serializes the document to legacy WorkflowV3 JSON (loadable by the v6 editor and the library backend). The JSON
- * carries a library record id only when the caller names one: a portable file or a new template has none.
- */
+/** Legacy WorkflowV3 JSON; carries a library record id only when the caller names one. */
 export const serializeWorkflowJson = (
   source: ProjectGraphState,
   options: { libraryWorkflowId?: string } = {}
@@ -529,14 +513,11 @@ export const serializeWorkflowJson = (
   };
 };
 
-/** True when the legacy WorkflowWithoutID schema can accept the workflow's output contract. */
+/** True when the workflow has more than one return node, which the legacy WorkflowWithoutID schema cannot accept. */
 export const hasMultipleWorkflowReturnNodes = (document: ProjectGraphState): boolean =>
   document.nodes.filter((node) => node.type === 'invocation' && node.data.type === 'workflow_return').length > 1;
 
-/**
- * Exclude runtime templates and current-image decorations from submitted workflow metadata while preserving
- * recallable loop links.
- */
+/** Leaves out runtime templates and current-image decorations, keeping recallable loop links. */
 export const serializeWorkflowJsonForSubmission = (document: ProjectGraphState): Record<string, unknown> => {
   const serialized = serializeWorkflowJson(document);
   const currentImageNodeIds = new Set(

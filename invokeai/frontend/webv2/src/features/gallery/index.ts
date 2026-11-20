@@ -66,6 +66,9 @@ import {
   uploadGalleryVideo,
 } from './data/backend';
 
+/** The most media names one gallery request may carry; the gallery's own transports batch past it. */
+export { GALLERY_REQUEST_MAX_NAMES } from './data/backend';
+
 /** Resolve backend Gallery images without exposing transport DTOs or endpoints. */
 export const galleryImages = {
   metadata: getGalleryImageMetadata,
@@ -212,8 +215,7 @@ const mutateGalleryItems = async (
 };
 
 /**
- * Mixed-media organization transport. Results contain only backend-confirmed
- * refs and do not patch caches, invalidate queries, or notify.
+ * Mixed-media organization transport: backend-confirmed refs only, with no cache patches, invalidation or notices.
  */
 export const galleryItemOrganization = {
   delete: (refs: readonly ItemRef[], signal?: AbortSignal): Promise<ConfirmedGalleryItemMutationResult> =>

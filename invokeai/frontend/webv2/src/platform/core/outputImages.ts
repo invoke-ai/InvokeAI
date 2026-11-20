@@ -1,9 +1,8 @@
 /**
  * Shared adapter from backend invocation-output contracts to image names.
  *
- * This deliberately understands only the output shapes owned by the backend
- * contract. It is not a general object walker: metadata and invocation inputs
- * may contain images, but they are not outputs.
+ * This deliberately understands only the output shapes owned by the backend contract. It is not a general object
+ * walker: metadata and invocation inputs may contain images, but they are not outputs.
  */
 type ImageNameVisitor = (imageName: string) => boolean;
 

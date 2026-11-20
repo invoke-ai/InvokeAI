@@ -1,4 +1,5 @@
 import type {
+  GalleryImageItem,
   GalleryItem,
   GalleryItemKey,
   GalleryItemRef,
@@ -20,7 +21,12 @@ import {
 } from '@features/gallery/contracts';
 import { getGalleryItemDragData, getGalleryItemDragId } from '@features/gallery/utility';
 import { getAuthSession, refreshProtectedMediaCookie } from '@features/identity';
-import { useActiveProgressTargets, useProgressImage, useQueueItemProgress } from '@features/queue/react';
+import {
+  useActiveProgressTargets,
+  useItemProgress,
+  useProgressImage,
+  useQueueItemProgress,
+} from '@features/queue/react';
 import {
   CURRENT_IMAGE_DEFAULT_HEIGHT,
   CURRENT_IMAGE_DEFAULT_WIDTH,
@@ -33,7 +39,11 @@ import {
   useIsWorkflowImageExport,
 } from '@features/workflow/ui/nodeChrome';
 import { useProjectGraphCommands } from '@features/workflow/ui/useProjectGraphCommands';
-import { useWorkflowNotifications, useWorkflowProjectSelector } from '@features/workflow/ui/WorkflowUiContext';
+import {
+  useWorkflowNotifications,
+  useWorkflowProjectSelector,
+  useWorkflowUi,
+} from '@features/workflow/ui/WorkflowUiContext';
 import { canCopyImage, copyImage } from '@platform/browser/clipboard';
 import { Button, IconButton } from '@platform/ui/Button';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
@@ -49,13 +59,16 @@ import {
   memo,
   Suspense,
   useCallback,
+  useId,
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type CSSProperties,
   type KeyboardEvent,
   type MouseEvent,
   type PointerEvent,
+  type ReactNode,
 } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -98,15 +111,57 @@ interface ResizeDragSession {
   zoom: number;
 }
 
-/**
- * Pair the displayed live frame's queue item with its progress percentage so concurrent runs never mix
- * one run's preview image with another run's percentage; fall back to the first active target before
- * any frame arrives.
- */
-export const resolveProgressQueueItemId = (
+// Match the displayed frame's target or oldest active target within the displayed project.
+export const resolveProgressTarget = (
   progressImage: LatestProgressImageSnapshot | null | undefined,
-  activeTargets: readonly { queueItemId: string }[]
-): string => progressImage?.target?.queueItemId ?? activeTargets[0]?.queueItemId ?? '';
+  activeTargets: readonly { itemIndex: number; queueItemId: string }[],
+  projectQueueItemIds?: ReadonlySet<string> | null
+): { itemIndex: number; queueItemId: string } | null => {
+  const matchesProject = (queueItemId: string): boolean => !projectQueueItemIds || projectQueueItemIds.has(queueItemId);
+  const frameTarget = progressImage?.target;
+  if (frameTarget && matchesProject(frameTarget.queueItemId)) {
+    return frameTarget;
+  }
+  return activeTargets.find((target) => matchesProject(target.queueItemId)) ?? null;
+};
+
+// Resolve the 1-based batch slot's backend item ID for per-slot progress lookup.
+export const resolveActiveBackendItemId = (
+  activeTarget: { itemIndex: number; queueItemId: string } | null,
+  projectQueueItemsById: ReadonlyMap<string, { backendItemIds?: readonly number[]; id: string }> | null
+): number | null => {
+  if (!activeTarget || activeTarget.itemIndex <= 0 || !projectQueueItemsById) {
+    return null;
+  }
+  return projectQueueItemsById.get(activeTarget.queueItemId)?.backendItemIds?.[activeTarget.itemIndex - 1] ?? null;
+};
+
+// Pair percentage with the displayed batch slot so another slot's progress never labels this frame.
+export const resolveProgressPercentage = ({
+  activeProgress,
+  activeTarget,
+  slotProgressPercentage,
+}: {
+  activeProgress: { activeItemIndex?: number; percentage: number | null } | null | undefined;
+  activeTarget: { itemIndex: number; queueItemId: string } | null;
+  slotProgressPercentage?: number | null;
+}): number | null => {
+  if (slotProgressPercentage !== undefined) {
+    return slotProgressPercentage;
+  }
+  if (!activeProgress) {
+    return null;
+  }
+  if (
+    activeProgress.activeItemIndex !== undefined &&
+    activeTarget !== null &&
+    activeTarget.itemIndex > 0 &&
+    activeProgress.activeItemIndex !== activeTarget.itemIndex
+  ) {
+    return null;
+  }
+  return activeProgress.percentage;
+};
 
 export interface CurrentImageExecutionState {
   dragRef: GalleryItemRef | null;
@@ -117,10 +172,7 @@ export interface CurrentImageExecutionState {
   progressPercent: number | null;
 }
 
-/**
- * Separate active backend execution (`progressImage` or `activeTargetCount > 0`) from queued/pending workflow runs
- * (`isWorkflowRunning`), so waiting jobs never hide usable media or remove the drag handle.
- */
+// Keep queued workflow runs in Waiting until a job owned by this project is actively executing.
 export const resolveCurrentImageExecutionState = ({
   activeTargetCount,
   displayedItem,
@@ -149,13 +201,11 @@ export const resolveCurrentImageExecutionState = ({
 
 export interface VideoErrorRecovery {
   handleError(video: HTMLVideoElement | null, isElementCurrent: () => boolean): void;
+  rearm(): void;
   retry(video: HTMLVideoElement | null): void;
 }
 
-/**
- * Match PreviewFrame's protected-media video recovery: refresh the media cookie once per load attempt, guard against
- * stale element or account changes while refreshing, and expose manual retry when loading still fails.
- */
+// Refresh the protected-media cookie once per load attempt before surfacing manual retry.
 export const createVideoErrorRecovery = ({
   getAccountEpoch,
   onFailedChange,
@@ -204,6 +254,11 @@ export const createVideoErrorRecovery = ({
 
       void refresh.then(finishRefresh, () => finishRefresh(false));
     },
+    rearm() {
+      automaticRefreshUsed = false;
+      pendingRefresh = null;
+      onFailedChange(false);
+    },
     retry(video) {
       if (!video) {
         return;
@@ -228,6 +283,18 @@ const resolveDisplayedGalleryItem = (values: Record<string, unknown>): GalleryIt
 
   return latest ? legacyGeneratedImageToGalleryItem(latest) : null;
 };
+
+const isSameDisplayedGalleryItem = (a: GalleryItem | null, b: GalleryItem | null): boolean =>
+  a === b ||
+  (a !== null &&
+    b !== null &&
+    a.kind === b.kind &&
+    a.name === b.name &&
+    a.fullUrl === b.fullUrl &&
+    a.thumbnailUrl === b.thumbnailUrl &&
+    a.width === b.width &&
+    a.height === b.height &&
+    (a.kind !== 'video' || b.kind !== 'video' || a.fps === b.fps));
 
 const isVideoFrameReady = (video: HTMLVideoElement | null): video is HTMLVideoElement =>
   Boolean(
@@ -254,41 +321,125 @@ const seekVideo = (video: HTMLVideoElement, seconds: number): void => {
   }
 };
 
+// Pointer drags only, as Preview's frame: no tab stop or button role so the canvas keeps its own keys.
+const DraggableCurrentImage = ({ children, image }: { children: ReactNode; image: GalleryImageItem | null }) => {
+  const disabledId = useId();
+  const dragData = useMemo(
+    () => (image ? getGalleryItemDragData([{ kind: 'image', name: image.name }]) : undefined),
+    [image]
+  );
+  const { listeners, setNodeRef } = useDraggable({
+    data: dragData,
+    disabled: !image,
+    id: image
+      ? getGalleryItemDragId({ kind: 'image', name: image.name }, 'workflow-current-image', disabledId)
+      : `workflow-current-image:disabled:${disabledId}`,
+  });
+
+  return (
+    <Box ref={setNodeRef} className="nodrag" cursor={image ? 'grab' : undefined} h="full" w="full" {...listeners}>
+      {children}
+    </Box>
+  );
+};
+
 const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNodeType>) => {
   const { t } = useTranslation();
   const { editGraph } = useProjectGraphCommands();
   const notifications = useWorkflowNotifications();
-  const galleryValues = useWorkflowProjectSelector((project) => project.galleryValues);
+  const { nodeExecution } = useWorkflowUi();
+  // Select only the shown media item so unrelated gallery changes (board filter, page, scroll) do not re-render.
+  const displayedItem = useWorkflowProjectSelector(
+    (project) => resolveDisplayedGalleryItem(project.galleryValues),
+    isSameDisplayedGalleryItem
+  );
+  const projectId = useWorkflowProjectSelector((project) => project.id);
   const isWorkflowRunning = useWorkflowProjectSelector((project) => project.isWorkflowRunning);
+  const queueItems = useWorkflowProjectSelector((project) => project.queueItems);
+  const getOriginProjectId = useCallback(() => nodeExecution.getOrigin()?.projectId ?? null, [nodeExecution]);
+  const originProjectId = useSyncExternalStore(nodeExecution.subscribeOrigin, getOriginProjectId, getOriginProjectId);
+
   const progressImage = useProgressImage();
   const activeTargets = useActiveProgressTargets();
 
-  const activeQueueItemId = resolveProgressQueueItemId(progressImage, activeTargets);
-  const activeProgress = useQueueItemProgress(activeQueueItemId);
+  const isOriginInProject = originProjectId === null || originProjectId === projectId;
+  const projectQueueItemsById = useMemo(
+    () => (queueItems ? new Map(queueItems.map((item) => [item.id, item])) : null),
+    [queueItems]
+  );
+  const projectQueueItemIds = useMemo(
+    () => (projectQueueItemsById ? new Set(projectQueueItemsById.keys()) : null),
+    [projectQueueItemsById]
+  );
 
-  const displayedItem = useMemo(() => resolveDisplayedGalleryItem(galleryValues), [galleryValues]);
+  // When project queue items are known, match by item ID directly; use nodeExecution origin only as a fallback.
+  const projectActiveTargets = useMemo(() => {
+    if (projectQueueItemIds) {
+      return activeTargets.filter((target) => projectQueueItemIds.has(target.queueItemId));
+    }
+    return isOriginInProject ? activeTargets : [];
+  }, [activeTargets, isOriginInProject, projectQueueItemIds]);
+
+  const projectProgressImage = useMemo(() => {
+    if (!progressImage) {
+      return null;
+    }
+    if (projectQueueItemIds) {
+      return progressImage.target
+        ? projectQueueItemIds.has(progressImage.target.queueItemId)
+          ? progressImage
+          : null
+        : projectActiveTargets.length > 0
+          ? progressImage
+          : null;
+    }
+    return isOriginInProject ? progressImage : null;
+  }, [isOriginInProject, progressImage, projectActiveTargets.length, projectQueueItemIds]);
+
+  const activeTarget = useMemo(
+    () => resolveProgressTarget(projectProgressImage, projectActiveTargets, projectQueueItemIds),
+    [projectActiveTargets, projectProgressImage, projectQueueItemIds]
+  );
+  const activeBackendItemId = useMemo(
+    () => resolveActiveBackendItemId(activeTarget, projectQueueItemsById),
+    [activeTarget, projectQueueItemsById]
+  );
+
+  const activeProgress = useQueueItemProgress(activeTarget?.queueItemId ?? '');
+  const slotProgress = useItemProgress(activeBackendItemId);
+  const progressPercentage = useMemo(
+    () =>
+      resolveProgressPercentage({
+        activeProgress,
+        activeTarget,
+        slotProgressPercentage: slotProgress?.percentage,
+      }),
+    [activeProgress, activeTarget, slotProgress?.percentage]
+  );
+
   const displayedItemKey = useMemo(() => (displayedItem ? toGalleryItemKey(displayedItem) : null), [displayedItem]);
-  const { dragRef, isGenerating, isShowingVideo, isWaiting, progressPercent } = useMemo(
+  const { dragRef, hasLiveFrame, isGenerating, isShowingVideo, isWaiting, progressPercent } = useMemo(
     () =>
       resolveCurrentImageExecutionState({
-        activeTargetCount: activeTargets.length,
+        activeTargetCount: projectActiveTargets.length,
         displayedItem,
         isWorkflowRunning,
-        progressImage,
-        progressPercentage: activeProgress?.percentage,
+        progressImage: projectProgressImage,
+        progressPercentage,
       }),
-    [activeProgress?.percentage, activeTargets.length, displayedItem, isWorkflowRunning, progressImage]
+    [displayedItem, isWorkflowRunning, progressPercentage, projectActiveTargets.length, projectProgressImage]
   );
 
   const node = data.documentNode;
-  const savedWidth = node.data.width ?? CURRENT_IMAGE_DEFAULT_WIDTH;
-  const savedHeight = node.data.height ?? CURRENT_IMAGE_DEFAULT_HEIGHT;
+  const savedWidth = clampCurrentImageWidth(node.data.width);
+  const savedHeight = clampCurrentImageHeight(node.data.height);
   const [liveSize, setLiveSize] = useState<{ height: number; width: number } | null>(null);
   const displayWidth = liveSize?.width ?? savedWidth;
   const displayHeight = liveSize?.height ?? savedHeight;
   const isCustomSize = displayWidth !== CURRENT_IMAGE_DEFAULT_WIDTH || displayHeight !== CURRENT_IMAGE_DEFAULT_HEIGHT;
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const resizeHandleRef = useRef<HTMLDivElement | null>(null);
   const [copyReadyVideoKey, setCopyReadyVideoKey] = useState<GalleryItemKey | null>(null);
   const canCopyVideoFrame = isShowingVideo && displayedItemKey !== null && copyReadyVideoKey === displayedItemKey;
   const dragSessionRef = useRef<ResizeDragSession | null>(null);
@@ -379,6 +530,7 @@ const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNo
       event.stopPropagation();
       setLiveSize(null);
       editGraph({ height: undefined, nodeId: node.id, type: 'setCurrentImageNodeSize', width: undefined });
+      resizeHandleRef.current?.focus();
     },
     [editGraph, node.id]
   );
@@ -468,22 +620,28 @@ const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNo
     [editGraph, node.id, resetSize, savedHeight, savedWidth]
   );
 
+  const title = node.data.label || t('widgets.workflow.addNodeDialog.currentImageTitle');
+  const draggableImage = !hasLiveFrame && displayedItem && isGalleryImageItem(displayedItem) ? displayedItem : null;
   const fallbackImage = useMemo(
     () =>
       displayedItem && isGalleryImageItem(displayedItem)
         ? imageUrlToStreamingSource({
-            alt: displayedItem.name,
+            alt: displayedItem.name || title,
             height: displayedItem.height,
             kind: 'fallback',
             src: displayedItem.fullUrl,
             width: displayedItem.width,
           })
         : null,
-    [displayedItem]
+    [displayedItem, title]
   );
-  const liveImage = useMemo(() => progressImageToStreamingSource(progressImage), [progressImage]);
+  const liveImage = useMemo(() => progressImageToStreamingSource(projectProgressImage), [projectProgressImage]);
 
   const resizeLabel = t('widgets.workflow.currentImageResizeHandle', {
+    height: displayHeight,
+    width: displayWidth,
+  });
+  const resetSizeLabel = t('widgets.workflow.currentImageResetSize', {
     height: displayHeight,
     width: displayWidth,
   });
@@ -492,19 +650,16 @@ const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNo
     <Box
       data-is-selected={selected}
       data-workflow-node-shell="true"
+      display="flex"
+      flexDirection="column"
+      h={`${displayHeight}px`}
       overflow="hidden"
       position="relative"
       w={`${displayWidth}px`}
       {...getWorkflowNodeShellProps({ selected })}
     >
-      <Flex {...getWorkflowNodeHeaderProps()} gap="1.5">
-        <MiddleTruncate
-          flex="1"
-          fontSize="lg"
-          fontWeight="700"
-          minW="0"
-          text={node.data.label || t('widgets.workflow.addNodeDialog.currentImageTitle')}
-        />
+      <Flex {...getWorkflowNodeHeaderProps()} flexShrink={0} gap="1.5">
+        <MiddleTruncate flex="1" fontWeight="600" minW="0" text={title} />
         <HStack className="nodrag nopan" flexShrink={0} gap="1" ms="auto">
           {isGenerating ? (
             <Text color="brand.solid" data-node-status-indicator="true" fontSize="xs" fontVariantNumeric="tabular-nums">
@@ -533,9 +688,9 @@ const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNo
             </Tooltip>
           ) : null}
           {isCustomSize ? (
-            <Tooltip content={resizeLabel}>
+            <Tooltip content={resetSizeLabel}>
               <Button
-                aria-label={resizeLabel}
+                aria-label={resetSizeLabel}
                 color="fg.muted"
                 data-testid="current-image-node-reset-size"
                 fontSize="xs"
@@ -555,7 +710,15 @@ const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNo
       </Flex>
 
       {isGenerating ? (
-        <Box bg="bg.muted" data-node-progress-strip="true" h="2px" overflow="hidden" position="relative" w="full">
+        <Box
+          bg="bg.muted"
+          data-node-progress-strip="true"
+          flexShrink={0}
+          h="2px"
+          overflow="hidden"
+          position="relative"
+          w="full"
+        >
           <Box
             animationDuration={progressPercent === null ? 'var(--wb-motion-duration-slow)' : undefined}
             animationIterationCount={
@@ -570,7 +733,7 @@ const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNo
         </Box>
       ) : null}
 
-      <Box h={`${displayHeight}px`} overflow="hidden" position="relative" w="full">
+      <Box flex="1" minH="0" overflow="hidden" position="relative" w="full">
         {isShowingVideo && displayedItem?.kind === 'video' && displayedItemKey ? (
           <CurrentImageVideoSurface
             key={displayedItemKey}
@@ -580,14 +743,18 @@ const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNo
             onVideoElementChange={handleVideoElementChange}
           />
         ) : (
-          <StreamingImageFrame fallbackImage={fallbackImage} fit="contain" h="full" liveImage={liveImage} w="full">
-            <Flex align="center" color="fg.subtle" fontSize="xs" h="full" justify="center" px="4" textAlign="center">
-              {t('widgets.workflow.currentImageEmpty')}
-            </Flex>
-          </StreamingImageFrame>
+          <DraggableCurrentImage image={draggableImage}>
+            <StreamingImageFrame fallbackImage={fallbackImage} fit="contain" h="full" liveImage={liveImage} w="full">
+              <Flex align="center" color="fg.subtle" fontSize="xs" h="full" justify="center" px="4" textAlign="center">
+                {t('widgets.workflow.currentImageEmpty')}
+              </Flex>
+            </StreamingImageFrame>
+          </DraggableCurrentImage>
         )}
 
-        {dragRef ? <CurrentMediaDragGrip itemRef={dragRef} nodeId={node.id} /> : null}
+        {isShowingVideo && dragRef?.kind === 'video' ? (
+          <CurrentMediaDragGrip itemRef={dragRef} nodeId={node.id} />
+        ) : null}
 
         {isGenerating ? (
           <Flex
@@ -608,7 +775,6 @@ const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNo
             zIndex="1"
           >
             {progressPercent === null ? (
-              // Reuse Chakra's Spinner so reduced-motion CSS slows it instead of bypassing app motion settings.
               <Spinner borderWidth="2px" boxSize="3.5" />
             ) : (
               <ProgressCircle.Root size="xs" value={progressPercent}>
@@ -627,9 +793,10 @@ const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNo
         ) : null}
       </Box>
 
-      {/* Dedicated footer strip keeps the resize grip completely clear of VideoPlayer's Fullscreen control. */}
-      <Flex align="center" bg="bg.subtle" borderTopWidth="1px" h="3.5" justify="end" px="1" w="full">
+      {/* Dedicated footer strip keeps the resize grip clear of VideoPlayer's Fullscreen control. */}
+      <Flex align="center" bg="bg.subtle" borderTopWidth="1px" flexShrink={0} h="3.5" justify="end" px="1" w="full">
         <Box
+          ref={resizeHandleRef}
           _focusVisible={RESIZE_FOCUS_VISIBLE_STYLE}
           _hover={RESIZE_HOVER_STYLE}
           aria-label={resizeLabel}
@@ -710,6 +877,11 @@ const CurrentImageVideoSurface = ({
     publishCopyAvailability();
     const video = localVideoRef.current;
     recovery.handleError(video, () => localVideoRef.current === video);
+  }, [publishCopyAvailability, recovery]);
+
+  const handleLoadedData = useCallback(() => {
+    recovery.rearm();
+    publishCopyAvailability();
   }, [publishCopyAvailability, recovery]);
 
   const handleLoadedMetadata = useCallback(() => {
@@ -798,7 +970,7 @@ const CurrentImageVideoSurface = ({
           onCanPlay={publishCopyAvailability}
           onEmptied={publishCopyAvailability}
           onError={handleVideoError}
-          onLoadedData={publishCopyAvailability}
+          onLoadedData={handleLoadedData}
           onLoadedMetadata={handleLoadedMetadata}
           onPlaying={publishCopyAvailability}
           onResize={publishCopyAvailability}
@@ -815,9 +987,9 @@ const CurrentMediaDragGrip = ({ itemRef, nodeId }: { itemRef: GalleryItemRef; no
   const dragData = useMemo(() => getGalleryItemDragData([itemRef]), [itemRef]);
   const { isDragging, listeners, setNodeRef } = useDraggable({
     data: dragData,
-    id: getGalleryItemDragId(itemRef, 'preview-frame', `current-image-${nodeId}`),
+    id: getGalleryItemDragId(itemRef, 'workflow-current-image', nodeId),
   });
-  const label = itemRef.kind === 'video' ? t('widgets.preview.dragVideo') : t('widgets.workflow.currentImageDragImage');
+  const label = t('widgets.preview.dragVideo');
 
   return (
     <Tooltip content={label}>
@@ -845,7 +1017,7 @@ const CurrentMediaDragGrip = ({ itemRef, nodeId }: { itemRef: GalleryItemRef; no
 const CurrentImageSnapshotNode = ({ data, selected }: NodeProps<CurrentImageFlowNodeType>) => {
   const { t } = useTranslation();
   const node = data.documentNode;
-  const width = node.data.width ?? CURRENT_IMAGE_DEFAULT_WIDTH;
+  const width = clampCurrentImageWidth(node.data.width);
 
   return (
     <Box
@@ -859,8 +1031,7 @@ const CurrentImageSnapshotNode = ({ data, selected }: NodeProps<CurrentImageFlow
           data-workflow-export-node-title="true"
           data-workflow-export-static-node-content="true"
           flex="1"
-          fontSize="lg"
-          fontWeight="700"
+          fontWeight="600"
           minW="0"
           text={node.data.label || t('widgets.workflow.addNodeDialog.currentImageTitle')}
         />

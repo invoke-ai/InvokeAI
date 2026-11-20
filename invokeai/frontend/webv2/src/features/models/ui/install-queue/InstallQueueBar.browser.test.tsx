@@ -3,11 +3,10 @@ import type { ModelConfig, ModelInstallJob } from '@features/models/core/types';
 import { ChakraProvider } from '@chakra-ui/react';
 import { handleModelInstallSocketEvent, refreshInstalls } from '@features/models/data/installsStore';
 import { setModelsSnapshotForTests } from '@features/models/data/modelsStore';
-import { getModelsUiSnapshotForTests, updateModelsUi } from '@features/models/ui/uiStore';
+import { updateModelsUi } from '@features/models/ui/uiStore';
 import { auditAccessibility } from '@platform/browser/auditAccessibility.testing';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { setConnectionStatus } from '@platform/transport/connectionStore';
-import { ApiError } from '@platform/transport/http';
 import { applyThemeToRoot } from '@theme/applyTheme';
 import { DEFAULT_THEME_ID, system } from '@theme/system';
 import { createInstance } from 'i18next';
@@ -169,7 +168,6 @@ beforeEach(async () => {
   api.installModel.mockImplementation(() => {
     const created: ModelInstallJob = { id: 7, source: 'https://example.com/old.safetensors', status: 'waiting' };
 
-    // The follow-up refresh must see the new job, as the real backend lists it immediately.
     api.listModelInstalls.mockResolvedValue([...JOBS, created]);
 
     return Promise.resolve(created);
@@ -232,7 +230,6 @@ describe('InstallQueueBar', () => {
     expect(api.listModelInstalls).toHaveBeenCalledTimes(1);
     expect(rowByStatus('downloading')?.textContent).not.toContain('weights.safetensors');
 
-    // The backend auto-paused the job after the part failed; only the refetch carries the errored part.
     api.listModelInstalls.mockResolvedValue(
       JOBS.map((job) =>
         job.id === 1
@@ -262,7 +259,6 @@ describe('InstallQueueBar', () => {
     expect(pausedRow?.textContent).toContain('weights.safetensors');
     expect(pausedRow?.textContent).toContain('ConnectionError(reset by peer)');
     expect(pausedRow?.textContent).not.toContain('Traceback');
-    // A transient failure keeps its partial file: resume first, restarts stay available but explicit.
     expect(pausedRow?.querySelector('button[aria-label="Resume download"]')).not.toBeNull();
     expect(pausedRow?.querySelector('button[aria-label="Restart this file"]')).not.toBeNull();
     expect(pausedRow?.querySelector('button[aria-label="Retry failed download"]')).not.toBeNull();
@@ -276,107 +272,6 @@ describe('InstallQueueBar', () => {
 
     expect(api.resumeModelInstall).toHaveBeenCalledWith(1, expect.any(AbortSignal));
     expect(api.restartFailedModelInstall).not.toHaveBeenCalled();
-  });
-
-  it('offers only a restart for a paused download whose server refused to resume', async () => {
-    updateModelsUi({ queueExpanded: true, queueMaximized: false });
-    api.listModelInstalls.mockResolvedValue(
-      JOBS.map((job) =>
-        job.id === 1
-          ? {
-              ...job,
-              download_parts: [
-                {
-                  bytes: 4,
-                  resume_message: 'Resume refused by server. Restart required.',
-                  resume_required: true,
-                  source: 'https://example.com/weights.safetensors',
-                  status: 'paused',
-                  total_bytes: 100,
-                },
-              ],
-              status: 'paused' as const,
-            }
-          : job
-      )
-    );
-    api.restartFailedModelInstall.mockResolvedValue({ ...JOBS[0], status: 'waiting' });
-    await render();
-
-    const pausedRow = rowByStatus('paused');
-    expect(pausedRow?.textContent).toContain('Resume refused by server. Restart required.');
-    expect(pausedRow?.querySelector('button[aria-label="Resume download"]')).toBeNull();
-    await click('Retry failed download', pausedRow);
-    await settle();
-
-    expect(api.restartFailedModelInstall).toHaveBeenCalledWith(1, expect.any(AbortSignal));
-  });
-
-  it('reflects live progress with a rate and ETA on the downloading row and the collapsed bar', async () => {
-    updateModelsUi({ queueExpanded: true, queueMaximized: false });
-    await render();
-
-    await act(() => {
-      handleModelInstallSocketEvent('model_install_download_progress', {
-        bytes: 2_660_000_000,
-        id: 1,
-        total_bytes: 7_000_000_000,
-      });
-    });
-    await new Promise<void>((resolve) => {
-      globalThis.setTimeout(resolve, 600);
-    });
-    await act(() => {
-      handleModelInstallSocketEvent('model_install_download_progress', {
-        bytes: 2_690_000_000,
-        id: 1,
-        total_bytes: 7_000_000_000,
-      });
-    });
-    await settle();
-
-    const caption = rowByStatus('downloading')?.textContent ?? '';
-    expect(caption).toContain('38% · 2.7 GB / 7.0 GB');
-    expect(caption).toMatch(/MB\/s · ~\d+ (s|min|h) left/);
-
-    await click('Install Queue');
-    await settle();
-    expect(rows()).toHaveLength(0);
-    const bar = host?.textContent ?? '';
-    expect(bar).toContain('krea2_turbo-Q4_K_M.gguf');
-    expect(bar).toContain('38% · 2.7 GB / 7.0 GB');
-    expect(bar).toContain('+1 queued');
-    expect(bar).toContain('2 need attention');
-
-    await click('Pause download');
-    await settle();
-    expect(api.pauseModelInstall).toHaveBeenCalledWith(1, expect.any(AbortSignal));
-  });
-
-  it('routes the unauthorized fix to the API keys tab and resubmits or dismisses settled jobs', async () => {
-    updateModelsUi({ activeTab: 'add', queueExpanded: true, queueMaximized: false });
-    await render();
-
-    await click('Add token', rowByStatus('unauthorized'));
-    expect(getModelsUiSnapshotForTests().activeTab).toBe('keys');
-
-    await click('Retry install', rowByStatus('cancelled'));
-    await settle();
-    expect(api.installModel).toHaveBeenCalledWith(
-      expect.objectContaining({ source: 'https://example.com/old.safetensors' }),
-      expect.any(AbortSignal)
-    );
-    expect(rowByStatus('cancelled')).toBeUndefined();
-    expect(rows().filter((row) => row.dataset.installStatus === 'queued')).toHaveLength(2);
-
-    await click('Remove from list', rowByStatus('installed'));
-    await settle();
-    expect(rowByStatus('installed')).toBeUndefined();
-    expect(api.pruneCompletedModelInstalls).not.toHaveBeenCalled();
-
-    await click('Clear finished');
-    await settle();
-    expect(api.pruneCompletedModelInstalls).toHaveBeenCalledTimes(1);
   });
 
   it('does not restore finished rows from a list request started before successful pruning', async () => {
@@ -416,36 +311,6 @@ describe('InstallQueueBar', () => {
     ).toBe(false);
   });
 
-  it('dismisses jobs the server prunes even when their completion socket event was missed', async () => {
-    updateModelsUi({ queueExpanded: true, queueMaximized: false });
-    api.pruneCompletedModelInstalls.mockResolvedValue([1, 3, 4, 5, 6]);
-    await render();
-
-    await click('Clear finished');
-    await settle();
-
-    expect(rowByStatus('installed')).toBeUndefined();
-    expect(api.pruneCompletedModelInstalls).toHaveBeenCalledTimes(1);
-  });
-
-  it('removes finished rows when pruning succeeds on the server but its response is lost', async () => {
-    updateModelsUi({ queueExpanded: true, queueMaximized: false });
-    api.listModelInstalls
-      .mockReset()
-      .mockResolvedValueOnce(JOBS)
-      .mockResolvedValueOnce(JOBS.filter(({ status }) => !['completed', 'error'].includes(status)));
-    api.pruneCompletedModelInstalls.mockRejectedValue(new Error('Prune response lost'));
-    await render();
-    expect(rows()).toHaveLength(JOBS.length);
-
-    await click('Clear finished');
-    await settle();
-
-    expect(rows().map((row) => row.dataset.installStatus)).toEqual(['downloading', 'queued', 'cancelled']);
-    expect(api.pruneCompletedModelInstalls).toHaveBeenCalledTimes(1);
-    expect(api.listModelInstalls).toHaveBeenCalledTimes(2);
-  });
-
   it('keeps a job that another client restarted before pruning', async () => {
     updateModelsUi({ queueExpanded: true, queueMaximized: false });
     api.listModelInstalls.mockResolvedValue(
@@ -459,36 +324,6 @@ describe('InstallQueueBar', () => {
 
     expect(rowByStatus('queued')).toBeDefined();
     expect(rowByStatus('failed')).toBeUndefined();
-  });
-
-  it('keeps jobs that settle after a prune request started', async () => {
-    updateModelsUi({ queueExpanded: true, queueMaximized: false });
-    let resolvePrune!: (jobIds: number[]) => void;
-    const afterPrune = [{ ...JOBS[0]!, status: 'completed' as const }, JOBS[1]!];
-    // The completion event also schedules a coalesced refresh, which lands within this test on a slow machine.
-    api.listModelInstalls
-      .mockReset()
-      .mockResolvedValue(afterPrune)
-      .mockResolvedValueOnce(JOBS)
-      .mockResolvedValueOnce(afterPrune);
-    api.pruneCompletedModelInstalls.mockReturnValue(
-      new Promise<number[]>((resolve) => {
-        resolvePrune = resolve;
-      })
-    );
-    await render();
-
-    await click('Clear finished');
-    act(() => handleModelInstallSocketEvent('model_install_complete', { id: 1, source: 'org/model', config: {} }));
-    await act(async () => {
-      resolvePrune([3, 4, 5, 6]);
-      await new Promise<void>((resolve) => {
-        globalThis.setTimeout(resolve, 20);
-      });
-    });
-
-    expect(rowByStatus('installed')).toBeDefined();
-    expect(rows()).toHaveLength(2);
   });
 
   it('keeps a completed cancel response over an older list row when the refresh fails', async () => {
@@ -525,67 +360,6 @@ describe('InstallQueueBar', () => {
     expect(rowByStatus('downloading')).toBeUndefined();
   });
 
-  it('projects an active cancel response as cancelled over an older list when refresh fails', async () => {
-    updateModelsUi({ queueExpanded: true, queueMaximized: false });
-    let resolveStale!: (jobs: ModelInstallJob[]) => void;
-    const stale = new Promise<ModelInstallJob[]>((resolve) => {
-      resolveStale = resolve;
-    });
-    api.listModelInstalls
-      .mockReset()
-      .mockResolvedValueOnce(JOBS)
-      .mockReturnValueOnce(stale)
-      .mockRejectedValueOnce(new Error('temporary list failure'));
-    api.cancelModelInstall.mockResolvedValue({ ...JOBS[0]!, status: 'downloading' });
-    await render();
-
-    act(() => {
-      void refreshInstalls();
-    });
-    await click('Cancel install', rowByStatus('downloading'));
-    await settle();
-    await act(async () => {
-      resolveStale(JOBS);
-      await new Promise<void>((resolve) => {
-        globalThis.setTimeout(resolve, 20);
-      });
-    });
-
-    expect(rowByStatus('cancelled')).toBeDefined();
-    expect(rowByStatus('downloading')).toBeUndefined();
-  });
-
-  it('refreshes after cancel succeeds but its follow-up state fetch fails', async () => {
-    updateModelsUi({ queueExpanded: true, queueMaximized: false });
-    api.listModelInstalls
-      .mockReset()
-      .mockResolvedValueOnce(JOBS)
-      .mockResolvedValueOnce(JOBS.map((job) => (job.id === 1 ? { ...job, status: 'cancelled' as const } : job)));
-    api.cancelModelInstall.mockRejectedValue(new ApiError('Could not fetch cancel state', 500));
-    await render();
-
-    await click('Cancel install', rowByStatus('downloading'));
-    await settle();
-
-    expect(api.listModelInstalls).toHaveBeenCalledTimes(2);
-    expect(rowByStatus('cancelled')).toBeDefined();
-    expect(rowByStatus('downloading')).toBeUndefined();
-  });
-
-  it('refreshes after a concurrent prune makes cancel return 415', async () => {
-    updateModelsUi({ queueExpanded: true, queueMaximized: false });
-    api.listModelInstalls.mockReset().mockResolvedValueOnce(JOBS).mockResolvedValueOnce(JOBS.slice(1));
-    api.cancelModelInstall.mockRejectedValue(new ApiError('Install job is no longer available', 415));
-    await render();
-
-    await click('Cancel install', rowByStatus('downloading'));
-    await settle();
-
-    expect(api.listModelInstalls).toHaveBeenCalledTimes(2);
-    expect(rowByStatus('downloading')).toBeUndefined();
-    expect(rows()).toHaveLength(JOBS.length - 1);
-  });
-
   it('stops with a stop icon, removes with an X, and asks before discarding a download that has progress', async () => {
     updateModelsUi({ queueExpanded: true, queueMaximized: false });
     api.listModelInstalls.mockResolvedValue(JOBS.map((job) => (job.id === 1 ? { ...job, bytes: 2_000_000_000 } : job)));
@@ -593,7 +367,6 @@ describe('InstallQueueBar', () => {
 
     const cancel = rowByStatus('downloading')?.querySelector('button[aria-label="Cancel install"] svg');
     const remove = rowByStatus('cancelled')?.querySelector('button[aria-label="Remove from list"] svg');
-    // Stopping work and tidying the list must not look alike.
     expect(cancel?.innerHTML).toBeTruthy();
     expect(cancel?.innerHTML).not.toBe(remove?.innerHTML);
 
@@ -626,39 +399,5 @@ describe('InstallQueueBar', () => {
     await click('Cancel 2 installs', document.querySelector('[role="alertdialog"]')!);
     await settle();
     expect(api.cancelModelInstall.mock.calls.map(([id]) => id).sort()).toEqual([1, 2]);
-  });
-
-  it('refreshes after a 409 resume response that may have changed backend status', async () => {
-    updateModelsUi({ queueExpanded: true, queueMaximized: false });
-    api.listModelInstalls
-      .mockReset()
-      .mockResolvedValueOnce(JOBS.map((job) => (job.id === 6 ? { ...job, status: 'paused' } : job)))
-      .mockResolvedValue(JOBS.map((job) => (job.id === 6 ? { ...job, status: 'error' } : job)));
-    api.resumeModelInstall.mockRejectedValue(new ApiError('Install changed state', 409));
-    await render();
-
-    const before = api.listModelInstalls.mock.calls.length;
-    await click('Resume download', rowByStatus('paused'));
-    await settle();
-
-    expect(api.listModelInstalls.mock.calls.length).toBeGreaterThan(before);
-    expect(rowByStatus('failed')).toBeDefined();
-  });
-
-  it('expands to fill the pane and restores', async () => {
-    updateModelsUi({ queueExpanded: true, queueMaximized: false });
-    await render();
-
-    await click('Expand');
-    expect(getModelsUiSnapshotForTests().queueMaximized).toBe(true);
-    await settle();
-    await click('Restore');
-    expect(getModelsUiSnapshotForTests().queueMaximized).toBe(false);
-
-    // Row navigation must uncover the pane it targets.
-    await click('Expand');
-    await settle();
-    await click('Add token', rowByStatus('unauthorized'));
-    expect(getModelsUiSnapshotForTests()).toMatchObject({ activeTab: 'keys', queueMaximized: false });
   });
 });

@@ -52,7 +52,6 @@ const createTransformOptions = () => ({
   pending: { get: () => null, set: vi.fn() },
   reportRefusal: vi.fn(),
   rebaseLineEnd: vi.fn(),
-  restoreCache: vi.fn(),
   select: vi.fn(),
   session: { get: () => null, set: vi.fn() },
   setOverride: vi.fn(),
@@ -67,6 +66,7 @@ const createSelectionPixelOptions = () => ({
   deleteDerived: vi.fn(),
   getDocument: () => null,
   getFillColor: () => '#000',
+  getTransformSessionLayerId: () => null,
   invalidateLayer: vi.fn(),
   isRasterCacheReady: () => true,
   isGestureActive: () => false,
@@ -114,7 +114,6 @@ describe('EditingController', () => {
       transform: createTransformOptions(),
     });
 
-    // The exposed selection records history; floats and document swaps access the underlying state.
     controller.selection.clear();
     expect(selection.clear).toHaveBeenCalledTimes(1);
     controller.discardSelection();

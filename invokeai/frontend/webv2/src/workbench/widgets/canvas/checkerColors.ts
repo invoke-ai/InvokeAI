@@ -1,7 +1,4 @@
-/**
- * Resolve checker semantic tokens through computed probe colors and feed the engine one-way. Use {@link
- * DEFAULT_CHECKER_COLORS} without DOM or usable tokens; changed colors rebuild its cached tile.
- */
+/** Checker tokens resolved through probe colors; `DEFAULT_CHECKER_COLORS` without a DOM or usable tokens. */
 
 import { system } from '@theme/system';
 import { type CheckerColors, DEFAULT_CHECKER_COLORS } from '@workbench/canvas-engine/api';
@@ -15,14 +12,10 @@ const cssVarRef = (token: string): string | null => {
   return varName ? `var(${varName})` : null;
 };
 
-/**
- * Whether a computed color string is usable — a non-empty color that isn't fully
- * transparent (the browser's answer when a var failed to resolve).
- */
+/** Non-empty and not fully transparent, which is what a browser returns when a var fails to resolve. */
 export const isUsableColor = (value: string | null | undefined): value is string =>
   typeof value === 'string' && value.trim() !== '' && value !== 'transparent' && value !== 'rgba(0, 0, 0, 0)';
 
-/** Returns `resolved` when usable, else `fallback`. */
 export const pickCheckerColor = (resolved: string | null | undefined, fallback: string): string =>
   isUsableColor(resolved) ? resolved : fallback;
 

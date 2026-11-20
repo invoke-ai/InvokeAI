@@ -25,8 +25,7 @@ describe('gallery reveal requests', () => {
     expect(listener).toHaveBeenCalledTimes(2);
     expect(first?.itemKey).toBe('image:a.png');
     expect(second?.itemKey).toBe('image:a.png');
-    // The token is what lets a repeated gesture on an unchanged selection
-    // still read as a new reveal.
+    // The token is what lets a repeated gesture on an unchanged selection still read as a new reveal.
     expect(second?.token).not.toBe(first?.token);
 
     unsubscribe();

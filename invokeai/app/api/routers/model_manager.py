@@ -55,6 +55,7 @@ from invokeai.backend.model_manager.configs.main import (
     Main_Checkpoint_SDXL_Config,
     Main_Checkpoint_SDXLRefiner_Config,
 )
+from invokeai.backend.model_manager.configs.roles import role_variant, serves_as
 from invokeai.backend.model_manager.load.fp8_capability import Fp8StorageSupport, fp8_storage_support
 from invokeai.backend.model_manager.load.model_cache.cache_stats import CacheStats
 from invokeai.backend.model_manager.metadata.fetch.huggingface import HuggingFaceMetadataFetch
@@ -174,6 +175,11 @@ class ModelsList(BaseModel):
 class EmptyModelCacheResponse(BaseModel):
     models_cleared: int
     bytes_freed: int
+    vram_release_refused: bool = Field(
+        description="The device refused to return its cached memory to the driver after the models were dropped (for "
+        "example an earlier error left it in a bad state). The models were still dropped; the memory stays reserved "
+        "by this process."
+    )
 
 
 class CacheType(str, Enum):
@@ -1517,8 +1523,9 @@ def get_is_installed(
 
         if expected_variant is not None:
             for model in installed_models:
-                if model.type == ModelType.Qwen3Encoder and hasattr(model, "variant"):
-                    model_variant = model.variant
+                # A Qwen3 folder installed as a Text LLM serves as the encoder too.
+                if serves_as(model, ModelType.Qwen3Encoder):
+                    model_variant = role_variant(model, ModelType.Qwen3Encoder)
                     # Handle both enum and string values
                     if isinstance(model_variant, Qwen3VariantType):
                         if model_variant == expected_variant:
@@ -1610,11 +1617,15 @@ def empty_model_cache(current_admin: AdminUserOrDefault) -> EmptyModelCacheRespo
     ApiDependencies.invoker.services.logger.info("Emptying model cache.")
     models_cleared = 0
     bytes_freed = 0
+    vram_release_refused = False
     for cache in distinct_caches(ApiDependencies.invoker.services.model_manager.load.ram_caches.values()):
         result = cache.make_room(1000 * 2**30)
         models_cleared += result.models_cleared
         bytes_freed += result.bytes_freed
-    return EmptyModelCacheResponse(models_cleared=models_cleared, bytes_freed=bytes_freed)
+        vram_release_refused = vram_release_refused or result.vram_release_refused
+    return EmptyModelCacheResponse(
+        models_cleared=models_cleared, bytes_freed=bytes_freed, vram_release_refused=vram_release_refused
+    )
 
 
 class HFTokenStatus(str, Enum):

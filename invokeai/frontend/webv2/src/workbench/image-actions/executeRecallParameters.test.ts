@@ -7,6 +7,7 @@ import i18n from 'i18next';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const galleryApi = vi.hoisted(() => ({
+  GALLERY_REQUEST_MAX_NAMES: 1000,
   galleryImages: {
     metadata: vi.fn(),
     resolveMany: vi.fn(),
@@ -18,11 +19,11 @@ vi.mock('@features/gallery', () => galleryApi);
 import {
   resetArchitectureCapabilities,
   setArchitectureCapabilities,
-} from '@features/generation/core/architectureCapabilities';
+} from '@features/models/core/architectureCapabilities';
 import {
   architectureCapabilitiesFixture,
   seedArchitectureCapabilities,
-} from '@features/generation/core/architectureCapabilities.testing';
+} from '@features/models/core/architectureCapabilities.testing';
 
 import { getCurrentGenerateValues } from './executeImageRecall';
 import { executeRecallParameters } from './executeRecallParameters';

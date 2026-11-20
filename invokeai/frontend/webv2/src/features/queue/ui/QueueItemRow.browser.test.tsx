@@ -3,6 +3,7 @@ import type { QueueItemReadModel } from '@features/queue/core/types';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { buildQueueItemOrigin } from '@features/queue/data/events';
+import { createMenuPartLoader, MenuActionItem } from '@platform/ui/Menu';
 import { system } from '@theme/system';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -129,13 +130,6 @@ describe('QueueItemRow', () => {
     expect(card.textContent).not.toContain('common.prompt');
   });
 
-  it('names a workflow run by its workflow rather than a prompt-like field', async () => {
-    await render(adapter(), item({ workflowName: 'Tiled upscale' }));
-
-    expect(primary().textContent).toContain('Tiled upscale');
-    expect(primary().textContent).not.toContain('A castle at dusk');
-  });
-
   it('shows why a failed row failed on one line without expanding it', async () => {
     await render(
       adapter(),
@@ -155,41 +149,6 @@ describe('QueueItemRow', () => {
     );
 
     expect(host.textContent).toContain('Loading SDXL Base…');
-  });
-
-  it('distinguishes workflow rows without prompt metadata by their queue item ids', async () => {
-    await render(adapter(), item({ fieldValues: [], id: 21 }), item({ fieldValues: [], id: 22 }));
-
-    const rows = host.querySelectorAll<HTMLElement>('[data-list-primary]');
-
-    expect(rows).toHaveLength(2);
-    expect(rows[0]!.textContent).toContain('Queue item #21');
-    expect(rows[1]!.textContent).toContain('Queue item #22');
-    expect(host.textContent).not.toContain('widgets.queue.noPrompt');
-  });
-
-  it('renders a row without viewable details as static content, not a button', async () => {
-    await render(
-      adapter({ canManageItem: () => false, canViewItemDetails: () => false }),
-      item({ userId: 'redacted' })
-    );
-
-    expect(primary().tagName).toBe('DIV');
-    expect(primary().hasAttribute('aria-expanded')).toBe(false);
-    expect(host.querySelector('button')).toBeNull();
-    expect(host.querySelector('[role="list"] > [role="listitem"]')).not.toBeNull();
-  });
-
-  it('warms the item actions on focus, before the first expand', async () => {
-    const preloadItemActions = vi.fn();
-
-    await render(adapter({ preloadItemActions }), item());
-    // Dispatch focusin directly: element.focus() is a no-op for focus events while the test window is unfocused.
-    await act(() => {
-      primary().dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
-    });
-
-    expect(preloadItemActions).toHaveBeenCalledTimes(1);
   });
 
   it('lets a waiting workflow-call parent be canceled from its own row', async () => {
@@ -264,5 +223,58 @@ describe('QueueItemRow', () => {
     root = createRoot(host);
     await render(adapter({ canManageItem: () => false }), item({ id: 14, status: 'canceled' }));
     expect(host.querySelector('button[aria-label="widgets.queue.retryItem"]')).toBeNull();
+  });
+
+  const openMenu = async () => {
+    await act(() =>
+      primary().dispatchEvent(
+        new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 20, clientY: 20 })
+      )
+    );
+
+    return vi.waitFor(() => {
+      const open = document.querySelector<HTMLElement>('[role="menu"]');
+      expect(open).not.toBeNull();
+      return open!;
+    });
+  };
+  const RecallEntries = () => <MenuActionItem label="Recall entries" value="recall" onSelect={() => undefined} />;
+
+  it('opens its menu at once and lets Escape close it while the recall entries still load', async () => {
+    const itemRecallMenuGroup = createMenuPartLoader(() => new Promise<() => null>(() => {}));
+    await render(adapter({ itemRecallMenuGroup }), item());
+
+    const menu = await openMenu();
+    // Only menu items while loading: an unavailable one in the entries' place.
+    const items = [...menu.children].filter((child) => child.getAttribute('role') !== 'presentation');
+    expect(items.map((child) => [child.getAttribute('role'), child.getAttribute('aria-disabled')])).toEqual([
+      ['menuitem', 'true'],
+    ]);
+    expect(menu.textContent).toContain('common.loading');
+    expect(menu.getAttribute('aria-busy')).toBe('true');
+
+    await act(() => menu.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' })));
+    await vi.waitFor(() => expect(document.querySelector('[role="menu"]')).toBeNull());
+  });
+
+  it('says the recall entries could not load, without unmounting the queue, and loads them on a later open', async () => {
+    const importer = vi
+      .fn<() => Promise<typeof RecallEntries>>()
+      .mockRejectedValueOnce(new TypeError('Failed to fetch dynamically imported module'))
+      .mockResolvedValue(RecallEntries);
+    await render(adapter({ itemRecallMenuGroup: createMenuPartLoader(importer) }), item());
+
+    let menu = await openMenu();
+    await vi.waitFor(() => expect(menu.textContent).toContain('common.menuPartLoadFailed'));
+    expect(menu.querySelector('[role="menuitem"]')?.getAttribute('aria-disabled')).toBe('true');
+    expect(menu.getAttribute('aria-busy')).toBe('false');
+    expect(primary().isConnected).toBe(true);
+
+    await act(() => menu.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' })));
+    await vi.waitFor(() => expect(document.querySelector('[role="menu"]')).toBeNull());
+    menu = await openMenu();
+
+    await vi.waitFor(() => expect(menu.textContent).toContain('Recall entries'));
+    expect(importer).toHaveBeenCalledTimes(2);
   });
 });

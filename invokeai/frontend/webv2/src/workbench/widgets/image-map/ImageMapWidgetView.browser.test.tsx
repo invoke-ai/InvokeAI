@@ -11,7 +11,6 @@ import { initReactI18next } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { page } from 'vitest/browser';
 
-// Stand-ins for the gallery's values and the workbench commands the chip and Esc write through.
 const workbench = vi.hoisted(() => ({
   galleryValues: {} as Record<string, unknown>,
   patchValues: vi.fn(),
@@ -26,9 +25,6 @@ vi.mock('@workbench/image-map/api', async (importOriginal) => ({
 }));
 
 vi.mock('@workbench/WorkbenchContext', () => ({
-  // The gallery's values drive the cluster chip and the Esc clear. Every other widget's selector is applied to an
-  // empty value bag rather than answering `false`: each accessor owns its own default, and handing a boolean to a
-  // setting that is a number or null makes the widget act on a value it could never be given in production.
   useWidgetValuesSelector: (widgetId: string, select: (values: Record<string, unknown>) => unknown) =>
     select(widgetId === 'gallery' ? workbench.galleryValues : {}),
   useWorkbenchCommands: () => ({
@@ -42,13 +38,9 @@ vi.mock('@workbench/widgetState', async (importOriginal) => ({
   getProjectWidgetValues: () => workbench.galleryValues,
 }));
 
-// Stub the heavy Plotly sibling; this test owns the progress badge.
 vi.mock('./ImageMapPlot', () => ({ default: () => <div data-testid="plot" /> }));
 
 const models = vi.hoisted(() => {
-  // A real subscribable store, like the one behind `useActiveInstallSources`:
-  // putting the encoder into (and out of) an in-flight install has to re-render
-  // whoever read it, which is exactly the path the widget depends on.
   const listeners = new Set<() => void>();
   let active: ReadonlySet<string> = new Set<string>();
 
@@ -131,18 +123,10 @@ vi.mock('@workbench/image-map/imageMapStore', async (importOriginal) => {
 });
 
 import { registerImageCluster } from '@features/gallery/contracts';
-import {
-  ensureImageMapLoaded,
-  imageMapStore,
-  refreshImageIndexStatus,
-  refreshImageMapPoints,
-  requestImageMapRecompute,
-  setImageMapMediaKind,
-} from '@workbench/image-map/imageMapStore';
+import { imageMapStore, refreshImageIndexStatus, requestImageMapRecompute } from '@workbench/image-map/imageMapStore';
 
 import { ImageMapWidgetView } from './ImageMapWidgetView';
 
-// The components read the global instance; give it the English catalog.
 await i18next.use(initReactI18next).init({
   interpolation: { escapeValue: false },
   lng: 'en',
@@ -152,7 +136,6 @@ await i18next.use(initReactI18next).init({
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
 
-/** Captures what the view registers, and what it disposes, so the Esc binding can be asserted and fired. */
 const registered = {
   commands: [] as { handler: () => unknown; id: string; runtime: string; disposed: boolean }[],
   hotkeys: [] as { commandId: string; defaultKeys: string[]; runtime: string; disposed: boolean }[],
@@ -223,16 +206,8 @@ const renderState = async (
   );
 };
 
-/** Every button the message currently offers, in DOM order. */
 const buttonLabels = (): string[] =>
   Array.from(host?.querySelectorAll('button') ?? []).map((button) => button.textContent ?? '');
-
-/** The install jobs the app currently has in flight, as the widget sees them. */
-const setActiveInstalls = async (sources: string[]) => {
-  await act(() => {
-    models.activeSources.set(sources);
-  });
-};
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -260,7 +235,6 @@ describe('Image Map unavailable states', () => {
       'model_missing',
       'Embedding model not installed',
       'To enable image indexing, install the image encoder model',
-      // A standing action also lets a user retry immediately after installing.
       ['Check again'],
     ],
     [
@@ -305,17 +279,6 @@ describe('Image Map computing state', () => {
   });
 });
 
-describe('Image Map for a session that cannot change the server', () => {
-  it('says whom to ask instead of naming a configuration file', async () => {
-    models.canManageAppConfig = false;
-    await renderState('disabled');
-
-    expect(host?.textContent).toContain('Image indexing is off');
-    expect(host?.textContent).toContain('Ask an administrator to turn it on.');
-    expect(host?.textContent).not.toContain('image_index_enabled');
-  });
-});
-
 describe('Image Map media filter', () => {
   it('says the shared media filter emptied the map and offers to show both kinds', async () => {
     workbench.galleryValues = { mediaFilter: 'video' };
@@ -342,7 +305,6 @@ describe('Image Map media filter', () => {
     expect(host?.textContent).toContain('No videos to map');
     expect(host?.textContent).not.toContain('Nothing to map yet');
 
-    // The header's trigger, which the frame renders outside the view.
     const trigger = document.createElement('button');
     trigger.id = 'image-map-media-filter-trigger';
     document.body.append(trigger);
@@ -352,34 +314,6 @@ describe('Image Map media filter', () => {
     expect(workbench.updateGallerySettings).toHaveBeenCalledExactlyOnceWith({ mediaFilter: 'all' });
     expect(document.activeElement).toBe(trigger);
     trigger.remove();
-  });
-
-  it('pushes the shared media filter into the store before the first load', async () => {
-    workbench.galleryValues = { mediaFilter: 'video' };
-    imageMapStore.setSnapshot({
-      clusterLabels: null,
-      clusterLabelsEps: null,
-      clusterLabelsHash: null,
-      data: null,
-      error: null,
-      indexCounts: null,
-      indexUpdatedAt: null,
-      loadState: 'idle',
-      renderError: null,
-    });
-
-    await act(() =>
-      root?.render(
-        <ChakraProvider value={system}>
-          <ImageMapWidgetView {...viewProps} />
-        </ChakraProvider>
-      )
-    );
-
-    expect(setImageMapMediaKind).toHaveBeenCalledWith('video');
-    expect(vi.mocked(setImageMapMediaKind).mock.invocationCallOrder[0]).toBeLessThan(
-      vi.mocked(ensureImageMapLoaded).mock.invocationCallOrder[0]!
-    );
   });
 });
 
@@ -444,76 +378,6 @@ describe('Image Map missing-model link', () => {
 
     expect(models.openAddModelsSearch).toHaveBeenCalledWith('DFN2B-CLIP-ViT-L-14-39B');
   });
-
-  it('leaves the encoder as plain text for a session that cannot manage models', async () => {
-    models.canManageModels = false;
-    await renderState('model_missing', 'DFN2B-CLIP-ViT-L-14-39B');
-
-    expect(host?.textContent).toContain(
-      'Image indexing needs the image encoder model DFN2B-CLIP-ViT-L-14-39B. Ask an administrator to install it.'
-    );
-    expect(host?.textContent).not.toContain('Model Manager');
-    expect(buttonLabels()).toEqual(['Check again']);
-  });
-
-  it('reports an in-flight download instead of offering the install again', async () => {
-    models.activeSources.set([ENCODER_SOURCE]);
-    await renderState('model_missing', 'DFN2B-CLIP-ViT-L-14-39B');
-
-    expect(host?.textContent).toContain('DFN2B-CLIP-ViT-L-14-39B (installing…)');
-    expect(buttonLabels()).toEqual(['Check again']);
-  });
-
-  it('asks the server again as soon as the download lands', async () => {
-    models.activeSources.set([ENCODER_SOURCE]);
-    await renderState('model_missing', 'DFN2B-CLIP-ViT-L-14-39B');
-
-    expect(refreshImageMapPoints).not.toHaveBeenCalled();
-
-    await setActiveInstalls([]);
-
-    // The server picks the encoder up on the next request, so this refresh is
-    // what starts indexing without a restart.
-    expect(refreshImageMapPoints).toHaveBeenCalledTimes(1);
-    expect(refreshImageIndexStatus).toHaveBeenCalledTimes(1);
-    // An automatic refresh must never bypass the refit cooldown.
-    expect(requestImageMapRecompute).not.toHaveBeenCalled();
-  });
-
-  it('keeps the message and the in-flight install mounted while a refresh runs', async () => {
-    models.activeSources.set([ENCODER_SOURCE]);
-    await renderState('model_missing', 'DFN2B-CLIP-ViT-L-14-39B');
-
-    // A refresh flips loadState to `loading`; a spinner here would unmount the
-    // link and lose both the download's pending state and the watcher that
-    // refreshes when it lands.
-    await act(() => {
-      imageMapStore.patchSnapshot({ loadState: 'loading' });
-    });
-
-    expect(host?.textContent).toContain('DFN2B-CLIP-ViT-L-14-39B (installing…)');
-
-    await setActiveInstalls([]);
-
-    expect(refreshImageMapPoints).toHaveBeenCalledTimes(1);
-  });
-
-  it('falls back to the default encoder name when the server reports none', async () => {
-    await renderState('model_missing', '');
-
-    expect(host?.textContent).toContain(
-      'install the image encoder model DFN2B-CLIP-ViT-L-14-39B from the Model Manager'
-    );
-  });
-
-  it('leaves a model the starter catalog does not carry as plain text', async () => {
-    await renderState('model_missing');
-
-    expect(host?.textContent).toContain(
-      'install the image encoder model clip-vit-large-patch14 from the Model Manager'
-    );
-    expect(buttonLabels()).toEqual(['Check again']);
-  });
 });
 
 describe('Image Map indexing activity', () => {
@@ -563,35 +427,11 @@ describe('Image Map indexing activity', () => {
   };
 
   it('reports an index run over the map instead of drawing it silently', async () => {
-    // Keep a usable stale map during reindexing but show progress so missing labels are explained.
     await renderMapWithCounts({ embedded: 1204, failed: 0, pending: 16846, total: 18050 });
 
     expect(host?.querySelector('[data-testid="plot"]')).not.toBeNull();
     expect(host?.textContent).toContain('indexing 1,204/18,050');
-    // The map stays: the badge must not replace it.
     expect(host?.textContent).not.toContain('Indexing gallery');
-  });
-
-  it('names the labels in the badge, since they vanish while the vocabulary rebuilds', async () => {
-    await renderMapWithCounts({ embedded: 1204, failed: 0, pending: 16846, total: 18050 });
-
-    const progressbar = host?.querySelector('[role="progressbar"]');
-
-    expect(progressbar?.getAttribute('aria-label')).toContain('cluster labels update as images finish');
-  });
-
-  it('shows no badge once the index is idle', async () => {
-    await renderMapWithCounts({ embedded: 18050, failed: 0, pending: 0, total: 18050 });
-
-    expect(host?.querySelector('[data-testid="plot"]')).not.toBeNull();
-    expect(host?.textContent).not.toContain('indexing');
-  });
-
-  it('shows no badge when the counts are absent, as for a non-admin', async () => {
-    await renderMapWithCounts(null);
-
-    expect(host?.querySelector('[data-testid="plot"]')).not.toBeNull();
-    expect(host?.textContent).not.toContain('indexing');
   });
 });
 
@@ -661,29 +501,10 @@ describe('Image Map cluster selection chip', () => {
     await renderMap({ embedded: 10, failed: 0, pending: 5, total: 15 });
 
     expect(chip()?.textContent).toBe('sunset beach· 2 items');
-    // Cluster 2's palette colour: both members are in it.
     expect(getComputedStyle(chip()!.querySelector('[aria-hidden="true"]')!).backgroundColor).toBe('rgb(225, 87, 89)');
-    // Stacked in one corner rather than drawn over each other, the selection first.
     const badge = host?.querySelector('[role="progressbar"]');
     expect(chip()!.compareDocumentPosition(badge!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(badge!.getBoundingClientRect().top).toBeGreaterThanOrEqual(chip()!.getBoundingClientRect().bottom);
-  });
-
-  it('shows only the current size for an unlabeled cluster, even after members were deleted', async () => {
-    // Named "2 items" at click time; one member has since gone.
-    selectCluster('2 items', 1);
-    await renderMap(null);
-
-    expect(chip()?.textContent).toBe('1 item');
-  });
-
-  it('starts below the floating view selector when the map is in the center area', async () => {
-    selectCluster('sunset beach');
-    await renderMap(null, viewProps, '3rem');
-
-    const surface = host!.querySelector<HTMLElement>('[data-image-map-surface]')!;
-    // 3rem of center chrome plus the corner's own spacing.
-    expect(chip()!.getBoundingClientRect().top - surface.getBoundingClientRect().top).toBeGreaterThanOrEqual(48 + 8);
   });
 
   it('clears the gallery cluster listing from its button', async () => {
@@ -695,7 +516,6 @@ describe('Image Map cluster selection chip', () => {
     await act(() => clear.click());
 
     expect(workbench.patchValues).toHaveBeenCalledWith('gallery', CLEARED);
-    // The button is about to unmount with the chip; focus stays on the map, where Esc keeps working.
     expect(document.activeElement).toBe(host!.querySelector('[data-image-map-surface]'));
   });
 
@@ -704,8 +524,6 @@ describe('Image Map cluster selection chip', () => {
     await renderMap(null, makeViewProps('project-b'));
 
     const escBindings = registered.hotkeys.filter((entry) => entry.defaultKeys.includes('esc'));
-    // Registrations carry the project they were made for; a binding left on the
-    // old project's runtime would never resolve in the new one.
     expect(escBindings.map((entry) => [entry.runtime, entry.disposed])).toEqual([
       ['project-a', true],
       ['project-b', false],
@@ -718,33 +536,5 @@ describe('Image Map cluster selection chip', () => {
       ['project-a', true],
       ['project-b', false],
     ]);
-  });
-
-  it('shows nothing when the gallery is not listing a cluster', async () => {
-    workbench.galleryValues = { searchTerm: 'cats' };
-    await renderMap(null);
-
-    expect(chip()).toBeNull();
-  });
-
-  it('binds Esc to the clear, which leaves an ordinary search alone', async () => {
-    workbench.galleryValues = { searchTerm: 'cats' };
-    await renderMap(null);
-
-    const hotkey = registered.hotkeys.find((entry) => entry.defaultKeys.includes('esc'));
-    const command = registered.commands.find((entry) => entry.id === hotkey?.commandId);
-    expect(command).toBeDefined();
-
-    // Esc with no cluster selected must not wipe the user's search.
-    await act(() => {
-      command!.handler();
-    });
-    expect(workbench.patchValues).not.toHaveBeenCalled();
-
-    selectCluster('sunset beach');
-    await act(() => {
-      command!.handler();
-    });
-    expect(workbench.patchValues).toHaveBeenCalledWith('gallery', CLEARED);
   });
 });

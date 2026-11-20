@@ -163,7 +163,7 @@ const activeProject = (): { id: string; name: string } | null => {
 };
 
 const generationUi = {
-  sectionPreferences: { sectionsOpen: {}, setSectionOpen: () => undefined },
+  sectionPreferences: { sectionsOpen: {}, setSectionsOpen: () => undefined },
 } as unknown as GenerationUiAdapter;
 
 const mountEditor = async ({ strict = false, withStrength = false } = {}) => {
@@ -205,8 +205,8 @@ let revivePage: (() => void) | null = null;
 
 /**
  * What a document unload does to work the page has not finished: its IndexedDB connections start no further
- * transactions (a transaction already committed still lands) and its requests never reach the server. The next
- * page's own connections, opened afterwards, work normally.
+ * transactions (a transaction already committed still lands) and its requests never reach the server. The next page's
+ * own connections, opened afterwards, work normally.
  */
 const unloadPage = (): void => {
   const deadConnections = new Set(openConnections);

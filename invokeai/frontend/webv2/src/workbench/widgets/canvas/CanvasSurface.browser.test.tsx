@@ -20,7 +20,6 @@ import { createRoot } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { userEvent } from 'vitest/browser';
 
-/** The surface reads the workbench only for key ownership: the active project and its widget placement. */
 const workbench = vi.hoisted(() => ({ store: null as unknown as WorkbenchInternalStore }));
 vi.mock('@workbench/WorkbenchContext', async (importOriginal) => ({
   ...(await importOriginal<typeof WorkbenchContextModule>()),
@@ -33,7 +32,6 @@ import { CanvasSurface } from './CanvasSurface';
 
 workbench.store = createWorkbenchStore();
 
-/** Focus for the surface outside the workbench shell; ownership itself is covered under a real provider below. */
 const TestFocus = ({ children }: { children: ReactNode }) => {
   const [controller] = useState(() => createTestFocusController());
   return <FocusRegionProvider controller={controller}>{children}</FocusRegionProvider>;
@@ -55,8 +53,8 @@ const delay = (ms: number): Promise<void> =>
 
 const createTrackedRegistry = (gracePeriodMs: number): EngineRegistry => {
   const registry = createEngineRegistry({ gracePeriodMs });
-  // Registered before references and roots, so reverse-order cleanup releases
-  // those first and then lets the registry's grace timers finish.
+  // Registered before references and roots, so reverse-order cleanup releases those first and then lets the registry's
+  // grace timers finish.
   addCleanup(() => delay(gracePeriodMs + 20));
   return registry;
 };
@@ -353,7 +351,6 @@ describe('CanvasSurface keyboard ownership', () => {
     const tool = () => engine.interaction.get('activeTool');
     engine.tools.setTool('brush');
 
-    // Focus that did not arrive by pointer is owned only through the keyboard root.
     await userEvent.hover(overlay);
     await userEvent.keyboard('{Tab}');
     surface.focus();
@@ -373,7 +370,6 @@ describe('CanvasSurface keyboard ownership', () => {
   });
 });
 
-/** The shell's layout in miniature: the canvas, the Generate panel and the Layers panel, each a focus region. */
 const WorkbenchHarness = ({ engine }: { engine: CanvasEngine }) => (
   <ChakraProvider value={system}>
     <WorkbenchFocusProvider>
@@ -463,7 +459,6 @@ describe('CanvasSurface key owner', () => {
 
     await userEvent.keyboard('{Escape}');
     expect(view.hasSelection()).toBe(false);
-    // Away from the canvas, a C tap selects the frame tool.
     await userEvent.keyboard('c');
     expect(view.tool()).toBe('bbox');
 

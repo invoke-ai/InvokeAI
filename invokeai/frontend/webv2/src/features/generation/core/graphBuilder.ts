@@ -5,7 +5,7 @@ import type {
   GenerationProjectSettings,
 } from '@features/generation/core/contracts';
 
-import type { GenerateLora, GenerateModelConfig, GenerateSettings } from './types';
+import type { GenerateLora, GenerateModelConfig, GenerateSettings, MainModelConfig } from './types';
 
 import { coerceSchedulerForGraph } from './baseGenerationPolicies';
 import { isLoraCompatibleWithModel } from './settings';
@@ -128,14 +128,78 @@ export const toModelIdentifier = (
   ...(typeof model.submodel_type === 'string' ? { submodel_type: model.submodel_type } : {}),
 });
 
+const isSingleTransformerWanModel = (model: Pick<MainModelConfig, 'variant'> | null | undefined): boolean =>
+  model?.variant === 'ti2v_5b';
+
+export const hasDistinctWanLowNoiseWeight = (
+  lora: Pick<GenerateLora, 'lowNoiseWeight' | 'target' | 'weight'>,
+  model: Pick<MainModelConfig, 'variant'> | null | undefined
+): lora is Pick<GenerateLora, 'target' | 'weight'> & { lowNoiseWeight: number; target: 'both' } =>
+  !isSingleTransformerWanModel(model) &&
+  lora.target === 'both' &&
+  lora.lowNoiseWeight !== undefined &&
+  lora.lowNoiseWeight !== lora.weight;
+
+export const toMetadataLora = (
+  lora: Pick<GenerateLora, 'lowNoiseWeight' | 'model' | 'target' | 'weight'>,
+  model: Pick<MainModelConfig, 'variant'> | null | undefined
+) => ({
+  model: toModelIdentifier(lora.model),
+  weight: lora.weight,
+  ...(lora.target ? { target: lora.target } : {}),
+  ...(hasDistinctWanLowNoiseWeight(lora, model) ? { low_noise_weight: lora.lowNoiseWeight } : {}),
+});
+
 /**
  * The LoRAs a graph loads, as metadata records them. Read from the graph rather than the settings, so a record names
  * only concepts that reached inference; a family whose graph has no LoRA loader loads none.
  */
-export const getLoadedLoras = (graph: BackendGraphContract) =>
-  Object.values(graph.nodes)
+export const getLoadedLoras = (graph: BackendGraphContract) => {
+  const selectorLoras = Object.values(graph.nodes)
     .filter((node) => node.type === 'lora_selector')
     .map((node) => ({ model: node.lora, weight: node.weight }));
+
+  const wanLoaderLoras: Record<string, unknown>[] = [];
+  const wanIndexByKey = new Map<string, number>();
+
+  for (const node of Object.values(graph.nodes)) {
+    if (node.type !== 'wan_lora_loader' || !node.lora || typeof node.lora !== 'object') {
+      continue;
+    }
+
+    const loraModel = node.lora as { key?: unknown };
+    const key = typeof loraModel.key === 'string' ? loraModel.key : null;
+    const target = node.target === 'high' || node.target === 'low' || node.target === 'both' ? node.target : undefined;
+    const weight = node.weight as number;
+    const existingIndex = key !== null ? wanIndexByKey.get(key) : undefined;
+
+    if (existingIndex !== undefined) {
+      const existing = wanLoaderLoras[existingIndex]!;
+      if ((existing.target === 'high' && target === 'low') || (existing.target === 'low' && target === 'high')) {
+        const highWeight = existing.target === 'high' ? (existing.weight as number) : weight;
+        const lowWeight = existing.target === 'low' ? (existing.weight as number) : weight;
+        wanLoaderLoras[existingIndex] = {
+          model: existing.model,
+          weight: highWeight,
+          target: 'both',
+          ...(lowWeight !== highWeight ? { low_noise_weight: lowWeight } : {}),
+        };
+        continue;
+      }
+    }
+
+    if (key !== null) {
+      wanIndexByKey.set(key, wanLoaderLoras.length);
+    }
+    wanLoaderLoras.push({
+      model: node.lora,
+      weight,
+      ...(target !== undefined ? { target } : {}),
+    });
+  }
+
+  return [...selectorLoras, ...wanLoaderLoras];
+};
 
 export const addMetadata = (
   graph: BackendGraphContract,

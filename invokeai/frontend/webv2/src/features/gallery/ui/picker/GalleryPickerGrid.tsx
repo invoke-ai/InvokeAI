@@ -7,7 +7,7 @@ import { Box, Icon, Skeleton, Stack, Text } from '@chakra-ui/react';
 import { toGalleryItemKey } from '@features/gallery/core/items';
 import { GALLERY_PAGE_SIZE } from '@features/gallery/data/queries';
 import { getGalleryColumnCountForCell } from '@features/gallery/ui/galleryGridLayout';
-import { GalleryTileFrame } from '@features/gallery/ui/GalleryTileFrame';
+import { GalleryTileFrame, GalleryTileMedia } from '@features/gallery/ui/GalleryTileFrame';
 import { Button } from '@platform/ui/Button';
 import { Scrollable } from '@platform/ui/Scrollable';
 import { CheckIcon } from 'lucide-react';
@@ -91,19 +91,25 @@ const GalleryPickerTile = memo(function GalleryPickerTile({
       data-item-index={index}
       data-item-key={key}
       id={galleryPickerOptionId(idBase, index)}
-      isSelected={key === currentKey || state === 'added'}
       item={item}
       role="option"
       title={unsupportedLabel}
     >
-      <img
-        alt=""
-        decoding="async"
-        draggable={false}
-        loading="lazy"
-        src={item.thumbnailUrl || item.fullUrl}
-        style={IMG_STYLE}
-      />
+      <GalleryTileMedia
+        fit="square"
+        height={item.height}
+        isSelected={key === currentKey || state === 'added'}
+        width={item.width}
+      >
+        <img
+          alt=""
+          decoding="async"
+          draggable={false}
+          loading="lazy"
+          src={item.thumbnailUrl || item.fullUrl}
+          style={IMG_STYLE}
+        />
+      </GalleryTileMedia>
       {state === 'added' ? (
         <Box
           alignItems="center"
@@ -315,9 +321,8 @@ export const GalleryPickerGrid = ({
     measure();
   }, [columnCount, measure, rowPitch]);
 
-  // Reveal the highlight when it is placed, its listing changes, or a reflow moves its row. A later count update or
-  // insert must not pull a pointer-scrolled view back to it; a highlight past the known count is revealed once the
-  // count reaches it.
+  // Reveal the highlight when placed, when its listing changes, or when a reflow moves its row. A later count update
+  // or insert must not pull a pointer-scrolled view back; a highlight past the known count shows once it is reached.
   const revealedActiveRef = useRef<string | null>(null);
   useLayoutEffect(() => {
     const active = `${activePlacement}\n${columnCount}`;

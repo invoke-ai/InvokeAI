@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 /**
- * Require settled UI before axe to avoid transient contrast failures. This scans src only; serialized release
- * journeys must implement the same wait separately.
+ * Require settled UI before axe to avoid transient contrast failures. This scans src only; serialized release journeys
+ * must implement the same wait separately.
  */
 const sources = import.meta.glob('../**/*.{ts,tsx}', {
   eager: true,

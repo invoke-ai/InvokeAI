@@ -25,8 +25,8 @@ const buildGradient = (ctx: Ctx, source: GradientSource, width: number, height: 
     const rad = (source.angle * Math.PI) / 180;
     const dx = Math.cos(rad);
     const dy = Math.sin(rad);
-    // Fitted fallback: the projection of the box's half-extents onto the
-    // gradient direction, so the ramp just covers the corners.
+    // Fitted fallback: the projection of the box's half-extents onto the gradient direction, so the ramp just covers
+    // the corners.
     const half = source.span !== undefined ? source.span / 2 : (Math.abs(dx) * width + Math.abs(dy) * height) / 2;
     gradient = ctx.createLinearGradient(cx - dx * half, cy - dy * half, cx + dx * half, cy + dy * half);
   }

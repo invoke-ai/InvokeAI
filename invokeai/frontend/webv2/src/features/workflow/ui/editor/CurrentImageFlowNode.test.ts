@@ -5,8 +5,10 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   createVideoErrorRecovery,
+  resolveActiveBackendItemId,
   resolveCurrentImageExecutionState,
-  resolveProgressQueueItemId,
+  resolveProgressPercentage,
+  resolveProgressTarget,
 } from './CurrentImageFlowNode';
 
 const englishCatalogModules = import.meta.glob('../../../../../public/locales/en.json', {
@@ -121,33 +123,80 @@ describe('resolveCurrentImageExecutionState', () => {
   });
 });
 
-describe('resolveProgressQueueItemId', () => {
+describe('resolveProgressTarget', () => {
   it('selects the displayed progress frame target when concurrent runs are active', () => {
     const activeTargets = [
-      { itemIndex: 0, queueItemId: 'run-a' },
-      { itemIndex: 0, queueItemId: 'run-b' },
+      { itemIndex: 1, queueItemId: 'run-a' },
+      { itemIndex: 1, queueItemId: 'run-b' },
     ];
     const frameFromRunB = {
       dataUrl: 'data:image/png;base64,AA==',
       height: 64,
-      target: { itemIndex: 0, queueItemId: 'run-b' },
+      target: { itemIndex: 1, queueItemId: 'run-b' },
       width: 64,
     };
 
-    expect(resolveProgressQueueItemId(frameFromRunB, activeTargets)).toBe('run-b');
+    expect(resolveProgressTarget(frameFromRunB, activeTargets)).toEqual({ itemIndex: 1, queueItemId: 'run-b' });
   });
 
   it('falls back to the oldest active target before a frame arrives or when the frame has no target', () => {
     const activeTargets = [
-      { itemIndex: 0, queueItemId: 'run-a' },
-      { itemIndex: 0, queueItemId: 'run-b' },
+      { itemIndex: 1, queueItemId: 'run-a' },
+      { itemIndex: 1, queueItemId: 'run-b' },
     ];
 
-    expect(resolveProgressQueueItemId(null, activeTargets)).toBe('run-a');
+    expect(resolveProgressTarget(null, activeTargets)).toEqual({ itemIndex: 1, queueItemId: 'run-a' });
     expect(
-      resolveProgressQueueItemId({ dataUrl: 'data:image/png;base64,AA==', height: 64, width: 64 }, activeTargets)
-    ).toBe('run-a');
-    expect(resolveProgressQueueItemId(null, [])).toBe('');
+      resolveProgressTarget({ dataUrl: 'data:image/png;base64,AA==', height: 64, width: 64 }, activeTargets)
+    ).toEqual({ itemIndex: 1, queueItemId: 'run-a' });
+    expect(resolveProgressTarget(null, [])).toBeNull();
+  });
+
+  it('ignores active targets and frames belonging to another project and pairs batch slot percentages', () => {
+    const activeTargets = [
+      { itemIndex: 1, queueItemId: 'run-project-a' },
+      { itemIndex: 2, queueItemId: 'run-project-b' },
+    ];
+    const projectBIds = new Set(['run-project-b']);
+    const frameFromProjectA = {
+      dataUrl: 'data:image/png;base64,AA==',
+      height: 64,
+      target: { itemIndex: 1, queueItemId: 'run-project-a' },
+      width: 64,
+    };
+
+    const resolvedTarget = resolveProgressTarget(frameFromProjectA, activeTargets, projectBIds);
+    expect(resolvedTarget).toEqual({
+      itemIndex: 2,
+      queueItemId: 'run-project-b',
+    });
+    expect(resolveProgressTarget(frameFromProjectA, [activeTargets[0]!], projectBIds)).toBeNull();
+
+    const itemsById = new Map([['run-project-b', { backendItemIds: [101, 102], id: 'run-project-b' }]]);
+    expect(resolveActiveBackendItemId(resolvedTarget, itemsById)).toBe(102);
+    expect(resolveActiveBackendItemId({ itemIndex: 1, queueItemId: 'run-project-b' }, itemsById)).toBe(101);
+    expect(resolveActiveBackendItemId({ itemIndex: 0, queueItemId: 'run-project-b' }, itemsById)).toBeNull();
+
+    const slot1Target = { itemIndex: 1, queueItemId: 'batch-1' };
+    expect(
+      resolveProgressPercentage({
+        activeProgress: { activeItemIndex: 2, percentage: 0.2 },
+        activeTarget: slot1Target,
+      })
+    ).toBeNull();
+    expect(
+      resolveProgressPercentage({
+        activeProgress: { activeItemIndex: 2, percentage: 0.2 },
+        activeTarget: slot1Target,
+        slotProgressPercentage: 0.75,
+      })
+    ).toBe(0.75);
+    expect(
+      resolveProgressPercentage({
+        activeProgress: { activeItemIndex: 1, percentage: 0.6 },
+        activeTarget: slot1Target,
+      })
+    ).toBe(0.6);
   });
 });
 
@@ -178,13 +227,19 @@ describe('createVideoErrorRecovery', () => {
     expect(failed).toBe(true);
     expect(refreshCookie).toHaveBeenCalledTimes(1);
 
+    // A successful load rearms the one-shot cookie refresh for later expirations in the same session.
+    recovery.rearm();
+    expect(failed).toBe(false);
+    recovery.handleError(video, () => true);
+    await vi.waitFor(() => expect(refreshCookie).toHaveBeenCalledTimes(2));
+
     // Manual retry clears failure, reloads, and rearms the one-shot cookie refresh.
     recovery.retry(video);
     expect(failed).toBe(false);
-    expect(video.load).toHaveBeenCalledTimes(2);
+    expect(video.load).toHaveBeenCalledTimes(3);
 
     recovery.handleError(video, () => true);
-    await vi.waitFor(() => expect(refreshCookie).toHaveBeenCalledTimes(2));
+    await vi.waitFor(() => expect(refreshCookie).toHaveBeenCalledTimes(3));
   });
 
   it('surfaces failure immediately when cookie refresh fails and ignores stale account epochs', async () => {
@@ -253,8 +308,8 @@ describe('CurrentImageFlowNode locale keys', () => {
       'widgets.preview.videoFailed',
       'widgets.preview.videoRetry',
       'widgets.workflow.addNodeDialog.currentImageTitle',
-      'widgets.workflow.currentImageDragImage',
       'widgets.workflow.currentImageEmpty',
+      'widgets.workflow.currentImageResetSize',
       'widgets.workflow.currentImageResizeHandle',
       'widgets.workflow.generating',
     ];

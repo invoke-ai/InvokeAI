@@ -1,10 +1,7 @@
 import type { ComponentProps, ReactNode } from 'react';
 
-import { MenuContent } from './Menu';
+import { MenuContent, SCROLLABLE_MENU_CONTENT_PROPS } from './Menu';
 import { Scrollable } from './Scrollable';
-
-/** A long menu's height: the context menus' cap, shrunk to the room the positioner measured beside its anchor. */
-const SCROLLABLE_MENU_MAX_H = 'min(28rem, var(--available-height))';
 
 /**
  * Re-implements Zag's highlight-follow. Zag scrolls a highlighted item into view only when the menu content itself
@@ -13,10 +10,7 @@ const SCROLLABLE_MENU_MAX_H = 'min(28rem, var(--available-height))';
  * highlight is skipped (the item under the pointer is already in view), as Zag does, so hovering an edge row does not
  * nudge the list.
  */
-const followHighlightedItem = (viewport: HTMLDivElement | null) => {
-  if (!viewport) {
-    return;
-  }
+const followHighlightedItem = (viewport: HTMLDivElement) => {
   const observer = new MutationObserver((records) => {
     for (const record of records) {
       const item = record.target;
@@ -30,17 +24,43 @@ const followHighlightedItem = (viewport: HTMLDivElement | null) => {
 };
 
 /**
- * Menu content for long lists, such as boards to move items to: it grows to the shared cap or the available height,
- * then scrolls in a Scrollable. The column layout gives the Scrollable the content's padded box, so the last row is
- * never cut off by the content's padding.
+ * Keeps the viewport out of the tab order: the menu owns keyboard navigation, and a menu may not contain a focusable
+ * element, even at tabindex -1. Zag sets tabindex 0 until it first measures its scrollbars (and whenever both axes
+ * overflow), and an undefined prop cannot override it, so the attribute is removed on attach, before first paint, and
+ * whenever Zag sets it again.
  */
+const keepOutOfTabOrder = (viewport: HTMLDivElement) => {
+  viewport.removeAttribute('tabindex');
+  const observer = new MutationObserver(() => viewport.removeAttribute('tabindex'));
+  observer.observe(viewport, { attributeFilter: ['tabindex'] });
+  return () => observer.disconnect();
+};
+
+const attachMenuViewport = (viewport: HTMLDivElement | null) => {
+  if (!viewport) {
+    return;
+  }
+  const stopKeepingOutOfTabOrder = keepOutOfTabOrder(viewport);
+  const stopFollowingHighlight = followHighlightedItem(viewport);
+  return () => {
+    stopKeepingOutOfTabOrder();
+    stopFollowingHighlight();
+  };
+};
+
+/** A menu's scrolling list, in content laid out with `SCROLLABLE_MENU_CONTENT_PROPS`, above any rows that stay in view. */
+export const ScrollableMenuList = ({ children }: { children: ReactNode }) => (
+  <Scrollable minH="0" viewportRef={attachMenuViewport}>
+    {children}
+  </Scrollable>
+);
+
+/** Menu content for long lists, such as boards to move items to: the list scrolls within the menu's cap. */
 export const ScrollableMenuContent = ({
   children,
   ...props
 }: ComponentProps<typeof MenuContent> & { children: ReactNode }) => (
-  <MenuContent display="flex" flexDirection="column" maxH={SCROLLABLE_MENU_MAX_H} overflow="hidden" {...props}>
-    <Scrollable minH="0" viewportRef={followHighlightedItem}>
-      {children}
-    </Scrollable>
+  <MenuContent {...SCROLLABLE_MENU_CONTENT_PROPS} {...props}>
+    <ScrollableMenuList>{children}</ScrollableMenuList>
   </MenuContent>
 );

@@ -41,8 +41,8 @@ export class NewRasterLayerController {
   constructor(private readonly deps: NewRasterLayerControllerOptions) {}
 
   /**
-   * Inserts `pixels` as a new paint layer covering `rect` (document space). The undo entry takes ownership of
-   * `pixels`; the caller owns getting it into document space.
+   * Inserts `pixels` as a new paint layer covering `rect` (document space). The undo entry takes ownership of `pixels`;
+   * the caller owns getting it into document space.
    */
   insert(rect: Rect, pixels: RasterSurface, name: string, label: string): NewRasterLayerResult {
     const { ctx } = this.deps;
@@ -97,8 +97,8 @@ export class NewRasterLayerController {
     if (!lifted) {
       return { status: 'empty' };
     }
-    // The copy comes out in LAYER-LOCAL space; a new layer is placed in document
-    // space, so bake the source layer's transform into the pixels on the way out.
+    // The copy comes out in LAYER-LOCAL space; a new layer is placed in document space, so bake the source layer's
+    // transform into the pixels on the way out.
     const documentRect = roundOut(transformBounds(matrix, lifted.pixels.rect));
     if (isEmpty(documentRect)) {
       return { status: 'empty' };

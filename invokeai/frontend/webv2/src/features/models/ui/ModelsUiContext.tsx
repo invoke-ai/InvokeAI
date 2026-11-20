@@ -1,5 +1,6 @@
 import type { ModelConfig } from '@features/models/core/types';
 import type { CalibrationGraphCompiler } from '@features/models/core/workingMemory';
+import type { ResolvedValues } from '@platform/core/resolvedValues';
 import type { ReactNode } from 'react';
 
 import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
@@ -27,8 +28,8 @@ export type SchedulerPolicyModel = Pick<ModelConfig, 'base' | 'format' | 'varian
 export type SchedulerPolicyReader = (model: SchedulerPolicyModel, currentValue: string | null) => ModelSchedulerPolicy;
 
 /**
- * Generate's scheduler rules: `loading` until the rules and the architecture table they read arrive, `unavailable`
- * when either failed, and `ready` with a reader that is replaced whenever the table changes.
+ * Generate's scheduler rules: `loading` until the rules and the architecture table they read arrive, `unavailable` when
+ * either failed, and `ready` with a reader that is replaced whenever the table changes.
  */
 export type SchedulerPolicyState =
   | { status: 'loading' }
@@ -56,6 +57,8 @@ export interface ModelsUiAdapter {
   /** Whether this session may open the Model Manager; its route redirects everyone else away. */
   canManageModels: boolean;
   enableModelDescriptions: boolean;
+  /** The user's Gallery defaults, for the manager's pickers. */
+  galleryValues?: ResolvedValues;
   /** Add Models' "Install in place" choice, an account preference. */
   installInPlace: boolean;
   isProjectActive: (projectId: string) => boolean;

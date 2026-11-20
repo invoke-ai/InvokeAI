@@ -1,10 +1,3 @@
-/**
- * Execute a {@link CompositePlan} with injected raster, encoding, hashing, and upload dependencies. Composite
- * enabled layers in z-order through their transforms, opacity, and blend modes into the bbox, then compute
- * document-space bounds and alpha coverage. The caller-owned {@link CompositeDedupeCache} skips unchanged plans
- * and reuses uploads with identical pixel hashes.
- */
-
 import type { CanvasImageUploadResult } from '@workbench/canvas-engine/document/imageUpload';
 import type { SpatialRunner } from '@workbench/canvas-engine/render/exactAdjustments';
 import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
@@ -30,26 +23,18 @@ type Ctx = RasterSurface['ctx'];
 /** SHA-256 hex of a blob's bytes, via `@platform/browser/sha256` (matches `bitmapStore`). */
 const defaultHashBlob = async (blob: Blob): Promise<string> => sha256Hex(await blob.arrayBuffer());
 
-/** Reads a surface's pixels via its 2D context (real DOM path; injectable for tests). */
 const defaultReadImageData = (surface: RasterSurface, rect: Rect): ImageData =>
   surface.ctx.getImageData(rect.x, rect.y, rect.width, rect.height);
 
-/** Writes pixels back to a surface's 2D context (real DOM path; injectable for tests). */
 const defaultWriteImageData = (surface: RasterSurface, imageData: ImageData, x: number, y: number): void =>
   surface.ctx.putImageData(imageData, x, y);
 
-/**
- * A caller-owned dedupe cache, persisted across executor calls:
- * - `byKey`: plan key → its last result, so an unchanged plan skips all work.
- * - `byHash`: pixel hash → uploaded image, so a changed plan with identical
- *   pixels reuses the upload.
- */
+/** Caller-owned: `byKey` skips unchanged plans, `byHash` reuses uploads of identical pixels. */
 export interface CompositeDedupeCache {
   byKey: Map<string, CompositeCacheEntry>;
   byHash: Map<string, CanvasImageUploadResult>;
 }
 
-/** A cached executor result for one plan key. */
 export interface CompositeCacheEntry {
   imageName: string;
   width: number;
@@ -62,7 +47,6 @@ export interface CompositeCacheEntry {
   bounds?: Rect;
 }
 
-/** Creates an empty {@link CompositeDedupeCache}. */
 export const createCompositeDedupeCache = (): CompositeDedupeCache => ({
   byHash: new Map(),
   byKey: new Map(),
@@ -84,52 +68,31 @@ class BoundedMap<K, V> extends Map<K, V> {
   }
 }
 
-/** Canvas-owned bounded cache used across generation transactions. */
 export const createBoundedCompositeDedupeCache = (capacity = 16): CompositeDedupeCache => ({
   byHash: new BoundedMap(capacity),
   byKey: new BoundedMap(capacity),
 });
 
-/** Injected dependencies for {@link executeCompositePlan}. */
 export interface ExecuteCompositePlanDeps {
-  /** Surface factory + encoder seam (usually the engine's `RasterBackend`). */
   backend: {
     createSurface(width: number, height: number): RasterSurface;
     encodeSurface(surface: RasterSurface, type?: string): Promise<Blob>;
   };
-  /**
-   * Return the rasterized surface and its layer-local content rect; drawing applies rect.origin before the layer
-   * transform, then releases it.
-   */
+  /** Drawing applies rect.origin before the layer transform. */
   getLayerSurface(layerId: string): Promise<{ surface: RasterSurface; rect: Rect; release(): void }>;
-  /**
-   * Upload the composite and return its server name and dimensions; the engine marks generation composites
-   * intermediate.
-   */
   uploadImage(blob: Blob): Promise<CanvasImageUploadResult>;
-  /** Persistent dedupe state (see {@link CompositeDedupeCache}). */
   dedupe: CompositeDedupeCache;
-  /** Content-hashes a blob (default SHA-256 hex via `@platform/browser/sha256`). */
   hashBlob?(blob: Blob): Promise<string>;
-  /** Reads a surface region's pixels for the coverage scan (default `getImageData`). */
   readImageData?(surface: RasterSurface, rect: Rect): ImageData;
-  /**
-   * Reserves transient raster bytes: once per composite for its planned buffers, and again while rendering for any
-   * layer whose rasterized pixels need more than planned. Over budget refuses with `RasterCompositeOverBudgetError`.
-   */
+  /** Reserves transient raster bytes; over budget refuses with `RasterCompositeOverBudgetError`. */
   reserve?(
     bytes: number
   ):
     | { status: 'ok'; lease: { release(): void } }
     | { status: 'over-budget'; requestedBytes: number; availableBytes: number };
-  /** Writes pixels back to a surface (default `putImageData`; injectable for tests). */
   writeImageData?(surface: RasterSurface, imageData: ImageData, x: number, y: number): void;
-  /**
-   * Evaluates spatial adjustment runs. Without it a spatial stack refuses with `AdjustmentRefusedError` instead of
-   * compositing without its spatial entries.
-   */
+  /** Without it a spatial stack refuses rather than compositing without its spatial entries. */
   runSpatial?: SpatialRunner;
-  /** Cancels spatial jobs; an aborted composite throws an `AbortError`. */
   signal?: AbortSignal;
 }
 
@@ -139,9 +102,7 @@ const reserveComposite = (
   scratchPixels: number
 ): { release(): void } => {
   const pixels = Math.max(0, entry.bbox.width) * Math.max(0, entry.bbox.height);
-  // Final/accumulator surface plus a final scan ImageData (except for control
-  // layers, which are made opaque by construction), plus a temporary surface
-  // and an ImageData buffer for every scratch pixel.
+  // Control layers skip the final scan buffer: they are opaque by construction.
   const finalBuffers = entry.kind === 'control-layer' ? 1 : 2;
   const reservation = deps.reserve?.((pixels * finalBuffers + scratchPixels * 2) * 4);
   if (reservation?.status === 'over-budget') {
@@ -150,43 +111,29 @@ const reserveComposite = (
   return reservation?.status === 'ok' ? reservation.lease : { release: () => undefined };
 };
 
-/** The base composite's upload identity + hash. */
 export interface CompositeEntryResult {
-  /** The entry's stable plan key. */
   key: string;
-  /** The uploaded (or reused) image name. */
   imageName: string;
   width: number;
   height: number;
-  /** SHA-256 of the composited PNG bytes. */
   pixelHash: string;
-  /** True when this result came from cache/dedupe (no upload happened this call). */
   reusedUpload: boolean;
 }
 
-/** The full result of executing a plan: the base image + mode-detection geometry. */
 export interface CompositeResult {
   base: CompositeEntryResult;
-  /** Union of enabled raster content bounds in document space, or `null`. */
   contentBounds: Rect | null;
-  /** Whether the composited bbox surface is fully opaque (no transparent holes). */
   bboxFullyCovered: boolean;
-  /** Whether any composited pixel in the bbox is not fully transparent. */
   bboxHasContent: boolean;
 }
 
-/** Document→bbox translate matrix (the "view" the entry is composited under). */
 const bboxView = (bbox: Rect): Mat2d => ({ a: 1, b: 0, c: 0, d: 1, e: -bbox.x, f: -bbox.y });
 
-/** Applies a matrix to a 2D context's transform. */
 const setTransform = (ctx: Ctx, m: Mat2d): void => {
   ctx.setTransform(m.a, m.b, m.c, m.d, m.e, m.f);
 };
 
-/**
- * Union base-raster bounds in document space, or null without enabled content. This geometry-only pre-pass avoids
- * uploads for txt2img; actualLayerRects replaces estimates with captured browser measurements.
- */
+/** Geometry-only pre-pass so txt2img needs no upload; actualLayerRects replaces estimates with measurements. */
 export const computeCompositeContentBounds = (
   plan: CompositePlan,
   actualLayerRects?: ReadonlyMap<string, Rect>
@@ -211,7 +158,6 @@ export const computeCompositeContentBounds = (
   return getCompositeLayerBounds(layers);
 };
 
-/** One alpha pass: every pixel fully opaque (empty → false), and any pixel not fully transparent. */
 const scanCoverage = (imageData: ImageData): { fullyOpaque: boolean; hasContent: boolean } => {
   const { data, height, width } = imageData;
   if (width <= 0 || height <= 0) {
@@ -227,10 +173,7 @@ const scanCoverage = (imageData: ImageData): { fullyOpaque: boolean; hasContent:
   return { fullyOpaque, hasContent };
 };
 
-/**
- * Flatten control composites over black: backend RGB normalization would otherwise matte erased pixels over white,
- * creating control signal. Editable surfaces retain alpha.
- */
+/** Over black: backend RGB normalization would matte erased pixels over white, creating control signal. */
 const flattenControlSurfaceOverBlack = (surface: RasterSurface): void => {
   const { ctx } = surface;
   ctx.save();
@@ -242,17 +185,12 @@ const flattenControlSurfaceOverBlack = (surface: RasterSurface): void => {
   ctx.restore();
 };
 
-/** A raster entry's upload plus its coverage scan; `bounds` is measured for regional masks only. */
 type RasterEntryResult = CompositeEntryResult & {
   bboxFullyCovered: boolean;
   bboxHasContent: boolean;
   bounds: Rect | null;
 };
 
-/**
- * Share raster composition, coverage scanning, encoding, and plan-key/content-hash upload deduplication between
- * {@link executeCompositePlan}, {@link executeControlComposite} and {@link executeRegionalMaskComposite}.
- */
 const executeRasterEntry = async (
   entry: CompositeEntry,
   deps: ExecuteCompositePlanDeps
@@ -347,7 +285,6 @@ export const executeCompositePlan = async (
   return { base, bboxFullyCovered, bboxHasContent, contentBounds };
 };
 
-/** Composite one control layer over the bbox; the shared cache avoids re-uploading unchanged controls. */
 export const executeControlComposite = async (
   entry: CompositeEntry,
   deps: ExecuteCompositePlanDeps
@@ -361,15 +298,11 @@ export const executeControlComposite = async (
   return result;
 };
 
-/** A regional mask upload plus the alpha bounds of its pixels in bbox space (empty when none fall inside). */
 export interface RegionalMaskCompositeResult extends CompositeEntryResult {
   bounds: Rect;
 }
 
-/**
- * Composite one regional mask with alpha preserved for alpha_mask_to_tensor and measure its alpha bounds; share the
- * base/control dedupe cache.
- */
+/** Alpha preserved for alpha_mask_to_tensor. */
 export const executeRegionalMaskComposite = async (
   entry: CompositeEntry,
   deps: ExecuteCompositePlanDeps
@@ -386,12 +319,7 @@ export const executeRegionalMaskComposite = async (
   return { ...result, bounds };
 };
 
-// ---- Grayscale mask composite (inpaint/outpaint) ---------------------------
-
-/**
- * Convert alpha > 127 to 255 - round(255 * attributeValue), otherwise white, with opaque alpha. Darken-compositing
- * these masks preserves legacy semantics: dark inpaints, white keeps.
- */
+/** Darkening these masks preserves legacy semantics: dark inpaints, white keeps. */
 export const toGrayscaleMaskPixels = (imageData: ImageData, attributeValue: number): void => {
   const { data } = imageData;
   const masked = Math.max(0, Math.min(255, 255 - Math.round(255 * attributeValue)));
@@ -404,7 +332,6 @@ export const toGrayscaleMaskPixels = (imageData: ImageData, attributeValue: numb
   }
 };
 
-/** The local→document transform matrix for a mask layer ref. */
 const maskLayerMatrix = (ref: CompositeMaskLayerRef): Mat2d =>
   fromTRS(
     { x: ref.transform.x, y: ref.transform.y },
@@ -413,7 +340,6 @@ const maskLayerMatrix = (ref: CompositeMaskLayerRef): Mat2d =>
     ref.transform.scaleY
   );
 
-/** True when any pixel is non-white (a masked region exists). Empty → false. */
 const hasNonWhitePixel = (imageData: ImageData): boolean => {
   const { data, height, width } = imageData;
   if (width <= 0 || height <= 0) {
@@ -427,7 +353,6 @@ const hasNonWhitePixel = (imageData: ImageData): boolean => {
   return false;
 };
 
-/** The result of a grayscale mask composite: its upload identity + whether it has any masked pixels. */
 export interface MaskCompositeResult {
   key: string;
   imageName: string;
@@ -435,11 +360,9 @@ export interface MaskCompositeResult {
   height: number;
   pixelHash: string;
   reusedUpload: boolean;
-  /** True when the composite contains a masked (non-white) region within the bbox. */
   hasContent: boolean;
 }
 
-/** Composites one mask entry's layers into a grayscale bbox surface (white bg, darken combine). */
 const compositeMaskEntry = async (
   entry: CompositeEntry,
   deps: ExecuteCompositePlanDeps,
@@ -453,7 +376,6 @@ const compositeMaskEntry = async (
   const accumulator = deps.backend.createSurface(width, height);
   const accCtx = accumulator.ctx;
 
-  // White background: unmasked area stays white ("keep").
   setTransform(accCtx, { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 });
   accCtx.fillStyle = 'white';
   accCtx.fillRect(0, 0, width, height);
@@ -462,7 +384,6 @@ const compositeMaskEntry = async (
   const fullRect: Rect = { height, width, x: 0, y: 0 };
 
   for (const ref of maskLayers) {
-    // Render the mask alpha into a temp bbox surface through its transform.
     const temp = deps.backend.createSurface(width, height);
     const tempCtx = temp.ctx;
     setTransform(tempCtx, { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 });
@@ -475,7 +396,6 @@ const compositeMaskEntry = async (
       layerSurface.release();
     }
 
-    // Convert its alpha to grayscale by the layer's attribute value.
     const pixels = readImageData(temp, fullRect);
     toGrayscaleMaskPixels(pixels, ref.attributeValue);
     writeImageData(temp, pixels, 0, 0);
@@ -491,10 +411,6 @@ const compositeMaskEntry = async (
   return accumulator;
 };
 
-/**
- * Composite inpaint/noise masks over white, scan mask coverage, and reuse the caller-owned plan-key/content-hash
- * upload cache.
- */
 export const executeMaskComposite = async (
   entry: CompositeEntry,
   deps: ExecuteCompositePlanDeps

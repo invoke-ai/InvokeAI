@@ -14,7 +14,7 @@ import pytest
 import torch
 
 from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
-from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.devices import EmptyCacheOutcome, TorchDevice
 from tests.backend.model_manager.load.model_cache.cached_model.utils import DummyModule
 
 MB = 2**20
@@ -194,6 +194,7 @@ def test_reports_the_availability_re_measured_after_the_offloads_empty_cache(gpu
 
     def empty_cache():
         vram.available += 30 * MB  # now the driver sees (some of) it
+        return EmptyCacheOutcome.RAN
 
     with (
         patch.object(cache, "_get_physical_vram_available", side_effect=vram.get_physical_vram_available),

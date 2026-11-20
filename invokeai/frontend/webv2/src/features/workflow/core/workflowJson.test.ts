@@ -662,5 +662,9 @@ describe('summarizeWorkflowLoadWarnings', () => {
         type: 'current_image',
       },
     ]);
+
+    const roundTripped = parseWorkflowJson(serializeWorkflowJson(document));
+    expect(roundTripped.warnings).toEqual([]);
+    expect(roundTripped.document.nodes).toEqual(document.nodes);
   });
 });

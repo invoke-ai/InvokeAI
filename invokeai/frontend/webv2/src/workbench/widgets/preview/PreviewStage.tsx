@@ -2,10 +2,7 @@ import type { Ref } from 'react';
 
 import { Box, Flex, type BoxProps, type FlexProps, type SystemStyleObject } from '@chakra-ui/react';
 
-/**
- * Share PreviewStage's fitted dot-grid surface and chrome clearance across media/live/empty states; FittedFrame
- * supplies bordered, shadowed media geometry.
- */
+import type { PreviewDensity } from './previewDensity';
 
 export const getFittedFrameCss = (width: number, height: number): SystemStyleObject => ({
   // The cue gallery thumbnails give when a touch hold arms their drag; only a draggable frame is ever armed.
@@ -17,24 +14,17 @@ export const getFittedFrameCss = (width: number, height: number): SystemStyleObj
   width: `min(100cqw, calc(100cqh * ${width / height}))`,
 });
 
-/**
- * Room for the centre region's floating chrome islands. `CenterArea` publishes
- * the variable and nothing else does, so the `0px` fallback keeps the right
- * panel — which reserves a real header row instead — unpadded.
- */
+/** Room for the centre's chrome islands; only `CenterArea` sets the variable, so `0px` keeps others unpadded. */
 const CENTER_CHROME_INSET = 'var(--wb-center-chrome-inset, 0px)';
 
-/**
- * Reserve chrome clearance on the stage content box so fitting shrinks media while the dot grid continues behind
- * chrome.
- */
+/** Chrome clearance on the content box; the larger of inset and stage padding is the top padding. */
 const getStagePaddingTop = (padding: string | undefined): string =>
-  padding === undefined ? CENTER_CHROME_INSET : `calc(var(--chakra-spacing-${padding}) + ${CENTER_CHROME_INSET})`;
+  padding === undefined ? CENTER_CHROME_INSET : `max(var(--chakra-spacing-${padding}), ${CENTER_CHROME_INSET})`;
 
-/**
- * Use parent fill for inset widget bodies and flex fill for framed stages. Both establish positioning for absolute
- * overlay children.
- */
+/** Stage padding by density, shared by the single item's stage and the comparison stage so their geometry matches. */
+export const getPreviewStagePadding = (density: PreviewDensity): string => (density === 'full' ? '6' : '3');
+
+/** Use parent fill for inset widget bodies and flex fill for framed stages. */
 export const PreviewStage = ({
   fill,
   padding,
