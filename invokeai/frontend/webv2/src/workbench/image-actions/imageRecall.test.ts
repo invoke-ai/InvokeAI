@@ -1557,7 +1557,13 @@ describe('legacy family metadata parity', () => {
     };
     const recall = (metadata: unknown) =>
       buildImageRecallSettings({
-        currentValues: createValues({ model, modelKey: model.key, ideogram4Steps: 70, ideogram4Mu: 3 }),
+        currentValues: createValues({
+          model,
+          modelKey: model.key,
+          ideogram4Steps: 70,
+          ideogram4GuidanceScale: 6,
+          ideogram4Mu: 3,
+        }),
         image,
         kind: 'all',
         metadata,
@@ -1583,7 +1589,9 @@ describe('legacy family metadata parity', () => {
     expect(
       recall({ model, ideogram4_steps: null, ideogram4_guidance_scale: null, ideogram4_mu: null })?.values
     ).toMatchObject({ ideogram4Steps: null, ideogram4GuidanceScale: null, ideogram4Mu: null });
-    expect(recall({ model, generation_mode: 'ideogram4_txt2img' })?.values).toMatchObject({
+    expect(recall({ model, generation_mode: 'ideogram4_txt2img', steps: 49, cfg_scale: 1.5 })?.values).toMatchObject({
+      steps: 49,
+      cfgScale: 1.5,
       ideogram4Steps: null,
       ideogram4GuidanceScale: null,
       ideogram4Mu: null,
