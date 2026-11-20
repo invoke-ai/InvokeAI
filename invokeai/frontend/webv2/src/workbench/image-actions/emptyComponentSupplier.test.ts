@@ -20,7 +20,7 @@ import type {
 import {
   getComponentPolicyContext,
   getComponentSectionPolicy,
-  getComponentSlotsSuppliedByMain,
+  getComponentSlotsSuppliedByRecord,
   getEmptyComponentSupplier,
   getFlux2ComponentSource,
 } from '@features/generation/core/baseGenerationPolicies';
@@ -345,19 +345,35 @@ describe('empty component supplier', () => {
     }
   });
 
+  // `source`: none recorded, a Diffusers pipeline of the model's own kind, or one recall cannot resolve.
   it.each([
-    ['z-image', { format: 'diffusers' }, ['qwen3EncoderModel', 'vae']],
-    ['z-image', { format: 'gguf_quantized' }, []],
-    ['qwen-image', { format: 'diffusers' }, ['qwenVLEncoderModel', 'vae']],
-    ['wan', { format: 'diffusers' }, ['wanT5EncoderModel', 'vae']],
-    ['flux2', { format: 'diffusers', variant: 'klein_4b' }, ['qwen3EncoderModel', 'vae']],
-    ['flux2', { format: 'diffusers', variant: 'dev' }, ['mistralEncoderModel', 'vae']],
-    ['flux2', { format: 'gguf_quantized', variant: 'dev' }, []],
-    ['krea-2', { format: 'diffusers' }, ['qwen3VLEncoderModel', 'vae']],
-    ['sdxl', { format: 'diffusers' }, []],
-  ] as const)('lists the slots a %s %j main fills from its own components', (base, overrides, expected) => {
+    ['z-image', { format: 'diffusers' }, 'none', ['qwen3EncoderModel', 'vae']],
+    // The Z-Image loader reads the source first, so an unknown one may have supplied everything.
+    ['z-image', { format: 'diffusers' }, 'unresolved', []],
+    ['z-image', { format: 'gguf_quantized' }, 'none', []],
+    ['z-image', { format: 'gguf_quantized' }, 'source', ['qwen3EncoderModel', 'vae']],
+    ['qwen-image', { format: 'diffusers' }, 'none', ['qwenVLEncoderModel', 'vae']],
+    // A bundled main fills its slots ahead of any source, known or not.
+    ['qwen-image', { format: 'diffusers' }, 'source', ['qwenVLEncoderModel', 'vae']],
+    ['qwen-image', { format: 'diffusers' }, 'unresolved', ['qwenVLEncoderModel', 'vae']],
+    ['qwen-image', { format: 'gguf_quantized' }, 'unresolved', []],
+    ['wan', { format: 'diffusers' }, 'source', ['vae', 'wanT5EncoderModel']],
+    ['flux2', { format: 'diffusers', variant: 'klein_4b' }, 'none', ['qwen3EncoderModel', 'vae']],
+    ['flux2', { format: 'diffusers', variant: 'dev' }, 'source', ['mistralEncoderModel', 'vae']],
+    ['flux2', { format: 'gguf_quantized', variant: 'dev' }, 'none', []],
+    ['flux2', { format: 'gguf_quantized', variant: 'dev' }, 'source', ['mistralEncoderModel', 'vae']],
+    ['krea-2', { format: 'diffusers' }, 'none', ['qwen3VLEncoderModel', 'vae']],
+    ['sdxl', { format: 'diffusers' }, 'none', ['vae']],
+    ['sd-1', { format: 'checkpoint' }, 'none', ['vae']],
+  ] as const)('lists the slots a %s %j record with %s source left to its loader', (base, overrides, kind, expected) => {
     const { model } = satisfiedSettingsFor(base, { label: 'main', overrides });
+    const source =
+      kind === 'none'
+        ? null
+        : kind === 'unresolved'
+          ? kind
+          : ({ ...model, format: 'diffusers', key: `${base}-source`, submodels: undefined } as MainModelConfig);
 
-    expect(getComponentSlotsSuppliedByMain(model, {})).toEqual(expected);
+    expect(getComponentSlotsSuppliedByRecord(model, source, {}).sort()).toEqual(expected);
   });
 });

@@ -132,7 +132,7 @@ const ComponentPicker = ({
     <Box data-issue-id={shownIssue && !shownIssue.fix ? shownIssue.id : undefined}>
       <Field label={slot.label} labelPlacement="inside" helpText={slot.helpText} error={error}>
         <ModelSelect
-          emptyLabel={supplier && !slot.placeholder ? emptyPlaceholder : undefined}
+          emptyLabel={!isRequired && (slot.placeholder || supplier) ? emptyPlaceholder : undefined}
           filter={slot.filter ? filter : undefined}
           invalid={Boolean(error)}
           isClearable

@@ -1187,54 +1187,24 @@ export const getEmptyComponentSupplier = (
   return null;
 };
 
-/** Every slot a component source can supply while it is empty: the sourced bases' slots and both FLUX.2 encoders. */
-const SOURCE_SUPPLIABLE_SLOTS: readonly GenerateComponentValueKey[] = [
-  ...new Set<GenerateComponentValueKey>([
-    'mistralEncoderModel',
-    'qwen3EncoderModel',
-    ...Object.values(SOURCED_SLOTS).flatMap((slots) => slots ?? []),
-  ]),
-];
-
 /**
- * The slots `source` supplies to `model` when they are empty, given the standalone encoders in `components`: what a
- * record that names the source leaves out of its own model fields. Asks `getEmptyComponentSupplier`, so it follows the
- * loader order (a bundled main beats the source on most bases) without repeating it.
+ * The slots a record left out because the loader filled them itself while they were empty: from the main, or from the
+ * recorded `source` (null when the record names none), in the loader's order (`getEmptyComponentSupplier`). A graph
+ * run's record names a slot's standalone pick whenever the graph loaded one, so these are what an absent key means;
+ * records written by older UIs never named a standalone SD 3 T5 or CLIP encoder. For a source recall could not
+ * resolve, only the slots the main fills ahead of any source are certain. `components` holds the standalone encoders
+ * that stay after recall, which decide what a FLUX.2 source supplies.
  */
-export const getComponentSlotsSuppliedBySource = (
+export const getComponentSlotsSuppliedByRecord = (
   model: GenerateModelConfig,
-  source: MainModelConfig,
+  source: MainModelConfig | null | 'unresolved',
   components: Partial<Pick<GenerateSettings, 'mistralEncoderModel' | 'qwen3EncoderModel'>>
 ): GenerateComponentValueKey[] =>
-  SOURCE_SUPPLIABLE_SLOTS.filter(
-    (key) => getEmptyComponentSupplier(model, { ...components, componentSourceModel: source }, key)?.key === source.key
-  );
-
-/** The component slots a model's loader can fill from its own main, by family. */
-const getMainSuppliableSlots = (model: GenerateModelConfig): readonly GenerateComponentValueKey[] => {
-  if (model.base === 'flux2') {
-    return ['mistralEncoderModel', 'qwen3EncoderModel', 'vae'];
-  }
-
-  if (model.base === 'sd-3') {
-    return SD3_MAIN_SLOTS;
-  }
-
-  return SOURCED_SLOTS[model.base] ?? BUNDLED_MAIN_SLOTS[model.base] ?? [];
-};
-
-/**
- * The slots a model fills from its own bundled components while they are empty, with no source: what a record that
- * names no source and no component for them left out. Every writer records a slot's pick whenever the graph used one,
- * so for these families an absent key means the main supplied it. Asks `getEmptyComponentSupplier`, so a main that
- * bundles nothing (a GGUF or a plain checkpoint) supplies nothing.
- */
-export const getComponentSlotsSuppliedByMain = (
-  model: GenerateModelConfig,
-  components: Partial<Pick<GenerateSettings, 'mistralEncoderModel' | 'qwen3EncoderModel'>>
-): GenerateComponentValueKey[] =>
-  getMainSuppliableSlots(model).filter(
-    (key) => getEmptyComponentSupplier(model, { ...components, componentSourceModel: null }, key)?.key === model.key
+  GENERATE_COMPONENT_VALUE_KEYS.filter((key) =>
+    source === 'unresolved'
+      ? !SOURCE_FIRST_BASES.has(model.base) &&
+        getEmptyComponentSupplier(model, { ...components, componentSourceModel: null }, key)?.key === model.key
+      : getEmptyComponentSupplier(model, { ...components, componentSourceModel: source }, key) !== null
   );
 
 export const getAutoFlux2ComponentSourceModel = (

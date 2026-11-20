@@ -446,6 +446,21 @@ describe('GenerateSettingsForm required components', () => {
     ]);
   });
 
+  it('shows "None" on the empty PiD slots while PiD is off, and asks for a model once it is on', async () => {
+    const emptyLabels = () =>
+      ['pid_decoder', 'gemma2_encoder'].map((type) =>
+        host!.querySelector(`[data-component-types="${type}"]`)?.getAttribute('data-component-empty-label')
+      );
+    stableGroups.models.catalog = [MODEL];
+    await renderAdapter(buildAdapter());
+    await selectModel(MODEL);
+
+    expect(emptyLabels()).toEqual(['None', 'None']);
+
+    await settle(() => storedValues().patchSnapshot({ pidMode: 'fit' }));
+    expect(emptyLabels()).toEqual([null, null]);
+  });
+
   it('names what the loader takes an empty slot from: a source for a GGUF main, the main itself when it bundles them', async () => {
     const wan = (key: string, name: string, format: string) =>
       ({ ...MODEL, base: 'wan', format, key, name }) as GenerationModelCatalogItem;

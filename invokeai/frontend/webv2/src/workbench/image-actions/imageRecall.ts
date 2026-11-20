@@ -18,8 +18,7 @@ import {
   isIdeogram4SamplerPreset,
   deriveAspectRatioId,
   getCompatibleReferenceImages,
-  getComponentSlotsSuppliedByMain,
-  getComponentSlotsSuppliedBySource,
+  getComponentSlotsSuppliedByRecord,
   getDimensionGrid,
   getExternalProviderOptionKeys,
   getExternalResolutionPresets,
@@ -573,6 +572,14 @@ const hasMossImageSkipLayers = (metadata: unknown, model: GenerateModelConfig | 
 /** On a stamped generation record a missing list or switch means none or the default; canvas saves record neither. */
 const isGenerationRecord = (metadata: unknown): boolean => getString(metadata, 'generation_mode') !== null;
 
+/**
+ * A graph run's record, which names the components its loaders used: a generation record, or a Refine upscale, which
+ * writes no `generation_mode` but always `creativity` (a Model only upscale copies its source's keys instead). A Canvas
+ * save records the panel's model and VAE but no components.
+ */
+const recordsGraphRun = (metadata: unknown): boolean =>
+  isGenerationRecord(metadata) || getNumber(metadata, 'creativity') !== null;
+
 const getBoundedNumber = (metadata: unknown, key: string, min: number, max: number): number | null => {
   const value = getNumber(metadata, key);
 
@@ -966,6 +973,18 @@ const RECALLED_COMPONENTS: readonly RecalledComponent[] = [
   { isMainModel: true, metadataKey: 'qwen_image_component_source', setting: 'componentSourceModel' },
   { isMainModel: true, metadataKey: 'wan_component_source', setting: 'componentSourceModel' },
 ];
+
+/**
+ * Settings no model supplies while empty that graph-run records name whenever the base's loader used them: a record
+ * naming the model but not them used none, so a panel pick would change the rerun. Z-Image records of v6.10.0rc1 did
+ * not name `qwen3_source`. FLUX.2 is left to the model transition, which drops a stored source wherever its graph
+ * would read none; dev records before 7.0 never named `mistral_source`, so its absence proves nothing there.
+ */
+const SETTINGS_RECORDED_WHEN_LOADED: Partial<Record<string, readonly RecalledComponentSetting[]>> = {
+  'qwen-image': ['componentSourceModel'],
+  wan: ['componentSourceModel', 'wanLowNoiseModel'],
+  'z-image': ['componentSourceModel'],
+};
 
 const getRecalledComponent = (
   metadata: unknown,
@@ -1579,19 +1598,26 @@ export const buildImageRecallSettings = ({
       }
     }
 
-    // A record that names its source left out the slots the source supplied, and a main that is its own source the
-    // slots it bundles. Standalone picks left in the panel would take those slots over, so clear them to let the
-    // recorded source supply them again. The encoders judged are the ones that survive recall: a recorded one that is
-    // gone leaves the panel's, and with it the question whether the source still supplies the VAE.
-    const recordedSource = fittingSettings.includes('componentSourceModel')
-      ? componentPatch.componentSourceModel
-      : null;
     // A slot the record names stays with the record, resolved or not: an uninstalled component is not one the source
     // supplied, so the panel's own pick stays.
     const recordsComponent = (setting: RecalledComponentSetting): boolean =>
       RECALLED_COMPONENTS.some(
         (component) => component.setting === setting && isRecord(metadata) && component.metadataKey in metadata
       );
+    // A record of a graph run left out the slots its main or its source filled. Standalone picks left in the panel would
+    // take those slots over, so clear them to let the same supplier fill them again. Only a recalled main establishes
+    // who that was: a record that names none says nothing about the panel's model, and one that records no components
+    // (a Canvas save) says nothing about them. The encoders judged are the ones that survive recall: a recorded one that
+    // is gone leaves the panel's, and with it the question whether the source still supplies the VAE.
+    const judgedModel = model && recordsGraphRun(metadata) ? model : undefined;
+    const { componentSourceModel } = componentPatch;
+    const recordedSource = !recordsComponent('componentSourceModel')
+      ? null
+      : !fittingSettings.includes('componentSourceModel')
+        ? ('unresolved' as const)
+        : isMainModelConfig(componentSourceModel)
+          ? componentSourceModel
+          : null;
     // The model selection below drops a pick the model does not accept, so only an accepted one counts here.
     const survivingEncoder = (setting: 'mistralEncoderModel' | 'qwen3EncoderModel') => {
       const encoder = values[setting];
@@ -1602,16 +1628,18 @@ export const buildImageRecallSettings = ({
       mistralEncoderModel: survivingEncoder('mistralEncoderModel'),
       qwen3EncoderModel: survivingEncoder('qwen3EncoderModel'),
     };
-    const suppliedBySource =
-      recordedSource && isMainModelConfig(recordedSource)
-        ? getComponentSlotsSuppliedBySource(effectiveModel, recordedSource, survivingEncoders)
-        : recordsComponent('componentSourceModel')
-          ? []
-          : getComponentSlotsSuppliedByMain(effectiveModel, survivingEncoders);
-    const clearedSettings = suppliedBySource.filter(
-      (key): key is RecalledComponentSetting & typeof key =>
-        key !== 'vae' && !recordsComponent(key as RecalledComponentSetting)
-    );
+    const suppliedByRecord = judgedModel
+      ? getComponentSlotsSuppliedByRecord(judgedModel, recordedSource, survivingEncoders)
+      : [];
+    const clearedSettings = [
+      ...suppliedByRecord.filter(
+        (key): key is RecalledComponentSetting & typeof key =>
+          key !== 'vae' && !recordsComponent(key as RecalledComponentSetting)
+      ),
+      ...((judgedModel && SETTINGS_RECORDED_WHEN_LOADED[judgedModel.base]) ?? []).filter(
+        (setting) => !recordsComponent(setting)
+      ),
+    ];
 
     for (const setting of clearedSettings) {
       values = { ...values, [setting]: null };
@@ -1666,7 +1694,7 @@ export const buildImageRecallSettings = ({
     if (vae !== undefined) {
       values = { ...values, vae };
       fields.push('vae');
-    } else if (suppliedBySource.includes('vae') && getRecordedVaeKey(metadata, values.model) === null && values.vae) {
+    } else if (suppliedByRecord.includes('vae') && getRecordedVaeKey(metadata, values.model) === null && values.vae) {
       values = { ...values, vae: null };
 
       if (currentValues.vae) {

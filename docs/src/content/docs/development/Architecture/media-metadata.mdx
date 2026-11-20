@@ -110,7 +110,7 @@ The current value is `CORE_METADATA_VERSION` in `invokeai/app/invocations/metada
 | `width`, `height` | integer |
 | `model` | `ModelIdentifier`: the main (transformer) model |
 | `vae` | `ModelIdentifier`: the VAE the graph loads; absent when the main model or a component source supplies it |
-| `loras` | `LoRA[]`: the LoRAs the graph loaded, in order; absent when none ran. On Wan, entries include optional `target` (`"high"`, `"low"`, or `"both"`) and `low_noise_weight` when high/low expert weights differ |
+| `loras` | `LoRA[]`: the LoRAs the graph loaded, in order; empty or absent when none ran. On Wan, entries include optional `target` (`"high"`, `"low"`, or `"both"`) and `low_noise_weight` when high/low expert weights differ |
 
 ### Image profile
 
