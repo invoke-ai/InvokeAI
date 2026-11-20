@@ -144,8 +144,8 @@ export const createGalleryBoardReferenceCheck = (
  * account changes, or the workbench unmounts, and a window's focus is forgotten once it docks or closes. The center
  * holds focus whenever nothing else does, including on load.
  *
- * It lives in this module, beside the other workbench lifecycle adapter, because the editor's startup module set
- * is pinned by the architecture performance gate; a module of its own would have to be added to that baseline.
+ * It lives in this module, beside the other workbench lifecycle adapter, because the editor's startup module set is
+ * pinned by the architecture performance gate; a module of its own would have to be added to that baseline.
  */
 export const WorkbenchFocusProvider = ({ children }: { children: ReactNode }) => {
   const { getSnapshot } = useWorkbenchQueries();

@@ -48,9 +48,7 @@ interface GraphPreviewMoreMenuProps {
   onClose: () => void;
 }
 
-/**
- * The preview's graph as a workflow of its own, for the More menu's Open-as items and the footer's "Edit as workflow".
- */
+/** The preview's graph as a workflow of its own, for the More menu's Open-as items and the footer's "Edit as workflow". */
 export const useGraphAsWorkflow = ({
   graph,
   sourceDocument,
@@ -69,8 +67,8 @@ export const useGraphAsWorkflow = ({
 
   /**
    * The graph as a new workflow document of its own: a copy of the source's document where it has one, so its labels,
-   * notes and form survive; else the compiled graph converted, without the node types this server lacks. Null, with
-   * the reason shown, when nothing would be left.
+   * notes and form survive; else the compiled graph converted, without the node types this server lacks. Null, with the
+   * reason shown, when nothing would be left.
    */
   const toNewDocument = useCallback(
     (failedKey: string): ProjectGraphState | null => {
@@ -109,7 +107,6 @@ export const useGraphAsWorkflow = ({
     [graph, notifications, sourceDocument, sourceLabel, t, templatesSnapshot]
   );
 
-  /** Adds the graph to the project as a workflow and opens it in the editor, closing the preview. */
   const editInEditor = useCallback(() => {
     const document = toNewDocument('graphPreview.editInEditorFailed');
 
@@ -313,8 +310,8 @@ export const GraphPreviewMoreMenu = ({
       return;
     }
 
-    // The port creates + activates a fresh project before loading the
-    // document, so the project this preview came from is left untouched.
+    // The port creates + activates a fresh project before loading the document, so the project this preview came from
+    // is left untouched.
     graphPreview.openDocumentInNewProject(document, t('graphPreview.openedFromPreview'));
     onClose();
   }, [toNewDocument, t, graphPreview, onClose]);

@@ -443,7 +443,6 @@ export const ReferenceImageCropDialog = ({
     dragRef.current = null;
     if (panRef.current) {
       panRef.current = null;
-      // Space still held keeps the viewport ready for the next pan.
       setPanState(spaceHeldRef.current ? 'ready' : 'idle');
     }
     if (viewportRef.current?.hasPointerCapture(event.pointerId)) {
@@ -496,8 +495,8 @@ export const ReferenceImageCropDialog = ({
     }
   }, [close, cropBox, gallery, image, notifications, onApply, onClose]);
 
-  // A durable copy of the crop in Uploads on the Gallery's auto-add board, unrelated to applying it: the dialog
-  // stays open and the reference unchanged.
+  // A durable copy of the crop in Uploads on the Gallery's auto-add board, unrelated to applying it: the dialog stays
+  // open and the reference unchanged.
   const saveToAssets = useCallback(async () => {
     const owner = captureAccountScope();
     setIsSaving(true);

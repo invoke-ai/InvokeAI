@@ -2,8 +2,8 @@ import { registerAccountOwnedResource } from '@platform/state/accountLifecycle';
 import { createExternalStore } from '@platform/state/externalStore';
 
 /**
- * Share session selection outside the flow; editor events publish IDs while external requests ask the editor to
- * select and focus.
+ * Share session selection outside the flow; editor events publish IDs while external requests ask the editor to select
+ * and focus.
  */
 
 export interface WorkflowSelectionSnapshot {
@@ -49,8 +49,8 @@ export const requestNodeSelection = (nodeIds: string[]): void => {
 };
 
 /**
- * Selects one node and zooms the editor to it: at once in a mounted editor, else when the next one mounts. Callers
- * show the Workflow editor first; the linear form panel does not apply selection requests.
+ * Selects one node and zooms the editor to it: at once in a mounted editor, else when the next one mounts. Callers show
+ * the Workflow editor first; the linear form panel does not apply selection requests.
  */
 export const revealWorkflowNode = (nodeId: string): void => requestNodeSelection([nodeId]);
 

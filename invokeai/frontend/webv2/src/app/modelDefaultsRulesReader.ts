@@ -1,25 +1,25 @@
-import type { ArchitectureCapabilitiesSnapshot } from '@features/generation/runtime';
 import type {
   DefaultComponentPruner,
   DefaultComponentSlotReader,
-  SchedulerPolicyReader,
   ModelDefaultsRulesState,
+  SchedulerPolicyReader,
 } from '@features/models';
+import type { ArchitectureCapabilitiesSnapshot } from '@features/models/architecturesStore';
 
+import {
+  getDefaultComponentSlotPolicies,
+  getDefaultGenerateSettings,
+  getGenerationUiPolicy,
+  getSchedulerOptions,
+  isDefaultVaeLoaded,
+  isVaeCompatibleWithGenerateModel,
+  pruneClosedDefaultComponents,
+} from '@features/generation/settings';
 import {
   ensureArchitectureCapabilitiesLoaded,
   getArchitectureCapabilitiesSnapshot,
   subscribeArchitectureCapabilities,
-} from '@features/generation/runtime';
-import {
-  getDefaultComponentSlotPolicies,
-  getDefaultGenerateSettings,
-  isVaeCompatibleWithGenerateModel,
-  getGenerationUiPolicy,
-  getSchedulerOptions,
-  isDefaultVaeLoaded,
-  pruneClosedDefaultComponents,
-} from '@features/generation/settings';
+} from '@features/models/architecturesStore';
 
 type GenerateMainModel = Parameters<typeof getDefaultGenerateSettings>[0] & { type: 'main' };
 

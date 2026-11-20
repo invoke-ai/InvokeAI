@@ -1,3 +1,4 @@
+import type { CanvasEngineHandle } from '@workbench/canvas-operations/react';
 import type { LucideIcon } from 'lucide-react';
 
 import { HStack, Input, Text } from '@chakra-ui/react';
@@ -7,23 +8,44 @@ import { CopyIcon, FolderPlusIcon, Trash2Icon } from 'lucide-react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import type { LayerSelectionCommands } from './useLayerSelectionCommands';
+import {
+  deleteLayers,
+  duplicateLayers,
+  groupLayers,
+  useLayerCommandAvailability,
+  useLayerCommandDeps,
+} from './layerCommands';
 
 const ACTION_TOOLTIP_POSITIONING = { placement: 'top' } as const;
 
 interface LayersPanelFooterProps {
-  commands: LayerSelectionCommands;
   degraded: boolean;
+  editingLocked: boolean;
+  engine: CanvasEngineHandle | null;
   filter: string;
+  /** The panel's selection, which the footer's commands act on. */
+  selectedIds: readonly string[];
   onFilterChange: (filter: string) => void;
 }
 
-const LayersPanelFooterComponent = ({ commands, degraded, filter, onFilterChange }: LayersPanelFooterProps) => {
+const LayersPanelFooterComponent = ({
+  degraded,
+  editingLocked,
+  engine,
+  filter,
+  selectedIds,
+  onFilterChange,
+}: LayersPanelFooterProps) => {
   const { t } = useTranslation();
+  const deps = useLayerCommandDeps(engine);
+  const available = useLayerCommandAvailability(engine, selectedIds);
   const handleFilter = useCallback(
     (event: { target: { value: string } }) => onFilterChange(event.target.value),
     [onFilterChange]
   );
+  const handleDuplicate = useCallback(() => void duplicateLayers(deps, selectedIds), [deps, selectedIds]);
+  const handleGroup = useCallback(() => groupLayers(deps, selectedIds), [deps, selectedIds]);
+  const handleDelete = useCallback(() => deleteLayers(deps, selectedIds), [deps, selectedIds]);
   return (
     <HStack borderColor="border.subtle" borderTopWidth="1px" gap="2" minH="10" px="2" py="1">
       <Input
@@ -41,23 +63,23 @@ const LayersPanelFooterComponent = ({ commands, degraded, filter, onFilterChange
       ) : null}
       <HStack gap="0.5">
         <FooterAction
-          disabled={!commands.canDuplicate}
+          disabled={editingLocked || !available.duplicate}
           icon={CopyIcon}
           label={t('widgets.layers.actions.duplicateSelected')}
-          onRun={commands.duplicateSelected}
+          onRun={handleDuplicate}
         />
         <FooterAction
-          disabled={!commands.canGroup}
+          disabled={editingLocked || !available.group}
           icon={FolderPlusIcon}
           label={t('widgets.layers.actions.groupSelected')}
-          onRun={commands.groupSelected}
+          onRun={handleGroup}
         />
         <FooterAction
           colorPalette="red"
-          disabled={!commands.canDelete}
+          disabled={editingLocked || !available.delete}
           icon={Trash2Icon}
           label={t('widgets.layers.actions.deleteSelected')}
-          onRun={commands.deleteSelected}
+          onRun={handleDelete}
         />
       </HStack>
     </HStack>

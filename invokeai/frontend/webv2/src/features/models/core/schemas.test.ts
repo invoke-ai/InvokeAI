@@ -58,7 +58,6 @@ describe('resolveModelAbsolutePath', () => {
 
 describe('mainDefaultSettingsSchema', () => {
   it('accepts the guidance this app itself stores for FLUX.1 Fill', () => {
-    // FLUX Fill defaults to guidance 30; editing unrelated fields must accept that stored value.
     const result = mainDefaultSettingsSchema.safeParse({
       cfgRescaleMultiplier: null,
       cfgScale: 1,

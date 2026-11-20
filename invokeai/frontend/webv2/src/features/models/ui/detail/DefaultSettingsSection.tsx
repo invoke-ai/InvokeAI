@@ -85,8 +85,8 @@ const FieldControl = ({ acceptsVae, control, disabled, label, modelKey, setValue
         value={typeof value === 'number' ? String(value) : ''}
         w="full"
         onValueChange={(details) => {
-          // Empty/partial input is transient; only commit finite numbers so the
-          // field never silently flips back to "off".
+          // Empty/partial input is transient; only commit finite numbers so the field never silently flips back to
+          // "off".
           if (Number.isFinite(details.valueAsNumber)) {
             setValue(details.valueAsNumber);
           }
@@ -163,8 +163,7 @@ const FieldControl = ({ acceptsVae, control, disabled, label, modelKey, setValue
         relatedTo={modelKey}
         showManagerButton={false}
         size="lg"
-        // The 'default' sentinel renders as the placeholder: the toggle is on
-        // but no specific model is pinned.
+        // The default sentinel renders as the placeholder: the toggle is on but no specific model is pinned.
         value={storedKey}
         onChange={(selected) => setValue(selected ? selected.key : 'default')}
       />
@@ -184,10 +183,8 @@ export const DefaultSettingsSection = ({
   onSaved: () => void;
 }) => {
   const { t } = useTranslation();
-  // Whether FP8 Storage reaches this model depends on its format and on its loader, so the backend
-  // answers it. Fetched here because this section is the only thing that asks, and the table is static
-  // per backend build. While it is unknown the row stays hidden: a control that arrives a moment late
-  // is better than one that does nothing.
+  // The backend answers whether FP8 Storage reaches this model; fetched here because this section is the only thing
+  // that asks. While unknown the row stays hidden: a control that arrives late beats one that does nothing.
   useMountEffect(() => {
     void ensureFp8StorageSupportLoaded();
   });
@@ -230,8 +227,8 @@ export const DefaultSettingsSection = ({
     setRetriedFailure(defaultsRulesState);
     defaultsRulesSource.load();
   };
-  // When a retry succeeds the Retry button leaves with the note; hand the focus it held to the scheduler row, or to
-  // the section heading when the base ignores the scheduler and the whole row left with it.
+  // When a retry succeeds the Retry button leaves with the note; hand the focus it held to the scheduler row, or to the
+  // section heading when the base ignores the scheduler and the whole row left with it.
   const handOverRetryFocus = useCallback((button: HTMLButtonElement | null) => {
     if (!button) {
       return undefined;

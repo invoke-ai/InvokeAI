@@ -1,4 +1,4 @@
-import { hasArchitectureCapabilities } from '@features/generation/core/architectureCapabilities';
+import { hasArchitectureCapabilities } from '@features/models/architectures';
 import { areJsonValuesStructurallyEqual } from '@platform/core/json';
 
 import type { GenerationModelCatalogItem } from './contracts';
@@ -24,8 +24,8 @@ import {
 export interface ResolveGenerateWidgetValuesInput {
   models: readonly GenerationModelCatalogItem[];
   /**
-   * Absent while the catalog is unread or failed. A successful empty catalog
-   * is distinct, but both preserve an applied snapshot that is not present.
+   * Absent while the catalog is unread or failed. A successful empty catalog is distinct, but both preserve an applied
+   * snapshot that is not present.
    */
   promptTemplates?: readonly PromptTemplateSnapshot[];
   storedValues: unknown;
@@ -91,8 +91,8 @@ export const resolveGenerateWidgetValues = ({
   const storedModel = normalizedWidgetValues?.model;
   // A chosen model that is no longer installed stays chosen: the model card names it and Invoke waits until the user
   // picks another or it returns. Reinstalling gives it a new key but the same file hash, so it is found again by hash
-  // (and its type, base and variant).
-  // Only values with no runnable choice (first run, an unknown family) take the default.
+  // (and its type, base and variant). Only values with no runnable choice (first run, an unknown family) take the
+  // default.
   const chosenModel =
     supportedModels.find((model) => model.key === normalizedSettings?.modelKey) ??
     (storedModel ? supportedModels.find((model) => isSameModelFile(model, storedModel)) : undefined) ??

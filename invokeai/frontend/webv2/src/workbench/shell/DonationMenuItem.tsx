@@ -14,10 +14,7 @@ const frontendConfigQueryOptions = queryOptions({
   staleTime: Infinity,
 });
 
-/**
- * Menu triggers call this on hover and focus so the setting usually resolves before the menu opens, rather than
- * inserting a row under the pointer. It also retries a failed request, which the mounted menu item never does.
- */
+/** Called on trigger hover and focus so the setting resolves before the menu opens; also retries failures. */
 export const prefetchDonationMenuItem = (queryClient: QueryClient) =>
   queryClient.prefetchQuery(frontendConfigQueryOptions);
 

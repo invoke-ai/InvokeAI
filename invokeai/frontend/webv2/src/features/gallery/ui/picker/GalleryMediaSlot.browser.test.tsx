@@ -352,8 +352,7 @@ describe('GalleryMediaSlot', () => {
 
     expect(find).not.toBeNull();
 
-    // Assert focus-based reveal via pointer-events; opacity transitions cannot reliably indicate whether the badge
-    // is revealed.
+    // Assert focus-based reveal via pointer-events; opacity transitions cannot reliably show whether it is revealed.
     expect(getComputedStyle(find!).pointerEvents).toBe('none');
     expect(getComputedStyle(find!).opacity).toBe('0');
 

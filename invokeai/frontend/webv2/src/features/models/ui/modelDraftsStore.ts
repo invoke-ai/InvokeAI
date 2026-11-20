@@ -8,12 +8,7 @@ import { createKeyedTransientStore } from '@platform/state/externalStore';
 import { shallowEqual, useExternalStoreSelector, type EqualityFn } from '@platform/state/selectors';
 import { useCallback } from 'react';
 
-/**
- * Unsaved model-detail edits, kept per model while the manager navigates between tabs and models so leaving a form
- * never loses work. Memory only, for the account's lifetime in this tab; a draft ends on its surface's save or
- * discard, the model's removal, eviction past the bound, or an account transition. A save in flight belongs here too,
- * so a form remounted mid-request still shows it and its outcome.
- */
+/** Unsaved model-detail edits per model, in memory for the account's lifetime in this tab, saves in flight included. */
 
 type DraftValues = Readonly<Record<string, unknown>>;
 
@@ -30,14 +25,12 @@ export interface ModelFieldsDraft {
 }
 
 export interface ModelIdentityDraft extends ModelFieldsDraft {
-  /** The last failed save's message, shown until the next save attempt. */
   readonly error: string | null;
 }
 
 export interface ModelDraft {
   /** Default-settings edits; absent when nothing differs from the server and no save is in flight. */
   readonly defaults?: ModelFieldsDraft;
-  /** Hosted-provider record edits, kept like `defaults`. */
   readonly external?: ModelFieldsDraft;
   /** Present exactly while the identity editor is open, even before anything is edited. */
   readonly identity?: ModelIdentityDraft;
@@ -84,7 +77,6 @@ const isSameValue = (left: unknown, right: unknown): boolean => shallowEqual(lef
 export const hasDraftFields = (draft: ModelFieldsDraft | undefined): boolean =>
   draft !== undefined && Object.keys(draft.fields).length > 0;
 
-/** The form's values: the current server record with the user's edited fields on top. */
 export const applyModelDraftFields = <Values extends object>(
   server: Values,
   draft: ModelFieldsDraft | undefined
@@ -102,10 +94,7 @@ export const hasModelDraftConflict = (server: object, draft: ModelFieldsDraft | 
 export const hasUnsavedModelChanges = (draft: ModelDraft | undefined): boolean =>
   FIELD_SURFACES.some((surface) => hasDraftFields(draft?.[surface]));
 
-/**
- * Whether a user value is still an edit: it differs from the server, or from a save in flight (a field typed back
- * to the old server value mid-save must survive that save landing).
- */
+/** A field typed back to the old server value mid-save must survive that save landing. */
 const isEdit = (value: unknown, key: string, server: object, submitted: DraftValues | undefined): boolean =>
   !isSameValue(value, readField(server, key)) || (submitted !== undefined && !isSameValue(value, submitted[key]));
 
@@ -196,10 +185,7 @@ registerAccountOwnedResource({
   name: 'model-drafts',
 });
 
-/**
- * Follow the loaded library: drop drafts of models that leave it (deleted here or found gone by a refresh), and when
- * a record changes, drop edits the server now agrees with so nothing reads as unsaved without a difference.
- */
+/** Drops drafts of models that left the library, and edits the server now agrees with. */
 const syncWithLibrary = (): void => {
   const { modelsByKey, status } = getModelsSnapshot();
 
@@ -263,10 +249,7 @@ export const openModelIdentityDraft = (modelKey: string): void => {
   }
 };
 
-/**
- * Record a surface's full current values against the server record it was edited from. Only edits are kept; a field
- * keeps the baseline it was first edited against until it stops being an edit.
- */
+/** A field keeps the baseline it was first edited against until it stops being an edit. */
 export const recordModelDraftFields = (
   modelKey: string,
   surface: ModelDraftSurface,
@@ -304,10 +287,7 @@ export const beginModelDraftSave = (modelKey: string, surface: ModelDraftSurface
   return true;
 };
 
-/**
- * A save landed: drop the fields it carried and keep anything edited since, as a draft against the saved record.
- * An identity editor left with nothing to save closes.
- */
+/** Keeps anything edited since the save as a draft; an identity editor left with nothing to save closes. */
 export const finishModelDraftSave = (modelKey: string, surface: ModelDraftSurface, saved: object): void => {
   const draft = store.get(modelKey);
   const previous = draft?.[surface];
@@ -353,7 +333,6 @@ export const failModelDraftSave = (
   writeDraft(modelKey, withFields(draft, surface, retainEdits(settled, server), error));
 };
 
-/** A new attempt replaces the last failure's message. */
 export const clearModelIdentitySaveError = (modelKey: string): void => {
   const draft = store.get(modelKey);
 
@@ -362,7 +341,6 @@ export const clearModelIdentitySaveError = (modelKey: string): void => {
   }
 };
 
-/** The intentional discard: Cancel/Reset. */
 export const discardModelDraft = (modelKey: string, surface: ModelDraftSurface): void => {
   const draft = store.get(modelKey);
 

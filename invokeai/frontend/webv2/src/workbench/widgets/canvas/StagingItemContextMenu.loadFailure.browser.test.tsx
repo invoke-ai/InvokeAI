@@ -62,7 +62,6 @@ afterEach(async () => {
   window.removeEventListener('unhandledrejection', unhandled);
 });
 
-/** Opens the menu, which loads its verbs as it mounts. */
 const open = async (onSaveToGallery = vi.fn()) => {
   await act(() =>
     root.render(

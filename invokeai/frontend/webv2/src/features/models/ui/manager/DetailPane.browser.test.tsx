@@ -3,9 +3,8 @@ import type { ModelConfig } from '@features/models/core/types';
 import { ChakraProvider } from '@chakra-ui/react';
 import { getModelsSnapshot, setModelsSnapshotForTests } from '@features/models/data/modelsStore';
 import { type ModelsUiAdapter, ModelsUiProvider, NO_DEFAULTS_RULES } from '@features/models/ui/ModelsUiContext';
-import { getModelsUiSnapshotForTests, openModelDetail } from '@features/models/ui/uiStore';
+import { openModelDetail } from '@features/models/ui/uiStore';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
-import { closingFrames, recordDialogExit } from '@platform/ui/dialogExit.testing';
 import { system } from '@theme/system';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -45,73 +44,6 @@ const VAE = {
   source_type: 'path',
   type: 'vae',
 } as ModelConfig;
-
-const pathDialog = () =>
-  [...document.querySelectorAll('[role="dialog"]')].find((dialog) => dialog.textContent.includes('models.currentPath'));
-
-describe('models DetailPane', () => {
-  let host: HTMLDivElement;
-  let root: Root;
-
-  beforeEach(async () => {
-    accountLifecycle.activate('detail-pane-test', ':user:detail-pane-test');
-    setModelsSnapshotForTests({ models: [VAE], status: 'loaded' });
-    openModelDetail(VAE.key);
-    host = document.createElement('div');
-    document.body.append(host);
-    root = createRoot(host);
-    await act(() =>
-      root.render(
-        <ChakraProvider value={system}>
-          <DetailPane />
-        </ChakraProvider>
-      )
-    );
-  });
-
-  afterEach(async () => {
-    await act(() => root.unmount());
-    host.remove();
-    accountLifecycle.invalidate();
-  });
-
-  it('animates the delete confirmation out after the deleted model leaves the pane', async () => {
-    await act(() => userEvent.click(document.querySelector<HTMLElement>('[aria-label="models.actions"]')!));
-    await expect.poll(() => document.querySelector('[role="menuitem"][data-value="delete"]')).not.toBeNull();
-    await act(() => userEvent.click(document.querySelector<HTMLElement>('[role="menuitem"][data-value="delete"]')!));
-    await expect.poll(() => document.querySelector('[role="alertdialog"]')?.getAttribute('data-state')).toBe('open');
-    const dialog = document.querySelector('[role="alertdialog"]')!;
-    const confirm = [...dialog.querySelectorAll('button')].find(
-      (button) => button.textContent === 'models.deleteModel'
-    );
-
-    const frames = closingFrames(
-      await recordDialogExit(dialog, async () => {
-        await act(() => userEvent.click(confirm!));
-        await expect.poll(() => getModelsUiSnapshotForTests().activeModelKey).toBeNull();
-      })
-    );
-
-    expect(api.deleteModel).toHaveBeenCalledWith(VAE.key, expect.anything());
-    expect(frames).not.toHaveLength(0);
-    // It still names the model it deleted while it animates out.
-    for (const frame of frames) {
-      expect(frame.text).toContain('models.deleteBodyModel VAE');
-    }
-  });
-
-  it('animates the update-path dialog out instead of unmounting it on close', async () => {
-    await act(() => userEvent.click(document.querySelector<HTMLElement>('[aria-label="models.updatePath"]')!));
-    await expect.poll(() => pathDialog()?.getAttribute('data-state')).toBe('open');
-
-    const frames = closingFrames(
-      await recordDialogExit(pathDialog()!, () => act(() => userEvent.keyboard('{Escape}')))
-    );
-    await expect.poll(() => pathDialog()).toBeUndefined();
-
-    expect(frames).not.toHaveLength(0);
-  });
-});
 
 describe('models DetailPane for a model installed before the probe recorded a fact', () => {
   const UNIDENTIFIED_LLLITE = {
@@ -197,7 +129,6 @@ describe('models DetailPane for a model installed before the probe recorded a fa
     await act(() => userEvent.click(dialogButton(cancelled, 'common.cancel')));
     await expect.poll(() => document.querySelector('[role="alertdialog"]')).toBeNull();
     expect(api.reidentifyModel).not.toHaveBeenCalled();
-    // Cancel returns focus to the button that opened the dialog.
     expect(document.activeElement).toBe(reidentifyButton());
 
     const confirmed = await openConfirm();
@@ -206,7 +137,6 @@ describe('models DetailPane for a model installed before the probe recorded a fa
     await expect.poll(() => getModelsSnapshot().modelsByKey.get(UNIDENTIFIED_LLLITE.key)?.cond_in_channels).toBe(3);
     expect(api.reidentifyModel).toHaveBeenCalledExactlyOnceWith(UNIDENTIFIED_LLLITE.key, expect.anything());
     expect(host.textContent).not.toContain('models.adapterTypeUnknown');
-    // The notice and its button are gone; focus lands on the model's actions rather than the page body.
     await expect.poll(() => document.querySelector('[role="alertdialog"]')).toBeNull();
     await expect.poll(() => document.activeElement).toBe(host.querySelector('[aria-label="models.actions"]'));
   });

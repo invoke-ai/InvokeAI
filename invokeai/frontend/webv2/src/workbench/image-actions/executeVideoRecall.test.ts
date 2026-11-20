@@ -130,8 +130,7 @@ const h3ReferenceMetadata = (conditioning: unknown) => ({
   width: 1344,
 });
 
-// The shared metadata entry answers once per video name, so each case recalls a distinct output video rather than
-// re-reading a cached answer.
+// The shared metadata entry answers once per video name, so each case recalls a distinct video, not a cached answer.
 let recallSeq = 0;
 let queryClient: QueryClient;
 
@@ -197,8 +196,8 @@ const recallConditioningClip = async (
   recallSeq += 1;
 
   videoMetadata.mockResolvedValue({ ...ltx2ConditioningMetadata(role, videoName), ...recorded });
-  // An ordinary gallery clip: `getDefaultConditioningRole` would take it for the VIDEO role, so a
-  // recalled `audio` role can only come from the metadata.
+  // An ordinary gallery clip: `getDefaultConditioningRole` would take it for the VIDEO role, so a recalled `audio` role
+  // can only come from the metadata.
   galleryApi.galleryItems.resolve.mockResolvedValue({ ...item, durationSeconds: 4, fps: 24, name: 'song.mp4' });
   const { commands, patchValues } = createCommands();
 
@@ -240,8 +239,7 @@ describe('executeVideoRecall', () => {
   it('writes only the prompt keys for a prompts-only recall', async () => {
     videoMetadata.mockResolvedValue(metadata);
     const { commands, patchValues } = createCommands();
-    // A prompts-only recall must not persist the model-family transition produced by resnapshotting an uninstalled
-    // main.
+    // A prompts-only recall must not persist the family transition from resnapshotting an uninstalled main.
     const videoValues = { ...createDefaultVideoWidgetValues([wanModel]), numFrames: 41, steps: 4 };
 
     const didRecall = await executeVideoRecall({
@@ -591,8 +589,8 @@ describe('the target resolution of a canvas the recorded media sized', () => {
   };
 
   it.each([
-    // 1800x1000 at 768 highres: over the area cap, scaled to 1363.1x757.3 and snapped to 1376x768. The canvas fed
-    // back would give 1344x768, and 768 lowres gives the frame 768x416.
+    // 1800x1000 at 768 highres: over the area cap, scaled to 1363.1x757.3 and snapped to 1376x768. The canvas fed back
+    // would give 1344x768, and 768 lowres gives the frame 768x416.
     ['an area-capped H3 canvas', h3Fl2va, 'minimax_h3_i2v', 1376, 768, 1800, 1000, '768 lowres', '768 highres'],
     // 1000x700 at 1080p: 1542.9x1080, snapped to 1536x1088. The canvas fed back would give 1520x1088.
     ['a Wan 1080p canvas', wanI2v, 'wan_i2v', 1536, 1088, 1000, 700, '720p', '1080p'],
@@ -672,8 +670,8 @@ describe('the LTX-2 keyframe and extend modes on recall', () => {
     return patchValues.mock.calls.at(-1)?.[1] as Record<string, unknown> | undefined;
   };
 
-  // Recognising the mode string is only the first half: an unlisted one is refused outright, but a
-  // listed one whose media never comes back is a silent downgrade to text-to-video.
+  // Recognising the mode string is only the first half: an unlisted one is refused outright, but a listed one whose
+  // media never comes back is a silent downgrade to text-to-video.
   it('restores the destination frame a last-frame run ended on', async () => {
     expect(
       await recallLtx2({ generation_mode: 'ltx2_lf2v', last_frame_image: { image_name: 'last.png' } })
@@ -688,8 +686,7 @@ describe('the LTX-2 keyframe and extend modes on recall', () => {
       source_video_start_frame: 12,
     });
 
-    // The trim is what decides WHERE the continuation picked up; the default would continue from
-    // somewhere else entirely.
+    // The trim decides WHERE the continuation picked up; the default would continue from somewhere else entirely.
     expect(written).toMatchObject({
       sourceVideo: { endFrame: 61, startFrame: 12, video_name: 'source.mp4' },
     });
@@ -705,9 +702,8 @@ describe('the LTX-2 conditioning clip on recall', () => {
     galleryApi.galleryImages.resolveMany.mockReset();
   });
 
-  // The role IS the mode: recalling an audio-to-video run as video-to-audio reproduces the
-  // opposite generation. And the clip it is read from is an ordinary gallery video, whose own
-  // default role is the other one -- so a dropped role does not fail loudly, it inverts.
+  // The role IS the mode: recalling an audio-to-video run as video-to-audio reproduces the opposite generation. The
+  // clip is an ordinary gallery video whose default role is the other one, so a dropped role inverts, not fails loudly.
   it('restores the recorded role rather than the one a fresh drop would default to', async () => {
     expect(await recallConditioningClip('audio')).toMatchObject({
       conditioningClip: { clip: { video_name: 'song.mp4' }, role: 'audio' },

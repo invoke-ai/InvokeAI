@@ -1,7 +1,7 @@
 import type { ModelBase, ModelConfig } from './types';
 
-// Model-base identity registry: labels, colors, and scalar display facts only.
-// Generation behavior keyed by base lives in @features/generation/settings.
+// Model-base identity registry: labels, colors, and scalar display facts only. Generation behavior keyed by base lives
+// in @features/generation/settings.
 
 /** Fallback display casing for open-union taxonomy values ("t5_encoder" -> "T5 Encoder"). */
 export const toTitleCase = (value: string): string =>

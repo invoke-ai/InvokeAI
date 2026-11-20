@@ -1,6 +1,6 @@
 import type { ModelDefaultsRulesState } from '@features/models';
 
-import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
+import { seedArchitectureCapabilities } from '@features/models/core/architectureCapabilities.testing';
 import { describe, expect, it, vi } from 'vitest';
 
 import { startModelDefaultsRulesReader } from './modelDefaultsRulesReader';

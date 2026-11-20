@@ -1,6 +1,6 @@
 import type { ModelConfig, WorkingMemoryCase } from '@features/models';
 
-import { architectureCapabilitiesFixture } from '@features/generation/core/architectureCapabilities.testing';
+import { architectureCapabilitiesFixture } from '@features/models/core/architectureCapabilities.testing';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 /** Serves the capability table; module mocks cannot be used here, since they would instrument the worker's modules. */

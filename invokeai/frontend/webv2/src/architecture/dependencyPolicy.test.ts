@@ -6,13 +6,11 @@ import {
   collectImportReferences,
   formatViolation,
   getModuleOwner,
-  isExcepted,
   isProductionSourcePath,
   primeImportSources,
   resolveImportPath,
 } from './dependencyPolicy';
 import { FEATURE_PUBLIC_INTERFACES } from './featureInterfaces';
-import { migrationExceptions } from './migrationExceptions';
 import { closeSourceAnalysis } from './tsSourceAnalysis';
 
 const sources = import.meta.glob('../**/*.{ts,tsx}', {
@@ -170,21 +168,33 @@ describe('dependency policy rules', () => {
     expect(checkDependency('workbench/canvas-engine/document-model/documentModel.test.ts', 'vitest')).toEqual([]);
   });
 
+  it('keeps a pure feature entry to its own Core, so the cores importing it stay pure', () => {
+    expect(checkDependency('features/models/architectures.ts', './core/architectureCapabilities')).toEqual([]);
+    for (const leak of ['./data/architectureCapabilitiesStore', './architecturesStore', './ui/components', 'react']) {
+      expect(checkDependency('features/models/architectures.ts', leak)).toContainEqual(
+        expect.objectContaining({ rule: 'feature-core-purity' })
+      );
+    }
+  });
+
   it('permits feature Core to depend on other pure Core and Platform State modules', () => {
     expect(checkDependency('features/queue/core/policy.ts', './types')).toEqual([]);
     expect(checkDependency('features/queue/core/policy.ts', '@platform/state/selectorCore')).toEqual([]);
   });
 
   it('treats test-support modules as non-production and keeps production out of them', () => {
-    expect(isProductionSourcePath('features/generation/core/architectureCapabilities.testing.ts')).toBe(false);
+    expect(isProductionSourcePath('features/models/core/architectureCapabilities.testing.ts')).toBe(false);
     expect(isProductionSourcePath('platform/ui/Button.type-test.tsx')).toBe(false);
     expect(isProductionSourcePath('features/generation/ui/GenerateWidgetView.browser.test.tsx')).toBe(false);
-    expect(isProductionSourcePath('features/generation/core/architectureCapabilities.ts')).toBe(true);
+    expect(isProductionSourcePath('features/models/core/architectureCapabilities.ts')).toBe(true);
     // The helper imports a test runner and a 1000-row fixture, and Core is bundled by every route.
     expect(
-      checkDependency('features/generation/ui/GenerateWidgetView.tsx', '../core/architectureCapabilities.testing')
+      checkDependency(
+        'features/models/ui/detail/RelatedModelsSection.tsx',
+        '../../core/architectureCapabilities.testing'
+      )
     ).toContainEqual(expect.objectContaining({ rule: 'test-support-isolation' }));
-    expect(checkDependency('features/generation/core/settings.test.ts', './architectureCapabilities.testing')).toEqual(
+    expect(checkDependency('features/models/core/relationships.test.ts', './architectureCapabilities.testing')).toEqual(
       []
     );
   });
@@ -242,6 +252,12 @@ describe('feature public-interface registry', () => {
     expect(checkDependency('workbench/invocationSubmit.ts', '@features/generation/prompts')).toEqual([]);
     expect(checkDependency('app/GenerateWidgetSyncRuntime.tsx', '@features/generation/runtime')).toEqual([]);
     expect(checkDependency('app/graphExport.ts', '@features/generation/graphExport')).toEqual([]);
+    expect(checkDependency('features/workflow/core/modelRequirements.ts', '@features/models/architectures')).toEqual(
+      []
+    );
+    expect(
+      checkDependency('features/generation/ui/CapabilitiesGate.tsx', '@features/models/architecturesStore')
+    ).toEqual([]);
     expect(checkDependency('workbench/widgets/canvas/invoke.ts', '@features/generation/canvasGraph')).toEqual([]);
     expect(checkDependency('workbench/WorkbenchContext.tsx', '@features/intermediates/holdLease')).toEqual([]);
     expect(
@@ -290,7 +306,6 @@ describe('production dependency graph', () => {
     const violations = Object.entries(sources)
       .filter(([path]) => isProduction(path))
       .flatMap(([path, source]) => checkSource(toSourcePath(path), source))
-      .filter((violation) => !migrationExceptions.some((exception) => isExcepted(violation, exception)))
       .map(formatViolation)
       .sort();
 
@@ -298,8 +313,4 @@ describe('production dependency graph', () => {
     // A whole-source scan whose cost grows with the codebase; on shared CI runners it already takes 3-5s, so the
     // default 5s budget turned runner speed into test failures.
   }, 60_000);
-
-  it('has no remaining migration exceptions', () => {
-    expect(migrationExceptions).toEqual([]);
-  });
 });

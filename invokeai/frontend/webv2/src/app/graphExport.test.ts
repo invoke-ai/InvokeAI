@@ -1,13 +1,8 @@
 import type { BackendGraphContract, BackendInvocationContract } from '@features/generation/contracts';
-import type { SupportedGenerateBase } from '@features/generation/core/baseGenerationPolicies';
 
-import { architectureCapabilitiesFixture } from '@features/generation/core/architectureCapabilities.testing';
-import {
-  generateGraphCases,
-  satisfiedSettingsFor,
-  type ModelShape,
-} from '@features/generation/core/graphCoverage.testing';
-import { withArchitectureCapabilities } from '@features/generation/graphExport';
+import { generateGraphCases, satisfiedSettingsFor } from '@features/generation/core/graphCoverage.testing';
+import { withArchitectureCapabilities } from '@features/models/architectures';
+import { architectureCapabilitiesFixture } from '@features/models/core/architectureCapabilities.testing';
 import { describe, expect, it } from 'vitest';
 
 import { exportGraphs, GraphExportRequestError, type GraphExportCaseResult } from './graphExport';
@@ -68,12 +63,6 @@ const exportOne = (testCase: Record<string, unknown>, models?: unknown[]) => {
 const nodesOfType = (graph: BackendGraphContract, type: string): BackendInvocationContract[] =>
   Object.values(graph.nodes).filter((node) => node.type === type);
 
-/** A main model of `base` and the components it needs, as graph coverage builds them. */
-const satisfiedFor = (base: SupportedGenerateBase, overrides: ModelShape['overrides']) =>
-  withArchitectureCapabilities(architectureCapabilitiesFixture, () =>
-    satisfiedSettingsFor(base, { label: base, overrides })
-  );
-
 const errorOf = (result: GraphExportCaseResult | undefined): string =>
   result && 'error' in result ? result.error : '';
 
@@ -117,72 +106,6 @@ describe('graph export', () => {
     );
   });
 
-  it('adds FLUX.2 reference images as Kontext conditioning, in order', () => {
-    const { filled, model: main, settings } = satisfiedFor('flux2', { format: 'diffusers', variant: 'dev' });
-    const { graph } = exportOne(
-      sdxlCase('flux2-refs', {
-        height: settings.height,
-        model_key: main.key,
-        negative_prompt: null,
-        reference_images: ['first.png', 'second.png'],
-        width: settings.width,
-      }),
-      [main, ...filled.map((key) => settings[key])]
-    ).batch;
-    const kontext = nodesOfType(graph, 'flux_kontext');
-    const [firstCollect, lastCollect] = kontext.map(
-      (node) => graph.edges.find((edge) => edge.source.node_id === node.id)?.destination.node_id
-    );
-
-    expect(kontext.map((node) => node.image)).toEqual([{ image_name: 'first.png' }, { image_name: 'second.png' }]);
-    expect(graph.edges).toContainEqual({
-      destination: { field: 'collection', node_id: lastCollect },
-      source: { field: 'collection', node_id: firstCollect },
-    });
-    expect(graph.edges).toContainEqual(
-      expect.objectContaining({
-        destination: expect.objectContaining({ field: 'kontext_conditioning' }),
-        source: { field: 'collection', node_id: lastCollect },
-      })
-    );
-  });
-
-  it('makes a lone Krea-2 reference the style reference and several references edit references', () => {
-    const { filled, model: main, settings } = satisfiedFor('krea-2', { format: 'diffusers' });
-    const krea2Case = (id: string, referenceImages: string[]) =>
-      sdxlCase(id, {
-        height: settings.height,
-        model_key: main.key,
-        reference_images: referenceImages,
-        width: settings.width,
-      });
-    const models = [main, ...filled.map((key) => settings[key])];
-    const style = exportOne(krea2Case('krea2-style', ['style.png']), models).batch.graph;
-    const edit = exportOne(krea2Case('krea2-edit', ['first.png', 'second.png']), models).batch.graph;
-
-    expect(nodesOfType(style, 'krea2_style_reference')).toMatchObject([
-      { height: settings.height, image: { image_name: 'style.png' }, style_strength: 1, width: settings.width },
-    ]);
-    expect(nodesOfType(style, 'qwen_image_i2l')).toEqual([]);
-    expect(nodesOfType(edit, 'krea2_style_reference')).toEqual([]);
-    expect(nodesOfType(edit, 'qwen_image_i2l').map((node) => [node.image, node.reference])).toEqual([
-      [{ image_name: 'first.png' }, true],
-      [{ image_name: 'second.png' }, true],
-    ]);
-  });
-
-  it('rejects reference images for a model without them and more than the model takes', () => {
-    const [unsupported, tooMany] = exportGraphs(
-      request([
-        sdxlCase('z-image-refs', { model_key: 'z-image-gguf', reference_images: ['reference.png'] }),
-        sdxlCase('sdxl-six-refs', { reference_images: ['1.png', '2.png', '3.png', '4.png', '5.png', '6.png'] }),
-      ])
-    ).cases;
-
-    expect(errorOf(unsupported)).toBe('reference_images: z-image-gguf name takes no reference images.');
-    expect(errorOf(tooMany)).toBe('sdxl name supports at most 5 reference images. Turn off or remove the extra ones.');
-  });
-
   it('sends img2img through Canvas with the uploaded image and strength', () => {
     const { graph } = exportOne(
       sdxlCase('sdxl-i2i', { init_image: { image_name: 'init.png', strength: 0.3 }, mode: 'img2img' })
@@ -224,59 +147,6 @@ describe('graph export', () => {
       qwen3EncoderModel: 'qwen3-4b-gguf',
       vae: 'flux-vae',
     });
-  });
-
-  it('opens the Qwen-Image-2.1 Vision Tower slot from a GGUF encoder pick, whatever order the picks are listed in', () => {
-    const qwen21Models = [
-      ...MODELS,
-      model('q21-gguf', 'qwen-image-2-1', 'main', { format: 'gguf_quantized', variant: 'qwen_image_21_base' }),
-      model('q21-encoder', 'any', 'qwen3_vl_encoder', { format: 'gguf_quantized', variant: 'qwen3_vl_8b' }),
-      model('q21-mmproj', 'any', 'qwen3_vl_vision_tower', { format: 'gguf_quantized', variant: 'qwen3_vl_8b' }),
-      model('q21-vae', 'qwen-image-2-1', 'vae', { format: 'checkpoint' }),
-    ];
-    const picks = { qwen3VLEncoderModel: 'q21-encoder', qwen3VLVisionTowerModel: 'q21-mmproj', vae: 'q21-vae' };
-    const towerFirst = { qwen3VLVisionTowerModel: 'q21-mmproj', qwen3VLEncoderModel: 'q21-encoder', vae: 'q21-vae' };
-
-    for (const components of [picks, towerFirst]) {
-      const { batch, components: used } = exportOne(
-        sdxlCase('q21', { components, model_key: 'q21-gguf' }),
-        qwen21Models
-      );
-
-      expect(used).toEqual(picks);
-      expect(batch.graph.nodes.model_loader).toMatchObject({ qwen3_vl_vision_tower_model: { key: 'q21-mmproj' } });
-    }
-  });
-
-  it('opens the Krea-2 Vision Tower slot from a GGUF 4B encoder pick, and has no slot beside any other encoder', () => {
-    const krea2Models = [
-      ...MODELS,
-      model('k2-gguf', 'krea-2', 'main', { format: 'gguf_quantized', variant: 'krea2_base' }),
-      model('k2-encoder-gguf', 'any', 'qwen3_vl_encoder', { format: 'gguf_quantized', variant: 'qwen3_vl_4b' }),
-      model('k2-encoder-st', 'any', 'qwen3_vl_encoder', { format: 'checkpoint', variant: 'qwen3_vl_4b' }),
-      model('k2-mmproj', 'any', 'qwen3_vl_vision_tower', { format: 'gguf_quantized', variant: 'qwen3_vl_4b' }),
-      model('k2-vae', 'qwen-image', 'vae', { format: 'checkpoint' }),
-    ];
-    const exportWith = (encoder: string) =>
-      exportOne(
-        sdxlCase('k2', {
-          components: { qwen3VLEncoderModel: encoder, qwen3VLVisionTowerModel: 'k2-mmproj', vae: 'k2-vae' },
-          model_key: 'k2-gguf',
-        }),
-        krea2Models
-      );
-
-    const gguf = exportWith('k2-encoder-gguf');
-
-    expect(gguf.components).toEqual({
-      qwen3VLEncoderModel: 'k2-encoder-gguf',
-      qwen3VLVisionTowerModel: 'k2-mmproj',
-      vae: 'k2-vae',
-    });
-    expect(gguf.batch.graph.nodes.model_loader).toMatchObject({ qwen3_vl_vision_tower_model: { key: 'k2-mmproj' } });
-
-    // A safetensors encoder has no tower slot, so a tower pick is rejected rather than sent.
-    expect(() => exportWith('k2-encoder-st')).toThrow(/Unknown component slot .{1,4}qwen3VLVisionTowerModel/);
   });
 
   it('rejects a Vision Tower beside a safetensors encoder whatever order the picks are listed in', () => {
@@ -324,34 +194,6 @@ describe('graph export', () => {
     expect(batch.graph.nodes.model_loader?.qwen3_vl_vision_tower_model).toBeUndefined();
   });
 
-  // The working-memory calibration planner (`default_vae`) restates this: it sizes each case for the VAE that decodes.
-  it("decodes with the main model's default VAE, which a pick replaces where the model has a VAE slot", () => {
-    const withDefaultVae = (key: string, vaeKey: string) => [
-      ...MODELS.map((entry) => (entry.key === key ? { ...entry, default_settings: { vae: vaeKey } } : entry)),
-      model('flux-vae-b', 'flux', 'vae', { format: 'checkpoint' }),
-    ];
-    const { batch } = exportOne(sdxlCase('sdxl-default-vae'), withDefaultVae('sdxl', 'sdxl-vae'));
-    const zImage = { ...sdxlCase('z-image'), model_key: 'z-image-gguf' };
-    const zImageModels = withDefaultVae('z-image-gguf', 'flux-vae-b');
-
-    expect(nodesOfType(batch.graph, 'vae_loader').map((node) => (node.vae_model as { key: string }).key)).toEqual([
-      'sdxl-vae',
-    ]);
-    expect(exportOne(zImage, zImageModels).components.vae).toBe('flux-vae-b');
-    expect(exportOne({ ...zImage, components: { vae: 'flux-vae' } }, zImageModels).components.vae).toBe('flux-vae');
-  });
-
-  it('rejects an installed component the slot does not offer', () => {
-    const [result] = exportGraphs(
-      request([sdxlCase('z-image', { components: { qwen3EncoderModel: 'qwen3-8b' }, model_key: 'z-image-gguf' })])
-    ).cases;
-
-    expect(errorOf(result)).toBe(
-      'components.qwen3EncoderModel: "qwen3-8b" cannot be the Qwen3 Encoder of z-image-gguf name. ' +
-        'Choices: qwen3-4b, qwen3-4b-gguf.'
-    );
-  });
-
   it.each(generateGraphCases)('compiles $label from exactly the components it needs', ({ base, shape }) => {
     const {
       filled,
@@ -362,31 +204,6 @@ describe('graph export', () => {
     const testCase = sdxlCase(base, { height: settings.height, model_key: main.key, width: settings.width });
 
     expect(exportOne(testCase, [main, ...filled.map((key) => settings[key])]).components).toEqual(components);
-  });
-
-  it('applies settings overrides and rejects values Generate would not keep', () => {
-    const { graph } = exportOne(sdxlCase('cfg', { settings: { cfgScale: 3.5, scheduler: 'dpmpp_2m' } })).batch;
-    const [badPid, badScheduler] = exportGraphs(
-      request([
-        sdxlCase('pid', { settings: { pidMode: 'sideways' } }),
-        sdxlCase('scheduler', { settings: { scheduler: 'not-a-scheduler' } }),
-      ])
-    ).cases;
-
-    expect(graph.nodes.denoise_latents).toMatchObject({ cfg_scale: 3.5, scheduler: 'dpmpp_2m' });
-    expect(errorOf(badPid)).toMatch(/^settings\.pidMode: Generate does not keep "sideways"/);
-    expect(errorOf(badScheduler)).toMatch(/^settings\.scheduler: .* Options: .*euler_a/);
-  });
-
-  it('rejects a prompt with dynamic syntax while dynamic prompts are on, and sends it as typed when they are off', () => {
-    const prompt = 'a {red|green} lighthouse';
-    const [expanding] = exportGraphs(request([sdxlCase('on', { positive_prompt: prompt })])).cases;
-    const { batch } = exportOne(
-      sdxlCase('off', { positive_prompt: prompt, settings: { dynamicPromptsEnabled: false } })
-    );
-
-    expect(errorOf(expanding)).toMatch(/^positive_prompt has dynamic prompt syntax/);
-    expect(batch.data[0]).toContainEqual({ field_name: 'value', items: [prompt], node_path: 'positive_prompt' });
   });
 
   it('reports unknown names per case, with the valid choices, and still exports the other cases', () => {

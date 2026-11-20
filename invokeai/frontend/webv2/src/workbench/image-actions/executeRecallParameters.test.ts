@@ -19,11 +19,11 @@ vi.mock('@features/gallery', () => galleryApi);
 import {
   resetArchitectureCapabilities,
   setArchitectureCapabilities,
-} from '@features/generation/core/architectureCapabilities';
+} from '@features/models/core/architectureCapabilities';
 import {
   architectureCapabilitiesFixture,
   seedArchitectureCapabilities,
-} from '@features/generation/core/architectureCapabilities.testing';
+} from '@features/models/core/architectureCapabilities.testing';
 
 import { getCurrentGenerateValues } from './executeImageRecall';
 import { executeRecallParameters } from './executeRecallParameters';
