@@ -36,14 +36,26 @@ fi
 # We do not install openssh-server in the image by default to avoid bloat.
 # but it is useful to have the full SSH server e.g. on Runpod.
 # (use SCP to copy files to/from the image, etc)
-if [[ -v "PUBLIC_KEY" ]] && [[ ! -d "${HOME}/.ssh" ]]; then
-  apt-get update
-  apt-get install -y openssh-server
-  pushd "$HOME"
-  mkdir -p .ssh
-  echo "${PUBLIC_KEY}" >.ssh/authorized_keys
-  chmod -R 700 .ssh
-  popd
+if [[ "${PUBLIC_KEY:-}" =~ [^[:space:]] ]]; then
+  authorized_keys="${HOME}/.ssh/authorized_keys"
+  if [[ -s "$authorized_keys" ]]; then
+    while IFS= read -r key; do
+      if [[ "$key" =~ [^[:space:]] ]] && ! grep -Fxq -- "$key" "$authorized_keys"; then
+        printf 'PUBLIC_KEY does not match %s. Set it to an existing key line or update the file from a trusted session before restarting.\n' "$authorized_keys" >&2
+        exit 1
+      fi
+    done <<< "$PUBLIC_KEY"
+  else
+    (
+      umask 077
+      mkdir -p "${HOME}/.ssh"
+      printf '%s\n' "$PUBLIC_KEY" >"$authorized_keys"
+    )
+  fi
+  if ! command -v sshd >/dev/null; then
+    apt-get update
+    apt-get install -y openssh-server
+  fi
   service ssh start
 fi
 

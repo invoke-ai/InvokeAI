@@ -426,6 +426,7 @@ def test_saving_generation_settings_preserves_the_authentication_choice_in_yaml(
     config_path.write_text(yaml.safe_dump(settings))
     monkeypatch.setenv("INVOKEAI_MULTIUSER", "false")
     runtime_config = load_config_from_root(tmp_path)
+    monkeypatch.setattr(mock_invoker.services, "configuration", runtime_config)
     monkeypatch.setattr(app_info, "get_config", lambda: runtime_config)
     monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", MockApiDependencies(mock_invoker))
 

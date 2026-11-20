@@ -7,9 +7,13 @@ import { Tabs, TabItem, Steps } from '@astrojs/starlight/components'
 
 Upgrading an existing install to v7 is one-way. This page covers what the upgrade changes, where the backup of your database is, how to go back to an older version and return to v7, and how to try v7 without touching your current install.
 
+:::caution[Before replacing a Docker container]
+An older ROCm Compose service with a custom `INVOKEAI_ROOT` may have stored your database and files in the container's writable layer, outside its volume. Before running `docker compose up`, `docker compose down` or `./run.sh`, check the root in the old container's startup log against its mounts. Compose can remove or recreate the only container holding that data. If the root is outside the mounts, [recover it before replacing the container](/configuration/docker/#recover-data-before-replacing-a-container).
+:::
+
 ## Before upgrading a single-user installation
 
-InvokeAI now requires sign-in by default, including on localhost. If you previously worked without an account, finish queued jobs and export the Workbench projects and wildcards you want to use with your new account **before switching modes**. Create the first administrator while only you can reach the server. The [single-user upgrade instructions](/configuration/multi-user-mode/admin-guide/#upgrading-from-single-user-mode) cover export, private setup, import and recovery if you have already upgraded.
+InvokeAI now requires sign-in by default, including on localhost. If you previously worked without an account, finish queued jobs and save the Workbench projects, wildcards, private prompt templates and private fonts you want to use with your new account **before switching modes**. Create the first administrator while only you can reach the server. The [single-user upgrade instructions](/configuration/multi-user-mode/admin-guide/#upgrading-from-single-user-mode) cover export, private setup, import and recovery if you have already upgraded.
 
 ## The upgrade is one-way
 
@@ -71,9 +75,7 @@ Invoke makes no backup of a server database. Back it up yourself before upgradin
 
 5. Copy the backup you chose to `invokeai.db`. Copy it rather than rename it, so the backup stays as it is.
 
-6. **Keep the first start private.** Older releases can default to running without sign-in. Disconnect external proxy routes, tunnels and port forwards, and configure the server or Docker host to [listen only on loopback](/configuration/multi-user-mode/admin-guide/#verify-local-only-access). If the release supports accounts, explicitly set `multiuser: true` in `invokeai.yaml` or `INVOKEAI_MULTIUSER=true` in the server environment before starting it.
-
-7. Start the older release and verify local-only access. If it supports accounts, open it in a fresh browser session and confirm that it requires sign-in. Use an administrator account from the restored database, or create the first administrator privately if the backup predates setup. Restore network access only after verifying administrator sign-in. For releases without account support, keep access private or require authentication at a reverse proxy and allow remote access only through that proxy.
+6. [Start the older release privately and verify the restored database](#first-start-after-switching-databases).
 
 </Steps>
 
@@ -118,7 +120,7 @@ To return to v7 after restoring a backup, put the v7 database you set aside back
 
 5. **Required:** if `invokeai.db.v7-wal` or `invokeai.db.v7-shm` exist, rename them to `invokeai.db-wal` and `invokeai.db-shm`. The write-ahead log can hold changes not yet written to the database file, and SQLite finds it only under the database's name.
 
-6. Start v7.
+6. [Start v7 privately and verify the restored database](#first-start-after-switching-databases). An administrator you created while using the v6 database exists only in that database. The v7 database may still need its first administrator.
 
 </Steps>
 
@@ -149,9 +151,17 @@ Steps 3 to 5 as commands:
   </TabItem>
 </Tabs>
 
+### First start after switching databases
+
+Use these steps in either direction. Each database has its own accounts and setup state.
+
+1. Before starting InvokeAI, disconnect external reverse proxy routes, tunnels and port forwards. Configure the server or Docker host to [listen only on loopback](/configuration/multi-user-mode/admin-guide/#verify-local-only-access). On releases that support accounts, explicitly enable sign-in with `multiuser: true` in `invokeai.yaml` and remove any `INVOKEAI_MULTIUSER=false` environment override, or set `INVOKEAI_MULTIUSER=true` in the server environment.
+2. Start the intended release and verify local-only access. Check that the database path in the startup log matches the file you restored, or the configured server database for MySQL or MariaDB. For Docker, also check that the data mount points to the restored data.
+3. For releases with accounts, open InvokeAI in a fresh browser session and confirm it requires sign-in. Sign in with an administrator from the active database, or complete first-administrator setup privately if that database predates setup. If setup appears when you expected an existing account, recheck the database and Docker mount. Restore network access only after verifying administrator sign-in and the expected data. For older releases without accounts, keep the server private or require authentication at a reverse proxy and allow remote access only through that proxy.
+
 ## Run v7 alongside v6
 
-Each install's root directory holds its own database, images and models. Give v7 a root of its own, and your v6 install stays as it is. The v7 install starts with an empty gallery and no models.
+Give v7 its own root directory **and database** before its first start. To use SQLite in the new root, unset any inherited `INVOKEAI_DB_URL`, remove `db_url` from the v7 configuration and check that `db_dir` resolves inside the new root. For MySQL or MariaDB, point v7 at a separate, empty database. Check that any absolute storage paths or environment overrides for v7 point to its own files, including outputs and models.
 
 - **Launcher:** install v7 into a new, empty folder. Do not select your existing install: that upgrades it in place. The folder you install into is v7's root directory.
 - **Manual install:** install v7 into a new directory, as [Manual Installation](/start-here/manual/) describes, and start it with `--root` set to that directory, or set the `INVOKEAI_ROOT` environment variable. `--root` takes precedence over `INVOKEAI_ROOT`, which takes precedence over the directory of the active virtual environment; see [InvokeAI Root Directory](/configuration/invokeai-yaml/#invokeai-root-directory).
@@ -159,3 +169,5 @@ Each install's root directory holds its own database, images and models. Give v7
 :::caution[Keep the models folders apart]
 Do not point both installs' `models_dir` at the same folder. Each install knows only the models it installed itself, so **Clean up orphaned models** in one install's Model Manager lists the other install's models as orphaned and offers to delete them.
 :::
+
+[Start v7 privately and set up its first administrator](/configuration/multi-user-mode/admin-guide/#set-up-multi-user-mode). Check the startup log for v7's root and database, then confirm administrator sign-in and the new, empty gallery before enabling network access.

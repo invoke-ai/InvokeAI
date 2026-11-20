@@ -1,6 +1,6 @@
 ---
 title: Family E2E Runs
-lastUpdated: 2026-11-05
+lastUpdated: 2026-11-20
 ---
 
 `scripts/family_e2e` runs model families end to end through the HTTP API of a server it launches itself. Per case and size it records the image, the run time, the time per denoise step and the VRAM the server process used, measured at driver level. The report compares them with an explicitly accepted reference and with the previous run of the same profile.
@@ -10,12 +10,13 @@ It is a developer tool. It runs on Windows with NVIDIA and AMD (ROCm) GPUs, wher
 ## How a run works
 
 1. **Scratch root.** The template root's `invokeai.yaml` and a snapshot of its SQLite database go to `<data_dir>/scratch-roots/<run_id>-default/`. The template's database files (with a WAL left by an unclean stop) are copied, and the copy is backed up through InvokeAI's database layer, so the WAL's contents are included and the template's files are only read.
+   - The runner uses the API without signing in. Use a template whose data you can expose to local processes. If its `invokeai.yaml` omits `multiuser`, opt in for the scratch server by adding `INVOKEAI_MULTIUSER: "false"` under `server.env` in the manifest. A dedicated template can set `multiuser: false` in its YAML instead. The runner refuses a template with `multiuser: true` before copying its database, even when the manifest supplies an override.
    - The tool refuses while the database file is open in any process (Windows only), or while anything listens on the template's configured port. Either means its server is still running.
    - It also refuses while a model install is unfinished (see [Shared paths](#shared-paths)).
    - Stores whose files the database owns start empty in the scratch root: outputs, uploaded fonts, style preset images, workflow thumbnails and profiles. The scratch server reconciles them with its own database; at the template it would, for example, delete uploaded fonts its database does not list.
    - Every other path setting points back at the template root as an absolute path, so models, custom nodes and memory settings are the template's own.
    - The tool overrides a few settings: a free port on `127.0.0.1`, a plain-format log file in the run directory, the image index off, and the queue cleared at startup. SSL and `base_url` are dropped. On Linux the server sees only the selected GPU, as `cuda:0`, so a `device` of `cuda:N` becomes `cuda:0` and a `generation_devices` list with a CUDA device becomes `auto`.
-   - `INVOKEAI_*` variables of the calling environment are not passed on. Put settings the server needs into the manifest's `server.env`.
+   - `INVOKEAI_*` variables of the calling environment are not passed on. Put settings the server needs into the manifest's `server.env`. The runner reserves the host, port, database URL and database-owned storage paths so a manifest cannot redirect the scratch server to a network listener or live store.
 2. **Server.** The tool checks that `server.python` imports `invokeai` from `server.code_dir`. It then starts `<python> <code_dir>/scripts/invokeai-web.py --root <scratch root>` and reads the actual port from the server log. Multiuser mode is refused.
    - On Windows the server runs in a job object of the runner, so it dies with the runner however the runner ends. On Linux it runs in a session of its own. `stop`, an interrupt or a plain kill (SIGTERM) of the runner ends it; a runner killed with SIGKILL leaves it running. The runner writes the launched process into `heartbeat.json` before it waits for the server to start, so `stop` and `resume` also find a server whose runner was killed during the startup. While it holds more than 1 GiB on that GPU, `start` and `resume` name it as foreign load and refuse; `stop RUN` ends it. Otherwise the resumed runner stops it first, before it replaces `heartbeat.json`, which names the server for `stop`, or touches the scratch root and a calibration store in it. If it cannot stop the server, the runner refuses and leaves the scratch root with its store and the server's entries in `heartbeat.json` as they are; `runner.log` names the pid and the run shows as failed.
 3. **Graphs.** The real webv2 graph builders produce each case's batch through `pnpm graphs:export`, run in the tool checkout. Run `pnpm install` in `invokeai/frontend/webv2` there first.

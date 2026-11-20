@@ -26,6 +26,7 @@ from typing import IO, Any
 import psutil
 import requests
 import yaml
+from pydantic import TypeAdapter, ValidationError
 
 from scripts.family_e2e.manifest import ServerSpec
 
@@ -55,6 +56,8 @@ TEMPLATE_PATHS: dict[str, str | None] = {
     "prompt_files_dir": "prompt_files",
     "legacy_models_yaml_path": None,
 }
+# The scratch YAML must control the listener and the stores that belong to the copied database.
+SCRATCH_ENV_KEYS = {f"INVOKEAI_{field.upper()}" for field in ("host", "port", "db_url", *SCRATCH_PATHS)}
 # The client speaks plain HTTP to the root path.
 DROPPED_SETTINGS = ("ssl_certfile", "ssl_keyfile", "base_url")
 # ModelInstallService's TMPDIR_PREFIX (invokeai/app/services/model_install/model_install_default.py).
@@ -86,9 +89,9 @@ class TerminationError(ServerError):
         """[pid, create time] of each process of the tree that still ran; empty when none could be identified."""
 
 
-def read_template_settings(template_root: Path) -> dict[str, Any]:
-    """The template's `invokeai.yaml` settings (empty when the root has none), refusing what the tool cannot copy."""
-    path = template_root / CONFIG_FILE
+def read_template_settings(spec: ServerSpec) -> dict[str, Any]:
+    """Read the template and require an explicit single-user run before sharing its resources."""
+    path = spec.template_root / CONFIG_FILE
     settings: dict[str, Any] = {}
     if path.is_file():
         settings = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
@@ -96,6 +99,24 @@ def read_template_settings(template_root: Path) -> dict[str, Any]:
             raise ServerError(f"{path} has schema {settings.get('schema_version')!r}; start its server once to migrate")
     if settings.get("db_url"):
         raise ServerError(f"{path} uses db_url; only a SQLite database can be copied into a scratch root")
+    # Settings from the manifest take precedence over the scratch YAML when the server starts.
+    for key in spec.env:
+        if key.upper() in SCRATCH_ENV_KEYS:
+            raise ServerError(f"remove {key} from server.env; the runner sets the scratch listener and storage paths")
+
+    choices = [value for key, value in spec.env.items() if key.upper() == "INVOKEAI_MULTIUSER" and value]
+    if "multiuser" in settings:
+        choices.append(settings["multiuser"])
+    try:
+        auth_settings = TypeAdapter(list[bool]).validate_python(choices)
+    except ValidationError as e:
+        raise ServerError(f"invalid multiuser setting in {path} or server.env") from e
+    if not auth_settings or any(auth_settings):
+        raise ServerError(
+            f"single-user access requires multiuser: false in {path} or "
+            'INVOKEAI_MULTIUSER: "false" in server.env when the template omits multiuser; '
+            "an explicitly authenticated template cannot be used"
+        )
     return settings
 
 
@@ -187,7 +208,7 @@ def free_port() -> int:
 
 
 def build_scratch_root(
-    template_root: Path, scratch_root: Path, log_file: Path, port: int, single_cuda_device: bool = False
+    spec: ServerSpec, scratch_root: Path, log_file: Path, port: int, single_cuda_device: bool = False
 ) -> None:
     """(Re)creates the scratch root: the template's settings with absolute paths and a snapshot of its database.
 
@@ -195,7 +216,8 @@ def build_scratch_root(
     template that names a CUDA device by index would then refuse to start, so its `device` becomes `cuda:0` and a
     `generation_devices` list with a CUDA device becomes `auto`.
     """
-    settings = read_template_settings(template_root)
+    settings = read_template_settings(spec)
+    template_root = spec.template_root
     template_db = (template_root / settings.get("db_dir", "databases")).resolve() / DB_FILE
     if not template_db.is_file():
         raise ServerError(f"template root has no database at {template_db}")
@@ -225,8 +247,6 @@ def build_scratch_root(
         # The index worker embeds every new image on the GPU between runs; a copied queue may hold pending items.
         image_index_enabled=False,
         clear_queue_on_startup=True,
-        # The runner drives the API without signing in; a template that sets `multiuser: true` is refused later.
-        multiuser=settings.get("multiuser", False),
     )
     if single_cuda_device:
         if str(config.get("device", "")).startswith("cuda:"):

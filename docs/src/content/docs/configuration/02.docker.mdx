@@ -55,21 +55,43 @@ docker run --device /dev/kfd --device /dev/dri \
 
 ### Recover data before replacing a container
 
-If you ran InvokeAI without a volume, or an older ROCm Compose service used a runtime directory outside its mounted volume, the container itself can hold your accounts and images. Find the actual path in its startup log (`Root directory = ...`). For a container created without `--rm`, substitute its name and that path below. Run these commands on the Docker host:
+If you ran InvokeAI without a volume, the container itself can hold your accounts and images. This also affects older ROCm Compose services where `INVOKEAI_ROOT` from `.env` became a path inside the container. For example, the service may have written data to `/srv/invoke` while Docker mounted the host directory at `/invokeai`.
+
+For a ROCm Compose upgrade, check the old container **before** running `docker compose up`, `down` or `rm`. From the original Compose project directory, run:
+
+```bash
+docker compose --profile rocm ps --all invokeai-rocm
+```
+
+Use the old container's name below. Find the absolute runtime path in its startup log (`Root directory = ...`) and compare it with its mount destinations:
 
 ```bash
 old_container=old-invokeai
-old_root=/invokeai
+docker logs "$old_container" 2>&1 | grep 'Root directory ='
+docker inspect --format '{{range .Mounts}}{{println .Type .Source "->" .Destination}}{{end}}' "$old_container"
+```
+
+If the runtime path matches the destination of a `bind` or `volume` mount, reuse the same host directory or volume for the replacement. Otherwise, keep the old container and copy the actual runtime directory. For a container created without `--rm`, set `old_root` to the absolute path from the log and run these commands on the Docker host:
+
+```bash
+old_root=/srv/invoke
 docker stop "$old_container" &&
   recovered_dir=$(mktemp -d "$PWD/invokeai-recovered.XXXXXX") &&
   docker cp "$old_container:$old_root/." "$recovered_dir"
 ```
 
-Check the copy for your data, including `databases/invokeai.db` with the default SQLite settings. Use `--volume "$recovered_dir:/invokeai"` for the replacement or set `HOST_INVOKEAI_ROOT` in Compose to the recovered directory's absolute path. Keep any external database settings. Start on loopback and verify your existing sign-in and data before enabling network access.
+Check the copy for your data, including `databases/invokeai.db` with the default SQLite settings. Mount it at **the same absolute path inside the replacement container** so absolute database and model paths under the old root still work. If databases, models or outputs lived outside the old root, recover or reattach those directories separately at their original paths. Keep any external database settings.
+
+- For **`docker run`**, replace the quickstart's volume option with `--volume "$recovered_dir:$old_root" --env "INVOKEAI_ROOT=$old_root"`. Keep the loopback port mapping and GPU options.
+- For **ROCm Compose**, set `HOST_INVOKEAI_ROOT` in `.env` to the absolute path printed by `echo "$recovered_dir"` and `CONTAINER_INVOKEAI_ROOT` to the old absolute runtime path (for example, `/srv/invoke`). Set `GPU_DRIVER=rocm`, `HOST_INVOKEAI_IP=127.0.0.1` and `COMPOSE_PROJECT_NAME` to a new, unused project name so the old container stays intact. Run `./run.sh` to build and start the ROCm image. Keep these settings on subsequent starts.
+
+Check the replacement's startup log and mounts with the same commands above. Confirm the logged root is the original container path and its mount source is the recovered directory. If you already had an administrator, confirm you can sign in with that account. If your old installation had no administrator, complete first-time setup privately. Verify your images and other expected data before enabling network access.
 
 ## Build-It-Yourself
 
 All the docker materials are located inside the [docker](https://github.com/invoke-ai/InvokeAI/tree/main/docker) directory in the Git repo.
+
+For an existing ROCm installation, keep your `.env` file and [check the old data mount](#recover-data-before-replacing-a-container) before starting Compose. For a new installation:
 
 ```bash
 cd docker

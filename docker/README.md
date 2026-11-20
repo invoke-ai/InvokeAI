@@ -32,7 +32,9 @@ Open `http://localhost:9090` on the Docker host and create the administrator acc
 
 ## Customize the container
 
-The included `run.sh` script is a convenience wrapper around `docker compose`. It can be helpful for passing additional build arguments to `docker compose`. Alternatively, the familiar `docker compose` commands work just as well.
+The included `run.sh` script passes build arguments to `docker compose` and checks the data mount before replacing a ROCm container. If you use Compose directly for a ROCm upgrade, [check the old container's data mount](https://v7.invoke.ai/configuration/docker/#recover-data-before-replacing-a-container) before running `up`, `down` or `rm`. Older containers may hold the only copy of your data in their writable layer.
+
+For a new installation:
 
 ```bash
 cd docker

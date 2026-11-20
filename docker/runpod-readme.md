@@ -18,6 +18,8 @@ Your working directory is mounted under the `/workspace` path inside the pod. Th
 4. Open `http://localhost:9090` on your computer, create the administrator account and sign in.
 5. Keep using the tunnel for private access. If you want to share InvokeAI through the pod's HTTP proxy, enable HTTP port 9090 only after setup, with multi-user mode enabled and the same `/workspace/invokeai` volume attached.
 
+If the pod already has a nonempty `/root/.ssh/authorized_keys`, each public key in `PUBLIC_KEY` must match a complete line in that file, including its comment. A mismatch stops startup and leaves the file intact. To rotate a key, add the new key from a trusted session, remove the retired key, then set `PUBLIC_KEY` to the new line and restart. To recover from a mismatch, you can also set `PUBLIC_KEY` back to an authorized line for which you have the private key.
+
 ## Other things you can do
 
 At any point you may edit the pod configuration and set an arbitrary Docker command. For example, you could run a command to downloads some models using `curl`, or fetch some images and place them into your outputs to continue a working session.
