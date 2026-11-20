@@ -38,20 +38,20 @@ fi
 # (use SCP to copy files to/from the image, etc)
 if [[ "${PUBLIC_KEY:-}" =~ [^[:space:]] ]]; then
   authorized_keys="${HOME}/.ssh/authorized_keys"
-  if [[ -s "$authorized_keys" ]]; then
-    while IFS= read -r key; do
-      if [[ "$key" =~ [^[:space:]] ]] && ! grep -Fxq -- "$key" "$authorized_keys"; then
-        printf 'PUBLIC_KEY does not match %s. Set it to an existing key line or update the file from a trusted session before restarting.\n' "$authorized_keys" >&2
-        exit 1
+  # Only append missing PUBLIC_KEY lines: keys added from a session must survive restarts.
+  (
+    umask 077
+    mkdir -p "${HOME}/.ssh"
+    # read trims surrounding spaces and tabs; CRs from Windows pastes are dropped first.
+    while read -r key; do
+      if [[ -n "$key" ]] && ! grep -Fxqs -- "$key" "$authorized_keys"; then
+        if [[ -n "$(tail -c1 "$authorized_keys" 2>/dev/null)" ]]; then
+          echo >>"$authorized_keys"
+        fi
+        printf '%s\n' "$key" >>"$authorized_keys"
       fi
-    done <<< "$PUBLIC_KEY"
-  else
-    (
-      umask 077
-      mkdir -p "${HOME}/.ssh"
-      printf '%s\n' "$PUBLIC_KEY" >"$authorized_keys"
-    )
-  fi
+    done <<<"${PUBLIC_KEY//$'\r'/}"
+  )
   if ! command -v sshd >/dev/null; then
     apt-get update
     apt-get install -y openssh-server
