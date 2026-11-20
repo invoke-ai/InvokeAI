@@ -27,10 +27,7 @@ interface MenuItemState {
   unavailableReason: string | undefined;
 }
 
-/**
- * The reset menu's items. Mounted only while the menu shows, until its exit animation ends, so edits re-render them
- * only meanwhile.
- */
+/** Mounted only while the menu shows (until its exit animation ends), so edits re-render the items only then. */
 export const GenerateResetMenuItems = ({
   resolve,
 }: {

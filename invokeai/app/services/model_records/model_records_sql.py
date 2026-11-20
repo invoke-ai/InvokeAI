@@ -101,6 +101,12 @@ def _check_path_length(path: str) -> None:
         raise ValueError(f"A model's path can be at most {MAX_PATH_LENGTH} characters long")
 
 
+def _stored_json(config: AnyModelConfig) -> str:
+    """The JSON a record is stored as. Empty roles are left out: a config with `extra="forbid"` would make an older
+    build, which has no `roles` field, drop the record."""
+    return config.model_dump_json(exclude=None if config.roles else {"roles"})
+
+
 def _parse(config: str) -> AnyModelConfig:
     return ModelConfigFactory.from_dict(json.loads(config))
 
@@ -125,7 +131,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
         if len(config.key) > MAX_KEY_LENGTH:
             raise ValueError(f"A model's key can be at most {MAX_KEY_LENGTH} characters long")
         _check_path_length(config.path)
-        stored = config.model_dump_json()
+        stored = _stored_json(config)
         try:
             self._queries.models.insert(config.key, stored)
         except UniqueViolation as error:
@@ -183,6 +189,10 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
                 # under text_llm). If the initial validation fails and the type changed, retry with stale
                 # format/variant fields stripped so the new class can apply its own defaults.
                 type_changed = "type" in changes.model_fields_set and changes.type != record.type
+                if type_changed:
+                    # Roles are derived by identification from the files. A manual type change discards them;
+                    # Re-identify restores them.
+                    record_as_dict["roles"] = []
                 try:
                     record = ModelConfigFactory.from_dict(record_as_dict)
                 except ValidationError:
@@ -215,7 +225,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
             # If we get this far, the updated model config is valid, so we can save it to the database.
             if "path" in changes.model_fields_set:
                 _check_path_length(record.path)
-            updated = record.model_dump_json()
+            updated = _stored_json(record)
             q.models.save(key, updated)
             return updated
 
@@ -224,7 +234,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
     def replace_model(self, key: str, new_config: AnyModelConfig) -> AnyModelConfig:
         if key != new_config.key:
             raise ValueError("key does not match new_config.key")
-        stored = new_config.model_dump_json()
+        stored = _stored_json(new_config)
         if not self._queries.models.save(key, stored):
             raise UnknownModelException("model not found")
         return _parse(stored)

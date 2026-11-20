@@ -20,10 +20,7 @@ import {
 } from './galleryDnd';
 import { GalleryDragCursor } from './GalleryDragCursor';
 
-/**
- * Advertise compatible drags anywhere in flight; incompatible kinds, counts, and non-gallery payloads expose no
- * affordance.
- */
+/** Advertise compatible drags anywhere in flight; incompatible kinds, counts and non-gallery payloads show none. */
 
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;

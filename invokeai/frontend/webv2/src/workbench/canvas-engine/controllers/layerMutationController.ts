@@ -244,8 +244,8 @@ export class LayerMutationController {
       return { status: layerEditRefusal(txn.status) };
     }
     try {
-      // Immutable durable sources rebuild caches on redo, needing one insertion copy. Unpersisted paint/mask
-      // pixels need separate history and live copies; both remain within the raster reservation.
+      // Immutable durable sources rebuild caches on redo, needing one insertion copy. Unpersisted paint/mask pixels
+      // need separate history and live copies; both remain within the raster reservation.
       if (!txn.reserveRaster(reserveBytes)) {
         return { status: 'over-budget' };
       }
@@ -264,8 +264,8 @@ export class LayerMutationController {
       const cloneLeaves = new Map(
         clones.flatMap((clone) => collectSubtreeLeaves(clone)).map((leaf) => [leaf.id, leaf])
       );
-      // The cloned leaf for each pixel source, in source order; clones are fresh objects, so an
-      // empty plan can strip their durable pixel reference in place before they enter the document.
+      // The cloned leaf for each pixel source, in source order; clones are fresh objects, so an empty plan can strip
+      // their durable pixel reference in place before they enter the document.
       const duplicates = sources.map((source, index) => {
         const duplicate = cloneLeaves.get(idMap.get(source.id)!)!;
         if (plans[index]?.type === 'empty') {
@@ -273,7 +273,7 @@ export class LayerMutationController {
             if (duplicate.source.type === 'paint') {
               duplicate.source = { bitmap: null, type: 'paint' };
             }
-          } else {
+          } else if (duplicate.type === 'inpaint_mask' || duplicate.type === 'regional_guidance') {
             duplicate.mask = { ...duplicate.mask, bitmap: null, offset: { x: 0, y: 0 } };
           }
         }
@@ -484,8 +484,8 @@ export class LayerMutationController {
    * Converts a raster image or paint layer into a control layer in place, as one undo step. Control layers carry no
    * adjustments, so the layer's pixels as displayed — its own stack evaluated exactly (spatial entries included, or
    * refused) and its transform — become the control layer's paint pixels at an identity transform. Undo restores the
-   * raster layer with its stack and original pixels; redo reinstalls the baked pixels. An empty layer has no pixels
-   * to bake, so it converts as a plain clone of its source and transform, without the stack.
+   * raster layer with its stack and original pixels; redo reinstalls the baked pixels. An empty layer has no pixels to
+   * bake, so it converts as a plain clone of its source and transform, without the stack.
    */
   async convertToControl(label: string, expected: CanvasLayerContract): Promise<ConvertLayerToControlResult> {
     const { ctx, ...o } = this.options;

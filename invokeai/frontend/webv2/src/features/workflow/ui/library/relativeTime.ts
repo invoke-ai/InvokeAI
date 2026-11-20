@@ -35,9 +35,7 @@ export const formatRelativeTime = (timestamp: string, now: Date): string => {
   return '';
 };
 
-/**
- * Past-event captions clamp server clock skew to "now". Use `formatRelativeTime` where future times are meaningful.
- */
+/** Past-event captions clamp server clock skew to "now". Use `formatRelativeTime` where future times are meaningful. */
 export const formatTimeSince = (timestamp: string, snapshot: Date): string =>
   formatRelativeTime(timestamp, new Date(Math.max(snapshot.getTime(), Date.parse(timestamp))));
 

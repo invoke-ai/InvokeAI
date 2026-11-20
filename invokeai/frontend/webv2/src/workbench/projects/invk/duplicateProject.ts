@@ -113,8 +113,8 @@ export const duplicateProjectRecord = async (
 
   assertAccountScopeCurrent(owner);
 
-  // Canonicalize with a fresh project identity and reset source board/selection state. The copy carries the
-  // duplicating account's workspace, never another member's: the source record's is the caller's own.
+  // Canonicalize with a fresh project identity and reset source board/selection state. The copy carries the duplicating
+  // account's workspace, never another member's: the source record's is the caller's own.
   const { deserializeProjectDocument, joinProjectRecord } = await import('@workbench/projects/projectHydration');
 
   assertAccountScopeCurrent(owner);
@@ -151,8 +151,8 @@ export const duplicateProjectRecord = async (
       `Project has ${String(boards.length)} boards; a copy carries at most ${String(INVK_MAX_BOARDS)}`
     );
   }
-  // Made before anything is staged: every staging board joins it as it is created, so a copy abandoned at any point
-  // can delete them all.
+  // Made before anything is staged: every staging board joins it as it is created, so a copy abandoned at any point can
+  // delete them all.
   const ledger = createRestoredMediaLedger([]);
   let didCreateProject = false;
   let didAttemptProjectCreate = false;
@@ -208,8 +208,8 @@ export const duplicateProjectRecord = async (
 
     didCreateProject = true;
     assertAccountScopeCurrent(owner);
-    // The copy exists; its other boards can now belong to it. Reported, never fatal, from here on. Lists fetched
-    // while they were still staged, the create's own refresh among them, would keep showing them in the Library.
+    // The copy exists; its other boards can now belong to it. Reported, never fatal, from here on. Lists fetched while
+    // they were still staged, the create's own refresh among them, would keep showing them in the Library.
     const boardIssues = await placeMemberBoards(stagedBoards, record.project_id, {
       onProgress: (completed, total) => deps.onProgress?.({ completed, phase: 'placing-boards', total }),
       signal: owner.signal,

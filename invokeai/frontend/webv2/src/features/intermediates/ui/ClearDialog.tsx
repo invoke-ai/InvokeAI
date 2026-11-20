@@ -145,8 +145,8 @@ const AffectedDocuments = ({
 };
 
 /**
- * One confirmation for both modes. The default deletes only safe items; the advanced disclosure switches to a
- * force preview, which adds the affected documents, an acknowledgement and a typed confirmation.
+ * One confirmation for both modes. The default deletes only safe items; the advanced disclosure switches to a force
+ * preview, which adds the affected documents, an acknowledgement and a typed confirmation.
  */
 export const ClearDialog = ({
   canManageEveryone,

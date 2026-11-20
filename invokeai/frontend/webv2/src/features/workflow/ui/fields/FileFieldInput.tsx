@@ -80,8 +80,8 @@ export const FileFieldInput = ({
 
       try {
         const uploaded = await uploadManagedFile(picked, owner.signal);
-        // The document that owned this widget may have closed or switched while the upload ran; a late success must
-        // not write into another document. The file was never adopted, so it is safe to remove as an orphan.
+        // The document that owned this widget may have closed or switched while the upload ran; a late success must not
+        // write into another document. The file was never adopted, so it is safe to remove as an orphan.
         const snapshot = project.getSnapshot();
         const document =
           workflowId !== undefined

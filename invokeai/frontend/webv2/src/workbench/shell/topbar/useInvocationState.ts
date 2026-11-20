@@ -4,7 +4,6 @@ import type { InvocationRoute, InvocationSourceId, ResultDestination } from '@wo
 import type { WidgetTypeId } from '@workbench/widgetContracts';
 
 import { useDynamicPrompts } from '@features/generation/react';
-import { getArchitectureCapabilitiesSnapshot, subscribeArchitectureCapabilities } from '@features/generation/runtime';
 import {
   describeDynamicPromptsFailure,
   describeGenerationIssue,
@@ -16,13 +15,16 @@ import {
   sanitizeDynamicPromptsConfig,
 } from '@features/generation/settings';
 import { ensureModelsLoaded, useModelsSelector } from '@features/models';
+import {
+  getArchitectureCapabilitiesSnapshot,
+  subscribeArchitectureCapabilities,
+} from '@features/models/architecturesStore';
 import { isUpscaleBatchCountFixed, readsUpscalePrompt } from '@features/upscale';
 import { normalizeVideoWidgetValues } from '@features/video';
 import { getInvocationTemplatesSnapshot, subscribeInvocationTemplates } from '@features/workflow/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { useExternalStoreSelector } from '@platform/state/selectors';
 import { submitActiveInvocation } from '@workbench/activeInvocationSubmission';
-import { describeControlLayerIssue } from '@workbench/controlLayerChecks';
 import { getPlacedWidgetTypeIds, getVisibleWidgetTypeIds, graphWidgetSources } from '@workbench/graphWidgets';
 import {
   createInvocationRouteInputSelector,
@@ -32,6 +34,7 @@ import {
 } from '@workbench/invocation';
 import { useIsInvocationPreparing } from '@workbench/invocationPreparation';
 import { getWorkbenchPreferences, subscribeWorkbenchPreferences } from '@workbench/settings/store';
+import { describeCanvasInvocationFailure } from '@workbench/widgets/canvas/invoke/canvasInvocationFailure';
 import {
   useActiveProjectSelector,
   useWorkbenchCommands,
@@ -47,10 +50,7 @@ export type { InvocationIssue, InvocationIssueTarget } from './invokeIssueTarget
 
 const selectInvocationRouteInput = createInvocationRouteInputSelector();
 
-/**
- * Include capability, template and remembered control-model snapshots in route selection so each change
- * independently re-evaluates its readiness gate.
- */
+/** Capability, template and control-model snapshots are route inputs so each change re-evaluates readiness. */
 const subscribeRouteSources = (listener: () => void): (() => void) => {
   const unsubscribeCapabilities = subscribeArchitectureCapabilities(listener);
   const unsubscribeTemplates = subscribeInvocationTemplates(listener);
@@ -135,10 +135,7 @@ export interface InvokeOptions {
   onStarted?: () => void;
 }
 
-/**
- * Invoke's state for the active route; given a `sourceId`, for that source's route instead, its source fixed (a graph
- * preview's Invoke), with the active route's destination. Video's fixed route always uses Gallery.
- */
+/** Invoke's state for the active route, or for `sourceId`'s route with the active destination (graph preview). */
 export const useInvocationState = ({ sourceId }: { sourceId?: InvocationSourceId } = {}): InvocationState => {
   const { t } = useTranslation();
   const routeInput = useActiveProjectSelector(selectInvocationRouteInput);
@@ -188,8 +185,7 @@ export const useInvocationState = ({ sourceId }: { sourceId?: InvocationSourceId
           ? routeInput.workflowValues
           : routeInput.generateValues;
 
-  // Video reads its own normalized values, so the count follows what its submission expands. Upscale's Refine reads
-  // the draft it shares with Generate, as its submission does.
+  // Video reads its own normalized values, so the count follows what its submission expands.
   const videoValues = invocation.sourceId === 'video' ? normalizeVideoWidgetValues(routeInput.videoValues) : null;
   const upscalePromptDraft =
     invocation.sourceId === 'upscale' && readsUpscalePrompt(routeInput.upscaleValues)
@@ -209,8 +205,7 @@ export const useInvocationState = ({ sourceId }: { sourceId?: InvocationSourceId
           ? sanitizeDynamicPromptsConfig(readDynamicPromptsConfig(routeInput.generateValues))
           : null
   );
-  // Block unexpandable prompts rather than submitting literal dynamic syntax; hotkey submission enforces the same
-  // rule. The prompt field offers the way out: retry, or turn dynamic prompts off and run the prompt as typed.
+  // Block unexpandable prompts rather than submitting literal dynamic syntax; hotkey submission enforces the same rule.
   const expansionFailure = describeDynamicPromptsFailure(promptExpansion);
   const expansionReason = expansionFailure ? describeGenerationIssue(t, expansionFailure) : null;
 
@@ -250,7 +245,7 @@ export const useInvocationState = ({ sourceId }: { sourceId?: InvocationSourceId
         onStarted,
         prepend,
         sourceId,
-        formatControlLayerError: (rejection) => describeControlLayerIssue(t, rejection),
+        formatCanvasInvocationFailure: (failure) => describeCanvasInvocationFailure(t, failure),
         formatUpscaleMetadataFailure: (name) => t('widgets.gallery.itemActions.upscale.metadataFailed', { name }),
         getModels: () => availabilityModels,
         queries,

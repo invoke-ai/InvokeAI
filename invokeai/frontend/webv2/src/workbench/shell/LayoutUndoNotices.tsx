@@ -49,13 +49,7 @@ export const describeLayoutUndoNotice = (
   return routeMessage === undefined ? { title } : { message: routeMessage, title };
 };
 
-/**
- * Reports each layout step that carries a notice (revert, discarding a preset's changes, switching presets, removing a
- * widget) with an Undo toast, whichever control took it. The toast's Undo acts on its step only while that step is the
- * project's latest: once the step is undone another way (the layout undo command) or another step lands on top, the
- * toast is withdrawn, since undoing it then would take the later work with it. A preset switch is navigation, so its
- * toast stays out of the notification center; the others are recorded there too.
- */
+/** Undo toasts for layout steps, withdrawn once their step is no longer the project's latest. */
 export const LayoutUndoNotices = () => {
   const subscribe = useWorkbenchSubscription();
   const queries = useWorkbenchQueries();
@@ -63,8 +57,7 @@ export const LayoutUndoNotices = () => {
   const notify = useNotify();
 
   useMountEffect(() => {
-    // Each project's history as last seen: a step is new when it was in none of them. Steps already there when the
-    // shell mounts were reported, or never will be.
+    // Each project's history as last seen: a step is new when it was in none of them.
     const histories = new Map(queries.getSnapshot().projects.map((project) => [project.id, project.undoRedo]));
     // The step each project's Undo toast stands for, while one shows.
     const shownSteps = new Map<string, string>();
@@ -95,8 +88,7 @@ export const LayoutUndoNotices = () => {
           shownSteps.delete(project.id);
         }
 
-        // An undo uncovers an older step and a merge keeps the top one: both were seen. A redo's new step has no
-        // notice. A step in a project that is not on screen is marked seen without a toast.
+        // An undo uncovers an older step and a merge keeps the top one: both were seen.
         const isNewStep = top !== undefined && previous !== undefined && !previous.past.some(({ id }) => id === top.id);
 
         if (!isNewStep || !top.notice || project.id !== activeProject.id) {

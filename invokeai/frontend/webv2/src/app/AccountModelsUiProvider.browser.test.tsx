@@ -1,11 +1,13 @@
-import type { ArchitectureCapabilitiesRow } from '@features/generation/core/architectureCapabilities';
+import type { ArchitectureCapabilitiesRow } from '@features/models/architectures';
 import type { ModelConfig } from '@features/models/core/types';
 import type * as ModelsApi from '@features/models/data/api';
 import type { DefaultSettingsModel } from '@features/models/ui/detail/defaultSettingsFields';
 import type { ReactNode } from 'react';
 
 import { ChakraProvider } from '@chakra-ui/react';
-import { architectureCapabilitiesFixture } from '@features/generation/core/architectureCapabilities.testing';
+import { getGallerySettings } from '@features/gallery/contracts';
+import { useModelsUi } from '@features/models';
+import { architectureCapabilitiesFixture } from '@features/models/core/architectureCapabilities.testing';
 import { setModelsSnapshotForTests } from '@features/models/data/modelsStore';
 import { AddModelsView } from '@features/models/ui/add-models/AddModelsView';
 import { DefaultSettingsSection } from '@features/models/ui/detail/DefaultSettingsSection';
@@ -45,7 +47,7 @@ vi.mock('@features/models/data/api', async (importOriginal) => ({
   // The detail's identification check has nothing to report here.
   getModelIdentification: () => Promise.resolve({ changed: false, proposed: null, refusal: null }),
 }));
-vi.mock('@features/generation/data/architectureCapabilitiesApi', () => ({
+vi.mock('@features/models/data/architectureCapabilitiesApi', () => ({
   getArchitectureCapabilities: () => capabilitiesApi.get(),
 }));
 vi.mock('@features/identity', async (importOriginal) => ({
@@ -54,7 +56,11 @@ vi.mock('@features/identity', async (importOriginal) => ({
 }));
 
 // The account preferences, kept beyond each mount as the settings store keeps them.
-const accountPreferences = createExternalStore({ enableModelDescriptions: true, installInPlace: true });
+const accountPreferences = createExternalStore({
+  enableModelDescriptions: true,
+  installInPlace: true,
+  scopedDefaults: {},
+});
 vi.mock('@workbench/settings/store', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   patchWorkbenchPreferences: (next: Record<string, unknown>) => {
@@ -138,7 +144,7 @@ describe('Account Models port on the Launchpad', () => {
 
   beforeEach(() => {
     session.canManageModels = true;
-    accountPreferences.setSnapshot({ enableModelDescriptions: true, installInPlace: true });
+    accountPreferences.setSnapshot({ enableModelDescriptions: true, installInPlace: true, scopedDefaults: {} });
     preferences.patch.mockReset();
     capabilitiesApi.get.mockReset();
     capabilitiesApi.get.mockResolvedValue(architectureCapabilitiesFixture);
@@ -162,8 +168,8 @@ describe('Account Models port on the Launchpad', () => {
   });
 
   describe('Default settings scheduler', () => {
-    // The rules are a lazy chunk (the reader and the Generation modules it imports); load it up front so the first
-    // test is not timing a cold transform. Importing it starts nothing: the section's load does.
+    // The rules are a lazy chunk (the reader and the Generation modules it imports); load it up front so the first test
+    // is not timing a cold transform. Importing it starts nothing: the section's load does.
     beforeAll(async () => {
       await import('./modelSchedulerPolicyReader');
     });
@@ -353,6 +359,21 @@ describe('Account Models port on the Launchpad', () => {
       root = createRoot(host);
       await render(<AddModelsView />);
       expect(inplaceInput()?.checked).toBe(false);
+    });
+
+    it("hands the manager's gallery pickers the user's Gallery defaults", async () => {
+      accountPreferences.setSnapshot({
+        enableModelDescriptions: true,
+        installInPlace: true,
+        scopedDefaults: { gallery: { thumbnailFit: 'aspect' } },
+      });
+      const Probe = () => {
+        const { galleryValues } = useModelsUi();
+        return galleryValues ? getGallerySettings(galleryValues).thumbnailFit : null;
+      };
+      await render(<Probe />);
+
+      expect(host.textContent).toBe('aspect');
     });
   });
 });

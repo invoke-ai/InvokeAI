@@ -58,9 +58,9 @@ const originalBytes = (original: CanvasPixelSourceContract): number | null => {
 
 /**
  * Owns the display-only control-layer view: at most one layer shows its kept original (alone, or under its map),
- * decoded under a raster reservation and retained as detached pixels until the view ends. A newer request supersedes
- * an older decode. Nothing here touches the document, history or exports; callers end the view whenever the layer
- * stops matching it.
+ * decoded under a raster reservation and retained as detached pixels until the view ends. A newer request supersedes an
+ * older decode. Nothing here touches the document, history or exports; callers end the view whenever the layer stops
+ * matching it.
  */
 export class ControlViewController {
   private state: ControlLayerViewState | null = null;

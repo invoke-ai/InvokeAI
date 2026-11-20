@@ -131,7 +131,8 @@ export class GeneratedResultController {
             const { adjustments: _adjustments, ...base } = structuredClone(liveLayer);
             after = { ...base, source, transform: identityTransform };
           } else {
-            // A workflow result replaces the pixels outright: no filter produced them and no kept original derives them.
+            // A workflow result replaces the pixels outright: no filter produced them and no kept original derives
+            // them.
             const { filter: _filter, ...base } = structuredClone(liveLayer);
             after = detachControlDerivation({ ...base, source, transform: identityTransform });
           }

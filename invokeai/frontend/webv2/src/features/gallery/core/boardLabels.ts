@@ -6,9 +6,9 @@ import { ALL_READABLE_BOARDS_ID } from './items';
 export type GalleryBoardTranslate = (key: string) => string;
 
 /**
- * Resolves the localized display label for synthesized and stored boards. An inbox is labelled as such: every
- * surface that lists one of the caller's also names its project, as a section, a group or the open project itself.
- * Someone else's inbox, which only an admin sees, keeps its stored name, the project's: nothing else names it.
+ * Resolves the localized display label for synthesized and stored boards. An inbox is labelled as such: every surface
+ * that lists one of the caller's also names its project, as a section, a group or the open project itself. Someone
+ * else's inbox, which only an admin sees, keeps its stored name, the project's: nothing else names it.
  */
 export const getGalleryBoardLabel = (board: GalleryBoard, t: GalleryBoardTranslate): string =>
   board.kind === 'uncategorized'
@@ -43,9 +43,9 @@ export interface GalleryBoardDestinationGroup {
 }
 
 /**
- * The tiers a flat "move to board" menu offers, in the panel's order: the open project, the Library, boards shared
- * with the caller, other users' boards (admins), then each other project under its own name. Only boards the caller
- * may add media to are destinations. Empty groups are dropped so a menu never shows a bare heading.
+ * The tiers a flat "move to board" menu offers, in the panel's order: the open project, the Library, boards shared with
+ * the caller, other users' boards (admins), then each other project under its own name. Only boards the caller may add
+ * media to are destinations. Empty groups are dropped so a menu never shows a bare heading.
  */
 export const getGalleryBoardDestinationGroups = ({
   boards,
@@ -112,9 +112,9 @@ export const getGalleryBoardDestinationGroups = ({
 
 /**
  * Where a set of items can be moved, shared by the selection bar and the item menus: stored boards that are not
- * archived (date and Uncategorized entries are not boards), less the one board every item is already on. Removing
- * from a board is offered only while some item may be on one. Items no loaded page holds sit on the listing's board;
- * where that is unknown (no listing named, or a search of every board) they could be on any board.
+ * archived (date and Uncategorized entries are not boards), less the one board every item is already on. Removing from
+ * a board is offered only while some item may be on one. Items no loaded page holds sit on the listing's board; where
+ * that is unknown (no listing named, or a search of every board) they could be on any board.
  */
 export const getGalleryMoveTargets = (
   boards: readonly GalleryBoard[],

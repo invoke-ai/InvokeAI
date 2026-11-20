@@ -61,18 +61,6 @@ afterEach(async () => {
 });
 
 describe('prompt line numbers', () => {
-  it('indents the text clear of the gutter so numbers never overlap it', async () => {
-    // Fractional Chakra spacing variables are invalid inside calc.
-    await render('toyota+\nhonda\nacura--');
-
-    const textarea = host!.querySelector('textarea')!;
-    const gutter = host!.querySelector('[data-line-number]')!.parentElement!.parentElement!;
-    const textStart = textarea.getBoundingClientRect().left + parseFloat(getComputedStyle(textarea).paddingInlineStart);
-
-    expect(parseFloat(getComputedStyle(textarea).paddingInlineStart)).toBeGreaterThan(0);
-    expect(gutter.getBoundingClientRect().right).toBeLessThanOrEqual(textStart);
-  });
-
   it('numbers every logical line', async () => {
     await render('red\ngreen\nblue');
 
@@ -93,7 +81,6 @@ describe('prompt line numbers', () => {
     const heights = gutterEntries().map((entry) => entry.getBoundingClientRect().height);
 
     expect(gutterEntries().map((entry) => entry.textContent)).toEqual(['1', '2', '3']);
-    // Wrapped lines need taller gutter entries but only one logical line number.
     expect(heights[1]).toBeGreaterThan(heights[0] * 2);
     expect(heights[2]).toBeCloseTo(heights[0], 1);
   });

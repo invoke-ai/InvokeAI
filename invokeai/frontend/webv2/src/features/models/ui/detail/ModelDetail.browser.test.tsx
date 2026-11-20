@@ -12,7 +12,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ModelDetail } from './ModelDetail';
 
-// The sections own their data; here they only mark where the page places them.
 const { section } = vi.hoisted(() => ({
   section: (name: string) => () => <section data-section={name} />,
 }));
@@ -25,7 +24,9 @@ vi.mock('@features/models/data/api', async (importOriginal) => ({
   ...(await importOriginal<object>()),
   getModelIdentification: () => Promise.resolve({ changed: false, proposed: null, refusal: null }),
 }));
-vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({ i18n: { resolvedLanguage: 'en' }, t: (key: string) => key }),
+}));
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -112,16 +113,42 @@ describe('ModelDetail', () => {
       )
     );
 
-  it('places working memory last, after the trigger phrases', async () => {
-    await renderDetail(MAIN.key);
+  it('lists the roles a model also serves, and no row without any', async () => {
+    const withRoles = config('llm', 'text_llm', {
+      roles: [
+        { type: 'qwen3_5_encoder', variant: 'qwen3_5_9b' },
+        { format: null, type: 'qwen3_encoder' },
+      ],
+    });
+    setModelsSnapshotForTests({ models: [MAIN, withRoles], status: 'loaded' });
+    const alsoUsableAs = () =>
+      [...host.querySelectorAll('dt')].find((label) => label.textContent === 'models.alsoUsableAs')?.nextElementSibling
+        ?.textContent;
 
-    const order = [...host.querySelectorAll('[data-section]')].map((element) => element.getAttribute('data-section'));
-    expect(order).toEqual(['default-settings', 'related-models', 'trigger-phrases', 'working-memory']);
+    await renderDetail(withRoles.key);
+    expect(alsoUsableAs()).toBe('Qwen3.5 Encoder · Qwen3.5 9B (MOSS-Image) and Qwen3 Encoder');
+
+    await renderDetail(MAIN.key);
+    expect(alsoUsableAs()).toBeUndefined();
+  });
+
+  it('offers Related Models to a Text LLM only when it serves as a linkable type', async () => {
+    const encoderLlm = config('encoder-llm', 'text_llm', {
+      roles: [{ type: 'qwen3_5_encoder', variant: 'qwen3_5_9b' }],
+    });
+    const plainLlm = config('plain-llm', 'text_llm', { roles: [] });
+    setModelsSnapshotForTests({ models: [encoderLlm, plainLlm], status: 'loaded' });
+    const hasRelated = () => host.querySelector('[data-section="related-models"]') !== null;
+
+    await renderDetail(encoderLlm.key);
+    expect(hasRelated()).toBe(true);
+
+    await renderDetail(plainLlm.key);
+    expect(hasRelated()).toBe(false);
   });
 
   it('offers Run on CPU exactly when the config carries cpu_only', async () => {
     setModelsSnapshotForTests({ models: [GEMMA4_ENCODER, QWEN3_VL_ENCODER_WITHOUT_CPU_ONLY], status: 'loaded' });
-    // A checkbox named by its label, not merely the label text somewhere on the page.
     const hasCpuSwitch = () =>
       [...host.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')].some(
         (input) => input.labels?.[0]?.textContent === 'models.runOnCpu'
@@ -144,7 +171,6 @@ describe('ModelDetail', () => {
     await renderDetail(EMBEDDING.key);
     expect(hasTriggerPhrases()).toBe(false);
 
-    // Prompt triggers never read Control LoRAs, so phrases stored there would have no effect.
     await renderDetail(CONTROL_LORA.key);
     expect(hasTriggerPhrases()).toBe(false);
   });

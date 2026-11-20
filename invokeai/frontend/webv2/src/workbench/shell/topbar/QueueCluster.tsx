@@ -86,9 +86,7 @@ export const QueueCluster = () => {
   const isCancellable = !cancelCurrent?.disabled;
   const [lastCancellable, setLastCancellable] = useState(isCancellable);
 
-  // Hover is tracked only while the "x" is enabled, so the shift gesture cannot arm a button that does nothing. It
-  // turns disabled under a resting pointer when the running job finishes, and that pointer's leave goes unhandled;
-  // reset the gesture state with it.
+  // Hover is tracked only while the "x" is enabled, so the shift gesture cannot arm a button that does nothing.
   if (isCancellable !== lastCancellable) {
     setLastCancellable(isCancellable);
 
@@ -110,9 +108,9 @@ export const QueueCluster = () => {
     setIsShiftHeld(false);
   }, []);
   // Shift-click reaches every item, so it confirms first; a plain click stops one item, the running one or between
-  // items the next one waiting (the button's name says which), and does not.
-  // The later clicks of a double click are one gesture with the first, however long the system lets it take; the
-  // command's own settle window covers double taps from the keyboard and the palette.
+  // items the next one waiting (the button's name says which), and does not. The later clicks of a double click are one
+  // gesture with the first, however long the system lets it take; the command's own settle window covers double taps
+  // from the keyboard and the palette.
   const handleCancelClick = useCallback(
     (event: MouseEvent<HTMLButtonElement>) => {
       if (event.detail > 1) {
@@ -195,9 +193,8 @@ export const QueueCluster = () => {
             </IconButton>
           </Tooltip>
         ) : null}
-        {/* Shift over the hovered button swaps it to cancel-all live; pointer
-            events alone cannot see a bare shift press, so watch the keyboard
-            only while hovered. */}
+        {/* Shift over the hovered button swaps it to cancel-all live; pointer events alone cannot see a bare shift
+            press, so watch the keyboard only while hovered. */}
         {isCancelHovered ? <ShiftKeyWatcher onChange={setIsShiftHeld} /> : null}
 
         <Menu.Trigger asChild>

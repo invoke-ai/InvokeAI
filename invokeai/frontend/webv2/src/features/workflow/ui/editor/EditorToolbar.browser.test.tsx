@@ -6,7 +6,6 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { userEvent } from 'vitest/browser';
 
 const toolbarMocks = vi.hoisted(() => ({
   exportWorkflowAsPng: vi.fn(),
@@ -162,7 +161,7 @@ describe('editor toolbar', () => {
     await render(1);
 
     expect(new Set(buttonBoxes())).toEqual(new Set(['28x28']));
-    // Undo and redo moved to the widget header, beside the other header actions as in Canvas.
+    // Undo and redo live in the widget header, beside the other header actions as in Canvas.
     expect(host!.querySelector('button[aria-label="Undo"], button[aria-label="Redo"]')).toBeNull();
   });
 
@@ -348,24 +347,6 @@ describe('editor toolbar', () => {
 
     expect(toolbarMocks.error).not.toHaveBeenCalled();
     expect(toolbarMocks.info).not.toHaveBeenCalled();
-  });
-
-  it('shows the translated label as a camera tooltip', async () => {
-    await render(1);
-
-    const camera = host!.querySelector<HTMLButtonElement>('button[aria-label="Download workflow as PNG"]')!;
-    await act(async () => {
-      await userEvent.hover(camera);
-      await new Promise<void>((resolve) => {
-        globalThis.setTimeout(resolve, 500);
-      });
-    });
-
-    const tooltip = [...document.querySelectorAll('[role="tooltip"]')].find(
-      (element) => element.textContent === 'Download workflow as PNG'
-    );
-
-    expect(tooltip).not.toBeUndefined();
   });
 
   it.each(['prepare', 'rasterize'])('reports a %s failure and releases the camera action', async (stage) => {

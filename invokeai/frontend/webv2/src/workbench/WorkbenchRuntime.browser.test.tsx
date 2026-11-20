@@ -182,8 +182,8 @@ describe('WorkbenchFocusProvider', () => {
     await render(true);
     await press('window');
 
-    // The focused window leaves — as a preset applied in the same project can make it — and a later change floats
-    // the same instance again.
+    // The focused window leaves — as a preset applied in the same project can make it — and a later change floats the
+    // same instance again.
     await act(() => commands.widgets.dockFloating('image-map'));
     await act(() => commands.widgets.float('image-map'));
 

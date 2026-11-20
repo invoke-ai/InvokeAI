@@ -13,8 +13,6 @@ import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-// Panel frames read the region's persisted size; the fallback under test only
-// needs a stable one, so the store is stubbed rather than booted.
 vi.mock('@workbench/WorkbenchContext', async (importOriginal) => ({
   ...(await importOriginal<typeof workbenchContext>()),
   shallowEqual: Object.is,
@@ -115,7 +113,6 @@ const render = async (children: ReactNode) => {
 };
 
 afterEach(async () => {
-  // Focus is per test: the next one starts with no region outlined and no move pending.
   focusController.clear();
   await interact(() => root?.unmount());
   host?.remove();
@@ -125,8 +122,6 @@ afterEach(async () => {
 });
 
 describe('WidgetLoadingFallback', () => {
-  // CenterArea keeps chrome mounted during loading; fallback headers would disappear and shift layout on
-  // resolution.
   it('fills the center region with announced, chrome-free surface while the implementation loads', async () => {
     const { widget } = createTestWidget();
     await render(<WidgetLoadingFallback instance={instance} region="center" widget={widget} />);

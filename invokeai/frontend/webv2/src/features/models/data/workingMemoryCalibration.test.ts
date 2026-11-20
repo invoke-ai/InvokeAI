@@ -44,7 +44,6 @@ const api = vi.hoisted(() => ({
 
 vi.mock('./workingMemoryApi', () => api);
 
-/** The model records the server holds, which a compile reads. */
 const library = vi.hoisted(() => ({ models: [] as unknown[] }));
 
 vi.mock('./api', async (importOriginal) => ({
@@ -82,7 +81,6 @@ it("marks every model's plan stale when a calibration item changes status, witho
   const read = vi.fn(() => Promise.resolve({}));
   const unsubscribe = plans.map((key) => {
     queryClient.setQueryData(key, { supported: true });
-    // An observed plan, as an open section has: an invalidation that refetched would read it now.
     return new QueryObserver(queryClient, { queryFn: read, queryKey: key, staleTime: Infinity }).subscribe(
       () => undefined
     );
@@ -134,10 +132,6 @@ describe('posting the steps of a calibration', () => {
   };
   const graphs = PLAN.cases.map((item) => ({ caseId: item.id, data: [], graph: { id: item.id }, models: {} }));
 
-  /**
-   * Answers like the server: a new key queues its items once, a repeat of a key returns the run it queued. The first
-   * `times` requests of the first key get `failure` once its items are queued, as a failed store write does.
-   */
   const serve = (failure: InstanceType<typeof ApiError>, times = 1) => {
     const queued = new Map<string, WorkingMemoryRunCreated>();
     let firstKeyRequests = 0;
@@ -183,8 +177,6 @@ describe('posting the steps of a calibration', () => {
         type: 'main',
         variant,
       }) as ModelConfig;
-    // Like Generate's compiler, it names the model as the records it was given have it. Another tab edits the model's
-    // variant once they were read, before the steps are posted.
     const compile: CalibrationGraphCompiler = async (cases, models) => {
       const [model] = await models;
       const named = { base: model!.base, hash: model!.hash, key: model!.key, name: model!.name, type: model!.type };
@@ -220,12 +212,10 @@ describe('posting the steps of a calibration', () => {
     await started;
 
     const keys = postedKeys();
-    // The first step twice under one key, then each later step once.
     expect(keys).toHaveLength(4);
     expect(keys[1]).toBe(keys[0]);
     expect(new Set(keys).size).toBe(3);
     expect(queued.size).toBe(3);
-    // Every step's response arrived, so every key is acknowledged once.
     expect(api.acknowledgeCalibrationEnqueue.mock.calls.map(([key]) => key)).toEqual([...new Set(keys)]);
   });
 

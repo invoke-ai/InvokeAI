@@ -116,8 +116,8 @@ describe('layout preset activation', () => {
       load: () => Promise.resolve(),
     });
 
-    // No await: a warm switch must commit in the caller's own task, not a
-    // microtask later, so the click that triggered it paints with the layout.
+    // No await: a warm switch must commit in the caller's own task, not a microtask later, so the click that triggered
+    // it paints with the layout.
     void activator.activate(layoutPresets[1]);
 
     expect(appliedPresetIds).toEqual(['edit']);

@@ -18,7 +18,6 @@ import { LibraryColumn } from './manager/LibraryColumn';
 
 const openAddNodes = () => openNodesManagerTab('add');
 
-/** Full custom nodes manager: the pack library, the detail pane, and the install queue under both. */
 export const NodeManagerView = () => {
   const { t } = useTranslation();
   const detailOpen = useNodesUiSelector((snapshot) => snapshot.detailOpen);
