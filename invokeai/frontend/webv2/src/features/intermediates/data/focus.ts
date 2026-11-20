@@ -6,8 +6,8 @@ export const INTERMEDIATES_SETTING_ID = 'intermediatesManager';
 
 /**
  * What an entry point wants the manager to start on: a project to preselect, or an account to filter by. The manager
- * reads it while rendering and consumes it once that render commits, so a discarded render cannot lose it and a
- * stale intent never resurfaces on a later visit.
+ * reads it while rendering and consumes it once that render commits, so a discarded render cannot lose it and a stale
+ * intent never resurfaces on a later visit.
  */
 export interface IntermediatesFocus {
   projectId?: string;

@@ -25,9 +25,9 @@ const holdPath = (leaseId: string): string => `/api/v1/intermediates/holds/${enc
 /**
  * Keeps the media an open editor still needs (unsaved content, undo state) out of cleanup for as long as the tab is
  * alive, under one lease the server replaces atomically. A send the server did not acknowledge is forgotten, so the
- * next change, heartbeat or return to the foreground sends again while the server keeps the previous lease. The
- * lease is released on dispose and on `pagehide`, with `keepalive` so the release survives the page; the server's
- * 15-minute expiry bounds anything a crash leaves behind.
+ * next change, heartbeat or return to the foreground sends again while the server keeps the previous lease. The lease
+ * is released on dispose and on `pagehide`, with `keepalive` so the release survives the page; the server's 15-minute
+ * expiry bounds anything a crash leaves behind.
  */
 export const startIntermediatesHoldLease = ({
   owner,

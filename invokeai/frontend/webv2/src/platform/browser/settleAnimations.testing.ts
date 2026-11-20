@@ -1,6 +1,6 @@
 /**
- * Wait for real browser animations before visual assertions; visible elements can still be mid-transition and
- * yield false contrast failures.
+ * Wait for real browser animations before visual assertions; visible elements can still be mid-transition and yield
+ * false contrast failures.
  */
 
 /**
@@ -20,8 +20,8 @@ const willFinish = (animation: Animation): boolean => {
 };
 
 /**
- * Settle the whole document by default, including sibling backdrops and portals. Ignore nonterminating animations;
- * use allSettled because removal cancels CSS animations and rejects finished.
+ * Settle the whole document by default, including sibling backdrops and portals. Ignore nonterminating animations; use
+ * allSettled because removal cancels CSS animations and rejects finished.
  */
 export const settleAnimations = async (root: Document | Element = document): Promise<void> => {
   await Promise.allSettled(

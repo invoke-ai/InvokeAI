@@ -38,7 +38,6 @@ const CHEVRON_HOVER = { bg: 'bg.muted', color: 'fg' };
 const THUMBNAIL_SIZE = `${LAYER_LEADING_BOX_PX}px`;
 const GROUP_PILE_OFFSET_PX = 4;
 
-/** How a row takes part in the current drag. */
 export type LayerRowDragState = 'source' | 'travelling' | null;
 
 interface LayerRowProps {
@@ -69,11 +68,7 @@ interface LayerRowProps {
 
 const stopPropagation = (event: { stopPropagation: () => void }): void => event.stopPropagation();
 
-/**
- * One tree item. The row element itself carries the tree role, the roving tab stop and the
- * keyboard model; every control inside it is pointer-only (`tabIndex={-1}`) and reachable from the
- * keyboard through the row's menu, so the tree stays a single tab stop.
- */
+/** The row carries the tree role and roving tab stop; controls inside are pointer-only, reached via its menu. */
 const LayerRowComponent = ({
   ancestorOfPrimary,
   ariaPosInSet,
@@ -223,8 +218,8 @@ const LayerRowComponent = ({
     (refocus: boolean) => {
       const name = nameInput.current?.value.trim() ?? '';
       const cancelled = renameCancelled.current;
-      // Refocusing the row blurs the still-mounted input, which re-enters this
-      // handler; claiming the commit first keeps it to one dispatch.
+      // Refocusing the row blurs the still-mounted input, which re-enters this handler; claiming the commit first keeps
+      // it to one dispatch.
       renameCancelled.current = true;
       finishRename(refocus);
       if (!cancelled && name && name !== node.name) {
@@ -443,8 +438,8 @@ const LayerRowComponent = ({
             left of its New button, so eyes and locks each form one column at every depth. */}
         <HStack flexShrink="0" gap={LAYER_PANEL_CONTROL_GAP} onClick={stopPropagation} onMouseDown={keepRowFocus}>
           {overlay ? (
-            // Overlays keep two axes: the dot says whether the layer takes part in generation (off, it is neither
-            // drawn nor generated) and the eye only whether it is drawn, so a mask can be out of view yet still used.
+            // Overlays keep two axes: the dot says whether the layer takes part in generation (off, it is neither drawn
+            // nor generated) and the eye only whether it is drawn, so a mask can be out of view yet still used.
             <>
               <LayerActiveDot
                 checked={node.isEnabled}
@@ -470,8 +465,8 @@ const LayerRowComponent = ({
                 <IconButton
                   aria-label={t('widgets.layers.actions.showOnCanvas')}
                   aria-pressed={!vm.documentHidden}
-                  // Out of generation the layer is not drawn either; the eye keeps its own state, dimmed, for when
-                  // the dot comes back on.
+                  // Out of generation the layer is not drawn either; the eye keeps its own state, dimmed, for when the
+                  // dot comes back on.
                   color={vm.contributionEnabled && !vm.documentHidden ? 'fg.muted' : 'fg.subtle'}
                   disabled={editingLocked || hiddenByAncestor}
                   size="sm"
@@ -485,8 +480,7 @@ const LayerRowComponent = ({
               </Tooltip>
             </>
           ) : (
-            // Raster layers have one axis: the eye takes a layer off the canvas and out of generation alike. The empty
-            // dot slot keeps the eye and lock columns aligned with the overlay stacks.
+            // Raster layers have one axis: the eye takes a layer off the canvas and out of generation alike.
             <>
               <Box aria-hidden flexShrink="0" w={LAYER_ACTIVE_DOT_SIZE} />
               <Tooltip

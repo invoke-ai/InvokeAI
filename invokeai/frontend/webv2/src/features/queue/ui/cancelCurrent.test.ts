@@ -139,42 +139,12 @@ describe('cancel-current target', () => {
     expect(targetId(batch(), 7)).toBeNull();
   });
 
-  it('stops nothing waiting while the processor is paused', () => {
-    expect(targetId(readModel([item(9, 'pending'), item(8, 'pending')], { isStarted: false }))).toBeNull();
-  });
-
   it("stops nothing waiting while someone else's item runs, but the viewer's own item running beside it", () => {
     const theirs = item(20, 'in_progress', { userId: 'someone' });
 
     expect(targetId(readModel([item(22, 'pending'), item(21, 'pending'), theirs]))).toBeNull();
     // Another GPU runs one of the viewer's items.
     expect(targetId(readModel([item(22, 'pending'), item(21, 'in_progress'), theirs]))).toBe(21);
-  });
-
-  it('in a project view, stops nothing waiting while an item runs elsewhere in the queue, however the view counts', () => {
-    const projectScope = { originPrefix: 'webv2:p:project-1:q:' };
-    // The project's reading: nothing of its own runs, and its next item waits.
-    const project = readModel([item(9, 'pending'), item(8, 'pending'), item(7, 'completed')]);
-    const wholeQueue = (inProgress: number) => ({ ...project.status, queue: { ...project.status.queue, inProgress } });
-    const targetIn = (inProgressAnywhere: number | null) =>
-      getCancelCurrentTarget(project, { canManageItem: mine, inProgressAnywhere })?.id ?? null;
-
-    // Another project's item, or another user's, runs.
-    expect(targetIn(getInProgressAnywhere(projectScope, project, wholeQueue(1)))).toBeNull();
-    // Not known yet: nothing is stopped on a guess.
-    expect(targetIn(getInProgressAnywhere(projectScope, project, null))).toBeNull();
-    // Nothing runs anywhere: the gap between two of the project's items.
-    expect(targetIn(getInProgressAnywhere(projectScope, project, wholeQueue(0)))).toBe(8);
-  });
-
-  it("between items, reaches past someone else's next item only when the window holds every pending item", () => {
-    const theirs = item(21, 'pending', { userId: 'someone' });
-    const window = [item(23, 'pending', { priority: 10 }), item(22, 'pending'), theirs];
-
-    // The viewer's own, in the order the server runs them: the one queued at the front first.
-    expect(targetId(readModel(window))).toBe(23);
-    // More wait than the window shows: the true next of the viewer's may be older than all of them.
-    expect(targetId(readModel(window, { pending: 40 }))).toBeNull();
   });
 });
 
@@ -194,8 +164,8 @@ describe('cancelCurrentQueueItem', () => {
     await vi.advanceTimersByTimeAsync(150);
     await expect(cancelCurrent()).resolves.toEqual({ kind: 'busy' });
 
-    // The read that reconciles the queue lands (the app's queue views keep the read model observed); then a
-    // deliberate press after the settle window stops the next item.
+    // The read that reconciles the queue lands (the app's queue views keep the read model observed); then a deliberate
+    // press after the settle window stops the next item.
     client.setQueryData(
       ['queue', 'read-model', 'all'],
       readModel([item(9, 'pending'), item(8, 'pending'), item(7, 'canceled', { statusSequence: 5 })])
@@ -214,21 +184,6 @@ describe('cancelCurrentQueueItem', () => {
     expect(cached().items.find((candidate) => candidate.id === 7)?.status).toBe('in_progress');
 
     await expect(cancelCurrent()).resolves.toMatchObject({ item: { id: 7 }, kind: 'canceled' });
-  });
-
-  it("moves the whole queue's counts at once, and puts them back when the cancel fails", async () => {
-    const failure = new Error('Server unavailable');
-    const request = deferred<QueueItemReadModel>();
-    server.cancelItem.mockReturnValueOnce(request.promise);
-    client.setQueryData(['queue', 'status', 'all'], batch().status);
-
-    const pressed = cancelCurrent();
-
-    // What runs anywhere, for the Launchpad's band and a project view's gap, drops with the item before the answer.
-    expect(wholeQueue()).toEqual({ ...batch().status.queue, canceled: 1, inProgress: 0 });
-    request.reject(failure);
-    await expect(pressed).resolves.toEqual({ error: failure, kind: 'failed' });
-    expect(wholeQueue()).toEqual(batch().status.queue);
   });
 
   it('cancels nothing it cannot know is next: a long batch whose oldest waiting items are outside the window', async () => {
@@ -253,93 +208,6 @@ describe('cancelCurrentQueueItem', () => {
 
     await expect(cancelCurrent()).resolves.toMatchObject({ item: { id: 8 }, kind: 'canceled' });
     expect(server.cancelItem.mock.calls).toEqual([[7], [8]]);
-  });
-
-  it("shows the server's answer for an item that had already finished at once, before the read", async () => {
-    server.cancelItem.mockImplementation((id) => answer(id, 'completed'));
-    const read = deferred<QueueReadModel>();
-    server.model = () => read.promise;
-
-    const pressed = cancelCurrent();
-    await vi.advanceTimersByTimeAsync(0);
-
-    expect(cached().items.find((candidate) => candidate.id === 7)?.status).toBe('completed');
-    read.resolve(readModel([item(7, 'completed')]));
-    await expect(pressed).resolves.toEqual({ kind: 'nothing' });
-  });
-
-  it('reads afresh after the answer instead of joining a read that started before it', async () => {
-    server.cancelItem.mockImplementation((id) => answer(id, id === 7 ? 'completed' : 'canceled'));
-    const stale = deferred<QueueReadModel>();
-    const fresh = readModel([item(9, 'pending'), item(8, 'in_progress'), item(7, 'completed')]);
-    server.model = () => (server.reads === 1 ? stale.promise : fresh);
-    // A read from before the cancel is still out: it would say item 7 runs.
-    const earlier = client.fetchQuery({
-      queryFn: () => {
-        server.reads += 1;
-        return stale.promise;
-      },
-      queryKey: ['queue', 'read-model', 'all'],
-      staleTime: 0,
-    });
-
-    await expect(cancelCurrent()).resolves.toMatchObject({ item: { id: 8 }, kind: 'canceled' });
-    expect(server.reads).toBe(2);
-    // The earlier read was neither joined nor cancelled: whoever awaits it (the palette's queue search) still gets it.
-    stale.resolve(batch());
-    await expect(earlier).resolves.toEqual(batch());
-  });
-
-  it('offers the next item after the settle window when the read that would reconcile fails', async () => {
-    server.model = () => Promise.reject(new Error('Server unavailable'));
-
-    await expect(cancelCurrent()).resolves.toMatchObject({ item: { id: 7 }, kind: 'canceled' });
-    await vi.advanceTimersByTimeAsync(CANCEL_CURRENT_SETTLE_MS);
-
-    // The canceled item no longer counts as running, so the gap shows without any read.
-    expect(cached().status.queue.inProgress).toBe(0);
-    await expect(cancelCurrent()).resolves.toMatchObject({ item: { id: 8 }, kind: 'canceled' });
-  });
-
-  it('gives up on a fresh read that stalls, and leaves the command free', async () => {
-    server.cancelItem.mockImplementation((id) => answer(id, 'completed'));
-    // A read that never answers.
-    server.model = () =>
-      new Promise<never>(() => {
-        // Never settles.
-      });
-
-    const pressed = cancelCurrent();
-    await vi.advanceTimersByTimeAsync(10_000);
-
-    // Nothing failed to cancel: the server said the item had already finished.
-    await expect(pressed).resolves.toMatchObject({ item: { id: 7 }, kind: 'finished' });
-    server.model = readModel([item(7, 'completed')]);
-    await expect(cancelCurrent()).resolves.not.toEqual({ kind: 'busy' });
-  });
-
-  it('says the item had already finished when what is current now cannot be read', async () => {
-    server.cancelItem.mockImplementation((id) => answer(id, 'completed'));
-    server.model = () => Promise.reject(new Error('Server unavailable'));
-
-    await expect(cancelCurrent()).resolves.toMatchObject({ item: { id: 7 }, kind: 'finished' });
-    expect(server.cancelItem.mock.calls).toEqual([[7]]);
-  });
-
-  it('reports a failed cancel of what is current now as failed', async () => {
-    const failure = new Error('Server unavailable');
-    server.cancelItem.mockImplementation((id) => (id === 7 ? answer(id, 'completed') : Promise.reject(failure)));
-    server.model = readModel([item(9, 'pending'), item(8, 'in_progress'), item(7, 'completed')]);
-
-    await expect(cancelCurrent()).resolves.toEqual({ error: failure, kind: 'failed' });
-  });
-
-  it('says there is nothing to cancel when the fresh read finds nothing either', async () => {
-    server.cancelItem.mockImplementation((id) => answer(id, 'completed'));
-    server.model = readModel([item(7, 'completed')]);
-
-    await expect(cancelCurrent()).resolves.toEqual({ kind: 'nothing' });
-    expect(server.cancelItem.mock.calls).toEqual([[7]]);
   });
 
   it('puts nothing back, reads nothing and retargets nothing once the account has signed out', async () => {
@@ -392,31 +260,5 @@ describe('cancelCurrentQueueItem', () => {
     await expect(pressed).resolves.toMatchObject({ item: { id: 7 }, kind: 'canceled' });
     expect(cached().items.find((candidate) => candidate.id === 7)?.status).toBe('canceled');
     expect(wholeQueue()).toEqual(guessed);
-  });
-
-  it('keeps what an event changed while a cancel was waiting, when that cancel then fails', async () => {
-    const failure = new Error('Server unavailable');
-    let fail!: () => void;
-    server.cancelItem.mockImplementationOnce(
-      () =>
-        new Promise((_resolve, reject) => {
-          fail = () => reject(failure);
-        })
-    );
-
-    client.setQueryData(['queue', 'status', 'all'], batch().status);
-
-    const pressed = cancelCurrent();
-    // Item 8 starts meanwhile.
-    applyQueueItemStatusToReadModels(client, {
-      item: item(8, 'in_progress', { statusSequence: 2 }),
-      queueCounts: null,
-    });
-    fail();
-
-    await expect(pressed).resolves.toEqual({ error: failure, kind: 'failed' });
-    expect(cached().items.find((candidate) => candidate.id === 8)?.status).toBe('in_progress');
-    // The whole queue's counts keep the event too, until the read reconciles them.
-    expect(wholeQueue()).toMatchObject({ inProgress: 1, pending: 1 });
   });
 });

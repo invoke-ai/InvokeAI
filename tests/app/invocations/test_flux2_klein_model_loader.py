@@ -13,7 +13,15 @@ import pytest
 
 from invokeai.app.invocations.flux2.flux2_klein_model_loader import Flux2KleinModelLoaderInvocation
 from invokeai.app.invocations.model import ModelIdentifierField
-from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType, SubModelType
+from invokeai.backend.model_manager.taxonomy import (
+    BaseModelType,
+    Flux2VariantType,
+    ModelFormat,
+    ModelType,
+    Qwen3VariantType,
+    SubModelType,
+)
+from tests.fixtures.model_roles import node_context, text_llm_qwen3_folder
 
 
 def _make_main_model() -> ModelIdentifierField:
@@ -66,3 +74,44 @@ class TestFlux2KleinSelfContainedSDNQ:
         config = SimpleNamespace(format=ModelFormat.SDNQQuantized, submodels=None, name="FLUX.2 single file")
         with pytest.raises(ValueError, match="No VAE source"):
             invocation.invoke(_make_context(config))
+
+
+class TestQwen3TextLLMServingAsEncoder:
+    """A Qwen3 folder installed as a Text LLM serves as the Klein encoder; the node asks for that role."""
+
+    @staticmethod
+    def _invoke(llm_variant: Qwen3VariantType | None):
+        encoder = ModelIdentifierField(
+            key="llm", hash="h-llm", name="llm folder", base=BaseModelType.Any, type=ModelType.TextLLM
+        )
+        vae = ModelIdentifierField(
+            key="vae", hash="h-vae", name="FLUX.2 VAE", base=BaseModelType.Flux2, type=ModelType.VAE
+        )
+        configs = {
+            "flux2-sdnq-key": SimpleNamespace(
+                name="Klein 4B",
+                type=ModelType.Main,
+                format=ModelFormat.GGUFQuantized,
+                variant=Flux2VariantType.Klein4B,
+                submodels=None,
+            ),
+            "llm": text_llm_qwen3_folder("llm", llm_variant),
+        }
+        invocation = Flux2KleinModelLoaderInvocation(
+            model=_make_main_model(), vae_model=vae, qwen3_encoder_model=encoder
+        )
+        return invocation.invoke(node_context(configs))  # type: ignore[arg-type]
+
+    def test_the_matching_folder_is_emitted_as_a_qwen3_encoder(self):
+        output = self._invoke(Qwen3VariantType.Qwen3_4B)
+
+        for field in (output.qwen3_encoder.text_encoder, output.qwen3_encoder.tokenizer):
+            assert (field.key, field.type) == ("llm", ModelType.Qwen3Encoder)
+
+    def test_a_folder_of_the_wrong_size_is_refused_by_its_role_variant(self):
+        with pytest.raises(ValueError, match="requires qwen3_4b encoder, but qwen3_8b was selected"):
+            self._invoke(Qwen3VariantType.Qwen3_8B)
+
+    def test_a_folder_without_the_role_is_refused_naming_the_selection(self):
+        with pytest.raises(ValueError, match="'llm folder' is not a Qwen3 encoder.*or a Text LLM that serves as one"):
+            self._invoke(None)

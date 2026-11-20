@@ -1,12 +1,10 @@
 import type { RasterSurface } from './render/raster';
 
-/** A 2D point or vector. */
 export interface Vec2 {
   x: number;
   y: number;
 }
 
-/** An axis-aligned rectangle. */
 export interface Rect {
   x: number;
   y: number;
@@ -15,9 +13,8 @@ export interface Rect {
 }
 
 /**
- * A raster surface placed in some coordinate space: the surface holds pixels for
- * `rect` (its bounds in that space), so surface pixel `(sx, sy)` maps to
- * `(rect.x + sx, rect.y + sy)`. Used for content-sized layer caches (layer-local
+ * A raster surface placed in some coordinate space: the surface holds pixels for `rect` (its bounds in that space), so
+ * surface pixel `(sx, sy)` maps to `(rect.x + sx, rect.y + sy)`. Used for content-sized layer caches (layer-local
  * space) and the bounded selection mask (document space).
  */
 export interface PlacedSurface {
@@ -35,7 +32,6 @@ export interface Mat2d {
   f: number;
 }
 
-/** Identifiers for the tools the engine's interaction layer can dispatch to. */
 export type ToolId =
   | 'brush'
   | 'eraser'
@@ -44,6 +40,7 @@ export type ToolId =
   | 'lasso'
   | 'marquee'
   | 'move'
+  | 'spline'
   | 'transform'
   | 'bbox'
   | 'view'
@@ -54,7 +51,6 @@ export type ToolId =
 /** Selection operations replace, union, subtract or intersect the existing alpha mask. */
 export type SelectionOp = 'replace' | 'add' | 'subtract' | 'intersect';
 
-/** Modifier key state accompanying a pointer sample. */
 export interface PointerModifiers {
   shift: boolean;
   alt: boolean;

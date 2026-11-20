@@ -67,7 +67,8 @@ describe('HotkeysSettingsSection conflicts', () => {
   // widget types; a Canvas binding on the same key meets neither.
   it('flags a binding that shares its key with a multi-widget shortcut on any of that shortcut’s widgets', async () => {
     await patchWorkbenchPreferences({
-      customHotkeys: { 'canvas.tool.brush': ['s'], 'gallery.toggleStarredOnly': ['s'] },
+      // Free S within Canvas so this fixture tests only cross-widget overlap with Recall Seed.
+      customHotkeys: { 'canvas.tool.brush': ['s'], 'canvas.tool.spline': [], 'gallery.toggleStarredOnly': ['s'] },
     });
     await render();
 

@@ -1,3 +1,4 @@
+import type { ResolvedValues } from '@platform/core/resolvedValues';
 import type { ProjectLayoutState } from '@workbench/layoutContracts';
 import type { Project } from '@workbench/projectContracts';
 import type { EffectiveProjectSettings } from '@workbench/settings/contracts';
@@ -59,8 +60,8 @@ const getNullSnapshot = (): null => null;
 
 /**
  * Each account lifetime's latest editor exit in this tab. The next editor loads only after it settles (bounded by the
- * runtime), so it never hydrates a snapshot older than the checkpoint and two editors never write at once. Keyed by
- * the lifetime: another account neither waits for it nor sees it.
+ * runtime), so it never hydrates a snapshot older than the checkpoint and two editors never write at once. Keyed by the
+ * lifetime: another account neither waits for it nor sees it.
  */
 const pendingEditorExits = new WeakMap<AccountScope, PersistenceExit>();
 
@@ -83,8 +84,8 @@ export const WorkbenchProvider = ({
   const [loadUnavailable, setLoadUnavailable] = useState<{ message: string; retry(): void } | null>(null);
   const hasHydrated = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot).hasHydrated;
 
-  // The runtime is created inside the effect: exit is terminal, so each
-  // mount (including a StrictMode remount) must get its own instance.
+  // The runtime is created inside the effect: exit is terminal, so each mount (including a StrictMode remount) must get
+  // its own instance.
   useMountEffect(() => {
     const releasePersistence = persistence.retain();
     const persistenceRuntime = createWorkbenchPersistenceRuntime({
@@ -124,7 +125,8 @@ export const WorkbenchProvider = ({
         setHasHydrated: store.setHasHydrated,
         subscribe: store.subscribe,
       },
-      // At exit, React runs a removed provider's cleanup before its descendants', so their flushers are still registered.
+      // At exit, React runs a removed provider's cleanup before its descendants', so their flushers are still
+      // registered.
       commitDrafts: flushWorkbenchDrafts,
       loadOptions,
       logger: createLogger({ area: 'autosave', namespace: 'persistence' }, { owner }),
@@ -308,7 +310,7 @@ export const useActiveProjectSettingsSelector = <Selected,>(
 /** A widget's values as it reads them: the active project's pins over the user's defaults for the widget's type. */
 export const useWidgetValuesSelector = <Selected,>(
   widgetId: WidgetTypeId,
-  selector: (values: Record<string, unknown>) => Selected,
+  selector: (values: ResolvedValues) => Selected,
   isEqual?: EqualityFn<Selected>
 ): Selected =>
   useWorkbenchSelector(
@@ -318,7 +320,7 @@ export const useWidgetValuesSelector = <Selected,>(
 
 export const useWidgetInstanceValuesSelector = <Selected,>(
   instanceId: WidgetInstanceId,
-  selector: (values: Record<string, unknown>) => Selected,
+  selector: (values: ResolvedValues) => Selected,
   isEqual?: EqualityFn<Selected>
 ): Selected =>
   useWorkbenchSelector(
@@ -330,7 +332,7 @@ export const useWidgetInstanceValuesSelector = <Selected,>(
 export const useProjectWidgetInstanceValuesSelector = <Selected,>(
   projectId: string,
   instanceId: WidgetInstanceId,
-  selector: (values: Record<string, unknown>) => Selected,
+  selector: (values: ResolvedValues) => Selected,
   isEqual?: EqualityFn<Selected>
 ): Selected =>
   useWorkbenchSelector((snapshot) => {

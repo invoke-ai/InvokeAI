@@ -48,7 +48,8 @@ import { HIDE_BELOW_PROJECT_NAME_WIDTH } from './topbarBreakpoints';
 import { TopbarMenuChevron } from './TopbarMenuChevron';
 
 // The dialog reads the gallery's board query, and this host sits in a boot graph the performance gates pin by source
-// file, so even a shared three-line wrapper module would register as growth. Loaded the first time a delete is asked for.
+// file, so even a shared three-line wrapper module would register as growth. Loaded the first time a delete is asked
+// for.
 const LazyDeleteProjectDialog = lazy(() =>
   import('@workbench/projects/components/DeleteProjectDialog').then((module) => ({
     default: module.DeleteProjectDialog,
@@ -119,8 +120,8 @@ export const ProjectSwitcher = () => {
   const hideOpenDialog = useCallback(() => setIsOpenDialogVisible(false), []);
   const closeRenameDialog = useCallback(() => setRenameTarget(null), []);
   const closeDeleteDialog = useCallback(() => setDeleteTarget(null), []);
-  // Through the library, not the bare store command: the library path flushes
-  // an open project immediately, which is what renames its board on the server.
+  // Through the library, not the bare store command: the library path flushes an open project immediately, which is
+  // what renames its board on the server.
   const renameProject = useCallback(
     async (name: string) => {
       if (!renameTarget) {

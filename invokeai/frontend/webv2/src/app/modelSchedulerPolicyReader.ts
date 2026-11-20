@@ -1,12 +1,12 @@
-import type { ArchitectureCapabilitiesSnapshot } from '@features/generation/runtime';
 import type { SchedulerPolicyReader, SchedulerPolicyState } from '@features/models';
+import type { ArchitectureCapabilitiesSnapshot } from '@features/models/architecturesStore';
 
+import { getDefaultGenerateSettings, getGenerationUiPolicy, getSchedulerOptions } from '@features/generation/settings';
 import {
   ensureArchitectureCapabilitiesLoaded,
   getArchitectureCapabilitiesSnapshot,
   subscribeArchitectureCapabilities,
-} from '@features/generation/runtime';
-import { getDefaultGenerateSettings, getGenerationUiPolicy, getSchedulerOptions } from '@features/generation/settings';
+} from '@features/models/architecturesStore';
 
 type GenerateMainModel = Parameters<typeof getDefaultGenerateSettings>[0] & { type: 'main' };
 

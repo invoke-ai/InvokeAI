@@ -46,6 +46,19 @@ describe('generateDocsId', () => {
   });
 });
 
+describe('makeHrefToId', () => {
+  it("maps a homepage href to the 'index' page id, with or without a base path or a locale", () => {
+    assert.equal(hrefToId('/'), 'index');
+    assert.equal(makeHrefToId('/InvokeAI/')('/InvokeAI/'), 'index');
+    assert.equal(makeHrefToId('/InvokeAI/')('/InvokeAI/de/'), 'index');
+  });
+
+  it('strips the base path from deeper hrefs but leaves unrelated paths alone', () => {
+    assert.equal(makeHrefToId('/InvokeAI/')('/InvokeAI/video/wan/'), 'video/wan');
+    assert.equal(makeHrefToId('/InvokeAI/')('/other/page/'), 'other/page');
+  });
+});
+
 describe('translateGroupLabels', () => {
   it('translates group labels at every depth by their slug, keeping labels without a string and link labels', () => {
     const german = {
@@ -204,6 +217,29 @@ describe('addCrossListings', () => {
     addCrossListings(sidebar, [{ id: 'video/wan', directory: 'models/local' }], directories, baseHrefToId);
     assert.deepEqual(labels(sidebar[0].entries), ['SDXL', 'Wan']);
   });
+
+  it('cross-lists the homepage when a base path deploys its link at the base itself', () => {
+    const baseHrefToId = makeHrefToId('/InvokeAI/');
+    // The fixture ids come from the real ID generator and the frontmatter through the cross-listing selector, as in
+    // `route-data.ts`: the root `index.mdx` gets the id 'index', not ''.
+    const homeDoc = { id: generateDocsId({ entry: 'index.mdx', data: { alsoListedIn: ['docs'] } }), data: { alsoListedIn: ['docs'] } };
+    assert.equal(homeDoc.id, 'index');
+    const sidebar = [
+      group('Docs', 'docs', [{ ...link('docs/intro', 'Intro'), href: '/InvokeAI/docs/intro/' }]),
+      group('Home', '', [
+        { ...link('index', 'Home'), href: '/InvokeAI/' },
+        { ...link('video/wan', 'Wan'), href: '/InvokeAI/video/wan/' },
+      ]),
+    ];
+    const dirs = new Map([
+      ['docs/intro', 'docs'],
+      ['index', ''],
+      ['video/wan', ''],
+    ]);
+    addCrossListings(sidebar, selectCrossListings([homeDoc], true), dirs, baseHrefToId);
+    assert.deepEqual(labels(sidebar[0].entries), ['Home', 'Intro']);
+    assert.ok(CROSS_LISTED_ATTR in sidebar[0].entries[0].attrs);
+  });
 });
 
 describe('locale routes', () => {
@@ -213,7 +249,7 @@ describe('locale routes', () => {
 
   it("maps a translated or fallback page's href to the English page id", () => {
     assert.equal(localeHrefToId('/InvokeAI/de/users-guide/gallery/boards/'), 'users-guide/gallery/boards');
-    assert.equal(localeHrefToId('/InvokeAI/hi/'), '');
+    assert.equal(localeHrefToId('/InvokeAI/hi/'), 'index');
     // Only a known locale is a locale segment.
     assert.equal(localeHrefToId('/InvokeAI/development/x/'), 'development/x');
     assert.equal(localeHrefToId('/InvokeAI/it/x/'), 'it/x');

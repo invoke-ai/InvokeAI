@@ -1,5 +1,5 @@
 import type { BoxProps } from '@chakra-ui/react';
-import type { MouseEventHandler, ReactNode } from 'react';
+import type { KeyboardEventHandler, MouseEventHandler, ReactNode } from 'react';
 
 import { Box } from '@chakra-ui/react';
 
@@ -11,14 +11,21 @@ const CANVAS_SURFACE_LAYER_LAYOUT = {
 export const CanvasSurfaceContextLayout = ({
   children,
   onContextMenu,
+  onKeyDown,
   surface,
 }: {
   children: ReactNode;
   onContextMenu: MouseEventHandler<HTMLDivElement>;
+  onKeyDown?: KeyboardEventHandler<HTMLDivElement>;
   surface: ReactNode;
 }) => (
   <>
-    <Box {...CANVAS_SURFACE_LAYER_LAYOUT} data-canvas-context-menu-owner="" onContextMenu={onContextMenu}>
+    <Box
+      {...CANVAS_SURFACE_LAYER_LAYOUT}
+      data-canvas-context-menu-owner=""
+      onContextMenu={onContextMenu}
+      onKeyDown={onKeyDown}
+    >
       {surface}
     </Box>
     {children}

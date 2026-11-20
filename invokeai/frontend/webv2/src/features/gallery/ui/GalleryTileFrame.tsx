@@ -24,8 +24,7 @@ export const GALLERY_TILE_MEDIA_SELECTOR = '[data-gallery-tile-media]';
 const MAX_MEDIA_RATIO = 3;
 
 /**
- * Aspect fit sizes the media box to the media's own ratio, clamped, when its dimensions are known; otherwise the box
- * fills the square cell and the media letterboxes inside it.
+ * Aspect fit sizes the media box to the media's ratio (clamped) when known; else it fills the cell and letterboxes.
  */
 export const getGalleryTileMediaRatio = (
   { height, width }: { height: number; width: number },
@@ -62,9 +61,9 @@ export interface GalleryTileMediaProps {
 }
 
 /**
- * The bordered box around the media's own rect, inside a tile's square cell; it carries the border, selection ring
- * and focus ring. Centred in the flex cell, its width alone fixes its rect: a portrait box narrows to the ratio and
- * its aspect-ratio brings the height back to the cell's, so it is sized before the media loads, without a jump.
+ * The bordered box around the media's own rect, inside a tile's square cell; it carries the border, selection ring and
+ * focus ring. Centred in the flex cell, its width alone fixes its rect: a portrait box narrows to the ratio and its
+ * aspect-ratio brings the height back to the cell's, so it is sized before the media loads, without a jump.
  */
 export const GalleryTileMedia = ({ children, fit, height, isSelected, width }: GalleryTileMediaProps) => {
   const ratio = getGalleryTileMediaRatio({ height, width }, fit) ?? 1;

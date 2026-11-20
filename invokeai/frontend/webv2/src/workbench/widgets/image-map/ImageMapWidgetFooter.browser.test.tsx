@@ -25,7 +25,6 @@ vi.mock('@workbench/image-map/api', async (importOriginal) => ({
   ...api,
 }));
 
-// The components read the global instance; give it the English catalog.
 await i18next.use(initReactI18next).init({
   interpolation: { escapeValue: false },
   lng: 'en',
@@ -45,10 +44,8 @@ const points = (...clusters: number[]): ImageMapPoint[] =>
     y: index,
   }));
 
-/** The narrowest a floating window gets (`workbench/floatingWindows.ts`). */
 const NARROW_HOST = '280px';
 
-/** Every other segment the row can show at once, to squeeze the readout hardest. */
 const CROWDED = { embedded: 123456, failed: 12, pending: 60544, total: 184012 };
 
 const renderFooter = async (clusters: number[], width?: string, crowded = false) => {
@@ -123,22 +120,12 @@ describe('ImageMapWidgetFooter', () => {
   });
 
   it('stays readable in a narrow widget, where the text itself cannot be', async () => {
-    // This segment is the only shrinkable item in the row, so it absorbs all
-    // the overflow: at 280px the numbers are clipped out of the page and the
-    // tooltip is the only way left to read them.
-    // Crowded: stale, indexing and skipped all showing, so every other
-    // segment is competing for the row. They are all nowrap and refuse to
-    // shrink, which is what makes this one absorb the whole overflow.
     await renderFooter([0, 0, 0, 1, 1, -1], NARROW_HOST, true);
 
     const element = readout();
 
     expect(host?.scrollWidth).toBeLessThanOrEqual((host?.clientWidth ?? 0) + 1);
     expect(element.scrollWidth).toBeGreaterThan(element.clientWidth);
-    // What is left of the readout is the tooltip's only hover target, so the
-    // row has to leave it a usable one. It survives on flex leftover alone —
-    // every sibling refuses to shrink — which is what this pins: a sibling
-    // that starts growing greedily would take the target away.
     expect(element.clientWidth).toBeGreaterThanOrEqual(40);
 
     await act(() => {
@@ -172,7 +159,6 @@ describe('ImageMapWidgetFooter', () => {
   });
 
   it('says so when nothing clustered', async () => {
-    // The symptom being diagnosed: a drawn map where every point is noise.
     await renderFooter([-1, -1, -1]);
 
     expect(host?.textContent).toContain(

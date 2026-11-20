@@ -41,9 +41,8 @@ export const useWidgetSortable = ({
   );
   const handleSemanticKeyDownCapture = useCallback(
     (event: ReactKeyboardEvent<HTMLElement>) => {
-      // Ark Tabs handles Space/Enter before user bubble handlers. Start the
-      // sortable keyboard gesture on capture so Space remains available for
-      // reorder, while Enter keeps its native tab-activation behavior.
+      // Ark Tabs handles Space/Enter before user bubble handlers. Start the sortable keyboard gesture on capture so
+      // Space remains available for reorder, while Enter keeps its native tab-activation behavior.
       if (event.code === 'Space') {
         listeners?.onKeyDown?.(event);
       }

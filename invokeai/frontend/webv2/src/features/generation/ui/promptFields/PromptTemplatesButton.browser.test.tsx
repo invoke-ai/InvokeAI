@@ -49,7 +49,6 @@ vi.mock('@features/generation/ui/GenerationUiContext', async (importOriginal) =>
   }),
 }));
 
-// The editor's image slot is the gallery's; only which field opens the editor is under test.
 vi.mock('@features/gallery/mediaSlot', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   GalleryMediaSlot: () => null,
@@ -194,7 +193,6 @@ describe('the prompt templates button', () => {
     document.body.append(host);
     root = createRoot(host);
 
-    // Upscale's field (first, so it would be first to hear) shares Generate's template but leaves the handover to it.
     await act(() => {
       root?.render(
         <I18nextProvider i18n={i18n}>

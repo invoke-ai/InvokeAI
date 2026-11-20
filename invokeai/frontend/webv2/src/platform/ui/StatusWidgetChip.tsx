@@ -61,8 +61,8 @@ export const StatusWidgetChip = ({
 }: {
   children: ReactNode;
   /**
-   * The widget's name, read before the status when the visible text does not say it ("Queue idle" for Queue status).
-   * A status-bar chip is named by its content, so this keeps every chip's name starting with its widget.
+   * The widget's name, read before the status when the visible text does not say it ("Queue idle" for Queue status). A
+   * status-bar chip is named by its content, so this keeps every chip's name starting with its widget.
    */
   hiddenLabel?: string;
   icon: LucideIcon;

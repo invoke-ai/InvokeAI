@@ -42,10 +42,7 @@ const imeCompose: BrowserCommand<[steps: readonly { kind: 'commit' | 'compose'; 
   }
 };
 
-/**
- * Drags with the real mouse through `points` (the test frame's viewport coordinates), so the browser hit-tests every
- * move and the release the way a user's drag is, which synthetic events dispatched at an element skip.
- */
+/** Real mouse moves, so the browser hit-tests each move and the release as for a user's drag. */
 const mouseDragPath: BrowserCommand<[points: readonly { x: number; y: number }[], frameWidth: number]> = async (
   { frame, page },
   points,
@@ -67,7 +64,6 @@ const mouseDragPath: BrowserCommand<[points: readonly { x: number; y: number }[]
       await page.mouse.move(point.x, point.y, { steps: 6 });
     }
   } finally {
-    // Never leave the button pressed for the next test.
     await page.mouse.up();
   }
 };
@@ -76,13 +72,8 @@ const mouseDragPath: BrowserCommand<[points: readonly { x: number; y: number }[]
 type NativeDragFile = { base64: string; name: string };
 
 /**
- * Drags files, a link (`uriList`) or plain text (`text`), alone or together, in from outside the page through
- * Chromium's own drag input: enters at the first point (the test frame's viewport coordinates), hovers each point and
- * drops at the last one. The browser dispatches each drag event in its own task, with a microtask checkpoint between
- * listeners, which events a test dispatches itself never have. It always drops, even when a step fails: a drag left
- * open swallows the next one's enter, and CDP's `dragCancel` reaches the page as no event at all, so it cannot stand
- * in for a cancel. The files are deleted once the command returns: read a dropped file's contents in a drop handler,
- * not after the drag.
+ * Drags data in through Chromium's own drag input, whose per-listener microtask checkpoints synthetic events lack.
+ * It always drops: an open drag swallows the next enter, and `dragCancel` fires no page event. Files are deleted after.
  */
 const nativeDrag: BrowserCommand<
   [
@@ -147,7 +138,6 @@ const nativeDrag: BrowserCommand<
       isOpen = false;
       await session.send('Input.dispatchDragEvent', drop);
     } finally {
-      // A step that failed must not leave the drag open for the next test.
       if (isOpen) {
         await session.send('Input.dispatchDragEvent', drop).catch(() => undefined);
       }
@@ -160,11 +150,7 @@ const nativeDrag: BrowserCommand<
 
 const devicePixelRatioSessions = new Map<string, CDPSession>();
 
-/**
- * Emulates a display's device pixel ratio, such as a desktop scaled to 125%, at the same CSS viewport size; `null`
- * restores the real one. Chromium drops the override with the CDP session that set it, so the session stays open until
- * then.
- */
+/** Chromium drops the override with the CDP session that set it, so the session stays open until restored. */
 const emulateDevicePixelRatio: BrowserCommand<[ratio: number | null]> = async ({ context, page, sessionId }, ratio) => {
   const previous = devicePixelRatioSessions.get(sessionId);
   devicePixelRatioSessions.delete(sessionId);
@@ -182,10 +168,7 @@ const emulateDevicePixelRatio: BrowserCommand<[ratio: number | null]> = async ({
   });
 };
 
-/**
- * Captures `rect` (the test frame's CSS pixels) at the display's device pixels, under any emulated device pixel ratio.
- * Playwright's own screenshots restore its viewport emulation, which ends `emulateDevicePixelRatio`'s.
- */
+/** Playwright's own screenshots restore its viewport emulation, ending `emulateDevicePixelRatio`'s. */
 const captureDevicePixels: BrowserCommand<
   [rect: { height: number; width: number; x: number; y: number }, frameWidth: number]
 > = async ({ context, frame, page, sessionId }, rect, frameWidth) => {
@@ -217,7 +200,6 @@ const captureDevicePixels: BrowserCommand<
 };
 
 type ThumbnailRouteState = {
-  /** Requests still to be answered with `failureStatus`. */
   failuresLeft: number;
   failureStatus: number;
   handler: (route: Route) => Promise<void>;
@@ -238,10 +220,7 @@ const stopThumbnailRoute = async (context: BrowserContext, sessionId: string) =>
   }
 };
 
-/**
- * Serves the images at `pathnames`, answering the first `failures` requests with `status` (default: one 404).
- * `endThumbnailRouteFailures` serves every later request.
- */
+/** The first `failures` requests answer `status` (default one 404). */
 const startThumbnailRoute: BrowserCommand<
   [pathnames: string | string[], options?: { failures?: number; status?: number }]
 > = async ({ context, sessionId }, pathnames, { failures = 1, status: failureStatus = 404 } = {}) => {
@@ -298,10 +277,7 @@ const stopThumbnailRouteCommand: BrowserCommand<[]> = async ({ context, sessionI
   await stopThumbnailRoute(context, sessionId);
 };
 
-/**
- * Without the dev proxy, `/api` requests fail the way they do in CI. Proxied to a developer's running backend, their
- * responses arrive late and change what tests render: a menu row inserted mid-click moves the clicked item.
- */
+/** Without the dev proxy `/api` fails as in CI; a proxied backend's late responses would change what tests render. */
 const { proxy: _devBackendProxy, ...server } = viteConfig.server ?? {};
 
 export default mergeConfig(

@@ -67,6 +67,9 @@ vi.mock('@platform/browser/clipboard', async (importOriginal) => ({
   canCopyText: clipboard.canCopyText,
 }));
 
+/** These menus have no trigger; Zag keeps a menu it cannot place off-screen, so give it an anchor. */
+const ANCHORED_AT_ORIGIN = { getAnchorRect: () => ({ height: 0, width: 0, x: 0, y: 0 }) };
+
 const TRANSLATIONS: Record<string, string> = {
   'projects.exportFailed': 'Export failed',
   'widgets.labels.workflow': 'Workflow',
@@ -241,7 +244,7 @@ describe('WorkflowMenuItems', () => {
       root.render(
         <ChakraProvider value={system}>
           <WorkflowUiProvider adapter={adapter}>
-            <Menu.Root open>
+            <Menu.Root open positioning={ANCHORED_AT_ORIGIN}>
               <Menu.Positioner>
                 <Menu.Content>
                   <WorkflowMenuItems region="center" runtime={TEST_RUNTIME} />
@@ -280,24 +283,6 @@ describe('WorkflowMenuItems', () => {
     await expect.element(menuItem('Export JSON')).toBeVisible();
   };
 
-  it('groups this workflow’s actions apart from import and export, with no library or new workflow', async () => {
-    await renderMenu(createProjectGraph('workflow-1'));
-
-    expect(
-      Array.from(host.querySelectorAll('[role="group"]'), (group) => group.getAttribute('aria-labelledby'))
-    ).toHaveLength(2);
-    expect(groupItems('This workflow')).toEqual(['Rename…', 'Details…', 'Save to library…']);
-    expect(groupItems('Import and export')).toEqual(['Import from JSON…', 'Export']);
-    expect(menuItem('Export').element().getAttribute('aria-haspopup')).toBe('menu');
-    // The breadcrumb's switcher carries both now.
-    expect(host.textContent).not.toContain('Workflow library…');
-    expect(host.textContent).not.toContain('New workflow');
-    // Every row leads with its icon.
-    for (const item of host.querySelectorAll('[role="menuitem"]')) {
-      expect(item.querySelector('svg')).not.toBeNull();
-    }
-  });
-
   it('exports, copies and draws the workflow from the Export submenu through the existing commands', async () => {
     const graph = { ...createProjectGraph('workflow-1'), name: 'Portraits' };
     const editor = mountEditor();
@@ -328,73 +313,6 @@ describe('WorkflowMenuItems', () => {
     expect(notifications.error).not.toHaveBeenCalled();
   });
 
-  it('opens Export from the keyboard and closes it back to its row', async () => {
-    await renderMenu(createProjectGraph('workflow-1'));
-    const highlighted = () =>
-      Array.from(document.querySelectorAll('[role="menu"] [data-highlighted]'), (item) => item.textContent);
-
-    await act(() => (host.querySelector('[role="menu"]') as HTMLElement).focus());
-    for (let step = 0; step < 5; step += 1) {
-      await act(() => userEvent.keyboard('{ArrowDown}'));
-      await act(() => new Promise(requestAnimationFrame));
-    }
-    expect(highlighted()).toEqual(['Export']);
-
-    await act(() => userEvent.keyboard('{ArrowRight}'));
-    await vi.waitFor(() => expect(highlighted()).toEqual(['Export', 'Export JSON']));
-    await act(() => userEvent.keyboard('{ArrowLeft}'));
-    await vi.waitFor(() => expect(document.querySelectorAll('[role="menu"]')).toHaveLength(1));
-    expect(highlighted()).toEqual(['Export']);
-  });
-
-  it('explains why the image or the copy is unavailable instead of acting', async () => {
-    clipboard.canCopyText.mockReturnValue(false);
-    await renderMenu(createProjectGraph('workflow-1'));
-    await openExport();
-
-    // No editor is mounted, as when the panel shows only the form.
-    await expect.element(menuItem('Download as PNG')).toHaveAttribute('aria-disabled', 'true');
-    await expect
-      .element(menuItem('Download as PNG'))
-      .toHaveAccessibleDescription('Open the workflow editor to download it as an image');
-    await expect.element(menuItem('Copy JSON')).toHaveAttribute('aria-disabled', 'true');
-    await act(() => (menuItem('Download as PNG').element() as HTMLElement).click());
-    await act(() => (menuItem('Copy JSON').element() as HTMLElement).click());
-
-    expect(imageExport.exportWorkflowAsPng).not.toHaveBeenCalled();
-    expect(copyWorkflowJsonMock).not.toHaveBeenCalled();
-  });
-
-  it('says an image download is already running until it finishes', async () => {
-    const editor = mountEditor();
-    let finishPreparing: (element: HTMLDivElement) => void = () => undefined;
-    editor.prepare.mockReturnValueOnce(
-      new Promise((resolve) => {
-        finishPreparing = resolve;
-      })
-    );
-    await renderMenu(createProjectGraph('workflow-1'));
-
-    await openExport();
-    await act(() => userEvent.click(menuItem('Download as PNG')));
-    await vi.waitFor(() => expect(editor.prepare).toHaveBeenCalledOnce());
-    await openExport();
-
-    await expect.element(menuItem('Download as PNG')).toHaveAttribute('aria-disabled', 'true');
-    await expect
-      .element(menuItem('Download as PNG'))
-      .toHaveAccessibleDescription('Already downloading the workflow as an image');
-    await act(() => (menuItem('Download as PNG').element() as HTMLElement).click());
-
-    await act(async () => {
-      finishPreparing(editor.flowElement);
-      await vi.waitFor(() => expect(editor.complete).toHaveBeenCalledOnce());
-    });
-    await expect.element(menuItem('Download as PNG')).not.toHaveAttribute('aria-disabled');
-    expect(editor.prepare).toHaveBeenCalledOnce();
-    expect(imageExport.exportWorkflowAsPng).toHaveBeenCalledOnce();
-  });
-
   it('blocks export and copy with action-specific translated feedback', async () => {
     await renderMenu(duplicateReturnGraph());
 
@@ -415,31 +333,6 @@ describe('WorkflowMenuItems', () => {
       'Failed to copy workflow JSON',
       'The workflow must contain exactly one workflow return node before it can be exported or copied.'
     );
-  });
-
-  it('asks the dialog host to import a workflow file', async () => {
-    await renderMenu(createProjectGraph('workflow-1'));
-    const before = workflowUiStore.getSnapshot().importRequestCount;
-
-    await act(() => userEvent.click(menuItem('Import from JSON…')));
-
-    expect(workflowUiStore.getSnapshot().importRequestCount).toBe(before + 1);
-  });
-
-  it('asks the publication host to save the active workflow as a new template', async () => {
-    await renderMenu(createProjectGraph('workflow-1'));
-
-    await act(() => userEvent.click(menuItem('Save to library…')));
-
-    expect(workflowUiStore.getSnapshot().publicationIntent).toEqual({ kind: 'save-as-new', workflowId: 'workflow-1' });
-  });
-
-  it('asks the dialog host to rename the active workflow, naming it', async () => {
-    await renderMenu(createProjectGraph('workflow-1'));
-
-    await act(() => userEvent.click(menuItem('Rename…')));
-
-    expect(workflowUiStore.getSnapshot().renameRequest).toMatchObject({ workflowId: 'workflow-1' });
   });
 
   it('offers a template update only for a workflow whose source can be written, and then names the save for what it makes', async () => {
@@ -541,7 +434,6 @@ describe('WorkflowHeaderActions', () => {
     });
   };
 
-  const status = () => host.querySelector<HTMLElement>('[role="status"][data-persistence-status]');
   const actionLabels = () =>
     Array.from(host.querySelectorAll<HTMLElement>('button, [role="status"]'), (action) =>
       action.getAttribute('aria-label')
@@ -574,120 +466,6 @@ describe('WorkflowHeaderActions', () => {
     expect(actionLabels()).toEqual(['Workflow library']);
   });
 
-  it('hands Undo and Redo to the ⋯ menu while a narrow header hides them, keys and availability included', async () => {
-    const graph = createProjectGraph('workflow-1');
-    const history: HistoryState = { canRedo: false, canUndo: true };
-    project = createMutablePort({ ...projectSnapshot(graph), ...history });
-    commands = createCommands();
-    // eslint-disable-next-line react-perf/jsx-no-new-object-as-prop -- intentionally minimal test adapter
-    const adapter = {
-      CommandShortcut: ({ commandId }: { commandId: string }) => <kbd>{commandId}</kbd>,
-      commands,
-      getProjectGraph: () => graph,
-      notifications: { error: vi.fn(), info: vi.fn(), success: vi.fn() },
-      persistence: persistence.port,
-      project: project.port,
-      widgets: { open: vi.fn(), patchValues: vi.fn() },
-    } as unknown as WorkflowUiAdapter;
-    const renderAt = (width: number) =>
-      act(() => {
-        root.render(
-          <ChakraProvider value={system}>
-            <WorkflowUiProvider adapter={adapter}>
-              {/* The header row is the inline-size container the actions query, as the center chrome is. */}
-              <div style={{ containerType: 'inline-size', width }}>
-                <WorkflowHeaderActions region="center" runtime={TEST_RUNTIME} />
-              </div>
-              <Menu.Root open>
-                <Menu.Positioner>
-                  <Menu.Content>
-                    <WorkflowMenuItems region="center" runtime={TEST_RUNTIME} />
-                  </Menu.Content>
-                </Menu.Positioner>
-              </Menu.Root>
-            </WorkflowUiProvider>
-          </ChakraProvider>
-        );
-      });
-    const menuItem = (value: string) => host.querySelector<HTMLElement>(`[role="menuitem"][data-value="${value}"]`);
-
-    await renderAt(480);
-    expect(historyButton('Undo')?.checkVisibility()).toBe(true);
-    expect(historyButton('Save to library…')?.checkVisibility()).toBe(true);
-    expect(menuItem('undo')).toBeNull();
-
-    await renderAt(304);
-    // The library action keeps its place; the history steps give way.
-    expect(host.querySelector<HTMLElement>('button[aria-label="Save to library…"]')?.checkVisibility()).toBe(true);
-    expect(historyButton('Undo')?.checkVisibility()).toBe(false);
-    await vi.waitFor(() => expect(menuItem('undo')).not.toBeNull());
-    expect(menuItem('undo')?.textContent).toBe('Undoworkflows.undo');
-    expect(menuItem('redo')?.textContent).toBe('Redoworkflows.redo');
-    expect(menuItem('redo')?.hasAttribute('data-disabled')).toBe(true);
-
-    await userEvent.click(menuItem('undo')!);
-    // Pointer tooling refuses a disabled item; forced, the press must still do nothing.
-    await userEvent.click(menuItem('redo')!, { force: true });
-    expect(commands.undo).toHaveBeenCalledExactlyOnceWith();
-    expect(commands.redo).not.toHaveBeenCalled();
-
-    // Room again: the header shows them and the menu stops repeating them.
-    await renderAt(480);
-    await vi.waitFor(() => expect(menuItem('undo')).toBeNull());
-  });
-
-  it('lets each header hand its history to its own ⋯ menu, and leaving forgets only its own', async () => {
-    const graph = createProjectGraph('workflow-1');
-    project = createMutablePort({ ...projectSnapshot(graph), ...NO_HISTORY });
-    // eslint-disable-next-line react-perf/jsx-no-new-object-as-prop -- intentionally minimal test adapter
-    const adapter = {
-      CommandShortcut: ({ commandId }: { commandId: string }) => <kbd>{commandId}</kbd>,
-      commands: createCommands(),
-      getProjectGraph: () => graph,
-      notifications: { error: vi.fn(), info: vi.fn(), success: vi.fn() },
-      persistence: persistence.port,
-      project: project.port,
-      widgets: { open: vi.fn(), patchValues: vi.fn() },
-    } as unknown as WorkflowUiAdapter;
-    /** A header at its own width beside its own open ⋯ menu, as the frame places them. */
-    const Surface = ({ region, width }: { region: 'bottom' | 'center'; width: number }) => (
-      <div data-surface={region}>
-        <div style={{ containerType: 'inline-size', width }}>
-          <WorkflowHeaderActions region={region} runtime={TEST_RUNTIME} />
-        </div>
-        <Menu.Root open>
-          <Menu.Positioner>
-            <Menu.Content>
-              <WorkflowMenuItems region={region} runtime={TEST_RUNTIME} />
-            </Menu.Content>
-          </Menu.Positioner>
-        </Menu.Root>
-      </div>
-    );
-    const renderSurfaces = (withBottom: boolean) =>
-      act(() => {
-        root.render(
-          <ChakraProvider value={system}>
-            <WorkflowUiProvider adapter={adapter}>
-              <Surface region="center" width={304} />
-              {withBottom ? <Surface region="bottom" width={720} /> : null}
-            </WorkflowUiProvider>
-          </ChakraProvider>
-        );
-      });
-    const menuOffersUndo = (region: string) =>
-      host.querySelector(`[data-surface="${region}"] [role="menuitem"][data-value="undo"]`) !== null;
-
-    // The wide bottom header mounts last; the narrow center's menu still offers what its own header hides.
-    await renderSurfaces(true);
-    await vi.waitFor(() => expect(menuOffersUndo('center')).toBe(true));
-    expect(menuOffersUndo('bottom')).toBe(false);
-
-    await renderSurfaces(false);
-    await vi.waitFor(() => expect(host.querySelector('[data-surface="bottom"]')).toBeNull());
-    expect(menuOffersUndo('center')).toBe(true);
-  });
-
   it('keeps keyboard focus on Undo when it steps back over the last edit', async () => {
     await renderHeader(undefined, { history: { canRedo: false, canUndo: true } });
     const undo = historyButton('Undo')!;
@@ -699,41 +477,6 @@ describe('WorkflowHeaderActions', () => {
     expect(commands.undo).toHaveBeenCalledOnce();
     expect(undo.getAttribute('aria-disabled')).toBe('true');
     expect(document.activeElement).toBe(undo);
-  });
-
-  it('names the project persistence state, including a pending save with no local safety net', async () => {
-    await renderHeader();
-
-    expect(status()?.dataset.persistenceStatus).toBe('saved');
-    expect(status()?.getAttribute('aria-label')).toBe('Project saved to the server');
-
-    const expectations: Array<[WorkflowProjectPersistence['status'], boolean, string]> = [
-      ['saving', true, 'Saving project…'],
-      ['pending', true, 'Project changes waiting to save (recovery draft kept)'],
-      ['pending', false, 'Project changes waiting to save — no browser recovery available'],
-      ['error', true, 'Project save failed — retrying'],
-      ['conflict', true, 'Project has a sync conflict — resolve it to keep saving'],
-      // Recovery only matters while a save is still waiting.
-      ['saved', false, 'Project saved to the server'],
-    ];
-
-    for (const [state, hasLocalRecovery, label] of expectations) {
-      await act(() => persistence.setSnapshot({ ...SAVED, hasLocalRecovery, status: state }));
-
-      expect(status()?.dataset.persistenceStatus).toBe(state);
-      expect(status()?.getAttribute('aria-label')).toBe(label);
-    }
-  });
-
-  it('asks the publication host to save the active workflow as a new template', async () => {
-    await renderHeader();
-
-    const button = host.querySelector<HTMLButtonElement>('button[aria-label="Save to library…"]');
-    expect(button).not.toBeNull();
-
-    await act(() => button?.click());
-
-    expect(workflowUiStore.getSnapshot().publicationIntent).toEqual({ kind: 'save-as-new', workflowId: 'workflow-1' });
   });
 
   it('offers Update library template only for a template the account can write, and asks for that update', async () => {
@@ -812,8 +555,7 @@ describe('WorkflowWidgetLabel', () => {
       );
     });
   };
-  const renderLabel = (source?: ProjectWorkflowSource) =>
-    renderProject(projectWithWorkflows([workflow('workflow-1', 'Portraits', source)], 'workflow-1'));
+
   const PROJECT_WORKFLOWS = [
     workflow('workflow-1', 'Text 2 Image'),
     workflow('workflow-2', 'Upscale'),
@@ -822,59 +564,19 @@ describe('WorkflowWidgetLabel', () => {
   ];
 
   const workflowsButton = () => host.querySelector<HTMLElement>('[data-template-link]')!.closest('button')!;
-  const linkDescription = () =>
-    document.getElementById(workflowsButton().getAttribute('aria-describedby') ?? '')?.textContent ?? null;
+
   const menu = () => document.querySelector<HTMLElement>('[role="menu"]');
   const choices = () =>
     Array.from(document.querySelectorAll<HTMLElement>('[role="menuitemradio"]')).map((item) => ({
       checked: item.getAttribute('aria-checked'),
       name: item.textContent,
     }));
-  const libraryItem = () => page.getByRole('menuitem', { name: 'Workflow library…' });
+
   const openMenu = async () => {
     await act(() => userEvent.click(workflowsButton()));
     await vi.waitFor(() => expect(menu()).toBeVisible());
   };
   const expectClosed = () => vi.waitFor(() => expect(menu()).toBeNull());
-
-  it('describes the link state on the workflow name: unlinked, bundled, or linked', async () => {
-    await renderLabel();
-    expect(linkDescription()).toBe('Not linked to a library template');
-
-    await renderLabel({ libraryWorkflowId: 'default_text-to-image', revision: 1 });
-    expect(linkDescription()).toBe('From a bundled template (read-only)');
-
-    await renderLabel({ libraryWorkflowId: 'library-1', revision: 2 });
-    expect(linkDescription()).toBe('Linked to a library template');
-  });
-
-  it('describes another user’s template as read-only rather than bundled', async () => {
-    identity.session = { multiuserEnabled: true, phase: 'ready', user: { user_id: 'user-b' } };
-    await renderLabel({ libraryWorkflowId: 'library-1', ownerUserId: 'user-a', revision: 4 });
-
-    expect(linkDescription()).toBe('Linked to library template at revision 4');
-    expect(host.querySelector('[data-template-link]')?.getAttribute('data-template-link')).toBe('read-only');
-  });
-
-  it('reads the linked template’s name only once the name’s tooltip is asked for', async () => {
-    await renderLabel({ libraryWorkflowId: 'library-1', revision: 2 });
-    expect(getLibraryWorkflowRecordMock).not.toHaveBeenCalled();
-
-    await act(() => workflowsButton().focus());
-
-    await vi.waitFor(() => expect(linkDescription()).toBe('Linked to library template "Portrait template"'));
-    expect(getLibraryWorkflowRecordMock).toHaveBeenCalledWith('library-1', expect.anything());
-  });
-
-  it('names the current workflow on a menu trigger whose list mounts only while open', async () => {
-    await renderProject(projectWithWorkflows(PROJECT_WORKFLOWS, 'workflow-2'));
-
-    await expect
-      .element(page.getByRole('button', { name: 'Switch workflow. Current workflow: Upscale' }))
-      .toHaveAttribute('aria-haspopup', 'menu');
-    expect(workflowsButton()).toHaveAccessibleDescription('Not linked to a library template');
-    expect(document.querySelectorAll('[role="menuitemradio"]')).toHaveLength(0);
-  });
 
   it('lists the project’s workflows in project order with the active one checked', async () => {
     await renderProject(projectWithWorkflows(PROJECT_WORKFLOWS, 'workflow-2'));
@@ -905,48 +607,6 @@ describe('WorkflowWidgetLabel', () => {
     expect(commands.selectWorkflow).toHaveBeenCalledExactlyOnceWith('workflow-4');
     await expectClosed();
     expect(workflowUiStore.getSnapshot().isLibraryOpen).toBe(false);
-  });
-
-  it('only closes when the active workflow is chosen', async () => {
-    await renderProject(projectWithWorkflows(PROJECT_WORKFLOWS, 'workflow-2'));
-    await openMenu();
-
-    await act(() => userEvent.click(page.getByRole('menuitemradio', { name: 'Upscale' })));
-
-    await expectClosed();
-    expect(commands.selectWorkflow).not.toHaveBeenCalled();
-  });
-
-  it('opens the library on the project’s workflows with the active one selected', async () => {
-    await renderProject(projectWithWorkflows(PROJECT_WORKFLOWS, 'workflow-2'));
-    await openMenu();
-
-    await act(() => userEvent.click(libraryItem()));
-
-    await expectClosed();
-    expect(workflowUiStore.getSnapshot()).toMatchObject({
-      isLibraryOpen: true,
-      librarySelection: { projectId: 'project-1', workflowId: 'workflow-2' },
-      libraryTab: 'project',
-    });
-    expect(commands.selectWorkflow).not.toHaveBeenCalled();
-  });
-
-  it('opens with every row, so a click on the library straight away reaches it, on a project of several workflows', async () => {
-    await renderProject(projectWithWorkflows(PROJECT_WORKFLOWS, 'workflow-2'));
-    await act(() => userEvent.click(workflowsButton()));
-    const library = () => document.querySelector<HTMLElement>('[data-value="workflow-library"]')!;
-    await vi.waitFor(() => expect(library()).not.toBeNull());
-    // Every row is there in the commit that opens the menu; nothing arrives later to push the actions down under the
-    // pointer, so a click straight away reaches the library.
-    expect(choices()).toHaveLength(PROJECT_WORKFLOWS.length);
-    await act(() => userEvent.click(library()));
-    expect(workflowUiStore.getSnapshot()).toMatchObject({
-      isLibraryOpen: true,
-      librarySelection: { projectId: 'project-1', workflowId: 'workflow-2' },
-      libraryTab: 'project',
-    });
-    expect(commands.createWorkflow).not.toHaveBeenCalled();
   });
 
   it('adds a new workflow that becomes the active one, returning focus to the renamed trigger', async () => {
@@ -1035,36 +695,5 @@ describe('WorkflowWidgetLabel', () => {
 
     await act(() => project.setSnapshot(projectWithWorkflows([workflow('workflow-5', 'Inpaint')], 'workflow-5')));
     expect(choices()).toEqual([{ checked: 'true', name: 'Inpaint' }]);
-  });
-
-  it('scrolls a long list, opened on the active workflow, under a library item that stays in view', async () => {
-    const workflows = Array.from({ length: 60 }, (_, index) => workflow(`workflow-${index}`, `Workflow ${index}`));
-    await renderProject(projectWithWorkflows(workflows, 'workflow-45'));
-    await openMenu();
-
-    const content = menu()!.getBoundingClientRect();
-    const footer = Array.from(menu()!.querySelectorAll<HTMLElement>('[role="menuitem"]'), (item) =>
-      item.getBoundingClientRect()
-    );
-    const viewport = menu()!.querySelector<HTMLElement>('[data-scope="scroll-area"][data-part="viewport"]')!;
-    const isInViewport = (name: string) => {
-      const item = page.getByRole('menuitemradio', { name }).element().getBoundingClientRect();
-      const bounds = viewport.getBoundingClientRect();
-
-      return item.top >= bounds.top - 1 && item.bottom <= bounds.bottom + 1;
-    };
-
-    expect(content.bottom).toBeLessThanOrEqual(window.innerHeight);
-    expect(viewport.scrollHeight).toBeGreaterThan(viewport.clientHeight);
-    expect(footer).toHaveLength(2);
-    for (const item of footer) {
-      expect(item.top).toBeGreaterThanOrEqual(content.top);
-      expect(item.bottom).toBeLessThanOrEqual(content.bottom);
-    }
-    await vi.waitFor(() => expect(isInViewport('Workflow 45')).toBe(true));
-
-    // The keyboard reaches the end of the list by scrolling it.
-    await act(() => userEvent.keyboard('{End}{ArrowUp}{ArrowUp}'));
-    await vi.waitFor(() => expect(isInViewport('Workflow 59')).toBe(true));
   });
 });

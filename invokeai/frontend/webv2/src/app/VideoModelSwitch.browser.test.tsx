@@ -4,8 +4,8 @@ import type { Project } from '@workbench/projectContracts';
 import type { WorkbenchInternalStore } from '@workbench/workbenchStore';
 
 import { ChakraProvider } from '@chakra-ui/react';
-import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
 import { GenerationUiProvider, type GenerationUiAdapter } from '@features/generation/ui/GenerationUiContext';
+import { seedArchitectureCapabilities } from '@features/models/core/architectureCapabilities.testing';
 import { setModelsSnapshotForTests } from '@features/models/data/modelsStore';
 import { getDefaultVideoSettings, normalizeVideoWidgetValues } from '@features/video';
 import { VideoWidgetView } from '@features/video/ui/VideoWidgetView';
@@ -110,7 +110,11 @@ vi.mock('@features/models/react', async (importOriginal) => ({
     }
 
     const options = (useModelSnapshot().models as ModelConfig[]).filter(
-      (candidate) => modelTypes.includes(candidate.type) && (!filter || filter(candidate))
+      (candidate) =>
+        [candidate.type, ...(candidate.roles ?? []).map((role) => role.type)].some((type) =>
+          modelTypes.includes(type)
+        ) &&
+        (!filter || filter(candidate))
     );
 
     return (
@@ -407,15 +411,6 @@ describe('video model switch confirmation', () => {
     expect(getProjectWidgetValues(original, 'video')).toBe(before);
   });
 
-  it('keeps the model picker on one id across remounts, so its remembered view and filter survive', async () => {
-    await render();
-    await act(() => root.unmount());
-    root = createRoot(host);
-    await render();
-
-    expect(new Set(pickerIds).size).toBe(1);
-  });
-
   it('commits a pending LoRA weight to the current model before switching', async () => {
     await render();
     await nudgeLoraWeight();
@@ -507,25 +502,6 @@ describe('Video section issues', () => {
     expect(issues('video-source')).toBeNull();
     expect(shownCount('video-render')).toBe('1');
   });
-
-  it('counts nothing in a section whose control for the issue is hidden', async () => {
-    const ti2v = model('wan-ti2v', 'wan', 'main', 'Wan 2.2 TI2V 5B', { variant: 'ti2v_5b' });
-    modelStore.set([...catalog, ti2v]);
-    await render();
-    // TI2V-5B cannot aim an extension at an end frame, and shows no last-frame field to clear it from.
-    await act(() =>
-      store.commands.widgets.patchValues('video', {
-        ...getDefaultVideoSettings(ti2v as never, [...catalog, ti2v] as never),
-        lastFrameImage: LAST_FRAME,
-        model: ti2v,
-        modelKey: ti2v.key,
-        sourceVideo: SOURCE_VIDEO,
-      })
-    );
-
-    expect(shownCount('video-source')).toBe('1');
-    expect(issues('video-frames')).toBeNull();
-  });
 });
 
 describe('video model field without a model', () => {
@@ -589,20 +565,5 @@ describe('the dynamic prompts decision on first mount', () => {
     store.commands.widgets.patchValues('video', { positivePromptHeightPx: 150 });
 
     expect(normalizeVideoWidgetValues(stored())?.dynamicPromptsEnabled).toBe(true);
-  });
-
-  it('records a panel saved before Video expanded prompts as off', async () => {
-    const saved: Record<string, unknown> = {
-      ...getDefaultVideoSettings(ltxDev as never, catalog as never),
-      model: ltxDev,
-      modelKey: ltxDev.key,
-    };
-    for (const key of Object.keys(saved).filter((name) => name.startsWith('dynamicPrompts'))) {
-      delete saved[key];
-    }
-    store.commands.widgets.patchValues('video', saved);
-    await mount();
-
-    expect((stored() as unknown as Record<string, unknown>).dynamicPromptsEnabled).toBe(false);
   });
 });

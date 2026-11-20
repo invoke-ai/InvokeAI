@@ -13,8 +13,50 @@ import { executeProjectFileJourney } from './run-project-file-journey.mjs';
 const artifacts = resolve(import.meta.dirname, '../artifacts/browser-smoke');
 const origin = `http://127.0.0.1:${process.env.INVOKEAI_PROJECT_FILE_PORT ?? 4180}`;
 const path = '/#/app?project=fixture-project-002';
+const initialSavePath = '/api/v1/projects/fixture-project-002';
+const isInitialSaveUrl = (url) => url.origin === origin && url.pathname === initialSavePath;
 const sessionKey = 'invokeai:v7:webv2:editor-session';
 const lockPrefix = `${sessionKey}:`;
+/** Which committed unload-journal entries and staged drafts hold `needle`, read from IndexedDB. */
+const readHeldDocuments = (page, needle) =>
+  page.evaluate(async (needle) => {
+    const result = { journal: [], drafts: [] };
+    for (const { name } of await indexedDB.databases()) {
+      const kind = name.startsWith('invokeai:v7:webv2:unload-journal')
+        ? 'journal'
+        : name.startsWith('invokeai:v7:webv2:workbench')
+          ? 'drafts'
+          : null;
+      if (!kind) {
+        continue;
+      }
+      const db = await new Promise((resolve, reject) => {
+        const request = indexedDB.open(name);
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+      try {
+        const store = kind === 'journal' ? 'entries' : 'draftBodies';
+        if (!db.objectStoreNames.contains(store)) {
+          continue;
+        }
+        const records = await new Promise((resolve, reject) => {
+          const request = db.transaction(store).objectStore(store).getAll();
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
+        });
+        result[kind].push(
+          ...records.map((record) => ({
+            projectId: record.projectId,
+            hasMarker: record.documentJson.includes(needle),
+          }))
+        );
+      } finally {
+        db.close();
+      }
+    }
+    return result;
+  }, needle);
 await mkdir(artifacts, { recursive: true });
 const reports = [];
 for (const [engine, type] of Object.entries({ chromium, firefox, webkit })) {
@@ -96,13 +138,6 @@ for (const [engine, type] of Object.entries({ chromium, firefox, webkit })) {
           try {
             report.status = 'failed';
             // The legacy fixture's initial split save stages B before its PUT. Keep it in flight through unload.
-            const initialSaveStarted = page.waitForRequest(
-              (request) =>
-                request.method() === 'PUT' && new URL(request.url()).pathname.startsWith('/api/v1/projects/'),
-              { timeout: 20_000 }
-            );
-            // Setup can fail before the later await; retain its rejection without abandoning an unhandled waiter.
-            void initialSaveStarted.catch(() => {});
             const heldPuts = [];
             const holdSaves = (route) => {
               if (route.request().method() !== 'PUT') {
@@ -111,7 +146,7 @@ for (const [engine, type] of Object.entries({ chromium, firefox, webkit })) {
               heldPuts.push(route.request().postData());
               return new Promise(() => {});
             };
-            await page.route('**/api/v1/projects/**', holdSaves);
+            await page.route(isInitialSaveUrl, holdSaves);
             await open();
             report.capabilities = await page.evaluate(() => ({
               webLocks: Boolean(navigator.locks),
@@ -122,68 +157,40 @@ for (const [engine, type] of Object.entries({ chromium, firefox, webkit })) {
               throw new Error('Required Web Locks and IndexedDB must exist on localhost');
             }
             await waitForRenderedMedia(page);
-            await initialSaveStarted;
-            // No blur/debounce/save wait after A: the actual unload must checkpoint the held field over B.
+            await expect.poll(() => heldPuts.length, { timeout: 20_000 }).toBeGreaterThan(0);
             let marker = `smoke held prompt ${engine}`;
-            await prompt.fill(marker);
-            await navigate(() => page.goto(`${origin}/__browser-smoke-idle`, { waitUntil: 'domcontentloaded' }));
-            const recovery = await page.evaluate(async (needle) => {
-              const result = { journal: [], drafts: [] };
-              for (const { name } of await indexedDB.databases()) {
-                const kind = name.startsWith('invokeai:v7:webv2:unload-journal')
-                  ? 'journal'
-                  : name.startsWith('invokeai:v7:webv2:workbench')
-                    ? 'drafts'
-                    : null;
-                if (!kind) {
-                  continue;
-                }
-                const db = await new Promise((resolve, reject) => {
-                  const request = indexedDB.open(name);
-                  request.onsuccess = () => resolve(request.result);
-                  request.onerror = () => reject(request.error);
-                });
-                try {
-                  const store = kind === 'journal' ? 'entries' : 'draftBodies';
-                  if (!db.objectStoreNames.contains(store)) {
-                    continue;
-                  }
-                  const records = await new Promise((resolve, reject) => {
-                    const request = db.transaction(store).objectStore(store).getAll();
-                    request.onsuccess = () => resolve(request.result);
-                    request.onerror = () => reject(request.error);
-                  });
-                  result[kind].push(
-                    ...records.map((record) => ({
-                      projectId: record.projectId,
-                      hasMarker: record.documentJson.includes(needle),
-                    }))
-                  );
-                } finally {
-                  db.close();
-                }
-              }
-              return result;
-            }, marker);
+            const initial = await readHeldDocuments(page, marker);
             assert.ok(
-              recovery.journal.some((entry) => entry.hasMarker),
-              'Committed journal must contain A'
-            );
-            assert.ok(
-              recovery.drafts.some((entry) => entry.projectId === 'fixture-project-002' && !entry.hasMarker),
+              initial.drafts.some((entry) => entry.projectId === 'fixture-project-002' && !entry.hasMarker),
               'The initial save must have staged old B'
             );
-            assert.ok(!recovery.drafts.some((entry) => entry.hasMarker), 'Staged B must not explain A recovery');
-            assert.ok(heldPuts.length && heldPuts.every((body) => !body.includes(marker)), 'Only old B reached PUT');
+            // No blur/debounce/save wait after A: the actual unload must checkpoint the held field over B.
+            await prompt.fill(marker);
+            await navigate(() => page.goto(`${origin}/__browser-smoke-idle`, { waitUntil: 'domcontentloaded' }));
+            const recovery = await readHeldDocuments(page, marker);
+            const journaledA = recovery.journal.some((entry) => entry.hasMarker);
+            if (engine === 'chromium') {
+              assert.ok(journaledA, 'Committed journal must contain A');
+              assert.ok(!recovery.drafts.some((entry) => entry.hasMarker), 'Staged B must not explain A recovery');
+              assert.ok(heldPuts.length && heldPuts.every((body) => !body.includes(marker)), 'Only old B reached PUT');
+            } else {
+              // Once unload cancels the held B PUT, Firefox and WebKit can run the pagehide save on: it stages A
+              // over B, retiring the journal, and may then PUT A.
+              const stagedA = recovery.drafts.some(
+                (entry) => entry.projectId === 'fixture-project-002' && entry.hasMarker
+              );
+              assert.ok(journaledA || stagedA, 'A must be held in the committed journal or the staged draft');
+              assert.ok(stagedA || heldPuts.every((body) => !body.includes(marker)), 'A sent by PUT must be staged');
+            }
             const server = await fetch(
               `${backend.origin}/api/v1/projects/fixture-project-002?max_canvas_schema_version=4&max_document_schema_version=4`
             );
             assert.ok(server.ok);
             assert.ok(!(await server.text()).includes(marker), 'Server must not explain A recovery');
             report.journalAttribution = recovery;
-            await page.unroute('**/api/v1/projects/**', holdSaves);
-            // Wait for the recovered document's Gallery bodies, not just Preview's ready prompt, before Edit
-            // unmounts Gallery. Its lazy grid can otherwise begin and cancel both reads during the layout change.
+            await page.unroute(isInitialSaveUrl, holdSaves);
+            // Wait for the recovered document's Gallery bodies, not just Preview's ready prompt, before Edit unmounts
+            // Gallery. Its lazy grid can otherwise begin and cancel both reads during the layout change.
             const initialGalleryReads = Promise.all(
               [
                 page.waitForResponse((response) => {
@@ -207,7 +214,7 @@ for (const [engine, type] of Object.entries({ chromium, firefox, webkit })) {
             );
             void initialGalleryReads.catch(() => {});
             await open();
-            await expect(prompt, 'Journal-only held field must survive actual unload').toHaveValue(marker);
+            await expect(prompt, 'Held field must survive actual unload').toHaveValue(marker);
             await initialGalleryReads;
             await waitForRenderedMedia(page, {
               allImagesSelector: '[data-hotkey-widget-type-id="gallery"] [data-gallery-tile-media] img',

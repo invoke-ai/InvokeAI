@@ -1,6 +1,6 @@
 import type { WorkingMemoryCase } from '@features/models';
 
-import { architectureCapabilitiesFixture } from '@features/generation/core/architectureCapabilities.testing';
+import { architectureCapabilitiesFixture } from '@features/models/core/architectureCapabilities.testing';
 import { describe, expect, it } from 'vitest';
 
 import { toCalibrationGraphs, toGraphExportCase } from './calibrationGraphs';

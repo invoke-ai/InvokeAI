@@ -11,9 +11,9 @@ import { readQueueItemRecallInput } from './queueRecall';
 import { loadLocalRecallSnapshot } from './useLocalRecallSnapshot';
 
 /**
- * Recalls from an item no menu has open, such as the focused queue row on a key press: what the open menus read as
- * they mount (the snapshot, the model catalog) is read first. The caller captures the account and project at the
- * press, before loading this module, so a switch while anything loads drops the recall.
+ * Recalls from an item no menu has open, such as the focused queue row on a key press: what the open menus read as they
+ * mount (the snapshot, the model catalog) is read first. The caller captures the account and project at the press,
+ * before loading this module, so a switch while anything loads drops the recall.
  */
 export const recallQueueItem = async ({
   context,

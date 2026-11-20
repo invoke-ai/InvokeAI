@@ -19,8 +19,8 @@ export interface NodePackInstallOptions {
 }
 
 /**
- * Install a pack from a Git URL, tracking it in the install queue. One install runs at a time across the manager,
- * so `isInstalling` also covers installs other callers started.
+ * Install a pack from a Git URL, tracking it in the install queue. One install runs at a time across the manager, so
+ * `isInstalling` also covers installs other callers started.
  */
 export const useNodePackInstall = () => {
   const { t } = useTranslation();
@@ -74,8 +74,7 @@ export const useNodePackInstall = () => {
         assertAccountScopeCurrent(owner);
 
         if (result.requires_dependencies) {
-          // Sticky: this demands a manual pip install + restart; a toast that
-          // expires quietly buries the instruction.
+          // Sticky: this demands a manual pip install + restart; a toast that expires quietly buries the instruction.
           notify.warning(
             t('nodes.dependenciesRequired'),
             t('nodes.dependenciesRequiredDescription', {

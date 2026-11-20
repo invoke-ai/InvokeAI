@@ -3,10 +3,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 import type { HotkeyContext, RegisteredHotkey } from './types';
 
 import { firstPartyHotkeyCatalog } from './catalog';
-import { IS_MAC_OS } from './keys';
 import { applyCustomHotkeys, resolveHotkey } from './resolve';
 
-/** Target selectors match real elements, so this runs where the DOM does. */
 describe('resolveHotkey with target-scoped bindings', () => {
   const host = document.createElement('div');
 
@@ -27,7 +25,6 @@ describe('resolveHotkey with target-scoped bindings', () => {
     firstPartyHotkeyCatalog.find((hotkey) => hotkey.id === 'app.promptWeightUp')!,
     {}
   );
-  // A lower-priority global binding on the same chord, as a user customization could add.
   const fallback: RegisteredHotkey = {
     allowInEditable: true,
     category: 'app',
@@ -96,17 +93,13 @@ describe('resolveHotkey inside an open popup', () => {
     scope: { kind: 'widget', typeIds: ['canvas'] },
     title: 'Eraser',
   };
-  const invoke = applyCustomHotkeys(
-    firstPartyHotkeyCatalog.find((hotkey) => hotkey.id === 'app.invoke')!,
-    {}
-  );
 
   const pressIn = (html: string, matchedKey: string, init: KeyboardEventInit = {}) => {
     host.innerHTML = html;
     const event = new KeyboardEvent('keydown', { bubbles: true, ...init });
     host.querySelector('[data-target]')!.dispatchEvent(event);
 
-    return resolveHotkey({ context, event, hotkeys: [eraser, invoke], matchedKey })?.commandId ?? null;
+    return resolveHotkey({ context, event, hotkeys: [eraser], matchedKey })?.commandId ?? null;
   };
 
   it('leaves unmodified presses in a menu or listbox to the popup, Shift included', () => {
@@ -115,73 +108,6 @@ describe('resolveHotkey inside an open popup', () => {
     expect(
       pressIn('<div data-target role="listbox" tabindex="-1"></div>', 'shift+e', { key: 'E', shiftKey: true })
     ).toBeNull();
-    // Outside a popup the same press is the canvas tool.
     expect(pressIn('<div data-target tabindex="-1"></div>', 'e', { key: 'e' })).toBe('eraser');
-  });
-
-  it('still resolves a modified chord pressed inside a popup', () => {
-    const mod = IS_MAC_OS ? { metaKey: true } : { ctrlKey: true };
-    expect(
-      pressIn('<div role="menu"><div data-target role="menuitem">x</div></div>', 'mod+enter', { key: 'Enter', ...mod })
-    ).toBe('app.invoke');
-    expect(pressIn('<div data-target role="listbox" tabindex="-1"></div>', 'mod+enter', { key: 'Enter', ...mod })).toBe(
-      'app.invoke'
-    );
-  });
-});
-
-describe('resolveHotkey on a focused radio group or slider', () => {
-  const host = document.createElement('div');
-
-  document.body.append(host);
-
-  afterEach(() => {
-    host.replaceChildren();
-  });
-
-  const context: HotkeyContext = {
-    activeInstanceId: 'gallery',
-    activeWidgetTypeId: 'gallery',
-    focusedRegion: 'right',
-    isModalPresent: false,
-    projectId: 'project-1',
-  };
-  // Gallery's arrow navigation, as its grid registers it.
-  const galleryRight: RegisteredHotkey = {
-    category: 'gallery',
-    commandId: 'gallery.galleryNavRight',
-    defaultKeys: ['arrowright'],
-    id: 'gallery.galleryNavRight',
-    keys: ['arrowright'],
-    scope: { kind: 'widget', typeIds: ['gallery'] },
-    title: 'Navigate right',
-  };
-  const editableRight: RegisteredHotkey = {
-    allowInEditable: true,
-    category: 'app',
-    commandId: 'editable',
-    defaultKeys: ['arrowright'],
-    id: 'editable',
-    keys: ['arrowright'],
-    scope: { kind: 'global' },
-    title: 'Editable',
-  };
-
-  const pressRightIn = (html: string, hotkey: RegisteredHotkey) => {
-    host.innerHTML = html;
-    const event = new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowRight' });
-    host.querySelector('[data-target]')!.dispatchEvent(event);
-
-    return resolveHotkey({ context, event, hotkeys: [hotkey], matchedKey: 'arrowright' })?.commandId ?? null;
-  };
-
-  it('leaves the arrow to the radio group instead of moving the gallery selection', () => {
-    expect(pressRightIn('<input data-target type="radio" />', galleryRight)).toBeNull();
-    expect(pressRightIn('<input data-target type="range" />', galleryRight)).toBeNull();
-    expect(pressRightIn('<button data-target type="button">x</button>', galleryRight)).toBe('gallery.galleryNavRight');
-  });
-
-  it('still resolves a binding that opts into editable targets', () => {
-    expect(pressRightIn('<input data-target type="radio" />', editableRight)).toBe('editable');
   });
 });

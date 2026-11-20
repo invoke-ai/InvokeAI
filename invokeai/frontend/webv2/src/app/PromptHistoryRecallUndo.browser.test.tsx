@@ -4,8 +4,8 @@ import type { Project } from '@workbench/projectContracts';
 import type { WorkbenchInternalStore } from '@workbench/workbenchStore';
 
 import { ChakraProvider } from '@chakra-ui/react';
-import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
 import { GenerationUiProvider, type GenerationUiAdapter } from '@features/generation/ui/GenerationUiContext';
+import { seedArchitectureCapabilities } from '@features/models/core/architectureCapabilities.testing';
 import { createDefaultUpscaleWidgetValues } from '@features/upscale';
 import { UpscaleWidgetView } from '@features/upscale/ui/UpscaleWidgetView';
 import { createDefaultVideoWidgetValues } from '@features/video';

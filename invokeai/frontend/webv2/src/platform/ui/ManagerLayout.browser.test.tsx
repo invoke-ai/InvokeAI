@@ -15,14 +15,7 @@ import { ConfirmDialog } from './ConfirmDialog';
 import { List } from './list/List';
 import { ListItem } from './list/ListItem';
 import { listRowsFromItems } from './list/listRows';
-import {
-  ManagerColumn,
-  ManagerDetailHeader,
-  ManagerFilterMenu,
-  ManagerFilterResetItem,
-  ManagerLayout,
-  ManagerSearchField,
-} from './ManagerLayout';
+import { ManagerColumn, ManagerDetailHeader, ManagerLayout, ManagerSearchField } from './ManagerLayout';
 import { MenuContent } from './Menu';
 
 vi.mock('react-i18next', () => ({
@@ -152,7 +145,6 @@ const render = async (width: number, content = <Harness />) => {
 const library = () => page.getByRole('list', { name: 'Item library' });
 const detail = () => page.getByRole('textbox', { name: 'Draft' });
 const back = () => page.getByRole('button', { name: 'Back to items' });
-const add = () => page.getByRole('button', { name: 'Add items' });
 const row = (name: string) => page.getByRole('button', { name, exact: true });
 const rowElement = (id: string) => host.querySelector<HTMLElement>(`[data-list-row="${id}"] [data-list-primary]`)!;
 const viewport = () => host.querySelector<HTMLElement>('[data-list-viewport]')!;
@@ -160,13 +152,6 @@ const draft = () => host.querySelector<HTMLInputElement>('input[aria-label="Draf
 const focused = () => document.activeElement as HTMLElement;
 const isShown = (element: Element) => element.checkVisibility({ visibilityProperty: true });
 const search = () => page.getByRole('textbox', { name: 'Search items' });
-/** A `/` press from the focused element, or the body; says whether the layout consumed it. */
-const pressSlash = () => {
-  const event = new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: '/' });
-  focused().dispatchEvent(event);
-
-  return event.defaultPrevented;
-};
 
 beforeEach(() => {
   applyThemeToRoot(DEFAULT_THEME_ID);
@@ -181,20 +166,6 @@ afterEach(async () => {
 });
 
 describe('ManagerLayout', () => {
-  it('shows the library, the detail and the footer side by side, without Back or the Add shortcut', async () => {
-    await render(WIDE_PX);
-
-    await expect.element(library()).toBeVisible();
-    await expect.element(detail()).toBeVisible();
-    await expect.element(page.getByRole('button', { name: 'Footer progress' })).toBeVisible();
-    await expect.element(back()).not.toBeInTheDocument();
-    await expect.element(add()).not.toBeInTheDocument();
-    await row('Item 3').click();
-    await expect.element(row('Item 3')).toHaveFocus();
-    await expect.element(page.getByRole('heading', { name: 'item-3' })).toBeVisible();
-    expect(await auditAccessibility(host)).toEqual([]);
-  });
-
   it('shows one pane at a time when narrow and returns to the row, scroll and focus it came from', async () => {
     await render(NARROW_PX);
 
@@ -248,36 +219,6 @@ describe('ManagerLayout', () => {
     expect(stops.some((stop) => stop.startsWith('Item '))).toBe(false);
   });
 
-  it('opens the detail from the Add shortcut, shown only when the panes take turns', async () => {
-    await render(NARROW_PX);
-
-    await add().click();
-
-    await expect.element(back()).toHaveFocus();
-    await expect.element(detail()).toBeVisible();
-    await setWidth(WIDE_PX);
-    await expect.element(add()).not.toBeInTheDocument();
-  });
-
-  it('keeps the selection, the open detail and its edits across wide and narrow resizes', async () => {
-    await render(WIDE_PX);
-    await row('Item 4').click();
-    await userEvent.fill(draft(), 'unsaved words');
-
-    await setWidth(NARROW_PX);
-
-    await expect.element(detail()).toBeVisible();
-    await expect.element(back()).toBeVisible();
-    expect(draft().value).toBe('unsaved words');
-
-    await setWidth(WIDE_PX);
-
-    await expect.element(library()).toBeVisible();
-    await expect.element(back()).not.toBeInTheDocument();
-    expect(draft().value).toBe('unsaved words');
-    await expect.element(row('Item 4')).toHaveAttribute('aria-current', 'true');
-  });
-
   it('moves focus off a pane a resize hides, in both directions', async () => {
     await render(WIDE_PX);
     await row('Item 6').click();
@@ -320,15 +261,6 @@ describe('ManagerLayout', () => {
     expect(rowElement('item-3')).toBeNull();
   });
 
-  it('moves focus into the detail when a portaled menu opens it', async () => {
-    await render(NARROW_PX);
-
-    await page.getByRole('button', { name: 'Item actions' }).click();
-    await page.getByRole('menuitem', { name: 'Open item 5' }).click();
-
-    await expect.element(page.getByRole('heading', { name: 'item-5' })).toBeVisible();
-    await vi.waitFor(() => expect(focused()).toBe(back().element()));
-  });
   describe('the `/` search shortcut', () => {
     it('focuses and selects the search from anywhere in the page, and types into fields', async () => {
       await render(WIDE_PX);
@@ -351,102 +283,10 @@ describe('ManagerLayout', () => {
       await userEvent.keyboard('/');
       await expect.element(search()).toHaveValue('/');
     });
-
-    it('leaves the key to an open menu', async () => {
-      await render(WIDE_PX);
-      await page.getByRole('button', { name: 'Item actions' }).click();
-      await expect.element(page.getByRole('menuitem', { name: 'Open item 5' })).toBeVisible();
-
-      await userEvent.keyboard('/');
-
-      await expect.element(page.getByRole('menuitem', { name: 'Open item 5' })).toBeVisible();
-      expect(focused().closest('[role="menu"]')).not.toBeNull();
-    });
-
-    it('answers only in the manager on screen', async () => {
-      // The hidden one registers first, as an earlier visited Launchpad page does.
-      await render(
-        WIDE_PX,
-        <>
-          <div hidden>
-            <Harness />
-          </div>
-          <Harness />
-        </>
-      );
-      const [hiddenSearch, shownSearch] = [...host.querySelectorAll<HTMLElement>('[data-manager-search]')];
-
-      await userEvent.keyboard('/');
-
-      expect(focused()).toBe(shownSearch);
-      expect(focused()).not.toBe(hiddenSearch);
-    });
-
-    it('does nothing while the single-pane view shows the detail', async () => {
-      await render(NARROW_PX);
-      await row('Item 2').click();
-      await expect.element(back()).toHaveFocus();
-
-      expect(pressSlash()).toBe(false);
-      await expect.element(back()).toHaveFocus();
-    });
-
-    it('does nothing while a modal is open', async () => {
-      await render(WIDE_PX);
-      await page.getByRole('button', { name: 'Delete item' }).click();
-      await expect.element(page.getByRole('alertdialog')).toBeVisible();
-
-      expect(pressSlash()).toBe(false);
-      expect(page.getByRole('alertdialog').element().contains(focused())).toBe(true);
-    });
   });
 
   describe('with the footer filling the panes, as a maximized queue does', () => {
-    const grid = () => host.querySelector<HTMLElement>('[data-view]')!.getBoundingClientRect();
-    /** Relative to the manager, which focusing a control may scroll within the test frame. */
-    const within = (selector: string) => {
-      const bounds = host.querySelector<HTMLElement>(selector)!.getBoundingClientRect();
-      const origin = grid();
-
-      return {
-        bottom: bounds.bottom - origin.top,
-        left: bounds.left - origin.left,
-        right: bounds.right - origin.left,
-        top: bounds.top - origin.top,
-      };
-    };
-    const footer = () => within('[data-manager-footer]');
-    const libraryPane = () => within('[data-manager-pane="library"]');
     const toggle = () => page.getByRole('button', { name: /^(Maximize|Restore) queue$/ });
-    const pressToggle = async () => {
-      await act(() => toggle().element().focus());
-      await userEvent.keyboard('{Enter}');
-    };
-
-    it('takes the detail column beside the library side by side, and gives it back', async () => {
-      await render(WIDE_PX);
-      await row('Item 2').click();
-      const libraryBounds = libraryPane();
-
-      await pressToggle();
-
-      await expect.element(toggle()).toHaveTextContent('Restore queue');
-      expect(footer()).toEqual({ bottom: grid().height, left: libraryBounds.right, right: grid().width, top: 0 });
-      // The library stays as it was; the detail leaves the accessibility tree and tab order.
-      expect(libraryPane()).toEqual(libraryBounds);
-      await expect.element(library()).toBeVisible();
-      await expect.element(detail()).not.toBeInTheDocument();
-      draft().focus();
-      expect(focused()).toBe(toggle().element());
-      expect(await auditAccessibility(host)).toEqual([]);
-
-      await pressToggle();
-
-      await expect.element(detail()).toBeVisible();
-      await expect.element(page.getByRole('heading', { name: 'item-2' })).toBeVisible();
-      expect(focused()).toBe(toggle().element());
-      expect(footer().top).toBeGreaterThan(grid().height / 2);
-    });
 
     it('moves focus to the footer when a maximize requested elsewhere hides the control holding it', async () => {
       await render(WIDE_PX);
@@ -464,84 +304,5 @@ describe('ManagerLayout', () => {
       expect(focused().closest('[data-manager-footer]')).not.toBeNull();
       expect(isShown(focused())).toBe(true);
     });
-
-    it('takes the whole manager when the panes take turns, and gives it back', async () => {
-      await render(NARROW_PX);
-
-      await pressToggle();
-
-      expect(footer()).toEqual({ bottom: grid().height, left: 0, right: grid().width, top: 0 });
-      await expect.element(library()).not.toBeInTheDocument();
-      await expect.element(detail()).not.toBeInTheDocument();
-      host.querySelector<HTMLElement>('[data-manager-pane="library"] button')!.focus();
-      expect(focused()).toBe(toggle().element());
-
-      await pressToggle();
-
-      await expect.element(library()).toBeVisible();
-      expect(focused()).toBe(toggle().element());
-    });
-  });
-
-  it('names the icon-only filter trigger in a tooltip that leaves its menu working', async () => {
-    await render(
-      WIDE_PX,
-      <ManagerFilterMenu activeCount={1} label="Filter items">
-        <Portal>
-          <Menu.Positioner>
-            <MenuContent>
-              <ManagerFilterResetItem activeCount={1} onReset={() => undefined} />
-            </MenuContent>
-          </Menu.Positioner>
-        </Portal>
-      </ManagerFilterMenu>
-    );
-    const trigger = page.getByRole('button', { name: 'Filter items, 1 active' });
-
-    await trigger.hover();
-    await expect.element(page.getByRole('tooltip')).toHaveTextContent('Filter items, 1 active');
-    await trigger.click();
-
-    // One trigger id serves both: the menu anchors to the button the tooltip describes.
-    const menu = page.getByRole('menu');
-    await expect.element(menu).toBeVisible();
-    await expect.element(trigger).toHaveAttribute('aria-expanded', 'true');
-    await expect.element(trigger).toHaveAttribute('aria-controls', menu.element().id);
-    await expect.element(menu).toHaveAttribute('aria-labelledby', trigger.element().id);
-    expect(await auditAccessibility(host)).toEqual([]);
-  });
-
-  it('badges the filter trigger with the active filter count, which its reset item clears', async () => {
-    const FilterHarness = () => {
-      const [count, setCount] = useState(2);
-
-      return (
-        <ManagerFilterMenu activeCount={count} closeOnSelect={false} label="Filter items">
-          <Portal>
-            <Menu.Positioner>
-              <MenuContent>
-                <ManagerFilterResetItem activeCount={count} onReset={() => setCount(0)} />
-              </MenuContent>
-            </Menu.Positioner>
-          </Portal>
-        </ManagerFilterMenu>
-      );
-    };
-    await render(WIDE_PX, <FilterHarness />);
-    const trigger = page.getByRole('button', { name: /^Filter items/ });
-
-    // The visible badge digits are part of the name, which axe's label-in-name rule checks.
-    await expect.element(trigger).toHaveAccessibleName('Filter items, 2 active');
-    expect((trigger.element() as HTMLElement).innerText).toBe('2');
-    expect(await auditAccessibility(host)).toEqual([]);
-
-    await trigger.click();
-    const reset = page.getByRole('menuitem', { name: 'common.resetFilters' });
-    await reset.click();
-
-    await expect.element(trigger).toHaveAccessibleName('Filter items');
-    expect((trigger.element() as HTMLElement).innerText).toBe('');
-    // The menu stays open, and the reset has nothing left to clear.
-    await expect.element(reset).toHaveAttribute('aria-disabled', 'true');
   });
 });

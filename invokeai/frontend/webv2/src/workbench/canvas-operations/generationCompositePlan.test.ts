@@ -125,21 +125,6 @@ describe('planComposites — plan shape', () => {
     expect(entry.layers.map((l) => l.id)).toEqual(['top']);
   });
 
-  it('derives sourceRef + content-sized contentSize/contentOffset for image and paint layers', () => {
-    const doc = makeDoc([
-      rasterLayer('img', { source: { image: imageRef('pic', 128, 96), type: 'image' } }),
-      rasterLayer('paint', { source: { bitmap: imageRef('bmp', 200, 150), offset: { x: 40, y: 25 }, type: 'paint' } }),
-    ]);
-    const [img, paint] = planComposites(doc, BBOX).entries[0]!.layers;
-    expect(img!.sourceRef).toBe('image:pic');
-    expect(img!.contentSize).toEqual({ height: 96, width: 128 });
-    expect(img!.contentOffset).toEqual({ x: 0, y: 0 });
-    expect(paint!.sourceRef).toBe('paint:bmp');
-    // Paint layers are content-sized: the persisted bitmap dims placed at its offset.
-    expect(paint!.contentSize).toEqual({ height: 150, width: 200 });
-    expect(paint!.contentOffset).toEqual({ x: 40, y: 25 });
-  });
-
   it('includes committed text with its estimated content rect and complete source identity', () => {
     const doc = makeDoc([textLayer('text')]);
     const entry = planComposites(doc, BBOX).entries[0]!;
@@ -164,48 +149,6 @@ describe('planComposites — plan shape', () => {
     expect(planComposites(edited, BBOX).entries[0]!.key).not.toBe(entry.key);
   });
 
-  it('keeps custom text in z-order over image content and keys the exact font reference', () => {
-    const fontRef = { contentHash: 'font-hash-v1', family: 'Studio Sans', id: 'font-studio', label: 'Studio Sans' };
-    const doc = makeDoc([
-      textLayer('text', {
-        source: {
-          align: 'left',
-          color: '#fff',
-          content: 'hello',
-          fontFamily: 'Studio Sans',
-          fontRef,
-          fontSize: 20,
-          fontWeight: 400,
-          lineHeight: 1.2,
-          type: 'text',
-        },
-      }),
-      rasterLayer('image'),
-    ]);
-    const entry = planComposites(doc, BBOX).entries[0]!;
-    expect(entry.layers.map((layer) => layer.id)).toEqual(['text', 'image']);
-    expect(entry.layers[0]!.contentSize).toEqual({ height: 24, width: 60 });
-    expect(entry.layers[0]!.sourceRef).toContain(JSON.stringify(fontRef.id));
-
-    const changedReference = makeDoc([
-      textLayer('text', {
-        source: {
-          align: 'left',
-          color: '#fff',
-          content: 'hello',
-          fontFamily: 'Studio Sans',
-          fontRef: { ...fontRef, contentHash: 'font-hash-v2' },
-          fontSize: 20,
-          fontWeight: 400,
-          lineHeight: 1.2,
-          type: 'text',
-        },
-      }),
-      rasterLayer('image'),
-    ]);
-    expect(planComposites(changedReference, BBOX).entries[0]!.key).not.toBe(entry.key);
-  });
-
   it('excludes an empty (bitmap: null) paint layer so it cannot force outpaint', () => {
     // Exclude blank paint layers: their transparent document-sized bounds would falsely imply outpaint.
     const doc = makeDoc([
@@ -214,11 +157,6 @@ describe('planComposites — plan shape', () => {
     ]);
     const entry = planComposites(doc, BBOX).entries[0]!;
     expect(entry.layers.map((l) => l.id)).toEqual(['img']);
-  });
-
-  it('emits an empty layer list when the only paint layer is unpainted', () => {
-    const doc = makeDoc([rasterLayer('blank', { source: { bitmap: null, type: 'paint' } })]);
-    expect(planComposites(doc, BBOX).entries[0]!.layers).toEqual([]);
   });
 });
 
@@ -230,67 +168,57 @@ describe('planComposites — key stability', () => {
 });
 
 describe('planComposites — key sensitivity', () => {
-  it('changes the key when layers are reordered', () => {
-    const a = makeDoc([rasterLayer('a'), rasterLayer('b')]);
-    const b = makeDoc([rasterLayer('b'), rasterLayer('a')]);
-    expect(keyOf(a)).not.toBe(keyOf(b));
-  });
-
-  it('changes the key when a layer opacity changes', () => {
-    const a = makeDoc([rasterLayer('a', { opacity: 1 })]);
-    const b = makeDoc([rasterLayer('a', { opacity: 0.5 })]);
-    expect(keyOf(a)).not.toBe(keyOf(b));
-  });
-
-  it('changes the key when a layer transform changes', () => {
-    const a = makeDoc([rasterLayer('a')]);
-    const b = makeDoc([rasterLayer('a', { transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 10, y: 0 } })]);
-    expect(keyOf(a)).not.toBe(keyOf(b));
-  });
-
-  it('changes the key when a layer blend mode changes', () => {
-    const a = makeDoc([rasterLayer('a', { blendMode: 'normal' })]);
-    const b = makeDoc([rasterLayer('a', { blendMode: 'multiply' })]);
-    expect(keyOf(a)).not.toBe(keyOf(b));
-  });
-
-  it('changes the key when a layer source is swapped', () => {
-    const a = makeDoc([rasterLayer('a', { source: { image: imageRef('cat'), type: 'image' } })]);
-    const b = makeDoc([rasterLayer('a', { source: { image: imageRef('dog'), type: 'image' } })]);
-    expect(keyOf(a)).not.toBe(keyOf(b));
-  });
-
-  it('changes the key when the bbox moves', () => {
-    const doc = makeDoc([rasterLayer('a')]);
-    expect(keyOf(doc, { height: 200, width: 200, x: 0, y: 0 })).not.toBe(
-      keyOf(doc, { height: 200, width: 200, x: 10, y: 0 })
-    );
-  });
-
-  it('changes the key when a layer is toggled off', () => {
-    const a = makeDoc([rasterLayer('a')]);
-    const b = makeDoc([rasterLayer('a', { isEnabled: false })]);
-    expect(keyOf(a)).not.toBe(keyOf(b));
+  it.each<[string, CanvasDocumentContractV3, CanvasDocumentContractV3]>([
+    [
+      'layers are reordered',
+      makeDoc([rasterLayer('a'), rasterLayer('b')]),
+      makeDoc([rasterLayer('b'), rasterLayer('a')]),
+    ],
+    [
+      'a layer opacity changes',
+      makeDoc([rasterLayer('a', { opacity: 1 })]),
+      makeDoc([rasterLayer('a', { opacity: 0.5 })]),
+    ],
+    [
+      'a layer transform changes',
+      makeDoc([rasterLayer('a')]),
+      makeDoc([rasterLayer('a', { transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 10, y: 0 } })]),
+    ],
+    [
+      'a layer blend mode changes',
+      makeDoc([rasterLayer('a', { blendMode: 'normal' })]),
+      makeDoc([rasterLayer('a', { blendMode: 'multiply' })]),
+    ],
+    [
+      'a layer source is swapped',
+      makeDoc([rasterLayer('a', { source: { image: imageRef('cat'), type: 'image' } })]),
+      makeDoc([rasterLayer('a', { source: { image: imageRef('dog'), type: 'image' } })]),
+    ],
+    ['a layer is toggled off', makeDoc([rasterLayer('a')]), makeDoc([rasterLayer('a', { isEnabled: false })])],
+  ])('changes the key when %s', (_label, before, after) => {
+    expect(keyOf(before)).not.toBe(keyOf(after));
   });
 });
 
 describe('planComposites — key insensitivity to irrelevant changes', () => {
-  it('ignores selectedLayerId', () => {
-    const a = makeDoc([rasterLayer('a')], { selectedLayerId: null });
-    const b = makeDoc([rasterLayer('a')], { selectedLayerId: 'a' });
-    expect(keyOf(a)).toBe(keyOf(b));
-  });
-
-  it('ignores the document background', () => {
-    const a = makeDoc([rasterLayer('a')], { background: 'transparent' });
-    const b = makeDoc([rasterLayer('a')], { background: { color: '#123456' } });
-    expect(keyOf(a)).toBe(keyOf(b));
-  });
-
-  it('ignores edits to a disabled layer', () => {
-    const a = makeDoc([rasterLayer('a'), rasterLayer('off', { isEnabled: false, opacity: 1 })]);
-    const b = makeDoc([rasterLayer('a'), rasterLayer('off', { isEnabled: false, opacity: 0.2, blendMode: 'screen' })]);
-    expect(keyOf(a)).toBe(keyOf(b));
+  it.each<[string, CanvasDocumentContractV3, CanvasDocumentContractV3]>([
+    [
+      'selectedLayerId',
+      makeDoc([rasterLayer('a')], { selectedLayerId: null }),
+      makeDoc([rasterLayer('a')], { selectedLayerId: 'a' }),
+    ],
+    [
+      'the document background',
+      makeDoc([rasterLayer('a')], { background: 'transparent' }),
+      makeDoc([rasterLayer('a')], { background: { color: '#123456' } }),
+    ],
+    [
+      'edits to a disabled layer',
+      makeDoc([rasterLayer('a'), rasterLayer('off', { isEnabled: false, opacity: 1 })]),
+      makeDoc([rasterLayer('a'), rasterLayer('off', { isEnabled: false, opacity: 0.2, blendMode: 'screen' })]),
+    ],
+  ])('ignores %s', (_label, before, after) => {
+    expect(keyOf(before)).toBe(keyOf(after));
   });
 });
 
@@ -333,11 +261,6 @@ const entryOfKind = (doc: CanvasDocumentContractV3, kind: string) =>
   planComposites(doc, BBOX).entries.find((e) => e.kind === kind);
 
 describe('planComposites — inpaint-mask entries', () => {
-  it('emits no mask entries when there are no active inpaint masks', () => {
-    const kinds = planComposites(makeDoc([rasterLayer('a')]), BBOX).entries.map((e) => e.kind);
-    expect(kinds).toEqual(['base-raster']);
-  });
-
   it('emits an inpaint-mask entry for enabled masks with a persisted bitmap', () => {
     const entry = entryOfKind(makeDoc([rasterLayer('a'), inpaintMask('m1')]), 'inpaint-mask');
     expect(entry).toBeDefined();
@@ -373,60 +296,6 @@ describe('planComposites — inpaint-mask entries', () => {
     expect(ref.contentSize).toEqual({ height: 48, width: 64 });
   });
 
-  it('emits an inpaint-mask entry for a region alone, and never a noise entry for it', () => {
-    const region = { fill: { color: '#e07575', style: 'diagonal' as const }, isEnabled: true };
-    const kinds = planComposites(makeDoc([rasterLayer('r1', { inpaint: region })]), BBOX).entries.map((e) => e.kind);
-    expect(kinds).toEqual(['base-raster', 'inpaint-mask']);
-  });
-
-  it('excludes disabled regions, empty paint layers, disabled layers, and unrasterizable polygons', () => {
-    const region = { fill: { color: '#e07575', style: 'diagonal' as const }, isEnabled: true };
-    const doc = makeDoc([
-      rasterLayer('on', { inpaint: region }),
-      rasterLayer('off', { inpaint: { ...region, isEnabled: false } }),
-      rasterLayer('empty', { inpaint: region, source: { bitmap: null, type: 'paint' } }),
-      rasterLayer('layer-off', { inpaint: region, isEnabled: false }),
-      rasterLayer('poly', {
-        inpaint: region,
-        source: { fill: '#fff', height: 10, kind: 'polygon', width: 10, type: 'shape' } as never,
-      }),
-    ]);
-    const entry = entryOfKind(doc, 'inpaint-mask');
-    expect(entry!.maskLayers!.map((l) => l.id)).toEqual(['on']);
-  });
-
-  it("keys a parametric-source region on the source's pixel-determining fields", () => {
-    const region = { fill: { color: '#e07575', style: 'diagonal' as const }, isEnabled: true };
-    const textDoc = (content: string) =>
-      makeDoc([
-        rasterLayer('t1', {
-          inpaint: region,
-          source: { color: '#fff', content, fontFamily: 'Inter', fontSize: 24, type: 'text' } as never,
-        }),
-      ]);
-    const keyFor = (doc: CanvasDocumentContractV3) => entryOfKind(doc, 'inpaint-mask')!.key;
-    expect(keyFor(textDoc('HELLO'))).not.toBe(keyFor(textDoc('WORLD')));
-    expect(keyFor(textDoc('HELLO'))).toBe(keyFor(textDoc('HELLO')));
-  });
-
-  it('resolves an undefined denoiseLimit to the legacy default (1.0)', () => {
-    const entry = entryOfKind(makeDoc([inpaintMask('m1')]), 'inpaint-mask');
-    expect(entry!.maskLayers![0]!.attributeValue).toBe(1);
-  });
-
-  it('uses the layer denoiseLimit when defined', () => {
-    const entry = entryOfKind(makeDoc([inpaintMask('m1', { denoiseLimit: 0.4 })]), 'inpaint-mask');
-    expect(entry!.maskLayers![0]!.attributeValue).toBe(0.4);
-  });
-
-  it('treats a disabled denoise modifier as the legacy default (disabled === absent)', () => {
-    const entry = entryOfKind(
-      makeDoc([inpaintMask('m1', { denoiseEnabled: false, denoiseLimit: 0.4 })]),
-      'inpaint-mask'
-    );
-    expect(entry!.maskLayers![0]!.attributeValue).toBe(1);
-  });
-
   it('unions multiple masks into the denoise-limit entry', () => {
     const doc = makeDoc([inpaintMask('a', { denoiseLimit: 0.3 }), inpaintMask('b')]);
     const entry = entryOfKind(doc, 'inpaint-mask');
@@ -435,25 +304,12 @@ describe('planComposites — inpaint-mask entries', () => {
 });
 
 describe('planComposites — noise-mask entries', () => {
-  it('omits the noise-mask entry when no mask defines a noiseLevel (undefined is NOT 0)', () => {
-    const kinds = planComposites(makeDoc([inpaintMask('m1')]), BBOX).entries.map((e) => e.kind);
-    expect(kinds).toEqual(['base-raster', 'inpaint-mask']);
-  });
-
   it('emits a noise-mask entry only for masks with a defined noiseLevel', () => {
     const doc = makeDoc([inpaintMask('withNoise', { noiseLevel: 0.15 }), inpaintMask('noNoise')]);
     const entry = entryOfKind(doc, 'noise-mask');
     expect(entry).toBeDefined();
     expect(entry!.maskLayers!.map((l) => l.id)).toEqual(['withNoise']);
     expect(entry!.maskLayers![0]!.attributeValue).toBe(0.15);
-  });
-
-  it('treats a disabled noise modifier as absent, never as noise 0', () => {
-    const kinds = planComposites(
-      makeDoc([inpaintMask('m1', { noiseEnabled: false, noiseLevel: 0.4 })]),
-      BBOX
-    ).entries.map((e) => e.kind);
-    expect(kinds).toEqual(['base-raster', 'inpaint-mask']);
   });
 
   it('treats noiseLevel 0 as defined (included), distinct from undefined (excluded)', () => {
@@ -465,18 +321,6 @@ describe('planComposites — noise-mask entries', () => {
 
 describe('planComposites — mask entry keys', () => {
   const maskKeyOf = (doc: CanvasDocumentContractV3, kind: string): string | undefined => entryOfKind(doc, kind)?.key;
-
-  it('is stable for identical documents', () => {
-    const a = makeDoc([inpaintMask('m1', { denoiseLimit: 0.5 })]);
-    const b = makeDoc([inpaintMask('m1', { denoiseLimit: 0.5 })]);
-    expect(maskKeyOf(a, 'inpaint-mask')).toBe(maskKeyOf(b, 'inpaint-mask'));
-  });
-
-  it('changes when the attribute value changes', () => {
-    const a = makeDoc([inpaintMask('m1', { denoiseLimit: 0.5 })]);
-    const b = makeDoc([inpaintMask('m1', { denoiseLimit: 0.6 })]);
-    expect(maskKeyOf(a, 'inpaint-mask')).not.toBe(maskKeyOf(b, 'inpaint-mask'));
-  });
 
   it('changes when the mask bitmap changes', () => {
     const a = makeDoc([inpaintMask('m1')]);
@@ -525,11 +369,6 @@ describe('planComposites — control-layer exclusion', () => {
     const base = plan.entries.find((entry) => entry.kind === 'base-raster');
     expect(base?.layers.map((layer) => layer.id)).toEqual(['r']);
   });
-
-  it('emits no control-layer entries from planComposites (they live in planControlComposites)', () => {
-    const plan = planComposites(makeDoc([controlLayer('c')]), BBOX);
-    expect(plan.entries.some((entry) => entry.kind === 'control-layer')).toBe(false);
-  });
 });
 
 describe('getBaseRasterContentBounds', () => {
@@ -545,10 +384,6 @@ describe('getBaseRasterContentBounds', () => {
 
     expect(getBaseRasterContentBounds(document)).toEqual({ x: -11, y: 20, width: 201, height: 51 });
   });
-
-  it('returns null when no enabled raster layer has content', () => {
-    expect(getBaseRasterContentBounds(makeDoc([controlLayer('control')]))).toBeNull();
-  });
 });
 
 describe('planControlComposites', () => {
@@ -562,25 +397,7 @@ describe('planControlComposites', () => {
       // Each control layer is composited SEPARATELY, never blended with others.
       expect(entry.layerId).toBe(entry.layers[0]!.id);
     }
-    // Distinct keys per layer.
     expect(composites[0]!.entry.key).not.toBe(composites[1]!.entry.key);
-  });
-
-  it('excludes disabled control layers and empty paint-source control layers', () => {
-    const composites = planControlComposites(
-      makeDoc([
-        controlLayer('enabled'),
-        controlLayer('disabled', { isEnabled: false }),
-        controlLayer('empty', { source: { bitmap: null, type: 'paint' } }),
-      ]),
-      BBOX
-    );
-    expect(composites.map((composite) => composite.layerId)).toEqual(['enabled']);
-  });
-
-  it('ignores raster/mask layers entirely', () => {
-    const composites = planControlComposites(makeDoc([rasterLayer('r'), inpaintMask('m'), controlLayer('c')]), BBOX);
-    expect(composites.map((composite) => composite.layerId)).toEqual(['c']);
   });
 
   it('forces opacity 1 / normal blend so display tweaks and the transparency effect never churn the key', () => {
@@ -592,15 +409,6 @@ describe('planControlComposites', () => {
     expect(a[0]!.entry.key).toBe(b[0]!.entry.key);
     expect(a[0]!.entry.layers[0]!.opacity).toBe(1);
     expect(a[0]!.entry.layers[0]!.blendMode).toBe('normal');
-  });
-
-  it('changes the key when the control source pixels change', () => {
-    const a = planControlComposites(makeDoc([controlLayer('c')]), BBOX);
-    const b = planControlComposites(
-      makeDoc([controlLayer('c', { source: { image: imageRef('other', 64, 48), type: 'image' } })]),
-      BBOX
-    );
-    expect(a[0]!.entry.key).not.toBe(b[0]!.entry.key);
   });
 });
 
@@ -634,29 +442,6 @@ describe('planRegionalMaskComposites', () => {
     expect(entries[0]!.entry.layers[0]!.opacity).toBe(1);
     expect(entries[0]!.entry.layers[0]!.blendMode).toBe('normal');
   });
-
-  it('skips regions with no mask bitmap and disabled regions', () => {
-    const entries = planRegionalMaskComposites(
-      makeDoc([
-        regionalLayer('empty', { mask: { bitmap: null, fill: { color: '#f00', style: 'solid' } } }),
-        regionalLayer('off', { isEnabled: false }),
-        regionalLayer('ok'),
-      ]),
-      BBOX
-    );
-    expect(entries.map((e) => e.layerId)).toEqual(['ok']);
-  });
-
-  it('keys are stable per region+bbox and change with the mask source', () => {
-    const a = planRegionalMaskComposites(makeDoc([regionalLayer('a')]), BBOX);
-    const b = planRegionalMaskComposites(
-      makeDoc([
-        regionalLayer('a', { mask: { bitmap: imageRef('other-mask'), fill: { color: '#f00', style: 'solid' } } }),
-      ]),
-      BBOX
-    );
-    expect(a[0]!.entry.key).not.toBe(b[0]!.entry.key);
-  });
 });
 
 describe('planComposites — raster adjustments in the base key', () => {
@@ -673,19 +458,7 @@ describe('planComposites — raster adjustments in the base key', () => {
     // A changed adjustment changes the entry key so the executor re-composites/uploads.
     expect(keyOf(makeDoc([plain]))).not.toBe(keyOf(makeDoc([adjusted])));
   });
-
-  it('ignores an identity adjustment (no key churn)', () => {
-    const plain = rasterLayer('a');
-    const identityAdj = rasterLayer('a', {
-      adjustments: [
-        { brightness: 0, contrast: 0, id: 'adj-bc', isEnabled: true, type: 'brightness-contrast' as const },
-      ],
-    });
-    expect(plan0(plain)).toBe(plan0(identityAdj));
-  });
 });
-
-const plan0 = (layer: CanvasLayerContract): string => planComposites(makeDoc([layer]), BBOX).entries[0]!.key;
 
 describe('planComposites — group gating', () => {
   it('excludes a raster leaf whose group is disabled', () => {

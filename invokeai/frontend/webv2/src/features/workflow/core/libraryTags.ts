@@ -18,8 +18,8 @@ export const parseWorkflowTags = (tags: string | null | undefined): string[] => 
 };
 
 /**
- * Merge case variants using maximum count, not sum, because LIKE totals overlap. Choose largest-count casing,
- * breaking ties lexicographically for stable labels.
+ * Merge case variants using maximum count, not sum, because LIKE totals overlap. Choose largest-count casing, breaking
+ * ties lexicographically for stable labels.
  */
 export const mergeTagCountsByCase = (counts: readonly WorkflowTagCount[]): WorkflowTagCount[] => {
   const merged = new Map<string, WorkflowTagCount>();
@@ -33,8 +33,8 @@ export const mergeTagCountsByCase = (counts: readonly WorkflowTagCount[]): Workf
       continue;
     }
 
-    // Compared before the max is folded in, so `existing.count` is still the
-    // count of the row whose casing currently wins.
+    // Compared before the max is folded in, so `existing.count` is still the count of the row whose casing currently
+    // wins.
     if (entry.count > existing.count || (entry.count === existing.count && entry.tag.localeCompare(existing.tag) < 0)) {
       existing.tag = entry.tag;
     }

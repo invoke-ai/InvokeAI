@@ -1,8 +1,4 @@
-/**
- * What every row of the control layer Properties panel shows, derived from the layer, its model resolution, the
- * installed models and detection status. Pure: texts are locale keys under `widgets.layers.control.` with values and
- * nested keys (`refs`) the view translates, so tests read states without a locale.
- */
+/** Pure Properties-panel rows; texts are locale keys under `widgets.layers.control.` for the view. */
 
 import type { ControlAdapterKind } from '@features/generation/graph';
 import type { CanvasControlLayerContract, ControlType } from '@workbench/canvas-engine/api';
@@ -79,9 +75,7 @@ export interface ControlPanelModel {
   };
   adapter: {
     kind: ControlAdapterKind;
-    /**
-     * `unbalanced` only for a layer that stored it: new picks cannot choose it, so it shows until the user moves off.
-     */
+    /** Only for a layer that stored it; new picks cannot choose it. */
     priority: { unavailable: ControlPriorityUnavailable | null; value: ControlPriority | 'unbalanced' | null };
     stepsReadout: PanelText;
   };
