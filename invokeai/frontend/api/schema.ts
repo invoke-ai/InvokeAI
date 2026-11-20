@@ -50844,6 +50844,12 @@ export type components = {
              * @description Email of the first active admin user, if any
              */
             admin_email?: string | null;
+            /**
+             * Has Single User Work
+             * @description Whether work made in single-user mode exists that new accounts will not see; only during setup
+             * @default false
+             */
+            has_single_user_work?: boolean;
         };
         /**
          * Show Image

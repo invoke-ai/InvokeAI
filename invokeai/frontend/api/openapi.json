@@ -116073,6 +116073,12 @@
             ],
             "title": "Admin Email",
             "description": "Email of the first active admin user, if any"
+          },
+          "has_single_user_work": {
+            "type": "boolean",
+            "title": "Has Single User Work",
+            "description": "Whether work made in single-user mode exists that new accounts will not see; only during setup",
+            "default": false
           }
         },
         "type": "object",
