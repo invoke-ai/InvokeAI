@@ -2441,12 +2441,16 @@ class ModelCache:
                     - working_mem_bytes
                     - reserve_vram_bytes
                 )
+                if not expandable_segments_enabled():
+                    physical += self._get_reclaimable_allocator_bytes()
                 return min(capped, physical)
             return capped
 
         # Shared-memory devices (MPS, integrated CUDA, Intel integrated GPUs) count free system RAM, not device totals.
         vram_available_to_process = TorchDevice.memory_available_to_process(self._execution_device)
-        if device_has_dedicated_vram(self._execution_device):
+        if device_has_dedicated_vram(self._execution_device) or (
+            _is_integrated_cuda(self._execution_device) and not expandable_segments_enabled()
+        ):
             # Blocks the caching allocator holds but is not using are just as available to this
             # process as driver-free memory: the allocator reuses them directly, and empty_cache()
             # returns whole unoccupied segments to the driver. mem_get_info() alone counts them as
@@ -2519,11 +2523,13 @@ class ModelCache:
         On a device with dedicated VRAM that offload moves every other unlocked model out, so what the cache holds now
         counts as available. On one whose memory is system RAM (MPS, an integrated GPU) it moves nothing, so what is
         allocated now stays subtracted, as the lock subtracts it. Within `max_vram_cache_size_gb` (the lock budgets
-        against the cap; the device must still hold it), less `reserve_vram_gb`. Without the allocator's reclaimable
-        credit: a plan does not count on blocks the offload's `empty_cache` returns only when it runs.
+        against the cap; the device must still hold it), less `reserve_vram_gb`. Non-expandable integrated CUDA includes
+        the allocator's reclaimable credit in both capped and uncapped budgets, matching `_get_vram_available()`.
         """
         live = 0 if device_has_dedicated_vram(self._execution_device) else self._get_vram_in_use()
         available = TorchDevice.memory_available_to_process(self._execution_device) - live
+        if _is_integrated_cuda(self._execution_device) and not expandable_segments_enabled():
+            available += self._get_reclaimable_allocator_bytes()
         if self._max_vram_cache_size_gb is not None:
             available = min(available, int(self._max_vram_cache_size_gb * GB) - live)
         return available - int(self._reserve_vram_gb * GB)
@@ -2713,16 +2719,43 @@ class ModelCache:
         empty_cache_per_offload = expandable_segments_enabled()
         vram_bytes_freed_uncounted = 0
         # TODO(ryand): Give more thought to the offloading policy used here.
-        cache_entries_increasing_size = sorted(self._cached_models.values(), key=lambda x: x.cached_model.total_bytes())
-        for cache_entry in cache_entries_increasing_size:
+        integrated_cuda = _is_integrated_cuda(self._execution_device)
+        models_cleared = 0
+        integrated_bytes_freed = 0
+        if integrated_cuda:
+            # An evicted UMA model must lose every cache-held reference before checking free memory again.
+            candidates = sorted(
+                ((entry.key, entry.cached_model.total_bytes()) for entry in self._cached_models.values()),
+                key=lambda item: item[1],
+            )
+        else:
+            candidates = sorted(self._cached_models.values(), key=lambda x: x.cached_model.total_bytes())
+        for candidate in candidates:
+            cache_entry = self._cached_models.get(candidate[0]) if integrated_cuda else candidate
+            if cache_entry is None:
+                continue
             # We do not fully trust the count of bytes freed, so we check again on each iteration.
             vram_available = vram_available_fn() + vram_bytes_freed_uncounted
             vram_bytes_to_free = vram_bytes_required - vram_available
             if vram_bytes_to_free <= 0:
                 break
-            if cache_entry.is_locked:
+            if cache_entry.is_locked or (integrated_cuda and cache_entry.in_first_use_window):
                 # TODO(ryand): In the future, we may want to partially unload locked models, but this requires careful
                 # handling of model patches (e.g. LoRA).
+                continue
+            if integrated_cuda:
+                # UMA CPU-resident weights still consume the same physical pool as CUDA allocations.
+                cache_entry_bytes_freed = cache_entry.cached_model.total_bytes()
+                self._delete_cache_entry(cache_entry)
+                del cache_entry
+                models_cleared += 1
+                integrated_bytes_freed += cache_entry_bytes_freed
+                if empty_cache_per_offload:
+                    if TorchDevice.empty_cache() is EmptyCacheOutcome.RAN:
+                        vram_bytes_freed_uncounted = 0
+                    else:
+                        vram_bytes_freed_uncounted += cache_entry_bytes_freed
+                vram_bytes_freed += cache_entry_bytes_freed
                 continue
             cache_entry_bytes_freed = self._move_model_to_ram(cache_entry, vram_bytes_to_free)
             if cache_entry_bytes_freed > 0:
@@ -2735,6 +2768,15 @@ class ModelCache:
                     else:
                         vram_bytes_freed_uncounted += cache_entry_bytes_freed
             vram_bytes_freed += cache_entry_bytes_freed
+
+        if models_cleared > 0:
+            self._notify_models_cleared(
+                models_cleared=models_cleared,
+                bytes_requested=vram_bytes_required,
+                bytes_freed=integrated_bytes_freed,
+                cumulative_stats=True,
+            )
+            gc.collect()
 
         # Only pay for empty_cache() when something was actually offloaded. Paced VRAM moves run
         # this method once per pass, and on most passes there is nothing left to offload —

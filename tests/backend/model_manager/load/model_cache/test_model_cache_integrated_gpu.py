@@ -85,12 +85,18 @@ def _patch_integrated_cuda():
         yield
 
 
-def _make_cuda_cache(logger: MagicMock, enable_partial_loading: bool = False, keep_ram_copy: bool = True) -> ModelCache:
+def _make_cuda_cache(
+    logger: MagicMock,
+    enable_partial_loading: bool = False,
+    keep_ram_copy: bool = True,
+    max_vram_cache_size_gb: float | None = None,
+) -> ModelCache:
     with _patch_integrated_cuda():
         return ModelCache(
             execution_device_working_mem_gb=1.0,
             enable_partial_loading=enable_partial_loading,
             keep_ram_copy_of_weights=keep_ram_copy,
+            max_vram_cache_size_gb=max_vram_cache_size_gb,
             execution_device="cuda:0",
             storage_device="cpu",
             logger=logger,
@@ -355,6 +361,206 @@ def test_integrated_cuda_offload_only_releases_a_retained_device_copy(
             move.assert_called_once()
         else:
             move.assert_not_called()
+    finally:
+        cache.shutdown()
+
+
+def test_integrated_cuda_keeps_idle_resident_model_without_pressure(mock_logger: MagicMock):
+    cache = _make_cuda_cache(mock_logger, keep_ram_copy=False)
+    try:
+        with _patch_integrated_cuda():
+            cache.put("m", DummyModule())
+            entry = _entry(cache, "m")
+            entry.awaiting_first_use = False
+            entry.cached_model._is_in_vram = True
+            with patch.object(TorchDevice, "empty_cache", return_value=EmptyCacheOutcome.RAN):
+                cache._offload_unlocked_models(0, vram_available_fn=lambda: 0)
+        assert "m" in cache._cached_models
+    finally:
+        cache.shutdown()
+
+
+def test_integrated_cuda_pressure_drops_idle_model(mock_logger: MagicMock):
+    cache = _make_cuda_cache(mock_logger, keep_ram_copy=False)
+    try:
+        with _patch_integrated_cuda():
+            cache.put("m", DummyModule())
+            entry = _entry(cache, "m")
+            entry.awaiting_first_use = False
+            entry.cached_model._is_in_vram = True
+            total_bytes = entry.cached_model.total_bytes()
+            with patch.object(TorchDevice, "empty_cache", return_value=EmptyCacheOutcome.RAN):
+                cache._offload_unlocked_models(total_bytes, vram_available_fn=lambda: 0)
+        assert "m" not in cache._cached_models
+    finally:
+        cache.shutdown()
+
+
+def test_integrated_cuda_pressure_preserves_locked_and_first_use_entries(mock_logger: MagicMock):
+    cache = _make_cuda_cache(mock_logger, keep_ram_copy=False)
+    try:
+        with _patch_integrated_cuda():
+            cache.put("locked", DummyModule())
+            cache.put("held", DummyModule())
+            locked = _entry(cache, "locked")
+            held = _entry(cache, "held")
+            locked.cached_model._is_in_vram = True
+            held.cached_model._is_in_vram = True
+            cache.lock_in_ram(locked)
+            held.awaiting_first_use = True
+            with patch.object(TorchDevice, "empty_cache", return_value=EmptyCacheOutcome.RAN):
+                cache._offload_unlocked_models(2**30, vram_available_fn=lambda: 0)
+        assert set(cache._cached_models) == {"locked", "held"}
+    finally:
+        cache.shutdown()
+
+
+def test_integrated_cuda_pressure_batches_cleanup_and_drops_cpu_resident_entries(mock_logger: MagicMock):
+    cache = _make_cuda_cache(mock_logger, keep_ram_copy=False)
+    try:
+        with _patch_integrated_cuda():
+            cache.put("cuda", DummyModule())
+            cache.put("cpu", DummyModule())
+            cuda_entry = _entry(cache, "cuda")
+            cpu_entry = _entry(cache, "cpu")
+            cuda_entry.awaiting_first_use = False
+            cpu_entry.awaiting_first_use = False
+            cuda_entry.cached_model._is_in_vram = True
+            assert cpu_entry.cached_model.cur_vram_bytes() == 0
+            bytes_requested = cuda_entry.cached_model.total_bytes() + cpu_entry.cached_model.total_bytes()
+            with (
+                patch(
+                    "invokeai.backend.model_manager.load.model_cache.model_cache.expandable_segments_enabled",
+                    return_value=False,
+                ),
+                patch.object(cache, "_notify_models_cleared") as notify,
+                patch("invokeai.backend.model_manager.load.model_cache.model_cache.gc.collect") as collect,
+                patch.object(TorchDevice, "empty_cache", return_value=EmptyCacheOutcome.RAN) as empty_cache,
+            ):
+                cache._offload_unlocked_models(bytes_requested, vram_available_fn=lambda: 0)
+        assert not cache._cached_models
+        notify.assert_called_once_with(
+            models_cleared=2,
+            bytes_requested=bytes_requested,
+            bytes_freed=bytes_requested,
+            cumulative_stats=True,
+        )
+        collect.assert_called_once()
+        empty_cache.assert_called_once()
+    finally:
+        cache.shutdown()
+
+
+def test_integrated_cuda_reuses_non_expandable_allocator_credit_after_eviction(mock_logger: MagicMock):
+    cache = _make_cuda_cache(mock_logger, keep_ram_copy=False)
+    try:
+        with (
+            _patch_integrated_cuda(),
+            patch(
+                "invokeai.backend.model_manager.load.model_cache.model_cache.expandable_segments_enabled",
+                return_value=False,
+            ),
+            patch.object(TorchDevice, "memory_available_to_process", return_value=8 * 2**30),
+            patch.object(cache, "_get_vram_in_use", return_value=0),
+            patch.object(cache, "_get_reclaimable_allocator_bytes", return_value=2 * 2**30),
+        ):
+            assert cache._get_vram_available(None) == 9 * 2**30
+    finally:
+        cache.shutdown()
+
+
+def test_integrated_cuda_calibration_capacity_matches_uncapped_availability(mock_logger: MagicMock):
+    cache = _make_cuda_cache(mock_logger, keep_ram_copy=False)
+    try:
+        with (
+            _patch_integrated_cuda(),
+            patch(
+                "invokeai.backend.model_manager.load.model_cache.model_cache.expandable_segments_enabled",
+                return_value=False,
+            ),
+            patch.object(TorchDevice, "memory_available_to_process", return_value=8 * 2**30),
+            patch.object(cache, "_get_vram_in_use", return_value=0),
+            patch.object(cache, "_get_reclaimable_allocator_bytes", return_value=2 * 2**30),
+        ):
+            assert cache.calibration_capacity() == cache._get_vram_available(None) + 1 * 2**30
+    finally:
+        cache.shutdown()
+
+
+@pytest.mark.parametrize(
+    ("cap_gb", "expected_available_gb"),
+    [(12.0, 9.0), (6.0, 5.0)],
+    ids=["high-cap-uses-credit", "low-cap-remains-hard-limit"],
+)
+def test_integrated_cuda_capped_availability_uses_credit_but_honors_cap(
+    cap_gb: float, expected_available_gb: float, mock_logger: MagicMock
+):
+    cache = _make_cuda_cache(mock_logger, keep_ram_copy=False, max_vram_cache_size_gb=cap_gb)
+    try:
+        with (
+            _patch_integrated_cuda(),
+            patch(
+                "invokeai.backend.model_manager.load.model_cache.model_cache.expandable_segments_enabled",
+                return_value=False,
+            ),
+            patch.object(TorchDevice, "memory_available_to_process", return_value=8 * 2**30),
+            patch.object(cache, "_get_vram_in_use", return_value=0),
+            patch.object(cache, "_get_reclaimable_allocator_bytes", return_value=2 * 2**30),
+        ):
+            assert cache._get_vram_available(None) == int(expected_available_gb * 2**30)
+            assert cache.calibration_capacity() == int(min(10.0, cap_gb) * 2**30)
+    finally:
+        cache.shutdown()
+
+
+def test_integrated_cuda_stops_after_first_eviction_when_allocator_reuses_freed_capacity(
+    mock_logger: MagicMock,
+):
+    cache = _make_cuda_cache(mock_logger, keep_ram_copy=False)
+    try:
+        with _patch_integrated_cuda():
+            cache.put("first", DummyModule())
+            cache.put("second", DummyModule())
+            first = _entry(cache, "first")
+            second = _entry(cache, "second")
+            first.awaiting_first_use = False
+            second.awaiting_first_use = False
+            first.cached_model._is_in_vram = True
+            second.cached_model._is_in_vram = True
+            model_bytes = first.cached_model.total_bytes()
+            with (
+                patch(
+                    "invokeai.backend.model_manager.load.model_cache.model_cache.expandable_segments_enabled",
+                    return_value=False,
+                ),
+                patch.object(cache, "_get_vram_available", side_effect=[0, model_bytes]),
+                patch.object(TorchDevice, "empty_cache", return_value=EmptyCacheOutcome.RAN),
+            ):
+                cache._offload_unlocked_models(model_bytes)
+        assert set(cache._cached_models) == {"second"}
+    finally:
+        cache.shutdown()
+
+
+def test_discrete_cuda_pressure_moves_model_to_ram(mock_logger: MagicMock):
+    cache = _make_cuda_cache(mock_logger)
+    try:
+        with (
+            patch("invokeai.backend.util.devices.device_is_integrated", return_value=False),
+            patch(
+                "invokeai.backend.model_manager.load.model_cache.model_cache.device_is_integrated",
+                return_value=False,
+            ),
+            patch("torch.version.hip", None),
+        ):
+            cache.put("m", DummyModule())
+            entry = _entry(cache, "m")
+            entry.awaiting_first_use = False
+            entry.cached_model._is_in_vram = True
+            entry.cached_model.full_unload_from_vram = MagicMock(return_value=1)
+            cache._offload_unlocked_models(1, vram_available_fn=lambda: 0)
+        assert "m" in cache._cached_models
+        entry.cached_model.full_unload_from_vram.assert_called_once()
     finally:
         cache.shutdown()
 
