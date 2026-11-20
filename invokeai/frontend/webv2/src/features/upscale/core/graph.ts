@@ -209,7 +209,8 @@ const buildSdUpscalePath: UpscalePathBuilder = ({
   positivePrompt,
   negativePrompt,
   seed,
-  frame,
+  frame: spandrelFrame,
+  denoiseSize,
   denoisingStart,
 }) => {
   const { tileControlnetModel } = settings;
@@ -218,6 +219,12 @@ const buildSdUpscalePath: UpscalePathBuilder = ({
     throw new Error('Upscale needs a Tile or Union ControlNet compatible with the main model.');
   }
 
+  // SD's noise, latents and tiles take their size from the frame, so a frame Spandrel left at source size would be
+  // denoised at it. Only a 1x model does that (a 2x model is looped up to the scale), so only then is the frame resized.
+  const frame =
+    getSpandrelNativeScale(settings.upscaleModel) === 1 && settings.scale > 1
+      ? fitFrameToDenoiseSize(graph, spandrelFrame, denoiseSize)
+      : spandrelFrame;
   const noise = addNode(graph, { id: 'noise', type: 'noise', use_cpu: projectSettings.useCpuNoise });
   const imageToLatents = addNode(graph, {
     fp32: settings.vaePrecision === 'fp32',

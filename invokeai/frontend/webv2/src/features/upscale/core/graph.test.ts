@@ -326,6 +326,70 @@ describe('compileUpscaleGraph for FLUX.1', () => {
     expect(nodes.fit_to_grid).toBeUndefined();
   });
 
+  describe('SD path with a Spandrel model of a given native scale', () => {
+    const withNativeScale = (base: 'sd-1' | 'sdxl', nativeScale: number, scale: number) => {
+      const values = createValues(base);
+
+      return {
+        ...values,
+        inputImage: { height: 1000, image_name: 'input.png', width: 1500 },
+        scale,
+        upscaleModel: { ...values.upscaleModel, scale: nativeScale } as typeof values.upscaleModel,
+      };
+    };
+
+    it.each(['sd-1', 'sdxl'] as const)(
+      'resizes the frame of a 1x %s model to the chosen size, which Spandrel would not reach',
+      (base) => {
+        const { edges, nodes } = compileUpscaleGraph(withNativeScale(base, 1, 2), 'gallery', {
+          useCpuNoise: true,
+        }).backendGraph;
+
+        // 1500x1000 at 2x
+        expect(nodes.fit_to_grid).toMatchObject({ height: 2000, type: 'img_resize', width: 3000 });
+        expect(hasEdge(edges, 'unsharp_2', 'image', 'fit_to_grid', 'image')).toBe(true);
+        expect(hasEdge(edges, 'fit_to_grid', 'image', 'i2l', 'image')).toBe(true);
+        expect(hasEdge(edges, 'fit_to_grid', 'image', 'controlnet_1', 'image')).toBe(true);
+        expect(hasEdge(edges, 'fit_to_grid', 'width', 'noise', 'width')).toBe(true);
+        expect(hasEdge(edges, 'fit_to_grid', 'height', 'core_metadata', 'height')).toBe(true);
+        expect(hasEdge(edges, 'unsharp_2', 'image', 'i2l', 'image')).toBe(false);
+      }
+    );
+
+    it('floors the resize target to the grid Spandrel would have used', () => {
+      const values = { ...withNativeScale('sd-1', 1, 2), inputImage: { height: 101, image_name: 'a.png', width: 203 } };
+      const { nodes } = compileUpscaleGraph(values, 'gallery', { useCpuNoise: true }).backendGraph;
+
+      // 203x2 = 406 -> 400, 101x2 = 202 -> 200
+      expect(nodes.fit_to_grid).toMatchObject({ height: 200, width: 400 });
+    });
+
+    it('adds no node for a model that enlarges, because Spandrel loops up to the scale', () => {
+      const { edges, nodes } = compileUpscaleGraph(withNativeScale('sd-1', 4, 4), 'gallery', {
+        useCpuNoise: true,
+      }).backendGraph;
+
+      expect(nodes.fit_to_grid).toBeUndefined();
+      expect(hasEdge(edges, 'unsharp_2', 'image', 'i2l', 'image')).toBe(true);
+    });
+
+    it('adds no node for a 2x model at scale 4, because Spandrel runs it twice', () => {
+      const { nodes } = compileUpscaleGraph(withNativeScale('sd-1', 2, 4), 'gallery', {
+        useCpuNoise: true,
+      }).backendGraph;
+
+      expect(nodes.fit_to_grid).toBeUndefined();
+    });
+
+    it('adds no node for a 1x model at scale 1, where there is nothing to enlarge', () => {
+      const { nodes } = compileUpscaleGraph(withNativeScale('sd-1', 1, 1), 'gallery', {
+        useCpuNoise: true,
+      }).backendGraph;
+
+      expect(nodes.fit_to_grid).toBeUndefined();
+    });
+  });
+
   it('resizes a frame the scale already puts on the grid, because a 1x model makes Spandrel ignore the scale', () => {
     const { edges, nodes } = compileUpscaleGraph(
       { ...createFluxValues(), inputImage: { height: 1024, image_name: 'input.png', width: 1024 }, scale: 2 },
