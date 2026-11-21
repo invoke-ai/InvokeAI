@@ -27,6 +27,7 @@ from invokeai.backend.model_manager.load import (
 )
 from invokeai.backend.model_manager.load.model_cache.model_cache import MODEL_LOAD_LOCK, ModelCache
 from invokeai.backend.model_manager.load.model_loaders.generic_diffusers import GenericDiffusersLoader
+from invokeai.backend.model_manager.load.model_util import calc_model_size_by_fs
 from invokeai.backend.model_manager.taxonomy import AnyModel, SubModelType
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
@@ -49,6 +50,16 @@ class _KeyEdits:
     watchers: int = 0
     # Bumped as each edit that changed how the model loads ends.
     generation: int = 0
+
+
+def _estimate_path_size(model_path: Path) -> int:
+    """Estimate a local model file or directory, including supported nested weights."""
+    size = calc_model_size_by_fs(model_path)
+    if model_path.is_dir():
+        size += sum(
+            _estimate_path_size(child) for child in model_path.iterdir() if child.is_dir() and not child.is_symlink()
+        )
+    return size
 
 
 class _RecordEdits:
@@ -400,6 +411,12 @@ class ModelLoadService(ModelLoadServiceBase):
                 )
             except IndexError:
                 pass
+            ram_admission = ram_cache.make_room(_estimate_path_size(model_path))
+            if getattr(ram_admission, "ram_headroom_satisfied", True) is False:
+                raise MemoryError(
+                    f"Insufficient host memory to construct model '{cache_key}'; "
+                    "close other applications or load a smaller model."
+                )
             raw_model = loader(model_path)
             # The admission claim shields the record until this retrieval's own claim takes over
             # (see ModelCache.put), so nothing can evict the model still held in raw_model here.

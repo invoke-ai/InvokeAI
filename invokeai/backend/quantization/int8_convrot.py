@@ -48,6 +48,7 @@ to check a model family against, it keeps refusing them.
 """
 
 import functools
+import inspect
 import json
 import struct
 from collections.abc import Callable, Iterable, Mapping
@@ -74,6 +75,7 @@ from invokeai.backend.quantization.int8_matmul import (
     is_int8_compute_enabled,
 )
 from invokeai.backend.util.logging import InvokeAILogger
+from invokeai.backend.util.ram import require_ram_headroom, state_dict_cast_bytes
 
 logger = InvokeAILogger.get_logger(__name__)
 
@@ -303,7 +305,7 @@ def dequantize_convrot_weight(
     """
     scale = as_column_scale(weight_q, weight_scale)
     rows = weight_q.shape[0] if weight_q.dim() == 2 else 0
-    if rows <= DEQUANTIZE_ROWS_PER_PASS:
+    if weight_q.dim() != 2 or rows <= DEQUANTIZE_ROWS_PER_PASS:
         return _dequantize_convrot_rows(weight_q, scale, convrot, dtype, group_size, packed_int4)
     per_row = scale.dim() == 2 and scale.shape[0] == rows
     columns = weight_q.shape[1] * (2 if packed_int4 else 1)
@@ -314,6 +316,25 @@ def dequantize_convrot_weight(
             weight_q[block], scale[block] if per_row else scale, convrot, dtype, group_size, packed_int4
         )
     return result
+
+
+def _dequantize_convrot_peak_bytes(
+    weight_q: torch.Tensor, scale: torch.Tensor, dtype: torch.dtype, *, packed_int4: bool, convrot: bool
+) -> int:
+    """Peak bytes newly allocated while decoding one layer, excluding resident source tensors.
+
+    Packed int4 keeps the float32 unpack tensor alive through multiplication and, for convrot, through the
+    float32 derotation; those lifetimes are intentionally wider than the int8 path.
+    """
+    elements = weight_q.numel() * (2 if packed_int4 else 1)
+    float_bytes = elements * torch.float32.itemsize
+    output_bytes = elements * dtype.itemsize
+    scale_cast_bytes = 0 if scale.dtype is torch.float32 else scale.numel() * torch.float32.itemsize
+    if packed_int4:
+        multiply_peak = 2 * float_bytes + scale_cast_bytes
+        rotation_peak = (3 * float_bytes) if convrot else (2 * float_bytes + output_bytes)
+        return max(multiply_peak, rotation_peak)
+    return max(2 * float_bytes + scale_cast_bytes, float_bytes + output_bytes)
 
 
 def _dequantize_convrot_rows(
@@ -966,9 +987,8 @@ def predict_int8_cast_size(
     """Bytes the state dict will occupy once the split and :func:`cast_unquantized` have run.
 
     Loaders call this to size their ``make_room()`` reservation, and call it *before* the split so
-    that the tensors the split widens are already reserved for when they appear. (The split's own
-    fp32 transient is absorbed by that reservation's slack rather than modelled: it widens one layer
-    at a time, and at most ``DEQUANTIZE_ROWS_PER_PASS`` rows of it at once.)
+    that the tensors the split widens are already reserved for when they appear. The installer adds
+    the split's float32 decode peak separately; this function remains the final state-dict target.
 
     Three widths are in play and only one of them is ``dtype.itemsize``. A payload that stays int8
     occupies one byte, and charging it two asks the cache to free ~12 GB a Krea-2 build never uses.
@@ -1162,9 +1182,10 @@ def install_int8_convrot_layers(
     dtype: torch.dtype,
     *,
     architecture: str,
-    reserve: Callable[[int], None],
+    reserve: Callable[[int], Any],
     skip_patterns: Iterable[str] = (),
     extra_reserved_bytes: int = 0,
+    extra_host_bytes: int = 0,
     read: Callable[[str], torch.Tensor] | None = None,
 ) -> dict[str, dict[str, Any]]:
     """Take a marked int8 or int4 checkpoint from state dict to installed ``Int8ConvrotLinear`` and
@@ -1197,9 +1218,55 @@ def install_int8_convrot_layers(
     the reservation, and no payload lands on an unreserved cache. Returns the layers that stayed int8.
     """
     reject_foreign_quantization_scales(sd, quantized, architecture, model)
-    reserve(
-        predict_int8_cast_size(sd, dtype, quantized, model=model, skip_patterns=skip_patterns) + extra_reserved_bytes
-    )
+    reserved_bytes = predict_int8_cast_size(sd, dtype, quantized, model=model, skip_patterns=skip_patterns)
+    reserved_bytes += extra_reserved_bytes
+    source_bytes = sum(tensor.nelement() * tensor.element_size() for tensor in sd.values() if not tensor.is_meta)
+    has_meta = read is not None and any(tensor.is_meta for tensor in sd.values())
+    materialized_source_bytes = source_bytes
+    read_peak = source_bytes
+    surviving = _surviving_int8_layers(sd, quantized, model, skip_patterns)
+    pinned = _pinned_quantized_keys(quantized)
+    if has_meta:
+        held = source_bytes
+        for key, tensor in sd.items():
+            if not tensor.is_meta:
+                continue
+            raw_bytes = tensor.nelement() * tensor.element_size()
+            if key not in pinned and is_castable_float(tensor):
+                target_bytes = tensor.nelement() * dtype.itemsize
+                if tensor.dtype != dtype:
+                    read_peak = max(read_peak, held + raw_bytes + target_bytes)
+                else:
+                    target_bytes = raw_bytes
+                    read_peak = max(read_peak, held + raw_bytes)
+            else:
+                target_bytes = raw_bytes
+                read_peak = max(read_peak, held + raw_bytes)
+            held += target_bytes
+        materialized_source_bytes = held
+    dequant_delta, dequant_peak = _predict_int8_dequant_peak(sd, quantized, surviving, dtype, materialized_source_bytes)
+    cast_sd = {key: tensor for key, tensor in sd.items() if key not in pinned and is_castable_float(tensor)}
+    if has_meta:
+        cast_peak = 0
+    else:
+        _, cast_peak = state_dict_cast_bytes(cast_sd, dtype, in_place=True)
+        cast_peak = materialized_source_bytes + dequant_delta + cast_peak
+    del cast_sd
+    int8_target_bytes = reserved_bytes - extra_reserved_bytes
+    host_peak = max(int8_target_bytes, dequant_peak, cast_peak)
+    host_peak = max(host_peak, read_peak)
+    host_bytes_needed = max(0, host_peak - source_bytes, int8_target_bytes - source_bytes + extra_host_bytes)
+    try:
+        parameters = inspect.signature(reserve).parameters.values()
+    except (TypeError, ValueError):
+        parameters = ()
+    if any(parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in parameters) or any(
+        parameter.name == "host_bytes_needed" for parameter in parameters
+    ):
+        reservation = reserve(reserved_bytes, host_bytes_needed=host_bytes_needed)  # type: ignore[call-arg]
+    else:
+        reservation = reserve(reserved_bytes)
+    require_ram_headroom(reservation, host_bytes_needed)
     if read is not None:
         # The reservation is each tensor at its width after the cast, so a dense tensor is cast as it arrives: reading
         # an fp32 file's dense tensors first and casting them afterwards holds twice what was reserved, in anonymous
@@ -1214,6 +1281,49 @@ def install_int8_convrot_layers(
     cast_unquantized(sd, dtype, surviving)
     swap_in_int8_linears(model, sd, surviving)
     return surviving
+
+
+def _predict_int8_dequant_peak(
+    sd: Mapping[str, Any],
+    quantized: Mapping[str, dict[str, Any]],
+    surviving: Mapping[str, Any],
+    dtype: torch.dtype,
+    materialized_source_bytes: int,
+) -> tuple[int, int]:
+    """Return net split growth and peak bytes while keeping decode locals out of later cast phases."""
+    dequant_delta = 0
+    dequant_peak = 0
+    for path, marker in quantized.items():
+        if path in surviving:
+            continue
+        weight = sd.get(f"{path}.weight")
+        if weight is None:
+            continue
+        layout = marker_layout(marker)
+        elements = weight.nelement() * (2 if layout.packed_int4 else 1)
+        output_bytes = elements * dtype.itemsize
+        old_bytes = weight.nelement() * weight.element_size()
+        scale = sd.get(f"{path}.weight_scale")
+        if scale is not None:
+            old_bytes += scale.nelement() * scale.element_size()
+            if weight.dim() == 2 and weight.shape[0] > DEQUANTIZE_ROWS_PER_PASS:
+                chunk_rows = min(DEQUANTIZE_ROWS_PER_PASS, weight.shape[0])
+                chunk_weight = weight[:chunk_rows]
+                chunk_scale = scale[:chunk_rows] if scale.dim() == 2 and scale.shape[0] == weight.shape[0] else scale
+                # Chunked decoding allocates the full result before the per-pass scratch; the helper sizes only
+                # that one chunk, so keep the result allocation in this phase explicitly.
+                transient_peak = output_bytes + _dequantize_convrot_peak_bytes(
+                    chunk_weight, chunk_scale, dtype, packed_int4=layout.packed_int4, convrot=layout.convrot
+                )
+            else:
+                transient_peak = _dequantize_convrot_peak_bytes(
+                    weight, scale, dtype, packed_int4=layout.packed_int4, convrot=layout.convrot
+                )
+        else:
+            transient_peak = output_bytes
+        dequant_peak = max(dequant_peak, materialized_source_bytes + dequant_delta + transient_peak)
+        dequant_delta += output_bytes - old_bytes
+    return dequant_delta, dequant_peak
 
 
 def reject_foreign_quantization_scales(

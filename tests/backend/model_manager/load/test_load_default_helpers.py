@@ -6,12 +6,14 @@ passes through (`put_in_eval_mode`) or in one shared resolver (`resolve_submodel
 
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import MagicMock
 
 import pytest
 import torch
 
 from invokeai.backend.model_manager.load.load_default import put_in_eval_mode, resolve_submodel_path
-from invokeai.backend.model_manager.taxonomy import SubModelType
+from invokeai.backend.model_manager.load.model_cache.model_cache import CacheClearResult, ModelCache
+from invokeai.backend.model_manager.taxonomy import ModelFormat, ModelType, SubModelType
 
 
 class TestPutInEvalMode:
@@ -199,3 +201,56 @@ class TestGetSizeFs:
         config = SimpleNamespace(path=str(tmp_path), repo_variant=None, submodels=None)
 
         assert self._loader().get_size_fs(config, tmp_path, SubModelType.TextEncoder) == 0
+
+    def test_qwen_vl_checkpoint_tokenizer_does_not_size_the_checkpoint(self, tmp_path: Path) -> None:
+        """The checkpoint is unrelated to the vendored tokenizer loaded for this component."""
+        checkpoint = tmp_path / "qwen_vl.safetensors"
+        with checkpoint.open("wb") as file:
+            file.truncate(8 * 2**30)
+        config = SimpleNamespace(
+            path=str(checkpoint),
+            repo_variant=None,
+            type=ModelType.QwenVLEncoder,
+            format=ModelFormat.Checkpoint,
+        )
+
+        assert self._loader().get_size_fs(config, checkpoint, SubModelType.Tokenizer) == 0
+        assert self._loader().get_size_fs(config, checkpoint, SubModelType.TextEncoder) == 8 * 2**30
+
+
+def test_cold_load_refuses_before_model_construction_when_host_headroom_is_insufficient(tmp_path: Path) -> None:
+    """A fixed cache cap must not let a large CPU construction run into a smaller live host budget."""
+    from invokeai.backend.model_manager.load.load_default import ModelLoader
+
+    cache = ModelCache(
+        execution_device_working_mem_gb=1.0,
+        enable_partial_loading=False,
+        keep_ram_copy_of_weights=True,
+        execution_device="cpu",
+        storage_device="cpu",
+        logger=MagicMock(),
+    )
+    loader = ModelLoader.__new__(ModelLoader)
+    loader._ram_cache = cache
+    loader._app_config = SimpleNamespace(log_memory_usage=False)
+    loader._logger = MagicMock()
+    loader._get_model_path = lambda _config: tmp_path  # type: ignore[method-assign]
+    loader.get_size_fs = lambda *_args: 25 * 2**30  # type: ignore[method-assign]
+    loader._load_model = MagicMock(return_value=object())  # type: ignore[method-assign]
+    cache.make_room = MagicMock(return_value=CacheClearResult(0, 0, False, False))  # type: ignore[method-assign]
+    config = SimpleNamespace(
+        base="base",
+        type="type",
+        name="model",
+        key="model",
+        path=str(tmp_path),
+        repo_variant=None,
+        submodels=None,
+    )
+
+    try:
+        with pytest.raises(MemoryError, match="host memory"):
+            loader._load_and_cache(config)
+        loader._load_model.assert_not_called()  # type: ignore[attr-defined]
+    finally:
+        cache.shutdown()

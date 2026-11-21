@@ -435,7 +435,7 @@ class TestHeaderFirstRead:
                 yield Handle(handle)
 
         loader = loader or _make_loader()
-        loader._ram_cache.make_room.side_effect = lambda size: events.append(("reserve", size))
+        loader._ram_cache.make_room.side_effect = lambda size, **_kwargs: events.append(("reserve", size))
         dtype = torch.float32 if "int8" in path.name else torch.bfloat16
         with patch.object(safetensors, "safe_open", safe_open), patch.object(safetensors.torch, "safe_open", safe_open):
             model = _load(path, loader=loader, dtype=dtype)
@@ -770,7 +770,8 @@ class TestInt8Convrot:
                 expected += tensor.numel() * 1 + tensor.shape[0] * torch.float32.itemsize
             else:
                 expected += tensor.numel() * torch.bfloat16.itemsize
-        loader._ram_cache.make_room.assert_called_once_with(expected)
+        loader._ram_cache.make_room.assert_called_once()
+        assert loader._ram_cache.make_room.call_args.args == (expected,)
 
     def test_fp8_storage_leaves_the_int8_buffers_alone(self, tmp_path: Path) -> None:
         """The loader ends in the FP8 Storage pass for every path. It walks parameters and an ``Int8ConvrotLinear``
@@ -1132,7 +1133,8 @@ class TestScaledFp8:
                 expected += tensor.numel() * 1 + torch.float32.itemsize
             else:
                 expected += tensor.numel() * torch.float32.itemsize
-        loader._ram_cache.make_room.assert_called_once_with(expected)
+        loader._ram_cache.make_room.assert_called_once()
+        assert loader._ram_cache.make_room.call_args.args == (expected,)
 
     def test_kept_layers_are_read_after_the_one_reservation_and_stay_as_stored(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -1275,4 +1277,5 @@ class TestScaledFp8:
         grid = 128 * (128 // MX_BLOCK) * torch.float32.itemsize
         rows = 128 if slab_rows is None else slab_rows
         fold = 3 * rows * 128 * torch.float32.itemsize + (0 if slab_rows is None else rows * torch.int64.itemsize)
-        loader._ram_cache.make_room.assert_called_once_with(held + grid + fold)
+        loader._ram_cache.make_room.assert_called_once()
+        assert loader._ram_cache.make_room.call_args.args == (held + grid + fold,)

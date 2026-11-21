@@ -19,7 +19,9 @@ TOTAL = 16 * 2**30
 def test_a_gpu_decode_flips_at_the_share_of_its_devices_memory(fraction):
     device = torch.device("cuda", 1)
     boundary = fraction * TOTAL
-    with patch("torch.cuda.get_device_properties", return_value=MagicMock(total_memory=TOTAL)) as props:
+    with patch(
+        "torch.cuda.get_device_properties", return_value=MagicMock(total_memory=TOTAL, is_integrated=False)
+    ) as props:
         assert should_pretile_vae_decode(device, math.floor(boundary), fraction) is False
         assert should_pretile_vae_decode(device, math.ceil(boundary) + 1, fraction) is True
     props.assert_called_with(device)  # the VAE's own device, not whichever is current
@@ -34,10 +36,24 @@ def test_a_decode_off_the_gpu_is_never_tiled_on_these_grounds(device_type):
 def test_1024px_stays_untiled_on_an_8gb_card_and_1536px_tiles_on_16gb():
     """The share is chosen so common sizes keep the exact single-pass decode: a Qwen-Image VAE decode at 1024px
     (~5.7 GiB) on an 8 GiB card stays untiled; a FLUX VAE decode at 1536px on ROCm (~15.8 GiB) tiles on 16 GiB."""
-    with patch("torch.cuda.get_device_properties", return_value=MagicMock(total_memory=8 * 2**30)):
+    with patch("torch.cuda.get_device_properties", return_value=MagicMock(total_memory=8 * 2**30, is_integrated=False)):
         assert not should_pretile_vae_decode(torch.device("cuda"), 1024 * 1024 * 2 * 2900, VAE_PRETILE_VRAM_FRACTION)
-    with patch("torch.cuda.get_device_properties", return_value=MagicMock(total_memory=TOTAL)):
+    with patch("torch.cuda.get_device_properties", return_value=MagicMock(total_memory=TOTAL, is_integrated=False)):
         assert should_pretile_vae_decode(torch.device("cuda"), 1536 * 1536 * 2 * 3600, VAE_PRETILE_VRAM_FRACTION)
+
+
+def test_an_integrated_cuda_decode_uses_current_host_headroom(monkeypatch: pytest.MonkeyPatch) -> None:
+    headroom = 8 * 2**30
+    monkeypatch.setattr(torch.version, "hip", None)
+    monkeypatch.setattr("invokeai.backend.util.vae_working_memory.device_is_integrated", lambda _device: True)
+    monkeypatch.setattr(
+        "invokeai.backend.util.vae_working_memory.TorchDevice.memory_available_to_process",
+        classmethod(lambda _cls, _device: 12 * 2**30),
+    )
+    monkeypatch.setattr(torch.cuda, "memory_allocated", lambda _device: 4 * 2**30)
+
+    assert should_pretile_vae_decode(torch.device("cuda"), math.floor(0.9 * headroom)) is False
+    assert should_pretile_vae_decode(torch.device("cuda"), math.ceil(0.9 * headroom) + 1) is True
 
 
 def test_the_pretile_gate_uses_the_memory_the_device_will_keep_resident(monkeypatch):
@@ -57,7 +73,9 @@ def test_the_pretile_gate_uses_the_memory_the_device_will_keep_resident(monkeypa
     budget_bytes = int(12.5 * 2**30)
     estimate = 1408 * 1408 * 2 * 3600  # 13.3 GiB: under 90% of the card, over the budget
 
-    monkeypatch.setattr("torch.cuda.get_device_properties", lambda device: MagicMock(total_memory=total_bytes))
+    monkeypatch.setattr(
+        "torch.cuda.get_device_properties", lambda device: MagicMock(total_memory=total_bytes, is_integrated=False)
+    )
     # This process has allocated nothing yet, so its residency cannot lift the ceiling above the budget.
     monkeypatch.setattr("invokeai.backend.util.wddm.local_video_memory", lambda device: (budget_bytes, 0))
     monkeypatch.setattr("invokeai.backend.util.wddm.paged_bytes", lambda device: 0)
@@ -76,7 +94,9 @@ def test_a_budget_below_our_own_residency_does_not_tile_a_decode_that_fits(monke
     total_bytes = 16 * 2**30
     estimate = 7 * 2**30
 
-    monkeypatch.setattr("torch.cuda.get_device_properties", lambda device: MagicMock(total_memory=total_bytes))
+    monkeypatch.setattr(
+        "torch.cuda.get_device_properties", lambda device: MagicMock(total_memory=total_bytes, is_integrated=False)
+    )
     monkeypatch.setattr("invokeai.backend.util.wddm.local_video_memory", lambda device: (int(7.6 * 2**30), 12 * 2**30))
     monkeypatch.setattr("invokeai.backend.util.wddm.paged_bytes", lambda device: 0)  # alone: nothing paged out
 
@@ -89,7 +109,9 @@ def test_a_decode_beyond_both_the_budget_and_our_residency_is_tiled(monkeypatch)
     total_bytes = 16 * 2**30
     estimate = int(8.93 * 2**30)  # a Qwen-Image 1024px decode peak
 
-    monkeypatch.setattr("torch.cuda.get_device_properties", lambda device: MagicMock(total_memory=total_bytes))
+    monkeypatch.setattr(
+        "torch.cuda.get_device_properties", lambda device: MagicMock(total_memory=total_bytes, is_integrated=False)
+    )
     monkeypatch.setattr(
         "invokeai.backend.util.wddm.local_video_memory", lambda device: (int(7.55 * 2**30), int(8.2 * 2**30))
     )
@@ -103,7 +125,9 @@ QWEN_1024_DECODE = int(8.93 * 2**30)
 
 
 def _windows_rocm(monkeypatch, budget: float, usage: float | None, paged: float | None) -> None:
-    monkeypatch.setattr("torch.cuda.get_device_properties", lambda device: MagicMock(total_memory=16 * 2**30))
+    monkeypatch.setattr(
+        "torch.cuda.get_device_properties", lambda device: MagicMock(total_memory=16 * 2**30, is_integrated=False)
+    )
     usage_bytes = None if usage is None else int(usage * 2**30)
     monkeypatch.setattr(
         "invokeai.backend.util.wddm.local_video_memory", lambda device: (int(budget * 2**30), usage_bytes)
@@ -140,7 +164,9 @@ def test_the_card_total_stands_when_windows_does_not_answer(monkeypatch):
     """Off Windows ROCm, and whenever the driver cannot answer, the rule is the card's own size."""
     total_bytes = 16 * 2**30
 
-    monkeypatch.setattr("torch.cuda.get_device_properties", lambda device: MagicMock(total_memory=total_bytes))
+    monkeypatch.setattr(
+        "torch.cuda.get_device_properties", lambda device: MagicMock(total_memory=total_bytes, is_integrated=False)
+    )
     monkeypatch.setattr("invokeai.backend.util.wddm.local_video_memory", lambda device: None)
 
     assert should_pretile_vae_decode(torch.device("cuda", 0), 7 * 2**30) is False

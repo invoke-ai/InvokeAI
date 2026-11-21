@@ -209,9 +209,10 @@ def test_the_transformer_keeps_nvfp4_packed_and_scaled_fp8_only_where_something_
     fp8_weight = 128 * 64 * (COMPUTE_DTYPE.itemsize if mode == "fold" else 1)
     dense = (128 + 256) + 128 + (128 * 64 + 128)
     recovered_scale = torch.tensor(0.5).element_size()
-    loader._ram_cache.make_room.assert_called_once_with(
-        packed + fp8_weight + dense * COMPUTE_DTYPE.itemsize + recovered_scale
-    )
+    loader._ram_cache.make_room.assert_called_once()
+    call = loader._ram_cache.make_room.call_args
+    assert call.args == (packed + fp8_weight + dense * COMPUTE_DTYPE.itemsize + recovered_scale,)
+    assert call.kwargs["host_bytes_needed"] > 0
 
 
 class _TinyQwenVL(torch.nn.Module):
@@ -296,7 +297,10 @@ def test_the_encoder_keeps_marker_named_nvfp4_layers_packed_under_their_transfor
     packed = 2 * _packed_bytes(128, 64)
     widened = 128 + 32 * 64 + (4 * 8 + 4)
     recovered_scale = torch.tensor(0.5).element_size()
-    loader._ram_cache.make_room.assert_called_once_with(packed + widened * COMPUTE_DTYPE.itemsize + recovered_scale)
+    loader._ram_cache.make_room.assert_called_once()
+    call = loader._ram_cache.make_room.call_args
+    assert call.args == (packed + widened * COMPUTE_DTYPE.itemsize + recovered_scale,)
+    assert call.kwargs["host_bytes_needed"] > 0
 
 
 #: The shared encoder seam computes in float32; the int8 cells need bf16, since a blanket cast to it is what would ruin

@@ -58,7 +58,7 @@ from invokeai.backend.quantization.dequantizing_linear import peak_dequant_trans
 from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import RectifiedFlowInpaintExtension
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import WanConditioningInfo
-from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.devices import TorchDevice, device_is_integrated
 from invokeai.backend.util.fp8 import peak_fp8_cast_transient_bytes
 from invokeai.backend.util.sage_attention import sage_attention_scope
 from invokeai.backend.wan.memory_optimization import wan_memory_optimization
@@ -73,11 +73,14 @@ WAN_MAX_RESIDENT_TRANSFORMER_BYTES = 2 * 2**30
 
 
 def _get_wan_transformer_working_mem_bytes(device: torch.device, *, enabled: bool) -> int | None:
-    """Reserve all but 2 GiB of VRAM so partial-load Wan weights target about 2 GiB resident."""
+    """Reserve all but 2 GiB of available memory so partial-load Wan weights target about 2 GiB resident."""
     if not enabled or device.type != "cuda":
         return None
 
-    total_vram = torch.cuda.get_device_properties(device).total_memory
+    if torch.version.hip is None and device_is_integrated(device) is True:
+        total_vram = TorchDevice.memory_available_to_process(device) - torch.cuda.memory_allocated(device)
+    else:
+        total_vram = torch.cuda.get_device_properties(device).total_memory
     if total_vram <= WAN_MAX_RESIDENT_TRANSFORMER_BYTES:
         return None
     return total_vram - WAN_MAX_RESIDENT_TRANSFORMER_BYTES

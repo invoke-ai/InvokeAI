@@ -1,3 +1,4 @@
+import inspect
 import json
 import math
 import re
@@ -19,6 +20,7 @@ from invokeai.backend.quantization.int8_convrot import (
     marker_layout,
 )
 from invokeai.backend.util.logging import InvokeAILogger
+from invokeai.backend.util.ram import require_ram_headroom
 
 logger = InvokeAILogger.get_logger()
 
@@ -403,11 +405,24 @@ _UNQUANTIZED_GGML_TYPES = frozenset(
 _UNPACK_CHUNK_ELEMENTS = 1 << 24
 
 
+def _reserve(reserve: Callable[[int], Any], cache_bytes: int, host_bytes_needed: int) -> Any:
+    """Pass incremental host demand while preserving one-argument reserve callbacks."""
+    try:
+        parameters = inspect.signature(reserve).parameters.values()
+    except (TypeError, ValueError):
+        parameters = ()
+    if any(parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in parameters) or any(
+        parameter.name == "host_bytes_needed" for parameter in parameters
+    ):
+        return reserve(cache_bytes, host_bytes_needed=host_bytes_needed)  # type: ignore[call-arg]
+    return reserve(cache_bytes)
+
+
 def unpack_ggml_at_load(
     sd: dict[str, torch.Tensor],
     model: torch.nn.Module,
     skip_patterns: tuple[str, ...],
-    reserve: Callable[[int], None],
+    reserve: Callable[[int], Any],
 ) -> int:
     """Replace, in `sd`, the GGUF tensors that must not -- or need not -- stay packed. Returns the count.
 
@@ -423,9 +438,10 @@ def unpack_ggml_at_load(
     dequantized on every forward -- for a 53248-wide BF16 projection, a measured 1.87 GB transient
     per call.
 
-    The reservation is absolute, because `make_room` makes that much room rather than adding to the
+    The cache reservation is absolute, because `make_room` makes that much room rather than adding to the
     file-size reservation the framework made before the loader ran: everything that stays packed at
-    its packed size, everything replaced at its unpacked size, and one replacement in flight. BF16 is
+    its packed size, everything replaced at its unpacked size, and one replacement in flight. Host admission
+    is incremental because the GGUF reader already copied packed tensors into RAM. BF16 is
     reinterpreted rather than run through the GGML kernel, which widens through int32 and float32 on
     the way -- about 8 bytes per element. What is in flight beside a result is the packed original it
     replaces and, for a quantized tensor, the temporaries of one row slice (see `_unpack`).
@@ -453,7 +469,21 @@ def unpack_ggml_at_load(
         if key not in unpacked
     )
     in_flight = max((_in_flight_bytes(sd[key]) for key in keys), default=0)
-    reserve(kept + sum(unpacked.values()) + in_flight)
+    reserved_bytes = kept + sum(unpacked.values()) + in_flight
+    unpack_scratch = max(
+        (_in_flight_bytes(sd[key]) - sd[key].quantized_data.nbytes for key in keys),
+        default=0,
+    )
+    # BF16-to-BF16 unpacking is a view of the mapped payload, so it adds no host allocation.
+    zero_copy = {
+        key
+        for key in keys
+        if sd[key]._ggml_quantization_type is gguf.GGMLQuantizationType.BF16 and sd[key].compute_dtype is torch.bfloat16
+    }
+    host_bytes_needed = (
+        sum(bytes_needed for key, bytes_needed in unpacked.items() if key not in zero_copy) + unpack_scratch
+    )
+    require_ram_headroom(_reserve(reserve, reserved_bytes, host_bytes_needed), host_bytes_needed)
     # One at a time, so each packed original is released as its replacement lands.
     for key in keys:
         sd[key] = _unpack(sd[key])

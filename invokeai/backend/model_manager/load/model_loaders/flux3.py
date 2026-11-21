@@ -189,6 +189,8 @@ def flux3_transformer_from_single_file(
             skip_patterns=skip_patterns,
             fp8_layers=fp8_layers,
             nvfp4_payloads=nvfp4_payloads,
+            source_tensors_retained=bool(fp8_layers and not keep_fp8),
+            modelopt_nvfp4_relayout=modelopt,
         )
         mapped = dict(sd) if fp8_layers and not keep_fp8 else None
         if fp8_layers and not keep_fp8:

@@ -76,6 +76,7 @@ from invokeai.backend.quantization.nvfp4 import (
     NVFP4Payload,
     install_nvfp4_layers,
     pop_nvfp4_layers,
+    predict_nvfp4_install_host_size,
     predict_nvfp4_install_size,
     split_nvfp4_rows,
 )
@@ -622,6 +623,7 @@ class ZImageCheckpointModel(ModelLoader):
                 reserve=self._ram_cache.make_room,
                 skip_patterns=skip_patterns,
                 extra_reserved_bytes=nvfp4_bytes,
+                extra_host_bytes=predict_nvfp4_install_host_size(model, nvfp4_payloads, model_dtype, skip_patterns),
             )
             # What did not stay int8 was widened to the compute dtype, so a load that kept far fewer
             # layers than the file marked is the explanation for a resident size twice what the file
@@ -1292,6 +1294,7 @@ class Qwen3EncoderCheckpointLoader(ModelLoader):
                 reserve=self._ram_cache.make_room,
                 skip_patterns=skip_patterns,
                 extra_reserved_bytes=nvfp4_bytes,
+                extra_host_bytes=predict_nvfp4_install_host_size(model, nvfp4_payloads, model_dtype, skip_patterns),
             )
             logger.info(f"Kept {len(kept)} of {len(int8_markers)} layer(s) in int8 (dequantized per forward)")
         else:

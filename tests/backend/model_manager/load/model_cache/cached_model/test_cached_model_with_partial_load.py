@@ -1,10 +1,12 @@
 import itertools
+from unittest.mock import MagicMock, patch
 
 import pytest
 import torch
 
 from invokeai.backend.model_manager.load.model_cache.cached_model.cached_model_with_partial_load import (
     CachedModelWithPartialLoad,
+    HostMemoryAdmissionError,
 )
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch_module_autocast import (
     apply_custom_layers_to_model,
@@ -95,6 +97,24 @@ def test_a_tied_group_with_a_required_member_is_kept_on_the_device():
     assert freed_bytes == 0
     assert model.required.is_meta
     assert model.linear.weight.is_meta
+
+
+def test_partial_unload_checks_selected_host_bytes_before_transfer():
+    """Host admission prices the selected tensors, not the full resident partial model."""
+    with torch.device("meta"):
+        model = torch.nn.Sequential(torch.nn.Linear(4, 4), torch.nn.Linear(4, 2))
+    cached_model = CachedModelWithPartialLoad(model=model, compute_device=torch.device("meta"), keep_ram_copy=False)
+    cached_model.full_load_to_vram()
+    selected_bytes = calc_tensor_size(model[0].weight) + calc_tensor_size(model[0].bias)
+    moved = patch.object(cached_model, "_load_state_dict_with_device_conversion", MagicMock())
+    with moved as transfer:
+        with pytest.raises(HostMemoryAdmissionError):
+            cached_model.partial_unload_from_vram(selected_bytes, host_bytes_available=selected_bytes - 1)
+        transfer.assert_not_called()
+        assert (
+            cached_model.partial_unload_from_vram(selected_bytes, host_bytes_available=selected_bytes) == selected_bytes
+        )
+        transfer.assert_called_once()
 
 
 @parameterize_mps_and_cuda

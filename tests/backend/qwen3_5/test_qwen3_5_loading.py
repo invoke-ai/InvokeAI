@@ -134,7 +134,8 @@ def test_a_multimodal_export_loads_its_language_model_and_never_reads_the_vision
 
     _assert_loaded(model, weights)
     assert [key for key in tensors_read if not key.startswith("language_model.")] == []
-    loader._ram_cache.make_room.assert_called_once_with(_bytes(weights))
+    loader._ram_cache.make_room.assert_called_once()
+    assert loader._ram_cache.make_room.call_args.args == (_bytes(weights),)
 
 
 def test_shards_load_as_one_checkpoint(tmp_path: Path, loader, tensors_read: list[str]) -> None:
@@ -152,7 +153,8 @@ def test_shards_load_as_one_checkpoint(tmp_path: Path, loader, tensors_read: lis
 
     _assert_loaded(model, weights)
     assert [key for key in tensors_read if key.startswith("visual.")] == []
-    loader._ram_cache.make_room.assert_called_once_with(_bytes(weights))
+    loader._ram_cache.make_room.assert_called_once()
+    assert loader._ram_cache.make_room.call_args.args == (_bytes(weights),)
 
 
 def test_a_checkpoint_without_its_final_norm_is_refused_when_the_norm_is_read(tmp_path: Path, loader) -> None:
@@ -194,7 +196,8 @@ def test_anima_3_8b_s_encoder_runs_its_last_layer_attention_only(tmp_path: Path,
     (expected,) = reference(input_ids, (_LAST,), last_layer_attention_only=True)
     (output,) = model(input_ids, (_LAST,))
     torch.testing.assert_close(output, expected)
-    loader._ram_cache.make_room.assert_called_once_with(_bytes(weights))
+    loader._ram_cache.make_room.assert_called_once()
+    assert loader._ram_cache.make_room.call_args.args == (_bytes(weights),)
 
 
 @pytest.mark.parametrize(
@@ -312,8 +315,9 @@ def test_an_int8_whole_model_file_computes_what_its_dequantized_weights_compute(
     torch.testing.assert_close(output, expected, rtol=1e-4, atol=1e-5)
     # One reservation, for what the load ends with: marked Linears stay one byte per weight, and the activation
     # scales are not loaded.
-    loader._ram_cache.make_room.assert_called_once_with(
-        sum(t.nelement() * t.element_size() for t in model.state_dict().values())
+    loader._ram_cache.make_room.assert_called_once()
+    assert loader._ram_cache.make_room.call_args.args == (
+        sum(t.nelement() * t.element_size() for t in model.state_dict().values()),
     )
 
 

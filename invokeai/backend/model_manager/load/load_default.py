@@ -27,6 +27,8 @@ from invokeai.backend.model_manager.load.model_util import calc_model_size_by_fs
 from invokeai.backend.model_manager.load.optimizations import skip_torch_weight_init
 from invokeai.backend.model_manager.taxonomy import (
     AnyModel,
+    ModelFormat,
+    ModelType,
     SubModelType,
 )
 from invokeai.backend.quantization.fp8_scaled import count_fp8_weights, should_keep_fp8_weights
@@ -438,7 +440,12 @@ class ModelLoader(ModelLoaderBase):
                 # peak) so the surge can be attributed without guessing.
                 log_mem = self._app_config.log_memory_usage
                 ram_before = MemorySnapshot.capture().process_ram if log_mem else 0
-                self._ram_cache.make_room(self.get_size_fs(config, Path(config.path), submodel_type))
+                ram_admission = self._ram_cache.make_room(self.get_size_fs(config, Path(config.path), submodel_type))
+                if getattr(ram_admission, "ram_headroom_satisfied", True) is False:
+                    raise MemoryError(
+                        f"Insufficient host memory to construct model '{cache_key}'; "
+                        "close other applications or load a smaller model."
+                    )
                 ram_after_room = MemorySnapshot.capture().process_ram if log_mem else 0
                 with skip_torch_weight_init():
                     loaded_model = put_in_eval_mode(self._load_model(config, submodel_type))
@@ -491,6 +498,15 @@ class ModelLoader(ModelLoaderBase):
         self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
     ) -> int:
         """Get the size of the model on disk."""
+        # Single-file Qwen2.5-VL checkpoints use InvokeAI's vendored tokenizer. The tokenizer
+        # request never reads the checkpoint itself, so charging this file here can refuse a
+        # prompt-only load despite the actual tokenizer having no checkpoint-sized allocation.
+        if (
+            submodel_type == SubModelType.Tokenizer
+            and getattr(config, "type", None) == ModelType.QwenVLEncoder
+            and getattr(config, "format", None) == ModelFormat.Checkpoint
+        ):
+            return 0
         # Size the folder the model will actually be loaded from. This has to track
         # `resolve_submodel_path`, or a pipeline whose index calls its CLIP encoder `clip_encoder`
         # gets sized at the non-existent `text_encoder/` — 0 bytes — and `make_room()` reserves
@@ -787,8 +803,8 @@ class ModelLoader(ModelLoaderBase):
         The exit puts back the *same tensors*, rather than re-quantizing to the storage dtype. Both
         end with a param of the storage dtype, and the difference is the whole point:
 
-        - `.to(storage_dtype)` allocates new storage. `CachedModelWithPartialLoad` keeps
-          `_cpu_state_dict = model.state_dict()` (the `keep_ram_copy_of_weights` default), so after
+        - `.to(storage_dtype)` allocates new storage. When `keep_ram_copy_of_weights` is enabled,
+          `CachedModelWithPartialLoad` keeps `_cpu_state_dict = model.state_dict()`, so after
           the first forward the param pointed at a private copy while that RAM copy pinned the
           original — both live, 2 bytes per element for every param still CPU-resident, against a
           budget snapshotted at `put()` that still said 1. It healed only when the model moved to

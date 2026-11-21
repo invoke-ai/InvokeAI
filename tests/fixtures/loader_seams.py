@@ -124,7 +124,7 @@ def prepare(
         served.append(dict(state_dict or {}))
         return served[-1]
 
-    def make_room(reserve: int) -> None:
+    def make_room(reserve: int, **_kwargs: Any) -> None:
         if not run.reserved and served:
             run.dtypes_at_make_room = {key: value.dtype for key, value in served[-1].items()}
         run.reserved.append(reserve)

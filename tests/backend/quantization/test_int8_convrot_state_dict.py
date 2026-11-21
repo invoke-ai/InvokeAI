@@ -7,6 +7,8 @@ surface as a model that loads cleanly and generates noise.
 """
 
 import weakref
+from types import SimpleNamespace
+from typing import Any
 
 import pytest
 import torch
@@ -14,6 +16,7 @@ from safetensors.torch import save_file
 
 from invokeai.backend.quantization.int8_convrot import (
     CONVROT_GROUP_SIZE,
+    DEQUANTIZE_ROWS_PER_PASS,
     Int4ConvrotLinear,
     Int8ConvrotLinear,
     cast_unquantized,
@@ -460,6 +463,23 @@ class TestTheSharedInstall:
         # And the split did run afterwards, or the assertion above would pass vacuously.
         assert sd["widens.weight"].dtype is torch.float32
 
+    def test_failed_ram_admission_stops_before_the_split_allocates(self) -> None:
+        sd = {**self._int8_layer("keeps"), **self._int8_layer("widens")}
+        model = self._model()
+
+        with pytest.raises(MemoryError, match="host memory"):
+            install_int8_convrot_layers(
+                model,
+                sd,
+                {"keeps": MARKER, "widens": MARKER},
+                torch.float32,
+                architecture="Z-Image",
+                reserve=lambda _bytes: SimpleNamespace(ram_headroom_satisfied=False),
+            )
+
+        assert sd["widens.weight"].dtype is torch.int8
+        assert type(model.widens) is torch.nn.Linear
+
     def test_only_the_surviving_layers_are_installed_and_returned(self) -> None:
         """A marker on a layer the split widened must not reach the swap: it would install an
         `Int8ConvrotLinear` over a weight that is no longer int8."""
@@ -502,6 +522,192 @@ class TestTheSharedInstall:
         scale = 4 * 4
         assert reserved == [codes + scale + 4096]
 
+    def test_dequantization_reserves_float32_intermediate_peak_as_host_demand(self) -> None:
+        model = self._model()
+        sd = self._int8_layer("widens")
+        asked: list[tuple[int, dict[str, int]]] = []
+
+        def reserve(bytes_needed: int, **kwargs: int) -> None:
+            asked.append((bytes_needed, kwargs))
+
+        install_int8_convrot_layers(
+            model,
+            sd,
+            {"widens": MARKER},
+            torch.float32,
+            architecture="Z-Image",
+            reserve=reserve,
+            skip_patterns=("widens",),
+        )
+
+        expected_output = 4 * CONVROT_GROUP_SIZE * torch.float32.itemsize
+        expected_peak = 2 * expected_output
+        assert asked == [(expected_output, {"host_bytes_needed": expected_peak})]
+
+    def test_one_dimensional_norm_weight_is_admitted_and_decoded(self) -> None:
+        model = torch.nn.Module()
+        model.norm = torch.nn.LayerNorm(4)
+        sd = {"norm.weight": torch.ones(4, dtype=torch.int8), "norm.weight_scale": torch.ones(())}
+        asked: list[tuple[int, dict[str, int]]] = []
+
+        def reserve(bytes_needed: int, **kwargs: int) -> None:
+            asked.append((bytes_needed, kwargs))
+
+        install_int8_convrot_layers(
+            model,
+            sd,
+            {"norm": {"format": "int8_tensorwise", "convrot": False}},
+            torch.float32,
+            architecture="test",
+            reserve=reserve,
+            skip_patterns=("norm",),
+        )
+
+        assert sd["norm.weight"].shape == (4,)
+        assert sd["norm.weight"].dtype is torch.float32
+        assert asked == [(16, {"host_bytes_needed": 32})]
+
+    def test_long_one_dimensional_norm_does_not_use_matrix_chunking(self) -> None:
+        length = DEQUANTIZE_ROWS_PER_PASS + 1
+        model = torch.nn.Module()
+        model.norm = torch.nn.LayerNorm(length)
+        sd = {"norm.weight": torch.ones(length, dtype=torch.int8), "norm.weight_scale": torch.ones(())}
+        asked: list[tuple[int, dict[str, int]]] = []
+
+        def reserve(bytes_needed: int, **kwargs: int) -> None:
+            asked.append((bytes_needed, kwargs))
+
+        install_int8_convrot_layers(
+            model,
+            sd,
+            {"norm": {"format": "int8_tensorwise", "convrot": False}},
+            torch.float32,
+            architecture="test",
+            reserve=reserve,
+            skip_patterns=("norm",),
+        )
+
+        output_bytes = length * torch.float32.itemsize
+        assert asked == [(output_bytes, {"host_bytes_needed": 2 * output_bytes})]
+
+    def test_higher_rank_scalar_scale_weight_is_admitted_and_decoded(self) -> None:
+        model = torch.nn.Module()
+        model.conv = torch.nn.Identity()
+        sd = {"conv.weight": torch.ones(2, 3, 4, 5, dtype=torch.int8), "conv.weight_scale": torch.ones(())}
+        asked: list[tuple[int, dict[str, int]]] = []
+
+        def reserve(bytes_needed: int, **kwargs: int) -> None:
+            asked.append((bytes_needed, kwargs))
+
+        install_int8_convrot_layers(
+            model,
+            sd,
+            {"conv": {"format": "int8_tensorwise", "convrot": False}},
+            torch.float32,
+            architecture="test",
+            reserve=reserve,
+            skip_patterns=("conv",),
+        )
+
+        assert sd["conv.weight"].shape == (2, 3, 4, 5)
+        assert sd["conv.weight"].dtype is torch.float32
+        assert asked == [(2 * 3 * 4 * 5 * 4, {"host_bytes_needed": 2 * 3 * 4 * 5 * 8})]
+
+    def test_cast_estimator_drops_replaced_sources_before_the_next_cast(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        import invokeai.backend.quantization.int8_convrot as int8_module
+
+        model = torch.nn.Module()
+        sd = {"first.weight": torch.zeros(64), "second.weight": torch.zeros(64)}
+        refs = {key: weakref.ref(value) for key, value in sd.items()}
+
+        def cast_and_check(state_dict: dict[str, torch.Tensor], dtype: torch.dtype, quantized: dict) -> None:
+            state_dict["first.weight"] = state_dict["first.weight"].to(dtype)
+            assert refs["first.weight"]() is None
+            state_dict["second.weight"] = state_dict["second.weight"].to(dtype)
+
+        monkeypatch.setattr(int8_module, "cast_unquantized", cast_and_check)
+        install_int8_convrot_layers(
+            model,
+            sd,
+            {},
+            torch.bfloat16,
+            architecture="test",
+            reserve=lambda _bytes: None,
+        )
+
+        assert refs["second.weight"]() is None
+
+    def test_mixed_split_drops_int8_sources_before_dense_cast(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        import weakref
+
+        import invokeai.backend.quantization.int8_convrot as int8_module
+
+        model = self._model()
+        sd = {**self._int8_layer("widens"), "dense.weight": torch.zeros(64)}
+        refs = {key: weakref.ref(value) for key, value in sd.items()}
+        original_cast = int8_module.cast_unquantized
+
+        def cast_and_check(state_dict: dict[str, torch.Tensor], dtype: torch.dtype, quantized: dict) -> None:
+            assert refs["widens.weight"]() is None
+            assert refs["widens.weight_scale"]() is None
+            original_cast(state_dict, dtype, quantized)
+
+        monkeypatch.setattr(int8_module, "cast_unquantized", cast_and_check)
+        install_int8_convrot_layers(
+            model,
+            sd,
+            {"widens": MARKER},
+            torch.bfloat16,
+            architecture="test",
+            reserve=lambda _bytes: None,
+            skip_patterns=("widens",),
+        )
+
+    @pytest.mark.parametrize("extra_host_bytes", [0, 4096])
+    def test_extra_nvfp4_cache_target_does_not_imply_host_demand(self, extra_host_bytes: int) -> None:
+        asked: list[tuple[int, dict[str, int]]] = []
+
+        def reserve(bytes_needed: int, **kwargs: int) -> None:
+            asked.append((bytes_needed, kwargs))
+
+        install_int8_convrot_layers(
+            self._model(),
+            self._int8_layer("keeps"),
+            {"keeps": MARKER},
+            torch.float32,
+            architecture="Krea-2",
+            reserve=reserve,
+            extra_reserved_bytes=4096,
+            extra_host_bytes=extra_host_bytes,
+        )
+
+        assert asked == [(4096 + 4 * CONVROT_GROUP_SIZE + 4 * 4, {"host_bytes_needed": extra_host_bytes})]
+
+    def test_multiple_dequantizations_charge_cumulative_growth(self) -> None:
+        model = self._model()
+        model.second = torch.nn.Linear(CONVROT_GROUP_SIZE, 4, bias=False)
+        sd = {**self._int8_layer("widens"), **self._int8_layer("second")}
+        asked: list[tuple[int, dict[str, int]]] = []
+
+        def reserve(bytes_needed: int, **kwargs: int) -> None:
+            asked.append((bytes_needed, kwargs))
+
+        install_int8_convrot_layers(
+            model,
+            sd,
+            {"widens": MARKER, "second": MARKER},
+            torch.float32,
+            architecture="Z-Image",
+            reserve=reserve,
+            skip_patterns=("widens", "second"),
+        )
+
+        final_bytes = 2 * 4 * CONVROT_GROUP_SIZE * torch.float32.itemsize
+        intermediate_peak = 2 * 4 * CONVROT_GROUP_SIZE * torch.float32.itemsize
+        net_growth_before_second = 4 * CONVROT_GROUP_SIZE * 4 - 4 * CONVROT_GROUP_SIZE - 4 * 4
+        expected_host = intermediate_peak + net_growth_before_second
+        assert asked == [(final_bytes, {"host_bytes_needed": expected_host})]
+
     def test_a_mixed_int8_and_int4_file_installs_each_layer_in_its_own_storage(self) -> None:
         """The published int4 builds are all mixed: some layers int8, the sensitive ones kept wider. Each layer is
         installed as its marker declares and charged as stored -- half a byte per weight for the packed one."""
@@ -530,7 +736,10 @@ class TestTheSharedInstall:
         model = self._model()
         int4 = quantize_convrot_int4(torch.randn(4, CONVROT_GROUP_SIZE))
         sd = {"widens.weight": int4.packed, "widens.weight_scale": int4.scale}
-        reserved: list[int] = []
+        reserved: list[tuple[int, dict[str, int]]] = []
+
+        def reserve(bytes_needed: int, **kwargs: int) -> None:
+            reserved.append((bytes_needed, kwargs))
 
         surviving = install_int8_convrot_layers(
             model,
@@ -538,13 +747,71 @@ class TestTheSharedInstall:
             {"widens": int4_tensorwise_marker()},
             torch.float32,
             architecture="Krea-2",
-            reserve=reserved.append,
+            reserve=reserve,
             skip_patterns=("widens",),
         )
 
         assert surviving == {}
-        assert reserved == [4 * CONVROT_GROUP_SIZE * 4]
+        expected_output = 4 * CONVROT_GROUP_SIZE * 4
+        assert reserved == [(expected_output, {"host_bytes_needed": 3 * expected_output})]
         assert torch.allclose(sd["widens.weight"], int4.dequantized, atol=1e-5)
+
+    @pytest.mark.parametrize(
+        ("marker", "expected_multiplier"),
+        [(int4_tensorwise_marker(), 6), (int4_tensorwise_marker(convrot=False), 5)],
+        ids=["convrot", "unrotated"],
+    )
+    def test_packed_int4_non_fp32_output_keeps_unpack_storage_in_the_peak(
+        self, marker: dict[str, Any], expected_multiplier: int
+    ) -> None:
+        model = self._model()
+        int4 = quantize_convrot_int4(torch.randn(4, CONVROT_GROUP_SIZE))
+        sd = {"widens.weight": int4.packed, "widens.weight_scale": int4.scale}
+        asked: list[tuple[int, dict[str, int]]] = []
+
+        def reserve(bytes_needed: int, **kwargs: int) -> None:
+            asked.append((bytes_needed, kwargs))
+
+        install_int8_convrot_layers(
+            model,
+            sd,
+            {"widens": marker},
+            torch.bfloat16,
+            architecture="Krea-2",
+            reserve=reserve,
+            skip_patterns=("widens",),
+        )
+
+        output_bytes = 4 * CONVROT_GROUP_SIZE * torch.bfloat16.itemsize
+        assert asked == [(output_bytes, {"host_bytes_needed": expected_multiplier * output_bytes})]
+
+    def test_tall_int8_decode_charges_full_result_plus_one_chunk_scratch(self) -> None:
+        rows = DEQUANTIZE_ROWS_PER_PASS + 1
+        columns = CONVROT_GROUP_SIZE
+        model = torch.nn.Module()
+        model.widens = torch.nn.Linear(columns, rows, bias=False)
+        sd = {
+            "widens.weight": torch.ones(rows, columns, dtype=torch.int8),
+            "widens.weight_scale": torch.ones(rows, 1),
+        }
+        asked: list[tuple[int, dict[str, int]]] = []
+
+        def reserve(bytes_needed: int, **kwargs: int) -> None:
+            asked.append((bytes_needed, kwargs))
+
+        install_int8_convrot_layers(
+            model,
+            sd,
+            {"widens": MARKER},
+            torch.bfloat16,
+            architecture="Z-Image",
+            reserve=reserve,
+            skip_patterns=("widens",),
+        )
+
+        full_output = rows * columns * torch.bfloat16.itemsize
+        chunk_float = DEQUANTIZE_ROWS_PER_PASS * columns * torch.float32.itemsize
+        assert asked == [(full_output, {"host_bytes_needed": full_output + 2 * chunk_float})]
 
     def test_a_header_read_never_holds_more_than_the_reservation(self) -> None:
         """A loader that hands over the file's header has each payload read after the reservation, which charges a
@@ -575,23 +842,49 @@ class TestTheSharedInstall:
             handed_out.append(weakref.ref(payload))
             return payload
 
+        def reserve(bytes_needed: int, **kwargs: int) -> None:
+            reserved.append((bytes_needed, kwargs))
+
         install_int8_convrot_layers(
             model,
             sd,
             {"keeps": MARKER},
             torch.bfloat16,
             architecture="Wan 2.2",
-            reserve=reserved.append,
+            reserve=reserve,
             read=read,
         )
         held.append(held_bytes())
 
         # Spelled out: int8 codes and their float32 scale as stored, the dense tensors at bf16's two bytes.
-        assert reserved == [4 * width + 4 * 4 + (width * width + width) * 2]
-        assert max(held) <= reserved[0]
+        expected = 4 * width + 4 * 4 + (width * width + width) * 2
+        expected_host = 4 * width + 4 * 4 + width * width * 4 + width * width * 2
+        assert reserved == [(expected, {"host_bytes_needed": expected_host})]
+        assert max(held) <= reserved[0][0]
         assert sd["dense.weight"].dtype is torch.bfloat16 and sd["dense.bias"].dtype is torch.bfloat16
         assert sd["keeps.weight"].dtype is torch.int8 and sd["keeps.weight_scale"].dtype is torch.float32
         assert torch.equal(sd["dense.weight"], stored["dense.weight"].to(torch.bfloat16))
+
+    def test_same_dtype_header_read_charges_one_resident_tensor(self) -> None:
+        model = self._model()
+        stored = {"dense.weight": torch.randn(4, 4)}
+        sd = {key: tensor.to("meta") for key, tensor in stored.items()}
+        asked: list[tuple[int, dict[str, int]]] = []
+
+        def reserve(bytes_needed: int, **kwargs: int) -> None:
+            asked.append((bytes_needed, kwargs))
+
+        install_int8_convrot_layers(
+            model,
+            sd,
+            {},
+            torch.float32,
+            architecture="test",
+            reserve=reserve,
+            read=lambda key: stored[key].clone(),
+        )
+
+        assert asked == [(64, {"host_bytes_needed": 64})]
 
 
 def test_read_comfy_quant_markers_reads_a_marker_off_a_file(tmp_path) -> None:

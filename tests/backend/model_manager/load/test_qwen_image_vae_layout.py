@@ -105,7 +105,8 @@ def test_the_original_layout_is_converted_and_float16_is_raised_to_bfloat16() ->
     assert {tensor.dtype for tensor in loaded.values()} == {torch.bfloat16}
 
     loader._ram_cache.make_room.assert_called_once_with(  # type: ignore[attr-defined]
-        sum(tensor.nelement() * tensor.element_size() for tensor in loaded.values())
+        sum(tensor.nelement() * tensor.element_size() for tensor in loaded.values()),
+        host_bytes_needed=4,
     )
     assert result is wan.return_value
 

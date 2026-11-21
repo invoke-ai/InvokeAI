@@ -12,7 +12,7 @@ from diffusers.models.autoencoders.autoencoder_tiny import AutoencoderTiny
 from invokeai.app.invocations.constants import LATENT_SCALE_FACTOR
 from invokeai.backend.util import wddm
 from invokeai.backend.util.attention import sdpa_score_matrix_bytes
-from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.devices import TorchDevice, device_is_integrated
 from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.backend.util.vae_tiling_scope import diffusers_tile, scoped_vae_tile
 from invokeai.backend.working_memory.estimate import FeatureValue, WorkingMemoryEstimate, WorkingMemoryTerm
@@ -29,15 +29,17 @@ VAE_PRETILE_VRAM_FRACTION = 0.9
 def should_pretile_vae_decode(
     device: torch.device, full_decode_bytes: int, vram_fraction: float = VAE_PRETILE_VRAM_FRACTION
 ) -> bool:
-    """Whether a decode should be tiled up front because its untiled working memory would claim more than
-    ``vram_fraction`` of the memory ``device`` will keep resident.
+    """Whether a decode should be tiled up front because its untiled working memory exceeds a share of the memory
+    budget available to ``device``.
 
     Waiting for an out-of-memory error does not work everywhere: on Windows, drivers page an allocation that does not
     fit into system memory instead of failing it (always for ROCm, by default for NVIDIA's sysmem fallback), and the
     decode just runs very slowly. ``device`` is where the VAE runs: a ``cpu_only`` VAE (and MPS, sharing system
     memory) is never tiled on these grounds.
 
-    On Windows the ceiling is the video-memory budget rather than the card's nameplate total -- the budget is the point
+    For integrated NVIDIA CUDA, the ceiling is current host headroom because CUDA's device total does not describe
+    available physical memory. On Windows with dedicated CUDA, the ceiling is the video-memory budget rather than the
+    card's nameplate total -- the budget is the point
     past which Windows pages this process out. With one correction: a budget *below* what this process keeps resident is
     Windows asking it to trim itself, and the cache does exactly that to honour the reservation, so the ceiling is then
     that residency. Measured on an RX 9060 XT (16 GB): with Invoke holding 12 GiB and nothing else on the card the
@@ -57,15 +59,18 @@ def should_pretile_vae_decode(
     page, and the end-of-session paging warning is what surfaces it.
     """
     if device.type == "cuda":
-        total_bytes = torch.cuda.get_device_properties(device).total_memory
-        local = wddm.local_video_memory(device)
-        if local is not None:
-            budget_bytes, usage_bytes = local
-            ceiling_bytes = budget_bytes
-            paged = wddm.paged_bytes(device) if usage_bytes is not None else None
-            if paged is not None:
-                ceiling_bytes = max(budget_bytes, usage_bytes - paged)
-            total_bytes = min(total_bytes, ceiling_bytes)
+        if torch.version.hip is None and device_is_integrated(device) is True:
+            total_bytes = TorchDevice.memory_available_to_process(device) - torch.cuda.memory_allocated(device)
+        else:
+            total_bytes = torch.cuda.get_device_properties(device).total_memory
+            local = wddm.local_video_memory(device)
+            if local is not None:
+                budget_bytes, usage_bytes = local
+                ceiling_bytes = budget_bytes
+                paged = wddm.paged_bytes(device) if usage_bytes is not None else None
+                if paged is not None:
+                    ceiling_bytes = max(budget_bytes, usage_bytes - paged)
+                total_bytes = min(total_bytes, ceiling_bytes)
     elif device.type == "xpu":
         total_bytes = torch.xpu.get_device_properties(device).total_memory
     else:

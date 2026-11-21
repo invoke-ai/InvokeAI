@@ -1,6 +1,6 @@
 ---
 title: Manual Installation
-lastUpdated: 2026-10-25
+lastUpdated: 2026-11-19
 ---
 
 import { LinkCard, Steps, LinkButton } from '@astrojs/starlight/components'
@@ -117,7 +117,10 @@ The following commands vary depending on the version of Invoke being installed a
 
         For example `invokeai[cuda]` for a 30xx series GPU or newer, or `invokeai[cuda,xformers]` for a 16xx or 20xx series GPU.
       </SetupVariant>
-      <SetupVariant gpu="amd intel none apple arm64" label="Every setup except NVIDIA">
+      <SetupVariant os="windows" gpu="arm64">
+        For an RTX Spark, use `invokeai[cuda]` to install NVIDIA's pinned PyTorch 2.14/CUDA 13.4 build and matching Triton 3.8. Do not use a torch backend; use the NVIDIA index options in step 7.
+      </SetupVariant>
+      <SetupVariant gpu="amd intel none apple" label="Every setup except NVIDIA">
         Use `invokeai` without extras. The `cuda` extra is only for `--torch-backend=cu130` (Nvidia GPU on Windows x64 or Linux x86_64): it pins PyTorch's CUDA 13 build, which no other backend provides. The `xformers` extra is only for Nvidia 16xx or 20xx series GPUs.
       </SetupVariant>
       </SetupSwitch>

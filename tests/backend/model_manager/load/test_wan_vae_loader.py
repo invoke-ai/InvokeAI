@@ -92,3 +92,21 @@ def test_wan_vae_checkpoint_loads_bfloat16_even_when_loader_dtype_is_fp16() -> N
     loaded_sd = fake_model.load_state_dict.call_args.args[0]
     assert loaded_sd["decoder.weight"].dtype == torch.bfloat16
     assert loaded_sd["step_counter"].dtype == torch.int64  # non-float buffers untouched
+
+
+def test_wan_vae_same_dtype_does_not_reserve_checkpoint_again() -> None:
+    loader = VAELoader.__new__(VAELoader)
+    loader._ram_cache = MagicMock()
+    loader._ram_cache.make_room.return_value = MagicMock(ram_headroom_satisfied=True)
+    loader._torch_dtype = torch.bfloat16
+    config = MagicMock(path="wan-vae.safetensors", latent_channels=16)
+    sd = {"decoder.weight": torch.zeros(2, 2, dtype=torch.bfloat16)}
+    fake_model = MagicMock()
+    with (
+        patch("safetensors.torch.load_file", return_value=sd),
+        patch("diffusers.models.autoencoders.autoencoder_kl_wan.AutoencoderKLWan", return_value=fake_model),
+        patch("invokeai.backend.wan.rocm_causal_conv3d.patch_wan_causal_conv3d_for_rocm"),
+    ):
+        loader._load_wan_vae(config)
+
+    loader._ram_cache.make_room.assert_called_once_with(8, host_bytes_needed=0)

@@ -465,6 +465,55 @@ def predict_nvfp4_install_size(
     )
 
 
+def predict_nvfp4_install_host_size(
+    model: torch.nn.Module,
+    payloads: Mapping[str, NVFP4Payload],
+    dtype: torch.dtype,
+    skip_patterns: Iterable[str] = (),
+) -> int:
+    """Peak decoded output plus decode scratch, cumulative across decoded layers; packed layers alias their payloads."""
+    patterns = tuple(skip_patterns)
+    completed_outputs = 0
+    peak = 0
+    for path, payload in payloads.items():
+        if _stays_packed(model, path, payload, patterns):
+            continue
+        output_bytes = payload.out_features * payload.in_features * dtype.itemsize
+        transient_bytes = NVFP4Linear(
+            payload.weight, payload.weight_scale, payload.weight_scale_2
+        ).dequant_transient_bytes(dtype)
+        peak = max(peak, completed_outputs + transient_bytes)
+        completed_outputs += output_bytes
+    return peak
+
+
+def predict_modelopt_nvfp4_relayout_host_size(payloads: Mapping[str, NVFP4Payload]) -> int:
+    """Peak extra host bytes while relaying out ModelOpt payload copies.
+
+    Each packed weight is built from two shifted temporaries and a result before the old payload is replaced;
+    the scale-grid copy is then built while that result remains live. Split views sharing one backing storage keep
+    earlier replacement outputs alive, so their peak is cumulative; independent payloads remain separate phases.
+    """
+    groups: dict[tuple[int, int], list[NVFP4Payload]] = {}
+    for payload in payloads.values():
+        key = (payload.weight.untyped_storage().data_ptr(), payload.weight_scale.untyped_storage().data_ptr())
+        groups.setdefault(key, []).append(payload)
+
+    peak = 0
+    for group in groups.values():
+        completed = 0
+        for payload in group:
+            weight_bytes = payload.weight.nbytes
+            scale_bytes = payload.weight_scale.nbytes
+            peak = max(
+                peak,
+                completed + 3 * weight_bytes,
+                completed + weight_bytes + scale_bytes,
+            )
+            completed += weight_bytes + scale_bytes
+    return peak
+
+
 def install_nvfp4_layers(
     model: torch.nn.Module,
     sd: dict[str, Any],

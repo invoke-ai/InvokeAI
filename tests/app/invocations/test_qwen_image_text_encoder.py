@@ -5,6 +5,7 @@ import json
 import threading
 import traceback
 import weakref
+from contextlib import contextmanager
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
@@ -15,6 +16,7 @@ from PIL import Image
 from safetensors.torch import save_file
 from transformers import Qwen2_5_VLConfig, Qwen2_5_VLForConditionalGeneration
 
+import invokeai.app.invocations.text_encoder.qwen_image_text_encoder as qwen_image_text_encoder_module
 from invokeai.app.invocations.fields import ImageField
 from invokeai.app.invocations.model import ModelIdentifierField, QwenVLEncoderField
 from invokeai.app.invocations.text_encoder.qwen_image_text_encoder import (
@@ -373,6 +375,32 @@ class TestQuantizedEncoderLoad:
         assert returned_device == device
         context.logger.warning.assert_not_called()
         cleanup()
+
+    def test_integrated_cuda_admission_spans_room_and_quantized_allocation(self, tmp_path: Path):
+        events: list[str] = []
+        context, _ = self._make_context(tmp_path, events)
+        device = torch.device("cuda:0")
+
+        @contextmanager
+        def admission_guard(guard_device: torch.device):
+            assert guard_device == device
+            events.append("admission-enter")
+            yield
+            events.append("admission-exit")
+
+        def fake_from_pretrained(path, **kwargs):
+            events.append("from_pretrained")
+            assert _write_lock_held()
+            return MagicMock()
+
+        with (
+            patch.object(qwen_image_text_encoder_module, "integrated_cuda_admission_lock", admission_guard),
+            patch.object(Qwen2_5_VLForConditionalGeneration, "from_pretrained", side_effect=fake_from_pretrained),
+            patch.object(TorchDevice, "choose_torch_device", return_value=device),
+        ):
+            self._make_invocation("int8")._load_quantized_encoder(context)
+
+        assert events == ["admission-enter", "make_room", "from_pretrained", "admission-exit"]
 
     def test_checkpoint_is_read_outside_the_model_load_lock(self, tmp_path: Path):
         """The disk read is the slow part of the load on anything but NVMe, and while MODEL_LOAD_LOCK is held (or

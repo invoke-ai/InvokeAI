@@ -85,9 +85,11 @@ from invokeai.backend.quantization.nvfp4 import (
     NVFP4_FORMAT,
     install_nvfp4_layers,
     pop_nvfp4_layers,
+    predict_nvfp4_install_host_size,
     predict_nvfp4_install_size,
 )
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.ram import require_ram_headroom, state_dict_cast_bytes
 from invokeai.backend.util.state_dict_loading import load_state_dict_ignoring_extras, reject_incomplete_load
 
 _TRANSFORMER_SUPPORTED_NOTE = (
@@ -225,7 +227,11 @@ class _LTX2ComponentLoading:
 
     def _reserve_for_cast(self, sd: dict[str, torch.Tensor], dtype: torch.dtype) -> None:
         """Reserve what the cast to ``dtype`` will leave resident, before any tensor widens."""
-        self._ram_cache.make_room(predict_cast_state_dict_size(sd, dtype, keep_fp8=False))
+        reserved_bytes = predict_cast_state_dict_size(sd, dtype, keep_fp8=False)
+        _, additional_bytes = state_dict_cast_bytes(sd, dtype, in_place=True)
+        require_ram_headroom(
+            self._ram_cache.make_room(reserved_bytes, host_bytes_needed=additional_bytes), additional_bytes
+        )
 
     def _build_dense(
         self, factory: Callable[[], torch.nn.Module], sd: dict[str, torch.Tensor], what: str, dtype: torch.dtype
@@ -368,6 +374,7 @@ class _LTX2ComponentLoading:
                 reserve=self._ram_cache.make_room,
                 skip_patterns=skip_patterns,
                 extra_reserved_bytes=nvfp4_bytes,
+                extra_host_bytes=predict_nvfp4_install_host_size(model, nvfp4_payloads, model_dtype, skip_patterns),
             )
             self._logger.info(
                 f"{what}: kept {len(quantized)} of {len(int8_markers)} layer(s) in int8 "
@@ -656,7 +663,11 @@ class LTX2Gemma4EncoderModel(ModelLoader):
                 model, sd, int8_markers, model_dtype, architecture="LTX-2 Gemma-4", reserve=self._ram_cache.make_room
             )
         else:
-            self._ram_cache.make_room(predict_cast_state_dict_size(sd, model_dtype, keep_fp8=False))
+            reserved_bytes = predict_cast_state_dict_size(sd, model_dtype, keep_fp8=False)
+            _, additional_bytes = state_dict_cast_bytes(sd, model_dtype, in_place=True)
+            require_ram_headroom(
+                self._ram_cache.make_room(reserved_bytes, host_bytes_needed=additional_bytes), additional_bytes
+            )
             cast_state_dict(sd, model_dtype, keep_fp8=False)
 
         _assign_gemma4_tower(model, sd, what)

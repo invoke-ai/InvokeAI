@@ -32,6 +32,7 @@ from invokeai.backend.quantization.fp8_scaled import reject_quantized_side_chann
 from invokeai.backend.quantization.sdnq.detection import is_sdnq_folder
 from invokeai.backend.quantization.sdnq.loaders import raise_on_incomplete_sdnq_load, sdnq_sd_loader
 from invokeai.backend.sd3.vae import get_sd3_vae_diffusers_config
+from invokeai.backend.util.ram import require_ram_headroom, state_dict_cast_bytes
 from invokeai.backend.util.state_dict_loading import load_state_dict_ignoring_extras
 
 
@@ -315,8 +316,11 @@ class VAELoader(GenericDiffusersLoader):
         reject_quantized_side_channel(sd, f"Qwen-Image-2.1 VAE checkpoint {name}")
         if is_comfy_vae_layout(sd):
             sd = convert_comfy_vae_to_diffusers(sd)
+        reserved_bytes, additional_bytes = state_dict_cast_bytes(sd, dtype, in_place=False)
+        require_ram_headroom(
+            self._ram_cache.make_room(reserved_bytes, host_bytes_needed=additional_bytes), additional_bytes
+        )
         sd = {k: v.to(dtype) if v.is_floating_point() else v for k, v in sd.items()}
-        self._ram_cache.make_room(sum(t.nelement() * t.element_size() for t in sd.values()))
 
         with accelerate.init_empty_weights():
             model = AutoencoderKLQwenImage21()
@@ -393,12 +397,13 @@ class VAELoader(GenericDiffusersLoader):
         sd = _read_checkpoint(config.path)
         reject_quantized_side_channel(sd, f"Wan VAE checkpoint {Path(config.path).name}")
 
+        new_sd_size, additional_bytes = state_dict_cast_bytes(sd, dtype, in_place=True)
+        require_ram_headroom(
+            self._ram_cache.make_room(new_sd_size, host_bytes_needed=additional_bytes), additional_bytes
+        )
         for k in list(sd.keys()):
             if sd[k].is_floating_point():
                 sd[k] = sd[k].to(dtype)
-
-        new_sd_size = sum(t.nelement() * t.element_size() for t in sd.values())
-        self._ram_cache.make_room(new_sd_size)
 
         init_kwargs = _wan_vae_init_kwargs_for(config.latent_channels)
         with accelerate.init_empty_weights():
@@ -462,11 +467,13 @@ class VAELoader(GenericDiffusersLoader):
         sd = _read_checkpoint(path)
         reject_quantized_side_channel(sd, f"Wan VAE checkpoint {Path(path).name}")
         sd = convert_wan_vae_to_diffusers(sd)
+        reserved_bytes, additional_bytes = state_dict_cast_bytes(sd, dtype, in_place=True)
+        require_ram_headroom(
+            self._ram_cache.make_room(reserved_bytes, host_bytes_needed=additional_bytes), additional_bytes
+        )
         for k in list(sd.keys()):
             if sd[k].is_floating_point():
                 sd[k] = sd[k].to(dtype)
-
-        self._ram_cache.make_room(sum(t.nelement() * t.element_size() for t in sd.values()))
 
         with accelerate.init_empty_weights():
             model = AutoencoderKLWan(z_dim=16)
@@ -517,12 +524,13 @@ class VAELoader(GenericDiffusersLoader):
 
         # The same autoencoder as the Wan-family layout above, so the same precision policy.
         dtype = _wan_family_dtype(self._torch_dtype)
+        new_sd_size, additional_bytes = state_dict_cast_bytes(sd, dtype, in_place=True)
+        require_ram_headroom(
+            self._ram_cache.make_room(new_sd_size, host_bytes_needed=additional_bytes), additional_bytes
+        )
         for k in list(sd.keys()):
             if sd[k].is_floating_point():
                 sd[k] = sd[k].to(dtype)
-
-        new_sd_size = sum(t.nelement() * t.element_size() for t in sd.values())
-        self._ram_cache.make_room(new_sd_size)
 
         with accelerate.init_empty_weights():
             model = AutoencoderKLQwenImage()

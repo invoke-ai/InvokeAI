@@ -18,6 +18,7 @@ from types import SimpleNamespace
 from typing import Any
 from unittest.mock import MagicMock, patch
 
+import anyio
 import pytest
 from fastapi import FastAPI, HTTPException, Response
 from fastapi.testclient import TestClient
@@ -899,7 +900,9 @@ def _drive_upload(
             result["headers"] = [(name.lower(), value.lower()) for name, value in message["headers"]]
             result["sent_at_response"] = sent
 
-    asyncio.run(asyncio.wait_for(middleware(_upload_scope() if scope is None else scope, receive, send), timeout=5))  # type: ignore[arg-type]
+    anyio.run(
+        lambda: asyncio.wait_for(middleware(_upload_scope() if scope is None else scope, receive, send), timeout=5)
+    )  # type: ignore[arg-type]
     return result["status"], result["headers"], result["sent_at_response"], len(chunks)
 
 
@@ -909,9 +912,11 @@ def _real_upload_app() -> FastAPI:
 
     app = FastAPI()
     app.include_router(videos.videos_router, prefix="/api")
-    app.dependency_overrides[get_current_user_or_default] = lambda: TokenData(
-        user_id="user", email="user@example.com", is_admin=False
-    )
+
+    async def fake_current_user() -> TokenData:
+        return TokenData(user_id="user", email="user@example.com", is_admin=False)
+
+    app.dependency_overrides[get_current_user_or_default] = fake_current_user
     return app
 
 

@@ -17,6 +17,10 @@ from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custo
 from invokeai.backend.util.logging import InvokeAILogger
 
 
+class HostMemoryAdmissionError(torch.OutOfMemoryError):
+    """Host-memory refusal raised before a device-to-host transfer begins."""
+
+
 class CachedModelWithPartialLoad:
     """A wrapper around a PyTorch model to handle partial loads and unloads between the CPU and the compute device.
 
@@ -497,7 +501,12 @@ class CachedModelWithPartialLoad:
         return vram_bytes_loaded, truncated
 
     @torch.no_grad()
-    def partial_unload_from_vram(self, vram_bytes_to_free: int, keep_required_weights_in_vram: bool = False) -> int:
+    def partial_unload_from_vram(
+        self,
+        vram_bytes_to_free: int,
+        keep_required_weights_in_vram: bool = False,
+        host_bytes_available: int | None = None,
+    ) -> int:
         """Unload weights from VRAM until vram_bytes_to_free bytes are freed. Or the entire model is unloaded.
 
         :param keep_required_weights_in_vram: If True, any weights that must be kept in VRAM to run the model will be
@@ -533,6 +542,12 @@ class CachedModelWithPartialLoad:
                 continue
 
             vram_bytes_freed += self._select_with_aliases(keys_to_offload, key)
+
+        available = max(host_bytes_available, 0) if host_bytes_available is not None else None
+        if available is not None and vram_bytes_freed > available:
+            raise HostMemoryAdmissionError(
+                f"Unloading {vram_bytes_freed} bytes to host memory needs more than the {available} bytes available."
+            )
 
         with self._transfer_operation():
             if len(keys_to_offload) > 0:

@@ -14,7 +14,7 @@ from invokeai.backend.architectures import LatentSpace, resolve_latent_space
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.configs.tiny_autoencoder import named_tiny_autoencoder_space
 from invokeai.backend.model_manager.load.load_base import LoadedModel
-from invokeai.backend.model_manager.load.model_cache.model_cache import MODEL_LOAD_LOCK
+from invokeai.backend.model_manager.load.model_cache.model_cache import MODEL_LOAD_LOCK, integrated_cuda_admission_lock
 from invokeai.backend.model_manager.starter_models import STARTER_MODELS, StarterModel
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
 from invokeai.backend.tiny_autoencoder.decoder import TinyAutoencoderDecoder
@@ -257,8 +257,9 @@ class TinyAutoencoderPreviews:
         so `_resolve` checks residency again after locking.
 
         The offload is a VRAM move, so it holds MODEL_LOAD_LOCK's read lock like every other: a construction on
-        another worker would otherwise strand the offloaded weights on `meta`. Taken before the cache's own lock,
-        per the lock order, and only around the offload -- `load_model` and the lock take it themselves.
+        another worker would otherwise strand the offloaded weights on `meta`. Integrated-CUDA admission wraps
+        MODEL_LOAD_LOCK and the cache's own lock, matching the cache and quantized-loader entry points; only the
+        offload is inside these locks -- `load_model` and the lock take them themselves.
         """
         if loaded.compute_device.type == "cpu":
             return True
@@ -266,8 +267,9 @@ class TinyAutoencoderPreviews:
         if missing <= 0:
             return True
         ram_cache = self._services.model_manager.load.ram_cache
-        with MODEL_LOAD_LOCK.read_lock():
-            available = ram_cache.make_room_in_vram(missing, working_mem_bytes=working_mem_bytes)
+        with integrated_cuda_admission_lock(loaded.compute_device):
+            with MODEL_LOAD_LOCK.read_lock():
+                available = ram_cache.make_room_in_vram(missing, working_mem_bytes=working_mem_bytes)
         return available >= missing
 
     def _report_missing(self, base_model: BaseModelType, space: LatentSpace) -> None:

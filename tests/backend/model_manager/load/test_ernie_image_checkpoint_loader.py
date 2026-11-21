@@ -120,6 +120,18 @@ def test_a_single_file_loads_into_the_model_it_describes(monkeypatch: pytest.Mon
     assert ram_cache.make_room.call_args.args[0] > 0
 
 
+def test_failed_ram_admission_stops_before_the_checkpoint_cast(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(loader_module, "ERNIE_IMAGE_TRANSFORMER_CONFIG", TINY_TRANSFORMER_CONFIG)
+    checkpoint = tmp_path / "ernie-image.safetensors"
+    _tiny_checkpoint(checkpoint)
+    loader, ram_cache = _loader(monkeypatch)
+    ram_cache.make_room.return_value = SimpleNamespace(ram_headroom_satisfied=False)
+    config = Main_Checkpoint_ErnieImage_Config.model_construct(path=str(checkpoint), name="ernie-image")
+
+    with pytest.raises(MemoryError, match="host memory"):
+        loader._load_model(config, SubModelType.Transformer)
+
+
 def test_the_checkpoint_refuses_submodels_it_does_not_contain(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """A single file holds the transformer alone. An old workflow wired to take a VAE out of the
     main model has to be told what to do instead, not handed a shape error."""
