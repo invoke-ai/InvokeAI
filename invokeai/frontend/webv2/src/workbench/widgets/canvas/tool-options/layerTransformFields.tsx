@@ -5,7 +5,6 @@ import { Box, Flex, Stack } from '@chakra-ui/react';
 import { AspectRatioLockButton } from '@features/generation/components';
 import { IconButton } from '@platform/ui/Button';
 import {
-  flipTransform,
   hittableLayerRect,
   layerPointToDocument,
   localHandlePoint,
@@ -16,6 +15,7 @@ import {
   scaleForLength,
   transformedSize,
 } from '@workbench/canvas-engine/api';
+import { useNotify } from '@workbench/useNotify';
 import {
   useCanvasActiveTool,
   useCanvasDocumentEditingLocked,
@@ -25,7 +25,7 @@ import {
 } from '@workbench/widgets/canvas/engineStoreHooks';
 import { FormNumberField, useNumberCommit } from '@workbench/widgets/canvas/tool-presentation/FormControls';
 import { PropertyControlRow, PropertyRowLabel } from '@workbench/widgets/canvas/tool-presentation/PropertyPrimitives';
-import { usePreparedCommit } from '@workbench/widgets/canvas/useStructuralCommit';
+import { reportStructuralCommit, usePreparedCommit } from '@workbench/widgets/canvas/useStructuralCommit';
 import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import { TrianglesCenterlineDashedVerticalIcon, TrianglesCenterlineDashedHorizontalIcon } from 'lucide-react';
 import { type ReactNode, useCallback, useMemo } from 'react';
@@ -60,6 +60,7 @@ type Axis = 'x' | 'y';
 export const useLayerTransformEditor = (engine: ToolFormProps['engine'], labelKey = 'widgets.transform.edit') => {
   const { t } = useTranslation();
   const commitPrepared = usePreparedCommit(engine);
+  const notify = useNotify();
   const session = useTransformSession(engine);
   const options = useTransformOptions(engine);
   const activeTool = useCanvasActiveTool(engine);
@@ -148,11 +149,18 @@ export const useLayerTransformEditor = (engine: ToolFormProps['engine'], labelKe
   );
   const flip = useCallback(
     (direction: 'horizontal' | 'vertical') => {
-      if (transform && rect) {
-        patch(flipTransform(transform, rect, direction));
+      if (!editable || !layer || !rect) {
+        return;
+      }
+      const label = t(
+        direction === 'horizontal' ? 'widgets.transform.flipHorizontal' : 'widgets.transform.flipVertical'
+      );
+      const result = engine.layers.flipLayer(layer.id, direction, label);
+      if (result.status !== 'previewed') {
+        reportStructuralCommit(result, notify.error, t);
       }
     },
-    [patch, rect, transform]
+    [editable, engine, layer, notify, rect, t]
   );
   const setRotation = useCallback(
     (degrees: number) => {

@@ -25,9 +25,7 @@ import {
   canMergeSelectedRasters,
   getDocumentIndex,
   getDocumentLayer,
-  flipTransform,
   getSourceContentRect,
-  hittableLayerRect,
   inpaintMaskMergeEligibility,
   isAdjustmentRefusal,
   isGroupNode,
@@ -52,6 +50,7 @@ import {
 import {
   describeNamedRefusal,
   reportLayerOperation,
+  reportStructuralCommit,
   usePreparedCommit,
 } from '@workbench/widgets/canvas/useStructuralCommit';
 import { useActiveProjectId, useActiveProjectSelector } from '@workbench/WorkbenchContext';
@@ -613,21 +612,15 @@ const LayerMenu = ({
 
   const handleFlip = useCallback(
     (direction: 'horizontal' | 'vertical') => {
-      const rect = hittableLayerRect(layer, document);
-      if (!rect) {
-        throw makeStatusError('empty');
+      if (!engine) {
+        throw makeStatusError('not-ready');
       }
-      const session = engine?.interaction.get('transformSession');
-      if (engine && session?.layerId === layer.id) {
-        if (session.processing) {
-          throw makeStatusError('busy');
-        }
-        engine.layers.updateTransformSession(flipTransform(session.transform, rect, direction));
-        return;
+      const result = engine.layers.flipLayer(layer.id, direction, getActionLabel(`flip-${direction}`));
+      if (result.status !== 'previewed') {
+        reportStructuralCommit(result, notify.error, t);
       }
-      patchBase(getActionLabel(`flip-${direction}`), { transform: flipTransform(layer.transform, rect, direction) });
     },
-    [document, engine, getActionLabel, layer, makeStatusError, patchBase]
+    [engine, getActionLabel, layer.id, makeStatusError, notify, t]
   );
 
   const handleSaveToBoard = useCallback(

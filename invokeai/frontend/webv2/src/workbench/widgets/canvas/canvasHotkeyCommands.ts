@@ -75,7 +75,14 @@ export const CANVAS_ONLY_HOTKEYS = [
   ['canvas.layerToBack', 'widgets.canvas.commands.layerToBack', ['mod+shift+[']],
   // No default key — assignable through the hotkeys settings; the canvas menu offers the same action.
   ['canvas.cropAllLayersToFrame', 'widgets.canvas.contextMenu.cropAllLayersToBbox', []],
+  ['canvas.flipHorizontal', 'widgets.transform.flipHorizontal', []],
+  ['canvas.flipVertical', 'widgets.transform.flipVertical', []],
 ] as const satisfies readonly HotkeyTableEntry[];
+
+const FLIP_LABEL_KEYS = {
+  horizontal: 'widgets.transform.flipHorizontal',
+  vertical: 'widgets.transform.flipVertical',
+} as const;
 
 /** Command id → document-space nudge delta (shift variants are ×10). */
 const NUDGE_DELTAS: Record<string, { dx: number; dy: number }> = {
@@ -239,6 +246,14 @@ export const executeCanvasHotkeyCommand = (commandId: string, ctx: CanvasHotkeyC
     ctx.pasteFromClipboard();
   } else if (commandId === 'canvas.cropAllLayersToFrame') {
     ctx.cropAllLayers();
+  } else if (commandId === 'canvas.flipHorizontal' || commandId === 'canvas.flipVertical') {
+    const direction = commandId === 'canvas.flipHorizontal' ? 'horizontal' : 'vertical';
+    const flipped =
+      selectedLayer && engine?.layers.flipLayer(selectedLayer.id, direction, t(FLIP_LABEL_KEYS[direction]));
+    // Like a nudge, nothing eligible selected is an expected no-op.
+    if (flipped && flipped.status !== 'previewed' && flipped.status !== 'dispatch-rejected') {
+      ctx.reportStructuralCommit(flipped);
+    }
   } else if (commandId === 'canvas.toggleNonRasterLayers') {
     // Hide overlays without disabling generation content; showing restores individually hidden nodes too.
     const overlays = index.nodes.filter((entry) => isOverlayStack(entry.stack));

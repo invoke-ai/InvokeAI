@@ -1,6 +1,7 @@
 import type {
   BeginTransformResult,
   CanvasEditRefusal,
+  FlipLayerResult,
   StructuralCommitResult,
 } from '@workbench/canvas-engine/capabilities';
 import type { CanvasDocumentContractV3, CanvasLayerContract } from '@workbench/canvas-engine/contracts';
@@ -29,9 +30,9 @@ import {
   imageDataOf,
   type SpatialRunner,
 } from '@workbench/canvas-engine/render/exactAdjustments';
-import { hittableLayerSize } from '@workbench/canvas-engine/tools/moveHitTest';
+import { hittableLayerRect, hittableLayerSize } from '@workbench/canvas-engine/tools/moveHitTest';
 import { isTransformEligible } from '@workbench/canvas-engine/tools/transformTool';
-import { bakeMatrix } from '@workbench/canvas-engine/transform/transformMath';
+import { bakeMatrix, flipTransform } from '@workbench/canvas-engine/transform/transformMath';
 
 import type { CanvasMutationContext, EditPublishResult, EditStep } from './mutationContext';
 
@@ -250,6 +251,35 @@ export class TransformEditingController {
       this.deps.pending.set(null);
       this.deps.reportRefusal('not-ready');
     }
+  }
+
+  flip(layerId: string, direction: 'horizontal' | 'vertical', label: string): FlipLayerResult {
+    const document = this.deps.getDocument();
+    const leaf = lookupDocumentLeaf(document, layerId);
+    if (this.disposed || !document) {
+      return { status: 'not-ready' };
+    }
+    const rect = leaf && !leaf.effectiveLocked ? hittableLayerRect(leaf.layer, document) : null;
+    if (!leaf || !rect) {
+      return { status: 'dispatch-rejected' };
+    }
+    const session = this.deps.session.get();
+    if (!this.deps.canEdit() || (session?.layerId === layerId && (session.processing || this.processing))) {
+      return { status: 'busy' };
+    }
+    if (session?.layerId === layerId) {
+      this.update(flipTransform(session.transform, rect, direction));
+      return { status: 'previewed' };
+    }
+    return this.deps.commitStructural(
+      label,
+      {
+        id: layerId,
+        patch: { transform: flipTransform(leaf.layer.transform, rect, direction) },
+        type: 'updateCanvasLayer',
+      },
+      { id: layerId, patch: { transform: leaf.layer.transform }, type: 'updateCanvasLayer' }
+    );
   }
 
   update(transform: LayerTransform): void {

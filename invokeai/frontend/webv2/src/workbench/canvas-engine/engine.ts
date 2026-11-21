@@ -3044,6 +3044,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     },
     applyTransform,
     beginTransform: (layerId) => editingController.transform.request(layerId),
+    flipLayer: (layerId, direction, label) => editingController.transform.flip(layerId, direction, label),
     booleanMergeRasterLayers,
     cancelTextEdit,
     cancelTransform,

@@ -489,6 +489,9 @@ export type StructuralCommitResult =
   | { status: SubsetOf<CanvasTransactionOutcome, 'stale'>; expectedRevision: number; actualRevision: number }
   | { status: 'postcondition-failed'; recovered: 'reverted' | 'reverted-unmirrored' | 'unreverted' };
 
+/** `dispatch-rejected` covers a missing or locked layer and one with no content to frame. */
+export type FlipLayerResult = StructuralCommitResult | { status: 'previewed' };
+
 export type CanvasFontReplacementResult =
   | (CanvasFontReplacementSummary & { status: 'committed' | 'unchanged' })
   | Exclude<StructuralCommitResult, { status: 'committed' }>;
@@ -728,6 +731,8 @@ export interface CanvasEngineLayerCapability extends CanvasLayerCapability {
   mergeVisibleRasterLayers(): Promise<MergeVisibleResult>;
   /** `dispatch-rejected` also covers a selection with nothing eligible to move. */
   nudgeSelectedLayer(dx: number, dy: number): StructuralCommitResult;
+  /** Mirrors about the content centre; inside that layer's transform session only the session preview flips. */
+  flipLayer(layerId: string, direction: 'horizontal' | 'vertical', label: string): FlipLayerResult;
   openTextCreate(docPoint: Vec2): void;
   openTextEdit(layerId: string): void;
   rasterizeLayer(layerId: string): Promise<RasterizeLayerResult>;
@@ -834,7 +839,6 @@ export {
   TEXT_FONT_WEIGHTS,
 } from './engineStores';
 export {
-  flipTransform,
   layerPointToDocument,
   localHandlePoint,
   moveLocalPointTo,
