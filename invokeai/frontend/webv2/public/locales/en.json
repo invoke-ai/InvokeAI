@@ -5839,6 +5839,7 @@
         "arrange": "Arrange",
         "booleanOperations": "Boolean operations",
         "convertTo": "Convert to",
+        "flip": "Flip",
         "copyTo": "Copy to",
         "addAdjustment": "Add adjustment",
         "colorLabel": "Color label"

@@ -25,7 +25,9 @@ import {
   canMergeSelectedRasters,
   getDocumentIndex,
   getDocumentLayer,
+  flipTransform,
   getSourceContentRect,
+  hittableLayerRect,
   inpaintMaskMergeEligibility,
   isAdjustmentRefusal,
   isGroupNode,
@@ -58,6 +60,7 @@ import {
   ArrowUpDownIcon,
   ChevronRightIcon,
   CopyIcon,
+  TrianglesCenterlineDashedVerticalIcon,
   MergeIcon,
   MoreVerticalIcon,
   PaletteIcon,
@@ -608,6 +611,25 @@ const LayerMenu = ({
     patchBase(getActionLabel('fit-to-bbox'), { transform });
   }, [bbox, documentRect, getActionLabel, layer, makeStatusError, patchBase]);
 
+  const handleFlip = useCallback(
+    (direction: 'horizontal' | 'vertical') => {
+      const rect = hittableLayerRect(layer, document);
+      if (!rect) {
+        throw makeStatusError('empty');
+      }
+      const session = engine?.interaction.get('transformSession');
+      if (engine && session?.layerId === layer.id) {
+        if (session.processing) {
+          throw makeStatusError('busy');
+        }
+        engine.layers.updateTransformSession(flipTransform(session.transform, rect, direction));
+        return;
+      }
+      patchBase(getActionLabel(`flip-${direction}`), { transform: flipTransform(layer.transform, rect, direction) });
+    },
+    [document, engine, getActionLabel, layer, makeStatusError, patchBase]
+  );
+
   const handleSaveToBoard = useCallback(
     async (board: LayerContextBoardChoice) => {
       if (!engine) {
@@ -909,6 +931,7 @@ const LayerMenu = ({
       extractMaskedArea: handleExtractMaskedArea,
       group: handleGroup,
       fitToBbox: handleFitToBbox,
+      flip: handleFlip,
       mergeDown: handleMerge,
       mergeMasks: handleMergeMasks,
       mergeSelected: handleMergeSelected,
@@ -944,6 +967,7 @@ const LayerMenu = ({
       handleDuplicate,
       handleExtractMaskedArea,
       handleFitToBbox,
+      handleFlip,
       handleGroup,
       handleMergeMasks,
       handleMergeSelected,
@@ -1177,6 +1201,7 @@ const SUBMENU_META: Record<LayerContextSubmenuId, { defaultLabel: string; icon: 
   'color-label': { defaultLabel: 'Color label', icon: PaletteIcon, labelKey: 'widgets.layers.menu.colorLabel' },
   'convert-to': { defaultLabel: 'Convert to', icon: ArrowRightLeftIcon, labelKey: 'widgets.layers.menu.convertTo' },
   'copy-to': { defaultLabel: 'Copy to', icon: CopyIcon, labelKey: 'widgets.layers.menu.copyTo' },
+  flip: { defaultLabel: 'Flip', icon: TrianglesCenterlineDashedVerticalIcon, labelKey: 'widgets.layers.menu.flip' },
 };
 
 /** Runs a layer action, reporting its failure; a `picker: 'board'` action runs with the board picked for it. */
