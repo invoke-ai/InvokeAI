@@ -137,6 +137,8 @@ describe('Transform adjustment bakes', () => {
           }),
           getUserToolId: () => 'transform',
           hasFloatingSelection: () => false,
+          getFloatingSelection: () => null,
+          setFloatingTransform: () => false,
           invalidate: vi.fn(),
           isGestureActive: () => false,
           peekCacheRect: (id) => h.layers.peek(id)?.rect,

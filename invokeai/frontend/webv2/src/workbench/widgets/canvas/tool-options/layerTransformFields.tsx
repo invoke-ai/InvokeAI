@@ -25,7 +25,7 @@ import {
 } from '@workbench/widgets/canvas/engineStoreHooks';
 import { FormNumberField, useNumberCommit } from '@workbench/widgets/canvas/tool-presentation/FormControls';
 import { PropertyControlRow, PropertyRowLabel } from '@workbench/widgets/canvas/tool-presentation/PropertyPrimitives';
-import { reportStructuralCommit, usePreparedCommit } from '@workbench/widgets/canvas/useStructuralCommit';
+import { reportFlipLayer, usePreparedCommit } from '@workbench/widgets/canvas/useStructuralCommit';
 import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import { TrianglesCenterlineDashedVerticalIcon, TrianglesCenterlineDashedHorizontalIcon } from 'lucide-react';
 import { type ReactNode, useCallback, useMemo } from 'react';
@@ -155,10 +155,7 @@ export const useLayerTransformEditor = (engine: ToolFormProps['engine'], labelKe
       const label = t(
         direction === 'horizontal' ? 'widgets.transform.flipHorizontal' : 'widgets.transform.flipVertical'
       );
-      const result = engine.layers.flipLayer(layer.id, direction, label);
-      if (result.status !== 'previewed') {
-        reportStructuralCommit(result, notify.error, t);
-      }
+      reportFlipLayer(engine.layers.flipLayer(layer.id, direction, label), notify.error, t);
     },
     [editable, engine, layer, notify, rect, t]
   );

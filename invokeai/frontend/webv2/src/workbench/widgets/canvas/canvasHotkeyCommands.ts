@@ -23,11 +23,13 @@ import {
   executeCanvasToolCommand,
   isCanvasToolCommand,
   mergeSelectedLayerDown,
+  showCanvasRefusalNotice,
   type CanvasToolCommandContext,
   type HotkeyTableEntry,
 } from '@workbench/widgets/canvas/canvasToolCommands';
 import {
   commitPreparedEdit,
+  isFlipLayerRefusal,
   type LayerOperationRefusal,
   type PreparedCommitOutcome,
 } from '@workbench/widgets/canvas/useStructuralCommit';
@@ -250,8 +252,11 @@ export const executeCanvasHotkeyCommand = (commandId: string, ctx: CanvasHotkeyC
     const direction = commandId === 'canvas.flipHorizontal' ? 'horizontal' : 'vertical';
     const flipped =
       selectedLayer && engine?.layers.flipLayer(selectedLayer.id, direction, t(FLIP_LABEL_KEYS[direction]));
-    // Like a nudge, nothing eligible selected is an expected no-op.
-    if (flipped && flipped.status !== 'previewed' && flipped.status !== 'dispatch-rejected') {
+    if (selected && isGroupNode(selected.node)) {
+      showCanvasRefusalNotice('flip:group', t('widgets.transform.noSelection'), t('widgets.transform.groupSelected'));
+    } else if (flipped && isFlipLayerRefusal(flipped)) {
+      ctx.reportLayerOperation(flipped.status);
+    } else if (flipped && flipped.status !== 'previewed') {
       ctx.reportStructuralCommit(flipped);
     }
   } else if (commandId === 'canvas.toggleNonRasterLayers') {

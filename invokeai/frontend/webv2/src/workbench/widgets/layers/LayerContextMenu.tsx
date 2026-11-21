@@ -50,7 +50,7 @@ import {
 import {
   describeNamedRefusal,
   reportLayerOperation,
-  reportStructuralCommit,
+  reportFlipLayer,
   usePreparedCommit,
 } from '@workbench/widgets/canvas/useStructuralCommit';
 import { useActiveProjectId, useActiveProjectSelector } from '@workbench/WorkbenchContext';
@@ -615,10 +615,11 @@ const LayerMenu = ({
       if (!engine) {
         throw makeStatusError('not-ready');
       }
-      const result = engine.layers.flipLayer(layer.id, direction, getActionLabel(`flip-${direction}`));
-      if (result.status !== 'previewed') {
-        reportStructuralCommit(result, notify.error, t);
-      }
+      reportFlipLayer(
+        engine.layers.flipLayer(layer.id, direction, getActionLabel(`flip-${direction}`)),
+        notify.error,
+        t
+      );
     },
     [engine, getActionLabel, layer.id, makeStatusError, notify, t]
   );
