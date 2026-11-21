@@ -1,6 +1,7 @@
 import gc
 import weakref
 from collections.abc import Sequence
+from types import SimpleNamespace
 
 import gguf
 import numpy as np
@@ -474,6 +475,23 @@ def test_unpacking_a_quantized_tensor_reserves_one_slice_of_temporaries_not_the_
 
     result = 37 * 512 * torch.bfloat16.itemsize
     assert reserved == [result + packed + HOST_DEQUANT_PEAK_COPIES * 3 * 512 * torch.bfloat16.itemsize]
+
+
+def test_failed_ram_admission_stops_before_unpacking(monkeypatch):
+    weight = _quantized_embedding(gguf.GGMLQuantizationType.Q4_K)
+    monkeypatch.setattr(
+        GGMLTensor,
+        "get_dequantized_tensor",
+        lambda _weight: pytest.fail("unpacking must not start after failed RAM admission"),
+    )
+
+    with pytest.raises(MemoryError, match="host memory"):
+        unpack_ggml_at_load(
+            {"embed.weight": weight},
+            torch.nn.Embedding(37, 512, device="meta"),
+            (),
+            lambda _bytes: SimpleNamespace(ram_headroom_satisfied=False),
+        )
 
 
 def _tensor_names_through_reader(path):

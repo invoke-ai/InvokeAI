@@ -2,6 +2,7 @@
 
 import logging
 from contextlib import contextmanager
+from threading import Event, RLock, Thread, get_ident
 from types import SimpleNamespace
 
 import numpy as np
@@ -382,6 +383,92 @@ def test_the_fit_check_offloads_under_the_model_load_read_lock_and_loads_and_loc
 
     assert load.model_load_lock_during == [("load_model", None), ("make_room_in_vram", "read")]
     assert loaded.model_load_lock_at_lock == [None]
+    assert _model_load_lock_state() is None
+
+
+def test_fit_check_completes_when_qwen_holds_admission_during_checkpoint_read(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Preview admission must precede MODEL_LOAD_LOCK, so Qwen's checkpoint/read-to-write transition cannot cycle."""
+    admission = RLock()
+    timeout = 1.0
+    checkpoint_reading = Event()
+    preview_started = Event()
+    preview_waiting_for_admission = Event()
+    qwen_write_acquired = Event()
+    preview_done = Event()
+    errors: list[BaseException] = []
+    admission_owner: int | None = None
+
+    @contextmanager
+    def bounded_admission(_device: torch.device):
+        nonlocal admission_owner
+        if admission_owner is not None and admission_owner != get_ident():
+            preview_waiting_for_admission.set()
+        if not admission.acquire(timeout=timeout):
+            raise TimeoutError("integrated CUDA admission lock did not become available")
+        previous_owner = admission_owner
+        admission_owner = get_ident()
+        try:
+            yield
+        finally:
+            admission_owner = previous_owner
+            admission.release()
+
+    monkeypatch.setattr(tiny_autoencoder_previews, "integrated_cuda_admission_lock", bounded_admission)
+
+    original_read_lock = MODEL_LOAD_LOCK.read_lock
+
+    @contextmanager
+    def tracked_read_lock():
+        assert admission_owner == get_ident(), "preview entered MODEL_LOAD_LOCK before integrated CUDA admission"
+        with original_read_lock():
+            yield
+
+    monkeypatch.setattr(MODEL_LOAD_LOCK, "read_lock", tracked_read_lock)
+
+    loaded = _LoadedModel(_decoder(), device="cuda")
+    load = _Load(loaded, vram_available=loaded.weight_bytes)
+
+    def make_room(_needed: int, working_mem_bytes: int | None = None) -> int:
+        assert _model_load_lock_state() == "read"
+        with tiny_autoencoder_previews.integrated_cuda_admission_lock(torch.device("cuda")):
+            return loaded.weight_bytes
+
+    load.ram_cache.make_room_in_vram = make_room
+    previews = _previews(_services(_Store([_tae_config()]), load))
+
+    def qwen_checkpoint_and_load() -> None:
+        try:
+            with tiny_autoencoder_previews.integrated_cuda_admission_lock(torch.device("cuda")):
+                checkpoint_reading.set()
+                assert preview_started.wait(timeout=timeout)
+                preview_waiting_for_admission.wait(timeout=timeout)
+                with MODEL_LOAD_LOCK.write_lock():
+                    qwen_write_acquired.set()
+        except BaseException as error:
+            errors.append(error)
+
+    def render_preview() -> None:
+        try:
+            preview_started.set()
+            assert previews._fits_in_vram(loaded, 0)
+        except BaseException as error:
+            errors.append(error)
+        finally:
+            preview_done.set()
+
+    qwen = Thread(target=qwen_checkpoint_and_load, daemon=True)
+    preview = Thread(target=render_preview, daemon=True)
+    qwen.start()
+    assert checkpoint_reading.wait(timeout=timeout)
+    preview.start()
+    preview.join(timeout=timeout * 3)
+    qwen.join(timeout=timeout * 3)
+
+    assert preview_done.is_set() and qwen_write_acquired.is_set(), "lock-order overlap did not complete"
+    assert not errors
+    assert not preview.is_alive() and not qwen.is_alive()
     assert _model_load_lock_state() is None
 
 

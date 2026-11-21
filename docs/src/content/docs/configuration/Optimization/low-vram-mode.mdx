@@ -84,7 +84,7 @@ none of them.
 | `max_cache_vram_gb` | unset: measured | You want Invoke to use less VRAM than it could. | Invoke stops measuring the GPU, so VRAM other programs use is not seen. |
 | `max_cache_ram_gb` | unset: half your RAM minus 2 GB, within limits; Spark uses its shared pool | You want more model weights cached, or Invoke to use less shared memory. | More can keep models warm longer, but uses more shared memory. |
 | `model_cache_keep_alive_min` | `0` (keep models indefinitely) | Another app needs shared memory after Invoke is idle. | After the timeout, the next model use reloads its weights. |
-| `keep_ram_copy_of_weights` | `auto` (`false` on integrated CUDA, `true` elsewhere) | You want a speed-for-memory choice on an integrated CUDA GPU. | `true` keeps a duplicate CPU shadow and speeds switching and LoRA patching; `false` lowers shared-memory pressure. |
+| `keep_ram_copy_of_weights` | automatic: omit the key or set it to `null` (`false` on integrated CUDA, `true` elsewhere) | You want a speed-for-memory choice on an integrated CUDA GPU. | `true` keeps a duplicate CPU shadow and speeds switching and LoRA patching; `false` lowers shared-memory pressure. |
 | `offload_on_architecture_switch` | `true` | You alternate between model architectures that fit in VRAM together. | On separate-memory GPUs, models move to RAM; on integrated CUDA, models stay warm until the cache budget or shared-memory pressure requires eviction. |
 | `clear_vram_after_session` | `false` | A generation that runs fine once runs out of memory, or slows down sharply, when repeated. On integrated CUDA, it can unload the duplicate CUDA copy when `keep_ram_copy_of_weights` is enabled. | A few seconds per queue item to reload models from RAM. The physical-memory effect on integrated CUDA is hardware-dependent. |
 | `pytorch_cuda_alloc_conf` | unset | You want to tune peak reserved VRAM, for example with `backend:cudaMallocAsync`. | The best value depends on the GPU, driver and CUDA version: test it. |
@@ -179,10 +179,11 @@ model_cache_keep_alive_min: 10
 <details>
 <summary><span>`keep_ram_copy_of_weights`: a RAM copy of loaded models</span></summary>
 
-Automatic by default: Invoke keeps a RAM copy on devices with separate VRAM, but omits the duplicate shadow on
-integrated CUDA because both copies consume the shared memory pool. Set it to `true` on Spark when faster switching
-and LoRA patching are worth the extra shared-memory pressure. Set it to `false` to force the memory-first behavior on
-any device. Integrated Intel GPUs still ignore the setting and log that choice once.
+Automatic by default: omit this YAML key or set it to `null`; `auto` is explanatory text, not a valid config value.
+Invoke keeps a RAM copy on devices with separate VRAM, but omits the duplicate shadow on integrated CUDA because both
+copies consume the shared memory pool. Set it to `true` on Spark when faster switching and LoRA patching are worth the
+extra shared-memory pressure. Set it to `false` to force the memory-first behavior on any device. Integrated Intel
+GPUs still ignore the setting and log that choice once.
 
 ```yaml
 keep_ram_copy_of_weights: false

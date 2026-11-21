@@ -183,4 +183,7 @@ def test_one_reservation_counts_the_nvfp4_layers_as_they_are_held(loaded) -> Non
         neighbour = 128 * CONVROT_GROUP_SIZE + 128 * torch.float32.itemsize
     else:
         neighbour = 128 * CONVROT_GROUP_SIZE * COMPUTE_DTYPE.itemsize
-    loaded.loader._ram_cache.make_room.assert_called_once_with(packed + decoded + dense + neighbour)
+    loaded.loader._ram_cache.make_room.assert_called_once()
+    call = loaded.loader._ram_cache.make_room.call_args
+    assert call.args == (packed + decoded + dense + neighbour,)
+    assert 0 < call.kwargs["host_bytes_needed"] < call.args[0]

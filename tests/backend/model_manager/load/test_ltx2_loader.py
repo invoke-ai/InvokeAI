@@ -204,7 +204,9 @@ def test_undeclared_float8_weights_are_refused_by_name(monkeypatch, tmp_path) ->
 
 def _folder_loader(reserved: list[int] | None = None) -> LTX2FolderModel:
     loader = object.__new__(LTX2FolderModel)
-    loader._ram_cache = SimpleNamespace(make_room=(reserved.append if reserved is not None else lambda _n: None))
+    loader._ram_cache = SimpleNamespace(
+        make_room=lambda n, **_kwargs: reserved.append(n) if reserved is not None else None
+    )
     loader._logger = SimpleNamespace(info=lambda *_a, **_k: None)
     loader._torch_device = torch.device("cpu")
     return loader
@@ -401,7 +403,7 @@ def test_the_text_tower_loads_from_the_file_with_its_int8_layer_packed(monkeypat
     _cpu(monkeypatch)
     loader = object.__new__(LTX2Gemma4EncoderModel)
     reserved: list[int] = []
-    loader._ram_cache = SimpleNamespace(make_room=reserved.append)
+    loader._ram_cache = SimpleNamespace(make_room=lambda n, **_kwargs: reserved.append(n))
     loader._logger = SimpleNamespace(info=lambda *_a, **_k: None)
     config = Gemma4Encoder_Gemma4Encoder_LTX2_Config.model_construct(
         path=str(gemma_folder.root), subfolder="", weight_file="te.safetensors"
@@ -547,7 +549,7 @@ def test_an_nvfp4_layer_missing_its_global_scale_is_refused_before_the_cache_is_
 
 def _duration_head_loader(reserved: list[int]) -> LTX2DurationHeadLoader:
     loader = object.__new__(LTX2DurationHeadLoader)
-    loader._ram_cache = SimpleNamespace(make_room=reserved.append)
+    loader._ram_cache = SimpleNamespace(make_room=lambda n, **_kwargs: reserved.append(n))
     loader._logger = SimpleNamespace(info=lambda *_a, **_k: None, warning=lambda *_a, **_k: None)
     return loader
 

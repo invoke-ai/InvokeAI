@@ -717,6 +717,7 @@ def test_caches_larger_than_half_the_card_are_not_kept(monkeypatch: pytest.Monke
 
 
 def test_integrated_cuda_prefix_cache_uses_host_headroom(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(torch.version, "hip", None)
     monkeypatch.setattr(f"{DENOISE}.device_is_integrated", lambda _device: True)
     monkeypatch.setattr(f"{DENOISE}.TorchDevice.memory_available_to_process", lambda _device: 21 * 2**30)
     monkeypatch.setattr(torch.cuda, "memory_allocated", lambda _device: 1 * 2**30)

@@ -172,6 +172,104 @@ def test_an_fp8_folder_build_still_loads(monkeypatch: pytest.MonkeyPatch, tmp_pa
     assert torch.equal(quantized.weight_scale, scale)
 
 
+def test_fp8_transformer_reserves_prepared_weights_and_builds_on_meta(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    import invokeai.backend.ideogram4.quantized_loading as quantized_loading
+
+    state_dict = _tiny_transformer_state_dict()
+    codes, scale = quantize_weight_to_fp8(state_dict[f"{QUANTIZED}.weight"])
+    state_dict[f"{QUANTIZED}.weight"] = codes
+    state_dict[f"{QUANTIZED}.weight_scale"] = scale.to(torch.float16)
+
+    constructed_devices: list[torch.device] = []
+    original_transformer = Ideogram4Transformer
+
+    def recording_transformer(*args, **kwargs):
+        model = original_transformer(*args, **kwargs)
+        constructed_devices.append(next(model.parameters()).device)
+        return model
+
+    monkeypatch.setattr("invokeai.backend.ideogram4.modeling_ideogram4.Ideogram4Transformer", recording_transformer)
+    original_load = quantized_loading.load_fp8_state_dict
+    pre_assignment_devices: list[torch.device] = []
+
+    def inspect_before_assignment(model, *args, **kwargs):
+        quantized = model.get_submodule(QUANTIZED)
+        pre_assignment_devices.extend(tensor.device for tensor in quantized.state_dict().values())
+        return original_load(model, *args, **kwargs)
+
+    monkeypatch.setattr(quantized_loading, "load_fp8_state_dict", inspect_before_assignment)
+    run = prepare(
+        Seam(**{**TRANSFORMER_SEAM.__dict__, "compute_dtype": torch.float64}),
+        monkeypatch,
+        state_dict=state_dict,
+        geometry=_shrink_the_geometry,
+    )
+    reservations = _record_host_reservation(run)
+
+    model = run.load(tmp_path)
+
+    expected_extra = sum(
+        tensor.nelement() * (torch.float32.itemsize if key.endswith(".weight_scale") else torch.float64.itemsize)
+        for key, tensor in state_dict.items()
+        if tensor.is_floating_point()
+        and tensor.dtype != torch.float8_e4m3fn
+        and tensor.dtype != (torch.float32 if key.endswith(".weight_scale") else torch.float64)
+    )
+    assert constructed_devices == [torch.device("meta")]
+    assert reservations == [
+        (sum(t.nelement() * t.element_size() for t in state_dict.values()), {"host_bytes_needed": expected_extra})
+    ]
+    assert isinstance(model.get_submodule(QUANTIZED), Fp8Linear)
+    assert model.get_submodule(QUANTIZED).weight_scale.dtype == torch.float32
+    assert pre_assignment_devices and all(device.type == "meta" for device in pre_assignment_devices)
+
+
+def _record_host_reservation(run):
+    reservations: list[tuple[int, dict[str, int]]] = []
+
+    def make_room(reserve: int, **kwargs: int) -> None:
+        reservations.append((reserve, kwargs))
+
+    run.loader._ram_cache.make_room = make_room
+    return reservations
+
+
+def test_dense_transformer_dtype_conversion_reserves_the_converted_weights(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    state_dict = _tiny_transformer_state_dict()
+    run = prepare(
+        Seam(**{**TRANSFORMER_SEAM.__dict__, "compute_dtype": torch.float64}),
+        monkeypatch,
+        state_dict=state_dict,
+        geometry=_shrink_the_geometry,
+    )
+    reservations = _record_host_reservation(run)
+
+    run.load(tmp_path)
+
+    expected_extra = sum(t.nelement() * torch.float64.itemsize for t in state_dict.values())
+    assert reservations == [
+        (sum(t.nelement() * t.element_size() for t in state_dict.values()), {"host_bytes_needed": expected_extra})
+    ]
+
+
+def test_dense_transformer_same_dtype_reserves_no_additional_host_bytes(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    state_dict = _tiny_transformer_state_dict()
+    run = prepare(TRANSFORMER_SEAM, monkeypatch, state_dict=state_dict, geometry=_shrink_the_geometry)
+    reservations = _record_host_reservation(run)
+
+    run.load(tmp_path)
+
+    assert reservations == [
+        (sum(t.nelement() * t.element_size() for t in state_dict.values()), {"host_bytes_needed": 0})
+    ]
+
+
 #: Small enough to build eagerly. `AutoModel` gives a bare Qwen3 encoder -- the architecture family
 #: the released Ideogram 4 text encoder belongs to -- so the dense cell loads a real model rather
 #: than asserting against a shape the loader never reaches.
@@ -253,6 +351,46 @@ def test_the_other_spelling_is_refused_in_the_flagged_branch_too(
     assert run.reserved == []
 
 
+def test_flagged_fp8_text_encoder_swaps_meta_buffers_before_assignment(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    import invokeai.backend.ideogram4.quantized_loading as quantized_loading
+
+    state_dict = _tiny_encoder_state_dict()
+    codes, scale = quantize_weight_to_fp8(state_dict[f"{ENCODER_LAYER}.weight"].float())
+    state_dict[f"{ENCODER_LAYER}.weight"] = codes
+    state_dict[f"{ENCODER_LAYER}.weight_scale"] = scale.to(torch.float16)
+    root = _encoder_folder(tmp_path, state_dict, fp8_flag=True)
+
+    original_load = quantized_loading.load_fp8_state_dict
+    pre_assignment_devices: list[torch.device] = []
+
+    def inspect_before_assignment(model, *args, **kwargs):
+        quantized = model.get_submodule(ENCODER_LAYER)
+        pre_assignment_devices.extend(tensor.device for tensor in quantized.state_dict().values())
+        return original_load(model, *args, **kwargs)
+
+    monkeypatch.setattr(quantized_loading, "load_fp8_state_dict", inspect_before_assignment)
+    run = prepare(Seam(**{**ENCODER_SEAM.__dict__, "compute_dtype": torch.float64}), monkeypatch)
+    reservations = _record_host_reservation(run)
+    model = run.load(root)
+
+    quantized = model.get_submodule(ENCODER_LAYER)
+    assert isinstance(quantized, Fp8Linear)
+    assert pre_assignment_devices and all(device.type == "meta" for device in pre_assignment_devices)
+    assert all(not tensor.is_meta for tensor in quantized.state_dict().values())
+    expected_extra = sum(
+        tensor.nelement() * (torch.float32.itemsize if key.endswith(".weight_scale") else torch.float64.itemsize)
+        for key, tensor in state_dict.items()
+        if tensor.is_floating_point()
+        and tensor.dtype != torch.float8_e4m3fn
+        and tensor.dtype != (torch.float32 if key.endswith(".weight_scale") else torch.float64)
+    )
+    assert reservations == [
+        (sum(t.nelement() * t.element_size() for t in state_dict.values()), {"host_bytes_needed": expected_extra})
+    ]
+
+
 def test_a_qwen3_vl_text_encoder_loses_its_visual_tower(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """The encoder Ideogram 4 actually ships is a Qwen3-VL, and `backend/ideogram4/text_encoding.py`
     drives its `language_model` directly -- the vision tower is never executed. It is dropped here
@@ -297,6 +435,40 @@ def test_a_dense_text_encoder_still_loads(monkeypatch: pytest.MonkeyPatch, tmp_p
 
     assert not model.training
     assert not any(tensor.is_meta for tensor in model.state_dict().values())
+
+
+def test_dense_text_encoder_dtype_conversion_reserves_the_converted_weights(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    state_dict = _tiny_encoder_state_dict()
+    root = _encoder_folder(tmp_path, state_dict)
+    run = prepare(
+        Seam(**{**ENCODER_SEAM.__dict__, "compute_dtype": torch.float64}),
+        monkeypatch,
+    )
+    reservations = _record_host_reservation(run)
+
+    run.load(root)
+
+    expected_extra = sum(t.nelement() * torch.float64.itemsize for t in state_dict.values())
+    assert reservations == [
+        (sum(t.nelement() * t.element_size() for t in state_dict.values()), {"host_bytes_needed": expected_extra})
+    ]
+
+
+def test_dense_text_encoder_same_dtype_reserves_no_additional_host_bytes(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    state_dict = _tiny_encoder_state_dict()
+    root = _encoder_folder(tmp_path, state_dict)
+    run = prepare(ENCODER_SEAM, monkeypatch)
+    reservations = _record_host_reservation(run)
+
+    run.load(root)
+
+    assert reservations == [
+        (sum(t.nelement() * t.element_size() for t in state_dict.values()), {"host_bytes_needed": 0})
+    ]
 
 
 def test_an_nf4_text_encoder_gets_past_the_guards(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

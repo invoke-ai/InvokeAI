@@ -438,7 +438,12 @@ class ModelLoader(ModelLoaderBase):
                 # peak) so the surge can be attributed without guessing.
                 log_mem = self._app_config.log_memory_usage
                 ram_before = MemorySnapshot.capture().process_ram if log_mem else 0
-                self._ram_cache.make_room(self.get_size_fs(config, Path(config.path), submodel_type))
+                ram_admission = self._ram_cache.make_room(self.get_size_fs(config, Path(config.path), submodel_type))
+                if getattr(ram_admission, "ram_headroom_satisfied", True) is False:
+                    raise MemoryError(
+                        f"Insufficient host memory to construct model '{cache_key}'; "
+                        "close other applications or load a smaller model."
+                    )
                 ram_after_room = MemorySnapshot.capture().process_ram if log_mem else 0
                 with skip_torch_weight_init():
                     loaded_model = put_in_eval_mode(self._load_model(config, submodel_type))

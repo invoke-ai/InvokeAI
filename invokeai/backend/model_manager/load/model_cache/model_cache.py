@@ -37,6 +37,7 @@ from invokeai.backend.model_manager.taxonomy import AnyModel, SubModelType
 from invokeai.backend.util.devices import (
     EmptyCacheOutcome,
     TorchDevice,
+    _host_memory_available,
     device_has_dedicated_vram,
     device_is_integrated,
 )
@@ -94,6 +95,18 @@ class _AbandonedHolderRelease(NamedTuple):
     cache_entry_ref: "weakref.ReferenceType[CacheRecord]"
     held_first_use: bool
     hold_epoch: int
+
+
+class _DetachedHandleRelease(NamedTuple):
+    """Deferred work for an integrated-device handle finalizer.
+
+    The record is weak here: a finalizer can run while the record is still attached, and queued work
+    must not pin an entry that pressure eviction has already released. Truly detached records are
+    kept strongly by ``ModelCache._detached_handle_records`` until this work is handled.
+    """
+
+    cache: "ModelCache"
+    cache_entry_ref: "weakref.ReferenceType[CacheRecord]"
 
 
 class FirstUseClaim:
@@ -222,18 +235,21 @@ def _run_deferred_work(cache_ref: "weakref.ReferenceType[ModelCache]", work_queu
                 if work is _DEFERRED_RECONCILE:
                     cache._reconcile_budget_if_pending()
                 else:
-                    assert isinstance(work, _AbandonedHolderRelease)
+                    assert isinstance(work, (_AbandonedHolderRelease, _DetachedHandleRelease))
                     cache_entry = work.cache_entry_ref()
                     if cache_entry is not None:
-                        # Dequeued means gone: whatever happens to this item from here on - the
-                        # handler raising, this thread dying inside it, a fork snapshotting it
-                        # mid-drain - it will never be queued again, so the coalescing gate it
-                        # closed (CacheRecord.abandonment_release_pending) must open now, not in
-                        # the handler and not in a recovery that a raise or a fork can skip. A
-                        # finalizer landing between here and the handler queues at most one
-                        # duplicate, which drains as a no-op.
-                        cache_entry.abandonment_release_pending = False
-                        cache._release_abandoned_holder(cache_entry, work.held_first_use, work.hold_epoch)
+                        if isinstance(work, _AbandonedHolderRelease):
+                            # Dequeued means gone: whatever happens to this item from here on - the
+                            # handler raising, this thread dying inside it, a fork snapshotting it
+                            # mid-drain - it will never be queued again, so the coalescing gate it
+                            # closed (CacheRecord.abandonment_release_pending) must open now, not in
+                            # the handler and not in a recovery that a raise or a fork can skip. A
+                            # finalizer landing between here and the handler queues at most one
+                            # duplicate, which drains as a no-op.
+                            cache_entry.abandonment_release_pending = False
+                            cache._release_abandoned_holder(cache_entry, work.held_first_use, work.hold_epoch)
+                        else:
+                            cache._release_detached_model_handle(cache_entry)
             except Exception:
                 if cache is not None:
                     cache._logger.exception("Error processing deferred model-cache work")
@@ -244,8 +260,8 @@ def _run_deferred_work(cache_ref: "weakref.ReferenceType[ModelCache]", work_queu
                 # record, removing it from the cache AND subtracting its bytes from the RamBudget,
                 # so holding it would leave the budget under-reporting a model that is still
                 # resident. `cache` must go for the same reason this function takes a weakref at
-                # all, and `cache_entry` is the strong reference the queue deliberately does not
-                # keep - parking on the next get() while still holding it would defeat the point.
+                # all. A detached-handle item intentionally owns its record through this point;
+                # clearing both references before blocking lets the worker release that ownership.
                 work = None
                 cache = None
                 cache_entry = None
@@ -289,14 +305,17 @@ def _run_shutdown_deferred_work(
         try:
             if work is _SHUTDOWN_DEFERRED_STOP:
                 return
-            cache = cache_ref()
+            cache = work.cache if isinstance(work, _DetachedHandleRelease) else cache_ref()
             if cache is None:
                 return
-            assert isinstance(work, _AbandonedHolderRelease)
+            assert isinstance(work, (_AbandonedHolderRelease, _DetachedHandleRelease))
             cache_entry = work.cache_entry_ref()
             if cache_entry is not None:
-                cache_entry.abandonment_release_pending = False
-                cache._release_abandoned_holder(cache_entry, work.held_first_use, work.hold_epoch)
+                if isinstance(work, _AbandonedHolderRelease):
+                    cache_entry.abandonment_release_pending = False
+                    cache._release_abandoned_holder(cache_entry, work.held_first_use, work.hold_epoch)
+                else:
+                    cache._release_detached_model_handle(cache_entry)
         except BaseException:
             if cache is not None:
                 _log_best_effort(cache._logger, "exception", "Error processing shutdown model-cache work")
@@ -479,6 +498,7 @@ class CacheClearResult:
     models_cleared: int
     bytes_freed: int
     vram_release_refused: bool  # the device refused to return its cached blocks after the drop
+    ram_headroom_satisfied: bool = True  # enough configured and live host RAM remained for the request
 
 
 class CacheMissCallback(Protocol):
@@ -680,6 +700,10 @@ class ModelCache:
         self._shutdown_deferred_work_queue: queue.SimpleQueue[object] = queue.SimpleQueue()
         self._shutdown_deferred_work_thread: Optional[threading.Thread] = None
         self._shutdown_deferred_work_finalizer: Optional[weakref.finalize] = None
+        self._shutdown_deferred_worker_start_lock = threading.Lock()
+        # Detached records stay strong until their finalizer release is handled. Queue items are
+        # weak, so an attached record can still be evicted and collected before a delayed callback.
+        self._detached_handle_records: list[CacheRecord] = []
 
         if ram_budget is not None:
             ram_budget.register_cache(self)
@@ -762,10 +786,16 @@ class ModelCache:
 
         Note: This method should only be called when self._lock is already held.
         """
+        # Retry detached cleanup on every activity. A failed dedicated-worker start can happen on
+        # a live cache too, and the strong detached-record owner must not wait for shutdown.
+        if self._detached_handle_records:
+            self._ensure_shutdown_deferred_worker(blocking=False)
         # A shut-down cache must not arm a new timer: shutdown() is idempotent (it returns early
         # once the event is set), so a timer armed by a post-shutdown operation would never be
         # cancelled by a later shutdown() and would outlive the cache it belongs to.
-        if self._keep_alive_minutes <= 0 or self._shutdown_event.is_set():
+        if self._shutdown_event.is_set():
+            return
+        if self._keep_alive_minutes <= 0:
             return
 
         self._last_activity_time = time.time()
@@ -840,6 +870,11 @@ class ModelCache:
     def shutdown(self) -> None:
         """Shutdown the model cache: cancel any pending timers and evict the resident records."""
         if self._shutdown_event.is_set():
+            # A finalizer may have queued detached cleanup while the dedicated worker could not
+            # start. Retry on an explicit later shutdown call so the strong detached-record owner
+            # is not stranded until process exit.
+            if self._detached_handle_records:
+                self._ensure_shutdown_deferred_worker()
             return
         self._shutdown_event.set()
         # The deferred worker is deliberately NOT stopped here. The sweep below retains records
@@ -932,7 +967,14 @@ class ModelCache:
         # A claimed admission or first-use wrapper can still be released after the normal worker
         # dies. Give those finalizers a shutdown-specific queue and worker that does not share the
         # normal worker's failure state.
-        if any(
+        detached_handles_pending = bool(self._detached_handle_records)
+        if detached_handles_pending and (
+            self._deferred_work_thread is None or not self._deferred_work_thread.is_alive()
+        ):
+            # A finalizer may have queued a detached release just before shutdown while the normal
+            # worker was already dead. Revive it so that pre-shutdown queue items are not stranded.
+            self._ensure_deferred_worker()
+        if detached_handles_pending or any(
             entry.first_use_holds > 0 or entry.admission_in_flight or entry.abandonment_release_pending
             for entry in self._cached_models.values()
         ):
@@ -1436,36 +1478,46 @@ class ModelCache:
             self._deferred_work_finalizer.atexit = False
         self._deferred_work_thread = thread
 
-    def _ensure_shutdown_deferred_worker(self) -> None:
+    def _ensure_shutdown_deferred_worker(self, *, blocking: bool = True) -> bool:
         """Start the finalizer-only worker needed by records retained across shutdown.
 
-        Caller must hold the cache lock. This worker is intentionally separate from the normal
-        worker: shutdown-retained claims must still be reclaimable if the normal worker dies, and
-        restarting the normal worker would unnecessarily revive budget-reconcile machinery.
+        The startup guard is separate from the cache lock because detached-handle finalizers cannot
+        acquire that lock. ``blocking=False`` is for finalizer callers: another startup may win,
+        and the caller can still enqueue work on this worker's queue without waiting.
+
+        This worker is intentionally separate from the normal worker: shutdown-retained claims must
+        still be reclaimable if the normal worker dies, and restarting the normal worker would
+        unnecessarily revive budget-reconcile machinery.
         """
-        if self._shutdown_deferred_work_thread is not None and self._shutdown_deferred_work_thread.is_alive():
-            return
-        thread = threading.Thread(
-            target=_run_shutdown_deferred_work,
-            args=(weakref.ref(self), self._shutdown_deferred_work_queue),
-            name="model-cache-shutdown-deferred-work",
-            daemon=True,
-        )
+        if not self._shutdown_deferred_worker_start_lock.acquire(blocking=blocking):
+            return False
         try:
-            thread.start()
-        except RuntimeError:
-            _log_best_effort(
-                self._logger,
-                "warning",
-                "Could not start the model-cache shutdown cleanup thread; abandoned records may remain resident.",
+            if self._shutdown_deferred_work_thread is not None and self._shutdown_deferred_work_thread.is_alive():
+                return True
+            thread = threading.Thread(
+                target=_run_shutdown_deferred_work,
+                args=(weakref.ref(self), self._shutdown_deferred_work_queue),
+                name="model-cache-shutdown-deferred-work",
+                daemon=True,
             )
-            return
-        if self._shutdown_deferred_work_finalizer is None:
-            self._shutdown_deferred_work_finalizer = weakref.finalize(
-                self, self._shutdown_deferred_work_queue.put, _SHUTDOWN_DEFERRED_STOP
-            )
-            self._shutdown_deferred_work_finalizer.atexit = False
-        self._shutdown_deferred_work_thread = thread
+            try:
+                thread.start()
+            except RuntimeError:
+                _log_best_effort(
+                    self._logger,
+                    "warning",
+                    "Could not start the model-cache shutdown cleanup thread; abandoned records may remain resident.",
+                )
+                return False
+            if self._shutdown_deferred_work_finalizer is None:
+                self._shutdown_deferred_work_finalizer = weakref.finalize(
+                    self, self._shutdown_deferred_work_queue.put, _SHUTDOWN_DEFERRED_STOP
+                )
+                self._shutdown_deferred_work_finalizer.atexit = False
+            self._shutdown_deferred_work_thread = thread
+            return True
+        finally:
+            self._shutdown_deferred_worker_start_lock.release()
 
     def _dispatch_deferred(self, work: object) -> None:
         """Hand work to the background worker, without blocking and without a lock.
@@ -1505,13 +1557,26 @@ class ModelCache:
         The liveness gate is deliberately unsynchronized (a finalizer must not take the cache lock),
         so it is only advisory before shutdown. After shutdown, dispatch does not consult the normal
         worker's liveness: it queues to the dedicated cleanup worker, which is started before
-        shutdown returns whenever a retained record needs a finalizer release. The record remains
-        weakly referenced so queued work never pins detached model state.
+        shutdown returns whenever a retained record needs a finalizer release. Both work kinds use
+        weak record references; detached records are held strongly by the cache until their release
+        runs, while attached records remain evictable if the worker is delayed.
         """
+        if isinstance(work, _DetachedHandleRelease):
+            # Always use the serialized cleanup queue so a normal-worker death immediately after a
+            # liveness check cannot strand the item. The record itself is weak in the work item.
+            # Keep it on that queue even when nonblocking startup returns False: that result also
+            # means startup-lock contention, and the next activity can retry it after the normal
+            # worker has died. Routing to the normal queue here creates a death-after-liveness race.
+            self._ensure_shutdown_deferred_worker(blocking=False)
+            self._shutdown_deferred_work_queue.put(work)
+            return
+
         if self._shutdown_event.is_set() and isinstance(work, _AbandonedHolderRelease):
             # Finalizers after shutdown should not depend on the normal worker. The dedicated queue
             # is drained by a worker whose lifetime is independent of that worker.
-            if self._shutdown_deferred_work_thread is not None:
+            if isinstance(work, _AbandonedHolderRelease) and self._shutdown_deferred_work_thread is not None:
+                # Preserve queued abandonment work for the dedicated worker's replacement, even
+                # when the previous cleanup thread has already exited.
                 self._shutdown_deferred_work_queue.put(work)
                 return
             # If the dedicated thread could not be started, a still-live normal worker is a safe
@@ -1519,7 +1584,7 @@ class ModelCache:
 
         thread = self._deferred_work_thread
         if thread is None or not thread.is_alive():
-            if not isinstance(work, _AbandonedHolderRelease):
+            if not isinstance(work, (_AbandonedHolderRelease, _DetachedHandleRelease)):
                 return
         self._deferred_work_queue.put(work)
 
@@ -2594,20 +2659,18 @@ class ModelCache:
         #   hard for users to understand. It is better for users to see that their RAM is maxed out, and then override
         #   the default value if desired.
 
-        # Lookup the total VRAM size for the CUDA or XPU execution device.
-        # This runs at startup (one ModelCache is built per generation device before any request is
-        # served), and torch.cuda.mem_get_info() would create a CUDA context that permanently holds
-        # ~100-300 MiB of VRAM in an otherwise idle process. cudaGetDeviceProperties reports the same
-        # total without creating a context (#9413). torch.xpu.get_device_properties() is the XPU
-        # equivalent, and is also the one total that survives a missing SYCL free-memory aspect --
-        # so this deliberately does not go through TorchDevice.xpu_mem_get_info(), whose first tier
-        # is the context-creating mem_get_info() call.
+        # Lookup the total VRAM size for the CUDA or XPU execution device. CUDA's integrated
+        # devices need the allocation total from mem_get_info(): on Spark, device properties can
+        # expose only the dedicated carveout while CUDA allocations may use the combined pool.
+        # This creates a CUDA context at startup, unlike the property query, but is required for
+        # the cache cap to match the allocation budget used by runtime admission. XPU keeps the
+        # property query because its mem_get_info() path may not be available on all systems.
         total_vram_bytes: int | None = None
         if self._execution_device.type == "cuda":
             integrated_cuda = _is_integrated_cuda(self._execution_device)
             properties = torch.cuda.get_device_properties(self._execution_device)
             if integrated_cuda:
-                total_vram_bytes = properties.total_memory
+                _, total_vram_bytes = TorchDevice.cuda_mem_get_info(self._execution_device)
                 if self._max_vram_cache_size_gb is not None:
                     total_vram_bytes = min(total_vram_bytes, int(self._max_vram_cache_size_gb * GB))
                     return max(total_vram_bytes - int(self._execution_device_working_mem_gb * GB), 0)
@@ -2764,12 +2827,9 @@ class ModelCache:
                 # handling of model patches (e.g. LoRA).
                 continue
             if integrated_cuda:
-                # UMA CPU-resident weights still consume the same physical pool as CUDA allocations.
-                cache_entry_bytes_freed = 0
-                if cache_entry.cached_model.cur_vram_bytes() > 0:
-                    cache_entry_bytes_freed = self._move_model_to_ram(
-                        cache_entry, cache_entry.cached_model.cur_vram_bytes()
-                    )
+                # Drop unowned UMA entries directly: moving them to CPU would materialize a second copy first.
+                has_live_handles = bool(cache_entry.live_handles)
+                cache_entry_bytes_freed = 0 if has_live_handles else cache_entry.cached_model.cur_vram_bytes()
                 self._delete_cache_entry(cache_entry)
                 del cache_entry
                 models_cleared += 1
@@ -2891,22 +2951,44 @@ class ModelCache:
         self._logger.debug(log)
 
     @synchronized
-    def make_room(self, bytes_needed: int) -> CacheClearResult:
+    def make_room(self, bytes_needed: int, *, host_bytes_needed: int | None = None) -> CacheClearResult:
         """Make enough room in the cache to accommodate a new model of indicated size.
 
         Note: This function deletes all of the cache's internal references to a model in order to free it. If there are
         external references to the model, there's nothing that the cache can do about it, and those models will not be
         garbage-collected.
         """
-        return self._make_room_internal(bytes_needed)
+        # This is the cold-load admission path. The model is about to be constructed on CPU, so the
+        # fixed cache cap is not enough: live host/cgroup headroom is a second, independent limit.
+        return self._make_room_internal(bytes_needed, check_host_memory=True, host_bytes_needed=host_bytes_needed)
 
-    def _make_room_internal(self, bytes_needed: int) -> CacheClearResult:
+    def _make_room_internal(
+        self, bytes_needed: int, *, check_host_memory: bool = False, host_bytes_needed: int | None = None
+    ) -> CacheClearResult:
         """Internal implementation of make_room(). Assumes the lock is already held."""
         self._logger.debug(f"Making room for {bytes_needed / MB:.2f}MB of RAM.")
         self._log_cache_state(title="Before dropping models:")
 
         ram_bytes_available = self._get_ram_available()
         ram_bytes_to_free = max(0, bytes_needed - ram_bytes_available)
+        host_bytes_needed = bytes_needed if host_bytes_needed is None else host_bytes_needed
+
+        def has_host_headroom() -> bool:
+            if not check_host_memory:
+                return True
+            # Use a fresh sample after eviction. Cache bytes may already be represented by reclaimable
+            # file pages, or may still be held by a deferred/refused CUDA allocator release.
+            return host_bytes_needed <= _host_memory_available()
+
+        def has_room() -> bool:
+            # A cache cap is an eviction target, not a hard per-model load limit. If one model is
+            # larger than the cap, require the cap's worth of cache capacity and let host-memory
+            # admission decide whether construction is safe.
+            cache_capacity = self._ram_budget.max_bytes if self._ram_budget is not None else self._ram_cache_size_bytes
+            required_cache_bytes = min(bytes_needed, cache_capacity)
+            if required_cache_bytes > self._get_ram_available():
+                return False
+            return has_host_headroom()
 
         ram_bytes_freed = 0
         pos = 0
@@ -2917,7 +2999,10 @@ class ModelCache:
             # hold frees no RAM (its shared weights stay live until the last reference is released),
             # so a fixed "bytes freed" tally would be wrong. Without a budget, the local tally is
             # exact, so the original cheaper check is kept.
-            if self._ram_budget is not None:
+            if check_host_memory:
+                if has_room():
+                    break
+            elif self._ram_budget is not None:
                 if bytes_needed <= self._get_ram_available():
                     break
             elif ram_bytes_freed >= ram_bytes_to_free:
@@ -2933,7 +3018,12 @@ class ModelCache:
             # grace deliberately does NOT shield from this path (matching its long-standing
             # semantics): its releaser is the loader's own forward progress, not a finalizer, so
             # an orphaned grace must stay reachable by the synchronous eviction paths.
-            if not cache_entry.is_locked and cache_entry.first_use_holds == 0 and not cache_entry.admission_in_flight:
+            if (
+                not cache_entry.is_locked
+                and not cache_entry.live_handles
+                and cache_entry.first_use_holds == 0
+                and not cache_entry.admission_in_flight
+            ):
                 ram_bytes_freed += cache_entry.cached_model.total_bytes()
                 self._logger.debug(
                     f"Dropping {model_key} from RAM cache to free {(cache_entry.cached_model.total_bytes() / MB):.2f}MB."
@@ -2944,28 +3034,24 @@ class ModelCache:
             else:
                 pos += 1
 
-        if self._ram_budget is not None and bytes_needed > self._get_ram_available():
-            # This cache's own evictable entries are exhausted, but the global budget is still
-            # short: the remaining usage is held by other device caches - e.g. a shared model whose
-            # weights stay live because another (possibly idle) cache retains them. Without
-            # cross-cache eviction the cap would be exceeded for as long as that cache stays idle,
-            # so ask each peer to drop its unlocked entries. Whatever still can't be freed is held
-            # by locked (in-use) entries, which release soon - the same transient overshoot the
-            # single-cache path has always allowed.
+        needs_peer_eviction = not has_room() if check_host_memory else bytes_needed > self._get_ram_available()
+        if self._ram_budget is not None and needs_peer_eviction:
+            # This cache's own evictable entries are exhausted, but admission is still short on either
+            # shared-cache or live host headroom. The remaining usage may be held by another device cache -
+            # e.g. a shared model whose weights stay live because another (possibly idle) cache retains them.
+            # Ask each peer to drop its unlocked entries. Whatever still cannot be freed is held by locked
+            # (in-use) entries, which release later or cause cold-load admission to refuse safely.
             for peer in self._ram_budget.peer_caches(exclude=self):
-                if bytes_needed <= self._get_ram_available():
+                if has_room():
                     break
                 peer_cleared = peer.evict_unlocked_for_peer(
-                    is_satisfied=lambda: bytes_needed <= self._get_ram_available()
+                    is_satisfied=has_room,
                 )
                 models_cleared += peer_cleared or 0
-            # A peer whose lock was contended (peer_cleared is None) could not be evicted here.
-            # That is handled AFTER admission: put() re-checks the budget once the new model is
-            # actually counted and records a reconcile request on every peer (see
-            # request_budget_reconcile). Requesting here, pre-admission, would race the peers'
-            # reconcile checks against a budget that does not yet include the incoming model -
-            # a peer could see the budget as satisfied, clear the request, and leave the cap
-            # exceeded once the model lands.
+            # A peer whose lock was contended (peer_cleared is None) could not be evicted here. In
+            # host-headroom mode the caller reports admission failure before construction; in the
+            # shared-cap-only path, put() re-checks the budget after counting the new model and records
+            # a reconcile request on every peer (see request_budget_reconcile).
 
         if models_cleared > 0:
             # There would likely be some 'garbage' to be collected regardless of whether a model was cleared or not, but
@@ -3000,26 +3086,31 @@ class ModelCache:
         self._logger.debug(f"Dropped {models_cleared} models to free {ram_bytes_freed / MB:.2f}MB of RAM.")
         self._log_cache_state(title="After dropping models:")
         return CacheClearResult(
-            models_cleared=models_cleared, bytes_freed=ram_bytes_freed, vram_release_refused=vram_release_refused
+            models_cleared=models_cleared,
+            bytes_freed=ram_bytes_freed,
+            vram_release_refused=vram_release_refused,
+            ram_headroom_satisfied=has_host_headroom(),
         )
 
-    def evict_unlocked_for_peer(self, is_satisfied: Callable[[], bool]) -> Optional[int]:
+    def evict_unlocked_for_peer(
+        self,
+        is_satisfied: Callable[[], bool],
+    ) -> Optional[int]:
         """Evict this cache's unlocked entries on behalf of another device's cache (best effort).
 
-        Called by a peer whose own eviction stack is exhausted while the shared RamBudget is still
-        over-committed - typically because this cache holds the last reference to shared weights the
-        peer already dropped. `is_satisfied` is re-checked after every eviction so no more entries
-        are dropped than the peer actually needs.
+        Called by a peer whose own eviction stack is exhausted while admission still lacks shared-cache
+        or host headroom - typically because this cache holds the last reference to shared weights the
+        peer already dropped. `is_satisfied` is re-checked after every eviction so no more entries are
+        dropped than the peer actually needs.
 
         The peer calls this while holding its own cache lock, so this cache's lock is taken
         NON-blocking: if it is contended, this device is actively working and the peer simply skips
         it - blocking here could deadlock two caches making room for each other simultaneously.
 
         Returns the number of entries evicted, or None if the lock was contended and nothing could
-        be attempted. Either way, if the shared budget is still exceeded once the caller admits its
-        model, the caller records a deferred reconcile request on every peer (see
-        request_budget_reconcile) - and every unlock that leaves the budget exceeded records one on
-        its own cache - so a skip never leaves the budget exceeded indefinitely.
+        be attempted. If admission remains unsatisfied, the caller either refuses before construction
+        or records a deferred shared-budget reconcile after counting the new model.
+
         """
         if not self._lock.acquire(blocking=False):
             return None
@@ -3029,7 +3120,7 @@ class ModelCache:
             pos = 0
             while pos < len(self._cache_stack) and not is_satisfied():
                 cache_entry = self._cached_models[self._cache_stack[pos]]
-                if cache_entry.is_locked or cache_entry.in_first_use_window:
+                if cache_entry.is_locked or cache_entry.live_handles or cache_entry.in_first_use_window:
                     pos += 1
                     continue
                 self._logger.debug(
@@ -3160,9 +3251,22 @@ class ModelCache:
             return
         if cache_entry.live_handles:
             cache_entry.detached = True
-            self._cache_stack = [key for key in self._cache_stack if key != cache_entry.key]
-            del self._cached_models[cache_entry.key]
-            return
+            self._detached_handle_records.append(cache_entry)
+            # The finalizer's WeakSet callback can run between the first check and publication of
+            # the detached record. Recheck after the strong owner is visible; if the last handle
+            # is already gone, finish ordinary deletion instead of leaving a detached record with
+            # no release work.
+            if not cache_entry.live_handles:
+                cache_entry.detached = False
+                self._detached_handle_records.remove(cache_entry)
+            else:
+                if self._shutdown_event.is_set():
+                    # A post-shutdown eviction can create a detached record after shutdown's sweep;
+                    # make the finalizer-only worker available before the handle can disappear.
+                    self._ensure_shutdown_deferred_worker()
+                self._cache_stack = [key for key in self._cache_stack if key != cache_entry.key]
+                del self._cached_models[cache_entry.key]
+                return
         # Armed or not: the weights may die during a later calibration window.
         probe.dropped(self, cache_entry)
         self._cache_stack = [key for key in self._cache_stack if key != cache_entry.key]
@@ -3184,16 +3288,32 @@ class ModelCache:
         return True
 
     def _release_loaded_model_handle(self, cache_entry: CacheRecord) -> None:
-        with self._lock:
-            if not cache_entry.detached or any(cache_entry.live_handles):
-                return
-            cache_entry.detached = False
-            probe.dropped(self, cache_entry)
-            uses_shared = cache_entry.cached_model.uses_shared_weights
-            total_bytes = cache_entry.cached_model.total_bytes()
-            cache_entry.cached_model.release_shared_weights()
-            if self._ram_budget is not None and not uses_shared:
-                self._ram_budget.remove_non_shared(total_bytes, cache=self)
+        """Queue release of an integrated-device handle from its finalizer.
+
+        ``weakref.finalize`` can run while the collecting thread owns the shared-weight store or
+        budget lock. The callback must therefore only enqueue; the worker performs the lock-taking
+        release. The queue item weakly references the record so attached entries can still be
+        evicted while the worker is delayed; detached entries are strongly owned by the cache until
+        this work completes.
+        """
+        self._dispatch_deferred(_DetachedHandleRelease(self, weakref.ref(cache_entry)))
+
+    @synchronized
+    def _release_detached_model_handle(self, cache_entry: CacheRecord) -> None:
+        """Release detached accounting once the last integrated-device handle has gone away."""
+        if not cache_entry.detached or any(cache_entry.live_handles):
+            return
+        cache_entry.detached = False
+        self._detached_handle_records = [entry for entry in self._detached_handle_records if entry is not cache_entry]
+        probe.dropped(self, cache_entry)
+        uses_shared = cache_entry.cached_model.uses_shared_weights
+        total_bytes = cache_entry.cached_model.total_bytes()
+        cache_entry.cached_model.release_shared_weights()
+        if self._ram_budget is not None and not uses_shared:
+            self._ram_budget.remove_non_shared(total_bytes, cache=self)
+        # This is a handle release, not a cache eviction: refresh residency only and leave the
+        # clear counter/callbacks untouched.
+        self._sync_current_stats()
 
     def _notify_models_cleared(
         self,

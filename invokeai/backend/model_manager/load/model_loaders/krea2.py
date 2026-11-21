@@ -82,6 +82,7 @@ from invokeai.backend.quantization.nvfp4 import (
     WEIGHT_SCALE_2_SUFFIX,
     install_nvfp4_layers,
     pop_nvfp4_layers,
+    predict_nvfp4_install_host_size,
     predict_nvfp4_install_size,
 )
 from invokeai.backend.qwen3_vl.qwen3_vl_assets import (
@@ -382,6 +383,7 @@ def _load_qwen3vl_visual_tower(
             skip_patterns=skip_patterns,
             # The branch's only reservation, and the nvfp4 layers are no longer in `sd`.
             extra_reserved_bytes=predict_nvfp4_install_size(tower, nvfp4_payloads, dtype, skip_patterns),
+            extra_host_bytes=predict_nvfp4_install_host_size(tower, nvfp4_payloads, dtype, skip_patterns),
         )
     else:
         # Whole keys were renamed, so each `.weight_scale` still sits beside its `.weight`.
@@ -397,6 +399,7 @@ def _load_qwen3vl_visual_tower(
             skip_patterns=skip_patterns,
         )
         dequantize_fp8_scaled(sd, fp8_layers, dtype)
+        fp8_layers = {}
         cast_state_dict(sd, dtype, keep_fp8=False, model=tower)
 
     install_nvfp4_layers(tower, sd, nvfp4_payloads, dtype, skip_patterns)
@@ -666,6 +669,7 @@ class Krea2CheckpointModel(ModelLoader):
                 reserve=self._ram_cache.make_room,
                 skip_patterns=skip_patterns,
                 extra_reserved_bytes=nvfp4_bytes,
+                extra_host_bytes=predict_nvfp4_install_host_size(model, nvfp4_payloads, model_dtype, skip_patterns),
             )
             self._logger.info(
                 f"Krea-2: kept {len(quantized)} of {len(int8_markers)} layer(s) quantized "
@@ -1187,6 +1191,7 @@ class Qwen3VLEncoderCheckpointLoader(_Qwen3VLEncoderSingleFileLoader[Qwen3VLEnco
                 # The nvfp4 layers taken out above are held beside the int8 ones, and this is the
                 # branch's only reservation.
                 extra_reserved_bytes=predict_nvfp4_install_size(model, nvfp4_payloads, model_dtype, skip_patterns),
+                extra_host_bytes=predict_nvfp4_install_host_size(model, nvfp4_payloads, model_dtype, skip_patterns),
             )
             self._logger.info(
                 f"Qwen3-VL encoder: kept {len(quantized)} of {len(int8_markers)} layer(s) in int8 "

@@ -49,8 +49,24 @@ def _host_memory_available() -> int:
                 limit = (cgroup_dir / "memory.max").read_text().strip()
                 if limit == "max":
                     continue
+                limit = int(limit)
                 current = int((cgroup_dir / "memory.current").read_text())
-                remaining = max(0, int(limit) - current)
+                if limit < 0 or current < 0:
+                    continue
+                reclaimable = 0
+                try:
+                    stats: dict[str, int] = {}
+                    for line in (cgroup_dir / "memory.stat").read_text().splitlines():
+                        key, value = line.split()
+                        stats[key] = int(value)
+                    inactive_file = stats.get("inactive_file")
+                    if inactive_file is not None and inactive_file >= 0:
+                        reclaimable = min(inactive_file, current)
+                except (OSError, ValueError):
+                    pass
+
+                remaining = max(0, min(limit, int(limit) - current + reclaimable))
+
                 cgroup_headroom = remaining if cgroup_headroom is None else min(cgroup_headroom, remaining)
             except (OSError, ValueError):
                 continue
@@ -656,12 +672,14 @@ class TorchDevice:
         ``torch.cuda.mem_get_info``, except that on a ROCm build under Windows the free figure is capped by what the
         Windows video-memory budget still allows this process (`wddm.video_memory_budget`). There, torch's figure is
         the device total minus this process's own live allocations: it ignores other processes, and Windows pages
-        allocations into shared system memory well before it is exhausted instead of failing them.
+        allocations into shared system memory well before it is exhausted instead of failing them. Native CUDA uses
+        the CUDA allocation budget directly; its WDDM resident budget is a separate constraint.
         """
         free, total = torch.cuda.mem_get_info(device)
-        budget = video_memory_budget(device)
-        if budget is not None:
-            free = min(free, max(budget - (total - free), 0))
+        if torch.version.hip is not None:
+            budget = video_memory_budget(device)
+            if budget is not None:
+                free = min(free, max(budget - (total - free), 0))
         return free, total
 
     @classmethod
@@ -669,15 +687,15 @@ class TorchDevice:
         """What this process can hold on a GPU `device`, what it holds there included.
 
         On a device with its own memory (`device_has_dedicated_vram`): what the driver has free plus what torch has
-        allocated. On one whose "VRAM" is system RAM (MPS, an integrated CUDA/XPU): the system's available RAM plus
-        what the backend holds for this process, since the
-        device totals say nothing about what the host still has free. The model cache budgets from it
-        (`ModelCache._get_vram_available`, which adds the caching allocator's reclaimable blocks on a dedicated
-        device), and a working-memory calibration plan sizes its cases from it. Raises ValueError for a device that is
-        not a GPU.
+        allocated. On Windows native CUDA integrated GPUs, ``cudaMemGetInfo`` reports the combined dedicated+shared
+        allocation budget, so that budget is used for GPU transfers. Linux integrated CUDA and integrated XPU use
+        system available RAM plus what the backend holds for this process, since their device totals do not describe
+        host headroom. The model cache budgets from it (`ModelCache._get_vram_available`, which adds the caching
+        allocator's reclaimable blocks on a dedicated device), and a working-memory calibration plan sizes its cases
+        from it. Raises ValueError for a device that is not a GPU.
         """
         if device.type == "cuda":
-            if device_is_integrated(device) is True and torch.version.hip is None:
+            if device_is_integrated(device) is True and torch.version.hip is None and sys.platform != "win32":
                 return _host_memory_available() + torch.cuda.memory_allocated(device)
             free, _ = cls.cuda_mem_get_info(device)
             return free + torch.cuda.memory_allocated(device)

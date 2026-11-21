@@ -8,6 +8,7 @@ whatever the quantization saved — roughly half for a 4-bit quant.
 
 from unittest.mock import call, create_autospec
 
+import pytest
 import torch
 
 from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
@@ -97,3 +98,17 @@ def test_an_sdnq_weight_is_handled_by_the_same_duck_typed_path() -> None:
     assert not isinstance(embedding.weight, SDNQTensor)
     assert embedding.weight.dtype is torch.bfloat16
     assert embedding(torch.tensor([[0, 1]])).shape == (1, 2, _HIDDEN)
+
+
+def test_failed_ram_admission_stops_before_dequantization(monkeypatch: pytest.MonkeyPatch) -> None:
+    ram_cache = create_autospec(ModelCache, instance=True)
+    ram_cache.make_room.return_value = type("FailedAdmission", (), {"ram_headroom_satisfied": False})()
+    embedding = _q8_0_embedding()
+    monkeypatch.setattr(
+        GGMLTensor,
+        "get_dequantized_tensor",
+        lambda _weight: pytest.fail("dequantization must not start after failed RAM admission"),
+    )
+
+    with pytest.raises(MemoryError, match="host memory"):
+        materialize_quantized_embedding(embedding, ram_cache=ram_cache)

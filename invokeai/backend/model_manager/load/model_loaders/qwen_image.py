@@ -58,7 +58,12 @@ from invokeai.backend.quantization.int8_convrot import (
     reject_unmarked_int8_weights,
 )
 from invokeai.backend.quantization.load_plan import reserve_for_load
-from invokeai.backend.quantization.nvfp4 import install_nvfp4_layers, pop_nvfp4_layers, predict_nvfp4_install_size
+from invokeai.backend.quantization.nvfp4 import (
+    install_nvfp4_layers,
+    pop_nvfp4_layers,
+    predict_nvfp4_install_host_size,
+    predict_nvfp4_install_size,
+)
 from invokeai.backend.qwen2_5_vl.qwen2_5_vl_assets import (
     load_bundled_qwen2_5_vl_config_dict,
     load_bundled_qwen2_5_vl_tokenizer,
@@ -360,6 +365,7 @@ class QwenImageCheckpointModel(ModelLoader):
                 reserve=self._ram_cache.make_room,
                 skip_patterns=skip_patterns,
                 extra_reserved_bytes=predict_nvfp4_install_size(model, nvfp4_payloads, model_dtype, skip_patterns),
+                extra_host_bytes=predict_nvfp4_install_host_size(model, nvfp4_payloads, model_dtype, skip_patterns),
             )
             logger.info(
                 f"Qwen Image: kept {len(quantized)} of {len(int8_markers)} layer(s) in int8 "
@@ -577,6 +583,7 @@ class QwenVLEncoderCheckpointLoader(ModelLoader):
                 reserve=self._ram_cache.make_room,
                 skip_patterns=skip_patterns,
                 extra_reserved_bytes=predict_nvfp4_install_size(model, nvfp4_payloads, model_dtype, skip_patterns),
+                extra_host_bytes=predict_nvfp4_install_host_size(model, nvfp4_payloads, model_dtype, skip_patterns),
             )
             logger.info(
                 f"Qwen VL encoder: kept {len(quantized)} of {len(int8_markers)} layer(s) in int8 "

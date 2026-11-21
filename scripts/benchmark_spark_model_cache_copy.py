@@ -26,6 +26,19 @@ GB = 2**30
 MB = 2**20
 
 
+def _get_current_record(cache: Any, name: str, create_model: Any) -> Any:
+    try:
+        return cache.get(name)
+    except IndexError:
+        cache.put(name, create_model())
+        return cache.get(name)
+
+
+def _build_synthetic_model(torch: Any, width: int, seed: int) -> Any:
+    torch.manual_seed(seed)
+    return torch.nn.Linear(width, width, bias=False, dtype=torch.float32).eval()
+
+
 def _memory_snapshot(torch: Any, psutil: Any, device: Any, TorchDevice: Any, wddm: Any) -> dict[str, Any]:
     process = psutil.Process(os.getpid())
     local_memory = wddm.local_video_memory(device)
@@ -76,22 +89,25 @@ def _run_child(repo_root: Path, device_index: int, width: int, switches: int, ke
         shared_cpu_weights=None,
         reserve_vram_gb=0.0,
     )
-    records: dict[str, Any] = {}
+    model_seeds = {"synthetic-a": 4200, "synthetic-b": 4201}
     failures: list[str] = []
     try:
-        for index, name in enumerate(("synthetic-a", "synthetic-b")):
-            torch.manual_seed(4200 + index)
-            model = torch.nn.Linear(width, width, bias=False, dtype=torch.float32).eval()
-            cache.put(name, model)
-            records[name] = cache.get(name)
+        for name in ("synthetic-a", "synthetic-b"):
+            cache.put(name, _build_synthetic_model(torch, width, model_seeds[name]))
 
         after_put = _memory_snapshot(torch, psutil, device, TorchDevice, wddm)
         input_tensor = torch.randn(1, width, generator=torch.Generator().manual_seed(7)).to(device)
         torch.cuda.reset_peak_memory_stats(device)
         output_hashes: dict[str, str] = {}
+        copy_flags: dict[str, bool] = {}
+        model_stats: dict[str, dict[str, int | bool]] = {}
 
         def lock_and_run(name: str) -> tuple[float, dict[str, Any]]:
-            record = records[name]
+            record = _get_current_record(
+                cache,
+                name,
+                lambda: _build_synthetic_model(torch, width, model_seeds[name]),
+            )
             torch.cuda.synchronize(device)
             started = time.perf_counter()
             settled = cache.lock(record, working_mem_bytes=0)
@@ -110,11 +126,27 @@ def _run_child(repo_root: Path, device_index: int, width: int, switches: int, ke
                 output_hashes[name] = output_hash
                 target_resident = record.cached_model.cur_vram_bytes()
                 other_name = "synthetic-b" if name == "synthetic-a" else "synthetic-a"
-                other_resident = records[other_name].cached_model.cur_vram_bytes()
+                # Peek without touching LRU order; this is only a residency observation.
+                other_record = cache._cached_models.get(other_name)
+                other_resident = other_record.cached_model.cur_vram_bytes() if other_record is not None else 0
                 if target_resident != model_bytes:
                     failures.append(f"{name} resident bytes {target_resident}, expected {model_bytes}")
                 if other_resident != 0:
                     failures.append(f"{other_name} stayed resident at {other_resident} bytes")
+                copy_flags[name] = record.cached_model.get_cpu_state_dict() is not None
+                model_stats[name] = {
+                    "model_bytes": record.cached_model.total_bytes(),
+                    "resident_bytes": target_resident,
+                    "cpu_state_dict_retained": copy_flags[name],
+                }
+                if other_record is None and other_name in model_stats:
+                    model_stats[other_name].update({"resident_bytes": 0, "cpu_state_dict_retained": False})
+                elif other_record is not None:
+                    model_stats[other_name] = {
+                        "model_bytes": other_record.cached_model.total_bytes(),
+                        "resident_bytes": other_resident,
+                        "cpu_state_dict_retained": other_record.cached_model.get_cpu_state_dict() is not None,
+                    }
                 snapshot = _memory_snapshot(torch, psutil, device, TorchDevice, wddm)
                 snapshot.update(
                     {
@@ -133,19 +165,10 @@ def _run_child(repo_root: Path, device_index: int, width: int, switches: int, ke
         lock_and_run("synthetic-b")
         measurements = [lock_and_run("synthetic-a" if index % 2 == 0 else "synthetic-b") for index in range(switches)]
         after_switch = _memory_snapshot(torch, psutil, device, TorchDevice, wddm)
-        copy_flags = {name: record.cached_model.get_cpu_state_dict() is not None for name, record in records.items()}
         expected_flag = keep_ram_copy
         if set(copy_flags.values()) != {expected_flag}:
             failures.append(f"CPU copy flags {copy_flags} did not match requested {expected_flag}")
         times = [item[0] for item in measurements]
-        per_model = {
-            name: {
-                "model_bytes": record.cached_model.total_bytes(),
-                "resident_bytes": record.cached_model.cur_vram_bytes(),
-                "cpu_state_dict_retained": copy_flags[name],
-            }
-            for name, record in records.items()
-        }
         return {
             "keep_ram_copy": keep_ram_copy,
             "device_name": properties.name,
@@ -159,7 +182,7 @@ def _run_child(repo_root: Path, device_index: int, width: int, switches: int, ke
             "switch_lock_seconds": times,
             "median_switch_lock_seconds": statistics.median(times),
             "measurements": [item[1] for item in measurements],
-            "models": per_model,
+            "models": model_stats,
             "failures": failures,
             "output_sha256": output_hashes,
             "torch": torch.__version__,

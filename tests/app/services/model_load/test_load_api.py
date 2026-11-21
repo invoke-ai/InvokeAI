@@ -1,4 +1,5 @@
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
 import torch
@@ -13,6 +14,7 @@ from invokeai.app.services.shared.invocation_context import (
 )
 from invokeai.backend.model_manager.configs.external_api import ExternalApiModelConfig, ExternalModelCapabilities
 from invokeai.backend.model_manager.load.load_base import LoadedModelWithoutConfig
+from invokeai.backend.model_manager.load.model_cache.model_cache import CacheClearResult
 from tests.backend.model_manager.model_manager_fixtures import *  # noqa F403
 
 
@@ -70,6 +72,58 @@ def test_download_and_load(mock_context: InvocationContext) -> None:
     loaded_model_2 = mock_context.models.load_remote_model("https://www.test.foo/download/test_embedding.safetensors")
     assert isinstance(loaded_model_2, LoadedModelWithoutConfig)
     assert loaded_model_1.model is loaded_model_2.model  # should be cached copy
+
+
+@pytest.mark.parametrize("path_kind", ["file", "directory"])
+def test_load_from_path_refuses_before_loader_when_host_headroom_is_insufficient(
+    mock_context: InvocationContext,
+    mm2_model_manager: ModelManagerServiceBase,
+    tmp_path: Path,
+    monkeypatch,
+    path_kind: str,
+) -> None:
+    if path_kind == "file":
+        model_path = tmp_path / "model.safetensors"
+        model_path.write_bytes(b"weights")
+        expected_size = model_path.stat().st_size
+    else:
+        model_path = tmp_path / "nested" / "model"
+        model_path.mkdir(parents=True)
+        (model_path / "weights").mkdir()
+        (model_path / "weights" / "part.safetensors").write_bytes(b"weights")
+        expected_size = (model_path / "weights" / "part.safetensors").stat().st_size
+    loader = MagicMock(return_value={"weights": torch.ones(1)})
+    make_room = MagicMock(
+        return_value=CacheClearResult(
+            models_cleared=0,
+            bytes_freed=0,
+            vram_release_refused=False,
+            ram_headroom_satisfied=False,
+        )
+    )
+    monkeypatch.setattr(mm2_model_manager.load.ram_cache, "make_room", make_room)
+
+    with pytest.raises(MemoryError, match="Insufficient host memory"):
+        mock_context.models.load_local_model(model_path, loader)
+
+    loader.assert_not_called()
+    make_room.assert_called_once_with(expected_size)
+
+
+def test_load_from_path_cache_hit_does_not_admit(
+    mock_context: InvocationContext, mm2_model_manager: ModelManagerServiceBase, tmp_path: Path, monkeypatch
+) -> None:
+    model_path = tmp_path / "model.safetensors"
+    model_path.write_bytes(b"weights")
+    loader = MagicMock(return_value={"weights": torch.ones(1)})
+    first = mock_context.models.load_local_model(model_path, loader)
+
+    make_room = MagicMock(side_effect=AssertionError("cache hit must not admit"))
+    monkeypatch.setattr(mm2_model_manager.load.ram_cache, "make_room", make_room)
+    second = mock_context.models.load_local_model(model_path, loader)
+
+    assert first.model is second.model
+    make_room.assert_not_called()
 
 
 def test_external_model_load_raises(

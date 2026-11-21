@@ -263,6 +263,7 @@ class _MossImageTransformerLoading(ModelLoader):
                 skip_patterns=skip_patterns,
                 fp8_layers=fp8_layers,
                 nvfp4_payloads={},
+                source_tensors_retained=bool(fp8_layers and not keep_fp8),
             )
             mapped = dict(sd) if fp8_layers and not keep_fp8 else None
             if fp8_layers and not keep_fp8:

@@ -9,6 +9,7 @@ integrated-GPU probe stubbed, so no Intel hardware is required.
 import gc
 import logging
 import threading
+import weakref
 from contextlib import contextmanager
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
@@ -17,14 +18,17 @@ import pytest
 import torch
 
 from invokeai.backend.model_manager.load.load_base import LoadedModelWithoutConfig
+from invokeai.backend.model_manager.load.model_cache import model_cache as model_cache_module
+from invokeai.backend.model_manager.load.model_cache.cache_stats import CacheStats
 from invokeai.backend.model_manager.load.model_cache.cached_model.cached_model_only_full_load import (
     CachedModelOnlyFullLoad,
 )
 from invokeai.backend.model_manager.load.model_cache.cached_model.cached_model_with_partial_load import (
     CachedModelWithPartialLoad,
 )
-from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache, integrated_cuda_admission_lock
+from invokeai.backend.model_manager.load.model_cache.model_cache import GB, ModelCache, integrated_cuda_admission_lock
 from invokeai.backend.model_manager.load.model_cache.ram_budget import RamBudget
+from invokeai.backend.model_manager.load.model_cache.shared_cpu_weights import SharedCpuWeightsStore
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch_module_autocast import (
     apply_custom_layers_to_model,
 )
@@ -85,6 +89,7 @@ def _patch_integrated_cuda():
         patch("invokeai.backend.model_manager.load.model_cache.model_cache.device_is_integrated", return_value=True),
         patch("torch.version.hip", None),
         patch.object(torch.cuda, "get_device_properties", return_value=SimpleNamespace(total_memory=8 * 2**30)),
+        patch.object(TorchDevice, "cuda_mem_get_info", classmethod(lambda cls, device: (7 * 2**30, 8 * 2**30))),
     ):
         yield
 
@@ -95,6 +100,7 @@ def _make_cuda_cache(
     keep_ram_copy: bool = True,
     max_vram_cache_size_gb: float | None = None,
     ram_budget: RamBudget | None = None,
+    shared_cpu_weights: SharedCpuWeightsStore | None = None,
 ) -> ModelCache:
     with _patch_integrated_cuda():
         return ModelCache(
@@ -105,7 +111,7 @@ def _make_cuda_cache(
             execution_device="cuda:0",
             storage_device="cpu",
             logger=logger,
-            shared_cpu_weights=None,
+            shared_cpu_weights=shared_cpu_weights,
             ram_budget=ram_budget,
         )
 
@@ -286,6 +292,29 @@ def test_native_integrated_cuda_ram_capacity_uses_shared_pool(mock_logger: Magic
         cache.shutdown()
 
 
+def test_native_integrated_cuda_ram_capacity_uses_cuda_allocation_total(mock_logger: MagicMock):
+    """Spark's CUDA total includes the shared allocation pool; the device property can expose only the carveout."""
+    with (
+        patch("invokeai.backend.util.devices.device_is_integrated", return_value=True),
+        patch("invokeai.backend.model_manager.load.model_cache.model_cache.device_is_integrated", return_value=True),
+        patch("torch.version.hip", None),
+        patch.object(torch.cuda, "get_device_properties", return_value=SimpleNamespace(total_memory=8 * GB)),
+        patch.object(TorchDevice, "cuda_mem_get_info", classmethod(lambda cls, device: (20 * GB, 24 * GB))),
+    ):
+        cache = ModelCache(
+            execution_device_working_mem_gb=1.0,
+            enable_partial_loading=False,
+            keep_ram_copy_of_weights=True,
+            execution_device="cuda:0",
+            storage_device="cpu",
+            logger=mock_logger,
+        )
+    try:
+        assert cache.local_ram_cache_size_bytes == 23 * GB
+    finally:
+        cache.shutdown()
+
+
 def test_native_integrated_cuda_ram_capacity_honors_vram_cap(mock_logger: MagicMock):
     with patch("invokeai.backend.model_manager.load.model_cache.model_cache.psutil.virtual_memory") as virtual_memory:
         virtual_memory.return_value.total = 128 * 2**30
@@ -422,6 +451,29 @@ def test_integrated_cuda_pressure_drops_idle_model(mock_logger: MagicMock):
         cache.shutdown()
 
 
+def test_integrated_cuda_pressure_drops_idle_model_without_copying_to_cpu(mock_logger: MagicMock):
+    """An unowned UMA entry must be dropped directly, without materialising a CPU copy first."""
+    cache = _make_cuda_cache(mock_logger, keep_ram_copy=False)
+    try:
+        with _patch_integrated_cuda():
+            cache.put("m", DummyModule())
+            entry = _entry(cache, "m")
+            entry.awaiting_first_use = False
+            entry.cached_model._is_in_vram = True
+            total_bytes = entry.cached_model.total_bytes()
+            with (
+                patch.object(
+                    cache, "_move_model_to_ram", side_effect=AssertionError("unexpected CPU materialization")
+                ) as move,
+                patch.object(TorchDevice, "empty_cache", return_value=EmptyCacheOutcome.RAN),
+            ):
+                assert cache._offload_unlocked_models(total_bytes, vram_available_fn=lambda: 0) == total_bytes
+            move.assert_not_called()
+        assert "m" not in cache._cached_models
+    finally:
+        cache.shutdown()
+
+
 def test_integrated_cuda_eviction_unloads_model_held_by_stale_handle(mock_logger: MagicMock):
     budget = RamBudget(max_bytes=2**30, shared_store=None)
     cache = _make_cuda_cache(mock_logger, keep_ram_copy=False, ram_budget=budget)
@@ -434,16 +486,469 @@ def test_integrated_cuda_eviction_unloads_model_held_by_stale_handle(mock_logger
             entry.awaiting_first_use = False
             entry.cached_model._is_in_vram = True
             model_bytes = entry.cached_model.total_bytes()
-            with patch.object(TorchDevice, "empty_cache", return_value=EmptyCacheOutcome.RAN):
+            with (
+                patch.object(cache, "_move_model_to_ram") as move,
+                patch.object(TorchDevice, "empty_cache", return_value=EmptyCacheOutcome.RAN),
+            ):
                 cache._offload_unlocked_models(model_bytes, vram_available_fn=lambda: 0)
         assert "m" not in cache._cached_models
-        assert loaded.resident_weight_bytes == 0
+        move.assert_not_called()
+        assert loaded.resident_weight_bytes == model_bytes
         assert cache._get_ram_in_use() == entry.cached_model.total_bytes()
         assert budget.total_in_use() == entry.cached_model.total_bytes()
         assert entry.detached
-        del loaded, entry
+        released = threading.Event()
+        release = cache._release_detached_model_handle
+
+        def release_and_signal(cache_entry):
+            release(cache_entry)
+            released.set()
+
+        with patch.object(cache, "_release_detached_model_handle", side_effect=release_and_signal):
+            del loaded, entry
+            gc.collect()
+            assert released.wait(timeout=10)
+        assert budget.total_in_use() == 0
+    finally:
+        cache.shutdown()
+
+
+def test_integrated_cuda_attached_handle_work_does_not_pin_evicted_model(mock_logger: MagicMock):
+    """A finalizer queued before WeakSet removal must not keep an evicted attached record alive."""
+    cache = _make_cuda_cache(mock_logger, keep_ram_copy=False)
+    queued: list[object] = []
+    try:
+        with _patch_integrated_cuda(), patch.object(cache, "_dispatch_deferred", side_effect=queued.append):
+            cache.put("m", DummyModule())
+            entry = _entry(cache, "m")
+            loaded = LoadedModelWithoutConfig(entry, cache)
+            loaded._end_first_use_window()
+            entry.awaiting_first_use = False
+            model_ref = weakref.ref(entry.cached_model)
+            cache._release_loaded_model_handle(entry)
+            entry.live_handles.clear()
+            cache._delete_cache_entry(entry)
+            del loaded, entry
+            gc.collect()
+        assert queued
+        assert model_ref() is None
+    finally:
+        cache.shutdown()
+
+
+def test_integrated_cuda_eviction_rechecks_handles_after_publishing_detached_record(mock_logger: MagicMock):
+    """A last handle disappearing during detachment must take the ordinary release path."""
+    cache = _make_cuda_cache(mock_logger, keep_ram_copy=False)
+
+    class LastHandleRace:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def __bool__(self) -> bool:
+            self.calls += 1
+            return self.calls == 1
+
+    try:
+        with _patch_integrated_cuda():
+            cache.put("m", DummyModule())
+            entry = _entry(cache, "m")
+            entry.live_handles = LastHandleRace()  # type: ignore[assignment]
+            cache._delete_cache_entry(entry)
+        assert "m" not in cache._cached_models
+        assert not entry.detached
+        assert cache._detached_handle_records == []
+    finally:
+        cache.shutdown()
+
+
+def test_integrated_cuda_detached_handle_release_recovers_after_worker_death(mock_logger: MagicMock):
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=2**30, shared_store=store)
+    cache = _make_cuda_cache(mock_logger, ram_budget=budget, shared_cpu_weights=store)
+    try:
+        with _patch_integrated_cuda():
+            cache.put("m", DummyModule())
+            entry = _entry(cache, "m")
+            loaded = LoadedModelWithoutConfig(entry, cache)
+            loaded._end_first_use_window()
+            entry.awaiting_first_use = False
+            cache._offload_unlocked_models(entry.cached_model.total_bytes(), vram_available_fn=lambda: 0)
+        assert entry.detached
+        assert store.refcount("m") == 1
+        worker = cache._deferred_work_thread
+        assert worker is not None
+        cache._deferred_work_queue.put(model_cache_module._DEFERRED_STOP)
+        worker.join(timeout=10)
+        assert not worker.is_alive()
+
+        released = threading.Event()
+        release = cache._release_detached_model_handle
+
+        def release_and_signal(cache_entry):
+            release(cache_entry)
+            released.set()
+
+        with patch.object(cache, "_release_detached_model_handle", side_effect=release_and_signal):
+            del loaded, entry
+            gc.collect()
+            assert released.wait(timeout=10)
+        assert store.refcount("m") == 0
+        assert budget.total_in_use() == 0
+    finally:
+        cache.shutdown()
+
+
+def test_integrated_cuda_detached_release_retries_after_shutdown_worker_start_failure(
+    mock_logger: MagicMock, monkeypatch: pytest.MonkeyPatch
+):
+    """A failed cleanup-thread start must not strand detached accounting permanently."""
+    cache = _make_cuda_cache(mock_logger, keep_ram_copy=False)
+    try:
+        with _patch_integrated_cuda():
+            cache.put("m", DummyModule())
+            entry = _entry(cache, "m")
+            loaded = LoadedModelWithoutConfig(entry, cache)
+            loaded._end_first_use_window()
+            entry.awaiting_first_use = False
+            cache._offload_unlocked_models(entry.cached_model.total_bytes(), vram_available_fn=lambda: 0)
+        assert entry.detached
+
+        real_start = threading.Thread.start
+
+        worker = cache._deferred_work_thread
+        assert worker is not None
+        cache._deferred_work_queue.put(model_cache_module._DEFERRED_STOP)
+        worker.join(timeout=10)
+        assert not worker.is_alive()
+
+        def fail_shutdown_worker(thread: threading.Thread) -> None:
+            if thread.name == "model-cache-shutdown-deferred-work":
+                raise RuntimeError("forced cleanup worker start failure")
+            real_start(thread)
+
+        monkeypatch.setattr(threading.Thread, "start", fail_shutdown_worker)
+        del loaded
+        gc.collect()
+        assert cache._shutdown_deferred_work_thread is None
+        assert cache._detached_handle_records == [entry]
+        assert not cache._shutdown_event.is_set()
+
+        monkeypatch.undo()
+        released = threading.Event()
+        release = cache._release_detached_model_handle
+
+        def release_and_signal(cache_entry):
+            release(cache_entry)
+            released.set()
+
+        with patch.object(cache, "_release_detached_model_handle", side_effect=release_and_signal):
+            # Timeout activity is a normal cache activity and must retry startup while live.
+            cache._on_timeout()
+            assert released.wait(timeout=10)
+        assert cache._detached_handle_records == []
+        assert entry.cached_model.uses_shared_weights is False
+    finally:
+        cache.shutdown()
+
+
+def test_integrated_cuda_detached_release_survives_start_lock_contention_and_worker_death(
+    mock_logger: MagicMock,
+):
+    """Startup contention must not route detached work to a worker that can die before enqueue."""
+    cache = _make_cuda_cache(mock_logger, keep_ram_copy=False)
+    try:
+        with _patch_integrated_cuda():
+            cache.put("m", DummyModule())
+            entry = _entry(cache, "m")
+            loaded = LoadedModelWithoutConfig(entry, cache)
+            loaded._end_first_use_window()
+            entry.awaiting_first_use = False
+            cache._offload_unlocked_models(entry.cached_model.total_bytes(), vram_available_fn=lambda: 0)
+        assert entry.detached
+        entry.live_handles.clear()
+
+        worker = cache._deferred_work_thread
+        assert worker is not None
+        released = threading.Event()
+        release = cache._release_detached_model_handle
+
+        def release_and_signal(cache_entry):
+            release(cache_entry)
+            released.set()
+
+        with patch.object(cache, "_release_detached_model_handle", side_effect=release_and_signal):
+            # Nonblocking startup reports contention while the normal worker is still alive. The
+            # normal worker then dies before any activity can retry the dedicated worker.
+            with cache._shutdown_deferred_worker_start_lock:
+                cache._dispatch_deferred(model_cache_module._DetachedHandleRelease(cache, weakref.ref(entry)))
+                cache._deferred_work_queue.put(model_cache_module._DEFERRED_STOP)
+                worker.join(timeout=10)
+                assert not worker.is_alive()
+            assert cache._shutdown_deferred_work_thread is None
+
+            cache._record_activity()
+            assert released.wait(timeout=10)
+        assert cache._detached_handle_records == []
+    finally:
+        cache.shutdown()
+
+
+def test_integrated_cuda_detached_release_uses_dedicated_worker(mock_logger: MagicMock):
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=2**30, shared_store=store)
+    cache = _make_cuda_cache(mock_logger, ram_budget=budget, shared_cpu_weights=store)
+    try:
+        with _patch_integrated_cuda():
+            cache.put("m", DummyModule())
+            entry = _entry(cache, "m")
+            loaded = LoadedModelWithoutConfig(entry, cache)
+            loaded._end_first_use_window()
+            entry.awaiting_first_use = False
+            cache._offload_unlocked_models(entry.cached_model.total_bytes(), vram_available_fn=lambda: 0)
+        entry.live_handles.clear()
+        assert entry.detached
+        assert store.refcount("m") == 1
+
+        handler_entered = threading.Event()
+        allow_release = threading.Event()
+        released = threading.Event()
+        handler_thread_name: list[str] = []
+        release = cache._release_detached_model_handle
+
+        def release_and_signal(cache_entry):
+            handler_thread_name.append(threading.current_thread().name)
+            handler_entered.set()
+            assert allow_release.wait(timeout=10)
+            release(cache_entry)
+            released.set()
+
+        with patch.object(cache, "_release_detached_model_handle", side_effect=release_and_signal):
+            cache._dispatch_deferred(model_cache_module._DetachedHandleRelease(cache, weakref.ref(entry)))
+            worker = cache._deferred_work_thread
+            assert worker is not None
+            assert handler_entered.wait(timeout=10)
+            cache._deferred_work_queue.put(model_cache_module._DEFERRED_STOP)
+            worker.join(timeout=10)
+            assert not worker.is_alive()
+            assert not released.is_set()
+            assert handler_thread_name == ["model-cache-shutdown-deferred-work"]
+            allow_release.set()
+            assert released.wait(timeout=10)
+        assert store.refcount("m") == 0
+        assert budget.total_in_use() == 0
+    finally:
+        cache.shutdown()
+
+
+def test_integrated_cuda_detached_release_keeps_cache_alive_until_accounting_cleanup(mock_logger: MagicMock):
+    """A queued detached release must retain its cache until budget accounting is released."""
+    budget = RamBudget(max_bytes=2**30, shared_store=None)
+    cache = _make_cuda_cache(mock_logger, keep_ram_copy=False, ram_budget=budget)
+    queue = model_cache_module.queue.SimpleQueue()
+    item_ready = threading.Event()
+    allow_get = threading.Event()
+
+    class BlockingQueue:
+        def put(self, item):
+            queue.put(item)
+
+        def get(self):
+            item_ready.set()
+            assert allow_get.wait(timeout=10)
+            return queue.get()
+
+    worker = threading.Thread(
+        target=model_cache_module._run_shutdown_deferred_work,
+        args=(weakref.ref(cache), BlockingQueue()),
+        daemon=True,
+    )
+    try:
+        with _patch_integrated_cuda():
+            cache.put("m", DummyModule())
+            entry = _entry(cache, "m")
+            loaded = LoadedModelWithoutConfig(entry, cache)
+            loaded._end_first_use_window()
+            entry.awaiting_first_use = False
+            cache._offload_unlocked_models(entry.cached_model.total_bytes(), vram_available_fn=lambda: 0)
+        assert budget.total_in_use() == entry.cached_model.total_bytes()
+        queue.put(model_cache_module._DetachedHandleRelease(cache, weakref.ref(entry)))
+        worker.start()
+        assert item_ready.wait(timeout=10)
+        cache_ref = weakref.ref(cache)
+        del loaded, entry, cache
+        gc.collect()
+        assert cache_ref() is not None
+        allow_get.set()
+        queue.put(model_cache_module._SHUTDOWN_DEFERRED_STOP)
+        worker.join(timeout=10)
+        assert not worker.is_alive()
         gc.collect()
         assert budget.total_in_use() == 0
+    finally:
+        allow_get.set()
+        worker.join(timeout=10)
+
+
+def test_shutdown_deferred_worker_start_is_serialized(mock_logger: MagicMock):
+    cache = _make_cuda_cache(mock_logger)
+    barrier = threading.Barrier(3)
+    starters: list[threading.Thread] = []
+    real_start = threading.Thread.start
+    shutdown_starts: list[threading.Thread] = []
+
+    def record_start(thread: threading.Thread) -> None:
+        if thread.name == "model-cache-shutdown-deferred-work":
+            shutdown_starts.append(thread)
+        real_start(thread)
+
+    def start_worker() -> None:
+        barrier.wait()
+        cache._ensure_shutdown_deferred_worker(blocking=False)
+
+    try:
+        with patch.object(threading.Thread, "start", new=record_start):
+            starters = [threading.Thread(target=start_worker) for _ in range(2)]
+            for starter in starters:
+                starter.start()
+            barrier.wait()
+            for starter in starters:
+                starter.join(timeout=10)
+        assert all(not starter.is_alive() for starter in starters)
+        assert len(shutdown_starts) == 1
+    finally:
+        cache.shutdown()
+
+
+def test_integrated_cuda_handle_finalizer_does_not_reenter_shared_store_lock(mock_logger: MagicMock):
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=2**30, shared_store=store)
+    cache = _make_cuda_cache(mock_logger, ram_budget=budget, shared_cpu_weights=store)
+    try:
+        with _patch_integrated_cuda():
+            cache.put("m", DummyModule())
+            entry = _entry(cache, "m")
+            loaded = LoadedModelWithoutConfig(entry, cache)
+            loaded._end_first_use_window()
+            entry.awaiting_first_use = False
+            cache._offload_unlocked_models(entry.cached_model.total_bytes(), vram_available_fn=lambda: 0)
+            assert entry.detached
+
+        released = threading.Event()
+        release = cache._release_detached_model_handle
+
+        def release_and_signal(cache_entry):
+            release(cache_entry)
+            released.set()
+
+        holder = [loaded]
+        del loaded
+        lock_held = threading.Event()
+        finished = threading.Event()
+
+        def collect_inside_store_lock():
+            with store._lock:
+                lock_held.set()
+                holder.clear()
+                gc.collect()
+                finished.set()
+
+        with patch.object(cache, "_release_detached_model_handle", side_effect=release_and_signal):
+            collector = threading.Thread(target=collect_inside_store_lock)
+            collector.start()
+            assert lock_held.wait(timeout=2)
+            if not finished.wait(timeout=2):
+                # The pre-fix callback deadlocks the collector while it owns store._lock. Release
+                # it from this test thread so the red run can unwind instead of hanging pytest.
+                store._lock.release()
+                collector.join(timeout=2)
+                pytest.fail("handle finalizer tried to reacquire the store lock")
+            collector.join(timeout=2)
+            assert released.wait(timeout=10)
+        assert store.total_bytes_in_use() == 0
+        assert budget.total_in_use() == 0
+    finally:
+        cache.shutdown()
+
+
+def test_integrated_cuda_handle_finalizer_runs_after_weakset_removal(mock_logger: MagicMock):
+    """Inline deferred handling must see the dying handle already removed from the WeakSet."""
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=2**30, shared_store=store)
+    cache = _make_cuda_cache(mock_logger, ram_budget=budget, shared_cpu_weights=store)
+    try:
+        cache.stats = CacheStats()
+        with _patch_integrated_cuda():
+            cache.put("m", DummyModule())
+            entry = _entry(cache, "m")
+            loaded = LoadedModelWithoutConfig(entry, cache)
+            loaded._end_first_use_window()
+            entry.awaiting_first_use = False
+            cache._offload_unlocked_models(entry.cached_model.total_bytes(), vram_available_fn=lambda: 0)
+            assert entry.detached
+            assert store.refcount("m") == 1
+            assert budget.total_in_use() == store.total_bytes_in_use()
+
+        def dispatch_inline(work):
+            cache._release_detached_model_handle(work.cache_entry_ref())
+
+        release = cache._release_detached_model_handle
+
+        def release_after_weakset_removal(cache_entry):
+            assert len(cache_entry.live_handles) == 0
+            return release(cache_entry)
+
+        with (
+            patch.object(cache, "_dispatch_deferred", side_effect=dispatch_inline),
+            patch.object(cache, "_release_detached_model_handle", side_effect=release_after_weakset_removal),
+        ):
+            del loaded
+            gc.collect()
+
+        assert store.refcount("m") == 0
+        assert budget.total_in_use() == 0
+        assert cache.stats.cache_used == 0
+        assert cache.stats.in_cache == 0
+        cache._release_detached_model_handle(entry)
+        assert store.refcount("m") == 0
+        assert budget.total_in_use() == 0
+    finally:
+        cache.shutdown()
+
+
+def test_integrated_cuda_detached_handle_release_refreshes_stats(mock_logger: MagicMock):
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=2**30, shared_store=store)
+    cache = _make_cuda_cache(mock_logger, ram_budget=budget, shared_cpu_weights=store)
+    try:
+        cache.stats = CacheStats()
+        with _patch_integrated_cuda():
+            cache.put("m", DummyModule())
+            entry = _entry(cache, "m")
+            loaded = LoadedModelWithoutConfig(entry, cache)
+            loaded._end_first_use_window()
+            entry.awaiting_first_use = False
+            cache._offload_unlocked_models(entry.cached_model.total_bytes(), vram_available_fn=lambda: 0)
+
+        assert cache.stats.cache_used > 0
+        assert cache.stats.in_cache == 0
+        cleared = cache.stats.cleared
+        cache.shutdown()
+        released = threading.Event()
+        release = cache._release_detached_model_handle
+
+        def release_and_signal(cache_entry):
+            release(cache_entry)
+            released.set()
+
+        with patch.object(cache, "_release_detached_model_handle", side_effect=release_and_signal):
+            del loaded
+            gc.collect()
+            assert released.wait(timeout=10)
+        assert store.total_bytes_in_use() == 0
+        assert budget.total_in_use() == 0
+        assert cache.stats.cache_used == 0
+        assert cache.stats.in_cache == 0
+        assert cache.stats.cleared == cleared
     finally:
         cache.shutdown()
 
@@ -463,8 +968,17 @@ def test_integrated_cuda_cpu_only_entry_keeps_budget_while_handle_lives(mock_log
             cache._offload_unlocked_models(model_bytes, vram_available_fn=lambda: 0)
         assert "m" not in cache._cached_models
         assert budget.total_in_use() == model_bytes
-        del loaded, entry
-        gc.collect()
+        released = threading.Event()
+        release = cache._release_detached_model_handle
+
+        def release_and_signal(cache_entry):
+            release(cache_entry)
+            released.set()
+
+        with patch.object(cache, "_release_detached_model_handle", side_effect=release_and_signal):
+            del loaded, entry
+            gc.collect()
+            assert released.wait(timeout=10)
         assert budget.total_in_use() == 0
     finally:
         cache.shutdown()

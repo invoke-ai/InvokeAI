@@ -25,6 +25,7 @@ import torch
 
 from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
 from invokeai.backend.quantization.gguf.ggml_tensor import HOST_DEQUANT_PEAK_COPIES
+from invokeai.backend.util.ram import require_ram_headroom
 
 
 def materialize_quantized_embedding(embedding: torch.nn.Module, *, ram_cache: ModelCache) -> bool:
@@ -41,6 +42,7 @@ def materialize_quantized_embedding(embedding: torch.nn.Module, *, ram_cache: Mo
     # `.shape` is the dequantized shape on both wrapper types; `Tensor.numel()` is not overridden and
     # would report the packed element count instead -- for a 4-bit quant, roughly half of what is
     # about to be allocated.
-    ram_cache.make_room(HOST_DEQUANT_PEAK_COPIES * weight.shape.numel() * weight.compute_dtype.itemsize)
+    reserved_bytes = HOST_DEQUANT_PEAK_COPIES * weight.shape.numel() * weight.compute_dtype.itemsize
+    require_ram_headroom(ram_cache.make_room(reserved_bytes), reserved_bytes)
     embedding.weight = torch.nn.Parameter(dequantize(), requires_grad=False)
     return True

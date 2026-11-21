@@ -830,7 +830,7 @@ class T5EncoderSingleFileLoader(ModelLoader):
             model_dtype,
             keep_fp8=keep_fp8,
             model=model,
-            fp8_layers=fp8_layers if keep_fp8 else {},
+            fp8_layers=fp8_layers,
             nvfp4_payloads={},
         )
         if keep_fp8:

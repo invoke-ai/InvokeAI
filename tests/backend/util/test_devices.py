@@ -70,11 +70,39 @@ def test_cuda_memory_budget_classification(integrated, expected, monkeypatch):
 def test_integrated_cuda_memory_available_uses_host_headroom(monkeypatch):
     device = torch.device("cuda:0")
     monkeypatch.setattr(torch.version, "hip", None)
+    monkeypatch.setattr("invokeai.backend.util.devices.sys.platform", "linux")
     monkeypatch.setattr(torch.cuda, "get_device_properties", lambda _: SimpleNamespace(is_integrated=1))
     monkeypatch.setattr(TorchDevice, "cuda_mem_get_info", classmethod(lambda *_: pytest.fail("CUDA free used")))
     monkeypatch.setattr("invokeai.backend.util.devices._host_memory_available", lambda: 100)
     monkeypatch.setattr(torch.cuda, "memory_allocated", lambda _device: 7)
     assert TorchDevice.memory_available_to_process(device) == 107
+
+
+def test_integrated_cuda_memory_available_uses_cuda_allocation_budget_on_windows(monkeypatch):
+    device = torch.device("cuda:0")
+    monkeypatch.setattr(torch.version, "hip", None)
+    monkeypatch.setattr("invokeai.backend.util.devices.sys.platform", "win32")
+    monkeypatch.setattr(torch.cuda, "get_device_properties", lambda _: SimpleNamespace(is_integrated=1))
+    monkeypatch.setattr(TorchDevice, "cuda_mem_get_info", classmethod(lambda *_: (30, 40)))
+    monkeypatch.setattr("invokeai.backend.util.devices._host_memory_available", lambda: pytest.fail("host RAM used"))
+    monkeypatch.setattr(torch.cuda, "memory_allocated", lambda _device: 10)
+    assert TorchDevice.memory_available_to_process(device) == 40
+
+
+@pytest.mark.parametrize(
+    "properties",
+    [SimpleNamespace(is_integrated=0), SimpleNamespace()],
+    ids=["discrete", "unknown"],
+)
+def test_nonintegrated_or_unknown_cuda_memory_available_uses_cuda_budget_on_windows(monkeypatch, properties):
+    device = torch.device("cuda:0")
+    monkeypatch.setattr(torch.version, "hip", None)
+    monkeypatch.setattr("invokeai.backend.util.devices.sys.platform", "win32")
+    monkeypatch.setattr(torch.cuda, "get_device_properties", lambda _: properties)
+    monkeypatch.setattr(TorchDevice, "cuda_mem_get_info", classmethod(lambda *_: (30, 40)))
+    monkeypatch.setattr("invokeai.backend.util.devices._host_memory_available", lambda: pytest.fail("host RAM used"))
+    monkeypatch.setattr(torch.cuda, "memory_allocated", lambda _device: 10)
+    assert TorchDevice.memory_available_to_process(device) == 40
 
 
 def test_host_memory_available_clamps_nested_cgroup_limit(monkeypatch):
@@ -94,6 +122,90 @@ def test_host_memory_available_clamps_nested_cgroup_limit(monkeypatch):
 
     monkeypatch.setattr(devices_module.Path, "read_text", read_text)
     assert devices_module._host_memory_available() == 400
+
+
+def test_host_memory_available_credits_reclaim_before_clamping_over_limit_usage(monkeypatch):
+    files = {
+        "/proc/self/cgroup": "0::/user.slice/invokeai",
+        "/sys/fs/cgroup/user.slice/invokeai/memory.max": "100",
+        "/sys/fs/cgroup/user.slice/invokeai/memory.current": "130",
+        "/sys/fs/cgroup/user.slice/invokeai/memory.stat": "inactive_file 40\n",
+        "/sys/fs/cgroup/user.slice/memory.max": "200",
+        "/sys/fs/cgroup/user.slice/memory.current": "120",
+        "/sys/fs/cgroup/user.slice/memory.stat": "inactive_file 0\n",
+    }
+    monkeypatch.setattr(devices_module.psutil, "virtual_memory", lambda: SimpleNamespace(available=1000))
+    monkeypatch.setattr(devices_module.sys, "platform", "linux")
+
+    def read_text(path):
+        try:
+            return files[path.as_posix()]
+        except KeyError as exc:
+            raise OSError from exc
+
+    monkeypatch.setattr(devices_module.Path, "read_text", read_text)
+    assert devices_module._host_memory_available() == 10
+
+
+def test_host_memory_available_credits_inactive_file_at_each_finite_ancestor(monkeypatch):
+    files = {
+        "/proc/self/cgroup": "0::/user.slice/invokeai",
+        "/sys/fs/cgroup/user.slice/invokeai/memory.max": "600",
+        "/sys/fs/cgroup/user.slice/invokeai/memory.current": "550",
+        "/sys/fs/cgroup/user.slice/invokeai/memory.stat": "anon 450\ninactive_file 50\n",
+        "/sys/fs/cgroup/user.slice/memory.max": "700",
+        "/sys/fs/cgroup/user.slice/memory.current": "650",
+        "/sys/fs/cgroup/user.slice/memory.stat": "file 300\ninactive_file 200\n",
+    }
+    monkeypatch.setattr(devices_module.psutil, "virtual_memory", lambda: SimpleNamespace(available=90))
+    monkeypatch.setattr(devices_module.sys, "platform", "linux")
+
+    def read_text(path):
+        try:
+            return files[path.as_posix()]
+        except KeyError as exc:
+            raise OSError from exc
+
+    monkeypatch.setattr(devices_module.Path, "read_text", read_text)
+    assert devices_module._host_memory_available() == 90
+
+
+def test_host_memory_available_ignores_malformed_memory_stat(monkeypatch):
+    files = {
+        "/proc/self/cgroup": "0::/user.slice/invokeai",
+        "/sys/fs/cgroup/user.slice/invokeai/memory.max": "600",
+        "/sys/fs/cgroup/user.slice/invokeai/memory.current": "200",
+        "/sys/fs/cgroup/user.slice/invokeai/memory.stat": "inactive_file nope\n",
+    }
+    monkeypatch.setattr(devices_module.psutil, "virtual_memory", lambda: SimpleNamespace(available=1000))
+    monkeypatch.setattr(devices_module.sys, "platform", "linux")
+
+    def read_text(path):
+        try:
+            return files[path.as_posix()]
+        except KeyError as exc:
+            raise OSError from exc
+
+    monkeypatch.setattr(devices_module.Path, "read_text", read_text)
+    assert devices_module._host_memory_available() == 400
+
+
+def test_host_memory_available_ignores_malformed_cgroup_limit(monkeypatch):
+    files = {
+        "/proc/self/cgroup": "0::/user.slice/invokeai",
+        "/sys/fs/cgroup/user.slice/invokeai/memory.max": "not-a-limit",
+    }
+    monkeypatch.setattr(devices_module.psutil, "virtual_memory", lambda: SimpleNamespace(available=1000))
+    monkeypatch.setattr(devices_module.sys, "platform", "linux")
+
+    def read_text(path):
+        try:
+            return files[path.as_posix()]
+        except KeyError as exc:
+            raise OSError from exc
+
+    monkeypatch.setattr(devices_module.Path, "read_text", read_text)
+    assert devices_module._host_memory_available() == 1000
 
 
 def test_host_memory_available_ignores_unlimited_cgroup_and_swap(monkeypatch):
@@ -766,18 +878,32 @@ def test_xpu_mem_get_info_estimates_when_native_and_sysman_both_fail(native_erro
     [(None, 10), (13, 7), (16, 10), (5, 0)],
     ids=["no-budget", "budget-is-tighter", "torch-is-tighter", "over-budget"],
 )
-def test_cuda_mem_get_info_is_capped_by_the_windows_video_memory_budget(budget_gib, expected_free_gib):
+def test_cuda_mem_get_info_is_capped_by_the_windows_video_memory_budget(budget_gib, expected_free_gib, monkeypatch):
     """On Windows ROCm, torch's free figure ignores other processes and the point where Windows starts paging. The
     headroom is the budget minus this process's live allocations (16 - 10 = 6 GiB here)."""
     gib = 1024**3
     device = torch.device("cuda", 0)
     budget = None if budget_gib is None else budget_gib * gib
+    monkeypatch.setattr(torch.version, "hip", "7.14.0")
     with (
         patch.object(torch.cuda, "mem_get_info", return_value=(10 * gib, 16 * gib)),
         patch("invokeai.backend.util.devices.video_memory_budget", return_value=budget) as mock_budget,
     ):
         assert TorchDevice.cuda_mem_get_info(device) == (expected_free_gib * gib, 16 * gib)
     mock_budget.assert_called_once_with(device)
+
+
+def test_native_cuda_mem_get_info_does_not_apply_wddm_resident_budget(monkeypatch):
+    device = torch.device("cuda", 0)
+    monkeypatch.setattr(torch.version, "hip", None)
+    with (
+        patch.object(torch.cuda, "mem_get_info", return_value=(10, 16)),
+        patch(
+            "invokeai.backend.util.devices.video_memory_budget",
+            side_effect=AssertionError("WDDM resident budget is not CUDA allocation budget"),
+        ),
+    ):
+        assert TorchDevice.cuda_mem_get_info(device) == (10, 16)
 
 
 def test_get_generation_devices_auto_expands_to_all_xpu():

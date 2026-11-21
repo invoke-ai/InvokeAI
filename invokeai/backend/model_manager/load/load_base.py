@@ -79,10 +79,13 @@ class LoadedModelWithoutConfig:
         # wrapper is dropped un-entered, by the claim's own finalizer when it dies with us.
         self._first_use_claim = first_use_claim
         if cache is not None and hasattr(cache, "_register_loaded_model_handle"):
-            registered = cache._register_loaded_model_handle(cache_record, self)
-            if registered:
-                handle_finalizer = finalize(self, cache._release_loaded_model_handle, cache_record)
-                handle_finalizer.atexit = False
+            # Register this callback before the cache's WeakSet callback. Weakref callbacks run
+            # in reverse registration order; otherwise the finalizer can observe this dying handle
+            # as still live, release nothing, and never be retried.
+            handle_finalizer = finalize(self, cache._release_loaded_model_handle, cache_record)
+            handle_finalizer.atexit = False
+            if not cache._register_loaded_model_handle(cache_record, self):
+                handle_finalizer.detach()
         # Fallback for a record obtained through plain get() (or by a caller that could not get a
         # claim): arm the hold here instead. The instructions between that get() returning and
         # this constructor are then unshielded — an eviction landing exactly there is the

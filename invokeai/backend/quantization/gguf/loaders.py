@@ -19,6 +19,7 @@ from invokeai.backend.quantization.int8_convrot import (
     marker_layout,
 )
 from invokeai.backend.util.logging import InvokeAILogger
+from invokeai.backend.util.ram import require_ram_headroom
 
 logger = InvokeAILogger.get_logger()
 
@@ -407,7 +408,7 @@ def unpack_ggml_at_load(
     sd: dict[str, torch.Tensor],
     model: torch.nn.Module,
     skip_patterns: tuple[str, ...],
-    reserve: Callable[[int], None],
+    reserve: Callable[[int], Any],
 ) -> int:
     """Replace, in `sd`, the GGUF tensors that must not -- or need not -- stay packed. Returns the count.
 
@@ -453,7 +454,8 @@ def unpack_ggml_at_load(
         if key not in unpacked
     )
     in_flight = max((_in_flight_bytes(sd[key]) for key in keys), default=0)
-    reserve(kept + sum(unpacked.values()) + in_flight)
+    reserved_bytes = kept + sum(unpacked.values()) + in_flight
+    require_ram_headroom(reserve(reserved_bytes), reserved_bytes)
     # One at a time, so each packed original is released as its replacement lands.
     for key in keys:
         sd[key] = _unpack(sd[key])

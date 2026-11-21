@@ -1,9 +1,11 @@
+import weakref
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
 import torch
 
+import invokeai.backend.model_manager.load.model_loaders.krea2 as krea2_module
 from invokeai.backend.model_manager.configs.main import (
     Main_Checkpoint_Krea2_Config,
     Main_Diffusers_Krea2_Config,
@@ -1048,6 +1050,56 @@ def test_room_is_reserved_before_the_scaled_weights_are_widened(monkeypatch, tmp
     assert torch.allclose(model.transformer_blocks[0].attn.to_q.weight.float(), payload.dequantized, atol=1e-5)
     assert [step for step, _ in run.order] == list(widening), run.order
     assert all(reserved for _step, reserved in run.order), run.order
+
+
+def test_qwen3vl_tower_releases_folded_scale_before_nvfp4_install(monkeypatch) -> None:
+    """The folded FP8 side-channel must not stay live through the later packed install."""
+    from invokeai.backend.quantization.fp8_scaled import extract_fp8_scaled_layers
+    from tests.fixtures.quantized_payloads import quantize_scaled_fp8
+
+    payload = quantize_scaled_fp8(torch.ones(2, 2, dtype=torch.float32))
+    captured_scale = None
+
+    def capture_layers(sd, **kwargs):
+        nonlocal captured_scale
+        layers = extract_fp8_scaled_layers(sd, **kwargs)
+        captured_scale = weakref.ref(layers["proj"].weight_scale)
+        return layers
+
+    class TinyVision(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.proj = torch.nn.Linear(2, 2, bias=False)
+
+        @classmethod
+        def _from_config(cls, _config):
+            return cls()
+
+    install_started_with_live_scale = None
+
+    def observe_install(*args, **kwargs):
+        nonlocal install_started_with_live_scale
+        install_started_with_live_scale = captured_scale() is not None
+        return 0
+
+    monkeypatch.setattr(
+        krea2_module,
+        "read_qwen3vl_visual_tower_tensors",
+        lambda _files: {
+            "proj.weight": payload.codes,
+            "proj.weight_scale": payload.scale,
+        },
+    )
+    monkeypatch.setattr(krea2_module, "extract_fp8_scaled_layers", capture_layers)
+    monkeypatch.setattr(krea2_module, "_remap_qwen3vl_tower_keys", lambda entries, **_kwargs: entries)
+    monkeypatch.setattr(krea2_module, "install_nvfp4_layers", observe_install)
+    monkeypatch.setattr("transformers.models.qwen3_vl.modeling_qwen3_vl.Qwen3VLVisionModel", TinyVision)
+
+    krea2_module._load_qwen3vl_visual_tower(
+        [], SimpleNamespace(), torch.float32, reserve=lambda _bytes, **_kwargs: None
+    )
+
+    assert install_started_with_live_scale is False
 
 
 def test_an_nvfp4_layer_missing_its_global_scale_is_refused_before_the_cache_is_evicted(monkeypatch, tmp_path) -> None:

@@ -324,6 +324,7 @@ def test_the_windows_video_memory_budget_caps_the_measured_free_vram(monkeypatch
         shared_cpu_weights=None,
     )
     cache._execution_device = torch.device("cuda")  # policy only; every VRAM query below is patched out
+    monkeypatch.setattr(torch.version, "hip", "7.14.0")
     monkeypatch.setattr(torch.cuda, "mem_get_info", lambda device: (12 * GB, 16 * GB))
     monkeypatch.setattr(torch.cuda, "memory_allocated", lambda device: 2 * GB)
     monkeypatch.setattr(torch.cuda, "memory_reserved", lambda device: 2 * GB)
