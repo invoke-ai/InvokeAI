@@ -1,7 +1,7 @@
 ---
 title: Krea-2
-description: Generate images with the Krea-2 text-to-image models (Turbo and Raw), including the GGUF / single-file workflow, the conditioning enhancers, training-free style reference and edit LoRAs with reference images.
-lastUpdated: 2026-11-06
+description: Generate images with the Krea-2 text-to-image models (Turbo and Raw), including the GGUF / single-file workflow, the conditioning enhancers, training-free style reference, edit LoRAs with reference images and Control LoRAs.
+lastUpdated: 2026-11-18
 sidebar:
   order: 8
 ---
@@ -305,6 +305,61 @@ figures with reference images can mean the LoRA was trained with isolated refere
   node refuses either combination before it loads the model.
 - Image-to-image and inpainting work as usual: they act only on the image being generated, not on the
   references.
+:::
+
+## Control LoRA
+
+A Krea-2 Control LoRA guides the composition with a control image, such as a depth map, the way a ControlNet
+does. It is a single `.safetensors` file trained with
+[Krea-2-controlnet](https://github.com/Tanmaypatil123/Krea-2-controlnet); the public one is
+[Patil/Krea-2-depth-controlnet](https://huggingface.co/Patil/Krea-2-depth-controlnet)
+(`depth-control-lora.safetensors`). It is not a starter model: install it from the Model Manager by pasting the
+file's URL,
+`https://huggingface.co/Patil/Krea-2-depth-controlnet/resolve/main/depth-control-lora.safetensors`. It installs as a
+**Control LoRA** for Krea-2, and a file name that names its control type (`depth`, ...) sets the matching
+preprocessor in its default settings. It is a different kind of file
+from the ai-toolkit "controlnet" [edit LoRAs](#edit-loras-and-reference-images), which take their control image as
+a reference image and install as ordinary LoRAs.
+
+The file holds LoRAs for the transformer blocks and a trained replacement for the transformer's input projection.
+The control image is encoded with the VAE at the generation size, and its latent tokens are concatenated to the
+latent tokens of the image being generated before they enter the transformer, in every step and in both CFG passes.
+The LoRA's weight scales the block LoRAs; the trained input projection is always applied whole. A weight below 1
+relaxes how closely the image follows the control image, and above 1 tightens it at some cost in quality. The public
+checkpoint was trained on Krea-2-Raw and works on Raw and Turbo.
+
+A Control LoRA is trained for one control type and needs a control image of that type. The public one takes a depth
+map in which near is white, as the **Depth Anything** filter produces.
+
+### On the Canvas
+
+With a Krea-2 model selected, add a [control layer](/users-guide/canvas/introduction/#control-layers) with your
+image and choose the type the Control LoRA was trained for, **Depth** for the public one. Its default detection,
+**Depth Anything**, makes the depth map; choose *None: image is already a depth map* if your image is one. The
+**Model** row picks the installed Krea-2 Control LoRA made for the type, or lets you choose it. Set the **Weight**
+(1 for a new layer) and press Invoke. The Canvas encodes the map at the generation size for you.
+
+- Krea-2 runs one Control LoRA per generation. A second control layer with an image blocks Invoke with *Only one
+  Control LoRA can be used at a time.*
+- **Steps** has no effect: the Control LoRA applies in every step.
+
+### In the workflow editor
+
+1. An **Image to Latents - Qwen Image** node (`qwen_image_i2l`) with the control image, its **VAE** connected from
+   the Krea-2 model loader (or a Qwen-Image VAE loader), and its **Width** and **Height** set to the generation width
+   and height. Leave **Reference** off.
+2. A **Control LoRA - Krea-2** node (`krea2_control_lora`) with the Control LoRA model, the latents from step 1
+   on **Control Latents**, and a **Weight** (1 by default).
+3. Its output on the **Control LoRA** input (`krea2_denoise.control_lora`) of **Denoise - Krea-2**.
+
+:::caution[Limits]
+- The denoise node refuses control latents of another size than the generation's, and a model that is not a Krea-2
+  Control LoRA, before it loads the transformer.
+- A weight of 0 turns the Control LoRA off entirely; the denoise node then neither loads it nor reads the control
+  latents.
+- Regular LoRAs (including ones that train the transformer's input projection), edit references, style reference,
+  regional prompts, image-to-image and inpainting combine with a Control LoRA. Edit references keep the
+  transformer's own input projection.
 :::
 
 ## Attention backend

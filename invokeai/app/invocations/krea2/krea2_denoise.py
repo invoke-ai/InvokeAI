@@ -25,6 +25,7 @@ from invokeai.app.invocations.fields import (
     MetadataField,
     WithMetadata,
 )
+from invokeai.app.invocations.krea2.krea2_control_lora import Krea2ControlLoRAField
 from invokeai.app.invocations.metadata import (
     LatentsMetaOutput,
     build_denoise_metadata,
@@ -37,6 +38,7 @@ from invokeai.backend.krea2.attention import (
     build_krea2_attention_processors,
     resolve_krea2_sdpa_backends,
 )
+from invokeai.backend.krea2.control_lora import Krea2ControlLoRAExtension, Krea2ControlLoRAPatch
 from invokeai.backend.krea2.denoise_working_memory import estimate_krea2_denoise_working_memory
 from invokeai.backend.krea2.reference_edit import (
     Krea2ReferenceKVCache,
@@ -60,7 +62,7 @@ from invokeai.backend.krea2.sampling_utils import (
 from invokeai.backend.krea2.style_reference_extension import Krea2StyleReferenceExtension
 from invokeai.backend.krea2.text_encoding import KREA2_MAX_REFERENCE_IMAGES
 from invokeai.backend.model_manager.load.load_base import LoadedModel
-from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat
+from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType
 from invokeai.backend.patches.layer_patcher import LayerPatcher
 from invokeai.backend.patches.lora_conversions.krea2_lora_constants import KREA2_LORA_TRANSFORMER_PREFIX
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
@@ -134,7 +136,7 @@ class _Krea2StepBenchmark:
     title="Denoise - Krea-2",
     tags=["image", "krea2", "krea-2"],
     category="image",
-    version="1.5.0",
+    version="1.6.0",
     classification=Classification.Prototype,
 )
 class Krea2DenoiseInvocation(BaseInvocation, WithMetadata):
@@ -205,6 +207,13 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata):
         "pass, which is faster. Leave off for normal edit LoRAs. The LoRA file does not say which kind it is; "
         "check its model card. No effect without reference latents.",
         title="Reference K/V Cache",
+    )
+    control_lora: Optional[Krea2ControlLoRAField] = InputField(
+        default=None,
+        description="A Krea-2 Control LoRA and its control latents. The control image's latents are concatenated to "
+        "the latent tokens in both CFG passes; a weight of 0 is ignored entirely.",
+        input=Input.Connection,
+        title="Control LoRA",
     )
 
     @field_validator("cfg_scale")
@@ -501,6 +510,39 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata):
             return None, []
         return torch.cat(packed, dim=1), grids
 
+    def _active_control_lora(self) -> Krea2ControlLoRAField | None:
+        """The connected Control LoRA, or None when there is none or its weight is 0."""
+        if self.control_lora is None or self.control_lora.weight == 0:
+            return None
+        return self.control_lora
+
+    @staticmethod
+    def _validate_control_lora_model(context: InvocationContext, control_lora: Krea2ControlLoRAField) -> None:
+        config = context.models.get_config(control_lora.lora)
+        if config.base is not BaseModelType.Krea2 or config.type is not ModelType.ControlLoRa:
+            raise ValueError(
+                f"'{config.name}' is a {config.base.value} {config.type.value} model, not a Krea-2 Control LoRA."
+            )
+
+    def _load_control_tokens(
+        self, context: InvocationContext, control_lora: Krea2ControlLoRAField, dtype: torch.dtype, device: torch.device
+    ) -> torch.Tensor:
+        """Load the control latents and pack them like the target: ``(1, target_len, 64)``."""
+        latents = context.tensors.load(control_lora.control_latents.latents_name)
+        if latents.dim() == 5 and latents.shape[2] == 1:
+            latents = latents.squeeze(2)
+        latent_height = self.height // LATENT_SCALE_FACTOR
+        latent_width = self.width // LATENT_SCALE_FACTOR
+        expected = (1, KREA2_LATENT_CHANNELS, latent_height, latent_width)
+        if tuple(latents.shape) != expected:
+            raise ValueError(
+                f"Krea-2 control latents have shape {tuple(latents.shape)}; this generation needs {expected}. Encode "
+                f"the control image with 'Image to Latents - Qwen Image' at the generation width and height "
+                f"({self.width}x{self.height})."
+            )
+        latents = latents.to(device=device, dtype=dtype)
+        return pack_latents(latents, 1, KREA2_LATENT_CHANNELS, latent_height, latent_width)
+
     def _is_distilled(self, context: InvocationContext) -> bool:
         """Whether the transformer is the distilled Turbo checkpoint (fixed mu) vs. Raw (dynamic mu).
 
@@ -543,6 +585,11 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata):
         # K/V-cache mode keeps the references out of the per-step sequence: they run once, alone, before the loop.
         cache_references = self.reference_kv_cache and reference_tokens is not None
         joint_references = None if cache_references else reference_tokens
+        control_lora = self._active_control_lora()
+        control_tokens = None
+        if control_lora is not None:
+            self._validate_control_lora_model(context, control_lora)
+            control_tokens = self._load_control_tokens(context, control_lora, inference_dtype, device)
 
         transformer_info = context.models.load(self.transformer.transformer)
 
@@ -700,6 +747,11 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata):
         # Loaded once: the estimate prices these patches and the patcher applies the same ones. Each load reports its
         # progress, and the un-entered wrappers keep the LoRA records shielded from eviction until the patcher pins them.
         loaded_loras = [(lora, self._load_lora(context, lora)) for lora in self.transformer.loras]
+        loaded_control_lora = self._load_lora(context, control_lora) if control_lora is not None else None
+        # The Control LoRA's block layers go on with the others; its input projection goes on as a hook below.
+        patch_loras = (
+            loaded_loras if loaded_control_lora is None else [*loaded_loras, (control_lora, loaded_control_lora)]
+        )
 
         # The transformer's lock reserves what the whole denoise needs beside the weights: the forward, the cached
         # reference or style K/V, regional masks and the LoRA patches applied under it.
@@ -713,7 +765,7 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata):
             reference_seq_len=reference_seq_len,
             cache_references=cache_references,
             cfg=do_cfg,
-            loras=[(lora_info.model, lora_info.config.file_size) for _, lora_info in loaded_loras],
+            loras=[(lora_info.model, lora_info.config.file_size) for _, lora_info in patch_loras],
             regional_mask_bytes=self._regional_attention_mask_bytes(pos_extension, neg_extension, inference_dtype),
             style_kv_bytes=style_extension.kv_cache_bytes(inference_dtype) if style_extension is not None else 0,
             device=device,
@@ -752,7 +804,7 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata):
                 LayerPatcher.apply_smart_model_patches(
                     model=transformer,
                     patches=(
-                        (lora_info.model, lora.weight, lora_info.model_in_ram()) for lora, lora_info in loaded_loras
+                        (lora_info.model, lora.weight, lora_info.model_in_ram()) for lora, lora_info in patch_loras
                     ),
                     prefix=KREA2_LORA_TRANSFORMER_PREFIX,
                     dtype=inference_dtype,
@@ -760,6 +812,23 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata):
                     force_sidecar_patching=model_is_quantized,
                 )
             )
+
+            control_projection: Krea2ControlLoRAExtension | None = None
+            if loaded_control_lora is not None:
+                assert control_tokens is not None
+                control_patch = loaded_control_lora.model
+                if not isinstance(control_patch, Krea2ControlLoRAPatch):
+                    raise TypeError(
+                        f"Expected Krea2ControlLoRAPatch for Control LoRA '{control_lora.lora.key}', got "
+                        f"{type(control_patch).__name__}."
+                    )
+                control_projection = Krea2ControlLoRAExtension(
+                    weight=control_patch.input_projection_weight.to(device=device, dtype=inference_dtype),
+                    bias=control_patch.input_projection_bias.to(device=device, dtype=inference_dtype),
+                    control_tokens=control_tokens,
+                    loras=[(lora_info.model, lora.weight) for lora, lora_info in loaded_loras],
+                )
+                exit_stack.enter_context(control_projection.install(transformer))
 
             pos_attention_payload = self._build_attention_payload(pos_extension, inference_dtype)
             neg_attention_payload = (
@@ -796,21 +865,23 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata):
                 timestep: torch.Tensor,
                 pass_position_ids: torch.Tensor,
             ) -> torch.Tensor:
-                if joint_references is None:
-                    # Cached references enter through the attention processors.
-                    return transformer(
-                        hidden_states=model_latents,
-                        encoder_hidden_states=prompt_embeds,
-                        encoder_attention_mask=None,
-                        timestep=timestep,
-                        position_ids=pass_position_ids,
-                        return_dict=False,
-                    )[0]
-                # Both CFG passes carry the references (as in Qwen-Image-Edit), so guidance contrasts the
-                # prompts and not the presence of the edit reference.
-                return forward_with_references(
-                    transformer, model_latents, prompt_embeds, timestep, pass_position_ids, joint_references
-                )
+                # The control is in both CFG passes, as in the Control LoRA's reference pipeline.
+                with control_projection.armed() if control_projection is not None else nullcontext():
+                    if joint_references is None:
+                        # Cached references enter through the attention processors.
+                        return transformer(
+                            hidden_states=model_latents,
+                            encoder_hidden_states=prompt_embeds,
+                            encoder_attention_mask=None,
+                            timestep=timestep,
+                            position_ids=pass_position_ids,
+                            return_dict=False,
+                        )[0]
+                    # Both CFG passes carry the references (as in Qwen-Image-Edit), so guidance contrasts the
+                    # prompts and not the presence of the edit reference.
+                    return forward_with_references(
+                        transformer, model_latents, prompt_embeds, timestep, pass_position_ids, joint_references
+                    )
 
             for step_idx, t in enumerate(tqdm(timesteps_sched)):
                 if benchmark is not None:

@@ -1764,6 +1764,9 @@
                       "$ref": "#/components/schemas/ControlLoRA_LyCORIS_FLUX_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/ControlLoRA_LyCORIS_Krea2_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/T5Encoder_T5Encoder_Config"
                     },
                     {
@@ -2369,6 +2372,9 @@
                       "$ref": "#/components/schemas/ControlLoRA_LyCORIS_FLUX_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/ControlLoRA_LyCORIS_Krea2_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/T5Encoder_T5Encoder_Config"
                     },
                     {
@@ -2972,6 +2978,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/ControlLoRA_LyCORIS_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ControlLoRA_LyCORIS_Krea2_Config"
                     },
                     {
                       "$ref": "#/components/schemas/T5Encoder_T5Encoder_Config"
@@ -3621,6 +3630,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/ControlLoRA_LyCORIS_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ControlLoRA_LyCORIS_Krea2_Config"
                     },
                     {
                       "$ref": "#/components/schemas/T5Encoder_T5Encoder_Config"
@@ -4297,6 +4309,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/ControlLoRA_LyCORIS_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ControlLoRA_LyCORIS_Krea2_Config"
                     },
                     {
                       "$ref": "#/components/schemas/T5Encoder_T5Encoder_Config"
@@ -5848,6 +5863,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/ControlLoRA_LyCORIS_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ControlLoRA_LyCORIS_Krea2_Config"
                     },
                     {
                       "$ref": "#/components/schemas/T5Encoder_T5Encoder_Config"
@@ -21858,6 +21876,9 @@
             "$ref": "#/components/schemas/ControlLoRA_LyCORIS_FLUX_Config"
           },
           {
+            "$ref": "#/components/schemas/ControlLoRA_LyCORIS_Krea2_Config"
+          },
+          {
             "$ref": "#/components/schemas/T5Encoder_T5Encoder_Config"
           },
           {
@@ -29510,6 +29531,165 @@
         ],
         "title": "ControlLoRA_LyCORIS_FLUX_Config",
         "description": "Model config for Control LoRA models."
+      },
+      "ControlLoRA_LyCORIS_Krea2_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "roles": {
+            "items": {
+              "$ref": "#/components/schemas/ModelRole"
+            },
+            "type": "array",
+            "title": "Roles",
+            "description": "Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh."
+          },
+          "default_settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ControlAdapterDefaultSettings"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "base": {
+            "type": "string",
+            "const": "krea-2",
+            "title": "Base",
+            "default": "krea-2"
+          },
+          "type": {
+            "type": "string",
+            "const": "control_lora",
+            "title": "Type",
+            "default": "control_lora"
+          },
+          "format": {
+            "type": "string",
+            "const": "lycoris",
+            "title": "Format",
+            "default": "lycoris"
+          },
+          "trigger_phrases": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger Phrases"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "roles",
+          "default_settings",
+          "base",
+          "type",
+          "format",
+          "trigger_phrases"
+        ],
+        "title": "ControlLoRA_LyCORIS_Krea2_Config",
+        "description": "Model config for Krea-2 Control LoRAs: native block LoRAs (`.A`/`.B`) and a widened `first` projection."
       },
       "ControlNetInvocation": {
         "category": "conditioning",
@@ -48489,6 +48669,9 @@
                   "$ref": "#/components/schemas/Krea2ConditioningRebalanceInvocation"
                 },
                 {
+                  "$ref": "#/components/schemas/Krea2ControlLoRAInvocation"
+                },
+                {
                   "$ref": "#/components/schemas/Krea2DenoiseInvocation"
                 },
                 {
@@ -49348,6 +49531,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/Krea2ConditioningOutput"
+                },
+                {
+                  "$ref": "#/components/schemas/Krea2ControlLoRAOutput"
                 },
                 {
                   "$ref": "#/components/schemas/Krea2LoRALoaderOutput"
@@ -59362,6 +59548,9 @@
                 "$ref": "#/components/schemas/Krea2ConditioningRebalanceInvocation"
               },
               {
+                "$ref": "#/components/schemas/Krea2ControlLoRAInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/Krea2DenoiseInvocation"
               },
               {
@@ -60217,6 +60406,9 @@
               },
               {
                 "$ref": "#/components/schemas/Krea2ConditioningOutput"
+              },
+              {
+                "$ref": "#/components/schemas/Krea2ControlLoRAOutput"
               },
               {
                 "$ref": "#/components/schemas/Krea2LoRALoaderOutput"
@@ -61107,6 +61299,9 @@
               },
               {
                 "$ref": "#/components/schemas/Krea2ConditioningRebalanceInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Krea2ControlLoRAInvocation"
               },
               {
                 "$ref": "#/components/schemas/Krea2DenoiseInvocation"
@@ -62335,6 +62530,9 @@
           "krea2_conditioning_rebalance": {
             "$ref": "#/components/schemas/Krea2ConditioningOutput"
           },
+          "krea2_control_lora": {
+            "$ref": "#/components/schemas/Krea2ControlLoRAOutput"
+          },
           "krea2_denoise": {
             "$ref": "#/components/schemas/LatentsMetaOutput"
           },
@@ -63110,6 +63308,7 @@
           "ip_adapter",
           "iterate",
           "krea2_conditioning_rebalance",
+          "krea2_control_lora",
           "krea2_denoise",
           "krea2_lora_collection_loader",
           "krea2_lora_loader",
@@ -63914,6 +64113,9 @@
               },
               {
                 "$ref": "#/components/schemas/Krea2ConditioningRebalanceInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Krea2ControlLoRAInvocation"
               },
               {
                 "$ref": "#/components/schemas/Krea2DenoiseInvocation"
@@ -65243,6 +65445,9 @@
               },
               {
                 "$ref": "#/components/schemas/Krea2ConditioningRebalanceInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Krea2ControlLoRAInvocation"
               },
               {
                 "$ref": "#/components/schemas/Krea2DenoiseInvocation"
@@ -68170,6 +68375,142 @@
           "$ref": "#/components/schemas/Krea2ConditioningOutput"
         }
       },
+      "Krea2ControlLoRAField": {
+        "description": "A Krea-2 Control LoRA, its block-LoRA weight and the control latents it conditions on.",
+        "properties": {
+          "lora": {
+            "$ref": "#/components/schemas/ModelIdentifierField",
+            "description": "Info to load lora model"
+          },
+          "weight": {
+            "description": "Weight to apply to lora model",
+            "title": "Weight",
+            "type": "number"
+          },
+          "control_latents": {
+            "$ref": "#/components/schemas/LatentsField",
+            "description": "The control image (e.g. a depth map) encoded by 'Image to Latents - Qwen Image' at the generation width and height."
+          }
+        },
+        "required": ["lora", "weight", "control_latents"],
+        "title": "Krea2ControlLoRAField",
+        "type": "object"
+      },
+      "Krea2ControlLoRAInvocation": {
+        "category": "conditioning",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Condition a Krea-2 generation on a control image through a Krea-2 Control LoRA.\n\nA Control LoRA is trained for one control type (the public one is depth, near = white). The control image's\nlatents are concatenated to the latent tokens at the transformer input. Works on Krea-2 Raw and Turbo.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "lora": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Control LoRA model to load",
+            "field_kind": "input",
+            "input": "any",
+            "orig_required": true,
+            "title": "Control LoRA",
+            "ui_model_base": ["krea-2"],
+            "ui_model_type": ["control_lora"]
+          },
+          "control_latents": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LatentsField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The control image (e.g. a depth map) encoded by 'Image to Latents - Qwen Image' at the generation width and height.",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true,
+            "title": "Control Latents"
+          },
+          "weight": {
+            "default": 1.0,
+            "description": "Scales the LoRA's block weights; 0 disables the control LoRA. The trained input projection is always applied whole.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": 1.0,
+            "orig_required": false,
+            "title": "Weight",
+            "type": "number"
+          },
+          "type": {
+            "const": "krea2_control_lora",
+            "default": "krea2_control_lora",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["lora", "control", "krea2", "krea-2"],
+        "title": "Control LoRA - Krea-2",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/Krea2ControlLoRAOutput"
+        }
+      },
+      "Krea2ControlLoRAOutput": {
+        "class": "output",
+        "description": "Krea-2 Control LoRA output.",
+        "properties": {
+          "control_lora": {
+            "$ref": "#/components/schemas/Krea2ControlLoRAField",
+            "description": "Krea-2 Control LoRA",
+            "field_kind": "output",
+            "title": "Control LoRA",
+            "ui_hidden": false
+          },
+          "type": {
+            "const": "krea2_control_lora_output",
+            "default": "krea2_control_lora_output",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["output_meta", "control_lora", "type", "type"],
+        "title": "Krea2ControlLoRAOutput",
+        "type": "object"
+      },
       "Krea2DenoiseInvocation": {
         "category": "image",
         "class": "invocation",
@@ -68483,6 +68824,23 @@
             "title": "Reference K/V Cache",
             "type": "boolean"
           },
+          "control_lora": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Krea2ControlLoRAField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "A Krea-2 Control LoRA and its control latents. The control image's latents are concatenated to the latent tokens in both CFG passes; a weight of 0 is ignored entirely.",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Control LoRA"
+          },
           "type": {
             "const": "krea2_denoise",
             "default": "krea2_denoise",
@@ -68495,7 +68853,7 @@
         "tags": ["image", "krea2", "krea-2"],
         "title": "Denoise - Krea-2",
         "type": "object",
-        "version": "1.5.0",
+        "version": "1.6.0",
         "output": {
           "$ref": "#/components/schemas/LatentsMetaOutput"
         }
@@ -97178,6 +97536,9 @@
                 "$ref": "#/components/schemas/ControlLoRA_LyCORIS_FLUX_Config"
               },
               {
+                "$ref": "#/components/schemas/ControlLoRA_LyCORIS_Krea2_Config"
+              },
+              {
                 "$ref": "#/components/schemas/T5Encoder_T5Encoder_Config"
               },
               {
@@ -98029,6 +98390,9 @@
                     "$ref": "#/components/schemas/ControlLoRA_LyCORIS_FLUX_Config"
                   },
                   {
+                    "$ref": "#/components/schemas/ControlLoRA_LyCORIS_Krea2_Config"
+                  },
+                  {
                     "$ref": "#/components/schemas/T5Encoder_T5Encoder_Config"
                   },
                   {
@@ -98810,6 +99174,9 @@
                 "$ref": "#/components/schemas/ControlLoRA_LyCORIS_FLUX_Config"
               },
               {
+                "$ref": "#/components/schemas/ControlLoRA_LyCORIS_Krea2_Config"
+              },
+              {
                 "$ref": "#/components/schemas/T5Encoder_T5Encoder_Config"
               },
               {
@@ -99400,6 +99767,9 @@
               },
               {
                 "$ref": "#/components/schemas/ControlLoRA_LyCORIS_FLUX_Config"
+              },
+              {
+                "$ref": "#/components/schemas/ControlLoRA_LyCORIS_Krea2_Config"
               },
               {
                 "$ref": "#/components/schemas/T5Encoder_T5Encoder_Config"
@@ -100572,6 +100942,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/ControlLoRA_LyCORIS_FLUX_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/ControlLoRA_LyCORIS_Krea2_Config"
                 },
                 {
                   "$ref": "#/components/schemas/T5Encoder_T5Encoder_Config"

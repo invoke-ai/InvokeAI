@@ -1,7 +1,7 @@
 ---
 title: Crafting images with the Canvas
 description: An introduction to the Canvas — layers and masks, sending generations to the Canvas, inpainting, outpainting, regional prompts, control layers, drawing and adding gallery images.
-lastUpdated: 2026-10-31
+lastUpdated: 2026-11-18
 ---
 
 import { Image } from 'astro:assets';
@@ -159,7 +159,7 @@ Once a map has been detected, a switch above the canvas shows the layer as its *
 
 An empty control layer, or one with neither a type nor a model, only shows a warning and contributes nothing; Invoke stays available. A control layer with an image blocks Invoke if no model can be chosen for it, or if its map is out of date. **Invoke** then shows the number of issues, for example *Invoke · 1 issue*; click it to list them, and choose **Show layer** to select the layer that needs attention.
 
-Control layers work with SD 1.5, SDXL, FLUX.1, FLUX.2 [dev], Qwen Image, Z-Image and Anima, and need a control model for the same family, installed from the Model Manager's starter models. If no model fits, the **Model** row says so, with a link to the Model Manager when you can manage models.
+Control layers work with SD 1.5, SDXL, FLUX.1, FLUX.2 [dev], Qwen Image, Krea-2, Z-Image and Anima, and need a control model for the same family, installed from the Model Manager's starter models. On Krea-2 the control model is a [Control LoRA](/users-guide/models/local-models/krea-2/#control-lora), installed from its Hugging Face file rather than the starter models. If no model fits, the **Model** row says so, with a link to the Model Manager when you can manage models.
 
 ## Drawing on a raster layer
 
