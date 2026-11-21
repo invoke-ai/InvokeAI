@@ -643,6 +643,12 @@ export const getDefaultLoraWeight = (model: LoraModelConfig): number => {
     : DEFAULT_LORA_WEIGHT_CONFIG.initial;
 };
 
+/** The weight slider's track; an unset bound falls back like the backend's effective-range validator. */
+export const getLoraWeightSliderRange = (model: LoraModelConfig): { max: number; min: number } => ({
+  max: model.default_settings?.weight_max ?? DEFAULT_LORA_WEIGHT_CONFIG.sliderMax,
+  min: model.default_settings?.weight_min ?? DEFAULT_LORA_WEIGHT_CONFIG.sliderMin,
+});
+
 const areModelSnapshotsEqual = (a: unknown, b: unknown): boolean => {
   if (a === b) {
     return true;
