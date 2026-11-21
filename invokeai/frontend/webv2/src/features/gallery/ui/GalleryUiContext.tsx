@@ -12,7 +12,7 @@ import type { QueueProgressSession } from '@features/queue/contracts';
 import type { ResolvedValues } from '@platform/core/resolvedValues';
 
 import { asSingleAccountBoards } from '@features/gallery/core/boardAccess';
-import { getContextMenuPoint } from '@platform/react/contextMenuPoint';
+import { getContextMenuPoint, getContextMenuPointBelow } from '@platform/react/contextMenuPoint';
 import { createKeyedTransientStore, type KeyedTransientStore } from '@platform/state/externalStore';
 import {
   createContext,
@@ -325,9 +325,13 @@ const isGalleryItem = (media: GalleryItem | GalleryItemRef): media is GalleryIte
  * The item menu on right-click (or the context-menu key) for an element showing gallery media; pass the item itself
  * when the surface has it, so the menu opens without a fetch. Undefined without media or outside the workbench (a
  * `GalleryHostProvider` host), where the browser's own menu stays.
+ *
+ * `anchor` opens the menu below what it returns, or else below the handler's element, whatever the event's position:
+ * for an element that only highlights the media (a field driving `aria-activedescendant`).
  */
 export const useGalleryItemContextMenu = (
-  media: GalleryItem | GalleryItemRef | null
+  media: GalleryItem | GalleryItemRef | null,
+  anchor?: () => Element | null
 ): ((event: MouseEvent<HTMLElement>) => void) | undefined => {
   const host = use(GalleryHostContext);
   const open = use(GalleryItemContextMenuContext);
@@ -356,13 +360,13 @@ export const useGalleryItemContextMenu = (
       const opener = getFocusedElement();
 
       open({
-        ...getContextMenuPoint(event),
+        ...(anchor ? getContextMenuPointBelow(anchor() ?? currentTarget) : getContextMenuPoint(event)),
         item,
         ref: { kind, name },
         returnFocus: () => (opener?.isConnected ? opener : null),
       });
     },
-    [item, kind, name, open]
+    [anchor, item, kind, name, open]
   );
 
   return host || !open || kind === undefined || name === undefined ? undefined : handleContextMenu;
