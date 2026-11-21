@@ -113,7 +113,7 @@ for more details.
 * **Aspect Ratio** presets (21:9 through 9:21) drive text-to-video output. As soon as conditioning media is set, **its aspect ratio takes over** and the preset locks — the readout names the source ("from the first frame").
 * **Target Resolution** picks the size tier within that ratio:
   * Wan — **480p** and **720p** (native), **1080p** (extrapolated beyond the training distribution; expect softer results).
-  * MiniMax H3 — **768 highres** (native: short edge 768) and **768 lowres** (fast preview: long edge 768).
+  * MiniMax H3 — **768 highres** (native: short edge 768) and **768 lowres** (fast preview: long edge 768), plus **480p** and **544p** draft presets (target short edge, under the native area cap).
   * LTX-2 — **512p**, **704p** (default) and **768p** in one pass; **1024p** and **1536p** are [two-stage](/users-guide/video-generation/ltx-2/#two-stage-presets), and much slower.
   The panel derives exact pixel dimensions automatically, snapped to each model's grid — you never do the multiple-of-16/32 math yourself.
 * **Frames** sets clip length:
