@@ -44,7 +44,6 @@ import {
   getImageRecallMessage,
   readMetadataReferenceImages,
   getImageRecallTitle,
-  getRecordedComponentSettings,
   isImageRecallKindAvailable,
   type ImageRecallKind,
   type ImageRecallSkip,
@@ -516,18 +515,16 @@ export const executeImageRecall = async ({
     }
 
     // An image that names no model leaves the fallback model of a fresh project, which takes its defaults after all,
-    // but only for the slots the image says nothing about: one it records as empty stays cleared.
+    // but not for a slot recall set from the image (a pick, or an explicit empty one): those are held, and the
+    // defaults resolve beside them, so a slot that hangs on a cleared one is not filled either. A pick recall rejected
+    // leaves its slot to the default.
     if (recallsModel && !result.fields.includes('model') && !normalizeGenerateWidgetValues(getGenerateValues())) {
-      const recorded: ReadonlySet<string> = new Set([
-        ...getRecordedComponentSettings(metadata, models),
-        ...(result.fields.includes('vae') ? ['vae'] : []),
-      ]);
+      const held = [...result.appliedComponents, ...(result.fields.includes('vae') ? (['vae'] as const) : [])];
 
-      const fills = Object.entries(getModelDefaultFills(result.values.model, result.values, models)).filter(
-        ([setting]) => !recorded.has(setting)
-      );
-
-      result.values = { ...result.values, ...Object.fromEntries(fills) };
+      result.values = {
+        ...result.values,
+        ...getModelDefaultFills(result.values.model, result.values, models, { held }),
+      };
     }
 
     if (result.fields.includes('referenceImages') && result.values.referenceImages.length > 0) {

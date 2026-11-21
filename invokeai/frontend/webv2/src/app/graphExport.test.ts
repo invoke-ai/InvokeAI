@@ -140,17 +140,23 @@ describe('graph export', () => {
 
   it('takes the default component the way Generate does: not while its files are missing', () => {
     const zImage = { ...sdxlCase('z-image'), model_key: 'z-image-gguf' };
-    const withDefault = (flagged: boolean) =>
-      MODELS.map((entry) =>
+    const withDefault = (flagged: boolean, missingFirst = false) => {
+      const models = MODELS.map((entry) =>
         entry.key === 'z-image-gguf'
           ? { ...entry, default_settings: { components: { qwen3_encoder: 'qwen3-4b-gguf' } } }
           : entry.key === 'qwen3-4b-gguf'
             ? { ...entry, ...(flagged ? { is_missing: true } : {}) }
             : entry
       );
+      const missing = models.find((entry) => entry.key === 'qwen3-4b-gguf')!;
+
+      return missingFirst ? [missing, ...models.filter((entry) => entry !== missing)] : models;
+    };
 
     expect(exportOne(zImage, withDefault(false)).components.qwen3EncoderModel).toBe('qwen3-4b-gguf');
+    // Whichever comes first in the catalog, the required-slot fallback skips the missing encoder too.
     expect(exportOne(zImage, withDefault(true)).components.qwen3EncoderModel).toBe('qwen3-4b');
+    expect(exportOne(zImage, withDefault(true, true)).components.qwen3EncoderModel).toBe('qwen3-4b');
   });
 
   it('fills required components from the installed models and keeps explicit picks', () => {

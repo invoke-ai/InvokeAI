@@ -903,6 +903,57 @@ describe('executeImageRecall', () => {
       expect(cleared.componentSourceModel).toBeNull();
     });
 
+    it('fills the default for a slot whose recorded pick recall rejected', async () => {
+      const qwen = (key: string, variant: string) =>
+        ({
+          base: 'any',
+          format: 'checkpoint',
+          key,
+          name: key,
+          type: 'qwen3_encoder',
+          variant,
+        }) as unknown as ModelConfig;
+      const small = qwen('enc-06b', 'qwen3_06b');
+      const fitting = qwen('enc-4b', 'qwen3_4b');
+      const zImage = {
+        base: 'z-image',
+        default_settings: { components: { qwen3_encoder: fitting.key } },
+        format: 'checkpoint',
+        key: 'z-main',
+        name: 'Z-Image',
+        type: 'main',
+      } as unknown as ModelConfig;
+
+      const values = await recallValues('remix', { positive_prompt: 'p', qwen3_encoder: { key: small.key } }, zImage, [
+        zImage,
+        small,
+        fitting,
+      ]);
+
+      expect(values.qwen3EncoderModel?.key).toBe(fitting.key);
+    });
+
+    it('leaves the default vision tower out when the image clears the encoder it hangs on', async () => {
+      const tower = { ...encoder, key: 'q21-tower', name: 'Tower', type: 'qwen3_vl_vision_tower' } as ModelConfig;
+      const withTower = {
+        ...q21,
+        default_settings: { components: { qwen3_vl_encoder: encoder.key, qwen3_vl_vision_tower: tower.key } },
+      } as unknown as ModelConfig;
+      const installed = [withTower, encoder, tower];
+
+      const filled = await recallValues('remix', { positive_prompt: 'p' }, withTower, installed);
+      expect(filled.qwen3VLVisionTowerModel?.key).toBe(tower.key);
+
+      const cleared = await recallValues(
+        'remix',
+        { positive_prompt: 'p', qwen3_vl_encoder: null },
+        withTower,
+        installed
+      );
+      expect(cleared.qwen3VLEncoderModel).toBeNull();
+      expect(cleared.qwen3VLVisionTowerModel).toBeNull();
+    });
+
     it('keeps a VAE the image records as empty cleared', async () => {
       const vae = { base: 'flux', format: 'checkpoint', key: 'flux-vae', name: 'FLUX VAE', type: 'vae' } as ModelConfig;
       const flux = {

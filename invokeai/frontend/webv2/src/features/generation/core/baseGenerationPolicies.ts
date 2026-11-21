@@ -1678,6 +1678,25 @@ export const isComponentCompatibleWithModel = (
 
 export type ModelDefaultComponents = Partial<Pick<GenerateSettings, DefaultComponentSlot['setting']>>;
 
+/**
+ * `settings` with each component pick replaced by the catalog's record of it, where it is installed: a copy saved with
+ * the project keeps the variant or base the pick had when it was made, which the catalog may have reclassified since.
+ */
+const withCatalogRecords = (settings: GenerateSettings, models: readonly ModelConfig[]): GenerateSettings => {
+  const current: Record<string, unknown> = { ...settings };
+
+  for (const setting of GENERATE_COMPONENT_VALUE_KEYS) {
+    const picked = settings[setting];
+    const installed = picked ? models.find((candidate) => candidate.key === picked.key && !candidate.is_missing) : null;
+
+    if (installed) {
+      current[setting] = installed;
+    }
+  }
+
+  return current as unknown as GenerateSettings;
+};
+
 /** Registered and loadable: a model whose files moved is listed (`is_missing`) but a default cannot take it. */
 const isInstalled = (models: readonly ModelConfig[], selected: { key: string }): boolean =>
   models.some((installed) => installed.key === selected.key && !installed.is_missing);
@@ -1757,20 +1776,7 @@ export const getModelDefaultComponents = (
   const stored = (model.default_settings as { components?: Record<string, string> | null } | null | undefined)
     ?.components;
   const patch: Partial<Record<DefaultComponentSlot['setting'], ComponentModelConfig>> = {};
-  // The picks as the catalog describes them now: a copy saved with the project keeps the variant it was picked with,
-  // which the catalog may have reclassified since.
-  const current: Record<string, unknown> = { ...settings };
-
-  for (const setting of GENERATE_COMPONENT_VALUE_KEYS) {
-    const picked = settings[setting];
-    const installed = picked ? models.find((candidate) => candidate.key === picked.key && !candidate.is_missing) : null;
-
-    if (installed) {
-      current[setting] = installed;
-    }
-  }
-
-  const fresh = current as unknown as GenerateSettings;
+  const fresh = withCatalogRecords(settings, models);
   let next = fresh;
   let pending = Object.entries(stored ?? {}).flatMap(([persistenceKey, modelKey]) => {
     const slot = getDefaultComponentSlot(persistenceKey);
@@ -1912,17 +1918,45 @@ export const pruneClosedDefaultComponents = (
   return components;
 };
 
+/** `model` without the stored defaults of the `held` slots, which the caller keeps as they are, empty ones included. */
+const withoutDefaultsOf = (
+  model: GenerateModelConfig,
+  held: readonly (DefaultComponentSlot['setting'] | 'vae')[]
+): GenerateModelConfig => {
+  if (held.length === 0 || model.type === 'external_image_generator') {
+    return model;
+  }
+
+  const stored = model.default_settings as { components?: Record<string, string> | null; vae?: string | null } | null;
+  const heldKeys = new Set(
+    DEFAULT_COMPONENT_SLOTS.filter(({ setting }) => held.includes(setting)).map(({ persistenceKey }) => persistenceKey)
+  );
+  const components = Object.fromEntries(Object.entries(stored?.components ?? {}).filter(([key]) => !heldKeys.has(key)));
+
+  return {
+    ...model,
+    default_settings: {
+      ...stored,
+      components,
+      ...(held.includes('vae') ? { vae: null } : {}),
+    },
+  } as GenerateModelConfig;
+};
+
 /**
  * What a model's defaults fill into the slots of `settings` that are empty: its default components, and its default
  * VAE where the model has a VAE picker the VAE fits. A selection that fits stays.
  */
 export const getModelDefaultFills = (
-  model: GenerateModelConfig,
+  fillModel: GenerateModelConfig,
   settings: GenerateSettings,
-  models: readonly ModelConfig[]
+  models: readonly ModelConfig[],
+  { held = [] }: { held?: readonly (DefaultComponentSlot['setting'] | 'vae')[] } = {}
 ): Partial<GenerateSettings> => {
+  const model = withoutDefaultsOf(fillModel, held);
   const components = getModelDefaultComponents(model, settings, models);
-  const filled = { ...settings, ...components };
+  const current = withCatalogRecords(settings, models);
+  const filled = { ...current, ...components };
   const hasVaeSlot = isSlotOffered(model, filled, 'vae');
   const fitsVae = (vae: VaeModelConfig) =>
     hasVaeSlot
@@ -1931,7 +1965,7 @@ export const getModelDefaultFills = (
 
   // A VAE that is installed and fits stays; one left over from another family (a fallback from an unsupported model)
   // gives way to the default.
-  if (settings.vae && isInstalled(models, settings.vae) && fitsVae(settings.vae)) {
+  if (current.vae && isInstalled(models, current.vae) && fitsVae(current.vae)) {
     return components;
   }
 

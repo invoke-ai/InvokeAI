@@ -284,7 +284,8 @@ const withFirstRequiredComponent = (
     }
 
     for (const candidate of models) {
-      const value = fitsSlot(slot, candidate, ctx) ? toSlotValue(slot, candidate) : null;
+      // A registered model whose files are gone is listed but cannot be loaded.
+      const value = !candidate.is_missing && fitsSlot(slot, candidate, ctx) ? toSlotValue(slot, candidate) : null;
 
       if (value) {
         return { ...values, [slot.key]: value };

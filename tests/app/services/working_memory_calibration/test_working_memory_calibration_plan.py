@@ -14,6 +14,7 @@ from diffusers import AutoencoderKL, AutoencoderKLFlux2
 
 from invokeai.app.services.config import get_config
 from invokeai.app.services.invoker import Invoker
+from invokeai.app.services.model_records.missing_models import is_model_missing
 from invokeai.app.services.working_memory_calibration.working_memory_calibration_default import _vae_dtypes
 from invokeai.app.services.working_memory_calibration.working_memory_calibration_plan import (
     DECODE_LINES,
@@ -1075,3 +1076,40 @@ def test_a_self_contained_z_image_pipeline_decodes_with_the_vae_of_its_default_c
     assert _lines_of(
         _plan(_with_default_components(sdnq, component_source="z-image"), [pipeline], vae_dtypes=FP32_VAES)
     ) == {("decode_bf16", ())}
+
+
+def test_a_z_image_default_source_whose_files_are_gone_sizes_no_case(tmp_path: Path, mock_invoker: Invoker) -> None:
+    """Generate skips a registered model whose files moved, so the graph decodes with the VAE it would without it."""
+    models_dir = tmp_path / "models"
+    (models_dir / "z-image").mkdir(parents=True)
+    (models_dir / "z-image-gguf.gguf").touch()
+    (models_dir / "ae.safetensors").touch()
+    gguf = _with_default_components(
+        _model("z-image-gguf", BaseModelType.ZImage, format="gguf_quantized", path="z-image-gguf.gguf"),
+        component_source="z-image",
+    )
+    pipeline = _model("z-image", BaseModelType.ZImage, format="diffusers", path="z-image")
+    flux_vae = _model("ae", BaseModelType.Flux, ModelType.VAE, format="checkpoint", path="ae.safetensors")
+
+    def plan_lines(models: list) -> set:
+        model_manager = MagicMock()
+        model_manager.store.get_model.return_value = gguf
+        model_manager.store.all_models.return_value = [gguf, *models]
+        mock_invoker.services.model_manager = model_manager
+        mock_invoker.services.configuration.models_dir = models_dir
+        service = calibration_service(
+            tmp_path,
+            untiled_decode_reservation=lambda estimator, h, w, dtype, device: 1000 * h * w,
+            vae_dtypes=FP32_VAES,
+            is_model_missing=is_model_missing,
+        )
+        service.start(mock_invoker)
+        try:
+            return {(case.line, tuple(case.components.items())) for case in service.get_plan(gguf.key).cases}
+        finally:
+            service.stop(mock_invoker)
+
+    # The pipeline's own VAE loads in bf16; the standalone FLUX VAE the model falls back to stays fp32.
+    assert plan_lines([pipeline, flux_vae]) == {("decode_bf16", ())}
+    (models_dir / "z-image").rmdir()
+    assert plan_lines([pipeline, flux_vae]) == plan_lines([flux_vae]) == {("decode_fp32", ())}

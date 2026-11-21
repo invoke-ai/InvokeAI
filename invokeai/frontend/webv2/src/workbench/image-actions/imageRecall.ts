@@ -148,6 +148,8 @@ export interface ImageRecallSkip {
 }
 
 export interface ImageRecallResult {
+  /** The component settings recall set from the image, an explicit empty one included; a pick it rejected is not. */
+  appliedComponents: DefaultComponentSlot['setting'][];
   fields: RecalledField[];
   skipped: ImageRecallSkip[];
   values: GenerateWidgetValues;
@@ -941,14 +943,8 @@ const getComponentPatch = (
   return patch;
 };
 
-/** The component settings the image records, an explicit empty one included. */
-export const getRecordedComponentSettings = (
-  metadata: unknown,
-  models: readonly ComponentModelConfig[]
-): RecalledComponentSetting[] => Object.keys(getComponentPatch(metadata, models)) as RecalledComponentSetting[];
-
 const hasComponentModels = (metadata: unknown, models: readonly ComponentModelConfig[]): boolean =>
-  getRecordedComponentSettings(metadata, models).length > 0;
+  Object.keys(getComponentPatch(metadata, models)).length > 0;
 
 type RefinerPatch = Partial<
   Pick<
@@ -1495,6 +1491,7 @@ export const buildImageRecallSettings = ({
   let values: GenerateWidgetValues = cloneGenerateWidgetValues(currentValues);
   let restoredProviderSize = false;
   let referenceRecall: ReturnType<typeof readMetadataReferenceImages> | null = null;
+  const appliedComponents: RecalledComponentSetting[] = [];
 
   if (kind === 'all' || kind === 'remix') {
     const model = getSupportedMetadataModel(metadata, supportedModels);
@@ -1517,7 +1514,7 @@ export const buildImageRecallSettings = ({
     const recordedSettings = Object.keys(componentPatch) as RecalledComponentSetting[];
     const effectiveModel = values.model;
     // Skip components that do not fit, judged beside those already restored (a Vision Tower depends on a GGUF encoder).
-    const fittingSettings: RecalledComponentSetting[] = [];
+    const fittingSettings = appliedComponents;
 
     for (const setting of recordedSettings) {
       const component = componentPatch[setting];
@@ -1752,7 +1749,7 @@ export const buildImageRecallSettings = ({
     skipped.length > 0 ||
     ((kind === 'all' || kind === 'remix') &&
       (hasCanvasRecall(metadata) || referenceRecall?.partial || (referenceRecall?.names.length ?? 0) > 0))
-    ? { fields, skipped, values }
+    ? { appliedComponents, fields, skipped, values }
     : null;
 };
 

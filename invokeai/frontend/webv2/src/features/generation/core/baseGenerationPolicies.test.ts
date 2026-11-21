@@ -2060,6 +2060,17 @@ describe("a main model's default components", () => {
       expect(getModelDefaultFills(model, stale, [fluxVae, sdxlVae]).vae).toBe(fluxVae);
     });
 
+    it('judges a kept VAE by the catalog record, so a default replaces one reclassified since', () => {
+      const defaultVae: VaeModelConfig = { base: 'flux', key: 'flux-vae-default', name: 'FLUX VAE 2', type: 'vae' };
+      const model = createModel('flux', { default_settings: { vae: defaultVae.key }, format: 'checkpoint' });
+      // The project saved the pick as a FLUX VAE; the catalog now classifies the same key as SD3's.
+      const saved = createSettings(model, { vae: fluxVae });
+      const reclassified: VaeModelConfig = { ...fluxVae, base: 'sd-3' };
+
+      expect(getModelDefaultFills(model, saved, [defaultVae, reclassified]).vae).toBe(defaultVae);
+      expect(getModelDefaultFills(model, saved, [defaultVae, fluxVae]).vae).toBeUndefined();
+    });
+
     it('fills no VAE for a self-contained FLUX.1 SDNQ pipeline, whose graph decodes with its own', () => {
       const pipeline = {
         text_encoder: {},
