@@ -179,3 +179,59 @@ def test_model_search_stops_when_asked(tmp_path: Path):
         search.search(tmp_path)
 
     assert len(visited) == 1
+
+
+def test_model_search_skips_a_symlinked_directory(model_search: tuple[ModelSearch, Path]):
+    """A folder that is symlinked next to its target must not be walked a second time.
+
+    Stability Matrix and similar launchers point several apps at one model folder, so the same
+    model would otherwise show up twice in the scan results.
+    """
+    search, tmp_path = model_search
+
+    model_dir = tmp_path / "models" / "sd"
+    model_dir.mkdir(parents=True)
+    model_file = model_dir / "model.safetensors"
+    model_file.write_text("")
+    (tmp_path / "models" / "sd_link").symlink_to(model_dir, target_is_directory=True)
+
+    found = search.search(tmp_path / "models")
+
+    assert len(found) == 1
+    assert {path.resolve() for path in found} == {model_file.resolve()}
+
+
+def test_model_search_finds_a_model_behind_symlinks(model_search: tuple[ModelSearch, Path]):
+    """Following a link is still allowed - only walking the same physical directory twice is not."""
+    search, tmp_path = model_search
+
+    model_dir = tmp_path / "real" / "sd"
+    model_dir.mkdir(parents=True)
+    model_file = model_dir / "model.safetensors"
+    model_file.write_text("")
+    scan_root = tmp_path / "models"
+    scan_root.mkdir()
+    (scan_root / "linked").symlink_to(model_dir, target_is_directory=True)
+
+    found = search.search(scan_root)
+
+    assert len(found) == 1
+    assert next(iter(found)).resolve() == model_file.resolve()
+
+
+def test_model_search_survives_a_symlink_cycle(model_search: tuple[ModelSearch, Path]):
+    """Two folders linking to each other must not produce the same model over and over."""
+    search, tmp_path = model_search
+
+    folder_a = tmp_path / "a"
+    folder_b = tmp_path / "b"
+    folder_a.mkdir()
+    folder_b.mkdir()
+    (folder_a / "model.ckpt").write_text("")
+    (folder_a / "to_b").symlink_to(folder_b, target_is_directory=True)
+    (folder_b / "to_a").symlink_to(folder_a, target_is_directory=True)
+
+    found = search.search(tmp_path)
+
+    assert len(found) == 1
+    assert next(iter(found)).name == "model.ckpt"
