@@ -77,7 +77,7 @@ Z_IMAGE_SHIFT_FIT = ShiftFit(base_seq_len=256, max_seq_len=4096, base_shift=0.5,
     title="Denoise - Z-Image",
     tags=["image", "z-image"],
     category="latents",
-    version="1.7.0",
+    version="1.8.0",
     classification=Classification.Prototype,
 )
 class ZImageDenoiseInvocation(BaseInvocation, WithMetadata):

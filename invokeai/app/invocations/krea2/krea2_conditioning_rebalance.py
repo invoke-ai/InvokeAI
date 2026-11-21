@@ -20,7 +20,7 @@ _NUM_TEXT_LAYERS = len(KREA2_SELECT_LAYERS)  # 12
     title="Conditioning Rebalance - Krea-2",
     tags=["conditioning", "krea2", "krea-2"],
     category="conditioning",
-    version="1.1.0",
+    version="1.2.0",
     classification=Classification.Prototype,
 )
 class Krea2ConditioningRebalanceInvocation(BaseInvocation):

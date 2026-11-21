@@ -27,7 +27,7 @@ from invokeai.backend.util.devices import TorchDevice
     title="Prompt - ERNIE-Image",
     tags=["prompt", "conditioning", "ernie-image"],
     category="conditioning",
-    version="2.0.0",
+    version="2.1.0",
     classification=Classification.Prototype,
     idle_gpu_offloadable=True,
 )

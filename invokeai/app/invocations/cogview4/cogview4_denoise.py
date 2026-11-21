@@ -40,7 +40,7 @@ from invokeai.backend.util.devices import TorchDevice
     title="Denoise - CogView4",
     tags=["image", "cogview4"],
     category="latents",
-    version="1.2.0",
+    version="1.3.0",
     classification=Classification.Prototype,
 )
 class CogView4DenoiseInvocation(BaseInvocation, WithMetadata):

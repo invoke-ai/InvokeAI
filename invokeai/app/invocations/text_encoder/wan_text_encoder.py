@@ -33,7 +33,7 @@ WAN_T5_MAX_SEQ_LEN = 512
     title="Prompt - Wan 2.2",
     tags=["prompt", "conditioning", "wan"],
     category="conditioning",
-    version="1.0.0",
+    version="1.1.0",
     classification=Classification.Prototype,
     idle_gpu_offloadable=True,
 )

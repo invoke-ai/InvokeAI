@@ -51,7 +51,7 @@ _PER_SAMPLE_LINEARS = frozenset(
     title="Denoise - ERNIE-Image",
     tags=["latents", "denoise", "ernie-image"],
     category="latents",
-    version="1.2.0",
+    version="1.3.0",
     classification=Classification.Prototype,
 )
 class ErnieImageDenoiseInvocation(BaseInvocation, WithMetadata):

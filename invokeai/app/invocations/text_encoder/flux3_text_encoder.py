@@ -26,7 +26,7 @@ from invokeai.backend.util.devices import TorchDevice
     title="Prompt - FLUX.3",
     tags=["prompt", "conditioning", "flux3", "flux"],
     category="conditioning",
-    version="1.0.0",
+    version="1.1.0",
     classification=Classification.Prototype,
     idle_gpu_offloadable=True,
 )

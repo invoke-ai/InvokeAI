@@ -915,9 +915,11 @@ def build_denoise_metadata(existing: Optional[MetadataField], updates: dict[str,
         md["generation_mode"] = existing_gen_mode
 
     # Clear stale regional and multi-prompt collections when switching to single-prompt / non-regional
-    if "positive_prompt" in updates and "positive_prompts" not in updates:
-        md.pop("positive_prompts", None)
-        md.pop("regions", None)
+    if "positive_prompt" in updates:
+        if "positive_prompts" not in updates:
+            md.pop("positive_prompts", None)
+        if "regions" not in updates:
+            md.pop("regions", None)
     if "negative_prompt" in updates and "negative_prompts" not in updates:
         md.pop("negative_prompts", None)
 

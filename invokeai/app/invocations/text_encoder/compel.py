@@ -44,7 +44,7 @@ from invokeai.backend.util.devices import TorchDevice
     title="Prompt - SD1.5",
     tags=["prompt", "compel"],
     category="prompt",
-    version="1.2.1",
+    version="1.3.0",
     idle_gpu_offloadable=True,
 )
 class CompelInvocation(BaseInvocation):
@@ -252,7 +252,7 @@ class SDXLPromptInvocationBase:
     title="Prompt - SDXL",
     tags=["sdxl", "compel", "prompt"],
     category="prompt",
-    version="1.2.1",
+    version="1.3.0",
     idle_gpu_offloadable=True,
 )
 class SDXLCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase):
@@ -353,7 +353,7 @@ class SDXLCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase):
     title="Prompt - SDXL Refiner",
     tags=["sdxl", "compel", "prompt"],
     category="prompt",
-    version="1.1.2",
+    version="1.2.0",
     idle_gpu_offloadable=True,
 )
 class SDXLRefinerCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase):

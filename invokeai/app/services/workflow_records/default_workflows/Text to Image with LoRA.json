@@ -47,7 +47,7 @@
       "type": "invocation",
       "data": {
         "id": "a9683c0a-6b1f-4a5e-8187-c57e764b3400",
-        "version": "1.3.0",
+        "version": "1.3.2",
         "label": "",
         "notes": "",
         "type": "l2i",
@@ -98,7 +98,7 @@
       "type": "invocation",
       "data": {
         "id": "c3fa6872-2599-4a82-a596-b3446a66cf8b",
-        "version": "1.2.0",
+        "version": "1.3.0",
         "label": "",
         "notes": "",
         "type": "compel",
@@ -131,7 +131,7 @@
       "type": "invocation",
       "data": {
         "id": "c41e705b-f2e3-4d1a-83c4-e34bb9344966",
-        "version": "1.0.3",
+        "version": "1.0.4",
         "label": "",
         "notes": "",
         "type": "lora_loader",
@@ -168,7 +168,7 @@
       "type": "invocation",
       "data": {
         "id": "24e9d7ed-4836-4ec4-8f9e-e747721f9818",
-        "version": "1.0.3",
+        "version": "1.0.4",
         "label": "",
         "notes": "",
         "type": "main_model_loader",
@@ -192,7 +192,7 @@
       "type": "invocation",
       "data": {
         "id": "85b77bb2-c67a-416a-b3e8-291abe746c44",
-        "version": "1.2.0",
+        "version": "1.3.0",
         "label": "",
         "notes": "",
         "type": "compel",
@@ -225,7 +225,7 @@
       "type": "invocation",
       "data": {
         "id": "ad487d0c-dcbb-49c5-bb8e-b28d4cbc5a63",
-        "version": "1.5.3",
+        "version": "1.10.0",
         "label": "",
         "notes": "",
         "type": "denoise_latents",
@@ -311,7 +311,7 @@
       "type": "invocation",
       "data": {
         "id": "ea18915f-2c5b-4569-b725-8e9e9122e8d3",
-        "version": "1.0.2",
+        "version": "1.1.0",
         "label": "",
         "notes": "",
         "type": "noise",

@@ -135,7 +135,7 @@ class _Krea2StepBenchmark:
     title="Denoise - Krea-2",
     tags=["image", "krea2", "krea-2"],
     category="image",
-    version="1.5.0",
+    version="1.6.0",
     classification=Classification.Prototype,
 )
 class Krea2DenoiseInvocation(BaseInvocation, WithMetadata):

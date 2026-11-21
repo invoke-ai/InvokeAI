@@ -47,7 +47,7 @@ KLEIN_MAX_SEQ_LEN = 512
     title="Prompt - Flux2 Klein",
     tags=["prompt", "conditioning", "flux", "klein", "qwen3"],
     category="prompt",
-    version="1.1.1",
+    version="1.2.0",
     classification=Classification.Prototype,
     idle_gpu_offloadable=True,
 )

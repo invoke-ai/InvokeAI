@@ -79,7 +79,7 @@ DEV_MAX_SEQ_LEN = 512
     title="Prompt - FLUX.2 [dev]",
     tags=["prompt", "conditioning", "flux", "flux2", "dev", "mistral"],
     category="prompt",
-    version="1.0.1",
+    version="1.1.0",
     classification=Classification.Prototype,
     idle_gpu_offloadable=True,
 )

@@ -155,7 +155,7 @@ def get_scheduler(
     title="Denoise - SD1.5, SDXL",
     tags=["latents", "denoise", "txt2img", "t2i", "t2l", "img2img", "i2i", "l2l"],
     category="latents",
-    version="1.9.0",
+    version="1.10.0",
 )
 class DenoiseLatentsInvocation(BaseInvocation, WithMetadata):
     """Denoises noisy latents to decodable images"""

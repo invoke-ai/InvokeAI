@@ -43,7 +43,7 @@
       "type": "invocation",
       "data": {
         "id": "58c957f5-0d01-41fc-a803-b2bbf0413d4f",
-        "version": "1.3.0",
+        "version": "1.3.2",
         "nodePack": "invokeai",
         "label": "",
         "notes": "",
@@ -95,7 +95,7 @@
       "type": "invocation",
       "data": {
         "id": "7d8bf987-284f-413a-b2fd-d825445a5d6c",
-        "version": "1.2.0",
+        "version": "1.3.0",
         "nodePack": "invokeai",
         "label": "Positive Compel Prompt",
         "notes": "",
@@ -129,7 +129,7 @@
       "type": "invocation",
       "data": {
         "id": "c8d55139-f380-4695-b7f2-8b3d1e1e3db8",
-        "version": "1.0.3",
+        "version": "1.0.4",
         "nodePack": "invokeai",
         "label": "",
         "notes": "",
@@ -154,7 +154,7 @@
       "type": "invocation",
       "data": {
         "id": "93dc02a4-d05b-48ed-b99c-c9b616af3402",
-        "version": "1.2.0",
+        "version": "1.3.0",
         "nodePack": "invokeai",
         "label": "Negative Compel Prompt",
         "notes": "",
@@ -188,7 +188,7 @@
       "type": "invocation",
       "data": {
         "id": "55705012-79b9-4aac-9f26-c0b10309785b",
-        "version": "1.0.2",
+        "version": "1.1.0",
         "nodePack": "invokeai",
         "label": "",
         "notes": "",
@@ -260,7 +260,7 @@
       "type": "invocation",
       "data": {
         "id": "eea2702a-19fb-45b5-9d75-56b4211ec03c",
-        "version": "1.5.3",
+        "version": "1.10.0",
         "nodePack": "invokeai",
         "label": "",
         "notes": "",

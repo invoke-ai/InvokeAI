@@ -36,7 +36,7 @@ Z_IMAGE_MAX_SEQ_LEN = 512
     title="Prompt - Z-Image",
     tags=["prompt", "conditioning", "z-image"],
     category="prompt",
-    version="1.1.0",
+    version="1.2.0",
     classification=Classification.Prototype,
     idle_gpu_offloadable=True,
 )

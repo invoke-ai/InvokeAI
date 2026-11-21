@@ -85,7 +85,7 @@ FLUX2_MAX_HIDDEN_SIZE = 6144
     title="FLUX2 Denoise",
     tags=["image", "flux", "flux2", "klein", "denoise"],
     category="latents",
-    version="1.8.0",
+    version="1.9.0",
     classification=Classification.Prototype,
 )
 class Flux2DenoiseInvocation(BaseInvocation, WithMetadata):

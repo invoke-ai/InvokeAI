@@ -28,7 +28,7 @@ from invokeai.backend.util.devices import TorchDevice
     title="Prompt - Ideogram 4",
     tags=["prompt", "conditioning", "ideogram4"],
     category="conditioning",
-    version="1.0.0",
+    version="1.1.0",
     classification=Classification.Prototype,
     idle_gpu_offloadable=True,
 )

@@ -19994,7 +19994,7 @@
         "tags": ["image", "anima"],
         "title": "Denoise - Anima",
         "type": "object",
-        "version": "1.10.0",
+        "version": "1.11.0",
         "output": {
           "$ref": "#/components/schemas/LatentsMetaOutput"
         }
@@ -21513,7 +21513,7 @@
         "tags": ["prompt", "conditioning", "anima"],
         "title": "Prompt - Anima",
         "type": "object",
-        "version": "1.5.0",
+        "version": "1.6.0",
         "output": {
           "$ref": "#/components/schemas/AnimaConditioningOutput"
         }
@@ -27637,7 +27637,7 @@
         "tags": ["image", "cogview4"],
         "title": "Denoise - CogView4",
         "type": "object",
-        "version": "1.2.0",
+        "version": "1.3.0",
         "output": {
           "$ref": "#/components/schemas/LatentsMetaOutput"
         }
@@ -28032,7 +28032,7 @@
         "tags": ["prompt", "conditioning", "cogview4"],
         "title": "Prompt - CogView4",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "output": {
           "$ref": "#/components/schemas/CogView4ConditioningOutput"
         }
@@ -28903,7 +28903,7 @@
         "tags": ["prompt", "compel"],
         "title": "Prompt - SD1.5",
         "type": "object",
-        "version": "1.2.1",
+        "version": "1.3.0",
         "output": {
           "$ref": "#/components/schemas/ConditioningOutput"
         }
@@ -29146,7 +29146,7 @@
         "tags": ["primitives", "conditioning"],
         "title": "Conditioning Primitive",
         "type": "object",
-        "version": "1.0.1",
+        "version": "1.1.0",
         "output": {
           "$ref": "#/components/schemas/ConditioningOutput"
         }
@@ -34477,7 +34477,7 @@
         "tags": ["latents", "denoise", "txt2img", "t2i", "t2l", "img2img", "i2i", "l2l"],
         "title": "Denoise - SD1.5, SDXL",
         "type": "object",
-        "version": "1.9.0",
+        "version": "1.10.0",
         "output": {
           "$ref": "#/components/schemas/LatentsMetaOutput"
         }
@@ -36162,7 +36162,7 @@
         "tags": ["latents", "denoise", "ernie-image"],
         "title": "Denoise - ERNIE-Image",
         "type": "object",
-        "version": "1.2.0",
+        "version": "1.3.0",
         "output": {
           "$ref": "#/components/schemas/LatentsMetaOutput"
         }
@@ -36786,7 +36786,7 @@
         "tags": ["prompt", "conditioning", "ernie-image"],
         "title": "Prompt - ERNIE-Image",
         "type": "object",
-        "version": "2.0.0",
+        "version": "2.1.0",
         "output": {
           "$ref": "#/components/schemas/ErnieImageConditioningOutput"
         }
@@ -40019,7 +40019,7 @@
         "tags": ["image", "flux", "flux2", "klein", "denoise"],
         "title": "FLUX2 Denoise",
         "type": "object",
-        "version": "1.8.0",
+        "version": "1.9.0",
         "output": {
           "$ref": "#/components/schemas/LatentsMetaOutput"
         }
@@ -40559,7 +40559,7 @@
         "tags": ["prompt", "conditioning", "flux", "flux2", "dev", "mistral"],
         "title": "Prompt - FLUX.2 [dev]",
         "type": "object",
-        "version": "1.0.1",
+        "version": "1.1.0",
         "output": {
           "$ref": "#/components/schemas/FluxConditioningOutput"
         }
@@ -41100,7 +41100,7 @@
         "tags": ["prompt", "conditioning", "flux", "klein", "qwen3"],
         "title": "Prompt - Flux2 Klein",
         "type": "object",
-        "version": "1.1.1",
+        "version": "1.2.0",
         "output": {
           "$ref": "#/components/schemas/FluxConditioningOutput"
         }
@@ -41890,7 +41890,7 @@
         "tags": ["image", "flux3", "flux", "denoise"],
         "title": "Denoise - FLUX.3",
         "type": "object",
-        "version": "1.1.0",
+        "version": "1.2.0",
         "output": {
           "$ref": "#/components/schemas/LatentsMetaOutput"
         }
@@ -42549,7 +42549,7 @@
         "tags": ["prompt", "conditioning", "flux3", "flux"],
         "title": "Prompt - FLUX.3",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "output": {
           "$ref": "#/components/schemas/Flux3ConditioningOutput"
         }
@@ -43590,7 +43590,7 @@
         "tags": ["image", "flux"],
         "title": "FLUX Denoise",
         "type": "object",
-        "version": "4.7.0",
+        "version": "4.8.0",
         "output": {
           "$ref": "#/components/schemas/LatentsMetaOutput"
         }
@@ -45403,7 +45403,7 @@
         "tags": ["prompt", "conditioning", "flux"],
         "title": "Prompt - FLUX",
         "type": "object",
-        "version": "1.1.2",
+        "version": "1.2.0",
         "output": {
           "$ref": "#/components/schemas/FluxConditioningOutput"
         }
@@ -52577,7 +52577,7 @@
         "tags": ["image", "ideogram4"],
         "title": "Denoise - Ideogram 4",
         "type": "object",
-        "version": "1.3.0",
+        "version": "1.4.0",
         "output": {
           "$ref": "#/components/schemas/LatentsMetaOutput"
         }
@@ -53231,7 +53231,7 @@
         "tags": ["prompt", "conditioning", "ideogram4"],
         "title": "Prompt - Ideogram 4",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "output": {
           "$ref": "#/components/schemas/Ideogram4ConditioningOutput"
         }
@@ -68667,7 +68667,7 @@
         "tags": ["conditioning", "krea2", "krea-2"],
         "title": "Conditioning Rebalance - Krea-2",
         "type": "object",
-        "version": "1.1.0",
+        "version": "1.2.0",
         "output": {
           "$ref": "#/components/schemas/Krea2ConditioningOutput"
         }
@@ -68997,7 +68997,7 @@
         "tags": ["image", "krea2", "krea-2"],
         "title": "Denoise - Krea-2",
         "type": "object",
-        "version": "1.5.0",
+        "version": "1.6.0",
         "output": {
           "$ref": "#/components/schemas/LatentsMetaOutput"
         }
@@ -69507,7 +69507,7 @@
         "tags": ["conditioning", "krea2", "krea-2", "variance"],
         "title": "Seed Variance - Krea-2",
         "type": "object",
-        "version": "1.1.0",
+        "version": "1.2.0",
         "output": {
           "$ref": "#/components/schemas/Krea2ConditioningOutput"
         }
@@ -69995,7 +69995,7 @@
         "tags": ["prompt", "conditioning", "krea2", "krea-2"],
         "title": "Prompt - Krea-2",
         "type": "object",
-        "version": "1.3.0",
+        "version": "1.4.0",
         "output": {
           "$ref": "#/components/schemas/Krea2ConditioningOutput"
         }
@@ -70750,7 +70750,7 @@
         "tags": ["ltx", "ltx2", "video", "audio", "denoise"],
         "title": "Denoise - LTX-2",
         "type": "object",
-        "version": "1.6.0",
+        "version": "1.7.0",
         "output": {
           "$ref": "#/components/schemas/LTX2DenoiseOutput"
         }
@@ -72645,7 +72645,7 @@
         "tags": ["prompt", "conditioning", "ltx", "ltx2", "video"],
         "title": "Prompt - LTX-2",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "output": {
           "$ref": "#/components/schemas/LTX2TextEncoderOutput"
         }
@@ -91781,7 +91781,7 @@
         "tags": ["metadata"],
         "title": "Metadata Item Linked",
         "type": "object",
-        "version": "1.1.0",
+        "version": "1.2.0",
         "output": {
           "$ref": "#/components/schemas/MetadataOutput"
         }
@@ -94487,7 +94487,7 @@
         "tags": ["latents", "video", "audio", "minimax"],
         "title": "Denoise - MiniMax H3",
         "type": "object",
-        "version": "1.5.0",
+        "version": "1.6.0",
         "output": {
           "$ref": "#/components/schemas/MiniMaxH3DenoiseOutput"
         }
@@ -96412,7 +96412,7 @@
         "tags": ["prompt", "conditioning", "minimax", "video"],
         "title": "Prompt - MiniMax H3",
         "type": "object",
-        "version": "1.1.0",
+        "version": "1.2.0",
         "output": {
           "$ref": "#/components/schemas/MiniMaxH3ConditioningOutput"
         }
@@ -101652,7 +101652,7 @@
         "tags": ["image", "moss_image", "moss-image"],
         "title": "Denoise - MOSS-Image",
         "type": "object",
-        "version": "1.2.0",
+        "version": "1.3.0",
         "output": {
           "$ref": "#/components/schemas/LatentsMetaOutput"
         }
@@ -102218,7 +102218,7 @@
         "tags": ["prompt", "conditioning", "moss_image", "moss-image"],
         "title": "Prompt - MOSS-Image",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "output": {
           "$ref": "#/components/schemas/MossImageConditioningOutput"
         }
@@ -108365,7 +108365,7 @@
         "tags": ["image", "qwen_image_2_1", "qwen-image-2.1"],
         "title": "Denoise - Qwen-Image-2.1",
         "type": "object",
-        "version": "1.3.0",
+        "version": "1.4.0",
         "output": {
           "$ref": "#/components/schemas/LatentsMetaOutput"
         }
@@ -109099,7 +109099,7 @@
         "tags": ["prompt", "conditioning", "qwen_image_2_1", "qwen-image-2.1"],
         "title": "Prompt - Qwen-Image-2.1",
         "type": "object",
-        "version": "1.1.0",
+        "version": "1.2.0",
         "output": {
           "$ref": "#/components/schemas/QwenImage21ConditioningOutput"
         }
@@ -109768,7 +109768,7 @@
         "tags": ["image", "qwen_image"],
         "title": "Denoise - Qwen Image",
         "type": "object",
-        "version": "1.2.0",
+        "version": "1.3.0",
         "output": {
           "$ref": "#/components/schemas/LatentsMetaOutput"
         }
@@ -110777,7 +110777,7 @@
         "tags": ["prompt", "conditioning", "qwen_image"],
         "title": "Prompt - Qwen Image",
         "type": "object",
-        "version": "1.2.0",
+        "version": "1.3.0",
         "output": {
           "$ref": "#/components/schemas/QwenImageConditioningOutput"
         }
@@ -112892,7 +112892,7 @@
         "tags": ["image", "sd3"],
         "title": "Denoise - SD3",
         "type": "object",
-        "version": "1.4.0",
+        "version": "1.5.0",
         "output": {
           "$ref": "#/components/schemas/LatentsMetaOutput"
         }
@@ -113853,7 +113853,7 @@
         "tags": ["sdxl", "compel", "prompt"],
         "title": "Prompt - SDXL",
         "type": "object",
-        "version": "1.2.1",
+        "version": "1.3.0",
         "output": {
           "$ref": "#/components/schemas/ConditioningOutput"
         }
@@ -114581,7 +114581,7 @@
         "tags": ["sdxl", "compel", "prompt"],
         "title": "Prompt - SDXL Refiner",
         "type": "object",
-        "version": "1.1.2",
+        "version": "1.2.0",
         "output": {
           "$ref": "#/components/schemas/ConditioningOutput"
         }
@@ -115482,7 +115482,7 @@
         "tags": ["prompt", "conditioning", "sd3"],
         "title": "Prompt - SD3",
         "type": "object",
-        "version": "1.0.1",
+        "version": "1.1.0",
         "output": {
           "$ref": "#/components/schemas/SD3ConditioningOutput"
         }
@@ -122725,7 +122725,7 @@
         "tags": ["upscale", "denoise"],
         "title": "Tiled Multi-Diffusion Denoise - SD1.5, SDXL",
         "type": "object",
-        "version": "1.1.0",
+        "version": "1.2.0",
         "output": {
           "$ref": "#/components/schemas/LatentsMetaOutput"
         }
@@ -129734,7 +129734,7 @@
         "tags": ["image", "wan"],
         "title": "Denoise - Wan 2.2",
         "type": "object",
-        "version": "1.1.0",
+        "version": "1.2.0",
         "output": {
           "$ref": "#/components/schemas/LatentsMetaOutput"
         }
@@ -131264,7 +131264,7 @@
         "tags": ["prompt", "conditioning", "wan"],
         "title": "Prompt - Wan 2.2",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "output": {
           "$ref": "#/components/schemas/WanConditioningOutput"
         }
@@ -131531,7 +131531,7 @@
         "tags": ["video", "wan"],
         "title": "Denoise Video - Wan 2.2",
         "type": "object",
-        "version": "1.1.0",
+        "version": "1.2.0",
         "output": {
           "$ref": "#/components/schemas/LatentsMetaOutput"
         }
@@ -134772,7 +134772,7 @@
         "tags": ["image", "z-image"],
         "title": "Denoise - Z-Image",
         "type": "object",
-        "version": "1.7.0",
+        "version": "1.8.0",
         "output": {
           "$ref": "#/components/schemas/LatentsMetaOutput"
         }
@@ -136057,7 +136057,7 @@
         "tags": ["conditioning", "z-image", "variance", "seed"],
         "title": "Seed Variance Enhancer - Z-Image",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "output": {
           "$ref": "#/components/schemas/ZImageConditioningOutput"
         }
@@ -136154,7 +136154,7 @@
         "tags": ["prompt", "conditioning", "z-image"],
         "title": "Prompt - Z-Image",
         "type": "object",
-        "version": "1.1.0",
+        "version": "1.2.0",
         "output": {
           "$ref": "#/components/schemas/ZImageConditioningOutput"
         }

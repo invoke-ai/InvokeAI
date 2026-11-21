@@ -44,7 +44,7 @@
       "data": {
         "id": "cd367e62-2b45-4118-b4ba-7c33e2e0b370",
         "type": "flux_denoise",
-        "version": "3.0.0",
+        "version": "4.8.0",
         "label": "",
         "notes": "",
         "isOpen": true,
@@ -124,7 +124,7 @@
       "data": {
         "id": "2981a67c-480f-4237-9384-26b68dbf912b",
         "type": "flux_vae_encode",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "label": "",
         "notes": "",
         "isOpen": true,
@@ -152,7 +152,7 @@
       "data": {
         "id": "7e5172eb-48c1-44db-a770-8fd83e1435d1",
         "type": "flux_vae_decode",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "label": "",
         "notes": "",
         "isOpen": true,
@@ -188,7 +188,7 @@
       "data": {
         "id": "f8d9d7c8-9ed7-4bd7-9e42-ab0e89bfac90",
         "type": "flux_model_loader",
-        "version": "1.0.4",
+        "version": "1.1.0",
         "label": "",
         "notes": "",
         "isOpen": true,
@@ -224,7 +224,7 @@
       "data": {
         "id": "01f674f8-b3d1-4df1-acac-6cb8e0bfb63c",
         "type": "flux_text_encoder",
-        "version": "1.0.0",
+        "version": "1.2.0",
         "label": "",
         "notes": "",
         "isOpen": true,

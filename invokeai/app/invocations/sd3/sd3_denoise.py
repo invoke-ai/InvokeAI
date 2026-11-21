@@ -121,7 +121,7 @@ def _delta_fits(layer: BaseLayerPatch, weight: torch.Tensor) -> bool:
     title="Denoise - SD3",
     tags=["image", "sd3"],
     category="latents",
-    version="1.4.0",
+    version="1.5.0",
 )
 class SD3DenoiseInvocation(BaseInvocation, WithMetadata):
     """Run denoising process with a SD3 model."""

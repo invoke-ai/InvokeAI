@@ -81,7 +81,7 @@ PREVIEW_LATENT_WINDOW = 2
     title="Denoise Video - Wan 2.2",
     tags=["video", "wan"],
     category="latents",
-    version="1.1.0",
+    version="1.2.0",
     classification=Classification.Prototype,
 )
 class WanVideoDenoiseInvocation(BaseInvocation, WithMetadata):

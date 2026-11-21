@@ -85,7 +85,7 @@ ControlNet run beside it."""
     title="Denoise - Qwen Image",
     tags=["image", "qwen_image"],
     category="image",
-    version="1.2.0",
+    version="1.3.0",
     classification=Classification.Prototype,
 )
 class QwenImageDenoiseInvocation(BaseInvocation, WithMetadata):

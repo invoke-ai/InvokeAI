@@ -30,7 +30,7 @@ from invokeai.backend.util.devices import TorchDevice
     title="Prompt - MOSS-Image",
     tags=["prompt", "conditioning", "moss_image", "moss-image"],
     category="conditioning",
-    version="1.0.0",
+    version="1.1.0",
     classification=Classification.Prototype,
     idle_gpu_offloadable=True,
 )

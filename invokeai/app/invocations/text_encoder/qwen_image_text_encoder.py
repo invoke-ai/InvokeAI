@@ -146,7 +146,7 @@ def _build_prompt(user_prompt: str, num_images: int) -> str:
     title="Prompt - Qwen Image",
     tags=["prompt", "conditioning", "qwen_image"],
     category="conditioning",
-    version="1.2.0",
+    version="1.3.0",
     classification=Classification.Prototype,
     idle_gpu_offloadable=True,
 )

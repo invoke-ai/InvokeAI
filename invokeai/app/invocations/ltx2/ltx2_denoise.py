@@ -93,7 +93,7 @@ class LTX2DenoiseOutput(MetadataOutput):
     title="Denoise - LTX-2",
     tags=["ltx", "ltx2", "video", "audio", "denoise"],
     category="latents",
-    version="1.6.0",
+    version="1.7.0",
     classification=Classification.Prototype,
 )
 class LTX2DenoiseInvocation(BaseInvocation, WithMetadata):

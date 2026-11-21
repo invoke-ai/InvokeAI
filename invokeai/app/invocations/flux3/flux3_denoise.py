@@ -55,7 +55,7 @@ from invokeai.backend.util.devices import TorchDevice
     title="Denoise - FLUX.3",
     tags=["image", "flux3", "flux", "denoise"],
     category="latents",
-    version="1.1.0",
+    version="1.2.0",
     classification=Classification.Prototype,
 )
 class Flux3DenoiseInvocation(BaseInvocation, WithMetadata):

@@ -21,7 +21,7 @@ from invokeai.backend.util.devices import TorchDevice
     title="Seed Variance Enhancer - Z-Image",
     tags=["conditioning", "z-image", "variance", "seed"],
     category="prompt",
-    version="1.0.0",
+    version="1.1.0",
     classification=Classification.Prototype,
 )
 class ZImageSeedVarianceEnhancerInvocation(BaseInvocation):

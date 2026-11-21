@@ -27,7 +27,7 @@ COGVIEW4_GLM_MAX_SEQ_LEN = 1024
     title="Prompt - CogView4",
     tags=["prompt", "conditioning", "cogview4"],
     category="prompt",
-    version="1.0.0",
+    version="1.1.0",
     classification=Classification.Prototype,
     idle_gpu_offloadable=True,
 )

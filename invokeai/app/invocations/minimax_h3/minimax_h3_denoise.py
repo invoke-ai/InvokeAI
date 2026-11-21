@@ -141,7 +141,7 @@ class MiniMaxH3DenoiseOutput(MetadataOutput):
     title="Denoise - MiniMax H3",
     tags=["latents", "video", "audio", "minimax"],
     category="latents",
-    version="1.5.0",
+    version="1.6.0",
     classification=Classification.Prototype,
 )
 class MiniMaxH3DenoiseInvocation(BaseInvocation, WithMetadata):

@@ -45,7 +45,7 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     title="Prompt - MiniMax H3",
     tags=["prompt", "conditioning", "minimax", "video"],
     category="conditioning",
-    version="1.1.0",
+    version="1.2.0",
     classification=Classification.Prototype,
     idle_gpu_offloadable=True,
 )

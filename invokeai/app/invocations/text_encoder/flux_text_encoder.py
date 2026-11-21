@@ -33,7 +33,7 @@ from invokeai.backend.util.fp8 import peak_fp8_cast_transient_bytes
     title="Prompt - FLUX",
     tags=["prompt", "conditioning", "flux"],
     category="prompt",
-    version="1.1.2",
+    version="1.2.0",
     idle_gpu_offloadable=True,
 )
 class FluxTextEncoderInvocation(BaseInvocation):

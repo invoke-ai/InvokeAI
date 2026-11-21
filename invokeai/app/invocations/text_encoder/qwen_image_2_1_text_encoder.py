@@ -45,7 +45,7 @@ _NO_VISION_TOWER = (
     title="Prompt - Qwen-Image-2.1",
     tags=["prompt", "conditioning", "qwen_image_2_1", "qwen-image-2.1"],
     category="conditioning",
-    version="1.1.0",
+    version="1.2.0",
     classification=Classification.Prototype,
     idle_gpu_offloadable=True,
 )

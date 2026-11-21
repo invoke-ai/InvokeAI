@@ -350,7 +350,7 @@ class _ExpertSwapper:
     title="Denoise - Wan 2.2",
     tags=["image", "wan"],
     category="image",
-    version="1.1.0",
+    version="1.2.0",
     classification=Classification.Prototype,
 )
 class WanDenoiseInvocation(BaseInvocation, WithMetadata):

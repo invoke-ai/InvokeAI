@@ -3735,3 +3735,107 @@ def test_denoise_ltx2_two_stage_metadata() -> None:
     assert md["ltx2_base_height"] == 512
     assert md["positive_prompt"] == "a waterfall in autumn forest"
     assert md["negative_prompt"] == "ugly"
+
+
+def test_serialize_lora_metadata_preserves_wan_dual_expert_fields_with_conditioning_loras() -> None:
+    """Combining Wan dual-expert LoRA dicts with conditioning.loras preserves target/low_noise_weight and deduplicates."""
+    from invokeai.app.invocations.metadata import serialize_wan_lora_metadata
+
+    lora_both = _make_model_id(
+        key="wan-lora-both", name="Both Expert", base=BaseModelType.Wan, model_type=ModelType.LoRA
+    )
+    lora_high = _make_model_id(
+        key="wan-lora-high", name="High Expert", base=BaseModelType.Wan, model_type=ModelType.LoRA
+    )
+    lora_cond = _make_model_id(key="wan-lora-cond", name="Cond LoRA", base=BaseModelType.Wan, model_type=ModelType.LoRA)
+
+    wan_loras = serialize_wan_lora_metadata(
+        [LoRAField(lora=lora_both, weight=0.8), LoRAField(lora=lora_high, weight=0.6)],
+        [LoRAField(lora=lora_both, weight=0.4)],
+    )
+    cond_updates = extract_conditioning_metadata(
+        SimpleNamespace(
+            prompt="a cat",
+            loras=[
+                # Duplicate of wan_loras[0] as a dict with matching target/low_noise_weight -> deduplicated
+                {
+                    "model": lora_both.model_dump(exclude_none=True),
+                    "weight": 0.8,
+                    "target": "both",
+                    "low_noise_weight": 0.4,
+                },
+                # Distinct conditioning-only LoRA
+                LoRAField(lora=lora_cond, weight=0.5),
+            ],
+        ),
+        None,
+    )
+
+    merged = serialize_lora_metadata(wan_loras, cond_updates["loras"])
+    assert len(merged) == 3
+    assert merged[0]["model"]["key"] == "wan-lora-both"
+    assert merged[0]["weight"] == 0.8
+    assert merged[0]["target"] == "both"
+    assert merged[0]["low_noise_weight"] == 0.4
+
+    assert merged[1]["model"]["key"] == "wan-lora-high"
+    assert merged[1]["weight"] == 0.6
+    assert merged[1]["target"] == "high"
+    assert "low_noise_weight" not in merged[1]
+
+    assert merged[2]["model"]["key"] == "wan-lora-cond"
+    assert merged[2]["weight"] == 0.5
+    assert "target" not in merged[2]
+
+    # Also verify end-to-end via WanDenoiseInvocation._build_metadata()
+    wan_tf = _make_model_id(key="wan-tf", base=BaseModelType.Wan)
+    wan_node = WanDenoiseInvocation.model_construct(
+        transformer=WanTransformerField(
+            transformer=wan_tf,
+            loras=[LoRAField(lora=lora_both, weight=0.8)],
+            loras_low_noise=[LoRAField(lora=lora_both, weight=0.4)],
+        ),
+        positive_conditioning=SimpleNamespace(
+            prompt="a cat",
+            loras=[LoRAField(lora=lora_cond, weight=0.5)],
+        ),
+        negative_conditioning=SimpleNamespace(prompt="blurry"),
+        width=832,
+        height=480,
+        num_frames=1,
+        steps=20,
+        cfg_scale=5.0,
+        seed=42,
+    )
+    md = wan_node._build_metadata().root
+    assert len(md["loras"]) == 2
+    assert md["loras"][0]["target"] == "both"
+    assert md["loras"][0]["low_noise_weight"] == 0.4
+    assert md["loras"][1]["model"]["key"] == "wan-lora-cond"
+    assert md["loras"][1]["weight"] == 0.5
+
+
+def test_build_denoise_metadata_preserves_single_masked_region_and_pops_stale_lists() -> None:
+    """Single masked conditioning keeps both positive_prompt and regions while popping stale positive_prompts."""
+    existing = MetadataField.model_validate(
+        {
+            "positive_prompts": ["old prompt 1", "old prompt 2"],
+            "regions": [{"positive_prompt": "old region"}],
+        }
+    )
+
+    masked_updates = extract_conditioning_metadata(
+        SimpleNamespace(prompt="masked hero", mask=TensorField(tensor_name="region_mask")),
+        None,
+    )
+    masked_md = build_denoise_metadata(existing, masked_updates).root
+    assert masked_md["positive_prompt"] == "masked hero"
+    assert masked_md["regions"] == [{"positive_prompt": "masked hero"}]
+    assert "positive_prompts" not in masked_md
+
+    # Unmasked single conditioning still clears stale positive_prompts and regions
+    unmasked_updates = extract_conditioning_metadata(SimpleNamespace(prompt="plain prompt"), None)
+    unmasked_md = build_denoise_metadata(existing, unmasked_updates).root
+    assert unmasked_md["positive_prompt"] == "plain prompt"
+    assert "positive_prompts" not in unmasked_md
+    assert "regions" not in unmasked_md

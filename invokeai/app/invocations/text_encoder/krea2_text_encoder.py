@@ -62,7 +62,7 @@ _NO_VISION_TOWER = (
     title="Prompt - Krea-2",
     tags=["prompt", "conditioning", "krea2", "krea-2"],
     category="conditioning",
-    version="1.3.0",
+    version="1.4.0",
     classification=Classification.Prototype,
     idle_gpu_offloadable=True,
 )

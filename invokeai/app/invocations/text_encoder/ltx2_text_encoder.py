@@ -46,7 +46,7 @@ class LTX2TextEncoderOutput(BaseInvocationOutput):
     title="Prompt - LTX-2",
     tags=["prompt", "conditioning", "ltx", "ltx2", "video"],
     category="conditioning",
-    version="1.0.0",
+    version="1.1.0",
     classification=Classification.Prototype,
     idle_gpu_offloadable=True,
 )

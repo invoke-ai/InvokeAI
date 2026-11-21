@@ -86,7 +86,7 @@ from invokeai.backend.util.sage_attention import sage_attention_scope
     title="FLUX Denoise",
     tags=["image", "flux"],
     category="latents",
-    version="4.7.0",
+    version="4.8.0",
 )
 class FluxDenoiseInvocation(BaseInvocation, WithMetadata):
     """Run denoising process with a FLUX transformer model."""

@@ -67,7 +67,7 @@ QWEN3_5_MAX_SEQ_LEN = 1024
     title="Prompt - Anima",
     tags=["prompt", "conditioning", "anima"],
     category="conditioning",
-    version="1.5.0",
+    version="1.6.0",
     classification=Classification.Prototype,
     idle_gpu_offloadable=True,
 )

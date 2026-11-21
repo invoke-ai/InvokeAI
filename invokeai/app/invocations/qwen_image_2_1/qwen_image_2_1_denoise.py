@@ -205,7 +205,7 @@ def unpack_latents(latents: torch.Tensor, height: int, width: int) -> torch.Tens
     title="Denoise - Qwen-Image-2.1",
     tags=["image", "qwen_image_2_1", "qwen-image-2.1"],
     category="image",
-    version="1.3.0",
+    version="1.4.0",
     classification=Classification.Prototype,
 )
 class QwenImage21DenoiseInvocation(BaseInvocation, WithMetadata):
