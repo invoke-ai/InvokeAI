@@ -5,6 +5,7 @@ import type { ModelConfig } from '@features/models';
 import type { WorkbenchCommands } from '@workbench/workbenchStore';
 import type { TFunction } from 'i18next';
 
+import { getDefaultGenerateSettings } from '@features/generation/settings';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { ApiError } from '@platform/transport/http';
 import { QueryClient } from '@tanstack/react-query';
@@ -1006,6 +1007,23 @@ describe('executeImageRecall', () => {
       ]);
 
       expect(values.vae?.key).toBe(working.key);
+    });
+
+    it('starts a fresh project on a selectable main model, not on a standalone branch the metadata could name', async () => {
+      const make = (key: string, base: string, extra: Record<string, unknown> = {}) =>
+        ({ base, format: 'checkpoint', key, name: key, type: 'main', ...extra }) as unknown as ModelConfig;
+      const gone = make('gone', 'sdxl', { is_missing: true });
+      const branch = make('branch', 'ideogram-4', { branch: 'unconditional' });
+      const sdxl = make('sdxl-ok', 'sdxl');
+
+      const values = await recallValues('remix', { positive_prompt: 'p' }, make('unset', 'sdxl'), [gone, branch, sdxl]);
+
+      expect(values.model.key).toBe('sdxl-ok');
+      // The two families default to different step counts, so the settings show which model they were built for.
+      expect(getDefaultGenerateSettings(branch as never).steps).not.toBe(
+        getDefaultGenerateSettings(sdxl as never).steps
+      );
+      expect(values.steps).toBe(getDefaultGenerateSettings(sdxl as never).steps);
     });
 
     it('keeps a VAE the image records as empty cleared', async () => {

@@ -21,6 +21,7 @@ import type {
 import {
   addReferenceImages,
   getAutoFlux2ComponentSourceModel,
+  pickFallbackGenerateModel,
   coerceSchedulerForGraph,
   getComponentPolicyContext,
   getComponentSectionPolicy,
@@ -275,6 +276,16 @@ describe('architecture policy, read from the backend capability table', () => {
       expect(isGenerateModelSelectable(conditional)).toBe(true);
       expect(isGenerateModelSelectable(createModel('ideogram-4', { format: 'diffusers' }))).toBe(true);
       expect(isGenerateModelSelectable(createModel('wan', { variant: 'a14b' }))).toBe(true);
+    });
+
+    it('starts on a selectable main model whose files are present, never on a standalone branch', () => {
+      const gone = { ...createModel('sdxl', { key: 'gone' }), is_missing: true } as MainModelConfig;
+      const sdxl = createModel('sdxl', { key: 'sdxl-ok' });
+
+      expect(pickFallbackGenerateModel([gone, unconditional, sdxl])).toBe(sdxl);
+      // All unusable by file: the first selectable one, not the branch.
+      expect(pickFallbackGenerateModel([unconditional, gone])).toBe(gone);
+      expect(pickFallbackGenerateModel([unconditional])).toBeUndefined();
     });
   });
 });

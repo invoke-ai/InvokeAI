@@ -94,15 +94,26 @@ export const resolveRecordedModel = <T extends ResolvableModel>(
     return byKey;
   }
 
+  const missingByKey = ref.key ? models.find((model) => model.key === ref.key) : undefined;
+
+  // Metadata often records no hash. The catalog still knows the weights its key stood for, and a reinstall carries
+  // them, so that hash outranks a name another model may share. It is only a hint: when nothing present has it, the
+  // recorded identifiers decide as before, `hashMiss` included, since the image itself recorded no hash.
+  if (!ref.hash && missingByKey?.hash) {
+    const reinstalls = present.filter((model) => model.hash === missingByKey.hash);
+
+    if (reinstalls.length > 0) {
+      return reinstalls.length > 1 && policy.ambiguous === 'refuse' ? 'ambiguous' : reinstalls[0]!;
+    }
+  }
+
   const matched = matchRecordedModel(ref, present, policy);
 
   if (matched !== null) {
     return matched;
   }
 
-  return (
-    (ref.key ? models.find((model) => model.key === ref.key) : undefined) ?? matchRecordedModel(ref, models, policy)
-  );
+  return missingByKey ?? matchRecordedModel(ref, models, policy);
 };
 
 export interface ParsedMetadataLoraTarget {

@@ -502,11 +502,17 @@ export const isGenerateModelSelectable = <T extends ModelConfig>(model: T): mode
   isSupportedGenerateModel(model) && !isIdeogram4UnconditionalBranch(model);
 
 /**
- * The model a fresh project starts on, or the Generate form falls back to when none is chosen: the first one whose
- * files are present, else the first. Where a model is stored or chosen, that one stays.
+ * The model a fresh project starts on, or the Generate form falls back to when none is chosen: the first one Generate
+ * can select as a main model (so no standalone Ideogram 4 branch) whose files are present, else the first. Where a
+ * model is stored or chosen, that one stays.
  */
-export const pickFallbackGenerateModel = <T extends GenerateModelConfig>(models: readonly T[]): T | undefined =>
-  models.find((model) => !model.is_missing) ?? models[0];
+export const pickFallbackGenerateModel = <T extends ModelConfig>(
+  models: readonly T[]
+): (T & GenerateModelConfig) | undefined => {
+  const selectable = models.filter(isGenerateModelSelectable);
+
+  return selectable.find((model) => !model.is_missing) ?? selectable[0];
+};
 
 export const getPromptHistoryRecallPatch = ({
   item,

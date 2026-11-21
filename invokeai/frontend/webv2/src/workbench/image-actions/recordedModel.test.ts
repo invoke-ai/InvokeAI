@@ -88,6 +88,26 @@ describe('resolveRecordedModel', () => {
     });
   });
 
+  it('takes the reinstall of the weights a missing key stood for over another model with the recorded name', () => {
+    // Metadata records the key and the name but no hash.
+    const ref = { base: 'sdxl', hash: null, key: 'old', name: 'Juggernaut', type: 'main' };
+    const missing = model('old', { hash: 'blake3:weights', is_missing: true });
+    const reinstall = model('new', { hash: 'blake3:weights', name: 'Juggernaut (renamed)' });
+    const namesake = model('namesake', { hash: 'blake3:other' });
+
+    expect(resolveRecordedModel(ref, [missing, namesake, reinstall], STRICT)).toBe(reinstall);
+    expect(resolveRecordedModel(ref, [reinstall, namesake, missing], LENIENT)).toBe(reinstall);
+    // No reinstall: the recorded identifiers decide, as for any image without a hash.
+    expect(resolveRecordedModel(ref, [missing, namesake], STRICT)).toBe(namesake);
+    // Two present copies of those weights are as ambiguous as two with the recorded hash.
+    expect(resolveRecordedModel(ref, [missing, reinstall, model('copy', { hash: 'blake3:weights' })], STRICT)).toBe(
+      'ambiguous'
+    );
+    expect(resolveRecordedModel(ref, [missing, reinstall, model('copy', { hash: 'blake3:weights' })], LENIENT)).toBe(
+      reinstall
+    );
+  });
+
   it('matches the type only when the ref records one', () => {
     const lora = model('lora', { type: 'lora' });
 
