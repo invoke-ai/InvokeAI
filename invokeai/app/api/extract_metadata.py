@@ -1,9 +1,10 @@
 """Recovers the ``invokeai_metadata`` / ``invokeai_workflow`` / ``invokeai_graph`` strings a media
-file carries, so an uploaded PNG or MP4 is recallable without the database that produced it.
+file carries, so an uploaded image or MP4 is recallable without the database that produced it.
 
-PNGs hold the shared keys and optional ``invokeai_resolved_inputs`` as text chunks; MP4s hold
+PNGs hold the shared keys and optional ``invokeai_resolved_inputs`` as text chunks, and exported JPEG, WebP and
+AVIF files hold them in their EXIF ``UserComment`` (see ``invokeai.app.services.images.image_export``); MP4s hold
 the three shared keys as QuickTime keyed metadata (see ``invokeai.app.util.mp4_metadata``).
-Both sources use the shared validation in ``extract_metadata``. The image entry point also
+Every source uses the shared validation in ``extract_metadata``. The image entry point also
 reads resolved inputs using the same Graph JSON envelope validation as the source graph.
 """
 
@@ -15,6 +16,7 @@ from pathlib import Path
 
 from PIL import Image
 
+from invokeai.app.services.images.image_export import generation_data_from_exif
 from invokeai.app.services.video_files.video_files_common import (
     EMBEDDED_METADATA_KEYS,
     GRAPH_KEY,
@@ -121,15 +123,16 @@ def extract_metadata_from_image(
     invokeai_graph_override: str | None,
     logger: logging.Logger,
 ) -> ExtractedMetadata:
-    """Extracts the three shared channels and optional resolved-input Graph JSON from an image's text chunks."""
+    """Extracts the three shared channels and optional resolved-input Graph JSON from an image's text chunks or EXIF."""
+    embedded = {**generation_data_from_exif(pil_image), **pil_image.info}
     extracted = extract_metadata(
-        pil_image.info,
+        embedded,
         invokeai_metadata_override,
         invokeai_workflow_override,
         invokeai_graph_override,
         logger,
     )
-    extracted.invokeai_resolved_inputs = _extract_graph(pil_image.info.get("invokeai_resolved_inputs"), logger)
+    extracted.invokeai_resolved_inputs = _extract_graph(embedded.get("invokeai_resolved_inputs"), logger)
     return extracted
 
 

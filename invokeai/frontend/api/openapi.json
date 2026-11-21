@@ -7824,6 +7824,165 @@
         }
       }
     },
+    "/api/v1/images/i/{image_name}/export": {
+      "get": {
+        "tags": ["images"],
+        "summary": "Export Image",
+        "description": "Encodes a stored image in another format and size. Never enlarges; only PNG carries Invoke metadata.",
+        "operationId": "export_image",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "image_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The name of the image to export",
+              "title": "Image Name"
+            },
+            "description": "The name of the image to export"
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "enum": ["png", "jpeg", "webp", "avif"],
+              "type": "string",
+              "description": "The format to encode the image in",
+              "title": "Format"
+            },
+            "description": "The format to encode the image in"
+          },
+          {
+            "name": "quality",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Encoder quality for lossy formats; ignored for PNG",
+              "default": 90,
+              "title": "Quality"
+            },
+            "description": "Encoder quality for lossy formats; ignored for PNG"
+          },
+          {
+            "name": "long_edge",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Caps the longer side in pixels. The image is never enlarged.",
+              "title": "Long Edge"
+            },
+            "description": "Caps the longer side in pixels. The image is never enlarged."
+          },
+          {
+            "name": "metadata",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": ["all", "parameters", "none"],
+              "type": "string",
+              "description": "Which Invoke metadata the exported file keeps; a JPEG keeps only what fits in about 64 kB",
+              "default": "none",
+              "title": "Metadata"
+            },
+            "description": "Which Invoke metadata the exported file keeps; a JPEG keeps only what fits in about 64 kB"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Return the image encoded with the requested export options",
+            "content": {
+              "image/png": {},
+              "image/jpeg": {},
+              "image/webp": {},
+              "image/avif": {}
+            }
+          },
+          "404": {
+            "description": "Image not found"
+          },
+          "409": {
+            "description": "Image storage maintenance is active"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/images/export/names": {
+      "post": {
+        "tags": ["images"],
+        "summary": "Resolve Image Export Names",
+        "description": "Resolves a file-name pattern for a list of images, exactly as an export archive names them.",
+        "operationId": "resolve_image_export_names",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImageExportNamesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImageExportNamesResult"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Image not found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/images/i/{image_name}/thumbnail": {
       "get": {
         "tags": ["images"],
@@ -8212,7 +8371,10 @@
             }
           },
           "404": {
-            "description": "Image not found"
+            "description": "The archive is not ready, or unknown"
+          },
+          "500": {
+            "description": "The archive job failed; `detail` says why"
           },
           "422": {
             "description": "Validation Error",
@@ -23927,6 +24089,17 @@
             ],
             "title": "Board Id",
             "description": "The board from which image should be downloaded"
+          },
+          "export": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BulkImageExportOptions"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Encode every image with these options and name it by the pattern. Omit for the stored files."
           }
         },
         "type": "object",
@@ -24903,6 +25076,54 @@
         "required": ["timestamp", "bulk_download_id", "bulk_download_item_id", "bulk_download_item_name", "user_id"],
         "title": "BulkDownloadStartedEvent",
         "type": "object"
+      },
+      "BulkImageExportOptions": {
+        "properties": {
+          "format": {
+            "type": "string",
+            "enum": ["png", "jpeg", "webp", "avif"],
+            "title": "Format",
+            "description": "The format to encode the image in"
+          },
+          "quality": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Quality",
+            "description": "Encoder quality for lossy formats; ignored for PNG",
+            "default": 90
+          },
+          "long_edge": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Long Edge",
+            "description": "Caps the longer side in pixels. The image is never enlarged."
+          },
+          "metadata": {
+            "type": "string",
+            "enum": ["all", "parameters", "none"],
+            "title": "Metadata",
+            "description": "Which Invoke metadata the exported file keeps; a JPEG keeps only what fits in about 64 kB",
+            "default": "none"
+          },
+          "name_pattern": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Name Pattern",
+            "description": "The file-name pattern for every exported image",
+            "default": "{name}"
+          }
+        },
+        "type": "object",
+        "required": ["format"],
+        "title": "BulkImageExportOptions"
       },
       "BulkReidentifyModelsRequest": {
         "properties": {
@@ -54143,6 +54364,51 @@
         ],
         "title": "ImageDTO",
         "description": "Deserialized image record, enriched for the frontend."
+      },
+      "ImageExportNamesRequest": {
+        "properties": {
+          "image_names": {
+            "items": {
+              "type": "string",
+              "maxLength": 255
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "minItems": 1,
+            "title": "Image Names",
+            "description": "The images to name, in export order"
+          },
+          "pattern": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Pattern",
+            "description": "The file-name pattern"
+          },
+          "format": {
+            "type": "string",
+            "enum": ["png", "jpeg", "webp", "avif"],
+            "title": "Format",
+            "description": "The export format, which sets the extension"
+          }
+        },
+        "type": "object",
+        "required": ["image_names", "pattern", "format"],
+        "title": "ImageExportNamesRequest"
+      },
+      "ImageExportNamesResult": {
+        "properties": {
+          "file_names": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "File Names",
+            "description": "One file name per requested image, in request order"
+          }
+        },
+        "type": "object",
+        "required": ["file_names"],
+        "title": "ImageExportNamesResult"
       },
       "ImageField": {
         "properties": {

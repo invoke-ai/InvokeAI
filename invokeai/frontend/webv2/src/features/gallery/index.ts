@@ -44,6 +44,7 @@ import {
   deleteGalleryImages,
   deleteGalleryVideoItems,
   downloadGalleryArchive,
+  exportGalleryImage,
   getGalleryImageByName,
   getGalleryImageMetadata,
   getGalleryImagesByNames,
@@ -56,6 +57,7 @@ import {
   moveGalleryVideoItemsToBoard,
   removeGalleryImageItemsFromBoard,
   removeImagesFromGalleryBoard,
+  resolveGalleryExportFileNames,
   saveImageToGallery,
   setGalleryImageItemsStarred,
   setGalleryVideoItemsStarred,
@@ -90,6 +92,8 @@ export const galleryVideos = {
 /** Import/export intents shared by image-producing and image-consuming features. */
 export const galleryTransfers = {
   downloadArchive: downloadGalleryArchive,
+  exportImage: exportGalleryImage,
+  resolveExportFileNames: resolveGalleryExportFileNames,
   upload: uploadGalleryImage,
   uploadVideo: uploadGalleryVideo,
 } as const;

@@ -1,4 +1,5 @@
 import type { components } from '@api/schema';
+import type { ImageExportEncoding, ImageExportFormat, ImageExportSettings } from '@features/gallery/core/imageExport';
 import type {
   GalleryImageItem,
   GalleryItem,
@@ -22,6 +23,7 @@ import type {
   GalleryView,
 } from '@features/gallery/core/types';
 
+import { getGalleryImageFullPath } from '@features/gallery/core/imagePaths';
 import {
   ALL_READABLE_BOARDS_ID,
   DATE_BOARD_ID_PREFIX,
@@ -41,8 +43,10 @@ import {
 import {
   absolutizeApiUrl,
   ApiError,
+  apiFetch,
   apiFetchJson,
   apiFetchRaw,
+  assertOk,
   HttpRequestIdentityExpiredError,
   sleep,
 } from '@platform/transport/http';
@@ -1495,13 +1499,75 @@ export const moveGalleryVideoItemsToBoard = async (
 
 const BULK_DOWNLOAD_POLL_INTERVAL_MS = 2000;
 const BULK_DOWNLOAD_TIMEOUT_MS = 5 * 60 * 1000;
+const BULK_EXPORT_TIMEOUT_PER_IMAGE_MS = 5000;
+
+const toImageExportQuery = (encoding: ImageExportEncoding): string =>
+  toSearchParams({
+    format: encoding.format,
+    long_edge: encoding.longEdge ?? undefined,
+    metadata: encoding.metadata,
+    quality: encoding.quality ?? undefined,
+  });
+
+export const exportGalleryImage = async (
+  imageName: string,
+  encoding: ImageExportEncoding,
+  signal?: AbortSignal
+): Promise<Blob> => {
+  const owner = captureAccountScope();
+  const response = await apiFetch(
+    `/api/v1/images/i/${encodeURIComponent(imageName)}/export?${toImageExportQuery(encoding)}`,
+    { signal: signal ? AbortSignal.any([signal, owner.signal]) : owner.signal }
+  );
+  const blob = await response.blob();
+
+  assertAccountScopeCurrent(owner);
+  return blob;
+};
+
+export const resolveGalleryExportFileNames = async (
+  {
+    format,
+    imageNames,
+    pattern,
+  }: {
+    format: ImageExportFormat;
+    imageNames: readonly string[];
+    pattern: string;
+  },
+  signal?: AbortSignal
+): Promise<string[]> => {
+  const owner = captureAccountScope();
+  const { file_names: fileNames } = await apiFetchJson<{ file_names: string[] }>('/api/v1/images/export/names', {
+    body: JSON.stringify({ format, image_names: imageNames, pattern }),
+    method: 'POST',
+    signal: signal ? AbortSignal.any([signal, owner.signal]) : owner.signal,
+  });
+
+  assertAccountScopeCurrent(owner);
+  return fileNames;
+};
+
+export const getGalleryImageFileSize = async (imageName: string, signal?: AbortSignal): Promise<number | null> => {
+  const owner = captureAccountScope();
+  const response = await apiFetch(getGalleryImageFullPath(imageName), {
+    method: 'HEAD',
+    signal: signal ? AbortSignal.any([signal, owner.signal]) : owner.signal,
+  });
+  const length = Number(response.headers.get('content-length') ?? Number.NaN);
+
+  assertAccountScopeCurrent(owner);
+  return Number.isSafeInteger(length) && length > 0 ? length : null;
+};
 
 export const downloadGalleryArchive = async ({
   boardId,
+  exportSettings,
   imageNames,
   signal,
 }: {
   boardId?: string;
+  exportSettings?: ImageExportSettings;
   imageNames?: string[];
   signal?: AbortSignal;
 }): Promise<{ blob: Blob; fileName: string }> => {
@@ -1510,7 +1576,19 @@ export const downloadGalleryArchive = async ({
   const { bulk_download_item_name: fileName } = await apiFetchJson<{ bulk_download_item_name?: string | null }>(
     '/api/v1/images/download',
     {
-      body: JSON.stringify({ board_id: boardId, image_names: imageNames }),
+      body: JSON.stringify({
+        board_id: boardId,
+        export: exportSettings
+          ? {
+              format: exportSettings.format,
+              long_edge: exportSettings.longEdge,
+              metadata: exportSettings.metadata,
+              name_pattern: exportSettings.namePattern,
+              quality: exportSettings.quality,
+            }
+          : undefined,
+        image_names: imageNames,
+      }),
       method: 'POST',
       signal: requestSignal,
     }
@@ -1523,8 +1601,10 @@ export const downloadGalleryArchive = async ({
   }
 
   const startedAt = Date.now();
+  const timeoutMs =
+    BULK_DOWNLOAD_TIMEOUT_MS + (exportSettings ? (imageNames?.length ?? 0) * BULK_EXPORT_TIMEOUT_PER_IMAGE_MS : 0);
 
-  while (Date.now() - startedAt < BULK_DOWNLOAD_TIMEOUT_MS) {
+  while (Date.now() - startedAt < timeoutMs) {
     const response = await apiFetchRaw(`/api/v1/images/download/${encodeURIComponent(fileName)}`, {
       signal: requestSignal,
     });
@@ -1539,8 +1619,9 @@ export const downloadGalleryArchive = async ({
       return { blob, fileName };
     }
 
+    // 404 means not ready yet; any other answer is the job's failure, with its reason in `detail`.
     if (response.status !== 404) {
-      throw new Error(`${response.status} ${response.statusText}`);
+      await assertOk(response);
     }
 
     await sleep(BULK_DOWNLOAD_POLL_INTERVAL_MS, requestSignal);
@@ -1548,7 +1629,9 @@ export const downloadGalleryArchive = async ({
     requestSignal.throwIfAborted();
   }
 
-  throw new Error('Timed out preparing the download archive.');
+  throw new Error(
+    exportSettings ? 'Timed out preparing the export archive.' : 'Timed out preparing the download archive.'
+  );
 };
 
 export const uploadGalleryImage = async (

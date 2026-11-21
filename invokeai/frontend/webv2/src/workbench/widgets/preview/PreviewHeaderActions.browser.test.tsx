@@ -38,6 +38,7 @@ void i18n.use(initReactI18next).init({
             },
           },
           gallery: {
+            export: { exportMenu: 'Export…', menuGroup: 'Export', quickExport: 'Quick export ({{summary}})' },
             itemActions: {
               recall: {
                 verbs: {
@@ -405,12 +406,15 @@ describe('preview header Edit and Use', () => {
         'Use seed',
         'Use size',
         'Use CLIP skip (disabled)',
+        '# Export',
+        'Export…',
+        'Quick export (PNG)',
       ])
     );
     const keycaps = [...menu.querySelectorAll<HTMLElement>('[role="menuitem"]')].map(
       (row) => [...row.querySelectorAll('kbd')].map((key) => key.textContent).join('+') || null
     );
-    expect(keycaps.slice(3)).toEqual(['r', 'a', 'p', 's', 'd', null]);
+    expect(keycaps.slice(3)).toEqual(['r', 'a', 'p', 's', 'd', null, 'ctrl+shift+e', null]);
     expect(menu.textContent).toContain('Same settings, new seed');
 
     const seed = page.getByRole('menuitem', { name: /^Use seed/ });

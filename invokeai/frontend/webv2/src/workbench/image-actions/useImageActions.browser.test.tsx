@@ -143,6 +143,8 @@ vi.mock('@features/gallery/queries', () => ({
   ensureGalleryBoardDestinations: () => mocks.ensureGalleryBoardDestinations(),
   fetchGalleryImageMetadata: (_client: unknown, _owner: unknown, imageName: string) => mocks.imageMetadata(imageName),
   fetchGalleryVideoMetadata: () => Promise.resolve(null),
+  galleryImageExportNamesOptions: vi.fn(),
+  galleryImageExportOptions: vi.fn(),
   getGalleryItemBoardIdsFromCaches: (...args: unknown[]) => mocks.getItemBoardIds(...args),
   getGalleryItemStarredFromCaches: (...args: unknown[]) => mocks.getItemStarred(...args),
   invalidateGallery: (...args: unknown[]) => mocks.invalidateGallery(...args),

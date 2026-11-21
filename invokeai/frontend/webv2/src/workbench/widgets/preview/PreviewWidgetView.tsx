@@ -52,8 +52,10 @@ import { useQuery } from '@tanstack/react-query';
 import { releaseFocusOnRemoval, useWorkbenchFocus } from '@workbench/focusRegions';
 import {
   ImageContextMenu,
+  SelectedImageExportCommand,
   useDeletionConfirmation,
   useImageActions,
+  useImageExportDialog,
   type ImageContextMenuTarget,
   type ImageContextMenuVariant,
 } from '@workbench/image-actions';
@@ -318,12 +320,14 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
   );
   const projectId = useActiveProjectId();
   const { dialog: deletionConfirmationDialog, requestDeletionConfirmation } = useDeletionConfirmation();
+  const { dialog: exportDialog, requestImageExport } = useImageExportDialog();
   const imageActions = useImageActions({
     boards,
     generateValues,
     getItemActionContext,
     projectId,
     requestDeletionConfirmation,
+    requestImageExport,
   });
   const contextMenuItem = useMemo<GalleryItem | null>(() => {
     if (!selectedItem) {
@@ -698,6 +702,13 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
         {isComparing || isCompareArmed ? (
           <PreviewExitCompareHotkey key={`${projectId}:${i18n.language}`} runtime={runtime} onExit={exitCompare} />
         ) : null}
+        {shouldFollowLive ? null : (
+          <SelectedImageExportCommand
+            key={`export:${projectId}:${i18n.language}`}
+            openImageExport={imageActions.openImageExport}
+            runtime={runtime}
+          />
+        )}
         {shouldFollowLive && activeGalleryPlaceholder ? (
           <LivePreview
             density={density}
@@ -762,6 +773,7 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
         {/* Outside the branches: deleting the shown item or a live session taking over must not unmount a pending
             confirmation, nor cut its exit animation short. */}
         {deletionConfirmationDialog}
+        {exportDialog}
       </Stack>
     </PreviewDropSurface>
   );

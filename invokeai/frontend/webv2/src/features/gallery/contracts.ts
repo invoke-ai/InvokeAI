@@ -23,6 +23,25 @@ export {
   type GalleryBoardTranslate,
 } from './core/boardLabels';
 export { normalizeGalleryImage } from './core/image';
+export {
+  DEFAULT_IMAGE_EXPORT_SETTINGS,
+  getImageExportDimensions,
+  getImageExportEncoding,
+  getImageExportLongEdgeForScale,
+  getImageExportLongEdgeForSide,
+  IMAGE_EXPORT_FORMAT_LABELS,
+  IMAGE_EXPORT_FORMATS,
+  IMAGE_EXPORT_METADATA,
+  IMAGE_EXPORT_NAME_PATTERN_MAX_LENGTH,
+  IMAGE_EXPORT_NAME_TOKENS,
+  isLossyImageExportFormat,
+  normalizeImageExportSettings,
+  type ImageExportEncoding,
+  type ImageExportFormat,
+  type ImageExportMetadata,
+  type ImageExportSettings,
+  type ImageSize,
+} from './core/imageExport';
 export { formatGalleryMediaCounts, type GalleryMediaCounts } from './core/mediaCounts';
 export {
   assertNeverGalleryItem,

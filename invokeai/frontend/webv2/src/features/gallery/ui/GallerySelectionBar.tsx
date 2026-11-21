@@ -10,7 +10,7 @@ import { parseGalleryItemKey, toGalleryItemKey } from '@features/gallery/core/it
 import { IconButton } from '@platform/ui/Button';
 import { ScrollableMenuContent } from '@platform/ui/ScrollableMenuContent';
 import { Tooltip } from '@platform/ui/Tooltip';
-import { DownloadIcon, FolderInputIcon, FolderMinusIcon, StarIcon, Trash2Icon, XIcon } from 'lucide-react';
+import { DownloadIcon, FolderInputIcon, FolderMinusIcon, ImageUpIcon, StarIcon, Trash2Icon, XIcon } from 'lucide-react';
 import { useCallback, useMemo, type MouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -65,6 +65,12 @@ export const GallerySelectionBar = () => {
     () => void itemActions.downloadItems(selectedItemRefs, loadedItems),
     [itemActions, loadedItems, selectedItemRefs]
   );
+
+  const handleExport = useCallback(
+    () => itemActions.exportItems(selectedItemRefs, loadedItems),
+    [itemActions, loadedItems, selectedItemRefs]
+  );
+  const hasImages = selectedItemRefs.some((ref) => ref.kind === 'image');
 
   const handleDelete = useCallback(
     () => void itemActions.deleteItems(selectedItemRefs, { targetsOffScreen: hasUnloadedMembers }),
@@ -190,6 +196,16 @@ export const GallerySelectionBar = () => {
           <Icon as={DownloadIcon} boxSize="3.5" />
         </IconButton>
       </Tooltip>
+      <IconButton
+        aria-label={t('widgets.gallery.export.exportSelection')}
+        size="sm"
+        tooltip={t('widgets.gallery.export.exportSelection')}
+        unavailableReason={hasImages ? undefined : t('widgets.gallery.export.noImagesInSelection')}
+        variant="ghost"
+        onClick={handleExport}
+      >
+        <Icon as={ImageUpIcon} boxSize="3.5" />
+      </IconButton>
       <Tooltip content={t('widgets.gallery.deleteSelection')}>
         <IconButton
           aria-label={t('widgets.gallery.deleteSelection')}

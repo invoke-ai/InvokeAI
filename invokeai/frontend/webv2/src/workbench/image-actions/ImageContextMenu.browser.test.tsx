@@ -86,6 +86,7 @@ vi.mock('@workbench/WorkbenchContext', () => ({
   useWidgetValuesSelector: (_widgetId: string, selector: (values: Record<string, unknown>) => unknown) =>
     selector(galleryValuesMock.current),
   useWorkbenchCommands: () => commandsMock,
+  useWorkbenchQueries: vi.fn(),
 }));
 // Keys stand in for copy; the one interpolated value a test reads, an upscale factor, is shown as the locale does.
 vi.mock('react-i18next', () => ({
@@ -126,13 +127,16 @@ const createActions = (deleteItems: ImageActions['deleteItems']): ImageActions =
   downloadItems: vi.fn(() => Promise.resolve()),
   downloadImage: vi.fn(() => Promise.resolve()),
   downloadImages: vi.fn(() => Promise.resolve()),
+  exportItems: vi.fn(),
   generatePbrMaps: vi.fn(() => Promise.resolve()),
   loadImageWorkflow: vi.fn(() => Promise.resolve()),
   moveItemsToBoard: vi.fn(() => Promise.resolve()),
   moveImagesToBoard: vi.fn(() => Promise.resolve()),
   openItemInNewTab: vi.fn(),
   openItemInPreview: vi.fn(),
+  openImageExport: vi.fn(),
   openImageInPreview: vi.fn(),
+  quickExportImages: vi.fn(() => Promise.resolve()),
   recallImageData: vi.fn(() => Promise.resolve()),
   loadVideoWorkflow: vi.fn(() => Promise.resolve()),
   recallVideoData: vi.fn(() => Promise.resolve()),
@@ -473,6 +477,8 @@ describe('ImageContextMenu canvas destinations', () => {
       '—',
       'widgets.gallery.starSelection',
       'widgets.gallery.downloadSelection',
+      'widgets.gallery.export.exportSelectionMenu',
+      'widgets.gallery.export.quickExport',
       'widgets.gallery.changeBoard',
       '—',
       'widgets.gallery.deleteSelection',

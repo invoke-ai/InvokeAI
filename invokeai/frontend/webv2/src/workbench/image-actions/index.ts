@@ -7,6 +7,7 @@ export {
 export {
   GALLERY_CANVAS_IMPORT_DESTINATIONS,
   ImageContinueGroup,
+  ImageExportGroup,
   ImageUseGroups,
   VideoUseGroups,
 } from './ImageItemMenuGroups';
@@ -36,3 +37,5 @@ export { getImageRecallVerb, IMAGE_RECALL_KINDS } from './RecallActionButtons';
 export { getSelectedGalleryImage, getSelectedGalleryImageFromValues } from './selectedImage';
 export { useImageActions, type ImageActions } from './useImageActions';
 export { useDeletionConfirmation, type RequestDeletionConfirmation } from './useDeletionConfirmation';
+export { SelectedImageExportCommand, type ImageExportTarget, type RequestImageExport } from './imageExport';
+export { useImageExportDialog } from './useImageExportDialog';

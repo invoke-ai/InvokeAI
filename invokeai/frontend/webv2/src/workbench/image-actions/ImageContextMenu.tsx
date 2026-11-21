@@ -43,12 +43,13 @@ import {
 import { useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import type { ImageExportTarget } from './imageExport';
 import type { ImageRecallCapabilities } from './imageRecall';
 import type { ImageActions } from './useImageActions';
 
 import { ContextSubMenu, IMAGE_MENU_CONTENT_PROPS } from './ContextSubMenu';
 import { GalleryBoardDestinationGroups } from './GalleryBoardDestinationGroups';
-import { ImageContinueGroup, ImageUseGroups, VideoUseGroups } from './ImageItemMenuGroups';
+import { ImageContinueGroup, ImageExportGroup, ImageUseGroups, VideoUseGroups } from './ImageItemMenuGroups';
 import { useImageRecallCapabilities } from './useImageRecallCapabilities';
 
 export interface LegacyImageContextMenuTarget {
@@ -173,6 +174,7 @@ export const ImageContextMenu = ({
       boards={boards}
       image={images[0] ?? null}
       images={images}
+      returnFocus={returnFocus}
       target={imageTarget}
       variant={variant}
       onClose={onClose}
@@ -184,6 +186,7 @@ export const ImageContextMenu = ({
       actions={actions}
       boards={boards}
       previewVideoActions={previewVideoActions}
+      returnFocus={returnFocus}
       target={itemTarget}
       variant={variant}
       onClose={onClose}
@@ -196,6 +199,7 @@ const GalleryItemContextMenuContent = ({
   actions,
   boards,
   previewVideoActions,
+  returnFocus,
   target,
   variant,
   onClose,
@@ -204,6 +208,7 @@ const GalleryItemContextMenuContent = ({
   actions: ImageActions;
   boards: GalleryBoard[];
   previewVideoActions?: PreviewVideoContextActions;
+  returnFocus?: () => HTMLElement | null;
   target: GalleryItemContextMenuTarget;
   variant: ImageContextMenuVariant;
   onClose: () => void;
@@ -260,6 +265,7 @@ const GalleryItemContextMenuContent = ({
                 listingBoardId={target.listingBoardId}
                 loadedItems={target.items}
                 primaryItem={item}
+                returnFocus={returnFocus}
                 onRequestDeletion={onRequestDeletion}
               />
             ) : (
@@ -450,6 +456,7 @@ const BulkItemMenuItems = ({
   listingBoardId,
   loadedItems,
   primaryItem,
+  returnFocus,
   onRequestDeletion,
 }: {
   actions: ImageActions;
@@ -460,6 +467,7 @@ const BulkItemMenuItems = ({
   listingBoardId: string | undefined;
   loadedItems: GalleryItem[];
   primaryItem: GalleryItem;
+  returnFocus?: () => HTMLElement | null;
   onRequestDeletion: (itemRefs: GalleryItemRef[]) => void;
 }) => {
   const { t } = useTranslation();
@@ -481,6 +489,11 @@ const BulkItemMenuItems = ({
   );
   const handleDelete = useCallback(() => onRequestDeletion(itemRefs), [itemRefs, onRequestDeletion]);
   const itemBoardIds = useMemo(() => loadedItems.map((item) => item.boardId), [loadedItems]);
+  const exportTarget = useMemo<ImageExportTarget>(() => {
+    const imageNames = itemRefs.filter((ref) => ref.kind === 'image').map((ref) => ref.name);
+
+    return { imageNames, kind: 'selection', videoCount: itemRefs.length - imageNames.length };
+  }, [itemRefs]);
 
   return (
     <>
@@ -516,6 +529,7 @@ const BulkItemMenuItems = ({
         value="download-selection"
         onClick={handleDownload}
       />
+      <ImageExportGroup actions={actions} presentation="compact" returnFocus={returnFocus} target={exportTarget} />
       <ChangeBoardSubMenu
         boards={boards}
         itemBoardIds={itemBoardIds}
@@ -540,6 +554,7 @@ const ImageContextMenuContent = ({
   boards,
   image,
   images,
+  returnFocus,
   target,
   variant,
   onClose,
@@ -549,6 +564,7 @@ const ImageContextMenuContent = ({
   boards: GalleryBoard[];
   image: GalleryImage;
   images: GalleryImage[];
+  returnFocus?: () => HTMLElement | null;
   target: ImageContextMenuTarget;
   variant: ImageContextMenuVariant;
   onClose: () => void;
@@ -601,6 +617,7 @@ const ImageContextMenuContent = ({
                 boards={boards}
                 imageNames={imageNames}
                 images={images}
+                returnFocus={returnFocus}
                 onRequestDeletion={onRequestDeletion}
               />
             ) : (
@@ -611,6 +628,7 @@ const ImageContextMenuContent = ({
                 images={images}
                 isLoadingRecallCapabilities={isLoadingRecallCapabilities}
                 recallCapabilities={recallCapabilities}
+                returnFocus={returnFocus}
                 variant={variant}
                 onRequestDeletion={onRequestDeletion}
               />
@@ -629,6 +647,7 @@ const SingleImageMenuItems = ({
   images,
   isLoadingRecallCapabilities,
   recallCapabilities,
+  returnFocus,
   variant,
   onRequestDeletion,
 }: {
@@ -638,6 +657,7 @@ const SingleImageMenuItems = ({
   images: GalleryImage[];
   isLoadingRecallCapabilities: boolean;
   recallCapabilities: ImageRecallCapabilities;
+  returnFocus?: () => HTMLElement | null;
   variant: ImageContextMenuVariant;
   onRequestDeletion: (imageNames: string[]) => void;
 }) => {
@@ -651,6 +671,7 @@ const SingleImageMenuItems = ({
   const imageItemRef = useMemo<GalleryItemRef>(() => ({ kind: 'image', name: image.imageName }), [image.imageName]);
   const handleLoadWorkflow = useCallback(() => void actions.loadImageWorkflow(image), [actions, image]);
   const handleGeneratePbrMaps = useCallback(() => void actions.generatePbrMaps(image), [actions, image]);
+  const exportTarget = useMemo<ImageExportTarget>(() => ({ image, kind: 'image' }), [image]);
 
   return (
     <>
@@ -661,6 +682,8 @@ const SingleImageMenuItems = ({
         <OpenPreviewQuickMenuItem actions={actions} image={image} />
         <ToggleStarQuickMenuItem actions={actions} image={image} />
       </HStack>
+      <Menu.Separator borderColor="border.subtle" />
+      <ImageExportGroup actions={actions} presentation="compact" returnFocus={returnFocus} target={exportTarget} />
       <Menu.Separator borderColor="border.subtle" />
       <ContextMenuItem
         disabled={isLoadingRecallCapabilities || !recallCapabilities.workflow}
@@ -786,12 +809,14 @@ const BulkMenuItems = ({
   boards,
   imageNames,
   images,
+  returnFocus,
   onRequestDeletion,
 }: {
   actions: ImageActions;
   boards: GalleryBoard[];
   imageNames: string[];
   images: GalleryImage[];
+  returnFocus?: () => HTMLElement | null;
   onRequestDeletion: (imageNames: string[]) => void;
 }) => {
   const { t } = useTranslation();
@@ -807,6 +832,10 @@ const BulkMenuItems = ({
     [actions, imageNames]
   );
   const handleDelete = useCallback(() => onRequestDeletion(imageNames), [imageNames, onRequestDeletion]);
+  const exportTarget = useMemo<ImageExportTarget>(
+    () => ({ imageNames, kind: 'selection', videoCount: 0 }),
+    [imageNames]
+  );
 
   return (
     <>
@@ -829,6 +858,7 @@ const BulkMenuItems = ({
         value="download-selection"
         onClick={handleDownload}
       />
+      <ImageExportGroup actions={actions} presentation="compact" returnFocus={returnFocus} target={exportTarget} />
       <ChangeBoardSubMenu boards={boards} itemBoardIds={sourceBoardIds} onMove={handleMove} />
       <Menu.Separator borderColor="border.subtle" />
       <ContextMenuItem
