@@ -9,6 +9,7 @@ import type {
   CanvasLayerPreviewMutation,
   CanvasDocumentModel,
   DocumentRefusal,
+  FlipLayerResult,
   LayerUnreadable,
   MaskEditResult,
   PrepareEditResult,
@@ -151,6 +152,23 @@ export const reportLayerOperation = (
     t('widgets.layers.actions.actionFailed'),
     typeof refusal === 'string' ? t(LAYER_OPERATION_KEYS[refusal]) : describeNamedRefusal(refusal, t)
   );
+
+type FlipLayerRefusal = Extract<FlipLayerResult, { status: 'locked' | 'missing' | 'empty' }>;
+
+export const isFlipLayerRefusal = (result: FlipLayerResult): result is FlipLayerRefusal =>
+  result.status === 'locked' || result.status === 'missing' || result.status === 'empty';
+
+export const reportFlipLayer = (
+  result: FlipLayerResult,
+  reportError: (title: string, message: string) => void,
+  t: TFunction
+): void => {
+  if (isFlipLayerRefusal(result)) {
+    reportLayerOperation(result.status, reportError, t);
+  } else if (result.status !== 'previewed') {
+    reportStructuralCommit(result, reportError, t);
+  }
+};
 
 /** Explains a refused mask clear or invert; `busy` and a mask with nothing to change stay silent. */
 export const reportMaskEdit = (

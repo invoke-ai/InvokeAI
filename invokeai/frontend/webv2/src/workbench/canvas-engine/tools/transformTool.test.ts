@@ -276,6 +276,24 @@ describe('transform tool: gestures', () => {
     expect(h.ctx.commitStructural).not.toHaveBeenCalled();
   });
 
+  it('keeps an edge drag proportional while the aspect link is on, and Shift frees it', () => {
+    const dragEastEdge = (shift: boolean) => {
+      const h = createHarness(makeDoc([imageLayer('a', { width: 100, height: 100 })], 'a'));
+      const tool = createTransformTool();
+      activate(tool, h.ctx);
+      down(tool, h.ctx, pointer(100, 50));
+      move(tool, h.ctx, pointer(150, 50, { shift }));
+      return h.session()!.transform;
+    };
+
+    const linked = dragEastEdge(false);
+    expect(linked.scaleX).toBeCloseTo(1.5, 9);
+    expect(linked.scaleY).toBeCloseTo(1.5, 9);
+    const free = dragEastEdge(true);
+    expect(free.scaleX).toBeCloseTo(1.5, 9);
+    expect(free.scaleY).toBe(1);
+  });
+
   it('moves via an interior drag', () => {
     const doc = makeDoc([imageLayer('a', { width: 100, height: 100 })], 'a');
     const h = createHarness(doc);
