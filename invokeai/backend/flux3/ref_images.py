@@ -1,6 +1,6 @@
 """FLUX.3 reference images: fitted to the token budget, VAE-encoded, normalized and packed.
 
-Unlike FLUX.2, a reference is VAE-encoded untiled wherever the encoder's attention runs fused, as both reference
+A reference is VAE-encoded untiled wherever the encoder's attention runs fused, as both reference
 pipelines encode it: tiling moves every token (see ``encode_reference_image``).
 
 The size budget follows the reference implementation (``src/flux3/pipeline.py``, Apache-2.0): a single
