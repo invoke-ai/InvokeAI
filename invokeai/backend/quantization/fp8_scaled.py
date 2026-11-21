@@ -416,6 +416,37 @@ def _usable_input_scale(scale: torch.Tensor | None) -> torch.Tensor | None:
 _MX_SCALE_DTYPES = tuple(dtype for dtype in (torch.uint8, getattr(torch, "float8_e8m0fnu", None)) if dtype is not None)
 
 
+# The same two spellings as `_MX_SCALE_DTYPES`, as safetensors header names.
+_MX_SCALE_HEADER_DTYPES = frozenset({"U8", "F8_E8M0"})
+_FP8_HEADER_DTYPES = frozenset({"F8_E4M3", "F8_E5M2"})
+
+
+def header_has_mx_block_scales(header: Mapping[str, Any]) -> bool:
+    """Whether a safetensors header (``read_safetensors_header``) holds an MXFP8 layer, judged by layout alone.
+
+    An fp8 ``<layer>.weight`` beside an exponent-grid ``<layer>.weight_scale``: a 2-D ``uint8`` (or E8M0) tensor with
+    one row per weight row and one entry per :data:`MXFP8_BLOCK_SIZE` columns, the shape :func:`decode_mx_block_scales`
+    requires. The ``comfy_quant`` marker that names the format is tensor data, which a header read cannot see. A
+    producer that writes this layout without naming it does not load at all, so the layout is enough to go on here.
+    """
+    for key, info in header.items():
+        if not key.endswith(".weight") or not isinstance(info, dict) or info.get("dtype") not in _FP8_HEADER_DTYPES:
+            continue
+        scale = header.get(f"{key[: -len('.weight')]}.weight_scale")
+        if not isinstance(scale, dict) or scale.get("dtype") not in _MX_SCALE_HEADER_DTYPES:
+            continue
+        weight_shape, scale_shape = info.get("shape"), scale.get("shape")
+        if (
+            isinstance(weight_shape, list)
+            and isinstance(scale_shape, list)
+            and len(weight_shape) == len(scale_shape) == 2
+            and scale_shape[0] == weight_shape[0]
+            and scale_shape[1] * MXFP8_BLOCK_SIZE == weight_shape[1]
+        ):
+            return True
+    return False
+
+
 def unparsed_fp8_scale_keys(sd: Mapping[str, Any]) -> list[str]:
     """The scale keys beside an fp8 weight in a spelling this module does not parse, such as ``.weight_scale_inv``.
 

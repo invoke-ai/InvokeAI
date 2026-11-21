@@ -54,9 +54,9 @@ an AMD GPU that passes Invoke's FP8 test (it falls back by itself otherwise). Im
 model is fully in VRAM. [FP8 Compute](/configuration/optimization/fp8-compute/).
 </MemoryOption>
 <MemoryOption id="mxfp8-off" title="Turn FP8 Storage off for MXFP8 checkpoints">
-With an MXFP8 checkpoint on an NVIDIA, AMD or Intel GPU: installing switches FP8 Storage on, but for MXFP8 it
-re-encodes the weights without their scales and costs quality. Turn it off under **Default Settings** in the Model
-Manager. [By file format](/configuration/optimization/fp8-storage/#by-file-format).
+With an MXFP8 checkpoint on an NVIDIA, AMD or Intel GPU: installing leaves FP8 Storage off, because for MXFP8 it
+re-encodes the weights without their scales and costs quality. If an earlier install left it on, turn it off under
+**Default Settings** in the Model Manager. [By file format](/configuration/optimization/fp8-storage/#by-file-format).
 </MemoryOption>
 <MemoryOption id="int8-compute" title="Turn on int8 Compute for a speedup">
 With an int8 build on an NVIDIA RTX 30-series or newer GPU, `int8_compute: true` runs it on the int8 tensor cores: up
