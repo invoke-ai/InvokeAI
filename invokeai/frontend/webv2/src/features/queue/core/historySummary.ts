@@ -73,10 +73,12 @@ const compareQueuePosition = (a: QueueItem, b: QueueItem): number => {
 
 const getRunningImageOrdinal = (item: QueueItem, progress: QueueItemProgress | null): number => {
   const expectedCount = getQueueItemExpectedImageCount(item);
-  const completedCount = progress?.completedItemCount ?? 0;
-  const activeIndex = progress?.activeItemIndex ?? completedCount + 1;
+  // Progress events from concurrent GPUs may arrive in any order. The number of
+  // finished slots, not the last GPU to report, determines the queue ordinal.
+  const settledCount = (item.completedBackendItemIds?.length ?? 0) + (item.cancelledBackendItemIds?.length ?? 0);
+  const finishedCount = Math.max(progress?.completedItemCount ?? 0, settledCount);
 
-  return Math.min(expectedCount, Math.max(1, activeIndex));
+  return Math.min(expectedCount, finishedCount + 1);
 };
 
 export const getQueueSummary = (items: QueueItem[], progress: QueueItemProgress | null = null): QueueSummary => {

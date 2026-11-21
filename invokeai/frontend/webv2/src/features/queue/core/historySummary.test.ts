@@ -106,6 +106,30 @@ describe('getQueueSummary', () => {
     expect(summary).toEqual({ current: 2, remaining: 7, runningQueueItemId: 'batch-1', total: 8 });
   });
 
+  it('does not move the queue ordinal backwards as concurrent iterations report out of order', () => {
+    const item = createQueueItem({
+      backendItemIds: [10, 11, 12, 13, 14],
+      batchCount: 5,
+      id: 'batch-concurrent',
+      status: 'running',
+      submittedAt: '2026-06-10T00:00:00.000Z',
+    });
+    const reports = [
+      { activeItemIndex: 4, completedItemCount: 0 },
+      { activeItemIndex: 1, completedItemCount: 0 },
+      { activeItemIndex: 5, completedItemCount: 1 },
+      { activeItemIndex: 2, completedItemCount: 1 },
+      { activeItemIndex: 3, completedItemCount: 2 },
+    ];
+
+    expect(
+      reports.map(
+        ({ activeItemIndex, completedItemCount }) =>
+          getQueueSummary([item], { activeItemIndex, completedItemCount, message: '', percentage: null }).current
+      )
+    ).toEqual([1, 1, 2, 2, 3]);
+  });
+
   it('returns zeroes when all batches are terminal', () => {
     const summary = getQueueSummary([
       createQueueItem({ batchCount: 4, id: 'batch-1', status: 'completed', submittedAt: '2026-06-10T00:00:00.000Z' }),
