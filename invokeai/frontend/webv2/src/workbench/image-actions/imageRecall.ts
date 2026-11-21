@@ -573,12 +573,19 @@ const hasMossImageSkipLayers = (metadata: unknown, model: GenerateModelConfig | 
 const isGenerationRecord = (metadata: unknown): boolean => getString(metadata, 'generation_mode') !== null;
 
 /**
- * A graph run's record, which names the components its loaders used: a generation record, or a Refine upscale, which
- * writes no `generation_mode` but always `creativity` (a Model only upscale copies its source's keys instead). A Canvas
- * save records the panel's model and VAE but no components.
+ * A record whose writer named every standalone component its loaders received, so one it leaves out went unused: a
+ * graph run's record (a generation record, or a Refine upscale, which writes no `generation_mode` but always
+ * `creativity`; a Model only upscale copies its source's keys) that also carries `rand_device`. webv2's Generate and
+ * Upscale graphs always write it, as do the legacy frontend's SD-1 and SDXL builders. Other writers name the model but
+ * not every component: a Canvas save records only the panel's model and VAE, a denoise node that a workflow wires
+ * straight to its decoder writes `generation_mode` and `model` but none of the loader's components, and the legacy
+ * SD 3 and Z-Image builders left some out. None of them writes `rand_device`; a workflow's record carries it only
+ * where the workflow sets it on its own metadata node.
  */
-const recordsGraphRun = (metadata: unknown): boolean =>
-  isGenerationRecord(metadata) || getNumber(metadata, 'creativity') !== null;
+const recordsLoaderSelections = (metadata: unknown): boolean =>
+  (isGenerationRecord(metadata) || getNumber(metadata, 'creativity') !== null) &&
+  isRecord(metadata) &&
+  'rand_device' in metadata;
 
 const getBoundedNumber = (metadata: unknown, key: string, min: number, max: number): number | null => {
   const value = getNumber(metadata, key);
@@ -990,29 +997,17 @@ const SETTINGS_RECORDED_WHEN_LOADED: Partial<Record<string, readonly RecalledCom
 };
 
 /**
- * Writers that passed a component to their loader without recording it, so its absence from their records proves
- * nothing. The server stamps `app_version`, so it dates a writer but cannot tell the webv2 writer from the legacy
- * frontend, which a 7.0 server also stamps. webv2 always records `rand_device`; the legacy SD 3 and Z-Image builders
- * never do. A record without `app_version` is the current writer's.
+ * webv2 releases that passed a component to their loader without recording it, so its absence from their records
+ * proves nothing. The server stamps `app_version`; a record without one is the current writer's.
  */
 const UNRECORDING_WRITERS: readonly {
   base: string;
   /** The first version that recorded the settings. */
   recordedFrom: string;
   settings: readonly RecalledComponentSetting[];
-  /** The legacy frontend, which writes no `rand_device`, omitted them too, whatever the server version. */
-  legacyFrontendOmits?: true;
 }[] = [
-  // v6.10.0rc1 sent `qwen3_source_model` to the loader but never wrote `qwen3_source`.
-  { base: 'z-image', recordedFrom: '6.10.0rc2', settings: ['componentSourceModel'] },
-  // The legacy frontend passes standalone T5 and CLIP encoders to the loader and writes none of them; webv2 recorded
-  // them from 7.0.0-beta.2.
-  {
-    base: 'sd-3',
-    legacyFrontendOmits: true,
-    recordedFrom: '7.0.0-beta.2',
-    settings: ['clipGEmbedModel', 'clipLEmbedModel', 't5EncoderModel'],
-  },
+  // webv2 passed standalone T5 and CLIP encoders to the SD 3 loader before it recorded them in 7.0.0-beta.2.
+  { base: 'sd-3', recordedFrom: '7.0.0-beta.2', settings: ['clipGEmbedModel', 'clipLEmbedModel', 't5EncoderModel'] },
 ];
 
 const PRE_RELEASE_RANK: Record<string, number> = { a: 0, alpha: 0, b: 1, beta: 1, rc: 2 };
@@ -1042,10 +1037,7 @@ const isWriterBefore = (metadata: unknown, version: string): boolean => {
 const mayHaveOmittedSetting = (metadata: unknown, base: string, setting: RecalledComponentSetting): boolean =>
   UNRECORDING_WRITERS.some(
     (writer) =>
-      writer.base === base &&
-      writer.settings.includes(setting) &&
-      (isWriterBefore(metadata, writer.recordedFrom) ||
-        (writer.legacyFrontendOmits === true && isRecord(metadata) && !('rand_device' in metadata)))
+      writer.base === base && writer.settings.includes(setting) && isWriterBefore(metadata, writer.recordedFrom)
   );
 
 const getRecalledComponent = (
@@ -1666,12 +1658,13 @@ export const buildImageRecallSettings = ({
       RECALLED_COMPONENTS.some(
         (component) => component.setting === setting && isRecord(metadata) && component.metadataKey in metadata
       );
-    // A record of a graph run left out the slots its main or its source filled. Standalone picks left in the panel would
-    // take those slots over, so clear them to let the same supplier fill them again. Only a recalled main establishes
-    // who that was: a record that names none says nothing about the panel's model, and one that records no components
-    // (a Canvas save) says nothing about them. The encoders judged are the ones that survive recall: a recorded one that
-    // is gone leaves the panel's, and with it the question whether the source still supplies the VAE.
-    const judgedModel = model && recordsGraphRun(metadata) ? model : undefined;
+    // A record that names every loader selection left out the slots its main or its source filled. Standalone picks
+    // left in the panel would take those slots over, so clear them to let the same supplier fill them again. Only a
+    // recalled main establishes who that was: a record that names none says nothing about the panel's model, and one
+    // whose writer may have left components out (a Canvas save, a workflow's denoise node) says nothing about them, so
+    // the panel keeps its picks. The encoders judged are the ones that survive recall: a recorded one that is gone
+    // leaves the panel's, and with it the question whether the source still supplies the VAE.
+    const judgedModel = model && recordsLoaderSelections(metadata) ? model : undefined;
     const { componentSourceModel } = componentPatch;
     // A writer that may have used a source without recording it leaves the question open, like an unresolved one.
     const recordedSource = !recordsComponent('componentSourceModel')

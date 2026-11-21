@@ -2383,25 +2383,58 @@ describe('recall onto a panel holding unused standalone components', () => {
       })!.values;
     };
 
-    // v6.10.0rc1 sent `qwen3_source_model` to the loader but never recorded it.
-    it.each([
-      ['6.10.0rc1', true],
-      ['6.10.0rc2', false],
-    ] as const)('keeps the source a split Z-Image panel selected for a %s record', (appVersion, keeps) => {
-      const { model, settings } = satisfiedSettingsFor('z-image', {
+    const splitWithSource = (base: 'wan' | 'z-image') => {
+      const { model, settings } = satisfiedSettingsFor(base, {
         label: 'gguf',
         overrides: { format: 'gguf_quantized' },
       });
-      const source = {
-        ...model,
-        format: 'diffusers',
-        key: 'z-image-source',
-        name: 'Z-Image source',
-      } as MainModelConfig;
-      const panel = { ...settings, componentSourceModel: source, qwen3EncoderModel: null, vae: null };
-      const values = recallStripped(model, panel, panel, ['qwen3_source'], appVersion);
+      const source = { ...model, format: 'diffusers', key: `${base}-source`, name: 'Source' } as MainModelConfig;
+      const encoder = base === 'wan' ? 'wanT5EncoderModel' : 'qwen3EncoderModel';
 
-      expect(values.componentSourceModel?.key ?? null).toBe(keeps ? source.key : null);
+      return { model, panel: { ...settings, componentSourceModel: source, [encoder]: null, vae: null }, source };
+    };
+
+    // A workflow can wire a denoise node's `metadata` output straight to its decoder; the node records no components.
+    it('keeps the source a split Wan panel selected for a record a Wan denoise node wrote', () => {
+      const { model, panel, source } = splitWithSource('wan');
+      const compileComponents = (settings: GenerateSettings) =>
+        componentKeys(compileGenerateGraph(settings, model, 'gallery', PROJECT_SETTINGS).backendGraph);
+      // As `WanDenoiseInvocation._build_metadata` and `build_denoise_metadata` write it without a metadata input.
+      const metadata = {
+        add_noise: true,
+        app_version: '7.0.0-beta.2-post1',
+        cfg_scale: panel.cfgScale,
+        denoising_end: 1,
+        denoising_start: 0,
+        generation_mode: 'wan_txt2img',
+        guidance: panel.cfgScale,
+        height: 512,
+        loras: [],
+        metadata_version: '1.4.0',
+        model: { base: model.base, hash: 'hash', key: model.key, name: model.name, type: model.type },
+        seed: 7,
+        steps: panel.steps,
+        width: 512,
+      };
+      const values = buildImageRecallSettings({
+        currentValues: createValues({ ...panel, model, modelKey: model.key }),
+        image,
+        kind: 'all',
+        metadata,
+        ...recallCatalogFor(model, panel),
+      })!.values;
+
+      expect(compileComponents(panel)).toEqual({ wan_component_source: source.key });
+      expect(values.componentSourceModel?.key).toBe(source.key);
+      expect(compileComponents(values)).toEqual(compileComponents(panel));
+    });
+
+    // The legacy Z-Image builder writes no `rand_device`, and v6.10.0rc1 sent a source it never recorded.
+    it('keeps the source a split Z-Image panel selected for a legacy frontend record that omits it', () => {
+      const { model, panel, source } = splitWithSource('z-image');
+      const values = recallStripped(model, panel, panel, ['qwen3_source', 'rand_device'], '6.10.0rc1');
+
+      expect(values.componentSourceModel?.key).toBe(source.key);
     });
 
     // The legacy SD 3 builder passed standalone encoders to the loader and recorded none of them.

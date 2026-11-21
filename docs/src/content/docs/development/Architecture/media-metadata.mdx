@@ -168,6 +168,12 @@ graph builders write only the canonical ones.
   by `name` + `base` (and `type` when recorded). A recorded hash that matches nothing is not
   replaced by a same-named file, and an identifier that matches more than one install is skipped.
   Reference-image adapters fall back to `name` + `base` on a hash miss.
+- **Components a record leaves out** were supplied by the main model or its component source when
+  the record's writer names every component its loaders received. webv2 recall clears the panel's
+  standalone picks for those slots, so the rerun loads the same components. It trusts only generation
+  and upscale records that carry `rand_device`, which webv2 graphs and the legacy SD 1.x/SDXL builders
+  always write. A record a denoise node writes on its own, a Canvas save, or another legacy builder's
+  record may leave a used component out, so recall keeps the panel's picks.
 - **Media references** (`image_name`, `video_name`) are names in the originating gallery, exactly
   as an image record's `init_image` is. Recall restores everything else and clears media it
   cannot find rather than substituting.
