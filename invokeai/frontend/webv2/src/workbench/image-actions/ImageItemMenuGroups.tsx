@@ -5,9 +5,11 @@ import type { VideoConditioningRole } from '@features/video';
 import type { GalleryCanvasImportDestination } from '@workbench/canvas-operations/api';
 
 import { Menu, Text } from '@chakra-ui/react';
+import { getImageExportSummary } from '@features/gallery/contracts';
 import { galleryVideoMetadataOptions } from '@features/gallery/queries';
 import { ensureModelsLoaded, useModelsSelector } from '@features/models';
 import { getModelOnlyUpscaleFactors, getSpandrelNativeScale } from '@features/upscale';
+import { formatCount } from '@platform/i18n/languages';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { MenuActionItem, MenuItem } from '@platform/ui/Menu';
@@ -25,6 +27,7 @@ import {
   FilmIcon,
   ImageIcon,
   ImagePlayIcon,
+  ImageUpIcon,
   LayersIcon,
   PencilIcon,
   QuoteIcon,
@@ -36,15 +39,18 @@ import {
   SlidersHorizontalIcon,
   SproutIcon,
   TypeIcon,
+  ZapIcon,
   type LucideIcon,
 } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import type { ImageExportTarget } from './imageExport';
 import type { ImageRecallCapabilities, ImageRecallKind } from './imageRecall';
 import type { ImageActions } from './useImageActions';
 
 import { ContextSubMenu } from './ContextSubMenu';
+import { EXPORT_IMAGE_COMMAND_ID, useImageExportPreference } from './imageExport';
 import {
   EMPTY_VIDEO_RECALL_CAPABILITIES,
   getVideoRecallCapabilities,
@@ -563,6 +569,66 @@ const VideoReuseMenuItem = ({
       value={reuseItem.value}
       onSelect={handleSelect}
     />
+  );
+};
+
+/** Export with the dialog, or at once with the settings it last saved; a selection without images offers neither. */
+export const ImageExportGroup = ({
+  actions,
+  presentation,
+  returnFocus,
+  target,
+}: {
+  actions: ImageActions;
+  presentation: ImageMenuPresentation;
+  returnFocus?: () => HTMLElement | null;
+  target: ImageExportTarget;
+}) => {
+  const { t } = useTranslation();
+  const settings = useImageExportPreference();
+  const guided = presentation === 'guided';
+  const isSelection = target.kind === 'selection';
+  const unavailableReason =
+    isSelection && target.imageNames.length === 0 ? t('widgets.gallery.export.noImagesInSelection') : undefined;
+  const summary = getImageExportSummary(settings, (pixels) =>
+    t('widgets.gallery.export.longEdgeSummary', { size: formatCount(pixels) })
+  );
+  const handleExport = useCallback(
+    () => actions.openImageExport(target, { returnFocus }),
+    [actions, returnFocus, target]
+  );
+  const handleQuickExport = useCallback(() => void actions.quickExportImages(target), [actions, target]);
+  const shortcut = useMemo(
+    () => (guided && !isSelection ? <CommandKeycaps commandId={EXPORT_IMAGE_COMMAND_ID} /> : undefined),
+    [guided, isSelection]
+  );
+  const items = (
+    <>
+      <MenuActionItem
+        icon={ImageUpIcon}
+        label={t(isSelection ? 'widgets.gallery.export.exportSelectionMenu' : 'widgets.gallery.export.exportMenu')}
+        shortcut={shortcut}
+        unavailableReason={unavailableReason}
+        value="export-image"
+        onSelect={handleExport}
+      />
+      <MenuActionItem
+        icon={ZapIcon}
+        label={t('widgets.gallery.export.quickExport', { summary })}
+        unavailableReason={unavailableReason}
+        value="quick-export"
+        onSelect={handleQuickExport}
+      />
+    </>
+  );
+
+  return guided ? (
+    <Menu.ItemGroup>
+      <Menu.ItemGroupLabel>{t('widgets.gallery.export.menuGroup')}</Menu.ItemGroupLabel>
+      {items}
+    </Menu.ItemGroup>
+  ) : (
+    items
   );
 };
 

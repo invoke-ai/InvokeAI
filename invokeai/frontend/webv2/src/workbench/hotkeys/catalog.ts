@@ -247,6 +247,7 @@ export const firstPartyHotkeyCatalog: HotkeyDefinition[] = [
   hotkey('viewer', 'nextItem', ['arrowright']),
   hotkey('viewer', 'zoomToActual', ['1'], { title: 'Zoom to Actual Size' }),
   hotkey('viewer', 'zoomToFit', ['f'], { title: 'Zoom to Fit' }),
+  hotkey('viewer', 'exportImage', ['mod+shift+e'], { title: 'Export Image…' }),
   hotkey('gallery', 'selectAllOnPage', ['mod+a']),
   // No default key: Esc in the Gallery is left to Preview interactions, and the Preview label's clear button deselects.
   hotkey('gallery', 'clearSelection', []),

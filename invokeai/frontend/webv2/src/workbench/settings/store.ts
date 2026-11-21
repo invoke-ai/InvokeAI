@@ -61,6 +61,7 @@ export const DEFAULT_PREFERENCES: WorkbenchPreferences = {
   generatePresetsIncludePrompts: true,
   generateSectionsOpen: {},
   highContrast: false,
+  imageExportSettings: {},
   installInPlace: true,
   krea2RebalancePresets: [],
   language: 'en',
@@ -449,6 +450,9 @@ export const normalizeWorkbenchPreferences = (preferences?: WorkbenchPreferences
   generatePresets: normalizeGeneratePresets(preferences?.generatePresets),
   generatePresetsIncludePrompts: preferences?.generatePresetsIncludePrompts !== false,
   generateSectionsOpen: normalizeGenerateSectionsOpen(preferences?.generateSectionsOpen),
+  imageExportSettings: isPlainRecord(preferences?.imageExportSettings)
+    ? preferences.imageExportSettings
+    : DEFAULT_PREFERENCES.imageExportSettings,
   installInPlace:
     typeof preferences?.installInPlace === 'boolean' ? preferences.installInPlace : DEFAULT_PREFERENCES.installInPlace,
   krea2RebalancePresets: normalizeRebalancePresets(preferences?.krea2RebalancePresets),

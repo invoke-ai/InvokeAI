@@ -83,6 +83,7 @@ const itemActions = {
   deleteItems: vi.fn(),
   downloadItem: vi.fn(),
   downloadItems: vi.fn(),
+  exportItems: vi.fn(),
   moveItemsToBoard: vi.fn(),
   openItemInNewTab: vi.fn(),
   openItemInPreview: vi.fn(),

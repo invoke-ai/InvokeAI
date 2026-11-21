@@ -6,6 +6,7 @@ import {
   ImageContextMenu,
   useDeletionConfirmation,
   useImageActions,
+  useImageExportDialog,
   type ImageActions,
 } from '@workbench/image-actions';
 import { createContext, use } from 'react';
@@ -30,12 +31,14 @@ const GalleryItemActionsAdapterComponent = ({
   projectId,
 }: GalleryItemActionsOptions & { children: ReactNode }) => {
   const { dialog, requestDeletionConfirmation } = useDeletionConfirmation();
+  const { dialog: exportDialog, requestImageExport } = useImageExportDialog();
   const actions = useImageActions({
     boards,
     generateValues,
     getItemActionContext,
     projectId,
     requestDeletionConfirmation,
+    requestImageExport,
   });
 
   return (
@@ -44,6 +47,7 @@ const GalleryItemActionsAdapterComponent = ({
         <GalleryItemActionsProvider actions={actions}>{children}</GalleryItemActionsProvider>
       </GalleryAppActionsContext>
       {dialog}
+      {exportDialog}
     </>
   );
 };

@@ -273,6 +273,8 @@ vi.mock('@workbench/projects/api', async (importOriginal) => ({
 vi.mock('@workbench/hotkeys/firstPartyCommands', () => ({ useRegisterFirstPartyCommands: () => {} }));
 
 vi.mock('@features/gallery/queries', () => ({
+  galleryImageExportNamesOptions: vi.fn(),
+  galleryImageExportOptions: vi.fn(),
   galleryImageMetadataOptions: (_owner: unknown, imageName: string) => ({
     queryFn: () => null,
     queryKey: ['test-image-metadata', imageName],
@@ -462,6 +464,7 @@ vi.mock('@features/gallery/contracts', async (importOriginal) => ({
 
 vi.mock('@workbench/image-actions', async () => ({
   EMPTY_IMAGE_RECALL_CAPABILITIES: {},
+  EXPORT_IMAGE_COMMAND_ID: 'viewer.exportImage',
   ImageContextMenu: (props: Parameters<typeof ImageContextMenuModule.ImageContextMenu>[0]) => {
     const { realImageContextMenu: RealImageContextMenu } = mocks;
 
@@ -471,6 +474,7 @@ vi.mock('@workbench/image-actions', async () => ({
     ) : null;
   },
   ImageContinueGroup: () => null,
+  ImageExportGroup: () => null,
   ImageUseGroups: () => null,
   VideoUseGroups: () => null,
   RecallActionButtons: () => null,
@@ -490,6 +494,7 @@ vi.mock('@workbench/image-actions', async () => ({
     mocks.imageActionOptions = options;
     return mocks.imageActions ?? {};
   },
+  useImageExportDialog: () => ({ dialog: null, requestImageExport: () => {} }),
   useImageRecallCapabilities: () => ({ capabilities: {}, isLoading: false }),
 }));
 
@@ -2058,13 +2063,16 @@ const createItemMenuActions = (overrides: Partial<ImageActions>): ImageActions =
   downloadItems: vi.fn(() => Promise.resolve()),
   downloadImage: vi.fn(() => Promise.resolve()),
   downloadImages: vi.fn(() => Promise.resolve()),
+  exportItems: vi.fn(),
   generatePbrMaps: vi.fn(() => Promise.resolve()),
   loadImageWorkflow: vi.fn(() => Promise.resolve()),
   moveItemsToBoard: vi.fn(() => Promise.resolve()),
   moveImagesToBoard: vi.fn(() => Promise.resolve()),
   openItemInNewTab: vi.fn(),
   openItemInPreview: vi.fn(),
+  openImageExport: vi.fn(),
   openImageInPreview: vi.fn(),
+  quickExportImages: vi.fn(() => Promise.resolve()),
   recallImageData: vi.fn(() => Promise.resolve()),
   loadVideoWorkflow: vi.fn(() => Promise.resolve()),
   recallVideoData: vi.fn(() => Promise.resolve()),

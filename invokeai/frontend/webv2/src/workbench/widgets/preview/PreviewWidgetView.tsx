@@ -51,9 +51,11 @@ import { useStreamingImageSource } from '@platform/ui/streaming-image/useStreami
 import { useQuery } from '@tanstack/react-query';
 import { releaseFocusOnRemoval, useWorkbenchFocus } from '@workbench/focusRegions';
 import {
+  EXPORT_IMAGE_COMMAND_ID,
   ImageContextMenu,
   useDeletionConfirmation,
   useImageActions,
+  useImageExportDialog,
   type ImageContextMenuTarget,
   type ImageContextMenuVariant,
 } from '@workbench/image-actions';
@@ -318,12 +320,14 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
   );
   const projectId = useActiveProjectId();
   const { dialog: deletionConfirmationDialog, requestDeletionConfirmation } = useDeletionConfirmation();
+  const { dialog: exportDialog, requestImageExport } = useImageExportDialog();
   const imageActions = useImageActions({
     boards,
     generateValues,
     getItemActionContext,
     projectId,
     requestDeletionConfirmation,
+    requestImageExport,
   });
   const contextMenuItem = useMemo<GalleryItem | null>(() => {
     if (!selectedItem) {
@@ -333,6 +337,11 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
     return boardItems.find((item) => toGalleryItemKey(item) === selectedItemKey) ?? selectedItem;
   }, [boardItems, selectedItem, selectedItemKey]);
   const exitCompare = useCallback(() => gallery.setCompareItem(null), [gallery]);
+  const exportShownImage = useCallback(() => {
+    if (contextMenuItem && isGalleryImageItem(contextMenuItem)) {
+      imageActions.openImageExport({ image: galleryImageItemToGalleryImage(contextMenuItem), kind: 'image' });
+    }
+  }, [contextMenuItem, imageActions]);
   // Remember the comparison item's original page for swap-back, but only within its original query and board.
   const swappedOutRef = useRef<{ boardId: string; key: GalleryItemKey; page: number; queryKey: string } | null>(null);
   const swapCompareImages = useCallback(() => {
@@ -698,6 +707,9 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
         {isComparing || isCompareArmed ? (
           <PreviewExitCompareHotkey key={`${projectId}:${i18n.language}`} runtime={runtime} onExit={exitCompare} />
         ) : null}
+        {!shouldFollowLive && contextMenuItem && isGalleryImageItem(contextMenuItem) ? (
+          <PreviewExportHotkey key={i18n.language} runtime={runtime} onExport={exportShownImage} />
+        ) : null}
         {shouldFollowLive && activeGalleryPlaceholder ? (
           <LivePreview
             density={density}
@@ -762,6 +774,7 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
         {/* Outside the branches: deleting the shown item or a live session taking over must not unmount a pending
             confirmation, nor cut its exit animation short. */}
         {deletionConfirmationDialog}
+        {exportDialog}
       </Stack>
     </PreviewDropSurface>
   );
@@ -1020,6 +1033,31 @@ const PreviewCompareArmedHint = ({ density, onCancel }: { density: PreviewDensit
 };
 
 const PREVIEW_EXIT_COMPARE_COMMAND = 'viewer.exitCompare';
+
+/** Mounted while Preview shows a saved image; `onExport` reads the image at the press. */
+const PreviewExportHotkey = ({ onExport, runtime }: { onExport: () => void; runtime: WidgetViewProps['runtime'] }) => {
+  const { t } = useTranslation();
+  const exportImage = useEffectEvent(onExport);
+
+  /* eslint-disable react-hooks/rules-of-hooks -- useMountEffect is the repository's explicit useEffect wrapper */
+  useMountEffect(() => {
+    const title = t('widgets.preview.commands.exportImage');
+    const disposers = [
+      runtime.commands.register({ handler: () => exportImage(), id: EXPORT_IMAGE_COMMAND_ID, title }),
+      runtime.hotkeys.register({
+        commandId: EXPORT_IMAGE_COMMAND_ID,
+        defaultKeys: ['mod+shift+e'],
+        id: EXPORT_IMAGE_COMMAND_ID,
+        title,
+      }),
+    ];
+
+    return () => disposers.forEach((dispose) => dispose());
+  });
+  /* eslint-enable react-hooks/rules-of-hooks */
+
+  return null;
+};
 
 /** Mounted only while compare waits or is open, so Esc keeps its other meanings otherwise. */
 const PreviewExitCompareHotkey = ({ onExit, runtime }: { onExit: () => void; runtime: WidgetViewProps['runtime'] }) => {

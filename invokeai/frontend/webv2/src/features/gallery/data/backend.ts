@@ -1,4 +1,5 @@
 import type { components } from '@api/schema';
+import type { ImageExportEncoding, ImageExportFormat, ImageExportSettings } from '@features/gallery/core/imageExport';
 import type {
   GalleryImageItem,
   GalleryItem,
@@ -22,6 +23,7 @@ import type {
   GalleryView,
 } from '@features/gallery/core/types';
 
+import { getGalleryImageFullPath } from '@features/gallery/core/imagePaths';
 import {
   ALL_READABLE_BOARDS_ID,
   DATE_BOARD_ID_PREFIX,
@@ -41,6 +43,7 @@ import {
 import {
   absolutizeApiUrl,
   ApiError,
+  apiFetch,
   apiFetchJson,
   apiFetchRaw,
   HttpRequestIdentityExpiredError,
@@ -1496,12 +1499,77 @@ export const moveGalleryVideoItemsToBoard = async (
 const BULK_DOWNLOAD_POLL_INTERVAL_MS = 2000;
 const BULK_DOWNLOAD_TIMEOUT_MS = 5 * 60 * 1000;
 
+const toImageExportQuery = (encoding: ImageExportEncoding): string =>
+  toSearchParams({
+    format: encoding.format,
+    long_edge: encoding.longEdge ?? undefined,
+    metadata: encoding.metadata ?? undefined,
+    quality: encoding.quality ?? undefined,
+  });
+
+/** The server's encode of a stored image: the exact bytes the file will hold. */
+export const exportGalleryImage = async (
+  imageName: string,
+  encoding: ImageExportEncoding,
+  signal?: AbortSignal
+): Promise<Blob> => {
+  const owner = captureAccountScope();
+  const response = await apiFetch(
+    `/api/v1/images/i/${encodeURIComponent(imageName)}/export?${toImageExportQuery(encoding)}`,
+    { signal: signal ? AbortSignal.any([signal, owner.signal]) : owner.signal }
+  );
+  const blob = await response.blob();
+
+  assertAccountScopeCurrent(owner);
+  return blob;
+};
+
+/** File names the server would give `imageNames` in one export, in order; `{n}` counts from the first. */
+export const resolveGalleryExportFileNames = async (
+  {
+    format,
+    imageNames,
+    pattern,
+  }: {
+    format: ImageExportFormat;
+    imageNames: readonly string[];
+    pattern: string;
+  },
+  signal?: AbortSignal
+): Promise<string[]> => {
+  const owner = captureAccountScope();
+  const { file_names: fileNames } = await apiFetchJson<{ file_names: string[] }>('/api/v1/images/export/names', {
+    body: JSON.stringify({ format, image_names: imageNames, pattern }),
+    method: 'POST',
+    signal: signal ? AbortSignal.any([signal, owner.signal]) : owner.signal,
+  });
+
+  assertAccountScopeCurrent(owner);
+  return fileNames;
+};
+
+/** The stored file's size from a HEAD on the full-image route; null when the server does not say. */
+export const getGalleryImageFileSize = async (imageName: string, signal?: AbortSignal): Promise<number | null> => {
+  const owner = captureAccountScope();
+  const response = await apiFetch(getGalleryImageFullPath(imageName), {
+    method: 'HEAD',
+    signal: signal ? AbortSignal.any([signal, owner.signal]) : owner.signal,
+  });
+  const length = Number(response.headers.get('content-length') ?? Number.NaN);
+
+  assertAccountScopeCurrent(owner);
+  return Number.isSafeInteger(length) && length > 0 ? length : null;
+};
+
+/** `exportSettings` encodes every image and names it at the archive root; without it the stored files go as they are. */
 export const downloadGalleryArchive = async ({
   boardId,
+  exportSettings,
   imageNames,
   signal,
 }: {
   boardId?: string;
+  exportSettings?: ImageExportSettings;
   imageNames?: string[];
   signal?: AbortSignal;
 }): Promise<{ blob: Blob; fileName: string }> => {
@@ -1510,7 +1578,19 @@ export const downloadGalleryArchive = async ({
   const { bulk_download_item_name: fileName } = await apiFetchJson<{ bulk_download_item_name?: string | null }>(
     '/api/v1/images/download',
     {
-      body: JSON.stringify({ board_id: boardId, image_names: imageNames }),
+      body: JSON.stringify({
+        board_id: boardId,
+        export: exportSettings
+          ? {
+              format: exportSettings.format,
+              long_edge: exportSettings.longEdge,
+              metadata: exportSettings.metadata,
+              name_pattern: exportSettings.namePattern,
+              quality: exportSettings.quality,
+            }
+          : undefined,
+        image_names: imageNames,
+      }),
       method: 'POST',
       signal: requestSignal,
     }

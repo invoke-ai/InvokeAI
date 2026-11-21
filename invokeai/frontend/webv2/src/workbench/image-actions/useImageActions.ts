@@ -22,10 +22,14 @@ import {
   type GalleryVideoItem,
 } from '@features/gallery';
 import {
+  galleryImageItemToGalleryImage,
   getGalleryAutoAddBoardId,
   getGalleryBoardLabel,
   getGalleryDeletionSuccessor,
   getPersistedSelectedGalleryItemKeys,
+  isGalleryImageItem,
+  normalizeImageExportSettings,
+  type ImageExportSettings,
 } from '@features/gallery/contracts';
 import {
   canAddToCachedGalleryBoard,
@@ -70,7 +74,7 @@ import {
   type GalleryCanvasImportDestination,
 } from '@workbench/canvas-operations/api';
 import { getProjectSyncSnapshot } from '@workbench/projects/syncStore';
-import { useWorkbenchPreferenceSelector } from '@workbench/settings/store';
+import { getWorkbenchPreferences, useWorkbenchPreferenceSelector } from '@workbench/settings/store';
 import { useNotify } from '@workbench/useNotify';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
 import { useRevealLayerProperties } from '@workbench/widgets/layers/revealLayerProperties';
@@ -79,6 +83,12 @@ import { useWorkbenchCommands, useWorkbenchQueries, useWorkbenchSelector } from 
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import type {
+  ExecuteImageExport,
+  ImageExportRequestOptions,
+  ImageExportTarget,
+  RequestImageExport,
+} from './imageExport';
 import type { MediaUsageHost } from './mediaUsageReport';
 import type { RequestDeletionConfirmation } from './useDeletionConfirmation';
 import type { VideoRecallKind } from './videoRecall';
@@ -102,6 +112,7 @@ import {
   selectRestorableGalleryWidgetPatches,
   type GalleryWidgetKeySnapshotEntry,
 } from './galleryOptimisticRollback';
+import { saveImageExport } from './imageExport';
 import {
   getMetadataPrompts,
   EMPTY_IMAGE_RECALL_CAPABILITIES,
@@ -128,7 +139,11 @@ export interface ImageActions extends GalleryItemActions {
   loadImageWorkflow: (image: GalleryImage) => Promise<void>;
   loadVideoWorkflow: (item: GalleryVideoItem) => Promise<void>;
   moveImagesToBoard: (imageNames: string[], boardId: string) => Promise<void>;
+  /** Opens the export dialog; does nothing in a host without one (the paste dialog). */
+  openImageExport: (target: ImageExportTarget, options?: ImageExportRequestOptions) => void;
   openImageInPreview: (image: GalleryImage) => void;
+  /** Exports with the settings the dialog last saved, without asking. */
+  quickExportImages: (target: ImageExportTarget) => Promise<void>;
   recallImageData: (image: GalleryImage, kind: ImageRecallKind) => Promise<void>;
   recallVideoData: (item: GalleryVideoItem, kind: VideoRecallKind) => Promise<void>;
   sendToInitialVideo: (item: GalleryVideoItem) => void;
@@ -238,6 +253,7 @@ export const useImageActions = ({
   onImagesDeleted,
   projectId,
   requestDeletionConfirmation,
+  requestImageExport,
 }: {
   boards: GalleryBoard[];
   generateValues: Record<string, unknown>;
@@ -245,6 +261,7 @@ export const useImageActions = ({
   projectId?: string;
   onImagesDeleted?: (imageNames: string[]) => void;
   requestDeletionConfirmation: RequestDeletionConfirmation;
+  requestImageExport?: RequestImageExport;
 }): ImageActions => {
   const openWorkbenchWidget = useOpenWorkbenchWidget();
   const revealLayerProperties = useRevealLayerProperties();
@@ -950,20 +967,23 @@ export const useImageActions = ({
         }
       }
     };
-    const downloadItems = async (items: GalleryItemRef[], loadedItems: GalleryItem[] = []): Promise<void> => {
-      const owner = captureAccountScope();
-      const loadedByKey = new Map(loadedItems.map((item) => [toGalleryItemKey(item), item]));
-      const imageNames = items.filter((item) => item.kind === 'image').map((item) => item.name);
-      const videoRefs = items.filter((item) => item.kind === 'video');
-      const archiveCount = Math.ceil(imageNames.length / GALLERY_REQUEST_MAX_NAMES);
-      let failedCount = 0;
-      let savedFileCount = 0;
-      let succeededCount = 0;
+    /** One archive per request-sized batch; null once the account changed, when nothing may be reported. */
+    const saveImageArchives = async (
+      owner: AccountScope,
+      imageNames: readonly string[],
+      exportSettings?: ImageExportSettings
+    ) => {
+      const outcome = {
+        archiveCount: Math.ceil(imageNames.length / GALLERY_REQUEST_MAX_NAMES),
+        failedCount: 0,
+        savedFileCount: 0,
+        succeededCount: 0,
+      };
 
-      if (archiveCount > 1) {
+      if (outcome.archiveCount > 1) {
         notifications.add({
           kind: 'info',
-          message: t('widgets.gallery.itemActions.download.preparingArchives', { count: archiveCount }),
+          message: t('widgets.gallery.itemActions.download.preparingArchives', { count: outcome.archiveCount }),
           title: t('widgets.gallery.preparingDownload'),
         });
       }
@@ -973,21 +993,62 @@ export const useImageActions = ({
 
         try {
           const { blob, fileName } = await galleryTransfers.downloadArchive({
+            exportSettings,
             imageNames: archiveNames,
             signal: owner.signal,
           });
 
           assertAccountScopeCurrent(owner);
           downloadBlob(blob, fileName);
-          savedFileCount += 1;
-          succeededCount += archiveNames.length;
+          outcome.savedFileCount += 1;
+          outcome.succeededCount += archiveNames.length;
         } catch {
           if (!isAccountScopeCurrent(owner)) {
-            return;
+            return null;
           }
 
-          failedCount += archiveNames.length;
+          outcome.failedCount += archiveNames.length;
         }
+      }
+
+      return outcome;
+    };
+    const reportDownloadOutcome = (
+      requestedCount: number,
+      {
+        archiveCount,
+        failedCount,
+        savedFileCount,
+        succeededCount,
+      }: NonNullable<Awaited<ReturnType<typeof saveImageArchives>>>
+    ) => {
+      if (failedCount > 0) {
+        recordError(
+          new Error(
+            t('widgets.gallery.itemActions.download.partial', {
+              count: requestedCount,
+              failed: failedCount,
+              succeeded: succeededCount,
+            })
+          )
+        );
+      } else {
+        recordSuccess(
+          archiveCount > 1
+            ? t('widgets.gallery.itemActions.download.successArchives', { count: savedFileCount })
+            : t('widgets.gallery.itemActions.download.success', { count: succeededCount })
+        );
+      }
+    };
+    const downloadItems = async (items: GalleryItemRef[], loadedItems: GalleryItem[] = []): Promise<void> => {
+      const owner = captureAccountScope();
+      const loadedByKey = new Map(loadedItems.map((item) => [toGalleryItemKey(item), item]));
+      const imageNames = items.filter((item) => item.kind === 'image').map((item) => item.name);
+      const videoRefs = items.filter((item) => item.kind === 'video');
+      const outcome = await saveImageArchives(owner, imageNames);
+
+      if (!outcome) {
+        return;
       }
 
       for (const ref of videoRefs) {
@@ -1004,34 +1065,56 @@ export const useImageActions = ({
 
           assertAccountScopeCurrent(owner);
           downloadBlob(blob, item.name);
-          savedFileCount += 1;
-          succeededCount += 1;
+          outcome.savedFileCount += 1;
+          outcome.succeededCount += 1;
         } catch {
           if (!isAccountScopeCurrent(owner)) {
             return;
           }
 
-          failedCount += 1;
+          outcome.failedCount += 1;
         }
       }
 
-      if (failedCount > 0) {
-        recordError(
-          new Error(
-            t('widgets.gallery.itemActions.download.partial', {
-              count: items.length,
-              failed: failedCount,
-              succeeded: succeededCount,
-            })
-          )
-        );
-      } else {
-        recordSuccess(
-          archiveCount > 1
-            ? t('widgets.gallery.itemActions.download.successArchives', { count: savedFileCount })
-            : t('widgets.gallery.itemActions.download.success', { count: succeededCount })
-        );
+      reportDownloadOutcome(items.length, outcome);
+    };
+    const executeImageExport: ExecuteImageExport = async (target, settings) => {
+      const owner = captureAccountScope();
+
+      if (target.kind === 'image') {
+        await saveImageExport({ image: target.image, owner, queryClient, settings });
+        return;
       }
+
+      const outcome = await saveImageArchives(owner, target.imageNames, settings);
+
+      if (outcome) {
+        reportDownloadOutcome(target.imageNames.length, outcome);
+      }
+    };
+    const openImageExport = (target: ImageExportTarget, options?: ImageExportRequestOptions) =>
+      requestImageExport?.(target, executeImageExport, options);
+    const quickExportImages = async (target: ImageExportTarget) => {
+      const owner = captureAccountScope();
+
+      try {
+        await executeImageExport(target, normalizeImageExportSettings(getWorkbenchPreferences().imageExportSettings));
+      } catch (error: unknown) {
+        if (isAccountScopeCurrent(owner)) {
+          recordError(error);
+        }
+      }
+    };
+    const toExportTarget = (items: readonly GalleryItemRef[], loadedItems: readonly GalleryItem[]) => {
+      const imageNames = items.filter((item) => item.kind === 'image').map((item) => item.name);
+      const loadedImage = loadedItems.find((item) => item.kind === 'image' && item.name === imageNames[0]);
+
+      return imageNames.length === items.length &&
+        imageNames.length === 1 &&
+        loadedImage &&
+        isGalleryImageItem(loadedImage)
+        ? ({ image: galleryImageItemToGalleryImage(loadedImage), kind: 'image' } as const)
+        : ({ imageNames, kind: 'selection', videoCount: items.length - imageNames.length } as const);
     };
     const deriveImageRecallCapabilities = (
       image: GalleryImage,
@@ -1055,7 +1138,10 @@ export const useImageActions = ({
       deleteItems,
       downloadItem,
       downloadItems,
+      exportItems: (items, loadedItems = []) => openImageExport(toExportTarget(items, loadedItems)),
       moveItemsToBoard,
+      openImageExport,
+      quickExportImages,
       openItemInNewTab: (item) => {
         window.open(item.fullUrl, '_blank', 'noopener');
       },
@@ -1521,6 +1607,7 @@ export const useImageActions = ({
     queryClient,
     queries,
     requestDeletionConfirmation,
+    requestImageExport,
     revealLayerProperties,
     selectForCompare,
     supportedModels,

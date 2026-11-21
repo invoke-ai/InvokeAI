@@ -35,6 +35,7 @@ vi.mock('@workbench/image-actions', () => ({
     dialog: <output data-testid="deletion-confirmation-dialog" />,
     requestDeletionConfirmation: mocks.requestDeletionConfirmation,
   }),
+  useImageExportDialog: () => ({ dialog: null, requestImageExport: vi.fn() }),
   useImageActions: (options: unknown) => {
     mocks.useImageActions(options);
     return {

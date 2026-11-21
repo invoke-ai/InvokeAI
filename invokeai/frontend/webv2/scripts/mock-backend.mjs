@@ -183,8 +183,14 @@ const isImageMoveMaintenanceRoute = (method, path, url) => {
   if (path.startsWith('/api/v1/board_images')) {
     return true;
   }
+  if (path === '/api/v1/images/export/names') {
+    return false;
+  }
   if (path.startsWith('/api/v1/images')) {
-    return method !== 'GET' || /^\/api\/v1\/images\/i\/[^/]+\/(full|thumbnail|workflow)$/.test(path);
+    return (
+      (method !== 'GET' && method !== 'HEAD') ||
+      /^\/api\/v1\/images\/i\/[^/]+\/(full|thumbnail|workflow|export)$/.test(path)
+    );
   }
   return method === 'DELETE' && path.startsWith('/api/v1/boards/') && url.searchParams.get('include_images') === 'true';
 };
@@ -1240,6 +1246,50 @@ const writePng = (response, image, thumbnail) => {
     'content-type': 'image/png',
   });
   response.end(bytes);
+};
+
+const EXPORT_CONTENT_TYPES = { avif: 'image/avif', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp' };
+const EXPORT_EXTENSIONS = { avif: '.avif', jpeg: '.jpg', png: '.png', webp: '.webp' };
+
+/** The server's never-enlarging long-edge cap. */
+const exportDimensions = ({ height, width }, longEdge) => {
+  const longest = Math.max(width, height);
+
+  if (longEdge === null || longEdge >= longest) {
+    return { height, width };
+  }
+  return {
+    height: Math.max(1, Math.round((height * longEdge) / longest)),
+    width: Math.max(1, Math.round((width * longEdge) / longest)),
+  };
+};
+
+/** A plausible stand-in for the server's resolver: tokens, unsafe characters, separators and uniqueness. */
+const resolveExportFileNames = (state, images, pattern, format) => {
+  const seen = new Map();
+
+  return images.map((image, index) => {
+    const stem = image.image_name.replace(/\.[^.]+$/, '');
+    const values = {
+      board: image.board_id ? (state.boards.get(image.board_id)?.board_name ?? 'uncategorized') : 'uncategorized',
+      date: String(image.created_at ?? '').slice(0, 10),
+      model: '',
+      n: String(index + 1).padStart(3, '0'),
+      name: stem,
+      seed: '',
+    };
+    const resolved = pattern
+      .replace(/\{(\w+)\}/g, (token, key) => (key in values ? values[key] : token))
+      // eslint-disable-next-line no-control-regex -- the server replaces control characters too
+      .replace(/[\\/:*?"<>|\u0000-\u001f]/g, '-')
+      .replace(/([-_. ])[-_. ]+/g, '$1')
+      .replace(/^[-_. ]+|[-_. ]+$/g, '');
+    const base = resolved || stem;
+    const count = (seen.get(base) ?? 0) + 1;
+
+    seen.set(base, count);
+    return `${count > 1 ? `${base}-${String(count)}` : base}${EXPORT_EXTENSIONS[format]}`;
+  });
 };
 
 const writeBinary = (response, status, body, headers) => {
@@ -3067,13 +3117,46 @@ export const startMockBackend = async (port, { clock = Date.now, profile = 'empt
       }
 
       const imageAssetMatch = /^\/api\/v1\/images\/i\/([^/]+)\/(full|thumbnail)$/.exec(path);
-      if (method === 'GET' && imageAssetMatch) {
+      if ((method === 'GET' || method === 'HEAD') && imageAssetMatch) {
         const imageName = decodeURIComponent(imageAssetMatch[1]);
 
         const image = state.images.get(imageName);
         return image
           ? writePng(response, image, imageAssetMatch[2] === 'thumbnail')
           : json(404, { detail: 'Image not found' });
+      }
+
+      const imageExportMatch = /^\/api\/v1\/images\/i\/([^/]+)\/export$/.exec(path);
+      if (method === 'GET' && imageExportMatch) {
+        const image = state.images.get(decodeURIComponent(imageExportMatch[1]));
+        const format = url.searchParams.get('format');
+        const longEdge = url.searchParams.has('long_edge') ? Number(url.searchParams.get('long_edge')) : null;
+
+        if (!image) {
+          return json(404, { detail: 'Image not found' });
+        }
+        if (!EXPORT_CONTENT_TYPES[format] || (longEdge !== null && !(Number.isInteger(longEdge) && longEdge >= 1))) {
+          return json(422, { detail: 'Invalid export options' });
+        }
+
+        // The mock cannot transcode: it resizes its fixture PNG and labels it with the requested type.
+        const { height, width } = exportDimensions(image, longEdge);
+        return writeBinary(response, 200, fixturePng(width, height), { 'content-type': EXPORT_CONTENT_TYPES[format] });
+      }
+
+      if (method === 'POST' && path === '/api/v1/images/export/names') {
+        const body = await readJsonBody(request);
+        const names = Array.isArray(body.image_names) ? body.image_names : [];
+        const images = names.map((name) => state.images.get(name));
+
+        if (names.length === 0 || !EXPORT_EXTENSIONS[body.format] || typeof body.pattern !== 'string') {
+          return json(422, { detail: 'Invalid export name request' });
+        }
+        if (images.some((image) => !image)) {
+          return json(404, { detail: 'Image not found' });
+        }
+
+        return json(200, { file_names: resolveExportFileNames(state, images, body.pattern, body.format) });
       }
 
       const imageWorkflowMatch = /^\/api\/v1\/images\/i\/([^/]+)\/workflow$/.exec(path);

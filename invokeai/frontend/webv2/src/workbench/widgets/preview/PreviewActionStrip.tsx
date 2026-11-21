@@ -1,5 +1,5 @@
 import type { GalleryImage, GalleryItem } from '@features/gallery';
-import type { ImageActions, ImageContextMenuVariant } from '@workbench/image-actions';
+import type { ImageActions, ImageContextMenuVariant, ImageExportTarget } from '@workbench/image-actions';
 
 import { Icon, HStack, Menu, Portal } from '@chakra-ui/react';
 import { galleryImageItemToGalleryImage, isGalleryImageItem, toGalleryItemRef } from '@features/gallery/contracts';
@@ -10,6 +10,7 @@ import { Tooltip, useTooltipTriggerIds } from '@platform/ui/Tooltip';
 import { releaseFocusOnRemoval } from '@workbench/focusRegions';
 import {
   ImageContinueGroup,
+  ImageExportGroup,
   ImageUseGroups,
   useImageRecallCapabilities,
   VideoUseGroups,
@@ -281,15 +282,20 @@ const UseMenu = ({
 /** Mounted with the open menu, so capabilities load on open rather than on every selection. */
 const UseMenuItems = ({ actions, image }: { actions: ImageActions; image: GalleryImage }) => {
   const { capabilities, isLoading } = useImageRecallCapabilities(actions, image);
+  const exportTarget = useMemo<ImageExportTarget>(() => ({ image, kind: 'image' }), [image]);
 
   return (
-    <ImageUseGroups
-      actions={actions}
-      capabilities={capabilities}
-      image={image}
-      isLoadingCapabilities={isLoading}
-      presentation="guided"
-    />
+    <>
+      <ImageUseGroups
+        actions={actions}
+        capabilities={capabilities}
+        image={image}
+        isLoadingCapabilities={isLoading}
+        presentation="guided"
+      />
+      <Menu.Separator borderColor="border.subtle" />
+      <ImageExportGroup actions={actions} presentation="guided" target={exportTarget} />
+    </>
   );
 };
 
