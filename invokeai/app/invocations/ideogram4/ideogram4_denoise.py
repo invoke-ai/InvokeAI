@@ -203,7 +203,9 @@ class Ideogram4DenoiseInvocation(BaseInvocation, WithMetadata):
 
         # Apply optional advanced overrides on top of the preset.
         num_steps = self.steps if self.steps is not None else preset.num_steps
-        mu = self.mu if self.mu is not None else preset.mu
+        # Negative mu is valid, so only exactly 0 reads as unset: the workflow editor sends 0 for an optional float
+        # field the user left alone.
+        mu = self.mu if self.mu is not None and self.mu != 0.0 else preset.mu
         guidance_schedule = _effective_guidance_schedule(
             preset.guidance_schedule, preset.num_steps, num_steps, self.guidance_scale
         )
