@@ -494,6 +494,11 @@ const getLegacyChunkName = (id: string): string | null => {
     return 'html-to-image';
   }
 
+  // Video comparison is lazy. The shared vendor chunk would load its player and CSS at startup.
+  if (id.includes('/node_modules/video-compare-player/')) {
+    return 'video-compare-player';
+  }
+
   if (id.includes('/node_modules/fflate/')) {
     return 'fflate';
   }

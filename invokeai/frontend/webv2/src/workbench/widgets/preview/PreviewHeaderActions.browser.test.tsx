@@ -1,4 +1,5 @@
 import '@fontsource/inter/index.css';
+import type { GalleryVideoItem } from '@features/gallery';
 import type * as GalleryBackendModule from '@features/gallery/data/backend';
 import type * as IdentityModule from '@features/identity';
 import type { WidgetViewProps } from '@workbench/widgetContracts';
@@ -109,6 +110,7 @@ const state = vi.hoisted(() => ({
 }));
 const patchValues = vi.hoisted(() => vi.fn());
 const openItemMenu = vi.hoisted(() => vi.fn());
+const setCompareItem = vi.hoisted(() => vi.fn());
 const itemActions = vi.hoisted(() => ({
   canUseAsConditioningClip: { audio: true, video: true },
   canUseAsReferenceImage: false,
@@ -183,6 +185,7 @@ vi.mock('@workbench/WorkbenchContext', async (importOriginal) => ({
     select({ settings: { viewerAutoSwitch: state.viewerAutoSwitch } }),
   useWorkbenchCommands: () => ({
     account: { updateProjectPreferences },
+    gallery: { setCompareItem },
     generation: { setSource: vi.fn() },
     widgets: { patchValues },
   }),
@@ -243,6 +246,7 @@ beforeEach(() => {
   state.density = 'full';
   itemActions.selectForCompare.mockClear();
   openItemMenu.mockClear();
+  setCompareItem.mockClear();
   itemActions.canUseAsReferenceImage = false;
   queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   imageMetadata.mockReset().mockResolvedValue({ seed: 1 });
@@ -485,5 +489,23 @@ describe('preview header Edit and Use', () => {
       expect.objectContaining({ imageName: 'still.png' }),
       'seed'
     );
+  });
+
+  it('arms video comparison from the header', async () => {
+    const video = {
+      ...STILL_IMAGE,
+      category: 'general',
+      durationSeconds: 1,
+      fps: 24,
+      fullUrl: '/videos/clip.mp4',
+      kind: 'video',
+      name: 'clip.mp4',
+    } satisfies GalleryVideoItem;
+    state.actionItem = video;
+    await render();
+
+    await settle(() => button('Select for Compare').click());
+
+    expect(setCompareItem).toHaveBeenCalledExactlyOnceWith(video);
   });
 });

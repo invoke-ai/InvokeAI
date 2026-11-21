@@ -3,3 +3,4 @@ patchedDependencies:
   '@zag-js/menu@1.47.0': patches/@zag-js__menu@1.47.0.patch
   '@zag-js/presence@1.47.0': patches/@zag-js__presence@1.47.0.patch
   '@zag-js/tooltip@1.47.0': patches/@zag-js__tooltip@1.47.0.patch
+  video-compare-player@0.1.4: patches/video-compare-player@0.1.4.patch

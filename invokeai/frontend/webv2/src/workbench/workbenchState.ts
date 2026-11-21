@@ -86,7 +86,6 @@ import {
   parseGalleryItemKey,
   toGalleryItemKey,
   type GalleryImage,
-  type GalleryImageItem,
   type GalleryItem,
   type GalleryItemKey,
   type GalleryBoardDeletionResult,
@@ -542,7 +541,7 @@ type WorkbenchReducerAction =
       projectId?: string;
       selectionPage?: number;
     }
-  | { type: 'setGalleryCompareImage'; image: GalleryImageItem | null; projectId?: string }
+  | { type: 'setGalleryCompareImage'; image: GalleryItem | null; projectId?: string }
   | { type: 'selectGalleryBoard'; boardId: string; projectId?: string }
   | { type: 'clearGallerySelection'; projectId?: string }
   | { type: 'setGalleryView'; galleryView: 'images' | 'assets'; projectId?: string }
@@ -1555,7 +1554,7 @@ const getGalleryCompareState = (values: Record<string, unknown>): 'armed' | 'com
   const compareItem = getGalleryItemFromPersistedValue(values, values.compareImage);
   const primaryKey = getPersistedPrimaryGalleryItemKey(values);
 
-  if (!compareItem || primaryKey === null || parseGalleryItemKey(primaryKey).kind !== 'image') {
+  if (!compareItem || primaryKey === null || parseGalleryItemKey(primaryKey).kind !== compareItem.kind) {
     return null;
   }
 
@@ -1563,11 +1562,11 @@ const getGalleryCompareState = (values: Record<string, unknown>): 'armed' | 'com
 };
 
 const getSelectionComparePatch = (values: Record<string, unknown>, item: GalleryItem): Record<string, unknown> => {
-  if (item.kind === 'video') {
+  const compareItem = getGalleryItemFromPersistedValue(values, values.compareImage);
+
+  if (compareItem && compareItem.kind !== item.kind) {
     return { compareImage: null };
   }
-
-  const compareItem = getGalleryItemFromPersistedValue(values, values.compareImage);
 
   if (
     !compareItem ||
@@ -1579,7 +1578,7 @@ const getSelectionComparePatch = (values: Record<string, unknown>, item: Gallery
 
   const previousItem = getSelectedGalleryItemFromValues(values);
 
-  return { compareImage: previousItem?.kind === 'image' ? previousItem : null };
+  return { compareImage: previousItem?.kind === item.kind ? previousItem : null };
 };
 
 /** Not a migration boundary: unknown/legacy input must run `loadCanvasState` first. */
@@ -3400,10 +3399,10 @@ const patchGalleryItemsAcrossProjects = (
 
   return updateAllProjectGalleryValues(state, (values) => {
     let didChange = false;
-    const patchPersistedItem = (value: unknown, imageOnly = false): unknown => {
+    const patchPersistedItem = (value: unknown): unknown => {
       const item = getGalleryItemFromPersistedValue(values, value);
 
-      if (!item || (imageOnly && item.kind !== 'image') || !itemKeys.has(toGalleryItemKey(item))) {
+      if (!item || !itemKeys.has(toGalleryItemKey(item))) {
         return value;
       }
 
@@ -3419,7 +3418,7 @@ const patchGalleryItemsAcrossProjects = (
       return { ...image, ...changes };
     });
     const selectedImage = patchPersistedItem(values.selectedImage);
-    const compareImage = patchPersistedItem(values.compareImage, true);
+    const compareImage = patchPersistedItem(values.compareImage);
     const selectedImageMoved = changes.boardId !== undefined && selectedImage !== values.selectedImage;
     const selectedImageQuery =
       selectedImageMoved && values.selectedImageQuery && typeof values.selectedImageQuery === 'object'
@@ -3517,7 +3516,7 @@ const removeGalleryItemsFromAllProjects = (
       const nextSelectedImageName = selectedNameKey && removedItemKeys.has(selectedNameKey) ? null : selectedImageName;
       const nextCompareImage =
         (compareImageKey && removedItemKeys.has(compareImageKey)) ||
-        (!keepComparisonForSuccessor && !nextSelectedImage && !nextSelectedImageName)
+        ((!keepComparisonForSuccessor || compareItem?.kind === 'video') && !nextSelectedImage && !nextSelectedImageName)
           ? null
           : compareImage;
 
@@ -3782,7 +3781,11 @@ const getGalleryResultSelectionValues = (
 
   return {
     // A comparison waiting for its second image is the user's to complete; a result arriving does not complete it.
-    ...(item.kind === 'video' || getGalleryCompareState(galleryValues) === 'armed' ? { compareImage: null } : {}),
+    ...(item.kind === 'video' ||
+    getGalleryCompareState(galleryValues) === 'armed' ||
+    getGalleryItemFromPersistedValue(galleryValues, galleryValues.compareImage)?.kind === 'video'
+      ? { compareImage: null }
+      : {}),
     selectedImage: item,
     selectedImageName: itemKey,
     selectedImageNames: [itemKey],
@@ -5846,14 +5849,16 @@ const reduceWorkbenchAction = (
         (values) => {
           const itemKey = toGalleryItemKey(action.item);
           const selectedItemKeys = getPersistedSelectedGalleryItemKeys(values);
-          const isCompareArmed = getGalleryCompareState(values) === 'armed';
+          const shouldClearCompare =
+            getGalleryCompareState(values) === 'armed' ||
+            getGalleryItemFromPersistedValue(values, values.compareImage)?.kind === 'video';
 
           if (!selectedItemKeys.includes(itemKey)) {
             const selectedImagePage = getGallerySelectionPage(values, action.selectionPage);
 
             return {
               ...values,
-              ...(action.item.kind === 'video' || isCompareArmed ? { compareImage: null } : {}),
+              ...(action.item.kind === 'video' || shouldClearCompare ? { compareImage: null } : {}),
               selectedImage: action.item,
               selectedImageName: itemKey,
               selectedImageNames: [...selectedItemKeys, itemKey],
@@ -5875,7 +5880,7 @@ const reduceWorkbenchAction = (
           if (!wasPrimary) {
             return {
               ...values,
-              ...(isCompareArmed ? { compareImage: null } : {}),
+              ...(shouldClearCompare ? { compareImage: null } : {}),
               selectedImageNames: remainingItemKeys,
             };
           }
@@ -5895,7 +5900,7 @@ const reduceWorkbenchAction = (
 
           return {
             ...values,
-            ...(nextPrimaryItem?.kind === 'image' && !isCompareArmed ? {} : { compareImage: null }),
+            ...(nextPrimaryItem?.kind === 'image' && !shouldClearCompare ? {} : { compareImage: null }),
             selectedImage: nextPrimaryItem,
             selectedImageName: nextPrimaryKey,
             selectedImageNames: expectedNextPrimaryKey && !nextPrimaryItem ? [] : remainingItemKeys,
@@ -5923,7 +5928,9 @@ const reduceWorkbenchAction = (
 
           return {
             ...values,
-            ...(action.primaryItem.kind === 'video' || getGalleryCompareState(values) === 'armed'
+            ...(action.primaryItem.kind === 'video' ||
+            getGalleryCompareState(values) === 'armed' ||
+            getGalleryItemFromPersistedValue(values, values.compareImage)?.kind === 'video'
               ? { compareImage: null }
               : {}),
             selectedImage: action.primaryItem,
@@ -5944,7 +5951,12 @@ const reduceWorkbenchAction = (
       );
     }
     case 'setGalleryCompareImage': {
-      const updateValues = (values: Record<string, unknown>) => ({ ...values, compareImage: action.image });
+      const updateValues = (values: Record<string, unknown>) =>
+        action.image?.kind === 'video' &&
+        (getPersistedPrimaryGalleryItemKey(values) !== toGalleryItemKey(action.image) ||
+          getPersistedSelectedGalleryItemKeys(values).length > 1)
+          ? values
+          : { ...values, compareImage: action.image };
 
       return action.image
         ? updateGalleryValuesAndStopAutoSwitch(state, updateValues, action.projectId)
