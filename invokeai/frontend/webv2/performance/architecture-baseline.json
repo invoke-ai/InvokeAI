@@ -779,6 +779,7 @@
           "source:src/platform/pwa/registerServiceWorker.ts",
           "source:src/platform/query/client.ts",
           "source:src/platform/react/composeProviders.tsx",
+          "source:src/platform/react/contextMenuPoint.ts",
           "source:src/platform/react/draftRegistry.ts",
           "source:src/platform/react/isEventFromOwnDom.ts",
           "source:src/platform/react/useDebouncedValue.ts",

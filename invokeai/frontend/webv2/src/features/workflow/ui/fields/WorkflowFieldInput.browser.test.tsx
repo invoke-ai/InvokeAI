@@ -664,43 +664,48 @@ describe('WorkflowFieldInput media inputs', () => {
     expect(uploadVideoMock.mock.calls[0]?.[1]).toBe('none');
   });
 
-  it("opens the gallery's item menu for the field's media at the pointer, and leaves its picker's to the browser", async () => {
+  const renderMediaMenuField = async (onNodeContextMenu?: (event: React.MouseEvent) => void) => {
     const openItemContextMenu = vi.fn();
-    const nodeMenu = vi.fn((event: React.MouseEvent) => event.defaultPrevented);
     const adapter = { openItemContextMenu } as unknown as GalleryUiAdapter;
+
+    await act(() => {
+      root.render(
+        <ChakraProvider value={system}>
+          <QueryClientProvider client={queryClient}>
+            <DndContext>
+              <GalleryUiProvider adapter={adapter}>
+                <div onContextMenu={onNodeContextMenu}>
+                  <WorkflowFieldInput template={VIDEO_TEMPLATE} value={{ video_name: 'clip.mp4' }} onChange={vi.fn()} />
+                </div>
+              </GalleryUiProvider>
+            </DndContext>
+          </QueryClientProvider>
+        </ChakraProvider>
+      );
+    });
+    await vi.waitFor(() => {
+      expect(host.textContent).toContain('640x480 · 5s');
+    });
+
+    // The thumbnail itself errors in the test server; the well's picker button holds it.
+    return {
+      openItemContextMenu,
+      well: host.querySelector<HTMLElement>('button[aria-label="widgets.gallery.picker.chooseVideo"]')!,
+    };
+  };
+
+  it("opens the gallery's item menu for the field's media at the pointer, and leaves its picker's to the browser", async () => {
+    const nodeMenu = vi.fn((event: React.MouseEvent) => event.defaultPrevented);
     pickerState.isOpen = true;
 
     try {
-      await act(() => {
-        root.render(
-          <ChakraProvider value={system}>
-            <QueryClientProvider client={queryClient}>
-              <DndContext>
-                <GalleryUiProvider adapter={adapter}>
-                  <div onContextMenu={nodeMenu}>
-                    <WorkflowFieldInput
-                      template={VIDEO_TEMPLATE}
-                      value={{ video_name: 'clip.mp4' }}
-                      onChange={vi.fn()}
-                    />
-                  </div>
-                </GalleryUiProvider>
-              </DndContext>
-            </QueryClientProvider>
-          </ChakraProvider>
-        );
-      });
-      await vi.waitFor(() => {
-        expect(host.textContent).toContain('640x480 · 5s');
-      });
+      const { openItemContextMenu, well } = await renderMediaMenuField(nodeMenu);
       const rightClick = async (element: Element) => {
         const event = new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 30, clientY: 40 });
         await act(() => element.dispatchEvent(event));
         return event;
       };
 
-      // The thumbnail itself errors in the test server; the well's picker button holds it.
-      const well = host.querySelector('button[aria-label="widgets.gallery.picker.chooseVideo"]')!;
       expect((await rightClick(well)).defaultPrevented).toBe(true);
       // The node reads this to stay out of the way.
       expect(nodeMenu).toHaveLastReturnedWith(true);
@@ -720,6 +725,30 @@ describe('WorkflowFieldInput media inputs', () => {
     } finally {
       pickerState.isOpen = false;
     }
+  });
+
+  it('anchors a keyboard-opened item menu below the start of the focused media, on screen, not at the pointer', async () => {
+    const { openItemContextMenu, well } = await renderMediaMenuField();
+    const elsewhere = document.createElement('div');
+    const openFromKeyboard = async () => {
+      await act(() => userEvent.keyboard('{Shift>}{F10}{/Shift}'));
+      return openItemContextMenu.mock.lastCall?.[0] as { x: number; y: number };
+    };
+
+    elsewhere.style.cssText = 'position:fixed;right:0;bottom:0;width:20px;height:20px';
+    host.append(elsewhere);
+    await userEvent.hover(elsewhere);
+    well.focus();
+    const rect = well.getBoundingClientRect();
+
+    expect(await openFromKeyboard()).toMatchObject({ x: rect.left, y: rect.bottom });
+
+    // Media can run past the viewport where scrolling cannot reveal it, as a node on the transformed workflow canvas.
+    host.style.cssText = `position:fixed;inset-inline:0;top:${window.innerHeight - rect.height / 2}px`;
+    const moved = well.getBoundingClientRect();
+
+    expect(moved.bottom).toBeGreaterThan(window.innerHeight);
+    expect(await openFromKeyboard()).toMatchObject({ x: moved.left, y: window.innerHeight });
   });
 });
 

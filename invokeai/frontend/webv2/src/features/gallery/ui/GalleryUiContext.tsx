@@ -12,6 +12,7 @@ import type { QueueProgressSession } from '@features/queue/contracts';
 import type { ResolvedValues } from '@platform/core/resolvedValues';
 
 import { asSingleAccountBoards } from '@features/gallery/core/boardAccess';
+import { getContextMenuPoint } from '@platform/react/contextMenuPoint';
 import { createKeyedTransientStore, type KeyedTransientStore } from '@platform/state/externalStore';
 import {
   createContext,
@@ -355,11 +356,10 @@ export const useGalleryItemContextMenu = (
       const opener = getFocusedElement();
 
       open({
+        ...getContextMenuPoint(event),
         item,
         ref: { kind, name },
         returnFocus: () => (opener?.isConnected ? opener : null),
-        x: event.clientX,
-        y: event.clientY,
       });
     },
     [item, kind, name, open]
