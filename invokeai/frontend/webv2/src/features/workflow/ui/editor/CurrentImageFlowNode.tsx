@@ -23,9 +23,12 @@ import { getGalleryItemDragData, getGalleryItemDragId } from '@features/gallery/
 import { getAuthSession, refreshProtectedMediaCookie } from '@features/identity';
 import {
   useActiveProgressTargets,
+  useFollowedProgressTargets,
+  useFramedProgressTargets,
   useItemProgress,
   useProgressImage,
   useQueueItemProgress,
+  useQueueItemProgressImage,
 } from '@features/queue/react';
 import {
   CURRENT_IMAGE_DEFAULT_HEIGHT,
@@ -111,18 +114,61 @@ interface ResizeDragSession {
   zoom: number;
 }
 
-// Match the displayed frame's target or oldest active target within the displayed project.
+// Match the displayed frame's running/settling target or fall back to a running/settling slot in the displayed project.
 export const resolveProgressTarget = (
   progressImage: LatestProgressImageSnapshot | null | undefined,
-  activeTargets: readonly { itemIndex: number; queueItemId: string }[],
-  projectQueueItemIds?: ReadonlySet<string> | null
+  followedTargets: readonly { itemIndex: number; queueItemId: string }[],
+  projectQueueItemIds?: ReadonlySet<string> | null,
+  framedTargets?: readonly { itemIndex: number; queueItemId: string }[]
 ): { itemIndex: number; queueItemId: string } | null => {
   const matchesProject = (queueItemId: string): boolean => !projectQueueItemIds || projectQueueItemIds.has(queueItemId);
+  const isFollowedInProject = (target: { itemIndex: number; queueItemId: string }): boolean =>
+    matchesProject(target.queueItemId) &&
+    followedTargets.some(
+      (candidate) => candidate.queueItemId === target.queueItemId && candidate.itemIndex === target.itemIndex
+    );
+
   const frameTarget = progressImage?.target;
-  if (frameTarget && matchesProject(frameTarget.queueItemId)) {
+  if (frameTarget && isFollowedInProject(frameTarget)) {
     return frameTarget;
   }
-  return activeTargets.find((target) => matchesProject(target.queueItemId)) ?? null;
+  const framedInProject = framedTargets?.filter(isFollowedInProject).at(-1);
+  if (framedInProject) {
+    return framedInProject;
+  }
+  return followedTargets.find((target) => matchesProject(target.queueItemId)) ?? null;
+};
+
+// Keep this project's retained frame while another project publishes frames, and drop frames once a slot leaves running/settling.
+export const resolveLiveProgressImage = ({
+  activeTarget,
+  allowUntargetedFrame = false,
+  followedTargets,
+  progressImage,
+  slotProgressImage,
+}: {
+  activeTarget: { itemIndex: number; queueItemId: string } | null;
+  allowUntargetedFrame?: boolean;
+  followedTargets: readonly { itemIndex: number; queueItemId: string }[];
+  progressImage: LatestProgressImageSnapshot | null | undefined;
+  slotProgressImage: Omit<LatestProgressImageSnapshot, 'target'> | null | undefined;
+}): Omit<LatestProgressImageSnapshot, 'target'> | null => {
+  if (!activeTarget) {
+    return null;
+  }
+  if (slotProgressImage) {
+    return slotProgressImage;
+  }
+  if (!progressImage) {
+    return null;
+  }
+  if (!progressImage.target) {
+    return allowUntargetedFrame && followedTargets.length > 0 ? progressImage : null;
+  }
+  return progressImage.target.queueItemId === activeTarget.queueItemId &&
+    progressImage.target.itemIndex === activeTarget.itemIndex
+    ? progressImage
+    : null;
 };
 
 // Resolve the 1-based batch slot's backend item ID for per-slot progress lookup.
@@ -136,7 +182,7 @@ export const resolveActiveBackendItemId = (
   return projectQueueItemsById.get(activeTarget.queueItemId)?.backendItemIds?.[activeTarget.itemIndex - 1] ?? null;
 };
 
-// Pair percentage with the displayed batch slot so another slot's progress never labels this frame.
+// Prefer the coordinator's percentage when its active slot matches the displayed frame; use per-slot lookup for other slots.
 export const resolveProgressPercentage = ({
   activeProgress,
   activeTarget,
@@ -146,21 +192,19 @@ export const resolveProgressPercentage = ({
   activeTarget: { itemIndex: number; queueItemId: string } | null;
   slotProgressPercentage?: number | null;
 }): number | null => {
-  if (slotProgressPercentage !== undefined) {
-    return slotProgressPercentage;
+  const coordinatorMatchesSlot =
+    activeProgress !== null &&
+    activeProgress !== undefined &&
+    (activeProgress.activeItemIndex === undefined ||
+      activeTarget === null ||
+      activeTarget.itemIndex <= 0 ||
+      activeProgress.activeItemIndex === activeTarget.itemIndex);
+
+  if (coordinatorMatchesSlot) {
+    return activeProgress.percentage;
   }
-  if (!activeProgress) {
-    return null;
-  }
-  if (
-    activeProgress.activeItemIndex !== undefined &&
-    activeTarget !== null &&
-    activeTarget.itemIndex > 0 &&
-    activeProgress.activeItemIndex !== activeTarget.itemIndex
-  ) {
-    return null;
-  }
-  return activeProgress.percentage;
+
+  return slotProgressPercentage ?? null;
 };
 
 export interface CurrentImageExecutionState {
@@ -201,11 +245,10 @@ export const resolveCurrentImageExecutionState = ({
 
 export interface VideoErrorRecovery {
   handleError(video: HTMLVideoElement | null, isElementCurrent: () => boolean): void;
-  rearm(): void;
   retry(video: HTMLVideoElement | null): void;
 }
 
-// Refresh the protected-media cookie once per load attempt before surfacing manual retry.
+// Refresh the protected-media cookie once per media selection (until manual retry) before surfacing manual retry.
 export const createVideoErrorRecovery = ({
   getAccountEpoch,
   onFailedChange,
@@ -253,11 +296,6 @@ export const createVideoErrorRecovery = ({
       };
 
       void refresh.then(finishRefresh, () => finishRefresh(false));
-    },
-    rearm() {
-      automaticRefreshUsed = false;
-      pendingRefresh = null;
-      onFailedChange(false);
     },
     retry(video) {
       if (!video) {
@@ -361,6 +399,8 @@ const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNo
 
   const progressImage = useProgressImage();
   const activeTargets = useActiveProgressTargets();
+  const followedTargets = useFollowedProgressTargets();
+  const framedTargets = useFramedProgressTargets();
 
   const isOriginInProject = originProjectId === null || originProjectId === projectId;
   const projectQueueItemsById = useMemo(
@@ -373,32 +413,41 @@ const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNo
   );
 
   // When project queue items are known, match by item ID directly; use nodeExecution origin only as a fallback.
-  const projectActiveTargets = useMemo(() => {
-    if (projectQueueItemIds) {
-      return activeTargets.filter((target) => projectQueueItemIds.has(target.queueItemId));
-    }
-    return isOriginInProject ? activeTargets : [];
-  }, [activeTargets, isOriginInProject, projectQueueItemIds]);
+  const isTargetInProject = useCallback(
+    (queueItemId: string): boolean => (projectQueueItemIds ? projectQueueItemIds.has(queueItemId) : isOriginInProject),
+    [isOriginInProject, projectQueueItemIds]
+  );
 
-  const projectProgressImage = useMemo(() => {
-    if (!progressImage) {
-      return null;
-    }
-    if (projectQueueItemIds) {
-      return progressImage.target
-        ? projectQueueItemIds.has(progressImage.target.queueItemId)
-          ? progressImage
-          : null
-        : projectActiveTargets.length > 0
-          ? progressImage
-          : null;
-    }
-    return isOriginInProject ? progressImage : null;
-  }, [isOriginInProject, progressImage, projectActiveTargets.length, projectQueueItemIds]);
+  const projectActiveTargets = useMemo(
+    () => activeTargets.filter((target) => isTargetInProject(target.queueItemId)),
+    [activeTargets, isTargetInProject]
+  );
+
+  const projectFollowedTargets = useMemo(
+    () => followedTargets.filter((target) => isTargetInProject(target.queueItemId)),
+    [followedTargets, isTargetInProject]
+  );
+
+  const projectFramedTargets = useMemo(
+    () => framedTargets.filter((target) => isTargetInProject(target.queueItemId)),
+    [framedTargets, isTargetInProject]
+  );
 
   const activeTarget = useMemo(
-    () => resolveProgressTarget(projectProgressImage, projectActiveTargets, projectQueueItemIds),
-    [projectActiveTargets, projectProgressImage, projectQueueItemIds]
+    () => resolveProgressTarget(progressImage, projectFollowedTargets, null, projectFramedTargets),
+    [progressImage, projectFollowedTargets, projectFramedTargets]
+  );
+  const slotProgressImage = useQueueItemProgressImage(activeTarget?.queueItemId ?? '', activeTarget?.itemIndex ?? 0);
+  const projectProgressImage = useMemo(
+    () =>
+      resolveLiveProgressImage({
+        activeTarget,
+        allowUntargetedFrame: projectQueueItemIds === null,
+        followedTargets: projectFollowedTargets,
+        progressImage,
+        slotProgressImage,
+      }),
+    [activeTarget, progressImage, projectFollowedTargets, projectQueueItemIds, slotProgressImage]
   );
   const activeBackendItemId = useMemo(
     () => resolveActiveBackendItemId(activeTarget, projectQueueItemsById),
@@ -418,7 +467,7 @@ const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNo
   );
 
   const displayedItemKey = useMemo(() => (displayedItem ? toGalleryItemKey(displayedItem) : null), [displayedItem]);
-  const { dragRef, hasLiveFrame, isGenerating, isShowingVideo, isWaiting, progressPercent } = useMemo(
+  const { hasLiveFrame, isGenerating, isShowingVideo, isWaiting, progressPercent } = useMemo(
     () =>
       resolveCurrentImageExecutionState({
         activeTargetCount: projectActiveTargets.length,
@@ -428,6 +477,10 @@ const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNo
         progressPercentage,
       }),
     [displayedItem, isWorkflowRunning, progressPercentage, projectActiveTargets.length, projectProgressImage]
+  );
+  const videoDragRef = useMemo<GalleryItemRef | null>(
+    () => (!hasLiveFrame && displayedItem?.kind === 'video' ? toGalleryItemRef(displayedItem) : null),
+    [displayedItem, hasLiveFrame]
   );
 
   const node = data.documentNode;
@@ -592,13 +645,7 @@ const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNo
 
   const handleResizeKeyDown = useCallback(
     (event: KeyboardEvent<HTMLDivElement>) => {
-      if (
-        event.key === 'Home' ||
-        event.key === 'Backspace' ||
-        event.key === 'Delete' ||
-        event.key === 'Enter' ||
-        event.key === ' '
-      ) {
+      if (event.key === 'Home' || event.key === 'Enter' || event.key === ' ') {
         resetSize(event);
         return;
       }
@@ -752,9 +799,7 @@ const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNo
           </DraggableCurrentImage>
         )}
 
-        {isShowingVideo && dragRef?.kind === 'video' ? (
-          <CurrentMediaDragGrip itemRef={dragRef} nodeId={node.id} />
-        ) : null}
+        {isShowingVideo && videoDragRef ? <CurrentMediaDragGrip itemRef={videoDragRef} nodeId={node.id} /> : null}
 
         {isGenerating ? (
           <Flex
@@ -880,9 +925,8 @@ const CurrentImageVideoSurface = ({
   }, [publishCopyAvailability, recovery]);
 
   const handleLoadedData = useCallback(() => {
-    recovery.rearm();
     publishCopyAvailability();
-  }, [publishCopyAvailability, recovery]);
+  }, [publishCopyAvailability]);
 
   const handleLoadedMetadata = useCallback(() => {
     publishCopyAvailability();

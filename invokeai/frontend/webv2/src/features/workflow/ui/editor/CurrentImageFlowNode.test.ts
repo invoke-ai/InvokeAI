@@ -7,6 +7,7 @@ import {
   createVideoErrorRecovery,
   resolveActiveBackendItemId,
   resolveCurrentImageExecutionState,
+  resolveLiveProgressImage,
   resolveProgressPercentage,
   resolveProgressTarget,
 } from './CurrentImageFlowNode';
@@ -171,6 +172,19 @@ describe('resolveProgressTarget', () => {
       queueItemId: 'run-project-b',
     });
     expect(resolveProgressTarget(frameFromProjectA, [activeTargets[0]!], projectBIds)).toBeNull();
+    // A retained frame whose slot is no longer running/settling is ignored when followedTargets is empty.
+    expect(
+      resolveProgressTarget(
+        {
+          dataUrl: 'data:image/png;base64,AA==',
+          height: 64,
+          target: { itemIndex: 2, queueItemId: 'run-project-b' },
+          width: 64,
+        },
+        [],
+        projectBIds
+      )
+    ).toBeNull();
 
     const itemsById = new Map([['run-project-b', { backendItemIds: [101, 102], id: 'run-project-b' }]]);
     expect(resolveActiveBackendItemId(resolvedTarget, itemsById)).toBe(102);
@@ -178,6 +192,7 @@ describe('resolveProgressTarget', () => {
     expect(resolveActiveBackendItemId({ itemIndex: 0, queueItemId: 'run-project-b' }, itemsById)).toBeNull();
 
     const slot1Target = { itemIndex: 1, queueItemId: 'batch-1' };
+    // Coordinator active on slot 2 while displaying slot 1 -> use slot 1's per-slot lookup (null if none, 0.3 if set).
     expect(
       resolveProgressPercentage({
         activeProgress: { activeItemIndex: 2, percentage: 0.2 },
@@ -191,12 +206,89 @@ describe('resolveProgressTarget', () => {
         slotProgressPercentage: 0.75,
       })
     ).toBe(0.75);
+    // Coordinator active on slot 1 (including Saved Workflow child calls where parent slotProgressPercentage is null) -> prefer coordinator %.
+    expect(
+      resolveProgressPercentage({
+        activeProgress: { activeItemIndex: 1, percentage: 0.5 },
+        activeTarget: slot1Target,
+        slotProgressPercentage: null,
+      })
+    ).toBe(0.5);
     expect(
       resolveProgressPercentage({
         activeProgress: { activeItemIndex: 1, percentage: 0.6 },
         activeTarget: slot1Target,
       })
     ).toBe(0.6);
+  });
+
+  it('prefers the most recently framed slot in the project when another project publishes the latest frame', () => {
+    const projectATarget1 = { itemIndex: 1, queueItemId: 'run-a-1' };
+    const projectATarget2 = { itemIndex: 1, queueItemId: 'run-a-2' };
+    const projectAIds = new Set(['run-a-1', 'run-a-2']);
+    const frameFromProjectB = {
+      dataUrl: 'data:image/png;base64,BB==',
+      height: 64,
+      target: { itemIndex: 1, queueItemId: 'run-b-1' },
+      width: 64,
+    };
+
+    expect(
+      resolveProgressTarget(frameFromProjectB, [projectATarget1, projectATarget2], projectAIds, [projectATarget2])
+    ).toEqual(projectATarget2);
+  });
+});
+
+describe('resolveLiveProgressImage', () => {
+  it('retains this project slot frame when another project owns the global latest frame, and drops frames when not followed', () => {
+    const slotFrame = { dataUrl: 'data:image/png;base64,AA==', height: 64, width: 64 };
+    const otherProjectGlobalFrame = {
+      dataUrl: 'data:image/png;base64,BB==',
+      height: 64,
+      target: { itemIndex: 1, queueItemId: 'run-b' },
+      width: 64,
+    };
+    const projectATarget = { itemIndex: 1, queueItemId: 'run-a' };
+
+    // Project A keeps its retained slot frame even though Project B published the latest global frame.
+    expect(
+      resolveLiveProgressImage({
+        activeTarget: projectATarget,
+        followedTargets: [projectATarget],
+        progressImage: otherProjectGlobalFrame,
+        slotProgressImage: slotFrame,
+      })
+    ).toBe(slotFrame);
+
+    // Once the job moves back to pending (no activeTarget), any retained frame is ignored so Waiting returns.
+    expect(
+      resolveLiveProgressImage({
+        activeTarget: null,
+        followedTargets: [],
+        progressImage: { ...slotFrame, target: projectATarget },
+        slotProgressImage: slotFrame,
+      })
+    ).toBeNull();
+
+    // Untargeted global frames are rejected when projectQueueItemIds is known, and only accepted in fallback mode.
+    expect(
+      resolveLiveProgressImage({
+        activeTarget: projectATarget,
+        allowUntargetedFrame: false,
+        followedTargets: [projectATarget],
+        progressImage: slotFrame,
+        slotProgressImage: null,
+      })
+    ).toBeNull();
+    expect(
+      resolveLiveProgressImage({
+        activeTarget: projectATarget,
+        allowUntargetedFrame: true,
+        followedTargets: [projectATarget],
+        progressImage: slotFrame,
+        slotProgressImage: null,
+      })
+    ).toBe(slotFrame);
   });
 });
 
@@ -222,24 +314,18 @@ describe('createVideoErrorRecovery', () => {
     expect(refreshCookie).toHaveBeenCalledTimes(1);
     expect(failed).toBe(false);
 
-    // A second error after the automatic refresh surfaces the failure UI instead of looping forever.
+    // A second error after the automatic refresh surfaces the failure UI instead of looping forever, even after partial loads.
     recovery.handleError(video, () => true);
     expect(failed).toBe(true);
     expect(refreshCookie).toHaveBeenCalledTimes(1);
 
-    // A successful load rearms the one-shot cookie refresh for later expirations in the same session.
-    recovery.rearm();
-    expect(failed).toBe(false);
-    recovery.handleError(video, () => true);
-    await vi.waitFor(() => expect(refreshCookie).toHaveBeenCalledTimes(2));
-
     // Manual retry clears failure, reloads, and rearms the one-shot cookie refresh.
     recovery.retry(video);
     expect(failed).toBe(false);
-    expect(video.load).toHaveBeenCalledTimes(3);
+    expect(video.load).toHaveBeenCalledTimes(2);
 
     recovery.handleError(video, () => true);
-    await vi.waitFor(() => expect(refreshCookie).toHaveBeenCalledTimes(3));
+    await vi.waitFor(() => expect(refreshCookie).toHaveBeenCalledTimes(2));
   });
 
   it('surfaces failure immediately when cookie refresh fails and ignores stale account epochs', async () => {
@@ -316,6 +402,10 @@ describe('CurrentImageFlowNode locale keys', () => {
 
     for (const key of requiredKeys) {
       expect(i18n.exists(key), `Missing locale key: ${key}`).toBe(true);
+    }
+    const resizeInstructions = i18n.t('widgets.workflow.currentImageResizeHandle', { height: 288, width: 320 });
+    for (const key of ['Enter', 'Space', 'Home']) {
+      expect(resizeInstructions).toContain(key);
     }
   });
 });

@@ -65,6 +65,7 @@ export const executeQueueItemRecall = async ({
     return project
       ? getCurrentGenerateValues({
           generateValues: getResolvedProjectWidgetValues(project, 'generate', queries.getSnapshot().scopedDefaults),
+          models,
           supportedModels,
         })
       : null;

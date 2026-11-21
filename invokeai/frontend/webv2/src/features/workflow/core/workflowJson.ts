@@ -13,13 +13,7 @@ import type {
 
 import { clearSavedWorkflowDynamicFields } from './callSavedWorkflow';
 import { createWorkflowForm, createWorkflowId } from './document';
-import {
-  CURRENT_IMAGE_DEFAULT_HEIGHT,
-  CURRENT_IMAGE_DEFAULT_WIDTH,
-  clampCurrentImageHeight,
-  clampCurrentImageWidth,
-  isInvocationNode,
-} from './types';
+import { isInvocationNode, normalizeCurrentImageSize } from './types';
 
 /** Round-trips legacy WorkflowV3 files; unknown elements and dangling edges recover as warnings. */
 
@@ -322,13 +316,12 @@ export const parseWorkflowJson = (raw: unknown): ParsedWorkflow => {
     }
 
     if (node.type === 'current_image') {
-      const width = clampCurrentImageWidth(node.data.width);
-      const height = clampCurrentImageHeight(node.data.height);
+      const { height, width } = normalizeCurrentImageSize(node.data.width, node.data.height);
       nodes.push({
         data: {
           label: node.data.label,
-          ...(height === CURRENT_IMAGE_DEFAULT_HEIGHT ? {} : { height }),
-          ...(width === CURRENT_IMAGE_DEFAULT_WIDTH ? {} : { width }),
+          ...(height === undefined ? {} : { height }),
+          ...(width === undefined ? {} : { width }),
         },
         id: node.id,
         position: node.position,

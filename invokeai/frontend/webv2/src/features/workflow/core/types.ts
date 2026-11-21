@@ -131,7 +131,6 @@ export interface WorkflowNotesNode {
   };
 }
 
-/** UI-only node mirroring the legacy `current_image` node: shows the latest run output / progress image. */
 export const CURRENT_IMAGE_DEFAULT_WIDTH = 320;
 export const CURRENT_IMAGE_DEFAULT_HEIGHT = 288;
 export const CURRENT_IMAGE_MIN_WIDTH = 200;
@@ -148,6 +147,17 @@ export const clampCurrentImageHeight = (value: unknown): number =>
     ? Math.round(Math.min(CURRENT_IMAGE_MAX_SIZE, Math.max(CURRENT_IMAGE_MIN_HEIGHT, value)))
     : CURRENT_IMAGE_DEFAULT_HEIGHT;
 
+/** Clamps `current_image` dimensions and omits default values so unchanged nodes stay compact in JSON/state. */
+export const normalizeCurrentImageSize = (width: unknown, height: unknown): { height?: number; width?: number } => {
+  const clampedW = clampCurrentImageWidth(width);
+  const clampedH = clampCurrentImageHeight(height);
+  return {
+    ...(clampedH === CURRENT_IMAGE_DEFAULT_HEIGHT ? {} : { height: clampedH }),
+    ...(clampedW === CURRENT_IMAGE_DEFAULT_WIDTH ? {} : { width: clampedW }),
+  };
+};
+
+/** UI-only node mirroring the legacy `current_image` node: shows the latest run output / progress image. */
 export interface WorkflowCurrentImageNode {
   id: string;
   type: 'current_image';

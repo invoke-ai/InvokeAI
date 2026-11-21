@@ -34,14 +34,7 @@ import {
 } from './callSavedWorkflow';
 import { getConnectorDeletionSpliceConnections } from './connectors';
 import { isHiDiffusionNode, isHiDiffusionRatioField, normalizeHiDiffusionInputs } from './fields';
-import {
-  CURRENT_IMAGE_DEFAULT_HEIGHT,
-  CURRENT_IMAGE_DEFAULT_WIDTH,
-  clampCurrentImageHeight,
-  clampCurrentImageWidth,
-  isInvocationNode,
-  isNotesNode,
-} from './types';
+import { isInvocationNode, isNotesNode, normalizeCurrentImageSize } from './types';
 
 const now = (): string => new Date().toISOString();
 
@@ -142,10 +135,7 @@ const normalizePersistedNode = (node: unknown): unknown => {
   }
 
   const label = typeof node.data.label === 'string' ? node.data.label : 'Current Image';
-  const clampedW = clampCurrentImageWidth(node.data.width);
-  const clampedH = clampCurrentImageHeight(node.data.height);
-  const width = clampedW === CURRENT_IMAGE_DEFAULT_WIDTH ? undefined : clampedW;
-  const height = clampedH === CURRENT_IMAGE_DEFAULT_HEIGHT ? undefined : clampedH;
+  const { height, width } = normalizeCurrentImageSize(node.data.width, node.data.height);
 
   if (
     node.data.label === label &&
@@ -157,9 +147,12 @@ const normalizePersistedNode = (node: unknown): unknown => {
     return node;
   }
 
+  const { height: _prevHeight, width: _prevWidth, ...restData } = node.data;
+
   return {
     ...node,
     data: {
+      ...restData,
       label,
       ...(height === undefined ? {} : { height }),
       ...(width === undefined ? {} : { width }),
@@ -169,7 +162,7 @@ const normalizePersistedNode = (node: unknown): unknown => {
 
 /**
  * Reads a persisted version-2 document. Authored content lacking the editor's structure is refused (`null`), never
- * replaced; only missing metadata strings are filled in.
+ * replaced; missing metadata strings are filled in and persisted `current_image` node data is normalized.
  */
 export const readPersistedProjectGraph = (candidate: unknown): ProjectGraphState | null => {
   if (
@@ -1065,10 +1058,7 @@ const applyProjectGraphAction = (document: ProjectGraphState, action: ProjectGra
       if (!current || current.type !== 'current_image') {
         return document;
       }
-      const clampedW = clampCurrentImageWidth(action.width);
-      const clampedH = clampCurrentImageHeight(action.height);
-      const width = clampedW === CURRENT_IMAGE_DEFAULT_WIDTH ? undefined : clampedW;
-      const height = clampedH === CURRENT_IMAGE_DEFAULT_HEIGHT ? undefined : clampedH;
+      const { height, width } = normalizeCurrentImageSize(action.width, action.height);
       if (current.data.width === width && current.data.height === height) {
         return document;
       }

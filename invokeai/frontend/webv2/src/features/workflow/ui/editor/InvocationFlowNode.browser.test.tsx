@@ -56,6 +56,8 @@ const exportMocks = vi.hoisted(() => {
   const listeners = new Set<() => void>();
   return {
     activeProgressTargets: [] as Array<{ itemIndex: number; queueItemId: string }>,
+    followedProgressTargets: null as null | Array<{ itemIndex: number; queueItemId: string }>,
+    framedProgressTargets: [] as Array<{ itemIndex: number; queueItemId: string }>,
     itemProgressByBackendId: {} as Record<number, { message: string; percentage: number | null } | null>,
     notify: () => listeners.forEach((listener) => listener()),
     progressByQueueItemId: {} as Record<
@@ -68,7 +70,9 @@ const exportMocks = vi.hoisted(() => {
       target?: { itemIndex: number; queueItemId: string };
       width: number;
     },
+    progressImageByTarget: {} as Record<string, { dataUrl: string; height: number; width: number } | undefined>,
     rasterize: vi.fn(),
+    refreshProtectedMediaCookie: vi.fn<() => Promise<boolean>>().mockResolvedValue(true),
     subscribe: (listener: () => void) => {
       listeners.add(listener);
       return () => {
@@ -80,12 +84,24 @@ const exportMocks = vi.hoisted(() => {
 });
 vi.mock('./workflowImageRaster', () => ({ rasterizeWorkflowImage: exportMocks.rasterize }));
 vi.mock('@platform/browser/downloadBlob', () => ({ downloadBlob: vi.fn() }));
+vi.mock('@features/identity', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  getAuthSession: () => ({ accountEpoch: 1 }),
+  refreshProtectedMediaCookie: exportMocks.refreshProtectedMediaCookie,
+}));
 vi.mock('@features/queue/react', async (importOriginal) => {
   const { useSyncExternalStore } = await import('react');
   return {
     ...(await importOriginal<Record<string, unknown>>()),
     useActiveProgressTargets: () =>
       useSyncExternalStore(exportMocks.subscribe, () => exportMocks.activeProgressTargets),
+    useFollowedProgressTargets: () =>
+      useSyncExternalStore(
+        exportMocks.subscribe,
+        () => exportMocks.followedProgressTargets ?? exportMocks.activeProgressTargets
+      ),
+    useFramedProgressTargets: () =>
+      useSyncExternalStore(exportMocks.subscribe, () => exportMocks.framedProgressTargets),
     useItemProgress: (backendItemId: number | null | undefined) =>
       useSyncExternalStore(exportMocks.subscribe, () =>
         backendItemId ? (exportMocks.itemProgressByBackendId[backendItemId] ?? null) : null
@@ -93,6 +109,11 @@ vi.mock('@features/queue/react', async (importOriginal) => {
     useProgressImage: () => useSyncExternalStore(exportMocks.subscribe, () => exportMocks.progressImage),
     useQueueItemProgress: (queueItemId: string) =>
       useSyncExternalStore(exportMocks.subscribe, () => exportMocks.progressByQueueItemId[queueItemId] ?? null),
+    useQueueItemProgressImage: (queueItemId: string, itemIndex: number) =>
+      useSyncExternalStore(
+        exportMocks.subscribe,
+        () => exportMocks.progressImageByTarget[`${queueItemId}:${itemIndex}`] ?? null
+      ),
   };
 });
 vi.mock('@features/generation/queries', () => ({
@@ -1566,9 +1587,13 @@ describe('CurrentImageFlowNode waiting vs active states', () => {
 
   beforeEach(() => {
     exportMocks.activeProgressTargets = [];
+    exportMocks.followedProgressTargets = null;
+    exportMocks.framedProgressTargets = [];
     exportMocks.itemProgressByBackendId = {};
     exportMocks.progressByQueueItemId = {};
     exportMocks.progressImage = null;
+    exportMocks.progressImageByTarget = {};
+    exportMocks.refreshProtectedMediaCookie.mockReset().mockResolvedValue(true);
     delete document.documentElement.dataset.reduceMotion;
     host = document.createElement('div');
     host.style.height = '600px';
@@ -1579,9 +1604,12 @@ describe('CurrentImageFlowNode waiting vs active states', () => {
 
   afterEach(async () => {
     exportMocks.activeProgressTargets = [];
+    exportMocks.followedProgressTargets = null;
+    exportMocks.framedProgressTargets = [];
     exportMocks.itemProgressByBackendId = {};
     exportMocks.progressByQueueItemId = {};
     exportMocks.progressImage = null;
+    exportMocks.progressImageByTarget = {};
     delete document.documentElement.dataset.reduceMotion;
     await act(() => {
       root.unmount();
@@ -1746,6 +1774,14 @@ describe('CurrentImageFlowNode waiting vs active states', () => {
       },
     };
     await act(() => {
+      exportMocks.activeProgressTargets = [
+        { itemIndex: 1, queueItemId: 'run-b' },
+        { itemIndex: 2, queueItemId: 'run-b' },
+      ];
+      exportMocks.progressByQueueItemId = {
+        ...exportMocks.progressByQueueItemId,
+        'run-b': { activeItemIndex: 1, message: 'Slot 1', percentage: 0.3 },
+      };
       exportMocks.itemProgressByBackendId = {
         101: { message: 'Slot 1', percentage: 0.3 },
         102: { message: 'Slot 2', percentage: 0.65 },
@@ -1765,6 +1801,215 @@ describe('CurrentImageFlowNode waiting vs active states', () => {
       );
     });
     expect(host.querySelector('[data-testid="current-image-progress-badge"]')?.textContent).toBe('65%');
+  });
+
+  it('retains this project live preview when another project publishes a frame, and returns to Waiting when requeued to pending', async () => {
+    await import('@platform/ui/video-player/VideoPlayer');
+    const selectedVideo = {
+      boardId: 'none',
+      category: 'general',
+      createdAt: '2026-11-13T00:00:00Z',
+      durationSeconds: 4,
+      fps: 24,
+      fullUrl: 'data:audio/wav;base64,UklGRiUAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQEAAACA',
+      height: 576,
+      isIntermediate: false,
+      kind: 'video' as const,
+      name: 'clip.mp4',
+      starred: false,
+      thumbnailUrl: 'data:image/png;base64,c2F2ZWQ=',
+      width: 1024,
+    };
+    const projectASnapshot = {
+      ...projectSnapshotFor(currentImageGraph, { selectedImage: selectedVideo }),
+      isWorkflowRunning: true,
+      queueItems: [{ id: 'run-a' }],
+    };
+    const projectAFrame = {
+      dataUrl: 'data:image/png;base64,cHJvamVjdEE=',
+      height: 2,
+      width: 2,
+    };
+    exportMocks.activeProgressTargets = [
+      { itemIndex: 1, queueItemId: 'run-a' },
+      { itemIndex: 1, queueItemId: 'run-b' },
+    ];
+    exportMocks.framedProgressTargets = [{ itemIndex: 1, queueItemId: 'run-a' }];
+    exportMocks.progressImage = { ...projectAFrame, target: { itemIndex: 1, queueItemId: 'run-a' } };
+    exportMocks.progressImageByTarget = { 'run-a:1': projectAFrame };
+    exportMocks.progressByQueueItemId = {
+      'run-a': { activeItemIndex: 1, message: 'Project A', percentage: 0.4 },
+      'run-b': { activeItemIndex: 1, message: 'Project B', percentage: 0.9 },
+    };
+
+    const adapter = createAdapter(createExecutionPort().port, projectASnapshot);
+    await act(() => {
+      root.render(
+        <ChakraProvider value={system}>
+          <WorkflowUiProvider adapter={adapter}>
+            <ReactFlow edges={[]} nodes={currentImageNodes} nodeTypes={nodeTypes} />
+          </WorkflowUiProvider>
+        </ChakraProvider>
+      );
+    });
+
+    expect(host.querySelector('video')).toBeNull();
+    expect(host.querySelector('img')?.getAttribute('src')).toBe(projectAFrame.dataUrl);
+    expect(host.querySelector('[data-testid="current-image-progress-badge"]')?.textContent).toBe('40%');
+
+    // Project B publishes the newest global frame: Project A must keep its retained live frame instead of flashing the video.
+    await act(() => {
+      exportMocks.progressImage = {
+        dataUrl: 'data:image/png;base64,cHJvamVjdEI=',
+        height: 2,
+        target: { itemIndex: 1, queueItemId: 'run-b' },
+        width: 2,
+      };
+      exportMocks.notify();
+    });
+    expect(host.querySelector('video')).toBeNull();
+    expect(host.querySelector('img')?.getAttribute('src')).toBe(projectAFrame.dataUrl);
+    expect(host.querySelector('[data-testid="current-image-progress-badge"]')?.textContent).toBe('40%');
+
+    // Run A returns to pending: activeProgressTargetStore clears run-a while progressImageStore still retains its frame.
+    await act(() => {
+      exportMocks.activeProgressTargets = [{ itemIndex: 1, queueItemId: 'run-b' }];
+      exportMocks.framedProgressTargets = [];
+      exportMocks.progressImage = { ...projectAFrame, target: { itemIndex: 1, queueItemId: 'run-a' } };
+      exportMocks.notify();
+    });
+
+    await vi.waitFor(
+      async () => {
+        await act(() => Promise.resolve());
+        expect(host.querySelector('video')).not.toBeNull();
+      },
+      { timeout: 10_000 }
+    );
+    expect(host.querySelector('[data-node-status-indicator="true"]')?.textContent).toBe(
+      i18n.t('common.status.waiting')
+    );
+    expect(host.querySelector('[data-testid="current-image-media-drag-grip"]')).not.toBeNull();
+    expect(host.querySelector('[data-testid="current-image-progress-badge"]')).toBeNull();
+  });
+
+  it('shows the routed child workflow percentage even when the parent backend item percentage is null', async () => {
+    const parentSnapshot = {
+      ...projectSnapshotFor(currentImageGraph),
+      isWorkflowRunning: true,
+      queueItems: [{ backendItemIds: [501], id: 'parent-run' }],
+    };
+    const childFrame = {
+      dataUrl: 'data:image/png;base64,Y2hpbGQ=',
+      height: 2,
+      width: 2,
+    };
+    exportMocks.activeProgressTargets = [{ itemIndex: 1, queueItemId: 'parent-run' }];
+    exportMocks.progressImage = { ...childFrame, target: { itemIndex: 1, queueItemId: 'parent-run' } };
+    exportMocks.progressImageByTarget = { 'parent-run:1': childFrame };
+    exportMocks.progressByQueueItemId = {
+      'parent-run': { activeItemIndex: 1, message: 'Child step', percentage: 0.5 },
+    };
+    exportMocks.itemProgressByBackendId = {
+      501: { message: 'Call Saved Workflow', percentage: null },
+    };
+
+    const adapter = createAdapter(createExecutionPort().port, parentSnapshot);
+    await act(() => {
+      root.render(
+        <ChakraProvider value={system}>
+          <WorkflowUiProvider adapter={adapter}>
+            <ReactFlow edges={[]} nodes={currentImageNodes} nodeTypes={nodeTypes} />
+          </WorkflowUiProvider>
+        </ChakraProvider>
+      );
+    });
+
+    const badge = host.querySelector<HTMLElement>('[data-testid="current-image-progress-badge"]')!;
+    expect(badge.textContent).toBe('50%');
+    expect(badge.querySelector('.chakra-spinner')).toBeNull();
+    expect(host.querySelector('[data-node-status-indicator="true"]')?.textContent).toContain('50%');
+  });
+
+  it('bounds automatic video cookie refresh across partial loadeddata reloads and surfaces Retry', async () => {
+    await import('@platform/ui/video-player/VideoPlayer');
+    const selectedVideo = {
+      boardId: 'none',
+      category: 'general',
+      createdAt: '2026-11-13T00:00:00Z',
+      durationSeconds: 4,
+      fps: 24,
+      fullUrl: 'data:audio/wav;base64,UklGRiUAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQEAAACA',
+      height: 576,
+      isIntermediate: false,
+      kind: 'video' as const,
+      name: 'partial-clip.mp4',
+      starred: false,
+      thumbnailUrl: 'data:image/png;base64,c2F2ZWQ=',
+      width: 1024,
+    };
+    const snapshot = projectSnapshotFor(currentImageGraph, { selectedImage: selectedVideo });
+    const adapter = createAdapter(createExecutionPort().port, snapshot);
+
+    await act(() => {
+      root.render(
+        <ChakraProvider value={system}>
+          <WorkflowUiProvider adapter={adapter}>
+            <ReactFlow edges={[]} nodes={currentImageNodes} nodeTypes={nodeTypes} />
+          </WorkflowUiProvider>
+        </ChakraProvider>
+      );
+    });
+
+    await vi.waitFor(
+      async () => {
+        await act(() => Promise.resolve());
+        expect(host.querySelector('video')).not.toBeNull();
+      },
+      { timeout: 10_000 }
+    );
+
+    const video = host.querySelector('video')!;
+    const loadSpy = vi.spyOn(video, 'load').mockImplementation(() => {});
+
+    // First error triggers one automatic cookie refresh and reload.
+    await act(() => {
+      video.dispatchEvent(new Event('error'));
+    });
+    await vi.waitFor(() => {
+      expect(exportMocks.refreshProtectedMediaCookie).toHaveBeenCalledTimes(1);
+      expect(loadSpy).toHaveBeenCalledTimes(1);
+    });
+    expect(host.querySelector('[data-testid="current-image-video-failure"]')).toBeNull();
+
+    // Partial load (first frame arrives via loadeddata) followed by a second error must NOT trigger another auto-refresh.
+    await act(() => {
+      video.dispatchEvent(new Event('loadeddata'));
+      video.dispatchEvent(new Event('error'));
+    });
+    await vi.waitFor(() => {
+      expect(host.querySelector('[data-testid="current-image-video-failure"]')).not.toBeNull();
+    });
+    expect(exportMocks.refreshProtectedMediaCookie).toHaveBeenCalledTimes(1);
+    expect(loadSpy).toHaveBeenCalledTimes(1);
+    const failureOverlay = host.querySelector('[data-testid="current-image-video-failure"]');
+
+    // Manual Retry clears the overlay, reloads, and rearms the one-shot automatic refresh.
+    const retryButton = failureOverlay!.querySelector('button')!;
+    await act(() => {
+      retryButton.click();
+    });
+    expect(host.querySelector('[data-testid="current-image-video-failure"]')).toBeNull();
+    expect(loadSpy).toHaveBeenCalledTimes(2);
+
+    await act(() => {
+      video.dispatchEvent(new Event('error'));
+    });
+    await vi.waitFor(() => {
+      expect(exportMocks.refreshProtectedMediaCookie).toHaveBeenCalledTimes(2);
+      expect(loadSpy).toHaveBeenCalledTimes(3);
+    });
+    loadSpy.mockRestore();
   });
 
   it('uses the platform spinner for indeterminate progress and honors Reduce Motion', async () => {
