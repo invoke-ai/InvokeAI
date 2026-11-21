@@ -131,7 +131,13 @@ const createHarness = (
   };
   const controller = new TransformEditingController({
     backend,
-    getOptions: () => ({ fitMode: 'contain', resampleMode: 'lanczos', smoothing: !!options.resample }),
+    getOptions: () => ({
+      aspectLinked: true,
+      fitMode: 'contain',
+      referencePoint: 'center',
+      resampleMode: 'lanczos',
+      smoothing: !!options.resample,
+    }),
     resample: options.resample,
     canEdit: () => state.canEdit,
     commitStructural: calls.commitStructural,

@@ -833,7 +833,19 @@ export {
   TEXT_FONT_FAMILIES,
   TEXT_FONT_WEIGHTS,
 } from './engineStores';
-export type { LayerTransform } from './transform/transformMath';
+export {
+  flipTransform,
+  layerPointToDocument,
+  localHandlePoint,
+  moveLocalPointTo,
+  retransformAbout,
+  scaleAxis,
+  scaleForLength,
+  transformedSize,
+  type LayerTransform,
+  type TransformAnchor,
+} from './transform/transformMath';
+export { hittableLayerRect } from './tools/moveHitTest';
 export { CanvasImageMissingError, type ImageResolver } from './render/rasterizers';
 export type { Rect, SelectionOp, ToolId, Vec2 } from './types';
 export { adjustmentsKey, buildCurveLut, isIdentityAdjustments } from './render/adjustments';
