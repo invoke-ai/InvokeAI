@@ -13,7 +13,7 @@ import type {
 
 import { clearSavedWorkflowDynamicFields } from './callSavedWorkflow';
 import { createWorkflowForm, createWorkflowId } from './document';
-import { isInvocationNode } from './types';
+import { isFormContainerElement, isInvocationNode } from './types';
 
 /** Round-trips legacy WorkflowV3 files; unknown elements and dangling edges recover as warnings. */
 
@@ -140,6 +140,15 @@ const zFormElement = z.discriminatedUnion('type', [
     type: z.literal('container'),
   }),
   z.object({
+    data: z.looseObject({
+      children: z.array(z.string()).catch([]),
+      content: z.string().catch(''),
+    }),
+    id: z.string(),
+    parentId: z.string().optional(),
+    type: z.literal('collapsible'),
+  }),
+  z.object({
     data: z
       .looseObject({
         fieldIdentifier: zFieldIdentifier,
@@ -263,7 +272,7 @@ const parseForm = (
 
     const parent = element.parentId ? form.elements[element.parentId] : undefined;
 
-    if (parent?.type === 'container') {
+    if (isFormContainerElement(parent)) {
       parent.data.children = parent.data.children.filter((childId) => childId !== element.id);
     }
 

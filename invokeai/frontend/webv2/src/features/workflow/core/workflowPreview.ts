@@ -381,18 +381,24 @@ const readForm = (
   const entered = new Set<string>();
   const read = (element: WorkflowFormElement | undefined): WorkflowPreviewFormItem | null => {
     switch (element?.type) {
-      case 'container': {
+      case 'container':
+      case 'collapsible': {
         if (entered.has(element.id)) {
           return null;
         }
 
         entered.add(element.id);
+        const children = element.data.children.map((id) => read(elements[id])).filter((item) => item !== null);
 
         return {
-          children: element.data.children.map((id) => read(elements[id])).filter((item) => item !== null),
+          // The library preview is read-only: show each section expanded, retaining its title and inputs.
+          children:
+            element.type === 'collapsible'
+              ? [{ id: `${element.id}:heading`, kind: 'heading', text: element.data.content }, ...children]
+              : children,
           id: element.id,
           kind: 'container',
-          layout: element.data.layout,
+          layout: element.type === 'container' ? element.data.layout : 'column',
         };
       }
       case 'node-field': {

@@ -3,6 +3,7 @@ import type { SeedMode } from '@platform/core/seed';
 import { createItemId } from '@platform/browser/randomUuid';
 
 import type {
+  CollapsibleFormElement,
   ContainerFormElement,
   FieldIdentifier,
   InvocationTemplate,
@@ -34,7 +35,9 @@ import {
 } from './callSavedWorkflow';
 import { getConnectorDeletionSpliceConnections } from './connectors';
 import { isHiDiffusionNode, isHiDiffusionRatioField, normalizeHiDiffusionInputs } from './fields';
-import { isInvocationNode, isNotesNode } from './types';
+import { isFormContainerElement, isInvocationNode, isNotesNode, withFormContainerChildren } from './types';
+
+export { isFormContainerElement };
 
 const now = (): string => new Date().toISOString();
 
@@ -93,6 +96,13 @@ const isFormElementLike = (value: unknown): boolean => {
       return (
         isRecord(data) &&
         (data.layout === 'row' || data.layout === 'column') &&
+        Array.isArray(data.children) &&
+        data.children.every((child) => typeof child === 'string')
+      );
+    case 'collapsible':
+      return (
+        isRecord(data) &&
+        typeof data.content === 'string' &&
         Array.isArray(data.children) &&
         data.children.every((child) => typeof child === 'string')
       );
@@ -256,7 +266,7 @@ const getRootContainer = (form: WorkflowForm): ContainerFormElement => {
 const collectDescendantIds = (form: WorkflowForm, elementId: string): string[] => {
   const element = form.elements[elementId];
 
-  if (!element || element.type !== 'container') {
+  if (!isFormContainerElement(element)) {
     return [elementId];
   }
 
@@ -290,13 +300,12 @@ const removeFormElement = (form: WorkflowForm, elementId: string): WorkflowForm 
       continue;
     }
 
-    elements[id] =
-      element.type === 'container'
-        ? {
-            ...element,
-            data: { ...element.data, children: element.data.children.filter((childId) => !removedIds.has(childId)) },
-          }
-        : element;
+    elements[id] = isFormContainerElement(element)
+      ? withFormContainerChildren(
+          element,
+          element.data.children.filter((childId) => !removedIds.has(childId))
+        )
+      : element;
   }
 
   return { ...form, elements };
@@ -310,8 +319,7 @@ const moveFormElementTo = (form: WorkflowForm, elementId: string, parentId: stri
   if (
     !element ||
     elementId === form.rootElementId ||
-    !nextParent ||
-    nextParent.type !== 'container' ||
+    !isFormContainerElement(nextParent) ||
     collectDescendantIds(form, elementId).includes(parentId)
   ) {
     return form;
@@ -319,7 +327,7 @@ const moveFormElementTo = (form: WorkflowForm, elementId: string, parentId: stri
 
   const previousParent = element.parentId ? form.elements[element.parentId] : undefined;
 
-  if (!previousParent || previousParent.type !== 'container') {
+  if (!isFormContainerElement(previousParent)) {
     return form;
   }
 
@@ -336,13 +344,13 @@ const moveFormElementTo = (form: WorkflowForm, elementId: string, parentId: stri
   const elements: Record<string, WorkflowFormElement> = {
     ...form.elements,
     [elementId]: { ...element, parentId: nextParent.id },
-    [previousParent.id]: { ...previousParent, data: { ...previousParent.data, children: withoutElement } },
+    [previousParent.id]: withFormContainerChildren(previousParent, withoutElement),
   };
 
-  elements[nextParent.id] = {
-    ...(elements[nextParent.id] as ContainerFormElement),
-    data: { ...(elements[nextParent.id] as ContainerFormElement).data, children: targetChildren },
-  };
+  elements[nextParent.id] = withFormContainerChildren(
+    elements[nextParent.id] as ContainerFormElement | CollapsibleFormElement,
+    targetChildren
+  );
 
   return { ...form, elements };
 };
@@ -351,7 +359,7 @@ const moveFormElement = (form: WorkflowForm, elementId: string, direction: -1 | 
   const element = form.elements[elementId];
   const parent = element?.parentId ? form.elements[element.parentId] : getRootContainer(form);
 
-  if (!element || !parent || parent.type !== 'container') {
+  if (!element || !isFormContainerElement(parent)) {
     return form;
   }
 
@@ -369,7 +377,7 @@ const moveFormElement = (form: WorkflowForm, elementId: string, direction: -1 | 
 
   return {
     ...form,
-    elements: { ...form.elements, [parent.id]: { ...parent, data: { ...parent.data, children } } },
+    elements: { ...form.elements, [parent.id]: withFormContainerChildren(parent, children) },
   };
 };
 
@@ -706,7 +714,7 @@ export type ProjectGraphAction =
   | { type: 'moveFormElementTo'; elementId: string; parentId: string; index: number }
   | {
       type: 'addFormElement';
-      elementType: 'heading' | 'text' | 'divider' | 'container';
+      elementType: 'heading' | 'text' | 'divider' | 'container' | 'collapsible';
       content?: string;
       layout?: 'row' | 'column';
     }
@@ -1188,20 +1196,34 @@ const applyProjectGraphAction = (document: ProjectGraphState, action: ProjectGra
                 id: createWorkflowId('container'),
                 type: 'container',
               }
-            : {
-                data: { content: action.content ?? '' },
-                id: createWorkflowId(action.elementType),
-                type: action.elementType,
-              };
+            : action.elementType === 'collapsible'
+              ? {
+                  data: { children: [], content: action.content ?? '' },
+                  id: createWorkflowId('collapsible'),
+                  type: 'collapsible',
+                }
+              : {
+                  data: { content: action.content ?? '' },
+                  id: createWorkflowId(action.elementType),
+                  type: action.elementType,
+                };
 
       return { ...document, form: appendToRoot(document.form, element) };
     }
     case 'setFormElementContent': {
       const element = document.form.elements[action.elementId];
 
-      if (!element || (element.type !== 'heading' && element.type !== 'text')) {
+      if (!element || (element.type !== 'heading' && element.type !== 'text' && element.type !== 'collapsible')) {
         return document;
       }
+
+      // Spread within each discriminant so TypeScript preserves the element/data correlation.
+      const updated: WorkflowFormElement =
+        element.type === 'collapsible'
+          ? { ...element, data: { ...element.data, content: action.content } }
+          : element.type === 'heading'
+            ? { ...element, data: { ...element.data, content: action.content } }
+            : { ...element, data: { ...element.data, content: action.content } };
 
       return {
         ...document,
@@ -1209,7 +1231,7 @@ const applyProjectGraphAction = (document: ProjectGraphState, action: ProjectGra
           ...document.form,
           elements: {
             ...document.form.elements,
-            [element.id]: { ...element, data: { ...element.data, content: action.content } },
+            [element.id]: updated,
           },
         },
       };
@@ -1259,7 +1281,7 @@ const applyProjectGraphAction = (document: ProjectGraphState, action: ProjectGra
 export const getFormChildren = (form: WorkflowForm, containerId?: string): WorkflowFormElement[] => {
   const container = form.elements[containerId ?? form.rootElementId];
 
-  if (!container || container.type !== 'container') {
+  if (!isFormContainerElement(container)) {
     return [];
   }
 

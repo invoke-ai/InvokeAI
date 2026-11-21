@@ -827,4 +827,56 @@ describe('Call Saved Workflow labels across a reload', () => {
 
     expect(node?.data.inputs[dynamicFieldName('a')]).toMatchObject({ label: 'My Addend', value: 99 });
   });
+
+  it('orders child fields inside collapsible sections and prunes retired dynamic fields from parent collapsibles', () => {
+    let child = buildChildWorkflow();
+    child = projectGraphReducer(child, { content: 'Inputs', elementType: 'collapsible', type: 'addFormElement' });
+    const childSection = Object.values(child.form.elements).find((element) => element.type === 'collapsible')!;
+    const childFields = Object.values(child.form.elements).filter((element) => element.type === 'node-field');
+    for (const [index, element] of [...childFields].reverse().entries()) {
+      child = projectGraphReducer(child, {
+        elementId: element.id,
+        index,
+        parentId: childSection.id,
+        type: 'moveFormElementTo',
+      });
+    }
+
+    const fields = getSavedWorkflowDynamicFields(child, templates);
+    expect(fields.map((item) => item.fieldName)).toEqual([dynamicFieldName('b'), dynamicFieldName('a')]);
+
+    const callNode = buildInvocationNode(callSavedWorkflowTemplate, { x: 0, y: 0 });
+    callNode.id = 'call-1';
+    let parent = syncCallSavedWorkflowFields(
+      { ...createProjectGraph('parent-collapsible'), nodes: [callNode] },
+      callNode.id,
+      fields,
+      []
+    );
+    parent = projectGraphReducer(parent, { content: 'Call Group', elementType: 'collapsible', type: 'addFormElement' });
+    const parentSection = Object.values(parent.form.elements).find((element) => element.type === 'collapsible')!;
+    for (const fieldName of [dynamicFieldName('a'), dynamicFieldName('b')]) {
+      parent = projectGraphReducer(parent, {
+        fieldIdentifier: { fieldName, nodeId: callNode.id },
+        type: 'exposeField',
+      });
+    }
+    for (const [index, element] of Object.values(parent.form.elements)
+      .filter((candidate) => candidate.type === 'node-field')
+      .entries()) {
+      parent = projectGraphReducer(parent, {
+        elementId: element.id,
+        index,
+        parentId: parentSection.id,
+        type: 'moveFormElementTo',
+      });
+    }
+
+    const pruned = syncCallSavedWorkflowFields(parent, callNode.id, fields.slice(0, 1), []);
+    const updatedSection = pruned.form.elements[parentSection.id];
+    expect(updatedSection?.type === 'collapsible' && updatedSection.data.children).toHaveLength(1);
+    const survivingId = updatedSection?.type === 'collapsible' ? updatedSection.data.children[0]! : '';
+    const surviving = pruned.form.elements[survivingId];
+    expect(surviving?.type === 'node-field' && surviving.data.fieldIdentifier.fieldName).toBe(dynamicFieldName('b'));
+  });
 });

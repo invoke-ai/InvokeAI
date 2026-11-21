@@ -180,6 +180,16 @@ export interface ContainerFormElement {
   };
 }
 
+export interface CollapsibleFormElement {
+  id: string;
+  type: 'collapsible';
+  parentId?: string;
+  data: {
+    content: string;
+    children: string[];
+  };
+}
+
 export interface NodeFieldFormElement {
   id: string;
   type: 'node-field';
@@ -219,10 +229,25 @@ export interface DividerFormElement {
 
 export type WorkflowFormElement =
   | ContainerFormElement
+  | CollapsibleFormElement
   | NodeFieldFormElement
   | HeadingFormElement
   | TextFormElement
   | DividerFormElement;
+
+export const isFormContainerElement = (
+  element: WorkflowFormElement | undefined
+): element is ContainerFormElement | CollapsibleFormElement =>
+  element?.type === 'container' || element?.type === 'collapsible';
+
+// Branch per discriminant so TypeScript preserves each container variant's data correlation.
+export const withFormContainerChildren = (
+  element: ContainerFormElement | CollapsibleFormElement,
+  children: string[]
+): ContainerFormElement | CollapsibleFormElement =>
+  element.type === 'container'
+    ? { ...element, data: { ...element.data, children } }
+    : { ...element, data: { ...element.data, children } };
 
 export interface WorkflowForm {
   rootElementId: string;
