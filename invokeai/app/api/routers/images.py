@@ -44,6 +44,18 @@ from invokeai.app.services.image_records.image_records_common import (
     ResourceOrigin,
     is_gallery_category,
 )
+from invokeai.app.services.images.image_export import (
+    EXPORT_EXTENSIONS,
+    EXPORT_MEDIA_TYPES,
+    BulkImageExportOptions,
+    ImageExportFormat,
+    ImageExportFormatUnavailableError,
+    ImageExportNamePattern,
+    ImageExportOptions,
+    assert_export_format_available,
+    encode_image,
+    resolve_export_file_names,
+)
 from invokeai.app.services.images.images_common import (
     DeleteImagesResult,
     ImageDTO,
@@ -458,6 +470,75 @@ def get_image_full(
         return response
     except Exception:
         raise HTTPException(status_code=404)
+
+
+@images_router.get(
+    "/i/{image_name}/export",
+    operation_id="export_image",
+    response_class=Response,
+    responses={
+        200: {
+            "description": "Return the image encoded with the requested export options",
+            "content": {media_type: {} for media_type in EXPORT_MEDIA_TYPES.values()},
+        },
+        404: {"description": "Image not found"},
+        409: {"description": "Image storage maintenance is active"},
+    },
+)
+def export_image(
+    current_user: CurrentUserOrDefault,
+    options: Annotated[ImageExportOptions, Query()],
+    image_name: str = Path(description="The name of the image to export"),
+) -> Response:
+    """Encodes a stored image in another format and size. Never enlarges; only PNG carries Invoke metadata."""
+    _assert_image_read_access(image_name, current_user)
+    assert_image_move_maintenance_inactive()
+
+    try:
+        content = encode_image(ApiDependencies.invoker.services.images.get_path(image_name), options)
+    except ImageExportFormatUnavailableError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    except (ImageRecordNotFoundException, FileNotFoundError):
+        raise HTTPException(status_code=404)
+    response = Response(content, media_type=EXPORT_MEDIA_TYPES[options.format])
+    response.headers["Cache-Control"] = _get_image_cache_control()
+    file_name = image_name.rsplit(".", 1)[0] + EXPORT_EXTENSIONS[options.format]
+    response.headers["Content-Disposition"] = f'inline; filename="{file_name}"'
+    return response
+
+
+class ImageExportNamesRequest(BaseModel):
+    image_names: list[ImageName] = Field(
+        min_length=1, max_length=MAX_IMAGE_BATCH_SIZE, description="The images to name, in export order"
+    )
+    pattern: ImageExportNamePattern = Field(description="The file-name pattern")
+    format: ImageExportFormat = Field(description="The export format, which sets the extension")
+
+
+class ImageExportNamesResult(BaseModel):
+    file_names: list[str] = Field(description="One file name per requested image, in request order")
+
+
+@images_router.post(
+    "/export/names",
+    operation_id="resolve_image_export_names",
+    response_model=ImageExportNamesResult,
+    responses={404: {"description": "Image not found"}},
+)
+def resolve_image_export_names(
+    current_user: CurrentUserOrDefault,
+    body: ImageExportNamesRequest,
+) -> ImageExportNamesResult:
+    """Resolves a file-name pattern for a list of images, exactly as an export archive names them."""
+    for name in body.image_names:
+        _assert_image_read_access(name, current_user)
+
+    services = ApiDependencies.invoker.services
+    try:
+        image_dtos = [services.images.get_dto(name) for name in body.image_names]
+    except ImageRecordNotFoundException:
+        raise HTTPException(status_code=404)
+    return ImageExportNamesResult(file_names=resolve_export_file_names(services, image_dtos, body.pattern, body.format))
 
 
 @images_router.get(
@@ -891,9 +972,19 @@ def download_images_from_list(
     board_id: Optional[str] = Body(
         default=None, description="The board from which image should be downloaded", embed=True
     ),
+    export: Optional[BulkImageExportOptions] = Body(
+        default=None,
+        description="Encode every image with these options and name it by the pattern. Omit for the stored files.",
+        embed=True,
+    ),
 ) -> ImagesDownloaded:
     if (image_names is None or len(image_names) == 0) and board_id is None:
         raise HTTPException(status_code=400, detail="No images or board id specified.")
+    if export is not None:
+        try:
+            assert_export_format_available(export.format)
+        except ImageExportFormatUnavailableError as e:
+            raise HTTPException(status_code=422, detail=str(e))
 
     # Validate that the caller can read every image they are requesting.
     # For a board_id request, check board visibility; for explicit image names,
@@ -915,6 +1006,7 @@ def download_images_from_list(
         bulk_download_item_id,
         current_user.user_id,
         uncategorized_owner_id=None if current_user.is_admin else current_user.user_id,
+        export=export,
     )
     return ImagesDownloaded(bulk_download_item_name=bulk_download_item_id + ".zip")
 

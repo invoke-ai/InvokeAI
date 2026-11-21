@@ -1118,6 +1118,36 @@ class TestImageReadAuth:
         r = client.get("/api/v1/images/i/user1-private-img", headers=_auth(user2_token))
         assert r.status_code == status.HTTP_403_FORBIDDEN
 
+    def test_non_owner_cannot_export_private_image(
+        self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
+    ):
+        user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+        assert user1 is not None
+        _save_image(mock_invoker, "user1-private-export", user1.user_id)
+
+        r = client.get(
+            "/api/v1/images/i/user1-private-export/export", params={"format": "png"}, headers=_auth(user2_token)
+        )
+        assert r.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_export_names_require_read_access_to_every_image(
+        self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
+    ):
+        user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+        user2 = mock_invoker.services.users.get_by_email("user2@test.com")
+        assert user1 is not None and user2 is not None
+        _save_image(mock_invoker, "user1-named.png", user1.user_id)
+        _save_image(mock_invoker, "user2-named.png", user2.user_id)
+        body = {"image_names": ["user2-named.png"], "pattern": "{name}", "format": "png"}
+
+        r = client.post("/api/v1/images/export/names", json=body, headers=_auth(user2_token))
+        assert r.status_code == status.HTTP_200_OK
+        assert r.json() == {"file_names": ["user2-named.png"]}
+
+        body["image_names"] = ["user2-named.png", "user1-named.png"]
+        r = client.post("/api/v1/images/export/names", json=body, headers=_auth(user2_token))
+        assert r.status_code == status.HTTP_403_FORBIDDEN
+
     def test_owner_can_read_own_image(self, client: TestClient, mock_invoker: Invoker, user1_token: str):
         user1 = mock_invoker.services.users.get_by_email("user1@test.com")
         assert user1 is not None
@@ -2582,6 +2612,20 @@ class TestBulkDownloadAccessControl:
         r = client.post(
             "/api/v1/images/download",
             json={"image_names": ["user1-private-dl"]},
+            headers=_auth(user2_token),
+        )
+        assert r.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_bulk_export_by_image_names_rejected_for_non_owner(
+        self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
+    ):
+        user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+        assert user1 is not None
+        _save_image(mock_invoker, "user1-private-export-dl", user1.user_id)
+
+        r = client.post(
+            "/api/v1/images/download",
+            json={"image_names": ["user1-private-export-dl"], "export": {"format": "jpeg"}},
             headers=_auth(user2_token),
         )
         assert r.status_code == status.HTTP_403_FORBIDDEN

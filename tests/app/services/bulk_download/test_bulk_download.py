@@ -5,6 +5,7 @@ from typing import Any
 from zipfile import ZipFile
 
 import pytest
+from PIL import Image
 
 from invokeai.app.services.board_records.board_records_common import (
     BOARD_NAME_MAX_LENGTH,
@@ -23,6 +24,7 @@ from invokeai.app.services.image_records.image_records_common import (
     ImageRecordNotFoundException,
     ResourceOrigin,
 )
+from invokeai.app.services.images.image_export import BulkImageExportOptions
 from invokeai.app.services.images.images_common import ImageDTO
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
@@ -160,6 +162,26 @@ def test_archive_is_not_downloadable_until_complete(
         for name in names:
             assert zip_file.read(f"general/{name}").decode() == f"contents of {name}"
     assert [p.name for p in (tmp_path / "bulk_downloads").iterdir()] == ["test.zip"]
+
+
+def test_export_archive_holds_encoded_images_under_resolved_names(
+    tmp_path: Path, monkeypatch: Any, mock_image_dto: ImageDTO, mock_invoker: Invoker
+):
+    names, disk_dir = prepare_two_image_download(tmp_path, monkeypatch, mock_image_dto, mock_invoker)
+    for name in names:
+        Image.new("RGB", (64, 32)).save(disk_dir / name, "PNG")
+    monkeypatch.setattr(mock_invoker.services.images, "get_path", lambda name: str(disk_dir / name))
+    service = BulkDownloadService()
+    service.start(mock_invoker)
+
+    service.handler(names, None, None, export=BulkImageExportOptions(format="webp", long_edge=16, name_pattern="{n}"))
+
+    with ZipFile(service.get_path("test.zip")) as zip_file:
+        assert zip_file.namelist() == ["001.webp", "002.webp"]
+        for entry in zip_file.namelist():
+            with Image.open(zip_file.open(entry)) as exported:
+                assert (exported.format, exported.size) == ("WEBP", (16, 8))
+    assert isinstance(mock_invoker.services.events.events[-1], BulkDownloadCompleteEvent)
 
 
 def patch_board_name(mock_invoker: Invoker, monkeypatch: Any, board_name: str) -> None:

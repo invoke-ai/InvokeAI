@@ -1,3 +1,4 @@
+import io
 import os
 from pathlib import Path
 from typing import Any
@@ -102,6 +103,7 @@ def prepare_image_maintenance_test(monkeypatch: Any, mock_invoker: Invoker) -> N
         ("head", "/api/v1/images/i/test.png/full", None),
         ("get", "/api/v1/images/i/test.png/thumbnail", None),
         ("get", "/api/v1/images/i/test.png/workflow", None),
+        ("get", "/api/v1/images/i/test.png/export?format=png", None),
         ("delete", "/api/v1/images/i/test.png", None),
         ("delete", "/api/v1/images/intermediates", None),
         ("delete", "/api/v1/images/uncategorized", None),
@@ -383,6 +385,96 @@ def _save_deletable_image(mock_invoker: Invoker, storage, image_name: str) -> No
         has_workflow=False,
     )
     storage.save(image=Image.new("RGB", (64, 64)), image_name=image_name)
+
+
+def test_export_image_returns_the_encoded_image(
+    monkeypatch: Any, mock_invoker: Invoker, tmp_path: Path, client: TestClient
+) -> None:
+    from PIL import Image
+
+    storage = prepare_delete_image_test(monkeypatch, mock_invoker, tmp_path)
+    _save_deletable_image(mock_invoker, storage, "exp.png")
+
+    response = client.get("/api/v1/images/i/exp.png/export", params={"format": "webp", "long_edge": 32})
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "image/webp"
+    assert response.headers["cache-control"] == "max-age=31536000"
+    exported = Image.open(io.BytesIO(response.content))
+    assert (exported.format, exported.size) == ("WEBP", (32, 32))
+
+
+def test_export_image_without_a_file_answers_404(
+    monkeypatch: Any, mock_invoker: Invoker, tmp_path: Path, client: TestClient
+) -> None:
+    from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
+
+    prepare_delete_image_test(monkeypatch, mock_invoker, tmp_path)
+    mock_invoker.services.image_records.save(
+        image_name="no-file.png",
+        image_origin=ResourceOrigin.INTERNAL,
+        image_category=ImageCategory.GENERAL,
+        width=64,
+        height=64,
+        has_workflow=False,
+    )
+
+    assert client.get("/api/v1/images/i/no-file.png/export", params={"format": "png"}).status_code == 404
+
+
+@pytest.mark.parametrize(
+    "params",
+    [
+        {},
+        {"format": "gif"},
+        {"format": "jpeg", "quality": 0},
+        {"format": "jpeg", "quality": 101},
+        {"format": "png", "long_edge": 0},
+        {"format": "png", "metadata": "workflow"},
+    ],
+)
+def test_export_image_rejects_invalid_options(
+    monkeypatch: Any, mock_invoker: Invoker, client: TestClient, params: dict[str, Any]
+) -> None:
+    images_service = prepare_image_batch_test(monkeypatch, mock_invoker)
+
+    assert client.get("/api/v1/images/i/test.png/export", params=params).status_code == 422
+    assert images_service.mock_calls == []
+
+
+def test_unavailable_export_codec_is_a_client_error(
+    monkeypatch: Any, mock_invoker: Invoker, client: TestClient
+) -> None:
+    prepare_image_batch_test(monkeypatch, mock_invoker)
+    bulk_download = MagicMock()
+    monkeypatch.setattr(mock_invoker.services, "bulk_download", bulk_download)
+    monkeypatch.setattr("invokeai.app.services.images.image_export.features.check", lambda feature: False)
+
+    response = client.get("/api/v1/images/i/test.png/export", params={"format": "avif"})
+    assert response.status_code == 422
+    assert response.json()["detail"] == "This server cannot encode AVIF images"
+
+    response = client.post("/api/v1/images/download", json={"image_names": ["test.png"], "export": {"format": "avif"}})
+    assert response.status_code == 422
+    assert bulk_download.mock_calls == []
+
+
+def test_export_names_resolve_in_request_order(
+    monkeypatch: Any, mock_invoker: Invoker, tmp_path: Path, client: TestClient
+) -> None:
+    storage = prepare_delete_image_test(monkeypatch, mock_invoker, tmp_path)
+    board = mock_invoker.services.board_records.save("Board", "system")
+    for name in ("one.png", "two.png"):
+        _save_deletable_image(mock_invoker, storage, name)
+    mock_invoker.services.board_image_records.add_image_to_board(board.board_id, "two.png")
+
+    response = client.post(
+        "/api/v1/images/export/names",
+        json={"image_names": ["two.png", "one.png"], "pattern": "{board}-{n}", "format": "jpeg"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"file_names": ["Board-001.jpg", "uncategorized-002.jpg"]}
 
 
 def test_delete_image_success_deletes_files_and_record(
@@ -853,6 +945,7 @@ def test_every_image_names_body_is_bounded(client: TestClient) -> None:
         "/api/v1/images/copy",
         "/api/v1/images/delete",
         "/api/v1/images/download",
+        "/api/v1/images/export/names",
         "/api/v1/images/images_by_names",
         "/api/v1/images/star",
         "/api/v1/images/unstar",

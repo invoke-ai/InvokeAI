@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import Optional
 
+from invokeai.app.services.images.image_export import BulkImageExportOptions
+
 
 class BulkDownloadBase(ABC):
     """Responsible for creating a zip file containing the images specified by the given image names or board id."""
@@ -13,6 +15,7 @@ class BulkDownloadBase(ABC):
         bulk_download_item_id: Optional[str],
         user_id: str = "system",
         uncategorized_owner_id: Optional[str] = None,
+        export: Optional[BulkImageExportOptions] = None,
     ) -> None:
         """
         Create a zip file containing the images specified by the given image names or board id.
@@ -22,6 +25,7 @@ class BulkDownloadBase(ABC):
         :param bulk_download_item_id: The bulk_download_item_id that will be used to retrieve the bulk download item when it is prepared, if none is provided a uuid will be generated.
         :param user_id: The ID of the user who initiated the download.
         :param uncategorized_owner_id: For board_id "none", include only this user's uncategorized images. None includes every account's (admins).
+        :param export: Encode every image with these options and write it at the archive root under its resolved name. None stores the original files under their category folders.
         """
 
     @abstractmethod
