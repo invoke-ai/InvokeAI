@@ -19,9 +19,11 @@ import {
   coerceSchedulerForGraph,
   GENERATE_COMPONENT_VALUE_KEYS,
   getComponentPolicyContext,
+  getClosedComponentSettings,
   getComponentSectionPolicy,
   getDefaultGenerateSettings,
   getGenerateModelSelectionResult,
+  getModelDefaultComponents,
   getSchedulerOptions,
   isArchitectureDescribed,
   isGenerateModelSelectable,
@@ -139,16 +141,21 @@ const getSelectableModel = (key: string, models: readonly ModelConfig[]): Genera
   return model;
 };
 
-/** Selecting the model, then its default VAE by recall's policy (`getRecallDefaultVae`); otherwise the selection's. */
+/**
+ * Selecting the model, then its default components and its default VAE by recall's policy (`getRecallDefaultVae`);
+ * otherwise the selection's VAE.
+ */
 const getModelDefaultValues = (model: GenerateModelConfig, models: readonly ModelConfig[]): GenerateWidgetValues => {
   const { settings } = getGenerateModelSelectionResult({
     currentValues: getDefaultGenerateSettings(model),
     model,
     models,
   });
-  const vae = getRecallDefaultVae(resolveModelDefaultVae(model, settings, models.filter(isVaeModelConfig)));
+  // Components first: a default component source can bundle the VAE the default VAE then falls back to.
+  const withComponents = { ...settings, ...getModelDefaultComponents(model, settings, models, { replace: true }) };
+  const vae = getRecallDefaultVae(resolveModelDefaultVae(model, withComponents, models.filter(isVaeModelConfig)));
 
-  return { ...settings, model, vae: vae === undefined ? settings.vae : vae };
+  return { ...withComponents, model, vae: vae === undefined ? withComponents.vae : vae };
 };
 
 const withCaseValues = (values: GenerateWidgetValues, input: GraphExportCase): GenerateWidgetValues => ({
@@ -196,6 +203,38 @@ const toSlotValue = (slot: ComponentSlotPolicy, model: ModelConfig): ComponentMo
   }
 };
 
+/** The slot a pick of `slotKey` fills and the installed model it names, or the error that tells why it cannot. */
+const resolveComponentPick = (
+  values: GenerateWidgetValues,
+  slotKey: string,
+  modelKey: string,
+  models: readonly ModelConfig[]
+): { slot: ComponentSlotPolicy; value: ComponentModelConfig } => {
+  const { slots } = getComponentSectionPolicy(values.model, values);
+  const slot = slots.find((candidate) => candidate.key === slotKey);
+
+  if (!slot) {
+    const validSlots = listKeys(slots.map((candidate) => candidate.key));
+
+    throw new Error(`Unknown component slot "${slotKey}" for ${values.model.name}. Valid slots: ${validSlots}.`);
+  }
+
+  const ctx = getComponentPolicyContext(values.model, values);
+  const fitting = models.filter((candidate) => fitsSlot(slot, candidate, ctx));
+  const pick = fitting.find((candidate) => candidate.key === modelKey);
+  const value = pick ? toSlotValue(slot, pick) : null;
+
+  if (!value) {
+    const problem = models.some((candidate) => candidate.key === modelKey)
+      ? `"${modelKey}" cannot be the ${slot.label} of ${values.model.name}`
+      : `model key "${modelKey}" is not installed`;
+
+    throw new Error(`components.${slotKey}: ${problem}. Choices: ${listModelKeys(fitting)}.`);
+  }
+
+  return { slot, value };
+};
+
 const withComponentPicks = (
   values: GenerateWidgetValues,
   picks: GraphExportCase['components'],
@@ -213,31 +252,21 @@ const withComponentPicks = (
       pending.findIndex(([key]) => slots.some((candidate) => candidate.key === key))
     );
     const [slotKey, modelKey] = pending.splice(index, 1)[0]!;
-    const slot = slots.find((candidate) => candidate.key === slotKey);
-
-    if (!slot) {
-      const validSlots = listKeys(slots.map((candidate) => candidate.key));
-
-      throw new Error(`Unknown component slot "${slotKey}" for ${values.model.name}. Valid slots: ${validSlots}.`);
-    }
-
-    const ctx = getComponentPolicyContext(next.model, next);
-    const fitting = models.filter((candidate) => fitsSlot(slot, candidate, ctx));
-    const pick = fitting.find((candidate) => candidate.key === modelKey);
-    const value = pick ? toSlotValue(slot, pick) : null;
-
-    if (!value) {
-      const problem = models.some((candidate) => candidate.key === modelKey)
-        ? `"${modelKey}" cannot be the ${slot.label} of ${values.model.name}`
-        : `model key "${modelKey}" is not installed`;
-
-      throw new Error(`components.${slotKey}: ${problem}. Choices: ${listModelKeys(fitting)}.`);
-    }
+    const { slot, value } = resolveComponentPick(next, slotKey, modelKey, models);
 
     next = { ...next, [slot.key]: value };
   }
 
-  return next;
+  // A later pick can close the slot of an earlier one (a safetensors encoder after the default GGUF encoder's tower),
+  // so the picks are judged together, in the settings they all lead to.
+  for (const [slotKey, modelKey] of Object.entries(picks)) {
+    resolveComponentPick(next, slotKey, modelKey, models);
+  }
+
+  // Inherited picks whose slot a pick closed go too, as the model switch clears them: the graph never loads them.
+  const closed = getClosedComponentSettings(values.model, values, next);
+
+  return closed.length === 0 ? next : { ...next, ...Object.fromEntries(closed.map((key) => [key, null])) };
 };
 
 /** Pick the first installed model for the first required slot that is unfilled; null when none can be filled. */
@@ -447,7 +476,9 @@ export const compileGraphExportCase = (
 ): CompiledGraphExportCase => {
   assertModeInputs(input);
 
-  const { models } = env;
+  // A registered model whose files are gone is listed but cannot be loaded: the case sees the usable ones only, as
+  // Generate's pickers do, and a case that names a missing one fails like one that names an unknown model.
+  const models = env.models.filter((candidate) => !candidate.is_missing);
   let values = withCaseValues(getModelDefaultValues(getSelectableModel(input.modelKey, models), models), input);
   values = withSettingsOverrides(values, input.settings);
   values = withComponentPicks(values, input.components, models);
