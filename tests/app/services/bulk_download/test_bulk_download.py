@@ -262,6 +262,7 @@ def test_failed_archive_leaves_no_file_behind(
     with pytest.raises(BulkDownloadTargetException):
         service.get_path("test.zip")
     assert list((tmp_path / "bulk_downloads").iterdir()) == []
+    assert service.take_failure("test.zip") == "The archive could not be created"
 
 
 def test_generate_id(monkeypatch: Any):

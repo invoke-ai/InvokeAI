@@ -65040,7 +65040,7 @@ export interface operations {
                     "application/zip": unknown;
                 };
             };
-            /** @description Image not found */
+            /** @description The archive is not ready, or unknown */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -65055,6 +65055,13 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description The archive job failed; `detail` says why */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

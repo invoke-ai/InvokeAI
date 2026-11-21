@@ -14,6 +14,7 @@ class BulkDownloadBase(ABC):
         board_id: Optional[str],
         bulk_download_item_id: Optional[str],
         user_id: str = "system",
+        is_admin: bool = False,
         uncategorized_owner_id: Optional[str] = None,
         export: Optional[BulkImageExportOptions] = None,
     ) -> None:
@@ -25,7 +26,6 @@ class BulkDownloadBase(ABC):
         :param bulk_download_item_id: The bulk_download_item_id that will be used to retrieve the bulk download item when it is prepared, if none is provided a uuid will be generated.
         :param user_id: The ID of the user who initiated the download.
         :param uncategorized_owner_id: For board_id "none", include only this user's uncategorized images. None includes every account's (admins).
-        :param export: Encode every image with these options and write it at the archive root under its resolved name. None stores the original files under their category folders.
         """
 
     @abstractmethod
@@ -53,6 +53,10 @@ class BulkDownloadBase(ABC):
 
         :param bulk_download_item_name: The name of the bulk download item.
         """
+
+    @abstractmethod
+    def take_failure(self, bulk_download_item_name: str) -> Optional[str]:
+        """Why the item's job failed, or None; the reason is forgotten once read."""
 
     @abstractmethod
     def get_owner(self, bulk_download_item_name: str) -> Optional[str]:

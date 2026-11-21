@@ -1,21 +1,20 @@
-"""Exporting stored images: encoding to another format and size, and naming the exported files.
-
-The single-image export route and the bulk download archive both use this module, so a preview is the exact bytes a
-download holds and a file name shown in the dialog is the name the archive entry gets.
-"""
-
 import io
 import os
 import re
 import threading
+import unicodedata
+from collections.abc import Awaitable, Callable
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Literal, Optional, Sequence, Union
 
-from PIL import Image, features
+import anyio
+from PIL import Image, UnidentifiedImageError, features
 from PIL.PngImagePlugin import PngInfo
 from pydantic import BaseModel, Field, StringConstraints
 
+from invokeai.app.services.board_access.board_access_common import BoardAction, BoardViewer
+from invokeai.app.services.board_records.board_records_common import BoardRecordNotFoundException
 from invokeai.app.services.images.images_common import ImageDTO
 
 if TYPE_CHECKING:
@@ -35,12 +34,20 @@ EXPORT_EXTENSIONS: dict[ImageExportFormat, str] = {"png": ".png", "jpeg": ".jpg"
 _PIL_FORMATS: dict[ImageExportFormat, str] = {"png": "PNG", "jpeg": "JPEG", "webp": "WEBP", "avif": "AVIF"}
 _PIL_FEATURES: dict[ImageExportFormat, str] = {"png": "zlib", "jpeg": "jpg", "webp": "webp", "avif": "avif"}
 
-# Encodes are CPU-bound; a burst of preview requests must not take every core. The AVIF encoder is multithreaded
-# and would otherwise use all of them per encode, so its threads share the same budget.
-_ENCODE_CORES = max(1, (os.cpu_count() or 2) // 2)
-_ENCODE_SLOT_COUNT = min(4, _ENCODE_CORES)
-_ENCODE_SLOTS = threading.BoundedSemaphore(_ENCODE_SLOT_COUNT)
-_AVIF_MAX_THREADS = max(1, _ENCODE_CORES // _ENCODE_SLOT_COUNT)
+
+def _available_cpus() -> int:
+    try:
+        return len(os.sched_getaffinity(0))
+    except AttributeError:
+        return os.cpu_count() or 1
+
+
+# Encodes get half the cores, AVIF threads included; archives have their own pool so they never queue previews.
+_ENCODE_CORES = max(1, _available_cpus() // 2)
+_REQUEST_SLOT_COUNT = min(4, _ENCODE_CORES)
+_REQUEST_SLOTS = anyio.Semaphore(_REQUEST_SLOT_COUNT)
+_ARCHIVE_SLOTS = threading.BoundedSemaphore(max(1, _REQUEST_SLOT_COUNT // 2))
+_AVIF_MAX_THREADS = max(1, _ENCODE_CORES // _REQUEST_SLOT_COUNT)
 
 
 class ImageExportOptions(BaseModel):
@@ -61,8 +68,16 @@ class BulkImageExportOptions(ImageExportOptions):
     )
 
 
-class ImageExportFormatUnavailableError(Exception):
-    """This server's Pillow build cannot encode the requested format."""
+class ImageExportError(Exception):
+    """An export the server refuses; its message is shown to the user and must name no path."""
+
+
+class ImageExportFormatUnavailableError(ImageExportError):
+    pass
+
+
+class ImageExportSourceError(ImageExportError):
+    pass
 
 
 def assert_export_format_available(format: ImageExportFormat) -> None:
@@ -71,14 +86,73 @@ def assert_export_format_available(format: ImageExportFormat) -> None:
 
 
 def encode_image(path: Union[str, Path], options: ImageExportOptions) -> bytes:
-    """Encode the stored image file at `path` with `options`.
+    stored = _stored_file_if_final(path, options)
+    if stored is not None:
+        return stored
+    with _ARCHIVE_SLOTS:
+        return _encode(path, options)
 
-    Raises FileNotFoundError for a missing file and ImageExportFormatUnavailableError for an unavailable codec.
-    """
-    assert_export_format_available(options.format)
-    with _ENCODE_SLOTS, Image.open(path) as source:
+
+async def encode_image_for_request(
+    path: Union[str, Path], options: ImageExportOptions, client_gone: Callable[[], Awaitable[None]]
+) -> Optional[bytes]:
+    stored = await anyio.to_thread.run_sync(_stored_file_if_final, path, options)
+    if stored is not None:
+        return stored
+    if not await _acquire_request_slot(client_gone):
+        return None
+    try:
+        return await anyio.to_thread.run_sync(_encode, path, options)
+    finally:
+        _REQUEST_SLOTS.release()
+
+
+async def _acquire_request_slot(client_gone: Callable[[], Awaitable[None]]) -> bool:
+    gone = granted = False
+
+    async def watch_client() -> None:
+        nonlocal gone
+        await client_gone()
+        gone = True
+        task_group.cancel_scope.cancel()
+
+    async with anyio.create_task_group() as task_group:
+        task_group.start_soon(watch_client)
+        await _REQUEST_SLOTS.acquire()
+        granted = True
+        task_group.cancel_scope.cancel()
+    if granted and gone:
+        _REQUEST_SLOTS.release()
+    return granted and not gone
+
+
+def _stored_file_if_final(path: Union[str, Path], options: ImageExportOptions) -> Optional[bytes]:
+    if options.format != "png" or options.metadata != "all":
+        return None
+    try:
+        with Image.open(path) as source:
+            if source.format != "PNG" or _target_size(source.size, options.long_edge) is not None:
+                return None
+    except (UnidentifiedImageError, Image.DecompressionBombError):
+        return None
+    return Path(path).read_bytes()
+
+
+def _decode(data: bytes) -> Image.Image:
+    try:
+        image = Image.open(io.BytesIO(data))
         # PNG text chunks after IDAT reach .info only once the pixels are loaded.
-        source.load()
+        image.load()
+    except Image.DecompressionBombError as e:
+        raise ImageExportSourceError("This image is too large to export") from e
+    except OSError as e:
+        raise ImageExportSourceError("This image's stored file is damaged or is not an image") from e
+    return image
+
+
+def _encode(path: Union[str, Path], options: ImageExportOptions) -> bytes:
+    assert_export_format_available(options.format)
+    with _decode(Path(path).read_bytes()) as source:
         info = source.info
         icc_profile = info.get("icc_profile")
         buffer = io.BytesIO()
@@ -130,7 +204,6 @@ def _resize(image: Image.Image, long_edge: Optional[int]) -> Image.Image:
 def _fit_png(image: Image.Image, long_edge: Optional[int]) -> Image.Image:
     if _target_size(image.size, long_edge) is None:
         return image
-    # Palette, bilevel and colour-key transparency cannot be resampled smoothly; Pillow would fall back to nearest.
     if image.mode in ("1", "P", "PA") or "transparency" in image.info:
         image = image.convert("RGBA" if _has_alpha(image) else "RGB")
     return _resize(image, long_edge)
@@ -138,17 +211,18 @@ def _fit_png(image: Image.Image, long_edge: Optional[int]) -> Image.Image:
 
 def _to_8bit_rgb(image: Image.Image) -> Image.Image:
     if image.mode.startswith("I"):
-        # Pillow clips 16-bit values into 8 bits on conversion, which turns most of a depth map white: scale instead.
+        # Pillow clips 16-bit values on conversion, turning most of a depth map white: scale first.
         image = image.convert("I").point(lambda value: value / 256).convert("L")
     return image.convert("RGBA" if _has_alpha(image) else "RGB")
 
-
-# File names
 
 _TOKENS = re.compile(r"\{(name|board|seed|model|date|n)\}")
 _UNSAFE_CHARACTERS = re.compile(r'[\\/:*?"<>|\x00-\x1f\x7f-\x9f]')
 _SEPARATORS = "-_ ."
 MAX_EXPORT_STEM_BYTES = 120
+_RESERVED_STEMS = frozenset(
+    ["CON", "PRN", "AUX", "NUL", *(f"COM{i}" for i in range(1, 10)), *(f"LPT{i}" for i in range(1, 10))]
+)
 
 
 def resolve_export_file_names(
@@ -156,8 +230,8 @@ def resolve_export_file_names(
     images: Sequence[ImageDTO],
     pattern: str,
     format: ImageExportFormat,
+    viewer: BoardViewer,
 ) -> list[str]:
-    """Resolve `pattern` into one unique, path-safe file name per image, in order."""
     parts = _TOKENS.split(pattern)
     tokens = set(parts[1::2])
     reads_metadata = bool(tokens & {"seed", "model"})
@@ -175,13 +249,13 @@ def resolve_export_file_names(
                 values["board"] = "uncategorized"
             else:
                 if image.board_id not in board_names:
-                    board_names[image.board_id] = services.board_records.get(image.board_id).board_name
+                    board_names[image.board_id] = _readable_board_name(services, image.board_id, viewer)
                 values["board"] = board_names[image.board_id]
         if reads_metadata:
             metadata = services.images.get_metadata(image.image_name)
             values.update(_metadata_tokens(metadata.root if metadata is not None else {}))
 
-        stem = _cut_stem(_render(parts, values) or _sanitize(name))
+        stem = _avoid_reserved_stem(_cut_stem(_render(parts, values) or _sanitize(name)))
         candidate, suffix = stem, 2
         while (candidate + extension).casefold() in used:
             candidate, suffix = f"{stem}-{suffix}", suffix + 1
@@ -189,6 +263,15 @@ def resolve_export_file_names(
         file_names.append(candidate + extension)
 
     return file_names
+
+
+def _readable_board_name(services: "InvocationServices", board_id: str, viewer: BoardViewer) -> str:
+    try:
+        if not services.board_access.get(board_id, viewer.user_id, viewer.is_admin).allows(BoardAction.Read):
+            return ""
+        return services.board_records.get(board_id).board_name
+    except BoardRecordNotFoundException:
+        return ""
 
 
 def _render(parts: list[str], values: dict[str, str]) -> str:
@@ -199,7 +282,6 @@ def _render(parts: list[str], values: dict[str, str]) -> str:
         if index % 2 and not text:
             after_empty_token = True
             continue
-        # An empty token leaves the separators on both of its sides: keep the run before it, drop the one after.
         if after_empty_token and (not rendered or rendered[-1] in _SEPARATORS):
             text = text.lstrip(_SEPARATORS)
         if text:
@@ -209,7 +291,17 @@ def _render(parts: list[str], values: dict[str, str]) -> str:
 
 
 def _sanitize(text: str) -> str:
-    return _UNSAFE_CHARACTERS.sub("-", text)
+    text = _UNSAFE_CHARACTERS.sub("-", text)
+    if text.isascii():
+        return text
+    return "".join("-" if unicodedata.category(character) == "Cf" else character for character in text)
+
+
+def _avoid_reserved_stem(stem: str) -> str:
+    head, dot, rest = stem.partition(".")
+    if head.upper() not in _RESERVED_STEMS:
+        return stem
+    return _cut_stem(f"{head}_{dot}{rest}") if dot else f"{head}_"
 
 
 def _cut_stem(stem: str) -> str:

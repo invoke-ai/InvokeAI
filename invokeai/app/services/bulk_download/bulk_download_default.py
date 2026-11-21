@@ -1,9 +1,12 @@
 import os
+import threading
+from collections import OrderedDict
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Optional, Union
 from zipfile import ZipFile
 
+from invokeai.app.services.board_access.board_access_common import BoardViewer
 from invokeai.app.services.board_records.board_records_common import BoardRecordNotFoundException
 from invokeai.app.services.bulk_download.bulk_download_base import BulkDownloadBase
 from invokeai.app.services.bulk_download.bulk_download_common import (
@@ -13,7 +16,12 @@ from invokeai.app.services.bulk_download.bulk_download_common import (
     BulkDownloadTargetException,
 )
 from invokeai.app.services.image_records.image_records_common import ImageRecordNotFoundException
-from invokeai.app.services.images.image_export import BulkImageExportOptions, encode_image, resolve_export_file_names
+from invokeai.app.services.images.image_export import (
+    BulkImageExportOptions,
+    ImageExportError,
+    encode_image,
+    resolve_export_file_names,
+)
 from invokeai.app.services.images.images_common import ImageDTO
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.util.misc import uuid_string
@@ -22,6 +30,10 @@ from invokeai.app.util.misc import uuid_string
 # within the 255-byte filename limit and, on Windows without long paths, MAX_PATH including the temp-dir prefix. The
 # uuid keeps truncated names unique.
 MAX_BOARD_NAME_BYTES = 100
+
+MAX_FAILURE_RECORDS = 100
+# Other errors can carry paths or internals, so the poll gets this instead.
+GENERIC_FAILURE_REASON = "The archive could not be created"
 
 
 class BulkDownloadService(BulkDownloadBase):
@@ -34,6 +46,8 @@ class BulkDownloadService(BulkDownloadBase):
         self._bulk_downloads_folder.mkdir(parents=True, exist_ok=True)
         # Track which user owns each download so the fetch endpoint can enforce ownership
         self._download_owners: dict[str, str] = {}
+        self._failures: OrderedDict[str, str] = OrderedDict()
+        self._failures_lock = threading.Lock()
 
     def handler(
         self,
@@ -41,6 +55,7 @@ class BulkDownloadService(BulkDownloadBase):
         board_id: Optional[str],
         bulk_download_item_id: Optional[str],
         user_id: str = "system",
+        is_admin: bool = False,
         uncategorized_owner_id: Optional[str] = None,
         export: Optional[BulkImageExportOptions] = None,
     ) -> None:
@@ -63,16 +78,20 @@ class BulkDownloadService(BulkDownloadBase):
             else:
                 raise BulkDownloadParametersException()
 
-            bulk_download_item_name: str = self._create_zip_file(image_dtos, bulk_download_item_id, export)
+            viewer = BoardViewer(user_id=user_id, is_admin=is_admin)
+            bulk_download_item_name: str = self._create_zip_file(image_dtos, bulk_download_item_id, export, viewer)
             self._signal_job_completed(bulk_download_id, bulk_download_item_id, bulk_download_item_name, user_id)
         except (
             ImageRecordNotFoundException,
             BoardRecordNotFoundException,
             BulkDownloadException,
             BulkDownloadParametersException,
+            ImageExportError,
         ) as e:
+            self._record_failure(bulk_download_item_name, e)
             self._signal_job_failed(bulk_download_id, bulk_download_item_id, bulk_download_item_name, e, user_id)
         except Exception as e:
+            self._record_failure(bulk_download_item_name, e)
             self._signal_job_failed(bulk_download_id, bulk_download_item_id, bulk_download_item_name, e, user_id)
             self._invoker.services.logger.error("Problem bulk downloading images.")
             raise e
@@ -103,7 +122,11 @@ class BulkDownloadService(BulkDownloadBase):
         return clean_name.encode("utf-8")[:MAX_BOARD_NAME_BYTES].decode("utf-8", "ignore").rstrip()
 
     def _create_zip_file(
-        self, image_dtos: list[ImageDTO], bulk_download_item_id: str, export: Optional[BulkImageExportOptions]
+        self,
+        image_dtos: list[ImageDTO],
+        bulk_download_item_id: str,
+        export: Optional[BulkImageExportOptions],
+        viewer: BoardViewer,
     ) -> str:
         """
         Create a zip file containing the images specified by the given image names or board id.
@@ -127,7 +150,7 @@ class BulkDownloadService(BulkDownloadBase):
                         zip_file.write(image_disk_path, arcname=image_zip_path)
                 else:
                     file_names = resolve_export_file_names(
-                        self._invoker.services, image_dtos, export.name_pattern, export.format
+                        self._invoker.services, image_dtos, export.name_pattern, export.format, viewer
                     )
                     for image_dto, file_name in zip(image_dtos, file_names, strict=True):
                         image_disk_path = self._invoker.services.images.get_path(image_dto.image_name)
@@ -191,6 +214,21 @@ class BulkDownloadService(BulkDownloadBase):
 
     def stop(self, *args, **kwargs):
         self._temp_directory.cleanup()
+
+    def _record_failure(self, bulk_download_item_name: str, exception: Exception) -> None:
+        reason = str(exception) if isinstance(exception, ImageExportError) else GENERIC_FAILURE_REASON
+        with self._failures_lock:
+            self._failures[bulk_download_item_name] = reason
+            while len(self._failures) > MAX_FAILURE_RECORDS:
+                forgotten, _ = self._failures.popitem(last=False)
+                self._download_owners.pop(forgotten, None)
+
+    def take_failure(self, bulk_download_item_name: str) -> Optional[str]:
+        with self._failures_lock:
+            reason = self._failures.pop(bulk_download_item_name, None)
+            if reason is not None:
+                self._download_owners.pop(bulk_download_item_name, None)
+        return reason
 
     def get_owner(self, bulk_download_item_name: str) -> Optional[str]:
         return self._download_owners.get(bulk_download_item_name)

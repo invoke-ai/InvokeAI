@@ -8371,7 +8371,10 @@
             }
           },
           "404": {
-            "description": "Image not found"
+            "description": "The archive is not ready, or unknown"
+          },
+          "500": {
+            "description": "The archive job failed; `detail` says why"
           },
           "422": {
             "description": "Validation Error",
