@@ -1,7 +1,7 @@
 ---
 title: FLUX.2
 description: Generate and edit images with FLUX.2 Klein (4B and 9B, distilled and Base) and FLUX.2 [dev], including multi-reference image editing and the FLUX.2 [dev] Fun-ControlNet-Union.
-lastUpdated: 2026-11-02
+lastUpdated: 2026-11-07
 sidebar:
   order: 5
 ---
@@ -214,6 +214,18 @@ LyCORIS LoKr and LoHA files are supported in BFL and kohya layouts; each LoKr op
 or as a factorized `_a` / `_b` pair. kohya LoRAs that also train layers outside the transformer blocks (`img_in`,
 `txt_in`, the time embedder, the guidance embedder of FLUX.2 [dev], the last layer and the shared modulations) are
 supported, as long as they train at least one block.
+
+For BFL and kohya DoRA adapters, fused image/text QKV projections support both input-axis magnitudes
+(`dora_scale` shaped `(1, in_features)`, including one-dimensional vectors) and output-axis magnitudes
+(`(out_features, 1)`) with dense floating-point base weights, including native FP8 storage. Input-axis
+normalization uses all Q, K and V base rows together before applying strength. OneTrainer uses the input
+axis by default; its **Apply on output axis (DoRA Only)** setting is off by default. Both orientations
+preserve their normalization when Q, K and V are split, including when the fused weight is square.
+
+Output-axis DoRA also works on supported FLUX.2 int8 checkpoints. For fused QKV
+input-axis DoRA, the shared norm currently requires ordinary floating-point Q/K/V weights (including native
+FP8 storage). Packed modules and GGUF or SDNQ tensor subclasses are rejected when applying that adapter;
+use a base with ordinary floating-point Q/K/V weights for this orientation.
 
 ## PiD super-resolution decode
 

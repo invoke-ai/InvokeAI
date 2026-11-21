@@ -89,19 +89,26 @@ The analytic terms:
   text stream of their own, but `add_hint` touches only `hidden_states`. `n + 4` hint-sized tensors (batch x image
   stream x width x element size) are charged for `n` blocks, the coefficient the Z-Image estimator measured for its
   adapter over the plain forward. It is not measured for FLUX.2.
-- Half a GiB per LoRA and sample: a sidecar patch adds an activation branch per patched layer.
+- Half a GiB per LoRA and sample for the existing sidecar activation allowance. DoRA additionally prices
+  its factors and its largest projection or norm pass from the loaded adapter shapes.
 - The dequantization copy an int8_tensorwise, nvfp4 or GGUF build materializes per quantized linear and forward,
   alive alongside the activations and invisible to them (`peak_dequant_transient_bytes`); zero for every other build.
 - The compute-dtype copies of a layer's float8-stored weights that FP8 Storage, or a kept fp8 checkpoint, widens per
   forward (`peak_fp8_cast_transient_bytes`); zero for every other build.
 """
 
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from typing import Final, Optional, cast
 
 import torch
 
-from invokeai.backend.quantization.dequantizing_linear import peak_dequant_transient_bytes
+from invokeai.backend.patches.layer_patcher import LayerPatcher
+from invokeai.backend.patches.layers.dora_layer import DoRALayer
+from invokeai.backend.patches.layers.fused_input_dora_layer import FusedInputDoRALayer
+from invokeai.backend.patches.layers.swapped_halves_layer_patch import SwappedHalvesLayerPatch
+from invokeai.backend.patches.lora_conversions.flux_lora_constants import FLUX_LORA_TRANSFORMER_PREFIX
+from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
+from invokeai.backend.quantization.dequantizing_linear import DequantizingLinear, peak_dequant_transient_bytes
 from invokeai.backend.util.attention import sdpa_score_matrix_bytes
 from invokeai.backend.util.calc_tensor_size import largest_module_bytes
 from invokeai.backend.util.fp8 import peak_fp8_cast_transient_bytes
@@ -177,6 +184,7 @@ def _terms(features: Mapping[str, FeatureValue], values: Mapping[str, float]) ->
     # mask: zero is what such a point streams and pads, though a forward the node prices now always carries them.
     streamed_layer_bytes = cast(int, features.get("streamed_layer_bytes", 0))
     padded_bias_bytes = cast(int, features.get("padded_bias_bytes", 0))
+    dora_patch_bytes = cast(int, features.get("dora_patch_bytes", 0))
     return (
         WorkingMemoryTerm.fitted("activations", f"k_{suffix}", cast(int, features["tokens"]) * batch, values),
         WorkingMemoryTerm.fitted("base", f"b_{suffix}", 1, values),
@@ -186,9 +194,128 @@ def _terms(features: Mapping[str, FeatureValue], values: Mapping[str, float]) ->
         WorkingMemoryTerm("attention_scores", cast(int, features["score_matrix_bytes"]), True),
         WorkingMemoryTerm("control_hints", hint_bytes, True),
         WorkingMemoryTerm("lora_patches", cast(int, features["lora_count"]) * batch * _LORA_PATCH_BYTES, True),
+        *((WorkingMemoryTerm("dora_patches", dora_patch_bytes, True),) if dora_patch_bytes else ()),
         WorkingMemoryTerm("dequant_transient", cast(int, features["dequant_transient_bytes"]), True),
         WorkingMemoryTerm("fp8_cast_transient", cast(int, features["fp8_cast_transient_bytes"]), True),
     )
+
+
+def flux2_dora_patch_bytes(
+    transformer: torch.nn.Module,
+    patches: Iterable[tuple[ModelPatchRaw, float]],
+    *,
+    dtype: torch.dtype,
+    rows: int,
+) -> int:
+    """Bound DoRA's explicit tensor allocations before transformer residency is decided.
+
+    A patch can be merged or run as a sidecar depending on placement. Allow all DoRA factors
+    (and the bound norms) to coexist on the device, including the per-projection copies of shared
+    factors. Only one projection is binding, applying, or running at a time. The legacy LoRA term
+    remains in place for other patch types. The bound counts tensors visible to PyTorch.
+    """
+    retained = 0
+    scratch = 0
+    for patch, strength in patches:
+        if strength == 0:
+            continue
+        flattened = not any("." in key for key in patch.layers)
+        for key, layer in patch.layers.items():
+            if not key.startswith(FLUX_LORA_TRANSFORMER_PREFIX):
+                continue
+            if isinstance(layer, FusedInputDoRALayer):
+                try:
+                    modules = [transformer.get_submodule(name) for name in layer.keys]
+                except AttributeError:
+                    continue  # The patcher skips an incomplete group.
+                if not all(isinstance(module, torch.nn.Linear) for module in modules):
+                    continue  # Binding owns the unsupported-quantization error.
+
+                dora = layer.layer
+                vector_bytes = dora.down.shape[1] * torch.float32.itemsize
+                retained += (
+                    _patch_tensor_bytes((dora.up,), dtype)
+                    + (
+                        dora.bias.numel() * max(dora.bias.element_size(), dtype.itemsize)
+                        if dora.bias is not None
+                        else 0
+                    )
+                    + len(modules) * (_patch_tensor_bytes((dora.down, dora.dora_scale), dtype) + vector_bytes)
+                )
+                for module in modules:
+                    scratch = max(
+                        scratch,
+                        layer.binding_workspace_bytes(module, dtype),
+                        _dora_projection_workspace_bytes(module, dora, dtype, rows, fused=True),
+                    )
+                continue
+
+            wrapped = isinstance(layer, SwappedHalvesLayerPatch)
+            dora = layer.layer if wrapped else layer
+            if not isinstance(dora, DoRALayer):
+                continue
+            try:
+                _, module = LayerPatcher._get_submodule(
+                    transformer, key.removeprefix(FLUX_LORA_TRANSFORMER_PREFIX), layer_key_is_flattened=flattened
+                )
+            except AttributeError:
+                continue
+            if not isinstance(module, (torch.nn.Linear, DequantizingLinear)):
+                continue
+            retained += _patch_tensor_bytes(
+                (dora.up, dora.down, dora.dora_scale, dora.bias, dora.direction_norm), dtype
+            )
+            scratch = max(scratch, _dora_projection_workspace_bytes(module, dora, dtype, rows, wrapped=wrapped))
+    return retained + scratch
+
+
+def _patch_tensor_bytes(tensors: Iterable[torch.Tensor | None], dtype: torch.dtype) -> int:
+    """The larger of a patch tensor's stored and streamed sizes."""
+    size = 0
+    for tensor in tensors:
+        if tensor is None:
+            continue
+        if tensor.is_sparse:
+            size += tensor._indices().nbytes
+            tensor = tensor._values()
+        size += tensor.numel() * max(tensor.element_size(), dtype.itemsize)
+    return size
+
+
+def _dora_projection_workspace_bytes(
+    module: torch.nn.Linear | DequantizingLinear,
+    layer: DoRALayer,
+    dtype: torch.dtype,
+    rows: int,
+    *,
+    wrapped: bool = False,
+    fused: bool = False,
+) -> int:
+    in_features, out_features = module.in_features, module.out_features
+    # Packed linears form the dense, inference-dtype base in the sidecar. Their backing payload
+    # can have a different shape and element width from the LoRA target.
+    base_bytes = module.weight.element_size() if isinstance(module, torch.nn.Linear) else dtype.itemsize
+    compute_dtype_bytes = max(torch.float32.itemsize, base_bytes, dtype.itemsize)
+    # In get_weight: widened base, scaled direction delta, direction, and residual. During a
+    # sidecar forward the base cast and running sum or prior update can also be live. The same
+    # space covers direct apply's dtype conversion and out-of-place replacement.
+    # Wrapper layouts can keep an extra weight from reordering or building the merged residual.
+    dense_bytes = (7 + 2 * wrapped) * in_features * out_features * compute_dtype_bytes
+    # Factor promotion is per projection. Fused input DoRA keeps its stored dtype and promotes
+    # only for the math; ordinary DoRA may move first and allocate the FP32 factors on-device.
+    if fused:
+        factor_bytes = (
+            _patch_tensor_bytes((layer.up,), torch.float32) // 3
+            + _patch_tensor_bytes((layer.down, layer.dora_scale), torch.float32)
+            + (layer.bias.numel() * torch.float32.itemsize // 3 if layer.bias is not None else 0)
+        )
+    else:
+        factor_bytes = _patch_tensor_bytes((layer.up, layer.down, layer.dora_scale, layer.bias), torch.float32)
+    # A streamed FP8 base can expand its scales with index tensors, and broadcasting a magnitude
+    # or applying a bias can hold extra input/output-width vectors.
+    vector_bytes = (in_features + out_features) * (2 * torch.int64.itemsize + 4 * compute_dtype_bytes)
+    output_bytes = rows * out_features * dtype.itemsize
+    return dense_bytes + factor_bytes + vector_bytes + output_bytes
 
 
 def _padded_bias_bytes(mask: Optional[torch.Tensor], dtype: torch.dtype) -> int:
@@ -221,6 +348,7 @@ def estimate_flux2_denoise_working_memory(
     text_seq_len: int,
     batch_size: int,
     lora_count: int,
+    dora_patch_bytes: int = 0,
     control_blocks: int = 0,
     regional_attn_mask: Optional[torch.Tensor] = None,
     weights_resident: bool = False,
@@ -272,4 +400,6 @@ def estimate_flux2_denoise_working_memory(
         "dequant_transient_bytes": peak_dequant_transient_bytes(transformer, dtype),
         "fp8_cast_transient_bytes": peak_fp8_cast_transient_bytes(transformer, dtype),
     }
+    if dora_patch_bytes:
+        features["dora_patch_bytes"] = dora_patch_bytes
     return FLUX2_DENOISE_SPEC.estimate(features, device)
