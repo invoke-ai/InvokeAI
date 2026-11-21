@@ -230,7 +230,7 @@ class ImagePasteInvocation(BaseInvocation, WithMetadata, WithBoard):
     title="Mask from Alpha",
     tags=["image", "mask"],
     category="mask",
-    version="1.2.2",
+    version="1.3.0",
 )
 class MaskFromAlphaInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Extracts the alpha channel of an image as a mask."""
@@ -241,7 +241,14 @@ class MaskFromAlphaInvocation(BaseInvocation, WithMetadata, WithBoard):
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.images.get_pil(self.image.image_name)
 
-        image_mask = image.split()[-1]
+        if image.mode == "L":
+            # A grayscale image is already a mask, so use it as is.
+            image_mask = image
+        else:
+            # Converting gives an image without an alpha channel a fully opaque one. Its last band is a color or
+            # palette channel, not alpha.
+            image_mask = image.convert("RGBA").getchannel("A")
+
         if self.invert:
             image_mask = ImageOps.invert(image_mask)
 
