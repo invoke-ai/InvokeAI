@@ -111,6 +111,10 @@ export const parsePreviewMetadata = (
     'generation_mode',
     'rand_device',
     'cfg_rescale_multiplier',
+    'color_compensation',
+    'vae_precision',
+    'pid_mode',
+    'pid_steps',
     'strength',
     'seamless_x',
     'seamless_y',
@@ -120,6 +124,7 @@ export const parsePreviewMetadata = (
     'hidiffusion',
     'hidiffusion_raunet',
     'hidiffusion_window_attn',
+    'hidiffusion_auto_ratios',
     'hidiffusion_t1_ratio',
     'hidiffusion_t2_ratio',
     'refiner_steps',
@@ -143,12 +148,16 @@ export const parsePreviewMetadata = (
     'krea2_rebalance_multiplier',
     'krea2_rebalance_weights',
     'krea2_reference_kv_cache',
+    'krea2_style_strength',
+    'moss_image_layout_prompt',
+    'moss_image_uncond_skip_layers',
     'anima_inpaint_adapter_weight',
     'ideogram4_sampler_preset',
     'ideogram4_steps',
     'ideogram4_guidance_scale',
     'ideogram4_mu',
     'ideogram4_caption',
+    'flux3_caption',
     'image_size',
     'gemini_temperature',
     'gemini_thinking_level',
@@ -184,6 +193,9 @@ export const parsePreviewMetadata = (
   ]);
   for (const key of primitiveFields) {
     const value = metadata[key];
+    if (Array.isArray(value) && value.length > 0 && value.every((item) => typeof item === 'number')) {
+      push(key, metadataLabel(key), value.join(', '));
+    }
     if (value === null && automaticFields.has(key)) {
       push(key, metadataLabel(key), t('common.auto'));
     }
@@ -226,6 +238,12 @@ export const parsePreviewMetadata = (
     'minimax_h3_transformer_model',
     'minimax_h3_text_encoder_model',
     'ideogram4_unconditional_model',
+    'clip_g_model',
+    'clip_l_model',
+    'mistral_source',
+    'qwen3_vl_vision_tower',
+    'pid_decoder',
+    'flux3_prompt_upsampler',
   ];
   for (const key of componentFields) {
     push(key, metadataLabel(key), metadata[key] === null ? t('common.auto') : modelName(metadata[key]));
@@ -285,6 +303,8 @@ export const parsePreviewMetadata = (
                 .join(', ')
             : null),
         getString(config, 'positivePrompt'),
+        // A layout family's region, which holds its box and a description instead of a mask and prompts.
+        getString(config, 'desc'),
         getString(config, 'clip_vision_model') ?? getString(config, 'clipVisionModel'),
         getString(config, 'method'),
       ];

@@ -72,6 +72,7 @@ CORE_METADATA_REGISTRY: tuple[tuple[str, MetadataType | tuple[MetadataType, ...]
     ("clip_skip", T.INTEGER),
     ("model", T.MODEL),
     ("vae", T.VAE),
+    ("vae_precision", T.STRING),
     # 2. Common feature extensions and denoise parameters
     ("seamless_x", T.BOOLEAN),
     ("seamless_y", T.BOOLEAN),
@@ -83,6 +84,7 @@ CORE_METADATA_REGISTRY: tuple[tuple[str, MetadataType | tuple[MetadataType, ...]
     ("strength", T.FLOAT),
     ("init_image", T.STRING),
     ("add_noise", T.BOOLEAN),
+    ("color_compensation", T.BOOLEAN),
     ("shift", T.FLOAT),
     ("dype_preset", T.STRING),
     ("dype_scale", T.FLOAT),
@@ -125,6 +127,7 @@ CORE_METADATA_REGISTRY: tuple[tuple[str, MetadataType | tuple[MetadataType, ...]
     ("clip_g_model", T.MODEL),
     ("mistral_encoder", T.MODEL),
     ("mistral_encoder_model", T.MODEL),
+    ("mistral_source", T.MODEL),
     ("qwen3_encoder", T.MODEL),
     ("qwen3_encoder_model", T.MODEL),
     ("qwen3_source", T.MODEL),

@@ -15,6 +15,7 @@ import {
   getCompelPromptNodeType,
   getActiveCompatibleLoras,
   getLoadedLoras,
+  getRecordedComponents,
   toGraphContract,
   toModelIdentifier,
 } from '@features/generation/graph';
@@ -105,22 +106,15 @@ const addUpscaleMetadata = (
   }
 
   const architecture = upscaleArchitectureFor(settings.model);
-  const components = activeUpscaleComponents(settings);
-  // FLUX calls this guidance, not CFG, and the encoders have to be recalled with the rest.
+  // FLUX calls this guidance, not CFG.
   const guidanceField =
     architecture?.negativePrompt === 'never' ? { guidance: settings.cfgScale } : { cfg_scale: settings.cfgScale };
   const metadata = addNode(graph, {
     ...guidanceField,
-    ...(components.t5EncoderModel ? { t5_encoder: toModelIdentifier(components.t5EncoderModel) } : {}),
-    ...(components.clipEmbedModel ? { clip_embed_model: toModelIdentifier(components.clipEmbedModel) } : {}),
-    ...(components.qwen3EncoderModel ? { qwen3_encoder: toModelIdentifier(components.qwen3EncoderModel) } : {}),
-    ...(components.qwen35EncoderModel ? { qwen3_5_encoder: toModelIdentifier(components.qwen35EncoderModel) } : {}),
-    ...(components.qwen3VlEncoderModel ? { qwen3_vl_encoder: toModelIdentifier(components.qwen3VlEncoderModel) } : {}),
-    ...(components.mistralEncoderModel ? { mistral_encoder: toModelIdentifier(components.mistralEncoderModel) } : {}),
-    // Generate records Qwen Image's encoder under its own key, and Remix reads it back from there.
-    ...(components.qwenVlEncoderModel
-      ? { qwen_image_qwen_vl_encoder: toModelIdentifier(components.qwenVlEncoderModel) }
-      : {}),
+    // The loaders hold the encoders and the VAE, under the keys Generate records them with.
+    ...getRecordedComponents(graph),
+    // Only the SD path runs its encode and decode at a chosen precision.
+    ...(graph.nodes.i2l?.type === 'i2l' ? { vae_precision: settings.vaePrecision } : {}),
     creativity: settings.creativity,
     id: 'core_metadata',
     // Runs after the path builder, so the graph already holds the LoRAs this architecture loads.
@@ -140,7 +134,6 @@ const addUpscaleMetadata = (
     },
     upscale_model: toModelIdentifier(settings.upscaleModel),
     upscale_scale: settings.scale,
-    vae: settings.vae ? toModelIdentifier(settings.vae) : undefined,
   });
 
   addEdge(graph, graph.nodes.positive_prompt, 'value', metadata, 'positive_prompt');

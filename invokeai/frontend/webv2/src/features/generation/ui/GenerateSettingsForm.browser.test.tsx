@@ -23,7 +23,13 @@ import { userEvent } from 'vitest/browser';
 import { GenerateWidgetView } from './GenerateWidgetView';
 import { GenerationUiProvider, type GenerationModelSelectProps, type GenerationUiAdapter } from './GenerationUiContext';
 vi.mock('react-i18next', () => {
-  const t = (key: string, options?: { labels?: string }) => (options?.labels ? `${key}: ${options.labels}` : key);
+  // Shows the cleared-settings list a model-switch confirmation formats into its body, and the model a slot names.
+  const t = (key: string, options?: { labels?: string; name?: string }) =>
+    options?.labels
+      ? `${key}: ${options.labels}`
+      : key === 'widgets.generate.componentFrom'
+        ? `${key}: ${options?.name}`
+        : key;
   return { useTranslation: () => ({ i18n: { resolvedLanguage: 'en' }, t }) };
 });
 
@@ -96,6 +102,7 @@ const ANIMA_INPAINT_ADAPTER = {
   type: 'controlnet',
 } as GenerationModelCatalogItem;
 const MainModelPicker = ({
+  emptyLabel,
   filter,
   id,
   invalid,
@@ -119,6 +126,7 @@ const MainModelPicker = ({
   ) : (
     <div
       aria-invalid={invalid}
+      data-component-empty-label={emptyLabel}
       data-component-placeholder={placeholder}
       data-component-types={modelTypes.join(',')}
       data-component-value={value ?? ''}
@@ -433,8 +441,66 @@ describe('GenerateSettingsForm required components', () => {
 
     await selectModel(diffusers);
     expect(slotStates()).toEqual([
-      { error: null, invalid: false, placeholder: 'widgets.generate.modelDefault' },
-      { error: null, invalid: false, placeholder: 'widgets.generate.modelDefault' },
+      { error: null, invalid: false, placeholder: 'widgets.generate.componentFrom: Krea-2' },
+      { error: null, invalid: false, placeholder: 'widgets.generate.componentFrom: Krea-2' },
+    ]);
+  });
+
+  it('shows "None" on the empty PiD slots while PiD is off, and asks for a model once it is on', async () => {
+    const emptyLabels = () =>
+      ['pid_decoder', 'gemma2_encoder'].map((type) =>
+        host!.querySelector(`[data-component-types="${type}"]`)?.getAttribute('data-component-empty-label')
+      );
+    stableGroups.models.catalog = [MODEL];
+    await renderAdapter(buildAdapter());
+    await selectModel(MODEL);
+
+    expect(emptyLabels()).toEqual(['None', 'None']);
+
+    await settle(() => storedValues().patchSnapshot({ pidMode: 'fit' }));
+    expect(emptyLabels()).toEqual([null, null]);
+  });
+
+  it('names what the loader takes an empty slot from: a source for a GGUF main, the main itself when it bundles them', async () => {
+    const wan = (key: string, name: string, format: string) =>
+      ({ ...MODEL, base: 'wan', format, key, name }) as GenerationModelCatalogItem;
+    const gguf = wan('wan-gguf', 'Wan GGUF', 'gguf_quantized');
+    const main = wan('wan-main', 'Wan main', 'diffusers');
+    const source = wan('wan-source', 'Wan source', 'diffusers');
+    const slotOf = (type: string) => host!.querySelector(`[data-component-types="${type}"]`);
+    stableGroups.models.catalog = [MODEL, gguf, main, source];
+    await renderAdapter(buildAdapter());
+
+    await selectModel(main);
+    expect(slotOf('vae')?.getAttribute('data-component-placeholder')).toBe('widgets.generate.componentFrom: Wan main');
+    expect(slotOf('wan_t5_encoder')?.getAttribute('data-component-empty-label')).toBe(
+      'widgets.generate.componentFrom: Wan main'
+    );
+
+    // The loader reads the source only for a main that holds no components; the Diffusers main wins over it.
+    await settle(() => storedValues().patchSnapshot({ componentSourceModel: source as never }));
+    expect(slotOf('vae')?.getAttribute('data-component-empty-label')).toBe('widgets.generate.componentFrom: Wan main');
+
+    await selectModel(gguf);
+    await settle(() => storedValues().patchSnapshot({ componentSourceModel: source as never }));
+    expect(slotOf('vae')?.getAttribute('data-component-placeholder')).toBe(
+      'widgets.generate.componentFrom: Wan source'
+    );
+    expect(slotOf('vae')?.getAttribute('data-component-empty-label')).toBe(
+      'widgets.generate.componentFrom: Wan source'
+    );
+    expect(slotOf('wan_t5_encoder')?.getAttribute('data-component-empty-label')).toBe(
+      'widgets.generate.componentFrom: Wan source'
+    );
+    // The source slot itself, and the second expert, which is no component of one model for certain.
+    expect(
+      [...host!.querySelectorAll('[data-component-types="main"]')].map((slot) => [
+        slot.getAttribute('data-component-placeholder'),
+        slot.getAttribute('data-component-empty-label'),
+      ])
+    ).toEqual([
+      ['widgets.generate.modelDefault', null],
+      ['widgets.generate.modelDefault', null],
     ]);
   });
 });

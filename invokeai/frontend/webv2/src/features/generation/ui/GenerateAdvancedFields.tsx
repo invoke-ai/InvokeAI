@@ -8,6 +8,7 @@ import type {
 import { chakra, createListCollection, Stack, useRecipe } from '@chakra-ui/react';
 import {
   getDefaultGenerateSettings,
+  getEmptyComponentSupplier,
   getGenerationUiPolicy,
   getKrea2EditLoraState,
 } from '@features/generation/core/baseGenerationPolicies';
@@ -213,6 +214,8 @@ export const GenerateAdvancedFields = ({
     </GenerateFieldContextMenu>
   );
 
+  const bundledVaeSupplier = getEmptyComponentSupplier(selectedModel, {}, 'vae');
+
   // The VAE the model's defaults name is no change from them, as Apply model defaults sets it.
   const isVaeAtDefault = !settings.vae || isModelDefaultVae(selectedModel, settings.vae);
   const customVae = policy.sdVaeVisible && !isVaeAtDefault;
@@ -278,9 +281,18 @@ export const GenerateAdvancedFields = ({
                 {/* Clearable: at the model's default VAE the reset is off, and clearing is how to reach the bundled one. */}
                 <ModelSelect
                   isClearable
+                  emptyLabel={
+                    bundledVaeSupplier
+                      ? t('widgets.generate.componentFrom', { name: bundledVaeSupplier.name })
+                      : undefined
+                  }
                   filter={(model) => model.base === modelBase}
                   modelTypes={['vae']}
-                  placeholder={t('widgets.generate.bundledVae')}
+                  placeholder={
+                    bundledVaeSupplier
+                      ? t('widgets.generate.componentFrom', { name: bundledVaeSupplier.name })
+                      : t('widgets.generate.bundledVae')
+                  }
                   relatedTo={selectedModel?.key ?? null}
                   value={settings.vae?.key ?? null}
                   onChange={(model) => onCommitImmediate({ vae: isVaeModelConfig(model) ? model : null })}

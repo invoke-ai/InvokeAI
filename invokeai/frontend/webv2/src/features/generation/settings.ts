@@ -54,6 +54,7 @@ export {
   coerceSchedulerForGraph,
   createReferenceImageId,
   getCompatibleReferenceImages,
+  getComponentSlotsSuppliedByRecord,
   getDefaultGenerateSettings,
   addReferenceImages,
   getGenerateModelSelectionResult,

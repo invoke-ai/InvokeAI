@@ -530,7 +530,7 @@ const buildSDGraph = (
         }
       : {}),
     ...(shouldUsePidDecode(settings, model.base) ? getPidMetadata(settings) : {}),
-    ...(refiner ? getRefinerMetadata(settings, model, refiner) : {}),
+    ...(refiner ? getRefinerMetadata(settings, model) : {}),
     scheduler,
   });
   addReferenceImageMetadata(graph, settings);
@@ -692,11 +692,7 @@ const buildSD3Graph = (
   addEdge(graph, negCond, 'conditioning', denoise, 'negative_conditioning');
   addEdge(graph, seed, 'value', denoise, 'seed');
   addMetadata(graph, output, settings, model, 'sd3_txt2img', projectSettings, {
-    clip_g_model: modelLoader.clip_g_model,
-    clip_l_model: modelLoader.clip_l_model,
     scheduler: undefined,
-    t5_encoder: modelLoader.t5_encoder_model,
-    vae: vaeModel ?? undefined,
     ...(shouldUsePidDecode(settings, model.base) ? getPidMetadata(settings) : {}),
   });
 
@@ -801,14 +797,11 @@ const buildFluxGraph = (
   const ipAdapterCollector = addIPAdapterReferenceImages(graph, settings, model, denoise);
   const fluxReduxCollector = addFluxReduxReferenceImages(graph, settings, model, denoise);
   addMetadata(graph, output, settings, model, 'flux_txt2img', projectSettings, {
-    clip_embed_model: clipEmbedModel ?? undefined,
     guidance: settings.cfgScale,
     ...dype,
     // Recorded even when off, so recall can restore it over a preset the panel has since turned on.
     dype_preset: settings.fluxDypePreset,
     scheduler,
-    t5_encoder: t5EncoderModel ?? undefined,
-    vae: vaeModel ?? undefined,
     ...(shouldUsePidDecode(settings, model.base) ? getPidMetadata(settings) : {}),
   });
   addReferenceImageMetadata(graph, settings);
@@ -934,11 +927,7 @@ const buildFlux2Graph = (
   addEdge(graph, graph.nodes.seed, 'value', denoise, 'seed');
   addFluxKontextReferenceImages(graph, settings, denoise, 'flux2_reference_image');
   addMetadata(graph, output, settings, model, 'flux2_txt2img', projectSettings, {
-    ...(isDev
-      ? { mistral_encoder: mistralEncoderModel ?? undefined }
-      : { qwen3_encoder: qwen3EncoderModel ?? undefined, qwen3_source: sourceModel }),
     scheduler,
-    vae: vaeModel ?? undefined,
     ...(shouldUsePidDecode(settings, model.base) ? getPidMetadata(settings) : {}),
   });
   addReferenceImageMetadata(graph, settings);
@@ -1066,9 +1055,7 @@ const buildErnieImageGraph = (
 
   addEdge(graph, seed, 'value', denoise, 'seed');
   addEdge(graph, denoise, 'latents', output, 'latents');
-  addMetadata(graph, output, settings, model, 'ernie_image_txt2img', projectSettings, {
-    mistral_encoder: mistralEncoderModel ?? undefined,
-  });
+  addMetadata(graph, output, settings, model, 'ernie_image_txt2img', projectSettings);
 
   return {
     conditioning: null,
@@ -1202,11 +1189,8 @@ const buildQwenImageGraph = (
     }
   }
   addMetadata(graph, output, settings, model, 'qwen_image_txt2img', projectSettings, {
-    qwen_image_component_source: sourceModel,
     qwen_image_quantization: settings.qwenImageEncoderQuantization,
-    qwen_image_qwen_vl_encoder: settings.qwenVLEncoderModel ?? undefined,
     qwen_image_shift: settings.qwenImageShift ?? 'auto',
-    qwen_image_vae: vaeModel ?? undefined,
     scheduler: undefined,
     ...(shouldUsePidDecode(settings, model.base) ? getPidMetadata(settings) : {}),
   });
@@ -1316,10 +1300,7 @@ const buildZImageGraph = (
 
   addEdge(graph, seed, 'value', denoise, 'seed');
   addMetadata(graph, output, settings, model, 'z_image_txt2img', projectSettings, {
-    qwen3_encoder: qwen3EncoderModel ?? undefined,
-    qwen3_source: sourceModel,
     scheduler,
-    vae: vaeModel ?? undefined,
     z_image_seed_variance_enabled: settings.zImageSeedVarianceEnabled,
     z_image_seed_variance_randomize_percent: settings.zImageSeedVarianceRandomizePercent,
     z_image_seed_variance_strength: settings.zImageSeedVarianceStrength,
@@ -1419,10 +1400,7 @@ const buildAnimaGraph = (
   addEdge(graph, denoise, 'latents', output, 'latents');
   const ipAdapterCollector = addIPAdapterReferenceImages(graph, settings, model, denoise);
   addMetadata(graph, output, settings, model, 'anima_txt2img', projectSettings, {
-    qwen3_encoder: qwen3EncoderModel,
-    ...(qwen35EncoderModel ? { qwen3_5_encoder: qwen35EncoderModel } : {}),
     scheduler,
-    vae: vaeModel,
   });
   addReferenceImageMetadata(graph, settings);
 
@@ -1617,9 +1595,6 @@ const buildKrea2Graph = (
     krea2_seed_variance_strength: settings.krea2SeedVarianceStrength,
     ...(styleReference ? { krea2_style_strength: styleReference.config.styleStrength } : {}),
     ...(referenceKvCache === undefined ? {} : { krea2_reference_kv_cache: referenceKvCache }),
-    qwen3_vl_encoder: qwen3VlEncoderModel ?? undefined,
-    qwen3_vl_vision_tower: qwen3VlVisionTowerModel ?? undefined,
-    vae: vaeModel ?? undefined,
   });
   addReferenceImageMetadata(graph, settings);
 
@@ -1700,12 +1675,9 @@ const buildQwenImage21Graph = (
     denoise,
     modelLoader,
   });
-  // The denoise adds its prefix-cache mode to the record, so metadata passes through it.
-  addMetadata(graph, denoise, settings, model, 'qwen_image_2_1_txt2img', projectSettings, {
-    qwen3_vl_encoder: qwen3VlEncoderModel ?? undefined,
-    qwen3_vl_vision_tower: qwen3VlVisionTowerModel ?? undefined,
-    vae: vaeModel ?? undefined,
-  });
+  // The denoise adds the prefix-cache mode it ran to the record, which changes the image, so the metadata passes
+  // through it on the way to the decoder.
+  addMetadata(graph, denoise, settings, model, 'qwen_image_2_1_txt2img', projectSettings);
   addEdge(graph, denoise, 'metadata', output, 'metadata');
   addReferenceImageMetadata(graph, settings);
 
@@ -1861,8 +1833,6 @@ const buildMossImageGraph = (
   addEdge(graph, seed, 'value', denoise, 'seed');
   addMetadata(graph, output, settings, model, 'moss_image_txt2img', projectSettings, {
     moss_image_uncond_skip_layers: [...settings.mossImageUncondSkipLayers],
-    qwen3_5_encoder: qwen35EncoderModel ?? undefined,
-    vae: vaeModel ?? undefined,
     ...(shouldUsePidDecode(settings, model.base) ? getPidMetadata(settings) : {}),
   });
   const metadata = Object.values(graph.nodes).find((node) => node.type === 'core_metadata');
@@ -1980,9 +1950,6 @@ const buildFlux3Graph = (
   const metadata = addMetadata(graph, output, settings, model, 'flux3_txt2img', projectSettings, {
     // FLUX.3 offers no scheduler: its denoise node always runs the reference Euler sampler.
     scheduler: 'euler',
-    ...(upsamplerModel ? { flux3_prompt_upsampler: toModelIdentifier(upsamplerModel) } : {}),
-    qwen3_vl_encoder: qwen3VlEncoderModel ?? undefined,
-    vae: vaeModel ?? undefined,
     ...(shouldUsePidDecode(settings, model.base) ? getPidMetadata(settings) : {}),
   });
   if (upsamplerModel) {
@@ -2073,9 +2040,6 @@ const buildIdeogram4Graph = (
     ideogram4_mu: settings.ideogram4Mu ?? null,
     ideogram4_sampler_preset: settings.ideogram4SamplerPreset,
     ideogram4_steps: settings.ideogram4Steps ?? null,
-    ideogram4_unconditional_model: isDiffusers ? undefined : (unconditionalModel ?? undefined),
-    qwen3_vl_encoder: qwen3VlEncoderModel ?? undefined,
-    vae: vaeModel ?? undefined,
   });
   // Record the caption the encoder saw; the positive prompt alone does not show regions or palette.
   addEdge(graph, captionBuilder, 'value', metadata, 'ideogram4_caption');
@@ -2146,11 +2110,7 @@ const buildWanGraph = (
   addEdge(graph, seed, 'value', denoise, 'seed');
   addEdge(graph, denoise, 'latents', output, 'latents');
   addMetadata(graph, output, settings, model, 'wan_txt2img', projectSettings, {
-    vae: vaeModel ?? undefined,
-    wan_component_source: sourceModel,
     wan_guidance_scale_low_noise: settings.wanGuidanceScaleLowNoise ?? null,
-    wan_t5_encoder_model: wanT5EncoderModel ?? undefined,
-    wan_transformer_low_noise: settings.wanLowNoiseModel ?? undefined,
   });
 
   return {

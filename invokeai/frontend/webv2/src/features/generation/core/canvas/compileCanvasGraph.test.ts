@@ -550,7 +550,12 @@ describe('compileCanvasGraph — inpaint per base', () => {
       expect(gradient?.mask).toEqual({ image_name: 'canvas-mask.png' });
       expect(getEdge(backendGraph, 'denoise_latents', 'denoise_mask')?.source.node_id).toBe('create_gradient_mask');
 
-      expect(gradient?.fp32).toBe(encodeType === 'i2l');
+      // fp32 only on the SD gradient mask (mirrors the SD i2l).
+      if (encodeType === 'i2l') {
+        expect(gradient?.fp32).toBe(true);
+      } else {
+        expect(gradient).not.toHaveProperty('fp32');
+      }
 
       expect(backendGraph.nodes.canvas_l2i?.type).toBe(outputType);
       expect(backendGraph.nodes.canvas_l2i?.is_intermediate).toBe(true);

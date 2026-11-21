@@ -18,6 +18,7 @@ import {
   isIdeogram4SamplerPreset,
   deriveAspectRatioId,
   getCompatibleReferenceImages,
+  getComponentSlotsSuppliedByRecord,
   getDimensionGrid,
   getExternalProviderOptionKeys,
   getExternalResolutionPresets,
@@ -416,29 +417,55 @@ const getMetadataMainModel = (
   models: readonly ComponentModelConfig[]
 ): MainModelConfig | null | undefined => getModelFromMetadata(metadata, key, models, isMainModelConfig);
 
+/** The key a record names its VAE under, whether or not the model resolves; older records use a base's own key. */
+const getRecordedVaeKey = (metadata: unknown, model: GenerateModelConfig): string | null => {
+  if (!isRecord(metadata)) {
+    return null;
+  }
+  const legacyKey = ({ 'qwen-image': 'qwen_image_vae', wan: 'wan_vae_model' } as Record<string, string>)[model.base];
+
+  return 'vae' in metadata ? 'vae' : legacyKey && legacyKey in metadata ? legacyKey : null;
+};
+
 const getMetadataVae = (
   metadata: unknown,
   model: GenerateModelConfig,
   vaeModels: VaeModelConfig[]
 ): VaeModelConfig | null | undefined => {
-  if (!isRecord(metadata)) {
-    return undefined;
-  }
-  const legacyKey = ({ 'qwen-image': 'qwen_image_vae', wan: 'wan_vae_model' } as Record<string, string>)[model.base];
-  if (!('vae' in metadata) && legacyKey && legacyKey in metadata) {
-    metadata = { ...metadata, vae: metadata[legacyKey] };
-  }
-  if (!isRecord(metadata) || !('vae' in metadata)) {
+  const key = getRecordedVaeKey(metadata, model);
+
+  if (!key || !isRecord(metadata)) {
     return undefined;
   }
 
-  if (metadata.vae === null) {
+  if (metadata[key] === null) {
     return null;
   }
 
-  const vae = resolveMetadataModel(metadata.vae, vaeModels);
+  const vae = resolveMetadataModel(metadata[key], vaeModels);
 
   return vae && isVaeCompatibleWithGenerateModel(model, vae) ? vae : undefined;
+};
+
+const getMetadataVaePrecision = (metadata: unknown): 'fp16' | 'fp32' | null => {
+  const precision = getString(metadata, 'vae_precision');
+
+  return precision === 'fp16' || precision === 'fp32' ? precision : null;
+};
+
+/** The decode settings a record restores onto `model`: only those its panel shows. Recall and its actions both ask. */
+const getMetadataVaeSettings = (
+  metadata: unknown,
+  model: GenerateModelConfig
+): Partial<Pick<GenerateWidgetValues, 'colorCompensation' | 'vaePrecision'>> => {
+  const policy = getGenerationUiPolicy(model);
+  const vaePrecision = getMetadataVaePrecision(metadata);
+  const colorCompensation = getBoolean(metadata, 'color_compensation');
+
+  return {
+    ...(vaePrecision !== null && policy.vaePrecisionVisible ? { vaePrecision } : {}),
+    ...(colorCompensation !== null && policy.colorCompensationVisible ? { colorCompensation } : {}),
+  };
 };
 
 const getPromptPatch = (
@@ -544,6 +571,21 @@ const hasMossImageSkipLayers = (metadata: unknown, model: GenerateModelConfig | 
 
 /** On a stamped generation record a missing list or switch means none or the default; canvas saves record neither. */
 const isGenerationRecord = (metadata: unknown): boolean => getString(metadata, 'generation_mode') !== null;
+
+/**
+ * A record whose writer named every standalone component its loaders received, so one it leaves out went unused: a
+ * graph run's record (a generation record, or a Refine upscale, which writes no `generation_mode` but always
+ * `creativity`; a Model only upscale copies its source's keys) that also carries `rand_device`. webv2's Generate and
+ * Upscale graphs always write it, as do the legacy frontend's SD-1 and SDXL builders. Other writers name the model but
+ * not every component: a Canvas save records only the panel's model and VAE, a denoise node that a workflow wires
+ * straight to its decoder writes `generation_mode` and `model` but none of the loader's components, and the legacy
+ * SD 3 and Z-Image builders left some out. None of them writes `rand_device`; a workflow's record carries it only
+ * where the workflow sets it on its own metadata node.
+ */
+const recordsLoaderSelections = (metadata: unknown): boolean =>
+  (isGenerationRecord(metadata) || getNumber(metadata, 'creativity') !== null) &&
+  isRecord(metadata) &&
+  'rand_device' in metadata;
 
 const getBoundedNumber = (metadata: unknown, key: string, min: number, max: number): number | null => {
   const value = getNumber(metadata, key);
@@ -914,9 +956,6 @@ interface RecalledComponent {
 
 /** Remix silently drops a key missing here. The first recorded key wins. */
 const RECALLED_COMPONENTS: readonly RecalledComponent[] = [
-  { isMainModel: true, metadataKey: 'qwen3_source', setting: 'componentSourceModel' },
-  { isMainModel: true, metadataKey: 'qwen_image_component_source', setting: 'componentSourceModel' },
-  { isMainModel: true, metadataKey: 'wan_component_source', setting: 'componentSourceModel' },
   { isMainModel: true, metadataKey: 'ideogram4_unconditional_model', setting: 'ideogram4UnconditionalModel' },
   { isMainModel: true, metadataKey: 'wan_transformer_low_noise', setting: 'wanLowNoiseModel' },
   { metadataKey: 'anima_inpaint_adapter', setting: 'animaInpaintAdapterModel' },
@@ -934,7 +973,72 @@ const RECALLED_COMPONENTS: readonly RecalledComponent[] = [
   { metadataKey: 'qwen_image_qwen_vl_encoder', setting: 'qwenVLEncoderModel' },
   { metadataKey: 't5_encoder', setting: 't5EncoderModel' },
   { metadataKey: 'wan_t5_encoder_model', setting: 'wanT5EncoderModel' },
+  // After the encoders: the model selection keeps a stored FLUX.2 source only beside the encoder it leaves to a
+  // standalone pick, and each entry is judged beside the ones before it.
+  { isMainModel: true, metadataKey: 'mistral_source', setting: 'componentSourceModel' },
+  { isMainModel: true, metadataKey: 'qwen3_source', setting: 'componentSourceModel' },
+  { isMainModel: true, metadataKey: 'qwen_image_component_source', setting: 'componentSourceModel' },
+  { isMainModel: true, metadataKey: 'wan_component_source', setting: 'componentSourceModel' },
 ];
+
+/**
+ * Settings no model supplies while empty that graph-run records name whenever the base's loader used them: a record
+ * naming the model but not them used none, so a panel pick would change the rerun. FLUX.2 is left to the model
+ * transition, which drops a stored source wherever its graph would read none; dev records before 7.0 never named
+ * `mistral_source`, so its absence proves nothing there. The Vision Tower is sent only beside a GGUF encoder that
+ * takes one, so a record without it ran without.
+ */
+const SETTINGS_RECORDED_WHEN_LOADED: Partial<Record<string, readonly RecalledComponentSetting[]>> = {
+  'krea-2': ['qwen3VLVisionTowerModel'],
+  'qwen-image': ['componentSourceModel'],
+  'qwen-image-2-1': ['qwen3VLVisionTowerModel'],
+  wan: ['componentSourceModel', 'wanLowNoiseModel'],
+  'z-image': ['componentSourceModel'],
+};
+
+/**
+ * webv2 releases that passed a component to their loader without recording it, so its absence from their records
+ * proves nothing. The server stamps `app_version`; a record without one is the current writer's.
+ */
+const UNRECORDING_WRITERS: readonly {
+  base: string;
+  /** The first version that recorded the settings. */
+  recordedFrom: string;
+  settings: readonly RecalledComponentSetting[];
+}[] = [
+  // webv2 passed standalone T5 and CLIP encoders to the SD 3 loader before it recorded them in 7.0.0-beta.2.
+  { base: 'sd-3', recordedFrom: '7.0.0-beta.2', settings: ['clipGEmbedModel', 'clipLEmbedModel', 't5EncoderModel'] },
+];
+
+const PRE_RELEASE_RANK: Record<string, number> = { a: 0, alpha: 0, b: 1, beta: 1, rc: 2 };
+
+/** Orders `major.minor.patch` with an optional `a`/`alpha`/`b`/`beta`/`rc` number; a final release sorts last. */
+const parseAppVersion = (version: string | null): number[] | null => {
+  const match = /^(\d+)\.(\d+)\.(\d+)(?:[.-]?(alpha|beta|rc|a|b)[.-]?(\d+))?/.exec(version ?? '');
+
+  if (!match) {
+    return null;
+  }
+
+  const [, major, minor, patch, stage, number] = match;
+
+  return [+major!, +minor!, +patch!, stage ? PRE_RELEASE_RANK[stage]! : 3, +(number ?? 0)];
+};
+
+const isWriterBefore = (metadata: unknown, version: string): boolean => {
+  const written = parseAppVersion(getString(metadata, 'app_version'));
+  const first = parseAppVersion(version)!;
+  const differing = written?.findIndex((part, index) => part !== first[index]) ?? -1;
+
+  return differing >= 0 && written![differing]! < first[differing]!;
+};
+
+/** Whether a record's writer may have used `setting` of a `base` model without recording it. */
+const mayHaveOmittedSetting = (metadata: unknown, base: string, setting: RecalledComponentSetting): boolean =>
+  UNRECORDING_WRITERS.some(
+    (writer) =>
+      writer.base === base && writer.settings.includes(setting) && isWriterBefore(metadata, writer.recordedFrom)
+  );
 
 const getRecalledComponent = (
   metadata: unknown,
@@ -1412,6 +1516,7 @@ export const getImageRecallCapabilities = ({
   const hasPrompts = hasPrompt(metadata);
   const hasSize = hasMetadataSize(metadata, currentValues.model);
   const hasSettings = hasGenerationSettings(metadata, clipSkipModel);
+  const hasVaeSettings = Object.keys(getMetadataVaeSettings(metadata, clipSkipModel)).length > 0;
   const hasComponents = hasComponentModels(metadata, models);
   const referenceRecord = readMetadataReferenceImages(metadata);
   const recordedReferenceImages = referenceRecord.images;
@@ -1434,6 +1539,7 @@ export const getImageRecallCapabilities = ({
   const hasAnyMetadata =
     hasModel ||
     hasVae ||
+    hasVaeSettings ||
     hasPrompts ||
     hasSeed ||
     hasSize ||
@@ -1453,6 +1559,7 @@ export const getImageRecallCapabilities = ({
   const hasNonSeedMetadata =
     hasModel ||
     hasVae ||
+    hasVaeSettings ||
     hasPrompts ||
     hasSize ||
     hasSettings ||
@@ -1531,10 +1638,69 @@ export const buildImageRecallSettings = ({
     for (const setting of recordedSettings) {
       const component = componentPatch[setting];
 
+      // A Diffusers main records itself as its own source, which the builders fall back to without a pick. Clearing
+      // the slot reproduces that, where a source left in the panel would supply the components instead.
+      if (setting === 'componentSourceModel' && component?.key === effectiveModel.key) {
+        values = { ...values, componentSourceModel: null };
+        fittingSettings.push(setting);
+        continue;
+      }
+
       if (!component || isComponentCompatibleWithModel(effectiveModel, values, setting, component)) {
         values = { ...values, [setting]: component };
         fittingSettings.push(setting);
       }
+    }
+
+    // A slot the record names stays with the record, resolved or not: an uninstalled component is not one the source
+    // supplied, so the panel's own pick stays.
+    const recordsComponent = (setting: RecalledComponentSetting): boolean =>
+      RECALLED_COMPONENTS.some(
+        (component) => component.setting === setting && isRecord(metadata) && component.metadataKey in metadata
+      );
+    // A record that names every loader selection left out the slots its main or its source filled. Standalone picks
+    // left in the panel would take those slots over, so clear them to let the same supplier fill them again. Only a
+    // recalled main establishes who that was: a record that names none says nothing about the panel's model, and one
+    // whose writer may have left components out (a Canvas save, a workflow's denoise node) says nothing about them, so
+    // the panel keeps its picks. The encoders judged are the ones that survive recall: a recorded one that is gone
+    // leaves the panel's, and with it the question whether the source still supplies the VAE.
+    const judgedModel = model && recordsLoaderSelections(metadata) ? model : undefined;
+    const { componentSourceModel } = componentPatch;
+    // A writer that may have used a source without recording it leaves the question open, like an unresolved one.
+    const recordedSource = !recordsComponent('componentSourceModel')
+      ? judgedModel && mayHaveOmittedSetting(metadata, judgedModel.base, 'componentSourceModel')
+        ? ('unresolved' as const)
+        : null
+      : !fittingSettings.includes('componentSourceModel')
+        ? ('unresolved' as const)
+        : isMainModelConfig(componentSourceModel)
+          ? componentSourceModel
+          : null;
+    // The model selection below drops a pick the model does not accept, so only an accepted one counts here.
+    const survivingEncoder = (setting: 'mistralEncoderModel' | 'qwen3EncoderModel') => {
+      const encoder = values[setting];
+
+      return encoder && isComponentCompatibleWithModel(effectiveModel, values, setting, encoder) ? encoder : null;
+    };
+    const survivingEncoders = {
+      mistralEncoderModel: survivingEncoder('mistralEncoderModel'),
+      qwen3EncoderModel: survivingEncoder('qwen3EncoderModel'),
+    };
+    const suppliedByRecord = judgedModel
+      ? getComponentSlotsSuppliedByRecord(judgedModel, recordedSource, survivingEncoders)
+      : [];
+    const isProvenUnused = (setting: RecalledComponentSetting): boolean =>
+      !recordsComponent(setting) && !(judgedModel && mayHaveOmittedSetting(metadata, judgedModel.base, setting));
+    const clearedSettings = [
+      ...suppliedByRecord.filter(
+        (key): key is RecalledComponentSetting & typeof key =>
+          key !== 'vae' && isProvenUnused(key as RecalledComponentSetting)
+      ),
+      ...((judgedModel && SETTINGS_RECORDED_WHEN_LOADED[judgedModel.base]) ?? []).filter(isProvenUnused),
+    ];
+
+    for (const setting of clearedSettings) {
+      values = { ...values, [setting]: null };
     }
 
     const rebalancePatch = getMetadataKrea2Rebalance(metadata, values.model);
@@ -1586,6 +1752,12 @@ export const buildImageRecallSettings = ({
     if (vae !== undefined) {
       values = { ...values, vae };
       fields.push('vae');
+    } else if (suppliedByRecord.includes('vae') && getRecordedVaeKey(metadata, values.model) === null && values.vae) {
+      values = { ...values, vae: null };
+
+      if (currentValues.vae) {
+        fields.push('vae');
+      }
     }
 
     if (model || fittingSettings.length > 0) {
@@ -1593,9 +1765,22 @@ export const buildImageRecallSettings = ({
       values = { ...values, ...settings };
     }
 
-    // Judged after the transition, which can complete or undo a recorded pick.
+    // After the transition, which resets what the model's panel does not show. Older records carry none.
+    const vaeSettings = getMetadataVaeSettings(metadata, values.model);
+
+    if (Object.keys(vaeSettings).length > 0) {
+      values = { ...values, ...vaeSettings };
+      if (!fields.includes('vae')) {
+        fields.push('vae');
+      }
+    }
+
+    // Judged after the transition, which can complete or undo a recorded pick. The adapter switch is a component
+    // change too: a record can turn it off without touching the pick.
     if (
-      recordedSettings.some((setting) => values[setting]?.key !== currentValues[setting]?.key) ||
+      [...recordedSettings, ...clearedSettings].some(
+        (setting) => values[setting]?.key !== currentValues[setting]?.key
+      ) ||
       values.animaInpaintAdapterEnabled !== currentValues.animaInpaintAdapterEnabled ||
       values.flux3PromptUpsamplerEnabled !== currentValues.flux3PromptUpsamplerEnabled
     ) {
