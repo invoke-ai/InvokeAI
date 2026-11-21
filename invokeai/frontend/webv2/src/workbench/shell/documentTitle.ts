@@ -13,6 +13,29 @@ export interface DocumentTitleLabels {
   queued: string;
 }
 
+/**
+ * Multi-image Invokes may have concurrent GPUs reporting unrelated percentages.
+ * Use the number of settled backend slots to represent the entire batch,
+ * while preserving live percentages for single-iteration Invokes.
+ */
+export const getBatchDocumentTitlePercent = ({
+  batchCount,
+  completedCount,
+  singleItemPercent,
+}: {
+  batchCount: number;
+  completedCount: number;
+  singleItemPercent: number | null;
+}): number | null => {
+  if (batchCount <= 1) {
+    return singleItemPercent;
+  }
+  if (completedCount <= 0) {
+    return null;
+  }
+  return Math.round((Math.min(batchCount, completedCount) / batchCount) * 100);
+};
+
 export const formatDocumentTitle = ({
   baseTitle = DOCUMENT_TITLE_BASE,
   current,
