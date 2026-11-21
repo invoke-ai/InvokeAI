@@ -1757,7 +1757,21 @@ export const getModelDefaultComponents = (
   const stored = (model.default_settings as { components?: Record<string, string> | null } | null | undefined)
     ?.components;
   const patch: Partial<Record<DefaultComponentSlot['setting'], ComponentModelConfig>> = {};
-  let next = settings;
+  // The picks as the catalog describes them now: a copy saved with the project keeps the variant it was picked with,
+  // which the catalog may have reclassified since.
+  const current: Record<string, unknown> = { ...settings };
+
+  for (const setting of GENERATE_COMPONENT_VALUE_KEYS) {
+    const picked = settings[setting];
+    const installed = picked ? models.find((candidate) => candidate.key === picked.key && !candidate.is_missing) : null;
+
+    if (installed) {
+      current[setting] = installed;
+    }
+  }
+
+  const fresh = current as unknown as GenerateSettings;
+  let next = fresh;
   let pending = Object.entries(stored ?? {}).flatMap(([persistenceKey, modelKey]) => {
     const slot = getDefaultComponentSlot(persistenceKey);
     const candidate = models.find((installed) => installed.key === modelKey && !installed.is_missing);
@@ -1771,13 +1785,13 @@ export const getModelDefaultComponents = (
   while (progressed && pending.length > 0) {
     progressed = false;
     pending = pending.filter(({ candidate, setting }) => {
-      const current = next[setting];
+      const picked = next[setting];
 
       if (
         !replace &&
-        current &&
-        isInstalled(models, current) &&
-        isComponentCompatibleWithModel(model, next, setting, current)
+        picked &&
+        isInstalled(models, picked) &&
+        isComponentCompatibleWithModel(model, next, setting, picked as ModelConfig)
       ) {
         return false;
       }
@@ -1806,7 +1820,7 @@ export const getModelDefaultComponents = (
         !isComponentCompatibleWithModel(model, next, setting, patch[setting]!)
       ) {
         delete patch[setting];
-        next = { ...next, [setting]: settings[setting] };
+        next = { ...next, [setting]: fresh[setting] };
         settled = false;
       }
     }
@@ -1814,7 +1828,7 @@ export const getModelDefaultComponents = (
 
   const cleared: ModelDefaultComponents = {};
 
-  for (const setting of getClosedComponentSettings(model, settings, next)) {
+  for (const setting of getClosedComponentSettings(model, fresh, next)) {
     if (setting !== 'vae' && !(setting in patch)) {
       cleared[setting as DefaultComponentSlot['setting']] = null;
     }
@@ -1856,7 +1870,7 @@ export const getDefaultComponentSlotPolicies = (
       ? [
           {
             filter: (candidate) =>
-              slot.modelTypes.includes(candidate.type as ModelTaxonomyType) &&
+              (slot.modelTypes as readonly string[]).some((type) => servesAsType(candidate, type)) &&
               (!slot.filter || slot.filter(candidate, context)),
             helpText: slot.helpText,
             label: slot.label,

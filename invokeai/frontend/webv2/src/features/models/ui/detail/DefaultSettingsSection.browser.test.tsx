@@ -390,6 +390,61 @@ describe('DefaultSettingsSection default components', () => {
     expect(savedDefaults().components).toBeNull();
   });
 
+  describe('a default whose file is missing', () => {
+    const gone = { ...component('t5-gone', 'T5 Gone', 't5_encoder'), is_missing: true } as ModelConfig;
+
+    beforeEach(() => {
+      setModelsSnapshotForTests({ error: null, models: [...catalog, gone], status: 'loaded' });
+    });
+
+    it('is not offered as a new choice', async () => {
+      await render(settingsModel({}));
+      await act(() => pickerOf('T5 Encoder').click());
+      await expect.poll(() => document.querySelectorAll('[role="option"]').length).toBeGreaterThan(0);
+
+      const options = [...document.querySelectorAll('[role="option"]')].map((option) => option.textContent ?? '');
+
+      expect(options.some((text) => text.includes('T5 A'))).toBe(true);
+      expect(options.some((text) => text.includes('T5 Gone'))).toBe(false);
+    });
+
+    it('leaves a slot out when only missing models could fill it', async () => {
+      setModelsSnapshotForTests({
+        error: null,
+        models: [...catalog.filter((candidate) => candidate.type !== 't5_encoder'), gone],
+        status: 'loaded',
+      });
+      await render(settingsModel({}));
+
+      expect(labels(host)).not.toContain('T5 Encoder');
+    });
+
+    it('is labelled by its name when it is the saved one, and can be cleared', async () => {
+      await render(settingsModel({ default_settings: { components: { t5_encoder: gone.key } } }));
+
+      expect(pickerOf('T5 Encoder').textContent).toContain('models.missingModelKey:T5 Gone');
+
+      await clear('T5 Encoder');
+      await save();
+
+      expect(savedDefaults()).toHaveProperty('components', null);
+    });
+  });
+
+  it("judges the slots by the catalog's record of the model, not the fields this section projects", async () => {
+    const read = vi.fn(readComponentSlots);
+    const main = { ...component('model-key', 'Main', 'main'), base: 'wan', expert: 'high' } as unknown as ModelConfig;
+    setModelsSnapshotForTests({ error: null, models: [...catalog, main], status: 'loaded' });
+
+    await render(
+      settingsModel({ base: 'wan' }),
+      adapterFor(createSource({ ...readyState, readComponentSlots: read }).source)
+    );
+
+    expect(read).toHaveBeenCalled();
+    expect(read.mock.calls.at(-1)![0]).toMatchObject({ expert: 'high' });
+  });
+
   describe('clearing a slot', () => {
     it('removes it from the stored map and keeps the others', async () => {
       await render(
@@ -539,6 +594,19 @@ describe('DefaultSettingsSection default components', () => {
 
       expect(labels(host)).not.toContain('models.defaultFields.vae');
       expect(labels(host)).toContain('models.defaultFields.steps');
+    });
+
+    it('does not offer a VAE whose files are missing, and names a stored one by its name', async () => {
+      const goneVae = { ...component('gone-vae', 'Gone VAE', 'vae'), base: 'flux2', is_missing: true } as ModelConfig;
+      setModelsSnapshotForTests({ error: null, models: [...catalog, goneVae], status: 'loaded' });
+
+      await render(mossModel);
+      expect((await offeredVaes()).join('|')).not.toContain('Gone VAE');
+
+      await act(() => root.unmount());
+      host.remove();
+      await render(settingsModel({ base: 'moss-image', default_settings: { vae: goneVae.key } }));
+      expect(host.textContent).toContain('models.missingModelKey:Gone VAE');
     });
 
     it('says a stored VAE that is no longer installed is missing, with its key', async () => {

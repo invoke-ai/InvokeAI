@@ -44,6 +44,7 @@ import {
   getImageRecallMessage,
   readMetadataReferenceImages,
   getImageRecallTitle,
+  getRecordedComponentSettings,
   isImageRecallKindAvailable,
   type ImageRecallKind,
   type ImageRecallSkip,
@@ -514,9 +515,19 @@ export const executeImageRecall = async ({
       return false;
     }
 
-    // An image that names no model leaves the fallback model of a fresh project, which takes its defaults after all.
+    // An image that names no model leaves the fallback model of a fresh project, which takes its defaults after all,
+    // but only for the slots the image says nothing about: one it records as empty stays cleared.
     if (recallsModel && !result.fields.includes('model') && !normalizeGenerateWidgetValues(getGenerateValues())) {
-      result.values = { ...result.values, ...getModelDefaultFills(result.values.model, result.values, models) };
+      const recorded: ReadonlySet<string> = new Set([
+        ...getRecordedComponentSettings(metadata, models),
+        ...(result.fields.includes('vae') ? ['vae'] : []),
+      ]);
+
+      const fills = Object.entries(getModelDefaultFills(result.values.model, result.values, models)).filter(
+        ([setting]) => !recorded.has(setting)
+      );
+
+      result.values = { ...result.values, ...Object.fromEntries(fills) };
     }
 
     if (result.fields.includes('referenceImages') && result.values.referenceImages.length > 0) {

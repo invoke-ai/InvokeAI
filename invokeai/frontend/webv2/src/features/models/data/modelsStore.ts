@@ -63,6 +63,22 @@ registerAccountOwnedResource({
 });
 
 /** Re-fetch the library; concurrent calls share one request, and a call made mid-flight queues one trailing rerun. */
+// Flagged on the entry itself, so every consumer of the catalog sees it, not only the library views.
+const withMissingFlags = (models: ModelConfig[], missingKeys: ReadonlySet<string>): ModelConfig[] =>
+  missingKeys.size > 0
+    ? models.map((model) => (missingKeys.has(model.key) ? { ...model, is_missing: true } : model))
+    : models;
+
+/**
+ * A fresh read of the library, not this tab's snapshot, with current file availability on each entry as the snapshot
+ * has it. Detection is best-effort: a failed missing-file lookup lists every model as present.
+ */
+export const listModelsWithAvailability = async (signal?: AbortSignal): Promise<ModelConfig[]> => {
+  const [models, missing] = await Promise.all([listModels(signal), listMissingModels(signal).catch(() => [])]);
+
+  return withMissingFlags(models, new Set(missing.map((model) => model.key)));
+};
+
 export const refreshModels = (owner: AccountScope = captureAccountScope()): Promise<void> =>
   refreshFlight.run(() => {
     const generation = mutationGeneration;
@@ -89,12 +105,7 @@ export const refreshModels = (owner: AccountScope = captureAccountScope()): Prom
           missingModels.length > 0 ? new Set(missingModels.map((model) => model.key)) : EMPTY_MISSING_KEYS;
 
         store.patchSnapshot({
-          // Flagged on the entry itself, so every consumer of the catalog sees it, not only the library views.
-          ...withModels(
-            missingKeys.size > 0
-              ? models.map((model) => (missingKeys.has(model.key) ? { ...model, is_missing: true } : model))
-              : models
-          ),
+          ...withModels(withMissingFlags(models, missingKeys)),
           error: null,
           missingModelKeys: missingKeys,
           modelsDir,
@@ -134,12 +145,16 @@ export const getModelsSnapshot = (): ModelsSnapshot => store.getSnapshot();
 /** Read-only subscription for App-owned cross-feature runtimes. */
 export const subscribeModels = (listener: () => void): (() => void) => store.subscribe(listener);
 
-/** Patch one model in place after a successful update/convert. */
+/**
+ * Patch one model in place after a successful update/convert. A server record carries no file availability, so the
+ * model keeps the missing flag the last refresh gave it; whoever moves its files refreshes the library afterwards.
+ */
 export const replaceModelInStore = (model: ModelConfig): void => {
   mutationGeneration += 1;
-  store.patchSnapshot(
-    withModels(store.getSnapshot().models.map((existing) => (existing.key === model.key ? model : existing)))
-  );
+  const { missingModelKeys, models } = store.getSnapshot();
+  const flagged = missingModelKeys.has(model.key) ? { ...model, is_missing: true } : model;
+
+  store.patchSnapshot(withModels(models.map((existing) => (existing.key === model.key ? flagged : existing))));
 };
 
 /** Apply a narrow optimistic model patch without replacing unrelated server fields. */

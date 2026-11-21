@@ -838,7 +838,14 @@ describe('executeImageRecall', () => {
       type: 'qwen3_vl_encoder',
       variant: 'qwen3_vl_8b',
     } as unknown as ModelConfig;
-    const recallInto = async (kind: 'prompts' | 'remix', metadata: Record<string, unknown>) => {
+    const recallValues = async (
+      kind: 'prompts' | 'remix',
+      metadata: Record<string, unknown>,
+      main: ModelConfig = q21,
+      installed: ModelConfig[] = [q21, encoder]
+    ) => {
+      // The metadata is cached per image: each recall reads its own.
+      queryClient.clear();
       const { commands, setSettings } = createCommands();
 
       galleryApi.galleryImages.metadata.mockResolvedValue(metadata);
@@ -847,20 +854,68 @@ describe('executeImageRecall', () => {
         t,
         commands,
         // Never initialised: nothing but a model key, so the values are synthesised.
-        getGenerateValues: () => ({ modelKey: q21.key }),
+        getGenerateValues: () => ({ modelKey: main.key }),
         image,
         kind,
-        models: [q21, encoder],
+        models: installed,
         projectId: 'project-1',
       });
 
-      return (setSettings.mock.calls[0]![0] as GenerateWidgetValues).qwen3VLEncoderModel;
+      return setSettings.mock.calls[0]![0] as GenerateWidgetValues;
     };
+    const recallInto = async (kind: 'prompts' | 'remix', metadata: Record<string, unknown>) =>
+      (await recallValues(kind, metadata)).qwen3VLEncoderModel;
 
     it('lets a remix of an image made with the bundled encoder keep the bundled one', async () => {
       await expect(
         recallInto('remix', { generation_mode: 'txt2img', model: { key: q21.key }, positive_prompt: 'bundled' })
       ).resolves.toBeNull();
+    });
+
+    it('keeps a component the image records as empty cleared, though the image names no model', async () => {
+      await expect(recallInto('remix', { positive_prompt: 'no model', qwen3_vl_encoder: null })).resolves.toBeNull();
+    });
+
+    it('keeps a component source recorded as empty under its alias cleared', async () => {
+      const source = {
+        base: 'wan',
+        format: 'diffusers',
+        key: 'wan-source',
+        name: 'Wan pipeline',
+        type: 'main',
+        variant: 't2v_a14b',
+      } as unknown as ModelConfig;
+      const wan = {
+        base: 'wan',
+        default_settings: { components: { component_source: source.key } },
+        format: 'gguf_quantized',
+        key: 'wan-main',
+        name: 'Wan',
+        type: 'main',
+        variant: 't2v_a14b',
+      } as unknown as ModelConfig;
+      const installed = [wan, source];
+
+      const filled = await recallValues('prompts', { positive_prompt: 'p' }, wan, installed);
+      expect(filled.componentSourceModel?.key).toBe(source.key);
+
+      const cleared = await recallValues('remix', { positive_prompt: 'p', wan_component_source: null }, wan, installed);
+      expect(cleared.componentSourceModel).toBeNull();
+    });
+
+    it('keeps a VAE the image records as empty cleared', async () => {
+      const vae = { base: 'flux', format: 'checkpoint', key: 'flux-vae', name: 'FLUX VAE', type: 'vae' } as ModelConfig;
+      const flux = {
+        base: 'flux',
+        default_settings: { vae: vae.key },
+        format: 'checkpoint',
+        key: 'flux-main',
+        name: 'FLUX',
+        type: 'main',
+      } as unknown as ModelConfig;
+
+      expect((await recallValues('prompts', { positive_prompt: 'p' }, flux, [flux, vae])).vae?.key).toBe(vae.key);
+      expect((await recallValues('remix', { positive_prompt: 'p', vae: null }, flux, [flux, vae])).vae).toBeNull();
     });
 
     it('still fills the saved default when the recall does not touch the model', async () => {

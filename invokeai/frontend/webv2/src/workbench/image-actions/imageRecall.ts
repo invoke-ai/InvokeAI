@@ -941,8 +941,14 @@ const getComponentPatch = (
   return patch;
 };
 
+/** The component settings the image records, an explicit empty one included. */
+export const getRecordedComponentSettings = (
+  metadata: unknown,
+  models: readonly ComponentModelConfig[]
+): RecalledComponentSetting[] => Object.keys(getComponentPatch(metadata, models)) as RecalledComponentSetting[];
+
 const hasComponentModels = (metadata: unknown, models: readonly ComponentModelConfig[]): boolean =>
-  Object.keys(getComponentPatch(metadata, models)).length > 0;
+  getRecordedComponentSettings(metadata, models).length > 0;
 
 type RefinerPatch = Partial<
   Pick<

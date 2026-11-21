@@ -1658,6 +1658,23 @@ describe("a main model's default components", () => {
     expect(isLossyModelSwitch(result)).toBe(false);
   });
 
+  it('offers a Text LLM that serves as the encoder through a role in the Model Manager', () => {
+    const model = createModel('z-image', { format: 'checkpoint' });
+    const llm = {
+      base: 'any',
+      format: 'checkpoint',
+      key: 'qwen3-llm',
+      name: 'Qwen3 4B',
+      roles: [{ type: 'qwen3_encoder', variant: 'qwen3_4b' }],
+      type: 'text_llm',
+    } as unknown as ComponentModelConfig;
+    const slot = getDefaultComponentSlotPolicies(model, [llm]).find(
+      (candidate) => candidate.persistenceKey === 'qwen3_encoder'
+    );
+
+    expect(slot?.filter(llm)).toBe(true);
+  });
+
   it('takes no default whose files are missing on a switch, and replaces a pick that went missing', () => {
     const model = withDefaults('flux', { t5_encoder: t5Encoder.key });
     const missingT5 = { ...t5Encoder, is_missing: true };
@@ -1986,6 +2003,24 @@ describe("a main model's default components", () => {
       });
 
       expect(result.settings.wanLowNoiseModel).toBeNull();
+    });
+
+    it('judges a kept expert by the catalog record, so a valid default replaces one reclassified since', () => {
+      const model = withDefaults('wan', { wan_transformer_low_noise: low.key }, {
+        format: 'gguf_quantized',
+        key: high.key,
+        variant: 't2v_a14b',
+      } as never);
+      // The project saved this pick while it was still a T2V expert; the catalog has since reclassified it.
+      const old = wan('old');
+      const reclassified = wan('old', { variant: 'i2v_a14b' });
+      const saved = createSettings(model, { wanLowNoiseModel: old as never });
+
+      expect(getModelDefaultComponents(model, saved, [model, low, reclassified] as never)).toEqual({
+        wanLowNoiseModel: low,
+      });
+      // Still a T2V expert in the catalog: it stays.
+      expect(getModelDefaultComponents(model, saved, [model, low, old] as never)).toEqual({});
     });
 
     it('skips a stored default the loader would reject', () => {

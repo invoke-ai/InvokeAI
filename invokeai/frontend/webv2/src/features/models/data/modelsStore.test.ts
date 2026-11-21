@@ -45,6 +45,20 @@ describe('models store loading', () => {
     expect(api.listModels).toHaveBeenCalledTimes(2);
   });
 
+  it('reads the library fresh with file availability, and lists every model present when detection fails', async () => {
+    const a = { base: 'sdxl', key: 'a', name: 'A', type: 'main' };
+    const b = { base: 'sdxl', key: 'b', name: 'B', type: 'main' };
+    const { listModelsWithAvailability } = await import('./modelsStore');
+
+    api.listModels.mockResolvedValueOnce([a, b]);
+    api.listMissingModels.mockResolvedValueOnce([b]);
+    await expect(listModelsWithAvailability()).resolves.toEqual([a, { ...b, is_missing: true }]);
+
+    api.listModels.mockResolvedValueOnce([a, b]);
+    api.listMissingModels.mockRejectedValueOnce(new Error('down'));
+    await expect(listModelsWithAvailability()).resolves.toEqual([a, b]);
+  });
+
   it('flags a registered model whose files are gone on its catalog entry', async () => {
     const a = { base: 'sdxl', key: 'a', name: 'A', type: 'main' };
     const b = { base: 'sdxl', key: 'b', name: 'B', type: 'main' };
@@ -56,6 +70,18 @@ describe('models store loading', () => {
 
     expect(store.getModelsSnapshot().models).toEqual([a, { ...b, is_missing: true }]);
     expect(store.getModelsSnapshot().modelsByKey.get('b')).toMatchObject({ is_missing: true });
+  });
+
+  it('keeps a missing model flagged when a server response replaces its record', async () => {
+    const b = { base: 'sdxl', key: 'b', name: 'B', type: 'main' };
+    api.listModels.mockResolvedValueOnce([b]);
+    api.listMissingModels.mockResolvedValueOnce([b]);
+    const store = await import('./modelsStore');
+
+    await store.refreshModels();
+    store.replaceModelInStore({ ...b, name: 'Renamed' } as ModelConfig);
+
+    expect(store.getModelsSnapshot().modelsByKey.get('b')).toMatchObject({ is_missing: true, name: 'Renamed' });
   });
 
   it('keeps the by-key index in lockstep with every models write', async () => {

@@ -277,7 +277,9 @@ export const ModelSelect = ({
     onPickerClose?.();
   };
   const canClear = isClearable && Boolean(value);
-  const missingText = value && loadStatus === 'loaded' && !selectedModel ? missingLabel : undefined;
+  // A model whose files are gone is listed but cannot be used: where a label is given, it shows that instead.
+  const missingText =
+    value && loadStatus === 'loaded' && (!selectedModel || selectedModel.is_missing) ? missingLabel : undefined;
 
   const renderOption = useCallback(
     (model: ModelConfig, state: PickerOptionState) => (
@@ -361,7 +363,7 @@ export const ModelSelect = ({
               }}
             >
               {insideLabel ? <FieldInsideLabel label={insideLabel} /> : null}
-              {selectedModel ? (
+              {selectedModel && !missingText ? (
                 <ModelButtonContent id={valueTextId} isEndAligned={Boolean(insideLabel)} model={selectedModel} />
               ) : (
                 <Text

@@ -66,8 +66,33 @@ interface FieldControlProps {
 const buildCollection = (options: readonly string[]) =>
   createListCollection({ items: options.map((option) => ({ label: option, value: option })) });
 
+/** Names a stored default whose file is gone (or which is no longer registered), so the user can replace or clear it. */
+const useMissingModelLabel = () => {
+  const { t } = useTranslation();
+  const modelsByKey = useModelsSelector((snapshot) => snapshot.modelsByKey);
+
+  return useCallback(
+    (storedKey: string | undefined) =>
+      t('models.missingModelKey', {
+        key: storedKey === undefined ? '' : (modelsByKey.get(storedKey)?.name ?? storedKey),
+      }),
+    [modelsByKey, t]
+  );
+};
+
 const FieldControl = ({ acceptsVae, control, disabled, label, modelKey, setValue, value }: FieldControlProps) => {
   const { t } = useTranslation();
+  const getMissingLabel = useMissingModelLabel();
+  const storedKey = typeof value === 'string' && value !== 'default' ? value : null;
+  // A model whose files are gone is never a new choice: the default would be skipped when it applies.
+  const vaeFilter = useCallback(
+    (candidate: ModelConfig) =>
+      !candidate.is_missing &&
+      (control.kind !== 'model' ||
+        !control.generateVaeRule ||
+        (acceptsVae ? acceptsVae(candidate) : storedKey === null || candidate.key === storedKey)),
+    [acceptsVae, control, storedKey]
+  );
   const selectCollection = useMemo(
     () => (control.kind === 'select' ? buildCollection(control.options) : null),
     [control]
@@ -144,7 +169,6 @@ const FieldControl = ({ acceptsVae, control, disabled, label, modelKey, setValue
   }
 
   if (control.kind === 'model') {
-    const storedKey = typeof value === 'string' && value !== 'default' ? value : null;
     const isRulesPending = control.generateVaeRule && !acceptsVae;
 
     return (
@@ -152,12 +176,9 @@ const FieldControl = ({ acceptsVae, control, disabled, label, modelKey, setValue
         // Until Generate's rules arrive no replacement is offered, since the model's own base is not always the
         // base its VAE must have: the picker is off, and a stored VAE stays visible and clearable.
         disabled={disabled || (isRulesPending && storedKey === null)}
-        filter={(candidate) =>
-          !control.generateVaeRule ||
-          (acceptsVae ? acceptsVae(candidate) : storedKey === null || candidate.key === storedKey)
-        }
+        filter={vaeFilter}
         isClearable
-        missingLabel={storedKey ? t('models.missingModelKey', { key: storedKey }) : undefined}
+        missingLabel={storedKey ? getMissingLabel(storedKey) : undefined}
         modelTypes={control.modelTypes}
         placeholder={t(control.placeholderKey)}
         relatedTo={modelKey}
@@ -281,25 +302,38 @@ export const DefaultSettingsSection = ({
   const catalog = useModelsSelector((snapshot) => (isMain ? snapshot.models : EMPTY_CATALOG));
   const isCatalogLoaded = useModelsSelector((snapshot) => snapshot.status === 'loaded');
   const storedComponents = settings.components ?? EMPTY_COMPONENTS;
+  // Generate's component rules read more of the model than the fields projected for this section (a Wan expert tag,
+  // say), so they judge the catalog's own record.
+  const catalogModel = useMemo(
+    () => catalog.find((candidate) => candidate.key === model.key) ?? model,
+    [catalog, model]
+  );
   const componentSlots = useMemo(
     () =>
       isMain && defaultsRulesState.status === 'ready'
-        ? defaultsRulesState.readComponentSlots(model, storedComponents, catalog)
+        ? defaultsRulesState.readComponentSlots(catalogModel, storedComponents, catalog)
         : null,
-    [catalog, defaultsRulesState, isMain, model, storedComponents]
+    [catalog, catalogModel, defaultsRulesState, isMain, storedComponents]
   );
   // The group shows once the rules are ready. A slot nothing installed can fill stays out of the way, unless it holds
   // a value (even a dangling one), which must stay clearable. The status of the rules is the scheduler row's to show.
+  // A model whose files are gone is never a new choice, nor a reason to show a slot: the default would be skipped.
   const visibleComponentSlots = useMemo(
     () =>
-      (componentSlots ?? EMPTY_SLOTS).filter(
-        (slot) =>
-          storedComponents[slot.persistenceKey] !== undefined ||
-          !isCatalogLoaded ||
-          hasModelPickerCandidates(catalog, { filter: slot.filter, modelTypes: slot.modelTypes })
-      ),
+      (componentSlots ?? EMPTY_SLOTS)
+        .map((slot) => ({
+          ...slot,
+          filter: (candidate: ModelConfig) => !candidate.is_missing && slot.filter(candidate),
+        }))
+        .filter(
+          (slot) =>
+            storedComponents[slot.persistenceKey] !== undefined ||
+            !isCatalogLoaded ||
+            hasModelPickerCandidates(catalog, { filter: slot.filter, modelTypes: slot.modelTypes })
+        ),
     [catalog, componentSlots, isCatalogLoaded, storedComponents]
   );
+  const getMissingLabel = useMissingModelLabel();
 
   // An empty map is stored as null, which the backend and the draft read as "no defaults".
   const setComponent = (persistenceKey: string, modelKey: string | null) => {
@@ -317,7 +351,7 @@ export const DefaultSettingsSection = ({
 
     // A slot this change closes (the vision tower once its encoder is cleared, even a missing one) leaves no hidden
     // default behind; a key for a slot this client does not know stays, since another version or client may.
-    const kept = defaultsRulesState.pruneComponents(model, next, catalog);
+    const kept = defaultsRulesState.pruneComponents(catalogModel, next, catalog);
 
     setFieldValue('components', Object.keys(kept).length > 0 ? kept : null);
   };
@@ -472,7 +506,7 @@ export const DefaultSettingsSection = ({
                     filter={slot.filter}
                     id={`default-component-${slot.persistenceKey}`}
                     isClearable
-                    missingLabel={t('models.missingModelKey', { key: storedComponents[slot.persistenceKey] ?? '' })}
+                    missingLabel={getMissingLabel(storedComponents[slot.persistenceKey])}
                     modelTypes={slot.modelTypes}
                     placeholder={t('models.defaultComponentsNone')}
                     relatedTo={model.key}
