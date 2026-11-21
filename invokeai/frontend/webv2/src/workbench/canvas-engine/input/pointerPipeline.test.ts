@@ -51,6 +51,7 @@ const makeKeyEvent = (init: {
   repeat?: boolean;
   shiftKey?: boolean;
   target?: unknown;
+  type?: 'keydown' | 'keyup';
 }): KeyboardEvent =>
   ({
     altKey: init.altKey ?? false,
@@ -63,6 +64,7 @@ const makeKeyEvent = (init: {
     repeat: init.repeat ?? false,
     shiftKey: init.shiftKey ?? false,
     target: init.target ?? null,
+    type: init.type ?? 'keydown',
   }) as unknown as KeyboardEvent;
 
 const SURFACE_TARGET = { tagName: 'DIV' };
@@ -72,6 +74,7 @@ const createHarness = (
   opts: {
     tools?: ToolId[];
     handleEscape?: (o: { gestureWasActive: boolean }) => void;
+    hasFocus?: () => boolean;
     maybeCommitModalSession?: () => boolean;
     replaying?: () => boolean;
     resolveKeyOwner?: (event: KeyboardEvent) => CanvasKeyOwner;
@@ -126,6 +129,7 @@ const createHarness = (
     getKeyOwnerResolver: () => opts.resolveKeyOwner ?? null,
     getToolContext: () => ctx,
     handleEscape: opts.handleEscape,
+    hasFocus: opts.hasFocus,
     hasTool: (id) => registered.has(id),
     isReplaying: () => opts.replaying?.() ?? false,
     maybeCommitModalSession: opts.maybeCommitModalSession,
@@ -253,6 +257,113 @@ describe('pointer pipeline: middle-mouse pan', () => {
     h.pipeline.onPointerMove(makePointerEvent({ buttons: 4, clientX: 25 }));
     expect(panBy).toHaveBeenCalledWith({ x: 25, y: 0 });
     expect(h.tool.moves).toHaveLength(0);
+  });
+});
+
+describe('pointer pipeline: physical Control key', () => {
+  const control = (type: 'keydown' | 'keyup', ctrlKey: boolean) =>
+    makeKeyEvent({ code: 'ControlLeft', ctrlKey, key: 'Control', type });
+
+  it('is unknown until a key or pointer event shows it, then follows presses and releases', () => {
+    const h = createHarness();
+    expect(h.pipeline.controlKeyState()).toBe('unknown');
+    h.pipeline.onKeyCapture(control('keydown', true));
+    expect(h.pipeline.controlKeyState()).toBe('down');
+    // Another key while Control stays down keeps it down.
+    h.pipeline.onKeyCapture(makeKeyEvent({ code: 'KeyZ', ctrlKey: true, key: 'z', type: 'keyup' }));
+    expect(h.pipeline.controlKeyState()).toBe('down');
+    // Browsers may still report ctrlKey on the Control key's own release.
+    h.pipeline.onKeyCapture(control('keyup', true));
+    expect(h.pipeline.controlKeyState()).toBe('up');
+  });
+
+  it('takes the modifier state from pointer events, but a Control-free one shows it up only while focused', () => {
+    const focus = { has: true };
+    const h = createHarness({ hasFocus: () => focus.has });
+    h.pipeline.onPointerMove(makePointerEvent({ buttons: 0, ctrlKey: true }));
+    expect(h.pipeline.controlKeyState()).toBe('down');
+    h.pipeline.onPointerMove(makePointerEvent({ buttons: 0 }));
+    expect(h.pipeline.controlKeyState()).toBe('up');
+
+    focus.has = false;
+    h.pipeline.onPointerMove(makePointerEvent({ buttons: 0 }));
+    expect(h.pipeline.controlKeyState()).toBe('unknown');
+    h.pipeline.onPointerMove(makePointerEvent({ buttons: 0, ctrlKey: true }));
+    expect(h.pipeline.controlKeyState()).toBe('down');
+  });
+
+  it('becomes unknown whenever focus may have changed hands: window focus, and reset on blur or a hidden page', () => {
+    const focused = createHarness();
+    focused.pipeline.onKeyCapture(control('keyup', false));
+    expect(focused.pipeline.controlKeyState()).toBe('up');
+    focused.pipeline.onWindowFocus();
+    expect(focused.pipeline.controlKeyState()).toBe('unknown');
+
+    const reset = createHarness();
+    reset.pipeline.onKeyCapture(control('keyup', false));
+    reset.pipeline.reset();
+    expect(reset.pipeline.controlKeyState()).toBe('unknown');
+  });
+});
+
+describe('pointer pipeline: hover refresh after a view change', () => {
+  it('re-delivers the still pointer as a hover move at its new document point', () => {
+    const h = createHarness();
+    h.pipeline.onPointerEnter();
+    h.pipeline.onPointerMove(
+      makePointerEvent({ buttons: 0, clientX: 40, clientY: 30, ctrlKey: true, pointerType: 'pen' })
+    );
+    h.deps.viewport.panBy({ x: 10, y: -20 });
+    h.pipeline.refreshHover();
+
+    const last = h.tool.moves.at(-1)!;
+    expect(h.tool.moves).toHaveLength(2);
+    expect(last.input.screenPoint).toEqual({ x: 40, y: 30 });
+    expect(last.input.documentPoint).toEqual({ x: 30, y: 50 });
+    expect(last.input.buttons).toBe(0);
+    expect(last.input.modifiers.ctrl).toBe(true);
+    expect(last.input.pointerType).toBe('pen');
+    expect(last.batch).toEqual([last.input]);
+  });
+
+  it('sends hover pressure, not the pressure of the stroke that ended under the still pen', () => {
+    const h = createHarness();
+    h.pipeline.onPointerEnter();
+    h.pipeline.onPointerDown(makePointerEvent({ clientX: 40, pointerType: 'pen', pressure: 0.9 }));
+    h.pipeline.onPointerMove(makePointerEvent({ clientX: 41, pointerType: 'pen', pressure: 0.8 }));
+    h.pipeline.onPointerUp(makePointerEvent({ buttons: 0, clientX: 41, pointerType: 'pen', pressure: 0 }));
+    h.deps.viewport.panBy({ x: 10, y: 0 });
+    h.pipeline.refreshHover();
+
+    const refreshed = h.tool.moves.at(-1)!.input;
+    expect(h.tool.moves).toHaveLength(2);
+    // A hovering pen reports no pressure, which tool input carries as the 0.5 default.
+    expect(refreshed.pressure).toBe(0.5);
+    expect(refreshed.buttons).toBe(0);
+    expect(refreshed.pointerType).toBe('pen');
+  });
+
+  it('delivers nothing off the canvas, during a gesture, or during a middle-button pan', () => {
+    const left = createHarness();
+    left.pipeline.onPointerEnter();
+    left.pipeline.onPointerMove(makePointerEvent({ buttons: 0, clientX: 5 }));
+    left.pipeline.onPointerLeave();
+    left.pipeline.refreshHover();
+    expect(left.tool.moves).toHaveLength(1);
+
+    const painting = createHarness();
+    painting.pipeline.onPointerDown(makePointerEvent({ clientX: 5 }));
+    painting.pipeline.onPointerMove(makePointerEvent({ clientX: 6 }));
+    painting.pipeline.refreshHover();
+    expect(painting.tool.moves).toHaveLength(1);
+
+    const middle = createHarness();
+    middle.pipeline.onPointerEnter();
+    middle.pipeline.onPointerMove(makePointerEvent({ buttons: 0, clientX: 5 }));
+    middle.pipeline.onPointerDown(makePointerEvent({ button: 1, buttons: 4, clientX: 5 }));
+    middle.pipeline.onPointerMove(makePointerEvent({ buttons: 4, clientX: 25 }));
+    middle.pipeline.refreshHover();
+    expect(middle.tool.moves).toHaveLength(1);
   });
 });
 
