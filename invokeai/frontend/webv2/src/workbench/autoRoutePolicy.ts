@@ -83,6 +83,7 @@ const GRAPH_EDIT_CONFIDENCE = {
   removeFormElement: false,
   removeNodes: true,
   setContainerLayout: false,
+  setCurrentImageNodeSize: false,
   setFieldDescription: false,
   setFieldLabel: false,
   setFieldSeedMode: true,

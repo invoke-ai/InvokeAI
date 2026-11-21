@@ -13,7 +13,7 @@ import type {
 
 import { clearSavedWorkflowDynamicFields } from './callSavedWorkflow';
 import { createWorkflowForm, createWorkflowId } from './document';
-import { isInvocationNode } from './types';
+import { isInvocationNode, normalizeCurrentImageSize } from './types';
 
 /** Round-trips legacy WorkflowV3 files; unknown elements and dangling edges recover as warnings. */
 
@@ -60,6 +60,8 @@ const zNotesNode = z.object({
 const zCurrentImageNode = z.object({
   data: z.looseObject({
     label: z.string().catch('Current Image'),
+    width: z.number().optional().catch(undefined),
+    height: z.number().optional().catch(undefined),
   }),
   id: z.string().min(1),
   position: zXYPosition,
@@ -314,8 +316,13 @@ export const parseWorkflowJson = (raw: unknown): ParsedWorkflow => {
     }
 
     if (node.type === 'current_image') {
+      const { height, width } = normalizeCurrentImageSize(node.data.width, node.data.height);
       nodes.push({
-        data: { label: node.data.label },
+        data: {
+          label: node.data.label,
+          ...(height === undefined ? {} : { height }),
+          ...(width === undefined ? {} : { width }),
+        },
         id: node.id,
         position: node.position,
         type: 'current_image',

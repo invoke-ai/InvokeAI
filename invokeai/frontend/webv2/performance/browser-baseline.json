@@ -235,12 +235,12 @@
         "cssRawBytes": 15413,
         "fontRawBytes": 0,
         "imageRawBytes": 0,
-        "largestAssetRawBytes": 221153,
+        "largestAssetRawBytes": 237737,
         "otherRawBytes": 0,
         "requestCount": 6,
-        "scriptRawBytes": 442649,
+        "scriptRawBytes": 459233,
         "scriptRequestCount": 5,
-        "totalRawBytes": 458062
+        "totalRawBytes": 474646
       },
       "domContentLoadedMedianMs": 133.40000000037253,
       "id": "editor-workflow",
@@ -258,11 +258,11 @@
         "fontRawBytes": 23664,
         "imageRawBytes": 44398,
         "largestAssetRawBytes": 770754,
-        "otherRawBytes": 337232,
+        "otherRawBytes": 337474,
         "requestCount": 90,
-        "scriptRawBytes": 5191433,
+        "scriptRawBytes": 5210336,
         "scriptRequestCount": 84,
-        "totalRawBytes": 5614299
+        "totalRawBytes": 5633444
       },
       "routeReadyMedianMs": 1276.699999999255,
       "scriptSourceOwnerSet": "editor-workflow-static",
@@ -273,12 +273,12 @@
         "cssRawBytes": 15413,
         "fontRawBytes": 0,
         "imageRawBytes": 0,
-        "largestAssetRawBytes": 221153,
+        "largestAssetRawBytes": 237737,
         "otherRawBytes": 0,
         "requestCount": 6,
-        "scriptRawBytes": 442649,
+        "scriptRawBytes": 459233,
         "scriptRequestCount": 5,
-        "totalRawBytes": 458062
+        "totalRawBytes": 474646
       },
       "domContentLoadedMedianMs": 132.30000000074506,
       "id": "editor-workflow",
@@ -296,11 +296,11 @@
         "fontRawBytes": 23664,
         "imageRawBytes": 44398,
         "largestAssetRawBytes": 770754,
-        "otherRawBytes": 337232,
+        "otherRawBytes": 337474,
         "requestCount": 90,
-        "scriptRawBytes": 5191433,
+        "scriptRawBytes": 5210336,
         "scriptRequestCount": 84,
-        "totalRawBytes": 5614299
+        "totalRawBytes": 5633444
       },
       "routeReadyMedianMs": 1363.5999999996275,
       "scriptSourceOwnerSet": "editor-workflow-static",

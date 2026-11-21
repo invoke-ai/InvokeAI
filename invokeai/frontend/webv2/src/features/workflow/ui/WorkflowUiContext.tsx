@@ -51,6 +51,8 @@ export interface WorkflowProjectSnapshot {
   galleryValues: ResolvedValues;
   id: string;
   isWorkflowRunning: boolean;
+  /** Queue items owned by this project, used to scope active progress targets and batch slot progress. */
+  queueItems?: readonly { backendItemIds?: readonly number[]; id: string }[];
   /** The active workflow's editable document. */
   projectGraph: ProjectGraphState;
   /** The active workflow's entry: its document plus source and run metadata. */
