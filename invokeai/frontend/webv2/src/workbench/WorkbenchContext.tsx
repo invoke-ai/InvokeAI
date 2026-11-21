@@ -1,3 +1,4 @@
+import type { ResolvedValues } from '@platform/core/resolvedValues';
 import type { ProjectLayoutState } from '@workbench/layoutContracts';
 import type { Project } from '@workbench/projectContracts';
 import type { EffectiveProjectSettings } from '@workbench/settings/contracts';
@@ -309,7 +310,7 @@ export const useActiveProjectSettingsSelector = <Selected,>(
 /** A widget's values as it reads them: the active project's pins over the user's defaults for the widget's type. */
 export const useWidgetValuesSelector = <Selected,>(
   widgetId: WidgetTypeId,
-  selector: (values: Record<string, unknown>) => Selected,
+  selector: (values: ResolvedValues) => Selected,
   isEqual?: EqualityFn<Selected>
 ): Selected =>
   useWorkbenchSelector(
@@ -319,7 +320,7 @@ export const useWidgetValuesSelector = <Selected,>(
 
 export const useWidgetInstanceValuesSelector = <Selected,>(
   instanceId: WidgetInstanceId,
-  selector: (values: Record<string, unknown>) => Selected,
+  selector: (values: ResolvedValues) => Selected,
   isEqual?: EqualityFn<Selected>
 ): Selected =>
   useWorkbenchSelector(
@@ -331,7 +332,7 @@ export const useWidgetInstanceValuesSelector = <Selected,>(
 export const useProjectWidgetInstanceValuesSelector = <Selected,>(
   projectId: string,
   instanceId: WidgetInstanceId,
-  selector: (values: Record<string, unknown>) => Selected,
+  selector: (values: ResolvedValues) => Selected,
   isEqual?: EqualityFn<Selected>
 ): Selected =>
   useWorkbenchSelector((snapshot) => {

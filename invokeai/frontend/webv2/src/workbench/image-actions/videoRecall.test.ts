@@ -1,8 +1,17 @@
 import type { GenerationModelCatalogItem, MainModelConfig } from '@features/generation/contracts';
 
-import { createDefaultVideoWidgetValues, getVideoDimensions, type VideoWidgetValues } from '@features/video';
+import {
+  compileVideoGraph,
+  createDefaultVideoWidgetValues,
+  getAcceleratorToggleResult,
+  getDefaultVideoSettings,
+  getVideoDimensions,
+  syncVideoWidgetValuesWithModels,
+  type VideoWidgetValues,
+} from '@features/video';
 import { describe, expect, it } from 'vitest';
 
+import { recordOf } from './recallContract.testing';
 import {
   buildVideoRecallSettings,
   deriveAcceleratorRecallState,
@@ -489,6 +498,33 @@ describe('model-position recall shapes', () => {
     expect(result?.values.modelKey).toBe(checkpoint.key);
     expect(result?.values).toMatchObject({ acceleratorEnabled: true, acceleratorLoraKeys: [ref2vTurbo.key] });
   });
+
+  it('preserves an explicitly matching Ref2VA hybrid through partial recall and catalog sync', () => {
+    const hybrid = { ...checkpoint, key: 'quality-base', variant: 'fl2va' };
+    const models = [...catalog, hybrid];
+    const holding: VideoWidgetValues = {
+      ...currentValues,
+      model: checkpoint,
+      modelKey: checkpoint.key,
+      h3TaskOverride: 'ref2va',
+      h3HybridBaseModel: hybrid,
+      h3HybridStartBlock: 30,
+    };
+    const result = buildVideoRecallSettings({
+      currentValues: holding,
+      kind: 'seed',
+      metadata: { generation_mode: 'minimax_h3_ref2v', seed: 123 },
+      models,
+    });
+    expect(result).not.toBeNull();
+    const synced = syncVideoWidgetValuesWithModels(result!.values, models);
+    expect(synced).toMatchObject({
+      seed: 123,
+      h3TaskOverride: 'ref2va',
+      h3HybridBaseModel: hybrid,
+      h3HybridStartBlock: 30,
+    });
+  });
 });
 
 describe('portable records (metadata_version 1.0.0)', () => {
@@ -676,6 +712,84 @@ it('reads the legacy Wan VAE slot', () => {
   });
 });
 
+describe('H3 overridden task recall', () => {
+  it.each(['fl2va', 'ref2va'] as const)('round-trips a %s override with its Turbo through graph metadata', (task) => {
+    const model = { ...h3Model('hybrid'), format: 'checkpoint', variant: task === 'ref2va' ? 'fl2va' : 'ref2va' };
+    const component = h3Model('components');
+    const flTurbo = lora('MiniMax H3 Turbo LoRA', 'minimax-h3', null);
+    const refTurbo = lora('MiniMax H3 Ref2V Turbo LoRA', 'minimax-h3', null);
+    const catalog = [model, component, flTurbo, refTurbo];
+    const references = [
+      { kind: 'image' as const, detail: 'match' as const, image: { image_name: 'ref.png', width: 512, height: 512 } },
+    ];
+    const settings = getAcceleratorToggleResult(
+      {
+        ...getDefaultVideoSettings(model, catalog),
+        h3TaskOverride: task,
+        references: task === 'ref2va' ? references : [],
+      },
+      model,
+      catalog,
+      true
+    ).settings;
+    const selectedTurbo = task === 'ref2va' ? refTurbo : flTurbo;
+    expect(settings.acceleratorLoraKeys).toEqual([selectedTurbo.key]);
+    const graph = compileVideoGraph(settings, model).backendGraph;
+    expect(graph.nodes.model_loader).toMatchObject({ task_variant_override: task });
+    const metadata = recordOf(compileVideoGraph(settings, model), settings);
+    const result = buildVideoRecallSettings({
+      currentValues: createDefaultVideoWidgetValues(catalog),
+      kind: 'all',
+      metadata,
+      models: catalog,
+    })!;
+    expect(result.values.h3TaskOverride).toBe(task);
+    expect(result.values.model).toBe(model);
+    expect(result.values.acceleratorEnabled).toBe(true);
+    expect(result.values.acceleratorLoraKeys).toEqual([selectedTurbo.key]);
+    // Hydration supplies the media returned separately by recall.
+    const restored = syncVideoWidgetValuesWithModels({ ...result.values, references: settings.references }, catalog);
+    expect(compileVideoGraph(restored, restored.model!).backendGraph.nodes.model_loader).toMatchObject({
+      task_variant_override: task,
+    });
+    expect(restored.steps).toBe(settings.steps);
+  });
+
+  it('restores the effective task from generation_mode for the same checkpoint', () => {
+    const model = { ...h3Model('hybrid'), format: 'checkpoint', variant: 'fl2va' };
+    const values = createDefaultVideoWidgetValues([model]);
+    const result = buildVideoRecallSettings({
+      currentValues: values,
+      kind: 'all',
+      metadata: {
+        generation_mode: 'minimax_h3_ref2v',
+        model: { base: 'minimax-h3', key: model.key, name: model.name, type: 'main' },
+      },
+      models: [model],
+    });
+    expect(result?.values.h3TaskOverride).toBe('ref2va');
+    expect(result?.values.model).toBe(model);
+    expect(model.variant).toBe('fl2va');
+  });
+
+  it('does not apply the recorded task to an unrelated model when the recorded model is unavailable', () => {
+    const current = { ...h3Model('current'), format: 'checkpoint', variant: 'fl2va' };
+    const values = createDefaultVideoWidgetValues([current]);
+    const result = buildVideoRecallSettings({
+      currentValues: values,
+      kind: 'all',
+      metadata: {
+        generation_mode: 'minimax_h3_ref2v',
+        positive_prompt: 'test scene',
+        model: { base: 'minimax-h3', key: 'uninstalled', name: 'Missing model', type: 'main' },
+      },
+      models: [current],
+    });
+    expect(result?.values.h3TaskOverride).toBeUndefined();
+    expect(result?.values.model?.variant).toBe('fl2va');
+  });
+});
+
 describe('legacy H3 duration recall', () => {
   const model = h3Model();
   const currentValues = { ...createDefaultVideoWidgetValues([model]), numFrames: 175 };
@@ -706,5 +820,78 @@ describe('legacy H3 duration recall', () => {
     });
     expect(result?.fields).toContain('frames');
     expect(result?.values).toMatchObject({ numFrames: expectedFrames, fps: 24 });
+  });
+});
+
+describe('Wan LoRA expert target recall', () => {
+  const highLora = { ...LIGHTNING_HIGH, key: 'wan-expert-high' };
+  const lowLora = { ...LIGHTNING_LOW, key: 'wan-expert-low' };
+  const dualLora = { base: 'wan', key: 'wan-expert-dual', name: 'Wan Dual', type: 'lora', variant: 'a14b' };
+  const currentValues = createDefaultVideoWidgetValues([WAN_T2V]);
+
+  it('restores target and low_noise_weight without altering untargeted LoRA records', () => {
+    const result = buildVideoRecallSettings({
+      currentValues,
+      kind: 'all',
+      metadata: wanMetadata({
+        loras: [
+          { model: { key: highLora.key }, target: 'high', weight: 0.9 },
+          { model: { key: lowLora.key }, target: 'low', weight: 0.5 },
+          { low_noise_weight: 0.3, model: { key: dualLora.key }, target: 'both', weight: 0.8 },
+          { model: { key: LIGHTNING_HIGH.key }, weight: 1 },
+        ],
+      }),
+      models: [WAN_T2V, highLora, lowLora, dualLora, LIGHTNING_HIGH],
+    });
+
+    expect(result?.values.loras).toEqual([
+      { isEnabled: true, model: highLora, target: 'high', weight: 0.9 },
+      { isEnabled: true, model: lowLora, target: 'low', weight: 0.5 },
+      { isEnabled: true, lowNoiseWeight: 0.3, model: dualLora, target: 'both', weight: 0.8 },
+      { isEnabled: true, model: LIGHTNING_HIGH, weight: 1 },
+    ]);
+  });
+
+  it('folds legacy dual high/low entries for the same LoRA into one both entry', () => {
+    const result = buildVideoRecallSettings({
+      currentValues,
+      kind: 'all',
+      metadata: wanMetadata({
+        loras: [
+          { model: { key: dualLora.key }, target: 'low', weight: 0.4 },
+          { model: { key: dualLora.key }, target: 'high', weight: 0.85 },
+        ],
+      }),
+      models: [WAN_T2V, dualLora],
+    });
+
+    expect(result?.values.loras).toEqual([
+      { isEnabled: true, lowNoiseWeight: 0.4, model: dualLora, target: 'both', weight: 0.85 },
+    ]);
+  });
+
+  it('deduplicates non-opposing duplicate entries for the same LoRA key', () => {
+    const sameTarget = buildVideoRecallSettings({
+      currentValues,
+      kind: 'all',
+      metadata: wanMetadata({
+        loras: [
+          { model: { key: highLora.key }, target: 'high', weight: 0.9 },
+          { model: { key: highLora.key }, target: 'high', weight: 0.5 },
+          { model: { key: dualLora.key }, target: 'high', weight: 0.8 },
+          { model: { key: dualLora.key }, target: 'low', weight: 0.4 },
+          { model: { key: dualLora.key }, target: 'low', weight: 0.2 },
+          { model: { key: LIGHTNING_HIGH.key }, weight: 1 },
+          { model: { key: LIGHTNING_HIGH.key }, weight: 0.6 },
+        ],
+      }),
+      models: [WAN_T2V, highLora, dualLora, LIGHTNING_HIGH],
+    });
+
+    expect(sameTarget?.values.loras).toEqual([
+      { isEnabled: true, model: highLora, target: 'high', weight: 0.9 },
+      { isEnabled: true, lowNoiseWeight: 0.4, model: dualLora, target: 'both', weight: 0.8 },
+      { isEnabled: true, model: LIGHTNING_HIGH, weight: 1 },
+    ]);
   });
 });

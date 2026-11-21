@@ -4,7 +4,7 @@ import {
   DEFAULT_DYNAMIC_PROMPTS_SETTINGS,
   DEFAULT_NEGATIVE_PROMPT_HEIGHT_PX,
   DEFAULT_POSITIVE_PROMPT_HEIGHT_PX,
-  isLoraModelConfig,
+  isGenerateLora,
   isMainModelConfig,
   isModelIdentifierConfig,
   isVaeModelConfig,
@@ -13,6 +13,7 @@ import {
   MIN_NEGATIVE_PROMPT_HEIGHT_PX,
   MIN_POSITIVE_PROMPT_HEIGHT_PX,
   normalizeDynamicPromptsSettings,
+  normalizeGenerateLora,
   sanitizeBatchCount,
 } from '@features/generation/settings';
 import { isSeedMode } from '@platform/core/seed';
@@ -237,11 +238,7 @@ const sanitizeVideoReferences = (value: unknown, sourceVideoName?: string): Vide
   return result;
 };
 
-const isVideoLora = (value: unknown): value is GenerateLora =>
-  isRecord(value) &&
-  isLoraModelConfig(value.model) &&
-  hasFiniteNumber(value, 'weight') &&
-  typeof value.isEnabled === 'boolean';
+const isVideoLora = isGenerateLora;
 
 const getStringArray = (value: unknown): string[] =>
   Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === 'string') : [];
@@ -327,7 +324,7 @@ export const normalizeVideoSettings = (values: unknown): VideoSettings | null =>
     (!firstFrameImage || !isConditioningClipExcludingFrames(values.conditioningClip))
       ? values.conditioningClip
       : null;
-  const loras = Array.isArray(values.loras) ? values.loras.filter(isVideoLora) : [];
+  const loras = Array.isArray(values.loras) ? values.loras.flatMap((entry) => normalizeGenerateLora(entry) ?? []) : [];
   const acceleratorLoraKeys = getStringArray(values.acceleratorLoraKeys);
   // Clear acceleration when any required accelerator LoRA disappears instead of claiming an inactive fast path.
   const acceleratorEnabled =
@@ -353,6 +350,8 @@ export const normalizeVideoSettings = (values: unknown): VideoSettings | null =>
     stgScale: hasFiniteNumber(values, 'stgScale') ? (values.stgScale as number) : null,
     firstFrameImage,
     fps: hasFiniteNumber(values, 'fps') ? (values.fps as number) : SETTINGS_FALLBACKS.fps,
+    h3TaskOverride:
+      values.h3TaskOverride === 'fl2va' || values.h3TaskOverride === 'ref2va' ? values.h3TaskOverride : undefined,
     h3HybridBaseModel: isMainModelConfig(values.h3HybridBaseModel) ? values.h3HybridBaseModel : null,
     h3HybridStartBlock: Math.round(
       getClampedNumber(
@@ -431,6 +430,7 @@ export const isVideoSettings = (values: unknown): values is VideoSettings => {
 
   // Strict only over the keys normalize would have to invent.
   return (
+    values.h3TaskOverride === normalized.h3TaskOverride &&
     isSeedMode(values.seedMode) &&
     isVideoAspectRatioId(values.aspectRatioId) &&
     isVideoTargetResolution(values.targetResolution) &&

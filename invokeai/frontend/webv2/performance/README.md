@@ -113,10 +113,16 @@ Use the raw `:browser` command only when the build is known current. Install eng
 `pnpm exec playwright install --with-deps chromium firefox webkit`. Ports default to 4180/4181; override
 `INVOKEAI_PROJECT_FILE_PORT` and `INVOKEAI_PROJECT_FILE_BACKEND_PORT` for an isolated focused run.
 
-The required localhost capabilities are IndexedDB and Web Locks. Each engine holds the initial fixture migration PUT before server dispatch, makes a new held prompt edit, and
-leaves for a neutral same-origin document immediately. Before any editor can reconcile it, the suite proves the
-committed journal has the new marker while the staged draft, held PUT bodies and server do not. Reopening must
-recover that marker. Each engine also verifies actual Canvas and layer-thumbnail fixture pixels, rejects an opaque
+The required localhost capabilities are IndexedDB and Web Locks. Each engine holds the initial fixture migration PUT before server dispatch and checks
+that this save staged the old document, then makes a new held prompt edit and leaves for a neutral same-origin
+document immediately. Before any editor can reconcile it, the suite checks where the edit is held and that the server
+lacks it; reopening must recover it. Chromium must hold it in the committed journal alone, with the staged draft and
+held PUT bodies still old, so its run proves journal-only recovery. In Firefox and WebKit, once unload cancels the held
+PUT, the queued `pagehide` save can continue: it stages the edit, retires its journal entry and may send it. Their runs
+prove only that the edit was durably held in the journal or the staged draft, was staged if sent, and survived the
+reload. Journal-only recovery is also covered by the scenarios in `src/workbench/projects/unloadJournal.scenarios.ts`,
+run on Chromium IndexedDB by `unloadJournal.scenarios.browser.test.ts`; that a save sends nothing until its draft
+write finishes is covered in `src/workbench/projects/durableSyncedPersistence.test.ts`. Each engine also verifies actual Canvas and layer-thumbnail fixture pixels, rejects an opaque
 checker-only thumbnail and empty Canvas, holds native animation-end delivery to prove retirement waits for the owner’s exit event, defers actual owner DOM removal by 100 ms to exercise the bounded React-removal grace, and injects retained portal DOM into the real sustained-workload collector.
 Engines must give duplicated tabs separate live editor sessions, release a closed tab's session lock, preserve edits
 across route re-entry after Launchpad owner/media readiness (all mounted cover images finish decoding), advance keyboard focus, and disable copy controls with an explanation when clipboard is
@@ -139,7 +145,7 @@ Document-navigation cancellation expectations are shared by smoke and release jo
 explicitly owned navigation through DOMContentLoaded, on the same origin's `/api/` requests or mock Socket.IO polling.
 All engines may cancel old-document reads and writes; WebKit may instead emit its exact native Fetch/XMLHttpRequest
 access-control-denial message. A canceled mutation is teardown evidence, never evidence of a successful save: the
-held-edit scenario separately proves journal-only recovery. HTTP 4xx/5xx responses, non-abort failures, cross-origin
+held-edit scenario separately checks where the edit was durably held and that reopening recovers it. HTTP 4xx/5xx responses, non-abort failures, cross-origin
 requests, asset failures, live-document mutations and unrelated runtime/console errors remain critical. Queue reader
 cancellations during route re-entry are limited to its actual read interface: status, current, next and item IDs (GET),
 then bounded item hydration (`items_by_ids`, read-only POST). Queue status GET cancellation is also recognized at the

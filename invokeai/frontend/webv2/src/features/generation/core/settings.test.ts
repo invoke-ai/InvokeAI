@@ -1,4 +1,4 @@
-import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
+import { seedArchitectureCapabilities } from '@features/models/core/architectureCapabilities.testing';
 import { getSeedSequenceLength, getSeedStep, planSeedSubmission, SEED_MAX, wrapSeed } from '@platform/core/seed';
 import { describe, expect, it } from 'vitest';
 
@@ -592,5 +592,30 @@ describe('normalizeGenerateSettings refiner fields', () => {
       refinerStart: 0.8,
       refinerSteps: 20,
     });
+  });
+
+  it('preserves valid Wan LoRA targets and lowNoiseWeight and strips invalid ones on normalizeGenerateSettings', () => {
+    const loraModel = { base: 'wan', key: 'wan-lora', name: 'Wan LoRA', type: 'lora' };
+    const normalized = normalizeGenerateSettings({
+      ...legacyStoredValues,
+      loras: [
+        { isEnabled: true, lowNoiseWeight: 0.35, model: loraModel, target: 'both', weight: 0.85 },
+        { isEnabled: true, lowNoiseWeight: 0.5, model: loraModel, target: 'high', weight: 0.9 },
+        { isEnabled: true, lowNoiseWeight: Number.NaN, model: loraModel, target: 'invalid', weight: 0.7 },
+      ],
+    });
+
+    expect(normalized?.loras).toEqual([
+      { isEnabled: true, lowNoiseWeight: 0.35, model: loraModel, target: 'both', weight: 0.85 },
+      { isEnabled: true, model: loraModel, target: 'high', weight: 0.9 },
+      { isEnabled: true, model: loraModel, weight: 0.7 },
+    ]);
+    expect(normalized && isGenerateSettings(normalized)).toBe(true);
+    expect(
+      isGenerateSettings({
+        ...normalized,
+        loras: [{ isEnabled: true, lowNoiseWeight: 0.5, model: loraModel, target: 'high', weight: 0.9 }],
+      })
+    ).toBe(false);
   });
 });

@@ -49,6 +49,32 @@ const createSettings = (overrides: Partial<VideoSettings> = {}): VideoSettings =
   ...overrides,
 });
 
+describe('H3 task override normalization', () => {
+  it.each([undefined, 'fl2va', 'ref2va'] as const)(
+    'preserves explicit intent %s without rewriting the catalog model',
+    (h3TaskOverride) => {
+      const model = {
+        base: 'minimax-h3',
+        format: 'checkpoint',
+        type: 'main' as const,
+        key: 'h3',
+        name: 'H3',
+        variant: 'fl2va',
+      };
+      const values = { ...createSettings({ h3TaskOverride }), model };
+      expect(isVideoSettings(values)).toBe(true);
+      expect(normalizeVideoWidgetValues(values)).toMatchObject({ model, h3TaskOverride });
+      expect(normalizeVideoWidgetValues(values)?.model).toBe(model);
+    }
+  );
+
+  it('rejects invalid overrides as canonical and normalizes them to Detected', () => {
+    const values = { ...createSettings(), h3TaskOverride: 'unknown' };
+    expect(isVideoSettings(values)).toBe(false);
+    expect(normalizeVideoSettings(values)?.h3TaskOverride).toBeUndefined();
+  });
+});
+
 describe('resolveVideoMode', () => {
   it('infers the mode from which inputs are filled', () => {
     expect(resolveVideoMode(createSettings())).toBe('txt2vid');
@@ -467,6 +493,32 @@ describe('references', () => {
 
     expect(trimmed?.references.map(named as never)).toEqual(['v0.mp4', 'v1.mp4', 'anchor.mp4']);
     expect(trimmed?.references.at(-1)).toMatchObject({ fromSourceVideo: true });
+  });
+
+  it('preserves valid Wan LoRA targets and lowNoiseWeight and strips invalid ones on normalizeVideoSettings', () => {
+    const loraModel = { base: 'wan', key: 'wan-lora', name: 'Wan LoRA', type: 'lora' };
+    const normalized = normalizeVideoSettings(
+      createSettings({
+        loras: [
+          { isEnabled: true, lowNoiseWeight: 0.4, model: loraModel as never, target: 'both', weight: 0.8 },
+          { isEnabled: true, lowNoiseWeight: 0.4, model: loraModel as never, target: 'low', weight: 0.6 },
+          { isEnabled: true, model: loraModel as never, target: 'bogus' as never, weight: 0.5 },
+        ],
+      })
+    );
+
+    expect(normalized?.loras).toEqual([
+      { isEnabled: true, lowNoiseWeight: 0.4, model: loraModel, target: 'both', weight: 0.8 },
+      { isEnabled: true, model: loraModel, target: 'low', weight: 0.6 },
+      { isEnabled: true, model: loraModel, weight: 0.5 },
+    ]);
+    expect(isVideoSettings(normalized)).toBe(true);
+    expect(
+      isVideoSettings({
+        ...normalized,
+        loras: [{ isEnabled: true, lowNoiseWeight: 0.4, model: loraModel, target: 'low', weight: 0.6 }],
+      })
+    ).toBe(false);
   });
 });
 

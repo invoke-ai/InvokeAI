@@ -1,18 +1,17 @@
 import type { BackendGraphContract } from '@features/generation/core/contracts';
 
-import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
+import { seedArchitectureCapabilities } from '@features/models/core/architectureCapabilities.testing';
 import { describe, expect, it } from 'vitest';
 
 import type { GenerateComponentValueKey, SupportedGenerateBase } from './baseGenerationPolicies';
 import type { MainModelConfig, ModelIdentifierConfig, VaeModelConfig } from './types';
 
 import {
+  addReferenceImages,
   getComponentSectionPolicy,
   getGenerationValidationReasons,
   isLoraSupported,
-  isReferenceImageSupported,
   SUPPORTED_GENERATE_BASES,
-  withAddedReferenceImages,
 } from './baseGenerationPolicies';
 import { compileCanvasGraph } from './canvas/compileCanvasGraph';
 import { compileGenerateGraph, GRAPH_BUILDERS } from './graph';
@@ -43,22 +42,22 @@ const compileForShape = (
         ...satisfiedSettingsFor(base, shape),
         projectSettings: { useCpuNoise: true, useNsfwChecker: false, useWatermark: false },
       };
-  const settings = isReferenceImageSupported(model, satisfied)
-    ? {
-        ...satisfied,
-        referenceImages: withAddedReferenceImages(
-          model,
-          [{ base, key: `${base}-ip-adapter`, name: `${base} IP Adapter`, type: 'ip_adapter' }],
-          [],
-          [
-            {
-              id: 'coverage-reference',
-              image: { original: { image: { height: 512, image_name: 'reference.png', width: 512 } } },
-            },
-          ]
-        ),
-      }
-    : satisfied;
+  const settings = {
+    ...satisfied,
+    referenceImages: addReferenceImages({
+      additions: [
+        {
+          id: 'coverage-reference',
+          image: { original: { image: { height: 512, image_name: 'reference.png', width: 512 } } },
+        },
+      ],
+      components: satisfied,
+      mode: 'strict',
+      model,
+      models: [{ base, key: `${base}-ip-adapter`, name: `${base} IP Adapter`, type: 'ip_adapter' }],
+      referenceImages: satisfied.referenceImages,
+    }).referenceImages,
+  };
 
   expect(getGenerationValidationReasons(model, settings), `${base}/${shape.label} is not satisfiable`).toEqual([]);
 

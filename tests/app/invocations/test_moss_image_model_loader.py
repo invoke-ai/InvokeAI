@@ -16,6 +16,7 @@ from invokeai.backend.model_manager.taxonomy import (
     Qwen35VariantType,
     SubModelType,
 )
+from tests.fixtures.model_roles import node_context, text_llm_file
 
 
 def _model(key: str, base: BaseModelType, model_type: ModelType) -> ModelIdentifierField:
@@ -110,3 +111,31 @@ def test_a_vae_from_another_latent_space_is_refused() -> None:
 def test_a_main_model_of_another_architecture_is_refused() -> None:
     with pytest.raises(ValueError, match="'Krea-2' is not a MOSS-Image main model"):
         _load("krea2")
+
+
+def _load_with_roles(encoder_key: str) -> MossImageModelLoaderOutput:
+    configs = {
+        **_CONFIGS,
+        "llm-9b": text_llm_file("llm-9b", Qwen35VariantType.Qwen35_9B),
+        "llm-4b": text_llm_file("llm-4b", Qwen35VariantType.Qwen35_4B),
+        "llm-plain": text_llm_file("llm-plain", None),
+    }
+    return MossImageModelLoaderInvocation(
+        model=_model("moss-diffusers", BaseModelType.MossImage, ModelType.Main),
+        # The UI puts the record's own type on the node.
+        qwen3_5_encoder_model=_model(encoder_key, BaseModelType.Any, ModelType.TextLLM),
+    ).invoke(node_context(configs))  # type: ignore[arg-type]
+
+
+def test_a_text_llm_serving_as_the_9b_encoder_is_accepted_and_emitted_as_an_encoder() -> None:
+    output = _load_with_roles("llm-9b")
+
+    for field in (output.qwen3_5_encoder.text_encoder, output.qwen3_5_encoder.tokenizer):
+        assert (field.key, field.type) == ("llm-9b", ModelType.Qwen35Encoder)
+    assert output.qwen3_5_encoder.text_encoder.submodel_type is SubModelType.TextEncoder
+
+
+@pytest.mark.parametrize("key", ["llm-4b", "llm-plain"])
+def test_a_text_llm_without_the_9b_encoder_role_is_refused_by_name(key: str) -> None:
+    with pytest.raises(ValueError, match=f"'{key} llm' is not a Qwen3.5 9B encoder.*or a Text LLM that serves as one"):
+        _load_with_roles(key)

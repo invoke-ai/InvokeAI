@@ -7,17 +7,17 @@ import type {
   VaeModelConfig,
 } from '@features/generation/contracts';
 
-import {
-  resetArchitectureCapabilities,
-  setArchitectureCapabilities,
-} from '@features/generation/core/architectureCapabilities';
-import {
-  architectureCapabilitiesFixture,
-  seedArchitectureCapabilities,
-} from '@features/generation/core/architectureCapabilities.testing';
 import { satisfiedSettingsFor } from '@features/generation/core/graphCoverage.testing';
 import { compileGenerateGraph } from '@features/generation/graph';
 import { normalizeReferenceImages } from '@features/generation/settings';
+import {
+  resetArchitectureCapabilities,
+  setArchitectureCapabilities,
+} from '@features/models/core/architectureCapabilities';
+import {
+  architectureCapabilitiesFixture,
+  seedArchitectureCapabilities,
+} from '@features/models/core/architectureCapabilities.testing';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { buildImageRecallSettings, getImageRecallCapabilities, type ImageRecallKind } from './imageRecall';
@@ -864,6 +864,38 @@ describe('model-family tuning recall', () => {
       expect(recallOverChanged(record(qwenModel, { qwen_image_shift: null }), qwenModel)?.qwenImageShift).toBeNull();
     });
   });
+
+  it('keeps the current Krea-2 style reference for a legacy record that did not list its references', () => {
+    const styleReference = normalizeReferenceImages([
+      {
+        config: {
+          image: { original: { image: { height: 512, image_name: 'current.png', width: 512 } } },
+          styleStrength: 1,
+          type: 'krea2_reference_image',
+        },
+        id: 'current-style',
+        isEnabled: true,
+      },
+    ]);
+    const result = buildImageRecallSettings({
+      currentValues: createValues({ model: krea2Model, modelKey: krea2Model.key, referenceImages: styleReference }),
+      image,
+      kind: 'all',
+      // The legacy UI recorded only the strength of the style reference it used.
+      metadata: {
+        app_version: '6.12.0',
+        generation_mode: 'krea2_txt2img',
+        krea2_style_strength: 0.6,
+        model: { key: krea2Model.key },
+      },
+      models: [],
+      supportedModels: [krea2Model],
+      vaeModels: [],
+    });
+
+    expect(result?.values.referenceImages).toEqual(styleReference);
+    expect(result?.fields).not.toContain('referenceImages');
+  });
 });
 
 describe('recall offered for a single recallable delta', () => {
@@ -1311,6 +1343,116 @@ describe('legacy records', () => {
 
       expect(result?.values.referenceImages).toEqual([]);
     });
+
+    it('clears the current references when a generation record omits them', () => {
+      const result = recall(
+        { app_version: '6.0.0', generation_mode: 'txt2img', model: { key: sdxlModel.key }, positive_prompt: 'silent' },
+        { referenceImages: currentReferenceImages },
+        [sdxlModel]
+      );
+
+      expect(result?.values.referenceImages).toEqual([]);
+      expect(result?.fields).toContain('referenceImages');
+    });
+
+    it('leaves the current references when the recorded list cannot be read', () => {
+      // v6.3–6.10 recorded Kontext references as a list nested inside `ref_images`.
+      const nested = [[{ config: { image: { image_name: 'kontext.png' }, type: 'flux_kontext' }, id: 'kontext' }]];
+      const result = recall(
+        {
+          app_version: '7.0.0',
+          generation_mode: 'txt2img',
+          model: { key: sdxlModel.key },
+          positive_prompt: 'nested',
+          ref_images: nested,
+        },
+        { referenceImages: currentReferenceImages },
+        [sdxlModel]
+      );
+
+      expect(result?.values.referenceImages).toEqual(currentReferenceImages);
+      expect(result?.fields).not.toContain('referenceImages');
+    });
+
+    it('leaves the current references on a record that is not a generation record', () => {
+      // An upscale or hand-built workflow record names a model without saying what references ran.
+      const result = recall(
+        { app_version: '7.0.0', model: { key: sdxlModel.key }, positive_prompt: 'upscaled' },
+        { referenceImages: currentReferenceImages },
+        [sdxlModel]
+      );
+
+      expect(result?.values.referenceImages).toEqual(currentReferenceImages);
+      expect(result?.fields).not.toContain('referenceImages');
+    });
+
+    it('keeps the current references for a model that takes none', () => {
+      const zImageModel: MainModelConfig = { base: 'z-image', key: 'z-model', name: 'Z-Image', type: 'main' };
+      const result = recall(
+        {
+          app_version: '7.0.0',
+          generation_mode: 'z_image_txt2img',
+          model: { key: zImageModel.key },
+          positive_prompt: 'no references',
+        },
+        { referenceImages: currentReferenceImages },
+        [sdxlModel, zImageModel]
+      );
+
+      expect(result?.values.model.key).toBe(zImageModel.key);
+      expect(result?.values.referenceImages.map((reference) => reference.id)).toEqual(['current-reference']);
+      expect(result?.fields).not.toContain('referenceImages');
+    });
+
+    it('leaves the current references for a v4.2 record that kept its IP-Adapters in control layers', () => {
+      const result = recall(
+        {
+          app_version: '6.0.0',
+          control_layers: { layers: [{ type: 'ip_adapter_layer' }], version: 2 },
+          generation_mode: 'txt2img',
+          model: { key: sdxlModel.key },
+          positive_prompt: 'v4.2',
+        },
+        { referenceImages: currentReferenceImages },
+        [sdxlModel]
+      );
+
+      expect(result?.values.referenceImages).toEqual(currentReferenceImages);
+      expect(result?.fields).not.toContain('referenceImages');
+    });
+
+    it('leaves the current references on a v5 record, which may have dropped the ones it used', () => {
+      // v5 Canvas-staged images saved to the Gallery lost `canvas_v2_metadata`, and their references with it.
+      const result = recall(
+        {
+          app_version: '5.15.0',
+          generation_mode: 'sdxl_txt2img',
+          model: { key: sdxlModel.key },
+          positive_prompt: 'v5',
+        },
+        { referenceImages: currentReferenceImages },
+        [sdxlModel]
+      );
+
+      expect(result?.values.referenceImages).toEqual(currentReferenceImages);
+      expect(result?.fields).not.toContain('referenceImages');
+    });
+
+    it('leaves the current references when the record names no recallable model', () => {
+      const result = recall(
+        {
+          app_version: '7.0.0',
+          generation_mode: 'txt2img',
+          model: { key: 'not-installed' },
+          positive_prompt: 'silent',
+        },
+        { referenceImages: currentReferenceImages },
+        [sdxlModel]
+      );
+
+      expect(result?.values.referenceImages).toEqual(currentReferenceImages);
+      expect(result?.fields).not.toContain('referenceImages');
+    });
   });
 
   describe('model identity', () => {
@@ -1351,6 +1493,167 @@ describe('legacy records', () => {
       expect(result?.values.t5EncoderModel?.key).toBe(t5.key);
       expect(result?.values.vae?.key).toBe(vae.key);
       expect(result?.fields).toEqual(expect.arrayContaining(['components', 'vae']));
+    });
+
+    describe("the recalled model's default components", () => {
+      const defaultT5: ComponentModelConfig = {
+        base: 'any',
+        key: 't5-default',
+        name: 'Default T5',
+        type: 't5_encoder',
+      };
+      const recordedT5: ComponentModelConfig = {
+        base: 'any',
+        hash: 'blake3:recorded',
+        key: 't5-recorded',
+        name: 'Recorded T5',
+        type: 't5_encoder',
+      };
+      const defaultClip: ComponentModelConfig = {
+        base: 'any',
+        key: 'clip-default',
+        name: 'Default CLIP',
+        type: 'clip_embed',
+        variant: 'large',
+      };
+      const withDefaults: MainModelConfig = {
+        ...fluxModel,
+        default_settings: { components: { clip_embed_model: defaultClip.key, t5_encoder: defaultT5.key } },
+        key: 'flux-with-defaults',
+      };
+      const installed = [withDefaults, defaultT5, recordedT5, defaultClip];
+
+      it('fills the slots the image recorded nothing for, and lets a recorded component win', () => {
+        const result = recall(
+          { model: { key: withDefaults.key }, t5_encoder: { ...recordedT5 } },
+          { model: sdxlModel, modelKey: sdxlModel.key },
+          [sdxlModel, withDefaults],
+          installed
+        );
+
+        expect(result?.values.t5EncoderModel?.key).toBe(recordedT5.key);
+        expect(result?.values.clipEmbedModel?.key).toBe(defaultClip.key);
+      });
+
+      it('replaces a current selection that fits when the image recorded nothing for the slot, like Reset', () => {
+        const result = recall(
+          { model: { key: withDefaults.key } },
+          { model: withDefaults, modelKey: withDefaults.key, t5EncoderModel: recordedT5 },
+          [sdxlModel, withDefaults],
+          installed
+        );
+
+        expect(result?.values.t5EncoderModel?.key).toBe(defaultT5.key);
+      });
+
+      it('lets a component the image recorded as empty clear the default', () => {
+        const result = recall(
+          { model: { key: withDefaults.key }, t5_encoder: null },
+          { model: sdxlModel, modelKey: sdxlModel.key },
+          [sdxlModel, withDefaults],
+          installed
+        );
+
+        expect(result?.values.t5EncoderModel).toBeNull();
+        expect(result?.values.clipEmbedModel?.key).toBe(defaultClip.key);
+      });
+
+      describe('on a generation record, which records what ran', () => {
+        const q21: MainModelConfig = {
+          base: 'qwen-image-2-1',
+          default_settings: { components: { qwen3_vl_encoder: 'q21-gguf-encoder' }, vae: 'q21-vae' },
+          format: 'diffusers',
+          key: 'q21-main',
+          name: 'Qwen-Image-2.1',
+          type: 'main',
+          variant: 'qwen_image_21_base',
+        };
+        const ggufEncoder: ComponentModelConfig = {
+          base: 'any',
+          format: 'gguf_quantized',
+          key: 'q21-gguf-encoder',
+          name: 'GGUF encoder',
+          type: 'qwen3_vl_encoder',
+          variant: 'qwen3_vl_8b',
+        };
+        const otherEncoder: ComponentModelConfig = {
+          ...ggufEncoder,
+          format: 'checkpoint',
+          key: 'q21-other-encoder',
+          name: 'Other encoder',
+        };
+        const vae: VaeModelConfig = { base: 'qwen-image-2-1', key: 'q21-vae', name: 'Q21 VAE', type: 'vae' };
+        const recallQ21 = (metadata: Record<string, unknown>, overrides: Partial<GenerateWidgetValues> = {}) =>
+          recall(
+            { model: { key: q21.key }, ...metadata },
+            { model: sdxlModel, modelKey: sdxlModel.key, ...overrides },
+            [sdxlModel, q21],
+            [q21, ggufEncoder, otherEncoder],
+            [vae]
+          );
+
+        it('applies no saved default component, and an unnamed slot keeps the current pick', () => {
+          const result = recallQ21({ generation_mode: 'txt2img' }, { qwen3VLEncoderModel: otherEncoder });
+          const empty = recallQ21({ generation_mode: 'txt2img' });
+
+          expect(result?.values.qwen3VLEncoderModel?.key).toBe(otherEncoder.key);
+          expect(empty?.values.qwen3VLEncoderModel).toBeNull();
+        });
+
+        it('still restores what the record names', () => {
+          const result = recallQ21({ generation_mode: 'txt2img', qwen3_vl_encoder: { ...ggufEncoder } });
+
+          expect(result?.values.qwen3VLEncoderModel?.key).toBe(ggufEncoder.key);
+        });
+
+        it('fills the defaults for a record that is no generation record, which says nothing of components', () => {
+          const result = recallQ21({});
+
+          expect(result?.values.qwen3VLEncoderModel?.key).toBe(ggufEncoder.key);
+          expect(result?.values.vae?.key).toBe(vae.key);
+        });
+      });
+
+      it('keeps the current VAE when the image clears the component source whose bundled VAE the default took', () => {
+        const pipeline: MainModelConfig = {
+          base: 'z-image',
+          format: 'diffusers',
+          key: 'z-pipeline',
+          name: 'Z-Image pipeline',
+          type: 'main',
+        };
+        const zGguf: MainModelConfig = {
+          base: 'z-image',
+          default_settings: { components: { component_source: pipeline.key }, vae: 'default' },
+          format: 'gguf_quantized',
+          key: 'z-gguf',
+          name: 'Z-Image GGUF',
+          type: 'main',
+        };
+        const vae: VaeModelConfig = { base: 'flux', key: 'z-vae', name: 'FLUX VAE', type: 'vae' };
+        const result = recall(
+          { model: { key: zGguf.key }, qwen3_source: null },
+          { model: sdxlModel, modelKey: sdxlModel.key, vae },
+          [sdxlModel, zGguf],
+          [zGguf, pipeline],
+          [vae]
+        );
+
+        expect(result?.values.componentSourceModel).toBeNull();
+        expect(result?.values.vae).toEqual(vae);
+      });
+
+      it('fills every slot of an image that recorded none', () => {
+        const result = recall(
+          { model: { key: withDefaults.key } },
+          { model: sdxlModel, modelKey: sdxlModel.key },
+          [sdxlModel, withDefaults],
+          installed
+        );
+
+        expect(result?.values.t5EncoderModel?.key).toBe(defaultT5.key);
+        expect(result?.values.clipEmbedModel?.key).toBe(defaultClip.key);
+      });
     });
 
     describe('reference-image adapters', () => {
@@ -1539,4 +1842,130 @@ it.each([false, true])('keeps modern references authoritative over v4 aliases (e
       }),
     }),
   ]);
+});
+
+describe('CFG scale schedule recall', () => {
+  it('recalls the initial step value from a valid CFG schedule array', () => {
+    const result = buildImageRecallSettings({
+      currentValues: createValues({ cfgScale: 7 }),
+      image,
+      kind: 'all',
+      metadata: { cfg_scale: [6.5, 4.5, 2.5], model: sdxlModel },
+      models: [sdxlModel],
+      supportedModels: [sdxlModel],
+      vaeModels: [],
+    });
+
+    expect(result?.fields).toContain('cfg');
+    expect(result?.values.cfgScale).toBe(6.5);
+  });
+
+  it('recalls the initial step value from a valid guidance schedule array for distilled-guidance models', () => {
+    const fluxModel: MainModelConfig = { base: 'flux', key: 'flux-model', name: 'FLUX', type: 'main' };
+    const result = buildImageRecallSettings({
+      currentValues: createValues({ cfgScale: 3.5, model: fluxModel, modelKey: fluxModel.key }),
+      image,
+      kind: 'all',
+      metadata: { guidance: [4.2, 3.0], model: fluxModel },
+      models: [fluxModel],
+      supportedModels: [fluxModel],
+      vaeModels: [],
+    });
+
+    expect(result?.fields).toContain('cfg');
+    expect(result?.values.cfgScale).toBe(4.2);
+  });
+
+  it.each<[unknown[]]>([[[]], [[6.5, 'bad']], [[6.5, Number.NaN]], [[0.5, 6]]])(
+    'ignores invalid or below-minimum CFG schedule array %j without overwriting cfgScale',
+    (cfgScale) => {
+      const result = buildImageRecallSettings({
+        currentValues: createValues({ cfgScale: 7 }),
+        image,
+        kind: 'all',
+        metadata: { cfg_scale: cfgScale, model: sdxlModel, positive_prompt: 'keep recall active' },
+        models: [sdxlModel],
+        supportedModels: [sdxlModel],
+        vaeModels: [],
+      });
+
+      expect(result?.fields).not.toContain('cfg');
+      expect(result?.values.cfgScale).toBe(7);
+    }
+  );
+});
+
+describe('Wan LoRA expert target recall', () => {
+  const wanMain: MainModelConfig = {
+    base: 'wan',
+    format: 'diffusers',
+    key: 'wan-main',
+    name: 'Wan A14B',
+    type: 'main',
+    variant: 't2v_a14b',
+  };
+  const wanLoraHigh: LoraModelConfig = {
+    base: 'wan',
+    key: 'wan-high',
+    name: 'Wan High',
+    type: 'lora',
+    variant: 'a14b',
+  };
+  const wanLoraLow: LoraModelConfig = { base: 'wan', key: 'wan-low', name: 'Wan Low', type: 'lora', variant: 'a14b' };
+  const wanLoraDual: LoraModelConfig = {
+    base: 'wan',
+    key: 'wan-dual',
+    name: 'Wan Dual',
+    type: 'lora',
+    variant: 'a14b',
+  };
+
+  it('preserves target and low_noise_weight and folds dual high/low entries for the same LoRA', () => {
+    const result = buildImageRecallSettings({
+      currentValues: createValues({ model: wanMain, modelKey: wanMain.key }),
+      image,
+      kind: 'all',
+      metadata: {
+        generation_mode: 'wan_txt2img',
+        loras: [
+          { model: wanLoraHigh, target: 'high', weight: 0.9 },
+          { model: wanLoraLow, target: 'low', weight: 0.6 },
+          { low_noise_weight: 0.35, model: wanLoraDual, target: 'both', weight: 0.85 },
+        ],
+        model: wanMain,
+      },
+      models: [wanMain, wanLoraHigh, wanLoraLow, wanLoraDual],
+      supportedModels: [wanMain],
+      vaeModels: [],
+    });
+
+    expect(result?.fields).toContain('loras');
+    expect(result?.values.loras).toEqual([
+      { isEnabled: true, model: wanLoraHigh, target: 'high', weight: 0.9 },
+      { isEnabled: true, model: wanLoraLow, target: 'low', weight: 0.6 },
+      { isEnabled: true, lowNoiseWeight: 0.35, model: wanLoraDual, target: 'both', weight: 0.85 },
+    ]);
+
+    const folded = buildImageRecallSettings({
+      currentValues: createValues({ model: wanMain, modelKey: wanMain.key }),
+      image,
+      kind: 'all',
+      metadata: {
+        generation_mode: 'wan_txt2img',
+        loras: [
+          { model: wanLoraDual, target: 'low', weight: 0.4 },
+          { model: wanLoraDual, target: 'high', weight: 0.8 },
+        ],
+        model: wanMain,
+      },
+      models: [wanMain, wanLoraDual],
+      supportedModels: [wanMain],
+      vaeModels: [],
+    });
+
+    expect(folded?.skipped).toEqual([]);
+    expect(folded?.values.loras).toEqual([
+      { isEnabled: true, lowNoiseWeight: 0.4, model: wanLoraDual, target: 'both', weight: 0.8 },
+    ]);
+  });
 });

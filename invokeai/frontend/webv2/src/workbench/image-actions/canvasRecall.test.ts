@@ -7,12 +7,12 @@ import type { CanvasControlLayerContract, CanvasLayerContract } from '@workbench
 import type { TFunction } from 'i18next';
 
 import { compileCanvasGraph } from '@features/generation/canvasGraph';
-import { setArchitectureCapabilities } from '@features/generation/core/architectureCapabilities';
+import { getDefaultGenerateSettings } from '@features/generation/settings';
+import { setArchitectureCapabilities } from '@features/models/core/architectureCapabilities';
 import {
   architectureCapabilitiesFixture,
   seedArchitectureCapabilities,
-} from '@features/generation/core/architectureCapabilities.testing';
-import { getDefaultGenerateSettings } from '@features/generation/settings';
+} from '@features/models/core/architectureCapabilities.testing';
 import { accountLifecycle, captureAccountScope } from '@platform/state/accountLifecycle';
 import { ApiError } from '@platform/transport/http';
 import { QueryClient } from '@tanstack/react-query';

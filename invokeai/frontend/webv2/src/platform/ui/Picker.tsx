@@ -123,6 +123,7 @@ export const Picker = <T,>({
   isMatch,
   listLabel,
   noMatchesMessage,
+  pending,
   renderOption,
   searchPlaceholder,
   searchSlot,
@@ -139,6 +140,11 @@ export const Picker = <T,>({
   isMatch: (option: T, searchTerm: string) => boolean;
   listLabel: string;
   noMatchesMessage: string;
+  /**
+   * Options still to come, e.g. while the data that admits some of them loads or after it failed. Shown under the
+   * options already listed, and in place of the empty or no-match message while none are.
+   */
+  pending?: PickerStatus;
   renderOption: (option: T, state: PickerOptionState) => ReactNode;
   searchPlaceholder: string;
   searchSlot?: ReactNode;
@@ -153,6 +159,7 @@ export const Picker = <T,>({
   const [activeId, setActiveId] = useState<string | null>(null);
   const deferredSearchTerm = useDeferredValue(searchTerm);
   const listboxRef = useRef<PickerListboxHandle>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
   const showHeaders = groups.length > 1;
 
   const visibleGroups = useMemo(() => {
@@ -233,7 +240,14 @@ export const Picker = <T,>({
   const activeIndex = resolvedActiveId === null ? -1 : (indexById.get(resolvedActiveId) ?? -1);
   const hasAnyOption = groups.some((group) => group.options.length > 0);
   const isListShown = !status && rows.length > 0;
-  const message = status?.message ?? (!hasAnyOption ? emptyMessage : isListShown ? null : noMatchesMessage);
+  const shownStatus = status ?? pending;
+  const onRetry = shownStatus?.onRetry;
+  // The retry's own loading status replaces the button; keep focus in the picker rather than dropping it to the page.
+  const handleRetry = useCallback(() => {
+    onRetry?.();
+    searchRef.current?.focus();
+  }, [onRetry]);
+  const message = shownStatus?.message ?? (!hasAnyOption ? emptyMessage : isListShown ? null : noMatchesMessage);
 
   const moveActive = useCallback(
     (delta: 1 | -1) => {
@@ -290,6 +304,7 @@ export const Picker = <T,>({
         <HStack gap="1">
           <InputGroup flex="1" minW="0" startElement={SEARCH_ICON}>
             <SearchInput
+              ref={searchRef}
               aria-activedescendant={
                 isListShown && resolvedActiveId ? getOptionDomId(listboxId, resolvedActiveId) : undefined
               }
@@ -331,9 +346,9 @@ export const Picker = <T,>({
       <Box role="status">
         {message ? (
           <Text
-            color={status?.isError ? 'fg.error' : 'fg.subtle'}
+            color={shownStatus?.isError ? 'fg.error' : 'fg.subtle'}
             fontSize="xs"
-            pb={status?.onRetry ? '1.5' : '3'}
+            pb={shownStatus?.onRetry ? '1.5' : '3'}
             pt="3"
             px="2"
           >
@@ -341,9 +356,9 @@ export const Picker = <T,>({
           </Text>
         ) : null}
       </Box>
-      {status?.onRetry ? (
+      {shownStatus?.onRetry ? (
         <Box pb="3" px="2">
-          <Button size="sm" variant="outline" onClick={status.onRetry}>
+          <Button size="sm" variant="outline" onClick={handleRetry}>
             {t('common.retry')}
           </Button>
         </Box>

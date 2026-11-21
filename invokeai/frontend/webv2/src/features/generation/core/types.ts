@@ -1,6 +1,7 @@
 import type { BackendGraphContract, GraphContract } from '@features/generation/core/contracts';
 import type { DynamicPromptsSeedBehaviour } from '@features/generation/core/dynamicPrompts';
 import type { PromptTemplateSnapshot } from '@features/generation/core/promptTemplates';
+import type { ModelRole } from '@features/models';
 import type { SeedMode } from '@platform/core/seed';
 
 export type ModelIdentifierConfig = {
@@ -10,7 +11,10 @@ export type ModelIdentifierConfig = {
   type: string;
   format?: string;
   variant?: string | null;
+  roles?: readonly ModelRole[];
   hash?: string;
+  /** Registered, but its files are gone: listed in the library, never loadable. */
+  is_missing?: boolean;
   submodel_type?: string;
   [key: string]: unknown;
 };
@@ -27,6 +31,7 @@ export type MainModelConfig = ModelIdentifierConfig & {
     height?: number | null;
     vae?: string | null;
     vae_precision?: string | null;
+    components?: Record<string, string> | null;
   } | null;
 };
 
@@ -91,10 +96,14 @@ export type LoraModelConfig = ModelIdentifierConfig & {
   variant?: string | null;
 };
 
+export type WanLoraTarget = 'high' | 'low' | 'both';
+
 export interface GenerateLora {
   isEnabled: boolean;
   model: LoraModelConfig;
   weight: number;
+  target?: WanLoraTarget;
+  lowNoiseWeight?: number;
 }
 
 export interface ImageWithDims {

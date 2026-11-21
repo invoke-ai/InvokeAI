@@ -4,7 +4,6 @@ import type { InvocationRoute, InvocationSourceId, ResultDestination } from '@wo
 import type { WidgetTypeId } from '@workbench/widgetContracts';
 
 import { useDynamicPrompts } from '@features/generation/react';
-import { getArchitectureCapabilitiesSnapshot, subscribeArchitectureCapabilities } from '@features/generation/runtime';
 import {
   describeDynamicPromptsFailure,
   describeGenerationIssue,
@@ -16,13 +15,16 @@ import {
   sanitizeDynamicPromptsConfig,
 } from '@features/generation/settings';
 import { ensureModelsLoaded, useModelsSelector } from '@features/models';
+import {
+  getArchitectureCapabilitiesSnapshot,
+  subscribeArchitectureCapabilities,
+} from '@features/models/architecturesStore';
 import { isUpscaleBatchCountFixed, readsUpscalePrompt } from '@features/upscale';
 import { normalizeVideoWidgetValues } from '@features/video';
 import { getInvocationTemplatesSnapshot, subscribeInvocationTemplates } from '@features/workflow/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { useExternalStoreSelector } from '@platform/state/selectors';
 import { submitActiveInvocation } from '@workbench/activeInvocationSubmission';
-import { describeControlLayerIssue } from '@workbench/controlLayerChecks';
 import { getPlacedWidgetTypeIds, getVisibleWidgetTypeIds, graphWidgetSources } from '@workbench/graphWidgets';
 import {
   createInvocationRouteInputSelector,
@@ -32,6 +34,7 @@ import {
 } from '@workbench/invocation';
 import { useIsInvocationPreparing } from '@workbench/invocationPreparation';
 import { getWorkbenchPreferences, subscribeWorkbenchPreferences } from '@workbench/settings/store';
+import { describeCanvasInvocationFailure } from '@workbench/widgets/canvas/invoke/canvasInvocationFailure';
 import {
   useActiveProjectSelector,
   useWorkbenchCommands,
@@ -242,7 +245,7 @@ export const useInvocationState = ({ sourceId }: { sourceId?: InvocationSourceId
         onStarted,
         prepend,
         sourceId,
-        formatControlLayerError: (rejection) => describeControlLayerIssue(t, rejection),
+        formatCanvasInvocationFailure: (failure) => describeCanvasInvocationFailure(t, failure),
         formatUpscaleMetadataFailure: (name) => t('widgets.gallery.itemActions.upscale.metadataFailed', { name }),
         getModels: () => availabilityModels,
         queries,

@@ -1,4 +1,4 @@
-import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
+import { seedArchitectureCapabilities } from '@features/models/core/architectureCapabilities.testing';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type {
@@ -366,6 +366,21 @@ describe('compileGenerateGraph', () => {
     expect(zImage.nodes.model_loader).toMatchObject({ qwen3_encoder_model: undefined, vae_model: undefined });
   });
 
+  it('sends a standalone Z-Image transformer a Qwen3 4B Text LLM as its stored config', () => {
+    const zImageGguf: MainModelConfig = { ...zImageModel, format: 'gguf_quantized' };
+    const textLlm: ComponentModelConfig = {
+      base: 'any',
+      format: 'diffusers',
+      key: 'llm-4b',
+      name: 'Qwen3 4B',
+      roles: [{ type: 'qwen3_encoder', variant: 'qwen3_4b' }],
+      type: 'text_llm',
+    };
+    const graph = compile(zImageGguf, { qwen3EncoderModel: textLlm, vae: fluxVae });
+
+    expect(graph.nodes.model_loader?.qwen3_encoder_model).toEqual(textLlm);
+  });
+
   it('sends a standalone Z-Image transformer the Qwen3 4B encoder and refuses the 8B one', () => {
     const zImageGguf: MainModelConfig = { ...zImageModel, format: 'gguf_quantized' };
     const qwen3_4b: ComponentModelConfig = { ...qwen3Encoder, key: 'qwen3-4b', variant: 'qwen3_4b' };
@@ -552,6 +567,12 @@ describe('compileGenerateGraph', () => {
         openai_quality: 'low',
       });
     });
+  });
+
+  it('records an empty reference list when generating without references', () => {
+    const graph = compile(sd1Model, { referenceImages: [] });
+
+    expect(getNodeByType(graph, 'core_metadata')?.ref_images).toEqual([]);
   });
 
   it('wires SD IP Adapter reference images into denoise', () => {
@@ -910,6 +931,42 @@ describe('Krea-2, Ideogram 4 and Wan graphs', () => {
     expect(getNodeByType(graph, 'wan_l2v')).toBeUndefined();
   });
 
+  it('passes the optional Wan low-noise expert to a single-file A14B model, and to no other', () => {
+    const wanHigh: MainModelConfig = {
+      base: 'wan',
+      format: 'gguf_quantized',
+      key: 'wan-high',
+      name: 'Wan high noise',
+      type: 'main',
+      variant: 't2v_a14b',
+    };
+    const wanLow: MainModelConfig = { ...wanHigh, key: 'wan-low-gguf', name: 'Wan low noise' };
+    // The loader takes the VAE of a component source only beside the same variant family.
+    const source = {
+      componentSourceModel: { ...wanDiffusers, key: 'wan-a14b-diffusers', variant: 't2v_a14b' } as const,
+    };
+
+    // Omit undefined optional fields instead of serializing null.
+    expect(compile(wanHigh, source).nodes.model_loader?.transformer_low_noise_model).toBeUndefined();
+    expect(compile(wanHigh, { ...source, wanLowNoiseModel: wanLow }).nodes.model_loader).toMatchObject({
+      transformer_low_noise_model: wanLow,
+    });
+    // The loader ignores it for a Diffusers or TI2V-5B model, so a stale pick never reaches the graph.
+    const wanLowNoise: MainModelConfig = {
+      ...wanDiffusers,
+      key: 'wan-low',
+      name: 'Wan low noise',
+      variant: 'i2v_a14b',
+    };
+    const stale = compile(wanDiffusers, { wanLowNoiseModel: wanLowNoise });
+
+    expect(stale.nodes.model_loader?.transformer_low_noise_model).toBeUndefined();
+    // A project saved before the picker listed single-file experts only can hold a Diffusers pipeline for an A14B
+    // model: Generate names it instead of sending what the loader rejects.
+    expect(() => compile(wanHigh, { ...source, wanLowNoiseModel: wanLowNoise })).toThrow(/low-noise expert/);
+    expect(JSON.stringify(stale)).not.toContain('wan_transformer_low_noise');
+  });
+
   it('routes Wan LoRAs through the transformer only, leaving the text encoder unpatched', () => {
     const a14bLora: LoraModelConfig = {
       base: 'wan',
@@ -924,6 +981,77 @@ describe('Krea-2, Ideogram 4 and Wan graphs', () => {
     expect(loader).toBeDefined();
     expect(getEdge(graph, 'denoise_latents', 'transformer')?.source.node_id).toBe(loader?.id);
     expect(getEdge(graph, 'pos_cond', 'wan_t5_encoder')?.source.node_id).toBe('model_loader');
+  });
+
+  it('chains wan_lora_loader nodes for targeted Wan A14B LoRAs and records target and low_noise_weight in metadata', () => {
+    const wanA14b: MainModelConfig = {
+      base: 'wan',
+      format: 'diffusers',
+      key: 'wan-a14b',
+      name: 'Wan 2.2 A14B',
+      type: 'main',
+      variant: 't2v_a14b',
+    };
+    const highLora: LoraModelConfig = { base: 'wan', key: 'wan-high', name: 'High', type: 'lora', variant: 'a14b' };
+    const dualLora: LoraModelConfig = { base: 'wan', key: 'wan-dual', name: 'Dual', type: 'lora', variant: 'a14b' };
+    const graph = compile(wanA14b, {
+      loras: [
+        { isEnabled: true, model: highLora, target: 'high', weight: 0.9 },
+        { isEnabled: true, lowNoiseWeight: 0.4, model: dualLora, target: 'both', weight: 0.8 },
+      ],
+    });
+
+    expect(getNodeByType(graph, 'wan_lora_collection_loader')).toBeUndefined();
+    const loaders = Object.values(graph.nodes).filter((node) => node.type === 'wan_lora_loader');
+    expect(loaders).toHaveLength(3);
+    expect(
+      loaders.map((node) => ({ key: (node.lora as { key: string }).key, target: node.target, weight: node.weight }))
+    ).toEqual([
+      { key: 'wan-high', target: 'high', weight: 0.9 },
+      { key: 'wan-dual', target: 'high', weight: 0.8 },
+      { key: 'wan-dual', target: 'low', weight: 0.4 },
+    ]);
+    expect(getEdge(graph, 'denoise_latents', 'transformer')?.source.node_id).toBe(loaders[2]?.id);
+    expect(getNodeByType(graph, 'core_metadata')?.loras).toEqual([
+      { model: expect.objectContaining({ key: 'wan-high' }), target: 'high', weight: 0.9 },
+      { low_noise_weight: 0.4, model: expect.objectContaining({ key: 'wan-dual' }), target: 'both', weight: 0.8 },
+    ]);
+
+    const equalLowNoiseGraph = compile(wanA14b, {
+      loras: [{ isEnabled: true, lowNoiseWeight: 0.8, model: dualLora, target: 'both', weight: 0.8 }],
+    });
+    const equalLoaders = Object.values(equalLowNoiseGraph.nodes).filter((node) => node.type === 'wan_lora_loader');
+    expect(equalLoaders).toHaveLength(1);
+    expect(equalLoaders[0]).toMatchObject({ target: 'both', weight: 0.8 });
+    expect(getNodeByType(equalLowNoiseGraph, 'core_metadata')?.loras).toEqual([
+      { model: expect.objectContaining({ key: 'wan-dual' }), target: 'both', weight: 0.8 },
+    ]);
+  });
+
+  it('emits a single wan_lora_loader node and omits low_noise_weight on single-transformer TI2V-5B even with lowNoiseWeight set', () => {
+    const dualLora5b: LoraModelConfig = {
+      base: 'wan',
+      key: 'wan-5b-dual',
+      name: 'Dual 5B',
+      type: 'lora',
+      variant: '5b',
+    };
+    const graph = compile(wanDiffusers, {
+      loras: [{ isEnabled: true, lowNoiseWeight: 0.4, model: dualLora5b, target: 'both', weight: 0.8 }],
+    });
+    const loaders = Object.values(graph.nodes).filter((node) => node.type === 'wan_lora_loader');
+
+    expect(getNodeByType(graph, 'wan_lora_collection_loader')).toBeUndefined();
+    expect(loaders).toHaveLength(1);
+    expect(loaders[0]).toMatchObject({
+      lora: expect.objectContaining({ key: 'wan-5b-dual' }),
+      target: 'both',
+      weight: 0.8,
+    });
+    expect(getEdge(graph, 'denoise_latents', 'transformer')?.source.node_id).toBe(loaders[0]?.id);
+    expect(getNodeByType(graph, 'core_metadata')?.loras).toEqual([
+      { model: expect.objectContaining({ key: 'wan-5b-dual' }), target: 'both', weight: 0.8 },
+    ]);
   });
 });
 
