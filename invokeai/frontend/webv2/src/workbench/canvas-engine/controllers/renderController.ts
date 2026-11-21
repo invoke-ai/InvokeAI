@@ -54,6 +54,8 @@ export interface RenderControllerOptions extends RenderSchedulerDeps {
     onFocusIn: (event: FocusEvent) => void;
     onWindowFocus: () => void;
     onWheel: (event: WheelEvent) => void;
+    onPinchGestureStart: (event: Event) => void;
+    onPinchGestureChange: (event: Event) => void;
     reset(): void;
   };
   readonly onPageHide: () => void;
@@ -126,6 +128,8 @@ export class RenderController {
     this.input.addEventListener('pointerenter', handlers.onPointerEnter);
     this.input.addEventListener('pointerleave', handlers.onPointerLeave);
     this.input.addEventListener('wheel', handlers.onWheel, { passive: false });
+    this.input.addEventListener('gesturestart', handlers.onPinchGestureStart, { passive: false });
+    this.input.addEventListener('gesturechange', handlers.onPinchGestureChange, { passive: false });
     if (typeof globalThis.addEventListener === 'function') {
       globalThis.addEventListener('keydown', handlers.onKeyDown);
       globalThis.addEventListener('keyup', handlers.onKeyUp);
@@ -156,6 +160,8 @@ export class RenderController {
       this.input.removeEventListener('pointerenter', handlers.onPointerEnter);
       this.input.removeEventListener('pointerleave', handlers.onPointerLeave);
       this.input.removeEventListener('wheel', handlers.onWheel);
+      this.input.removeEventListener('gesturestart', handlers.onPinchGestureStart);
+      this.input.removeEventListener('gesturechange', handlers.onPinchGestureChange);
       this.options.applyCursor('');
     }
     if (typeof globalThis.removeEventListener === 'function') {

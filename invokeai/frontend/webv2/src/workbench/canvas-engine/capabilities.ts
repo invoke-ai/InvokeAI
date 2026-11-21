@@ -45,6 +45,7 @@ import type {
   LayerQuickSwitchState,
   LayerThumbnailStatus,
   MarqueeToolOptions,
+  ScrollInput,
   ShapeToolOptions,
   TextEditSession,
   TextToolOptions,
@@ -204,6 +205,7 @@ export interface CanvasInteractionState {
   /** Advances after the engine reacted to the document change. */
   documentEpoch: number;
   ruleOfThirds: boolean;
+  scrollInput: ScrollInput;
   shapeOptions: ShapeToolOptions;
   showBbox: boolean;
   showGrid: boolean;
@@ -212,7 +214,8 @@ export interface CanvasInteractionState {
   stagingHidesOverlays: boolean;
   textEditSession: TextEditSession | null;
   textOptions: TextToolOptions;
-  trackpadNavigation: boolean;
+  /** Engine-set on trackpad proof; callers restore it. */
+  trackpadDetected: boolean;
   transformOptions: TransformOptions;
   transformSession: TransformSession | null;
   /** Waits for fresh pixels to persist; clears on tool switch, selection change, Escape, removal or failure. */
@@ -238,12 +241,13 @@ export type CanvasWritableInteractionKey = Extract<
   | 'layerQuickSwitch'
   | 'marqueeOptions'
   | 'ruleOfThirds'
+  | 'scrollInput'
   | 'shapeOptions'
   | 'showBbox'
   | 'showGrid'
   | 'snapToGrid'
   | 'textOptions'
-  | 'trackpadNavigation'
+  | 'trackpadDetected'
   | 'transformOptions'
 >;
 
@@ -643,8 +647,6 @@ export interface CanvasEngineToolCapability extends CanvasToolCapability {
   handleEscapePriority(options: { gestureWasActive: boolean }): void;
   onStrokeCommitted(listener: (event: StrokeCommittedEvent) => void): () => void;
   onEditRefused(listener: (refusal: CanvasEditRefusal) => void): () => void;
-  /** A trackpad pinch while trackpad navigation is off; listeners run before the event is routed. */
-  onTrackpadPinch(listener: () => void): () => void;
   /** Null on Escape, tool change or disposal; restores the previous tool either way. */
   requestColorSample(): Promise<string | null>;
   /** A declined `preview` falls back to the brush color; disposal removes only this router. */
@@ -815,6 +817,7 @@ export type {
   LayerQuickSwitchState,
   LayerThumbnailStatus,
   MarqueeToolOptions,
+  ScrollInput,
   ShapeToolKind,
   ShapeToolOptions,
   ShapeToolTarget,

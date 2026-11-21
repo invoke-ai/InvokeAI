@@ -57,12 +57,12 @@ export const getLayeredSettings = (): LayeredSettingsTable =>
         invertBrushSizeScroll: typedBoolean(false),
         outputOnlyMaskedRegions: typedBoolean(true),
         ruleOfThirds: typedBoolean(false),
+        scrollInput: oneOf('auto', ['mouse', 'trackpad']),
         showBbox: typedBoolean(true),
         showCheckerboard: typedBoolean(true),
         showGrid: typedBoolean(false),
         showProgressOnCanvas: typedBoolean(true),
         snapToGrid: typedBoolean(true),
-        trackpadNavigation: typedBoolean(false),
       },
       gallery: {
         boardOrderBy: oneOf('created_at', ['board_name']),

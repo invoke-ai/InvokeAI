@@ -161,7 +161,7 @@ import {
   type RasterCompositeExportSnapshot,
 } from '@workbench/canvas-engine/exportRasterComposite';
 import { createPointerPipeline, type PointerPipeline } from '@workbench/canvas-engine/input/pointerPipeline';
-import { createWheelHandler } from '@workbench/canvas-engine/input/wheel';
+import { createWheelInput } from '@workbench/canvas-engine/input/wheel';
 import { isEmpty, union } from '@workbench/canvas-engine/math/rect';
 import { hasSpatialAdjustments } from '@workbench/canvas-engine/render/adjustments';
 import { createColorSampler } from '@workbench/canvas-engine/render/colorSample';
@@ -393,6 +393,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     layerPixelEpoch: stores.layerPixelEpoch,
     documentEpoch: stores.documentEpoch,
     ruleOfThirds: stores.ruleOfThirds,
+    scrollInput: stores.scrollInput,
     shapeOptions: stores.shapeOptions,
     showBbox: stores.showBbox,
     showGrid: stores.showGrid,
@@ -402,7 +403,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     vectorEditSession: stores.vectorEditSession,
     vectorToolsStatus: stores.vectorToolsStatus,
     textOptions: stores.textOptions,
-    trackpadNavigation: stores.trackpadNavigation,
+    trackpadDetected: stores.trackpadDetected,
     transformOptions: stores.transformOptions,
     transformSession: stores.transformSession,
     pendingTransformLayerId: stores.pendingTransformLayerId,
@@ -881,16 +882,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     subscribeReducer: (listener) => mutationPort.subscribe(listener),
   });
   const editRefusalListeners = new Set<(refusal: CanvasEditRefusal) => void>();
-  const trackpadPinchListeners = new Set<() => void>();
-  const reportTrackpadPinch = (): void => {
-    for (const listener of trackpadPinchListeners) {
-      try {
-        listener();
-      } catch {
-        // A faulty listener must not stop the wheel event from being routed.
-      }
-    }
-  };
   const reportEditRefusal = (refusal: CanvasEditRefusal): void => {
     for (const listener of editRefusalListeners) {
       try {
@@ -1511,7 +1502,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
 
   const renderController = new RenderController({
     applyCursor: (value) => applyCursorToInput(value),
-    getInputHandlers: () => ({ ...pipeline, onPointerLeave: onCanvasPointerLeave, onWheel, reset: resetInput }),
+    getInputHandlers: () => ({ ...pipeline, ...wheelInput, onPointerLeave: onCanvasPointerLeave, reset: resetInput }),
     isEngineDisposed: () => disposed,
     onPageHide: () => onPageHide(),
     onVisibilityChange: () => onVisibilityChange(),
@@ -2041,16 +2032,16 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   // A view change under a still pointer moves the document beneath it; hover-derived tool state must follow.
   const unsubscribeHoverRefresh = viewport.subscribe(() => pipeline.refreshHover());
 
-  const onWheel = createWheelHandler({
+  const wheelInput = createWheelInput({
     getActiveTool: activeTool,
     getControlKeyState: () => pipeline.controlKeyState(),
     getInputElement: () => renderController.getInputElement(),
     getInvertBrushSizeScroll: () => stores.invertBrushSizeScroll.get(),
-    getTrackpadNavigation: () => stores.trackpadNavigation.get(),
+    getScrollInput: () => stores.scrollInput.get(),
     invalidate: (payload) => scheduler.invalidate(payload),
-    isPinchDetectionArmed: () => trackpadPinchListeners.size > 0,
-    reportTrackpadPinch,
+    isGestureActive: () => pipeline.isGestureActive(),
     stepActiveBrushSize,
+    trackpadDetected: stores.trackpadDetected,
     viewport,
   });
 
@@ -2679,7 +2670,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     cleanup.run(() => stores.thumbnailStatus.clear());
     cleanup.run(() => strokeListeners.clear());
     cleanup.run(() => editRefusalListeners.clear());
-    cleanup.run(() => trackpadPinchListeners.clear());
     cleanup.run(() => toolChangeListeners.clear());
     cleanup.run(() => {
       samInputHandler = null;
@@ -2691,13 +2681,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     strokeListeners.add(listener);
     return () => {
       strokeListeners.delete(listener);
-    };
-  };
-
-  const onTrackpadPinch = (listener: () => void): (() => void) => {
-    trackpadPinchListeners.add(listener);
-    return () => {
-      trackpadPinchListeners.delete(listener);
     };
   };
 
@@ -2993,7 +2976,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     handleEscapePriority,
     onEditRefused,
     onStrokeCommitted,
-    onTrackpadPinch,
     requestColorSample: () => colorSamples.requestSample(),
     setColorSampleRouter: (router) => colorSamples.setRouter(router),
   };

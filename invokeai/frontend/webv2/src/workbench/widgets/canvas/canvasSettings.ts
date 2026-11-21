@@ -1,6 +1,7 @@
 /** Per-project canvas preferences, outside undo history; engine-backed ones feed stores one way. */
 
 import type { ResolvedValues } from '@platform/core/resolvedValues';
+import type { ScrollInput } from '@workbench/canvas-engine/api';
 
 import { CANVAS_COMPOSITING_KEYS, DEFAULT_CANVAS_COMPOSITING } from './invoke/canvasCompositing';
 
@@ -13,8 +14,7 @@ export type CanvasSettingStore =
   | 'bboxOverlay'
   | 'ruleOfThirds'
   | 'snapToGrid'
-  | 'clipToBbox'
-  | 'trackpadNavigation';
+  | 'clipToBbox';
 
 export type CanvasSettingSection = 'behavior' | 'display' | 'grid';
 
@@ -22,7 +22,6 @@ export type CanvasSettingSection = 'behavior' | 'display' | 'grid';
 export const CANVAS_CHECKERBOARD_KEY = 'showCheckerboard';
 export const CANVAS_SHOW_GRID_KEY = 'showGrid';
 export const CANVAS_INVERT_BRUSH_SCROLL_KEY = 'invertBrushSizeScroll';
-export const CANVAS_TRACKPAD_NAVIGATION_KEY = 'trackpadNavigation';
 export const CANVAS_SHOW_BBOX_KEY = 'showBbox';
 export const CANVAS_BBOX_OVERLAY_KEY = 'bboxOverlay';
 export const CANVAS_RULE_OF_THIRDS_KEY = 'ruleOfThirds';
@@ -46,22 +45,11 @@ export interface CanvasBooleanSetting {
   store?: CanvasSettingStore;
   defaultValue: boolean;
   labelKey: string;
-  /** i18n key for a hint under the label, where the settings surface shows one. */
-  descriptionKey?: string;
   section: CanvasSettingSection;
 }
 
 /** Derive popover order, persistence, and engine feeds from these sectioned entries. */
 export const CANVAS_SETTINGS: readonly CanvasBooleanSetting[] = [
-  {
-    // Browsers cannot reliably tell a trackpad from a mouse, so this is opt-in rather than detected.
-    defaultValue: false,
-    descriptionKey: 'widgets.canvas.settings.trackpadNavigationDescription',
-    key: CANVAS_TRACKPAD_NAVIGATION_KEY,
-    labelKey: 'widgets.canvas.settings.trackpadNavigation',
-    section: 'behavior',
-    store: 'trackpadNavigation',
-  },
   {
     defaultValue: false,
     key: CANVAS_INVERT_BRUSH_SCROLL_KEY,
@@ -131,6 +119,18 @@ export const CANVAS_SETTINGS: readonly CanvasBooleanSetting[] = [
     store: 'ruleOfThirds',
   },
 ];
+
+/** Feeds the engine's `scrollInput` store; a select, so it stays outside `CANVAS_SETTINGS`. */
+export const CANVAS_SCROLL_INPUT_KEY = 'scrollInput';
+export const CANVAS_SCROLL_INPUTS = ['auto', 'mouse', 'trackpad'] as const satisfies readonly ScrollInput[];
+
+export const isCanvasScrollInput = (value: unknown): value is ScrollInput =>
+  (CANVAS_SCROLL_INPUTS as readonly unknown[]).includes(value);
+
+export const readCanvasScrollInput = (values: ResolvedValues | undefined): ScrollInput => {
+  const raw = values?.[CANVAS_SCROLL_INPUT_KEY];
+  return isCanvasScrollInput(raw) ? raw : 'auto';
+};
 
 /** Resolved settings, keyed by persisted setting key (default-applied). */
 export type ResolvedCanvasSettings = Record<string, boolean>;

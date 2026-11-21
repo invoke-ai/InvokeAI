@@ -225,6 +225,9 @@ export interface ControlLayerView {
   view: 'original' | 'overlay';
 }
 
+/** How wheel events route: `auto` judges each one as a mouse wheel or a trackpad. */
+export type ScrollInput = 'auto' | 'mouse' | 'trackpad';
+
 export interface TransformOptions {
   smoothing: boolean;
   resampleMode: 'bilinear' | 'bicubic' | 'hamming' | 'lanczos';
@@ -452,8 +455,9 @@ export interface EngineStores {
   showGrid: ScalarStore<boolean>;
   /** Default wheel-up grows. */
   invertBrushSizeScroll: ScalarStore<boolean>;
-  /** Wheel pans and ctrl+wheel (pinch) zooms. */
-  trackpadNavigation: ScalarStore<boolean>;
+  scrollInput: ScalarStore<ScrollInput>;
+  /** Set by the engine on trackpad proof, never cleared by it; the frontend persists and restores it. */
+  trackpadDetected: ScalarStore<boolean>;
   /** The active bbox tool always draws its frame and handles. */
   showBbox: ScalarStore<boolean>;
   /** Toggling never recomposites document pixels. */
@@ -659,6 +663,7 @@ export const createEngineStores = (initialTool: ToolId = 'view'): EngineStores =
   documentEpoch: createScalarStore<number>(0),
   ruleOfThirds: createScalarStore<boolean>(false),
   samInteraction: createScalarStore(null),
+  scrollInput: createScalarStore<ScrollInput>('auto'),
   shapeOptions: createScalarStore<ShapeToolOptions>({ ...DEFAULT_SHAPE_OPTIONS }, shapeOptionsEqual),
   shapePreview: createScalarStore<{ rect: Rect; kind: ParametricShapeKind } | null>(null, rectShapePreviewEqual),
   vectorShapePreview: createScalarStore<VectorShapePreview | null>(null),
@@ -670,7 +675,7 @@ export const createEngineStores = (initialTool: ToolId = 'view'): EngineStores =
   stagingHidesOverlays: createScalarStore<boolean>(false),
   textEditSession: createScalarStore<TextEditSession | null>(null, textEditSessionEqual),
   textOptions: createScalarStore<TextToolOptions>({ ...DEFAULT_TEXT_OPTIONS }, textOptionsEqual),
-  trackpadNavigation: createScalarStore<boolean>(false),
+  trackpadDetected: createScalarStore<boolean>(false),
   thumbnailVersion: createKeyedVersionStore(),
   thumbnailStatus: createKeyedStatusStore<LayerThumbnailStatus>(),
   adjustmentStatus: createKeyedStatusStore<LayerAdjustmentStatus>(),

@@ -13,9 +13,9 @@ import {
   CANVAS_SHOW_GRID_KEY,
   CANVAS_SHOW_PROGRESS_KEY,
   CANVAS_SNAP_TO_GRID_KEY,
-  CANVAS_TRACKPAD_NAVIGATION_KEY,
   canvasSettingsEqual,
   readCanvasBooleanSetting,
+  readCanvasScrollInput,
   resolveCanvasSettings,
 } from './canvasSettings';
 
@@ -38,8 +38,6 @@ const DEFAULTS = {
   [CANVAS_SHOW_GRID_KEY]: false,
   [CANVAS_SHOW_PROGRESS_KEY]: true,
   [CANVAS_SNAP_TO_GRID_KEY]: true,
-  // Opt-in: browsers cannot tell a trackpad from a mouse wheel.
-  [CANVAS_TRACKPAD_NAVIGATION_KEY]: false,
 };
 
 describe('canvasSettings persistence mapping', () => {
@@ -61,7 +59,6 @@ describe('canvasSettings persistence mapping', () => {
         [CANVAS_SHOW_GRID_KEY]: true,
         [CANVAS_SHOW_PROGRESS_KEY]: false,
         [CANVAS_SNAP_TO_GRID_KEY]: false,
-        [CANVAS_TRACKPAD_NAVIGATION_KEY]: true,
       })
     );
     expect(resolved).toEqual({
@@ -75,7 +72,6 @@ describe('canvasSettings persistence mapping', () => {
       [CANVAS_SHOW_GRID_KEY]: true,
       [CANVAS_SHOW_PROGRESS_KEY]: false,
       [CANVAS_SNAP_TO_GRID_KEY]: false,
-      [CANVAS_TRACKPAD_NAVIGATION_KEY]: true,
     });
   });
 
@@ -89,6 +85,12 @@ describe('canvasSettings persistence mapping', () => {
     expect(
       readCanvasBooleanSetting(resolvedValues({ [CANVAS_SHOW_GRID_KEY]: 1 }), settingByKey(CANVAS_SHOW_GRID_KEY))
     ).toBe(false);
+  });
+
+  it('reads the scroll input, falling back to auto-detection for anything unknown', () => {
+    expect(readCanvasScrollInput(resolvedValues({ scrollInput: 'trackpad' }))).toBe('trackpad');
+    expect(readCanvasScrollInput(resolvedValues({ scrollInput: true }))).toBe('auto');
+    expect(readCanvasScrollInput(undefined)).toBe('auto');
   });
 
   it('maps every setting to a unique persisted key', () => {

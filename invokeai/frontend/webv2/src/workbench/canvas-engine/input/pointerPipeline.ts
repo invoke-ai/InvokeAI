@@ -35,11 +35,7 @@ export interface PointerPipelineDeps {
   isReplaying(): boolean;
   /** Middle-button pans do not count. */
   onGestureChange?(active: boolean): void;
-  /**
-   * Whether the document has focus. Absent (tests, detached engines), it is taken as focused. Pointer events still
-   * reach a visible page while another app, the address bar or DevTools has focus, and their modifier state then says
-   * nothing about a Control press the page cannot see.
-   */
+  /** Absent means focused. Unfocused, a pointer event's modifiers miss Control presses the page cannot see. */
   hasFocus?(): boolean;
 }
 
@@ -67,7 +63,7 @@ export interface PointerPipeline {
   hoverPoint(): Vec2 | null;
   /** `unknown` until a key or focused pointer event shows it, and again whenever focus may have changed hands. */
   controlKeyState(): ControlKeyState;
-  /** The view moved under a still pointer: re-delivers a hover move so hover state follows. Skipped mid-gesture. */
+  /** Re-delivers a hover move after the view moved under a still pointer; skipped mid-gesture. */
   refreshHover(): void;
   /** Used on document replacement so a later release cannot commit stale drag state. */
   cancelActiveGesture(): void;
@@ -177,7 +173,6 @@ export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipelin
   const inputOrigin = (): { left: number; top: number } =>
     deps.getInputElement()?.getBoundingClientRect() ?? { left: 0, top: 0 };
 
-  /** Control as a pointer event shows it; see `controlKeyState`. */
   const observePointerControl = (event: PointerEvent): void => {
     controlKey = event.ctrlKey ? 'down' : deps.hasFocus?.() === false ? 'unknown' : 'up';
   };
