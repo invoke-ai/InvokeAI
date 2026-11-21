@@ -308,8 +308,11 @@ class CachedModelOnlyFullLoad:
             elif name in module._buffers:
                 buffer_slots.append((module, name))
         if parameter_slots:
-            for _module, _name, parameter in parameter_slots:
-                parameter.data = tensor
+            for module, name, parameter in parameter_slots:
+                if torch._has_compatible_shallow_copy_type(parameter, tensor):
+                    parameter.data = tensor
+                else:
+                    module._parameters[name] = torch.nn.Parameter(tensor, requires_grad=parameter.requires_grad)
             for module, name in buffer_slots:
                 module._buffers[name] = tensor
         else:
