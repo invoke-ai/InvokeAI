@@ -34,7 +34,10 @@ from invokeai.backend.model_manager.configs.main import (
 )
 from invokeai.backend.model_manager.configs.qwen3_5_encoder import Qwen35Encoder_Checkpoint_Config
 from invokeai.backend.model_manager.configs.qwen3_encoder import Qwen3Encoder_Qwen3Encoder_Config
-from invokeai.backend.model_manager.configs.qwen3_vl_encoder import Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config
+from invokeai.backend.model_manager.configs.qwen3_vl_encoder import (
+    Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config,
+    Qwen3VLEncoder_Qwen3VLEncoder_Config,
+)
 from invokeai.backend.model_manager.configs.text_llm import TextLLM_Checkpoint_Config, TextLLM_Diffusers_Config
 from invokeai.backend.model_manager.configs.textual_inversion import TI_File_SD1_Config
 from invokeai.backend.model_manager.configs.unknown import Unknown_Config
@@ -47,6 +50,7 @@ from invokeai.backend.model_manager.taxonomy import (
     ModelType,
     ModelVariantType,
     Qwen3VariantType,
+    Qwen3VLVariantType,
     Qwen35VariantType,
     SchedulerPredictionType,
 )
@@ -140,6 +144,28 @@ def test_update_changing_type_drops_stale_format_and_variant(store: ModelRecordS
 
     changes = ModelRecordChanges(type=ModelType.TextLLM)
     new_config = store.update_model(config.key, changes, allow_class_change=True)
+    assert isinstance(new_config, TextLLM_Diffusers_Config)
+
+
+def test_a_qwen3_vl_encoder_folder_made_a_text_llm_is_not_taken_for_an_encoders_view(
+    store: ModelRecordServiceBase,
+) -> None:
+    """Its `format` and `variant` match the Text LLM view of a single-file encoder, which exists only as a view: the
+    record has to become an ordinary Text LLM folder."""
+    config = Qwen3VLEncoder_Qwen3VLEncoder_Config(
+        key="key1",
+        source="test/source/",
+        source_type=ModelSourceType.Path,
+        path="/tmp/Qwen3-VL-4B-Instruct",
+        file_size=1024,
+        name="Qwen3-VL-4B-Instruct",
+        hash="ABC123",
+        variant=Qwen3VLVariantType.Qwen3VL_4B,
+    )
+    store.add_model(config)
+
+    new_config = store.update_model("key1", ModelRecordChanges(type=ModelType.TextLLM), allow_class_change=True)
+
     assert isinstance(new_config, TextLLM_Diffusers_Config)
 
 

@@ -13,6 +13,7 @@ import pytest
 import torch
 from safetensors.torch import save_file
 
+from invokeai.backend.model_manager.configs.base import ModelRole
 from invokeai.backend.model_manager.configs.identification_utils import InvalidMatchError, NotAMatchError
 from invokeai.backend.model_manager.configs.qwen3_vl_encoder import (
     Qwen3VLEncoder_Checkpoint_Config,
@@ -21,7 +22,12 @@ from invokeai.backend.model_manager.configs.qwen3_vl_encoder import (
 )
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType, Qwen3VLVariantType
-from tests.fixtures.quantized_payloads import comfy_quant_marker, nvfp4_signed_tensors, quantize_scaled_fp8
+from tests.fixtures.quantized_payloads import (
+    comfy_quant_marker,
+    mxfp8_tensors,
+    nvfp4_signed_tensors,
+    quantize_scaled_fp8,
+)
 
 _REQUIRED_FIELDS = {
     "hash": "blake3:fakehash",
@@ -324,6 +330,113 @@ class TestQwen3VLEncoderQuantizedCheckpoints:
             self._identify(tmp_path, add_marker, naming="header")
         with pytest.raises(ValueError, match="contradicts its tensors"):
             self._loader_finds_nvfp4_layers(tmp_path / "qwen3vl_4b.safetensors")
+
+
+_HIDDEN_BY_VARIANT = {Qwen3VLVariantType.Qwen3VL_4B: 2560, Qwen3VLVariantType.Qwen3VL_8B: 4096}
+_MX_HEADER = {"_quantization_metadata": json.dumps({"layers": {"lm_head": {"format": "mxfp8"}}})}
+
+
+def _mx_head(rows: int = 128) -> dict[str, torch.Tensor]:
+    return mxfp8_tensors("lm_head", torch.full((rows, 4096 // 32), 127))[0]
+
+
+class TestQwen3VLEncoderServesAsATextLLM:
+    """A single file that is the whole Instruct chat model also serves as a Text LLM; one that cannot generate does not.
+
+    Real files through `ModelOnDisk`, so the decision is made on the meta tensors identification holds, by the rule
+    the Text LLM loader refuses by.
+    """
+
+    @staticmethod
+    def _roles(
+        tmp_path: Path,
+        variant: Qwen3VLVariantType,
+        head: dict[str, torch.Tensor] | None = None,
+        *,
+        language_model: str = "model.",
+        head_prefix: str = "lm_head.",
+        vocab: int = 2,
+        metadata: dict[str, str] | None = None,
+    ) -> list[ModelRole]:
+        hidden = _HIDDEN_BY_VARIANT[variant]
+        state_dict = {
+            f"{language_model}embed_tokens.weight": torch.zeros(vocab, hidden, dtype=torch.bfloat16),
+            f"{language_model}layers.35.input_layernorm.weight": torch.ones(4, dtype=torch.bfloat16),
+            f"{language_model}norm.weight": torch.ones(hidden, dtype=torch.bfloat16),
+            "model.visual.blocks.0.attn.qkv.weight": torch.zeros(4, 4, dtype=torch.bfloat16),
+            **{f"{head_prefix}{key.removeprefix('lm_head.')}": tensor for key, tensor in (head or {}).items()},
+        }
+        path = tmp_path / "qwen3vl.safetensors"
+        save_file(state_dict, str(path), metadata=metadata)
+        config = Qwen3VLEncoder_Checkpoint_Config.from_model_on_disk(ModelOnDisk(path), {**_REQUIRED_FIELDS})
+        assert config.variant is variant
+        return config.roles
+
+    @staticmethod
+    def _role(variant: Qwen3VLVariantType) -> list[ModelRole]:
+        return [ModelRole(type=ModelType.TextLLM, format=ModelFormat.Qwen3VLEncoder, variant=variant)]
+
+    def test_a_4b_file_generates_through_its_tied_embedding_without_an_lm_head(self, tmp_path: Path) -> None:
+        assert self._roles(tmp_path, Qwen3VLVariantType.Qwen3VL_4B) == self._role(Qwen3VLVariantType.Qwen3VL_4B)
+
+    @pytest.mark.parametrize(
+        "head",
+        [
+            pytest.param({"lm_head.weight": torch.zeros(2, 4096, dtype=torch.bfloat16)}, id="bf16"),
+            # Comfy-Org's nvfp4 8B keeps its head in scaled fp8, named by a marker.
+            pytest.param(
+                {
+                    "lm_head.weight": quantize_scaled_fp8(torch.randn(2, 4096)).codes,
+                    "lm_head.weight_scale": torch.tensor(0.01),
+                    "lm_head.comfy_quant": comfy_quant_marker({"format": "float8_e4m3fn"}),
+                },
+                id="scaled-fp8",
+            ),
+        ],
+    )
+    def test_an_8b_file_with_an_lm_head_the_loader_widens_serves_as_a_text_llm(self, tmp_path: Path, head) -> None:
+        assert self._roles(tmp_path, Qwen3VLVariantType.Qwen3VL_8B, head) == self._role(Qwen3VLVariantType.Qwen3VL_8B)
+
+    @pytest.mark.parametrize(
+        ("language_model", "head_prefix"),
+        [("model.", "model.lm_head."), ("model.language_model.", "lm_head.")],
+        ids=["model-prefixed-head", "transformers-layout"],
+    )
+    def test_the_lm_head_is_found_in_either_spelling(
+        self, tmp_path: Path, language_model: str, head_prefix: str
+    ) -> None:
+        head = {"lm_head.weight": torch.zeros(2, 4096, dtype=torch.bfloat16)}
+
+        roles = self._roles(
+            tmp_path, Qwen3VLVariantType.Qwen3VL_8B, head, language_model=language_model, head_prefix=head_prefix
+        )
+
+        assert roles == self._role(Qwen3VLVariantType.Qwen3VL_8B)
+
+    def test_an_mxfp8_head_serves_when_the_header_names_it(self, tmp_path: Path) -> None:
+        roles = self._roles(tmp_path, Qwen3VLVariantType.Qwen3VL_8B, _mx_head(), vocab=128, metadata=_MX_HEADER)
+
+        assert roles == self._role(Qwen3VLVariantType.Qwen3VL_8B)
+
+    @pytest.mark.parametrize(
+        ("head", "vocab"),
+        [
+            pytest.param({}, 2, id="no-lm-head"),
+            pytest.param({"lm_head.weight": torch.zeros(2, 2048, dtype=torch.uint8)}, 2, id="packed-lm-head"),
+            pytest.param({"lm_head.weight": torch.zeros(3, 4096, dtype=torch.bfloat16)}, 2, id="head-wider-than-vocab"),
+            pytest.param(
+                {
+                    "lm_head.weight": torch.zeros(2, 4096, dtype=torch.bfloat16),
+                    "lm_head.bias": torch.zeros(2, dtype=torch.bfloat16),
+                },
+                2,
+                id="unread-head-key",
+            ),
+            pytest.param(_mx_head(), 128, id="mx-grid-nothing-names"),
+        ],
+    )
+    def test_an_8b_file_that_cannot_generate_is_only_an_encoder(self, tmp_path: Path, head, vocab: int) -> None:
+        assert self._roles(tmp_path, Qwen3VLVariantType.Qwen3VL_8B, head, vocab=vocab) == []
 
 
 class TestQwen3VLEncoderDirectoryConfig:

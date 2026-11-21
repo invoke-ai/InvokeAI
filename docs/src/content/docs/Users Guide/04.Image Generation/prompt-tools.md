@@ -15,7 +15,7 @@ Takes your short prompt and expands it into a detailed, vivid description suitab
 
 1. Type a brief prompt (e.g. "a cat in a garden")
 2. Click **Expand prompt** (the pencil-and-sparkles button) in the prompt toolbar
-3. Select a Text LLM model from the dropdown. The panel remembers your choice for the project. The list includes models that also serve as a Text LLM, such as a Qwen3.5 9B encoder single file with LM head and vision tower.
+3. Select a Text LLM model from the dropdown. The panel remembers your choice for the project. The list includes models that also serve as a Text LLM, such as a Qwen3.5 9B encoder single file with LM head and vision tower, or a single-file Qwen3-VL encoder that holds the whole chat model (text only; [which files](/users-guide/models/model-format-support/#text-llms)).
 4. Choose a **System prompt**, the instructions that tell the model how to rewrite your prompt
 5. Click **Expand**
 6. Your prompt is replaced with the expanded version, which you can edit before generating
@@ -26,7 +26,7 @@ InvokeAI ships with a **Default** system prompt and several tuned for particular
 
 You can duplicate, edit and delete your own system prompts. Shared system prompts, including the built-in ones, are marked **Shared**. On a multi-user installation only administrators can edit them, and changes apply to every user.
 
-**Compatible models:** Any HuggingFace model with a `ForCausalLM` architecture, plus Gemma-4 (`Gemma4ForConditionalGeneration`) and Qwen3.5 vision-language models (`Qwen3_5ForConditionalGeneration`), which can also read an image. The FLUX.3 prompt upsampler is one of these, as a folder or as ComfyUI's single file; see [Model Format Support](/users-guide/models/model-format-support/#text-llms). Recommended options:
+**Compatible models:** Any HuggingFace model with a `ForCausalLM` architecture, plus Gemma-4 (`Gemma4ForConditionalGeneration`) and Qwen3.5 vision-language models (`Qwen3_5ForConditionalGeneration`), which can also read an image. The FLUX.3 prompt upsampler is one of these, as a folder or as ComfyUI's single file. The single-file Qwen3-VL encoders of Krea-2, FLUX.3, Ideogram 4 and Qwen-Image-2.1 serve as Text LLMs too, for text only: every 4B file, and an 8B file that carries its LM head. See [Model Format Support](/users-guide/models/model-format-support/#text-llms). Recommended options:
 
 | Model | Size | HuggingFace ID |
 |-------|------|----------------|

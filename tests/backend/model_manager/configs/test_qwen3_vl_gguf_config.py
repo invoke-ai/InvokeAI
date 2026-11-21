@@ -99,6 +99,8 @@ def test_a_qwen3_vl_gguf_identifies_unambiguously_as_a_vl_encoder(tmp_path: Path
     assert result.match_count == 1
     assert isinstance(result.config, Qwen3VLEncoder_GGUF_Config)
     assert result.config.variant is Qwen3VLVariantType.Qwen3VL_4B
+    # The whole chat model, but no Text LLM: its GGML layers dequantize on every forward, far too slow to generate.
+    assert result.config.roles == []
 
 
 def test_a_text_only_qwen3_gguf_still_identifies_as_a_qwen3_encoder(tmp_path: Path) -> None:

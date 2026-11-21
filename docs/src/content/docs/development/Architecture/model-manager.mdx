@@ -107,12 +107,13 @@ There are a series of such classes each discriminated by their `ModelFormat`, in
 
 ### Roles
 
-Some files serve as more than one model type, such as a Qwen3.5 9B vision-language model (Text LLM and MOSS-Image's Qwen3.5 encoder) or a complete Qwen3 language-model folder (Text LLM and Qwen3 encoder). The record keeps one primary `type`, which is its identity, and lists the others in `roles`. Each family's identification derives the roles from the files; nothing is configured.
+Some files serve as more than one model type, such as a Qwen3.5 9B vision-language model (Text LLM and MOSS-Image's Qwen3.5 encoder), a complete Qwen3 language-model folder (Text LLM and Qwen3 encoder) or a single-file Qwen3-VL encoder that is the whole Instruct model (Qwen3-VL encoder and Text LLM). The record keeps one primary `type`, which is its identity, and lists the others in `roles`. Each family's identification derives the roles from the files; nothing is configured.
 
 - **Selection.** `GET /api/v2/models/?model_type=` and `search_by_attr(model_type=...)` filter by the primary type only. The UI lists a model under each of its roles.
 - **Nodes.** A node asks for a model in a role through the `type` of the `ModelIdentifierField` it passes to `context.models.load()` or `get_config()`. The invocation context then returns a role view: an instance of the role's config class built from the record (`serves_as`, `role_variant` and `view_as` in `invokeai/backend/model_manager/configs/roles.py`). The loader nodes of MOSS-Image, Z-Image, FLUX.2 Klein, Anima and the Text LLM nodes do this themselves, so graphs keep sending the record's own type.
 - **Node authors.** A node that takes a role-capable model field must request the role by setting the identifier's `type` before `load` or `get_config`. The UI offers role-serving models in every picker of that type, and workflow fields store the record's own type, so the node cannot rely on the field to carry the role.
 - **Loading and cache.** A role view loads through the role's loader and is cached under `<key>[:<submodel>]:as_<type>[:<variant>]` (the loader's device-format suffix comes last), so the encoder and the Text LLM of one file never share a cache entry. Editing or re-identifying the record evicts both. Model load socket events carry the role view's config: the record key and the role type.
+- **View-only configs.** A role's `format` and `variant` select the view's class. A Qwen3-VL encoder's Text LLM role names format `qwen3_vl_encoder`, so its view is `TextLLM_Qwen3VLEncoder_Config`, which identification never returns and no record stores; `TextLLMQwen3VLLoader` builds it as a text-only `Qwen3VLForConditionalGeneration` over the encoder loader's decode.
 - **Lifecycle.** Re-identification recomputes the roles. Changing `type` by hand through `update_model_record()` discards them.
 
 ### Limitations of the Data Model

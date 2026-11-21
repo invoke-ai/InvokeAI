@@ -3,7 +3,7 @@ from typing import Any, Literal, Self
 
 from pydantic import Field
 
-from invokeai.backend.model_manager.configs.base import Checkpoint_Config_Base, Config_Base
+from invokeai.backend.model_manager.configs.base import Checkpoint_Config_Base, Config_Base, ModelRole
 from invokeai.backend.model_manager.configs.identification_utils import (
     InvalidMatchError,
     NotAMatchError,
@@ -16,11 +16,20 @@ from invokeai.backend.model_manager.configs.identification_utils import (
 from invokeai.backend.model_manager.configs.qwen3_5_encoder import has_qwen3_5_linear_attention
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType, Qwen3VLVariantType
-from invokeai.backend.model_manager.util.qwen3_vl import drop_qwen3vl_unloaded_keys
+from invokeai.backend.model_manager.util.qwen3_vl import (
+    drop_qwen3vl_unloaded_keys,
+    qwen3vl_lm_head_entries,
+    qwen3vl_lm_head_hints,
+    qwen3vl_lm_head_refusal,
+    qwen3vl_token_embedding,
+)
 from invokeai.backend.quantization.fp8_scaled import COMFY_QUANT_SUFFIX, parse_quantization_metadata
 from invokeai.backend.quantization.int8_convrot import read_comfy_quant_markers
 from invokeai.backend.quantization.nvfp4 import find_nvfp4_layers
-from invokeai.backend.qwen3_vl.qwen3_vl_assets import load_bundled_qwen3_vl_config_dict
+from invokeai.backend.qwen3_vl.qwen3_vl_assets import (
+    load_bundled_qwen3_vl_config_dict,
+    qwen3_vl_ties_word_embeddings,
+)
 
 # The two Qwen3-VL encoders v7 can build, by language-model width. Both have 36 layers, so the
 # width alone identifies the variant. Anything else -- including MiniMax H3's truncated
@@ -246,7 +255,25 @@ class Qwen3VLEncoder_Checkpoint_Config(Checkpoint_Config_Base, Config_Base):
         _raise_for_undecodable_nvfp4_layers(mod, state_dict)
         variant = override_fields.pop("variant", None) or _variant_from_checkpoint_shape(state_dict)
 
-        return cls(**override_fields, variant=variant)
+        return cls(**override_fields, variant=variant, roles=_text_llm_roles(mod, state_dict, variant))
+
+
+def _text_llm_roles(mod: ModelOnDisk, state_dict: dict[str | int, Any], variant: Qwen3VLVariantType) -> list[ModelRole]:
+    """The Text LLM role of a single file that is a whole Qwen3-VL Instruct chat model.
+
+    The language model is complete already (the config requires it); generating also takes an LM head. A variant
+    whose config ties it to the token embedding (the 4B) has one in every file. Otherwise the file must carry one the
+    Text LLM view widens on load, by the rule its loader applies (`qwen3vl_lm_head_refusal`); a file without one stays
+    an encoder only. The role names the view's format (`TextLLM_Qwen3VLEncoder_Config`).
+    """
+    if not qwen3_vl_ties_word_embeddings(variant):
+        head = qwen3vl_lm_head_entries(state_dict)
+        if "weight" not in head:
+            return []
+        hints = qwen3vl_lm_head_hints(mod.path, mod.metadata())
+        if qwen3vl_lm_head_refusal(head, hints, qwen3vl_token_embedding(state_dict)) is not None:
+            return []
+    return [ModelRole(type=ModelType.TextLLM, format=ModelFormat.Qwen3VLEncoder, variant=variant)]
 
 
 _QWEN3_VL_GGUF_ARCHITECTURE = "qwen3vl"
@@ -340,6 +367,9 @@ class Qwen3VLEncoder_GGUF_Config(Checkpoint_Config_Base, Config_Base):
         # `override_fields` is one dict shared by every candidate config in this sweep, so it must not
         # be mutated: popping here would erase a user's variant override for every class probed after
         # this one, and the probe order is a set iteration (see `Config_Base.CONFIG_CLASSES`).
+        #
+        # No Text LLM role, although the file is the whole chat model: its GGML layers dequantize on every
+        # forward, so generation ran at about 0.1 tokens/s on an RTX 4090.
         return cls(**{"variant": variant, **override_fields})
 
 

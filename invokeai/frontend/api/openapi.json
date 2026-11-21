@@ -1929,6 +1929,9 @@
                       "$ref": "#/components/schemas/TextLLM_Checkpoint_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/TextLLM_Qwen3VLEncoder_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/ExternalApiModelConfig"
                     },
                     {
@@ -2534,6 +2537,9 @@
                       "$ref": "#/components/schemas/TextLLM_Checkpoint_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/TextLLM_Qwen3VLEncoder_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/ExternalApiModelConfig"
                     },
                     {
@@ -3137,6 +3143,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/TextLLM_Checkpoint_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TextLLM_Qwen3VLEncoder_Config"
                     },
                     {
                       "$ref": "#/components/schemas/ExternalApiModelConfig"
@@ -3786,6 +3795,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/TextLLM_Checkpoint_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TextLLM_Qwen3VLEncoder_Config"
                     },
                     {
                       "$ref": "#/components/schemas/ExternalApiModelConfig"
@@ -4462,6 +4474,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/TextLLM_Checkpoint_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TextLLM_Qwen3VLEncoder_Config"
                     },
                     {
                       "$ref": "#/components/schemas/ExternalApiModelConfig"
@@ -6013,6 +6028,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/TextLLM_Checkpoint_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TextLLM_Qwen3VLEncoder_Config"
                     },
                     {
                       "$ref": "#/components/schemas/ExternalApiModelConfig"
@@ -22021,6 +22039,9 @@
           },
           {
             "$ref": "#/components/schemas/TextLLM_Checkpoint_Config"
+          },
+          {
+            "$ref": "#/components/schemas/TextLLM_Qwen3VLEncoder_Config"
           },
           {
             "$ref": "#/components/schemas/ExternalApiModelConfig"
@@ -97328,6 +97349,9 @@
                 "$ref": "#/components/schemas/TextLLM_Checkpoint_Config"
               },
               {
+                "$ref": "#/components/schemas/TextLLM_Qwen3VLEncoder_Config"
+              },
+              {
                 "$ref": "#/components/schemas/ExternalApiModelConfig"
               },
               {
@@ -98179,6 +98203,9 @@
                     "$ref": "#/components/schemas/TextLLM_Checkpoint_Config"
                   },
                   {
+                    "$ref": "#/components/schemas/TextLLM_Qwen3VLEncoder_Config"
+                  },
+                  {
                     "$ref": "#/components/schemas/ExternalApiModelConfig"
                   },
                   {
@@ -98960,6 +98987,9 @@
                 "$ref": "#/components/schemas/TextLLM_Checkpoint_Config"
               },
               {
+                "$ref": "#/components/schemas/TextLLM_Qwen3VLEncoder_Config"
+              },
+              {
                 "$ref": "#/components/schemas/ExternalApiModelConfig"
               },
               {
@@ -99550,6 +99580,9 @@
               },
               {
                 "$ref": "#/components/schemas/TextLLM_Checkpoint_Config"
+              },
+              {
+                "$ref": "#/components/schemas/TextLLM_Qwen3VLEncoder_Config"
               },
               {
                 "$ref": "#/components/schemas/ExternalApiModelConfig"
@@ -100722,6 +100755,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/TextLLM_Checkpoint_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/TextLLM_Qwen3VLEncoder_Config"
                 },
                 {
                   "$ref": "#/components/schemas/ExternalApiModelConfig"
@@ -121338,6 +121374,176 @@
         ],
         "title": "TextLLM_Diffusers_Config",
         "description": "Model config for a language model folder: a causal LM (Llama, Phi, Qwen, Mistral, ...) or an allow-listed\nvision-language model (Gemma-4, Qwen3.5)."
+      },
+      "TextLLM_Qwen3VLEncoder_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "roles": {
+            "items": {
+              "$ref": "#/components/schemas/ModelRole"
+            },
+            "type": "array",
+            "title": "Roles",
+            "description": "Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh."
+          },
+          "config_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Path",
+            "description": "Path to the config for this model, if any."
+          },
+          "type": {
+            "type": "string",
+            "const": "text_llm",
+            "title": "Type",
+            "default": "text_llm"
+          },
+          "format": {
+            "type": "string",
+            "const": "qwen3_vl_encoder",
+            "title": "Format",
+            "default": "qwen3_vl_encoder"
+          },
+          "base": {
+            "type": "string",
+            "const": "any",
+            "title": "Base",
+            "default": "any"
+          },
+          "variant": {
+            "$ref": "#/components/schemas/Qwen3VLVariantType",
+            "description": "Which Qwen3-VL the encoder file is"
+          },
+          "cpu_only": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Only",
+            "description": "Whether this model should run on CPU only"
+          },
+          "supports_images": {
+            "type": "boolean",
+            "title": "Supports Images",
+            "description": "Whether the model has a vision tower and processor, so Expand Prompt can condition on an image",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "roles",
+          "config_path",
+          "type",
+          "format",
+          "base",
+          "variant",
+          "cpu_only",
+          "supports_images"
+        ],
+        "title": "TextLLM_Qwen3VLEncoder_Config",
+        "description": "A single-file Qwen3-VL encoder in its Text LLM role: the whole Qwen3-VL Instruct chat model, run on text only.\n\nNever identified and never stored. `Qwen3VLEncoder_Checkpoint_Config` records the role, with this format and the\nvariant, when its file can generate, and `roles.view_as` builds this config from the encoder record. The format\nnames what the view loads, the encoder's file through the encoder's decode. A class of its own keeps the Qwen3.5\ncheckpoint config as it is: no `variant` on its records, and no Qwen3-VL load path a record could be edited into."
       },
       "TextureInvocation": {
         "category": "image",

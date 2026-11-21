@@ -33,7 +33,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-from transformers import PreTrainedTokenizerBase
+from transformers import GenerationConfig, PreTrainedTokenizerBase
 
 from invokeai.backend.model_manager.taxonomy import Qwen3VLVariantType
 from invokeai.backend.util.bundled_tokenizer import load_gzipped_tokenizer_dir
@@ -49,15 +49,35 @@ _CONFIG_BY_VARIANT: dict[Qwen3VLVariantType, str] = {
     Qwen3VLVariantType.Qwen3VL_8B: "qwen3_vl_8b_instruct.json",
 }
 
+# The releases' `generation_config.json`, identical in the 4B and 8B (compared byte for byte when it was vendored). The
+# architecture configs name only `<|im_end|>` as end of sequence and no padding id; this one stops at `<|endoftext|>`
+# too and carries the sampling defaults (`top_k`) the Text LLM pipeline does not set itself.
+_GENERATION_CONFIG_PATH = _CONFIG_DIR / "qwen3_vl_instruct_generation_config.json"
 
-@lru_cache(maxsize=1)
-def load_bundled_qwen3_vl_tokenizer() -> PreTrainedTokenizerBase:
-    """Load the vendored Qwen3-VL fast tokenizer. Result is cached for the process.
+
+def load_qwen3_vl_tokenizer() -> PreTrainedTokenizerBase:
+    """A new instance of the vendored Qwen3-VL fast tokenizer, not the process-wide one.
 
     ``extra_special_tokens={}`` matches what the loaders passed when they fetched this tokenizer
     from the hub, so the returned object is configured exactly as before.
     """
     return load_gzipped_tokenizer_dir(_TOKENIZER_DIR, extra_special_tokens={})
+
+
+@lru_cache(maxsize=1)
+def load_bundled_qwen3_vl_tokenizer() -> PreTrainedTokenizerBase:
+    """The vendored Qwen3-VL fast tokenizer, one instance for the process (shared by the encoders)."""
+    return load_qwen3_vl_tokenizer()
+
+
+def qwen3_vl_ties_word_embeddings(variant: Qwen3VLVariantType) -> bool:
+    """Whether this variant's LM head is its token embedding, so a file of it needs no ``lm_head`` to generate."""
+    return bool(load_bundled_qwen3_vl_config_dict(variant).get("tie_word_embeddings", False))
+
+
+def qwen3_vl_instruct_generation_config() -> GenerationConfig:
+    """The release's generation settings: both end-of-turn tokens, the padding id and the sampling defaults."""
+    return GenerationConfig.from_dict(json.loads(_GENERATION_CONFIG_PATH.read_text(encoding="utf-8")))
 
 
 def load_bundled_qwen3_vl_config_dict(variant: Qwen3VLVariantType) -> dict[str, Any]:
