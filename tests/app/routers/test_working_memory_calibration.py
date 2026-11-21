@@ -1,5 +1,6 @@
 """The calibration routes and the reserved origin, against a real SQLite queue and a store on a temporary root."""
 
+import asyncio
 import threading
 from pathlib import Path
 from types import SimpleNamespace
@@ -18,6 +19,7 @@ from invokeai.app.invocations.model import LoRACollectionLoader, LoRAField, Mode
 from invokeai.app.invocations.sd.sdxl import SDXLModelLoaderInvocation
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.model_records import UnknownModelException
+from invokeai.app.services.session_queue.session_queue_common import Batch
 from invokeai.app.services.session_queue.session_queue_default import SessionQueue
 from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.graph import Graph
@@ -253,6 +255,70 @@ def test_a_retry_the_calibration_store_cannot_count_is_refused_with_503_naming_n
         "The working-memory calibration store cannot be written now, so no item was retried. Try again."
     )
     assert queue.dequeue() is None
+
+
+def test_a_retry_that_would_break_attempt_exclusivity_is_refused_with_a_coded_409(
+    client: TestClient, admin_token: str, calibration
+) -> None:
+    """A's step failed, and another calibration ran since: A's retry would measure after it. The whole request is
+    refused, the generation it also retries included, with the code the calibrate route uses."""
+    queue, _ = calibration
+    step = {"graph": _graph(), "attempt_id": "model-tab", "attempt_steps": 2}
+    [item_id] = _calibrate(client, admin_token, step).json()["item_ids"]
+    queue.dequeue()
+    queue.fail_queue_item(item_id, "OutOfMemoryError", "out of memory", "")
+    [other] = _calibrate(client, admin_token).json()["item_ids"]
+    queue.dequeue()
+    queue.complete_queue_item(other)
+    [generation] = asyncio.run(
+        queue.enqueue_batch("default", Batch(graph=Graph.model_validate(_graph()), origin="canvas"), prepend=False)
+    ).item_ids
+    queue.dequeue()
+    queue.fail_queue_item(generation, "ValueError", "failed", "")
+    before = queue.get_queue_item_ids("default").item_ids
+
+    response = client.put(
+        "/api/v1/queue/default/retry_items_by_id", json=[generation, item_id], headers=_auth(admin_token)
+    )
+
+    assert response.status_code == 409, response.text
+    assert response.json()["detail"] == {
+        "code": "calibration_interleaved",
+        "message": "Another calibration ran on this GPU after this calibration started, so its measurements can no "
+        "longer be combined. Calibrate again.",
+    }
+    assert queue.get_queue_item_ids("default").item_ids == before
+
+
+def test_a_retry_between_another_attempts_steps_is_refused_with_a_coded_409(
+    client: TestClient, admin_token: str, calibration
+) -> None:
+    """A script's run failed; then an attempt started and is between its steps. The script run's retry would measure
+    between them."""
+    queue, _ = calibration
+    [item_id] = _calibrate(client, admin_token).json()["item_ids"]
+    queue.dequeue()
+    queue.fail_queue_item(item_id, "OutOfMemoryError", "out of memory", "")
+    [step] = _calibrate(client, admin_token, {"graph": _graph(), "attempt_id": "tab", "attempt_steps": 2}).json()[
+        "item_ids"
+    ]
+    queue.dequeue()
+    queue.complete_queue_item(step)
+
+    response = client.put("/api/v1/queue/default/retry_items_by_id", json=[item_id], headers=_auth(admin_token))
+
+    assert response.status_code == 409, response.text
+    assert response.json()["detail"] == {
+        "code": "calibration_running",
+        "message": "Another calibration on this GPU is between its steps. Try again in a moment, or once it has "
+        "finished.",
+    }
+
+
+def test_the_retry_route_documents_its_coded_409() -> None:
+    responses = app.openapi()["paths"]["/api/v1/queue/{queue_id}/retry_items_by_id"]["put"]["responses"]
+    assert "calibration_running" in responses["409"]["description"]
+    assert "calibration_interleaved" in responses["409"]["description"]
 
 
 def test_status_reset_and_export_for_admins(client: TestClient, admin_token: str, calibration) -> None:
