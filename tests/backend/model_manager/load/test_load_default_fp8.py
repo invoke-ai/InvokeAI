@@ -36,7 +36,11 @@ from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch
     apply_custom_layers_to_model,
 )
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType, SubModelType
+from invokeai.backend.quantization.int8_convrot import Int4ConvrotLinear, Int8ConvrotLinear
+from invokeai.backend.quantization.nvfp4 import NVFP4Linear
 from invokeai.backend.util.fp8 import FP8_COMPUTE_DTYPE_ATTR
+from tests.fixtures.loader_seams import FP8_STORAGE_SKIPPED
+from tests.fixtures.quantized_payloads import nvfp4_codes, nvfp4_tensors
 
 
 def _make_loader(device: str = "cuda") -> ModelLoader:
@@ -1224,3 +1228,73 @@ def test_a_krea2_pipelines_encoders_never_take_fp8_storage(submodel):
     with _device_holds_fp8():
         assert loader._should_use_fp8(config, SubModelType.Transformer) is True
         assert loader._should_use_fp8(config, submodel) is False
+
+
+def _quantized_layer(scheme: str) -> torch.nn.Module:
+    if scheme == "int8":
+        codes = torch.randint(-127, 128, (128, 64), dtype=torch.int8)
+        return Int8ConvrotLinear(codes, torch.rand(128, 1) + 0.5, convrot=False, bias=torch.randn(128))
+    if scheme == "int4":
+        packed = torch.randint(-128, 128, (128, 32), dtype=torch.int8)
+        return Int4ConvrotLinear(packed, torch.rand(128, 1) + 0.5, convrot=False, bias=torch.randn(128))
+    tensors = nvfp4_tensors("layer", nvfp4_codes(torch.rand(128, 64) > 0.5), block_scale=1.0, global_scale=0.5)
+    return NVFP4Linear(tensors["layer.weight"], tensors["layer.weight_scale"], tensors["layer.weight_scale_2"])
+
+
+@pytest.mark.parametrize("scheme", ["int8", "int4", "nvfp4", None])
+def test_fp8_storage_declines_an_int8_or_int4_build_and_casts_the_dense_layers_of_any_other(scheme, caplog) -> None:
+    """One int8 or int4 layer declines the whole model, so its dense neighbour keeps the precision the build chose. An
+    nvfp4 build is cast like a dense one: the dense layer goes to fp8 and the nvfp4 buffers stay as stored."""
+    torch.manual_seed(0)
+    model = torch.nn.Module()
+    model.dense = torch.nn.Linear(16, 32).to(torch.bfloat16)
+    if scheme is not None:
+        model.quantized = _quantized_layer(scheme)
+    before = {name: tensor.clone() for name, tensor in model.state_dict().items()}
+    config = _make_config(ModelType.Main, fp8=True, base=BaseModelType.ZImage, fmt=ModelFormat.Checkpoint)
+
+    with caplog.at_level("INFO", logger="test"), _device_holds_fp8():
+        _make_loader()._apply_fp8_layerwise_casting(model, config, SubModelType.Transformer)
+
+    messages = [record.getMessage() for record in caplog.records]
+    skipped = [m for m in messages if m.startswith("FP8 Storage skipped for test - ")]
+    if scheme in ("int8", "int4"):
+        after = model.state_dict()
+        assert after.keys() == before.keys()
+        for name, tensor in before.items():
+            assert after[name].dtype is tensor.dtype, name
+            assert torch.equal(after[name], tensor), name
+        assert getattr(model, FP8_COMPUTE_DTYPE_ATTR, None) is None
+        assert skipped == [FP8_STORAGE_SKIPPED.format(name="test")]
+        return
+    assert model.dense.weight.dtype is torch.float8_e4m3fn
+    assert getattr(model, FP8_COMPUTE_DTYPE_ATTR, None) is torch.bfloat16
+    assert not skipped
+    assert any(m.startswith("FP8 layerwise casting enabled for test") for m in messages)
+    for name, tensor in before.items():
+        if name.startswith("quantized."):
+            assert model.state_dict()[name].dtype is tensor.dtype, name
+            assert torch.equal(model.state_dict()[name].float(), tensor.float()), name
+
+
+def test_an_int8_build_that_also_holds_fp8_weights_is_reported_as_already_fp8(caplog) -> None:
+    """A build that holds scaled fp8 layers keeps them packed only because FP8 Storage is on. The notice names that,
+    not the quantized layers: the latter would read as a reason to turn the setting off, which unpacks every scaled
+    layer."""
+    model = torch.nn.Module()
+    model.dense = torch.nn.Linear(16, 32).to(torch.bfloat16)
+    model.quantized = _quantized_layer("int8")
+    model.scaled = torch.nn.Linear(16, 32)
+    model.scaled.weight = torch.nn.Parameter(torch.zeros(32, 16).to(torch.float8_e4m3fn), requires_grad=False)
+    dense_before = model.dense.weight.clone()
+    config = _make_config(ModelType.Main, fp8=True, base=BaseModelType.ZImage, fmt=ModelFormat.Checkpoint)
+
+    with caplog.at_level("INFO", logger="test"), _device_holds_fp8():
+        _make_loader()._apply_fp8_layerwise_casting(model, config, SubModelType.Transformer)
+
+    messages = [record.getMessage() for record in caplog.records]
+    assert sum("weight(s) are already fp8" in message for message in messages) == 1
+    assert not any("this quantized build" in message for message in messages)
+    assert model.dense.weight.dtype is torch.bfloat16
+    assert torch.equal(model.dense.weight, dense_before)
+    assert getattr(model, FP8_COMPUTE_DTYPE_ATTR, None) is None

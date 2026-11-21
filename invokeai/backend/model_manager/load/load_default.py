@@ -29,6 +29,7 @@ from invokeai.backend.model_manager.taxonomy import (
     AnyModel,
     SubModelType,
 )
+from invokeai.backend.quantization.dequantizing_linear import DequantizingLinear
 from invokeai.backend.quantization.fp8_scaled import count_fp8_weights, should_keep_fp8_weights
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.fp8 import FP8_COMPUTE_DTYPE_ATTR, FP8_STORAGE_DTYPES, set_fp8_compute_dtype
@@ -629,6 +630,21 @@ class ModelLoader(ModelLoaderBase):
                     "no further VRAM to save and casting them would drop the scales they are stored with."
                 )
                 return model
+
+        # A quantized build leaves its timestep, input/output, modulation and text layers dense, at the precision the
+        # build chose. For int8 an unscaled e4m3 cast flushes small weights there to zero (94.8% of MOSS-Image int8's
+        # `time_embedding.2`) and moved Krea-2 int8's step-0 output error from 1.9% to 2.8%, for a saving of 0-7% of
+        # the model, so a scheme keeps its build as shipped unless it sets `leaves_dense_layers_to_fp8_storage`. After
+        # the fp8 check so that a model holding fp8 weights gets the single "already fp8" notice.
+        if isinstance(model, torch.nn.Module) and any(
+            isinstance(module, DequantizingLinear) and not module.leaves_dense_layers_to_fp8_storage
+            for module in model.modules()
+        ):
+            self._logger.info(
+                f"FP8 Storage skipped for {config.name} - this quantized build keeps its quantized layers as "
+                "stored and its other layers in the precision the build chose."
+            )
+            return model
 
         storage_dtype = torch.float8_e4m3fn
         compute_dtype = self._torch_dtype
