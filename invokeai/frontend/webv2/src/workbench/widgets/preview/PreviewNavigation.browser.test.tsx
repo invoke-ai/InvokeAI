@@ -1537,6 +1537,41 @@ describe('preview keyboard navigation boundary', () => {
     expect(mocks.commands.gallery.selectItem).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps deliberate saved navigation during a concurrent batch handoff', async () => {
+    mocks.project.queue.items = [{ ...queueItem, backendItemIds: [1, 2, 3], completedBackendItemIds: [1] }];
+    mocks.project.settings.viewerAutoSwitch = 'progress';
+    mocks.runningProgressTargets = [{ itemIndex: 2, queueItemId: queueItem.id }];
+    await render();
+
+    expect(followControls.followedSessionId).toBe('queue-item-live:2');
+    await expect.poll(() => host!.querySelector('[data-preview-filmstrip] button[aria-label="newest"]')).not.toBeNull();
+    await pressArrow('ArrowRight');
+    expect(mocks.commands.gallery.selectItem).toHaveBeenLastCalledWith(
+      expect.objectContaining({ name: 'newest' }),
+      undefined,
+      expect.any(Number),
+      true
+    );
+    expect(followControls.viewingSaved).toBe(true);
+    await commitLastSelection();
+
+    mocks.project.queue.items = [{ ...queueItem, backendItemIds: [1, 2, 3], completedBackendItemIds: [1, 2] }];
+    mocks.runningProgressTargets = [{ itemIndex: 3, queueItemId: queueItem.id }];
+    await rerender();
+
+    expect(followControls.viewingSaved).toBe(true);
+    expect(followControls.followedSessionId).toBeNull();
+    await pressArrow('ArrowRight');
+    expect(mocks.commands.gallery.selectItem).toHaveBeenLastCalledWith(
+      expect.objectContaining({ name: 'oldest' }),
+      undefined,
+      expect.any(Number),
+      true
+    );
+    expect(mocks.project.settings.viewerAutoSwitch).toBe('progress');
+    expect(mocks.commands.account.updateProjectPreferences).not.toHaveBeenCalled();
+  });
+
   it("holds the finished slot's last frame while its result routes, then shows the result until the next first frame", async () => {
     const slotOne = { itemIndex: 1, queueItemId: 'queue-item-live' };
     const slotTwo = { itemIndex: 2, queueItemId: 'queue-item-live' };

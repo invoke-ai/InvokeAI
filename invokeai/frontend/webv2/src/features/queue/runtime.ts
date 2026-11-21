@@ -54,6 +54,8 @@ import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/acco
 import { normalizeServerTimestamp } from '@platform/time/serverTimestamp';
 import { ApiError, getApiErrorMessage, sleep } from '@platform/transport/http';
 
+import { applyRemoteWorkersToGraph } from './data/remoteWorkersGraph';
+
 export interface QueueResultDestinationPort {
   addImagesToGalleryBoard(boardId: string, imageNames: string[]): Promise<void>;
   addVideosToGalleryBoard(boardId: string, videoNames: string[]): Promise<void>;
@@ -298,6 +300,14 @@ export const createQueueItemBackendSubmission = (
     return { error: 'Queue item backend submission has an invalid batch count.', kind: 'invalid' };
   }
 
+  // Only the submitted graph is modified: never write automatic nodes into
+  // the user's saved workflow document or change a recovered queue snapshot.
+  const graph = applyRemoteWorkersToGraph(
+    submission.graph,
+    queueItem.snapshot.galleryBoardId,
+    queueItem.snapshot.destination
+  );
+
   if (submission.kind === 'generate') {
     const seedStep = readSubmissionSeedStep(submission);
 
@@ -326,6 +336,7 @@ export const createQueueItemBackendSubmission = (
       kind: 'generate',
       request: {
         ...compiled,
+        graph,
         destination: queueItem.snapshot.destination,
         ...(isQueueSeedStep(submission.seedStep) ? {} : { legacySeedPlan: true as const }),
         ...(queueItem.snapshot.prepend === true ? { prepend: true } : {}),
@@ -361,6 +372,7 @@ export const createQueueItemBackendSubmission = (
     kind: 'workflow',
     request: {
       ...compiled,
+      graph,
       destination: queueItem.snapshot.destination,
       ...(queueItem.snapshot.prepend === true ? { prepend: true } : {}),
       projectId: project.id,

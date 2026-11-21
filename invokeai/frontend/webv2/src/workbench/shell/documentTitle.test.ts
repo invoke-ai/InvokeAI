@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { DOCUMENT_TITLE_BASE, DOCUMENT_TITLE_PRODUCT, formatDocumentTitle } from './documentTitle';
+import {
+  DOCUMENT_TITLE_BASE,
+  DOCUMENT_TITLE_PRODUCT,
+  formatDocumentTitle,
+  getBatchDocumentTitlePercent,
+} from './documentTitle';
 
 const labels = { generating: 'Generating', queued: '3 queued' };
 
@@ -38,5 +43,26 @@ describe('formatDocumentTitle', () => {
     expect(DOCUMENT_TITLE_PRODUCT.length).toBeLessThan(DOCUMENT_TITLE_BASE.length);
     expect(running).not.toContain(DOCUMENT_TITLE_BASE);
     expect(running.endsWith(DOCUMENT_TITLE_PRODUCT)).toBe(true);
+  });
+});
+
+describe('getBatchDocumentTitlePercent', () => {
+  it('retains live progress for a single-iteration Invoke', () => {
+    expect(getBatchDocumentTitlePercent({ batchCount: 1, completedCount: 0, singleItemPercent: 87 })).toBe(87);
+  });
+
+  it('has no misleading percent before any iteration finishes', () => {
+    expect(getBatchDocumentTitlePercent({ batchCount: 8, completedCount: 0, singleItemPercent: 87 })).toBeNull();
+  });
+
+  it('uses stable overall batch progress regardless of other GPUs progress events', () => {
+    expect(getBatchDocumentTitlePercent({ batchCount: 8, completedCount: 2, singleItemPercent: 10 })).toBe(25);
+    expect(getBatchDocumentTitlePercent({ batchCount: 8, completedCount: 2, singleItemPercent: 90 })).toBe(25);
+  });
+
+  it('advances through completions and caps at 100 percent', () => {
+    expect(getBatchDocumentTitlePercent({ batchCount: 8, completedCount: 3, singleItemPercent: 99 })).toBe(38);
+    expect(getBatchDocumentTitlePercent({ batchCount: 8, completedCount: 8, singleItemPercent: 12 })).toBe(100);
+    expect(getBatchDocumentTitlePercent({ batchCount: 8, completedCount: 9, singleItemPercent: 12 })).toBe(100);
   });
 });

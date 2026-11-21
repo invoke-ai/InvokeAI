@@ -17,6 +17,8 @@ interface LivePreviewFollow {
   sessions: QueueActiveSession[];
   gallerySessions: QueueProgressSession[];
   pinnedSessionId: string | null;
+  /** A deliberate saved Gallery selection temporarily takes priority over live rendering. */
+  viewingSaved: boolean;
   /** The session Auto-switch shows (`getAutoSwitchFollowedLive`); else null, and the Preview keeps the selected result. */
   followedSessionId: string | null;
   /** The newest running session without a frame while none is followed: what Preview waits for. */
@@ -25,6 +27,8 @@ interface LivePreviewFollow {
   follow(sessionId: string): void;
   pin(sessionId: string): void;
   showAll(): void;
+  /** A Gallery click opens saved media without stopping the running generations. */
+  showSaved(): void;
 }
 
 const LivePreviewFollowContext = createContext<LivePreviewFollow | null>(null);
@@ -49,23 +53,30 @@ export const LivePreviewFollowProvider = ({ children }: { children: ReactNode })
     () => getQueueProgressSessions(items.filter(isGalleryProgressItem), sessions),
     [items, sessions]
   );
-  const [selection, setSelection] = useState<{ projectId: string; sessionId: string | null }>({
+  const [selection, setSelection] = useState<{
+    projectId: string;
+    sessionId: string | null;
+    viewingSaved: boolean;
+  }>({
     projectId,
     sessionId: null,
+    viewingSaved: false,
   });
   const isStale =
     selection.projectId !== projectId ||
-    !enabled ||
+    (!selection.viewingSaved && !enabled) ||
+    (selection.viewingSaved && sessions.length === 0) ||
     (selection.sessionId !== null && !isAutoSwitchPinHeld(sessions, selection.sessionId));
-  if (isStale && (selection.sessionId !== null || selection.projectId !== projectId)) {
-    setSelection({ projectId, sessionId: null });
+  if (isStale && (selection.sessionId !== null || selection.viewingSaved || selection.projectId !== projectId)) {
+    setSelection({ projectId, sessionId: null, viewingSaved: false });
   }
-  const pinnedSessionId = isStale ? null : selection.sessionId;
-  // Sessions are in backend start order, so the newest running one is followed, not the one whose frame came last.
-  const followedSession = getAutoSwitchFollowedLive(mode, sessions, pinnedSessionId);
+  const viewingSaved = !isStale && selection.viewingSaved;
+  const pinnedSessionId = isStale || viewingSaved ? null : selection.sessionId;
+  // Keep upstream's first-frame and settling policy, unless the user deliberately selected saved media.
+  const followedSession = viewingSaved ? null : getAutoSwitchFollowedLive(mode, sessions, pinnedSessionId);
   const followedSessionId = followedSession?.id ?? null;
   const startingSession =
-    enabled && followedSession?.state !== 'running'
+    enabled && !viewingSaved && followedSession?.state !== 'running'
       ? (sessions.filter((session) => session.state === 'running' && !session.hasOwnFrame).at(-1) ?? null)
       : null;
   const { account } = useWorkbenchCommands();
@@ -75,16 +86,18 @@ export const LivePreviewFollowProvider = ({ children }: { children: ReactNode })
       gallerySessions,
       pinnedSessionId,
       followedSessionId,
+      viewingSaved,
       startingSession,
       follow: (sessionId) => {
         const { mode: nextMode, pinnedId } = pickAutoSwitch({ id: sessionId, kind: 'live' });
         account.updateProjectPreferences({ viewerAutoSwitch: nextMode });
-        setSelection({ projectId, sessionId: pinnedId });
+        setSelection({ projectId, sessionId: pinnedId, viewingSaved: false });
       },
-      pin: (sessionId) => setSelection({ projectId, sessionId }),
-      showAll: () => setSelection({ projectId, sessionId: null }),
+      pin: (sessionId) => setSelection({ projectId, sessionId, viewingSaved: false }),
+      showAll: () => setSelection({ projectId, sessionId: null, viewingSaved: false }),
+      showSaved: () => setSelection({ projectId, sessionId: null, viewingSaved: true }),
     }),
-    [account, sessions, gallerySessions, followedSessionId, pinnedSessionId, projectId, startingSession]
+    [account, sessions, gallerySessions, followedSessionId, pinnedSessionId, projectId, startingSession, viewingSaved]
   );
   return <LivePreviewFollowContext value={value}>{children}</LivePreviewFollowContext>;
 };

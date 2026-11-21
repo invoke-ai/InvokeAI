@@ -2,6 +2,7 @@
 import type * as QueueDataStore from '@features/queue/ui/queueDataStore';
 
 import { ChakraProvider } from '@chakra-ui/react';
+import { itemProgressStore } from '@features/queue/data/itemProgressStore';
 import { CANCEL_CURRENT_SETTLE_MS } from '@features/queue/ui/cancelCurrent';
 import { clearQueueConfirmation } from '@features/queue/ui/queueConfirmationStore';
 import { QueueDataRuntime } from '@features/queue/ui/QueueDataRuntime';
@@ -331,6 +332,26 @@ describe('QueueCluster', () => {
 
     expect(queueButton().textContent).toBe('3');
     expect(announcement()).toBe('topbar.queue.imageProgress {"current":1,"total":3}');
+  });
+
+  it('shows separate progress rows for concurrent iterations of one Invoke', async () => {
+    state.localItems = [projectRun('running')];
+    itemProgressStore.set(7, { message: 'Denoising first', percentage: 0.25 });
+    itemProgressStore.set(8, { message: 'Denoising second', percentage: 0.75 });
+    await render({ items: [running, serverItem(8, 'in_progress'), serverItem(9, 'pending')] });
+
+    await act(() => userEvent.hover(queueButton()));
+    await vi.waitFor(() => expect(document.querySelector('[data-queue-backend-progress="7"]')).not.toBeNull());
+    const first = () => document.querySelector('[data-queue-backend-progress="7"]');
+    const second = () => document.querySelector('[data-queue-backend-progress="8"]');
+    expect(first()?.textContent).toContain('Denoising first');
+    expect(second()?.textContent).toContain('Denoising second');
+    expect(document.body.textContent).toContain('topbar.queue.imagesFinished {"current":0,"total":3}');
+
+    await act(() => itemProgressStore.set(8, { message: 'Second at 90%', percentage: 0.9 }));
+    expect(first()?.textContent).toContain('Denoising first');
+    await vi.waitFor(() => expect(second()?.textContent).toContain('Second at 90%'));
+    expect(announcement()).toBe('topbar.queue.imagesFinished {"current":0,"total":3}');
   });
 
   it("shows the project's runs waiting on a lost connection instead of an idle queue", async () => {

@@ -453,6 +453,60 @@ describe('queueCoordinator', () => {
     expect(images.map((image) => image.imageName)).toEqual(['image-1.png']);
   });
 
+  it.each([
+    { name: 'a burst of completions', statuses: Array.from({ length: 10 }, () => 'completed' as const) },
+    { name: 'failed or canceled items', statuses: ['failed', 'canceled'] as const },
+  ])('does not request redundant Gallery refreshes for $name', async ({ statuses }) => {
+    vi.useFakeTimers();
+    harness.coordinator.dispose();
+    harness.hub.disconnect();
+    harness = createHarness({ galleryRefreshCoalesceMs: 400 });
+    const itemIds = statuses.map((_status, index) => index + 1);
+    harness.api.enqueueGenerate.mockResolvedValue({
+      batchId: 'batch-1',
+      enqueued: itemIds.length,
+      itemIds,
+      requested: itemIds.length,
+    });
+    harness.coordinator.connect();
+    await harness.coordinator.submitGenerate('local-1', generateRequest);
+    await vi.advanceTimersByTimeAsync(500);
+    harness.callbacks.onGalleryRefresh.mockClear();
+
+    statuses.forEach((status, index) => {
+      harness.socket.fire('queue_item_status_changed', createStatusEvent({ item_id: index + 1, status }));
+    });
+
+    await vi.advanceTimersByTimeAsync(500);
+    expect(harness.callbacks.onGalleryRefresh).not.toHaveBeenCalled();
+  });
+
+  it('keeps model-transfer progress out of generation progress', async () => {
+    harness.coordinator.connect();
+    await harness.coordinator.submitGenerate('local-1', generateRequest);
+    const before = harness.progressEntries.get('local-1');
+    harness.activeProgressTarget.set.mockClear();
+
+    const message = `[[IRW_MODEL_TRANSFER]]${JSON.stringify({
+      backend_item_id: 1,
+      remote_index: 2,
+      model_hash: 'hash',
+      name: 'Example',
+      directory: true,
+      phase: 'downloading',
+      bytes: 40,
+      total_bytes: 100,
+    })}`;
+    harness.socket.fire('invocation_progress', {
+      ...createStatusEvent({ item_id: 1 }),
+      message,
+      percentage: 0.4,
+    });
+
+    expect(harness.activeProgressTarget.set).not.toHaveBeenCalled();
+    expect(harness.progressEntries.get('local-1')).toEqual(before);
+  });
+
   it('routes progress events to the tracked item and clears them on completion', async () => {
     harness.coordinator.connect();
 
