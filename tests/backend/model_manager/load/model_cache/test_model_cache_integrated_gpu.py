@@ -954,6 +954,7 @@ def test_integrated_cuda_handle_finalizer_does_not_reenter_shared_store_lock(moc
     store = SharedCpuWeightsStore()
     budget = RamBudget(max_bytes=2**30, shared_store=store)
     cache = _make_cuda_cache(mock_logger, ram_budget=budget, shared_cpu_weights=store)
+    gc.freeze()
     try:
         with _patch_integrated_cuda():
             cache.put("m", DummyModule())
@@ -999,7 +1000,10 @@ def test_integrated_cuda_handle_finalizer_does_not_reenter_shared_store_lock(moc
         assert store.total_bytes_in_use() == 0
         assert budget.total_in_use() == 0
     finally:
-        cache.shutdown()
+        try:
+            cache.shutdown()
+        finally:
+            gc.unfreeze()
 
 
 def test_integrated_cuda_handle_finalizer_runs_after_weakset_removal(mock_logger: MagicMock):
