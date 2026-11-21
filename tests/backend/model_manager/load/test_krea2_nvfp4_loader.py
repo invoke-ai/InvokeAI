@@ -22,6 +22,7 @@ from invokeai.backend.model_manager.taxonomy import Krea2VariantType
 from invokeai.backend.quantization.int8_convrot import CONVROT_GROUP_SIZE, Int8ConvrotLinear
 from invokeai.backend.quantization.nvfp4 import NVFP4Linear
 from tests.fixtures.quantized_payloads import comfy_quant_marker, nvfp4_signed_tensors
+from tests.fixtures.safetensors_files import served_checkpoint
 
 COMPUTE_DTYPE = torch.bfloat16
 
@@ -77,7 +78,6 @@ def loaded(request, monkeypatch: pytest.MonkeyPatch, tmp_path) -> SimpleNamespac
     """The loader run over a native nvfp4 file whose `blocks.0.attn.wk` neighbour is dense or int8 -- the two
     side-channel branches the nvfp4 layers have to pass through untouched."""
     import diffusers
-    import safetensors.torch
 
     torch.manual_seed(0)
     state_dict: dict[str, torch.Tensor] = {}
@@ -122,7 +122,10 @@ def loaded(request, monkeypatch: pytest.MonkeyPatch, tmp_path) -> SimpleNamespac
     loader._apply_fp8_layerwise_casting = lambda model, _config, _submodel: model
 
     monkeypatch.setattr(diffusers, "Krea2Transformer2DModel", _TinyKrea2, raising=False)
-    monkeypatch.setattr(safetensors.torch, "load_file", lambda _path: state_dict)
+    monkeypatch.setattr(
+        "invokeai.backend.model_manager.load.model_loaders.krea2.load_safetensors_checkpoint",
+        served_checkpoint(state_dict),
+    )
     monkeypatch.setattr(
         krea2,
         "read_safetensors_metadata",

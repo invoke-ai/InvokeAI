@@ -38,6 +38,7 @@ from tests.backend.flux3.flux3_fixture import (
 )
 from tests.fixtures.loader_seams import Seam, SeamRun, prepare
 from tests.fixtures.quantized_payloads import nvfp4_codes, nvfp4_tensors
+from tests.fixtures.safetensors_files import needs_mapping_that_shows_file_writes, tensors_reading_the_file
 
 SEAM = Seam(
     loader=Flux3CheckpointModel,
@@ -79,9 +80,9 @@ def _build(scheme: str, *, flow_map: bool = True, **options) -> QuantizedFlux3:
     return quantize_flux3_native(to_native(tiny_flux3_model(flow_map=flow_map)), scheme, **options)
 
 
-def _config(flow_map: bool = True) -> Main_Checkpoint_Flux3_Config:
+def _config(flow_map: bool = True, path: str = "flux3.safetensors") -> Main_Checkpoint_Flux3_Config:
     variant = Flux3VariantType.Klein if flow_map else Flux3VariantType.KleinBase
-    return Main_Checkpoint_Flux3_Config.model_construct(path="flux3.safetensors", name="flux3", variant=variant)
+    return Main_Checkpoint_Flux3_Config.model_construct(path=path, name="flux3", variant=variant)
 
 
 def _load(
@@ -397,23 +398,23 @@ def test_a_torchao_build_the_loader_cannot_decode_is_refused_before_room_is_rese
     assert run.reserved == []
 
 
-def test_a_folded_torchao_load_does_not_leave_parameters_pinning_the_file_mapping(
-    monkeypatch: pytest.MonkeyPatch,
+@needs_mapping_that_shows_file_writes
+@pytest.mark.parametrize("keep_fp8", [False, True], ids=["folded", "kept"])
+def test_no_parameter_of_a_torchao_load_reads_the_file_afterwards(
+    monkeypatch: pytest.MonkeyPatch, tmp_path, keep_fp8: bool
 ) -> None:
-    """Dense tensors already in the compute dtype (the text blocks and the embedders) are left in place
-    by the fold and the cast; as parameters they would be slices of the file's mapping, which the cache's size
-    calculation cannot see."""
+    """Dense tensors already in the compute dtype (the text blocks and the embedders) are left in place by the fold and
+    the cast, and a kept load leaves the fp8 codes as read too. A parameter that is still a slice of the file's mapping
+    pins the whole file, which the cache's size calculation cannot see. Read from a real file: only one has a mapping."""
+    monkeypatch.setattr(load_default, "should_keep_fp8_weights", lambda _device: keep_fp8)
     build = _torchao()
+    path = tmp_path / "flux3.safetensors"
+    safetensors.torch.save_file({key: value.clone() for key, value in build.state_dict.items()}, str(path))
 
-    _, model = _load(monkeypatch, build)
+    run = prepare(SEAM, monkeypatch, metadata=build.metadata)
+    model = run.load(_config(path=str(path)), SubModelType.Transformer)
 
-    for name in (
-        "txt_mode_blocks.0.attn.to_q.weight",
-        "x_embedders.image.weight",
-    ):
-        parameter = model.get_parameter(name)
-        assert parameter.data_ptr() != build.state_dict[name].data_ptr(), name
-        assert torch.equal(parameter, build.state_dict[name])
+    assert tensors_reading_the_file(model, path) == []
 
 
 def test_a_kept_torchao_load_does_not_copy_the_fp8_codes(monkeypatch: pytest.MonkeyPatch) -> None:
