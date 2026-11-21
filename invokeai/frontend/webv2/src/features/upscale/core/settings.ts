@@ -246,8 +246,8 @@ export interface UpscaleArchitecture {
   /** Lets the compiler start an index-clipping node where FLUX would for the same Creativity; null otherwise. */
   readonly indexClipping: UpscaleIndexClipping | null;
   /**
-   * Schedulers that start where Creativity puts the pass; null where all do. LCM on FLUX.1/Z-Image/Anima and
-   * Anima's Heun build their own schedules past the blend. `test_upscale_index_clipped_starts.py` checks these.
+   * Schedulers that start where Creativity puts the pass; null where all do. Explicit even where they match every
+   * backend scheduler, so a new one stays out until `test_upscale_index_clipped_starts.py` passes it.
    */
   readonly schedulers: readonly string[] | null;
   /**
@@ -293,8 +293,9 @@ export const UPSCALE_ARCHITECTURES = {
     indexClipping: null,
     label: 'FLUX.1',
     negativePrompt: 'never',
-    // `flux/denoise.py` uses `z_image_denoise`'s schedulers, so this follows the backend contract's Z-Image list.
-    schedulers: ['euler', 'heun'],
+    // `flux/denoise.py` hands Heun and LCM to the same diffusers schedulers as `z_image_denoise`, so
+    // this list follows the one the backend contract checks for Z-Image.
+    schedulers: ['euler', 'heun', 'lcm'],
     takesModelGuidance: false,
     takesModelSteps: false,
     tileControlNet: null,
@@ -327,7 +328,7 @@ export const UPSCALE_ARCHITECTURES = {
     },
     label: 'Z-Image',
     negativePrompt: 'cfg-gated',
-    schedulers: ['euler', 'heun'],
+    schedulers: ['euler', 'heun', 'lcm'],
     takesModelGuidance: true,
     takesModelSteps: false,
     tileControlNet: { matchesName: nameIncludes('tile'), required: false },
@@ -342,7 +343,7 @@ export const UPSCALE_ARCHITECTURES = {
     indexClipping: { rounding: 'floor', sigmas: (_model, _size, steps) => shiftedSigmas(ANIMA_SCHEDULE_SHIFT, steps) },
     label: 'Anima',
     negativePrompt: 'cfg-gated',
-    schedulers: ['euler', 'dpmpp_2m', 'dpmpp_2m_sde', 'er_sde'],
+    schedulers: ['euler', 'heun', 'dpmpp_2m', 'dpmpp_2m_sde', 'er_sde', 'lcm'],
     takesModelGuidance: true,
     takesModelSteps: false,
     tileControlNet: null,

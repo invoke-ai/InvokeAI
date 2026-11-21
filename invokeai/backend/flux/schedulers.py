@@ -78,6 +78,8 @@ def set_timesteps_from_sigmas(
     # set_timesteps() appends a terminal sigma of 0, and step() reads sigmas[step_index + 1], so the
     # requested terminal sigma has to replace it for a pass that ends before the schedule does.
     scheduler.set_timesteps(sigmas=sigmas, device=device)
+    # step() otherwise finds its index by value, which lands past the first entry when the leading sigma repeats.
+    scheduler.set_begin_index(0)
     scheduler.sigmas[-1] = torch.as_tensor(terminal_sigma, dtype=scheduler.sigmas.dtype, device=scheduler.sigmas.device)
 
 
@@ -135,12 +137,10 @@ ERNIE_IMAGE_SHIFT = 4.0
 
 
 # Anima scheduler types.
-# Anima uses rectified flow with shift=3.0. The driver passes pre-shifted sigmas via
-# set_timesteps(sigmas=...) when the scheduler accepts that signature. For those, the
-# entry carries shift=1.0 to avoid double-shifting (the scheduler uses our sigmas verbatim).
-# Schedulers that don't accept sigmas= (Heun, DPM++ on diffusers 0.35.1) build their own
-# internal schedule, so they need shift=ANIMA_SHIFT/flow_shift=ANIMA_SHIFT in kwargs to match
-# Anima's reference loglinear schedule.
+# Anima uses rectified flow with shift=3.0. The driver passes pre-shifted sigmas, so Euler, Heun and LCM
+# entries carry shift=1.0 to avoid double-shifting: Euler and LCM take them through set_timesteps(sigmas=...),
+# Heun through set_heun_timesteps_from_sigmas. DPM++ on diffusers takes no sigmas= and builds its own
+# internal schedule, so it needs flow_shift=ANIMA_SHIFT in kwargs to match Anima's reference loglinear schedule.
 
 # Fixed shift factor for the Anima rectified-flow noise schedule.
 ANIMA_SHIFT = 3.0
@@ -159,12 +159,11 @@ ANIMA_SCHEDULER_LABELS: dict[str, str] = {
 # When adding a new Anima scheduler: add to all three of NAME_VALUES, LABELS,
 # and this MAP. The MAP entry is `(SchedulerClass, scheduler_kwargs)`. For
 # rectified-flow schedulers, set `use_flow_sigmas=True` and use
-# `prediction_type="flow_prediction"`. If the scheduler accepts set_timesteps(sigmas=...),
-# use shift=1.0 (driver passes pre-shifted sigmas); otherwise use shift=ANIMA_SHIFT
-# so the scheduler builds the correct internal schedule.
+# `prediction_type="flow_prediction"`. If the driver passes the scheduler pre-shifted sigmas,
+# use shift=1.0; otherwise use shift=ANIMA_SHIFT so the scheduler builds the correct internal schedule.
 ANIMA_SCHEDULER_MAP: dict[str, tuple[Type[SchedulerMixin], dict[str, Any]]] = {
     "euler": (FlowMatchEulerDiscreteScheduler, {"shift": 1.0}),
-    "heun": (FlowMatchHeunDiscreteScheduler, {"shift": ANIMA_SHIFT}),
+    "heun": (FlowMatchHeunDiscreteScheduler, {"shift": 1.0}),
     "dpmpp_2m": (
         DPMSolverMultistepScheduler,
         {

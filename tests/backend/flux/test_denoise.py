@@ -539,9 +539,42 @@ def test_lcm_preview_uses_the_model_evaluation_sample_and_sigma(monkeypatch):
     assert model.timesteps == pytest.approx(
         [float(timestep / scheduler.config.num_train_timesteps) for timestep in scheduler.timesteps]
     )
-    assert model.timesteps == pytest.approx([1.0, 0.001])
-    assert not torch.allclose(scheduler.sigmas, torch.tensor([1.0, 0.5, 0.0]))
+    assert model.timesteps == pytest.approx([1.0, 0.5])
     assert torch.allclose(callbacks[0].latents, expected_preview)
+
+
+@pytest.mark.skipif(not _HAS_LCM, reason="FlowMatchLCMScheduler not available in this Diffusers version")
+@pytest.mark.parametrize("terminal_sigma", [0.0, 0.1])
+def test_lcm_img2img_starts_at_the_clipped_schedules_first_sigma_and_ends_at_its_terminal_sigma(
+    monkeypatch, terminal_sigma
+):
+    monkeypatch.setattr("invokeai.backend.flux.denoise.tqdm", _fake_tqdm)
+    schedule = [0.5, 0.3, terminal_sigma]
+    scheduler = FLUX_SCHEDULER_MAP["lcm"](num_train_timesteps=1000)
+
+    _, _, model, callbacks = _run_with_scheduler(scheduler, schedule)
+
+    assert model.timesteps == pytest.approx(schedule[:-1])
+    assert scheduler.sigmas[0].item() == pytest.approx(0.5)
+    assert scheduler.sigmas[-1].item() == pytest.approx(terminal_sigma)
+    assert [callback.step for callback in callbacks] == [1, 2]
+
+
+@pytest.mark.parametrize("scheduler_name", ["euler", "lcm"])
+def test_set_timesteps_from_sigmas_steps_a_plan_whose_leading_sigma_repeats(scheduler_name):
+    """step() would find a repeated leading timestep by value and start one entry late, running off the plan's end."""
+    if scheduler_name == "lcm" and not _HAS_LCM:
+        pytest.skip("FlowMatchLCMScheduler not available in this Diffusers version")
+    from invokeai.backend.flux.schedulers import set_timesteps_from_sigmas
+
+    scheduler = FLUX_SCHEDULER_MAP[scheduler_name](num_train_timesteps=1000)
+    set_timesteps_from_sigmas(scheduler, [0.5, 0.5, 0.2], 0.1, "cpu")
+    sample = torch.ones(1, 1, 1)
+
+    for timestep in scheduler.timesteps:
+        sample = scheduler.step(torch.zeros_like(sample), timestep, sample).prev_sample
+
+    assert scheduler.step_index == 3
 
 
 @pytest.mark.skipif(not _HAS_LCM, reason="FlowMatchLCMScheduler not available in this Diffusers version")
