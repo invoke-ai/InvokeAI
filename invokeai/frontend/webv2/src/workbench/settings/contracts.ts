@@ -121,10 +121,7 @@ export interface WorkbenchPreferences {
   controlModelMemory: Record<string, string>;
   /** Canvas owns the shape and normalizes it on read (`canvas-operations/toolMemory.ts`). */
   canvasToolMemory: Readonly<Record<string, unknown>>;
-  /**
-   * The last settings an export dialog saved with, read by Quick export. Image actions own the shape and normalize it on
-   * read (gallery `normalizeImageExportSettings`): opaque here, the store keeps gallery code off the Launchpad's startup.
-   */
+  /** Opaque so the store keeps gallery code off Launchpad startup; read through `normalizeImageExportSettings`. */
   imageExportSettings: Readonly<Record<string, unknown>>;
   scopedDefaults: ScopedDefaults;
   antialiasProgressImages: boolean;

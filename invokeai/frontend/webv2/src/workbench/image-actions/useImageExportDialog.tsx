@@ -17,15 +17,12 @@ export interface ImageExportDialogRequest {
   ticket: number;
 }
 
-/** The dialog's controls and preview load on first open, outside the editor's initial payload. */
 const LazyImageExportDialog = lazy(() =>
   import('./ImageExportDialog').then((module) => ({ default: module.ImageExportDialog }))
 );
 
-// The dialog is open, and modal, from the request that opened it, not from when its module arrives.
 const PENDING_DIALOG = <Dialog.Pending />;
 
-/** One export dialog per host; a new request replaces an open one, and an account change closes it. */
 export const useImageExportDialog = (): { dialog: ReactNode; requestImageExport: RequestImageExport } => {
   const [request, setRequest] = useState<ImageExportDialogRequest | null>(null);
   const retained = useExitRetainedValue(request);
@@ -52,7 +49,7 @@ export const useImageExportDialog = (): { dialog: ReactNode; requestImageExport:
       setRequest({
         execute,
         owner,
-        // A menu item that opened the dialog is gone by the time it closes; the dialog then restores focus itself.
+        // A menu item opener is gone by close time; the dialog then restores focus itself.
         returnFocus: () => options.returnFocus?.() ?? (opener?.isConnected ? opener : null),
         target,
         ticket,

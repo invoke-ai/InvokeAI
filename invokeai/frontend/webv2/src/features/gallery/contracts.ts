@@ -29,7 +29,6 @@ export {
   getImageExportEncoding,
   getImageExportLongEdgeForScale,
   getImageExportLongEdgeForSide,
-  getImageExportSummary,
   IMAGE_EXPORT_FORMAT_LABELS,
   IMAGE_EXPORT_FORMATS,
   IMAGE_EXPORT_METADATA,

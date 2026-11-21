@@ -86,6 +86,7 @@ vi.mock('@workbench/WorkbenchContext', () => ({
   useWidgetValuesSelector: (_widgetId: string, selector: (values: Record<string, unknown>) => unknown) =>
     selector(galleryValuesMock.current),
   useWorkbenchCommands: () => commandsMock,
+  useWorkbenchQueries: vi.fn(),
 }));
 // Keys stand in for copy; the one interpolated value a test reads, an upscale factor, is shown as the locale does.
 vi.mock('react-i18next', () => ({

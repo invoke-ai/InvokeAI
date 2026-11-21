@@ -1,9 +1,10 @@
 import type { ImageSize } from '@features/gallery/contracts';
 import type { CSSProperties, KeyboardEvent, PointerEvent } from 'react';
 
-import { Box, HStack, Stack, Text } from '@chakra-ui/react';
+import { Box, HStack, Icon, Stack, Text } from '@chakra-ui/react';
 import { LoadError } from '@platform/ui/LoadError';
 import { SegmentedControl } from '@platform/ui/SegmentedControl';
+import { TriangleAlertIcon } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -14,9 +15,21 @@ interface Pan {
   y: number;
 }
 
-/** While nothing has loaded, the frame holds a common photo shape instead of collapsing. */
+export interface ImageExportPreviewError {
+  canRetry: boolean;
+  detail: string | null;
+  message: string;
+}
+
 const PLACEHOLDER_SIZE: ImageSize = { height: 3, width: 4 };
 const DIVIDER_KEY_STEP = 5;
+const PAN_KEY_STEP = 40;
+const PAN_KEY_STEPS: Readonly<Record<string, Pan>> = {
+  ArrowDown: { x: 0, y: -1 },
+  ArrowLeft: { x: 1, y: 0 },
+  ArrowRight: { x: -1, y: 0 },
+  ArrowUp: { x: 0, y: 1 },
+};
 
 const LAYER_STYLE: CSSProperties = { inset: 0, overflow: 'hidden', pointerEvents: 'none', position: 'absolute' };
 const FIT_IMAGE_STYLE: CSSProperties = {
@@ -30,6 +43,7 @@ const FIT_IMAGE_STYLE: CSSProperties = {
 };
 const FRAME_TOUCH_STYLE: CSSProperties = { touchAction: 'none' };
 const NO_TRANSITION = { transition: 'none' } as const;
+const FRAME_FOCUS_RING = { outline: '2px solid', outlineColor: 'accent.focusRing', outlineOffset: '2px' } as const;
 const DIVIDER_FOCUS_RING = {
   outline: 'none',
   '& > span': { boxShadow: '0 0 0 2px var(--chakra-colors-accent-solid)' },
@@ -50,7 +64,8 @@ const getFrameSize = (frame: HTMLElement | null): ImageSize => {
   return { height: rect?.height ?? 0, width: rect?.width ?? 0 };
 };
 
-/** The original against the export, split by a divider; at 100% both show at the original's pixels and pan together. */
+const EMPTY_FRAME: ImageSize = { height: 0, width: 0 };
+
 export const ImageExportCompare = ({
   error,
   exportBlob,
@@ -64,14 +79,13 @@ export const ImageExportCompare = ({
   onOriginalLoad,
   onRetry,
 }: {
-  error: { detail: string | null; message: string } | null;
+  error: ImageExportPreviewError | null;
   exportBlob: Blob | null;
   exportLabel: string;
   isEncoding: boolean;
   isRetrying: boolean;
   originalAlt: string;
   originalUrl: string;
-  /** The original's pixel size; until known, the frame keeps a placeholder shape. */
   sourceSize: ImageSize | null;
   onExportLoad: (size: ImageSize) => void;
   onOriginalLoad: (size: ImageSize) => void;
@@ -80,12 +94,29 @@ export const ImageExportCompare = ({
   const { t } = useTranslation();
   const [split, setSplit] = useState(50);
   const [zoom, setZoom] = useState<ExportZoom>('fit');
-  const [pan, setPan] = useState<Pan>({ x: 0, y: 0 });
+  const [storedPan, setPan] = useState<Pan>({ x: 0, y: 0 });
+  const [frameSize, setFrameSize] = useState<ImageSize>(EMPTY_FRAME);
   const [isPanning, setIsPanning] = useState(false);
   const frameRef = useRef<HTMLDivElement | null>(null);
   const dragRef = useRef<{ kind: 'divider' } | { kind: 'pan'; origin: Pan; x: number; y: number } | null>(null);
   const shape = sourceSize ?? PLACEHOLDER_SIZE;
   const isActual = zoom === 'actual' && sourceSize !== null;
+  const pan = isActual ? clampPan(storedPan, frameSize, sourceSize) : storedPan;
+
+  const attachFrame = useCallback((node: HTMLDivElement | null) => {
+    frameRef.current = node;
+    if (!node) {
+      return;
+    }
+
+    const observer = new ResizeObserver(() => setFrameSize(getFrameSize(node)));
+
+    observer.observe(node);
+    return () => {
+      observer.disconnect();
+      frameRef.current = null;
+    };
+  }, []);
 
   const exportImageRef = useCallback(
     (node: HTMLImageElement | null) => {
@@ -163,6 +194,28 @@ export const ImageExportCompare = ({
     setIsPanning(false);
   }, []);
 
+  const handleFrameKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLDivElement>) => {
+      const direction = PAN_KEY_STEPS[event.key];
+
+      if (!isActual || !sourceSize || !direction || event.target !== event.currentTarget) {
+        return;
+      }
+
+      const step = event.shiftKey ? PAN_KEY_STEP * 5 : PAN_KEY_STEP;
+
+      event.preventDefault();
+      setPan(
+        clampPan(
+          { x: pan.x + direction.x * step, y: pan.y + direction.y * step },
+          getFrameSize(frameRef.current),
+          sourceSize
+        )
+      );
+    },
+    [isActual, pan, sourceSize]
+  );
+
   const handleDividerKeyDown = useCallback((event: KeyboardEvent<HTMLDivElement>) => {
     const step = event.shiftKey ? DIVIDER_KEY_STEP * 2 : DIVIDER_KEY_STEP;
     const next =
@@ -191,7 +244,6 @@ export const ImageExportCompare = ({
         const frame = getFrameSize(frameRef.current);
         const fraction = split / 100;
 
-        // Keep the point under the divider under it, where the two sides meet.
         setPan(
           clampPan(
             { x: fraction * (frame.width - sourceSize.width), y: (frame.height - sourceSize.height) / 2 },
@@ -248,7 +300,8 @@ export const ImageExportCompare = ({
     <Stack bg="bg.inset" gap="0" h="full" minH="0" minW="0">
       <Box containerType="size" flex="1" minH="56" p="3" position="relative">
         <Box
-          ref={frameRef}
+          ref={attachFrame}
+          aria-label={isActual ? t('widgets.gallery.export.panStage') : undefined}
           aspectRatio={`${shape.width} / ${shape.height}`}
           cursor={isActual ? (isPanning ? 'grabbing' : 'grab') : 'ew-resize'}
           insetInlineStart="50%"
@@ -257,10 +310,14 @@ export const ImageExportCompare = ({
           outlineColor="border.subtle"
           overflow="hidden"
           position="absolute"
+          role={isActual ? 'group' : undefined}
           style={FRAME_TOUCH_STYLE}
+          tabIndex={isActual ? 0 : undefined}
           top="50%"
           transform="translate(-50%, -50%)"
           w={`min(calc(100cqw - var(--chakra-spacing-6)), calc((100cqh - var(--chakra-spacing-6)) * ${shape.width / shape.height}))`}
+          _focusVisible={FRAME_FOCUS_RING}
+          onKeyDown={handleFrameKeyDown}
           onLostPointerCapture={endDrag}
           onPointerCancel={endDrag}
           onPointerDown={handlePointerDown}
@@ -335,14 +392,30 @@ export const ImageExportCompare = ({
         {/* Outside the frame, whose pointer capture would swallow the Retry click. */}
         {error ? (
           <Box bg="bg.panel" borderRadius="md" bottom="4" boxShadow="md" insetInline="4" p="2" position="absolute">
-            <LoadError
-              detail={error.detail}
-              isRetrying={isRetrying}
-              layout="inline"
-              message={error.message}
-              retryLabel={t('widgets.gallery.export.retryPreview')}
-              onRetry={onRetry}
-            />
+            {error.canRetry ? (
+              <LoadError
+                detail={error.detail}
+                isRetrying={isRetrying}
+                layout="inline"
+                message={error.message}
+                retryLabel={t('widgets.gallery.export.retryPreview')}
+                onRetry={onRetry}
+              />
+            ) : (
+              <HStack alignItems="flex-start" gap="1.5" role="alert">
+                <Icon as={TriangleAlertIcon} boxSize="3" color="fg.error" flexShrink={0} mt="px" />
+                <Stack flex="1" gap="0.5" minW="0">
+                  <Text color="fg.error" fontSize="xs" textWrap="pretty">
+                    {error.message}
+                  </Text>
+                  {error.detail ? (
+                    <Text color="fg.muted" fontSize="xs" wordBreak="break-word">
+                      {error.detail}
+                    </Text>
+                  ) : null}
+                </Stack>
+              </HStack>
+            )}
           </Box>
         ) : null}
       </Box>

@@ -83,12 +83,7 @@ import { useWorkbenchCommands, useWorkbenchQueries, useWorkbenchSelector } from 
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import type {
-  ExecuteImageExport,
-  ImageExportRequestOptions,
-  ImageExportTarget,
-  RequestImageExport,
-} from './imageExport';
+import type { ExecuteImageExport, ImageExportTarget, OpenImageExport, RequestImageExport } from './imageExport';
 import type { MediaUsageHost } from './mediaUsageReport';
 import type { RequestDeletionConfirmation } from './useDeletionConfirmation';
 import type { VideoRecallKind } from './videoRecall';
@@ -139,10 +134,8 @@ export interface ImageActions extends GalleryItemActions {
   loadImageWorkflow: (image: GalleryImage) => Promise<void>;
   loadVideoWorkflow: (item: GalleryVideoItem) => Promise<void>;
   moveImagesToBoard: (imageNames: string[], boardId: string) => Promise<void>;
-  /** Opens the export dialog; does nothing in a host without one (the paste dialog). */
-  openImageExport: (target: ImageExportTarget, options?: ImageExportRequestOptions) => void;
+  openImageExport: OpenImageExport;
   openImageInPreview: (image: GalleryImage) => void;
-  /** Exports with the settings the dialog last saved, without asking. */
   quickExportImages: (target: ImageExportTarget) => Promise<void>;
   recallImageData: (image: GalleryImage, kind: ImageRecallKind) => Promise<void>;
   recallVideoData: (item: GalleryVideoItem, kind: VideoRecallKind) => Promise<void>;
@@ -246,6 +239,54 @@ const toPngBlob = async (blob: Blob): Promise<Blob> => {
   });
 };
 
+interface ImageArchivesOutcome {
+  archiveCount: number;
+  failedCount: number;
+  failureReason: string | null;
+  savedFileCount: number;
+  succeededCount: number;
+}
+
+const saveImageArchives = async (
+  owner: AccountScope,
+  imageNames: readonly string[],
+  exportSettings?: ImageExportSettings
+): Promise<ImageArchivesOutcome | null> => {
+  const outcome: ImageArchivesOutcome = {
+    archiveCount: Math.ceil(imageNames.length / GALLERY_REQUEST_MAX_NAMES),
+    failedCount: 0,
+    failureReason: null,
+    savedFileCount: 0,
+    succeededCount: 0,
+  };
+
+  for (let offset = 0; offset < imageNames.length; offset += GALLERY_REQUEST_MAX_NAMES) {
+    const archiveNames = imageNames.slice(offset, offset + GALLERY_REQUEST_MAX_NAMES);
+
+    try {
+      const { blob, fileName } = await galleryTransfers.downloadArchive({
+        exportSettings,
+        imageNames: archiveNames,
+        signal: owner.signal,
+      });
+
+      assertAccountScopeCurrent(owner);
+      downloadBlob(blob, fileName);
+      outcome.savedFileCount += 1;
+      outcome.succeededCount += archiveNames.length;
+    } catch (error: unknown) {
+      if (!isAccountScopeCurrent(owner)) {
+        return null;
+      }
+
+      outcome.failedCount += archiveNames.length;
+      outcome.failureReason ??= toErrorMessage(error);
+    }
+  }
+
+  return outcome;
+};
+
 export const useImageActions = ({
   boards,
   generateValues,
@@ -311,6 +352,88 @@ export const useImageActions = ({
     (image: GalleryImage) => gallery.setCompareImage(image, projectId),
     [gallery, projectId]
   );
+
+  // Separate so `openImageExport` stays stable while generation values and boards change.
+  const exportActions = useMemo(() => {
+    const reportExportFailure = (error: unknown) =>
+      notifications.add({
+        kind: 'error',
+        message: toErrorMessage(error),
+        title: t('widgets.gallery.export.exportFailed'),
+      });
+    const exportArchives = async (
+      owner: AccountScope,
+      imageNames: readonly string[],
+      settings: ImageExportSettings
+    ) => {
+      const archiveCount = Math.ceil(imageNames.length / GALLERY_REQUEST_MAX_NAMES);
+
+      notifications.add({
+        kind: 'info',
+        message:
+          archiveCount > 1
+            ? t('widgets.gallery.export.preparingArchives', { count: archiveCount })
+            : t('widgets.gallery.export.preparingArchive', { count: imageNames.length }),
+        title: t('widgets.gallery.export.preparing'),
+      });
+
+      const outcome = await saveImageArchives(owner, imageNames, settings);
+
+      if (!outcome) {
+        return;
+      }
+      if (outcome.failedCount === 0) {
+        notifications.add({
+          kind: 'success',
+          title:
+            archiveCount > 1
+              ? t('widgets.gallery.export.exportedArchives', { count: outcome.savedFileCount })
+              : t('widgets.gallery.export.exportedImages', { count: outcome.succeededCount }),
+        });
+        return;
+      }
+      notifications.add({
+        kind: 'error',
+        message: outcome.failureReason ?? undefined,
+        persistent: true,
+        title:
+          outcome.succeededCount === 0
+            ? t('widgets.gallery.export.exportFailedImages', { count: imageNames.length })
+            : t('widgets.gallery.export.exportPartial', {
+                count: imageNames.length,
+                failed: outcome.failedCount,
+                succeeded: outcome.succeededCount,
+              }),
+      });
+    };
+    const executeImageExport: ExecuteImageExport = async (target, settings, { signal } = {}) => {
+      const owner = captureAccountScope();
+
+      if (target.kind === 'selection') {
+        await exportArchives(owner, target.imageNames, settings);
+        return;
+      }
+
+      const fileName = await saveImageExport({ image: target.image, owner, queryClient, settings, signal });
+
+      notifications.add({ kind: 'success', title: t('widgets.gallery.export.exportedFile', { name: fileName }) });
+    };
+    const openImageExport: OpenImageExport = (target, options) =>
+      requestImageExport?.(target, executeImageExport, options);
+    const quickExportImages = async (target: ImageExportTarget) => {
+      const owner = captureAccountScope();
+
+      try {
+        await executeImageExport(target, normalizeImageExportSettings(getWorkbenchPreferences().imageExportSettings));
+      } catch (error: unknown) {
+        if (isAccountScopeCurrent(owner)) {
+          reportExportFailure(error);
+        }
+      }
+    };
+
+    return { openImageExport, quickExportImages };
+  }, [notifications, queryClient, requestImageExport, t]);
 
   return useMemo<ImageActions>(() => {
     const recordError = (error: unknown) =>
@@ -967,60 +1090,9 @@ export const useImageActions = ({
         }
       }
     };
-    /** One archive per request-sized batch; null once the account changed, when nothing may be reported. */
-    const saveImageArchives = async (
-      owner: AccountScope,
-      imageNames: readonly string[],
-      exportSettings?: ImageExportSettings
-    ) => {
-      const outcome = {
-        archiveCount: Math.ceil(imageNames.length / GALLERY_REQUEST_MAX_NAMES),
-        failedCount: 0,
-        savedFileCount: 0,
-        succeededCount: 0,
-      };
-
-      if (outcome.archiveCount > 1) {
-        notifications.add({
-          kind: 'info',
-          message: t('widgets.gallery.itemActions.download.preparingArchives', { count: outcome.archiveCount }),
-          title: t('widgets.gallery.preparingDownload'),
-        });
-      }
-
-      for (let offset = 0; offset < imageNames.length; offset += GALLERY_REQUEST_MAX_NAMES) {
-        const archiveNames = imageNames.slice(offset, offset + GALLERY_REQUEST_MAX_NAMES);
-
-        try {
-          const { blob, fileName } = await galleryTransfers.downloadArchive({
-            exportSettings,
-            imageNames: archiveNames,
-            signal: owner.signal,
-          });
-
-          assertAccountScopeCurrent(owner);
-          downloadBlob(blob, fileName);
-          outcome.savedFileCount += 1;
-          outcome.succeededCount += archiveNames.length;
-        } catch {
-          if (!isAccountScopeCurrent(owner)) {
-            return null;
-          }
-
-          outcome.failedCount += archiveNames.length;
-        }
-      }
-
-      return outcome;
-    };
     const reportDownloadOutcome = (
       requestedCount: number,
-      {
-        archiveCount,
-        failedCount,
-        savedFileCount,
-        succeededCount,
-      }: NonNullable<Awaited<ReturnType<typeof saveImageArchives>>>
+      { archiveCount, failedCount, savedFileCount, succeededCount }: ImageArchivesOutcome
     ) => {
       if (failedCount > 0) {
         recordError(
@@ -1045,6 +1117,16 @@ export const useImageActions = ({
       const loadedByKey = new Map(loadedItems.map((item) => [toGalleryItemKey(item), item]));
       const imageNames = items.filter((item) => item.kind === 'image').map((item) => item.name);
       const videoRefs = items.filter((item) => item.kind === 'video');
+      const archiveCount = Math.ceil(imageNames.length / GALLERY_REQUEST_MAX_NAMES);
+
+      if (archiveCount > 1) {
+        notifications.add({
+          kind: 'info',
+          message: t('widgets.gallery.itemActions.download.preparingArchives', { count: archiveCount }),
+          title: t('widgets.gallery.preparingDownload'),
+        });
+      }
+
       const outcome = await saveImageArchives(owner, imageNames);
 
       if (!outcome) {
@@ -1077,33 +1159,6 @@ export const useImageActions = ({
       }
 
       reportDownloadOutcome(items.length, outcome);
-    };
-    const executeImageExport: ExecuteImageExport = async (target, settings) => {
-      const owner = captureAccountScope();
-
-      if (target.kind === 'image') {
-        await saveImageExport({ image: target.image, owner, queryClient, settings });
-        return;
-      }
-
-      const outcome = await saveImageArchives(owner, target.imageNames, settings);
-
-      if (outcome) {
-        reportDownloadOutcome(target.imageNames.length, outcome);
-      }
-    };
-    const openImageExport = (target: ImageExportTarget, options?: ImageExportRequestOptions) =>
-      requestImageExport?.(target, executeImageExport, options);
-    const quickExportImages = async (target: ImageExportTarget) => {
-      const owner = captureAccountScope();
-
-      try {
-        await executeImageExport(target, normalizeImageExportSettings(getWorkbenchPreferences().imageExportSettings));
-      } catch (error: unknown) {
-        if (isAccountScopeCurrent(owner)) {
-          recordError(error);
-        }
-      }
     };
     const toExportTarget = (items: readonly GalleryItemRef[], loadedItems: readonly GalleryItem[]) => {
       const imageNames = items.filter((item) => item.kind === 'image').map((item) => item.name);
@@ -1138,10 +1193,10 @@ export const useImageActions = ({
       deleteItems,
       downloadItem,
       downloadItems,
-      exportItems: (items, loadedItems = []) => openImageExport(toExportTarget(items, loadedItems)),
+      exportItems: (items, loadedItems = []) => exportActions.openImageExport(toExportTarget(items, loadedItems)),
       moveItemsToBoard,
-      openImageExport,
-      quickExportImages,
+      openImageExport: exportActions.openImageExport,
+      quickExportImages: exportActions.quickExportImages,
       openItemInNewTab: (item) => {
         window.open(item.fullUrl, '_blank', 'noopener');
       },
@@ -1595,6 +1650,7 @@ export const useImageActions = ({
     confirmImageDeletion,
     currentGenerateValues,
     commands,
+    exportActions,
     gallery,
     generation,
     getItemActionContext,
@@ -1607,7 +1663,6 @@ export const useImageActions = ({
     queryClient,
     queries,
     requestDeletionConfirmation,
-    requestImageExport,
     revealLayerProperties,
     selectForCompare,
     supportedModels,

@@ -18,7 +18,7 @@ vi.mock('@platform/transport/http', async (importOriginal) => ({
   sleep: mocks.sleep,
 }));
 
-import { ApiError } from '@platform/transport/http';
+import { ApiError, getApiErrorMessage } from '@platform/transport/http';
 
 import {
   addImagesToGalleryBoard,
@@ -150,6 +150,21 @@ describe('downloadGalleryArchive', () => {
     expect(pollSignal?.aborted).toBe(true);
     expect(sleepSignal.aborted).toBe(true);
     expect(mocks.apiFetchRaw).toHaveBeenCalledTimes(1);
+  });
+
+  it('ends the wait on a failed job with the server reason', async () => {
+    mocks.apiFetchJson.mockResolvedValue({ bulk_download_item_name: 'export.zip' });
+    mocks.apiFetchRaw
+      .mockResolvedValueOnce(new Response(null, { status: 404 }))
+      .mockResolvedValueOnce(Response.json({ detail: 'moon.png cannot be decoded' }, { status: 500 }));
+    mocks.sleep.mockResolvedValue(undefined);
+
+    const error: unknown = await downloadGalleryArchive({
+      exportSettings: { format: 'webp', longEdge: null, metadata: 'none', namePattern: '{name}', quality: 90 },
+      imageNames: ['moon.png'],
+    }).catch((reason: unknown) => reason);
+
+    expect(getApiErrorMessage(error, '')).toBe('moon.png cannot be decoded');
   });
 });
 

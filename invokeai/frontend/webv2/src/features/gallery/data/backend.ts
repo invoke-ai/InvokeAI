@@ -46,6 +46,7 @@ import {
   apiFetch,
   apiFetchJson,
   apiFetchRaw,
+  assertOk,
   HttpRequestIdentityExpiredError,
   sleep,
 } from '@platform/transport/http';
@@ -1498,6 +1499,7 @@ export const moveGalleryVideoItemsToBoard = async (
 
 const BULK_DOWNLOAD_POLL_INTERVAL_MS = 2000;
 const BULK_DOWNLOAD_TIMEOUT_MS = 5 * 60 * 1000;
+const BULK_EXPORT_TIMEOUT_PER_IMAGE_MS = 5000;
 
 const toImageExportQuery = (encoding: ImageExportEncoding): string =>
   toSearchParams({
@@ -1507,7 +1509,6 @@ const toImageExportQuery = (encoding: ImageExportEncoding): string =>
     quality: encoding.quality ?? undefined,
   });
 
-/** The server's encode of a stored image: the exact bytes the file will hold. */
 export const exportGalleryImage = async (
   imageName: string,
   encoding: ImageExportEncoding,
@@ -1524,7 +1525,6 @@ export const exportGalleryImage = async (
   return blob;
 };
 
-/** File names the server would give `imageNames` in one export, in order; `{n}` counts from the first. */
 export const resolveGalleryExportFileNames = async (
   {
     format,
@@ -1548,7 +1548,6 @@ export const resolveGalleryExportFileNames = async (
   return fileNames;
 };
 
-/** The stored file's size from a HEAD on the full-image route; null when the server does not say. */
 export const getGalleryImageFileSize = async (imageName: string, signal?: AbortSignal): Promise<number | null> => {
   const owner = captureAccountScope();
   const response = await apiFetch(getGalleryImageFullPath(imageName), {
@@ -1561,7 +1560,6 @@ export const getGalleryImageFileSize = async (imageName: string, signal?: AbortS
   return Number.isSafeInteger(length) && length > 0 ? length : null;
 };
 
-/** `exportSettings` encodes every image and names it at the archive root; without it the stored files go as they are. */
 export const downloadGalleryArchive = async ({
   boardId,
   exportSettings,
@@ -1603,8 +1601,10 @@ export const downloadGalleryArchive = async ({
   }
 
   const startedAt = Date.now();
+  const timeoutMs =
+    BULK_DOWNLOAD_TIMEOUT_MS + (exportSettings ? (imageNames?.length ?? 0) * BULK_EXPORT_TIMEOUT_PER_IMAGE_MS : 0);
 
-  while (Date.now() - startedAt < BULK_DOWNLOAD_TIMEOUT_MS) {
+  while (Date.now() - startedAt < timeoutMs) {
     const response = await apiFetchRaw(`/api/v1/images/download/${encodeURIComponent(fileName)}`, {
       signal: requestSignal,
     });
@@ -1619,8 +1619,9 @@ export const downloadGalleryArchive = async ({
       return { blob, fileName };
     }
 
+    // 404 means not ready yet; any other answer is the job's failure, with its reason in `detail`.
     if (response.status !== 404) {
-      throw new Error(`${response.status} ${response.statusText}`);
+      await assertOk(response);
     }
 
     await sleep(BULK_DOWNLOAD_POLL_INTERVAL_MS, requestSignal);
@@ -1628,7 +1629,9 @@ export const downloadGalleryArchive = async ({
     requestSignal.throwIfAborted();
   }
 
-  throw new Error('Timed out preparing the download archive.');
+  throw new Error(
+    exportSettings ? 'Timed out preparing the export archive.' : 'Timed out preparing the download archive.'
+  );
 };
 
 export const uploadGalleryImage = async (

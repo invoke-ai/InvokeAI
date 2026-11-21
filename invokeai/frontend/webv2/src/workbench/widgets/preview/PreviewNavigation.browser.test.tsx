@@ -464,7 +464,6 @@ vi.mock('@features/gallery/contracts', async (importOriginal) => ({
 
 vi.mock('@workbench/image-actions', async () => ({
   EMPTY_IMAGE_RECALL_CAPABILITIES: {},
-  EXPORT_IMAGE_COMMAND_ID: 'viewer.exportImage',
   ImageContextMenu: (props: Parameters<typeof ImageContextMenuModule.ImageContextMenu>[0]) => {
     const { realImageContextMenu: RealImageContextMenu } = mocks;
 
@@ -487,6 +486,7 @@ vi.mock('@workbench/image-actions', async () => ({
   getImageRecallTitle: () => '',
   getSelectedGalleryImage: () => null,
   getSelectedGalleryImageFromValues: () => null,
+  SelectedImageExportCommand: () => null,
   useDeletionConfirmation: (
     await vi.importActual<typeof DeletionConfirmationModule>('@workbench/image-actions/useDeletionConfirmation')
   ).useDeletionConfirmation,

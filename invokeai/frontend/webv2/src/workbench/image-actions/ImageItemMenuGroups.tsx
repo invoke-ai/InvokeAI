@@ -5,11 +5,9 @@ import type { VideoConditioningRole } from '@features/video';
 import type { GalleryCanvasImportDestination } from '@workbench/canvas-operations/api';
 
 import { Menu, Text } from '@chakra-ui/react';
-import { getImageExportSummary } from '@features/gallery/contracts';
 import { galleryVideoMetadataOptions } from '@features/gallery/queries';
 import { ensureModelsLoaded, useModelsSelector } from '@features/models';
 import { getModelOnlyUpscaleFactors, getSpandrelNativeScale } from '@features/upscale';
-import { formatCount } from '@platform/i18n/languages';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { MenuActionItem, MenuItem } from '@platform/ui/Menu';
@@ -50,7 +48,7 @@ import type { ImageRecallCapabilities, ImageRecallKind } from './imageRecall';
 import type { ImageActions } from './useImageActions';
 
 import { ContextSubMenu } from './ContextSubMenu';
-import { EXPORT_IMAGE_COMMAND_ID, useImageExportPreference } from './imageExport';
+import { EXPORT_IMAGE_COMMAND_ID, formatImageExportSummary, useImageExportPreference } from './imageExport';
 import {
   EMPTY_VIDEO_RECALL_CAPABILITIES,
   getVideoRecallCapabilities,
@@ -572,7 +570,6 @@ const VideoReuseMenuItem = ({
   );
 };
 
-/** Export with the dialog, or at once with the settings it last saved; a selection without images offers neither. */
 export const ImageExportGroup = ({
   actions,
   presentation,
@@ -590,9 +587,7 @@ export const ImageExportGroup = ({
   const isSelection = target.kind === 'selection';
   const unavailableReason =
     isSelection && target.imageNames.length === 0 ? t('widgets.gallery.export.noImagesInSelection') : undefined;
-  const summary = getImageExportSummary(settings, (pixels) =>
-    t('widgets.gallery.export.longEdgeSummary', { size: formatCount(pixels) })
-  );
+  const summary = formatImageExportSummary(t, settings);
   const handleExport = useCallback(
     () => actions.openImageExport(target, { returnFocus }),
     [actions, returnFocus, target]

@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { resolve } from 'node:path';
+import { crc32 } from 'node:zlib';
 
 import {
   assertMockBackendFixture,
@@ -431,6 +432,7 @@ const createState = (profile, clock) => {
   return {
     boardMembers: new Map(),
     boards: new Map(fixture.boards.map((board) => [board.board_id, clone(board)])),
+    bulkDownloads: new Map(),
     // Dismiss the beta notice and What's New notes so journeys start on the requested page.
     clientState: new Map([
       [
@@ -1249,9 +1251,54 @@ const writePng = (response, image, thumbnail) => {
 };
 
 const EXPORT_CONTENT_TYPES = { avif: 'image/avif', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp' };
+const UNAVAILABLE_EXPORT_FORMATS = { avif: 'This server cannot encode AVIF images' };
+const BULK_DOWNLOAD_BUILD_MS = 3000;
+
+const storedZip = (entries) => {
+  const locals = [];
+  const centrals = [];
+  let offset = 0;
+
+  for (const { bytes, name } of entries) {
+    const nameBytes = Buffer.from(name, 'utf8');
+    const checksum = crc32(bytes);
+    const local = Buffer.alloc(30);
+
+    local.writeUInt32LE(0x04034b50, 0);
+    local.writeUInt16LE(20, 4);
+    local.writeUInt16LE(0x0800, 6);
+    local.writeUInt32LE(checksum, 14);
+    local.writeUInt32LE(bytes.length, 18);
+    local.writeUInt32LE(bytes.length, 22);
+    local.writeUInt16LE(nameBytes.length, 26);
+    const central = Buffer.alloc(46);
+
+    central.writeUInt32LE(0x02014b50, 0);
+    central.writeUInt16LE(20, 4);
+    central.writeUInt16LE(20, 6);
+    central.writeUInt16LE(0x0800, 8);
+    central.writeUInt32LE(checksum, 16);
+    central.writeUInt32LE(bytes.length, 20);
+    central.writeUInt32LE(bytes.length, 24);
+    central.writeUInt16LE(nameBytes.length, 28);
+    central.writeUInt32LE(offset, 42);
+    locals.push(local, nameBytes, bytes);
+    centrals.push(central, nameBytes);
+    offset += local.length + nameBytes.length + bytes.length;
+  }
+
+  const directory = Buffer.concat(centrals);
+  const end = Buffer.alloc(22);
+
+  end.writeUInt32LE(0x06054b50, 0);
+  end.writeUInt16LE(entries.length, 8);
+  end.writeUInt16LE(entries.length, 10);
+  end.writeUInt32LE(directory.length, 12);
+  end.writeUInt32LE(offset, 16);
+  return Buffer.concat([...locals, directory, end]);
+};
 const EXPORT_EXTENSIONS = { avif: '.avif', jpeg: '.jpg', png: '.png', webp: '.webp' };
 
-/** The server's never-enlarging long-edge cap. */
 const exportDimensions = ({ height, width }, longEdge) => {
   const longest = Math.max(width, height);
 
@@ -1264,7 +1311,6 @@ const exportDimensions = ({ height, width }, longEdge) => {
   };
 };
 
-/** A plausible stand-in for the server's resolver: tokens, unsafe characters, separators and uniqueness. */
 const resolveExportFileNames = (state, images, pattern, format) => {
   const seen = new Map();
 
@@ -3138,6 +3184,9 @@ export const startMockBackend = async (port, { clock = Date.now, profile = 'empt
         if (!EXPORT_CONTENT_TYPES[format] || (longEdge !== null && !(Number.isInteger(longEdge) && longEdge >= 1))) {
           return json(422, { detail: 'Invalid export options' });
         }
+        if (UNAVAILABLE_EXPORT_FORMATS[format]) {
+          return json(422, { detail: UNAVAILABLE_EXPORT_FORMATS[format] });
+        }
 
         // The mock cannot transcode: it resizes its fixture PNG and labels it with the requested type.
         const { height, width } = exportDimensions(image, longEdge);
@@ -3157,6 +3206,56 @@ export const startMockBackend = async (port, { clock = Date.now, profile = 'empt
         }
 
         return json(200, { file_names: resolveExportFileNames(state, images, body.pattern, body.format) });
+      }
+
+      if (method === 'POST' && path === '/api/v1/images/download') {
+        const body = await readJsonBody(request);
+        const images = (Array.isArray(body.image_names) ? body.image_names : [])
+          .map((name) => state.images.get(name))
+          .filter(Boolean);
+        const options = body.export ?? null;
+
+        if (images.length === 0) {
+          return json(422, { detail: 'No images to download' });
+        }
+        if (options && !EXPORT_EXTENSIONS[options.format]) {
+          return json(422, { detail: 'Invalid export options' });
+        }
+        if (options && UNAVAILABLE_EXPORT_FORMATS[options.format]) {
+          return json(422, { detail: UNAVAILABLE_EXPORT_FORMATS[options.format] });
+        }
+
+        const longEdge = typeof options?.long_edge === 'number' ? options.long_edge : null;
+        const names = options
+          ? resolveExportFileNames(state, images, options.name_pattern ?? '{name}', options.format)
+          : images.map((image) => image.image_name);
+        const name = `${randomUUID()}.zip`;
+
+        state.bulkDownloads.set(name, {
+          entries: images.map((image, index) => {
+            const { height, width } = exportDimensions(image, longEdge);
+
+            return { bytes: fixturePng(width, height), name: names[index] };
+          }),
+          readyAt: clock() + BULK_DOWNLOAD_BUILD_MS,
+        });
+        return json(202, { bulk_download_item_name: name, response: 'Your images are preparing to be downloaded' });
+      }
+
+      const bulkDownloadMatch = /^\/api\/v1\/images\/download\/([^/]+)$/.exec(path);
+      if (method === 'GET' && bulkDownloadMatch) {
+        const name = decodeURIComponent(bulkDownloadMatch[1]);
+        const job = state.bulkDownloads.get(name);
+
+        if (!job || clock() < job.readyAt) {
+          return json(404, { detail: 'The file could not be found' });
+        }
+
+        state.bulkDownloads.delete(name);
+        return writeBinary(response, 200, storedZip(job.entries), {
+          'content-disposition': `attachment; filename="${name}"`,
+          'content-type': 'application/zip',
+        });
       }
 
       const imageWorkflowMatch = /^\/api\/v1\/images\/i\/([^/]+)\/workflow$/.exec(path);

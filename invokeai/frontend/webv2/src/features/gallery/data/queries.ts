@@ -291,11 +291,7 @@ const fetchFollowingCancellation = async <TData>(owner: AccountScope, fetch: () 
   }
 };
 
-/**
- * One encode per image and encoding, shared by the export preview and the save that follows it. Kept outside the
- * `gallery` root so listing invalidations never re-encode, and dropped as soon as nothing shows it: each blob can be
- * the size of a full image, and a dragged slider must not leave one behind per position it rested on.
- */
+// Outside the `gallery` key root so invalidations never re-encode; gcTime 0 since each blob can be a full image.
 export const galleryImageExportOptions = (owner: AccountScope, imageName: string, encoding: ImageExportEncoding) =>
   queryOptions({
     gcTime: 0,
@@ -312,7 +308,6 @@ export const galleryImageExportOptions = (owner: AccountScope, imageName: string
     staleTime: Number.POSITIVE_INFINITY,
   });
 
-/** A short freshness: `{board}` and the uniqueness suffixes follow renames and moves. */
 export const galleryImageExportNamesOptions = (
   owner: AccountScope,
   request: { format: ImageExportFormat; imageNames: readonly string[]; pattern: string }
@@ -329,7 +324,6 @@ export const galleryImageExportNamesOptions = (
     staleTime: 30_000,
   });
 
-/** A stored file never changes size. */
 export const galleryImageFileSizeOptions = (owner: AccountScope, imageName: string) =>
   queryOptions({
     queryFn: async ({ signal }) => {

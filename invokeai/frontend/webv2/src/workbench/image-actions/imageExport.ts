@@ -1,28 +1,41 @@
 import type { GalleryImage } from '@features/gallery';
 import type { ImageExportSettings } from '@features/gallery/contracts';
 import type { AccountScope } from '@platform/state/accountLifecycle';
-import type { QueryClient } from '@tanstack/react-query';
+import type { QueryClient, QueryKey } from '@tanstack/react-query';
+import type { TFunction } from 'i18next';
 
-import { getImageExportEncoding, normalizeImageExportSettings } from '@features/gallery/contracts';
+import { galleryTransfers } from '@features/gallery';
+import {
+  getImageExportEncoding,
+  IMAGE_EXPORT_FORMAT_LABELS,
+  isLossyImageExportFormat,
+  normalizeImageExportSettings,
+} from '@features/gallery/contracts';
 import { galleryImageExportNamesOptions, galleryImageExportOptions } from '@features/gallery/queries';
 import { downloadBlob } from '@platform/browser/downloadBlob';
+import { formatCount } from '@platform/i18n/languages';
+import { useMountEffect } from '@platform/react/useMountEffect';
 import { assertAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { useWorkbenchPreferenceSelector } from '@workbench/settings/store';
+import { useWorkbenchQueries } from '@workbench/WorkbenchContext';
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 
-/** Preview's shortcut for opening the export dialog on the image it shows. */
+import { getSelectedGalleryImage } from './selectedImage';
+
 export const EXPORT_IMAGE_COMMAND_ID = 'viewer.exportImage';
 
-/** One image exports as a file; a selection as archives of its images, its videos left out. */
 export type ImageExportTarget =
   | { kind: 'image'; image: GalleryImage }
   | { kind: 'selection'; imageNames: readonly string[]; videoCount: number };
 
-/** Runs an export: rejects for one image, so its dialog can show why; a selection reports through notifications. */
-export type ExecuteImageExport = (target: ImageExportTarget, settings: ImageExportSettings) => Promise<void>;
+export type ExecuteImageExport = (
+  target: ImageExportTarget,
+  settings: ImageExportSettings,
+  options?: { signal?: AbortSignal }
+) => Promise<void>;
 
 export interface ImageExportRequestOptions {
-  /** Where focus goes when the dialog closes; without it, the element focused as it opened, while it stays. */
   returnFocus?: () => HTMLElement | null;
 }
 
@@ -31,6 +44,8 @@ export type RequestImageExport = (
   execute: ExecuteImageExport,
   options?: ImageExportRequestOptions
 ) => void;
+
+export type OpenImageExport = (target: ImageExportTarget, options?: ImageExportRequestOptions) => void;
 
 export const getImageExportTargetNames = (target: ImageExportTarget): readonly string[] =>
   target.kind === 'image' ? [target.image.imageName] : target.imageNames;
@@ -41,33 +56,88 @@ export const useImageExportPreference = (): ImageExportSettings => {
   return useMemo(() => normalizeImageExportSettings(stored), [stored]);
 };
 
-/** Saves the encode a preview of the same settings already holds, else fetches it, under the server's file name. */
+export const formatImageExportEncoding = (t: TFunction, settings: ImageExportSettings): string =>
+  isLossyImageExportFormat(settings.format)
+    ? t('widgets.gallery.export.encodingLossy', {
+        format: IMAGE_EXPORT_FORMAT_LABELS[settings.format],
+        quality: settings.quality,
+      })
+    : IMAGE_EXPORT_FORMAT_LABELS[settings.format];
+
+export const formatImageExportSummary = (t: TFunction, settings: ImageExportSettings): string =>
+  settings.longEdge === null
+    ? formatImageExportEncoding(t, settings)
+    : t('widgets.gallery.export.summaryWithLimit', {
+        encoding: formatImageExportEncoding(t, settings),
+        size: formatCount(settings.longEdge),
+      });
+
+/** Settled data only: an entry still fetching may be cancelled by the observer that started it. */
+const getSettledQueryData = <Data>(queryClient: QueryClient, queryKey: QueryKey): Data | undefined => {
+  const query = queryClient.getQueryCache().find<Data>({ exact: true, queryKey });
+
+  return query?.state.status === 'success' && query.state.fetchStatus === 'idle' && !query.isStale()
+    ? query.state.data
+    : undefined;
+};
+
 export const saveImageExport = async ({
   image,
   owner,
   queryClient,
   settings,
+  signal,
 }: {
   image: GalleryImage;
   owner: AccountScope;
   queryClient: QueryClient;
   settings: ImageExportSettings;
-}): Promise<void> => {
+  signal?: AbortSignal;
+}): Promise<string> => {
+  const requestSignal = signal ? AbortSignal.any([signal, owner.signal]) : owner.signal;
+  const encoding = getImageExportEncoding(settings, image);
+  const namesRequest = { format: settings.format, imageNames: [image.imageName], pattern: settings.namePattern };
   const [blob, fileNames] = await Promise.all([
-    queryClient.fetchQuery(galleryImageExportOptions(owner, image.imageName, getImageExportEncoding(settings, image))),
-    queryClient.fetchQuery(
-      galleryImageExportNamesOptions(owner, {
-        format: settings.format,
-        imageNames: [image.imageName],
-        pattern: settings.namePattern,
-      })
-    ),
+    getSettledQueryData<Blob>(queryClient, galleryImageExportOptions(owner, image.imageName, encoding).queryKey) ??
+      galleryTransfers.exportImage(image.imageName, encoding, requestSignal),
+    getSettledQueryData<string[]>(queryClient, galleryImageExportNamesOptions(owner, namesRequest).queryKey) ??
+      galleryTransfers.resolveExportFileNames(namesRequest, requestSignal),
   ]);
   const fileName = fileNames[0];
 
   assertAccountScopeCurrent(owner);
+  requestSignal.throwIfAborted();
   if (!fileName) {
     throw new Error('The server named no file for the export.');
   }
   await downloadBlob(blob, fileName);
+  return fileName;
+};
+
+/** Registers once: `openImageExport` must be stable, and the caller keys this mount by project and language. */
+export const SelectedImageExportCommand = ({
+  openImageExport,
+  runtime,
+}: {
+  openImageExport: OpenImageExport;
+  runtime: { commands: { register(command: { handler: () => void; id: string; title: string }): () => void } };
+}) => {
+  const { t } = useTranslation();
+  const queries = useWorkbenchQueries();
+
+  useMountEffect(() =>
+    runtime.commands.register({
+      handler: () => {
+        const image = getSelectedGalleryImage(queries.getSnapshot().activeProject);
+
+        if (image) {
+          openImageExport({ image, kind: 'image' });
+        }
+      },
+      id: EXPORT_IMAGE_COMMAND_ID,
+      title: t('widgets.preview.commands.exportImage'),
+    })
+  );
+
+  return null;
 };

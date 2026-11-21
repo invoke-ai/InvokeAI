@@ -7,7 +7,19 @@ import type {
 } from '@features/gallery/contracts';
 import type { KeyboardEvent, ReactNode, SyntheticEvent } from 'react';
 
-import { Box, Flex, Grid, HStack, Image, Input, NumberInput, Portal, Stack, Text } from '@chakra-ui/react';
+import {
+  Box,
+  Flex,
+  Grid,
+  HStack,
+  Image,
+  Input,
+  NumberInput,
+  Portal,
+  Stack,
+  Text,
+  VisuallyHidden,
+} from '@chakra-ui/react';
 import { GALLERY_REQUEST_MAX_NAMES } from '@features/gallery';
 import {
   getImageExportDimensions,
@@ -28,11 +40,13 @@ import {
 import { galleryImageUrls } from '@features/gallery/utility';
 import { formatBytes, formatCount } from '@platform/i18n/languages';
 import { useDebouncedValue } from '@platform/react/useDebouncedValue';
+import { useMountEffect } from '@platform/react/useMountEffect';
 import { isAccountScopeCurrent } from '@platform/state/accountLifecycle';
-import { getApiErrorMessage } from '@platform/transport/http';
+import { ApiError, getApiErrorMessage } from '@platform/transport/http';
 import { Button, CloseButton } from '@platform/ui/Button';
 import { Dialog } from '@platform/ui/Dialog';
 import { Field, FieldLabel } from '@platform/ui/Field';
+import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { SegmentedControl } from '@platform/ui/SegmentedControl';
 import { SliderNumberField } from '@platform/ui/SliderNumberField';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
@@ -43,19 +57,17 @@ import { useTranslation } from 'react-i18next';
 
 import type { ImageExportDialogRequest } from './useImageExportDialog';
 
-import { getImageExportTargetNames, useImageExportPreference } from './imageExport';
-import { ImageExportCompare } from './ImageExportCompare';
+import { formatImageExportEncoding, getImageExportTargetNames, useImageExportPreference } from './imageExport';
+import { ImageExportCompare, type ImageExportPreviewError } from './ImageExportCompare';
 
-/** A dragged slider or typed size settles before the server encodes it. */
 const PREVIEW_DEBOUNCE_MS = 350;
 const NAME_DEBOUNCE_MS = 300;
-/** Thumbnails a selection offers to preview; the rest export unseen. */
 const PREVIEW_STRIP_LIMIT = 12;
-/** What "Limit" starts from when the selection exported at its original size. */
 const DEFAULT_SELECTION_LONG_EDGE = 2048;
 const SCALE_SHORTCUTS = [1, 0.5, 0.25] as const;
+const NAME_SEPARATORS = new Set(['-', '_', '.', ' ']);
+const EXAMPLE_TAIL_GRAPHEMES = 12;
 
-// Two columns from `md`; narrower, the preview stacks above the controls and the body scrolls as one.
 const BODY_COLUMNS = { base: 'minmax(0, 1fr)', md: 'minmax(0, 1fr) 18rem' } as const;
 const BODY_HEIGHT = { base: 'auto', md: 'min(38rem, calc(100dvh - 9rem))' } as const;
 const BODY_ROWS = { base: 'auto', md: 'minmax(0, 1fr)' } as const;
@@ -71,6 +83,14 @@ const isSameEncoding = (left: ImageExportEncoding, right: ImageExportEncoding): 
   left.longEdge === right.longEdge &&
   left.metadata === right.metadata &&
   left.quality === right.quality;
+
+const isPermanentRefusal = (error: unknown): boolean =>
+  error instanceof ApiError &&
+  error.status >= 400 &&
+  error.status < 500 &&
+  error.status !== 408 &&
+  error.status !== 409 &&
+  error.status !== 429;
 
 export const ImageExportDialog = ({
   isOpen,
@@ -92,16 +112,18 @@ export const ImageExportDialog = ({
   const [loadedExport, setLoadedExport] = useState<{ blob: Blob; size: ImageSize } | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
-  const isClosedRef = useRef(false);
+  const exportAbortRef = useRef<AbortController | null>(null);
   const imageNames = getImageExportTargetNames(target);
   const isSelection = target.kind === 'selection';
   const image = target.kind === 'image' ? target.image : null;
   const previewName = imageNames[previewIndex] ?? '';
   const sourceSize: ImageSize | null = image ?? (loadedOriginal?.name === previewName ? loadedOriginal.size : null);
-  const patchSettings = useCallback(
-    (changes: Partial<ImageExportSettings>) => setSettings((current) => ({ ...current, ...changes })),
-    []
-  );
+  const patchSettings = useCallback((changes: Partial<ImageExportSettings>) => {
+    setSettings((current) => ({ ...current, ...changes }));
+    setExportError(null);
+  }, []);
+
+  useMountEffect(() => () => exportAbortRef.current?.abort());
 
   const encoding = getImageExportEncoding(settings, image ?? undefined);
   const previewEncoding = useDebouncedValue(encoding, PREVIEW_DEBOUNCE_MS, { isEqual: isSameEncoding });
@@ -116,7 +138,6 @@ export const ImageExportDialog = ({
     enabled: isOpen && previewName !== '',
   });
   const namedPattern = useDebouncedValue(settings.namePattern, NAME_DEBOUNCE_MS);
-  // A selection's archives each count `{n}` from their own first image, as the export will.
   const archiveStart = previewIndex - (previewIndex % GALLERY_REQUEST_MAX_NAMES);
   const namesQuery = useQuery({
     ...galleryImageExportNamesOptions(owner, {
@@ -129,10 +150,26 @@ export const ImageExportDialog = ({
   });
 
   const exportBlob = exportQuery.data ?? null;
-  const isEncoding = exportQuery.isFetching || !isSameEncoding(encoding, previewEncoding);
+  const isEncodingSettled = isSameEncoding(encoding, previewEncoding);
+  const isEncoding = exportQuery.isFetching || !isEncodingSettled;
   const exportSize = exportBlob && loadedExport?.blob === exportBlob ? loadedExport.size : null;
   const patternIsBlank = settings.namePattern.trim() === '';
   const lossy = isLossyImageExportFormat(settings.format);
+  const hasPreviewError = exportQuery.isError && !exportQuery.isPlaceholderData;
+  const isPreviewRefused = hasPreviewError && isPermanentRefusal(exportQuery.error);
+  const previewError = useMemo<ImageExportPreviewError | null>(() => {
+    if (!hasPreviewError) {
+      return null;
+    }
+
+    const detail = getApiErrorMessage(exportQuery.error, '');
+
+    return isPreviewRefused
+      ? { canRetry: false, detail, message: t('widgets.gallery.export.previewRefused') }
+      : { canRetry: true, detail, message: t('widgets.gallery.export.previewFailed') };
+  }, [exportQuery.error, hasPreviewError, isPreviewRefused, t]);
+  const refusalReason =
+    isPreviewRefused && isEncodingSettled ? previewError?.detail || t('widgets.gallery.export.previewRefused') : null;
 
   const handleOriginalLoad = useCallback(
     (size: ImageSize) => setLoadedOriginal({ name: previewName, size }),
@@ -146,12 +183,12 @@ export const ImageExportDialog = ({
     },
     [exportBlob]
   );
-  const retryPreview = useCallback(() => void exportQuery.refetch(), [exportQuery]);
+  const retryPreview = useCallback(() => exportQuery.refetch(), [exportQuery]);
 
   const handleOpenChange = useCallback(
     ({ open }: { open: boolean }) => {
       if (!open) {
-        isClosedRef.current = true;
+        exportAbortRef.current?.abort();
         onClose();
       }
     },
@@ -160,67 +197,61 @@ export const ImageExportDialog = ({
   const close = useCallback(() => handleOpenChange({ open: false }), [handleOpenChange]);
 
   const handleExport = useCallback(async () => {
-    if (isExporting || patternIsBlank || imageNames.length === 0) {
+    if (isExporting || patternIsBlank || imageNames.length === 0 || refusalReason !== null) {
       return;
     }
 
-    void patchWorkbenchPreferences({ imageExportSettings: { ...settings } });
     if (target.kind === 'selection') {
+      void patchWorkbenchPreferences({ imageExportSettings: { ...settings } });
       close();
       void request.execute(target, settings);
       return;
     }
 
+    const controller = new AbortController();
+
+    exportAbortRef.current = controller;
     setIsExporting(true);
     setExportError(null);
     try {
-      await request.execute(target, settings);
-      // Cancelled meanwhile, the host may already show another request.
-      if (!isClosedRef.current) {
+      await request.execute(target, settings, { signal: controller.signal });
+      void patchWorkbenchPreferences({ imageExportSettings: { ...settings } });
+      // Closed or replaced meanwhile, the host may already show another request.
+      if (!controller.signal.aborted) {
         close();
       }
     } catch (error: unknown) {
-      if (!isClosedRef.current && isAccountScopeCurrent(owner)) {
+      if (!controller.signal.aborted && isAccountScopeCurrent(owner)) {
         setExportError(getApiErrorMessage(error, t('widgets.gallery.export.exportFailed')));
       }
     } finally {
+      if (exportAbortRef.current === controller) {
+        exportAbortRef.current = null;
+      }
       setIsExporting(false);
     }
-  }, [close, imageNames.length, isExporting, owner, patternIsBlank, request, settings, t, target]);
+  }, [close, imageNames.length, isExporting, owner, patternIsBlank, refusalReason, request, settings, t, target]);
 
   const subtitle =
     target.kind === 'image'
-      ? [
-          target.image.imageName,
-          t('widgets.gallery.export.dimensions', {
+      ? originalSizeQuery.data
+        ? t('widgets.gallery.export.subtitleImageWithSize', {
             height: formatCount(target.image.height),
+            name: target.image.imageName,
+            size: formatBytes(originalSizeQuery.data),
             width: formatCount(target.image.width),
-          }),
-          originalSizeQuery.data ? formatBytes(originalSizeQuery.data) : null,
-        ]
-          .filter(Boolean)
-          .join(' · ')
-      : [
-          t('widgets.gallery.export.selectionImages', { count: target.imageNames.length }),
-          target.videoCount > 0 ? t('widgets.gallery.export.videosLeftOut', { count: target.videoCount }) : null,
-        ]
-          .filter(Boolean)
-          .join(' · ');
-  const exportLabel = lossy
-    ? `${IMAGE_EXPORT_FORMAT_LABELS[settings.format]} ${String(settings.quality)}`
-    : IMAGE_EXPORT_FORMAT_LABELS[settings.format];
-  const hasPreviewError = exportQuery.isError && !exportQuery.isPlaceholderData;
-  const previewError = useMemo(
-    () =>
-      hasPreviewError
-        ? { detail: getApiErrorMessage(exportQuery.error, ''), message: t('widgets.gallery.export.previewFailed') }
-        : null,
-    [exportQuery.error, hasPreviewError, t]
-  );
+          })
+        : t('widgets.gallery.export.subtitleImage', {
+            height: formatCount(target.image.height),
+            name: target.image.imageName,
+            width: formatCount(target.image.width),
+          })
+      : target.videoCount > 0
+        ? t('widgets.gallery.export.videosLeftOut', { count: target.videoCount })
+        : null;
 
   return (
     <Dialog.Root
-      closeOnEscape={!isExporting}
       closeOnInteractOutside={!isExporting}
       finalFocusEl={request.returnFocus}
       open={isOpen}
@@ -239,9 +270,17 @@ export const ImageExportDialog = ({
                   ? t('widgets.gallery.export.titleSelection', { count: imageNames.length })
                   : t('widgets.gallery.export.titleImage')}
               </Dialog.Title>
-              <Dialog.Description fontSize="sm" minW="0" overflow="hidden" textOverflow="ellipsis" whiteSpace="nowrap">
-                {subtitle}
-              </Dialog.Description>
+              {subtitle ? (
+                <Dialog.Description
+                  fontSize="sm"
+                  minW="0"
+                  overflow="hidden"
+                  textOverflow="ellipsis"
+                  whiteSpace="nowrap"
+                >
+                  {subtitle}
+                </Dialog.Description>
+              ) : null}
             </Dialog.Header>
             <Grid
               gridTemplateColumns={BODY_COLUMNS}
@@ -267,7 +306,9 @@ export const ImageExportDialog = ({
                   <ImageExportCompare
                     error={previewError}
                     exportBlob={exportBlob}
-                    exportLabel={t('widgets.gallery.export.exportSide', { encoding: exportLabel })}
+                    exportLabel={t('widgets.gallery.export.exportSide', {
+                      encoding: formatImageExportEncoding(t, settings),
+                    })}
                     isEncoding={isEncoding}
                     isRetrying={exportQuery.isFetching}
                     originalAlt={t('widgets.gallery.export.original')}
@@ -284,14 +325,20 @@ export const ImageExportDialog = ({
               </Stack>
               <Box minH="0" minW="0" overflowY={CONTROLS_OVERFLOW}>
                 <Stack gap="4" px="4" py="3">
-                  <FormatControls lossy={lossy} settings={settings} onChange={patchSettings} />
+                  <FormatControls disabled={isExporting} lossy={lossy} settings={settings} onChange={patchSettings} />
                   {image ? (
-                    <ImageSizeControls source={image} settings={settings} onChange={patchSettings} />
+                    <ImageSizeControls
+                      disabled={isExporting}
+                      settings={settings}
+                      source={image}
+                      onChange={patchSettings}
+                    />
                   ) : (
-                    <SelectionSizeControls settings={settings} onChange={patchSettings} />
+                    <SelectionSizeControls disabled={isExporting} settings={settings} onChange={patchSettings} />
                   )}
-                  <MetadataControls settings={settings} onChange={patchSettings} />
+                  <MetadataControls disabled={isExporting} settings={settings} onChange={patchSettings} />
                   <FileNameControls
+                    disabled={isExporting}
                     exampleName={namesQuery.data?.at(-1) ?? null}
                     isExampleError={namesQuery.isError}
                     isExamplePending={namesQuery.isFetching || namedPattern !== settings.namePattern}
@@ -315,6 +362,10 @@ export const ImageExportDialog = ({
                   <Text color="fg.error" fontSize="sm" role="alert">
                     {exportError}
                   </Text>
+                ) : refusalReason ? (
+                  <Text color="fg.error" fontSize="sm">
+                    {refusalReason}
+                  </Text>
                 ) : (
                   <ExportSummary
                     exportBytes={exportBlob?.size ?? null}
@@ -334,6 +385,7 @@ export const ImageExportDialog = ({
                 disabled={patternIsBlank || imageNames.length === 0}
                 loading={isExporting}
                 loadingText={t('widgets.gallery.export.exporting')}
+                unavailableReason={refusalReason ?? undefined}
                 onClick={handleExport}
               >
                 <ImageUpIcon />
@@ -354,7 +406,7 @@ export const ImageExportDialog = ({
 
 type ChangeSettings = (changes: Partial<ImageExportSettings>) => void;
 
-/** A labelled group for controls that bring their own input names; a Field would hand them all one control id. */
+/** Not a Field: it would hand its one control id to inputs that bring their own (segments, sliders). */
 const ControlGroup = ({ children, hint, label }: { children: ReactNode; hint?: string; label: string }) => {
   const labelId = useId();
   const hintId = useId();
@@ -375,10 +427,12 @@ const ControlGroup = ({ children, hint, label }: { children: ReactNode; hint?: s
 };
 
 const FormatControls = ({
+  disabled,
   lossy,
   onChange,
   settings,
 }: {
+  disabled: boolean;
   lossy: boolean;
   onChange: ChangeSettings;
   settings: ImageExportSettings;
@@ -396,24 +450,25 @@ const FormatControls = ({
 
   return (
     <>
-      <Field
-        helpText={t(`widgets.gallery.export.formatHint.${settings.format}`)}
+      <ControlGroup
+        hint={t(`widgets.gallery.export.formatHint.${settings.format}`)}
         label={t('widgets.gallery.export.format')}
       >
         <SegmentedControl
           ariaLabel={t('widgets.gallery.export.format')}
+          disabled={disabled}
           options={formatOptions}
           value={settings.format}
           onChange={handleFormatChange}
         />
-      </Field>
+      </ControlGroup>
       <ControlGroup
         hint={lossy ? undefined : t('widgets.gallery.export.qualityLossless')}
         label={t('widgets.gallery.export.quality')}
       >
         <SliderNumberField
           ariaLabel={t('widgets.gallery.export.quality')}
-          disabled={!lossy}
+          disabled={disabled || !lossy}
           max={100}
           min={1}
           step={1}
@@ -425,14 +480,15 @@ const FormatControls = ({
   );
 };
 
-/** A number field that commits on blur or Enter, so a half-typed size never resizes the export under the caret. */
 const CommittedNumberInput = ({
   ariaLabel,
+  disabled,
   max,
   value,
   onCommit,
 }: {
   ariaLabel: string;
+  disabled: boolean;
   max?: number;
   value: number;
   onCommit: (value: number) => void;
@@ -451,6 +507,7 @@ const CommittedNumberInput = ({
 
   return (
     <NumberInput.Root
+      disabled={disabled}
       flex="1"
       max={max}
       min={1}
@@ -466,10 +523,12 @@ const CommittedNumberInput = ({
 };
 
 const ImageSizeControls = ({
+  disabled,
   onChange,
   settings,
   source,
 }: {
+  disabled: boolean;
   onChange: ChangeSettings;
   settings: ImageExportSettings;
   source: ImageSize;
@@ -477,8 +536,12 @@ const ImageSizeControls = ({
   const { t } = useTranslation();
   const output = getImageExportDimensions(source, settings.longEdge);
   const scaleOptions = useMemo(
-    () => SCALE_SHORTCUTS.map((scale) => ({ label: `${String(scale * 100)}%`, value: String(scale) })),
-    []
+    () =>
+      SCALE_SHORTCUTS.map((scale) => ({
+        label: t('widgets.gallery.export.scalePercent', { percent: scale * 100 }),
+        value: String(scale),
+      })),
+    [t]
   );
   const effectiveLongEdge = getImageExportEncoding(settings, source).longEdge;
   const scaleValue =
@@ -497,11 +560,12 @@ const ImageSizeControls = ({
   );
 
   return (
-    <ControlGroup hint={t('widgets.gallery.export.neverEnlarges')} label={t('widgets.gallery.export.size')}>
+    <ControlGroup hint={t('widgets.gallery.export.sizeHint')} label={t('widgets.gallery.export.size')}>
       <Stack gap="2" w="full">
         <HStack gap="1.5">
           <CommittedNumberInput
             ariaLabel={t('widgets.gallery.export.width')}
+            disabled={disabled}
             max={source.width}
             value={output.width}
             onCommit={handleWidthCommit}
@@ -511,6 +575,7 @@ const ImageSizeControls = ({
           </Text>
           <CommittedNumberInput
             ariaLabel={t('widgets.gallery.export.height')}
+            disabled={disabled}
             max={source.height}
             value={output.height}
             onCommit={handleHeightCommit}
@@ -521,6 +586,7 @@ const ImageSizeControls = ({
         </HStack>
         <SegmentedControl
           ariaLabel={t('widgets.gallery.export.scale')}
+          disabled={disabled}
           options={scaleOptions}
           value={scaleValue === null ? null : String(scaleValue)}
           onChange={handleScaleChange}
@@ -530,7 +596,15 @@ const ImageSizeControls = ({
   );
 };
 
-const SelectionSizeControls = ({ onChange, settings }: { onChange: ChangeSettings; settings: ImageExportSettings }) => {
+const SelectionSizeControls = ({
+  disabled,
+  onChange,
+  settings,
+}: {
+  disabled: boolean;
+  onChange: ChangeSettings;
+  settings: ImageExportSettings;
+}) => {
   const { t } = useTranslation();
   const [limit, setLimit] = useState(settings.longEdge ?? DEFAULT_SELECTION_LONG_EDGE);
   const modeOptions = useMemo(
@@ -553,10 +627,11 @@ const SelectionSizeControls = ({ onChange, settings }: { onChange: ChangeSetting
   );
 
   return (
-    <ControlGroup hint={t('widgets.gallery.export.neverEnlarges')} label={t('widgets.gallery.export.size')}>
+    <ControlGroup hint={t('widgets.gallery.export.sizeHint')} label={t('widgets.gallery.export.size')}>
       <Stack gap="2" w="full">
         <SegmentedControl
           ariaLabel={t('widgets.gallery.export.size')}
+          disabled={disabled}
           options={modeOptions}
           value={settings.longEdge === null ? 'original' : 'limit'}
           onChange={handleModeChange}
@@ -565,6 +640,7 @@ const SelectionSizeControls = ({ onChange, settings }: { onChange: ChangeSetting
           <HStack gap="1.5">
             <CommittedNumberInput
               ariaLabel={t('widgets.gallery.export.longEdge')}
+              disabled={disabled}
               value={settings.longEdge}
               onCommit={handleLimitCommit}
             />
@@ -584,16 +660,23 @@ const METADATA_OPTIONS: readonly { labelKey: string; value: ImageExportMetadata 
   { labelKey: 'widgets.gallery.export.metadataNone', value: 'none' },
 ];
 
-const MetadataControls = ({ onChange, settings }: { onChange: ChangeSettings; settings: ImageExportSettings }) => {
+const MetadataControls = ({
+  disabled,
+  onChange,
+  settings,
+}: {
+  disabled: boolean;
+  onChange: ChangeSettings;
+  settings: ImageExportSettings;
+}) => {
   const { t } = useTranslation();
   const isPng = settings.format === 'png';
   const options = useMemo(() => METADATA_OPTIONS.map(({ labelKey, value }) => ({ label: t(labelKey), value })), [t]);
   const handleChange = useCallback((value: string) => onChange({ metadata: value as ImageExportMetadata }), [onChange]);
 
   return (
-    <Field
-      disabled={!isPng}
-      helpText={
+    <ControlGroup
+      hint={
         isPng
           ? t(`widgets.gallery.export.metadataHint.${settings.metadata}`)
           : t('widgets.gallery.export.metadataPngOnly')
@@ -602,17 +685,24 @@ const MetadataControls = ({ onChange, settings }: { onChange: ChangeSettings; se
     >
       <SegmentedControl
         ariaLabel={t('widgets.gallery.export.metadata')}
-        disabled={!isPng}
+        disabled={disabled || !isPng}
         options={options}
-        // What the file will carry: nothing, outside PNG; the saved choice returns with PNG.
         value={isPng ? settings.metadata : 'none'}
         onChange={handleChange}
       />
-    </Field>
+    </ControlGroup>
   );
 };
 
+const insertNameToken = (pattern: string, at: number, token: string): { caret: number; pattern: string } => {
+  const before = pattern.slice(0, at);
+  const insertion = before !== '' && !NAME_SEPARATORS.has(before.at(-1) ?? '') ? `-${token}` : token;
+
+  return { caret: at + insertion.length, pattern: `${before}${insertion}${pattern.slice(at)}` };
+};
+
 const FileNameControls = ({
+  disabled,
   exampleName,
   isExampleError,
   isExamplePending,
@@ -620,6 +710,7 @@ const FileNameControls = ({
   onSubmit,
   settings,
 }: {
+  disabled: boolean;
   exampleName: string | null;
   isExampleError: boolean;
   isExamplePending: boolean;
@@ -654,22 +745,21 @@ const FileNameControls = ({
   const insertToken = useCallback(
     (token: string) => {
       const pattern = settings.namePattern;
-      const at = Math.min(caretRef.current ?? pattern.length, pattern.length);
-      const next = `${pattern.slice(0, at)}${token}${pattern.slice(at)}`;
+      const next = insertNameToken(pattern, Math.min(caretRef.current ?? pattern.length, pattern.length), token);
 
-      if (next.length <= IMAGE_EXPORT_NAME_PATTERN_MAX_LENGTH) {
-        caretRef.current = at + token.length;
-        onChange({ namePattern: next });
+      if (next.pattern.length <= IMAGE_EXPORT_NAME_PATTERN_MAX_LENGTH) {
+        caretRef.current = next.caret;
+        onChange({ namePattern: next.pattern });
       }
     },
     [onChange, settings.namePattern]
   );
-  const example = isBlank
+  const exampleMessage = isBlank
     ? t('widgets.gallery.export.fileNameRequired')
     : isExampleError
       ? t('widgets.gallery.export.fileNameExampleFailed')
       : exampleName
-        ? t('widgets.gallery.export.fileNameExample', { name: exampleName })
+        ? null
         : t('widgets.gallery.export.fileNameResolving');
 
   return (
@@ -678,6 +768,7 @@ const FileNameControls = ({
         <Input
           aria-describedby={exampleId}
           autoComplete="off"
+          disabled={disabled}
           fontFamily="mono"
           maxLength={IMAGE_EXPORT_NAME_PATTERN_MAX_LENGTH}
           spellCheck={false}
@@ -686,36 +777,53 @@ const FileNameControls = ({
           onKeyDown={handleKeyDown}
           onSelect={rememberCaret}
         />
-        <Flex aria-label={t('widgets.gallery.export.tokens')} gap="1" role="group" wrap="wrap">
-          {IMAGE_EXPORT_NAME_TOKENS.map((token) => (
-            <TokenButton key={token} token={token} onInsert={insertToken} />
-          ))}
-        </Flex>
-        <Text
+        <HStack
           aria-live="polite"
           color={isBlank || isExampleError ? 'fg.error' : 'fg.muted'}
           fontFamily="mono"
           fontSize="xs"
+          gap="1"
           id={exampleId}
+          minW="0"
           opacity={isExamplePending && !isBlank ? 0.6 : 1}
-          overflow="hidden"
-          textOverflow="ellipsis"
-          whiteSpace="nowrap"
         >
-          {example}
-        </Text>
+          {exampleMessage === null && exampleName ? (
+            <>
+              <Text aria-hidden as="span" flexShrink={0}>
+                →
+              </Text>
+              <MiddleTruncate tailGraphemes={EXAMPLE_TAIL_GRAPHEMES} text={exampleName} />
+            </>
+          ) : (
+            <Text as="span">{exampleMessage}</Text>
+          )}
+        </HStack>
+        <Flex aria-label={t('widgets.gallery.export.tokens')} gap="1" role="group" wrap="wrap">
+          {IMAGE_EXPORT_NAME_TOKENS.map((token) => (
+            <TokenButton key={token} disabled={disabled} token={token} onInsert={insertToken} />
+          ))}
+        </Flex>
       </Stack>
     </Field>
   );
 };
 
-const TokenButton = ({ onInsert, token }: { onInsert: (token: string) => void; token: string }) => {
+const TokenButton = ({
+  disabled,
+  onInsert,
+  token,
+}: {
+  disabled: boolean;
+  onInsert: (token: string) => void;
+  token: string;
+}) => {
   const { t } = useTranslation();
   const handleClick = useCallback(() => onInsert(token), [onInsert, token]);
 
   return (
     <Button
       aria-label={t('widgets.gallery.export.insertToken', { token })}
+      disabled={disabled}
       fontFamily="mono"
       size="xs"
       variant="outline"
@@ -760,7 +868,8 @@ const PreviewStrip = ({
       ))}
       {hiddenCount > 0 ? (
         <Text color="fg.muted" flexShrink={0} fontSize="sm" fontVariantNumeric="tabular-nums" px="1">
-          {t('widgets.gallery.export.moreImages', { count: hiddenCount })}
+          <span aria-hidden>{t('widgets.gallery.export.moreImages', { count: hiddenCount })}</span>
+          <VisuallyHidden>{t('widgets.gallery.export.moreImagesLabel', { count: hiddenCount })}</VisuallyHidden>
         </Text>
       ) : null}
     </HStack>
@@ -826,14 +935,29 @@ const ExportSummary = ({
     );
   }
 
+  const size = formatBytes(exportBytes);
+  const dimensions = exportSize
+    ? { height: formatCount(exportSize.height), width: formatCount(exportSize.width) }
+    : null;
   const change =
     originalBytes === null
       ? null
-      : new Intl.NumberFormat(language, {
-          maximumFractionDigits: 0,
-          signDisplay: 'exceptZero',
-          style: 'percent',
-        }).format(exportBytes / originalBytes - 1);
+      : {
+          change: new Intl.NumberFormat(language, {
+            maximumFractionDigits: 0,
+            signDisplay: 'exceptZero',
+            style: 'percent',
+          }).format(exportBytes / originalBytes - 1),
+          original: formatBytes(originalBytes),
+        };
+  const summary =
+    change && dimensions
+      ? t('widgets.gallery.export.outputWithChangeAndDimensions', { ...change, ...dimensions, size })
+      : change
+        ? t('widgets.gallery.export.outputWithChange', { ...change, size })
+        : dimensions
+          ? t('widgets.gallery.export.outputWithDimensions', { ...dimensions, size })
+          : size;
 
   return (
     <Text
@@ -845,19 +969,7 @@ const ExportSummary = ({
       textOverflow="ellipsis"
       whiteSpace="nowrap"
     >
-      {isSelection ? `${t('widgets.gallery.export.previewedImage')} ` : null}
-      <Text as="span" color="fg" fontWeight="600">
-        {formatBytes(exportBytes)}
-      </Text>
-      {change === null
-        ? null
-        : ` · ${t('widgets.gallery.export.sizeChange', { change, original: formatBytes(originalBytes) })}`}
-      {exportSize
-        ? ` · ${t('widgets.gallery.export.dimensions', {
-            height: formatCount(exportSize.height),
-            width: formatCount(exportSize.width),
-          })}`
-        : null}
+      {isSelection ? t('widgets.gallery.export.previewedImageSummary', { summary }) : summary}
     </Text>
   );
 };

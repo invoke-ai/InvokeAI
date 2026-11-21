@@ -377,7 +377,6 @@ const WIDGET_HOST_MODULES = [
 
 // Boot image menus the lazy queue recall chunks also import; ungrouped, Rolldown splits them into a boot request.
 const IMAGE_ACTIONS_MODULES = [
-  // Read only by the boot export menus and their lazy dialog.
   '/features/gallery/core/imageExport.ts',
   '/workbench/canvas-operations/canvasImportNotice.ts',
   '/workbench/image-actions/ContextSubMenu.tsx',
@@ -391,6 +390,7 @@ const IMAGE_ACTIONS_MODULES = [
   '/workbench/image-actions/imageExport.ts',
   '/workbench/image-actions/index.ts',
   '/workbench/image-actions/pbrMapsGraph.ts',
+  '/workbench/image-actions/selectedImage.ts',
   '/workbench/image-actions/useDeletionConfirmation.tsx',
   '/workbench/image-actions/useImageActions.ts',
   '/workbench/image-actions/useImageExportDialog.tsx',

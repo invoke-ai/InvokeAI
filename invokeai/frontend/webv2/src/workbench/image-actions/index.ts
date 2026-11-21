@@ -37,5 +37,5 @@ export { getImageRecallVerb, IMAGE_RECALL_KINDS } from './RecallActionButtons';
 export { getSelectedGalleryImage, getSelectedGalleryImageFromValues } from './selectedImage';
 export { useImageActions, type ImageActions } from './useImageActions';
 export { useDeletionConfirmation, type RequestDeletionConfirmation } from './useDeletionConfirmation';
-export { EXPORT_IMAGE_COMMAND_ID, type ImageExportTarget, type RequestImageExport } from './imageExport';
+export { SelectedImageExportCommand, type ImageExportTarget, type RequestImageExport } from './imageExport';
 export { useImageExportDialog } from './useImageExportDialog';
