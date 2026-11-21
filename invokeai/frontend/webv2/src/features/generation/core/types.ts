@@ -13,6 +13,8 @@ export type ModelIdentifierConfig = {
   variant?: string | null;
   roles?: readonly ModelRole[];
   hash?: string;
+  /** Registered, but its files are gone: listed in the library, never loadable. */
+  is_missing?: boolean;
   submodel_type?: string;
   [key: string]: unknown;
 };
@@ -29,6 +31,7 @@ export type MainModelConfig = ModelIdentifierConfig & {
     height?: number | null;
     vae?: string | null;
     vae_precision?: string | null;
+    components?: Record<string, string> | null;
   } | null;
 };
 

@@ -113,7 +113,7 @@ class InvokeAIAppConfig(BaseSettings):
         profile_graphs: Enable graph profiling using `cProfile`.
         profile_prefix: An optional prefix for profile output files.
         profiles_dir: Path to profiles output directory.
-        max_cache_ram_gb: The maximum amount of CPU RAM to use for model caching in GB. If unset, the limit will be configured based on the available RAM. In most cases, it is recommended to leave this unset.
+        max_cache_ram_gb: For separate-memory systems, the maximum amount of CPU RAM to use for model caching in GB. On native integrated-CUDA platforms, this limits the shared host/CUDA memory pool used by the model cache. If unset, the limit will be configured automatically based on available memory. In most cases, it is recommended to leave this unset.
         max_cache_vram_gb: The amount of VRAM to use for model caching in GB. If unset, the limit will be configured based on the available VRAM and the device_working_mem_gb. In most cases, it is recommended to leave this unset.
         reserve_vram_gb: The amount of VRAM (in GB) to subtract from the model cache's available memory budget. Defaults to 0.
         log_memory_usage: If True, a memory snapshot will be captured before and after every model cache operation, and the result will be logged (at debug level). There is a time cost to capturing the memory snapshots, so it is recommended to only enable this feature if you are actively inspecting the model cache's behaviour.
@@ -244,7 +244,7 @@ class InvokeAIAppConfig(BaseSettings):
     profiles_dir:                  Path = Field(default=Path("profiles"),   description="Path to profiles output directory.")
 
     # CACHE
-    max_cache_ram_gb:   Optional[float] = Field(default=None, gt=0,         description="The maximum amount of CPU RAM to use for model caching in GB. If unset, the limit will be configured based on the available RAM. In most cases, it is recommended to leave this unset.")
+    max_cache_ram_gb:   Optional[float] = Field(default=None, gt=0,         description="For separate-memory systems, the maximum amount of CPU RAM to use for model caching in GB. On native integrated-CUDA platforms, this limits the shared host/CUDA memory pool used by the model cache. If unset, the limit will be configured automatically based on available memory. In most cases, it is recommended to leave this unset.")
     max_cache_vram_gb:  Optional[float] = Field(default=None, ge=0,         description="The amount of VRAM to use for model caching in GB. If unset, the limit will be configured based on the available VRAM and the device_working_mem_gb. In most cases, it is recommended to leave this unset.")
     reserve_vram_gb:              float = Field(default=0.0, ge=0,          description="The amount of VRAM (in GB) to subtract from the model cache's available memory budget. Defaults to 0.")
     log_memory_usage:              bool = Field(default=False,              description="If True, a memory snapshot will be captured before and after every model cache operation, and the result will be logged (at debug level). There is a time cost to capturing the memory snapshots, so it is recommended to only enable this feature if you are actively inspecting the model cache's behaviour.")

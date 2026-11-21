@@ -192,6 +192,8 @@ class FakeInvoke:
             return reply({"set_fields": [], "config": {"multiuser": False, "fp8_compute": False}})
         if path == "/api/v2/models/":
             return reply({"models": [MODEL_CONFIG]})
+        if path == "/api/v2/models/missing":
+            return reply({"models": []})
         if path == "/api/v2/models/capabilities":
             return reply({"fake": {}})
         if path == "/api/v2/models/empty_model_cache":

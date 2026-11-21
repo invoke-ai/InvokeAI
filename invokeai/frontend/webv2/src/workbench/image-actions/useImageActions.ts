@@ -263,7 +263,7 @@ export const useImageActions = ({
     subscribeArchitectureCapabilities,
     getArchitectureCapabilitiesSnapshot,
     useCallback(() => {
-      const values = getCurrentGenerateValues({ generateValues, supportedModels });
+      const values = getCurrentGenerateValues({ generateValues, models, supportedModels });
 
       return {
         canUseAsReferenceImage: Boolean(
@@ -271,7 +271,7 @@ export const useImageActions = ({
         ),
         currentGenerateValues: values,
       };
-    }, [generateValues, supportedModels])
+    }, [generateValues, models, supportedModels])
   );
 
   const selectVideoPlacementRoom = useMemo(

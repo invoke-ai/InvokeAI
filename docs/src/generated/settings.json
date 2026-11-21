@@ -507,7 +507,7 @@
     {
       "category": "CACHE",
       "default": null,
-      "description": "The maximum amount of CPU RAM to use for model caching in GB. If unset, the limit will be configured based on the available RAM. In most cases, it is recommended to leave this unset.",
+      "description": "For separate-memory systems, the maximum amount of CPU RAM to use for model caching in GB. On native integrated-CUDA platforms, this limits the shared host/CUDA memory pool used by the model cache. If unset, the limit will be configured automatically based on available memory. In most cases, it is recommended to leave this unset.",
       "env_var": "INVOKEAI_MAX_CACHE_RAM_GB",
       "literal_values": [],
       "name": "max_cache_ram_gb",

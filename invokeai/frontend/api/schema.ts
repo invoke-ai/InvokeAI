@@ -25265,7 +25265,7 @@ export type components = {
          *         profile_graphs: Enable graph profiling using `cProfile`.
          *         profile_prefix: An optional prefix for profile output files.
          *         profiles_dir: Path to profiles output directory.
-         *         max_cache_ram_gb: The maximum amount of CPU RAM to use for model caching in GB. If unset, the limit will be configured based on the available RAM. In most cases, it is recommended to leave this unset.
+         *         max_cache_ram_gb: For separate-memory systems, the maximum amount of CPU RAM to use for model caching in GB. On native integrated-CUDA platforms, this limits the shared host/CUDA memory pool used by the model cache. If unset, the limit will be configured automatically based on available memory. In most cases, it is recommended to leave this unset.
          *         max_cache_vram_gb: The amount of VRAM to use for model caching in GB. If unset, the limit will be configured based on the available VRAM and the device_working_mem_gb. In most cases, it is recommended to leave this unset.
          *         reserve_vram_gb: The amount of VRAM (in GB) to subtract from the model cache's available memory budget. Defaults to 0.
          *         log_memory_usage: If True, a memory snapshot will be captured before and after every model cache operation, and the result will be logged (at debug level). There is a time cost to capturing the memory snapshots, so it is recommended to only enable this feature if you are actively inspecting the model cache's behaviour.
@@ -25621,7 +25621,7 @@ export type components = {
             profiles_dir?: string;
             /**
              * Max Cache Ram Gb
-             * @description The maximum amount of CPU RAM to use for model caching in GB. If unset, the limit will be configured based on the available RAM. In most cases, it is recommended to leave this unset.
+             * @description For separate-memory systems, the maximum amount of CPU RAM to use for model caching in GB. On native integrated-CUDA platforms, this limits the shared host/CUDA memory pool used by the model cache. If unset, the limit will be configured automatically based on available memory. In most cases, it is recommended to leave this unset.
              */
             max_cache_ram_gb?: number | null;
             /**
@@ -32825,6 +32825,13 @@ export type components = {
              * @description Store weights in FP8 to reduce VRAM usage (~50% savings). Weights are cast to compute dtype during inference.
              */
             fp8_storage?: boolean | null;
+            /**
+             * Components
+             * @description Default component models for this main model, keyed by the component slot name Generate reads, e.g. `t5_encoder`, `qwen3_encoder` or `component_source` (the component source of Qwen Image, Wan and similar families, which graphs record under their own metadata names); values are model keys. The default VAE lives in `vae`.
+             */
+            components?: {
+                [key: string]: string;
+            } | null;
         };
         /**
          * Main Model - SD1.5, SD2
