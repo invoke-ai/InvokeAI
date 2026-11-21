@@ -45,6 +45,7 @@ import {
   isMossImageQwen35Encoder,
   isQwen3Vl4bEncoder,
   isVisionTextLlm,
+  hasWanLowNoiseSlot,
   isSelfContainedSDNQFlux1Pipeline,
   isVaeCompatibleWithGenerateModel,
   isZImageQwen3Encoder,
@@ -2103,6 +2104,8 @@ const buildWanGraph = (
   const sourceModel = getDiffusersSource(settings, model);
   const vaeModel = getCompatibleVae(settings, model);
   const wanT5EncoderModel = settings.wanT5EncoderModel;
+  // The loader reads the second expert only for a single-file A14B model, so a stale pick never reaches the graph.
+  const lowNoiseModel = hasWanLowNoiseSlot(model) ? settings.wanLowNoiseModel : null;
 
   if (!sourceModel && (!vaeModel || !wanT5EncoderModel)) {
     throw new Error('Wan models require a VAE and Wan T5 Encoder, or a Diffusers component source.');
@@ -2116,7 +2119,7 @@ const buildWanGraph = (
     id: 'model_loader',
     model,
     // The second A14B expert. Omitted, the high-noise expert covers the whole schedule.
-    transformer_low_noise_model: settings.wanLowNoiseModel ?? undefined,
+    transformer_low_noise_model: lowNoiseModel ?? undefined,
     type: 'wan_model_loader',
     vae_model: vaeModel ?? undefined,
     wan_t5_encoder_model: wanT5EncoderModel ?? undefined,
@@ -2154,7 +2157,7 @@ const buildWanGraph = (
     wan_component_source: sourceModel,
     wan_guidance_scale_low_noise: settings.wanGuidanceScaleLowNoise ?? null,
     wan_t5_encoder_model: wanT5EncoderModel ?? undefined,
-    wan_transformer_low_noise: settings.wanLowNoiseModel ?? undefined,
+    wan_transformer_low_noise: lowNoiseModel ?? undefined,
   });
 
   return {

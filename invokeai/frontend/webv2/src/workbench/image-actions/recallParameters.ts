@@ -21,6 +21,7 @@ import {
   getDefaultLoraWeight,
   getGenerateModelSelectionResult,
   getGenerationUiPolicy,
+  getModelDefaultComponents,
   getSettingsWithModelDefaults,
   isLoraCompatibleWithModel,
   isLoraModelConfig,
@@ -228,8 +229,14 @@ export const buildRecallParametersSettings = ({
         model,
         models,
       });
-      const vae = getRecallDefaultVae(resolveModelDefaultVae(model, settings, vaeModels));
-      values = { ...values, ...settings, model, ...(vae === undefined ? {} : { vae }) };
+      // Components first: a default component source can bundle the VAE the default VAE then falls back to.
+      const selected = { ...values, ...settings, model };
+      const withComponents = {
+        ...selected,
+        ...getModelDefaultComponents(model, selected, models, { replace: true }),
+      };
+      const vae = getRecallDefaultVae(resolveModelDefaultVae(model, withComponents, vaeModels));
+      values = { ...withComponents, ...(vae === undefined ? {} : { vae }) };
       fields.add('model');
     }
   }

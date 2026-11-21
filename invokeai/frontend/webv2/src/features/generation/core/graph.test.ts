@@ -974,6 +974,42 @@ describe('Krea-2, Ideogram 4 and Wan graphs', () => {
     expect(getNodeByType(graph, 'wan_l2v')).toBeUndefined();
   });
 
+  it('passes the optional Wan low-noise expert to a single-file A14B model, and to no other', () => {
+    const wanHigh: MainModelConfig = {
+      base: 'wan',
+      format: 'gguf_quantized',
+      key: 'wan-high',
+      name: 'Wan high noise',
+      type: 'main',
+      variant: 't2v_a14b',
+    };
+    const wanLow: MainModelConfig = { ...wanHigh, key: 'wan-low-gguf', name: 'Wan low noise' };
+    // The loader takes the VAE of a component source only beside the same variant family.
+    const source = {
+      componentSourceModel: { ...wanDiffusers, key: 'wan-a14b-diffusers', variant: 't2v_a14b' } as const,
+    };
+
+    // Omit undefined optional fields instead of serializing null.
+    expect(compile(wanHigh, source).nodes.model_loader?.transformer_low_noise_model).toBeUndefined();
+    expect(compile(wanHigh, { ...source, wanLowNoiseModel: wanLow }).nodes.model_loader).toMatchObject({
+      transformer_low_noise_model: wanLow,
+    });
+    // The loader ignores it for a Diffusers or TI2V-5B model, so a stale pick never reaches the graph.
+    const wanLowNoise: MainModelConfig = {
+      ...wanDiffusers,
+      key: 'wan-low',
+      name: 'Wan low noise',
+      variant: 'i2v_a14b',
+    };
+    const stale = compile(wanDiffusers, { wanLowNoiseModel: wanLowNoise });
+
+    expect(stale.nodes.model_loader?.transformer_low_noise_model).toBeUndefined();
+    // A project saved before the picker listed single-file experts only can hold a Diffusers pipeline for an A14B
+    // model: Generate names it instead of sending what the loader rejects.
+    expect(() => compile(wanHigh, { ...source, wanLowNoiseModel: wanLowNoise })).toThrow(/low-noise expert/);
+    expect(JSON.stringify(stale)).not.toContain('wan_transformer_low_noise');
+  });
+
   it('routes Wan LoRAs through the transformer only, leaving the text encoder unpatched', () => {
     const a14bLora: LoraModelConfig = {
       base: 'wan',

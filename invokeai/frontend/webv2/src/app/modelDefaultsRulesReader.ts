@@ -1,7 +1,20 @@
-import type { SchedulerPolicyReader, SchedulerPolicyState } from '@features/models';
+import type {
+  DefaultComponentPruner,
+  DefaultComponentSlotReader,
+  ModelDefaultsRulesState,
+  SchedulerPolicyReader,
+} from '@features/models';
 import type { ArchitectureCapabilitiesSnapshot } from '@features/models/architecturesStore';
 
-import { getDefaultGenerateSettings, getGenerationUiPolicy, getSchedulerOptions } from '@features/generation/settings';
+import {
+  getDefaultComponentSlotPolicies,
+  getDefaultGenerateSettings,
+  getGenerationUiPolicy,
+  getSchedulerOptions,
+  isDefaultVaeLoaded,
+  isVaeCompatibleWithGenerateModel,
+  pruneClosedDefaultComponents,
+} from '@features/generation/settings';
 import {
   ensureArchitectureCapabilitiesLoaded,
   getArchitectureCapabilitiesSnapshot,
@@ -21,9 +34,30 @@ const readSchedulerPolicy: SchedulerPolicyReader = (model, currentValue) => {
   };
 };
 
-const toPolicyState = (snapshot: ArchitectureCapabilitiesSnapshot): SchedulerPolicyState => {
+const readDefaultComponentSlots: DefaultComponentSlotReader = (model, components, catalog) =>
+  getDefaultComponentSlotPolicies(
+    { ...model, default_settings: { components }, type: 'main' } as GenerateMainModel,
+    catalog
+  );
+
+const readPrunedDefaultComponents: DefaultComponentPruner = (model, components, catalog) =>
+  pruneClosedDefaultComponents(
+    { ...model, default_settings: { components }, type: 'main' } as GenerateMainModel,
+    catalog
+  );
+
+const toPolicyState = (snapshot: ArchitectureCapabilitiesSnapshot): ModelDefaultsRulesState => {
   if (snapshot.status === 'loaded' && snapshot.revision > 0) {
-    return { read: (model, currentValue) => readSchedulerPolicy(model, currentValue), status: 'ready' };
+    return {
+      acceptsDefaultVae: (model, candidate) =>
+        isVaeCompatibleWithGenerateModel({ ...model, type: 'main' } as GenerateMainModel, candidate as never),
+      usesDefaultVae: (model) =>
+        isDefaultVaeLoaded({ ...model, default_settings: null, type: 'main' } as GenerateMainModel),
+      pruneComponents: (model, components, catalog) => readPrunedDefaultComponents(model, components, catalog),
+      read: (model, currentValue) => readSchedulerPolicy(model, currentValue),
+      readComponentSlots: (model, components, catalog) => readDefaultComponentSlots(model, components, catalog),
+      status: 'ready',
+    };
   }
   return snapshot.status === 'error' ? { status: 'unavailable' } : { status: 'loading' };
 };
@@ -32,7 +66,7 @@ const toPolicyState = (snapshot: ArchitectureCapabilitiesSnapshot): SchedulerPol
  * Publishes the rules' state now and whenever the architecture table's status or revision changes, with a new reader
  * per revision so memoized callers recompute. Lives for the page, like the table's own store.
  */
-export const startSchedulerPolicyReader = (publish: (state: SchedulerPolicyState) => void): void => {
+export const startModelDefaultsRulesReader = (publish: (state: ModelDefaultsRulesState) => void): void => {
   let published: Pick<ArchitectureCapabilitiesSnapshot, 'revision' | 'status'> | null = null;
   const sync = () => {
     const snapshot = getArchitectureCapabilitiesSnapshot();
@@ -47,4 +81,4 @@ export const startSchedulerPolicyReader = (publish: (state: SchedulerPolicyState
 };
 
 /** Joins or starts the table's load; it never rejects (see `ensureArchitectureCapabilitiesLoaded`). */
-export const ensureSchedulerRulesLoaded = (): Promise<void> => ensureArchitectureCapabilitiesLoaded();
+export const ensureDefaultsRulesLoaded = (): Promise<void> => ensureArchitectureCapabilitiesLoaded();
