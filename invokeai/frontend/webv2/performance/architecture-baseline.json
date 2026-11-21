@@ -686,6 +686,7 @@
           "source:src/features/queue/core/promptBatch.ts",
           "source:src/features/queue/core/queueActivity.ts",
           "source:src/features/queue/core/retryReport.ts",
+          "source:src/features/queue/core/submissionRetry.ts",
           "source:src/features/queue/core/submissionRules.ts",
           "source:src/features/queue/core/types.ts",
           "source:src/features/queue/data/activeProgressTargetStore.ts",

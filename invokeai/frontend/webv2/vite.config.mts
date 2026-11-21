@@ -363,6 +363,7 @@ const GALLERY_STATE_MODULES = [
   '/features/queue/core/historySnapshot.ts',
   '/features/queue/core/historySummary.ts',
   '/features/queue/core/progressRail.ts',
+  '/features/queue/core/submissionRetry.ts',
   '/features/queue/core/submissionRules.ts',
   '/features/queue/data/events.ts',
 ] as const;
