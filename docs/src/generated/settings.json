@@ -1203,6 +1203,28 @@
     {
       "category": "EXTERNAL PROVIDERS",
       "default": null,
+      "description": "API key for MiniMax image generation.",
+      "env_var": "INVOKEAI_EXTERNAL_MINIMAX_API_KEY",
+      "literal_values": [],
+      "name": "external_minimax_api_key",
+      "required": false,
+      "type": "typing.Optional[str]",
+      "validation": {}
+    },
+    {
+      "category": "EXTERNAL PROVIDERS",
+      "default": null,
+      "description": "Base URL override for MiniMax image generation.",
+      "env_var": "INVOKEAI_EXTERNAL_MINIMAX_BASE_URL",
+      "literal_values": [],
+      "name": "external_minimax_base_url",
+      "required": false,
+      "type": "typing.Optional[str]",
+      "validation": {}
+    },
+    {
+      "category": "EXTERNAL PROVIDERS",
+      "default": null,
       "description": "API key for OpenAI image generation.",
       "env_var": "INVOKEAI_EXTERNAL_OPENAI_API_KEY",
       "literal_values": [],

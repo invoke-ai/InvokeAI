@@ -205,7 +205,16 @@ def test_get_external_provider_statuses(monkeypatch: Any, mock_invoker: Invoker,
     ]
 
 
-def test_external_provider_config_update_and_reset(monkeypatch: Any, mock_invoker: Invoker, client: TestClient) -> None:
+@pytest.mark.parametrize(
+    ("provider_id", "starter_sources"),
+    [
+        ("openai", None),
+        ("minimax", ["external://minimax/MiniMax-H3-Image", "external://minimax/MiniMax-H3-Image-Highspeed"]),
+    ],
+)
+def test_external_provider_config_update_and_reset(
+    monkeypatch: Any, mock_invoker: Invoker, client: TestClient, provider_id: str, starter_sources: list[str] | None
+) -> None:
     mock_store = Mock()
     mock_store.search_by_attr.return_value = []
     mock_install = Mock()
@@ -216,45 +225,54 @@ def test_external_provider_config_update_and_reset(monkeypatch: Any, mock_invoke
     monkeypatch.setattr("invokeai.app.api.routers.app_info.ApiDependencies", MockApiDependencies(mock_invoker))
     monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", MockApiDependencies(mock_invoker))
 
-    for provider_id in ("gemini", "openai"):
-        response = client.delete(f"/api/v1/app/external_providers/config/{provider_id}")
+    for reset_provider in ("gemini", provider_id):
+        response = client.delete(f"/api/v1/app/external_providers/config/{reset_provider}")
         assert response.status_code == 200
 
     response = client.get("/api/v1/app/external_providers/config")
     assert response.status_code == 200
     payload = response.json()
-    openai_config = _get_provider_config(payload, "openai")
-    assert openai_config["api_key_configured"] is False
-    assert openai_config["base_url"] is None
+    provider_config = _get_provider_config(payload, provider_id)
+    assert provider_config["api_key_configured"] is False
+    assert provider_config["base_url"] is None
 
     response = client.post(
-        "/api/v1/app/external_providers/config/openai",
-        json={"api_key": "openai-key", "base_url": "https://api.openai.test"},
+        f"/api/v1/app/external_providers/config/{provider_id}",
+        json={"api_key": "provider-key", "base_url": "https://api.provider.test"},
     )
     assert response.status_code == 200
     payload = response.json()
     assert payload["api_key_configured"] is True
-    assert payload["base_url"] == "https://api.openai.test"
+    assert payload["base_url"] == "https://api.provider.test"
 
     response = client.get("/api/v1/app/external_providers/config")
     assert response.status_code == 200
     payload = response.json()
-    openai_config = _get_provider_config(payload, "openai")
-    assert openai_config["api_key_configured"] is True
-    assert openai_config["base_url"] == "https://api.openai.test"
+    provider_config = _get_provider_config(payload, provider_id)
+    assert provider_config["api_key_configured"] is True
+    assert provider_config["base_url"] == "https://api.provider.test"
+
+    if starter_sources is not None:
+        assert [call.args[0] for call in mock_install.heuristic_import.call_args_list] == starter_sources
+
+    api_key_field = f"external_{provider_id}_api_key"
+    base_url_field = f"external_{provider_id}_base_url"
+    runtime_response = client.get("/api/v1/app/runtime_config")
+    assert runtime_response.status_code == 200
+    assert runtime_response.json()["config"][api_key_field] == app_info.REDACTED_SECRET
 
     config_path = get_config().config_file_path
     api_keys_path = get_config().api_keys_file_path
     file_config = load_and_migrate_config(config_path)
-    assert file_config.external_openai_api_key is None
-    assert file_config.external_openai_base_url is None
-    assert "external_openai_api_key" not in config_path.read_text()
-    assert "external_openai_base_url" not in config_path.read_text()
+    assert getattr(file_config, api_key_field) is None
+    assert getattr(file_config, base_url_field) is None
+    assert api_key_field not in config_path.read_text()
+    assert base_url_field not in config_path.read_text()
     api_keys = load_external_api_keys(api_keys_path)
-    assert api_keys["external_openai_api_key"] == "openai-key"
-    assert api_keys["external_openai_base_url"] == "https://api.openai.test"
+    assert api_keys[api_key_field] == "provider-key"
+    assert api_keys[base_url_field] == "https://api.provider.test"
 
-    response = client.delete("/api/v1/app/external_providers/config/openai")
+    response = client.delete(f"/api/v1/app/external_providers/config/{provider_id}")
     assert response.status_code == 200
     payload = response.json()
     assert payload["api_key_configured"] is False
@@ -262,11 +280,11 @@ def test_external_provider_config_update_and_reset(monkeypatch: Any, mock_invoke
 
     file_config = load_and_migrate_config(config_path)
     api_keys = load_external_api_keys(api_keys_path)
-    assert file_config.external_openai_api_key is None
-    assert file_config.external_openai_base_url is None
-    assert "external_openai_api_key" not in config_path.read_text()
-    assert "external_openai_api_key" not in api_keys
-    assert "external_openai_base_url" not in api_keys
+    assert getattr(file_config, api_key_field) is None
+    assert getattr(file_config, base_url_field) is None
+    assert api_key_field not in config_path.read_text()
+    assert api_key_field not in api_keys
+    assert base_url_field not in api_keys
 
 
 def test_reset_external_provider_config_removes_provider_models(

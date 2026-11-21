@@ -71,7 +71,11 @@ import {
   getExternalAspectRatioSizes,
   getExternalReferenceImages,
   getExternalResolutionPresets,
+  isMiniMaxImageModel,
   isSeedreamBatchModel,
+  MINIMAX_H3_IMAGE_MAX_ASPECT,
+  MINIMAX_H3_IMAGE_MAX_INPUT_IMAGES,
+  MINIMAX_H3_IMAGE_MIN_PIXELS,
   resolveExternalCanvasRequestSize,
   resolveExternalImageSize,
   SEEDREAM_BATCH_MAX_TOTAL_IMAGES,
@@ -545,6 +549,7 @@ export const EXTERNAL_PROVIDER_NODE_TYPES: Record<string, string> = {
   alibabacloud: 'alibabacloud_image_generation',
   atlascloud: 'atlascloud_image_generation',
   gemini: 'gemini_image_generation',
+  minimax: 'minimax_image_generation',
   openai: 'openai_image_generation',
   seedream: 'seedream_image_generation',
 };
@@ -3036,6 +3041,33 @@ const getDimensionValidationIssues = (model: GenerateModelConfig, settings: Gene
     );
   }
 
+  if (issues.length === 0 && isMiniMaxImageModel(model)) {
+    const { height, width } = settings;
+    const area = width * height;
+    const aspect = Math.max(width, height) / Math.min(width, height);
+
+    if (aspect > MINIMAX_H3_IMAGE_MAX_ASPECT) {
+      issues.push(
+        issue(
+          'dimensions:minimaxAspect',
+          'minimaxAspect',
+          'MiniMax H3-Image requires an aspect ratio between 1:3 and 3:1.',
+          target
+        )
+      );
+    }
+    if (area < MINIMAX_H3_IMAGE_MIN_PIXELS) {
+      issues.push(
+        issue(
+          'dimensions:minimaxArea',
+          'minimaxArea',
+          'MiniMax H3-Image requires an image area of at least 655,360 pixels.',
+          target
+        )
+      );
+    }
+  }
+
   return issues;
 };
 
@@ -3080,11 +3112,15 @@ const KREA2_GGUF_VISION_TOWER_REASON =
 
 const getReferenceImageValidationIssues = (
   model: GenerateModelConfig,
-  settings: GenerateSettings
+  settings: GenerateSettings,
+  mode: ExternalGenerationMode
 ): GenerationIssue[] => {
   const issues: GenerationIssue[] = [];
-  // Use the shared limit, but report unsupported images individually rather than a misleading maximum of zero.
-  const maxReferenceImages = getReferenceImageLimit(model);
+  // MiniMax counts the Canvas composite against the same limit as the additional references.
+  const referenceLimit = getReferenceImageLimit(model);
+  const maxReferenceImages = isMiniMaxImageModel(model)
+    ? Math.min(referenceLimit, MINIMAX_H3_IMAGE_MAX_INPUT_IMAGES - (mode === 'img2img' ? 1 : 0))
+    : referenceLimit;
   const active = settings.referenceImages.filter(isReferenceImageActive);
 
   if (takesReferenceImages(model) && active.length > maxReferenceImages) {
@@ -3470,7 +3506,7 @@ export const getGenerationValidationIssues = (
 
   const issues = [
     ...getDimensionValidationIssues(model, settings),
-    ...getReferenceImageValidationIssues(model, settings),
+    ...getReferenceImageValidationIssues(model, settings, mode),
     ...getPidValidationIssues(model, settings),
   ];
 

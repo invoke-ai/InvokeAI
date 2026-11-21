@@ -182,6 +182,33 @@ describe('buildExternalGraph', () => {
     expect(externalNode?.type).toBe('gemini_image_generation');
   });
 
+  it('builds MiniMax H3-Image requests using the hosted image node', async () => {
+    mockModelConfig = createExternalModel({
+      capabilities: { modes: ['txt2img', 'img2img'], supports_reference_images: true },
+      hash: 'external:minimax:MiniMax-H3-Image',
+      name: 'MiniMax H3-Image',
+      path: 'external://minimax/MiniMax-H3-Image',
+      source: 'external://minimax/MiniMax-H3-Image',
+      provider_id: 'minimax',
+      provider_model_id: 'MiniMax-H3-Image',
+    });
+
+    mockParams.dimensions = { ...mockParams.dimensions, height: 1024, width: 1024 };
+
+    const { g } = await buildExternalGraph({ generationMode: 'txt2img', manager: null, state: {} as RootState });
+    const graph = g.getGraph();
+
+    expect(graph.nodes.external_output).toMatchObject({
+      height: 1024,
+      mode: 'txt2img',
+      num_images: 1,
+      reference_images: [{ image_name: 'ref.png' }],
+      type: 'minimax_image_generation',
+      width: 1024,
+    });
+    expect(graph.edges.some(({ destination }) => destination.field === 'seed')).toBe(false);
+  });
+
   it('throws when mode is unsupported', async () => {
     const modelConfig = createExternalModel({
       capabilities: {
