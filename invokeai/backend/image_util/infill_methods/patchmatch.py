@@ -5,11 +5,25 @@ wraps the actual patchmatch object. It respects the global
 be suppressed or deferred
 """
 
+import logging
+
 import numpy as np
 from PIL import Image
 
 import invokeai.backend.util.logging as logger
 from invokeai.app.services.config.config_default import get_config
+
+# pypatchmatch logs a hard-coded installation-help URL at import time when its C extension
+# fails to build, and that URL points at a documentation page that has moved
+# (invoke-ai/InvokeAI#9775). Drop only that record at its source logger and print the
+# current installation help location instead, keeping the compile error detail it reports.
+STALE_INSTALL_HELP_URL = "https://invoke-ai.github.io/InvokeAI/installation/060_INSTALL_PATCHMATCH/"
+INSTALL_HELP_URL = "https://invoke.ai/configuration/patchmatch/#installation"
+PYPATCHMATCH_LOGGER_NAME = "patchmatch.patch_match"
+
+
+def _drop_stale_install_help(record: logging.LogRecord) -> bool:
+    return STALE_INSTALL_HELP_URL not in record.getMessage()
 
 
 class PatchMatch:
@@ -28,6 +42,9 @@ class PatchMatch:
         if cls.tried_load:
             return
         if get_config().patchmatch:
+            # Must be in place before the import: pypatchmatch emits its guidance while
+            # the module body runs.
+            logging.getLogger(PYPATCHMATCH_LOGGER_NAME).addFilter(_drop_stale_install_help)
             from patchmatch import patch_match as pm
 
             if pm.patchmatch_available:
@@ -35,6 +52,7 @@ class PatchMatch:
                 cls.patch_match = pm
             else:
                 logger.info("Patchmatch not loaded (nonfatal)")
+                logger.info(f"Refer to {INSTALL_HELP_URL} for installation instructions.")
         else:
             logger.info("Patchmatch loading disabled")
         cls.tried_load = True
