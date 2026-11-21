@@ -115,10 +115,12 @@ name, contains "turbo" gets the Large Turbo column, a Diffusers model as well as
 | Resolution | 1024 × 1024 | 1024 × 1024 |
 
 The default steps and CFG follow the SD3.5 Medium model card's example; the Large Turbo ones follow
-Stability's step count and guidance for SD3.5 Large Turbo. Stability's SD3.5 models also shift the noise
-schedule by 3.0, which InvokeAI's SD3 denoise does not do for any SD3 model. The missing shift matters most
-at Turbo's 4 steps: the images are usable, but objects can fall apart in places. If Turbo output looks
-undercooked, raise the steps to about 8, which looked about as clean as 4 shifted steps in our tests.
+Stability's step count and guidance for SD3.5 Large Turbo.
+
+SD3 samples on Stability's noise schedule, shifted by 3.0 toward high noise. A Diffusers model uses the
+shift in its own `scheduler` folder; a GGUF build has none and uses 3.0, the value of every SD3 and SD3.5
+release. Image-to-image and inpainting start at a noise level set by the denoising strength and run the
+shifted steps below it, so a low strength runs fewer steps than the step count.
 
 - **CFG Scale** applies true classifier-free guidance. The SD3.5 Large model card's example is about
   **28 steps at CFG 3.5**. Large gets Medium's defaults, so use that as a starting point when you

@@ -1074,9 +1074,8 @@ def test_sd3_partial_denoise_short_circuit_uses_first_clipped_timestep():
     ):
         result = invocation._run_diffusion(mock_context)
 
-    timesteps = clip_timestep_schedule_fractional(torch.linspace(1, 0, invocation.steps + 1).tolist(), 0.25, 0.25)
-    expected = timesteps[0] * noise + (1.0 - timesteps[0]) * init_latents
-    assert torch.equal(result, expected)
+    # A pass that starts and ends at denoising_start 0.25 only noises its input, to sigma 0.75.
+    assert torch.allclose(result, 0.75 * noise + 0.25 * init_latents)
 
 
 def test_cogview4_partial_denoise_short_circuit_uses_first_clipped_sigma():
