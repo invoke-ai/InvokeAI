@@ -15,10 +15,12 @@ import {
   isFlux2MistralEncoder,
   isFlux2PipelineForModel,
   isFlux2Qwen3EncoderForModel,
+  isImageToPromptModel,
   isSelfContainedSDNQFlux1Pipeline,
   isSelfContainedSDNQPipeline,
   isVaeAcceptedByBase,
   isVaeCompatibleWithGenerateModel,
+  isVisionTextLlm,
   isZImageQwen3Encoder,
   roleVariantOf,
   servesAsType,
@@ -309,5 +311,35 @@ describe('encoder predicates over roles', () => {
     expect(anyKlein(textLlm('qwen3_encoder', 'qwen3_4b'))).toBe(true);
     expect(anyKlein(textLlm('qwen3_encoder', 'qwen3_06b'))).toBe(false);
     expect(anyKlein(candidate({ type: 'text_llm' }))).toBe(false);
+  });
+});
+
+describe('Text LLMs that read images', () => {
+  const qwen3VlEncoder = (supportsImages: boolean | null): GenerateComponentCandidate =>
+    candidate({
+      roles: [
+        { format: 'qwen3_vl_encoder', supports_images: supportsImages, type: 'text_llm', variant: 'qwen3_vl_4b' },
+      ],
+      type: 'qwen3_vl_encoder',
+      variant: 'qwen3_vl_4b',
+    });
+
+  it('reads the flag of a Text LLM record and the capability of a Text LLM role', () => {
+    expect(isVisionTextLlm(candidate({ supports_images: true, type: 'text_llm' }))).toBe(true);
+    expect(isVisionTextLlm(candidate({ supports_images: false, type: 'text_llm' }))).toBe(false);
+    expect(isVisionTextLlm(qwen3VlEncoder(true))).toBe(true);
+    // A role stored before identification recorded it reads text only until the model is re-identified.
+    expect(isVisionTextLlm(qwen3VlEncoder(null))).toBe(false);
+    // The encoder record's own fields say nothing about its Text LLM role.
+    expect(isVisionTextLlm({ ...qwen3VlEncoder(false), supports_images: true })).toBe(false);
+    expect(
+      isVisionTextLlm(candidate({ roles: [{ supports_images: true, type: 'qwen3_5_encoder' }], type: 'text_llm' }))
+    ).toBe(false);
+  });
+
+  it('offers Image to Prompt LLaVA OneVision and every Text LLM that reads images, by record or role', () => {
+    expect(isImageToPromptModel(candidate({ type: 'llava_onevision' }))).toBe(true);
+    expect(isImageToPromptModel(qwen3VlEncoder(true))).toBe(true);
+    expect(isImageToPromptModel(qwen3VlEncoder(null))).toBe(false);
   });
 });

@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any, Literal, Optional, Self
 
 import torch
-from pydantic import Field
+from pydantic import Field, field_validator
 
 from invokeai.backend.model_manager.configs.base import Checkpoint_Config_Base, Config_Base, ModelRole
 from invokeai.backend.model_manager.configs.identification_utils import (
@@ -188,6 +188,19 @@ class Qwen35Encoder_Checkpoint_Config(Checkpoint_Config_Base, Config_Base):
     format: Literal[ModelFormat.Checkpoint] = Field(default=ModelFormat.Checkpoint)
     cpu_only: bool | None = Field(default=None, description="Whether this model should run on CPU only")
     variant: Qwen35VariantType = Field(description="Qwen3.5 model size variant")
+
+    @field_validator("roles", mode="after")
+    @classmethod
+    def _text_llm_role_reads_images(cls, roles: list[ModelRole]) -> list[ModelRole]:
+        # A file gets the Text LLM role only with its vision tower, and the processor is vendored, so the role always
+        # reads images. Said here rather than at identification, so a role stored before it recorded the capability
+        # says so too, without a re-identify.
+        return [
+            role.model_copy(update={"supports_images": True})
+            if role.type == ModelType.TextLLM and role.supports_images is None
+            else role
+            for role in roles
+        ]
 
     @classmethod
     def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:

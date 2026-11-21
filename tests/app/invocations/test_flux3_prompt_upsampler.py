@@ -144,6 +144,57 @@ def test_a_model_that_cannot_read_images_is_refused_before_anything_loads(config
     assert harness.events == []
 
 
+def _qwen3_5_encoder_serving_as_text_llm() -> Any:
+    from tests.fixtures.model_roles import encoder_file
+
+    return encoder_file("pup")
+
+
+def _qwen3_vl_encoder_reading_images() -> Any:
+    from tests.fixtures.model_roles import qwen3_vl_encoder_file
+
+    return qwen3_vl_encoder_file("pup", reads_images=True)
+
+
+@pytest.mark.parametrize(
+    "record", [_qwen3_5_encoder_serving_as_text_llm, _qwen3_vl_encoder_reading_images], ids=["qwen3.5", "qwen3-vl"]
+)
+def test_a_record_that_reads_images_in_its_text_llm_role_runs_in_that_role(record: Any) -> None:
+    """Generate sends a role-serving model under its record's type; the node loads it as a Text LLM, whose view the
+    refusal reads."""
+    from tests.fixtures.model_roles import models_interface
+
+    stored = record()
+    harness = _Harness()
+    harness.context.models.get_config.side_effect = models_interface({"pup": stored}).get_config
+    asked_as: list[str] = []
+    load = harness.context.models.load.side_effect
+    harness.context.models.load.side_effect = lambda identifier, submodel_type=None: (
+        asked_as.append(identifier.type) or load(identifier, submodel_type)
+    )
+    node = Flux3PromptUpsamplerInvocation(
+        id="upsampler", upsampler_model=MODEL.model_copy(update={"type": stored.type}), prompt="A sea."
+    )
+
+    assert node.invoke(harness.context).value == "A calm sea at dawn."
+    assert asked_as == [ModelType.TextLLM, ModelType.TextLLM]
+
+
+def test_a_text_llm_role_that_does_not_read_images_is_refused_before_anything_loads() -> None:
+    from tests.fixtures.model_roles import models_interface, qwen3_vl_encoder_file
+
+    stored = qwen3_vl_encoder_file("pup")
+    harness = _Harness()
+    harness.context.models.get_config.side_effect = models_interface({"pup": stored}).get_config
+    node = Flux3PromptUpsamplerInvocation(
+        id="upsampler", upsampler_model=MODEL.model_copy(update={"type": stored.type}), prompt="A sea."
+    )
+
+    with pytest.raises(ValueError, match="cannot be the FLUX.3 prompt upsampler"):
+        node.invoke(harness.context)
+    harness.context.models.load.assert_not_called()
+
+
 def test_more_than_ten_reference_images_are_refused_before_anything_loads() -> None:
     harness = _Harness()
 

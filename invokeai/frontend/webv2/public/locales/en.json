@@ -3295,7 +3295,7 @@
       "imageToPrompt": "Image to prompt",
       "incompatible": "Incompatible",
       "installTextLlmToExpandPrompts": "Install a Text LLM model to expand prompts.",
-      "installVisionModelToGeneratePrompts": "Install a LLaVA OneVision model to generate prompts from images.",
+      "installVisionModelToGeneratePrompts": "Install a LLaVA OneVision model or a Text LLM that reads images to generate prompts from images.",
       "krea2Rebalance": "Conditioning rebalance",
       "krea2RebalanceAxisDeep": "deep",
       "krea2RebalanceAxisShallow": "shallow",

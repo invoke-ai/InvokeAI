@@ -11,15 +11,22 @@ from invokeai.backend.model_manager.configs.qwen3_encoder import (
     Qwen3Encoder_Checkpoint_Config,
     Qwen3Encoder_Qwen3Encoder_Config,
 )
+from invokeai.backend.model_manager.configs.qwen3_vl_encoder import Qwen3VLEncoder_Checkpoint_Config
 from invokeai.backend.model_manager.configs.roles import ModelRoleError, role_variant, serves_as, view_as
-from invokeai.backend.model_manager.configs.text_llm import TextLLM_Checkpoint_Config, TextLLM_Diffusers_Config
+from invokeai.backend.model_manager.configs.text_llm import (
+    TextLLM_Checkpoint_Config,
+    TextLLM_Diffusers_Config,
+    TextLLM_Qwen3VLEncoder_Config,
+)
 from invokeai.backend.model_manager.taxonomy import (
     ModelFormat,
     ModelSourceType,
     ModelType,
     Qwen3VariantType,
+    Qwen3VLVariantType,
     Qwen35VariantType,
 )
+from tests.fixtures.model_roles import encoder_file, qwen3_vl_encoder_file
 
 _COMMON = {
     "key": "key1",
@@ -69,7 +76,8 @@ def test_a_text_llm_file_viewed_as_the_encoder_is_an_encoder_config_of_the_same_
     assert view.variant is Qwen35VariantType.Qwen35_9B
     assert view.role_of is ModelType.TextLLM
     assert record.role_of is None
-    assert _dumped(view.roles) == _dumped([ModelRole(type=ModelType.TextLLM)])
+    # The way back names the Text LLM, which reads images in that role.
+    assert _dumped(view.roles) == _dumped([ModelRole(type=ModelType.TextLLM, supports_images=True)])
 
 
 def test_a_folder_viewed_as_the_qwen3_encoder_switches_format_and_remembers_its_own() -> None:
@@ -169,3 +177,67 @@ def test_a_role_this_build_cannot_read_is_dropped_and_the_record_survives() -> N
     assert _dumped(restored.roles) == _dumped(
         [ModelRole(type=ModelType.Qwen35Encoder, variant=Qwen35VariantType.Qwen35_9B)]
     )
+
+
+def test_a_qwen3_vl_encoder_viewed_as_a_text_llm_is_a_text_only_view_that_finds_its_way_back() -> None:
+    record = qwen3_vl_encoder_file("vl", Qwen3VLVariantType.Qwen3VL_8B)
+
+    view = view_as(ModelConfigFactory.from_dict(json.loads(record.model_dump_json())), ModelType.TextLLM)
+
+    assert isinstance(view, TextLLM_Qwen3VLEncoder_Config)
+    assert (view.format, view.variant) == (ModelFormat.Qwen3VLEncoder, Qwen3VLVariantType.Qwen3VL_8B)
+    # The view reads text only: without this an image request would pass the router and reach the loader.
+    assert view.supports_images is False
+    assert _dumped(view.roles) == _dumped(
+        [ModelRole(type=ModelType.Qwen3VLEncoder, format=ModelFormat.Checkpoint, variant=Qwen3VLVariantType.Qwen3VL_8B)]
+    )
+    back = view_as(view, ModelType.Qwen3VLEncoder)
+    assert isinstance(back, Qwen3VLEncoder_Checkpoint_Config)
+    assert (back.path, back.variant) == (record.path, Qwen3VLVariantType.Qwen3VL_8B)
+
+
+def test_a_text_llm_role_that_reads_images_gives_its_view_the_capability_through_storage() -> None:
+    record = qwen3_vl_encoder_file("vl", reads_images=True)
+
+    restored = ModelConfigFactory.from_dict(json.loads(record.model_dump_json()))
+    view = view_as(restored, ModelType.TextLLM)
+
+    assert restored.roles[0].supports_images is True
+    assert isinstance(view, TextLLM_Qwen3VLEncoder_Config)
+    assert view.supports_images is True
+
+
+def _stored_without_the_capability(record) -> dict:
+    """The record as stored before roles recorded whether the model reads images: no `supports_images` key."""
+    stored = record.model_dump(mode="json")
+    for role in stored["roles"]:
+        del role["supports_images"]
+    return stored
+
+
+def test_a_qwen3_vl_role_stored_without_the_capability_stays_readable_and_text_only() -> None:
+    restored = ModelConfigFactory.from_dict(_stored_without_the_capability(qwen3_vl_encoder_file("vl")))
+
+    assert restored.roles[0].supports_images is None
+    assert view_as(restored, ModelType.TextLLM).supports_images is False
+
+
+def test_a_qwen3_5_encoders_text_llm_role_reads_images_even_as_stored_before_it_said_so() -> None:
+    """Its files get the role only with their vision tower, so the record says so to every reader, the API included,
+    without a re-identify."""
+    restored = ModelConfigFactory.from_dict(_stored_without_the_capability(encoder_file("enc")))
+
+    assert json.loads(restored.model_dump_json())["roles"][0]["supports_images"] is True
+    assert view_as(restored, ModelType.TextLLM).supports_images is True
+
+
+def test_qwen3_5_text_llms_keep_their_checkpoint_config_with_no_variant() -> None:
+    """A stored Qwen3.5 file reads images by default and has no `variant`, which the Model Manager would offer to edit;
+    the Qwen3.5 encoder's view is the same class."""
+    stored = _text_llm_file().model_dump(mode="json")
+    del stored["supports_images"]
+
+    for config in (ModelConfigFactory.from_dict(stored), view_as(encoder_file("enc"), ModelType.TextLLM)):
+        assert isinstance(config, TextLLM_Checkpoint_Config)
+        assert config.supports_images is True
+        assert "variant" not in config.model_dump()

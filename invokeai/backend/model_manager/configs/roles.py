@@ -46,6 +46,9 @@ def view_as(config: AnyModelConfig, model_type: ModelType) -> AnyModelConfig:
     fields["format"] = role.format or config.format
     if role.variant is not None:
         fields["variant"] = role.variant
+    # A role without it, stored before identification recorded it, leaves the view class's default.
+    if role.supports_images is not None:
+        fields["supports_images"] = role.supports_images
     fields["roles"] = [r for r in config.roles if r.type != model_type] + [
         ModelRole(
             type=config.type,

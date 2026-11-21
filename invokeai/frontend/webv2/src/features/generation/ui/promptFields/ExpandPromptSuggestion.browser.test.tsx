@@ -52,13 +52,15 @@ const ENHANCER = {
   type: 'text_llm',
 };
 
-/** A record whose primary type is another one but whose files also serve as a Text LLM. */
+/** A record whose primary type is another one but whose files also serve as a Text LLM, reading images in it. */
 const ROLE_ENHANCER = {
   ...ENHANCER,
   key: 'role-e4b',
   name: 'Gemma 4 E4B (encoder)',
-  roles: [{ format: null, type: 'text_llm', variant: null }],
+  roles: [{ format: null, supports_images: true, type: 'text_llm', variant: null }],
   source: 'google/gemma-4-E4B-it',
+  // The record's own fields describe its primary type; the role says what it does as a Text LLM.
+  supports_images: undefined,
   type: 'qwen3_5_encoder',
 };
 const MOSS_PROMPT_ID = '0f8f5b2e-1c9e-4f2a-9a4e-1f1f1f1f0011';
@@ -351,6 +353,14 @@ it('offers a record that serves as a Text LLM through a role, and suggests it by
   expect(select('text llm')?.value).toBe('role-e4b');
 });
 
+it('describes from the first frame with a model that reads images through its Text LLM role', async () => {
+  catalog = [TEXT_ONLY, ROLE_ENHANCER];
+  await renderAndOpen(LTX_SUGGESTION, savedModels({ expandPromptModelKey: 'role-e4b' }));
+
+  expect(firstFrameCheckbox()).toBeDefined();
+  expect(await runExpand()).toMatchObject({ image_name: 'frame.png', model_key: 'role-e4b', system_prompt: 'I2V' });
+});
+
 it('does not take a record of another type without the Text LLM role as a candidate', async () => {
   catalog = [TEXT_ONLY, { ...ROLE_ENHANCER, roles: [] }];
   await renderAndOpen(MOSS_SUGGESTION, savedModels());
@@ -524,6 +534,15 @@ it('drops a result for a project this field no longer shows', async () => {
   expect(onChange).not.toHaveBeenCalled();
   expect(notices.offer).not.toHaveBeenCalled();
   expect(notices.undoable).not.toHaveBeenCalled();
+});
+
+it('starts Image to Prompt from LLaVA OneVision when nothing is picked, over a Text LLM that sorts first', async () => {
+  catalog = [ENHANCER, VISION_A];
+  await renderAndOpen(null, savedModels(), 'widgets.generate.imageToPrompt');
+
+  expect(select('text llm')?.value).toBe('llava-a');
+  await act(() => buttonWithText('widgets.generate.generatePrompt')?.click());
+  expect(imageToPrompt).toHaveBeenCalledWith(expect.objectContaining({ model_key: 'llava-a' }));
 });
 
 it('runs Image to Prompt and writes its prompt', async () => {
