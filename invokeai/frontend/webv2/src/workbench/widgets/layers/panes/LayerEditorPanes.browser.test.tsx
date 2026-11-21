@@ -846,6 +846,16 @@ describe('Transform pane', () => {
 
     await act(() => userEvent.click(page.getByRole('button', { name: 'Flip horizontal' })));
     expect(layer().transform).toMatchObject({ rotation: -0.5, scaleX: -2, scaleY: 2 });
+
+    await act(async () => {
+      await userEvent.tripleClick(width);
+      const clipboardData = new DataTransfer();
+      clipboardData.setData('text', '50%');
+      width.element().dispatchEvent(new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData }));
+    });
+    await expect.element(width).toHaveValue('50');
+    await act(() => userEvent.keyboard('{Enter}'));
+    await expect.element(width).toHaveValue('100');
   });
 
   it('keeps resampling controls in the tool options rather than layer properties', async () => {

@@ -1,6 +1,6 @@
 /* oxlint-disable react-perf/jsx-no-jsx-as-prop */
 import type { NumberInput as ChakraNumberInput } from '@chakra-ui/react';
-import type { InputEvent, KeyboardEvent, ReactNode } from 'react';
+import type { ClipboardEvent, InputEvent, KeyboardEvent, ReactNode, SyntheticEvent } from 'react';
 
 import { Box, Flex, Icon, InputGroup, NumberInput, VisuallyHidden } from '@chakra-ui/react';
 import { Button } from '@platform/ui/Button';
@@ -100,19 +100,27 @@ export const FormNumberField = ({
     [onValueCommit, setDraftText, setOperatorState, value]
   );
   // Caught before the number input, which rejects any character that is not part of a number.
-  const onBeforeInputCapture = useCallback(
-    (event: InputEvent<HTMLDivElement>) => {
-      const input = event.target as HTMLInputElement;
-      const parsed = parseRelativeInput(event.data);
+  const takeOperator = useCallback(
+    (event: SyntheticEvent<HTMLDivElement>, text: string): void => {
+      const parsed = parseRelativeInput(text);
       if (!parsed) {
         return;
       }
       event.preventDefault();
       event.stopPropagation();
       setOperatorState(parsed.operator);
-      setDraftText(parsed.operand || (parsed.operator === '%' ? input.value : ''));
+      setDraftText(parsed.operand || (parsed.operator === '%' ? (event.target as HTMLInputElement).value : ''));
     },
     [setDraftText, setOperatorState]
+  );
+  const onBeforeInputCapture = useCallback(
+    (event: InputEvent<HTMLDivElement>) => takeOperator(event, event.data),
+    [takeOperator]
+  );
+  // React raises no beforeinput for a paste in every engine; cancelling the paste stops the typed path seeing it too.
+  const onPasteCapture = useCallback(
+    (event: ClipboardEvent<HTMLDivElement>) => takeOperator(event, event.clipboardData.getData('text')),
+    [takeOperator]
   );
   const onKeyDownCapture = useCallback(
     (event: KeyboardEvent<HTMLDivElement>) => {
@@ -171,6 +179,7 @@ export const FormNumberField = ({
       w={`${FORM_NUMBER_FIELD_WIDTH_PX}px`}
       onBeforeInputCapture={relative && !live ? onBeforeInputCapture : undefined}
       onKeyDownCapture={relative && !live ? onKeyDownCapture : undefined}
+      onPasteCapture={relative && !live ? onPasteCapture : undefined}
       onValueChange={live ? onValueChange : onDraftChange}
       onValueCommit={live ? undefined : onDraftCommit}
     >
