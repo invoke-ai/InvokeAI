@@ -5,7 +5,7 @@ import { toExternalModelValues } from '@features/models/core/externalModelFields
 import { getModelsSnapshot, subscribeModels } from '@features/models/data/modelsStore';
 import { registerAccountOwnedResource } from '@platform/state/accountLifecycle';
 import { createKeyedTransientStore } from '@platform/state/externalStore';
-import { useExternalStoreSelector, type EqualityFn } from '@platform/state/selectors';
+import { shallowEqual, useExternalStoreSelector, type EqualityFn } from '@platform/state/selectors';
 import { useCallback } from 'react';
 
 /** Unsaved model-detail edits per model, in memory for the account's lifetime in this tab, saves in flight included. */
@@ -70,8 +70,9 @@ const SERVER_VALUES: Record<ModelDraftSurface, (model: ModelConfig) => object> =
 
 const FIELD_SURFACES = ['identity', 'defaults', 'external'] as const satisfies readonly ModelDraftSurface[];
 
-// Unset and null are the same "no value" to the backend and to every form here.
-const isSameValue = (left: unknown, right: unknown): boolean => Object.is(left ?? null, right ?? null);
+// Unset and null are the same "no value" to the backend and to every form here. Shallow, so an edited map of default
+// components (model keys by slot) that is back to the saved one stops being an edit.
+const isSameValue = (left: unknown, right: unknown): boolean => shallowEqual(left ?? null, right ?? null);
 
 export const hasDraftFields = (draft: ModelFieldsDraft | undefined): boolean =>
   draft !== undefined && Object.keys(draft.fields).length > 0;
