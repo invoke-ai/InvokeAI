@@ -89,6 +89,28 @@ def test_integrated_cuda_memory_available_uses_cuda_allocation_budget_on_windows
     assert TorchDevice.memory_available_to_process(device) == 40
 
 
+def test_integrated_cuda_memory_available_is_limited_by_windows_commit(monkeypatch):
+    device = torch.device("cuda:0")
+    monkeypatch.setattr(torch.version, "hip", None)
+    monkeypatch.setattr("invokeai.backend.util.devices.sys.platform", "win32")
+    monkeypatch.setattr(torch.cuda, "get_device_properties", lambda _: SimpleNamespace(is_integrated=1))
+    monkeypatch.setattr(TorchDevice, "cuda_mem_get_info", classmethod(lambda *_: (30, 40)))
+    monkeypatch.setattr("invokeai.backend.util.devices._windows_commit_available", lambda: 5)
+    monkeypatch.setattr(torch.cuda, "memory_allocated", lambda _device: 10)
+
+    # CUDA reports 40 bytes available including the 10 already allocated, but only 5 bytes of
+    # system commit remain. Existing allocations are reusable, so the process can add 5 bytes.
+    assert TorchDevice.memory_available_to_process(device) == 15
+
+
+def test_host_memory_available_is_limited_by_windows_commit(monkeypatch):
+    monkeypatch.setattr(devices_module.sys, "platform", "win32")
+    monkeypatch.setattr(devices_module.psutil, "virtual_memory", lambda: SimpleNamespace(available=100))
+    monkeypatch.setattr(devices_module, "_windows_commit_available", lambda: 40)
+
+    assert devices_module._host_memory_available() == 40
+
+
 @pytest.mark.parametrize(
     "properties",
     [SimpleNamespace(is_integrated=0), SimpleNamespace()],

@@ -108,6 +108,28 @@ class TestTheSideChannelIsCounted:
 
 
 class TestTheDictAndThePayloads:
+    def test_mapped_fp8_sources_are_not_credited_as_reclaimed_host_bytes(self) -> None:
+        """File-backed source pages remain reclaimable in the live-RAM sample while the widened output is live."""
+        sd = {"lin.weight": torch.zeros((4, 8), dtype=torch.float8_e4m3fn)}
+        asked: list[tuple[int, dict[str, int]]] = []
+
+        def reserve(bytes_needed: int, **kwargs: int) -> None:
+            asked.append((bytes_needed, kwargs))
+
+        needed = reserve_for_load(
+            reserve,
+            sd,
+            torch.bfloat16,
+            keep_fp8=False,
+            model=_linear_model(8, 4),
+            fp8_layers={},
+            nvfp4_payloads={},
+            source_tensors_mapped=True,
+        )
+
+        assert needed == 4 * 8 * torch.bfloat16.itemsize
+        assert asked == [(needed, {"host_bytes_needed": needed})]
+
     def test_retained_mapped_sources_charge_final_output_tensors(self) -> None:
         payload = quantize_scaled_fp8(torch.arange(32, dtype=torch.float32).reshape(4, 8))
         sd = {

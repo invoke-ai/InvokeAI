@@ -254,6 +254,97 @@ def test_integrated_cuda_partial_relock_with_no_required_weights_tolerates_negat
         cache.shutdown()
 
 
+def test_integrated_cuda_relock_checks_host_headroom_before_copying_gpu_only_model(mock_logger: MagicMock):
+    cache = _make_cuda_cache(mock_logger, keep_ram_copy=False)
+    try:
+        with _patch_integrated_cuda():
+            cache.put("m", DummyModule())
+            entry = _entry(cache, "m")
+            entry.cached_model._is_in_vram = True
+            cache._offload_unlocked_models = MagicMock(return_value=0)  # type: ignore[method-assign]
+            cache._get_vram_available = MagicMock(return_value=-1)  # type: ignore[method-assign]
+            cache._get_physical_vram_available = MagicMock(return_value=2**30)  # type: ignore[method-assign]
+            full_unload = MagicMock(side_effect=AssertionError("copied before host admission"))
+            with (
+                patch.object(entry.cached_model, "full_unload_from_vram", full_unload),
+                patch.object(model_cache_module, "_host_memory_available", return_value=0),
+            ):
+                with pytest.raises(torch.OutOfMemoryError, match="host memory"):
+                    cache.lock(entry, None)
+
+            assert cache._cached_models["m"] is entry
+            assert entry.is_locked is False
+            full_unload.assert_not_called()
+    finally:
+        cache.shutdown()
+
+
+def test_integrated_cuda_partial_relock_unloads_only_the_shortfall_before_copying(mock_logger: MagicMock):
+    """Partial loading can recover a small shortage without copying the full resident model to the host."""
+    cache = _make_cuda_cache(mock_logger, enable_partial_loading=True, keep_ram_copy=False)
+    try:
+        with _patch_integrated_cuda():
+            cache.put("m", DummyModule())
+            entry = _entry(cache, "m")
+            total_bytes = entry.cached_model.total_bytes()
+            entry.cached_model._cur_vram_bytes = total_bytes
+            cache._offload_unlocked_models = MagicMock(return_value=0)  # type: ignore[method-assign]
+            cache._get_vram_available = MagicMock(side_effect=[-1, -1, 2**30, 2**30, 2**30])  # type: ignore[method-assign]
+            cache._get_physical_vram_available = MagicMock(return_value=1)  # type: ignore[method-assign]
+            cache._move_model_to_ram = MagicMock(return_value=1)  # type: ignore[method-assign]
+            cache._move_model_to_vram = MagicMock(return_value=(0, False))  # type: ignore[method-assign]
+            cache._release_allocator_blocks_for_reserve = MagicMock()  # type: ignore[method-assign]
+
+            assert cache.lock(entry, None)
+            cache._move_model_to_ram.assert_called_once_with(entry, 1)
+            cache.unlock(entry)
+    finally:
+        cache.shutdown()
+
+
+def test_integrated_cuda_public_partial_unload_refuses_before_cpu_transfer(mock_logger: MagicMock):
+    cache = _make_cuda_cache(mock_logger, enable_partial_loading=True, keep_ram_copy=False)
+    try:
+        with _patch_integrated_cuda():
+            cache.put("m", DummyModule())
+            entry = _entry(cache, "m")
+            model = entry.cached_model.model
+            cpu_state_dict = model.state_dict()
+            model.state_dict = lambda: {key: SimpleNamespace(device=torch.device("cuda")) for key in cpu_state_dict}  # type: ignore[method-assign]
+            entry.cached_model._cur_vram_bytes = entry.cached_model.total_bytes()
+            cache._get_physical_vram_available = MagicMock(return_value=2**30)  # type: ignore[method-assign]
+            with patch.object(model_cache_module, "_host_memory_available", return_value=0):
+                with pytest.raises(torch.OutOfMemoryError, match="host memory"):
+                    cache.unload_model_from_vram(entry, entry.cached_model.total_bytes())
+
+            assert "m" in cache._cached_models
+            assert not entry.detached
+    finally:
+        cache.shutdown()
+
+
+def test_integrated_cuda_relock_with_cpu_shadow_does_not_require_new_host_memory(mock_logger: MagicMock):
+    cache = _make_cuda_cache(mock_logger, keep_ram_copy=True)
+    try:
+        with _patch_integrated_cuda():
+            cache.put("m", DummyModule())
+            entry = _entry(cache, "m")
+            entry.cached_model._is_in_vram = True
+            cache._offload_unlocked_models = MagicMock(return_value=0)  # type: ignore[method-assign]
+            cache._get_vram_available = MagicMock(return_value=-1)  # type: ignore[method-assign]
+            cache._get_physical_vram_available = MagicMock(return_value=0)  # type: ignore[method-assign]
+            cache._move_model_to_ram = MagicMock(return_value=entry.cached_model.total_bytes())  # type: ignore[method-assign]
+            cache._move_model_to_vram = MagicMock(return_value=(0, False))  # type: ignore[method-assign]
+            cache._release_allocator_blocks_for_reserve = MagicMock()  # type: ignore[method-assign]
+
+            assert cache.lock(entry, None)
+            cache._move_model_to_ram.assert_called_once()
+            cache._move_model_to_vram.assert_called_once()
+            cache.unlock(entry)
+    finally:
+        cache.shutdown()
+
+
 def test_partial_loading_still_off_on_shared_memory_devices_we_do_not_own(mock_logger: MagicMock):
     """CPU and MPS keep their existing behaviour; this PR does not change other platforms."""
     cache = _make_cache("cpu", mock_logger, enable_partial_loading=True)
@@ -513,6 +604,44 @@ def test_integrated_cuda_eviction_unloads_model_held_by_stale_handle(mock_logger
         cache.shutdown()
 
 
+def test_integrated_cuda_pressure_offloads_live_handle_with_cpu_shadow(mock_logger: MagicMock):
+    """A live handle may remain usable while its retained CPU shadow makes GPU eviction safe."""
+    cache = _make_cuda_cache(mock_logger, keep_ram_copy=True)
+    try:
+        with _patch_integrated_cuda():
+            cache.put("m1", DummyModule())
+            cache.put("m2", DummyModule())
+            entry = _entry(cache, "m1")
+            loaded = LoadedModelWithoutConfig(entry, cache)
+            loaded._end_first_use_window()
+            entry.awaiting_first_use = False
+            size = entry.cached_model.total_bytes()
+            entry.cached_model.cur_vram_bytes = lambda: size  # type: ignore[method-assign]
+            second = _entry(cache, "m2")
+            second.awaiting_first_use = False
+            second.cached_model._is_in_vram = True
+            second.cached_model.cur_vram_bytes = lambda: size  # type: ignore[method-assign]
+            available = 0
+
+            def move_to_ram(_entry: object, _bytes: int) -> int:
+                nonlocal available
+                available += size
+                return size
+
+            with (
+                patch.object(cache, "_move_model_to_ram", side_effect=move_to_ram) as move,
+                patch.object(TorchDevice, "empty_cache", return_value=EmptyCacheOutcome.RAN),
+            ):
+                assert cache._offload_unlocked_models(size, vram_available_fn=lambda: available) == size
+        assert "m1" in cache._cached_models
+        assert "m2" in cache._cached_models
+        assert not entry.detached
+        move.assert_called_once_with(entry, size)
+        assert loaded.resident_weight_bytes == size
+    finally:
+        cache.shutdown()
+
+
 def test_integrated_cuda_attached_handle_work_does_not_pin_evicted_model(mock_logger: MagicMock):
     """A finalizer queued before WeakSet removal must not keep an evicted attached record alive."""
     cache = _make_cuda_cache(mock_logger, keep_ram_copy=False)
@@ -569,6 +698,7 @@ def test_integrated_cuda_detached_handle_release_recovers_after_worker_death(moc
         with _patch_integrated_cuda():
             cache.put("m", DummyModule())
             entry = _entry(cache, "m")
+            entry.cached_model._cpu_state_dict = None
             loaded = LoadedModelWithoutConfig(entry, cache)
             loaded._end_first_use_window()
             entry.awaiting_first_use = False
@@ -701,6 +831,7 @@ def test_integrated_cuda_detached_release_uses_dedicated_worker(mock_logger: Mag
         with _patch_integrated_cuda():
             cache.put("m", DummyModule())
             entry = _entry(cache, "m")
+            entry.cached_model._cpu_state_dict = None
             loaded = LoadedModelWithoutConfig(entry, cache)
             loaded._end_first_use_window()
             entry.awaiting_first_use = False
@@ -827,6 +958,7 @@ def test_integrated_cuda_handle_finalizer_does_not_reenter_shared_store_lock(moc
         with _patch_integrated_cuda():
             cache.put("m", DummyModule())
             entry = _entry(cache, "m")
+            entry.cached_model._cpu_state_dict = None
             loaded = LoadedModelWithoutConfig(entry, cache)
             loaded._end_first_use_window()
             entry.awaiting_first_use = False
@@ -880,6 +1012,7 @@ def test_integrated_cuda_handle_finalizer_runs_after_weakset_removal(mock_logger
         with _patch_integrated_cuda():
             cache.put("m", DummyModule())
             entry = _entry(cache, "m")
+            entry.cached_model._cpu_state_dict = None
             loaded = LoadedModelWithoutConfig(entry, cache)
             loaded._end_first_use_window()
             entry.awaiting_first_use = False
@@ -924,6 +1057,7 @@ def test_integrated_cuda_detached_handle_release_refreshes_stats(mock_logger: Ma
         with _patch_integrated_cuda():
             cache.put("m", DummyModule())
             entry = _entry(cache, "m")
+            entry.cached_model._cpu_state_dict = None
             loaded = LoadedModelWithoutConfig(entry, cache)
             loaded._end_first_use_window()
             entry.awaiting_first_use = False

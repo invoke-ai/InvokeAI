@@ -469,12 +469,45 @@ def test_unpacking_a_quantized_tensor_reserves_one_slice_of_temporaries_not_the_
     monkeypatch.setattr(loaders, "_UNPACK_CHUNK_ELEMENTS", 3 * 512)
     weight = _quantized_embedding(gguf.GGMLQuantizationType.Q4_K)
     packed = weight.quantized_data.nbytes
-    reserved: list[int] = []
+    reserved: list[tuple[int, dict[str, int]]] = []
 
-    unpack_ggml_at_load({"embed.weight": weight}, torch.nn.Embedding(37, 512, device="meta"), (), reserved.append)
+    def reserve(bytes_needed: int, **kwargs: int) -> None:
+        reserved.append((bytes_needed, kwargs))
+
+    unpack_ggml_at_load({"embed.weight": weight}, torch.nn.Embedding(37, 512, device="meta"), (), reserve)
 
     result = 37 * 512 * torch.bfloat16.itemsize
-    assert reserved == [result + packed + HOST_DEQUANT_PEAK_COPIES * 3 * 512 * torch.bfloat16.itemsize]
+    scratch = HOST_DEQUANT_PEAK_COPIES * 3 * 512 * torch.bfloat16.itemsize
+    assert reserved == [(result + packed + scratch, {"host_bytes_needed": result + scratch})]
+
+
+def test_bf16_view_does_not_reserve_incremental_host_bytes():
+    """A BF16 GGUF tensor with BF16 compute dtype is unpacked as a view, not a host copy."""
+    weight = _quantized_embedding(gguf.GGMLQuantizationType.BF16)
+    reserved: list[tuple[int, dict[str, int]]] = []
+
+    def reserve(bytes_needed: int, **kwargs: int) -> None:
+        reserved.append((bytes_needed, kwargs))
+
+    unpack_ggml_at_load({"embed.weight": weight}, torch.nn.Embedding(37, 512, device="meta"), (), reserve)
+
+    packed = weight.quantized_data.nbytes
+    result = 37 * 512 * torch.bfloat16.itemsize
+    assert reserved == [(result + packed, {"host_bytes_needed": 0})]
+
+
+def test_a_packed_linear_that_stays_packed_requests_no_incremental_host_bytes():
+    weight = _quantized_embedding(gguf.GGMLQuantizationType.Q4_K)
+    reserved: list[tuple[int, dict[str, int]]] = []
+
+    def reserve(bytes_needed: int, **kwargs: int) -> None:
+        reserved.append((bytes_needed, kwargs))
+
+    model = torch.nn.Module()
+    model.add_module("lin", torch.nn.Linear(512, 37, device="meta", bias=False))
+    unpack_ggml_at_load({"lin.weight": weight}, model, (), reserve)
+
+    assert reserved == [(weight.quantized_data.nbytes, {"host_bytes_needed": 0})]
 
 
 def test_failed_ram_admission_stops_before_unpacking(monkeypatch):

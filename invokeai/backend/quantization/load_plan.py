@@ -95,6 +95,7 @@ def reserve_for_load(
     nvfp4_payloads: Mapping[str, NVFP4Payload],
     skip_patterns: Iterable[str] = (),
     source_tensors_retained: bool = False,
+    source_tensors_mapped: bool = False,
     modelopt_nvfp4_relayout: bool = False,
 ) -> int:
     """Ask for room for the state dict, the payloads it will install, and the scales it took out.
@@ -166,7 +167,7 @@ def reserve_for_load(
         output_bytes = tensor.nelement() * dtype.itemsize
         fold_peak = max(
             fold_peak,
-            (fold_output_total if source_tensors_retained else fold_delta)
+            (fold_output_total if source_tensors_retained or source_tensors_mapped else fold_delta)
             + output_bytes
             + fold_transient_bytes(tensor, layer.weight_scale),
         )
@@ -204,6 +205,9 @@ def reserve_for_load(
         )
         cast_phase_peak = max(fold_peak, final_state_dict_bytes)
         cast_phase_delta = final_state_dict_bytes - state_dict_source_bytes - released_side_channel_bytes
+    elif source_tensors_mapped:
+        cast_phase_peak = max(fold_peak, fold_output_total + cast_target_bytes)
+        cast_phase_delta = fold_output_total + cast_target_bytes
     else:
         cast_phase_peak = fold_delta + cast_peak
         cast_phase_delta = fold_delta + cast_delta - released_side_channel_bytes

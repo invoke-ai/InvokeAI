@@ -10,6 +10,7 @@ from invokeai.backend.model_manager.load.load_base import LoadedModelWithoutConf
 from invokeai.backend.model_manager.load.model_cache import model_cache as model_cache_module
 from invokeai.backend.model_manager.load.model_cache.model_cache import GB, ModelCache
 from invokeai.backend.model_manager.load.model_cache.ram_budget import RamBudget
+from invokeai.backend.util.devices import EmptyCacheOutcome, TorchDevice
 from tests.backend.model_manager.load.model_cache.cached_model.utils import DummyModule
 
 
@@ -110,6 +111,69 @@ def test_make_room_separates_cache_capacity_from_additional_host_bytes(monkeypat
         result = cache.make_room(6 * GB, host_bytes_needed=1 * GB)
 
         assert not result.ram_headroom_satisfied
+    finally:
+        cache.shutdown()
+
+
+def test_make_room_retries_host_admission_after_releasing_allocator_blocks(monkeypatch: pytest.MonkeyPatch):
+    cache = _make_cache()
+    try:
+        cache._execution_device = torch.device("cuda")
+        monkeypatch.setattr(model_cache_module, "device_is_integrated", lambda _device: True)
+        host_available = [0]
+        monkeypatch.setattr(model_cache_module, "_host_memory_available", lambda: host_available[0])
+        monkeypatch.setattr(cache, "_get_reclaimable_allocator_bytes", lambda: 2 * GB)
+        monkeypatch.setattr(TorchDevice, "cuda_mem_get_info", classmethod(lambda _cls, _device: (8 * GB, 16 * GB)))
+
+        def empty_cache() -> EmptyCacheOutcome:
+            host_available[0] = 2 * GB
+            return EmptyCacheOutcome.RAN
+
+        monkeypatch.setattr(TorchDevice, "empty_cache", classmethod(lambda _cls, **_kwargs: empty_cache()))
+
+        result = cache.make_room(1, host_bytes_needed=1 * GB)
+
+        assert result.ram_headroom_satisfied
+    finally:
+        cache.shutdown()
+
+
+def test_make_room_still_refuses_when_releasing_allocator_blocks_is_insufficient(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    cache = _make_cache()
+    try:
+        cache._execution_device = torch.device("cuda")
+        monkeypatch.setattr(model_cache_module, "device_is_integrated", lambda _device: True)
+        monkeypatch.setattr(model_cache_module, "_host_memory_available", lambda: 0)
+        monkeypatch.setattr(cache, "_get_reclaimable_allocator_bytes", lambda: 2 * GB)
+        monkeypatch.setattr(TorchDevice, "cuda_mem_get_info", classmethod(lambda _cls, _device: (8 * GB, 16 * GB)))
+        empty_cache = MagicMock(return_value=EmptyCacheOutcome.RAN)
+        monkeypatch.setattr(TorchDevice, "empty_cache", classmethod(lambda _cls, **_kwargs: empty_cache()))
+
+        result = cache.make_room(1, host_bytes_needed=1 * GB)
+
+        assert not result.ram_headroom_satisfied
+        empty_cache.assert_called_once()
+    finally:
+        cache.shutdown()
+
+
+def test_make_room_does_not_flush_allocator_for_cache_only_shortage(monkeypatch: pytest.MonkeyPatch):
+    cache = _make_cache()
+    try:
+        cache._execution_device = torch.device("cuda")
+        monkeypatch.setattr(cache, "_get_ram_available", lambda: 0)
+        monkeypatch.setattr(model_cache_module, "_host_memory_available", lambda: 2 * GB)
+        monkeypatch.setattr(cache, "_get_reclaimable_allocator_bytes", lambda: 2 * GB)
+        monkeypatch.setattr(TorchDevice, "cuda_mem_get_info", classmethod(lambda _cls, _device: (8 * GB, 16 * GB)))
+        empty_cache = MagicMock(return_value=EmptyCacheOutcome.RAN)
+        monkeypatch.setattr(TorchDevice, "empty_cache", classmethod(lambda _cls, **_kwargs: empty_cache()))
+
+        result = cache.make_room(2 * GB, host_bytes_needed=1 * GB)
+
+        assert result.ram_headroom_satisfied
+        empty_cache.assert_not_called()
     finally:
         cache.shutdown()
 

@@ -160,8 +160,11 @@ def test_an_fp8_folder_build_still_loads(monkeypatch: pytest.MonkeyPatch, tmp_pa
     codes, scale = quantize_weight_to_fp8(state_dict[f"{QUANTIZED}.weight"])
     state_dict[f"{QUANTIZED}.weight"] = codes
     state_dict[f"{QUANTIZED}.weight_scale"] = scale
+    input_codes, _ = quantize_weight_to_fp8(state_dict["input_proj.weight"])
+    state_dict["input_proj.weight"] = input_codes
 
     run = prepare(TRANSFORMER_SEAM, monkeypatch, state_dict=state_dict, geometry=_shrink_the_geometry)
+    reservations = _record_host_reservation(run)
     model = run.load(tmp_path)
 
     quantized = model.get_submodule(QUANTIZED)
@@ -170,6 +173,23 @@ def test_an_fp8_folder_build_still_loads(monkeypatch: pytest.MonkeyPatch, tmp_pa
     # asserting the dtype alone passes on a loader that installs the layers and never fills them.
     assert torch.equal(quantized.weight.view(torch.int8), codes.view(torch.int8))
     assert torch.equal(quantized.weight_scale, scale)
+    assert model.input_proj.weight.dtype == torch.float32
+    assert reservations == [
+        (
+            sum(t.nelement() * t.element_size() for t in state_dict.values()),
+            {"host_bytes_needed": input_codes.numel() * torch.float32.itemsize},
+        )
+    ]
+    with torch.no_grad():
+        output = model(
+            llm_features=torch.randn(1, 1, 32),
+            x=torch.randn(1, 1, 8),
+            t=torch.tensor([0.5]),
+            position_ids=torch.zeros(1, 1, 3, dtype=torch.long),
+            segment_ids=torch.zeros(1, 1, dtype=torch.long),
+            indicator=torch.ones(1, 1, dtype=torch.long),
+        )
+    assert output.shape == (1, 1, 8)
 
 
 def test_fp8_transformer_reserves_prepared_weights_and_builds_on_meta(

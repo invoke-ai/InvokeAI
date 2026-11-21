@@ -23,6 +23,7 @@ from invokeai.backend.model_manager.load.model_cache.cached_model.cached_model_o
 )
 from invokeai.backend.model_manager.load.model_cache.cached_model.cached_model_with_partial_load import (
     CachedModelWithPartialLoad,
+    HostMemoryAdmissionError,
 )
 from invokeai.backend.model_manager.load.model_cache.ram_budget import RamBudget
 from invokeai.backend.model_manager.load.model_cache.shared_cpu_weights import (
@@ -2358,7 +2359,7 @@ class ModelCache:
         default = int(self._execution_device_working_mem_gb * GB)
         return max(working_mem_bytes or default, default)
 
-    def _release_allocator_blocks_for_reserve(self, working_mem_bytes: Optional[int]) -> None:
+    def _release_allocator_blocks_for_reserve(self, working_mem_bytes: Optional[int], *, force: bool = False) -> bool:
         """Return torch's unused blocks to the driver when the working-memory reserve is not free there.
 
         `_get_vram_available` counts the blocks torch's caching allocator holds but does not use as available, and
@@ -2379,14 +2380,14 @@ class ModelCache:
         `TorchDevice.empty_cache`) stays.
         """
         if self._execution_device.type != "cuda":
-            return
+            return False
         reserve = self._working_mem_reserve(working_mem_bytes)
         if _is_integrated_cuda(self._execution_device):
             driver_free = TorchDevice.memory_available_to_process(self._execution_device) - self._get_vram_in_use()
         else:
             driver_free, _ = TorchDevice.cuda_mem_get_info(self._execution_device)
-        if driver_free >= reserve:
-            return
+        if driver_free >= reserve and not force:
+            return False
         if expandable_segments_enabled():
             # Freed pages inside a segment are not counted as reclaimable there, but empty_cache() unmaps them.
             releasable = torch.cuda.memory_reserved(self._execution_device) - torch.cuda.memory_allocated(
@@ -2395,12 +2396,18 @@ class ModelCache:
         else:
             releasable = self._get_reclaimable_allocator_bytes()
         if releasable < _MIN_RELEASABLE_FOR_RESERVE:
-            return
+            return False
         if TorchDevice.empty_cache(force=sys.platform == "win32") is EmptyCacheOutcome.RAN:
-            self._logger.debug(
-                f"Returned {releasable / MB:.0f}MB of the allocator's unused blocks to the driver: "
-                f"{driver_free / MB:.0f}MB driver-free was short of the {reserve / MB:.0f}MB working-memory reserve."
+            reason = (
+                "during the cold-load host-admission retry"
+                if force
+                else f"driver-free was short of the {reserve / MB:.0f}MB working-memory reserve"
             )
+            self._logger.debug(
+                f"Returned {releasable / MB:.0f}MB of the allocator's unused blocks to the driver: {reason}."
+            )
+            return True
+        return False
 
     def _move_model_to_vram(
         self, cache_entry: CacheRecord, vram_available: int, max_move_bytes: Optional[int] = None
@@ -2460,6 +2467,12 @@ class ModelCache:
             probe.offloading(self, cache_entry)
         try:
             if isinstance(cache_entry.cached_model, CachedModelWithPartialLoad):
+                host_bytes_available = None
+                if (
+                    _is_integrated_cuda(cache_entry.cached_model.compute_device)
+                    and cache_entry.cached_model.get_cpu_state_dict() is None
+                ):
+                    host_bytes_available = _host_memory_available()
                 return cache_entry.cached_model.partial_unload_from_vram(
                     vram_bytes_to_free,
                     keep_required_weights_in_vram=(
@@ -2467,11 +2480,27 @@ class ModelCache:
                         if keep_required_weights_in_vram is None
                         else keep_required_weights_in_vram
                     ),
+                    host_bytes_available=host_bytes_available,
                 )
             elif isinstance(cache_entry.cached_model, CachedModelOnlyFullLoad):  # type: ignore
+                if (
+                    _is_integrated_cuda(cache_entry.cached_model.compute_device)
+                    and cache_entry.cached_model.get_cpu_state_dict() is None
+                ):
+                    resident_bytes = cache_entry.cached_model.cur_vram_bytes()
+                    host_bytes_available = _host_memory_available()
+                    if resident_bytes > max(host_bytes_available, 0):
+                        raise HostMemoryAdmissionError(
+                            f"Cannot unload model '{cache_entry.key}' to shared host memory: its "
+                            f"{resident_bytes / MB:.2f}MB resident weights need more than the "
+                            f"{max(host_bytes_available, 0) / MB:.2f}MB available."
+                        )
                 return cache_entry.cached_model.full_unload_from_vram()
             else:
                 raise ValueError(f"Unsupported cached model type: {type(cache_entry.cached_model)}")
+        except HostMemoryAdmissionError:
+            # A preflight host-admission refusal leaves the model and handle usable for a later retry.
+            raise
         except Exception:
             # If an exception occurs, the model could be left in a bad state, so we delete it from the cache entirely.
             self._delete_cache_entry(cache_entry)
@@ -2827,8 +2856,25 @@ class ModelCache:
                 # handling of model patches (e.g. LoRA).
                 continue
             if integrated_cuda:
-                # Drop unowned UMA entries directly: moving them to CPU would materialize a second copy first.
                 has_live_handles = bool(cache_entry.live_handles)
+                if has_live_handles and cache_entry.cached_model.get_cpu_state_dict() is not None:
+                    # A live handle keeps the record usable after eviction. When the cache already owns a
+                    # complete CPU shadow, unload the device weights in place instead of detaching the record:
+                    # materializing another shadow would be wasteful, and detaching would leave the handle's
+                    # device weights resident while reporting zero bytes freed.
+                    cache_entry_bytes_freed = self._move_model_to_ram(cache_entry, vram_bytes_to_free)
+                    if cache_entry_bytes_freed > 0:
+                        self._logger.debug(
+                            f"Unloaded {cache_entry.key} from VRAM to free {(cache_entry_bytes_freed / MB):.0f} MB."
+                        )
+                        if empty_cache_per_offload:
+                            if TorchDevice.empty_cache() is EmptyCacheOutcome.RAN:
+                                vram_bytes_freed_uncounted = 0
+                            else:
+                                vram_bytes_freed_uncounted += cache_entry_bytes_freed
+                    vram_bytes_freed += cache_entry_bytes_freed
+                    continue
+                # Drop unowned UMA entries directly: moving them to CPU would materialize a second copy first.
                 cache_entry_bytes_freed = 0 if has_live_handles else cache_entry.cached_model.cur_vram_bytes()
                 self._delete_cache_entry(cache_entry)
                 del cache_entry
@@ -3052,6 +3098,17 @@ class ModelCache:
             # host-headroom mode the caller reports admission failure before construction; in the
             # shared-cap-only path, put() re-checks the budget after counting the new model and records
             # a reconcile request on every peer (see request_budget_reconcile).
+
+        # A cold load can fail host admission even when no cache entry was evicted: on shared-memory
+        # CUDA systems, inactive allocator blocks still occupy host pages until returned to the driver.
+        # Release eligible blocks once, then resample below; never loop on a permanently insufficient host.
+        if (
+            check_host_memory
+            and models_cleared == 0
+            and _is_integrated_cuda(self._execution_device)
+            and not has_host_headroom()
+        ):
+            self._release_allocator_blocks_for_reserve(None, force=True)
 
         if models_cleared > 0:
             # There would likely be some 'garbage' to be collected regardless of whether a model was cleared or not, but

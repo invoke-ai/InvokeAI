@@ -13,7 +13,7 @@ import torch
 
 from invokeai.backend.model_manager.load.load_default import put_in_eval_mode, resolve_submodel_path
 from invokeai.backend.model_manager.load.model_cache.model_cache import CacheClearResult, ModelCache
-from invokeai.backend.model_manager.taxonomy import SubModelType
+from invokeai.backend.model_manager.taxonomy import ModelFormat, ModelType, SubModelType
 
 
 class TestPutInEvalMode:
@@ -201,6 +201,21 @@ class TestGetSizeFs:
         config = SimpleNamespace(path=str(tmp_path), repo_variant=None, submodels=None)
 
         assert self._loader().get_size_fs(config, tmp_path, SubModelType.TextEncoder) == 0
+
+    def test_qwen_vl_checkpoint_tokenizer_does_not_size_the_checkpoint(self, tmp_path: Path) -> None:
+        """The checkpoint is unrelated to the vendored tokenizer loaded for this component."""
+        checkpoint = tmp_path / "qwen_vl.safetensors"
+        with checkpoint.open("wb") as file:
+            file.truncate(8 * 2**30)
+        config = SimpleNamespace(
+            path=str(checkpoint),
+            repo_variant=None,
+            type=ModelType.QwenVLEncoder,
+            format=ModelFormat.Checkpoint,
+        )
+
+        assert self._loader().get_size_fs(config, checkpoint, SubModelType.Tokenizer) == 0
+        assert self._loader().get_size_fs(config, checkpoint, SubModelType.TextEncoder) == 8 * 2**30
 
 
 def test_cold_load_refuses_before_model_construction_when_host_headroom_is_insufficient(tmp_path: Path) -> None:

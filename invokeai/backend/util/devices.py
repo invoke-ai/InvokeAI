@@ -1,3 +1,4 @@
+import ctypes
 import sys
 import threading
 from collections import Counter, defaultdict
@@ -28,10 +29,51 @@ MPS_DEVICE = torch.device("mps")
 _XPU_MEM_FALLBACK_WARNED: set[str] = set()
 
 
+def _windows_commit_available() -> int | None:
+    """Return system commit bytes still available, or None when Windows cannot report it."""
+    if sys.platform != "win32":
+        return None
+
+    class PerformanceInformation(ctypes.Structure):
+        _fields_ = [
+            ("cb", ctypes.c_uint32),
+            ("commit_total", ctypes.c_size_t),
+            ("commit_limit", ctypes.c_size_t),
+            ("commit_peak", ctypes.c_size_t),
+            ("physical_total", ctypes.c_size_t),
+            ("physical_available", ctypes.c_size_t),
+            ("system_cache", ctypes.c_size_t),
+            ("kernel_total", ctypes.c_size_t),
+            ("kernel_paged", ctypes.c_size_t),
+            ("kernel_nonpaged", ctypes.c_size_t),
+            ("page_size", ctypes.c_size_t),
+            ("handle_count", ctypes.c_uint32),
+            ("process_count", ctypes.c_uint32),
+            ("thread_count", ctypes.c_uint32),
+        ]
+
+    try:
+        info = PerformanceInformation()
+        info.cb = ctypes.sizeof(info)
+        psapi = ctypes.WinDLL("psapi", use_last_error=True)
+        get_performance_info = psapi.GetPerformanceInfo
+        get_performance_info.argtypes = [ctypes.POINTER(PerformanceInformation), ctypes.c_uint32]
+        get_performance_info.restype = ctypes.c_int
+        if not get_performance_info(ctypes.byref(info), info.cb):
+            raise ctypes.WinError(ctypes.get_last_error())
+        return max((info.commit_limit - info.commit_total) * info.page_size, 0)
+    except (AttributeError, OSError):
+        return None
+
+
 def _host_memory_available() -> int:
-    """Return conservative host headroom for an integrated CUDA device."""
+    """Return conservative host headroom for CPU allocations, including cgroup and Windows commit limits."""
     available = int(psutil.virtual_memory().available)
     if sys.platform != "linux":
+        if sys.platform == "win32":
+            commit_available = _windows_commit_available()
+            if commit_available is not None:
+                available = min(available, commit_available)
         return available
     try:
         cgroup = next(
@@ -698,7 +740,13 @@ class TorchDevice:
             if device_is_integrated(device) is True and torch.version.hip is None and sys.platform != "win32":
                 return _host_memory_available() + torch.cuda.memory_allocated(device)
             free, _ = cls.cuda_mem_get_info(device)
-            return free + torch.cuda.memory_allocated(device)
+            allocated = torch.cuda.memory_allocated(device)
+            available = free + allocated
+            if device_is_integrated(device) is True and torch.version.hip is None:
+                commit_available = _windows_commit_available()
+                if commit_available is not None:
+                    available = min(available, commit_available + allocated)
+            return available
         if device.type == "xpu" and device_has_dedicated_vram(device):
             free, _ = cls.xpu_mem_get_info(device)
             return free + torch.xpu.memory_allocated(device)

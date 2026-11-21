@@ -215,6 +215,16 @@ class Ideogram4DiffusersModel(ModelLoader):
                 and tensor.dtype != torch.float8_e4m3fn
                 and tensor.dtype != (torch.float32 if tensor_key.endswith(".weight_scale") else compute_dtype)
             )
+            unscaled_fp8_weights = {
+                tensor_key: tensor
+                for tensor_key, tensor in sd.items()
+                if tensor_key.endswith(".weight")
+                and tensor.dtype == torch.float8_e4m3fn
+                and f"{tensor_key}_scale" not in sd
+            }
+            additional_bytes += sum(
+                tensor.nelement() * compute_dtype.itemsize for tensor in unscaled_fp8_weights.values()
+            )
             require_ram_headroom(
                 self._ram_cache.make_room(reserved_bytes, host_bytes_needed=additional_bytes), additional_bytes
             )
@@ -225,6 +235,8 @@ class Ideogram4DiffusersModel(ModelLoader):
                 model = Ideogram4Transformer(Ideogram4Config())
             with accelerate.init_empty_weights(include_buffers=True):
                 swap_linears_to_fp8(model, sd, compute_dtype=compute_dtype)
+            for tensor_key in unscaled_fp8_weights:
+                sd[tensor_key] = sd[tensor_key].to(dtype=compute_dtype)
             load_fp8_state_dict(model, sd, device=torch.device("cpu"), dtype=compute_dtype, assign=True)
             model.eval()
             return model

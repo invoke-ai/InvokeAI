@@ -832,6 +832,7 @@ class T5EncoderSingleFileLoader(ModelLoader):
             model=model,
             fp8_layers=fp8_layers,
             nvfp4_payloads={},
+            source_tensors_mapped=True,
         )
         if keep_fp8:
             # Folds the layers that cannot stay fp8, so the cast below never drops a scale.
@@ -1409,6 +1410,7 @@ class Flux2CheckpointModel(ModelLoader):
                     model=None,
                     fp8_layers=fp8_layers,
                     nvfp4_payloads={},
+                    source_tensors_mapped=True,
                 )
 
             if fp8_layers and not keep_fp8:
@@ -1542,6 +1544,7 @@ class Flux2CheckpointModel(ModelLoader):
                 skip_patterns=skip_patterns,
                 fp8_layers=fp8_layers,
                 nvfp4_payloads={},
+                source_tensors_mapped=True,
             )
 
             # Scaled layers the cast would dequantize anyway are folded here, scale applied, so
