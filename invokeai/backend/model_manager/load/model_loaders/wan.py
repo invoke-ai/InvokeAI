@@ -12,9 +12,11 @@ Currently covers:
 - VAE: handled in ``vae.py`` (registered for type=VAE generically).
 """
 
+from copy import deepcopy
 from itertools import chain
+from math import prod
 from pathlib import Path
-from typing import Any, Callable, Iterable, Mapping, Optional
+from typing import TYPE_CHECKING, Any, Callable, Iterable, Mapping, NamedTuple, Optional
 
 import torch
 
@@ -29,6 +31,8 @@ from invokeai.backend.model_manager.configs.main import (
 )
 from invokeai.backend.model_manager.configs.wan_t5_encoder import WanT5Encoder_GGUF_Config
 from invokeai.backend.model_manager.load.load_default import ModelLoader, _model_declared_skip_patterns
+from invokeai.backend.model_manager.load.model_cache.cache_record import CacheRecord
+from invokeai.backend.model_manager.load.model_cache.model_cache import FirstUseClaim, get_model_cache_key
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.model_manager.load.model_loaders.generic_diffusers import GenericDiffusersLoader
 from invokeai.backend.model_manager.model_on_disk import safetensors_meta_state_dict
@@ -80,6 +84,9 @@ from invokeai.backend.quantization.load_plan import reserve_for_load
 from invokeai.backend.quantization.nvfp4 import reject_nvfp4_layers_a_plain_fold_cannot_decode
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.state_dict_loading import load_state_dict_ignoring_extras, reject_incomplete_load
+
+if TYPE_CHECKING:
+    from transformers import UMT5Config
 
 
 @ModelLoaderRegistry.register(base=BaseModelType.Wan, type=ModelType.Main, format=ModelFormat.Diffusers)
@@ -776,6 +783,20 @@ class WanCheckpointModel(ModelLoader):
         return self._apply_fp8_layerwise_casting(model, config, SubModelType.Transformer)
 
 
+class _WanT5Checkpoint(NamedTuple):
+    config: "UMT5Config"
+    source: Path
+    files: tuple[Path, ...]
+
+    @property
+    def is_dense_safetensors(self) -> bool:
+        return (
+            self.files[0].name.endswith(".safetensors")
+            and getattr(self.config, "quantization_config", None) is None
+            and getattr(self.config, "fusion_config", None) is None
+        )
+
+
 @ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.WanT5Encoder, format=ModelFormat.WanT5Encoder)
 class WanT5EncoderLoader(ModelLoader):
     """Loader for the standalone Wan UMT5-XXL encoder.
@@ -786,7 +807,200 @@ class WanT5EncoderLoader(ModelLoader):
     2. A flat ``text_encoder/`` folder with ``config.json`` declaring
        ``model_type: umt5`` directly at the root. In this case the tokenizer
        is loaded from the same folder.
+
+    Dense safetensors use float32 on CPU. Accelerators and legacy formats keep
+    their bfloat16 load behavior.
     """
+
+    @staticmethod
+    def _encoder_folder(root: Path) -> Path:
+        nested = root / "text_encoder"
+        return nested if nested.exists() else root
+
+    # Keep the resolved folder even if text_encoder/ disappears during a cold load.
+    _checkpoint_plan: tuple[Path, Path, _WanT5Checkpoint | None] | None = None
+
+    def _resolve_checkpoint(self, root: Path) -> tuple[Path, _WanT5Checkpoint | None]:
+        if self._checkpoint_plan is None:
+            folder = self._encoder_folder(root)
+            self._checkpoint_plan = root, folder, self._read_checkpoint(folder)
+        planned_root, folder, checkpoint = self._checkpoint_plan
+        if root != planned_root:
+            raise FileNotFoundError(f"Wan UMT5 model path changed during load: {planned_root} -> {root}")
+        return folder, checkpoint
+
+    @staticmethod
+    def _read_checkpoint(folder: Path) -> _WanT5Checkpoint | None:
+        from transformers import UMT5Config
+        from transformers.modeling_utils import _get_resolved_checkpoint_files
+        from transformers.utils import CONFIG_NAME, SAFE_WEIGHTS_INDEX_NAME, WEIGHTS_INDEX_NAME, is_peft_available
+        from transformers.utils.peft_utils import ADAPTER_CONFIG_NAME
+
+        # Transformers can redirect PEFT folders to a different base model.
+        if is_peft_available() and (folder / ADAPTER_CONFIG_NAME).is_file():
+            return None
+
+        # Transformers can silently use default dimensions when config.json is absent.
+        config_path = folder / CONFIG_NAME
+        if not config_path.is_file():
+            raise FileNotFoundError(f"Wan UMT5 configuration not found: {config_path}")
+
+        model_config = UMT5Config.from_pretrained(folder, local_files_only=True)
+        explicit = getattr(model_config, "transformers_weights", None)
+        # Transformers 5.10 uses this resolver in from_pretrained. Preserve
+        # explicit names, single-file precedence, and the index's shard paths.
+        files, index_metadata = _get_resolved_checkpoint_files(
+            pretrained_model_name_or_path=folder,
+            variant=None,
+            gguf_file=None,
+            use_safetensors=None,
+            user_agent=None,
+            is_remote_code=False,
+            transformers_explicit_filename=explicit,
+            download_kwargs={"local_files_only": True},
+        )
+        if not files:
+            raise OSError(f"No checkpoint files found for Wan UMT5 encoder at {folder}")
+        paths = tuple(Path(file) for file in files)
+        if explicit is not None:
+            source = folder / explicit
+        elif index_metadata is not None:
+            safe_index = folder / SAFE_WEIGHTS_INDEX_NAME
+            source = safe_index if safe_index.is_file() else folder / WEIGHTS_INDEX_NAME
+        else:
+            source = paths[0]
+        return _WanT5Checkpoint(model_config, source, paths)
+
+    def _runs_on_cpu(self, config: AnyModelConfig) -> bool:
+        device = self._get_execution_device(config, SubModelType.TextEncoder) or self.ram_cache.execution_device
+        return device.type == "cpu"
+
+    def _load_and_cache(
+        self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None
+    ) -> tuple[CacheRecord, FirstUseClaim | None]:
+        self._checkpoint_plan = None
+        try:
+            if submodel_type == SubModelType.TextEncoder and self._runs_on_cpu(config):
+                key = get_model_cache_key(config.key, submodel_type)
+                if getattr(config, "role_of", None) is not None:
+                    key = f"{key}:as_{config.type.value}"
+                stats_name = ":".join([config.base, config.type, config.name, submodel_type])
+                # Like the base loader's first lookup, a hit transfers its first-use claim
+                # directly to LoadedModel. A miss never selects a key for cold admission.
+                try:
+                    return self.ram_cache.get_with_first_use_claim(f"{key}:float32", stats_name)
+                except IndexError:
+                    pass
+                try:
+                    self._resolve_checkpoint(self._get_model_path(config))
+                except (OSError, ValueError, TypeError, KeyError) as error:
+                    # While metadata is absent, only a resident CPU record can satisfy this request.
+                    try:
+                        record, claim = self.ram_cache.get_with_first_use_claim(key, stats_name)
+                    except IndexError:
+                        raise error from None
+                    if record.cached_model.compute_device.type == "cpu":
+                        return record, claim
+                    if claim is not None:
+                        claim.release()
+                    raise
+            return super()._load_and_cache(config, submodel_type)
+        finally:
+            self._checkpoint_plan = None
+
+    def _cache_key_variant(self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> str:
+        if submodel_type == SubModelType.TextEncoder and self._runs_on_cpu(config):
+            _, checkpoint = self._resolve_checkpoint(self._get_model_path(config))
+            if checkpoint is not None and checkpoint.is_dense_safetensors:
+                return "float32"
+        return ""
+
+    @staticmethod
+    def _block_weight_shapes(config: "UMT5Config") -> dict[str, tuple[int, ...]]:
+        width = config.d_model
+        inner = config.num_heads * config.d_kv
+        shapes = {}
+        attention_layers = ("SelfAttention", "EncDecAttention") if config.is_decoder else ("SelfAttention",)
+        for layer, name in enumerate(attention_layers):
+            prefix = f"layer.{layer}.{name}"
+            shapes.update({f"{prefix}.{projection}.weight": (inner, width) for projection in ("q", "k", "v")})
+            shapes[f"{prefix}.o.weight"] = (width, inner)
+            shapes[f"layer.{layer}.layer_norm.weight"] = (width,)
+        shapes["layer.0.SelfAttention.relative_attention_bias.weight"] = (
+            config.relative_attention_num_buckets,
+            config.num_heads,
+        )
+        feed_forward = f"layer.{len(attention_layers)}"
+        inputs = ("wi_0", "wi_1") if config.is_gated_act else ("wi",)
+        shapes.update({f"{feed_forward}.DenseReluDense.{name}.weight": (config.d_ff, width) for name in inputs})
+        shapes[f"{feed_forward}.DenseReluDense.wo.weight"] = (width, config.d_ff)
+        shapes[f"{feed_forward}.layer_norm.weight"] = (width,)
+        return shapes
+
+    def get_size_fs(
+        self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
+    ) -> int:
+        if submodel_type != SubModelType.TextEncoder:
+            return super().get_size_fs(config, model_path, submodel_type)
+
+        _, checkpoint = self._resolve_checkpoint(model_path)
+        if checkpoint is None:
+            return super().get_size_fs(config, model_path, submodel_type)
+        for file in (checkpoint.source, *checkpoint.files):
+            if not file.is_file():
+                raise FileNotFoundError(f"Wan UMT5 checkpoint file not found: {file}")
+        if not checkpoint.is_dense_safetensors:
+            return super().get_size_fs(config, model_path, submodel_type)
+
+        from safetensors import safe_open
+
+        model_config = checkpoint.config
+        embedding = (model_config.vocab_size, model_config.d_model)
+        encoder_shapes = {
+            "shared.weight": embedding,
+            "encoder.embed_tokens.weight": embedding,
+            "encoder.final_layer_norm.weight": (model_config.d_model,),
+        }
+        block_shapes = self._block_weight_shapes(model_config)
+        observed: dict[str, tuple[str, Path, tuple[int, ...], tuple[int, ...]]] = {}
+        keys: set[str] = set()
+        for file in checkpoint.files:
+            with safe_open(file, framework="pt", device="cpu") as weights:
+                for key in weights.keys():
+                    keys.add(key)
+                    name = key.removeprefix("transformer.")
+                    expected = encoder_shapes.get(name)
+                    if expected is None and name.startswith("encoder.block."):
+                        number, _, relative = name.removeprefix("encoder.block.").partition(".")
+                        if relative in block_shapes and number.isascii() and number.isdecimal():
+                            # Compare the canonical layer number without parsing arbitrarily long unknown keys.
+                            limit = str(model_config.num_layers)
+                            if (number == "0" or not number.startswith("0")) and (
+                                (len(number), number) < (len(limit), limit) and model_config.num_layers > 0
+                            ):
+                                expected = block_shapes[relative]
+                    if expected is None:
+                        continue
+                    # Transformers takes the last shard for identical keys, then prefers the
+                    # unprefixed key if both names map to the same parameter.
+                    if key != name and name in observed and observed[name][0] == name:
+                        continue
+                    observed[name] = (key, file, tuple(weights.get_slice(key).get_shape()), expected)
+        for key, file, actual, expected in observed.values():
+            if actual != expected:
+                raise ValueError(f"Wan UMT5 weight {key!r} in {file} has shape {actual}, expected {expected}")
+
+        # Include tensors Transformers initializes when absent. The two embeddings
+        # can stay separate if the checkpoint supplies differing values for both.
+        separate_embeddings = not model_config.tie_word_embeddings or (
+            any(key.endswith("shared.weight") for key in keys)
+            and any(key.endswith("encoder.embed_tokens.weight") for key in keys)
+        )
+        embeddings = (2 if separate_embeddings else 1) * prod(embedding)
+        block = sum(prod(shape) for shape in block_shapes.values())
+        elements = embeddings + max(0, model_config.num_layers) * block + model_config.d_model
+        dtype = torch.float32 if self._runs_on_cpu(config) else torch.bfloat16
+        return elements * dtype.itemsize
 
     def _load_model(
         self,
@@ -803,10 +1017,21 @@ class WanT5EncoderLoader(ModelLoader):
         if submodel_type == SubModelType.TextEncoder:
             from transformers import UMT5EncoderModel
 
-            target = nested_text_encoder if nested_text_encoder.exists() else root
+            target, checkpoint = self._resolve_checkpoint(root)
+            if checkpoint is None:
+                return UMT5EncoderModel.from_pretrained(str(target), dtype=torch.bfloat16, local_files_only=True)
+
+            dense_safetensors = checkpoint.is_dense_safetensors
+            # The resolver needs its default selection to open a binary-named
+            # index, even when the first resolved shard dispatches safetensors.
+            use_safetensors = dense_safetensors and checkpoint.source.name.endswith(
+                (".safetensors", ".safetensors.index.json")
+            )
             return UMT5EncoderModel.from_pretrained(
                 str(target),
-                torch_dtype=torch.bfloat16,
+                config=deepcopy(checkpoint.config),
+                dtype=torch.float32 if dense_safetensors and self._runs_on_cpu(config) else torch.bfloat16,
+                use_safetensors=True if use_safetensors else None,
                 local_files_only=True,
             )
         if submodel_type == SubModelType.Tokenizer:
@@ -827,7 +1052,7 @@ class WanT5EncoderLoader(ModelLoader):
 
 
 def _umt5_compute_dtype(device: torch.device) -> torch.dtype:
-    """bfloat16, as the folder loader always uses, or float32 where the device lacks it -- never float16.
+    """bfloat16, or float32 where the device lacks it -- never float16.
 
     UMT5's feed-forward activations overflow float16; transformers guards a float16 load by keeping
     ``wo`` in float32, which a packed ``wo`` cannot be.
