@@ -51,7 +51,7 @@ const makeLayer = (type: CanvasLayerContract['type']): CanvasLayerContract => {
     case 'inpaint_mask':
       return createInpaintMaskLayer('Mask', 'mask');
     case 'regional_guidance':
-      return createRegionalGuidanceLayer('Region', 0, 'region');
+      return createRegionalGuidanceLayer('Region', undefined, 'region');
     case 'vector':
       return createVectorLayer({ id: 'vector', name: 'Vector' });
   }
@@ -246,7 +246,7 @@ describe('getLayerContextActions', () => {
       },
     });
     const inpaint = createInpaintMaskLayer('Interaction mask', 'interaction-mask');
-    const regional = createRegionalGuidanceLayer('Interaction region', 0, 'interaction-region');
+    const regional = createRegionalGuidanceLayer('Interaction region', undefined, 'interaction-region');
     const contexts = [
       makeState(raster, { document: rasterDocument, operationLocked: true }),
       makeState(raster, {
@@ -585,7 +585,7 @@ describe('remove-from-group', () => {
 describe('merge-masks', () => {
   const m1 = createInpaintMaskLayer('Mask 1', 'm1');
   const m2 = createInpaintMaskLayer('Mask 2', 'm2');
-  const region = createRegionalGuidanceLayer('Region', 0, 'region');
+  const region = createRegionalGuidanceLayer('Region', undefined, 'region');
   const layers = [m1, groupContract('G', [m2]), region];
 
   it('replaces raster merge for a selection of inpaint masks only', () => {

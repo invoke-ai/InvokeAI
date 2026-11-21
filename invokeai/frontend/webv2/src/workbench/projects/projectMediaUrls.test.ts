@@ -49,7 +49,7 @@ const galleryItem = (kind: 'image' | 'video', name: string) => ({
 });
 
 const regionalWith = (id: string, image: GeneratedImageContract | null): CanvasRegionalGuidanceLayerContract => {
-  const layer = createRegionalGuidanceLayerWithRefImage(id, 0, 'sdxl', id);
+  const layer = createRegionalGuidanceLayerWithRefImage(id, undefined, 'sdxl', id);
   const [reference] = layer.referenceImages;
   return { ...layer, referenceImages: [{ ...reference!, config: { ...reference!.config, image } }] };
 };

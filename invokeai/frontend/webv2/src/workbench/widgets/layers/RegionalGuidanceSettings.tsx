@@ -62,11 +62,11 @@ interface RegionalConfigPatch {
   layout?: CanvasRegionalLayoutContract | null;
 }
 
-/** The six mask fill styles, matching `CanvasMaskFillContract['style']` / legacy `zFillStyle`. */
 const MASK_FILL_STYLES: readonly CanvasMaskFillContract['style'][] = [
   'solid',
   'grid',
   'crosshatch',
+  'diagonal_left',
   'diagonal',
   'horizontal',
   'vertical',

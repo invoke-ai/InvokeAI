@@ -88,6 +88,7 @@ const makeHarness = (): Harness => {
       getCheckerboardTile: () => surface(8, 8),
       getControlView: () => harness.controlView,
       getMaskPatternTile: () => null,
+      maskScratch: { getMaskScratch: () => surface(8, 8), releaseMaskScratch: vi.fn() },
       isEditingStagingHiddenStack: () => harness.editingHiddenStack,
       layerCache: {
         byteSize: () => 0,
@@ -128,7 +129,7 @@ const lastCompositeOptions = () => composite.mock.calls.at(-1)?.[4] as Record<st
 
 beforeEach(() => {
   harness = makeHarness();
-  composite = vi.spyOn(compositor, 'compositeDocument').mockImplementation(() => undefined);
+  composite = vi.spyOn(compositor, 'compositeDocument').mockImplementation(() => false);
 });
 
 describe('cache preparation', () => {
@@ -331,6 +332,19 @@ describe('the surface budget', () => {
   it('enforces the budget after compositing, never before', () => {
     draw();
     expect(composite.mock.invocationCallOrder[0]).toBeLessThan(harness.enforce.mock.invocationCallOrder[0]!);
+  });
+
+  it('releases mask scratch after a full repaint without patterns and retains it across bounded damage', () => {
+    const doc = documentOf([layer('a')]);
+    const frame = createCompositeFrame(harness.deps);
+    const screen = surface();
+    const release = harness.deps.maskScratch.releaseMaskScratch;
+    composite.mockReturnValueOnce(true);
+    frame.draw(screen, doc, VIEW, null, null);
+    frame.draw(screen, doc, VIEW, null, null, { kind: 'regions', regions: [{ layerId: 'a', rect: entryFor().rect }] });
+    expect(release).not.toHaveBeenCalled();
+    frame.draw(screen, doc, VIEW, null, null);
+    expect(release).toHaveBeenCalledOnce();
   });
 });
 

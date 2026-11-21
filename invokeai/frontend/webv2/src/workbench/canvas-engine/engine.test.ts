@@ -5959,7 +5959,7 @@ describe('commitMaskImageResult', () => {
         isLocked: false,
         mask: {
           bitmap: resultImage,
-          fill: { color: '#fae150', style: 'solid' },
+          fill: { color: '#83d683', style: 'solid' },
           offset: { x: -5, y: 7 },
         },
         name: 'Regional Guidance 2',

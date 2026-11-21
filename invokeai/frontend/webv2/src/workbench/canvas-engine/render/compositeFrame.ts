@@ -4,6 +4,7 @@ import type {
   SamPreviewState,
 } from '@workbench/canvas-engine/controllers/previewStateController';
 import type { RasterController } from '@workbench/canvas-engine/controllers/rasterController';
+import type { RenderController } from '@workbench/canvas-engine/controllers/renderController';
 import type { CanvasDiagnostics } from '@workbench/canvas-engine/diagnostics';
 import type { SemanticLeaf } from '@workbench/canvas-engine/document-model/semanticLeaf';
 import type { OverlayStackKind } from '@workbench/canvas-engine/document/layerStacks';
@@ -40,6 +41,7 @@ export interface CreateCompositeFrameDeps {
   readonly backend: RasterBackend;
   readonly diagnostics: CanvasDiagnostics;
   readonly raster: Pick<RasterController, 'beginFrame' | 'enforceBudget'>;
+  readonly maskScratch: Pick<RenderController, 'getMaskScratch' | 'releaseMaskScratch'>;
   readonly previews: PreviewStateController;
   readonly stores: EngineStores;
   readonly viewport: Viewport;
@@ -278,7 +280,7 @@ export const createCompositeFrame = (deps: CreateCompositeFrameDeps): CompositeF
         fullFrameUsage = usage;
       }
 
-      compositeDocument(screen, doc, layerCache, view, {
+      const usedMaskScratch = compositeDocument(screen, doc, layerCache, view, {
         damage: frameDamage,
         adjustedSurface: deps.getAdjustedSurface,
         groupSurface: deps.getGroupSurface,
@@ -296,6 +298,7 @@ export const createCompositeFrame = (deps: CreateCompositeFrameDeps): CompositeF
         preparation: frame,
         // Screen frames are display-time: the region tint may draw, except over a staged result.
         regionOverlays: !staging,
+        screenMask: { dpr: viewport.getDpr(), getScratch: deps.maskScratch.getMaskScratch },
         showOverlayStacks,
         // Candidates and progress frames alike land at the rect pinned at submission, never the live bbox.
         stagedPreview:
@@ -315,6 +318,10 @@ export const createCompositeFrame = (deps: CreateCompositeFrameDeps): CompositeF
         transformOverrides: overrides,
       });
 
+      // A bounded repaint can miss a pattern that is still on screen.
+      if (frameDamage.kind === 'full' && !usedMaskScratch) {
+        deps.maskScratch.releaseMaskScratch();
+      }
       enforceBudget(activeFrameLayerIds, fullFrameUsage);
     },
   };

@@ -30,10 +30,12 @@ import {
   type AccountScope,
 } from '@platform/state/accountLifecycle';
 import {
+  advanceMaskFillColors,
   captureInsertionAnchor,
   createControlLayer,
   getDocumentLeaves,
   nextControlLayerName,
+  nextMaskFillColor,
 } from '@workbench/canvas-engine/api';
 import { hasPendingCanvasResults } from '@workbench/canvasStagingView';
 import {
@@ -44,7 +46,6 @@ import {
   createRegionalGuidanceLayerWithRefImage,
   DEFAULT_INPAINT_MASK_FILL,
   nextInpaintMaskName,
-  nextRegionalGuidanceFillColor,
   nextRegionalGuidanceName,
 } from '@workbench/widgets/layers/layerOps';
 import { getSelectedModelBase } from '@workbench/widgets/layers/selectedModel';
@@ -77,6 +78,7 @@ interface BuildLayerContext {
   bbox: Project['canvas']['document']['bbox'];
   existingLayers: readonly CanvasLayerContract[];
   modelBase: string | null;
+  colorOffset: number;
 }
 
 type LayerImage = CanvasImageRef | GalleryImage;
@@ -131,16 +133,15 @@ const buildLayer = (
       );
     case 'inpaint-mask':
       return createInpaintMaskFromImage({
-        fill: DEFAULT_INPAINT_MASK_FILL,
+        fill: { ...DEFAULT_INPAINT_MASK_FILL, color: nextMaskFillColor('inpaint_mask', context.colorOffset) },
         id,
         image: ref,
         name: nextInpaintMaskName(names),
         rect: context.bbox,
       });
     case 'regional-guidance': {
-      const regionalGuidanceCount = context.existingLayers.filter((layer) => layer.type === 'regional_guidance').length;
       return createRegionalGuidanceFromImage({
-        fill: { color: nextRegionalGuidanceFillColor(regionalGuidanceCount), style: 'solid' },
+        fill: { color: nextMaskFillColor('regional_guidance', context.colorOffset), style: 'solid' },
         id,
         image: ref,
         name: nextRegionalGuidanceName(names),
@@ -148,10 +149,9 @@ const buildLayer = (
       });
     }
     case 'regional-reference': {
-      const regionalGuidanceCount = context.existingLayers.filter((layer) => layer.type === 'regional_guidance').length;
       const layer = createRegionalGuidanceLayerWithRefImage(
         nextRegionalGuidanceName(names),
-        regionalGuidanceCount,
+        nextMaskFillColor('regional_guidance', context.colorOffset),
         context.modelBase,
         id
       );
@@ -181,6 +181,7 @@ const buildLayers = (
     layers.push(
       buildLayer(image, destination, {
         bbox: project.canvas.document.bbox,
+        colorOffset: layers.length,
         existingLayers: [...getDocumentLeaves(project.canvas.document), ...layers],
         modelBase,
       })
@@ -355,9 +356,13 @@ export const importGalleryImagesToCanvas = async (options: {
       if (committed.status !== 'committed') {
         return { status: 'blocked' };
       }
-    } else {
-      // Without a live canvas session, import through ingestion.
-      applyCanvasMutation(project.id, forward);
+    } else if (applyCanvasMutation(project.id, forward) === false) {
+      // Without a live canvas session, import through ingestion; `false` means the project refused the layers.
+      return { status: 'blocked' };
+    }
+    const layerKind = layers[0]?.type;
+    if (layerKind === 'inpaint_mask' || layerKind === 'regional_guidance') {
+      advanceMaskFillColors(layerKind, layers.length);
     }
     return { failedImageNames, layerIds: layers.map((layer) => layer.id), status: 'imported' };
   } finally {

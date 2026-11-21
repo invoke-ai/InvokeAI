@@ -14,6 +14,7 @@ import { identity } from '@workbench/canvas-engine/math/mat2d';
 import {
   compositeDocument,
   createCheckerboardTile,
+  shouldSmoothAtZoom,
   type CompositeOptions,
 } from '@workbench/canvas-engine/render/compositor';
 import { createLayerCacheStore } from '@workbench/canvas-engine/render/layerCache';
@@ -188,6 +189,60 @@ describe('compositor goldens', () => {
       await expectGolden(`mask-${style}`, target);
     });
   }
+
+  it.each(['diagonal', 'diagonal_left'] as const)('renders the %s mask at a fixed screen scale', (style) => {
+    const layers = [inpaintMask('mask', { color: '#e07575', style })];
+    const { backend, caches } = scene(layers, {
+      mask: { paint: solid('#000000'), rect: { height: 30, width: 30, x: 4, y: 4 } },
+    });
+    const target = backend.createSurface(WIDTH, HEIGHT);
+    const tile = createMaskPatternTile(backend, style, '#e07575');
+    const scratch = backend.createSurface(WIDTH, HEIGHT);
+    const options: CompositeOptions = {
+      backend,
+      maskPatternTile: () => tile,
+      screenMask: { dpr: 2, getScratch: () => scratch },
+    };
+    const document = doc(layers);
+    const read = () => target.ctx.getImageData(0, 0, WIDTH, HEIGHT).data;
+    const stripe = (x = 24, y = 24) =>
+      Array.from(target.ctx.getImageData(x, y, 24, 1).data).filter((_, i) => i % 4 === 3);
+
+    compositeDocument(
+      target,
+      document,
+      caches,
+      { a: 1.5, b: 0, c: 0, d: 1.5, e: 0, f: 0 },
+      {
+        ...options,
+        imageSmoothing: shouldSmoothAtZoom(0.75),
+      }
+    );
+    const baseline = stripe();
+    const nextRow = stripe(24, 26);
+    const peakShift = nextRow.indexOf(Math.max(...nextRow)) - baseline.indexOf(Math.max(...baseline));
+    expect(Math.abs(peakShift - (style === 'diagonal' ? -2 : 2))).toBeLessThanOrEqual(1);
+    expect(Math.max(...baseline)).toBeGreaterThan(0);
+    expect(Math.min(...baseline)).toBe(0);
+    expect(baseline.slice(0, 12)).toEqual(baseline.slice(12, 24));
+    expect(baseline.slice(0, 6)).not.toEqual(baseline.slice(6, 12));
+
+    const zoomedView = { a: 4, b: 0, c: 0, d: 4, e: 3, f: -2 };
+    const zoomedOptions = { ...options, imageSmoothing: shouldSmoothAtZoom(2) };
+    compositeDocument(target, document, caches, zoomedView, zoomedOptions);
+    expect(stripe()).toEqual(baseline);
+    expect(target.ctx.getImageData(16, 24, 1, 1).data[3]).toBe(0);
+
+    const fullFrame = read();
+    solid('#00ff00')(scratch.ctx, { height: HEIGHT, width: WIDTH, x: 0, y: 0 });
+    compositeDocument(target, document, caches, zoomedView, {
+      ...zoomedOptions,
+      damage: { kind: 'regions', regions: [{ layerId: 'mask', rect: { height: 4, width: 4, x: 5, y: 5 } }] },
+    });
+    expect(read()).toEqual(fullFrame);
+    // A small repaint draws only its own corner of the retained scratch.
+    expect(Array.from(scratch.ctx.getImageData(80, 60, 1, 1).data)).toEqual([0, 255, 0, 255]);
+  });
 
   it('draws a mask being edited over a staged candidate, which covers the raster beneath', async () => {
     const layers = [inpaintMask('mask', { color: '#e07575', style: 'solid' }), raster('base')];

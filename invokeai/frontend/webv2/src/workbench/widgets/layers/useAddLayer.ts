@@ -1,10 +1,11 @@
 import type { CanvasNodeContract } from '@workbench/canvas-engine/api';
 
 import {
+  advanceMaskFillColors,
   createControlLayer,
   getDocumentIndex,
-  getDocumentLeaves,
   nextControlLayerName,
+  nextMaskFillColor,
 } from '@workbench/canvas-engine/api';
 import { useCanvasEngine } from '@workbench/canvas-operations/react';
 import { setLayerGroupExpanded } from '@workbench/layerPanelState';
@@ -41,19 +42,20 @@ export const useAddLayer = (): ((id: AddLayerItemId) => void) => {
     (project) => getDocumentIndex(project.canvas.document).nodes.map((entry) => entry.node.name),
     (left, right) => left.length === right.length && left.every((name, index) => name === right[index])
   );
-  const regionalGuidanceCount = useActiveProjectSelector(
-    (project) => getDocumentLeaves(project.canvas.document).filter((layer) => layer.type === 'regional_guidance').length
-  );
-
   return useCallback(
     (id: AddLayerItemId) => {
       if (!isAddLayerItemAvailable(id, base)) {
         return;
       }
-      const add = (label: string, node: CanvasNodeContract) =>
-        commitPrepared(label, (model) =>
+      const add = (label: string, node: CanvasNodeContract) => {
+        const outcome = commitPrepared(label, (model) =>
           model.prepare({ aboveId: model.document.selectedLayerId, nodes: [node], type: 'insert' })
         );
+        if (outcome.status === 'committed' && (node.type === 'inpaint_mask' || node.type === 'regional_guidance')) {
+          advanceMaskFillColors(node.type);
+        }
+        return outcome;
+      };
       switch (id) {
         case 'vector': {
           if (!engine) {
@@ -116,19 +118,26 @@ export const useAddLayer = (): ((id: AddLayerItemId) => void) => {
           return;
         }
         case 'inpaint_mask': {
-          const layer = createInpaintMaskLayer(nextInpaintMaskName(layerNames));
+          const layer = createInpaintMaskLayer(
+            nextInpaintMaskName(layerNames),
+            undefined,
+            nextMaskFillColor('inpaint_mask')
+          );
           add(t('widgets.layers.actions.addInpaintMask'), layer);
           return;
         }
         case 'regional_guidance': {
-          const layer = createRegionalGuidanceLayer(nextRegionalGuidanceName(layerNames), regionalGuidanceCount);
+          const layer = createRegionalGuidanceLayer(
+            nextRegionalGuidanceName(layerNames),
+            nextMaskFillColor('regional_guidance')
+          );
           add(t('widgets.layers.actions.addRegionalGuidance'), layer);
           return;
         }
         case 'regional_reference_image': {
           const layer = createRegionalGuidanceLayerWithRefImage(
             nextRegionalGuidanceName(layerNames),
-            regionalGuidanceCount,
+            nextMaskFillColor('regional_guidance'),
             base
           );
           add(t('widgets.layers.actions.addRegionalReferenceImage'), layer);
@@ -136,6 +145,6 @@ export const useAddLayer = (): ((id: AddLayerItemId) => void) => {
         }
       }
     },
-    [engine, base, commitPrepared, layerNames, projectId, regionalGuidanceCount, t]
+    [engine, base, commitPrepared, layerNames, projectId, t]
   );
 };

@@ -13,15 +13,37 @@ import type { Rect } from '@workbench/canvas-engine/types';
 import { createDefaultControlAdapter } from '@workbench/controlAdapters';
 
 export const DEFAULT_INPAINT_MASK_FILL = { color: '#e07575', style: 'diagonal' } as const;
-export const REGIONAL_GUIDANCE_FILL_COLORS: readonly string[] = [
-  '#799ddb',
-  '#83d683',
-  '#fae150',
-  '#dc9065',
+export const DEFAULT_REGIONAL_GUIDANCE_FILL_COLOR = '#83d683';
+const MASK_FILL_COLORS = [
   '#e07575',
-  '#d58bca',
-  '#a178d6',
-];
+  DEFAULT_REGIONAL_GUIDANCE_FILL_COLOR,
+  '#F59E42',
+  '#F4D35E',
+  '#38C9C5',
+  '#62B5F5',
+  '#637BE8',
+  '#AD80E8',
+  '#ED79BA',
+  '#B7D65A',
+] as const;
+
+type MaskLayerKind = 'inpaint_mask' | 'regional_guidance';
+
+// Keep top-level code side-effect free (no spreads, member reads or account registration): the eager editor bundle
+// imports the Canvas API, which would otherwise keep this module. The engine registry registers the account reset.
+const nextColorIndex = { inpaint_mask: 0, regional_guidance: 1 };
+
+export const nextMaskFillColor = (kind: MaskLayerKind, offset = 0): string =>
+  MASK_FILL_COLORS[(nextColorIndex[kind] + offset) % MASK_FILL_COLORS.length]!;
+
+export const advanceMaskFillColors = (kind: MaskLayerKind, count = 1): void => {
+  nextColorIndex[kind] = (nextColorIndex[kind] + count) % MASK_FILL_COLORS.length;
+};
+
+export const resetMaskFillColors = (): void => {
+  nextColorIndex.inpaint_mask = 0;
+  nextColorIndex.regional_guidance = 1;
+};
 
 export const nextNumberedName = (prefix: string, existingNames: readonly string[]): string => {
   const expression = new RegExp(`^${prefix} (\\d+)$`);
@@ -41,10 +63,6 @@ export const nextInpaintMaskName = (names: readonly string[]): string => nextNum
 export const nextControlLayerName = (names: readonly string[]): string => nextNumberedName('Control Layer', names);
 export const nextRegionalGuidanceName = (names: readonly string[]): string =>
   nextNumberedName('Regional Guidance', names);
-export const nextRegionalGuidanceFillColor = (count: number): string =>
-  REGIONAL_GUIDANCE_FILL_COLORS[(count + 1) % REGIONAL_GUIDANCE_FILL_COLORS.length] ??
-  REGIONAL_GUIDANCE_FILL_COLORS[0]!;
-
 export interface CreateMaskLayerFromImageInput {
   image: CanvasImageRef;
   rect: Rect;
