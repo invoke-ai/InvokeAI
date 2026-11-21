@@ -244,7 +244,7 @@ def get_model(
     title="Metadata Item Linked",
     tags=["metadata"],
     category="metadata",
-    version="1.1.0",
+    version="1.2.0",
     classification=Classification.Beta,
 )
 class MetadataItemLinkedInvocation(BaseInvocation, WithMetadata):

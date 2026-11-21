@@ -26,6 +26,7 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.metadata import (
     LatentsMetaOutput,
     build_denoise_metadata,
+    extract_conditioning_metadata,
     serialize_adapter_metadata,
     serialize_lora_metadata,
 )
@@ -84,7 +85,7 @@ ControlNet run beside it."""
     title="Denoise - Qwen Image",
     tags=["image", "qwen_image"],
     category="image",
-    version="1.2.0",
+    version="1.3.0",
     classification=Classification.Prototype,
 )
 class QwenImageDenoiseInvocation(BaseInvocation, WithMetadata):
@@ -161,6 +162,15 @@ class QwenImageDenoiseInvocation(BaseInvocation, WithMetadata):
 
         updates["loras"] = serialize_lora_metadata(getattr(self.transformer, "loras", None))
         updates["controlnets"] = serialize_adapter_metadata(self.control)
+
+        cond_updates = extract_conditioning_metadata(
+            self.positive_conditioning, getattr(self, "negative_conditioning", None)
+        )
+        if "loras" in cond_updates and "loras" in updates:
+            updates["loras"] = serialize_lora_metadata(updates.get("loras"), cond_updates.get("loras"))
+        for k, v in cond_updates.items():
+            if k not in updates:
+                updates[k] = v
 
         return build_denoise_metadata(getattr(self, "metadata", None), updates)
 

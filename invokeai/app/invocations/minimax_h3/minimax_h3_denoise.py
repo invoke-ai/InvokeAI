@@ -34,6 +34,7 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.metadata import (
     MetadataOutput,
     build_denoise_metadata,
+    extract_conditioning_metadata,
     serialize_lora_metadata,
 )
 from invokeai.app.invocations.model import MiniMaxH3TransformerField
@@ -140,7 +141,7 @@ class MiniMaxH3DenoiseOutput(MetadataOutput):
     title="Denoise - MiniMax H3",
     tags=["latents", "video", "audio", "minimax"],
     category="latents",
-    version="1.5.0",
+    version="1.6.0",
     classification=Classification.Prototype,
 )
 class MiniMaxH3DenoiseInvocation(BaseInvocation, WithMetadata):
@@ -359,6 +360,15 @@ class MiniMaxH3DenoiseInvocation(BaseInvocation, WithMetadata):
             updates["minimax_h3_hybrid_start_block"] = self.transformer.adaln_overlay.start_block
 
         updates["loras"] = serialize_lora_metadata(getattr(self.transformer, "loras", None))
+
+        cond_updates = extract_conditioning_metadata(
+            self.positive_conditioning, getattr(self, "negative_conditioning", None)
+        )
+        if "loras" in cond_updates and "loras" in updates:
+            updates["loras"] = serialize_lora_metadata(updates.get("loras"), cond_updates.get("loras"))
+        for k, v in cond_updates.items():
+            if k not in updates:
+                updates[k] = v
 
         return build_denoise_metadata(getattr(self, "metadata", None), updates)
 

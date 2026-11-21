@@ -35,6 +35,7 @@ from invokeai.app.invocations.fields import (
     TensorField,
     UIComponent,
 )
+from invokeai.app.invocations.metadata import extract_encoder_model, extract_loras_metadata
 from invokeai.app.invocations.model import MistralEncoderField
 from invokeai.app.invocations.primitives import FluxConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
@@ -78,7 +79,7 @@ DEV_MAX_SEQ_LEN = 512
     title="Prompt - FLUX.2 [dev]",
     tags=["prompt", "conditioning", "flux", "flux2", "dev", "mistral"],
     category="prompt",
-    version="1.0.1",
+    version="1.1.0",
     classification=Classification.Prototype,
     idle_gpu_offloadable=True,
 )
@@ -124,8 +125,15 @@ class Flux2DevTextEncoderInvocation(BaseInvocation):
                 ]
             )
             conditioning_name = context.conditioning.save(conditioning_data)
+            loras = extract_loras_metadata(getattr(self.mistral_encoder, "loras", None))
             return FluxConditioningOutput(
-                conditioning=FluxConditioningField(conditioning_name=conditioning_name, mask=self.mask)
+                conditioning=FluxConditioningField(
+                    conditioning_name=conditioning_name,
+                    mask=self.mask,
+                    prompt=self.prompt,
+                    mistral_encoder=extract_encoder_model(self.mistral_encoder),
+                    loras=loras,
+                )
             )
 
     def _encode_prompt(self, context: InvocationContext, exit_stack: ExitStack) -> torch.Tensor:

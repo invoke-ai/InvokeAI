@@ -15,6 +15,7 @@ from invokeai.app.invocations.fields import (
     TensorField,
     UIComponent,
 )
+from invokeai.app.invocations.metadata import extract_loras_metadata
 from invokeai.app.invocations.model import CLIPField
 from invokeai.app.invocations.primitives import ConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
@@ -43,7 +44,7 @@ from invokeai.backend.util.devices import TorchDevice
     title="Prompt - SD1.5",
     tags=["prompt", "compel"],
     category="prompt",
-    version="1.2.1",
+    version="1.3.0",
     idle_gpu_offloadable=True,
 )
 class CompelInvocation(BaseInvocation):
@@ -126,10 +127,14 @@ class CompelInvocation(BaseInvocation):
         conditioning_data = ConditioningFieldData(conditionings=[BasicConditioningInfo(embeds=c)])
 
         conditioning_name = context.conditioning.save(conditioning_data)
+        loras = extract_loras_metadata(getattr(self.clip, "loras", None))
         return ConditioningOutput(
             conditioning=ConditioningField(
                 conditioning_name=conditioning_name,
                 mask=self.mask,
+                prompt=self.prompt,
+                skipped_layers=self.clip.skipped_layers,
+                loras=loras,
             )
         )
 
@@ -247,7 +252,7 @@ class SDXLPromptInvocationBase:
     title="Prompt - SDXL",
     tags=["sdxl", "compel", "prompt"],
     category="prompt",
-    version="1.2.1",
+    version="1.3.0",
     idle_gpu_offloadable=True,
 )
 class SDXLCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase):
@@ -329,10 +334,16 @@ class SDXLCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase):
 
         conditioning_name = context.conditioning.save(conditioning_data)
 
+        all_loras = list(getattr(self.clip, "loras", []) or []) + list(getattr(self.clip2, "loras", []) or [])
+        loras = extract_loras_metadata(all_loras)
         return ConditioningOutput(
             conditioning=ConditioningField(
                 conditioning_name=conditioning_name,
                 mask=self.mask,
+                prompt=self.prompt,
+                style_prompt=self.style,
+                skipped_layers=self.clip.skipped_layers,
+                loras=loras,
             )
         )
 
@@ -342,7 +353,7 @@ class SDXLCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase):
     title="Prompt - SDXL Refiner",
     tags=["sdxl", "compel", "prompt"],
     category="prompt",
-    version="1.1.2",
+    version="1.2.0",
     idle_gpu_offloadable=True,
 )
 class SDXLRefinerCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase):
@@ -377,7 +388,17 @@ class SDXLRefinerCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase
 
         conditioning_name = context.conditioning.save(conditioning_data)
 
-        return ConditioningOutput.build(conditioning_name)
+        loras = extract_loras_metadata(getattr(self.clip2, "loras", None))
+        return ConditioningOutput(
+            conditioning=ConditioningField(
+                conditioning_name=conditioning_name,
+                mask=getattr(self, "mask", None),
+                prompt=getattr(self, "prompt", None),
+                style_prompt=self.style,
+                aesthetic_score=self.aesthetic_score,
+                loras=loras,
+            )
+        )
 
 
 @invocation_output("clip_skip_output")

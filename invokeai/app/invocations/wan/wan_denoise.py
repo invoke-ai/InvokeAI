@@ -46,6 +46,8 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.metadata import (
     LatentsMetaOutput,
     build_denoise_metadata,
+    extract_conditioning_metadata,
+    serialize_lora_metadata,
     serialize_wan_lora_metadata,
 )
 from invokeai.app.invocations.model import LoRAField, WanTransformerField
@@ -348,7 +350,7 @@ class _ExpertSwapper:
     title="Denoise - Wan 2.2",
     tags=["image", "wan"],
     category="image",
-    version="1.1.0",
+    version="1.2.0",
     classification=Classification.Prototype,
 )
 class WanDenoiseInvocation(BaseInvocation, WithMetadata):
@@ -449,6 +451,15 @@ class WanDenoiseInvocation(BaseInvocation, WithMetadata):
             getattr(self.transformer, "loras", None),
             getattr(self.transformer, "loras_low_noise", None),
         )
+
+        cond_updates = extract_conditioning_metadata(
+            self.positive_conditioning, getattr(self, "negative_conditioning", None)
+        )
+        if "loras" in cond_updates and "loras" in updates:
+            updates["loras"] = serialize_lora_metadata(updates.get("loras"), cond_updates.get("loras"))
+        for k, v in cond_updates.items():
+            if k not in updates:
+                updates[k] = v
 
         return build_denoise_metadata(getattr(self, "metadata", None), updates)
 

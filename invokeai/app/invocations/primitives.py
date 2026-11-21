@@ -725,7 +725,7 @@ class ConditioningCollectionOutput(BaseInvocationOutput):
     title="Conditioning Primitive",
     tags=["primitives", "conditioning"],
     category="primitives",
-    version="1.0.1",
+    version="1.1.0",
 )
 class ConditioningInvocation(BaseInvocation):
     """A conditioning tensor primitive value"""
@@ -733,7 +733,7 @@ class ConditioningInvocation(BaseInvocation):
     conditioning: ConditioningField = InputField(description=FieldDescriptions.cond, input=Input.Connection)
 
     def invoke(self, context: InvocationContext) -> ConditioningOutput:
-        return ConditioningOutput(conditioning=self.conditioning)
+        return ConditioningOutput(conditioning=self.conditioning.model_copy())
 
 
 @invocation(

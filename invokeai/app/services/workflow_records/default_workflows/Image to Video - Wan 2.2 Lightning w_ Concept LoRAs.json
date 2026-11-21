@@ -121,7 +121,7 @@
       "type": "invocation",
       "data": {
         "id": "2b1f7d8c-ae3f-5c4d-9f2b-3a4e5d6c7b8f",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "nodePack": "invokeai",
         "label": "Positive Prompt",
         "notes": "",
@@ -154,7 +154,7 @@
       "type": "invocation",
       "data": {
         "id": "3c2a8e9d-bf4a-6d5e-af3c-4b5f6e7d8c9a",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "nodePack": "invokeai",
         "label": "Negative Prompt (unused at CFG=1.0)",
         "notes": "",
@@ -221,7 +221,7 @@
       "type": "invocation",
       "data": {
         "id": "4d3b9faf-c05b-7e6f-bf4d-5c6a7f8e9dab",
-        "version": "1.1.0",
+        "version": "1.2.0",
         "nodePack": "invokeai",
         "label": "",
         "notes": "",

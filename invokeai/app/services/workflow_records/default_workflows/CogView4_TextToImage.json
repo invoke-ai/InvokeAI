@@ -118,7 +118,7 @@
       "type": "invocation",
       "data": {
         "id": "a4569d8b-6a43-44b9-8919-4ceec6682904",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "nodePack": "invokeai",
         "label": "",
         "notes": "",
@@ -147,7 +147,7 @@
       "type": "invocation",
       "data": {
         "id": "acb26944-1208-4016-9929-ab8dd0860573",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "nodePack": "invokeai",
         "label": "",
         "notes": "",
@@ -203,7 +203,7 @@
       "type": "invocation",
       "data": {
         "id": "e75e2ced-284e-4135-81dc-cdf06c7a409d",
-        "version": "1.0.0",
+        "version": "1.3.0",
         "nodePack": "invokeai",
         "label": "",
         "notes": "",

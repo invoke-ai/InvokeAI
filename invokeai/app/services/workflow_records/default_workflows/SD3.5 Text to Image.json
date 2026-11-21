@@ -28,7 +28,7 @@
       "data": {
         "id": "3f22f668-0e02-4fde-a2bb-c339586ceb4c",
         "type": "sd3_model_loader",
-        "version": "1.0.0",
+        "version": "1.0.1",
         "label": "",
         "notes": "",
         "isOpen": true,
@@ -100,7 +100,7 @@
       "data": {
         "id": "9eb72af0-dd9e-4ec5-ad87-d65e3c01f48b",
         "type": "sd3_l2i",
-        "version": "1.3.0",
+        "version": "1.3.2",
         "label": "",
         "notes": "",
         "isOpen": true,
@@ -137,7 +137,7 @@
       "data": {
         "id": "3b4f7f27-cfc0-4373-a009-99c5290d0cd6",
         "type": "sd3_text_encoder",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "label": "",
         "notes": "",
         "isOpen": true,
@@ -175,7 +175,7 @@
       "data": {
         "id": "e17d34e7-6ed1-493c-9a85-4fcd291cb084",
         "type": "sd3_text_encoder",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "label": "",
         "notes": "",
         "isOpen": true,
@@ -213,7 +213,7 @@
       "data": {
         "id": "c7539f7b-7ac5-49b9-93eb-87ede611409f",
         "type": "sd3_denoise",
-        "version": "1.0.0",
+        "version": "1.5.0",
         "label": "",
         "notes": "",
         "isOpen": true,
