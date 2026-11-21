@@ -1217,6 +1217,7 @@ const applyProjectGraphAction = (document: ProjectGraphState, action: ProjectGra
         return document;
       }
 
+      // Spread within each discriminant so TypeScript preserves the element/data correlation.
       const updated: WorkflowFormElement =
         element.type === 'collapsible'
           ? { ...element, data: { ...element.data, content: action.content } }

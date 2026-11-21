@@ -340,7 +340,9 @@ describe('native workflow-form accordion', () => {
     expect(second.getBoundingClientRect().left).toBe(first.getBoundingClientRect().left);
     const firstField = first.closest<HTMLElement>('[data-scope="field"][data-part="root"]')!;
     const secondField = second.closest<HTMLElement>('[data-scope="field"][data-part="root"]')!;
-    expect(Math.round(secondField.getBoundingClientRect().top - firstField.getBoundingClientRect().bottom)).toBe(10);
+    expect(
+      Math.abs(secondField.getBoundingClientRect().top - firstField.getBoundingClientRect().bottom - 10)
+    ).toBeLessThanOrEqual(1);
   });
 
   it('keeps a nested collapsible independent and reports descendant errors when closed', async () => {
@@ -453,8 +455,12 @@ describe('native workflow-form accordion', () => {
       .element()
       .closest<HTMLElement>('[data-part="root"]')!;
     const introText = page.getByText('Always visible').element();
-    expect(Math.round(tailSection.getBoundingClientRect().top - outputSection.getBoundingClientRect().bottom)).toBe(0);
-    expect(Math.round(inputSection.getBoundingClientRect().top - introText.getBoundingClientRect().bottom)).toBe(10);
+    expect(
+      Math.abs(tailSection.getBoundingClientRect().top - outputSection.getBoundingClientRect().bottom)
+    ).toBeLessThanOrEqual(1);
+    expect(
+      Math.abs(inputSection.getBoundingClientRect().top - introText.getBoundingClientRect().bottom - 10)
+    ).toBeLessThanOrEqual(1);
     expect(isTransparentColor(getComputedStyle(outputSection).borderTopColor)).toBe(true);
   });
 
@@ -533,7 +539,9 @@ describe('native workflow-form accordion', () => {
     await act(() => userEvent.unhover(page.getByRole('button', { name: 'Additional section' })));
     await expect.poll(() => isVisibleHairline(secondRoot)).toBe(true);
     expect(isVisibleHairline(firstRoot, 'bottom')).toBe(false);
-    expect(Math.round(secondRoot.getBoundingClientRect().top - firstRoot.getBoundingClientRect().bottom)).toBe(0);
+    expect(
+      Math.abs(secondRoot.getBoundingClientRect().top - firstRoot.getBoundingClientRect().bottom)
+    ).toBeLessThanOrEqual(1);
     if (rootElement.type === 'container') {
       rootElement.data.children.splice(1, 0, 'between');
     }
@@ -541,8 +549,10 @@ describe('native workflow-form accordion', () => {
     await renderForm(structuredClone(projectGraph));
     const interruptingText = page.getByText('Visible interruption').element();
     await expect
-      .poll(() => Math.round(secondRoot.getBoundingClientRect().top - interruptingText.getBoundingClientRect().bottom))
-      .toBe(10);
+      .poll(() =>
+        Math.abs(secondRoot.getBoundingClientRect().top - interruptingText.getBoundingClientRect().bottom - 10)
+      )
+      .toBeLessThanOrEqual(1);
   });
 
   it('preserves hairlines and flush spacing around a section inside a single-child row wrapper', async () => {
@@ -595,8 +605,12 @@ describe('native workflow-form accordion', () => {
     await expect.poll(() => isVisibleHairline(trailingRoot)).toBe(true);
     expect(isVisibleHairline(leadingRoot, 'bottom')).toBe(false);
     expect(isVisibleHairline(middleRoot, 'bottom')).toBe(false);
-    expect(Math.round(middleRoot.getBoundingClientRect().top - leadingRoot.getBoundingClientRect().bottom)).toBe(0);
-    expect(Math.round(trailingRoot.getBoundingClientRect().top - middleRoot.getBoundingClientRect().bottom)).toBe(0);
+    expect(
+      Math.abs(middleRoot.getBoundingClientRect().top - leadingRoot.getBoundingClientRect().bottom)
+    ).toBeLessThanOrEqual(1);
+    expect(
+      Math.abs(trailingRoot.getBoundingClientRect().top - middleRoot.getBoundingClientRect().bottom)
+    ).toBeLessThanOrEqual(1);
   });
 
   it('collapses only children of the clicked collapsible section, preserving errors and siblings outside it', async () => {

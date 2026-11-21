@@ -15,7 +15,7 @@ import {
 export const getInvalidFormFieldIds = (
   projectGraph: ProjectGraphState,
   templates: InvocationTemplates,
-  templatesStatus: 'idle' | 'loading' | 'loaded' | 'error' = 'loaded'
+  templatesStatus: 'idle' | 'loading' | 'loaded' | 'error'
 ): Set<string> => {
   const invalid = new Set<string>();
   if (templatesStatus !== 'loaded') {

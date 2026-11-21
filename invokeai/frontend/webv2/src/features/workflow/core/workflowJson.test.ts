@@ -390,6 +390,9 @@ describe('parseWorkflowJson tolerance', () => {
       parentId: 'root',
       type: 'heading',
     });
+    const reimported = parseWorkflowJson(serializeWorkflowJson(document));
+    expect(reimported.warnings).toEqual([]);
+    expect(reimported.document.form).toEqual(document.form);
   });
 
   it('migrates pre-form exposedFields into form elements', () => {

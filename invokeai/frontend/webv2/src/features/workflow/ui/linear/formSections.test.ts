@@ -22,6 +22,22 @@ describe('linear workflow form sections', () => {
     expect(getFormSectionOpenState({ formSectionsOpen: [] }, 'workflowA')).toEqual({});
   });
 
+  it('bounds workflow histories and retains the most recently edited workflow preferences without mutating input', () => {
+    let values: Record<string, unknown> = {};
+    for (let index = 0; index < 64; index += 1) {
+      values = updateFormSectionOpenState(values, `workflow-${index}`, 'section', false);
+    }
+    const original = structuredClone(values);
+    const revisited = updateFormSectionOpenState(values, 'workflow-0', 'section', true);
+    const updated = updateFormSectionOpenState(revisited, 'workflow-64', 'section', false);
+    expect(Object.keys(updated.formSectionsOpen as object)).toHaveLength(64);
+    expect(getFormSectionOpenState(updated, 'workflow-0')).toEqual({ section: true });
+    expect(getFormSectionOpenState(updated, 'workflow-1')).toEqual({});
+    expect(getFormSectionOpenState(updated, 'workflow-2')).toEqual({ section: false });
+    expect(getFormSectionOpenState(updated, 'workflow-64')).toEqual({ section: false });
+    expect(values).toEqual(original);
+  });
+
   it('prunes deleted section ids when updating expansion state and skips invalid flags while templates load', () => {
     const values = { formSectionsOpen: { workflowA: { keep: false, stale: false } } };
     const updated = updateFormSectionOpenState(values, 'workflowA', 'next', false, new Set(['keep', 'next']));
