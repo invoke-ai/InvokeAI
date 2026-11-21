@@ -5,7 +5,7 @@ import sys
 import threading
 import time
 import weakref
-from contextlib import contextmanager
+from contextlib import AbstractContextManager, contextmanager, nullcontext
 from dataclasses import dataclass
 from functools import wraps
 from logging import Logger
@@ -27,6 +27,7 @@ from invokeai.backend.model_manager.load.model_cache.cached_model.cached_model_w
 from invokeai.backend.model_manager.load.model_cache.ram_budget import RamBudget
 from invokeai.backend.model_manager.load.model_cache.shared_cpu_weights import (
     SHARED_CPU_WEIGHTS,
+    SharedCpuWeightsAdoption,
     SharedCpuWeightsStore,
 )
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch_module_autocast import (
@@ -907,6 +908,8 @@ class ModelCache:
         execution_device: Optional[torch.device] = None,
         prefetch: bool = False,
         claim_admission: bool = False,
+        *,
+        adoption: SharedCpuWeightsAdoption | None = None,
     ) -> Optional[FirstUseClaim]:
         """Add a model to the cache.
 
@@ -929,6 +932,7 @@ class ModelCache:
                 cannot outlive its load, so a load that is cancelled or errors before its
                 retrieval releases the admission by dying, instead of leaving a grace standing
                 that nothing can clear (see shutdown()).
+            adoption: The canonical generation that supplied the adopted model.
         """
         if key in self._cached_models:
             self._logger.debug(
@@ -1029,11 +1033,6 @@ class ModelCache:
             return None
 
         size = calc_model_size_by_data(self._logger, model)
-        self._make_room_internal(size)
-
-        # Inject custom modules into the model.
-        if isinstance(model, torch.nn.Module):
-            apply_custom_layers_to_model(model)
 
         # Use the provided execution device, or fall back to the cache's default
         effective_execution_device = execution_device if execution_device is not None else self._execution_device
@@ -1047,7 +1046,8 @@ class ModelCache:
         #   ("no choice but to try and fit it all"), and on Linux that overshoot is an uncatchable OOM-kill rather than
         #   a degraded load. Combined with keep_ram_copy=False below, streaming moves weights rather than copying them.
         running_with_dedicated_vram = device_has_dedicated_vram(effective_execution_device)
-        supports_partial_loading = running_with_dedicated_vram or _is_integrated_xpu(effective_execution_device)
+        integrated_xpu = _is_integrated_xpu(effective_execution_device)
+        supports_partial_loading = running_with_dedicated_vram or integrated_xpu
 
         # On an integrated GPU the "VRAM" copy and the RAM copy are the same DRAM, so keeping a RAM
         # copy makes every resident model cost twice its size: full_load_to_vram() copies each
@@ -1057,11 +1057,11 @@ class ModelCache:
         #
         # Scoped to integrated XPU on purpose: CPU and MPS share memory too, but their behaviour
         # here predates this and is left alone.
-        keep_ram_copy = self._keep_ram_copy_of_weights and not _is_integrated_xpu(effective_execution_device)
+        keep_ram_copy = self._keep_ram_copy_of_weights and not integrated_xpu
 
         # Overriding a setting the user turned on is worth saying once, rather than leaving someone
         # to wonder why it made no difference.
-        if self._keep_ram_copy_of_weights and _is_integrated_xpu(effective_execution_device):
+        if self._keep_ram_copy_of_weights and integrated_xpu:
             self._warn_once(
                 "keep_ram_copy",
                 effective_execution_device,
@@ -1070,24 +1070,50 @@ class ModelCache:
                 "footprint against the same memory. Weights are moved rather than copied.",
             )
 
-        # Wrap model.
-        if isinstance(model, torch.nn.Module) and supports_partial_loading and self._enable_partial_loading:
-            wrapped_model = CachedModelWithPartialLoad(
-                model,
-                effective_execution_device,
-                keep_ram_copy=keep_ram_copy,
-                shared_store=self._shared_cpu_weights,
-                cache_key=key,
-            )
-        else:
-            wrapped_model = CachedModelOnlyFullLoad(
-                model,
-                effective_execution_device,
-                size,
-                keep_ram_copy=keep_ram_copy,
-                shared_store=self._shared_cpu_weights,
-                cache_key=key,
-            )
+        store = self._shared_cpu_weights
+        if adoption is not None and (store is None or not isinstance(model, torch.nn.Module)):
+            raise RuntimeError("Adoption requires a module and a shared CPU weights store.")
+        reservation: AbstractContextManager[bool] = nullcontext(False)
+        if store is not None and isinstance(model, torch.nn.Module):
+            check_match = keep_ram_copy and self._ram_budget is not None and self._ram_budget.counts_store(store)
+            if check_match or adoption is not None:
+                reservation = store.pin_for_admission(key, model if check_match else None, size, adoption)
+
+        with reservation as shares_reservation:
+            self._make_room_internal(0 if shares_reservation else size)
+
+            # Inject custom modules into the model.
+            if isinstance(model, torch.nn.Module):
+                apply_custom_layers_to_model(model)
+
+            if isinstance(model, torch.nn.Module) and supports_partial_loading and self._enable_partial_loading:
+                wrapped_model = CachedModelWithPartialLoad(
+                    model,
+                    effective_execution_device,
+                    keep_ram_copy=keep_ram_copy,
+                    shared_store=store,
+                    cache_key=key,
+                    adoption=adoption,
+                )
+            else:
+                wrapped_model = CachedModelOnlyFullLoad(
+                    model,
+                    effective_execution_device,
+                    size,
+                    keep_ram_copy=keep_ram_copy,
+                    shared_store=store,
+                    cache_key=key,
+                    adoption=adoption,
+                )
+            if adoption is not None:
+                assert store is not None
+                # Covers destinations without a shared state dict and invalidation during wrapper
+                # construction. Production settings changes take the same model load write lock.
+                try:
+                    store.validate_adoption(key, adoption)
+                except BaseException:
+                    wrapped_model.release_shared_weights()
+                    raise
 
         # awaiting_first_use protects an unclaimed new entry from the asynchronous eviction paths
         # (budget reconcile, peer-requested eviction) until the loader locks it - see CacheRecord.

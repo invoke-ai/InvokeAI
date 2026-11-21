@@ -8,11 +8,20 @@ so it covers diffusers, single-file checkpoints, GGUF and transformers models al
 any registered hooks (e.g. fp8 layerwise-cast hooks).
 """
 
+import logging
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
+import pytest
 import torch
 
 from invokeai.backend.model_manager.load.load_default import ModelLoader
+from invokeai.backend.model_manager.load.model_cache import model_cache as cache_module
+from invokeai.backend.model_manager.load.model_cache.cached_model.cached_model_with_partial_load import (
+    CachedModelWithPartialLoad,
+)
+from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
+from invokeai.backend.model_manager.load.model_cache.ram_budget import RamBudget
 from invokeai.backend.model_manager.load.model_cache.shared_cpu_weights import SharedCpuWeightsStore
 
 
@@ -27,12 +36,11 @@ class _TinyModel(torch.nn.Module):
         return self.lin(x) * self.scale
 
 
-def _loader_with_store(store: SharedCpuWeightsStore | None) -> ModelLoader:
+def _adopt(store: SharedCpuWeightsStore, key: str):
     loader = ModelLoader.__new__(ModelLoader)  # bypass __init__ (needs app deps we don't use here)
     loader._logger = MagicMock()
-    loader._ram_cache = MagicMock()
-    loader._ram_cache.shared_cpu_weights = store
-    return loader
+    with store.pin_for_adoption(key) as pin:
+        return loader._try_adopt_shared_weights(key, pin) if pin is not None else None
 
 
 def _populate(store: SharedCpuWeightsStore, key: str, model: torch.nn.Module) -> None:
@@ -92,7 +100,7 @@ def test_adopts_gguf_quantized_weights_and_shares_storage():
     store.acquire("g", model.state_dict())
     store.set_shell("g", shell)
 
-    adopted = _loader_with_store(store)._try_adopt_shared_weights("g")
+    adopted = _adopt(store, "g")
 
     assert adopted is not None
     assert not any(t.is_meta for t in adopted.parameters())
@@ -112,7 +120,7 @@ def test_adopts_canonical_weights_without_copying():
     canonical = store.peek("m")
     refcount_before = store.refcount("m")
 
-    model = _loader_with_store(store)._try_adopt_shared_weights("m")
+    model = _adopt(store, "m")
 
     assert model is not None
     # The adopted params ARE the canonical tensors (assign=True, no copy) -> no extra RAM.
@@ -120,7 +128,7 @@ def test_adopts_canonical_weights_without_copying():
     assert model.lin.bias.data_ptr() == canonical["lin.bias"].data_ptr()
     assert not any(t.is_meta for t in model.parameters())
     assert not any(t.is_meta for t in model.buffers())
-    # peek()/get_shell() must not have taken a reference -- the wrapper's acquire() does that later.
+    # The temporary pin is gone after leaving its scope.
     assert store.refcount("m") == refcount_before
 
 
@@ -130,7 +138,7 @@ def test_adopted_model_produces_correct_output():
     _populate(store, "m", source)
     x = torch.randn(3, 4)
 
-    model = _loader_with_store(store)._try_adopt_shared_weights("m")
+    model = _adopt(store, "m")
 
     assert torch.allclose(model(x), source(x), atol=1e-6)
 
@@ -143,7 +151,7 @@ def test_adoption_preserves_forward_hooks():
     source.lin.register_forward_pre_hook(lambda mod, args: fired.append("pre"))
     _populate(store, "m", source)
 
-    model = _loader_with_store(store)._try_adopt_shared_weights("m")
+    model = _adopt(store, "m")
     model(torch.randn(1, 4))
 
     assert fired == ["pre"]  # the cloned module's hook fired
@@ -153,15 +161,11 @@ def test_no_shell_means_no_adoption():
     # Canonical present but no shell registered (e.g. first device couldn't clone) -> fall back.
     store = SharedCpuWeightsStore()
     store.acquire("m", _TinyModel().state_dict())
-    assert _loader_with_store(store)._try_adopt_shared_weights("m") is None
+    assert _adopt(store, "m") is None
 
 
 def test_absent_key_means_no_adoption():
-    assert _loader_with_store(SharedCpuWeightsStore())._try_adopt_shared_weights("missing") is None
-
-
-def test_no_shared_store_means_no_adoption():
-    assert _loader_with_store(None)._try_adopt_shared_weights("m") is None
+    assert _adopt(SharedCpuWeightsStore(), "missing") is None
 
 
 def test_mismatched_canonical_falls_back_safely():
@@ -174,9 +178,8 @@ def test_mismatched_canonical_falls_back_safely():
     store.acquire("m", {"unexpected.key": torch.zeros(2)})  # wrong state dict
     store.set_shell("m", shell)
 
-    loader = _loader_with_store(store)
-    assert loader._try_adopt_shared_weights("m") is None
-    loader._logger.warning.assert_called_once()
+    assert _adopt(store, "m") is None
+    assert store.refcount("m") == 1
 
 
 def test_shell_dropped_when_entry_released():
@@ -186,3 +189,236 @@ def test_shell_dropped_when_entry_released():
     store.release("m")  # last reference -> entry (and its shell) gone
     assert store.get_shell("m") is None
     assert "m" not in store
+
+
+class _AdmissionModel(torch.nn.Module):
+    def __init__(self, layout):
+        super().__init__()
+        self.proj = torch.nn.Linear(8, 8, bias=False)
+        if layout == "private":
+            self.register_buffer("private", torch.ones(8), persistent=False)
+        if layout == "tied":
+            self.head = torch.nn.Linear(8, 8, bias=False)
+            self.head.weight = self.proj.weight
+
+
+class _FileLoader(ModelLoader):
+    def __init__(self, cache, path, layout):
+        self._ram_cache = cache
+        self._logger = logging.getLogger(__name__)
+        self._app_config = SimpleNamespace(log_memory_usage=False, models_path=path.parent)
+        self.layout = layout
+        self.disk_loads = 0
+
+    def _load_model(self, config, submodel_type=None):
+        self.disk_loads += 1
+        model = _AdmissionModel(self.layout)
+        model.load_state_dict(torch.load(config.path, weights_only=True))
+        return model
+
+
+@pytest.fixture
+def adoption_pair(tmp_path):
+    caches = []
+
+    def create(*, layout="dense", keep_copy=True, partial=False, cap=10**12):
+        path = tmp_path / "tiny.pt"
+        torch.save(_AdmissionModel(layout).state_dict(), path)
+        store = SharedCpuWeightsStore()
+        budget = RamBudget(max_bytes=cap, shared_store=store)
+        for keep in (True, keep_copy):
+            caches.append(
+                ModelCache(
+                    execution_device_working_mem_gb=1,
+                    enable_partial_loading=partial,
+                    keep_ram_copy_of_weights=keep,
+                    execution_device="cpu",
+                    storage_device="cpu",
+                    logger=logging.getLogger(__name__),
+                    shared_cpu_weights=store,
+                    ram_budget=budget,
+                )
+            )
+        source, dest = (_FileLoader(cache, path, layout) for cache in caches)
+        config = SimpleNamespace(key="encoder", path=str(path), name="encoder", base="any", type="test")
+        first, claim = source._load_and_cache(config)
+        assert claim is not None
+        claim.release()
+        caches[0].lock(first, None)
+        caches[0].unlock(first)
+        return source, dest, config, store, budget
+
+    yield create
+    for cache in caches:
+        cache.shutdown()
+
+
+@pytest.mark.parametrize(
+    ("layout", "policy", "reservation"),
+    [("private", "keep", 288), ("tied", "keep", 512), ("dense", "no_copy", 256), ("dense", "integrated_xpu", 256)],
+)
+def test_full_reservation_can_evict_source_without_evicting_warm_peer(
+    adoption_pair, monkeypatch, layout, policy, reservation
+):
+    warm_bytes = 256
+    source, dest, config, store, budget = adoption_pair(
+        layout=layout, keep_copy=policy != "no_copy", cap=reservation + warm_bytes
+    )
+    if policy == "integrated_xpu":
+        # Exercise the integrated-device RAM-copy override without selecting an accelerator.
+        dest_device = dest._ram_cache._execution_device
+        monkeypatch.setattr(cache_module, "_is_integrated_xpu", lambda device: device is dest_device)
+    warm_key = "warm"
+    source._ram_cache.put(warm_key, torch.nn.Linear(8, 8, bias=False))
+    warm = source._ram_cache.get(warm_key)
+    source._ram_cache.lock(warm, None)
+    source._ram_cache.unlock(warm)
+    canonical = store.peek(config.key)
+    assert canonical is not None
+    assert store.get_shell(config.key) is not None
+
+    record, claim = dest._load_and_cache(config)
+    assert claim is not None
+    claim.release()
+    assert dest.disk_loads == 0
+    assert source._ram_cache.get(warm_key) is warm
+    with pytest.raises(IndexError):
+        source._ram_cache.get(config.key)
+    assert torch.equal(record.cached_model.model.proj.weight, canonical["proj.weight"])
+    if policy == "keep":
+        # Full reservation can evict the original entry. The adopted model is then registered
+        # without a shell, as it was before the adoption pin was introduced.
+        current = store.peek(config.key)
+        assert current is not None and current is not canonical
+        assert record.cached_model.get_cpu_state_dict() is current
+    else:
+        assert record.cached_model.get_cpu_state_dict() is None
+        assert store.peek(config.key) is None
+    assert store.get_shell(config.key) is None
+    assert budget.total_in_use() <= budget.max_bytes
+
+
+@pytest.mark.parametrize("fail_make_room", [False, True])
+def test_matching_loader_pins_canonical_until_admission(adoption_pair, monkeypatch, fail_make_room):
+    source, dest, config, store, budget = adoption_pair()
+    key = config.key
+    canonical, shell = store.peek(key), store.get_shell(key)
+    assert canonical is not None and shell is not None
+
+    def evict_last_peer():
+        assert source._ram_cache.evict_unlocked_for_peer(lambda: False) == 1
+        assert store.peek(key) is canonical
+        assert store.get_shell(key) is shell
+
+    if fail_make_room:
+
+        def fail_reservation(size):
+            assert size == 0
+            evict_last_peer()
+            raise RuntimeError("cache reservation failed")
+
+        monkeypatch.setattr(dest._ram_cache, "_make_room_internal", fail_reservation)
+        with pytest.raises(RuntimeError, match="cache reservation failed"):
+            dest._load_and_cache(config)
+        with pytest.raises(IndexError):
+            dest._ram_cache.get(key)
+        assert store.peek(key) is None
+        assert budget.total_in_use() == 0
+    else:
+        original_put = dest._ram_cache.put
+
+        def evict_before_put(*args, **kwargs):
+            evict_last_peer()
+            return original_put(*args, **kwargs)
+
+        monkeypatch.setattr(dest._ram_cache, "put", evict_before_put)
+        record, claim = dest._load_and_cache(config)
+        assert claim is not None
+        claim.release()
+        assert dest.disk_loads == 0
+        assert record.cached_model.get_cpu_state_dict() is canonical
+        assert store.get_shell(key) is shell
+        assert store.refcount(key) == 1
+
+
+@pytest.mark.parametrize("partial", [False, True], ids=["full", "partial"])
+@pytest.mark.parametrize("when", ["before_reservation", "before_acquire", "after_acquire"])
+def test_loader_rejects_replaced_canonical(adoption_pair, monkeypatch, partial, when):
+    # Select the wrapper using only the device policy. Tensors and transfers remain on CPU.
+    if partial:
+        monkeypatch.setattr(cache_module, "device_has_dedicated_vram", lambda _: True)
+    source, dest, config, store, _ = adoption_pair(partial=partial)
+    key = config.key
+    if partial:
+        assert isinstance(source._ram_cache.get(key).cached_model, CachedModelWithPartialLoad)
+    canonical = store.peek(key)
+    assert canonical is not None
+    replacement = {name: tensor.clone() for name, tensor in canonical.items()}
+
+    def replace_entry():
+        assert store.invalidate(key) == 1
+        store.acquire(key, replacement)
+
+    if when == "before_reservation":
+        original_put = dest._ram_cache.put
+
+        def put_after_invalidation(*args, **kwargs):
+            replace_entry()
+            return original_put(*args, **kwargs)
+
+        def unexpected_reservation(size):
+            pytest.fail(f"Stale adoption tried to reserve {size} bytes")
+
+        monkeypatch.setattr(dest._ram_cache, "put", put_after_invalidation)
+        monkeypatch.setattr(dest._ram_cache, "_make_room_internal", unexpected_reservation)
+    else:
+        original_apply = cache_module.apply_custom_layers_to_model
+
+        def inject_replacement(model):
+            original_apply(model)
+            if when == "before_acquire":
+                replace_entry()
+            else:
+                original_assign = model.load_state_dict
+
+                def assign_then_replace(*args, **kwargs):
+                    result = original_assign(*args, **kwargs)
+                    replace_entry()
+                    return result
+
+                monkeypatch.setattr(model, "load_state_dict", assign_then_replace)
+
+        monkeypatch.setattr(cache_module, "apply_custom_layers_to_model", inject_replacement)
+    try:
+        with pytest.raises(RuntimeError, match="Shared CPU weights .* invalidated"):
+            dest._load_and_cache(config)
+        with pytest.raises(IndexError):
+            dest._ram_cache.get(key)
+        assert store.peek(key) is replacement
+        assert store.refcount(key) == 1
+        source._ram_cache.shutdown()
+        assert store.retired_bytes() == 0
+        assert store.refcount(key) == 1
+    finally:
+        store.release(key, replacement)
+
+
+@pytest.mark.parametrize("keep_copy", [False, True])
+def test_fallback_rejects_invalidation_after_source_eviction(adoption_pair, monkeypatch, keep_copy):
+    source, dest, config, store, budget = adoption_pair(layout="private", keep_copy=keep_copy, cap=288)
+    original_make_room = dest._ram_cache._make_room_internal
+
+    def invalidate_after_reservation(size):
+        assert size == 288
+        result = original_make_room(size)
+        with pytest.raises(IndexError):
+            source._ram_cache.get(config.key)
+        assert store.invalidate(config.key) == 0
+        return result
+
+    monkeypatch.setattr(dest._ram_cache, "_make_room_internal", invalidate_after_reservation)
+    with pytest.raises(RuntimeError, match="Shared CPU weights .* invalidated"):
+        dest._load_and_cache(config)
+    with pytest.raises(IndexError):
+        dest._ram_cache.get(config.key)
+    assert budget.total_in_use() == 0
