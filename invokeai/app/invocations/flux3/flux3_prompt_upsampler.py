@@ -69,7 +69,10 @@ class Flux3PromptUpsamplerInvocation(BaseInvocation):
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> StringOutput:
         references = self._reference_fields()
-        self._require_vision_text_llm(context)
+        # Asked for as a Text LLM: a model whose record is another type, an encoder whose file is the whole model,
+        # serves through its Text LLM role.
+        upsampler = self.upsampler_model.model_copy(update={"type": ModelType.TextLLM})
+        self._require_vision_text_llm(context, upsampler)
         if len(references) > FLUX3_MAX_REFERENCE_IMAGES:
             raise ValueError(f"FLUX.3 takes at most {FLUX3_MAX_REFERENCE_IMAGES} reference images.")
 
@@ -80,13 +83,13 @@ class Flux3PromptUpsamplerInvocation(BaseInvocation):
         # Loaded before the model so reading them does not hold it on the device. A processor also for a request
         # without images: one path serves every mode.
         _, processor = load_text_llm_tokenizer_and_processor(
-            lambda submodel: context.models.load(self.upsampler_model, submodel), with_processor=True
+            lambda submodel: context.models.load(upsampler, submodel), with_processor=True
         )
         assert processor is not None
 
         context.util.signal_progress("Loading the prompt upsampler")
         try:
-            loaded = context.models.load(self.upsampler_model)
+            loaded = context.models.load(upsampler)
             with loaded.model_on_device() as (_, model):
                 try:
                     caption = upsample_flux3_prompt(
@@ -111,7 +114,7 @@ class Flux3PromptUpsamplerInvocation(BaseInvocation):
             # transformer by itself, but by splitting the largest unlocked model against each model that loads next;
             # moving the upsampler out whole leaves them their VRAM. The cost is a re-stream of the upsampler into
             # VRAM on its next run (about 2.5 s on an RTX 4090).
-            context.models.offload_from_vram(self.upsampler_model)
+            context.models.offload_from_vram(upsampler)
 
         # The caption is a user's prompt, and can run to 15 KB.
         context.logger.info(f"FLUX.3 prompt upsampler ({mode}) wrote a caption of {len(caption)} characters")
@@ -125,8 +128,9 @@ class Flux3PromptUpsamplerInvocation(BaseInvocation):
             return self.reference_images
         return [self.reference_images]
 
-    def _require_vision_text_llm(self, context: InvocationContext) -> None:
-        config = context.models.get_config(self.upsampler_model)
+    @staticmethod
+    def _require_vision_text_llm(context: InvocationContext, upsampler: ModelIdentifierField) -> None:
+        config = context.models.get_config(upsampler)
         if config.type is not ModelType.TextLLM or not getattr(config, "supports_images", False):
             raise ValueError(
                 f"'{config.name}' cannot be the FLUX.3 prompt upsampler: choose an installed Text LLM that reads "

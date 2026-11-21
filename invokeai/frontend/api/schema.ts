@@ -23227,7 +23227,10 @@ export type components = {
         ImageToPromptRequest: {
             /** Image Name */
             image_name: string;
-            /** Model Key */
+            /**
+             * Model Key
+             * @description A LLaVA OneVision model, or a Text LLM whose `supports_images` is true.
+             */
             model_key: string;
             /**
              * Instruction
@@ -42476,6 +42479,11 @@ export type components = {
              * @description The variant the model serves as in this role
              */
             variant: components["schemas"]["ModelVariantType"] | components["schemas"]["ClipVariantType"] | components["schemas"]["FluxVariantType"] | components["schemas"]["Flux2VariantType"] | components["schemas"]["Flux3VariantType"] | components["schemas"]["ZImageVariantType"] | components["schemas"]["QwenImageVariantType"] | components["schemas"]["WanVariantType"] | components["schemas"]["WanLoRAVariantType"] | components["schemas"]["SD3VariantType"] | components["schemas"]["Qwen3VariantType"] | components["schemas"]["Qwen3VLVariantType"] | components["schemas"]["Qwen35VariantType"] | components["schemas"]["AnimaVariantType"] | components["schemas"]["Krea2VariantType"] | components["schemas"]["QwenImage21VariantType"] | components["schemas"]["MiniMaxH3VariantType"] | components["schemas"]["LTX2VariantType"] | components["schemas"]["MistralVariantType"] | components["schemas"]["PiDDecoderVariantType"] | null;
+            /**
+             * Supports Images
+             * @description A Text LLM role only: whether the model reads images in it. None when identification did not record it, as for a role stored before the field existed; re-identify to refresh
+             */
+            supports_images: boolean | null;
         };
         /**
          * ModelSourceType
@@ -53724,12 +53732,14 @@ export type components = {
         };
         /**
          * TextLLM_Qwen3VLEncoder_Config
-         * @description A single-file Qwen3-VL encoder in its Text LLM role: the whole Qwen3-VL Instruct chat model, run on text only.
+         * @description A single-file Qwen3-VL encoder in its Text LLM role: the whole Qwen3-VL Instruct chat model, reading images
+         *     when the file's vision tower loads.
          *
-         *     Never identified and never stored. `Qwen3VLEncoder_Checkpoint_Config` records the role, with this format and the
-         *     variant, when its file can generate, and `roles.view_as` builds this config from the encoder record. The format
-         *     names what the view loads, the encoder's file through the encoder's decode. A class of its own keeps the Qwen3.5
-         *     checkpoint config as it is: no `variant` on its records, and no Qwen3-VL load path a record could be edited into.
+         *     Never identified and never stored. `Qwen3VLEncoder_Checkpoint_Config` records the role, with this format, the
+         *     variant and the image capability, when its file can generate, and `roles.view_as` builds this config from the
+         *     encoder record. The format names what the view loads, the encoder's file through the encoder's decode. A class of
+         *     its own keeps the Qwen3.5 checkpoint config as it is: no `variant` on its records, and no Qwen3-VL load path a
+         *     record could be edited into.
          */
         TextLLM_Qwen3VLEncoder_Config: {
             /**

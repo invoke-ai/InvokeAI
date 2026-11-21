@@ -162,7 +162,7 @@ class TestTheLineBetweenTheUpsamplerAndAQwen3_5Encoder:
 
         assert _matches(result) == [Qwen35Encoder_Checkpoint_Config.__name__]
         assert isinstance(result.config, Qwen35Encoder_Checkpoint_Config)
-        assert result.config.roles == [ModelRole(type=ModelType.TextLLM)]
+        assert result.config.roles == [ModelRole(type=ModelType.TextLLM, supports_images=True)]
 
     def test_a_whole_model_in_a_pickle_file_is_not_an_encoder_unprompted_and_serves_no_text_llm_role(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -244,7 +244,7 @@ class TestQuantizedQwen3_5Encoders:
         assert _matches(result) == [Qwen35Encoder_Checkpoint_Config.__name__]
         assert isinstance(result.config, Qwen35Encoder_Checkpoint_Config)
         assert result.config.variant is Qwen35VariantType.Qwen35_9B
-        assert result.config.roles == [ModelRole(type=ModelType.TextLLM)]
+        assert result.config.roles == [ModelRole(type=ModelType.TextLLM, supports_images=True)]
 
     @pytest.mark.parametrize(
         ("source", "source_type"),

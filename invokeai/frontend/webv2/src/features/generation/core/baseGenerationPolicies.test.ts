@@ -191,6 +191,12 @@ describe('architecture policy, read from the backend capability table', () => {
       expect(issues({ ...on, flux3PromptUpsamplerModel: llm() })).toEqual([]);
       expect(issues({ ...on, flux3PromptUpsamplerModel: llm({ supports_images: false }) })).toHaveLength(1);
       expect(issues({ ...on, flux3PromptUpsamplerModel: llm({ type: 'llava_onevision' }) })).toHaveLength(1);
+      // An encoder record serves through its Text LLM role when the role reads images. The backend always says so
+      // for the Qwen3.5 file; a Qwen3-VL role stored before it recorded the capability does not.
+      const encoderRole = (type: string, supportsImages: boolean | null) =>
+        llm({ roles: [{ supports_images: supportsImages, type: 'text_llm' }], supports_images: undefined, type });
+      expect(issues({ ...on, flux3PromptUpsamplerModel: encoderRole('qwen3_5_encoder', true) })).toEqual([]);
+      expect(issues({ ...on, flux3PromptUpsamplerModel: encoderRole('qwen3_vl_encoder', null) })).toHaveLength(1);
       expect(issues({ ...on, flux3PromptUpsamplerEnabled: false })).toEqual([]);
     });
   });

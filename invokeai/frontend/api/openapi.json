@@ -56619,7 +56619,8 @@
           },
           "model_key": {
             "type": "string",
-            "title": "Model Key"
+            "title": "Model Key",
+            "description": "A LLaVA OneVision model, or a Text LLM whose `supports_images` is true."
           },
           "instruction": {
             "type": "string",
@@ -100144,10 +100145,22 @@
             ],
             "title": "Variant",
             "description": "The variant the model serves as in this role"
+          },
+          "supports_images": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supports Images",
+            "description": "A Text LLM role only: whether the model reads images in it. None when identification did not record it, as for a role stored before the field existed; re-identify to refresh"
           }
         },
         "type": "object",
-        "required": ["type", "format", "variant"],
+        "required": ["type", "format", "variant", "supports_images"],
         "title": "ModelRole",
         "description": "Another model type a model's files serve as, beside the type its record is filed under. Set by identification."
       },
@@ -121543,7 +121556,7 @@
           "supports_images"
         ],
         "title": "TextLLM_Qwen3VLEncoder_Config",
-        "description": "A single-file Qwen3-VL encoder in its Text LLM role: the whole Qwen3-VL Instruct chat model, run on text only.\n\nNever identified and never stored. `Qwen3VLEncoder_Checkpoint_Config` records the role, with this format and the\nvariant, when its file can generate, and `roles.view_as` builds this config from the encoder record. The format\nnames what the view loads, the encoder's file through the encoder's decode. A class of its own keeps the Qwen3.5\ncheckpoint config as it is: no `variant` on its records, and no Qwen3-VL load path a record could be edited into."
+        "description": "A single-file Qwen3-VL encoder in its Text LLM role: the whole Qwen3-VL Instruct chat model, reading images\nwhen the file's vision tower loads.\n\nNever identified and never stored. `Qwen3VLEncoder_Checkpoint_Config` records the role, with this format, the\nvariant and the image capability, when its file can generate, and `roles.view_as` builds this config from the\nencoder record. The format names what the view loads, the encoder's file through the encoder's decode. A class of\nits own keeps the Qwen3.5 checkpoint config as it is: no `variant` on its records, and no Qwen3-VL load path a\nrecord could be edited into."
       },
       "TextureInvocation": {
         "category": "image",

@@ -4,7 +4,7 @@ Driven through the view loader's own entry point with the Text LLM view of an en
 file in ComfyUI's spelling, at toy width and in float32 on the CPU. The language model is the encoder loader's own
 decode; what these pin is the head on top of it: tied to the embedding where the variant's config ties it (the 4B),
 read from the file and widened otherwise (the 8B), and refused from the header, before anything is reserved, when
-the loader cannot widen it.
+the loader cannot widen it. A view whose role reads images also runs the file's vision tower and serves a processor.
 """
 
 import json
@@ -12,8 +12,10 @@ from pathlib import Path
 
 import pytest
 import torch
+from PIL import Image
 from safetensors.torch import save_file
-from transformers import Qwen3VLConfig, Qwen3VLForConditionalGeneration
+from transformers import Qwen3VLConfig, Qwen3VLForConditionalGeneration, Qwen3VLProcessor
+from transformers.models.qwen3_vl.modeling_qwen3_vl import Qwen3VLVisionModel
 
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.backend.model_manager.configs.roles import view_as
@@ -23,6 +25,7 @@ from invokeai.backend.model_manager.load.model_loaders.krea2 import Qwen3VLEncod
 from invokeai.backend.model_manager.load.model_loaders.text_llm import TextLLMQwen3VLLoader
 from invokeai.backend.model_manager.taxonomy import ModelType, Qwen3VLVariantType, SubModelType
 from invokeai.backend.qwen3_vl.qwen3_vl_assets import load_bundled_qwen3_vl_tokenizer
+from invokeai.backend.text_llm_pipeline import TextLLMPipeline
 from invokeai.backend.util.devices import TorchDevice
 from tests.fixtures.loader_seams import Seam, SeamRun, prepare
 from tests.fixtures.model_roles import qwen3_vl_encoder_file
@@ -32,6 +35,8 @@ from tests.fixtures.quantized_payloads import comfy_quant_marker, mxfp8_tensors,
 HIDDEN = 128
 VOCAB = 128
 FLOAT32 = torch.float32.itemsize
+# Inside the toy vocabulary, where the release's ids (151652 and up) are not.
+IMAGE_TOKEN, VISION_START, VISION_END = 120, 122, 123
 
 
 def _seam(loader: type, entry: str, compute_dtype: torch.dtype = torch.float32) -> Seam:
@@ -66,6 +71,9 @@ def _tiny_config(*, tied: bool) -> Qwen3VLConfig:
             "deepstack_visual_indexes": [],
         },
         tie_word_embeddings=tied,
+        image_token_id=IMAGE_TOKEN,
+        vision_start_token_id=VISION_START,
+        vision_end_token_id=VISION_END,
     )
 
 
@@ -88,6 +96,23 @@ def _logits(model: Qwen3VLForConditionalGeneration) -> torch.Tensor:
         return model(input_ids=torch.tensor([[1, 5, 9, 33, 2, 47, 17]]), use_cache=False).logits
 
 
+def _logits_with_an_image(model: Qwen3VLForConditionalGeneration) -> torch.Tensor:
+    """A 64 x 64 image as the processor would send it: 4 x 4 patches of 16 px, two frames deep, merged 2 x 2 into
+    four image tokens."""
+    generator = torch.Generator().manual_seed(1)
+    pixel_values = torch.randn(16, 3 * 2 * 16 * 16, generator=generator)
+    input_ids = torch.tensor([[1, VISION_START, *[IMAGE_TOKEN] * 4, VISION_END, 5, 9]])
+    with torch.no_grad():
+        return model(
+            input_ids=input_ids,
+            pixel_values=pixel_values,
+            image_grid_thw=torch.tensor([[1, 4, 4]]),
+            # 1 marks image tokens, as the processor's own output does.
+            mm_token_type_ids=(input_ids == IMAGE_TOKEN).long(),
+            use_cache=False,
+        ).logits
+
+
 def _view(
     tmp_path: Path,
     state_dict: dict[str, torch.Tensor],
@@ -95,10 +120,13 @@ def _view(
     *,
     cpu_only: bool | None = None,
     metadata: dict[str, str] | None = None,
+    reads_images: bool | None = None,
 ) -> TextLLM_Qwen3VLEncoder_Config:
     path = tmp_path / "qwen3vl.safetensors"
     save_file(state_dict, str(path), metadata=metadata)
-    record = qwen3_vl_encoder_file("vl", variant).model_copy(update={"path": str(path), "cpu_only": cpu_only})
+    record = qwen3_vl_encoder_file("vl", variant, reads_images).model_copy(
+        update={"path": str(path), "cpu_only": cpu_only}
+    )
     view = view_as(record, ModelType.TextLLM)
     assert isinstance(view, TextLLM_Qwen3VLEncoder_Config)
     return view
@@ -299,3 +327,130 @@ def test_the_text_side_is_its_own_tokenizer_stopping_at_the_end_of_the_turn_and_
     assert model.generation_config.pad_token_id == end_of_text
     with pytest.raises(ValueError, match="cannot read images"):
         run.load(view, SubModelType.Processor)
+
+
+_TOWER_QKV = "model.visual.blocks.0.attn.qkv"
+
+
+def _tower_as_stored(reference: Qwen3VLForConditionalGeneration, stored: str) -> tuple[dict[str, torch.Tensor], int]:
+    """The reference's file with its tower stored as `stored`, the reference's tower set to what that decodes to, and
+    the bytes loading the tower holds beyond its float32 result."""
+    file = _comfy_file(reference)
+    tower = {key: tensor for key, tensor in file.items() if key.startswith("model.visual.")}
+    if stored == "float32":
+        return file, 0
+    if stored == "bf16":
+        with torch.no_grad():
+            for parameter in reference.model.visual.parameters():
+                parameter.copy_(parameter.to(torch.bfloat16).float())
+        file.update({key: tensor.to(torch.bfloat16) for key, tensor in tower.items()})
+        # Each bf16 tensor, held until it is cast.
+        return file, sum(tensor.numel() for tensor in tower.values()) * 2
+    payload = quantize_scaled_fp8(file[f"{_TOWER_QKV}.weight"])
+    with torch.no_grad():
+        reference.model.visual.blocks[0].attn.qkv.weight.copy_(payload.dequantized)
+    file[f"{_TOWER_QKV}.weight"] = payload.codes
+    file[f"{_TOWER_QKV}.weight_scale"] = payload.scale
+    numel = payload.codes.numel()
+    # The e4m3 codes until they are folded, the fold's float32 copy of the weight and its product, and the scale.
+    return file, numel + 2 * numel * FLOAT32 + FLOAT32
+
+
+@pytest.mark.parametrize("stored", ["float32", "bf16", "scaled-fp8"])
+def test_a_view_that_reads_images_runs_the_files_vision_tower(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, stored: str
+) -> None:
+    reference = _reference(tied=True)
+    file, held_while_casting = _tower_as_stored(reference, stored)
+    view = _view(tmp_path, file, Qwen3VLVariantType.Qwen3VL_4B, reads_images=True)
+    run = _run(monkeypatch, tied=True)
+
+    model = run.load(view, None)
+
+    assert isinstance(model.model.visual, Qwen3VLVisionModel)
+    assert {parameter.dtype for parameter in model.model.visual.parameters()} == {torch.float32}
+    expected = _logits_with_an_image(reference)
+    assert expected.abs().max() > 0.1
+    torch.testing.assert_close(_logits_with_an_image(model), expected)
+    # Still the one reservation, made before the decode and now covering the tower, which loads after it.
+    tower_bytes = sum(tensor.numel() for tensor in reference.model.visual.state_dict().values()) * FLOAT32
+    assert run.reserved == [_encoder_reservation(monkeypatch, view, tied=True) + tower_bytes + held_while_casting]
+
+
+def test_a_view_whose_tower_no_longer_loads_says_so_rather_than_running_text_only(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Its role says it reads images, so it serves a processor: a model without its tower would fail at the first
+    image, or answer about pixels it never saw."""
+    file = _comfy_file(_reference(tied=True))
+    del file["model.visual.merger.linear_fc2.weight"]
+    view = _view(tmp_path, file, Qwen3VLVariantType.Qwen3VL_4B, reads_images=True)
+
+    with pytest.raises(ValueError, match="cannot load its vision tower.*Re-identify it"):
+        _run(monkeypatch, tied=True).load(view, None)
+
+
+def test_a_view_that_reads_images_serves_a_processor_over_its_own_tokenizer(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    view = _view(tmp_path, _comfy_file(_reference(tied=True)), Qwen3VLVariantType.Qwen3VL_4B, reads_images=True)
+    run = _run(monkeypatch, tied=True)
+
+    processor = run.load(view, SubModelType.Processor)
+
+    assert isinstance(processor, Qwen3VLProcessor)
+    assert processor.tokenizer is not load_bundled_qwen3_vl_tokenizer()
+    assert processor.chat_template is not None
+    assert processor.chat_template == processor.tokenizer.chat_template
+
+
+def _tiny_qwen3_vl_with_the_release_vocabulary() -> Qwen3VLForConditionalGeneration:
+    """The release's vocabulary and image token ids, and 16 px patches merged 2 x 2, around layers a few dozen wide."""
+    config = Qwen3VLConfig(
+        text_config={
+            "vocab_size": 151936,
+            "hidden_size": 32,
+            "intermediate_size": 64,
+            "num_hidden_layers": 1,
+            "num_attention_heads": 2,
+            "num_key_value_heads": 2,
+            "head_dim": 16,
+            "rope_scaling": {"rope_type": "default", "mrope_section": [4, 2, 2], "mrope_interleaved": True},
+        },
+        vision_config={
+            "depth": 1,
+            "hidden_size": 32,
+            "intermediate_size": 64,
+            "num_heads": 2,
+            "out_hidden_size": 32,
+            "deepstack_visual_indexes": [],
+        },
+        tie_word_embeddings=True,
+    )
+    torch.manual_seed(0)
+    return Qwen3VLForConditionalGeneration(config).eval()
+
+
+def test_an_image_reaches_the_vision_tower_through_the_processor_the_view_serves(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """The chat template's image placeholder has to expand into as many image tokens as the tower returns features, or
+    generate() fails: the step the Text LLM pipeline takes for Expand Prompt and Image to Prompt."""
+    view = _view(tmp_path, _comfy_file(_reference(tied=True)), Qwen3VLVariantType.Qwen3VL_4B, reads_images=True)
+    processor = _run(monkeypatch, tied=True).load(view, SubModelType.Processor)
+    model = _tiny_qwen3_vl_with_the_release_vocabulary()
+    grids: list[list[list[int]]] = []
+    model.model.visual.register_forward_hook(
+        lambda _module, _args, kwargs, _output: grids.append(kwargs["grid_thw"].tolist()), with_kwargs=True
+    )
+
+    result = TextLLMPipeline(model, processor.tokenizer, processor).run(
+        prompt="Describe this image.",
+        system_prompt="Write the prompt.",
+        max_new_tokens=2,
+        image=Image.new("RGB", (320, 256)),
+    )
+
+    # 320 x 256 is a whole number of 32 px merge cells and inside the processor's pixel range: 20 x 16 patches.
+    assert grids == [[[1, 16, 20]]]
+    assert isinstance(result, str)

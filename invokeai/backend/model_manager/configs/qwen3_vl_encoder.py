@@ -1,6 +1,10 @@
+from collections.abc import Mapping
+from functools import lru_cache
 from pathlib import Path
+from types import MappingProxyType
 from typing import Any, Literal, Self
 
+import torch
 from pydantic import Field
 
 from invokeai.backend.model_manager.configs.base import Checkpoint_Config_Base, Config_Base, ModelRole
@@ -18,13 +22,19 @@ from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType, Qwen3VLVariantType
 from invokeai.backend.model_manager.util.qwen3_vl import (
     drop_qwen3vl_unloaded_keys,
+    is_qwen3vl_visual_key,
     qwen3vl_lm_head_entries,
     qwen3vl_lm_head_hints,
     qwen3vl_lm_head_refusal,
+    qwen3vl_target_key,
     qwen3vl_token_embedding,
 )
 from invokeai.backend.quantization.fp8_scaled import COMFY_QUANT_SUFFIX, parse_quantization_metadata
-from invokeai.backend.quantization.int8_convrot import read_comfy_quant_markers
+from invokeai.backend.quantization.int8_convrot import (
+    INT8_TENSORWISE_FORMAT,
+    read_comfy_quant_markers,
+    reject_unmarked_int8_weights,
+)
 from invokeai.backend.quantization.nvfp4 import find_nvfp4_layers
 from invokeai.backend.qwen3_vl.qwen3_vl_assets import (
     load_bundled_qwen3_vl_config_dict,
@@ -120,14 +130,84 @@ def _raise_for_undecodable_nvfp4_layers(mod: ModelOnDisk, state_dict: dict[str |
     them -- and passed beside the header rather than over it: as at load, either one naming a layer nvfp4 is
     enough.
     """
-    consumed = drop_qwen3vl_unloaded_keys(state_dict)
+    refusal = _nvfp4_refusal(mod, drop_qwen3vl_unloaded_keys(state_dict))
+    if refusal is not None:
+        raise InvalidMatchError(f"this Qwen3-VL encoder cannot be loaded: {refusal}")
+
+
+def _nvfp4_refusal(mod: ModelOnDisk, entries: dict[str | int, Any]) -> str | None:
+    """Why a loader would refuse the nvfp4 layers among `entries`, part of the file's state dict; None if it would not."""
     markers = None
-    if any(isinstance(key, str) and key.endswith(COMFY_QUANT_SUFFIX) for key in consumed):
+    if any(isinstance(key, str) and key.endswith(COMFY_QUANT_SUFFIX) for key in entries):
         markers = read_comfy_quant_markers(mod.path)
     try:
-        find_nvfp4_layers(consumed, header_layers=parse_quantization_metadata(mod.metadata()), markers=markers)
+        find_nvfp4_layers(entries, header_layers=parse_quantization_metadata(mod.metadata()), markers=markers)
     except ValueError as e:
-        raise InvalidMatchError(f"this Qwen3-VL encoder cannot be loaded: {e}") from e
+        return str(e)
+    return None
+
+
+@lru_cache(maxsize=None)
+def _vision_tower_shapes(variant: Qwen3VLVariantType) -> Mapping[str, tuple[int, ...]]:
+    """The variant's vision tower as the loader builds it: each weight's name, relative to the tower, and its shape.
+
+    Built on the meta device through `torch.device`, a context of this thread only. `accelerate.init_empty_weights`
+    patches `nn.Module` for every thread, and identification runs beside generations, outside the model load lock.
+    """
+    from transformers import Qwen3VLConfig
+    from transformers.models.qwen3_vl.modeling_qwen3_vl import Qwen3VLVisionModel
+
+    vision_config = Qwen3VLConfig.from_dict(load_bundled_qwen3_vl_config_dict(variant)).vision_config
+    with torch.device("meta"):
+        tower = Qwen3VLVisionModel._from_config(vision_config)
+    return MappingProxyType({key: tuple(tensor.shape) for key, tensor in tower.state_dict().items()})
+
+
+def _vision_tower_refusal(
+    mod: ModelOnDisk, state_dict: dict[str | int, Any], variant: Qwen3VLVariantType
+) -> str | None:
+    """Why the vision tower loader (`krea2._load_qwen3vl_visual_tower`) would refuse the file's tower, or None.
+
+    Read from the header's meta tensors and the file's markers, by the loader's own rules where they read no tensor
+    data: one key per tower weight across both spellings, every weight the variant's tower has, at its shape unless
+    packed, every int8 weight claimed by an ``int8_tensorwise`` marker, and nvfp4 layers the loader decodes. The Text
+    LLM view loads the tower with its language model, so a tower that would fail this way would take the text side
+    down with it; such a file serves as a text-only Text LLM instead.
+    """
+    tower = {key: value for key, value in state_dict.items() if is_qwen3vl_visual_key(key)}
+    by_name: dict[str, Any] = {}
+    for key, value in tower.items():
+        name = qwen3vl_target_key(str(key)).removeprefix("visual.")
+        if name in by_name:
+            return f"its vision tower holds '{name}' under two spellings"
+        by_name[name] = value
+
+    expected = _vision_tower_shapes(variant)
+    missing = sorted(set(expected) - set(by_name))
+    if missing:
+        return f"its vision tower lacks {len(missing)} weight(s), e.g. {missing[:3]}"
+    # A packed nvfp4 weight has a shape of its own; the nvfp4 check below judges those.
+    misshapen = sorted(
+        name
+        for name, shape in expected.items()
+        if by_name[name].dtype.is_floating_point and tuple(by_name[name].shape) != shape
+    )
+    if misshapen:
+        return f"its vision tower has {len(misshapen)} weight(s) of another shape, e.g. {misshapen[:3]}"
+
+    markers: dict[str, Any] = {}
+    if any(isinstance(key, str) and key.endswith(COMFY_QUANT_SUFFIX) for key in tower):
+        # As the loader claims them: per-tensor markers of the int8 format, no header entries.
+        markers = {
+            layer: marker
+            for layer, marker in read_comfy_quant_markers(mod.path).items()
+            if marker.get("format") == INT8_TENSORWISE_FORMAT
+        }
+    try:
+        reject_unmarked_int8_weights(tower, markers, "Qwen3-VL vision tower")
+    except ValueError as e:
+        return str(e)
+    return _nvfp4_refusal(mod, tower)
 
 
 class Qwen3VLEncoder_Qwen3VLEncoder_Config(Config_Base):
@@ -264,7 +344,8 @@ def _text_llm_roles(mod: ModelOnDisk, state_dict: dict[str | int, Any], variant:
     The language model is complete already (the config requires it); generating also takes an LM head. A variant
     whose config ties it to the token embedding (the 4B) has one in every file. Otherwise the file must carry one the
     Text LLM view widens on load, by the rule its loader applies (`qwen3vl_lm_head_refusal`); a file without one stays
-    an encoder only. The role names the view's format (`TextLLM_Qwen3VLEncoder_Config`).
+    an encoder only. The role names the view's format (`TextLLM_Qwen3VLEncoder_Config`), and whether the view reads
+    images: when the file's vision tower loads (`_vision_tower_refusal`).
     """
     if not qwen3_vl_ties_word_embeddings(variant):
         head = qwen3vl_lm_head_entries(state_dict)
@@ -273,7 +354,14 @@ def _text_llm_roles(mod: ModelOnDisk, state_dict: dict[str | int, Any], variant:
         hints = qwen3vl_lm_head_hints(mod.path, mod.metadata())
         if qwen3vl_lm_head_refusal(head, hints, qwen3vl_token_embedding(state_dict)) is not None:
             return []
-    return [ModelRole(type=ModelType.TextLLM, format=ModelFormat.Qwen3VLEncoder, variant=variant)]
+    return [
+        ModelRole(
+            type=ModelType.TextLLM,
+            format=ModelFormat.Qwen3VLEncoder,
+            variant=variant,
+            supports_images=_vision_tower_refusal(mod, state_dict, variant) is None,
+        )
+    ]
 
 
 _QWEN3_VL_GGUF_ARCHITECTURE = "qwen3vl"

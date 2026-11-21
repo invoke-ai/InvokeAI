@@ -38,6 +38,7 @@ from invokeai.backend.model_manager.load.model_loaders.krea2 import Qwen3VLEncod
 from invokeai.backend.model_manager.model_on_disk import safetensors_meta_state_dict
 from invokeai.backend.model_manager.taxonomy import AnyModel, BaseModelType, ModelFormat, ModelType, SubModelType
 from invokeai.backend.model_manager.util.qwen3_vl import (
+    is_qwen3vl_visual_key,
     qwen3vl_lm_head_entries,
     qwen3vl_lm_head_hints,
     qwen3vl_lm_head_refusal,
@@ -67,6 +68,7 @@ from invokeai.backend.qwen3_5.qwen3_5_vl import (
     qwen3_5_vl_generation_config,
 )
 from invokeai.backend.qwen3_vl.qwen3_vl_assets import (
+    build_qwen3_vl_processor,
     load_qwen3_vl_tokenizer,
     qwen3_vl_instruct_generation_config,
     qwen3_vl_ties_word_embeddings,
@@ -194,11 +196,14 @@ class TextLLMCheckpointLoader(_TextLLMLoader):
 @ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.TextLLM, format=ModelFormat.Qwen3VLEncoder)
 class TextLLMQwen3VLLoader(_TextLLMLoader):
     """Loads the Text LLM view of a single-file Qwen3-VL encoder (`TextLLM_Qwen3VLEncoder_Config`): the whole Qwen3-VL
-    Instruct model, text only, with its own instance of the vendored Qwen3-VL tokenizer.
+    Instruct model, with its own instance of the vendored Qwen3-VL tokenizer and, when it reads images, a processor.
 
     The language model is the encoder loader's own decode, so every quantization the encoder takes loads here alike.
-    The visual tower stays on disk. The LM head is the token embedding where the variant ties them (the 4B), and
-    otherwise the file's, widened to the compute dtype on load.
+    The LM head is the token embedding where the variant ties them (the 4B), and otherwise the file's, widened to the
+    compute dtype on load. A view that reads images runs the file's vision tower inside the model, loaded with it
+    whether or not a request has an image: 0.77 GiB (4B) or 1.07 GiB (8B) in bf16, against a language model of 2.5 to
+    16 GiB. Lending it per request, as the encoder's edit modes do, would add a second cache entry that has to stay
+    locked with the model for every image generation. A text-only view leaves the tower on disk.
     """
 
     def _load_model(
@@ -216,13 +221,19 @@ class TextLLMQwen3VLLoader(_TextLLMLoader):
                 # Its own instance, as for Qwen3.5: the process-wide one is shared with the Qwen3-VL encoders.
                 return load_qwen3_vl_tokenizer()
             case SubModelType.Processor:
-                raise ValueError(
-                    f"'{config.name}' runs as a text-only LLM: its vision tower is not loaded, so it cannot read images."
-                )
+                if not config.supports_images:
+                    raise ValueError(
+                        f"'{config.name}' runs as a text-only LLM: its vision tower is not loaded, so it cannot read "
+                        "images. Re-identify it to check whether its file carries a vision tower that loads."
+                    )
+                processor = build_qwen3_vl_processor(load_qwen3_vl_tokenizer())
+                # As for Qwen3.5: the processor renders the tokenizer's chat template, as the release's does.
+                processor.chat_template = processor.tokenizer.chat_template
+                return processor
 
         raise ValueError(
-            "Only the model and its Tokenizer can be loaded from a Qwen3-VL encoder serving as a TextLLM. "
-            f"Received: {submodel_type.value if submodel_type else 'None'}"
+            "Only the model, its Tokenizer and its Processor can be loaded from a Qwen3-VL encoder serving as a "
+            f"TextLLM. Received: {submodel_type.value if submodel_type else 'None'}"
         )
 
     def _load_qwen3_vl(self, config: TextLLM_Qwen3VLEncoder_Config) -> "Qwen3VLForConditionalGeneration":
@@ -239,11 +250,11 @@ class TextLLMQwen3VLLoader(_TextLLMLoader):
         device = torch.device("cpu") if config.cpu_only else None
 
         tied = qwen3_vl_ties_word_embeddings(config.variant)
+        header = safetensors_meta_state_dict(path) if config.supports_images or not tied else {}
         hints: dict[str, Any] = {}
         head_bytes = 0
         if not tied:
             # Judged from the header, so a head the loader refuses costs no load; its bytes are read after the decode.
-            header = safetensors_meta_state_dict(path)
             head_meta = qwen3vl_lm_head_entries(header)
             hints = qwen3vl_lm_head_hints(path, read_safetensors_metadata(path, self._logger))
             refusal = qwen3vl_lm_head_refusal(head_meta, hints, qwen3vl_token_embedding(header))
@@ -251,14 +262,31 @@ class TextLLMQwen3VLLoader(_TextLLMLoader):
                 raise ValueError(f"'{config.name}' cannot run as a Text LLM: {refusal}. Re-identify it.")
             head_bytes = _lm_head_widening_bytes(head_meta, dtype)
 
+        tower_bytes = _visual_tower_load_bytes(header, dtype) if config.supports_images else 0
+
         encoder_loader = Qwen3VLEncoderCheckpointLoader(self._app_config, self._logger, self._ram_cache)
-        # The decode makes the one reservation, before it widens anything; the head widens after it.
+        # The decode makes the one reservation, before it widens anything; the tower and the head load after it.
         language_model = encoder_loader.load_language_model(
             encoder_config,
-            reserve=lambda needed: self._ram_cache.make_room(needed + head_bytes),
+            reserve=lambda needed: self._ram_cache.make_room(needed + head_bytes + tower_bytes),
             device=device,
             dtype=dtype,
         )
+        if config.supports_images:
+            try:
+                tower = encoder_loader.load_vision_tower(encoder_config, dtype, reserve=lambda _: None)
+            except torch.OutOfMemoryError:
+                raise
+            except (ValueError, RuntimeError) as e:
+                # Identification gives the role the capability only for a tower that loads, so the file changed or
+                # the rules did. Text only would leave this view serving a processor for a model without its tower.
+                raise ValueError(
+                    f"'{config.name}' cannot load its vision tower, which reading images needs: {e}. Re-identify it; "
+                    "a file whose vision tower does not load serves as a text-only Text LLM."
+                ) from e
+            # In the slot the decode left its parameter-free stub in, so the model's first parameter, whose dtype the
+            # pipelines cast pixels to, is the tower's.
+            language_model.visual = tower
 
         with accelerate.init_empty_weights():
             model = Qwen3VLForConditionalGeneration(language_model.config)
@@ -274,9 +302,30 @@ class TextLLMQwen3VLLoader(_TextLLMLoader):
         model.generation_config = qwen3_vl_instruct_generation_config()
         reject_incomplete_load(model, what=what)
         self._logger.info(
-            f"{what}: LM head {'tied to the token embedding' if tied else f'read from the file in {dtype}'}."
+            f"{what}: LM head {'tied to the token embedding' if tied else f'read from the file in {dtype}'}; "
+            f"{'vision tower loaded' if config.supports_images else 'text only, vision tower not loaded'}."
         )
         return model
+
+
+def _visual_tower_load_bytes(header: dict[str, Any], dtype: torch.dtype) -> int:
+    """What loading the vision tower holds beside the language model: each of its tensors at `dtype`, the stored one
+    until it is cast (nothing when it already is `dtype`), and for a scaled fp8 weight the fold's slabs. Reads the
+    file's header, before anything is loaded.
+    """
+    total = 0
+    for key, tensor in header.items():
+        if not is_qwen3vl_visual_key(key):
+            continue
+        total += tensor.numel() * dtype.itemsize
+        if tensor.dtype != dtype:
+            total += tensor.numel() * tensor.element_size()
+        if key.endswith(".weight") and tensor.dtype in FP8_WEIGHT_DTYPES:
+            layer = key[: -len("weight")]
+            scale = header.get(f"{layer}weight_scale", header.get(f"{layer}scale_weight"))
+            if scale is not None:
+                total += fold_transient_bytes(tensor, scale)
+    return total
 
 
 def _lm_head_widening_bytes(head: dict[str, Any], dtype: torch.dtype) -> int:

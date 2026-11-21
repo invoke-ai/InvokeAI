@@ -22,6 +22,7 @@ from invokeai.backend.model_manager.configs.qwen3_vl_encoder import (
 )
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType, Qwen3VLVariantType
+from invokeai.backend.qwen3_vl.qwen3_vl_assets import load_bundled_qwen3_vl_config_dict
 from tests.fixtures.quantized_payloads import (
     comfy_quant_marker,
     mxfp8_tensors,
@@ -363,6 +364,7 @@ class TestQwen3VLEncoderServesAsATextLLM:
             f"{language_model}embed_tokens.weight": torch.zeros(vocab, hidden, dtype=torch.bfloat16),
             f"{language_model}layers.35.input_layernorm.weight": torch.ones(4, dtype=torch.bfloat16),
             f"{language_model}norm.weight": torch.ones(hidden, dtype=torch.bfloat16),
+            # One tower weight: enough to identify the encoder, too few for the tower to load.
             "model.visual.blocks.0.attn.qkv.weight": torch.zeros(4, 4, dtype=torch.bfloat16),
             **{f"{head_prefix}{key.removeprefix('lm_head.')}": tensor for key, tensor in (head or {}).items()},
         }
@@ -373,8 +375,12 @@ class TestQwen3VLEncoderServesAsATextLLM:
         return config.roles
 
     @staticmethod
-    def _role(variant: Qwen3VLVariantType) -> list[ModelRole]:
-        return [ModelRole(type=ModelType.TextLLM, format=ModelFormat.Qwen3VLEncoder, variant=variant)]
+    def _role(variant: Qwen3VLVariantType, *, reads_images: bool = False) -> list[ModelRole]:
+        return [
+            ModelRole(
+                type=ModelType.TextLLM, format=ModelFormat.Qwen3VLEncoder, variant=variant, supports_images=reads_images
+            )
+        ]
 
     def test_a_4b_file_generates_through_its_tied_embedding_without_an_lm_head(self, tmp_path: Path) -> None:
         assert self._roles(tmp_path, Qwen3VLVariantType.Qwen3VL_4B) == self._role(Qwen3VLVariantType.Qwen3VL_4B)
@@ -437,6 +443,142 @@ class TestQwen3VLEncoderServesAsATextLLM:
     )
     def test_an_8b_file_that_cannot_generate_is_only_an_encoder(self, tmp_path: Path, head, vocab: int) -> None:
         assert self._roles(tmp_path, Qwen3VLVariantType.Qwen3VL_8B, head, vocab=vocab) == []
+
+
+def _release_tower_shapes(variant: Qwen3VLVariantType) -> dict[str, list[int]]:
+    """The vision tower's weights and shapes, worked out from the release's vision config rather than from a model."""
+    config = load_bundled_qwen3_vl_config_dict(variant)["vision_config"]
+    hidden, inner, out = config["hidden_size"], config["intermediate_size"], config["out_hidden_size"]
+    merged = hidden * config["spatial_merge_size"] ** 2
+    patch = config["patch_size"]
+    shapes = {
+        "patch_embed.proj.weight": [hidden, config["in_channels"], config["temporal_patch_size"], patch, patch],
+        "patch_embed.proj.bias": [hidden],
+        "pos_embed.weight": [config["num_position_embeddings"], hidden],
+    }
+    for block in range(config["depth"]):
+        for name, shape in {
+            "norm1.weight": [hidden],
+            "norm1.bias": [hidden],
+            "norm2.weight": [hidden],
+            "norm2.bias": [hidden],
+            "attn.qkv.weight": [3 * hidden, hidden],
+            "attn.qkv.bias": [3 * hidden],
+            "attn.proj.weight": [hidden, hidden],
+            "attn.proj.bias": [hidden],
+            "mlp.linear_fc1.weight": [inner, hidden],
+            "mlp.linear_fc1.bias": [inner],
+            "mlp.linear_fc2.weight": [hidden, inner],
+            "mlp.linear_fc2.bias": [hidden],
+        }.items():
+            shapes[f"blocks.{block}.{name}"] = shape
+    # The final merger normalizes each patch before merging 2 x 2 of them; the deepstack mergers normalize after.
+    mergers = [("merger", hidden)] + [
+        (f"deepstack_merger_list.{index}", merged) for index in range(len(config["deepstack_visual_indexes"]))
+    ]
+    for merger, norm in mergers:
+        shapes.update(
+            {
+                f"{merger}.norm.weight": [norm],
+                f"{merger}.norm.bias": [norm],
+                f"{merger}.linear_fc1.weight": [merged, merged],
+                f"{merger}.linear_fc1.bias": [merged],
+                f"{merger}.linear_fc2.weight": [out, merged],
+                f"{merger}.linear_fc2.bias": [out],
+            }
+        )
+    return shapes
+
+
+_QKV = "blocks.0.attn.qkv"
+
+
+class TestQwen3VLEncoderTextLLMReadsImages:
+    """The Text LLM role reads images when the file's vision tower would load, by the tower loader's rules.
+
+    Header-only files at the release's shapes: identification reads headers and markers, never tensor data.
+    """
+
+    @staticmethod
+    def _reads_images(
+        tmp_path: Path,
+        variant: Qwen3VLVariantType,
+        tower: dict[str, tuple[list[int], str]],
+        markers: dict[str, dict] | None = None,
+    ) -> bool | None:
+        from tests.backend.model_manager.load.state_dicts.utils import write_header_only_safetensors
+
+        hidden = _HIDDEN_BY_VARIANT[variant]
+        keys = {
+            "model.embed_tokens.weight": ([2, hidden], "BF16"),
+            "model.layers.35.input_layernorm.weight": ([4], "BF16"),
+            "model.norm.weight": ([hidden], "BF16"),
+            "lm_head.weight": ([2, hidden], "BF16"),
+            **tower,
+        }
+        path = write_header_only_safetensors(tmp_path / "qwen3vl.safetensors", keys, markers)
+        config = Qwen3VLEncoder_Checkpoint_Config.from_model_on_disk(ModelOnDisk(path), {**_REQUIRED_FIELDS})
+        (role,) = config.roles
+        assert (role.type, role.variant) == (ModelType.TextLLM, variant)
+        return role.supports_images
+
+    @staticmethod
+    def _tower(variant: Qwen3VLVariantType, prefix: str = "model.visual.") -> dict[str, tuple[list[int], str]]:
+        return {f"{prefix}{name}": (shape, "BF16") for name, shape in _release_tower_shapes(variant).items()}
+
+    @pytest.mark.parametrize("variant", [Qwen3VLVariantType.Qwen3VL_4B, Qwen3VLVariantType.Qwen3VL_8B])
+    @pytest.mark.parametrize("prefix", ["model.visual.", "visual."], ids=["comfy", "bare"])
+    def test_a_whole_tower_in_either_spelling_reads_images(
+        self, tmp_path: Path, variant: Qwen3VLVariantType, prefix: str
+    ) -> None:
+        assert self._reads_images(tmp_path, variant, self._tower(variant, prefix)) is True
+
+    def test_a_scaled_fp8_tower_layer_reads_images(self, tmp_path: Path) -> None:
+        tower = self._tower(Qwen3VLVariantType.Qwen3VL_4B)
+        shape, _ = tower[f"model.visual.{_QKV}.weight"]
+        tower[f"model.visual.{_QKV}.weight"] = (shape, "F8_E4M3")
+        tower[f"model.visual.{_QKV}.weight_scale"] = ([], "F32")
+
+        assert self._reads_images(tmp_path, Qwen3VLVariantType.Qwen3VL_4B, tower) is True
+
+    def test_an_int8_tower_layer_reads_images_when_its_marker_claims_it(self, tmp_path: Path) -> None:
+        tower = self._tower(Qwen3VLVariantType.Qwen3VL_4B)
+        shape, _ = tower[f"model.visual.{_QKV}.weight"]
+        tower[f"model.visual.{_QKV}.weight"] = (shape, "I8")
+        tower[f"model.visual.{_QKV}.weight_scale"] = ([shape[0], 1], "F32")
+        marker = {f"model.visual.{_QKV}": {"format": "int8_tensorwise"}}
+
+        assert self._reads_images(tmp_path, Qwen3VLVariantType.Qwen3VL_4B, tower, marker) is True
+        assert self._reads_images(tmp_path, Qwen3VLVariantType.Qwen3VL_4B, tower) is False
+
+    @pytest.mark.parametrize(
+        "mutate",
+        [
+            pytest.param(lambda tower: tower.pop("model.visual.merger.linear_fc2.weight"), id="a-weight-missing"),
+            pytest.param(
+                lambda tower: tower.update({f"model.visual.{_QKV}.weight": ([3072, 1000], "BF16")}),
+                id="a-weight-of-another-shape",
+            ),
+            pytest.param(
+                lambda tower: tower.update({"visual.merger.norm.weight": ([1024], "BF16")}), id="a-key-spelled-twice"
+            ),
+        ],
+    )
+    def test_a_tower_its_loader_refuses_leaves_the_text_llm_text_only(self, tmp_path: Path, mutate) -> None:
+        tower = self._tower(Qwen3VLVariantType.Qwen3VL_4B)
+        mutate(tower)
+
+        assert self._reads_images(tmp_path, Qwen3VLVariantType.Qwen3VL_4B, tower) is False
+
+    def test_a_tower_with_an_nvfp4_layer_its_loader_refuses_leaves_the_text_llm_text_only(self, tmp_path: Path) -> None:
+        """ModelOpt-style: nvfp4 tensors, but nothing naming the layout ComfyUI's. The encoder still installs."""
+        tower = self._tower(Qwen3VLVariantType.Qwen3VL_4B)
+        layer = "model.visual.blocks.0.mlp.linear_fc1"
+        packed, _ = nvfp4_signed_tensors(layer, torch.ones(128, 64, dtype=torch.bool))
+        dtypes = {torch.uint8: "U8", torch.float8_e4m3fn: "F8_E4M3", torch.float32: "F32"}
+        tower.update({key: (list(tensor.shape), dtypes[tensor.dtype]) for key, tensor in packed.items()})
+
+        assert self._reads_images(tmp_path, Qwen3VLVariantType.Qwen3VL_4B, tower) is False
 
 
 class TestQwen3VLEncoderDirectoryConfig:

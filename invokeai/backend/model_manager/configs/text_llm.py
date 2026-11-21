@@ -178,12 +178,14 @@ class TextLLM_Checkpoint_Config(Checkpoint_Config_Base, Config_Base):
 
 
 class TextLLM_Qwen3VLEncoder_Config(Checkpoint_Config_Base, Config_Base):
-    """A single-file Qwen3-VL encoder in its Text LLM role: the whole Qwen3-VL Instruct chat model, run on text only.
+    """A single-file Qwen3-VL encoder in its Text LLM role: the whole Qwen3-VL Instruct chat model, reading images
+    when the file's vision tower loads.
 
-    Never identified and never stored. `Qwen3VLEncoder_Checkpoint_Config` records the role, with this format and the
-    variant, when its file can generate, and `roles.view_as` builds this config from the encoder record. The format
-    names what the view loads, the encoder's file through the encoder's decode. A class of its own keeps the Qwen3.5
-    checkpoint config as it is: no `variant` on its records, and no Qwen3-VL load path a record could be edited into.
+    Never identified and never stored. `Qwen3VLEncoder_Checkpoint_Config` records the role, with this format, the
+    variant and the image capability, when its file can generate, and `roles.view_as` builds this config from the
+    encoder record. The format names what the view loads, the encoder's file through the encoder's decode. A class of
+    its own keeps the Qwen3.5 checkpoint config as it is: no `variant` on its records, and no Qwen3-VL load path a
+    record could be edited into.
     """
 
     type: Literal[ModelType.TextLLM] = Field(default=ModelType.TextLLM)
@@ -191,7 +193,8 @@ class TextLLM_Qwen3VLEncoder_Config(Checkpoint_Config_Base, Config_Base):
     base: Literal[BaseModelType.Any] = Field(default=BaseModelType.Any)
     variant: Qwen3VLVariantType = Field(description="Which Qwen3-VL the encoder file is")
     cpu_only: bool | None = Field(default=None, description="Whether this model should run on CPU only")
-    # The vision tower stays on disk, so the view has no processor.
+    # From the encoder's Text LLM role. A role stored before it recorded the capability leaves the view text only: the
+    # tower stays on disk and there is no processor.
     supports_images: bool = Field(default=False, description=_SUPPORTS_IMAGES_DESCRIPTION)
 
     @model_validator(mode="after")

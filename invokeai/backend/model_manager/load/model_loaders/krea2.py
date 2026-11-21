@@ -1072,12 +1072,19 @@ class Qwen3VLEncoderCheckpointLoader(_Qwen3VLEncoderSingleFileLoader[Qwen3VLEnco
         return qwen3vl_visual_tower_nbytes([model_path])
 
     def _load_vision_encoder(self, config: Qwen3VLEncoder_Checkpoint_Config) -> AnyModel:
-        model_path = Path(config.path)
-        return _load_qwen3vl_visual_tower(
-            [model_path],
-            self._load_te_config(config).vision_config,
+        return self.load_vision_tower(
+            config,
             TorchDevice.choose_bfloat16_safe_dtype(TorchDevice.choose_torch_device()),
             reserve=self._ram_cache.make_room,
+        )
+
+    def load_vision_tower(
+        self, config: Qwen3VLEncoder_Checkpoint_Config, dtype: torch.dtype, *, reserve: Callable[[int], None]
+    ) -> torch.nn.Module:
+        """Build the file's vision tower at `dtype`. The encoder's edit modes load it as its own cache entry; the Text
+        LLM view of the same file (`TextLLMQwen3VLLoader`) runs it inside its model."""
+        return _load_qwen3vl_visual_tower(
+            [Path(config.path)], self._load_te_config(config).vision_config, dtype, reserve=reserve
         )
 
     def _load_text_encoder(self, config: Qwen3VLEncoder_Checkpoint_Config) -> AnyModel:

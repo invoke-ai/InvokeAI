@@ -76,7 +76,8 @@ def test_a_text_llm_file_viewed_as_the_encoder_is_an_encoder_config_of_the_same_
     assert view.variant is Qwen35VariantType.Qwen35_9B
     assert view.role_of is ModelType.TextLLM
     assert record.role_of is None
-    assert _dumped(view.roles) == _dumped([ModelRole(type=ModelType.TextLLM)])
+    # The way back names the Text LLM, which reads images in that role.
+    assert _dumped(view.roles) == _dumped([ModelRole(type=ModelType.TextLLM, supports_images=True)])
 
 
 def test_a_folder_viewed_as_the_qwen3_encoder_switches_format_and_remembers_its_own() -> None:
@@ -193,6 +194,41 @@ def test_a_qwen3_vl_encoder_viewed_as_a_text_llm_is_a_text_only_view_that_finds_
     back = view_as(view, ModelType.Qwen3VLEncoder)
     assert isinstance(back, Qwen3VLEncoder_Checkpoint_Config)
     assert (back.path, back.variant) == (record.path, Qwen3VLVariantType.Qwen3VL_8B)
+
+
+def test_a_text_llm_role_that_reads_images_gives_its_view_the_capability_through_storage() -> None:
+    record = qwen3_vl_encoder_file("vl", reads_images=True)
+
+    restored = ModelConfigFactory.from_dict(json.loads(record.model_dump_json()))
+    view = view_as(restored, ModelType.TextLLM)
+
+    assert restored.roles[0].supports_images is True
+    assert isinstance(view, TextLLM_Qwen3VLEncoder_Config)
+    assert view.supports_images is True
+
+
+def _stored_without_the_capability(record) -> dict:
+    """The record as stored before roles recorded whether the model reads images: no `supports_images` key."""
+    stored = record.model_dump(mode="json")
+    for role in stored["roles"]:
+        del role["supports_images"]
+    return stored
+
+
+def test_a_qwen3_vl_role_stored_without_the_capability_stays_readable_and_text_only() -> None:
+    restored = ModelConfigFactory.from_dict(_stored_without_the_capability(qwen3_vl_encoder_file("vl")))
+
+    assert restored.roles[0].supports_images is None
+    assert view_as(restored, ModelType.TextLLM).supports_images is False
+
+
+def test_a_qwen3_5_encoders_text_llm_role_reads_images_even_as_stored_before_it_said_so() -> None:
+    """Its files get the role only with their vision tower, so the record says so to every reader, the API included,
+    without a re-identify."""
+    restored = ModelConfigFactory.from_dict(_stored_without_the_capability(encoder_file("enc")))
+
+    assert json.loads(restored.model_dump_json())["roles"][0]["supports_images"] is True
+    assert view_as(restored, ModelType.TextLLM).supports_images is True
 
 
 def test_qwen3_5_text_llms_keep_their_checkpoint_config_with_no_variant() -> None:

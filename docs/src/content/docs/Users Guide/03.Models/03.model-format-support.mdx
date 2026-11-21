@@ -152,13 +152,14 @@ int8 build of the 4B exists to test against.
 ## Text LLMs
 
 Text LLMs rewrite prompts in [Expand Prompt](/users-guide/image-generation/prompt-tools/#expand-prompt) and run the
-Text LLM workflow nodes.
+Text LLM workflow nodes. Those that read images also write prompts in
+[Image to Prompt](/users-guide/image-generation/prompt-tools/#image-to-prompt).
 
 | Model | Folder | Single file (bf16) | int8 | GGUF | Other quantizations |
 |---|---|---|---|---|---|
 | Causal language models (`…ForCausalLM`), Gemma-4 | ✓ | ✗ | ✗ | ✗ | ✗ |
 | Qwen3.5 vision-language models, such as the [FLUX.3 prompt upsampler](/users-guide/models/local-models/flux-3/#prompt-upsampler-model) | ✓ | ✓ (9B) | ✓ (9B) | ✗ | R (w4a8, fp8 scaled, nvfp4, mxfp8) |
-| Qwen3-VL 4B / 8B Instruct, as single-file Qwen3-VL encoders (text only) | ✗ | ✓ | ✓ (4B) | ✗ | ✓ (fp8 scaled, nvfp4) |
+| Qwen3-VL 4B / 8B Instruct, as single-file Qwen3-VL encoders | ✗ | ✓ | ✓ (4B) | ✗ | ✓ (fp8 scaled, nvfp4) |
 
 A folder is a Hugging Face model folder with its tokenizer files; quantized folders (bitsandbytes, GPTQ, AWQ) are not
 supported. Gemma-4 and Qwen3.5 folders also read an image when the folder carries its processor files. A single file
@@ -183,15 +184,18 @@ offered too, and conditioning follows its weights. Anima's own encoder is Qwen3-
 post-trained Qwen3-0.6B folder conditions differently.
 
 A single-file Qwen3-VL 4B or 8B encoder (ComfyUI's `qwen3vl_4b_*` and `qwen3vl_8b_*`, in bf16, fp8 scaled, nvfp4 or
-`int8_convrot`) is the whole Qwen3-VL Instruct chat model, so it also serves as a Text LLM. It reads text only:
-Expand Prompt with an image refuses it. The 4B uses its token embedding as its LM head, so every 4B file serves. An 8B
+`int8_convrot`) is the whole Qwen3-VL Instruct chat model, so it also serves as a Text LLM. It reads images when the
+file carries the whole vision tower, as ComfyUI's builds do: the tower then loads with the Text LLM, in the compute
+dtype (0.8 GiB for the 4B, 1.1 GiB for the 8B in bf16), even for a prompt without an image. A file whose tower is
+incomplete, or stored in a shape or quantization its loader refuses, serves text only, and Expand Prompt with an image and Image to
+Prompt refuse it. The 4B uses its token embedding as its LM head, so every 4B file serves. An 8B
 file serves when it carries its own LM head as a float weight, which loads widened to the compute dtype: bf16, fp16 or
 fp32, or fp8 with or without a scale (an MXFP8 scale only when the file's `comfy_quant` marker or
 `_quantization_metadata` header names it). An 8B file without an LM head, or with a packed or integer one, is only an
-encoder. The vision tower stays on disk. Set to **Run on CPU**, the Text LLM computes in float32. Qwen3-VL GGUF encoders
+encoder. Set to **Run on CPU**, the Text LLM computes in float32. Qwen3-VL GGUF encoders
 get no Text LLM role, because their layers are unpacked on every forward, far too slowly to generate text; neither do
-Qwen3-VL encoder folders and MiniMax H3's truncated encoder. An encoder installed earlier gets the role when
-re-identified. The encoder and the Text LLM are separate entries in the model cache, so after both were used the file's
+Qwen3-VL encoder folders and MiniMax H3's truncated encoder. An encoder installed earlier gets the role, and whether
+it reads images, when re-identified. The encoder and the Text LLM are separate entries in the model cache, so after both were used the file's
 weights can be held twice until one is evicted.
 
 ## VAEs

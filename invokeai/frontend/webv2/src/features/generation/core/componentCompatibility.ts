@@ -110,9 +110,19 @@ export const isZImageQwen3Encoder: GenerateComponentFilter = (model) =>
 /** The optional 4-channel ControlNet-LLLite adapter the canvas feeds during Anima inpainting and outpainting. */
 export const isAnimaInpaintAdapter: GenerateComponentFilter = (model) => isAnimaInpaintAdapterModel(model);
 
-/** The FLUX.3 prompt upsampler reads reference images, so a text-only LLM cannot serve it. */
+/**
+ * A Text LLM that reads images, as filed (its own flag) or through its Text LLM role (the role's): Expand Prompt with
+ * an image, Image to Prompt and the FLUX.3 prompt upsampler need one. Mirrors the backend, which hands the role's
+ * flag to its role view and fills it in where a model always reads images in the role.
+ */
 export const isVisionTextLlm: GenerateComponentFilter = (model) =>
-  model.type === 'text_llm' && model.supports_images === true;
+  model.type === 'text_llm'
+    ? model.supports_images === true
+    : (model.roles ?? []).some((role) => role.type === 'text_llm' && role.supports_images === true);
+
+/** Image to Prompt runs LLaVA OneVision on its own pipeline and a vision Text LLM on the Text LLM one. */
+export const isImageToPromptModel: GenerateComponentFilter = (model) =>
+  model.type === 'llava_onevision' || isVisionTextLlm(model);
 
 /** Ministral and Mistral encoders require distinct variants. */
 const MINISTRAL_3B_VARIANT = 'ministral3_3b';

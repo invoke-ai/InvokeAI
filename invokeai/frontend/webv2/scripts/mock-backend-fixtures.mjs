@@ -694,8 +694,8 @@ export const MODEL_SEED_SETS = Object.freeze({
     controlSeed('flux-controlnet-union-pro', 'flux', null),
   ],
   // Models whose files also serve as another type: single-file MOSS-Image and Z-Image mains with their VAEs, a Text
-  // LLM that is also the Qwen3.5 9B encoder, a Qwen3.5 encoder that is also a Text LLM, and a Qwen3 4B causal-LM
-  // folder that is also the Qwen3 encoder.
+  // LLM that is also the Qwen3.5 9B encoder, a Qwen3.5 encoder and a Qwen3-VL 4B encoder that are also Text LLMs
+  // reading images, and a Qwen3 4B causal-LM folder that is also the Qwen3 encoder.
   'model-roles': [
     {
       record: seedModel({
@@ -725,9 +725,19 @@ export const MODEL_SEED_SETS = Object.freeze({
         cpu_only: null,
         key: 'seed-qwen35-encoder-9b',
         name: 'Qwen3.5 9B Encoder (int8)',
-        roles: [{ format: null, type: 'text_llm', variant: null }],
+        roles: [{ format: null, supports_images: true, type: 'text_llm', variant: null }],
         type: 'qwen3_5_encoder',
         variant: 'qwen3_5_9b',
+      }),
+    },
+    {
+      record: seedModel({
+        cpu_only: null,
+        key: 'seed-qwen3-vl-4b-encoder',
+        name: 'Qwen3-VL 4B Encoder (fp8)',
+        roles: [{ format: 'qwen3_vl_encoder', supports_images: true, type: 'text_llm', variant: 'qwen3_vl_4b' }],
+        type: 'qwen3_vl_encoder',
+        variant: 'qwen3_vl_4b',
       }),
     },
     {

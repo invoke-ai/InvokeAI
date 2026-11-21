@@ -44,9 +44,17 @@ def encoder_file(key: str, variant: Qwen35VariantType = Qwen35VariantType.Qwen35
     return Qwen35Encoder_Checkpoint_Config(**_common(key, f"{key} encoder"), variant=variant, roles=roles)
 
 
-def qwen3_vl_encoder_file(key: str, variant: Qwen3VLVariantType = Qwen3VLVariantType.Qwen3VL_4B):
-    """A single-file Qwen3-VL encoder record whose file is a whole Instruct model, so it serves as a Text LLM."""
-    roles = [ModelRole(type=ModelType.TextLLM, format=ModelFormat.Qwen3VLEncoder, variant=variant)]
+def qwen3_vl_encoder_file(
+    key: str, variant: Qwen3VLVariantType = Qwen3VLVariantType.Qwen3VL_4B, reads_images: bool | None = None
+):
+    """A single-file Qwen3-VL encoder record whose file is a whole Instruct model, so it serves as a Text LLM.
+
+    `reads_images` is what its role records about the file's vision tower: None for a role stored before it did."""
+    roles = [
+        ModelRole(
+            type=ModelType.TextLLM, format=ModelFormat.Qwen3VLEncoder, variant=variant, supports_images=reads_images
+        )
+    ]
     return Qwen3VLEncoder_Checkpoint_Config(**_common(key, f"{key} encoder"), variant=variant, roles=roles)
 
 
