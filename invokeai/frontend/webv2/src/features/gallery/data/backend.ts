@@ -1505,7 +1505,7 @@ const toImageExportQuery = (encoding: ImageExportEncoding): string =>
   toSearchParams({
     format: encoding.format,
     long_edge: encoding.longEdge ?? undefined,
-    metadata: encoding.metadata ?? undefined,
+    metadata: encoding.metadata,
     quality: encoding.quality ?? undefined,
   });
 

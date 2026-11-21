@@ -143,7 +143,7 @@ describe('image export dialog', () => {
     await expect.poll(() => exportUrls, DIALOG_LOAD_WAIT).toEqual(['format=png&metadata=all']);
 
     await userEvent.click(segment('webp'));
-    await expect.poll(() => exportUrls.at(-1)).toBe('format=webp&quality=90');
+    await expect.poll(() => exportUrls.at(-1)).toBe('format=webp&metadata=all&quality=90');
     await expect.poll(() => dialog()?.textContent).toContain('moon-night.webp');
     const encodesBeforeSave = exportUrls.length;
 

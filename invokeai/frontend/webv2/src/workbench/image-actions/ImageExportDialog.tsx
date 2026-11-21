@@ -671,24 +671,23 @@ const MetadataControls = ({
   settings: ImageExportSettings;
 }) => {
   const { t } = useTranslation();
-  const isPng = settings.format === 'png';
   const options = useMemo(() => METADATA_OPTIONS.map(({ labelKey, value }) => ({ label: t(labelKey), value })), [t]);
   const handleChange = useCallback((value: string) => onChange({ metadata: value as ImageExportMetadata }), [onChange]);
 
   return (
     <ControlGroup
-      hint={
-        isPng
-          ? t(`widgets.gallery.export.metadataHint.${settings.metadata}`)
-          : t('widgets.gallery.export.metadataPngOnly')
-      }
+      hint={t(
+        settings.format === 'jpeg' && settings.metadata === 'all'
+          ? 'widgets.gallery.export.metadataHint.allJpeg'
+          : `widgets.gallery.export.metadataHint.${settings.metadata}`
+      )}
       label={t('widgets.gallery.export.metadata')}
     >
       <SegmentedControl
         ariaLabel={t('widgets.gallery.export.metadata')}
-        disabled={disabled || !isPng}
+        disabled={disabled}
         options={options}
-        value={isPng ? settings.metadata : 'none'}
+        value={settings.metadata}
         onChange={handleChange}
       />
     </ControlGroup>

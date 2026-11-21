@@ -102,7 +102,7 @@ export const getImageExportLongEdgeForSide = (
 export interface ImageExportEncoding {
   format: ImageExportFormat;
   longEdge: number | null;
-  metadata: ImageExportMetadata | null;
+  metadata: ImageExportMetadata;
   quality: number | null;
 }
 
@@ -112,6 +112,6 @@ export const getImageExportEncoding = (settings: ImageExportSettings, source?: I
     settings.longEdge !== null && source && settings.longEdge >= Math.max(source.width, source.height)
       ? null
       : settings.longEdge,
-  metadata: settings.format === 'png' ? settings.metadata : null,
+  metadata: settings.metadata,
   quality: isLossyImageExportFormat(settings.format) ? settings.quality : null,
 });

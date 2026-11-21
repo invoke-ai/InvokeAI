@@ -6287,7 +6287,7 @@
         "formatHint": {
           "avif": "Smallest files, with transparency. Some older apps cannot open them.",
           "jpeg": "Opens everywhere. Transparency is flattened onto white.",
-          "png": "Lossless, with transparency. The only format that keeps generation data.",
+          "png": "Lossless, with transparency.",
           "webp": "Small files, with transparency."
         },
         "height": "Height",
@@ -6300,12 +6300,12 @@
         "metadataAll": "Everything",
         "metadataHint": {
           "all": "Recall and Load workflow still work when this file comes back into Invoke.",
+          "allJpeg": "Recall and Load workflow still work when this file comes back into Invoke. Past about 64 kB a JPEG keeps only the settings.",
           "none": "Nothing about how it was made leaves with the file.",
           "parameters": "Prompt, seed and model travel with the file; the workflow and graph stay behind."
         },
         "metadataNone": "None",
         "metadataParameters": "Parameters",
-        "metadataPngOnly": "Generation data is kept only in PNG.",
         "moreImages": "+{{count}}",
         "moreImagesLabel_one": "{{count}} more image",
         "moreImagesLabel_other": "{{count}} more images",
