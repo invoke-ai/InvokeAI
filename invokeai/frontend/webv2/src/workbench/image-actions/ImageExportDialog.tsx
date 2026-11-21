@@ -309,6 +309,7 @@ export const ImageExportDialog = ({
                     exportLabel={t('widgets.gallery.export.exportSide', {
                       encoding: formatImageExportEncoding(t, settings),
                     })}
+                    fallbackShape={loadedOriginal?.size ?? null}
                     isEncoding={isEncoding}
                     isRetrying={exportQuery.isFetching}
                     originalAlt={t('widgets.gallery.export.original')}

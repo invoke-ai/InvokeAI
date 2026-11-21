@@ -70,6 +70,7 @@ export const ImageExportCompare = ({
   error,
   exportBlob,
   exportLabel,
+  fallbackShape,
   isEncoding,
   isRetrying,
   originalAlt,
@@ -82,6 +83,7 @@ export const ImageExportCompare = ({
   error: ImageExportPreviewError | null;
   exportBlob: Blob | null;
   exportLabel: string;
+  fallbackShape: ImageSize | null;
   isEncoding: boolean;
   isRetrying: boolean;
   originalAlt: string;
@@ -99,7 +101,7 @@ export const ImageExportCompare = ({
   const [isPanning, setIsPanning] = useState(false);
   const frameRef = useRef<HTMLDivElement | null>(null);
   const dragRef = useRef<{ kind: 'divider' } | { kind: 'pan'; origin: Pan; x: number; y: number } | null>(null);
-  const shape = sourceSize ?? PLACEHOLDER_SIZE;
+  const shape = sourceSize ?? fallbackShape ?? PLACEHOLDER_SIZE;
   const isActual = zoom === 'actual' && sourceSize !== null;
   const pan = isActual ? clampPan(storedPan, frameSize, sourceSize) : storedPan;
 
@@ -325,9 +327,16 @@ export const ImageExportCompare = ({
           onPointerUp={endDrag}
         >
           <div style={LAYER_STYLE}>
-            <img alt={originalAlt} draggable={false} src={originalUrl} style={imageStyle} onLoad={handleOriginalLoad} />
+            <img
+              key={originalUrl}
+              alt={originalAlt}
+              draggable={false}
+              src={originalUrl}
+              style={imageStyle}
+              onLoad={handleOriginalLoad}
+            />
           </div>
-          {exportBlob ? (
+          {exportBlob && sourceSize ? (
             <Box
               _motionReduce={NO_TRANSITION}
               opacity={isEncoding ? 0.6 : 1}
