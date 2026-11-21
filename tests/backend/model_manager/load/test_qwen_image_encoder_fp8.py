@@ -20,6 +20,7 @@ from safetensors.torch import save_file
 from transformers import Qwen2_5_VLConfig, Qwen2_5_VLForConditionalGeneration
 
 from invokeai.backend.model_manager.configs.qwen_vl_encoder import QwenVLEncoder_Checkpoint_Config
+from invokeai.backend.model_manager.load import load_default
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custom_modules import custom_linear
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch_module_autocast import (
     apply_custom_layers_to_model,
@@ -159,9 +160,9 @@ def _decide(monkeypatch: pytest.MonkeyPatch, *, device: str, matmul: bool = Fals
     monkeypatch.setattr(qwen_image, "load_bundled_qwen2_5_vl_config_dict", _toy_config_dict)
     monkeypatch.setattr(qwen_image.TorchDevice, "choose_torch_device", lambda: torch.device(device))
     monkeypatch.setattr(qwen_image.TorchDevice, "choose_bfloat16_safe_dtype", lambda _device: torch.float32)
-    monkeypatch.setattr(qwen_image, "should_keep_fp8_weights", lambda d: matmul and d.type == "cuda")
+    monkeypatch.setattr(load_default, "should_keep_fp8_weights", lambda d: matmul and d.type == "cuda")
     monkeypatch.setattr(
-        qwen_image, "_device_supports_fp8_storage", lambda d, _logger=None: storage and d.type == "cuda"
+        load_default, "_device_supports_fp8_storage", lambda d, _logger=None: storage and d.type == "cuda"
     )
 
 
@@ -173,8 +174,9 @@ def _loader() -> QwenVLEncoderCheckpointLoader:
     return loader
 
 
-def _load(checkpoint: _Checkpoint, loader: QwenVLEncoderCheckpointLoader | None = None):
-    config = QwenVLEncoder_Checkpoint_Config.model_construct(path=str(checkpoint.path))
+def _load(checkpoint: _Checkpoint, loader: QwenVLEncoderCheckpointLoader | None = None, config=None):
+    if config is None:
+        config = QwenVLEncoder_Checkpoint_Config.model_construct(path=str(checkpoint.path))
     return (loader or _loader())._load_text_encoder_from_singlefile(config)
 
 
@@ -397,10 +399,28 @@ def test_the_cache_key_and_the_stored_format_come_from_one_capability_decision(
     _decide(monkeypatch, device="cuda:0")
     loader = _loader()
     config = QwenVLEncoder_Checkpoint_Config.model_construct(path=str(checkpoint.path))
-    assert loader._cache_key_variant(config, SubModelType.TextEncoder) == "float32"
+    assert loader._cache_key_variant(config, SubModelType.TextEncoder) == "full-float32"
 
     _decide(monkeypatch, device="cuda:0", storage=True)
-    model = _load(checkpoint, loader)
+    model = _load(checkpoint, loader, config)
+
+    assert all(param.dtype is torch.float32 for param in model.parameters())
+
+
+def test_cpu_encoder_uses_cpu_dtype_for_key_and_weights(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    checkpoint = _write(tmp_path)
+    _decide(monkeypatch, device="cpu", storage=True)
+    monkeypatch.setattr(
+        qwen_image.TorchDevice,
+        "choose_bfloat16_safe_dtype",
+        lambda device: torch.float32 if device.type == "cpu" else torch.bfloat16,
+    )
+    loader = _loader()
+    config = QwenVLEncoder_Checkpoint_Config.model_construct(path=str(checkpoint.path))
+    assert loader._cache_key_variant(config, SubModelType.TextEncoder) == "full-float32"
+    monkeypatch.setattr(qwen_image.TorchDevice, "choose_bfloat16_safe_dtype", lambda _device: torch.float16)
+
+    model = _load(checkpoint, loader, config)
 
     assert all(param.dtype is torch.float32 for param in model.parameters())
 
@@ -440,8 +460,10 @@ def test_device_caches_share_weights_only_with_a_device_that_builds_the_same_for
     checkpoint = _write(tmp_path)
     monkeypatch.setattr(qwen_image, "load_bundled_qwen2_5_vl_config_dict", _toy_config_dict)
     monkeypatch.setattr(qwen_image.TorchDevice, "choose_bfloat16_safe_dtype", lambda _device: torch.float32)
-    monkeypatch.setattr(qwen_image, "should_keep_fp8_weights", lambda _device: False)
-    monkeypatch.setattr(qwen_image, "_device_supports_fp8_storage", lambda d, _logger=None: d == torch.device("cuda:0"))
+    monkeypatch.setattr(load_default, "should_keep_fp8_weights", lambda _device: False)
+    monkeypatch.setattr(
+        load_default, "_device_supports_fp8_storage", lambda d, _logger=None: d == torch.device("cuda:0")
+    )
     config = QwenVLEncoder_Checkpoint_Config.model_construct(
         key="qwen-vl",
         path=checkpoint.path.name,

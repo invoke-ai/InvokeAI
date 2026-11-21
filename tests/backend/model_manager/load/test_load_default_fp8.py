@@ -127,9 +127,10 @@ def test_should_use_fp8_probes_the_device_when_fp8_is_requested():
     with patch(_STORAGE_PROBE, return_value=True) as mock_probe:
         assert loader._should_use_fp8(config, None) is True
     mock_probe.assert_called_once()
-    # An unsupported device still vetoes, just without probing on every unrelated load.
+    # The key/build answer stays frozen. A fresh load can observe a new capability verdict.
     with patch(_STORAGE_PROBE, return_value=False):
-        assert loader._should_use_fp8(config, None) is False
+        assert loader._should_use_fp8(config, None) is True
+        assert _make_loader("xpu")._should_use_fp8(config, None) is False
 
 
 def test_should_use_fp8_excludes_control_lora():

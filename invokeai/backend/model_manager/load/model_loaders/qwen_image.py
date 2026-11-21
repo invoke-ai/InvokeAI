@@ -18,7 +18,6 @@ from invokeai.backend.model_manager.configs.qwen_vl_encoder import (
 )
 from invokeai.backend.model_manager.load.load_default import (
     ModelLoader,
-    _device_supports_fp8_storage,
     _model_declared_skip_patterns,
 )
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
@@ -44,7 +43,6 @@ from invokeai.backend.quantization.fp8_scaled import (
     extract_fp8_scaled_layers,
     parse_quantization_metadata,
     read_safetensors_metadata,
-    should_keep_fp8_weights,
     split_fp8_scaled_layers,
     strip_layer_path_prefix,
     warn_on_unattached_scales,
@@ -165,6 +163,8 @@ def _build_qwen_image_transformer_config(sd: dict, is_edit: bool) -> dict:
 class QwenImageDiffusersModel(GenericDiffusersLoader):
     """Class to load Qwen Image Edit main models."""
 
+    _fixed_dtype = torch.bfloat16
+
     def _load_model(
         self,
         config: AnyModelConfig,
@@ -184,7 +184,8 @@ class QwenImageDiffusersModel(GenericDiffusersLoader):
 
         # We force bfloat16 for Qwen Image Edit models.
         # Use `dtype` (newer) with fallback to `torch_dtype` (older diffusers).
-        dtype_kwarg = {"dtype": torch.bfloat16}
+        dtype = self._decision(config, submodel_type).dtype
+        dtype_kwarg = {"dtype": dtype}
         try:
             result: AnyModel = load_class.from_pretrained(
                 model_path,
@@ -194,7 +195,7 @@ class QwenImageDiffusersModel(GenericDiffusersLoader):
             )
         except TypeError:
             # Older diffusers uses torch_dtype instead of dtype
-            dtype_kwarg = {"torch_dtype": torch.bfloat16}
+            dtype_kwarg = {"torch_dtype": dtype}
             result = load_class.from_pretrained(
                 model_path,
                 **dtype_kwarg,
@@ -265,6 +266,8 @@ class QwenImageCheckpointModel(ModelLoader):
     `default_settings.fp8_storage` is on (which then also casts the dense remainder to fp8);
     otherwise they are dequantized to bf16 at load time. A file carries int8 or scaled fp8, not both."""
 
+    _fp8_checkpoint_submodels = frozenset({SubModelType.Transformer})
+
     def _load_model(
         self,
         config: AnyModelConfig,
@@ -294,8 +297,7 @@ class QwenImageCheckpointModel(ModelLoader):
             raise TypeError(f"Expected Main_Checkpoint_QwenImage_Config, got {type(config).__name__}.")
         model_path = Path(config.path)
 
-        target_device = TorchDevice.choose_torch_device()
-        model_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
+        keep_checkpoint_fp8, model_dtype = self._storage_format(config, SubModelType.Transformer)
 
         sd = load_file(str(model_path))
         sd = CheckpointPrefix.detect(sd).strip(sd)
@@ -337,7 +339,7 @@ class QwenImageCheckpointModel(ModelLoader):
             # Without either, a dequantize per forward would cost speed for memory nobody asked to save, so they are
             # folded.
             use_fp8_storage = bool(fp8_layers) and self._should_use_fp8(config, SubModelType.Transformer)
-            keep_fp8 = bool(fp8_layers) and (should_keep_fp8_weights(target_device) or use_fp8_storage)
+            keep_fp8 = bool(fp8_layers) and keep_checkpoint_fp8
 
         is_edit = getattr(config, "variant", None) == QwenImageVariantType.Edit
         model_config = _build_qwen_image_transformer_config(sd, is_edit=is_edit)
@@ -472,29 +474,8 @@ class QwenVLEncoderCheckpointLoader(ModelLoader):
     `invokeai.backend.qwen2_5_vl`, so this encoder loads with no network access.
     """
 
-    def _storage_format(self, config: AnyModelConfig) -> tuple[bool, torch.dtype]:
-        """Whether float8 Linear weights stay float8, and the compute dtype everything else is held in.
-
-        Decided once per loader (a fresh one serves each load): the cache key and the built weights must agree, and the
-        capability probes can flip between the key computation and the build under the load lock. Float8 follows the
-        execution device, because a CPU-only encoder reads its weights on the CPU whatever the session's device is.
-        """
-        device = self._get_execution_device(config, SubModelType.TextEncoder) or self._torch_device
-        decisions = self.__dict__.setdefault("_storage_format_decisions", {})
-        if device not in decisions:
-            keep_fp8 = should_keep_fp8_weights(device) or _device_supports_fp8_storage(device, self._logger)
-            decisions[device] = (keep_fp8, TorchDevice.choose_bfloat16_safe_dtype(self._torch_device))
-        return decisions[device]
-
-    def _cache_key_variant(self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> str:
-        # Device caches share one canonical CPU copy per key: a device must not adopt float8 it cannot hold, nor folded
-        # weights that throw away a capable device's saving. The visual tower is part of the text encoder's module, so
-        # it is covered too. Keyed by the device's decision, not the file's contents, which would take a header read
-        # on every cache lookup.
-        if submodel_type == SubModelType.TextEncoder:
-            keep_fp8, dtype = self._storage_format(config)
-            return f"{'fp8-' if keep_fp8 else ''}{str(dtype).removeprefix('torch.')}"
-        return ""
+    _fp8_checkpoint_submodels = frozenset({SubModelType.TextEncoder})
+    _encoder_fp8_storage = True
 
     def _load_model(
         self,
@@ -525,7 +506,7 @@ class QwenVLEncoderCheckpointLoader(ModelLoader):
 
         model_path = Path(config.path)
 
-        device_keeps_fp8, model_dtype = self._storage_format(config)
+        device_keeps_fp8, model_dtype = self._storage_format(config, SubModelType.TextEncoder)
 
         sd = load_file(str(model_path))
 

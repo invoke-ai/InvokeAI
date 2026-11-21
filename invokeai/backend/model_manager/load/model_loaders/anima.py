@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 import accelerate
+import torch
 
 from invokeai.backend.anima.checkpoint_layout import (
     ANIMA_KEY_PREFIXES,
@@ -76,6 +77,13 @@ class AnimaCheckpointModel(ModelLoader):
     the AnimaTransformer model with the correct architecture parameters.
     """
 
+    _fp8_checkpoint_submodels = frozenset({SubModelType.Transformer})
+
+    def _select_model_dtype(
+        self, config: AnyModelConfig, submodel_type: Optional[SubModelType], device: torch.device
+    ) -> torch.dtype:
+        return TorchDevice.choose_anima_inference_dtype(device)
+
     def _load_model(
         self,
         config: AnyModelConfig,
@@ -124,8 +132,7 @@ class AnimaCheckpointModel(ModelLoader):
         # Drop runtime-derived buffers and exporter metadata that aren't model weights.
         sd = filter_non_model_keys(sd)
 
-        target_device = TorchDevice.choose_torch_device()
-        model_dtype = TorchDevice.choose_anima_inference_dtype(target_device)
+        _keep, model_dtype = self._storage_format(config, SubModelType.Transformer)
 
         # Two ComfyUI side-channel formats share the `weight` + `weight_scale` layout, and a checkpoint
         # carries one or the other (Anima-2.9B ships an `int8_tensorwise` build beside its bf16 one).

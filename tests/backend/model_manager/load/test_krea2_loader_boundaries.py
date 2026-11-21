@@ -250,6 +250,7 @@ def test_single_file_loader_keeps_a_mixed_int4_build_named_only_in_its_header_pa
 def test_diffusers_loader_reaches_transformer_from_pretrained(monkeypatch, tmp_path) -> None:
     config = Main_Diffusers_Krea2_Config.model_construct(path=str(tmp_path), repo_variant=None)
     loader = object.__new__(Krea2DiffusersModel)
+    loader._torch_device = torch.device("cpu")
     loaded_model = object()
     load_class = SimpleNamespace(from_pretrained=MagicMock(return_value=loaded_model))
     loader.get_hf_load_class = lambda _path, _submodel: load_class
@@ -488,7 +489,7 @@ def test_checkpoint_encoder_loader_decodes_int8_and_does_not_call_it_fp8(monkeyp
         lambda _device: torch.float32,
     )
     monkeypatch.setattr(
-        "invokeai.backend.model_manager.load.model_loaders.krea2._device_supports_fp8_storage",
+        "invokeai.backend.model_manager.load.load_default._device_supports_fp8_storage",
         lambda _device, _logger: True,
     )
 
@@ -589,6 +590,7 @@ def test_an_int8_weight_without_a_marker_is_refused(monkeypatch, tmp_path) -> No
     loader._logger = MagicMock()
 
     monkeypatch.setattr(diffusers, "Krea2Transformer2DModel", _TinyInt8Krea2Transformer, raising=False)
+    loader._torch_device = torch.device("cpu")
     monkeypatch.setattr(safetensors.torch, "load_file", lambda _path: state_dict)
     monkeypatch.setattr(
         "invokeai.backend.model_manager.load.model_loaders.krea2.TorchDevice.choose_torch_device",
@@ -639,6 +641,7 @@ def _int8_transformer_driver(monkeypatch, tmp_path, model_class, state_dict):
     loader = object.__new__(Krea2CheckpointModel)
     loader._ram_cache = SimpleNamespace(make_room=MagicMock())
     loader._logger = MagicMock()
+    loader._torch_device = torch.device("cpu")
     loader._apply_fp8_layerwise_casting = lambda model, _config, _submodel: model
 
     monkeypatch.setattr(diffusers, "Krea2Transformer2DModel", model_class, raising=False)

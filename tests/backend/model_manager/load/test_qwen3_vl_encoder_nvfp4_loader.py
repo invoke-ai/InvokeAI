@@ -19,6 +19,7 @@ import torch
 from transformers import Qwen3VLConfig, Qwen3VLModel
 
 from invokeai.backend.model_manager.configs.qwen3_vl_encoder import Qwen3VLEncoder_Checkpoint_Config
+from invokeai.backend.model_manager.load import load_default
 from invokeai.backend.model_manager.load.model_loaders import krea2
 from invokeai.backend.model_manager.load.model_loaders.krea2 import Qwen3VLEncoderCheckpointLoader
 from invokeai.backend.quantization.int8_convrot import Int8ConvrotLinear
@@ -163,8 +164,8 @@ def _prepare(
     safetensors.torch.save_file({key: value.contiguous() for key, value in state_dict.items()}, path, metadata)
     run = prepare(SEAM, monkeypatch, observe=("dequantize_fp8_scaled", "split_fp8_scaled_layers"))
     run.loader._load_te_config = lambda _config: _te_config()
-    monkeypatch.setattr(krea2, "should_keep_fp8_weights", lambda _device: matmul)
-    monkeypatch.setattr(krea2, "_device_supports_fp8_storage", lambda *_args: storage)
+    monkeypatch.setattr(load_default, "should_keep_fp8_weights", lambda _device: matmul)
+    monkeypatch.setattr(load_default, "_device_supports_fp8_storage", lambda *_args: storage)
     return run, Qwen3VLEncoder_Checkpoint_Config.model_construct(path=str(path), name="encoder")
 
 

@@ -16,6 +16,7 @@ import pytest
 import torch
 
 from invokeai.backend.model_manager.configs.main import Main_Checkpoint_Krea2_Config
+from invokeai.backend.model_manager.load import load_default
 from invokeai.backend.model_manager.load.model_loaders import krea2
 from invokeai.backend.model_manager.load.model_loaders.krea2 import Krea2CheckpointModel
 from invokeai.backend.model_manager.taxonomy import Krea2VariantType
@@ -128,7 +129,7 @@ def loaded(request, monkeypatch: pytest.MonkeyPatch, tmp_path) -> SimpleNamespac
         "read_safetensors_metadata",
         lambda _path, _logger: {"_quantization_metadata": json.dumps({"layers": header_layers})},
     )
-    monkeypatch.setattr(krea2, "should_keep_fp8_weights", lambda _device: False)
+    monkeypatch.setattr(load_default, "should_keep_fp8_weights", lambda _device: False)
     monkeypatch.setattr(krea2.TorchDevice, "choose_torch_device", lambda: torch.device("cpu"))
     monkeypatch.setattr(krea2.TorchDevice, "choose_bfloat16_safe_dtype", lambda _device: COMPUTE_DTYPE)
 

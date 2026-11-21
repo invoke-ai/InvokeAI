@@ -226,6 +226,34 @@ def test_the_reservation_is_one_call_made_before_the_split_and_the_cast_widen_an
     assert widening_steps == [("split_int8_convrot_layers", 1), ("cast_unquantized", 1)]
 
 
+@pytest.mark.parametrize("dtype,later_dtype", [(torch.float32, torch.bfloat16), (torch.bfloat16, torch.float32)])
+def test_int8_loading_uses_the_dtype_captured_for_its_cache_key(monkeypatch, tmp_path, dtype, later_dtype) -> None:
+    state_dict, expected = _state_dict()
+    run, config = _run(monkeypatch, tmp_path, state_dict)
+    monkeypatch.setattr(qwen_image.TorchDevice, "choose_bfloat16_safe_dtype", staticmethod(lambda _device: dtype))
+    key = run.loader._get_cache_key(config, SubModelType.Transformer)
+    monkeypatch.setattr(qwen_image.TorchDevice, "choose_bfloat16_safe_dtype", staticmethod(lambda _device: later_dtype))
+
+    model = run.loader._load_model(config, SubModelType.Transformer)
+
+    assert model.img_in.weight.dtype is dtype
+    torch.testing.assert_close(model.img_in.weight, state_dict["img_in.weight"].to(dtype))
+    for path, weight in expected.items():
+        layer = model.get_submodule(path)
+        assert isinstance(layer, Int8ConvrotLinear), path
+        assert layer.weight.dtype is torch.int8, path
+        assert layer.weight_scale.dtype is torch.float32, path
+        x = torch.arange(64, dtype=torch.float32).reshape(1, 64) / 64
+        bias = state_dict[f"{path}.bias"].to(dtype).float()
+        torch.testing.assert_close(layer(x), torch.nn.functional.linear(x, weight, bias), rtol=1e-4, atol=1e-4)
+    # Packed codes and fp32 column scales are fixed; only the dense remainder follows the captured dtype.
+    int8 = sum(out * inp for out, inp in LAYERS.values())
+    scales = sum(out for out, _ in LAYERS.values()) * 4
+    dense = sum(out for out, _ in LAYERS.values()) + 2 * (128 * 64 + 128)
+    assert run.reserved == [int8 + scales + dense * dtype.itemsize]
+    assert run.loader._get_cache_key(config, SubModelType.Transformer) == key
+
+
 def test_fp8_storage_leaves_the_int8_layers_int8(monkeypatch, tmp_path) -> None:
     """The model-level storage cast walks the dense remainder; the int8 buffers are not layers it casts."""
     state_dict, expected = _state_dict()
