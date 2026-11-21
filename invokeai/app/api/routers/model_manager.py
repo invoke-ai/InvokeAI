@@ -547,10 +547,12 @@ async def scan_for_models(
             non_core_model_paths = [p for p in found_model_paths if not p.is_relative_to(core_models_path)]
 
             installed_models = ApiDependencies.invoker.services.model_manager.store.search_by_attr()
-            installed_paths = {str(models_path / m.path) for m in installed_models}
+            # Compare resolved paths: a model that was installed through one symlink and is discovered through
+            # another one is the same file, and plain string comparison would report it as not installed.
+            installed_paths = {(models_path / m.path).resolve() for m in installed_models}
 
             # Check if the model is installed by comparing paths.
-            return [FoundModel(path=str(p), is_installed=str(p) in installed_paths) for p in non_core_model_paths]
+            return [FoundModel(path=str(p), is_installed=p.resolve() in installed_paths) for p in non_core_model_paths]
 
         # The store query and the path comparison are blocking work; this handler is async only to watch the request.
         scan_results = await asyncio.to_thread(classify_found_models)
