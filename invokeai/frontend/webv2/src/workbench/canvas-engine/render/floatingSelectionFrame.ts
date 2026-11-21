@@ -16,8 +16,8 @@ export interface FloatingSelectionFrame {
 }
 
 /**
- * Resolve float drawing and ants together so transforms agree. Prefer display-effect pixels for drawing, raw
- * pixels for baking; return null when no float/layer exists.
+ * Resolve float drawing and ants together so transforms agree. Prefer display-effect pixels for drawing, raw pixels for
+ * baking; return null when no float/layer exists.
  */
 export const floatingSelectionFrame = (
   float: FloatingSelection | null,

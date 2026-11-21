@@ -47,6 +47,7 @@ const actionsFor = (layer: CanvasLayerContract, layers: readonly CanvasLayerCont
     selectedIds: [layer.id],
     canGroupSelection: true,
     canDeleteSelection: true,
+    canDuplicateSelection: true,
     mergeMasksEligibility: 'eligible',
     canMergeSelection: true,
     canRemoveFromGroup: true,
@@ -127,12 +128,20 @@ describe('getLayerContextMenuLayout', () => {
 
     expect(summarize(inpaint)[1]).toEqual({
       id: 'primary',
-      items: ['open-properties', 'rename', 'fit-to-bbox', 'add-noise', 'add-denoise-limit', 'extract-masked-area'],
+      items: [
+        'open-properties',
+        'transform',
+        'rename',
+        'fit-to-bbox',
+        'add-noise',
+        'add-denoise-limit',
+        'extract-masked-area',
+      ],
       presentation: 'list',
     });
     expect(summarize(regional)[1]).toEqual({
       id: 'primary',
-      items: ['open-properties', 'rename', 'fit-to-bbox', 'regional-auto-negative', 'add-reference-image'],
+      items: ['open-properties', 'transform', 'rename', 'fit-to-bbox', 'regional-auto-negative', 'add-reference-image'],
       presentation: 'list',
     });
   });

@@ -18,7 +18,6 @@ await i18n.use(initReactI18next).init({
   resources: { en: { translation: { 'widgets.layers.control.filter': 'Filter' } } },
 });
 
-/** An engine whose layer gains content later, announced through one of its interaction signals. */
 const createChangingEngine = () => {
   let hasContent = false;
   const listeners = new Map<string, Set<() => void>>();

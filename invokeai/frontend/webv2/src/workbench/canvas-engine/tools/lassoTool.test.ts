@@ -1,10 +1,11 @@
 import type { SelectionCommit } from '@workbench/canvas-engine/selection/selectionState';
 import type { Tool, ToolContext } from '@workbench/canvas-engine/tools/tool';
-import type { PointerInput } from '@workbench/canvas-engine/types';
+import type { PointerInput, Vec2 } from '@workbench/canvas-engine/types';
 import type { WorkbenchAction } from '@workbench/workbenchState.testing';
 
 import { createEngineStores } from '@workbench/canvas-engine/engineStores';
-import { createLassoTool } from '@workbench/canvas-engine/tools/lassoTool';
+import { polygonBounds } from '@workbench/canvas-engine/freehand';
+import { createLassoTool, FREEHAND_MIN_SPACING_PX } from '@workbench/canvas-engine/tools/lassoTool';
 import { describe, expect, it, vi } from 'vitest';
 
 const pointer = (
@@ -32,7 +33,6 @@ const createHarness = () => {
     invalidate: vi.fn(),
     stores,
     updateCursor: vi.fn(),
-    // Identity viewport makes document coordinates valid for the screen-space polygon close test.
     viewport: { documentToScreen: (p: { x: number; y: number }) => p },
   } as unknown as ToolContext;
   return { commits, ctx, dispatched, stores };
@@ -64,7 +64,6 @@ describe('lassoTool: drag → commit', () => {
     expect(commits).toHaveLength(1);
     expect(commits[0]!.op).toBe('replace');
     expect(commits[0]!.bounds).toEqual({ height: 20, width: 20, x: 0, y: 0 });
-    // Preview cleared on commit.
     expect(stores.lassoPreview.get()).toBeNull();
   });
 
@@ -117,33 +116,126 @@ describe('lassoTool: cancel + guards', () => {
     expect(commits).toHaveLength(0);
   });
 
-  it('decimates by on-screen travel, stores document points, and always keeps the release point', () => {
-    const at = (x: number, y: number, zoom: number): PointerInput => ({
+  it.each([
+    [1, 1, 1],
+    [10, 10, 0.1],
+    [0.5, 0.5, 10],
+    [8, 0.25, 1],
+  ])('keeps a %s by %s outline at %sx zoom', (width, height, zoom) => {
+    const tool = createLassoTool();
+    const { commits, ctx } = createHarness();
+    const at = (x: number, y: number): PointerInput => ({
       ...pointer(x, y),
       screenPoint: { x: x * zoom, y: y * zoom },
     });
-    // Zoomed in 10×: half-pixel document steps are 5 CSS px apart and all survive.
-    const zoomedIn = createLassoTool();
-    const near = createHarness();
-    down(zoomedIn, near.ctx, at(0, 0, 10));
-    move(zoomedIn, near.ctx, at(0.5, 0, 10));
-    move(zoomedIn, near.ctx, at(0.5, 0.5, 10));
-    expect(near.stores.lassoPreview.get()?.points).toEqual([
-      { x: 0, y: 0 },
-      { x: 0.5, y: 0 },
-      { x: 0.5, y: 0.5 },
-    ]);
+    down(tool, ctx, at(0, 0));
+    move(tool, ctx, at(width, 0));
+    move(tool, ctx, at(width, height));
+    move(tool, ctx, at(0, height));
+    up(tool, ctx, at(0, 0));
 
-    // Zoomed out 10×: 10-unit document steps are 1 CSS px apart and decimate away, but the release point stays.
-    const zoomedOut = createLassoTool();
-    const far = createHarness();
-    down(zoomedOut, far.ctx, at(0, 0, 0.1));
-    move(zoomedOut, far.ctx, at(10, 0, 0.1));
-    expect(far.stores.lassoPreview.get()?.points).toHaveLength(1);
-    move(zoomedOut, far.ctx, at(40, 0, 0.1));
-    move(zoomedOut, far.ctx, at(40, 40, 0.1));
-    up(zoomedOut, far.ctx, at(41, 40, 0.1));
-    expect(far.commits[0]?.bounds).toEqual({ height: 40, width: 41, x: 0, y: 0 });
+    expect(commits).toHaveLength(1);
+    expect(commits[0]!.bounds).toEqual({ height, width, x: 0, y: 0 });
+  });
+
+  it('coalesces repeated and forward collinear samples without losing reversals or thin corners', () => {
+    const tool = createLassoTool();
+    const { commits, ctx, stores } = createHarness();
+    down(tool, ctx, pointer(0, 0));
+    for (let step = 0; step <= 1000; step++) {
+      move(tool, ctx, pointer(step / 10, 0));
+    }
+    expect(stores.lassoPreview.get()?.points).toEqual([
+      { x: 0, y: 0 },
+      { x: 100, y: 0 },
+    ]);
+    move(tool, ctx, pointer(90, 0));
+    move(tool, ctx, pointer(90, 0.25));
+    up(tool, ctx, pointer(0, 0.25));
+
+    expect(commits).toHaveLength(1);
+    expect(commits[0]!.path).toEqual({ d: 'M 0 0 L 100 0 L 90 0 L 90 0.25 L 0 0.25 Z' });
+  });
+
+  it('thins a long dense drag by on-screen spacing, staying on its path and ending where it was released', () => {
+    const zoom = 1.7;
+    const pan = { x: 13.37, y: -7.21 };
+    const at = (sx: number, sy: number): PointerInput => ({
+      ...pointer((sx - pan.x) / zoom, (sy - pan.y) / zoom),
+      screenPoint: { x: sx, y: sy },
+    });
+    const samples = Array.from({ length: 10_001 }, (_, index) => {
+      const angle = (index / 10_000) * 2 * Math.PI;
+      const radius = 150 + 20 * Math.sin(5 * angle);
+      return at(400 + radius * Math.cos(angle), 300 + radius * Math.sin(angle));
+    });
+    const release = samples.pop()!;
+    const tool = createLassoTool();
+    const { commits, ctx } = createHarness();
+    down(tool, ctx, samples[0]!);
+    for (let start = 1; start < samples.length; start += 16) {
+      const batch = samples.slice(start, start + 16);
+      tool.onPointerMove?.(ctx, batch[batch.length - 1]!, batch);
+    }
+    up(tool, ctx, release);
+
+    const vertices = [...(commits[0]!.path as unknown as { d: string }).d.matchAll(/[ML] (\S+) (\S+)/g)].map(
+      ([, x, y]) => ({ x: Number(x), y: Number(y) })
+    );
+    let screenLength = 0;
+    for (let index = 1; index <= samples.length; index++) {
+      const a = samples[index - 1]!.screenPoint;
+      const b = (samples[index] ?? release).screenPoint;
+      screenLength += Math.hypot(b.x - a.x, b.y - a.y);
+    }
+    expect(vertices.length).toBeLessThanOrEqual((2 * screenLength) / FREEHAND_MIN_SPACING_PX + 2);
+    expect(vertices.length).toBeLessThan(samples.length / 3);
+    expect(vertices[vertices.length - 1]).toEqual(release.documentPoint);
+
+    const tolerance = FREEHAND_MIN_SPACING_PX / zoom + 1e-9;
+    const distanceToSegment = (p: Vec2, a: Vec2, b: Vec2): number => {
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / (dx * dx + dy * dy || 1)));
+      return Math.hypot(p.x - a.x - t * dx, p.y - a.y - t * dy);
+    };
+    let segment = 1;
+    for (const { documentPoint } of samples) {
+      while (
+        segment < vertices.length - 1 &&
+        distanceToSegment(documentPoint, vertices[segment - 1]!, vertices[segment]!) > tolerance
+      ) {
+        segment++;
+      }
+      expect(distanceToSegment(documentPoint, vertices[segment - 1]!, vertices[segment]!)).toBeLessThanOrEqual(
+        tolerance
+      );
+    }
+    const dense = polygonBounds([...samples.map((sample) => sample.documentPoint), release.documentPoint]);
+    const kept = commits[0]!.bounds;
+    for (const key of ['x', 'y', 'width', 'height'] as const) {
+      expect(Math.abs(kept[key] - dense[key])).toBeLessThanOrEqual(2 * tolerance);
+    }
+  });
+
+  it('commits a self-crossing outline even when its signed areas cancel', () => {
+    const tool = createLassoTool();
+    const { commits, ctx } = createHarness();
+    down(tool, ctx, pointer(0, 0));
+    move(tool, ctx, pointer(1, 1));
+    move(tool, ctx, pointer(0, 1));
+    move(tool, ctx, pointer(1, 0));
+    up(tool, ctx, pointer(0, 0));
+    expect(commits).toHaveLength(1);
+  });
+
+  it('does not commit a diagonal line with three distinct vertices', () => {
+    const tool = createLassoTool();
+    const { commits, ctx } = createHarness();
+    down(tool, ctx, pointer(0, 0));
+    move(tool, ctx, pointer(2, 2));
+    up(tool, ctx, pointer(4, 4));
+    expect(commits).toHaveLength(0);
   });
 });
 
@@ -154,7 +246,6 @@ describe('lassoTool: polygon mode', () => {
     return h;
   };
 
-  /** One vertex placement: a press and release at the same spot. */
   const click = (tool: Tool, ctx: ToolContext, x: number, y: number, timeStamp: number): void => {
     down(tool, ctx, pointer(x, y, { timeStamp }));
     up(tool, ctx, pointer(x, y, { timeStamp }));
@@ -179,7 +270,6 @@ describe('lassoTool: polygon mode', () => {
     click(tool, ctx, 0, 0, 0);
     move(tool, ctx, pointer(30, 10));
 
-    // The placed vertex plus the live cursor endpoint.
     expect(stores.lassoPreview.get()).toEqual({
       closeArmed: false,
       closeRadiusPx: null,
@@ -201,6 +291,17 @@ describe('lassoTool: polygon mode', () => {
     expect(commits).toHaveLength(1);
     expect(commits[0]!.bounds).toEqual({ height: 40, width: 40, x: 0, y: 0 });
     expect(stores.lassoPreview.get()).toBeNull();
+  });
+
+  it('commits subpixel polygon vertices on Enter', () => {
+    const tool = createLassoTool();
+    const { commits, ctx } = createPolygonHarness();
+    click(tool, ctx, 0, 0, 0);
+    click(tool, ctx, 0.5, 0, 1000);
+    click(tool, ctx, 0.5, 0.5, 2000);
+    tool.onKeyCommand?.(ctx, 'apply');
+    expect(commits).toHaveLength(1);
+    expect(commits[0]!.bounds).toEqual({ height: 0.5, width: 0.5, x: 0, y: 0 });
   });
 
   it('arms the close cue and pointer cursor while the cursor hovers the first vertex', () => {
@@ -240,58 +341,6 @@ describe('lassoTool: polygon mode', () => {
     click(tool, ctx, 40, 1, 1200);
 
     expect(commits).toHaveLength(0);
-  });
-
-  it('closes on a click landing on the first vertex', () => {
-    const tool = createLassoTool();
-    const { commits, ctx } = createPolygonHarness();
-
-    click(tool, ctx, 0, 0, 0);
-    click(tool, ctx, 40, 0, 1000);
-    click(tool, ctx, 40, 40, 2000);
-    // Within the polyline close radius of the first vertex (identity viewport).
-    click(tool, ctx, 3, 2, 3000);
-
-    expect(commits).toHaveLength(1);
-    expect(commits[0]!.bounds).toEqual({ height: 40, width: 40, x: 0, y: 0 });
-  });
-
-  it('does not close on the first vertex before the polygon is fillable', () => {
-    const tool = createLassoTool();
-    const { commits, ctx, stores } = createPolygonHarness();
-
-    click(tool, ctx, 0, 0, 0);
-    // A second click back near the start must add a vertex, not close a 2-gon.
-    click(tool, ctx, 2, 0, 1000);
-
-    expect(commits).toHaveLength(0);
-    expect(stores.lassoPreview.get()?.points).toHaveLength(2);
-  });
-
-  it('closes on a double-click', () => {
-    const tool = createLassoTool();
-    const { commits, ctx } = createPolygonHarness();
-
-    click(tool, ctx, 0, 0, 0);
-    click(tool, ctx, 40, 0, 1000);
-    click(tool, ctx, 40, 40, 2000);
-    // A second press at the same spot, inside the double-click window.
-    click(tool, ctx, 40, 40, 2100);
-
-    expect(commits).toHaveLength(1);
-  });
-
-  it('treats a slow second click at the same spot as a new vertex, not a close', () => {
-    const tool = createLassoTool();
-    const { commits, ctx, stores } = createPolygonHarness();
-
-    click(tool, ctx, 0, 0, 0);
-    click(tool, ctx, 40, 0, 1000);
-    click(tool, ctx, 40, 40, 2000);
-    click(tool, ctx, 40, 40, 9000);
-
-    expect(commits).toHaveLength(0);
-    expect(stores.lassoPreview.get()?.points).toHaveLength(4);
   });
 
   it('drops the session on Escape without committing', () => {

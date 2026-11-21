@@ -66,8 +66,8 @@ export interface DocumentModelContext {
 }
 
 /**
- * Pure document lookup, tree facts, semantic leaves and prepared edits. Indexes cache by forest identity; leaves
- * retain identity while layer and ancestor-effective state match. Returned sequences define ordering.
+ * Pure document lookup, tree facts, semantic leaves and prepared edits. Indexes cache by forest identity; leaves retain
+ * identity while layer and ancestor-effective state match. Returned sequences define ordering.
  */
 export interface CanvasDocumentModel {
   readonly document: CanvasDocumentContractV3;
@@ -267,7 +267,12 @@ export const lookupLayerBelow = (document: DocumentView, id: string): CanvasLaye
   return below && !isGroupNode(below) ? below : null;
 };
 
-/** Merge-down joins a raster leaf with the raster leaf directly below it under the same parent. */
+/**
+ * Merge-down joins a raster leaf with the raster leaf directly below it under the same parent. A refusal says which:
+ * nothing below at the top level (`no-layer-below`) or in a group (`bottom-of-group`), a group below (`group-below`,
+ * naming it), a layer of either pair that is not paint or image pixels (`not-mergeable`), a lock (naming each locked
+ * node), or a disabled layer or ancestor group (`disabled`, naming it).
+ */
 export const mergeDownEligibility = (document: CanvasDocumentContractV3, upperId: string): MergeDownEligibility => {
   const index = getDocumentIndex(document);
   const upper = index.byId.get(upperId);
@@ -277,10 +282,18 @@ export const mergeDownEligibility = (document: CanvasDocumentContractV3, upperId
   if (isGroupNode(upper.node) || upper.stack !== 'raster') {
     return { actual: upper.node.type, expected: ['raster'], status: 'wrong-type' };
   }
-  const lower = lookupLayerBelow(document, upperId);
-  if (!lower) {
-    return { reason: 'no-layer-below', status: 'invalid-target', targetId: upperId };
+  const sibling = childrenAt(index, upper.stack, upper.parentId)?.[upper.siblingIndex + 1];
+  if (!sibling) {
+    return {
+      reason: upper.parentId === null ? 'no-layer-below' : 'bottom-of-group',
+      status: 'invalid-target',
+      targetId: upperId,
+    };
   }
+  if (isGroupNode(sibling)) {
+    return { reason: 'group-below', status: 'invalid-target', targetId: sibling.id };
+  }
+  const lower = sibling;
   const pair = [upper.node, lower];
   const unmergeable = pair.find((layer) => layer.type !== 'raster' || !isPixelBackedLayer(layer));
   if (unmergeable) {
@@ -293,9 +306,12 @@ export const mergeDownEligibility = (document: CanvasDocumentContractV3, upperId
   if (locked.length > 0) {
     return { ids: locked, status: 'locked' };
   }
-  const disabled = pair.find((layer) => !isLayerContributing(layer));
-  if (disabled || !upper.ancestorsEnabled) {
-    return { reason: 'not-mergeable', status: 'invalid-target', targetId: disabled?.id ?? upperId };
+  // Both share the upper layer's ancestors, so a disabled group gates the pair; name that group.
+  const disabledId =
+    upper.path.find((id) => !index.byId.get(id)!.node.isEnabled) ??
+    pair.find((layer) => !isLayerContributing(layer))?.id;
+  if (disabledId) {
+    return { reason: 'disabled', status: 'invalid-target', targetId: disabledId };
   }
   return { lowerId: lower.id, status: 'eligible', upperId };
 };
@@ -303,8 +319,8 @@ export const mergeDownEligibility = (document: CanvasDocumentContractV3, upperId
 const unique = <T>(values: readonly T[]): T[] => [...new Set(values)];
 
 /**
- * Whether two patches name the same fields, descending only into the partial containers listed in
- * `containers` as dotted paths; every other value is compared as a whole.
+ * Whether two patches name the same fields, descending only into the partial containers listed in `containers` as
+ * dotted paths; every other value is compared as a whole.
  */
 const sameKeys = (
   left: Record<string, unknown>,
@@ -410,9 +426,9 @@ interface SiblingRun {
 }
 
 /**
- * Splits `entries` (outermost, document order) into maximal runs of adjacent siblings, each anchored
- * to the nearest siblings that are not among `entries`. Applying the runs top first puts every
- * node back exactly where it was, whether they are being restored after a removal or a move.
+ * Splits `entries` (outermost, document order) into maximal runs of adjacent siblings, each anchored to the nearest
+ * siblings that are not among `entries`. Applying the runs top first puts every node back exactly where it was, whether
+ * they are being restored after a removal or a move.
  */
 const captureRestoreRuns = (
   index: CanvasDocumentIndex,
@@ -639,7 +655,7 @@ export const createDocumentModel = (
     const removedSet = new Set(removedIds);
     const remaining = { ...stacks };
     for (const stack of new Set(outer.map((entry) => entry.stack))) {
-      remaining[stack] = stacks[stack]
+      remaining[stack] = (stacks[stack] ?? [])
         .filter((node) => !removedSet.has(node.id))
         .map((node) => stripRemoved(node, removedSet));
     }
@@ -668,7 +684,13 @@ export const createDocumentModel = (
     );
   };
 
-  const prepareDuplicate = (command: Extract<DocumentCommand, { type: 'duplicate' }>): PrepareEditResult => {
+  /**
+   * Every refusal a duplicate can meet from the document, decided before an id is minted: asking is free of side
+   * effects and costs no copy. Only a `createId` that returns an id the document holds is refused later.
+   */
+  const checkDuplicate = (
+    command: Extract<DocumentCommand, { type: 'duplicate' }>
+  ): DocumentRefusal | { outer: CanvasNodeEntry[] } => {
     const ids = unique(command.ids);
     if (ids.length === 0) {
       return { operation: 'duplicate nothing', status: 'unsupported' };
@@ -678,11 +700,12 @@ export const createDocumentModel = (
       return found;
     }
     const outer = outermostNodes(index, ids);
-    const locked = unique(outer.flatMap((entry) => lockedWithin(index, entry)));
+    // A copy lands beside its source, so only a locked ancestor refuses it: copying a locked node (or one holding
+    // locked nodes) inserts nothing into a locked subtree, and the copy keeps its locks.
+    const locked = unique(outer.flatMap((entry) => lockedAlong(index, entry.path)));
     if (locked.length > 0) {
       return { ids: locked, status: 'locked' };
     }
-    // Every refusal is decided before an id is minted, so asking is free of side effects.
     let budgeted = 0;
     for (const entry of outer) {
       const refusal = limits([entry.node], entry.path.length, budgeted);
@@ -691,6 +714,16 @@ export const createDocumentModel = (
       }
       budgeted += collectSubtree(entry.node).length;
     }
+    return { outer };
+  };
+
+  // Production duplicates commit through the engine (pixel copies), which asks `refusalFor`; model tests use this edit.
+  const prepareDuplicate = (command: Extract<DocumentCommand, { type: 'duplicate' }>): PrepareEditResult => {
+    const checked = checkDuplicate(command);
+    if ('status' in checked) {
+      return checked;
+    }
+    const { outer } = checked;
     const add: CanvasNodeInsertion[] = [];
     const createdIds: string[] = [];
     const rootIds: string[] = [];
@@ -1098,7 +1131,7 @@ export const createDocumentModel = (
       touchedIds.push(group.id, ...childIds);
       expected = {
         ...expected,
-        [entry.stack]: dissolve(expected[entry.stack], dissolved),
+        [entry.stack]: dissolve(expected[entry.stack] ?? [], dissolved),
       };
     }
     for (const key of unique(
@@ -1142,7 +1175,7 @@ export const createDocumentModel = (
       if (unsupported) {
         return {
           actual: 'group',
-          expected: ['raster', 'control', 'regional_guidance', 'inpaint_mask'],
+          expected: ['raster', 'control', 'regional_guidance', 'inpaint_mask', 'vector'],
           status: 'wrong-type',
         };
       }
@@ -1189,7 +1222,7 @@ export const createDocumentModel = (
     if (isGroupNode(entry.node)) {
       return {
         actual: 'group',
-        expected: ['raster', 'control', 'regional_guidance', 'inpaint_mask'],
+        expected: ['raster', 'control', 'regional_guidance', 'inpaint_mask', 'vector'],
         status: 'wrong-type',
       };
     }
@@ -1518,7 +1551,7 @@ export const createDocumentModel = (
       return node && !isGroupNode(node) ? node : null;
     },
     getNode: (id) => index.byId.get(id)?.node ?? null,
-    getStack: (kind) => stacks[kind],
+    getStack: (kind) => stacks[kind] ?? [],
     prepare: (command) => {
       switch (command.type) {
         case 'insert':
@@ -1566,7 +1599,9 @@ export const createDocumentModel = (
               ? checkUngroup(command)
               : command.type === 'remove'
                 ? checkRemove(command)
-                : null;
+                : command.type === 'duplicate'
+                  ? checkDuplicate(command)
+                  : null;
       if (checked) {
         return 'status' in checked && checked.status !== 'unchanged' ? (checked as DocumentRefusal) : null;
       }

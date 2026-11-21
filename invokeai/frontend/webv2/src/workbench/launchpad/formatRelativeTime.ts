@@ -1,10 +1,6 @@
 import i18next from 'i18next';
 
-/**
- * Compact "Edited 5 minutes ago" timestamps for the Home grid, the Open Project dialog and the notification list, in
- * the active language. Expects ISO timestamps (the project library normalizes the backend's SQLite format at its
- * boundary).
- */
+/** Compact relative timestamps in the active language; expects ISO strings. */
 
 const DIVISIONS: { amount: number; unit: Intl.RelativeTimeFormatUnit }[] = [
   { amount: 60, unit: 'second' },

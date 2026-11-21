@@ -11,8 +11,7 @@ import { absolutizeApiUrl } from '@platform/transport/http';
 import { getClientStateValue, setClientStateValue } from './api';
 
 /**
- * The cover index is nonauthoritative. Load it before replacing the whole blob; failed reads must not unlock
- * writes.
+ * The cover index is nonauthoritative. Load it before replacing the whole blob; failed reads must not unlock writes.
  */
 
 export const PROJECT_COVERS_KEY = 'webv2:project-covers';

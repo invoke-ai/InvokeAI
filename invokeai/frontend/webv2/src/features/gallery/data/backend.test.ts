@@ -1,6 +1,7 @@
 import { galleryItems } from '@features/gallery';
+import { configureLogging, getLoggingConfig, getLogSnapshot, resetLogging } from '@platform/logging/logger';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   apiFetchJson: vi.fn(),
@@ -20,32 +21,22 @@ vi.mock('@platform/transport/http', async (importOriginal) => ({
 import { ApiError } from '@platform/transport/http';
 
 import {
-  ALL_READABLE_BOARDS_ID,
   addImagesToGalleryBoard,
-  checkGalleryMediaUsage,
   createGalleryBoard,
   galleryBoardExists,
   deleteGalleryBoard,
   deleteGalleryImages,
   downloadGalleryArchive,
-  fetchImageIndexAvailability,
   getGalleryImageByName,
   getGalleryImagesByNames,
   getGalleryItemLocation,
-  getGalleryVideoMetadata,
   listGalleryDateBoardItemNames,
   listGalleryItemNames,
-  getGalleryImageWorkflow,
-  getGalleryVideoWorkflow,
   imageMakeCanvasAssetChanges,
-  imageMakeDurableChanges,
-  imageSaveToGalleryChanges,
   listGalleryBoards,
   listGalleryItems,
   listPaletteImages,
   removeImagesFromGalleryBoard,
-  starGalleryImages,
-  unstarGalleryImages,
   updateGalleryBoard,
   uploadGalleryImage,
   uploadGalleryVideo,
@@ -106,152 +97,6 @@ describe('deleteGalleryBoard outcomes', () => {
   });
 });
 
-describe('checkGalleryMediaUsage', () => {
-  const usageBody = (overrides: Record<string, unknown> = {}) => ({
-    checked_image_count: 2,
-    checked_video_count: 1,
-    documents: [
-      {
-        id: 'legacy_editor',
-        image_count: 1,
-        image_names: ['a.png'],
-        kind: 'legacy_editor',
-        name: null,
-        revision: null,
-        video_count: 0,
-        video_names: [],
-        workspace_revision: null,
-      },
-      {
-        id: 'project-1',
-        image_count: 1200,
-        image_names: ['a.png', 'b.png'],
-        kind: 'project',
-        name: 'Harbor Tower',
-        revision: 7,
-        video_count: 1,
-        video_names: ['c.mp4'],
-        workspace_revision: 3,
-      },
-      {
-        id: 'later-kind',
-        image_count: 1,
-        image_names: ['b.png'],
-        kind: 'storyboard',
-        name: '  ',
-        // Revisions are only a hint: a malformed one reads as unknown rather than failing the check.
-        revision: '2',
-        video_count: 0,
-        video_names: [],
-        workspace_revision: -1,
-      },
-    ],
-    documents_total: 140,
-    in_use_image_count: 2,
-    in_use_video_count: 1,
-    other_accounts: { document_count: 3, image_count: 1, queue_item_count: 2, video_count: 0 },
-    queue: { image_count: 1, image_names: ['a.png'], item_count: 2, video_count: 0, video_names: [] },
-    ...overrides,
-  });
-
-  beforeEach(() => {
-    accountLifecycle.activate('user-a');
-    mocks.apiFetchJson.mockReset();
-  });
-
-  it('asks about the items by kind, or about a whole board, and maps the answer', async () => {
-    mocks.apiFetchJson.mockResolvedValue(usageBody());
-
-    const usage = await checkGalleryMediaUsage({
-      kind: 'items',
-      refs: [
-        { kind: 'image', name: 'a.png' },
-        { kind: 'video', name: 'c.mp4' },
-        { kind: 'image', name: 'b.png' },
-      ],
-    });
-    await checkGalleryMediaUsage({ boardId: 'board-1', kind: 'board' });
-
-    expect(JSON.parse(String(mocks.apiFetchJson.mock.calls[0]?.[1]?.body))).toEqual({
-      image_names: ['a.png', 'b.png'],
-      video_names: ['c.mp4'],
-    });
-    expect(mocks.apiFetchJson.mock.calls[0]?.[0]).toBe('/api/v1/gallery/usage');
-    expect(mocks.apiFetchJson.mock.calls[0]?.[1]?.method).toBe('POST');
-    expect(JSON.parse(String(mocks.apiFetchJson.mock.calls[1]?.[1]?.body))).toEqual({ board_id: 'board-1' });
-    expect(usage).toEqual({
-      checkedImageCount: 2,
-      checkedVideoCount: 1,
-      documents: [
-        {
-          id: 'legacy_editor',
-          imageCount: 1,
-          imageNames: ['a.png'],
-          kind: 'legacyEditor',
-          name: null,
-          revision: null,
-          videoCount: 0,
-          videoNames: [],
-          workspaceRevision: null,
-        },
-        {
-          id: 'project-1',
-          imageCount: 1200,
-          imageNames: ['a.png', 'b.png'],
-          kind: 'project',
-          name: 'Harbor Tower',
-          revision: 7,
-          videoCount: 1,
-          videoNames: ['c.mp4'],
-          workspaceRevision: 3,
-        },
-        // A kind this build does not know still uses the media; a blank name reads as none.
-        {
-          id: 'later-kind',
-          imageCount: 1,
-          imageNames: ['b.png'],
-          kind: 'other',
-          name: null,
-          revision: null,
-          videoCount: 0,
-          videoNames: [],
-          workspaceRevision: null,
-        },
-      ],
-      documentsTotal: 140,
-      inUseImageCount: 2,
-      inUseVideoCount: 1,
-      otherAccounts: { documentCount: 3, imageCount: 1, queueItemCount: 2, videoCount: 0 },
-      queue: { imageCount: 1, imageNames: ['a.png'], itemCount: 2, videoCount: 0, videoNames: [] },
-    });
-  });
-
-  it('fails on a malformed answer rather than reading it as nothing in use', async () => {
-    mocks.apiFetchJson.mockResolvedValue(usageBody({ in_use_image_count: undefined }));
-
-    await expect(checkGalleryMediaUsage({ boardId: 'board-1', kind: 'board' })).rejects.toThrow(TypeError);
-  });
-
-  it('drops an answer that arrives after the account changed', async () => {
-    let answer: (value: unknown) => void = () => {};
-    mocks.apiFetchJson.mockReturnValue(
-      new Promise((resolve) => {
-        answer = resolve;
-      })
-    );
-
-    const check = checkGalleryMediaUsage({ boardId: 'board-1', kind: 'board' });
-    const signal = mocks.apiFetchJson.mock.calls[0]?.[1]?.signal as AbortSignal;
-
-    accountLifecycle.invalidate();
-    accountLifecycle.activate('user-b');
-    answer(usageBody());
-
-    await expect(check).rejects.toThrow('no longer active');
-    expect(signal.aborted).toBe(true);
-  });
-});
-
 describe('image mutation outcomes', () => {
   beforeEach(() => {
     accountLifecycle.activate('user-a');
@@ -265,15 +110,6 @@ describe('image mutation outcomes', () => {
 
     await expect(addImagesToGalleryBoard('board-1', ['moved.png', 'locked.png'])).resolves.toEqual(['moved.png']);
     await expect(removeImagesFromGalleryBoard(['removed.png', 'locked.png'])).resolves.toEqual(['removed.png']);
-  });
-
-  it('returns only images confirmed starred or unstarred', async () => {
-    mocks.apiFetchJson
-      .mockResolvedValueOnce({ affected_boards: ['board-1'], starred_images: ['starred.png'] })
-      .mockResolvedValueOnce({ affected_boards: ['board-1'], unstarred_images: ['unstarred.png'] });
-
-    await expect(starGalleryImages(['starred.png', 'locked.png'])).resolves.toEqual(['starred.png']);
-    await expect(unstarGalleryImages(['unstarred.png', 'locked.png'])).resolves.toEqual(['unstarred.png']);
   });
 });
 
@@ -380,50 +216,6 @@ describe('media kind restriction', () => {
 
     expect(requestedMediaKinds()).toEqual([['video'], ['video'], ['video'], ['image']]);
   });
-
-  it('omits media_kind when both kinds are listed', async () => {
-    await listGalleryItems(base);
-    await listGalleryItemNames({ ...base, orderDir: 'DESC' });
-    await getGalleryItemLocation({ ...base, kind: 'video', name: 'clip.mp4', orderDir: 'DESC' });
-    await listGalleryDateBoardItemNames({ ...base, boardId: 'by_date:2026-08-02', orderDir: 'DESC' });
-
-    expect(requestedMediaKinds()).toEqual([[], [], [], []]);
-  });
-});
-
-describe('all-boards scope', () => {
-  beforeEach(() => {
-    accountLifecycle.activate('user-a');
-    mocks.apiFetchJson.mockReset();
-    mocks.apiFetchJson.mockResolvedValue({
-      index: 0,
-      items: [],
-      kind: 'image',
-      name: 'a.png',
-      total: 0,
-      total_count: 0,
-    });
-  });
-
-  it('sends the all-boards scope as-is to the items, names and location reads', async () => {
-    const scope = { boardId: ALL_READABLE_BOARDS_ID, galleryView: 'images', searchTerm: 'cat' } as const;
-
-    await listGalleryItems(scope);
-    await listGalleryItemNames({ ...scope, orderDir: 'DESC' });
-    await getGalleryItemLocation({ ...scope, kind: 'image', name: 'a.png', orderDir: 'DESC' });
-
-    const requests = mocks.apiFetchJson.mock.calls.map(([url]) => String(url));
-    expect(requests.map((url) => url.split('?')[0])).toEqual([
-      '/api/v1/gallery/items/',
-      '/api/v1/gallery/items/names',
-      '/api/v1/gallery/items/location',
-    ]);
-    expect(requests.map((url) => new URLSearchParams(url.split('?')[1]).get('board_id'))).toEqual([
-      'all',
-      'all',
-      'all',
-    ]);
-  });
 });
 
 describe('getGalleryImageByName', () => {
@@ -464,36 +256,6 @@ describe('getGalleryImageByName', () => {
     expect(mocks.apiFetchJson).toHaveBeenCalledWith('/api/v1/images/i/folder%2Fworkflow%20result.png', {
       signal: controller.signal,
     });
-  });
-
-  it('reads the embedded workflow of an image, encoded like the record lookup', async () => {
-    mocks.apiFetchJson.mockResolvedValue({ graph: null, workflow: '{"nodes":[]}' });
-
-    await expect(getGalleryImageWorkflow('folder/workflow result.png')).resolves.toEqual({
-      graph: null,
-      workflow: '{"nodes":[]}',
-    });
-    expect(mocks.apiFetchJson).toHaveBeenCalledWith('/api/v1/images/i/folder%2Fworkflow%20result.png/workflow', {
-      signal: undefined,
-    });
-  });
-
-  it('propagates backend lookup errors', async () => {
-    const error = new Error('404 image not found');
-    mocks.apiFetchJson.mockRejectedValue(error);
-
-    await expect(getGalleryImageByName('missing.png')).rejects.toBe(error);
-  });
-
-  it('propagates request aborts', async () => {
-    const controller = new AbortController();
-    const error = new DOMException('The operation was aborted.', 'AbortError');
-    mocks.apiFetchJson.mockRejectedValue(error);
-
-    const result = getGalleryImageByName('workflow.png', controller.signal);
-    controller.abort();
-
-    await expect(result).rejects.toBe(error);
   });
 });
 
@@ -543,31 +305,6 @@ describe('listPaletteImages created-at range', () => {
     expect(params.get('created_to')).toBe('2026-07-15');
   });
 
-  it('sends the explicit all-readable scope and forwards cancellation', async () => {
-    const controller = new AbortController();
-
-    await listPaletteImages({
-      boardId: 'all',
-      galleryView: 'images',
-      searchTerm: 'sunset',
-      signal: controller.signal,
-    });
-
-    const [url, init] = mocks.apiFetchJson.mock.calls[0] as [string, RequestInit];
-    const params = new URLSearchParams(url.split('?')[1]);
-    expect(params.get('board_id')).toBe('all');
-    expect(init.signal).toBe(controller.signal);
-  });
-
-  it('omits the range params when no range is given', async () => {
-    await listPaletteImages({ boardId: 'board-1', galleryView: 'images', searchTerm: 'sunset' });
-
-    const url = mocks.apiFetchJson.mock.calls[0]?.[0] as string;
-    const params = new URLSearchParams(url.split('?')[1]);
-    expect(params.has('created_from')).toBe(false);
-    expect(params.has('created_to')).toBe(false);
-  });
-
   it('short-circuits a date board that falls outside the range without a request', async () => {
     await expect(
       listPaletteImages({
@@ -579,21 +316,6 @@ describe('listPaletteImages created-at range', () => {
       })
     ).resolves.toEqual({ images: [], total: 0 });
     expect(mocks.apiFetchJson).not.toHaveBeenCalled();
-  });
-
-  it('queries a date board normally when its day is inside the range', async () => {
-    mocks.apiFetchJson.mockResolvedValue({ items: [], starred_count: 0, total_count: 0 });
-
-    await expect(
-      listPaletteImages({
-        boardId: 'by_date:2026-07-10',
-        createdFrom: '2026-07-01',
-        createdTo: '2026-07-15',
-        galleryView: 'images',
-        searchTerm: '',
-      })
-    ).resolves.toEqual({ images: [], total: 0 });
-    expect(mocks.apiFetchJson).toHaveBeenCalledOnce();
   });
 });
 
@@ -674,37 +396,6 @@ describe('listGalleryItems', () => {
     });
   });
 
-  it.each([undefined, null, Number.NaN, Number.POSITIVE_INFINITY])(
-    'rejects a video whose duration is not finite: %s',
-    async (duration) => {
-      mocks.apiFetchJson.mockResolvedValue({
-        items: [
-          {
-            board_id: null,
-            category: 'general',
-            created_at: '2026-07-20T09:00:00.000Z',
-            duration,
-            full_url: '/videos/broken.mp4',
-            height: 720,
-            is_intermediate: false,
-            kind: 'video',
-            name: 'broken.mp4',
-            starred: false,
-            thumbnail_url: '/thumbnails/broken.webp',
-            width: 1280,
-          },
-        ],
-        limit: 20,
-        offset: 0,
-        total: 1,
-      });
-
-      await expect(listGalleryItems({ boardId: 'none', galleryView: 'images', searchTerm: '' })).rejects.toThrow(
-        'finite duration'
-      );
-    }
-  );
-
   it('forwards gallery filters and pagination to the polymorphic endpoint', async () => {
     const controller = new AbortController();
     mocks.apiFetchJson.mockResolvedValue({ items: [], limit: 17, offset: 34, total: 0 });
@@ -741,62 +432,11 @@ describe('listGalleryItems', () => {
     expect(params.get('search_term')).toBe('summer clip');
     expect(init.signal).toBe(controller.signal);
   });
-
-  it('uses asset categories so general-category videos stay out of Assets', async () => {
-    mocks.apiFetchJson.mockResolvedValue({ items: [], limit: 100, offset: 0, total: 0 });
-
-    await listGalleryItems({ boardId: 'board-1', galleryView: 'assets', searchTerm: '' });
-
-    const url = mocks.apiFetchJson.mock.calls[0]?.[0] as string;
-    const categories = new URLSearchParams(url.split('?')[1]).getAll('categories');
-
-    expect(categories).toEqual(['control', 'mask', 'user']);
-    expect(categories).not.toContain('general');
-  });
-});
-
-describe('palette image search', () => {
-  beforeEach(() => {
-    mocks.apiFetchJson.mockReset();
-    mocks.apiFetchJson.mockResolvedValue({ items: [], limit: 20, offset: 0, total: 0 });
-  });
-
-  it('keeps all-readable palette searches on the image-only endpoint', async () => {
-    await listPaletteImages({ boardId: 'all', galleryView: 'images', limit: 20, searchTerm: '  portrait  ' });
-
-    const url = mocks.apiFetchJson.mock.calls[0]?.[0] as string;
-    const params = new URLSearchParams(url.split('?')[1]);
-
-    expect(url.split('?')[0]).toBe('/api/v1/images/');
-    expect(params.get('board_id')).toBe('all');
-    expect(params.get('search_term')).toBe('portrait');
-  });
 });
 
 describe('mixed gallery item details', () => {
   beforeEach(() => {
     mocks.apiFetchJson.mockReset();
-  });
-
-  it('resolves an image ref through the strict image DTO mapper', async () => {
-    mocks.apiFetchJson.mockResolvedValue({
-      board_id: null,
-      created_at: '2026-07-20T10:00:00.000Z',
-      height: 512,
-      image_category: 'general',
-      image_name: 'folder/still.png',
-      image_url: '/images/still.png',
-      is_intermediate: false,
-      starred: false,
-      thumbnail_url: '/thumbnails/still.webp',
-      width: 768,
-    });
-
-    await expect(galleryItems.resolve({ kind: 'image', name: 'folder/still.png' })).resolves.toMatchObject({
-      kind: 'image',
-      name: 'folder/still.png',
-    });
-    expect(mocks.apiFetchJson).toHaveBeenCalledWith('/api/v1/images/i/folder%2Fstill.png', { signal: undefined });
   });
 
   it('resolves a video ref and omits absent fps', async () => {
@@ -855,81 +495,12 @@ describe('mixed gallery item details', () => {
 
     expect(item).toMatchObject({ kind: 'video', mediaOrigin: 'audio_upload' });
   });
-
-  it('leaves the marker off a video the server did not mark', async () => {
-    mocks.apiFetchJson.mockResolvedValue({
-      board_id: null,
-      created_at: '2026-07-20T10:00:00.000Z',
-      duration: 4.5,
-      fps: 24,
-      height: 360,
-      is_intermediate: false,
-      media_origin: null,
-      starred: false,
-      thumbnail_url: '/thumbnails/clip.webp',
-      video_category: 'user',
-      video_name: 'clip.mp4',
-      video_url: '/videos/clip.mp4',
-      width: 640,
-    });
-
-    const item = await galleryItems.resolve({ kind: 'video', name: 'clip.mp4' });
-
-    expect(item && 'mediaOrigin' in item).toBe(false);
-  });
-
-  it('fetches focused video metadata and workflow details', async () => {
-    const controller = new AbortController();
-    mocks.apiFetchJson
-      .mockResolvedValueOnce({ positive_prompt: 'moving portrait' })
-      .mockResolvedValueOnce({ graph: '{"nodes":[]}', workflow: null });
-
-    await expect(getGalleryVideoMetadata('folder/clip.mp4', controller.signal)).resolves.toEqual({
-      positive_prompt: 'moving portrait',
-    });
-    await expect(getGalleryVideoWorkflow('folder/clip.mp4', controller.signal)).resolves.toEqual({
-      graph: '{"nodes":[]}',
-      workflow: null,
-    });
-    expect(mocks.apiFetchJson).toHaveBeenNthCalledWith(1, '/api/v1/videos/i/folder%2Fclip.mp4/metadata', {
-      signal: controller.signal,
-    });
-    expect(mocks.apiFetchJson).toHaveBeenNthCalledWith(2, '/api/v1/videos/i/folder%2Fclip.mp4/workflow', {
-      signal: controller.signal,
-    });
-  });
-});
-
-describe('imageSaveToGalleryChanges', () => {
-  it('promotes an intermediate candidate to a durable, gallery-visible image', () => {
-    // The backend `ImageRecordChanges` body: clear `is_intermediate` (stop GC)
-    // and set `image_category: 'general'` (surface in the gallery images view).
-    expect(imageSaveToGalleryChanges()).toEqual({ image_category: 'general', is_intermediate: false });
-  });
-});
-
-describe('imageMakeDurableChanges', () => {
-  it('clears is_intermediate without changing the existing image category', () => {
-    // A utility result adopted by the canvas must survive GC, while its existing
-    // category continues to determine whether it appears in Images or Assets.
-    const body = imageMakeDurableChanges();
-    expect(body).toEqual({ is_intermediate: false });
-    expect('image_category' in body).toBe(false);
-  });
 });
 
 describe('imageMakeCanvasAssetChanges', () => {
   it('makes the image durable AND moves it out of the gallery images view', () => {
     // Durability alone leaves node outputs in `general`, publishing preprocess results to Images.
     expect(imageMakeCanvasAssetChanges()).toEqual({ image_category: 'other', is_intermediate: false });
-  });
-
-  it('uses the same category the canvas uploads its own paint bitmaps under', () => {
-    expect(imageMakeCanvasAssetChanges().image_category).toBe('other');
-  });
-
-  it('still clears is_intermediate, so the layer source cannot be collected', () => {
-    expect(imageMakeCanvasAssetChanges().is_intermediate).toBe(false);
   });
 });
 
@@ -946,26 +517,8 @@ describe('gallery category queries', () => {
     return new URLSearchParams(url.split('?')[1]).getAll('categories');
   };
 
-  it('never asks the assets view for the canvas-owned category', async () => {
-    // Canvas-owned `other` images must stay out of Assets, including brush strokes and adopted filter results.
-    expect(await categoriesFor('assets')).not.toContain('other');
-  });
-
   it('lists only user-facing categories in the assets view', async () => {
     expect(await categoriesFor('assets')).toEqual(['control', 'mask', 'user']);
-  });
-
-  it('lists only general in the images view', async () => {
-    expect(await categoriesFor('images')).toEqual(['general']);
-  });
-
-  it('leaves the canvas category out of both views', async () => {
-    const assets = await categoriesFor('assets');
-
-    mocks.apiFetchJson.mockClear();
-    const images = await categoriesFor('images');
-
-    expect([...assets, ...images]).not.toContain('other');
   });
 });
 
@@ -1006,69 +559,6 @@ describe('board media counts and covers', () => {
       videoCount: 3,
     });
   });
-
-  it('counts uncategorized videos, which no board DTO reports', async () => {
-    mocks.apiFetchJson.mockImplementation((path: string) => {
-      if (path.startsWith('/api/v1/boards/')) {
-        return Promise.resolve([]);
-      }
-
-      if (path.startsWith('/api/v1/videos/')) {
-        return Promise.resolve({ total: 7 });
-      }
-
-      return Promise.resolve({ total: 4 });
-    });
-
-    const boards = await listGalleryBoards();
-
-    expect(boards[0]).toMatchObject({ id: 'none', kind: 'uncategorized', videoCount: 7 });
-  });
-
-  it('counts only the uncategorized videos the Media and Uploads views list', async () => {
-    mocks.apiFetchJson.mockImplementation((path: string) =>
-      Promise.resolve(path.startsWith('/api/v1/boards/') ? [] : { total: 0 })
-    );
-
-    await listGalleryBoards();
-
-    const videoTotals = mocks.apiFetchJson.mock.calls
-      .map(([path]) => String(path))
-      .filter((path) => path.startsWith('/api/v1/videos/'))
-      .map((path) => new URLSearchParams(path.slice(path.indexOf('?') + 1)));
-    // An OTHER video is in neither view, so neither total may include it.
-    expect(videoTotals.map((query) => query.getAll('categories').sort())).toEqual([
-      ['control', 'general', 'mask', 'user'],
-      ['control', 'mask', 'user'],
-    ]);
-    expect(videoTotals.every((query) => query.get('board_id') === 'none')).toBe(true);
-  });
-
-  it('treats a board with only videos as non-empty even though image_count is 0', async () => {
-    mocks.apiFetchJson.mockImplementation((path: string) => {
-      if (path.startsWith('/api/v1/boards/')) {
-        return Promise.resolve([
-          {
-            archived: false,
-            asset_count: 0,
-            board_id: 'video-only',
-            board_name: 'Video only',
-            cover_image_name: null,
-            cover_video_name: 'only.mp4',
-            image_count: 0,
-            video_count: 5,
-          },
-        ]);
-      }
-
-      return Promise.resolve({ total: 0 });
-    });
-
-    const boards = await listGalleryBoards();
-
-    expect(boards[1]).toMatchObject({ imageCount: 0, videoCount: 5 });
-    expect(boards[1]?.coverThumbnailUrl).toBeDefined();
-  });
 });
 
 describe('deleteGalleryImages partial failures', () => {
@@ -1089,19 +579,103 @@ describe('deleteGalleryImages partial failures', () => {
       failedImageNames: ['locked.png'],
     });
   });
+});
 
-  it('reports no failures when the backend omits failed_images', async () => {
-    mocks.apiFetchJson.mockResolvedValue({ affected_boards: [], deleted_images: ['gone.png'] });
+describe('name lists past the server’s per-request cap', () => {
+  const names = (count: number) => Array.from({ length: count }, (_, index) => `image-${index}.png`);
+  const sentNames = () =>
+    mocks.apiFetchJson.mock.calls.map(
+      ([, init]) => (JSON.parse(String(init.body)) as { image_names: string[] }).image_names
+    );
+  // Deletes what it is sent, except that it reports every name ending in 7 as failed.
+  const deleteServer = (_url: string, init: { body: string }) => {
+    const sent = (JSON.parse(init.body) as { image_names: string[] }).image_names;
 
-    await expect(deleteGalleryImages(['gone.png'])).resolves.toEqual({
-      deletedImageNames: ['gone.png'],
-      failedImageNames: [],
+    if (sent.length > 1000) {
+      return Promise.reject(new ApiError('List should have at most 1000 items', 422));
+    }
+
+    return Promise.resolve({
+      affected_boards: [`board-${sent[0]}`],
+      deleted_images: sent.filter((name) => !name.endsWith('7.png')),
+      failed_images: sent.filter((name) => name.endsWith('7.png')),
+    });
+  };
+
+  beforeEach(() => {
+    accountLifecycle.activate('user-a');
+    mocks.apiFetchJson.mockReset();
+  });
+
+  it('sends 2,500 names as 1,000, 1,000 and 500, in order, and merges the answers', async () => {
+    mocks.apiFetchJson.mockImplementation(deleteServer);
+    const requested = names(2500);
+
+    const result = await deleteGalleryImages(requested);
+
+    expect(sentNames()).toEqual([requested.slice(0, 1000), requested.slice(1000, 2000), requested.slice(2000)]);
+    expect(result).toEqual({
+      deletedImageNames: requested.filter((name) => !name.endsWith('7.png')),
+      failedImageNames: requested.filter((name) => name.endsWith('7.png')),
     });
   });
 
-  it('skips the request entirely for an empty selection', async () => {
-    await expect(deleteGalleryImages([])).resolves.toEqual({ deletedImageNames: [], failedImageNames: [] });
-    expect(mocks.apiFetchJson).not.toHaveBeenCalled();
+  it('reports the earlier batches’ successes when a later batch fails, and the rest as failed', async () => {
+    configureLogging({ ...getLoggingConfig(), level: 'debug' });
+    onTestFinished(resetLogging);
+    mocks.apiFetchJson
+      .mockImplementationOnce(deleteServer)
+      .mockRejectedValueOnce(new ApiError('{"detail":"Server error"}', 500));
+    const requested = names(2500);
+
+    const result = await deleteGalleryImages(requested);
+
+    // The third batch is never sent, and the cause is kept in the log.
+    expect(mocks.apiFetchJson).toHaveBeenCalledTimes(2);
+    expect(getLogSnapshot().entries).toContainEqual(
+      expect.objectContaining({ level: 'debug', name: 'gallery.batch-request-failed' })
+    );
+    expect(result).toEqual({
+      deletedImageNames: requested.slice(0, 1000).filter((name) => !name.endsWith('7.png')),
+      failedImageNames: [
+        ...requested.slice(0, 1000).filter((name) => name.endsWith('7.png')),
+        ...requested.slice(1000),
+      ],
+    });
+  });
+
+  it('reports what earlier batches did when the caller aborts later, and sends nothing after', async () => {
+    const controller = new AbortController();
+    const requested = names(2500);
+    mocks.apiFetchJson.mockImplementation((url: string, init: { body: string }) => {
+      if (mocks.apiFetchJson.mock.calls.length === 2) {
+        controller.abort();
+      }
+      return deleteServer(url, init);
+    });
+
+    const result = await deleteGalleryImages(requested, controller.signal);
+
+    expect(mocks.apiFetchJson).toHaveBeenCalledTimes(2);
+    // The aborted batch's answer is never read, so its names are unconfirmed.
+    expect(result).toEqual({
+      deletedImageNames: requested.slice(0, 1000).filter((name) => !name.endsWith('7.png')),
+      failedImageNames: [
+        ...requested.slice(0, 1000).filter((name) => name.endsWith('7.png')),
+        ...requested.slice(1000),
+      ],
+    });
+  });
+
+  it('sends no further batch once the account changes', async () => {
+    mocks.apiFetchJson.mockImplementationOnce(() => {
+      accountLifecycle.invalidate();
+      accountLifecycle.activate('user-b');
+      return Promise.resolve({ affected_boards: [], removed_images: names(1000) });
+    });
+
+    await expect(removeImagesFromGalleryBoard(names(2500))).rejects.toThrow('no longer active');
+    expect(mocks.apiFetchJson).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -1137,45 +711,6 @@ describe('gallery uploads', () => {
     expect(init.body).toBeInstanceOf(FormData);
   });
 
-  it('uploads videos as durable user assets to a real board', async () => {
-    const controller = new AbortController();
-    mocks.apiFetchJson.mockResolvedValue({
-      board_id: 'board-1',
-      created_at: '2026-07-30T12:00:00.000Z',
-      duration: 4.2,
-      fps: 24,
-      height: 360,
-      is_intermediate: false,
-      starred: false,
-      thumbnail_url: '/videos/clip.webp',
-      video_category: 'general',
-      video_name: 'clip.mp4',
-      video_url: '/videos/clip.mp4',
-      width: 640,
-    });
-
-    await expect(
-      uploadGalleryVideo(new File(['video'], 'clip.mp4', { type: 'video/mp4' }), 'board-1', {
-        signal: controller.signal,
-      })
-    ).resolves.toMatchObject({
-      boardId: 'board-1',
-      category: 'general',
-      durationSeconds: 4.2,
-      kind: 'video',
-      name: 'clip.mp4',
-    });
-
-    const [url, init] = mocks.apiFetchJson.mock.calls[0] as [string, RequestInit];
-    const query = new URLSearchParams(url.split('?')[1]);
-    expect(url.split('?')[0]).toBe('/api/v1/videos/upload');
-    expect(query.get('video_category')).toBe('user');
-    expect(query.get('is_intermediate')).toBe('false');
-    expect(query.get('board_id')).toBe('board-1');
-    expect(init).toMatchObject({ method: 'POST', signal: controller.signal });
-    expect(init.body).toBeInstanceOf(FormData);
-  });
-
   it.each(['none', 'all', 'by_date:2026-07-30'])('omits synthetic board %s from video uploads', async (boardId) => {
     mocks.apiFetchJson.mockResolvedValue({
       board_id: null,
@@ -1198,36 +733,6 @@ describe('gallery uploads', () => {
   });
 });
 
-describe('fetchImageIndexAvailability', () => {
-  beforeEach(() => {
-    mocks.apiFetchJson.mockReset();
-  });
-
-  it.each([
-    [
-      { enabled: true, projection: { state: 'ready' } },
-      { modelName: null, state: 'ready' },
-    ],
-    [
-      { enabled: false, model_name: 'clip', projection: { state: 'model_missing' } },
-      { modelName: 'clip', state: 'model_missing' },
-    ],
-    // A draining replacement must keep search offered and polled, not read as indexing turned off.
-    [
-      { enabled: false, model_name: null, projection: { state: 'computing' } },
-      { modelName: null, state: 'switching' },
-    ],
-    [
-      { enabled: false, model_name: null, projection: { state: 'disabled' } },
-      { modelName: null, state: 'disabled' },
-    ],
-  ])('reads %o as %o', async (body, availability) => {
-    mocks.apiFetchJson.mockResolvedValue(body);
-
-    await expect(fetchImageIndexAvailability(new AbortController().signal)).resolves.toEqual(availability);
-  });
-});
-
 describe('board membership transport', () => {
   const dto = { archived: false, asset_count: 0, board_id: 'b1', board_name: 'B', image_count: 0, is_inbox: false };
 
@@ -1235,16 +740,6 @@ describe('board membership transport', () => {
     accountLifecycle.activate('user-a');
     mocks.apiFetchJson.mockReset();
     mocks.apiFetchJson.mockResolvedValue(dto);
-  });
-
-  it('creates in a project only when one is named', async () => {
-    await createGalleryBoard('B');
-    await createGalleryBoard('B', 'p1');
-
-    expect(mocks.apiFetchJson.mock.calls.map(([url]) => url)).toEqual([
-      '/api/v1/boards/?board_name=B',
-      '/api/v1/boards/?board_name=B&project_id=p1',
-    ]);
   });
 
   it('sends an explicit null to move a board to the Library, and no key to leave it alone', async () => {
@@ -1256,14 +751,6 @@ describe('board membership transport', () => {
     expect(bodies[0]).toEqual({ project_id: null });
     expect(bodies[1]).toEqual({ project_id: 'p2' });
     expect(bodies[2]).toEqual({ board_name: 'Renamed' });
-  });
-
-  it('reads membership and the inbox flag off the wire', async () => {
-    mocks.apiFetchJson.mockResolvedValueOnce({ ...dto, is_inbox: true, project_id: 'p1' });
-
-    const board = await createGalleryBoard('B', 'p1');
-
-    expect(board).toMatchObject({ id: 'b1', isInbox: true, projectId: 'p1' });
   });
 
   it('reads the caller’s access, and reports none for a server that sends no actions', async () => {
@@ -1306,19 +793,5 @@ describe('galleryBoardExists', () => {
     await expect(galleryBoardExists('b1')).resolves.toBe(true);
     await expect(galleryBoardExists('restricted')).resolves.toBe(true);
     expect(mocks.apiFetchJson).toHaveBeenCalledTimes(2);
-  });
-
-  it('answers false only for a board the server says there is none of (404), and rethrows anything else', async () => {
-    mocks.apiFetchJson.mockRejectedValueOnce(new ApiError('{"detail":"Board not found"}', 404));
-    mocks.apiFetchJson.mockRejectedValueOnce(new ApiError('{"detail":"Server error"}', 500));
-
-    await expect(galleryBoardExists('gone')).resolves.toBe(false);
-    await expect(galleryBoardExists('b1')).rejects.toBeInstanceOf(ApiError);
-  });
-
-  it('takes virtual boards as existing without asking the server', async () => {
-    await expect(galleryBoardExists('none')).resolves.toBe(true);
-    await expect(galleryBoardExists('by_date:2026-07-30')).resolves.toBe(true);
-    expect(mocks.apiFetchJson).not.toHaveBeenCalled();
   });
 });

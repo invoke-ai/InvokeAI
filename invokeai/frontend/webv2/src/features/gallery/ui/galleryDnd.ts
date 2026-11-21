@@ -30,12 +30,11 @@ export interface GalleryBoardDropResolution {
   items: GalleryItemRef[];
 }
 
-export type GalleryItemDragSource = 'gallery-grid' | 'preview-filmstrip' | 'preview-frame';
+export type GalleryItemDragSource = 'gallery-grid' | 'preview-filmstrip' | 'preview-frame' | 'workflow-current-image';
 export type GalleryItemDragId = `${GalleryItemDragSource}${string}:${GalleryItemKey}`;
 
 /**
- * `scope` separates surfaces showing the same item: dnd-kit keys drag state by
- * id, so two galleries sharing one both report as dragging.
+ * `scope` separates surfaces showing the same item: dnd-kit keys drag state by id, so both would report dragging.
  */
 export const getGalleryItemDragId = (
   item: GalleryItemRef,
@@ -44,8 +43,8 @@ export const getGalleryItemDragId = (
 ): GalleryItemDragId => `${source}${scope ? `#${scope}` : ''}:${toGalleryItemKey(item)}`;
 
 /**
- * True inside the drag context that gallery items are dragged in (the workbench shell). dnd-kit cannot say whether a
- * DndContext is mounted, and surfaces outside it (widget dialog hosts, the Launchpad) still render gallery drop targets.
+ * True inside the drag context gallery items are dragged in (the workbench shell). dnd-kit cannot say whether a
+ * DndContext is mounted, and surfaces outside it (widget dialog hosts, the Launchpad) still render drop targets.
  */
 export const GalleryDragScope = createContext(false);
 
@@ -131,8 +130,7 @@ const holdsGalleryItems = (boardKind: GalleryBoardKind): boolean =>
   boardKind === 'board' || boardKind === 'uncategorized';
 
 /**
- * Whether a board row takes dropped items: one that holds items, unless the caller may only view it. Such a board is
- * no destination at all, rather than one that refuses after the drop.
+ * Whether a board row takes dropped items: one holding items, unless view-only, which is then no destination at all.
  */
 export const acceptsGalleryItemMoves = (board: GalleryBoard): boolean =>
   holdsGalleryItems(board.kind) && canOnBoard(board, 'add_media');

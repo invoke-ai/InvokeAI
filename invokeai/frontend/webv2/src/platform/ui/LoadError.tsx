@@ -22,8 +22,8 @@ export type RetryButtonProps = Omit<ComponentProps<typeof Button>, 'children' | 
 };
 
 /**
- * "Retry" for a failed read. It stays mounted and focused while the attempt runs: `aria-disabled` and a spinner
- * rather than `disabled`, which would drop focus. An `aria-label` naming what is retried must begin with "Retry".
+ * "Retry" for a failed read. It stays mounted and focused while the attempt runs: `aria-disabled` and a spinner rather
+ * than `disabled`, which would drop focus. An `aria-label` naming what is retried must begin with "Retry".
  */
 export const RetryButton = ({ flagsFailure = false, isRetrying, onFocusLost, onRetry, ...props }: RetryButtonProps) => {
   const { t } = useTranslation();

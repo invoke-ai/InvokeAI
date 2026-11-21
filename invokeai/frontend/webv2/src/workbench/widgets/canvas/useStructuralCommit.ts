@@ -2,6 +2,7 @@ import type {
   AdjustmentRefusal,
   AdjustmentRefusalReason,
   CanvasDocumentCapability,
+  CanvasLayerEditRefusal,
   CanvasLayerBasePatch,
   CanvasLayerCapability,
   CanvasLayerConfigPatch,
@@ -54,6 +55,86 @@ const ADJUSTMENT_REFUSAL_KEYS: Record<AdjustmentRefusalReason, string> = {
 export const describeAdjustmentRefusal = (refusal: AdjustmentRefusal, t: TFunction): string =>
   t(ADJUSTMENT_REFUSAL_KEYS[refusal.reason], { name: refusal.ownerName });
 
+/** Refusal copy per status; only hidden or locked layers offer a new layer, since one above escapes the cause. */
+const LAYER_REFUSAL_KEYS: Record<
+  CanvasLayerEditRefusal['status'],
+  { message: string; offerMessage: string | null; title: string }
+> = {
+  'erase-unsupported': {
+    message: 'widgets.canvas.editRefusal.eraseUnsupportedMessage',
+    offerMessage: null,
+    title: 'widgets.canvas.editRefusal.eraseUnsupported',
+  },
+  'gradient-unsupported': {
+    message: 'widgets.canvas.editRefusal.gradientUnsupportedMessage',
+    offerMessage: null,
+    title: 'widgets.canvas.editRefusal.gradientUnsupported',
+  },
+  'layer-alpha-locked': {
+    message: 'widgets.canvas.editRefusal.alphaLockedMessage',
+    offerMessage: null,
+    title: 'widgets.canvas.editRefusal.alphaLocked',
+  },
+  'layer-display-hidden': {
+    message: 'widgets.canvas.editRefusal.displayHiddenMessage',
+    offerMessage: 'widgets.canvas.editRefusal.displayHiddenOfferMessage',
+    title: 'widgets.canvas.editRefusal.displayHidden',
+  },
+  'layer-hidden': {
+    message: 'widgets.canvas.editRefusal.hiddenMessage',
+    offerMessage: 'widgets.canvas.editRefusal.hiddenOfferMessage',
+    title: 'widgets.canvas.editRefusal.hidden',
+  },
+  'layer-loading': {
+    message: 'widgets.canvas.editRefusal.loadingMessage',
+    offerMessage: null,
+    title: 'widgets.canvas.editRefusal.loading',
+  },
+  'layer-unpaintable': {
+    message: 'widgets.canvas.editRefusal.unpaintableMessage',
+    offerMessage: null,
+    title: 'widgets.canvas.editRefusal.unpaintable',
+  },
+  'layer-locked': {
+    message: 'widgets.canvas.editRefusal.lockedMessage',
+    offerMessage: 'widgets.canvas.editRefusal.lockedOfferMessage',
+    title: 'widgets.canvas.editRefusal.locked',
+  },
+  'selection-erase-unsupported': {
+    message: 'widgets.canvas.editRefusal.selectionEraseUnsupportedMessage',
+    offerMessage: null,
+    title: 'widgets.canvas.editRefusal.selectionEraseUnsupported',
+  },
+  'transform-session': {
+    message: 'widgets.canvas.editRefusal.transformSessionMessage',
+    offerMessage: null,
+    title: 'widgets.canvas.editRefusal.transformSession',
+  },
+};
+
+/** An overlay out of generation is turned back on with its dot, not its eye; it has no new-layer offer. */
+const OVERLAY_EXCLUDED_KEYS = {
+  message: 'widgets.canvas.editRefusal.excludedMessage',
+  offerMessage: null,
+  title: 'widgets.canvas.editRefusal.excluded',
+} as const;
+
+/** The notice for a layer the active tool could not edit, with an offer only for statuses with offer wording. */
+export const describeLayerEditRefusal = (
+  refusal: CanvasLayerEditRefusal,
+  t: TFunction,
+  overlay: boolean
+): { message: string; offersNewLayer: boolean; title: string } => {
+  const keys =
+    overlay && refusal.status === 'layer-hidden' ? OVERLAY_EXCLUDED_KEYS : LAYER_REFUSAL_KEYS[refusal.status];
+  const offerMessage = refusal.canPaintNewLayer ? keys.offerMessage : null;
+  return {
+    message: t(offerMessage ?? keys.message),
+    offersNewLayer: offerMessage !== null,
+    title: t(keys.title, { name: refusal.layerName }),
+  };
+};
+
 /** Words a refusal that names its layer: an image that could not be read, or adjustments that could not run. */
 export const describeNamedRefusal = (refusal: AdjustmentRefusal | LayerUnreadable, t: TFunction): string =>
   refusal.status === 'unreadable'
@@ -82,10 +163,7 @@ export const reportMaskEdit = (
   }
 };
 
-/**
- * Explains a refused structural edit. `busy` stays silent because an in-flight operation already
- * disables the controls that could reach here; every other refusal drops the edit and says so.
- */
+/** `busy` stays silent: an in-flight operation already disables the controls that could reach here. */
 export const reportStructuralCommit = (
   result: StructuralCommitResult,
   reportError: (title: string, message: string) => void,
@@ -125,7 +203,6 @@ export const reportStructuralCommit = (
   }
 };
 
-/** The engine surface a prepared edit needs: the document model and the transaction. */
 export interface CanvasPreparedEngine {
   readonly document: Pick<CanvasDocumentCapability, 'model'>;
   readonly layers: Pick<CanvasLayerCapability, 'commitPrepared' | 'endStructuralPreview'>;
@@ -136,10 +213,7 @@ export type PreparedCommitOutcome =
   | { status: 'refused'; refusal: DocumentRefusal }
   | { status: 'unchanged' };
 
-/**
- * Prepares an edit against the engine's current model and commits it; refusals and no-ops never dispatch. A preview
- * gesture open elsewhere ends first, so the edit and its inverse capture the committed document, not the preview.
- */
+/** Prepares against the current model and commits; open previews end first so the inverse sees the commit. */
 export const commitPreparedEdit = (
   engine: CanvasPreparedEngine | null,
   label: string,
@@ -220,11 +294,7 @@ export interface CanvasPreviewEngine extends CanvasPreparedEngine {
   readonly layers: Pick<CanvasLayerCapability, 'beginStructuralPreview' | 'commitPrepared' | 'endStructuralPreview'>;
 }
 
-/**
- * Prepares the gesture's edit. `baseline` restores what the gesture previewed, for the edit's `before`; it is null
- * when nothing was previewed or the engine ended the gesture (a replay or an edit from elsewhere landed), and the
- * edit then records from the live document.
- */
+/** `baseline` restores the previewed state for `before`; null records from the live document. */
 export type PreviewCommit = (
   label: string,
   prepare: (model: CanvasDocumentModel, baseline: CanvasLayerPreviewMutation | null) => PrepareEditResult
@@ -233,10 +303,7 @@ export type PreviewCommit = (
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
-/**
- * `source` narrowed to the fields `shape` names, record by record, or undefined when `shape` names a field `source`
- * does not hold: the model refuses a `before` whose fields differ from the edit's.
- */
+/** `source` narrowed to `shape`'s fields, or undefined if one is missing: the model refuses mismatched `before`. */
 const narrowTo = (
   source: Record<string, unknown>,
   shape: Record<string, unknown>
@@ -284,10 +351,7 @@ export interface StructuralPreview {
   commit: PreviewCommit;
   /** Ends the gesture unrecorded, restoring what it previewed. */
   cancel(): void;
-  /**
-   * What the gesture's open preview session replaced, while the document carries its previews; null before the first
-   * preview and once the engine ended the session.
-   */
+  /** What the open preview session replaced; null before the first preview and once the engine ends it. */
   baseline(): CanvasLayerPreviewMutation | null;
 }
 
@@ -306,9 +370,7 @@ export const useStructuralPreview = (engine: CanvasPreviewEngine | null): Struct
       if (session?.apply(action)) {
         return true;
       }
-      // No session yet, or the engine ended it: the next session starts from the document as it is now. A session
-      // that only refused this preview (edits locked mid-gesture) stays the gesture's, holding its previews and
-      // baseline for the commit or cancel to come.
+      // No session yet, or the engine ended it: the next session starts from the document as it is now.
       sessionRef.current = engine.layers.beginStructuralPreview() ?? (session?.isActive() ? session : null);
       return sessionRef.current?.apply(action) ?? false;
     },
@@ -321,14 +383,13 @@ export const useStructuralPreview = (engine: CanvasPreviewEngine | null): Struct
       sessionRef.current = null;
       // The engine ended the gesture: a replay, a newer preview, or any edit or committed-document read from elsewhere
       // (a stroke, a selection edit, a staged result) restored its baseline. Its edit then commits like any prepared
-      // edit, and any refusal to prepare it stays silent. Often that refusal is the interrupting change's own
-      // consequence (an undone conversion, lock or removal); when it is a genuine one, the interrupted gesture's
-      // previews have already reverted on screen, so the control shows the document as it is and the value was
-      // never applied.
+      // edit, silently on refusal: usually the refusal is the interrupting change's own consequence (an undone
+      // conversion, lock or removal), and otherwise the previews have already reverted on screen, so the control shows
+      // the document as it is.
       const sessionEnded = session !== null && !session.isActive();
-      // Without a live session of its own, the edit is prepared from the committed document: a preview another
-      // gesture holds ends first, as for any one-shot commit, or its values would leak into the edit and its
-      // revision would turn stale when the commit ends it.
+      // Without a live session of its own, the edit is prepared from the committed document: a preview another gesture
+      // holds ends first, as for any one-shot commit, or its values would leak into the edit and its revision would
+      // turn stale when the commit ends it.
       if (engine && !session?.isActive()) {
         engine.layers.endStructuralPreview();
       }

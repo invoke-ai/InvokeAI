@@ -11,10 +11,7 @@ import { setPropertyGroupCollapsed, usePropertyGroupCollapsed } from './property
 
 const GROUP_HEADER_HOVER = { color: 'fg' } as const;
 
-/**
- * A row label that names itself in a tooltip while the pointer is on it and its column cuts it short. Only then is a
- * tooltip (and its portal) mounted, so the many rows of a Properties pane cost none at rest.
- */
+/** A row label with a tooltip only while hovered and truncated, so rows at rest mount no portal. */
 const PropertyRowLabel = ({ label, labelId }: { label: string; labelId?: string }) => {
   const [isTipShown, setIsTipShown] = useState(false);
   const showIfCut = useCallback((event: ReactPointerEvent<HTMLParagraphElement>) => {
@@ -36,21 +33,25 @@ const PropertyRowLabel = ({ label, labelId }: { label: string; labelId?: string 
   );
 };
 
-/**
- * Use fixed label/trailing columns around a flexible control so sliders and numbers never wrap; blank labels
- * preserve continuation alignment. `labelId` names the label so a control in the row can point
- * `aria-labelledby` at it.
- */
+/** Fixed label and trailing columns around a flexible control, so sliders and numbers never wrap. */
 export const PropertyControlRow = ({
   children,
   label,
   labelId,
+  labelWidth = '4.5rem',
 }: {
   children: ReactNode;
   label?: string;
   labelId?: string;
+  labelWidth?: string;
 }) => (
-  <Grid alignItems="center" columnGap="2" gridTemplateColumns="4.5rem minmax(0, 1fr) auto" minH="control.md" w="full">
+  <Grid
+    alignItems="center"
+    columnGap="2"
+    gridTemplateColumns={`${labelWidth} minmax(0, 1fr) auto`}
+    minH="control.md"
+    w="full"
+  >
     {label ? <PropertyRowLabel label={label} labelId={labelId} /> : <Text color="fg.muted" id={labelId} minW="0" />}
     {children}
   </Grid>
@@ -92,22 +93,20 @@ export const PropertySwitchRow = ({
   );
 };
 
-/**
- * A named group of form rows. A collapsible group renders its label as a
- * disclosure button and remembers the user's choice per group id (an override
- * store; the declared default applies until the user touches it).
- */
+/** A named group of rows; collapsible ones remember the user's override per group id. */
 export const PropertyGroup = ({
   children,
   collapsible,
   id,
   label,
+  hideLabel = false,
 }: {
   children: ReactNode;
   /** Absent means always open with a plain header. */
   collapsible?: 'open' | 'collapsed';
   id: string;
   label: string;
+  hideLabel?: boolean;
 }) => {
   const collapsed = usePropertyGroupCollapsed(id, collapsible === 'collapsed');
   const onToggle = useCallback(() => setPropertyGroupCollapsed(id, !collapsed), [collapsed, id]);
@@ -139,7 +138,7 @@ export const PropertyGroup = ({
           </Text>
         </chakra.button>
       ) : (
-        <Text color="fg.muted" fontWeight="600">
+        <Text color="fg.muted" fontWeight="600" hidden={hideLabel}>
           {label}
         </Text>
       )}
@@ -161,7 +160,7 @@ export const PropertySegmentedRow = <Value extends string>({
   disabled?: boolean;
   label: string;
   onValueChange: (value: Value) => void;
-  options: readonly { value: Value; label: string; icon?: ElementType; disabled?: boolean }[];
+  options: readonly { value: Value; label: ReactNode; icon?: ElementType; disabled?: boolean }[];
   value: Value;
 }) => {
   const handleChange = useCallback(

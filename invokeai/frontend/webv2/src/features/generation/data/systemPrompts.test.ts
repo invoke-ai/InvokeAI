@@ -61,7 +61,6 @@ describe('system prompt max_tokens', () => {
   });
 
   it('sends an explicit null on update so a cap can be cleared', async () => {
-    // Explicit null clears the value; omission preserves it.
     await updateSystemPrompt('prompt-1', { content: dto.content, maxTokens: null, name: dto.name });
 
     const body = sentBody();

@@ -6,15 +6,15 @@ import { HourglassIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 /**
- * Home shows server-wide activity outside project scope. Read the status query directly to avoid loading Queue
- * runtime, items, or the recent window for summary counts.
+ * Home shows server-wide activity outside project scope. Read the status query directly to avoid loading Queue runtime,
+ * items, or the recent window for summary counts.
  */
 
 const ALL_JOBS_SCOPE = {} as const;
 
 /**
- * Refresh Home counts here because editor realtime invalidation is unmounted and query focus refetching is
- * disabled. Polling continues at zero so work started elsewhere appears; it pauses while the document is hidden.
+ * Refresh Home counts here because editor realtime invalidation is unmounted and query focus refetching is disabled.
+ * Polling continues at zero so work started elsewhere appears; it pauses while the document is hidden.
  */
 const QUEUE_POLL_INTERVAL_MS = 5_000;
 

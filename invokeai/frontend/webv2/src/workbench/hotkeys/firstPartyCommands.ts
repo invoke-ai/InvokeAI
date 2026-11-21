@@ -21,7 +21,6 @@ import {
 } from '@platform/state/accountLifecycle';
 import { useQueryClient } from '@tanstack/react-query';
 import { submitActiveInvocation } from '@workbench/activeInvocationSubmission';
-import { describeControlLayerIssue } from '@workbench/controlLayerChecks';
 import { useWorkbenchFocus, useWorkbenchFocusTarget } from '@workbench/focusRegions';
 import { builtInLayoutPresetDescriptors } from '@workbench/layoutPresets';
 import { toggleCommandPalette } from '@workbench/palette/paletteStore';
@@ -29,9 +28,15 @@ import { openWorkbenchSettings } from '@workbench/settings/settingsDialogStore';
 import { getWorkbenchPreferences } from '@workbench/settings/store';
 import { openProjectSwitcher } from '@workbench/shell/topbar/projectSwitcherStore';
 import { openWidgetsDialog } from '@workbench/shell/widgetsDialogStore';
-import { cycleRegionWidget, openWidgetPlacement, toggleCenterPreview } from '@workbench/widgetPlacementCommands';
+import {
+  cycleRegionWidget,
+  getOpenableWidgetPlacement,
+  openWidgetPlacement,
+  toggleCenterPreview,
+} from '@workbench/widgetPlacementCommands';
 import { getWidgetPlacementProject } from '@workbench/widgetPlacementMeta';
 import { getWidgetsForRegion } from '@workbench/widgetRegistry';
+import { describeCanvasInvocationFailure } from '@workbench/widgets/canvas/invoke/canvasInvocationFailure';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import { useWorkbenchCommands, useWorkbenchExtensions, useWorkbenchQueries } from '@workbench/WorkbenchContext';
 import { resolvePanelToggle } from '@workbench/workbenchState';
@@ -80,6 +85,7 @@ export const FIRST_PARTY_APP_COMMAND_IDS = [
   'app.selectCanvasTab',
   'app.selectUpscalingTab',
   'app.selectWorkflowsTab',
+  'app.switchWorkflowView',
   'app.selectModelsTab',
   'app.selectQueueTab',
   'app.openWidgets',
@@ -127,17 +133,12 @@ export const useRegisterFirstPartyCommands = () => {
     void ensureModelsLoaded();
   });
 
-  /**
-   * Submits the active route. `destinationOverride` applies to this run only and
-   * is never written back to the project — "just this once, send it to the
-   * gallery" must not silently retarget every subsequent invoke. `prepend` is
-   * likewise per run: Invoke Front puts this batch ahead of the user's pending work.
-   */
+  /** Submits the active route; `destinationOverride` and `prepend` apply to this run only, never persisted. */
   const submitInvocation = async (destinationOverride?: ResultDestination, prepend = false) => {
     await submitActiveInvocation({
       commands,
       destinationOverride,
-      formatControlLayerError: (rejection) => describeControlLayerIssue(t, rejection),
+      formatCanvasInvocationFailure: (failure) => describeCanvasInvocationFailure(t, failure),
       formatUpscaleMetadataFailure: (name) => t('widgets.gallery.itemActions.upscale.metadataFailed', { name }),
       getModels: getAvailableModels,
       ...(prepend ? { prepend } : {}),
@@ -214,8 +215,8 @@ export const useRegisterFirstPartyCommands = () => {
 
       const didRecall = await executeImageRecall({
         commands,
-        // Re-read on every call: recall awaits the image record, and a snapshot from the keypress would overwrite
-        // edits and recalls committed meanwhile.
+        // Re-read on every call: recall awaits the image record, and a snapshot from the keypress would overwrite edits
+        // and recalls committed meanwhile.
         getGenerateValues: () => {
           const project = queries.getProject(activeProject.id);
 
@@ -286,6 +287,99 @@ export const useRegisterFirstPartyCommands = () => {
     assertAccountScopeCurrent(owner);
     if (didRecall && queries.isActiveProject(projectId)) {
       openWidgetPlacement({ getWidgetsForRegion, options: { preferredRegions: ['left'] }, typeId: 'video', widgets });
+    }
+  };
+
+  const switchWorkflowView = () => {
+    const project = queries.getSnapshot().activeProject;
+    const target = getFocusTarget();
+    const graphRegions = ['center', 'bottom'] as const;
+    const isWorkflow = (instanceId: string) => project.widgetInstances[instanceId]?.typeId === 'workflow';
+    const hasWorkflow = (region: 'center' | 'bottom' | 'left') =>
+      project.widgetRegions[region].instanceIds.some(isWorkflow);
+    const visibleWorkflow = (region: 'center' | 'bottom' | 'left') => {
+      const { activeInstanceId, instanceIds, isCollapsed } = project.widgetRegions[region];
+      const panelOpen = region === 'center' || project.layout.panels[region === 'left' ? 'isLeftOpen' : 'isBottomOpen'];
+
+      return panelOpen && !isCollapsed && instanceIds.includes(activeInstanceId) && isWorkflow(activeInstanceId)
+        ? activeInstanceId
+        : null;
+    };
+    const fromGraph =
+      target?.kind === 'floating'
+        ? isWorkflow(target.instanceId)
+        : (target?.region === 'center' || target?.region === 'bottom') && visibleWorkflow(target.region) !== null;
+    const floatingWorkflow = Object.keys(project.floatingWidgets ?? {}).find(isWorkflow);
+    const region = fromGraph ? 'left' : (graphRegions.find(visibleWorkflow) ?? graphRegions.find(hasWorkflow));
+
+    if (!region && floatingWorkflow) {
+      widgets.revealFloating(floatingWorkflow);
+      focus.focusFloating(floatingWorkflow);
+      return;
+    }
+
+    const destination = region ?? 'center';
+    const visibleInstance = visibleWorkflow(destination);
+
+    if (visibleInstance) {
+      focus.focusRegion(destination, undefined, visibleInstance);
+      return;
+    }
+
+    // Opening an unplaced view could dock the graph's floating window.
+    if (floatingWorkflow && !hasWorkflow(destination)) {
+      return;
+    }
+
+    const placedCenterGraph =
+      destination === 'center' ? project.widgetRegions.center.instanceIds.find(isWorkflow) : undefined;
+    if (placedCenterGraph) {
+      if (
+        getOpenableWidgetPlacement({
+          getWidgetsForRegion,
+          options: { preferredRegions: ['center'] },
+          typeId: 'workflow',
+        })
+      ) {
+        // Use the center picker's instance selection to keep the left panel in view.
+        widgets.select({ projectId: project.id, region: 'center', widgetId: placedCenterGraph });
+        focus.focusRegion('center', undefined, placedCenterGraph);
+      }
+      return;
+    }
+
+    // The Workflow preset uses a separate graph instance so opening the center leaves the form active.
+    if (!region && hasWorkflow('left')) {
+      const leftInstanceId = project.widgetRegions.left.activeInstanceId;
+      const graphInstanceId = ['workflow:center', 'workflow:bottom', 'workflow'].find(
+        (id) => id !== leftInstanceId && isWorkflow(id)
+      );
+
+      if (
+        graphInstanceId &&
+        getOpenableWidgetPlacement({
+          getWidgetsForRegion,
+          options: { preferredRegions: ['center'] },
+          typeId: 'workflow',
+        })
+      ) {
+        widgets.toggle({ projectId: project.id, region: 'center', widgetId: graphInstanceId });
+        focus.focusRegion('center', undefined, graphInstanceId);
+      }
+      return;
+    }
+
+    const opened = openWidgetPlacement({
+      getWidgetsForRegion,
+      options: { preferredRegions: [destination] },
+      projectId: project.id,
+      typeId: 'workflow',
+      widgets,
+    });
+
+    if (opened.ok) {
+      const { activeInstanceId } = queries.getSnapshot().activeProject.widgetRegions[destination];
+      focus.focusRegion(destination, undefined, activeInstanceId);
     }
   };
 
@@ -374,7 +468,7 @@ export const useRegisterFirstPartyCommands = () => {
       commandApi.register({
         handler: () => requestQueueAction('cancel-current'),
         id: 'app.cancelQueueItem',
-        title: 'Cancel current queue item',
+        title: 'Cancel current or next queue item',
       }),
       commandApi.register({
         handler: () => requestQueueAction('cancel-all'),
@@ -424,6 +518,11 @@ export const useRegisterFirstPartyCommands = () => {
           }),
         id: 'app.selectWorkflowsTab',
         title: 'Open Workflow editor',
+      }),
+      commandApi.register({
+        handler: switchWorkflowView,
+        id: 'app.switchWorkflowView',
+        title: 'Switch workflow view',
       }),
       commandApi.register({
         handler: () => openModelManager({ projectId: queries.getSnapshot().activeProject.id }),

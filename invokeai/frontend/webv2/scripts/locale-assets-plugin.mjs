@@ -53,8 +53,9 @@ const buildLocaleAssets = async (projectRoot) => {
 };
 
 /**
- * Keep source locales readable; load font-library and metadata labels only when their UI opens. Locale URLs stay
- * the same across releases, so the injected content version tells the client and service worker which files a build carries.
+ * Keep source locales readable; load font-library and metadata labels only when their UI opens. Locale URLs stay the
+ * same across releases, so the injected content version tells the client and service worker which files a build
+ * carries.
  */
 export const localeAssetsPlugin = ({ projectRoot }) => {
   let assets;
@@ -75,8 +76,8 @@ export const localeAssetsPlugin = ({ projectRoot }) => {
           return translated ? [[language, { translated, ...(language === 'en' ? { ready: true } : {}) }]] : [];
         })
       );
-      // Hash the emitted files, not the sources: formatting-only edits keep the version, transform changes do not.
-      // JSON keeps the boundaries between file names and contents unambiguous.
+      // Hash the emitted files, not the sources: formatting-only edits keep the version, transform changes do not. JSON
+      // keeps the boundaries between file names and contents unambiguous.
       const version = createHash('sha256').update(JSON.stringify(assets)).digest('hex').slice(0, 12);
       // An env define, not a global: Vitest browser mode re-encodes string globals, wrapping them in quotes.
       return {

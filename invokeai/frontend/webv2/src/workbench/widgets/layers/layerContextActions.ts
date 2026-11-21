@@ -12,9 +12,11 @@ import type { LucideIcon } from 'lucide-react';
 import {
   getDocumentIndex,
   getSourceContentRect,
+  isGroupNode,
   isEmptyPolygonShape,
   isHideableLayer,
   isNodeHidden,
+  isOverlayStack,
   isPixelBackedLayer,
   lookupLayerBelow,
 } from '@workbench/canvas-engine/api';
@@ -27,12 +29,12 @@ import {
   ArrowUpToLineIcon,
   BookmarkIcon,
   BookmarkMinusIcon,
+  CircleDotIcon,
   CircleIcon,
   CircleOffIcon,
   CopyIcon,
   CropIcon,
   DropletIcon,
-  EyeClosedIcon,
   EyeIcon,
   FilmIcon,
   FingerprintPatternIcon,
@@ -63,7 +65,7 @@ import {
 } from 'lucide-react';
 
 import { COLOR_LABEL_ITEMS } from './colorLabels';
-import { removeFromGroupCommand } from './layerGroupCommands';
+import { layerCommandLabel, layerCommandTargets, removeFromGroupCommand } from './layerCommands';
 import { canAddRegionalReferenceImage, canConvertRasterControl, canMergeLayerDown } from './layerOps';
 
 export type LayerContextActionId =
@@ -146,6 +148,8 @@ export interface LayerContextActionState {
   canGroupSelection: boolean;
   /** The model's answer for removing `actionTargets`, asked the same way. */
   canDeleteSelection: boolean;
+  /** The model's answer for duplicating `actionTargets`, asked the same way. */
+  canDuplicateSelection: boolean;
   /** Whether the whole multi-selection can merge into one raster, asked the same way. */
   canMergeSelection: boolean;
   /** Whether merge masks would take `actionTargets`, and if not, whether only their generation settings differ. */
@@ -233,10 +237,7 @@ interface LayerContextActionDefinitionBase {
   getLabelCount?(context: LayerContextActionState): number;
 }
 
-/**
- * A picker action is its own submenu, so it cannot also sit in a static one: there it would render as a plain item
- * that runs without a board.
- */
+/** Its own submenu, never in a static one, where it would run as a plain item without a board. */
 export type LayerContextActionDefinition = LayerContextActionDefinitionBase &
   (
     | { picker?: never; submenu?: LayerContextSubmenuId }
@@ -266,7 +267,7 @@ export interface LayerContextAction {
 
 export type LayerConfigPatchKind = 'control-transparency-effect' | 'regional-auto-negative';
 
-const ALL_LAYER_TYPES = ['raster', 'control', 'inpaint_mask', 'regional_guidance'] as const;
+const ALL_LAYER_TYPES = ['raster', 'control', 'inpaint_mask', 'regional_guidance', 'vector'] as const;
 type AdjustmentAddItem = {
   readonly defaultLabel: string;
   readonly icon: LucideIcon;
@@ -313,11 +314,13 @@ const REGIONAL_ONLY = ['regional_guidance'] as const;
 const alwaysVisible = (): boolean => true;
 const isOperationFree = (context: LayerContextActionState): boolean => !context.operationLocked;
 const layerEntry = (context: LayerContextActionState) => getDocumentIndex(context.document).byId.get(context.layer.id);
-/** The nodes a selection-wide action applies to: the whole selection when the layer is in it. */
+/** The nodes a selection-wide action applies to, by the layer commands' rule. */
 export const actionTargets = (context: Pick<LayerContextActionState, 'layer' | 'selectedIds'>): readonly string[] =>
-  context.selectedIds.includes(context.layer.id) ? context.selectedIds : [context.layer.id];
+  layerCommandTargets(context.selectedIds, context.layer.id);
 
 const targetCount = (context: LayerContextActionState): number => actionTargets(context).length;
+const commandLabel = (context: LayerContextActionState, command: 'delete' | 'duplicate') =>
+  layerCommandLabel(context.document, command, actionTargets(context));
 const isMultiTarget = (context: LayerContextActionState): boolean => targetCount(context) > 1;
 const targetNodes = (context: LayerContextActionState) => {
   const index = getDocumentIndex(context.document);
@@ -325,6 +328,91 @@ const targetNodes = (context: LayerContextActionState) => {
 };
 const allTargetsEnabled = (context: LayerContextActionState): boolean =>
   targetNodes(context).every((node) => node.isEnabled);
+interface EnabledToggleLabel {
+  readonly defaultLabel: string;
+  readonly icon: LucideIcon;
+  readonly key: string;
+}
+interface EnabledToggleLabels {
+  readonly off: EnabledToggleLabel;
+  readonly on: EnabledToggleLabel;
+}
+const toggleLabel = (key: string, defaultLabel: string, icon: LucideIcon): EnabledToggleLabel => ({
+  defaultLabel,
+  icon,
+  key: `widgets.layers.actions.${key}`,
+});
+// Overlays name the enabled flag for what it decides there, taking part in generation, since their canvas visibility is
+// its own action; raster layers show and hide; a selection holding both is turned off or on, which is true of each. The
+// overlay icons are the row dot's shapes: a plain ring for off, a dot for on (the dashed ring means a group above
+// leaves the layer out, which no action sets).
+const OVERLAY_LAYER: EnabledToggleLabels = {
+  off: toggleLabel('excludeFromGeneration', 'Exclude from generation', CircleIcon),
+  on: toggleLabel('useInGeneration', 'Use in generation', CircleDotIcon),
+};
+const OVERLAY_GROUP: EnabledToggleLabels = {
+  off: toggleLabel('excludeGroupFromGeneration', 'Exclude group from generation', CircleIcon),
+  on: toggleLabel('useGroupInGeneration', 'Use group in generation', CircleDotIcon),
+};
+const OVERLAY_SELECTION: EnabledToggleLabels = {
+  off: toggleLabel('excludeSelectedFromGeneration', 'Exclude selected from generation', CircleIcon),
+  on: toggleLabel('useSelectedInGeneration', 'Use selected in generation', CircleDotIcon),
+};
+const RASTER_LAYER: EnabledToggleLabels = {
+  off: toggleLabel('hideLayer', 'Hide layer', EyeOffIcon),
+  on: toggleLabel('showLayer', 'Show layer', EyeIcon),
+};
+const RASTER_GROUP: EnabledToggleLabels = {
+  off: toggleLabel('hideGroup', 'Hide group', EyeOffIcon),
+  on: toggleLabel('showGroup', 'Show group', EyeIcon),
+};
+const RASTER_SELECTION: EnabledToggleLabels = {
+  off: toggleLabel('hideSelected', 'Hide selected', EyeOffIcon),
+  on: toggleLabel('showSelected', 'Show selected', EyeIcon),
+};
+const MIXED_SELECTION: EnabledToggleLabels = {
+  off: toggleLabel('turnOffSelected', 'Turn off selected', EyeOffIcon),
+  on: toggleLabel('turnOnSelected', 'Turn on selected', EyeIcon),
+};
+
+/** How toggling `targets` enabled is named in the dot, eye, menus and undo step. */
+export const enabledToggleLabel = (
+  document: Pick<CanvasDocumentContractV3, 'stacks'>,
+  targets: readonly string[],
+  turnOff: boolean
+): EnabledToggleLabel => {
+  const index = getDocumentIndex(document);
+  const entries = targets.flatMap((id) => index.byId.get(id) ?? []);
+  const overlays = entries.filter((entry) => isOverlayStack(entry.stack)).length;
+  const labels =
+    entries.length > 1
+      ? overlays === entries.length
+        ? OVERLAY_SELECTION
+        : overlays === 0
+          ? RASTER_SELECTION
+          : MIXED_SELECTION
+      : overlays === 1
+        ? isGroupNode(entries[0]!.node)
+          ? OVERLAY_GROUP
+          : OVERLAY_LAYER
+        : entries[0] && isGroupNode(entries[0].node)
+          ? RASTER_GROUP
+          : RASTER_LAYER;
+  return turnOff ? labels.off : labels.on;
+};
+const enabledActionLabel = (context: LayerContextActionState): EnabledToggleLabel =>
+  enabledToggleLabel(context.document, actionTargets(context), allTargetsEnabled(context));
+/** The overlay targets, which are the ones Hide on canvas changes, are all hidden already: the item shows them. */
+const allOverlayTargetsHidden = (context: LayerContextActionState): boolean => {
+  if (!isMultiTarget(context)) {
+    return isNodeHidden(context.layer);
+  }
+  const index = getDocumentIndex(context.document);
+  return actionTargets(context).every((id) => {
+    const entry = index.byId.get(id);
+    return !entry || !isOverlayStack(entry.stack) || isNodeHidden(entry.node);
+  });
+};
 const allTargetsLocked = (context: LayerContextActionState): boolean =>
   targetNodes(context).every((node) => node.isLocked);
 const allTargetsInpaintMasks = (context: LayerContextActionState): boolean =>
@@ -349,7 +437,13 @@ const hasReadablePixels = (context: LayerContextActionState): boolean =>
 const hasMutablePixels = (context: LayerContextActionState): boolean =>
   isLayerMutable(context) && hasReadablePixels(context);
 const hasTransformablePixels = (context: LayerContextActionState): boolean =>
-  context.layer.isEnabled && hasMutablePixels(context);
+  context.layer.type === 'vector'
+    ? context.layer.isEnabled &&
+      isLayerMutable(context) &&
+      context.hasEngine &&
+      !(layerEntry(context)?.ancestorsEnabled === false) &&
+      context.layer.paths.some((path) => path.points.length >= 2)
+    : context.layer.isEnabled && hasMutablePixels(context);
 const hasDocumentContent = (context: LayerContextActionState): boolean => {
   const contentRect = getSourceContentRect(context.layer, context.document);
   return contentRect.width > 0 && contentRect.height > 0;
@@ -367,8 +461,8 @@ const hasFilterableLayerContent = (context: LayerContextActionState): boolean =>
   }
   const { source } = context.layer;
   if (source.type === 'image' || source.type === 'paint') {
-    // `hasSupportedContent` distinguishes empty paint from live unpersisted
-    // cache pixels, which are intentionally filterable despite `bitmap: null`.
+    // `hasSupportedContent` distinguishes empty paint from live unpersisted cache pixels, which are intentionally
+    // filterable despite `bitmap: null`.
     return true;
   }
   if (context.layer.type !== 'raster') {
@@ -388,7 +482,7 @@ const siblingPosition = (context: LayerContextActionState): { index: number; cou
   }
   const parent = entry.parentId === null ? null : index.byId.get(entry.parentId)!.node;
   const count =
-    parent && parent.type === 'group' ? parent.children.length : context.document.stacks[entry.stack].length;
+    parent && parent.type === 'group' ? parent.children.length : (context.document.stacks[entry.stack]?.length ?? 0);
   return { count, index: entry.siblingIndex };
 };
 
@@ -470,14 +564,12 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
   },
   {
     defaultLabel: 'Duplicate',
-    getDefaultLabel: (context) => (isMultiTarget(context) ? `Duplicate ${targetCount(context)} layers` : 'Duplicate'),
-    getLabelCount: targetCount,
-    getLabelKey: (context) =>
-      isMultiTarget(context) ? 'widgets.layers.actions.duplicateCount' : 'widgets.layers.actions.duplicate',
+    getLabelCount: (context) => commandLabel(context, 'duplicate').count,
+    getLabelKey: (context) => commandLabel(context, 'duplicate').key,
     handler: ({ effects }) => effects.duplicate(),
     icon: CopyIcon,
     id: 'duplicate',
-    isEnabled: isOperationFree,
+    isEnabled: (context) => isOperationFree(context) && context.canDuplicateSelection,
     isVisible: alwaysVisible,
     labelKey: 'widgets.layers.actions.duplicate',
     order: 10,
@@ -542,7 +634,7 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
     labelKey: 'widgets.layers.actions.transform',
     order: 10,
     section: 'primary',
-    supportedLayerTypes: ['raster', 'control'],
+    supportedLayerTypes: ['raster', 'control', 'vector', 'inpaint_mask', 'regional_guidance'],
   },
   {
     defaultLabel: 'Rename',
@@ -976,26 +1068,12 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
     section: 'output',
     supportedLayerTypes: ALL_LAYER_TYPES,
   },
-  // One visibility model: hiding a layer takes it off the canvas and out of generation alike.
+  // Raster layers have one axis: hiding takes a layer off the canvas and out of generation alike.
   {
     defaultLabel: 'Show or hide layer',
-    getDefaultLabel: (context) =>
-      isMultiTarget(context)
-        ? allTargetsEnabled(context)
-          ? 'Hide selected'
-          : 'Show selected'
-        : context.layer.isEnabled
-          ? 'Hide layer'
-          : 'Show layer',
-    getIcon: (context) => (allTargetsEnabled(context) ? EyeOffIcon : EyeIcon),
-    getLabelKey: (context) =>
-      isMultiTarget(context)
-        ? allTargetsEnabled(context)
-          ? 'widgets.layers.actions.hideSelected'
-          : 'widgets.layers.actions.showSelected'
-        : context.layer.isEnabled
-          ? 'widgets.layers.actions.hideLayer'
-          : 'widgets.layers.actions.showLayer',
+    getDefaultLabel: (context) => enabledActionLabel(context).defaultLabel,
+    getIcon: (context) => enabledActionLabel(context).icon,
+    getLabelKey: (context) => enabledActionLabel(context).key,
     handler: ({ effects }) => effects.toggleVisibility(),
     icon: EyeOffIcon,
     id: 'toggle-visibility',
@@ -1008,13 +1086,26 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
   },
   // Overlays only: off the canvas to see the image under them, still used by generation.
   {
-    defaultLabel: 'Hide on canvas only',
-    getDefaultLabel: (context) => (isNodeHidden(context.layer) ? 'Show on canvas' : 'Hide on canvas only'),
-    getIcon: (context) => (isNodeHidden(context.layer) ? EyeIcon : EyeClosedIcon),
+    defaultLabel: 'Hide on canvas',
+    getDefaultLabel: (context) =>
+      isMultiTarget(context)
+        ? allOverlayTargetsHidden(context)
+          ? 'Show selected on canvas'
+          : 'Hide selected on canvas'
+        : allOverlayTargetsHidden(context)
+          ? 'Show on canvas'
+          : 'Hide on canvas',
+    getIcon: (context) => (allOverlayTargetsHidden(context) ? EyeIcon : EyeOffIcon),
     getLabelKey: (context) =>
-      isNodeHidden(context.layer) ? 'widgets.layers.actions.showOnCanvas' : 'widgets.layers.actions.hideOnCanvas',
+      isMultiTarget(context)
+        ? allOverlayTargetsHidden(context)
+          ? 'widgets.layers.actions.showSelectedOnCanvas'
+          : 'widgets.layers.actions.hideSelectedOnCanvas'
+        : allOverlayTargetsHidden(context)
+          ? 'widgets.layers.actions.showOnCanvas'
+          : 'widgets.layers.actions.hideOnCanvas',
     handler: ({ effects }) => effects.toggleHidden(),
-    icon: EyeClosedIcon,
+    icon: EyeOffIcon,
     id: 'toggle-hidden',
     isEnabled: (context) => isOperationFree(context) && !context.hiddenByAncestor,
     isVisible: (context) => isHideableLayer(context.layer),
@@ -1103,10 +1194,8 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
   },
   {
     defaultLabel: 'Delete',
-    getDefaultLabel: (context) => (isMultiTarget(context) ? `Delete ${targetCount(context)} layers` : 'Delete'),
-    getLabelCount: targetCount,
-    getLabelKey: (context) =>
-      isMultiTarget(context) ? 'widgets.layers.actions.deleteCount' : 'widgets.layers.actions.delete',
+    getLabelCount: (context) => commandLabel(context, 'delete').count,
+    getLabelKey: (context) => commandLabel(context, 'delete').key,
     handler: ({ effects }) => effects.delete(),
     icon: Trash2Icon,
     id: 'delete',

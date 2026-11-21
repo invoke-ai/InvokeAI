@@ -82,3 +82,42 @@ class TestRejection:
     def test_extreme_aspect_ratio_rejected(self, w: int, h: int) -> None:
         with pytest.raises(ValueError, match="aspect ratio"):
             _resolve(w, h)
+
+
+@pytest.mark.parametrize("preset, expected", [("480p", (864, 480)), ("544p", (960, 544))])
+def test_draft_landscape_and_portrait(preset, expected):
+    assert _resolve(16, 9, target_resolution=preset) == expected
+    assert _resolve(9, 16, target_resolution=preset) == expected[::-1]
+    assert _resolve(1920, 1080, target_resolution=preset) == expected
+
+
+@pytest.mark.parametrize("preset, edge", [("480p", 480), ("544p", 544)])
+def test_draft_square_and_four_three(preset, edge):
+    assert _resolve(1, 1, target_resolution=preset) == (edge, edge)
+    assert _resolve(4, 3, target_resolution=preset) == ((640 if edge == 480 else 736), edge)
+
+
+@pytest.mark.parametrize("preset", ["480p", "544p"])
+@pytest.mark.parametrize("width,height", [(4, 1), (1, 4), (21, 9), (9, 21), (1, 1)])
+def test_draft_canvases_pass_sampling_validation(preset, width, height):
+    from invokeai.backend.minimax_h3.sampling import validate_canvas
+
+    w, h = _resolve(width, height, target_resolution=preset)
+    validate_canvas(h, w)
+    native_w, native_h = _resolve(width, height)
+    assert w * h <= native_w * native_h
+
+
+@pytest.mark.parametrize("preset", ["480p", "544p", "768 lowres", "768 highres"])
+def test_presets_reject_invalid_ratios(preset):
+    with pytest.raises(ValueError, match="aspect ratio"):
+        _resolve(5, 1, target_resolution=preset)
+
+
+@pytest.mark.parametrize(
+    "preset, source, equivalent, expected",
+    [("544p", (21, 14), (3, 2), (832, 544)), ("480p", (187, 110), (17, 10), (832, 480))],
+)
+def test_draft_rounding_is_independent_of_source_scale(preset, source, equivalent, expected):
+    assert _resolve(*source, target_resolution=preset) == expected
+    assert _resolve(*equivalent, target_resolution=preset) == expected

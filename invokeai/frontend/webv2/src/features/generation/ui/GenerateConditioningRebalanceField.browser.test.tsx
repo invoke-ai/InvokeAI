@@ -46,6 +46,8 @@ await i18n.use(initReactI18next).init({
             krea2RebalanceTapReadout: 'tap {{tap}} · {{value}}',
             krea2RebalanceWeights: 'Per-tap weights',
             krea2RebalanceWeightsInvalid: 'Enter exactly {{count}} comma-separated numbers.',
+            resetFieldNamed: '{{reset}}: {{field}}',
+            resetToDefault: 'Reset to default',
           },
         },
       },
@@ -87,7 +89,6 @@ const buildSettings = (overrides: Partial<GenerateSettings> = {}): GenerateSetti
     ...overrides,
   }) as unknown as GenerateSettings;
 
-/** Mirrors the real form: commits land back on the rendered settings. */
 const Harness = ({ initial }: { initial: Partial<GenerateSettings> }) => {
   const [settings, setSettings] = useState(() => buildSettings(initial));
   const apply = (patch: Partial<GenerateSettings>) => setSettings((current) => ({ ...current, ...patch }));
@@ -130,7 +131,6 @@ const interact = async (run: () => void) => {
   });
 };
 
-/** Scoped by orientation: the Gain slider's thumb is a `role="slider"` too. */
 const bars = () => [...document.querySelectorAll('[role="slider"][aria-orientation="vertical"]')];
 
 const byLabel = (label: string): HTMLElement | null =>
@@ -185,7 +185,6 @@ describe('GenerateConditioningRebalanceField', () => {
     expect(document.body.textContent).toContain('Conditioning rebalance');
     expect(bars()).toHaveLength(0);
     expect(byLabel('Per-tap weights')).toBeNull();
-    // The collapsed row still previews the curve.
     expect(document.querySelector('svg[aria-hidden]')).not.toBeNull();
   });
 
@@ -216,24 +215,60 @@ describe('GenerateConditioningRebalanceField', () => {
     expect(bars()[0]?.getAttribute('aria-label')).toBe('Tap 1, encoder layer 2');
   });
 
-  it('disables reset at the backend defaults and restores them once edited', async () => {
+  it('marks the preset with the reset dot once edited, and the dot restores the backend defaults', async () => {
     await renderField();
+    const dot = () => byLabel('Reset to default curve: Rebalance preset');
 
-    const reset = byLabel('Reset to default curve');
-
-    expect(reset?.getAttribute('disabled')).not.toBeNull();
+    expect(document.querySelector('button[aria-label="Reset to default curve"]')).toBeNull();
+    expect(dot()).toBeNull();
 
     await interact(() => typeInto(weightsInput(), NEUTRAL_KREA2_REBALANCE_WEIGHTS));
+    expect(dot()).not.toBeNull();
 
-    expect(byLabel('Reset to default curve')?.getAttribute('disabled')).toBeNull();
-
-    await interact(() => byLabel('Reset to default curve')?.click());
+    await interact(() => dot()?.click());
 
     expect(onCommitImmediate).toHaveBeenLastCalledWith({
       krea2RebalanceMultiplier: DEFAULT_KREA2_REBALANCE_MULTIPLIER,
       krea2RebalanceWeights: DEFAULT_KREA2_REBALANCE_WEIGHTS,
     });
     expect(weightsInput().value).toBe(DEFAULT_KREA2_REBALANCE_WEIGHTS);
+    expect(dot()).toBeNull();
+    await vi.waitFor(() =>
+      expect(document.activeElement?.matches('[data-scope="select"][data-part="trigger"]')).toBe(true)
+    );
+  });
+
+  describe('with only the gain changed', () => {
+    const presetDot = () => byLabel('Reset to default curve: Rebalance preset');
+    const gainDot = () => byLabel('Reset to default: Gain');
+    const changedGain = DEFAULT_KREA2_REBALANCE_MULTIPLIER + 0.5;
+
+    it('marks both the preset, now custom, and the gain; the gain dot resets the gain alone', async () => {
+      await renderField({ krea2RebalanceMultiplier: changedGain });
+
+      expect(presetDot()).not.toBeNull();
+      expect(gainDot()).not.toBeNull();
+
+      await interact(() => gainDot()?.click());
+
+      expect(onCommit).toHaveBeenLastCalledWith({ krea2RebalanceMultiplier: DEFAULT_KREA2_REBALANCE_MULTIPLIER });
+      expect(onCommitImmediate).not.toHaveBeenCalled();
+      expect(gainDot()).toBeNull();
+      expect(presetDot()).toBeNull();
+    });
+
+    it('resets the whole curve, gain included, from the preset dot', async () => {
+      await renderField({ krea2RebalanceMultiplier: changedGain });
+
+      await interact(() => presetDot()?.click());
+
+      expect(onCommitImmediate).toHaveBeenLastCalledWith({
+        krea2RebalanceMultiplier: DEFAULT_KREA2_REBALANCE_MULTIPLIER,
+        krea2RebalanceWeights: DEFAULT_KREA2_REBALANCE_WEIGHTS,
+      });
+      expect(presetDot()).toBeNull();
+      expect(gainDot()).toBeNull();
+    });
   });
 
   it('commits a typed vector the backend would accept', async () => {
@@ -251,7 +286,6 @@ describe('GenerateConditioningRebalanceField', () => {
     await interact(() => typeInto(weightsInput(), '1,2,three'));
 
     expect(document.body.textContent).toContain('Enter exactly 12 comma-separated numbers.');
-    // The last valid vector still drives the editor.
     expect(bars()[8]?.getAttribute('aria-valuenow')).toBe('5');
     expect(onCommitImmediate).not.toHaveBeenCalled();
   });

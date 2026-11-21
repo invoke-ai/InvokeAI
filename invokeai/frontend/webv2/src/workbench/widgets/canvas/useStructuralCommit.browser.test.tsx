@@ -55,7 +55,6 @@ const opacity = (value: number): CanvasLayerPreviewMutation => ({
 });
 const EDIT = { forward: opacity(0.5), inverse: opacity(1) } as unknown as PreparedDocumentEdit;
 
-/** A session mock; `active: false` models one the engine ended (a replay or a commit from elsewhere landed). */
 const createSession = (commitStatus: 'committed' | 'busy' = 'committed', active = true) => {
   const session = {
     apply: vi.fn(() => active),
@@ -85,7 +84,6 @@ const renderPreview = (engine: CanvasPreviewEngine): StructuralPreview => {
   return ref.current!;
 };
 
-/** An engine whose only capability is the refusal channel, and the emitter that drives it. */
 const createRefusalEngine = () => {
   const listeners: ((refusal: CanvasEditRefusal) => void)[] = [];
   return {
@@ -167,7 +165,6 @@ describe('useStructuralPreview', () => {
       refusal: { ids: ['layer'], status: 'missing' },
       status: 'refused',
     });
-    // An undone conversion or unlock refuses the late commit too; that refusal is the undo's, not the user's.
     endedPreview.preview(opacity(0.5));
     expect(
       endedPreview.commit('Opacity', () => ({ actual: 'raster', expected: ['control'], status: 'wrong-type' }) as never)
@@ -239,7 +236,6 @@ describe('useStructuralPreview with a gesture superseded by another', () => {
     const layer = () => getDocumentLayer(stub.document(), 'layer');
 
     expect(tint.preview({ id: 'layer', patch: { name: 'Draft' }, type: 'updateCanvasLayer' })).toBe(true);
-    // A newer gesture's session restores the first one's baseline and holds its own preview.
     expect(scrub.preview(opacity(0.3))).toBe(true);
     expect(layer()).toMatchObject({ name: 'Layer', opacity: 0.3 });
 
@@ -263,7 +259,6 @@ describe('CanvasEditRefusalNotices', () => {
   it.each<[CanvasEditRefusal, string]>([
     ['over-budget', 'widgets.canvas.structural.overBudget'],
     ['busy', 'widgets.canvas.structural.busy'],
-    // A pending transform whose stroke failed to save ends with this refusal.
     ['not-ready', 'widgets.canvas.structural.notReady'],
   ])('explains a %s refusal of an edit nobody else reports', (refusal, message) => {
     const { emit, engine } = createRefusalEngine();

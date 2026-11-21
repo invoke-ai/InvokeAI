@@ -1,13 +1,10 @@
 import type { TFunction } from 'i18next';
 
+import { normalizeReferenceImageName } from '@features/generation/settings';
 import { readRecordedModelRef } from '@workbench/image-actions';
 import { getLegacyCanvasReferenceEntries } from '@workbench/image-actions/imageRecall';
 
-/**
- * Parse variable untyped generation metadata tolerantly into display rows; skip unknown or malformed fields while the
- * complete raw record stays available for JSON display. Rows show what was recorded, whether or not recall could
- * apply it to the current panel.
- */
+/** Tolerant parse of untyped metadata into rows; malformed fields are skipped, the raw record stays. */
 
 export interface PreviewMetadataEntry {
   key: string;
@@ -30,6 +27,22 @@ const getFiniteNumber = (metadata: Record<string, unknown>, key: string): number
   const value = metadata[key];
 
   return typeof value === 'number' && Number.isFinite(value) ? value : null;
+};
+
+const getNumberOrScheduleDisplay = (metadata: Record<string, unknown>, key: string): string | number | null => {
+  const scalar = getFiniteNumber(metadata, key);
+
+  if (scalar !== null) {
+    return scalar;
+  }
+
+  const value = metadata[key];
+
+  return Array.isArray(value) &&
+    value.length > 0 &&
+    value.every((entry) => typeof entry === 'number' && Number.isFinite(entry))
+    ? value.join(', ')
+    : null;
 };
 
 const getModelName = (metadata: Record<string, unknown>): string | null => {
@@ -58,7 +71,7 @@ export const parsePreviewMetadata = (
     const label = t(lookup);
     return label === lookup ? null : label;
   };
-  const cfgScale = getFiniteNumber(metadata, 'cfg_scale');
+  const cfgScale = getNumberOrScheduleDisplay(metadata, 'cfg_scale');
 
   push('positivePrompt', t('widgets.preview.fields.prompt'), getString(metadata, 'positive_prompt'), true);
   push('negativePrompt', t('widgets.preview.fields.negativePrompt'), getString(metadata, 'negative_prompt'), true);
@@ -68,12 +81,11 @@ export const parsePreviewMetadata = (
   push('cfgScale', t('widgets.preview.fields.cfgScale'), cfgScale);
 
   if (kind === 'image') {
-    // Older distilled-guidance records store their single guidance value as `guidance` with no `cfg_scale`. With both
-    // recorded, which one drove the run depends on the model, which display does not consult.
+    // Older distilled-guidance records store their single guidance value as `guidance` with no `cfg_scale`.
     push(
       'guidance',
       t('widgets.preview.fields.guidance'),
-      cfgScale === null ? getFiniteNumber(metadata, 'guidance') : null
+      cfgScale === null ? getNumberOrScheduleDisplay(metadata, 'guidance') : null
     );
     push('scheduler', t('widgets.preview.fields.scheduler'), getString(metadata, 'scheduler'));
     push('clipSkip', t('widgets.preview.fields.clipSkip'), getFiniteNumber(metadata, 'clip_skip'));
@@ -260,6 +272,8 @@ export const parsePreviewMetadata = (
       const original =
         asset && isRecord(asset.original) && isRecord(asset.original.image) ? asset.original.image : asset;
       const parts = [
+        // A Generate reference the user named leads with its name.
+        key === 'ref_images' && !showLegacyReferences ? (normalizeReferenceImageName(entry.name) ?? null) : null,
         model,
         getString(config, 'type'),
         getString(config, 'imageName') ??

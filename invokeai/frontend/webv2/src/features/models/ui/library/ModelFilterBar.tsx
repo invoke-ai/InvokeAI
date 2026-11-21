@@ -8,8 +8,9 @@ import { ManagerSearchField } from '@platform/ui/ManagerLayout';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const isFiltering = (filters: ModelLibraryFilters): boolean =>
-  filters.typeFilter !== null || filters.baseFilter !== null || filters.missingOnly;
+// Missing files is a pseudo-type (choosing it clears the type), so it counts as the type filter.
+const countActiveFilters = (filters: ModelLibraryFilters): number =>
+  Number(filters.typeFilter !== null || filters.missingOnly) + Number(filters.baseFilter !== null);
 
 /** Offer taxonomy filters only for values present in the library. */
 export const ModelFilterBar = ({
@@ -36,6 +37,10 @@ export const ModelFilterBar = ({
   );
   const handleBaseFilterChange = useCallback(
     (baseFilter: string | null) => onChange({ ...filters, baseFilter }),
+    [filters, onChange]
+  );
+  const handleResetFilters = useCallback(
+    () => onChange({ ...filters, baseFilter: null, missingOnly: false, typeFilter: null }),
     [filters, onChange]
   );
   const handleSortChange = useCallback(
@@ -67,12 +72,12 @@ export const ModelFilterBar = ({
         onChange={handleSearchChange}
       />
       <ModelFilterMenu
+        activeFilterCount={countActiveFilters(filters)}
         ariaLabel={t('models.filterAndSort')}
         availableBases={availableBases}
         availableTypes={availableTypes}
         baseFilter={filters.baseFilter}
         extraTypeItems={extraTypeItems}
-        isActive={isFiltering(filters)}
         sortDirection={filters.sortDirection}
         sortField={filters.sortField}
         sortFields={SORT_FIELD_OPTIONS}
@@ -80,6 +85,7 @@ export const ModelFilterBar = ({
         typeFilter={filters.typeFilter}
         typeSummary={filters.missingOnly ? t('models.missingFilesCount', { count: missingCount }) : undefined}
         onBaseFilterChange={handleBaseFilterChange}
+        onResetFilters={handleResetFilters}
         onSortChange={handleSortChange}
         onTypeFilterChange={handleTypeFilterChange}
       />

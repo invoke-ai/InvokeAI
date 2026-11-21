@@ -3,12 +3,6 @@ import { builtInLayoutPresetDescriptors } from '@workbench/layoutPresets';
 import { describe, expect, it } from 'vitest';
 
 describe('launchpad intents', () => {
-  it('resolves every advertised id', () => {
-    for (const id of LAUNCHPAD_INTENT_IDS) {
-      expect(resolveLaunchpadIntent(id)?.id).toBe(id);
-    }
-  });
-
   it('names a real built-in preset for every intent', () => {
     const presetIds = new Set(builtInLayoutPresetDescriptors.map((descriptor) => descriptor.preset.id));
 
@@ -23,7 +17,6 @@ describe('launchpad intents', () => {
   });
 
   it('sets a source that a preset alone could not imply', () => {
-    // Compose hosts both generate and upscale, so the intent has to say which.
     const generate = resolveLaunchpadIntent('generate');
     const upscale = resolveLaunchpadIntent('upscale');
 

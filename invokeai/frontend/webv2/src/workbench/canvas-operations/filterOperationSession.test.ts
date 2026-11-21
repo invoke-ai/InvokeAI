@@ -254,6 +254,25 @@ describe('createFilterOperationSession', () => {
     });
   });
 
+  it('runs the same settings again on a retry after a failed run', async () => {
+    const runFilter = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('graph exploded'))
+      .mockResolvedValueOnce({ height: 10, imageName: 'filtered', origin: { x: 3, y: 4 }, width: 10 });
+    const deps = createDeps({ runFilter });
+    const session = createFilterOperationSession({ deps, guard, initialFilter: layer.filter!, layerType: 'raster' })!;
+    expect(await session.process()).toBe('error');
+
+    expect(await session.process()).toBe('published');
+
+    expect(runFilter).toHaveBeenCalledTimes(2);
+    expect(runFilter.mock.calls[1]![0]).toMatchObject({
+      filterType: runFilter.mock.calls[0]![0].filterType,
+      settings: runFilter.mock.calls[0]![0].settings,
+    });
+    expect(session.getSnapshot()).toMatchObject({ error: null, preview: { imageName: 'filtered' }, status: 'ready' });
+  });
+
   it.each([
     ['disabled', 'disabled'],
     ['empty', 'empty'],

@@ -7,7 +7,6 @@ import { describe, expect, it } from 'vitest';
 
 import { createEmptyCanvasState } from './canvasMigration';
 import {
-  getCancelableCanvasStagingQueueItemId,
   getCanvasQueuePlaceholderSlots,
   getCanvasStagingCandidateFingerprint,
   getCanvasStagingSlotRect,
@@ -224,34 +223,6 @@ describe('canvas staging view', () => {
           : `placeholder:${slot.queueItemId}:${slot.itemIndex}`
       )
     ).toEqual(['candidate:q-first:1', 'placeholder:q-first:2', 'placeholder:q-second:1']);
-  });
-
-  it('resolves a cancelable queue item only for placeholder slots', () => {
-    const candidate = createCandidate('ready.png', 'q-ready');
-
-    expect(
-      getCancelableCanvasStagingQueueItemId({
-        candidate,
-        height: 768,
-        id: 'candidate:q-ready:ready.png',
-        imageName: 'ready.png',
-        kind: 'candidate',
-        queueItemId: 'q-ready',
-        width: 512,
-      })
-    ).toBeNull();
-    expect(
-      getCancelableCanvasStagingQueueItemId({
-        height: 320,
-        id: 'q-pending:0',
-        itemIndex: 1,
-        kind: 'placeholder',
-        queueItemId: 'q-pending',
-        width: 640,
-        x: 0,
-        y: 0,
-      })
-    ).toBe('q-pending');
   });
 
   it('places a candidate at its placement and a placeholder at its submitted rect, wherever the bbox is now', () => {

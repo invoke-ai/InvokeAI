@@ -5,6 +5,7 @@ import { Box, chakra, HStack, Text, VisuallyHidden } from '@chakra-ui/react';
 import { formatGalleryVideoDuration, toGalleryItemKey, toGalleryItemRef } from '@features/gallery/contracts';
 import { imageIndexAvailabilityOptions } from '@features/gallery/queries';
 import { useAuthSession } from '@features/identity';
+import { isEventFromOwnDom } from '@platform/react/isEventFromOwnDom';
 import { ToggleIconButton } from '@platform/ui/Button';
 import { useQuery } from '@tanstack/react-query';
 import { useWorkbenchFocus } from '@workbench/focusRegions';
@@ -24,11 +25,7 @@ const HeaderSeparator = () => (
   </Text>
 );
 
-/**
- * The item's image-map tags, best first. The label cache is loaded on open, keeping it out of the editor's initial
- * graph, and answers repeat opens without a request; it owns invalidation (vocabulary rebuilds, accounts), so this
- * query keeps nothing once closed.
- */
+/** Image-map tags, best first; the label cache loads on open and owns invalidation. */
 const PreviewImageTags = ({ accountEpoch, item }: { accountEpoch: number; item: GalleryItem }): ReactNode => {
   const { t } = useTranslation();
   const { data: indexAvailability } = useQuery(imageIndexAvailabilityOptions());
@@ -52,8 +49,8 @@ const PreviewImageTags = ({ accountEpoch, item }: { accountEpoch: number; item: 
     return null;
   }
 
-  // A zero basis gives the tags only the width the header leaves over, so they truncate before anything else and,
-  // with the separator inside them, vanish whole rather than leave a dangling one.
+  // A zero basis gives the tags only the width the header leaves over, so they truncate before anything else and, with
+  // the separator inside them, vanish whole rather than leave a dangling one.
   return (
     <Text color="fg.muted" data-preview-image-tags flex="1 1 0" fontSize="xs" minW="0" truncate>
       <chakra.span aria-hidden="true" color="fg.subtle" marginInlineEnd="1">
@@ -70,20 +67,11 @@ const PreviewImageTags = ({ accountEpoch, item }: { accountEpoch: number; item: 
   );
 };
 
-/**
- * The centre region's inset already spans its chrome islands' top offset, their height and an equal gap below them, so
- * the panel sits as far under the islands as they sit under the region's top. Elsewhere the variable is unset and the
- * panel takes the islands' own offset from the stage's corner; `insetEnd` matches their end inset either way.
- */
+/** The centre region's inset already includes the islands and a gap; elsewhere the islands' own offset applies. */
 const PANEL_TOP = 'var(--wb-center-chrome-inset, var(--chakra-spacing-2))';
 const PANEL_MAX_HEIGHT = `calc(100% - ${PANEL_TOP} - var(--chakra-spacing-2))`;
 
-/**
- * Details as a panel pinned to the media stage's top-end corner, beside the header trigger and off the filmstrip;
- * images offer parsed details alongside raw payload tabs. It is not a popup: nothing outside closes it, and it listens
- * to no document events, so other surfaces keep their own Escape, pointer and focus handling. Only its trigger, or
- * Escape from within it, closes it. It follows the selection and re-anchors whenever the stage remounts.
- */
+/** Pinned to the stage, not a popup: only its trigger or Escape inside closes it; no document listeners. */
 export const PreviewDetailsPanel = ({
   actions,
   image,
@@ -114,20 +102,22 @@ export const PreviewDetailsPanel = ({
         event.key !== 'Escape' ||
         event.defaultPrevented ||
         event.nativeEvent.isComposing ||
-        !(event.target instanceof Node && event.currentTarget.contains(event.target))
+        !isEventFromOwnDom(event)
       ) {
         return;
       }
       event.preventDefault();
+      // The press is the panel's alone: Preview's own Esc (cancelling or closing a comparison) must not also take it.
+      event.stopPropagation();
       onOpenChange(false);
     },
     [onOpenChange]
   );
   const focusMoves = useWorkbenchFocus();
   // However Details leaves (its trigger, Escape, the I hotkey, a selection that takes the header item, a stage that
-  // remounts), focus inside it would fall to the body. It goes to the trigger instead, or, when the trigger left too, to
-  // the Preview's own window or region. Read once removal is committed: a cleanup alone cannot tell removal apart from a
-  // re-attached ref, and focus that already moved elsewhere stays put.
+  // remounts), focus inside it would fall to the body. It goes to the trigger instead, or, when the trigger left too,
+  // to the Preview's own window or region. Read once removal is committed: a cleanup alone cannot tell removal apart
+  // from a re-attached ref, and focus that already moved elsewhere stays put.
   const restoreFocusOnRemoval = useCallback(
     (element: HTMLDivElement | null) => {
       if (!element) {
@@ -180,8 +170,7 @@ export const PreviewDetailsPanel = ({
   const panel =
     isOpen && stageElement
       ? createPortal(
-          // A named region rather than a group: a pinned panel is a place to return to, so it is a landmark. It
-          // follows the stage's media in DOM order, so Tab reaches it from the Preview without moving focus on open.
+          // A named region rather than a group: a pinned panel is a place to return to, so it is a landmark.
           <Box
             ref={restoreFocusOnRemoval}
             aria-label={label}

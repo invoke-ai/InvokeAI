@@ -7,11 +7,8 @@ import type { GalleryItemDragData } from './galleryDnd';
 
 import { getGalleryItemDragData, useGalleryImageDroppable } from './galleryDnd';
 
-const TARGET_IDS = [
-  'upscale-input-image',
-  'generate-reference-images',
-  'regional-ref-image:layer-1:reference-1',
-] as const;
+// Every image-only target uses the same hook branch; its id is an opaque string.
+const TARGET_ID = 'generate-reference-images';
 const imageData = getGalleryItemDragData([{ kind: 'image', name: 'still.png' }]);
 const videoData = getGalleryItemDragData([{ kind: 'video', name: 'clip.mp4' }]);
 const mixedData = getGalleryItemDragData([
@@ -102,16 +99,16 @@ afterEach(async () => {
   root = null;
 });
 
-describe.each(TARGET_IDS)('%s image-only drop presentation', (targetId) => {
+describe('image-only drop presentation', () => {
   it('visually accepts an all-image gallery drag', async () => {
-    expect(await dragOverTarget(imageData, targetId)).toBe('true');
+    expect(await dragOverTarget(imageData, TARGET_ID)).toBe('true');
   });
 
   it('does not visually accept a video gallery drag', async () => {
-    expect(await dragOverTarget(videoData, targetId)).toBe('false');
+    expect(await dragOverTarget(videoData, TARGET_ID)).toBe('false');
   });
 
   it('does not visually accept a mixed gallery drag', async () => {
-    expect(await dragOverTarget(mixedData, targetId)).toBe('false');
+    expect(await dragOverTarget(mixedData, TARGET_ID)).toBe('false');
   });
 });

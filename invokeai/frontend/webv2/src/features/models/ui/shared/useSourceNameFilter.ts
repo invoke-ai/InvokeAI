@@ -6,8 +6,8 @@ export const sourceFileName = (source: string): string => source.split(/[\\/]/).
 const HF_RESOLVE_PATH = /\/resolve\/[^/]+\/(.+)$/;
 
 /**
- * Where a source sits under its repo or scan root: the part that tells same-named files apart. Null when that is
- * just the file name, which the row already shows.
+ * Where a source sits under its repo or scan root: the part that tells same-named files apart. Null when that is just
+ * the file name, which the row already shows.
  */
 export const sourceLocation = (source: string, root?: string): string | null => {
   const inRepo = HF_RESOLVE_PATH.exec(source)?.[1];

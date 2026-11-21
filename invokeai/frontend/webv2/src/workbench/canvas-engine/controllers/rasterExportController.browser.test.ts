@@ -1,5 +1,3 @@
-/** Real-canvas checks that world-space bakes resample the display's layer-local adjusted pixels. */
-
 import type { CanvasDocumentContractV3, CanvasRasterLayerContractV2 } from '@workbench/canvas-engine/contracts';
 import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
 
@@ -16,7 +14,6 @@ import { RasterExportController } from './rasterExportController';
 
 const TRANSFORM = { rotation: Math.PI / 9, scaleX: 0.6, scaleY: 0.6, x: 11, y: 5 };
 
-/** A rotated, downscaled noisy layer with off-origin content: its stack works in layer-local pixels. */
 const bakeScene = (peekDisplayed: boolean) => {
   const backend = createDomRasterBackend();
   const layers = createLayerCacheStore(backend);
@@ -88,7 +85,6 @@ const bakeScene = (peekDisplayed: boolean) => {
     pin: () => ({ release: () => undefined }),
     reserve,
   });
-  /** The display's adjusted surface drawn through the layer transform: what the canvas shows. */
   const reference = (rect: { x: number; y: number; width: number; height: number }) => {
     const surface = backend.createSurface(rect.width, rect.height);
     const matrix = fromTRS({ x: TRANSFORM.x, y: TRANSFORM.y }, TRANSFORM.rotation, TRANSFORM.scaleX, TRANSFORM.scaleY);
@@ -114,7 +110,6 @@ describe('baked raster export', () => {
     }
     const { height, width } = baked.rect;
     expect([...baked.surface.ctx.getImageData(0, 0, width, height).data]).toEqual(reference(baked.rect));
-    // The world surface always; a layer-local copy (surface plus ImageData) only without a current display copy.
     const world = width * height * 4;
     expect(reserve.mock.calls).toEqual(peekDisplayed ? [[world]] : [[40 * 30 * 8], [world]]);
     baked.release();

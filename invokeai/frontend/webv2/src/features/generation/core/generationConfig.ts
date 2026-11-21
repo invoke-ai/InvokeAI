@@ -1,8 +1,11 @@
 /** Shared types avoid a mapper/policy circular dependency. */
 
-export type SchedulerSetId = 'standard' | 'flow' | 'flow-no-lcm' | 'anima';
+import type { ArchitectureCapabilitiesRow } from '@features/models/architectures';
 
-export type NegativePromptUsage = 'always' | 'cfg-gated' | 'never';
+/** The served vocabularies, as the backend's `FeaturesFacet` names them. */
+export type SchedulerSetId = NonNullable<ArchitectureCapabilitiesRow['features']['scheduler_set']>;
+
+export type NegativePromptUsage = ArchitectureCapabilitiesRow['features']['negative_prompt']['usage'];
 
 export type GuidanceLabel = 'CFG' | 'Guidance';
 

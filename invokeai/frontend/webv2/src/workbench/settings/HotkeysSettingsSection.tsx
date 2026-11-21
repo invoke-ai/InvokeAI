@@ -33,6 +33,7 @@ const SCOPE_LABEL_KEYS: Record<HotkeyCategory, string> = {
   app: 'hotkeys.scopes.focusedPanel',
   canvas: 'hotkeys.categories.canvas',
   gallery: 'hotkeys.categories.gallery',
+  queue: 'hotkeys.categories.queue',
   viewer: 'hotkeys.categories.viewer',
   workflows: 'hotkeys.categories.workflows',
 };
@@ -47,11 +48,12 @@ const CATEGORY_LABEL_KEYS: Record<HotkeyCategory, string> = {
   app: 'hotkeys.categories.app',
   canvas: 'hotkeys.categories.canvas',
   gallery: 'hotkeys.categories.gallery',
+  queue: 'hotkeys.categories.queue',
   viewer: 'hotkeys.categories.viewer',
   workflows: 'hotkeys.categories.workflows',
 };
 
-const CATEGORY_ORDER: HotkeyCategory[] = ['app', 'canvas', 'workflows', 'viewer', 'gallery'];
+const CATEGORY_ORDER: HotkeyCategory[] = ['app', 'canvas', 'workflows', 'viewer', 'gallery', 'queue'];
 
 const SEARCH_START_ELEMENT = <Icon as={SearchIcon} boxSize="3.5" />;
 const NO_MATCHES_ICON = <Icon as={SearchIcon} />;

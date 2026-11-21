@@ -103,11 +103,7 @@ const stopped = (
   return null;
 };
 
-/**
- * Reserve seeds after layer upload in the graph-build turn. Serialized runs advance consecutively; pre-build
- * refusals consume none, later failures do. Apply advances to the project graph with value/mode fences so
- * concurrent edits win.
- */
+/** Seeds reserved after upload; pre-build refusals consume none, later failures do. */
 export const reserveLayerWorkflowSeeds = (
   document: ProjectGraphState,
   templatesSnapshot: InvocationTemplatesSnapshot
@@ -145,8 +141,6 @@ export const runLayerWorkflow = async (options: RunLayerWorkflowOptions): Promis
     }
 
     failureStage = 'graph';
-    // Reserve seeds with graph build after upload; earlier refusals consume none, later failures retain the
-    // reservation.
     const seedPlan = deps.reserveSeeds();
 
     if (seedPlan.seedAdvances.length > 0) {
@@ -180,9 +174,8 @@ export const runLayerWorkflow = async (options: RunLayerWorkflowOptions): Promis
     }
 
     if (options.destination === 'gallery') {
-      // Saving is itself the authoritative external mutation. Once it succeeds,
-      // refresh the captured project and report success even if the dialog closes
-      // in the same tick.
+      // Saving is itself the authoritative external mutation. Once it succeeds, refresh the captured project and report
+      // success even if the dialog closes in the same tick.
       failureStage = 'gallery';
       await deps.saveToGallery(image.imageName);
       try {
@@ -194,11 +187,9 @@ export const runLayerWorkflow = async (options: RunLayerWorkflowOptions): Promis
     }
 
     failureStage = 'durability';
-    // Promotion must precede any canvas reference. If cancellation/staleness
-    // wins after this non-abortable PATCH, leave the output durable but
-    // unreferenced: arbitrary workflow outputs may echo/cache an existing image,
-    // and the image API has no ownership token or compare-and-swap with which to
-    // safely delete or mark it intermediate again.
+    // Promotion must precede any canvas reference. If cancellation/staleness wins after this non-abortable PATCH, leave
+    // the output durable but unreferenced: arbitrary workflow outputs may echo/cache an existing image, and the image
+    // API has no ownership token or compare-and-swap with which to safely delete or mark it intermediate again.
     await deps.makeDurable(image.imageName);
     canceled = stopped(signal, exported.guard, deps.isGuardCurrent);
     if (canceled) {
@@ -229,9 +220,8 @@ export const runLayerWorkflow = async (options: RunLayerWorkflowOptions): Promis
       signal,
       target: options.destination,
     });
-    // The engine performs the last abort/guard check immediately before its
-    // structural mutation. Preserve that authoritative result instead of
-    // relabeling a successful commit after a late dialog close.
+    // The engine performs the last abort/guard check immediately before its structural mutation. Preserve that
+    // authoritative result instead of relabeling a successful commit after a late dialog close.
     if (committed.status === 'committed') {
       return { imageName: image.imageName, status: 'completed' };
     }

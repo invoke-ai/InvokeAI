@@ -3,6 +3,7 @@ import pytest
 from scripts.family_e2e.graphs import (
     IDEOGRAM4_PRESET_STEPS,
     build_export_request,
+    flag_missing_models,
     output_image_name,
     prepare_batch,
     shareable_source,
@@ -90,6 +91,11 @@ def test_output_image_comes_from_the_one_non_intermediate_image_node() -> None:
         output_image_name(graph, session)
     with pytest.raises(ValueError, match="found 0"):
         output_image_name(graph, _session({}))
+
+
+def test_models_whose_files_are_gone_reach_the_exporter_flagged() -> None:
+    assert flag_missing_models([MAIN, LORA], [LORA]) == [MAIN, {**LORA, "is_missing": True}]
+    assert flag_missing_models([MAIN], []) == [MAIN]
 
 
 def test_export_request_carries_each_case_with_its_uploaded_images() -> None:

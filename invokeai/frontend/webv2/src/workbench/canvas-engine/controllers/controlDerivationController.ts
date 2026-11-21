@@ -72,8 +72,8 @@ interface RecordedEntry {
   /** `controlDetectionInputKey` of the entry's after-state. */
   readonly inputKey: string;
   /**
-   * Whether a map for `inputKey` belongs to this entry: it changed what detection runs on (an intent that requested
-   * the map), or it is a map itself. A weight or name patch is not, so undoing it never also drops a later map.
+   * Whether a map for `inputKey` belongs to this entry: it changed what detection runs on (an intent that requested the
+   * map), or it is a map itself. A weight or name patch is not, so undoing it never also drops a later map.
    */
   readonly requestsMap: boolean;
   /** The layer the entry's undo restores, with its unpersisted pixels when its source cannot reproduce them. */
@@ -99,8 +99,8 @@ const sameSource = (a: CanvasControlLayerContract, b: CanvasControlLayerContract
 /**
  * Commits control-layer derivation edits: intent patches (type, detector, settings, image) and background detection
  * maps. Neither takes the operation edit owner, so both yield to a modal operation, gesture, replay or layer session
- * and the caller retries. A map lands in the same undo step as the intent that requested it while that intent is
- * still the newest step.
+ * and the caller retries. A map lands in the same undo step as the intent that requested it while that intent is still
+ * the newest step.
  */
 export class ControlDerivationController implements CanvasControlDerivationCapability {
   private last: RecordedEntry | null = null;
@@ -409,8 +409,8 @@ export class ControlDerivationController implements CanvasControlDerivationCapab
   }
 
   /**
-   * Swaps `layer` in. A source change drops the outgoing source's pending persistence, which would otherwise land
-   * its old pixels over the new source.
+   * Swaps `layer` in. A source change drops the outgoing source's pending persistence, which would otherwise land its
+   * old pixels over the new source.
    */
   private replaceStep(
     layer: CanvasControlLayerContract,

@@ -12,6 +12,7 @@ import { toGalleryItemKey, toGalleryItemRef } from '@features/gallery/core/items
 import { getGalleryDeletionSuccessor } from '@features/gallery/core/selection';
 import { getGallerySettings, type GallerySettings } from '@features/gallery/core/settings';
 import { GalleryUiProvider, type GalleryUiAdapter } from '@features/gallery/react';
+import { resolvedValues } from '@platform/core/resolvedValues.testing';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
@@ -40,12 +41,6 @@ import { mergeGalleryLoadedItems } from './galleryGridLayout';
 import { GalleryImageGrid } from './GalleryImageGrid';
 import { GalleryWidgetContext } from './GalleryWidgetContext';
 
-/**
- * Keyboard focus in the real grid: the real virtualizer and real key presses, routed to the gallery's commands by
- * the workbench hotkey runtime through real focus regions. The gallery's slice of workbench state is a small
- * external store, and item deletion stands in for the backend round trip that decides the next selection.
- */
-
 const runtimeMocks = vi.hoisted(() => ({
   extensions: null as unknown as ExtensionRegistry,
   store: null as unknown as WorkbenchInternalStore,
@@ -57,16 +52,13 @@ vi.mock('@workbench/WorkbenchContext', () => ({
   useOptionalWorkbenchExtensions: () => runtimeMocks.extensions,
   useWorkbenchExtensions: () => runtimeMocks.extensions,
   useWorkbenchInternalStore: () => runtimeMocks.store,
-  // No canvas engine is live here, so a frame resize the runtime asks for stays a plain write.
   useWorkbenchLiveCanvasEngines: () => ({ commitFrame: () => false }),
   useWorkbenchQueries: () => runtimeMocks.store.queries,
   useWorkbenchSubscription: () => runtimeMocks.store.subscribe,
 }));
-// They need the whole application; the gallery registers its own commands.
 vi.mock('@workbench/hotkeys/firstPartyCommands', () => ({ useRegisterFirstPartyCommands: () => {} }));
 vi.mock('@features/gallery/data/queries', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  // The listing's order, which Shift ranges resolve against.
   galleryItemNamesOptions: () => ({
     queryFn: () => ({ items: state.gallery.items.map(toGalleryItemRef) }),
     queryKey: ['test-gallery-item-names', state.gallery.selectedBoardId],
@@ -76,7 +68,6 @@ vi.mock('@features/gallery/data/queries', async (importOriginal) => ({
     queryKey: ['test-image-index-availability'],
   }),
 }));
-// Hotkey preferences save as Settings saves them; the backend round trip is not under test.
 vi.mock('@workbench/projects/api', async (importOriginal) => ({
   ...(await importOriginal<typeof projectsApi>()),
   setClientStateValue: async () => {},
@@ -165,6 +156,7 @@ const createGallery = (items: GalleryItem[], selected: GalleryItem | null): Gall
   compareImageKey: null,
   galleryView: 'images',
   isComparisonActive: false,
+  isCompareArmed: false,
   isSearchActive: false,
   items,
   listingBoardId: 'board-a',
@@ -178,8 +170,8 @@ const createGallery = (items: GalleryItem[], selected: GalleryItem | null): Gall
   selectionStarredOnly: false,
   semanticImageQuery: null,
   semanticSearchText: null,
-  // At the default density the harness shows three columns and a few rows of 400 items.
-  settings: getGallerySettings({ paginationMode: 'paginated' }),
+  // The harness shows three columns.
+  settings: getGallerySettings(resolvedValues({ paginationMode: 'paginated' })),
   starredOnly: false,
 });
 
@@ -188,7 +180,6 @@ interface HarnessState {
   galleryMounted: boolean;
   followedSessionId: string | null;
   gallery: GalleryStateView;
-  /** The widget's persisted values; the selection as the workbench keeps it. */
   galleryValues: Record<string, unknown>;
   listing: GalleryListingState;
   sessions: QueueProgressSession[];
@@ -218,7 +209,6 @@ const actions = {
     setGallery({ selectedItemKey: toGalleryItemKey(primary), selectedItemKeys: refs.map(toGalleryItemKey) }),
   setCompareItem: vi.fn(),
   setStarredOnly: vi.fn(),
-  // As the workbench toggles: an added item becomes the primary; removing the primary hands it on.
   toggleItemInSelection: (item: GalleryItem, nextPrimary: GalleryItem | null) => {
     const key = toGalleryItemKey(item);
     const { selectedItemKey, selectedItemKeys } = state.gallery;
@@ -237,10 +227,6 @@ const actions = {
   uploadFiles: vi.fn(),
 } as unknown as GalleryActions;
 
-/**
- * Deletion as the workbench applies it: the items leave the listing and the selection at once, and the neighbour is
- * selected once the backend confirms.
- */
 const applyDeletion = async (refs: GalleryItemRef[]) => {
   const removed = new Set(refs.map(toGalleryItemKey));
   const before = state.gallery.items;
@@ -258,7 +244,6 @@ const applyDeletion = async (refs: GalleryItemRef[]) => {
 const confirmationRef = createRef<RequestDeletionConfirmation>();
 const openedInPreview: string[] = [];
 const itemActions = {
-  // As the workbench opens one: select the item, then reveal Preview elsewhere in the layout.
   openItemInPreview: (item: GalleryItem) => {
     select(item);
     openedInPreview.push(item.name);
@@ -267,7 +252,6 @@ const itemActions = {
     state.confirmDeletion
       ? confirmationRef.current!(refs, () => applyDeletion(refs), { returnFocus: options?.returnFocus })
       : applyDeletion(refs),
-  // The listing holds unstarred items only, so starring moves an item into the strip and back.
   setItemsStarred: (refs: GalleryItemRef[], starred: boolean) => {
     const keys = new Set(refs.map(toGalleryItemKey));
     const moved = [...state.strip, ...state.gallery.items]
@@ -286,7 +270,6 @@ const itemActions = {
   },
 };
 
-/** The production confirmation dialog, which returns focus where the request says, else to whatever opened it. */
 const DeletionConfirmationHost = ({ ref }: { ref: Ref<RequestDeletionConfirmation> }) => {
   const { dialog, requestDeletionConfirmation } = useDeletionConfirmation();
 
@@ -314,7 +297,6 @@ const GalleryRegion = ({ runtime }: { runtime: ReturnType<typeof createGalleryRu
     subscribe,
     getState
   );
-  // Memoized per scope, as the widget derives it.
   const filter = useMemo(() => ({ boardId: gallery.selectedBoardId }), [gallery.selectedBoardId]);
   const adapter = {
     ImageContextMenu: () => null,
@@ -364,7 +346,6 @@ const GalleryRegion = ({ runtime }: { runtime: ReturnType<typeof createGalleryRu
   );
 };
 
-/** Another docked region holding ordinary controls. */
 const OtherRegion = () => (
   <Box {...useFocusRegionProps('left')}>
     <input aria-label="Prompt" />
@@ -384,7 +365,6 @@ const settle = (ms = 30) =>
     });
   });
 
-/** Polls an observable condition instead of waiting a fixed time for scrolling, deletion or a dialog's exit. */
 const until = (assertion: () => void) => act(() => vi.waitFor(assertion, { interval: 20, timeout: 2000 }));
 
 const press = async (keys: string) => {
@@ -397,7 +377,6 @@ const thumbnail = (name: string) =>
   host!.querySelector<HTMLButtonElement>(`button[aria-label="Select ${name} for preview"]`);
 const button = (name: string) =>
   [...document.querySelectorAll<HTMLButtonElement>('button')].find((candidate) => candidate.textContent === name)!;
-/** The thumbnail holding keyboard focus, by item name; null when focus is anywhere else. */
 const focusedThumbnail = () =>
   document.activeElement instanceof HTMLButtonElement && document.activeElement.closest('[role="listitem"]') !== null
     ? document.activeElement.getAttribute('aria-label')!.replace(/^Select (.*) for preview$/, '$1')
@@ -459,7 +438,6 @@ const renderGrid = async (
   await settle(50);
 };
 
-/** Tabs from the other region's last control into the gallery. */
 const tabIntoGallery = async () => {
   button('Elsewhere').focus();
   await act(() => userEvent.tab());
@@ -511,7 +489,6 @@ describe('Gallery grid keyboard focus', () => {
     expect(selectedKey()).toBe('image:image-90.png');
     expect(focusedThumbnail()).toBe('image-90.png');
     expect(isInView(document.activeElement!)).toBe(true);
-    // The rows focus started in are gone: the grid really virtualized them away.
     expect(thumbnail('image-0.png')).toBeNull();
   });
 
@@ -527,7 +504,6 @@ describe('Gallery grid keyboard focus', () => {
     expect(selectedKeys()).toEqual(['image:image-2.png']);
     expect(openedInPreview).toEqual([]);
 
-    // Enter is not a gallery hotkey: it reaches the focused tile alone, which opens it.
     await press('{ArrowRight}');
     await press('{Enter}');
 
@@ -558,7 +534,6 @@ describe('Gallery grid keyboard focus', () => {
     const items = createItems(120);
     await renderGrid(items, { selected: items[119]!, settings: { paginationMode: 'infinite' } });
 
-    // The selection's row stays mounted as the Tab stop, but the top of the listing is what is in view.
     expect(thumbnail('image-119.png')).not.toBeNull();
     expect(actions.loadMore).not.toHaveBeenCalled();
 
@@ -610,7 +585,6 @@ describe('Gallery grid keyboard focus', () => {
     (document.activeElement as HTMLElement | null)?.blur();
     expect(document.activeElement).toBe(document.body);
 
-    // Nothing holds focus, and the deleted tile never did: the gallery must not take it.
     await act(() => runtimeMocks.extensions.commands.executeForSource('gallery.deleteSelection', gallerySource));
     await until(() => expect(selectedKey()).toBe('image:image-2.png'));
 
@@ -634,7 +608,6 @@ describe('Gallery grid keyboard focus', () => {
     await renderGrid(createItems(6), { strip: [createItem('starred-0.png', { starred: true })] });
     const star = host!.querySelector<HTMLButtonElement>('button[aria-label="Star image-2.png"]')!;
 
-    // A pointer press focuses the star, which is click-focusable though not a Tab stop.
     await act(() => {
       star.focus();
       star.click();
@@ -650,7 +623,6 @@ describe('Gallery grid keyboard focus', () => {
     const strip = [0, 1, 2].map((index) => createItem(`starred-${index}.png`, { starred: true }));
     const beyond = createItem('starred-40.png', { starred: true });
     const items = createItems(6);
-    // The strip's bound left the selection out, and the listing holds unstarred items only: no tile shows it.
     await renderGrid(items, {
       galleryValues: { selectedBoardId: 'board-a', selectedImage: beyond },
       selected: null,
@@ -668,7 +640,6 @@ describe('Gallery grid keyboard focus', () => {
   it("starts from the new board's first starred tile when the starred selection stayed on the previous board", async () => {
     const starredA = createItem('starred-a.png', { starred: true });
     await renderGrid(createItems(6), {
-      // Selecting stamps the listing the selection was made in.
       galleryValues: {
         selectedBoardId: 'board-a',
         selectedImage: starredA,
@@ -687,7 +658,6 @@ describe('Gallery grid keyboard focus', () => {
       strip: [starredA],
     });
 
-    // As the board switch leaves it: the selection set clears, but the primary selection and its stamp persist.
     const stripB = [0, 1, 2].map((index) =>
       createItem(`starred-b-${index}.png`, { boardId: 'board-b', starred: true })
     );
@@ -737,7 +707,6 @@ describe('Gallery grid keyboard focus', () => {
     );
     await settle();
 
-    // With the old selection off this board, Tab and the arrows both start from its first tile.
     expect(host!.querySelector('[role="listitem"] button[tabindex="0"]')?.getAttribute('aria-label')).toBe(
       'Select other-0.png for preview'
     );
@@ -752,11 +721,9 @@ describe('Gallery grid keyboard focus', () => {
     const elsewhere = button('Elsewhere');
     elsewhere.focus();
 
-    // An arrow aimed at another region is not the gallery's.
     await press('{ArrowRight}');
     expect(selectedKey()).toBe('image:image-0.png');
 
-    // The command palette runs the gallery's command with focus elsewhere.
     await act(() => runtimeMocks.extensions.commands.executeForSource('gallery.galleryNavRight', gallerySource));
     await settle();
 
@@ -774,7 +741,6 @@ describe('Gallery grid keyboard focus', () => {
     expect(focusedThumbnail()).toBe('image-200.png');
     expect(isInView(document.activeElement!)).toBe(true);
 
-    // Neither the other tiles nor their star toggles are Tab stops.
     await act(() => userEvent.tab());
     expect(document.activeElement).toBe(button('After the gallery'));
 
@@ -794,7 +760,6 @@ describe('Gallery grid keyboard focus', () => {
     expect(selectedKeys()).toEqual(['image:image-1.png', 'image:image-2.png', 'image:image-3.png']);
     expect(focusedThumbnail()).toBe('image-3.png');
 
-    // Down a row of three keeps the anchor; back up shrinks the range to it again.
     await press('{Shift>}{ArrowDown}{/Shift}');
     await until(() => expect(selectedKeys()).toHaveLength(6));
     expect(selectedKeys().at(-1)).toBe('image:image-6.png');
@@ -803,7 +768,6 @@ describe('Gallery grid keyboard focus', () => {
     await until(() => expect(selectedKeys()).toHaveLength(3));
     expect(focusedThumbnail()).toBe('image-3.png');
 
-    // A plain arrow replaces the range.
     await press('{ArrowLeft}');
 
     expect(selectedKeys()).toEqual(['image:image-2.png']);
@@ -843,14 +807,13 @@ describe('Gallery grid keyboard focus', () => {
     expect(focusedThumbnail()).toBe('image-2.png');
     expect(selectedKeys()).toEqual(['image:image-0.png']);
 
-    // Up and down as well: the app binds Ctrl+Up/Down to prompt weight, but inside the gallery its keys win.
+    // The app binds Ctrl+Up/Down to prompt weight, but inside the gallery its keys win.
     await press('{Control>}{ArrowDown}{/Control}');
     expect(focusedThumbnail()).toBe('image-5.png');
     await press('{Control>}{ArrowUp}{/Control}');
     expect(focusedThumbnail()).toBe('image-2.png');
     expect(selectedKeys()).toEqual(['image:image-0.png']);
 
-    // No hotkey is bound by default: the browser activates the focused button as a Ctrl+click, which toggles it.
     await press('{Control>} {/Control}');
 
     expect(selectedKeys()).toEqual(['image:image-0.png', 'image:image-2.png']);
@@ -861,12 +824,10 @@ describe('Gallery grid keyboard focus', () => {
 
     expect(selectedKeys()).toEqual(['image:image-0.png', 'image:image-2.png']);
 
-    // The focused tile, not the selection, is where Tab comes back to.
     await act(() => userEvent.tab());
     await act(() => userEvent.tab({ shift: true }));
     expect(focusedThumbnail()).toBe('image-3.png');
 
-    // A plain arrow steps from focus and replaces the selection.
     await press('{ArrowRight}');
 
     expect(selectedKeys()).toEqual(['image:image-4.png']);
@@ -878,7 +839,6 @@ describe('Gallery grid keyboard focus', () => {
     await renderGrid(items);
     await tabIntoGallery();
 
-    // Unbound by default, so the key does nothing until it is assigned as Settings assigns it.
     await press('{Control>}{ArrowRight}{/Control}');
     await press('x');
     expect(selectedKeys()).toEqual(['image:image-0.png']);
@@ -901,7 +861,6 @@ describe('Gallery grid keyboard focus', () => {
     await press('{Shift>}{ArrowRight}{/Shift}');
     expect(selectedKeys()).toEqual(['image:image-0.png', 'image:image-1.png']);
 
-    // Esc in the Gallery is left to Preview; it neither deselects nor moves focus.
     await press('{Escape}');
     expect(selectedKeys()).toEqual(['image:image-0.png', 'image:image-1.png']);
     expect(selectedKey()).toBe('image:image-1.png');
@@ -921,14 +880,12 @@ describe('Gallery grid keyboard focus', () => {
       sessions: [createSession('queued', 'queued'), createSession('running', 'running')],
       strip,
     });
-    // The strip's disclosure comes first, then the one thumbnail Tab stop.
     await tabIntoGallery();
     expect(document.activeElement?.getAttribute('aria-expanded')).toBe('true');
     expect(document.activeElement?.textContent).toMatch(/^Starred/);
     await act(() => userEvent.tab());
     expect(focusedThumbnail()).toBe('starred-0.png');
 
-    // Down from the strip skips the queued session, which cannot be followed.
     await press('{ArrowDown}');
 
     expect(state.followedSessionId).toBe('running');
@@ -952,12 +909,10 @@ describe('Gallery grid keyboard focus', () => {
     await act(() => userEvent.click(thumbnail('image-1.png')!));
     await settle();
 
-    // Up from the listing's first row follows the running tile above it.
     await press('{ArrowUp}');
     expect(state.followedSessionId).toBe('running');
     expect(document.activeElement?.getAttribute('data-gallery-session-id')).toBe('running');
 
-    // Focus alone moves past the tile to the next thumbnail, which follows it in the listing, then on along it.
     await press('{Control>}{ArrowRight}{/Control}');
     expect(focusedThumbnail()).toBe('image-0.png');
     await press('{Control>}{ArrowRight}{/Control}');
@@ -972,7 +927,6 @@ describe('Gallery grid keyboard focus', () => {
     await press('{ArrowUp}');
     expect(state.followedSessionId).toBe('running');
 
-    // A range runs from the selection to that same neighbour.
     await press('{Shift>}{ArrowRight}{/Shift}');
     await until(() => expect(selectedKey()).toBe('image:image-0.png'));
     expect(selectedKeys()).toEqual(['image:image-0.png', 'image:image-1.png']);
@@ -982,7 +936,6 @@ describe('Gallery grid keyboard focus', () => {
   it('steps from a clicked thumbnail while a run is followed, also after a resubmit follows it again', async () => {
     const strip = [createItem('starred-0.png', { starred: true }), createItem('starred-1.png', { starred: true })];
     const items = createItems(40);
-    // The user's sequence: a run is followed live when they click a thumbnail, which pauses following.
     await renderGrid(items, {
       followedSessionId: 'running',
       selected: null,
@@ -996,8 +949,6 @@ describe('Gallery grid keyboard focus', () => {
     await press('{ArrowRight}');
     expect(selectedKey()).toBe('image:image-5.png');
 
-    // Invoking again follows the new run while the thumbnail keeps keyboard focus: the arrows step from that tile,
-    // whether the In progress section is shown or collapsed.
     for (const [collapsed, expected] of [
       [false, 'image-6.png'],
       [true, 'image-7.png'],
@@ -1022,15 +973,12 @@ describe('Gallery grid keyboard focus', () => {
       settings: { progressSectionCollapsed: true },
       strip,
     });
-    // Collapsing the section leaves focus on its disclosure, outside every thumbnail.
     await act(() => host!.querySelector<HTMLButtonElement>('[data-progress-disclosure]')!.focus());
 
     await press('{ArrowRight}');
     expect(selectedKey()).toBe('image:image-5.png');
     expect(focusedThumbnail()).toBe('image-5.png');
 
-    // Each resubmit follows live again; with focus off the thumbnails and the tile still hidden, the arrows keep
-    // stepping from the selection.
     for (const expected of ['image-6.png', 'image-7.png']) {
       await act(() => {
         host!.querySelector<HTMLButtonElement>('[data-progress-disclosure]')!.focus();
@@ -1040,7 +988,6 @@ describe('Gallery grid keyboard focus', () => {
       expect(selectedKey()).toBe(`image:${expected}`);
     }
 
-    // Shown, the followed tile is where the arrows start, as in Preview: right of it is the listing's first tile.
     await act(() => setGallery({ settings: { ...state.gallery.settings, progressSectionCollapsed: false } }));
     await act(() => {
       host!.querySelector<HTMLButtonElement>('[data-progress-disclosure]')!.focus();
@@ -1053,7 +1000,6 @@ describe('Gallery grid keyboard focus', () => {
   it('starts from the first thumbnail in view, not the first starred one, when no cursor is on screen', async () => {
     const strip = [createItem('starred-0.png', { starred: true }), createItem('starred-1.png', { starred: true })];
     await renderGrid(createItems(400), { selected: null, strip });
-    // Scrolled well past the strip with nothing selected and focus on the grid itself, off every thumbnail.
     await act(() => {
       viewport().scrollTop = 3000;
     });
@@ -1073,7 +1019,6 @@ describe('Gallery grid keyboard focus', () => {
     await renderGrid(createItems(40), { sessions: [createSession('running', 'running')], strip });
     await act(() => userEvent.click(thumbnail('image-1.png')!));
     await settle();
-    // With no selection, the Tab stop is the thumbnail focus was last on. Preview's clear button runs this command.
     await act(() => runtimeMocks.extensions.commands.executeForSource('gallery.clearSelection', gallerySource));
     await settle();
     expect(selectedKey()).toBeNull();
@@ -1082,7 +1027,6 @@ describe('Gallery grid keyboard focus', () => {
     await press('{ArrowUp}');
     expect(document.activeElement?.getAttribute('data-gallery-session-id')).toBe('running');
 
-    // The run finishes; its tile, holding focus, leaves with the whole In progress section.
     await act(() => setState({ followedSessionId: null, sessions: [] }));
     await until(() => expect(focusedThumbnail()).toBe('image-1.png'));
   });
@@ -1097,7 +1041,6 @@ describe('Gallery grid keyboard focus', () => {
     await press('{ArrowRight}');
     expect(selectedKey()).toBe('image:image-5.png');
 
-    // The run finishes: its result lands at the top of the listing and its tile leaves, shifting every row.
     const result = createItem('result-0.png');
     await act(() => setState({ gallery: { ...state.gallery, items: [result, ...state.gallery.items] }, sessions: [] }));
     await until(() => expect(focusedThumbnail()).toBe('image-5.png'));
@@ -1106,7 +1049,6 @@ describe('Gallery grid keyboard focus', () => {
     expect(selectedKey()).toBe('image:image-6.png');
     expect(focusedThumbnail()).toBe('image-6.png');
 
-    // Starred, the selection moves to the strip's end; the next step is from there, onto the listing's first tile.
     await press('.');
     await until(() => expect(document.activeElement?.closest('[data-gallery-section="starred"]')).not.toBeNull());
     await press('{ArrowRight}');

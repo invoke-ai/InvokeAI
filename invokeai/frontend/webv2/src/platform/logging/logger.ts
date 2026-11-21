@@ -339,8 +339,8 @@ const mergeSource = (base: LogSource, override: Partial<LogSource>): LogSource =
 };
 
 /**
- * A logger bound to `source`. Pass `owner` from a runtime or operation start so writes after that account
- * lifetime ends are discarded; module-level loggers stay unbound.
+ * A logger bound to `source`. Pass `owner` from a runtime or operation start so writes after that account lifetime ends
+ * are discarded; module-level loggers stay unbound.
  */
 export const createLogger = (source: LogSource, options: { owner?: AccountScope } = {}): Logger => {
   const bound = cloneSource(source);

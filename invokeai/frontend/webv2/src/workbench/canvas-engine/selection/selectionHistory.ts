@@ -1,7 +1,7 @@
 /**
- * Snapshots selection-changing calls into individual engine-history steps. Unchanged selections record nothing;
- * replay restores snapshots directly without recording again. A change is refused while a replay runs, and one
- * whose step history could never keep is rolled back to the exact prior snapshot.
+ * Snapshots selection-changing calls into individual engine-history steps. Unchanged selections record nothing; replay
+ * restores snapshots directly without recording again. A change is refused while a replay runs, and one whose step
+ * history could never keep is rolled back to the exact prior snapshot.
  */
 
 import type { History } from '@workbench/canvas-engine/history/history';
