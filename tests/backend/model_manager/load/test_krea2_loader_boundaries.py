@@ -1075,3 +1075,41 @@ def test_an_nvfp4_layer_missing_its_global_scale_is_refused_before_the_cache_is_
         run.load(config)
 
     assert run.reserved == []
+
+
+def test_gguf_loader_holds_rms_norm_weights_in_fp32_as_stored(monkeypatch, tmp_path) -> None:
+    """#10117: a bf16 norm weight against Krea2RMSNorm's float32 input rounds `1 + weight` and skips the fused kernel."""
+    import gguf
+    from diffusers.models.transformers.transformer_krea2 import Krea2RMSNorm
+
+    from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
+
+    class _NormHost(torch.nn.Module):
+        def __init__(self, **_kwargs) -> None:
+            super().__init__()
+            self.norm = Krea2RMSNorm(4)
+
+    stored = torch.tensor([0.1234567, -0.0101, 0.5, 3e-4])  # not representable in bf16
+    checkpoint_path = tmp_path / "krea2.gguf"
+    loader, config = _gguf_driver(monkeypatch, checkpoint_path, _NormHost)
+    monkeypatch.setattr(
+        "invokeai.backend.model_manager.load.model_loaders.krea2.TorchDevice.choose_krea2_transformer_dtype",
+        lambda **_kwargs: torch.bfloat16,
+    )
+    monkeypatch.setattr(
+        "invokeai.backend.model_manager.load.model_loaders.krea2.gguf_sd_loader",
+        lambda _path, *, compute_dtype, **_kwargs: {
+            "norm.weight": GGMLTensor(
+                stored.clone(),
+                ggml_quantization_type=gguf.GGMLQuantizationType.F32,
+                tensor_shape=stored.shape,
+                compute_dtype=compute_dtype,
+            )
+        },
+    )
+
+    model = loader._load_from_gguf(config)
+
+    assert type(model.norm.weight.data) is torch.Tensor
+    assert model.norm.weight.dtype == torch.float32
+    assert torch.equal(model.norm.weight.data, stored)
