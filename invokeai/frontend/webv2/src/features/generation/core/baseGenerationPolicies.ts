@@ -3553,6 +3553,23 @@ export const getGenerationValidationReasons = (
   mode: ExternalGenerationMode = 'txt2img'
 ): string[] => getGenerationValidationIssues(model, settings, mode).map(({ message }) => message);
 
+export const needsEmptyCanvasFrameForReferenceBudget = (
+  model: GenerateModelConfig | undefined,
+  settings: Pick<GenerateSettings, 'referenceImages'>
+): boolean => {
+  if (
+    !model ||
+    model.type !== 'external_image_generator' ||
+    !isSeedreamBatchModel(model) ||
+    !model.capabilities?.modes?.includes('txt2img') ||
+    !model.capabilities.modes.includes('img2img')
+  ) {
+    return false;
+  }
+
+  return getExternalReferenceImages(settings, model).length + 1 === SEEDREAM_BATCH_MAX_TOTAL_IMAGES;
+};
+
 /** Shared by the Invoke route and the Generate form. Omit `models` while the catalog is unread. */
 export const getGenerateInvocationIssues = (
   values: GenerateSettings & { model: GenerateModelConfig },
