@@ -231,7 +231,7 @@ export const buildQueueRecallValues = (
       : null;
   }
 
-  return snapshot ? { ...current, clipSkip: snapshot.clipSkip } : null;
+  return kind === 'clipSkip' && snapshot ? { ...current, clipSkip: snapshot.clipSkip } : null;
 };
 
 export const buildVideoQueueRecallPatch = (

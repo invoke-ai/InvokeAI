@@ -142,6 +142,8 @@ void i18n.use(initReactI18next).init({
                   clipSkip: 'Use CLIP skip',
                   dimensions: 'Use size',
                   prompts: 'Use prompt',
+                  positivePrompt: 'Use positive prompt',
+                  negativePrompt: 'Use negative prompt',
                   remix: 'Remix image',
                   seed: 'Use seed',
                 },
@@ -465,6 +467,7 @@ describe('Preview query-driven Details', () => {
     galleryMocks.imageMetadata.mockResolvedValueOnce({
       model: { name: 'Test Model' },
       positive_prompt: 'query-driven prompt',
+      negative_prompt: 'recalled negative prompt',
       seed: 42,
     });
 
@@ -481,8 +484,10 @@ describe('Preview query-driven Details', () => {
     expect(document.body.textContent).toContain('Queue run');
     expect(document.body.textContent).toContain('queue-image');
 
-    await interact(() => document.querySelector<HTMLButtonElement>('[aria-label="Use prompt"]')?.click());
-    expect(actions.recallImageData).toHaveBeenCalledWith(actionImage, 'prompts');
+    await interact(() => document.querySelector<HTMLButtonElement>('[aria-label="Use positive prompt"]')?.click());
+    expect(actions.recallImageData).toHaveBeenLastCalledWith(actionImage, 'positivePrompt');
+    await interact(() => document.querySelector<HTMLButtonElement>('[aria-label="Use negative prompt"]')?.click());
+    expect(actions.recallImageData).toHaveBeenLastCalledWith(actionImage, 'negativePrompt');
   });
 
   it('keeps the video workflow and graph tabs when its metadata cannot be read, and retries the metadata', async () => {
@@ -530,7 +535,7 @@ describe('Preview query-driven Details', () => {
 
     const seedRecall = document.querySelector<HTMLButtonElement>('[aria-label="Use seed"]');
     expect(seedRecall).not.toBeNull();
-    expect(document.querySelector('[aria-label="Use prompt"]')).not.toBeNull();
+    expect(document.querySelector('[aria-label="Use positive prompt"]')).not.toBeNull();
     expect(document.querySelector('[aria-label="Use size"]')).toBeNull();
 
     const modelRow = [...(document.querySelectorAll('.chakra-data-list__item') ?? [])].find((row) =>

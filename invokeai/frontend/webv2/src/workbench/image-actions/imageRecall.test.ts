@@ -205,6 +205,76 @@ const metadata = {
 seedArchitectureCapabilities();
 
 describe('image recall', () => {
+  it.each(['positivePrompt', 'negativePrompt'] as const)(
+    'recalls only the %s without replacing the other prompt',
+    (kind) => {
+      const currentValues = createValues({ positivePrompt: 'keep positive', negativePrompt: 'keep negative' });
+      const result = buildImageRecallSettings({
+        currentValues,
+        image,
+        kind,
+        metadata: { positive_prompt: 'saved positive', negative_prompt: 'saved negative' },
+        models: [],
+        supportedModels: [sdxlModel],
+        vaeModels: [],
+      });
+
+      expect(result?.values).toMatchObject({
+        positivePrompt: kind === 'positivePrompt' ? 'saved positive' : 'keep positive',
+        negativePrompt: kind === 'negativePrompt' ? 'saved negative' : 'keep negative',
+      });
+    }
+  );
+
+  it.each([
+    {
+      kind: 'positivePrompt',
+      metadata: { positive_prompt: '' },
+      expected: { positivePrompt: '', negativePrompt: 'keep negative' },
+    },
+    {
+      kind: 'negativePrompt',
+      metadata: { negative_prompt: '' },
+      expected: { positivePrompt: 'keep positive', negativePrompt: '' },
+    },
+    {
+      kind: 'negativePrompt',
+      metadata: { negative_prompt: null },
+      expected: { positivePrompt: 'keep positive', negativePrompt: '' },
+    },
+    { kind: 'positivePrompt', metadata: { negative_prompt: 'recorded' }, expected: null },
+    { kind: 'negativePrompt', metadata: { positive_prompt: 'recorded' }, expected: null },
+  ] as const)(
+    'handles empty or absent $kind metadata without recalling the other prompt',
+    ({ kind, metadata, expected }) => {
+      const result = buildImageRecallSettings({
+        currentValues: createValues({
+          positivePrompt: 'keep positive',
+          negativePrompt: 'keep negative',
+          promptTemplate: {
+            id: 'template',
+            name: 'Template',
+            negativePrompt: 'lowres',
+            positivePrompt: '{prompt}, detailed',
+          },
+          promptTemplateViewMode: true,
+        }),
+        image,
+        kind,
+        metadata,
+        models: [],
+        supportedModels: [sdxlModel],
+        vaeModels: [],
+      });
+
+      if (expected === null) {
+        expect(result).toBeNull();
+      } else {
+        expect(result?.values).toMatchObject({ ...expected, promptTemplate: null, promptTemplateViewMode: false });
+      }
+    }
+  );
+
   it('recalls supported image metadata into generate settings', () => {
     const result = buildImageRecallSettings({
       currentValues: createValues(),
