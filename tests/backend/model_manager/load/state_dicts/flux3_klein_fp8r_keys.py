@@ -1,0 +1,96 @@
+"""Black Forest Labs' per-row fp8 export of FLUX.3 Image Klein, `variants/fp8r/model.safetensors`.
+
+Captured on 2026-10-31 with `scripts/capture_state_dict_fixture.py`,
+which reads the header only, from
+`https://huggingface.co/black-forest-labs/flux-3-image-klein/resolve/337337621b8526e120f2275d250242f4a6bedd75/variants/fp8r/model.safetensors`.
+
+Subsetting rule: `content_mode_blocks.image` index 0, `content_mode_blocks.image_cond` index 0, `single_blocks` index 0, `txt_mode_blocks` index 0, plus every key outside a stack. Values are `(shape, dtype)`.
+
+Every block linear but the text blocks' is e4m3 with one float32 scale per output row (`weight_scale` `[N]`; the
+export's manifest states `weight.float() * weight_scale[:, None]`), and so are the six modulation `lin` layers.
+The metadata says `quantization: fp8r`, `scale: per_row_fp32`, and no layer carries a marker. `scaled_mm` applies
+a per-row scale to its output, so with the fp8 matmul or FP8 Storage the weights stay fp8.
+"""
+
+state_dict_keys: dict[str, tuple[list[int], str]] = {
+    "content_mode_blocks.image.0.attn_out.weight": ([3072, 3072], "F8_E4M3"),
+    "content_mode_blocks.image.0.attn_out.weight_scale": ([3072], "F32"),
+    "content_mode_blocks.image.0.k_proj.weight": ([3072, 3072], "F8_E4M3"),
+    "content_mode_blocks.image.0.k_proj.weight_scale": ([3072], "F32"),
+    "content_mode_blocks.image.0.mlp_in.weight": ([18432, 3072], "F8_E4M3"),
+    "content_mode_blocks.image.0.mlp_in.weight_scale": ([18432], "F32"),
+    "content_mode_blocks.image.0.mlp_out.weight": ([3072, 9216], "F8_E4M3"),
+    "content_mode_blocks.image.0.mlp_out.weight_scale": ([3072], "F32"),
+    "content_mode_blocks.image.0.norm.key_norm.scale": ([128], "BF16"),
+    "content_mode_blocks.image.0.norm.query_norm.scale": ([128], "BF16"),
+    "content_mode_blocks.image.0.q_proj.weight": ([3072, 3072], "F8_E4M3"),
+    "content_mode_blocks.image.0.q_proj.weight_scale": ([3072], "F32"),
+    "content_mode_blocks.image.0.v_proj.weight": ([3072, 3072], "F8_E4M3"),
+    "content_mode_blocks.image.0.v_proj.weight_scale": ([3072], "F32"),
+    "content_mode_blocks.image_cond.0.attn_out.weight": ([3072, 3072], "F8_E4M3"),
+    "content_mode_blocks.image_cond.0.attn_out.weight_scale": ([3072], "F32"),
+    "content_mode_blocks.image_cond.0.k_proj.weight": ([3072, 3072], "F8_E4M3"),
+    "content_mode_blocks.image_cond.0.k_proj.weight_scale": ([3072], "F32"),
+    "content_mode_blocks.image_cond.0.mlp_in.weight": ([18432, 3072], "F8_E4M3"),
+    "content_mode_blocks.image_cond.0.mlp_in.weight_scale": ([18432], "F32"),
+    "content_mode_blocks.image_cond.0.mlp_out.weight": ([3072, 9216], "F8_E4M3"),
+    "content_mode_blocks.image_cond.0.mlp_out.weight_scale": ([3072], "F32"),
+    "content_mode_blocks.image_cond.0.norm.key_norm.scale": ([128], "BF16"),
+    "content_mode_blocks.image_cond.0.norm.query_norm.scale": ([128], "BF16"),
+    "content_mode_blocks.image_cond.0.q_proj.weight": ([3072, 3072], "F8_E4M3"),
+    "content_mode_blocks.image_cond.0.q_proj.weight_scale": ([3072], "F32"),
+    "content_mode_blocks.image_cond.0.v_proj.weight": ([3072, 3072], "F8_E4M3"),
+    "content_mode_blocks.image_cond.0.v_proj.weight_scale": ([3072], "F32"),
+    "early_stream_modulations.image.lin.weight": ([9216, 3072], "F8_E4M3"),
+    "early_stream_modulations.image.lin.weight_scale": ([9216], "F32"),
+    "early_stream_modulations.image_cond.lin.weight": ([9216, 3072], "F8_E4M3"),
+    "early_stream_modulations.image_cond.lin.weight_scale": ([9216], "F32"),
+    "early_stream_modulations.txt.lin.weight": ([9216, 3072], "F8_E4M3"),
+    "early_stream_modulations.txt.lin.weight_scale": ([9216], "F32"),
+    "emb_in.image.weight": ([3072, 128], "BF16"),
+    "emb_in.image_cond.weight": ([3072, 128], "BF16"),
+    "final_layer.image.adaLN_modulation.1.weight": ([6144, 3072], "BF16"),
+    "final_layer.image.linear.weight": ([128, 3072], "BF16"),
+    "ref_time_in.in_layer.weight": ([3072, 256], "BF16"),
+    "ref_time_in.out_layer.weight": ([3072, 3072], "BF16"),
+    "single_blocks.0.attn_out.weight": ([3072, 3072], "F8_E4M3"),
+    "single_blocks.0.attn_out.weight_scale": ([3072], "F32"),
+    "single_blocks.0.k_proj.weight": ([3072, 3072], "F8_E4M3"),
+    "single_blocks.0.k_proj.weight_scale": ([3072], "F32"),
+    "single_blocks.0.mlp_in.weight": ([18432, 3072], "F8_E4M3"),
+    "single_blocks.0.mlp_in.weight_scale": ([18432], "F32"),
+    "single_blocks.0.mlp_out.weight": ([3072, 9216], "F8_E4M3"),
+    "single_blocks.0.mlp_out.weight_scale": ([3072], "F32"),
+    "single_blocks.0.norm.key_norm.scale": ([128], "BF16"),
+    "single_blocks.0.norm.query_norm.scale": ([128], "BF16"),
+    "single_blocks.0.q_proj.weight": ([3072, 3072], "F8_E4M3"),
+    "single_blocks.0.q_proj.weight_scale": ([3072], "F32"),
+    "single_blocks.0.v_proj.weight": ([3072, 3072], "F8_E4M3"),
+    "single_blocks.0.v_proj.weight_scale": ([3072], "F32"),
+    "single_stream_modulations.image.lin.weight": ([9216, 3072], "F8_E4M3"),
+    "single_stream_modulations.image.lin.weight_scale": ([9216], "F32"),
+    "single_stream_modulations.image_cond.lin.weight": ([9216, 3072], "F8_E4M3"),
+    "single_stream_modulations.image_cond.lin.weight_scale": ([9216], "F32"),
+    "single_stream_modulations.txt.lin.weight": ([9216, 3072], "F8_E4M3"),
+    "single_stream_modulations.txt.lin.weight_scale": ([9216], "F32"),
+    "time_in.in_layer.weight": ([3072, 256], "BF16"),
+    "time_in.out_layer.weight": ([3072, 3072], "BF16"),
+    "txt_in.weight": ([3072, 20480], "BF16"),
+    "txt_mode_blocks.0.attn_out.weight": ([3072, 3072], "BF16"),
+    "txt_mode_blocks.0.k_proj.weight": ([3072, 3072], "BF16"),
+    "txt_mode_blocks.0.mlp_in.weight": ([18432, 3072], "BF16"),
+    "txt_mode_blocks.0.mlp_out.weight": ([3072, 9216], "BF16"),
+    "txt_mode_blocks.0.norm.key_norm.scale": ([128], "BF16"),
+    "txt_mode_blocks.0.norm.query_norm.scale": ([128], "BF16"),
+    "txt_mode_blocks.0.q_proj.weight": ([3072, 3072], "BF16"),
+    "txt_mode_blocks.0.v_proj.weight": ([3072, 3072], "BF16"),
+}
+
+# The rest of the header's `__metadata__`, as the producer wrote it. A producer that names its scheme
+# only here -- NVIDIA ModelOpt's `quantization` -- is told apart by these alone.
+metadata: dict[str, str] = {
+    "format": "pt",
+    "model": "f3-image-small",
+    "quantization": "fp8r",
+    "scale": "per_row_fp32",
+}

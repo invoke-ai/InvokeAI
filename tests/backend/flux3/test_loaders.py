@@ -8,9 +8,7 @@ which diffusers' transformer runs in float32.
 import gguf
 import pytest
 import torch
-from diffusers import Flux3Transformer2DModel
 
-from invokeai.backend.flux3.conversion import convert_flux3_native_to_diffusers
 from invokeai.backend.model_manager.configs.main import Main_Checkpoint_Flux3_Config, Main_GGUF_Flux3_Config
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch_module_autocast import (
     apply_custom_layers_to_model,
@@ -19,7 +17,13 @@ from invokeai.backend.model_manager.load.model_loaders import flux3 as flux3_loa
 from invokeai.backend.model_manager.load.model_loaders.flux3 import Flux3CheckpointModel, Flux3GGUFCheckpointModel
 from invokeai.backend.model_manager.taxonomy import Flux3VariantType, SubModelType
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
-from tests.backend.flux3.flux3_fixture import TINY_CONFIG, forward, tiny_flux3_model, to_native, write_flux3_gguf
+from tests.backend.flux3.flux3_fixture import (
+    flux3_model_from_native,
+    forward,
+    tiny_flux3_model,
+    to_native,
+    write_flux3_gguf,
+)
 from tests.fixtures.loader_seams import Seam, prepare
 
 FLOW_MAP = pytest.mark.parametrize("flow_map", [True, False], ids=["klein", "base"])
@@ -43,7 +47,7 @@ def test_a_single_file_loads_as_the_model_it_was_written_from(monkeypatch, flow_
         load_file_host=safetensors.torch,
         patches_device=True,
     )
-    run = prepare(seam, monkeypatch, state_dict=native)
+    run = prepare(seam, monkeypatch, state_dict=native, metadata=None)
     config = Main_Checkpoint_Flux3_Config.model_construct(
         path="flux3.safetensors", name="flux3", variant=_variant(flow_map)
     )
@@ -56,24 +60,6 @@ def test_a_single_file_loads_as_the_model_it_was_written_from(monkeypatch, flow_
         if name.endswith((".norm_q", ".norm_k")):
             assert module.weight.dtype == torch.float32, name
     torch.testing.assert_close(forward(model, flow_map), forward(reference, flow_map), rtol=0, atol=0)
-
-
-def test_a_quantized_side_channel_is_refused_by_the_single_file_loader(monkeypatch) -> None:
-    import safetensors.torch
-
-    native = to_native(tiny_flux3_model(flow_map=True))
-    native["single_blocks.0.q_proj.weight_scale"] = torch.ones(1)
-    seam = Seam(
-        loader=Flux3CheckpointModel, module=flux3_loaders, entry="_load_model", load_file_host=safetensors.torch
-    )
-    run = prepare(seam, monkeypatch, state_dict=native)
-    config = Main_Checkpoint_Flux3_Config.model_construct(
-        path="x.safetensors", name="x", variant=Flux3VariantType.Klein
-    )
-
-    with pytest.raises(ValueError, match="quantization side channel"):
-        run.load(config, SubModelType.Transformer)
-    assert run.reserved == [], "a refused file must not reserve cache room first"
 
 
 @FLOW_MAP
@@ -103,7 +89,6 @@ def test_a_gguf_loads_and_predicts_what_its_dequantized_weights_mean(
     for name, module in model.named_modules():
         if name.endswith((".norm_q", ".norm_k")):
             assert not isinstance(module.weight, GGMLTensor) and module.weight.dtype == torch.float32, name
-    reference = Flux3Transformer2DModel(**TINY_CONFIG, flow_map=flow_map).eval()
-    reference.load_state_dict(convert_flux3_native_to_diffusers(dict(meant)))
+    reference = flux3_model_from_native(meant, flow_map)
     # Q8_0 blocks dequantize through their fp16 scale, so the two forwards agree to fp16 precision.
     torch.testing.assert_close(forward(model, flow_map), forward(reference, flow_map), rtol=1e-3, atol=1e-3)

@@ -35,18 +35,18 @@ const getGalleryItemRange = (
   return orderedRefs.slice(start, end + 1);
 };
 
-/**
- * Async range selection fetches beyond the loaded window; apply only if account, filter, and anchor still match
- * the captured context.
- */
+/** Async range selection fetches past the loaded window; apply only if account, filter and anchor still match. */
 export const useGalleryGridSelection = ({
+  getItemReturnFocus,
   getSelectionPage,
 }: {
+  /** Where focus returns from a dialog the item's context menu opens; see `GalleryItemContextMenuTarget`. */
+  getItemReturnFocus?: (item: GalleryItem) => () => HTMLElement | null;
   /** The sparse page stamp for a loaded listing item; selections without one stamp the grid's page. */
   getSelectionPage?: (item: GalleryItem) => number | undefined;
 } = {}) => {
-  // `loadedItems` includes the strip, whose starred items the listing window
-  // may not hold; the context menu and ctrl-toggle must resolve those too.
+  // `loadedItems` includes the strip, whose starred items the listing window may not hold; the context menu and
+  // ctrl-toggle must resolve those too.
   const { actions, filter, gallery, loadedItems, starredStrip } = useGalleryWidget();
   const queryClient = useQueryClient();
   const [contextMenuTarget, setContextMenuTarget] = useState<GalleryItemContextMenuTarget | null>(null);
@@ -180,8 +180,7 @@ export const useGalleryGridSelection = ({
         }
       }
 
-      // The names list describes the listing only; a range inside the strip
-      // resolves against the strip's own order.
+      // The names list describes the listing only; a range inside the strip resolves against the strip's own order.
       if (!isInteractionCurrent(hasAwaitedNames)) {
         return;
       }
@@ -223,9 +222,8 @@ export const useGalleryGridSelection = ({
         return;
       }
 
-      // The next primary's page has left the viewport. Without its item the toggle clears the whole selection, so
-      // resolve it first. A lookup that fails (the item was deleted elsewhere, or the request failed) still toggles
-      // rather than ignoring the click.
+      // The next primary's page left the viewport, and without its item the toggle clears the selection: resolve it
+      // first. A failed lookup (deleted elsewhere, or the request failed) still toggles instead of ignoring the click.
       const owner = captureAccountScope();
       const capturedContext = rangeInteractionContextRef.current;
       const controller = new AbortController();
@@ -297,6 +295,7 @@ export const useGalleryGridSelection = ({
   const handleThumbnailContextMenu = useCallback(
     (item: GalleryItem, x: number, y: number) => {
       const itemKey = toGalleryItemKey(item);
+      const returnFocus = getItemReturnFocus?.(item);
 
       if (selectedItemKeys.has(itemKey) && selectedItemKeys.size > 1) {
         const selectionItems = [
@@ -312,15 +311,16 @@ export const useGalleryGridSelection = ({
           itemRefs: selectedItemRefs,
           items: selectionItems,
           listingBoardId: gallery.listingBoardId,
+          returnFocus,
           x,
           y,
         });
         return;
       }
 
-      setContextMenuTarget({ itemRefs: [toGalleryItemRef(item)], items: [item], x, y });
+      setContextMenuTarget({ itemRefs: [toGalleryItemRef(item)], items: [item], returnFocus, x, y });
     },
-    [gallery.listingBoardId, loadedItems, selectedItemKeys, selectedItemRefs, shouldStarSelection]
+    [getItemReturnFocus, gallery.listingBoardId, loadedItems, selectedItemKeys, selectedItemRefs, shouldStarSelection]
   );
 
   const getDragItems = useCallback(

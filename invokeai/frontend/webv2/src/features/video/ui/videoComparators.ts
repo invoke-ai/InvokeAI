@@ -17,6 +17,8 @@ export const areVideoLorasEquivalent = (left: VideoWidgetValues['loras'], right:
       lora.model.name === right[index]?.model.name &&
       lora.model.hash === right[index]?.model.hash &&
       lora.weight === right[index]?.weight &&
+      lora.target === right[index]?.target &&
+      lora.lowNoiseWeight === right[index]?.lowNoiseWeight &&
       lora.isEnabled === right[index]?.isEnabled
   );
 
@@ -27,6 +29,8 @@ export const areVideoValuesEqual = (left: VideoWidgetValues, right: VideoWidgetV
 
   return (
     left.modelKey === right.modelKey &&
+    left.h3TaskOverride === right.h3TaskOverride &&
+    left.model?.variant === right.model?.variant &&
     areVideoModelsEquivalent(left.model, right.model) &&
     left.positivePrompt === right.positivePrompt &&
     left.negativePrompt === right.negativePrompt &&

@@ -42,6 +42,7 @@ from invokeai.app.services.model_records import (
     ModelRecordOrderBy,
     UnknownModelException,
 )
+from invokeai.app.services.model_records.missing_models import find_missing_models
 from invokeai.app.services.orphaned_models import CONVERSION_SCRATCH_DIRNAME, OrphanedModelInfo
 from invokeai.app.services.shared.pagination import SQLiteDirection
 from invokeai.app.util.path_safety import is_plain_filename
@@ -55,6 +56,7 @@ from invokeai.backend.model_manager.configs.main import (
     Main_Checkpoint_SDXL_Config,
     Main_Checkpoint_SDXLRefiner_Config,
 )
+from invokeai.backend.model_manager.configs.roles import role_variant, serves_as
 from invokeai.backend.model_manager.load.fp8_capability import Fp8StorageSupport, fp8_storage_support
 from invokeai.backend.model_manager.load.model_cache.cache_stats import CacheStats
 from invokeai.backend.model_manager.metadata.fetch.huggingface import HuggingFaceMetadataFetch
@@ -174,6 +176,11 @@ class ModelsList(BaseModel):
 class EmptyModelCacheResponse(BaseModel):
     models_cleared: int
     bytes_freed: int
+    vram_release_refused: bool = Field(
+        description="The device refused to return its cached memory to the driver after the models were dropped (for "
+        "example an earlier error left it in a bad state). The models were still dropped; the memory stays reserved "
+        "by this process."
+    )
 
 
 class CacheType(str, Enum):
@@ -238,7 +245,6 @@ example_model_config = {
     "variant": "normal",
     "prediction_type": "epsilon",
     "repo_variant": "fp16",
-    "upcast_attention": False,
 }
 
 example_model_input = {
@@ -367,14 +373,7 @@ def list_missing_models(current_user: CurrentUserOrDefault) -> ModelsList:
     record_store = ApiDependencies.invoker.services.model_manager.store
     models_path = ApiDependencies.invoker.services.configuration.models_path
 
-    missing_models: list[AnyModelConfig] = []
-    for model_config in record_store.all_models():
-        if model_config.base == BaseModelType.External or model_config.format == ModelFormat.ExternalApi:
-            continue
-        if not (models_path / model_config.path).resolve().exists():
-            missing_models.append(model_config)
-
-    return ModelsList(models=missing_models)
+    return ModelsList(models=find_missing_models(record_store.all_models(), models_path))
 
 
 @model_manager_router.get(
@@ -635,7 +634,7 @@ def _update_model_record(key: str, changes: ModelRecordChanges) -> AnyModelConfi
         },
         400: {"description": "Bad request"},
         404: {"description": "The model could not be found"},
-        409: {"description": "There is already a model corresponding to the new name"},
+        409: {"description": "The change cannot be applied to this model"},
     },
     status_code=200,
 )
@@ -1518,8 +1517,9 @@ def get_is_installed(
 
         if expected_variant is not None:
             for model in installed_models:
-                if model.type == ModelType.Qwen3Encoder and hasattr(model, "variant"):
-                    model_variant = model.variant
+                # A Qwen3 folder installed as a Text LLM serves as the encoder too.
+                if serves_as(model, ModelType.Qwen3Encoder):
+                    model_variant = role_variant(model, ModelType.Qwen3Encoder)
                     # Handle both enum and string values
                     if isinstance(model_variant, Qwen3VariantType):
                         if model_variant == expected_variant:
@@ -1611,11 +1611,15 @@ def empty_model_cache(current_admin: AdminUserOrDefault) -> EmptyModelCacheRespo
     ApiDependencies.invoker.services.logger.info("Emptying model cache.")
     models_cleared = 0
     bytes_freed = 0
+    vram_release_refused = False
     for cache in distinct_caches(ApiDependencies.invoker.services.model_manager.load.ram_caches.values()):
         result = cache.make_room(1000 * 2**30)
         models_cleared += result.models_cleared
         bytes_freed += result.bytes_freed
-    return EmptyModelCacheResponse(models_cleared=models_cleared, bytes_freed=bytes_freed)
+        vram_release_refused = vram_release_refused or result.vram_release_refused
+    return EmptyModelCacheResponse(
+        models_cleared=models_cleared, bytes_freed=bytes_freed, vram_release_refused=vram_release_refused
+    )
 
 
 class HFTokenStatus(str, Enum):

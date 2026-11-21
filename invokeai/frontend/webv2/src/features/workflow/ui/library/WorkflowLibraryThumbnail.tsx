@@ -24,11 +24,13 @@ import { getApiErrorMessage } from '@platform/transport/http';
 import { IconButton } from '@platform/ui/Button';
 import { Tooltip, useTooltipTriggerIds } from '@platform/ui/Tooltip';
 import { CameraIcon, ImageOffIcon, Trash2Icon, UploadIcon } from 'lucide-react';
-import { Suspense, useCallback, useRef, useState, type MouseEvent } from 'react';
+import { Suspense, useCallback, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { buildLibraryGraphPreviewSource, DeferredGraphPreviewSnapshot, loadGraphPreview } from './libraryPreviewSource';
 import { formatTimeSince, useDataTimeSnapshot } from './relativeTime';
+import { WorkflowPreviewThumbnailButton } from './WorkflowDetailOverview';
+import { getWorkflowSilhouetteImage } from './workflowSilhouette';
 import { WORKFLOW_THUMBNAIL_ASPECT_RATIO, WorkflowThumbnailImage } from './workflowThumbnail';
 
 const IMAGE_ONLY = ['image'] as const;
@@ -43,13 +45,61 @@ const WELL_CSS: SystemStyleObject = {
   w: 'full',
 };
 
+/** A faint dot ground under the silhouette: one tiny tile image, cheaper to paint while scrolling than a gradient. */
+const DOT_TILE = `url("data:image/svg+xml,${encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12"><circle cx="6" cy="6" r="0.75" fill="rgb(140 144 156 / 0.35)"/></svg>'
+)}")`;
+const SILHOUETTE_CSS: SystemStyleObject = {
+  backgroundPosition: 'center, center',
+  backgroundRepeat: 'no-repeat, repeat',
+  backgroundSize: '100% 100%, 12px 12px',
+  h: 'full',
+  w: 'full',
+};
+
+/**
+ * What a well shows without an image: the workflow's node layout as faint boxes on a dotted ground, or, before its
+ * document is known or when it has no nodes, the plain no-image placeholder. The silhouette is one element with a
+ * cached background image, so cards scrolling through the grid cost one box each.
+ */
+export const WorkflowThumbnailPlaceholder = ({
+  caption,
+  workflowDocument,
+}: {
+  /** Shown under the no-image icon; the silhouette needs none. */
+  caption?: string;
+  workflowDocument: ProjectGraphState | null;
+}) => {
+  const image = workflowDocument ? getWorkflowSilhouetteImage(workflowDocument) : null;
+  const style = useMemo(() => (image ? { backgroundImage: `${image.url}, ${DOT_TILE}` } : undefined), [image]);
+
+  if (!image) {
+    return (
+      <Flex align="center" direction="column" gap="1" h="full" justify="center" w="full">
+        <Icon aria-hidden as={ImageOffIcon} boxSize="5" color="fg.subtle" opacity={0.6} />
+        {caption ? (
+          <Text color="fg.subtle" fontSize="xs">
+            {caption}
+          </Text>
+        ) : null}
+      </Flex>
+    );
+  }
+
+  // The image goes in a plain style attribute: as a style prop, every distinct graph would mint its own CSS class.
+  return <Box aria-hidden css={SILHOUETTE_CSS} data-workflow-silhouette={image.rectCount} style={style} />;
+};
+
 /** Key by workflow id: an action in flight for one workflow must not show as busy on the next selection. */
 export const WorkflowLibraryThumbnail = ({
   canEdit,
   item,
   workflowDocument,
+  onPreview,
 }: {
   canEdit: boolean;
+  /** Makes the thumbnail the way into the preview. */
+  onPreview?: () => void;
   /** The template's parsed workflow once its row has loaded; the snapshot renders its graph. */
   workflowDocument: ProjectGraphState | null;
   item: WorkflowLibraryListItem;
@@ -239,12 +289,7 @@ export const WorkflowLibraryThumbnail = ({
       {showThumbnail ? (
         <WorkflowThumbnailImage src={item.thumbnail_url} onError={handleThumbnailError} />
       ) : (
-        <Flex align="center" direction="column" gap="1" h="full" justify="center" w="full">
-          <Icon aria-hidden as={ImageOffIcon} boxSize="5" color="fg.subtle" opacity={0.6} />
-          <Text color="fg.subtle" fontSize="xs">
-            {t('workflowLibrary.notRunYet')}
-          </Text>
-        </Flex>
+        <WorkflowThumbnailPlaceholder caption={t('workflowLibrary.notRunYet')} workflowDocument={workflowDocument} />
       )}
       {isBusy ? (
         <Flex align="center" bg="bg.muted/90" inset="0" justify="center" position="absolute">
@@ -255,9 +300,12 @@ export const WorkflowLibraryThumbnail = ({
   );
 
   return (
-    <Stack gap="1" minW="0">
+    <Stack data-thumbnail-kind={showThumbnail ? 'image' : 'silhouette'} gap="1" minW="0">
       <Box aria-busy={isBusy || undefined} css={WELL_CSS}>
         {wellContent}
+        {onPreview ? (
+          <WorkflowPreviewThumbnailButton name={item.name || t('workflowLibrary.untitled')} onPreview={onPreview} />
+        ) : null}
         {/* Bundled defaults keep their shipped image; the account's own templates choose theirs from the gallery. */}
         {isEditable ? (
           <HStack

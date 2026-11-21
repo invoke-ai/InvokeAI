@@ -5,10 +5,13 @@ import {
   addCrossListings,
   CROSS_LISTED_ATTR,
   fileDirectory,
+  findCurrentTrail,
   makeHrefToId,
   paginate,
+  sectionDirectory,
   selectCrossListings,
   sortAndRelabel,
+  translateGroupLabels,
 } from './sidebar.mjs';
 import { generateDocsId } from './sort-prefix.mjs';
 
@@ -43,6 +46,39 @@ describe('generateDocsId', () => {
   });
 });
 
+describe('makeHrefToId', () => {
+  it("maps a homepage href to the 'index' page id, with or without a base path or a locale", () => {
+    assert.equal(hrefToId('/'), 'index');
+    assert.equal(makeHrefToId('/InvokeAI/')('/InvokeAI/'), 'index');
+    assert.equal(makeHrefToId('/InvokeAI/')('/InvokeAI/de/'), 'index');
+  });
+
+  it('strips the base path from deeper hrefs but leaves unrelated paths alone', () => {
+    assert.equal(makeHrefToId('/InvokeAI/')('/InvokeAI/video/wan/'), 'video/wan');
+    assert.equal(makeHrefToId('/InvokeAI/')('/other/page/'), 'other/page');
+  });
+});
+
+describe('translateGroupLabels', () => {
+  it('translates group labels at every depth by their slug, keeping labels without a string and link labels', () => {
+    const german = {
+      'sidebar.group.image-generation': 'Bildgenerierung',
+      'sidebar.group.advanced-topics': 'Fortgeschritten',
+    };
+    const t = Object.assign((key) => german[key], { exists: (key) => key in german });
+    const sidebar = [
+      group('Image Generation', 'image-generation', [
+        link('image-generation/introduction', 'Introduction'),
+        group('Advanced Topics', 'image-generation/advanced-topics', [link('image-generation/advanced-topics/x')]),
+      ]),
+      group('Gallery', 'gallery', []),
+    ];
+    translateGroupLabels(sidebar, t);
+    assert.deepEqual(labels(sidebar), ['Bildgenerierung', 'Gallery']);
+    assert.deepEqual(labels(sidebar[0].entries), ['Introduction', 'Fortgeschritten']);
+  });
+});
+
 describe('sortAndRelabel', () => {
   it('orders prefixed siblings by prefix, keeps unprefixed ones after them in order, and strips group labels', () => {
     const fileNames = new Map([
@@ -57,7 +93,7 @@ describe('sortAndRelabel', () => {
       { ...link('guide/a'), autogenerate: { directory: 'guide' } },
       { ...link('guide/intro'), autogenerate: { directory: 'guide' } },
     ];
-    assert.equal(sortAndRelabel(entries, fileNames, hrefToId), true);
+    sortAndRelabel(entries, fileNames, hrefToId);
     assert.deepEqual(labels(entries), ['intro', 'setup', 'b', 'a']);
   });
 
@@ -75,11 +111,6 @@ describe('sortAndRelabel', () => {
     sortAndRelabel(entries, fileNames, hrefToId);
     assert.deepEqual(labels(entries), ['Workbench', 'Models']);
     assert.deepEqual(labels(models.entries), ['introduction', 'zoo']);
-  });
-
-  it('reports no change when the order is already right', () => {
-    const entries = [{ ...link('x/a'), autogenerate: { directory: 'x' } }];
-    assert.equal(sortAndRelabel(entries, new Map([['x/a', '01.a.mdx']]), hrefToId), false);
   });
 });
 
@@ -134,7 +165,7 @@ describe('addCrossListings', () => {
       { id: 'video/wan', directory: 'models/local' },
       { id: 'video/ltx', directory: 'models/local' },
     ];
-    assert.equal(addCrossListings(sidebar, listings, directories, hrefToId), true);
+    addCrossListings(sidebar, listings, directories, hrefToId);
     const models = sidebar[0].entries;
     assert.deepEqual(labels(models), ['Anima', 'LTX-2', 'SDXL', 'Wan 2.2', 'Nested']);
     const ltxCopy = models[1];
@@ -157,7 +188,9 @@ describe('addCrossListings', () => {
   });
 
   it('does nothing without listings', () => {
-    assert.equal(addCrossListings(makeSidebar(), [], directories, hrefToId), false);
+    const sidebar = makeSidebar();
+    addCrossListings(sidebar, [], directories, hrefToId);
+    assert.deepEqual(sidebar, makeSidebar());
   });
 
   it('fails loudly on misconfiguration', () => {
@@ -183,6 +216,68 @@ describe('addCrossListings', () => {
     ];
     addCrossListings(sidebar, [{ id: 'video/wan', directory: 'models/local' }], directories, baseHrefToId);
     assert.deepEqual(labels(sidebar[0].entries), ['SDXL', 'Wan']);
+  });
+
+  it('cross-lists the homepage when a base path deploys its link at the base itself', () => {
+    const baseHrefToId = makeHrefToId('/InvokeAI/');
+    // The fixture ids come from the real ID generator and the frontmatter through the cross-listing selector, as in
+    // `route-data.ts`: the root `index.mdx` gets the id 'index', not ''.
+    const homeDoc = { id: generateDocsId({ entry: 'index.mdx', data: { alsoListedIn: ['docs'] } }), data: { alsoListedIn: ['docs'] } };
+    assert.equal(homeDoc.id, 'index');
+    const sidebar = [
+      group('Docs', 'docs', [{ ...link('docs/intro', 'Intro'), href: '/InvokeAI/docs/intro/' }]),
+      group('Home', '', [
+        { ...link('index', 'Home'), href: '/InvokeAI/' },
+        { ...link('video/wan', 'Wan'), href: '/InvokeAI/video/wan/' },
+      ]),
+    ];
+    const dirs = new Map([
+      ['docs/intro', 'docs'],
+      ['index', ''],
+      ['video/wan', ''],
+    ]);
+    addCrossListings(sidebar, selectCrossListings([homeDoc], true), dirs, baseHrefToId);
+    assert.deepEqual(labels(sidebar[0].entries), ['Home', 'Intro']);
+    assert.ok(CROSS_LISTED_ATTR in sidebar[0].entries[0].attrs);
+  });
+});
+
+describe('locale routes', () => {
+  /** @param {string} id @param {string} label */
+  const localeLink = (id, label) => ({ ...link(id, label), href: `/InvokeAI/de/${id}/` });
+  const localeHrefToId = makeHrefToId('/InvokeAI/');
+
+  it("maps a translated or fallback page's href to the English page id", () => {
+    assert.equal(localeHrefToId('/InvokeAI/de/users-guide/gallery/boards/'), 'users-guide/gallery/boards');
+    assert.equal(localeHrefToId('/InvokeAI/hi/'), 'index');
+    // Only a known locale is a locale segment.
+    assert.equal(localeHrefToId('/InvokeAI/development/x/'), 'development/x');
+    assert.equal(localeHrefToId('/InvokeAI/it/x/'), 'it/x');
+  });
+
+  it('orders and cross-lists a locale sidebar from the English file names and directories', () => {
+    const sidebar = [
+      group('Models', 'models', [localeLink('models/local/sdxl', 'SDXL')]),
+      group('Video', 'video', [
+        { ...localeLink('video/wan', 'Wan'), autogenerate: { directory: 'video' } },
+        { ...localeLink('video/ltx', 'LTX'), autogenerate: { directory: 'video' } },
+      ]),
+    ];
+    const fileNames = new Map([
+      ['video/wan', '02.wan.mdx'],
+      ['video/ltx', '01.ltx.mdx'],
+    ]);
+    const directories = new Map([
+      ['models/local/sdxl', 'models/local'],
+      ['video/wan', 'video'],
+      ['video/ltx', 'video'],
+    ]);
+    sortAndRelabel(sidebar, fileNames, localeHrefToId);
+    addCrossListings(sidebar, [{ id: 'video/wan', directory: 'models/local' }], directories, localeHrefToId);
+    assert.deepEqual(labels(sidebar[1].entries), ['LTX', 'Wan']);
+    assert.deepEqual(labels(sidebar[0].entries), ['SDXL', 'Wan']);
+    assert.equal(sidebar[0].entries[1].href, '/InvokeAI/de/video/wan/');
+    assert.equal(sectionDirectory(sidebar[1], directories, localeHrefToId), 'video');
   });
 });
 
@@ -217,5 +312,59 @@ describe('paginate', () => {
 
   it('returns null when the current page is not in the sidebar', () => {
     assert.equal(paginate([group('Models', 'models', [link('models/a')])], {}), null);
+  });
+});
+
+describe('findCurrentTrail', () => {
+  it('lists the groups enclosing the current page, outermost first', () => {
+    const sidebar = [
+      link('models/intro', 'Overview'),
+      group('Local Models', 'models', [group('FLUX', 'models/flux', [link('models/flux/two', 'FLUX.2', true)])]),
+    ];
+    const trail = findCurrentTrail(sidebar);
+    assert.deepEqual(trail.groups, ['Local Models', 'FLUX']);
+    assert.equal(trail.link.label, 'FLUX.2');
+  });
+
+  it('follows the page itself, not a cross-listed copy of it', () => {
+    const page = link('video/wan', 'Wan', true);
+    const sidebar = [
+      group('Models', 'models', [{ ...page, isCurrent: false, attrs: { [CROSS_LISTED_ATTR]: '' } }]),
+      group('Video', 'video', [page]),
+    ];
+    assert.deepEqual(findCurrentTrail(sidebar).groups, ['Video']);
+  });
+
+  it('is undefined when the current page is not in the sidebar', () => {
+    assert.equal(findCurrentTrail([group('Models', 'models', [link('models/a')])]), undefined);
+  });
+});
+
+describe('sectionDirectory', () => {
+  const directories = new Map([
+    ['guide/images/intro', 'guide/images'],
+    ['guide/images/advanced/hidiffusion', 'guide/images/advanced'],
+    ['guide/video/wan', 'guide/video'],
+  ]);
+
+  it("is the deepest directory holding all of a section's pages, nested ones included", () => {
+    const section = group('Images', 'guide', [
+      link('guide/images/intro'),
+      group('Advanced', 'guide', [link('guide/images/advanced/hidiffusion')]),
+    ]);
+    assert.equal(sectionDirectory(section, directories, hrefToId), 'guide/images');
+    assert.equal(sectionDirectory(section.entries[1], directories, hrefToId), 'guide/images/advanced');
+  });
+
+  it('ignores cross-listed copies, which live in other directories', () => {
+    const section = group('Images', 'guide', [
+      link('guide/images/intro'),
+      { ...link('guide/video/wan'), attrs: { [CROSS_LISTED_ATTR]: '' } },
+    ]);
+    assert.equal(sectionDirectory(section, directories, hrefToId), 'guide/images');
+  });
+
+  it('is undefined for a section without pages', () => {
+    assert.equal(sectionDirectory(group('Empty', 'guide', []), directories, hrefToId), undefined);
   });
 });

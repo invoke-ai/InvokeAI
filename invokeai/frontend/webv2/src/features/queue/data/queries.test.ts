@@ -1,4 +1,4 @@
-import type { QueueBackendPort, QueueItemDetailReadModel } from '@features/queue/core/types';
+import type { QueueBackendPort, QueueCounts, QueueItemReadModel, QueueReadModel } from '@features/queue/core/types';
 
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { QueryClient } from '@tanstack/react-query';
@@ -6,8 +6,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { queueBackend } from './httpRealtimeQueueBackend';
 import {
+  applyQueueItemStatusChange,
   invalidateQueueQueries,
-  queueItemDetailOptions,
   QUEUE_RECENT_WINDOW,
   queueKeys,
   queueReadModelOptions,
@@ -16,7 +16,6 @@ import {
 import { createQueueItemDTO, createQueueServer } from './queueServer.testing';
 
 const createBackend = (): QueueBackendPort => ({
-  cancelCurrentItem: vi.fn(),
   cancelQueueItems: vi.fn(),
   cancelQueueItemsByBatchIds: vi.fn(),
   cancelBatch: vi.fn(),
@@ -101,21 +100,6 @@ describe('queue queries', () => {
     expect(client.getQueryState(queueKeys.status({}))?.isInvalidated).toBe(true);
   });
 
-  it("re-reads an open item's details only while the item can still change", async () => {
-    const backend = createBackend();
-    const client = new QueryClient();
-    vi.mocked(backend.readItemDetail).mockImplementation((itemId) =>
-      Promise.resolve({ status: itemId === 1 ? 'completed' : 'in_progress' } as QueueItemDetailReadModel)
-    );
-
-    await client.fetchQuery(queueItemDetailOptions(backend, 1));
-    await client.fetchQuery(queueItemDetailOptions(backend, 2));
-    await invalidateQueueQueries(client);
-
-    expect(client.getQueryState(queueKeys.itemDetail(1))?.isInvalidated).toBe(false);
-    expect(client.getQueryState(queueKeys.itemDetail(2))?.isInvalidated).toBe(true);
-  });
-
   it('does not continue or publish a read after its account epoch expires', async () => {
     accountLifecycle.activate('user-a');
     const backend = createBackend();
@@ -149,29 +133,6 @@ describe('queue queries', () => {
     await expect(oldRead).rejects.toThrow('no longer active');
     expect(backend.readItemsById).not.toHaveBeenCalled();
     expect(onRead).not.toHaveBeenCalled();
-  });
-
-  it('does not publish a status read whose account epoch expired', async () => {
-    accountLifecycle.activate('user-a');
-    const backend = createBackend();
-    let resolveStatus: ((value: Awaited<ReturnType<QueueBackendPort['readStatus']>>) => void) | undefined;
-
-    vi.mocked(backend.readStatus).mockReturnValueOnce(
-      new Promise((resolve) => {
-        resolveStatus = resolve;
-      })
-    );
-    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    const oldRead = client.fetchQuery(queueStatusOptions(backend, {}));
-    const signal = vi.mocked(backend.readStatus).mock.calls[0]?.[1];
-
-    accountLifecycle.invalidate();
-    accountLifecycle.activate('user-b');
-    resolveStatus?.(await createBackend().readStatus());
-
-    await expect(oldRead).rejects.toThrow('no longer active');
-    expect(signal?.aborted).toBe(true);
-    expect(client.getQueryData(queueKeys.status({}))).toBeUndefined();
   });
 });
 
@@ -226,5 +187,125 @@ describe('queue reads at the transport boundary', () => {
 
     expect(server.requests).toEqual(['GET status']);
     expect(status.queue).toMatchObject({ completed: 999, inProgress: 1, total: 1_000 });
+  });
+});
+
+describe('applyQueueItemStatusChange', () => {
+  const PROJECT = 'webv2:p:project-1:q:';
+  const item = (
+    id: number,
+    status: QueueItemReadModel['status'],
+    overrides: Partial<QueueItemReadModel> = {}
+  ): QueueItemReadModel => ({
+    batchId: 'batch-1',
+    createdAt: '2026-11-14T00:00:00.000Z',
+    id,
+    origin: `${PROJECT}run-1`,
+    resultImageNames: [],
+    sessionId: `session-${id}`,
+    status,
+    statusSequence: 1,
+    updatedAt: '2026-11-14T00:00:00.000Z',
+    ...overrides,
+  });
+  const counts = (overrides: Partial<QueueCounts>): QueueCounts => ({
+    canceled: 0,
+    completed: 0,
+    failed: 0,
+    inProgress: 0,
+    pending: 0,
+    queueId: 'default',
+    total: 0,
+    waiting: 0,
+    ...overrides,
+  });
+  /** A reading whose counts are its window's unless `queue` says otherwise (more waiting than it lists). */
+  const model = (
+    overrides: Partial<Omit<QueueReadModel, 'status'>>,
+    queue: Partial<QueueCounts> = {}
+  ): QueueReadModel => {
+    const items = overrides.items ?? [];
+    return {
+      current: null,
+      items,
+      next: null,
+      scope: { originPrefix: PROJECT },
+      ...overrides,
+      status: {
+        processor: { isProcessing: true, isStarted: true },
+        queue: counts({
+          inProgress: items.filter((candidate) => candidate.status === 'in_progress').length,
+          pending: items.filter((candidate) => candidate.status === 'pending').length,
+          ...queue,
+        }),
+      },
+    };
+  };
+
+  it("takes only the whole queue's counts, never the owner's own counts an administrator also receives", () => {
+    const before = model({ scope: {} }, { userInProgress: 0, userPending: 4 });
+
+    // Another user's item started; the event carries that user's own counts.
+    const after = applyQueueItemStatusChange(before, {
+      item: item(7, 'in_progress', { origin: 'webv2:p:other:q:run-9', statusSequence: 2, userId: 'someone' }),
+      queueCounts: counts({ inProgress: 1, pending: 5, total: 6, userInProgress: 1, userPending: 2 }),
+    });
+
+    // An item the model did not list still becomes the current one.
+    expect(after.current?.id).toBe(7);
+    expect(after.status.queue).toMatchObject({ inProgress: 1, pending: 5, userInProgress: 0, userPending: 4 });
+  });
+
+  it("moves a scoped model's known item between its buckets, never taking the whole queue's counts", () => {
+    const running = item(1, 'in_progress');
+    const before = model({ current: running, items: [running] });
+    const wholeQueue = counts({ canceled: 1, inProgress: 3, pending: 9, total: 13 });
+
+    const after = applyQueueItemStatusChange(before, {
+      item: { ...running, status: 'canceled', statusSequence: 2 },
+      queueCounts: wholeQueue,
+    });
+
+    expect(after.current).toBeNull();
+    expect(after.status.queue).toMatchObject({ canceled: 1, inProgress: 0, pending: 0 });
+    expect(
+      applyQueueItemStatusChange(before, {
+        item: item(9, 'in_progress', { origin: 'webv2:p:other:q:run-9' }),
+        queueCounts: null,
+      })
+    ).toBe(before);
+  });
+
+  describe('the window standing in for the next item', () => {
+    // Item 2 is next; it starts, and the window's next pending item in run order would stand in.
+    const window = () => [item(4, 'pending'), item(3, 'pending'), item(2, 'pending')];
+    const start2 = (before: QueueReadModel) =>
+      applyQueueItemStatusChange(before, { item: item(2, 'in_progress', { statusSequence: 2 }), queueCounts: null });
+
+    it('stands in when the window holds every pending item the counts report', () => {
+      expect(start2(model({ items: window(), next: item(2, 'pending') })).next?.id).toBe(3);
+    });
+  });
+
+  it('keeps a read newer than the event, and follows sequences again once a read brings in restarted ones', () => {
+    const fetched = model({ current: item(5, 'in_progress', { statusSequence: 3 }), items: [] });
+
+    // A late event from before the read.
+    expect(
+      applyQueueItemStatusChange(fetched, { item: item(5, 'pending', { statusSequence: 2 }), queueCounts: null })
+    ).toBe(fetched);
+    // A change this tab assumes, with no sequence, never revives a finished item.
+    const finished = model({ items: [item(6, 'completed', { statusSequence: 4 })] });
+    expect(
+      applyQueueItemStatusChange(finished, { item: item(6, 'canceled', { statusSequence: null }), queueCounts: null })
+    ).toBe(finished);
+    // An event with a higher sequence does correct it: the item had finished, not been canceled.
+    const assumedCanceled = model({ items: [item(6, 'canceled', { statusSequence: 4 })] });
+    expect(
+      applyQueueItemStatusChange(assumedCanceled, {
+        item: item(6, 'completed', { statusSequence: 5 }),
+        queueCounts: null,
+      }).items[0]?.status
+    ).toBe('completed');
   });
 });

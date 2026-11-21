@@ -1,15 +1,17 @@
 /**
  * Rect/ellipse marquee previews do not change the mask. Shift constrains aspect; Alt draws from center. On release
- * those same modifiers choose the shared boolean op, intentionally composing shape and operation.
- * Degenerate/cancelled drags do not commit; engine selection history records accepted changes.
+ * those same modifiers choose the shared boolean op, intentionally composing shape and operation. Degenerate/cancelled
+ * drags do not commit; engine selection history records accepted changes.
  */
 
-import type { Rect, Vec2 } from '@workbench/canvas-engine/types';
+import type { Vec2 } from '@workbench/canvas-engine/types';
 
 import { selectionOpFor } from '@workbench/canvas-engine/selection/selectionOpMode';
 import { selectionShapePathData } from '@workbench/canvas-engine/selection/selectionPaths';
 
 import type { Tool, ToolContext } from './tool';
+
+import { dragRect, type DragRectConstraints } from './dragRect';
 
 /** Bit for the primary (usually left) mouse button in `PointerEvent.buttons`. */
 const PRIMARY_BUTTON = 1;
@@ -22,50 +24,16 @@ interface GestureState {
   startScreen: Vec2;
   moved: boolean;
   /**
-   * Shift/alt held at the press pick the boolean op (add/subtract); the same
-   * keys pressed mid-drag shape the rect instead (square / from centre).
+   * Shift/alt held at the press pick the boolean op (add/subtract); the same keys pressed mid-drag shape the rect
+   * instead (square / from centre).
    */
   opModifiers: { shift: boolean; alt: boolean };
   /** Op keys let go during the drag: pressing one again shapes like any mid-drag press. */
   released: { shift: boolean; alt: boolean };
 }
 
-/** How the drag modifiers shape the rect. */
-export interface MarqueeConstraints {
-  /** Equal width and height (shift). */
-  square: boolean;
-  /** The press point is the rect's centre rather than a corner (alt). */
-  fromCenter: boolean;
-}
-
-/** The drag delta, optionally forced to equal magnitude on both axes (sign kept). */
-const constrainedDelta = (start: Vec2, end: Vec2, square: boolean): Vec2 => {
-  const dx = end.x - start.x;
-  const dy = end.y - start.y;
-  if (!square) {
-    return { x: dx, y: dy };
-  }
-  const side = Math.max(Math.abs(dx), Math.abs(dy));
-  return { x: (dx < 0 ? -1 : 1) * side, y: (dy < 0 ? -1 : 1) * side };
-};
-
-/** Normalized integer marquee bounds; centered mode mirrors the constrained delta around the press point. */
-export const marqueeRect = (start: Vec2, end: Vec2, constraints: MarqueeConstraints): Rect => {
-  const delta = constrainedDelta(start, end, constraints.square);
-  const a = constraints.fromCenter ? { x: start.x - delta.x, y: start.y - delta.y } : start;
-  const b = { x: start.x + delta.x, y: start.y + delta.y };
-  const left = Math.round(Math.min(a.x, b.x));
-  const top = Math.round(Math.min(a.y, b.y));
-  return {
-    height: Math.round(Math.max(a.y, b.y)) - top,
-    width: Math.round(Math.max(a.x, b.x)) - left,
-    x: left,
-    y: top,
-  };
-};
-
 /** The shaping constraints: a key still held since it chose the op at the press does not also shape. */
-const constraintsFor = (modifiers: { shift: boolean; alt: boolean }, state: GestureState): MarqueeConstraints => {
+const constraintsFor = (modifiers: { shift: boolean; alt: boolean }, state: GestureState): DragRectConstraints => {
   if (state.opModifiers.shift && !modifiers.shift) {
     state.released.shift = true;
   }
@@ -78,7 +46,6 @@ const constraintsFor = (modifiers: { shift: boolean; alt: boolean }, state: Gest
   };
 };
 
-/** Creates a fresh marquee tool with its own gesture state. */
 export const createMarqueeTool = (): Tool => {
   let state: GestureState | null = null;
 
@@ -100,10 +67,12 @@ export const createMarqueeTool = (): Tool => {
       clearPreview(ctx);
     },
     onKeyCommand: (ctx, command) => {
-      if (command === 'cancel' && state) {
-        end();
-        clearPreview(ctx);
+      if (command !== 'cancel' || !state) {
+        return false;
       }
+      end();
+      clearPreview(ctx);
+      return true;
     },
     onPointerCancel: (ctx) => {
       end();
@@ -133,7 +102,7 @@ export const createMarqueeTool = (): Tool => {
         }
         state.moved = true;
       }
-      const rect = marqueeRect(state.startDoc, input.documentPoint, constraintsFor(input.modifiers, state));
+      const rect = dragRect(state.startDoc, input.documentPoint, constraintsFor(input.modifiers, state));
       ctx.stores.marqueePreview.set({ kind: ctx.stores.marqueeOptions.get().kind, rect });
       ctx.invalidate({ overlay: true });
     },
@@ -148,10 +117,9 @@ export const createMarqueeTool = (): Tool => {
       if (!current.moved || !ctx.commitSelection) {
         return;
       }
-      const rect = marqueeRect(current.startDoc, input.documentPoint, constraintsFor(input.modifiers, current));
+      const rect = dragRect(current.startDoc, input.documentPoint, constraintsFor(input.modifiers, current));
       if (rect.width < 1 || rect.height < 1) {
-        // Degenerate drag: selecting nothing would silently wipe the selection
-        // under `replace`, so treat it as a no-op instead.
+        // Degenerate drag: selecting nothing would silently wipe the selection under `replace`, so it is a no-op.
         return;
       }
       const { kind } = ctx.stores.marqueeOptions.get();

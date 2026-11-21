@@ -45,7 +45,6 @@ export interface CanvasCompositingSettings {
 /** The legacy-parity generation modes a canvas invoke resolves to. */
 export type CanvasGenerationMode = 'txt2img' | 'img2img' | 'inpaint' | 'outpaint';
 
-/** The generation modes the pure canvas graph compiler supports (full matrix). */
 export type CanvasCompileMode = CanvasGenerationMode;
 
 /** Pure compiler inputs reference already-uploaded media. */
@@ -65,8 +64,8 @@ export interface CompileCanvasGraphInput {
   /** The uploaded bbox composite (executor result). Required for image-referencing modes. */
   compositeImageName: string | null;
   /**
-   * Uploaded grayscale mask: white keeps, dark inpaints. Required for inpaint; outpaint can derive its mask from
-   * image alpha.
+   * Uploaded grayscale mask: white keeps, dark inpaints. Required for inpaint; outpaint can derive its mask from image
+   * alpha.
    */
   maskImageName?: string | null;
   /** An optional noise-level mask adds image noise before encoding. */
@@ -77,9 +76,10 @@ export interface CompileCanvasGraphInput {
   compositing: CanvasCompositingSettings;
   /** Processing-size policy; absent means the bbox snapped to the model grid. */
   scaling?: CanvasScalingSettings;
+  /** Opaque Workbench-owned authored canvas record, captured with the composites. */
+  canvasMetadata?: Record<string, unknown>;
   /** Prevalidated per-layer composites, each uploaded separately. */
   controlLayers?: readonly ControlLayerGraphInput[];
-  /** Resolved inputs for each supported region. */
   regionalGuidance?: readonly RegionalGuidanceInput[];
 }
 

@@ -52,6 +52,7 @@ export const useGalleryActions = ({
     exportProject,
     gallery,
     galleryValues,
+    getBoardMediaUsage,
     getProjectGalleryValues,
     notifications,
     projectId,
@@ -120,8 +121,7 @@ export const useGalleryActions = ({
       const owner = captureAccountScope();
       const rollback = patchGalleryBoardCaches(queryClient, boardId, { archived });
       const movedSelectionAway = archived && boardId === selectedBoardId;
-      // An archived board is out of the way, as a deleted one is: results stop going to it rather than to a board
-      // nothing on screen shows.
+      // An archived board is out of the way, as a deleted one is: results stop going to a board no screen shows.
       const stoppedAutoAdding = archived && autoAddBoardId === boardId;
 
       if (movedSelectionAway) {
@@ -143,9 +143,8 @@ export const useGalleryActions = ({
           if (!(await setBoardArchived(boardId, false))) {
             return;
           }
-          // Back to what the archive changed, in the project it changed them in (the toast outlives a project
-          // switch), and each only while that project still has what the archive left: no destination, and
-          // Uncategorized on screen.
+          // Back to what the archive changed, in the project it changed them in (the toast outlives a project switch),
+          // each only while that project still has what the archive left: no destination, Uncategorized on screen.
           const values = movedSelectionAway || stoppedAutoAdding ? getProjectGalleryValues?.(projectId) : null;
 
           if (!values) {
@@ -314,12 +313,13 @@ export const useGalleryActions = ({
         }
       },
       exportProject,
+      getBoardMediaUsage,
       loadMore,
       moveBoard: async (boardId, destinationProjectId, destinationLabel) => {
         const owner = captureAccountScope();
         const rollback = patchGalleryBoardCaches(queryClient, boardId, { projectId: destinationProjectId });
-        // Into another project while other projects are hidden, the board leaves the panel as an archived one does:
-        // it stops being the selection and the auto-add target rather than take results nothing on screen shows.
+        // Into another project while other projects are hidden, the board leaves the panel as an archived one does: it
+        // stops being the selection and the auto-add target rather than take results nothing on screen shows.
         const leavesView =
           destinationProjectId !== null && destinationProjectId !== projectId && !showOtherProjectBoards;
         const movedSelectionAway = leavesView && boardId === selectedBoardId;
@@ -445,6 +445,7 @@ export const useGalleryActions = ({
     ensureProjectOnServer,
     exportProject,
     gallery,
+    getBoardMediaUsage,
     getCurrentGalleryLocation,
     getProjectGalleryValues,
     loadMore,

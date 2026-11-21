@@ -17,14 +17,12 @@ import { system } from '@theme/system';
 import { act, StrictMode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { userEvent } from 'vitest/browser';
 
 import { loadGraphPreview } from './libraryPreviewSource';
 import { WorkflowPublicationHost } from './WorkflowPublicationHost';
 
-/**
- * The publication controller reaches the transport through the API module itself (not the queries barrel), so
- * that is where the library is stubbed; the barrel re-exports the same stubs to the host's review fetch.
- */
+/** Stubbed at the API module, which the publication controller reaches directly; the barrel re-exports the stubs. */
 const identity = vi.hoisted(() => ({
   session: { multiuserEnabled: false, phase: 'ready', user: null } as {
     multiuserEnabled: boolean;
@@ -51,9 +49,12 @@ vi.mock('@features/workflow/data/api', async (importOriginal) => ({
   ...api,
 }));
 
+// One snapshot, as the real store hands out until the templates change.
+const TEMPLATES_SNAPSHOT = vi.hoisted(() => ({ error: null, status: 'loaded' as const, templates: {} }));
+
 vi.mock('@features/workflow/react', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  useInvocationTemplatesSnapshot: () => ({ error: null, status: 'loaded', templates: {} }),
+  useInvocationTemplatesSnapshot: () => TEMPLATES_SNAPSHOT,
 }));
 
 const TRANSLATIONS: Record<string, string> = {
@@ -158,8 +159,6 @@ const BUNDLED: ProjectWorkflowEntry = { ...UNLINKED, source: { libraryWorkflowId
 const OTHER: ProjectWorkflowEntry = { document: { ...createProjectGraph('wf-2'), name: 'Beta' } };
 const GRAPH_PREVIEW: WorkflowGraphPreviewPort = {
   focusSource: vi.fn(),
-  getRoute: () => null,
-  invoke: () => Promise.resolve(false),
   openDocumentInNewProject: vi.fn(),
   openWorkflowEditor: vi.fn(),
 };
@@ -321,7 +320,6 @@ describe('WorkflowPublicationHost', () => {
     api.setLibraryWorkflowPublic.mockReset();
     api.updateLibraryWorkflow.mockReset();
     identity.session = { multiuserEnabled: false, phase: 'ready', user: null };
-    // A fresh controller and an empty intent for every test.
     accountLifecycle.invalidate();
   });
 
@@ -352,12 +350,10 @@ describe('WorkflowPublicationHost', () => {
     expect(workflow).toMatchObject({ ...serializeWorkflowJson(UNLINKED.document), name: 'Alpha, published' });
     expect(options.reservedId).toEqual(expect.any(String));
     expect(options).not.toHaveProperty('isPublic');
-    // The project workflow now knows which template, at which revision, it can update later.
     expect(commands.setWorkflowSource).toHaveBeenCalledWith(
       { projectId: PROJECT_ID, workflowId: WORKFLOW_ID },
       { libraryWorkflowId: 'lib-new', ownerUserId: 'user-a', revision: 1 }
     );
-    // It is now that template's working copy, so it takes the template's name.
     expect(commands.renameWorkflow).toHaveBeenCalledWith(WORKFLOW_ID, 'Alpha, published', PROJECT_ID);
     expect(notifications.success).toHaveBeenCalledWith('Workflow saved', 'Saved "Alpha, published" to the library.');
     expect(api.setLibraryWorkflowPublic).not.toHaveBeenCalled();
@@ -520,7 +516,6 @@ describe('WorkflowPublicationHost', () => {
     });
     await flush();
 
-    // The copy still links to the template it created; the name chosen meanwhile stands.
     expect(commands.setWorkflowSource).toHaveBeenCalledWith(
       { projectId: PROJECT_ID, workflowId: WORKFLOW_ID },
       { libraryWorkflowId: 'lib-new', ownerUserId: 'user-a', revision: 1 }
@@ -539,7 +534,6 @@ describe('WorkflowPublicationHost', () => {
       )
     );
     api.updateLibraryWorkflow.mockResolvedValue(record({ name: 'demo', revision: 2, workflow_id: 'lib-demo' }));
-    // Opened from a library template, then saved as a new one: the app re-links the copy to what was saved.
     commands.setWorkflowSource.mockImplementation((_target, source: ProjectWorkflowEntry['source']) =>
       project.setSnapshot(projectSnapshot([{ ...LINKED, source }]))
     );
@@ -551,7 +545,6 @@ describe('WorkflowPublicationHost', () => {
     await flush();
 
     const dialog = dialogTitled('Update library template');
-    // Only the template being replaced is named, never the one the workflow was first opened from.
     expect(dialog?.textContent).toContain(
       'Replace the library template "demo" with this workflow\'s current graph, form, and input values?'
     );
@@ -638,7 +631,6 @@ describe('WorkflowPublicationHost', () => {
     await click(buttonWithText(reviewDialog(), 'Replace template'));
     await confirmUpdate();
 
-    // The write is fenced at exactly the revision that was reviewed.
     expect(api.updateLibraryWorkflow).toHaveBeenCalledTimes(1);
     expect(api.updateLibraryWorkflow.mock.calls[0]?.[2]).toMatchObject({ expectedRevision: 5 });
     expect(commands.setWorkflowSource).toHaveBeenCalledWith(
@@ -647,6 +639,37 @@ describe('WorkflowPublicationHost', () => {
     );
     expect(notifications.success).toHaveBeenCalledWith('Workflow saved', 'Updated "Alpha" in the library.');
     expect(dialogs()).toHaveLength(0);
+  });
+
+  it('opens the graph preview over the review under StrictMode and returns to the review, which stays open', async () => {
+    await loadGraphPreview();
+    api.getLibraryWorkflowRecord.mockResolvedValue(record({ revision: 5 }));
+    await renderHost([LINKED_UNKNOWN]);
+    await request('update-source');
+    await click(choice('review'));
+
+    const preview = () =>
+      document.querySelector<HTMLElement>('[data-graph-preview-stage]')?.closest<HTMLElement>('[role="dialog"]') ??
+      null;
+    const openPreview = async () => {
+      await click(buttonWithText(reviewDialog(), 'workflowLibrary.previewGraph'));
+      await vi.waitFor(() => expect(preview()?.dataset.state).toBe('open'));
+      await vi.waitFor(() => expect(preview()?.contains(document.activeElement)).toBe(true));
+    };
+    const expectBackInReview = async () => {
+      await vi.waitFor(() => expect(preview()).toBeNull());
+      expect(reviewDialog()).not.toBeNull();
+      await vi.waitFor(() => expect(reviewDialog()?.contains(document.activeElement)).toBe(true));
+    };
+
+    await openPreview();
+    await act(() => userEvent.keyboard('{Escape}'));
+    await flush();
+    await expectBackInReview();
+
+    await openPreview();
+    await click(preview()?.querySelector<HTMLButtonElement>('[data-scope="dialog"][data-part="close-trigger"]'));
+    await expectBackInReview();
   });
 
   it('dates the revision against the arriving review record instead of the loading view mount', async () => {
@@ -750,7 +773,6 @@ describe('WorkflowPublicationHost', () => {
     expect(api.createLibraryWorkflowRecord).toHaveBeenCalledTimes(2);
     const first = api.createLibraryWorkflowRecord.mock.calls[0]?.[1] as { reservedId: string };
     const second = api.createLibraryWorkflowRecord.mock.calls[1]?.[1] as { reservedId: string };
-    // The server matches the resend against whatever the first send created, so nothing is saved twice.
     expect(second.reservedId).toBe(first.reservedId);
     expect(dialogs()).toHaveLength(0);
   });
@@ -784,7 +806,6 @@ describe('WorkflowPublicationHost', () => {
     await confirmUpdate();
     expect(api.updateLibraryWorkflow).toHaveBeenCalledTimes(1);
 
-    // A duplicate of the project shares its workflow ids but points at a different template.
     const copied: ProjectWorkflowEntry = {
       ...LINKED,
       document: { ...LINKED.document, description: 'Only project B content', name: 'Beta project copy' },
@@ -800,7 +821,6 @@ describe('WorkflowPublicationHost', () => {
     });
     await flush();
 
-    // The late conflict belongs to the ended operation: the save dialog stays, no conflict dialog appears.
     expect(saveDialog()).not.toBeNull();
     expect(dialogTitled('Template has changed')).toBeNull();
     expect(saveDialog()?.querySelector<HTMLButtonElement>('button[type="submit"]')?.disabled).toBe(false);
@@ -824,7 +844,6 @@ describe('WorkflowPublicationHost', () => {
     await request('update-source');
     await confirmUpdate();
 
-    // Project B is a duplicate: same workflow id, its own template at its own revision.
     const copied: ProjectWorkflowEntry = { ...LINKED, source: { libraryWorkflowId: 'lib-B', revision: 1 } };
     await act(() => project.setSnapshot({ ...projectSnapshot([copied]), id: 'project-2' }));
     await request('update-source');
@@ -836,7 +855,6 @@ describe('WorkflowPublicationHost', () => {
     });
     await flush();
 
-    // A's settled confirmation closed A's dialog only; B's confirmation is still waiting for its answer.
     expect(dialogTitled('Update library template')).not.toBeNull();
     api.getLibraryWorkflowRecord.mockResolvedValue(record({ revision: 1, workflow_id: 'lib-B' }));
     api.updateLibraryWorkflow.mockResolvedValueOnce(record({ revision: 2, workflow_id: 'lib-B' }));
@@ -861,7 +879,6 @@ describe('WorkflowPublicationHost', () => {
     await act(() => project.setSnapshot({ ...projectSnapshot([copied]), id: 'project-2' }));
     await request('update-source');
 
-    // B's confirmation is its own dialog: nothing of A's in-flight state reaches it.
     const dialog = dialogTitled('Update library template');
     expect(buttonWithText(dialog, 'Update template')?.disabled).toBe(false);
     expect(buttonWithText(dialog, 'Cancel')?.disabled).toBe(false);
@@ -913,7 +930,6 @@ describe('WorkflowPublicationHost', () => {
     );
     expect(dialogs()).toHaveLength(0);
 
-    // Settled: coming back again offers nothing.
     await act(() => project.setSnapshot({ ...projectSnapshot([OTHER]), id: 'project-2' }));
     await act(() => project.setSnapshot(projectSnapshot([UNLINKED])));
     await flush();
@@ -932,7 +948,6 @@ describe('WorkflowPublicationHost', () => {
     await submitSaveAsNew('Alpha');
     expect(dialogTitled('Library did not answer')).not.toBeNull();
 
-    // Cancel defers: the handle is kept and offered once more on the next return, then stays quiet.
     await click(buttonWithText(dialogTitled('Library did not answer'), 'Cancel'));
     expect(dialogs()).toHaveLength(0);
     await act(() => project.setSnapshot({ ...projectSnapshot([OTHER]), id: 'project-2' }));
@@ -945,7 +960,6 @@ describe('WorkflowPublicationHost', () => {
     await flush();
     expect(dialogs()).toHaveLength(0);
 
-    // A new save for that workflow meets the unanswered one first; discarding it lets the new save proceed.
     await request('save-as-new');
     expect(dialogTitled('Library did not answer')).not.toBeNull();
     expect(saveDialog()).toBeNull();
@@ -975,7 +989,6 @@ describe('WorkflowPublicationHost', () => {
 
     expect(saveDialog()).toBeNull();
 
-    // A request for a workflow the project does not hold starts nothing.
     await request('save-as-new', WORKFLOW_ID);
     expect(saveDialog()).toBeNull();
     expect(workflowUiStore.getSnapshot().publicationIntent).toBeNull();

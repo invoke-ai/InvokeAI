@@ -1,3 +1,4 @@
+import type { ResolvedValues } from '@platform/core/resolvedValues';
 import type { CanvasDocumentContractV3, Rect } from '@workbench/canvas-engine/api';
 import type { CanvasGallerySaveRegion, CreateFromBboxDestination } from '@workbench/canvas-operations/api';
 /* oxlint-disable react-perf/jsx-no-new-function-as-prop */
@@ -5,11 +6,12 @@ import type { CanvasEngineHandle } from '@workbench/canvas-operations/react';
 import type { Project } from '@workbench/projectContracts';
 import type { WidgetViewProps } from '@workbench/widgetContracts';
 
-import { Box, Checkbox, HStack, Menu, Portal, Spinner, Stack, Text } from '@chakra-ui/react';
+import { Checkbox, HStack, Menu, Portal, Spinner, Stack, Text } from '@chakra-ui/react';
 import { useModifierHeld } from '@platform/react/useModifierHeld';
 import { Button, IconButton } from '@platform/ui/Button';
 import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
 import { MenuActionItem, MenuContent, MenuHeadingGroup, type MenuActionItemProps } from '@platform/ui/Menu';
+import { HeaderActionDivider, HeaderHistoryButton } from '@platform/ui/PanelHeader';
 import { Tooltip, useTooltipTriggerIds } from '@platform/ui/Tooltip';
 import { getBaseRasterContentBounds, getDocumentLeaves } from '@workbench/canvas-engine/api';
 import { getCanvasEngine, isBlankCanvasDocument } from '@workbench/canvas-operations/api';
@@ -89,7 +91,7 @@ const selectModelBase = (project: Project): string | null => {
 };
 
 /** The project's clamped compositing mask blur, which fit-to-masks clears so the feathered edge stays in frame. */
-const selectMaskBlur = (values: Record<string, unknown>): number => readCanvasCompositingSettings(values).maskBlur;
+const selectMaskBlur = (values: ResolvedValues): number => readCanvasCompositingSettings(values).maskBlur;
 
 const selectModelVariant = (project: Project): string | null => {
   const values = getProjectWidgetValues(project, 'generate') as { model?: { variant?: unknown } } | undefined;
@@ -125,6 +127,8 @@ const CanvasHeaderActionsInner = ({
     ? t('widgets.canvas.controls.redoStep', { label: redoLabel })
     : t('widgets.canvas.controls.redo');
   const editingLocked = useCanvasDocumentEditingLocked(engine);
+  const undoShortcut = useMemo(() => <CommandKeycaps commandId="canvas.undo" />, []);
+  const redoShortcut = useMemo(() => <CommandKeycaps commandId="canvas.redo" />, []);
   const { describeDestination, isSaving, save: saveToGallery } = useCanvasGallerySave(engine);
   const { createFromBbox, isCreating } = useCreateFromBbox(engine);
   const saveMenuIds = useTooltipTriggerIds();
@@ -242,8 +246,8 @@ const CanvasHeaderActionsInner = ({
     [clearCanvas, editingLocked, inFlightCount, stopGenerations]
   );
 
-  // Register catalog commands once while useEffectEvent reads current fit rects/dialog openers; new-session uses
-  // the button's confirmation flow.
+  // Register catalog commands once while useEffectEvent reads current fit rects/dialog openers; new-session uses the
+  // button's confirmation flow.
   const executeHeaderCommand = useEffectEvent((commandId: string) =>
     executeCanvasHeaderCommand(commandId, commandContext())
   );
@@ -356,35 +360,27 @@ const CanvasHeaderActionsInner = ({
         </Portal>
       </Menu.Root>
 
-      <HeaderDivider />
+      <HeaderActionDivider />
 
-      <Tooltip content={undoText}>
-        <IconButton
-          aria-label={undoText}
-          color="fg.muted"
-          disabled={editingLocked || !canUndo}
-          size="sm"
-          variant="ghost"
-          onClick={() => engine.history.undo()}
-        >
-          <Undo2Icon />
-        </IconButton>
-      </Tooltip>
+      {/* A lock explains itself only on a step that exists; with nothing to step over there is nothing to explain. */}
+      <HeaderHistoryButton
+        available={canUndo}
+        icon={Undo2Icon}
+        label={undoText}
+        shortcut={undoShortcut}
+        unavailableReason={canUndo ? lockReason : undefined}
+        onStep={() => engine.history.undo()}
+      />
+      <HeaderHistoryButton
+        available={canRedo}
+        icon={Redo2Icon}
+        label={redoText}
+        shortcut={redoShortcut}
+        unavailableReason={canRedo ? lockReason : undefined}
+        onStep={() => engine.history.redo()}
+      />
 
-      <Tooltip content={redoText}>
-        <IconButton
-          aria-label={redoText}
-          color="fg.muted"
-          disabled={editingLocked || !canRedo}
-          size="sm"
-          variant="ghost"
-          onClick={() => engine.history.redo()}
-        >
-          <Redo2Icon />
-        </IconButton>
-      </Tooltip>
-
-      <HeaderDivider />
+      <HeaderActionDivider />
 
       <Menu.Root
         ids={saveMenuIds}
@@ -457,6 +453,12 @@ const CommandMenuItem = ({ commandId, ...item }: Omit<MenuActionItemProps, 'shor
   return <MenuActionItem {...item} shortcut={shortcut} />;
 };
 
+/** A command's effective first binding, remaps included, as keycaps; nothing while it is unbound. */
+const CommandKeycaps = ({ commandId }: { commandId: string }) => {
+  const parts = useShortcutBinding(commandId)?.parts;
+  return parts ? <ShortcutKeycaps parts={parts} /> : null;
+};
+
 /** "{w} × {h} · {board}", dropping whichever part is unknown; undefined when neither is. */
 const describeSave = (
   t: (key: string, options?: Record<string, unknown>) => string,
@@ -472,10 +474,7 @@ const describeSave = (
   return board ?? undefined;
 };
 
-/**
- * The frame save, then the whole canvas, each saying what it would save and where. Mounted only while the menu is
- * open, so the canvas content bounds (the rect the canvas save exports) are planned then, not on every edit.
- */
+/** Mounted only while the menu is open, so the content bounds are planned then, not on every edit. */
 const SaveMenuItems = ({
   board,
   document,
@@ -508,9 +507,6 @@ const SaveMenuItems = ({
     </>
   );
 };
-
-/** A thin vertical rule separating header-action groups (matching legacy's dividers). */
-const HeaderDivider = () => <Box bg="border.subtle" flexShrink={0} h="4" mx="1" w="1px" />;
 
 /** Diagnostics use an existing engine; opening settings must never acquire a canvas engine lease. */
 export const CanvasSettingsActions = (_props: WidgetViewProps) => {

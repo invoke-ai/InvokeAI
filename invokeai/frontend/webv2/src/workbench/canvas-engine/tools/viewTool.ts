@@ -1,7 +1,4 @@
-/**
- * Per-engine view tool pans and zooms through viewport state without document dispatch; also used for temporary
- * Space navigation.
- */
+/** Per-engine view tool: pans and zooms the viewport without document dispatch; also the temporary Space tool. */
 
 import type { PointerInput, Vec2 } from '@workbench/canvas-engine/types';
 
@@ -10,7 +7,6 @@ import type { Tool, ToolContext } from './tool';
 /** Bit for the primary (usually left) mouse button in `PointerEvent.buttons`. */
 const PRIMARY_BUTTON = 1;
 
-/** Creates a fresh view tool with its own drag state. */
 export const createViewTool = (): Tool => {
   let panning = false;
   let lastScreen: Vec2 | null = null;

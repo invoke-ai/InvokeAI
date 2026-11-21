@@ -4,6 +4,8 @@ import type { CanvasEngineHandle } from '@workbench/canvas-operations/react';
 import { Stack, Switch, Text } from '@chakra-ui/react';
 import { getDocumentNode } from '@workbench/canvas-engine/api';
 import { useCanvasEngine } from '@workbench/canvas-operations/react';
+import { SelectedShapeAppearanceSettings } from '@workbench/widgets/canvas/tool-options/ShapeOptions';
+import { PropertyGroup } from '@workbench/widgets/canvas/tool-presentation/PropertyPrimitives';
 import { usePreparedCommit } from '@workbench/widgets/canvas/useStructuralCommit';
 import { AdjustmentSettings } from '@workbench/widgets/layers/AdjustmentSettings';
 import { ControlLayerSettings } from '@workbench/widgets/layers/ControlLayerSettings';
@@ -23,28 +25,27 @@ import { RasterLayerFilterSection } from '@workbench/widgets/layers/RasterLayerF
 import { ReferenceImageSettings } from '@workbench/widgets/layers/ReferenceImageSettings';
 import { RegionalGuidanceSettings } from '@workbench/widgets/layers/RegionalGuidanceSettings';
 import { useActiveProjectId, useActiveProjectSelector } from '@workbench/WorkbenchContext';
-import { useCallback } from 'react';
+import { lazy, Suspense, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { GroupSelectedNotice } from './GroupSelectedNotice';
 import { PropertiesSection } from './PropertiesSection';
+
+const VectorLayerSettings = lazy(() =>
+  import('@workbench/widgets/layers/VectorLayerSettings').then((module) => ({ default: module.VectorLayerSettings }))
+);
 
 type LayerSectionEngine = Pick<
   CanvasEngineHandle,
   'document' | 'exports' | 'interaction' | 'layers' | 'lifecycle' | 'projectId' | 'tools'
 >;
 
-// Reference equality is exact: the document index hands back the same node
-// object until the node itself changes, and the section renders the whole
-// node, so a narrower comparison would serve stale views of it.
+// Reference equality is exact: the document index hands back the same node object until the node itself changes, and
+// the section renders the whole node, so a narrower comparison would serve stale views of it.
 const selectSelectedNode = (project: {
   canvas: { document: Pick<CanvasDocumentContractV3, 'stacks' | 'selectedLayerId'> };
 }): CanvasNodeContract | null => getDocumentNode(project.canvas.document, project.canvas.document.selectedLayerId);
 
-/**
- * Render selected-layer editors here; blend/opacity remain in LayerBlendRow and all edits retain their document
- * seams.
- */
 export const LayerSection = ({ disabled }: { disabled: boolean }) => {
   const { t } = useTranslation();
   const engine = useCanvasEngine();
@@ -146,7 +147,6 @@ const ChildEditor = ({
   return null;
 };
 
-/** Dispatches to the correct per-type settings block for the layer. */
 const LayerTypeSettings = ({
   documentRevision,
   engine,
@@ -156,7 +156,15 @@ const LayerTypeSettings = ({
   engine: LayerSectionEngine | null;
   layer: CanvasLayerContract;
 }) => {
+  const { t } = useTranslation();
+  const loading = useMemo(() => <Text>{t('common.loading')}</Text>, [t]);
   switch (layer.type) {
+    case 'vector':
+      return (
+        <Suspense fallback={loading}>
+          <VectorLayerSettings key={layer.id} engine={engine} layer={layer} />
+        </Suspense>
+      );
     case 'inpaint_mask':
       return <InpaintMaskSettings key={layer.id} engine={engine} layer={layer} />;
     case 'regional_guidance':
@@ -204,6 +212,11 @@ const RasterLayerSettings = ({
 
   return (
     <Stack gap="2">
+      {layer.source.type === 'shape' ? (
+        <PropertyGroup id="layer-shape-appearance" label={t('widgets.properties.groups.appearance')}>
+          <SelectedShapeAppearanceSettings engine={engine} layer={layer} source={layer.source} />
+        </PropertyGroup>
+      ) : null}
       <Switch.Root checked={isLocked} onCheckedChange={handleTransparencyLock}>
         <Switch.HiddenInput />
         <Switch.Control>

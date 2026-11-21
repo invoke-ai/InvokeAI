@@ -1,6 +1,6 @@
-import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
 import { GENERATE_COMPONENT_VALUE_KEYS } from '@features/generation/core/baseGenerationPolicies';
 import { collectGenerationIssueScenarios } from '@features/generation/core/generationIssues.testing';
+import { seedArchitectureCapabilities } from '@features/models/core/architectureCapabilities.testing';
 import { describe, expect, it } from 'vitest';
 
 import { ISSUE_FIELD_RENDERERS } from './GenerateIssues';

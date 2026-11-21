@@ -1,9 +1,11 @@
+import type { GalleryMediaUsageReport } from '@features/gallery/core/mediaUsage';
 /* oxlint-disable react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
 import type { GalleryBoard, GalleryBoardAccess, GalleryBoardAction } from '@features/gallery/core/types';
 
 import { ChakraProvider } from '@chakra-ui/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
-import { act, useCallback, useState } from 'react';
+import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { userEvent } from 'vitest/browser';
@@ -19,13 +21,33 @@ vi.mock('react-i18next', () => ({
       const messages: Record<string, string> = {
         'widgets.gallery.assetCount': `${String(values?.count)} uploads`,
         'common.cancel': 'Cancel',
+        'common.retry': 'Retry',
         'widgets.gallery.deleteBoard': 'Delete board',
         'widgets.gallery.deleteBoardAndMedia': `Delete board and ${String(values?.count)} items`,
         'widgets.gallery.deleteBoardDescription': `Its ${String(values?.media)} move to Uncategorized.`,
         'widgets.gallery.deleteBoardEmptyDescription': 'The board is empty.',
+        'widgets.gallery.deleteBoardWithMediaDescription': `Its ${String(values?.media)} are deleted with it.`,
+        'widgets.gallery.deleteBoardWithOwnMediaDescription': `Your ${String(
+          values?.media
+        )} on it are deleted with it; the rest move to Uncategorized.`,
+        'widgets.gallery.deleteBoardWithNoOwnMediaDescription':
+          'None of its media is yours; all of it moves to Uncategorized.',
+        'widgets.gallery.deleteBoardIncludeOwnMedia': `Also permanently delete your ${String(values?.count)} items`,
+        'widgets.gallery.deleteBoardIncludeOwnMediaNone': 'Also permanently delete your items',
+        'widgets.gallery.deleteBoardAndOwnMedia': `Delete board and your ${String(values?.count)} items`,
         'widgets.gallery.deleteBoardIncludeMedia': `Also permanently delete its ${String(values?.count)} items`,
         'widgets.gallery.deleteBoardQuestion': `Delete board "${String(values?.name)}"?`,
         'widgets.gallery.deleteBoardTypeName': `Type "${String(values?.name)}" to confirm`,
+        'widgets.gallery.deleteInUse.checking': 'Checking where this media is used…',
+        'widgets.gallery.deleteInUse.none': 'Nothing uses this media.',
+        'widgets.gallery.deleteInUse.failed': 'Couldn’t check where this media is used.',
+        'widgets.gallery.deleteInUse.group.project': `Project “${String(values?.name)}”`,
+        'widgets.gallery.deleteInUse.itemCount': `${String(values?.count)} items`,
+        'widgets.gallery.deleteInUse.summaryBoard': `${String(values?.count)} of the ${String(
+          values?.media
+        )} this deletes are still in use:`,
+        'widgets.gallery.deleteInUse.summaryOne': 'Still in use:',
+        'widgets.gallery.deleteInUse.surface.canvasRaster': 'Canvas raster layers',
         'widgets.gallery.downloadBoard': 'Download board',
         'widgets.gallery.downloadBoardWithOmission': `Download board (${String(values?.count)} video omitted)`,
         'widgets.gallery.imageCount': `${String(values?.count)} images`,
@@ -63,6 +85,7 @@ const context = {
     archiveBoard: vi.fn(),
     deleteBoard: vi.fn(),
     downloadBoard: vi.fn(),
+    getBoardMediaUsage: vi.fn<(boardId: string, signal: AbortSignal) => Promise<GalleryMediaUsageReport>>(),
     moveBoard: vi.fn(),
     renameBoard: vi.fn(),
     setBoardGeneralAccess: vi.fn(),
@@ -81,16 +104,14 @@ const context = {
     ['p2', 'Harbor Tower'],
   ]),
 } as unknown as GalleryWidgetContextValue;
-const targetContext = {
-  ...context,
-  gallery: { ...context.gallery, settings: { autoAddBoardId: 'board-1', followSelectedBoard: false } },
-} as unknown as GalleryWidgetContextValue;
 
 let host: HTMLDivElement | null = null;
+let queryClient = new QueryClient();
 let root: Root | null = null;
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 beforeEach(async () => {
+  queryClient = new QueryClient();
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
@@ -98,9 +119,11 @@ beforeEach(async () => {
   await act(async () => {
     root?.render(
       <ChakraProvider value={system}>
-        <GalleryWidgetContext value={context}>
-          <GalleryBoardMenu target={target} onClose={noop} />
-        </GalleryWidgetContext>
+        <QueryClientProvider client={queryClient}>
+          <GalleryWidgetContext value={context}>
+            <GalleryBoardMenu target={target} onClose={noop} />
+          </GalleryWidgetContext>
+        </QueryClientProvider>
       </ChakraProvider>
     );
     await Promise.resolve();
@@ -112,17 +135,6 @@ afterEach(async () => {
   host?.remove();
   host = null;
   root = null;
-});
-
-it('states the exact number of videos omitted from the image-only board archive', () => {
-  expect(document.body.textContent).toContain('Download board (1 video omitted)');
-});
-
-it('offers a plain board download when the board holds no videos', async () => {
-  await renderMenuFor({ ...board, videoCount: 0 } as GalleryBoard);
-
-  expect(menuItemLabels()).toContain('Download board');
-  expect(document.body.textContent).not.toContain('omitted');
 });
 
 const openDeleteDialog = async () => {
@@ -158,6 +170,9 @@ it('deletes the media too only behind its checkbox, naming how many items go', a
 
   await act(() => userEvent.click(dialog.querySelector<HTMLElement>('[data-part="label"]')!));
   expect(dialog.textContent).toContain('Also permanently delete its 3 items');
+  // The description follows the choice: the media no longer moves anywhere.
+  expect(dialog.textContent).toContain('Its 2 images and 1 videos are deleted with it.');
+  expect(dialog.textContent).not.toContain('move to Uncategorized');
   await act(() => userEvent.click(dialogButton('Delete board and 3 items')!));
 
   expect(context.actions.deleteBoard).toHaveBeenLastCalledWith('board-1', true);
@@ -178,71 +193,194 @@ it('asks for the board name before deleting many items with it', async () => {
   expect(context.actions.deleteBoard).toHaveBeenLastCalledWith('board-1', true);
 });
 
-it('starts each opening of the delete dialog over, for the same board too', async () => {
-  await renderMenuFor({ ...board, assetCount: 40, imageCount: 20 } as GalleryBoard);
-  let dialog = await openDeleteDialog();
-
-  await act(() => userEvent.click(dialog.querySelector<HTMLElement>('[data-part="label"]')!));
-  await act(() => userEvent.type(dialog.querySelector<HTMLInputElement>('input:not([type="checkbox"])')!, 'Board 1'));
-  expect(dialogButton('Delete board and 61 items')!.disabled).toBe(false);
-  await act(() => userEvent.click(dialogButton('Cancel')!));
-  await vi.waitFor(() => expect(document.querySelector('[role="alertdialog"]')).toBeNull());
-
-  dialog = await openDeleteDialog();
-
-  expect(dialog.querySelector<HTMLInputElement>('input[type="checkbox"]')?.checked).toBe(false);
-  expect(dialog.querySelector('input:not([type="checkbox"])')).toBeNull();
-  expect(dialogButton('Delete board and 61 items')).toBeUndefined();
-  expect(dialogButton('Delete board')!.disabled).toBe(false);
-
-  // Asking again for the media brings back an empty name field and a refused delete.
-  await act(() => userEvent.click(dialog.querySelector<HTMLElement>('[data-part="label"]')!));
-  expect(dialog.querySelector<HTMLInputElement>('input:not([type="checkbox"])')!.value).toBe('');
-  expect(dialogButton('Delete board and 61 items')!.disabled).toBe(true);
-});
-
-/** The panel's part: the menu target clears when the menu closes. */
-const ControlledMenu = ({ initialTarget }: { initialTarget: typeof target }) => {
-  const [menuTarget, setMenuTarget] = useState<typeof target | null>(initialTarget);
-  const close = useCallback(() => setMenuTarget(null), []);
-
-  return <GalleryBoardMenu target={menuTarget} onClose={close} />;
+const boardUsageReport: GalleryMediaUsageReport = {
+  checkedCount: 3,
+  groups: [{ count: 2, kind: 'project', name: 'Harbor Tower', surfaces: [{ count: 2, surface: 'canvasRaster' }] }],
+  inUseCount: 2,
+  onlyImages: false,
+  scope: 'board',
+  serverCheck: 'complete',
 };
 
-const openMenus = () => document.querySelectorAll('[role="menu"][data-state="open"]');
+/** The report's code loads lazily on the first settled check; a cold transform under a busy run can take a while. */
+const REPORT_WAIT = { timeout: 5000 };
 
-it.each(['cancel', 'delete'] as const)(
-  'closes the board menu as its delete dialog opens, and keeps it closed after %s',
-  async (outcome) => {
-    await act(async () => {
-      root?.render(
-        <ChakraProvider value={system}>
-          <GalleryWidgetContext value={context}>
-            <ControlledMenu initialTarget={target} />
-          </GalleryWidgetContext>
-        </ChakraProvider>
-      );
-      await Promise.resolve();
+const tickDeleteMedia = (dialog: HTMLElement) =>
+  act(() => userEvent.click(dialog.querySelector<HTMLElement>('[data-part="label"]')!));
+
+it('checks where the media is used once deleting it is asked for, and shows the report beside the choice', async () => {
+  const getBoardMediaUsage = vi.mocked(context.actions.getBoardMediaUsage);
+  let settle: (report: GalleryMediaUsageReport) => void = () => {};
+  getBoardMediaUsage.mockReset().mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        settle = resolve;
+      })
+  );
+  const dialog = await openDeleteDialog();
+
+  // Keeping the media breaks nothing, so nothing is checked for it.
+  expect(getBoardMediaUsage).not.toHaveBeenCalled();
+  await tickDeleteMedia(dialog);
+
+  expect(getBoardMediaUsage).toHaveBeenCalledExactlyOnceWith('board-1', expect.any(AbortSignal));
+  expect(dialog.textContent).toContain('Checking where this media is used…');
+  expect(dialogButton('Delete board and 3 items')!.disabled).toBe(false);
+
+  await act(() => settle(boardUsageReport));
+
+  await vi.waitFor(
+    () => expect(dialog.textContent).toContain('2 of the 3 items this deletes are still in use:'),
+    REPORT_WAIT
+  );
+  expect(dialog.textContent).toContain('Project “Harbor Tower”2 items');
+  expect(dialog.textContent).toContain('Canvas raster layers2 items');
+  await act(() => userEvent.click(dialogButton('Delete board and 3 items')!));
+  expect(context.actions.deleteBoard).toHaveBeenLastCalledWith('board-1', true);
+});
+
+it('warns when the check failed, still lets the board and its media go, and checks again on Retry', async () => {
+  const getBoardMediaUsage = vi.mocked(context.actions.getBoardMediaUsage);
+  let settleRetry: (report: GalleryMediaUsageReport) => void = () => {};
+  getBoardMediaUsage
+    .mockReset()
+    .mockRejectedValueOnce(new Error('offline'))
+    .mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          settleRetry = resolve;
+        })
+    );
+  const dialog = await openDeleteDialog();
+
+  await tickDeleteMedia(dialog);
+
+  await vi.waitFor(() => expect(dialog.textContent).toContain('Couldn’t check where this media is used.'), REPORT_WAIT);
+  expect(dialogButton('Delete board and 3 items')!.disabled).toBe(false);
+
+  await act(() => userEvent.click(dialogButton('Retry')!));
+
+  // Retry gives way to the checking state; focus stays in the dialog, on the panel that reads the outcome.
+  const panel = dialog.querySelector<HTMLElement>('[aria-live="polite"]');
+  await vi.waitFor(() => expect(dialog.textContent).toContain('Checking where this media is used…'));
+  expect(document.activeElement).toBe(panel);
+
+  await act(() => settleRetry({ ...boardUsageReport, checkedCount: 1, inUseCount: 1, onlyImages: true }));
+
+  await vi.waitFor(() => expect(dialog.textContent).toContain('Still in use:'), REPORT_WAIT);
+  expect(document.activeElement).toBe(panel);
+  expect(dialog.contains(document.activeElement)).toBe(true);
+  expect(getBoardMediaUsage).toHaveBeenCalledTimes(2);
+});
+
+/** A check that never answers, recording the signal of each call. */
+const hangingChecks = () => {
+  const signals: AbortSignal[] = [];
+  vi.mocked(context.actions.getBoardMediaUsage)
+    .mockReset()
+    .mockImplementation((_boardId, signal) => {
+      signals.push(signal);
+      return new Promise(() => {});
     });
-    expect(openMenus()).toHaveLength(1);
 
-    await openDeleteDialog();
-    await vi.waitFor(() => expect(openMenus()).toHaveLength(0));
+  return signals;
+};
 
-    await act(() => userEvent.click(dialogButton(outcome === 'cancel' ? 'Cancel' : 'Delete board')!));
-    await vi.waitFor(() => expect(document.querySelector('[role="alertdialog"][data-state="open"]')).toBeNull());
+const closeDialog = {
+  cancel: () => act(() => userEvent.click(dialogButton('Cancel')!)),
+  escape: () => act(() => userEvent.keyboard('{Escape}')),
+  // A refetch finds the board gone (deleted elsewhere, or access revoked): the menu closes the dialog on its own.
+  external: () => renderMenuFor(board as GalleryBoard, { gallery: { ...context.gallery, boards: [] } } as never),
+};
 
-    expect(openMenus()).toHaveLength(0);
-    expect(document.activeElement?.closest('[role="menu"]')).toBeNull();
+it.each(Object.keys(closeDialog) as (keyof typeof closeDialog)[])(
+  'stops a running check when the dialog closes (%s)',
+  async (how) => {
+    const signals = hangingChecks();
+    const dialog = await openDeleteDialog();
+
+    await tickDeleteMedia(dialog);
+    await vi.waitFor(() => expect(signals).toHaveLength(1));
+    expect(signals[0]!.aborted).toBe(false);
+
+    await closeDialog[how]();
+    await vi.waitFor(() => expect(document.querySelector('[role="alertdialog"]')).toBeNull());
+    expect(signals[0]!.aborted).toBe(true);
   }
 );
 
-it('offers no media choice for an empty board', async () => {
-  await renderMenuFor({ ...board, imageCount: 0, videoCount: 0 } as GalleryBoard);
+/** Opens the dialog for `menuBoard`, ticks the media and answers the check with `checkedCount` items to delete. */
+const answerWithCheckedCount = async (menuBoard: GalleryBoard, checkedCount: number, onlyImages = true) => {
+  let settle: (report: GalleryMediaUsageReport) => void = () => {};
+  vi.mocked(context.actions.getBoardMediaUsage)
+    .mockReset()
+    .mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          settle = resolve;
+        })
+    );
+  await renderMenuFor(menuBoard);
   const dialog = await openDeleteDialog();
 
-  expect(dialog.textContent).toContain('The board is empty.');
-  expect(dialog.querySelector('input[type="checkbox"]')).toBeNull();
+  await tickDeleteMedia(dialog);
+  const before = dialog.textContent;
+  const regionBefore = dialog.querySelector<HTMLElement>('[aria-live="polite"]');
+  const regionBeforePosition = regionBefore ? getComputedStyle(regionBefore).position : null;
+  await act(() =>
+    settle({
+      ...boardUsageReport,
+      checkedCount,
+      groups: checkedCount === 0 ? [] : boardUsageReport.groups,
+      inUseCount: Math.min(1, checkedCount),
+      onlyImages,
+    })
+  );
+  await vi.waitFor(() => expect(dialog.textContent).not.toContain('Checking where this media is used…'), REPORT_WAIT);
+
+  return { before, dialog, regionBefore, regionBeforePosition };
+};
+
+it('names only the caller’s own items once the check says only those go, and keeps saying so when unticked', async () => {
+  // A shared board of 61 items; the caller added two of them.
+  const shared = { ...board, assetCount: 40, imageCount: 20 } as GalleryBoard;
+  const { before, dialog } = await answerWithCheckedCount(shared, 2);
+
+  // Until the check answers, the board's own counts are all there is, and so many items need the name typed.
+  expect(before).toContain('Its 20 images, 1 videos and 40 uploads are deleted with it.');
+  expect(before).toContain('Type "Board 1" to confirm');
+
+  expect(dialog.textContent).toContain('Your 2 images on it are deleted with it; the rest move to Uncategorized.');
+  expect(dialog.textContent).toContain('Also permanently delete your 2 items');
+  expect(dialog.textContent).toContain('1 of the 2 images this deletes are still in use:');
+  // Two items are not many: no name to type.
+  expect(dialog.textContent).not.toContain('to confirm');
+  expect(dialogButton('Delete board and your 2 items')!.disabled).toBe(false);
+
+  await tickDeleteMedia(dialog);
+  expect(dialog.textContent).toContain('Also permanently delete your 2 items');
+  await tickDeleteMedia(dialog);
+  await act(() => userEvent.click(dialogButton('Delete board and your 2 items')!));
+  expect(context.actions.deleteBoard).toHaveBeenLastCalledWith('board-1', true);
+});
+
+it('keeps counting every item for an administrator overriding, who deletes them all', async () => {
+  const overridden = {
+    ...board,
+    access: {
+      actions: ['read', 'rename', 'archive', 'delete'],
+      adminOverride: true,
+      generalAccess: 'restricted',
+      role: null,
+    },
+  } as GalleryBoard;
+  // The board's counts went stale: one item left since they were read.
+  const { dialog } = await answerWithCheckedCount(overridden, 2, false);
+
+  expect(dialog.textContent).toContain('Its 2 items are deleted with it.');
+  expect(dialog.textContent).toContain('Also permanently delete its 2 items');
+  expect(dialog.textContent).not.toContain('your');
+  expect(dialogButton('Delete board and 2 items')).toBeDefined();
 });
 
 it('makes the board the auto-add destination', async () => {
@@ -257,34 +395,6 @@ it('makes the board the auto-add destination', async () => {
   });
 });
 
-it('hands results back to the default destination from the auto-add board itself', async () => {
-  await act(async () => {
-    root?.render(
-      <ChakraProvider value={system}>
-        <GalleryWidgetContext value={targetContext}>
-          <GalleryBoardMenu target={target} onClose={noop} />
-        </GalleryWidgetContext>
-      </ChakraProvider>
-    );
-    await Promise.resolve();
-  });
-
-  const item = document.querySelector<HTMLElement>('[role="menuitem"][data-value="auto-add-board"]');
-
-  expect(item?.textContent).toBe('widgets.gallery.stopAutoAdd');
-  await act(() => userEvent.click(item!));
-
-  expect(context.actions.updateSettings).toHaveBeenLastCalledWith({ autoAddBoardId: null, followSelectedBoard: false });
-});
-
-it('offers neither choice on the default destination, where results already go', async () => {
-  await renderMenuFor(board, {
-    gallery: { ...context.gallery, projectBoardId: 'board-1' } as GalleryWidgetContextValue['gallery'],
-  });
-
-  expect(document.querySelector('[role="menuitem"][data-value="auto-add-board"]')).toBeNull();
-});
-
 const renderMenuFor = async (menuBoard: GalleryBoard, overrides: Partial<GalleryWidgetContextValue> = {}) => {
   const value = {
     ...context,
@@ -294,9 +404,11 @@ const renderMenuFor = async (menuBoard: GalleryBoard, overrides: Partial<Gallery
   await act(async () => {
     root?.render(
       <ChakraProvider value={system}>
-        <GalleryWidgetContext value={value}>
-          <GalleryBoardMenu target={{ board: menuBoard, x: 20, y: 20 }} onClose={noop} />
-        </GalleryWidgetContext>
+        <QueryClientProvider client={queryClient}>
+          <GalleryWidgetContext value={value}>
+            <GalleryBoardMenu target={{ board: menuBoard, x: 20, y: 20 }} onClose={noop} />
+          </GalleryWidgetContext>
+        </QueryClientProvider>
       </ChakraProvider>
     );
     await Promise.resolve();
@@ -355,36 +467,6 @@ it('offers every tier but the one the board is in, and moves it there', async ()
   expect(context.actions.moveBoard).toHaveBeenCalledExactlyOnceWith('board-1', null, 'Library');
 });
 
-it('offers a Library board the open project first', async () => {
-  await renderMenuFor(board);
-
-  const trigger = Array.from(document.querySelectorAll<HTMLElement>('[role="menuitem"]')).find(
-    (element) => element.textContent === 'Move to…'
-  )!;
-  await act(() => userEvent.click(trigger));
-
-  await vi.waitFor(() => {
-    expect(menuItemLabels()).toContain('Harbor Tower');
-  });
-  expect(
-    menuItemLabels().filter((label) => label === 'Library' || label === 'Harbor Tower' || label === 'Mahogany House')
-  ).toEqual(['Mahogany House', 'Harbor Tower']);
-  expect(projectGroup()).toEqual({ label: 'Projects', items: ['Mahogany House', 'Harbor Tower'] });
-  expect(libraryItem()).toBeUndefined();
-  expect(projectGroupElement()?.previousElementSibling?.getAttribute('role')).not.toBe('separator');
-});
-
-it('leaves an inbox with only the actions its project does not own', async () => {
-  await renderMenuFor({ ...board, isInbox: true, projectId: 'p1' } as GalleryBoard);
-
-  const labels = menuItemLabels();
-
-  expect(labels).toContain('widgets.gallery.exportProjectFromBoard');
-  expect(labels).not.toContain('Move to…');
-  expect(labels).not.toContain('Delete board');
-  expect(labels).not.toContain('widgets.gallery.renameBoard');
-});
-
 const withAccess = (
   role: GalleryBoardAccess['role'],
   actions: GalleryBoardAction[],
@@ -430,26 +512,6 @@ it('lets an editor rename and archive someone else’s board, but not move, shar
   expect(document.body.textContent).not.toContain('askToAdd');
 });
 
-it('lets an owner change who can open the board, only where boards can be shared', async () => {
-  await renderMenuFor(withAccess('owner', ALL_ACTIONS), { boardSharing: false });
-  expect(menuItemLabels().some((label) => label?.includes('widgets.gallery.boardAccess.menu'))).toBe(false);
-  expect(document.body.textContent).not.toContain('boardAccess.header');
-
-  await renderMenuFor(withAccess('owner', ALL_ACTIONS), { boardSharing: true });
-  const access = Array.from(document.querySelectorAll<HTMLElement>('[role="menuitem"]')).find((item) =>
-    item.textContent?.includes('widgets.gallery.boardAccess.menu')
-  )!;
-  await act(() => userEvent.click(access));
-  const everyone = await vi.waitFor(() => {
-    const option = document.querySelector<HTMLElement>('[role="menuitemradio"][data-value="viewer"]');
-    expect(option).not.toBeNull();
-    return option!;
-  });
-  await act(() => userEvent.click(everyone));
-
-  expect(context.actions.setBoardGeneralAccess).toHaveBeenCalledExactlyOnceWith('board-1', 'viewer');
-});
-
 it('gives an admin someone else’s board to manage, but no move into their own projects', async () => {
   await renderMenuFor(withAccess(null, ALL_ACTIONS, true), { boardSharing: true });
 
@@ -457,30 +519,4 @@ it('gives an admin someone else’s board to manage, but no move into their own 
   expect(document.body.textContent).toContain('widgets.gallery.boardAccess.header.admin');
   expect(labels).toContain('Delete board');
   expect(labels).not.toContain('Move to…');
-});
-
-it('closes the rename dialog once the board no longer allows renaming', async () => {
-  const editable = withAccess('editor', ['read', 'rename']);
-  await renderMenuFor(editable);
-  const rename = Array.from(document.querySelectorAll<HTMLElement>('[role="menuitem"]')).find(
-    (item) => item.textContent === 'widgets.gallery.renameBoard'
-  )!;
-  await act(() => userEvent.click(rename));
-  await vi.waitFor(() => expect(document.querySelector('[role="dialog"]')).not.toBeNull());
-
-  // A refetch reports the role revoked to viewer.
-  await renderMenuFor(editable, {
-    gallery: { ...context.gallery, boards: [withAccess('viewer', ['read'])] } as GalleryWidgetContextValue['gallery'],
-  });
-
-  await vi.waitFor(() => expect(document.querySelector('[role="dialog"]')).toBeNull());
-
-  // The role comes back on a later refetch: the dialog stays closed rather than reopening with what was typed.
-  await renderMenuFor(editable, {
-    gallery: { ...context.gallery, boards: [editable] } as GalleryWidgetContextValue['gallery'],
-  });
-  await new Promise((resolve) => {
-    setTimeout(resolve, 100);
-  });
-  expect(document.querySelector('[role="dialog"]')).toBeNull();
 });

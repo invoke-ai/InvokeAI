@@ -10,6 +10,7 @@ export interface QueueCanvasSessionRef {
 }
 
 export interface WorkbenchQueueRecallValues {
+  canvasMetadata?: Record<string, unknown>;
   generateValues?: GenerateWidgetValues;
   videoValues?: VideoWidgetValues;
 }

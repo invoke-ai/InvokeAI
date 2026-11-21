@@ -62,7 +62,10 @@ class ModelIdentifierField(BaseModel):
     hash: str = Field(description="The model's BLAKE3 hash")
     name: str = Field(description="The model's name")
     base: BaseModelType = Field(description="The model's base model type")
-    type: ModelType = Field(description="The model's type")
+    type: ModelType = Field(
+        description="The model's type, or a role it serves as (see its config's `roles`) when a node asks for it in "
+        "that role"
+    )
     submodel_type: SubModelType | None = Field(
         description="The submodel to load, if this is a main model",
         default=None,
@@ -118,6 +121,7 @@ class QwenVLEncoderField(BaseModel):
 
     tokenizer: ModelIdentifierField = Field(description="Info to load tokenizer submodel")
     text_encoder: ModelIdentifierField = Field(description="Info to load text_encoder submodel")
+    loras: list[LoRAField] = Field(default_factory=list, description="LoRAs to apply on model loading")
 
 
 class Qwen3EncoderField(BaseModel):
@@ -155,10 +159,14 @@ class PromptEnhancerField(BaseModel):
 
 
 class Qwen3VLEncoderField(BaseModel):
-    """Field for the Qwen3-VL text encoder used by Krea-2 models."""
+    """Field for the Qwen3-VL text encoder used by Krea-2 and Qwen-Image-2.1 models."""
 
     tokenizer: ModelIdentifierField = Field(description="Info to load tokenizer submodel")
     text_encoder: ModelIdentifierField = Field(description="Info to load text_encoder submodel")
+    vision_tower: ModelIdentifierField | None = Field(
+        default=None,
+        description="Info to load the vision tower of a GGUF encoder, which has none of its own",
+    )
     loras: List[LoRAField] = Field(default_factory=list, description="LoRAs to apply on model loading")
 
 

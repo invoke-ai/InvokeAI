@@ -113,7 +113,6 @@ describe('RasterizeLayerController', () => {
       type: 'noise',
     } as const;
     const h = createHarness(undefined, { ...shapeLayer, adjustments: [noise] });
-    // The 60×40 source render, plus the 120×40 baked pixels and their prepared replacement.
     h.state.rasterBytes = (60 * 40 + 120 * 40 * 2) * 4;
 
     expect(await h.controller.rasterize('shape')).toBe('over-budget');
@@ -145,7 +144,6 @@ describe('RasterizeLayerController', () => {
 
       expect(await h.controller.rasterize('shape')).toBe('rasterized');
 
-      // The 60×40 source render, before the transform scales it.
       expect(runSpatial).toHaveBeenCalledExactlyOnceWith(
         expect.objectContaining({ height: 40, priority: 'now', width: 60 })
       );

@@ -251,6 +251,30 @@ def test_a_gguf_encoder_reserves_its_dequant_transient(node_name: str, kind: str
         assert not encoder.working_mem_bytes
 
 
+@pytest.mark.parametrize("kind", ["gguf", "dense"])
+def test_the_wan_node_reserves_a_gguf_encoders_dequant_transient(kind: str) -> None:
+    """Wan's UMT5 encoder became loadable from GGUF. Kept out of the table above because this node
+    tokenizes before it loads the encoder."""
+    from invokeai.app.invocations.text_encoder.wan_text_encoder import WanTextEncoderInvocation
+
+    model_format = ModelFormat.GGUFQuantized if kind == "gguf" else ModelFormat.WanT5Encoder
+    encoder = _LoadedModel(_encoder(kind), model_format)
+    encoder.stop_on_device = True
+    context = MagicMock()
+    context.models.load.side_effect = [_LoadedModel(MagicMock()), encoder]
+    node = WanTextEncoderInvocation.model_construct(
+        prompt="a prompt", wan_t5_encoder=SimpleNamespace(text_encoder=SimpleNamespace(), tokenizer=SimpleNamespace())
+    )
+
+    with pytest.raises(_StopOnDevice):
+        node._encode(context)
+
+    if kind == "gguf":
+        assert encoder.working_mem_bytes is not None and encoder.working_mem_bytes > 128 * 64 * 2
+    else:
+        assert not encoder.working_mem_bytes
+
+
 @pytest.mark.parametrize("kind", ["gguf", "nvfp4", "dense"])
 def test_the_ltx2_tower_reserves_a_gguf_transient_on_top_of_its_estimate(kind: str) -> None:
     """LTX-2 reserves its measured tower estimate for every build. It was measured on the int8 tower, so a

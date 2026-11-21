@@ -1,6 +1,7 @@
 import { Box, Flex, VisuallyHidden, type SystemStyleObject } from '@chakra-ui/react';
 import { FontsPage } from '@features/fonts/launchpad';
-import { useCapabilities, UsersPage } from '@features/identity';
+import { useCapabilities } from '@features/identity';
+import { UsersPage } from '@features/identity/launchpad';
 import { INTERMEDIATES_SETTING_ID, requestIntermediatesFocus } from '@features/intermediates';
 import { ModelsPage } from '@features/models';
 import { NodesPage } from '@features/nodes';
@@ -17,7 +18,7 @@ import {
   UsersIcon,
   type LucideIcon,
 } from 'lucide-react';
-import { useCallback, useMemo, useState, type ReactNode } from 'react';
+import { Activity, useCallback, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { LaunchpadNav, type LaunchpadNavGroupId } from './LaunchpadNav';
@@ -26,10 +27,7 @@ import { HomePage } from './pages/HomePage';
 import { ProjectsPage } from './pages/ProjectsPage';
 import { ProjectActionsMenuProvider } from './projects/ProjectActionsMenuHost';
 
-/**
- * Launchpad owns grouped home/admin pages without mounting workbench runtimes. Model management loads on demand
- * across the route split.
- */
+/** Launchpad owns grouped home/admin pages without mounting workbench runtimes. */
 
 type LaunchpadSectionId = 'home' | 'projects' | 'models' | 'nodes' | 'users' | 'fonts' | 'preferences';
 
@@ -182,7 +180,7 @@ const LaunchpadSections = ({ sections }: { sections: LaunchpadSection[] }) => {
     () => sections.map((section) => ({ ...section, to: SECTION_PATHS[section.id] })),
     [sections]
   );
-  // Visited pages stay mounted (hidden) so returning to one keeps its state, as the former lazily mounted tabs did.
+  // Activity retains view state while disconnecting inactive observers and registrations.
   const [visitedIds, setVisitedIds] = useState<ReadonlySet<LaunchpadSectionId>>(() => new Set([activeSectionId]));
 
   if (!visitedIds.has(activeSectionId)) {
@@ -199,9 +197,11 @@ const LaunchpadSections = ({ sections }: { sections: LaunchpadSection[] }) => {
         {sections
           .filter((section) => visitedIds.has(section.id))
           .map((section) => (
-            <Box key={section.id} h="full" hidden={section.id !== activeSectionId} minH="0">
-              {section.render()}
-            </Box>
+            <Activity key={section.id} mode={section.id === activeSectionId ? 'visible' : 'hidden'}>
+              <Box h="full" minH="0">
+                {section.render()}
+              </Box>
+            </Activity>
           ))}
       </Box>
     </Flex>

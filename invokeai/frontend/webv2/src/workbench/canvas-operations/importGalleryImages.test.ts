@@ -9,11 +9,11 @@ import type { Project, WorkbenchState } from '@workbench/projectContracts';
 import {
   resetArchitectureCapabilities,
   setArchitectureCapabilities,
-} from '@features/generation/core/architectureCapabilities';
+} from '@features/models/core/architectureCapabilities';
 import {
   architectureCapabilitiesFixture,
   seedArchitectureCapabilities,
-} from '@features/generation/core/architectureCapabilities.testing';
+} from '@features/models/core/architectureCapabilities.testing';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { createControlLayer, getDocumentLeaves } from '@workbench/canvas-engine/api';
 import { stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
@@ -110,10 +110,13 @@ const setModel = (project: Project, base: GenerateWidgetValues['model']['base'])
     qwen3EncoderModel: null,
     qwenVLEncoderModel: null,
     qwen3VLEncoderModel: null,
+    qwen3VLVisionTowerModel: null,
     qwen35EncoderModel: null,
     animaInpaintAdapterModel: null,
     animaInpaintAdapterEnabled: true,
     animaInpaintAdapterWeight: 1,
+    flux3PromptUpsamplerEnabled: false,
+    flux3PromptUpsamplerModel: null,
     wanT5EncoderModel: null,
     wanLowNoiseModel: null,
     ideogram4UnconditionalModel: null,
@@ -695,8 +698,7 @@ describe('importGalleryImagesToCanvas', () => {
 
   it('does not upload an old account image after local preprocessing crosses an account switch', async () => {
     accountLifecycle.activate('user-a');
-    // Reseed capabilities after the account reset so this test reaches the account fence rather than the resize
-    // gate.
+    // Reseed capabilities after the account reset so this test reaches the account fence rather than the resize gate.
     setArchitectureCapabilities(architectureCapabilitiesFixture);
     const { project, state } = withProject();
     let resolveFetch: ((response: Response) => void) | undefined;

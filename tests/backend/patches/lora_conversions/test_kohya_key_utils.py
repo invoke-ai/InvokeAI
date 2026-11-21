@@ -94,3 +94,11 @@ def test_generate_kohya_parsing_tree_from_empty_keys():
     keys: list[str] = []
     tree = generate_kohya_parsing_tree_from_keys(keys)
     assert tree == {}
+
+
+def test_insert_periods_into_kohya_key_prefers_a_longer_sibling_when_the_shorter_one_does_not_fit():
+    """`ff` and `ff_context` are siblings in FLUX's block: the key below `ff_context` must not stop at `ff`."""
+    parsing_tree: ParsingTree = {"blocks": {INDEX_PLACEHOLDER: {"ff": {"net": {}}, "ff_context": {"net": {}}}}}
+
+    assert insert_periods_into_kohya_key("blocks_0_ff_context_net", parsing_tree) == "blocks.0.ff_context.net"
+    assert insert_periods_into_kohya_key("blocks_0_ff_net", parsing_tree) == "blocks.0.ff.net"

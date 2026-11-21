@@ -1,0 +1,261 @@
+---
+/*
+ * One numbered entry of an `Annotated` figure: a pin at `x`/`y` over the media and a legend entry with `label` as its
+ * term and the children as its description. Numbers come from the entries' order. See `Annotated.astro`.
+ */
+import { calloutMarker } from './callout-ids.mjs';
+
+type Props = {
+  /** Pin position, in percent of the media's width from the left. */
+  x: number;
+  /** Pin position, in percent of the media's height from the top. */
+  y: number;
+  /** The control's name: the entry's term, the pin's accessible name and its hover label. */
+  label: string;
+  /**
+   * Which side of the pin its hover label opens on: away from the control it names, into empty space. Defaults to
+   * the side facing the middle of the media, so the label never runs off an edge.
+   */
+  labelSide?: 'left' | 'right' | 'top' | 'bottom';
+};
+
+const { x, y, label, labelSide = x > 60 ? 'left' : 'right' } = Astro.props;
+for (const [name, value] of Object.entries({ x, y })) {
+  if (!Number.isFinite(value) || value < 0 || value > 100) {
+    throw new Error(`Callout "${label}": ${name} must be a percentage from 0 to 100, got ${value}.`);
+  }
+}
+
+// The figure replaces the marker with the entry's id (`callout-ids.mjs`).
+const id = calloutMarker();
+---
+
+<li class="entry" id={id} style={`--x: ${x}; --y: ${y}`} data-annotated-entry>
+  <a class:list={['pin', `pin--label-${labelSide}`]} href={`#${id}`} aria-label={label} data-annotated-pin>
+    <span class="pin__label" aria-hidden="true">{label}</span>
+  </a>
+  <span class="badge" aria-hidden="true"></span>
+  <div class="text">
+    {/* The pin carries the same words as its accessible name; read once. */}
+    <strong class="term" aria-hidden="true">{label}</strong>
+    <div class="description"><slot /></div>
+  </div>
+</li>
+
+<style>
+  .entry {
+    display: flex;
+    gap: 0.625rem;
+    padding: 0.5rem 0.625rem;
+    border: 1px solid transparent;
+    border-radius: var(--docs-radius-lg);
+    counter-increment: annotated;
+    scroll-margin-block: 1rem;
+    transition: var(--docs-control-transition);
+  }
+
+  .badge,
+  .pin {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 1.375rem;
+    height: 1.375rem;
+    border-radius: 999px;
+    font-size: var(--docs-control-font-size);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    transition: var(--docs-control-transition);
+
+    &::before {
+      content: counter(annotated);
+    }
+  }
+
+  .badge {
+    margin-top: 0.0625rem;
+    border: 1px solid var(--docs-border);
+    background-color: var(--docs-control);
+    color: var(--docs-text-strong);
+  }
+
+  /*
+   * High contrast on the app's dark surfaces and on screenshots, with a ring of page background around it. 22px over
+   * a full-width figure, shrinking to 16px on a phone, where the media is drawn at about half size and a 22px pin
+   * would cover the control beside it. The tap target (`--hit`) is 44px where the media is at least 550px wide, and
+   * 8% of the media's width below that, so pins at least 8% of the width apart never share tap area (see
+   * `Annotated.astro`).
+   */
+  .pin {
+    --pin: clamp(1rem, 2.75cqw + 0.25rem, 1.375rem);
+    --hit: clamp(var(--pin), 8cqw, 2.75rem);
+    width: var(--pin);
+    height: var(--pin);
+    font-size: calc(var(--pin) * 0.55);
+    position: absolute;
+    top: calc(var(--y) * var(--annotated-ratio) * 1cqw);
+    left: calc(var(--x) * 1cqw);
+    z-index: 1;
+    translate: -50% -50%;
+    background-color: var(--docs-text-strong);
+    box-shadow: 0 0 0 2px var(--docs-bg);
+    color: var(--docs-bg);
+    text-decoration: none;
+    -webkit-tap-highlight-color: transparent;
+
+    &::after {
+      content: '';
+      position: absolute;
+      inset: calc((var(--pin) - var(--hit)) / 2);
+      border-radius: inherit;
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--docs-accent);
+      outline-offset: 3px;
+    }
+  }
+
+  .pin__label {
+    position: absolute;
+    top: 50%;
+    left: calc(100% + 0.5rem);
+    translate: 0 -50%;
+    padding: 0.25rem 0.5rem;
+    border: 1px solid var(--docs-border-strong);
+    border-radius: var(--docs-radius);
+    background-color: var(--docs-surface);
+    box-shadow: var(--docs-shadow-popup);
+    color: var(--docs-text-strong);
+    font-size: var(--docs-control-font-size);
+    font-weight: 600;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--docs-popup-duration) var(--docs-popup-easing);
+  }
+
+  .pin--label-left .pin__label {
+    right: calc(100% + 0.5rem);
+    left: auto;
+  }
+
+  .pin--label-top .pin__label,
+  .pin--label-bottom .pin__label {
+    left: 50%;
+    translate: -50% 0;
+  }
+
+  .pin--label-top .pin__label {
+    top: auto;
+    bottom: calc(100% + 0.5rem);
+  }
+
+  .pin--label-bottom .pin__label {
+    top: calc(100% + 0.5rem);
+  }
+
+  .text {
+    min-width: 0;
+    font-size: var(--sl-text-sm);
+    line-height: 1.55;
+  }
+
+  .term {
+    display: block;
+    color: var(--docs-text-strong);
+    font-weight: 600;
+  }
+
+  .description {
+    color: var(--docs-text-muted);
+
+    > :global(* + *) {
+      margin-top: 0.5rem;
+    }
+
+    :global(a) {
+      color: var(--docs-accent-text);
+      text-decoration: underline;
+      text-decoration-color: color-mix(in oklab, var(--docs-accent) 40%, transparent);
+      text-underline-offset: 0.2em;
+
+      &:hover {
+        text-decoration-color: currentColor;
+      }
+    }
+
+    :global(code) {
+      padding: 0.0625rem 0.25rem;
+      border-radius: 4px;
+      background-color: var(--docs-control);
+      font-size: 0.875em;
+    }
+
+    :global(strong) {
+      color: var(--docs-text);
+      font-weight: 600;
+    }
+  }
+
+  /*
+   * Linked: the entry and its pin highlight together, whichever is pointed at, or chosen. The pin is inside the entry,
+   * so pointing at it is pointing at the entry. Without script, focus and the URL's `:target` choose; with it,
+   * `data-active` alone does (the script sets it on focus and on load from the URL), so one entry at most is chosen.
+   */
+  :global(.annotated:not([data-js])) .entry:is(:hover, :focus-within, :target),
+  :global(.annotated[data-js]) .entry:is(:hover, [data-active]) {
+    border-color: var(--docs-border-strong);
+    background-color: var(--docs-control);
+
+    .badge,
+    .pin {
+      background-color: var(--docs-accent);
+      color: var(--docs-accent-contrast);
+    }
+
+    .badge {
+      border-color: var(--docs-accent);
+    }
+
+    .pin {
+      z-index: 2;
+    }
+
+    .pin__label {
+      opacity: 1;
+    }
+  }
+
+  /* Forced colors drop backgrounds and shadows: outline the pins and badges, and mark the chosen ones. */
+  @media (forced-colors: active) {
+    .badge,
+    .pin {
+      border: 1px solid CanvasText;
+      background-color: Canvas;
+      color: CanvasText;
+    }
+
+    :global(.annotated:not([data-js])) .entry:is(:hover, :focus-within, :target),
+    :global(.annotated[data-js]) .entry:is(:hover, [data-active]) {
+      border-color: Highlight;
+
+      .badge,
+      .pin {
+        border-color: Highlight;
+        background-color: Highlight;
+        color: HighlightText;
+      }
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .entry,
+    .badge,
+    .pin,
+    .pin__label {
+      transition: none;
+    }
+  }
+</style>

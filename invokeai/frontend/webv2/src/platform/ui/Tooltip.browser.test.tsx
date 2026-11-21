@@ -1,12 +1,13 @@
 import { ChakraProvider } from '@chakra-ui/react';
 import { system } from '@theme/system';
 import { CameraIcon } from 'lucide-react';
-import { act, useCallback, useRef, useState } from 'react';
+import { Activity, act, useCallback, useRef, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, expect, it } from 'vitest';
+import { afterEach, expect, it, vi } from 'vitest';
+import { userEvent } from 'vitest/browser';
 
 import { Toolbar, ToolbarButton } from './Toolbar';
-import { ClippedTooltip } from './Tooltip';
+import { ClippedTooltip, Tooltip } from './Tooltip';
 
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -133,4 +134,89 @@ it('shows a clipped name on keyboard focus and nothing for a name that fits', as
     });
   });
   expect(openTooltipText()).toBeUndefined();
+});
+
+it('lets a click through an open tip to the control under it, such as the next row of a dense list', async () => {
+  host = document.createElement('div');
+  document.body.append(host);
+  root = createRoot(host);
+  const onNextClick = vi.fn();
+  await act(() =>
+    root?.render(
+      <ChakraProvider value={system}>
+        <div style={{ display: 'grid', gap: '2px', left: '200px', position: 'absolute', top: '200px' }}>
+          <Tooltip content="Delete" openDelay={0} placement="bottom">
+            <button style={{ height: '28px', width: '28px' }} type="button">
+              A
+            </button>
+          </Tooltip>
+          <button aria-label="Next" style={{ height: '28px', width: '28px' }} type="button" onClick={onNextClick}>
+            B
+          </button>
+        </div>
+      </ChakraProvider>
+    )
+  );
+  const [first, next] = host.querySelectorAll('button');
+
+  await focusWithKeyboard(first!);
+  await expect.poll(openTooltipText).toBe('Delete');
+  const target = next!.getBoundingClientRect();
+  const centre = target.top + target.height / 2;
+  const tip = () => document.querySelector('[role="tooltip"][data-state="open"]')!.getBoundingClientRect();
+  // Once placed, the tip covers the next button's centre: the case this guards.
+  await expect.poll(() => tip().top < centre && tip().bottom > centre).toBe(true);
+
+  await userEvent.click(next!);
+
+  expect(onNextClick).toHaveBeenCalledOnce();
+});
+
+/** Two sections kept alive by Activity, like the launchpad's pages: the tooltipped button switches to the other one. */
+const Sections = () => {
+  const [isOtherShown, setIsOtherShown] = useState(false);
+  const showOther = useCallback(() => setIsOtherShown(true), []);
+  const showFirst = useCallback(() => setIsOtherShown(false), []);
+
+  return (
+    <>
+      <button type="button" onClick={showFirst}>
+        First section
+      </button>
+      <Activity mode={isOtherShown ? 'hidden' : 'visible'}>
+        <Tooltip content="Open the other section">
+          <button aria-label="Other section" type="button" onClick={showOther}>
+            Go
+          </button>
+        </Tooltip>
+      </Activity>
+    </>
+  );
+};
+
+it('shows a tip again only when hovered after its section was hidden mid-fade', async () => {
+  host = document.createElement('div');
+  document.body.append(host);
+  root = createRoot(host);
+  await act(() =>
+    root?.render(
+      <ChakraProvider value={system}>
+        <Sections />
+      </ChakraProvider>
+    )
+  );
+  const shownTip = () =>
+    [...document.querySelectorAll<HTMLElement>('[role="tooltip"]')].find((tip) => tip.checkVisibility());
+  const trigger = host.querySelector<HTMLButtonElement>('button[aria-label="Other section"]')!;
+
+  await userEvent.hover(trigger);
+  await expect.poll(() => shownTip()?.textContent).toBe('Open the other section');
+  // The press closes the tip and the click hides its section before the fade ends.
+  await act(() => userEvent.click(trigger));
+  await act(() => userEvent.click(host!.querySelector('button')!));
+
+  await expect.poll(shownTip).toBeUndefined();
+  // The pointer left while the section was hidden; the next hover still opens the tip.
+  await userEvent.hover(trigger);
+  await expect.poll(() => shownTip()?.textContent).toBe('Open the other section');
 });

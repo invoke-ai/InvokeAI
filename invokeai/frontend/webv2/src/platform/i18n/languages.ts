@@ -47,6 +47,22 @@ export const normalizeWorkbenchLanguage = (value: unknown): WorkbenchLanguage | 
 export const getWorkbenchLanguageDirection = (language: WorkbenchLanguage): WorkbenchLanguageDirection =>
   WORKBENCH_LANGUAGE_OPTIONS.find((option) => option.value === language)?.direction ?? 'ltr';
 
+type LanguageCatalogs = Readonly<Record<string, { translated: number; ready?: boolean }>>;
+const catalogs: LanguageCatalogs = JSON.parse(import.meta.env.LOCALE_AVAILABILITY);
+
+/** Requested codes remain preferences even when their catalogs cannot yet serve application content. */
+export const getWorkbenchLanguageAvailability = (language: WorkbenchLanguage, content: LanguageCatalogs = catalogs) => {
+  const exact = content[language];
+  const base = content[language.split('-')[0] ?? ''];
+  const catalog = exact?.ready ? exact : base?.ready ? base : exact;
+  return catalog?.ready ? 'available' : catalog?.translated ? 'incomplete' : 'unavailable';
+};
+
+export const getEffectiveWorkbenchLanguage = (
+  language: WorkbenchLanguage,
+  content: LanguageCatalogs = catalogs
+): WorkbenchLanguage => (getWorkbenchLanguageAvailability(language, content) === 'available' ? language : 'en');
+
 const BYTE_UNITS = ['byte', 'kilobyte', 'megabyte', 'gigabyte', 'terabyte', 'petabyte'] as const;
 const BINARY_BYTE_UNITS = ['B', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB'] as const;
 
@@ -69,8 +85,8 @@ export const formatCount = (count: number, locale: string | undefined = document
   getNumberFormat(locale, {}).format(count);
 
 /**
- * A byte size with one decimal from kilobytes up, in the document language by default. Decimal (SI) units are the
- * ones Intl can name; `binary` scales by 1024 and appends IEC labels (KiB, GiB) that Intl lacks. Missing, negative or
+ * A byte size with one decimal from kilobytes up, in the document language by default. Decimal (SI) units are the ones
+ * Intl can name; `binary` scales by 1024 and appends IEC labels (KiB, GiB) that Intl lacks. Missing, negative or
  * non-finite sizes render as a dash.
  */
 export const formatBytes = (

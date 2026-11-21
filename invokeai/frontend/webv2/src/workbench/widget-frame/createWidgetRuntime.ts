@@ -106,9 +106,6 @@ export const createWidgetRuntime = ({
         source,
       }),
   };
-  const menus = {
-    register: (menu) => extensions.menus.register({ ...menu, source }),
-  } satisfies WidgetRuntimeApi['menus'];
   const diagnostics = {
     logger: (namespace) =>
       createLogger({
@@ -124,7 +121,6 @@ export const createWidgetRuntime = ({
     diagnostics,
     hotkeys,
     instanceId: instance.id,
-    menus,
     palette: {
       register: (entry) => extensions.palette.register({ ...entry, source }),
     },
@@ -133,9 +129,6 @@ export const createWidgetRuntime = ({
       registerProvider: (provider) => extensions.search.registerProvider({ ...provider, source }),
     },
     state,
-    toolbars: {
-      register: (toolbar) => extensions.toolbars.register({ ...toolbar, source }),
-    },
     typeId: instance.typeId,
     workbench: {
       closeWidgetInstance: (instanceId) => {

@@ -21,9 +21,14 @@ export interface CreateStrokeEditsDeps {
   readonly reportRefusal: (status: EditRefusal) => void;
 }
 
-/** The history label for a committed pixel stroke. */
-export const strokeCommitLabel = (tool: StrokeCommittedEvent['tool']): string =>
-  tool === 'eraser' ? 'Eraser stroke' : tool === 'shape' ? 'Draw shape' : 'Brush stroke';
+const STROKE_COMMIT_LABELS: Record<StrokeCommittedEvent['tool'], string> = {
+  brush: 'Brush stroke',
+  eraser: 'Eraser stroke',
+  shape: 'Draw shape',
+  'shape-cutout': 'Cut out shape',
+};
+
+export const strokeCommitLabel = (tool: StrokeCommittedEvent['tool']): string => STROKE_COMMIT_LABELS[tool];
 
 export interface StrokeEdits {
   /**
@@ -34,8 +39,8 @@ export interface StrokeEdits {
 }
 
 /**
- * Ordinary strokes paint their preview straight into the layer cache, so publication records the already-applied
- * pixels as one undo step. Auto-created layers compose layer removal/recreation into the same step.
+ * Ordinary strokes paint their preview straight into the layer cache, so publication records the already-applied pixels
+ * as one undo step. Auto-created layers compose layer removal/recreation into the same step.
  */
 export const createStrokeEdits = (deps: CreateStrokeEditsDeps): StrokeEdits => {
   const { applyImagePatch, ctx, layerCache } = deps;

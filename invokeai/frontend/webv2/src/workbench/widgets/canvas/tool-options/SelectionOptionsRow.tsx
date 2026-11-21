@@ -1,13 +1,21 @@
-import type { SelectionOp } from '@workbench/canvas-engine/api';
+import type { CanvasDocumentContractV3, SelectionOp, SelectionPixelEditRefusal } from '@workbench/canvas-engine/api';
 import type { ToolFormProps } from '@workbench/widgets/canvas/tool-presentation/toolFormContracts';
+import type { TFunction } from 'i18next';
 
 import { HStack } from '@chakra-ui/react';
 import { Button, IconButton } from '@platform/ui/Button';
 import { Tooltip } from '@platform/ui/Tooltip';
-import { isLeafPixelEditEligible, lookupDocumentLeaf } from '@workbench/canvas-engine/api';
+import {
+  getDocumentNode,
+  isLeafPixelEditEligible,
+  isOverlayStack,
+  lookupDocumentLeaf,
+  lookupDocumentNodeState,
+  selectionPixelEditRefusal,
+} from '@workbench/canvas-engine/api';
 import { useNotify } from '@workbench/useNotify';
-import { useCanvasHasSelection } from '@workbench/widgets/canvas/engineStoreHooks';
-import { reportLayerOperation } from '@workbench/widgets/canvas/useStructuralCommit';
+import { useCanvasHasSelection, useTransformSession } from '@workbench/widgets/canvas/engineStoreHooks';
+import { describeLayerEditRefusal, reportLayerOperation } from '@workbench/widgets/canvas/useStructuralCommit';
 import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import { SquareIcon, SquareMinusIcon, SquarePlusIcon, SquaresIntersectIcon } from 'lucide-react';
 import { useCallback } from 'react';
@@ -51,10 +59,6 @@ const OpModeButton = ({
   );
 };
 
-/**
- * Share selection operation mode and empty-selection hints; each tool stores its mode, with transient Shift/Alt
- * overrides.
- */
 /** The four op-mode toggles alone; the form places them in a labelled row. */
 export const SelectionOpModeButtons = ({
   mode,
@@ -73,12 +77,7 @@ export const SelectionOpModeButtons = ({
   );
 };
 
-/**
- * A selection command; while unavailable, its tooltip says what is missing
- * instead of going quiet. The button is aria-disabled rather than natively
- * disabled so it still emits the pointer events the tooltip needs and stays
- * reachable by keyboard, where the reason reads as its description.
- */
+/** aria-disabled, not disabled, so the reason tooltip still gets pointer events and keyboard focus. */
 const SelectionAction = ({
   disabledReason,
   label,
@@ -102,19 +101,53 @@ const SelectionAction = ({
   );
 };
 
-/**
- * Commands over the live selection. Select all always works; fill, erase and
- * lift need an eligible (unlocked, visible) paint layer — the same rule the
- * engine enforces; invert and deselect need only a selection.
- */
+/** The selected leaf, `'group'` for a selected group, or null: what `selectionPixelEditRefusal` judges. */
+const selectedLeafOrGroup = (document: CanvasDocumentContractV3) => {
+  const node = getDocumentNode(document, document.selectedLayerId);
+  return node ? (lookupDocumentLeaf(document, node.id) ?? 'group') : null;
+};
+
+/** Why Fill or Erase is unavailable, in the words of the notice the engine would give. */
+const describePixelRefusal = (
+  status: Exclude<SelectionPixelEditRefusal, 'no-target' | 'unsupported'> | 'transform-session',
+  layer: { id: string; name: string; overlay: boolean },
+  t: TFunction
+): string => {
+  const { message, title } = describeLayerEditRefusal(
+    { layerId: layer.id, layerName: layer.name, status },
+    t,
+    layer.overlay
+  );
+  return t('widgets.canvas.toolOptions.refusalReason', { message, title });
+};
+
+/** Commands over the live selection; fill and erase follow the engine's own brush and eraser rule. */
 export const SelectionActions = ({ engine }: ToolFormProps) => {
   const { t } = useTranslation();
   const notify = useNotify();
   const hasSelection = useCanvasHasSelection(engine);
-  const canPaintTarget = useActiveProjectSelector((project) => {
+  const canLiftTarget = useActiveProjectSelector((project) => {
     const { document } = project.canvas;
     return isLeafPixelEditEligible(lookupDocumentLeaf(document, document.selectedLayerId ?? ''));
   });
+  const fillRefusal = useActiveProjectSelector((project) =>
+    selectionPixelEditRefusal(selectedLeafOrGroup(project.canvas.document), 'fill')
+  );
+  const eraseRefusal = useActiveProjectSelector((project) =>
+    selectionPixelEditRefusal(selectedLeafOrGroup(project.canvas.document), 'erase')
+  );
+  const selectedName = useActiveProjectSelector(
+    (project) => getDocumentNode(project.canvas.document, project.canvas.document.selectedLayerId)?.name ?? ''
+  );
+  const selectedOverlay = useActiveProjectSelector((project) => {
+    const { document } = project.canvas;
+    const stack = lookupDocumentNodeState(document, document.selectedLayerId ?? '')?.stack;
+    return stack !== undefined && isOverlayStack(stack);
+  });
+  const sessionLayerId = useTransformSession(engine)?.layerId ?? null;
+  const sessionName = useActiveProjectSelector((project) =>
+    sessionLayerId === null ? '' : (getDocumentNode(project.canvas.document, sessionLayerId)?.name ?? '')
+  );
   const onSelectAll = useCallback(() => engine.selection.selectAll(), [engine]);
   const onFill = useCallback(() => engine.selection.fillSelection(), [engine]);
   const onErase = useCallback(() => engine.selection.eraseSelection(), [engine]);
@@ -127,23 +160,35 @@ export const SelectionActions = ({ engine }: ToolFormProps) => {
     }
   }, [engine, notify, t]);
   const needsSelection = hasSelection ? null : t('widgets.canvas.toolOptions.selectionNeedsSelection');
-  const needsPaintTarget =
-    needsSelection ?? (canPaintTarget ? null : t('widgets.canvas.toolOptions.selectionNeedsPaintLayer'));
+  // The engine's order: what the target refuses, then an open transform session.
+  const pixelReason = (refusal: SelectionPixelEditRefusal | null): string | null =>
+    needsSelection ??
+    (refusal === 'no-target' || refusal === 'unsupported'
+      ? t('widgets.canvas.toolOptions.selectionNeedsPixelLayer')
+      : refusal
+        ? describePixelRefusal(refusal, { id: '', name: selectedName, overlay: selectedOverlay }, t)
+        : sessionLayerId !== null
+          ? describePixelRefusal('transform-session', { id: sessionLayerId, name: sessionName, overlay: false }, t)
+          : null);
+  const fillReason = pixelReason(fillRefusal);
+  const eraseReason = pixelReason(eraseRefusal);
+  const liftReason =
+    needsSelection ?? (canLiftTarget ? null : t('widgets.canvas.toolOptions.selectionNeedsPaintLayer'));
   return (
     <HStack flexWrap="wrap" gap="1">
       <SelectionAction disabledReason={null} label={t('widgets.canvas.toolOptions.selectAll')} onClick={onSelectAll} />
       <SelectionAction
-        disabledReason={needsPaintTarget}
+        disabledReason={fillReason}
         label={t('widgets.canvas.toolOptions.fillSelection')}
         onClick={onFill}
       />
       <SelectionAction
-        disabledReason={needsPaintTarget}
+        disabledReason={eraseReason}
         label={t('widgets.canvas.toolOptions.eraseSelection')}
         onClick={onErase}
       />
       <SelectionAction
-        disabledReason={needsPaintTarget}
+        disabledReason={liftReason}
         label={t('widgets.canvas.toolOptions.liftSelectionToLayer')}
         onClick={onLiftToLayer}
       />

@@ -60,7 +60,13 @@ export const useCanvasGallerySave = (
         savingProjects.set(project.id, true);
 
         try {
-          const result = await saveCanvasToGallery({ engine: matchedEngine, project, region, scopedDefaults });
+          const result = await saveCanvasToGallery({
+            engine: matchedEngine,
+            getProject: queries.getProject,
+            project,
+            region,
+            scopedDefaults,
+          });
 
           assertAccountScopeCurrent(owner);
           if (result.status === 'saved') {
@@ -119,8 +125,8 @@ export const useCanvasGallerySave = (
             return;
           }
 
-          // The board refused the save (403) or is gone (404): the listing the board was chosen from is read again
-          // at once, so a save that follows the read is routed by it.
+          // The board refused the save (403) or is gone (404): the listing the board was chosen from is read again at
+          // once, so a save that follows the read is routed by it.
           if (error instanceof ApiError && (error.status === 403 || error.status === 404)) {
             void invalidateGalleryBoardDestinations(queryClient, owner);
           }

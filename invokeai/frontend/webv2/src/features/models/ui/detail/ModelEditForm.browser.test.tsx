@@ -1,7 +1,9 @@
 import type { ModelConfig } from '@features/models/core/types';
 
 import { ChakraProvider } from '@chakra-ui/react';
+import { getModelTypeLabel, getModelVariantLabel } from '@features/models/core/taxonomy';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
+import { ApiError } from '@platform/transport/http';
 import { system } from '@theme/system';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -59,7 +61,6 @@ const setInputValue = (input: HTMLInputElement, value: string): void => {
   input.dispatchEvent(new Event('input', { bubbles: true }));
 };
 
-/** Each select trigger's accessible name, resolved through its aria-labelledby references. */
 const selectTriggerNames = (host: HTMLElement): string[] =>
   [...host.querySelectorAll('[data-scope="select"][data-part="trigger"]')].map((trigger) =>
     (trigger.getAttribute('aria-labelledby') ?? '')
@@ -68,6 +69,26 @@ const selectTriggerNames = (host: HTMLElement): string[] =>
       .join(' ')
       .trim()
   );
+
+const selectTrigger = (host: HTMLElement, name: string): HTMLButtonElement => {
+  const triggers = [...host.querySelectorAll<HTMLButtonElement>('[data-scope="select"][data-part="trigger"]')];
+
+  return triggers[selectTriggerNames(host).indexOf(name)]!;
+};
+
+const option = (label: string): HTMLElement =>
+  [...document.querySelectorAll<HTMLElement>('[role="option"]')].find((item) => item.textContent === label)!;
+
+const pick = async (host: HTMLElement, name: string, label: string): Promise<void> => {
+  await act(async () => {
+    selectTrigger(host, name).click();
+    await Promise.resolve();
+  });
+  await act(async () => {
+    option(label).click();
+    await Promise.resolve();
+  });
+};
 
 describe('ModelEditForm', () => {
   let host: HTMLDivElement;
@@ -109,19 +130,24 @@ describe('ModelEditForm', () => {
   it('offers format, a constrained variant select, and config path for a checkpoint main', async () => {
     await mount(checkpointMain);
 
-    // Each select trigger is named by its surrounding field's label.
     expect(selectTriggerNames(host)).toContain('models.format');
-    // sd-1 main has a curated variant list, so the field is a select.
     expect(selectTriggerNames(host)).toContain('models.variant');
     expect(host.textContent).toContain('models.configPath');
     expect(host.querySelector<HTMLInputElement>('input[value="v1-inference.yaml"]')).not.toBeNull();
   });
 
-  it('hides config path and falls back to free-text variant when the model has neither', async () => {
+  it('hides config path, variant and prediction type when the config has none of them', async () => {
     await mount(diffusersVae);
 
     expect(host.textContent).not.toContain('models.configPath');
-    // sdxl vae has no variant concept: free-text input, no select trigger.
+    expect(host.textContent).not.toContain('models.variant');
+    expect(host.textContent).not.toContain('models.predictionType');
+  });
+
+  it('falls back to a free-text variant when the config has one but no curated choices', async () => {
+    await mount({ ...diffusersVae, variant: null } as ModelConfig);
+
+    expect(host.textContent).toContain('models.variant');
     expect(selectTriggerNames(host)).not.toContain('models.variant');
   });
 
@@ -188,6 +214,44 @@ describe('ModelEditForm', () => {
     });
 
     expect(api.updateModel).toHaveBeenCalledOnce();
-    expect(api.updateModel.mock.calls[0]![1]).not.toHaveProperty('config_path');
+    const body = api.updateModel.mock.calls[0]![1] as object;
+    expect(body).not.toHaveProperty('config_path');
+    expect(body).not.toHaveProperty('prediction_type');
+    expect(body).not.toHaveProperty('variant');
+  });
+
+  it('offers variant and prediction type when reclassifying into a main model, and sends what was picked', async () => {
+    api.updateModel.mockResolvedValue({ ...diffusersVae, prediction_type: null, type: 'main', variant: 'inpaint' });
+    await mount(diffusersVae);
+
+    await pick(host, 'models.type', getModelTypeLabel('main'));
+    expect(selectTriggerNames(host)).toEqual(expect.arrayContaining(['models.variant', 'models.predictionType']));
+
+    await pick(host, 'models.variant', getModelVariantLabel('inpaint'));
+    await act(async () => {
+      saveButton().click();
+      await Promise.resolve();
+    });
+
+    expect(api.updateModel).toHaveBeenCalledWith(
+      'sdxl-vae',
+      expect.objectContaining({ prediction_type: null, type: 'main', variant: 'inpaint' }),
+      expect.anything()
+    );
+  });
+
+  it("shows the backend's refusal as readable text", async () => {
+    api.updateModel.mockRejectedValue(
+      new ApiError(JSON.stringify({ detail: "Model 'Checkpoint Main' does not support variant" }), 409)
+    );
+    await mount(checkpointMain);
+
+    await act(async () => {
+      saveButton().click();
+      await Promise.resolve();
+    });
+
+    expect(host.querySelector('[role="alert"]')?.textContent).toBe("Model 'Checkpoint Main' does not support variant");
+    expect(onSaved).not.toHaveBeenCalled();
   });
 });

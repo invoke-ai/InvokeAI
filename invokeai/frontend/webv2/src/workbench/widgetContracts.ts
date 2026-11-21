@@ -133,10 +133,8 @@ export interface WidgetRuntimeApi<State extends Record<string, unknown> = Record
   diagnostics: WidgetDiagnosticsApi;
   commands: WidgetCommandApi;
   hotkeys: WidgetHotkeyApi;
-  menus: WidgetMenuApi;
   palette: WidgetCommandPaletteApi;
   search: WidgetSearchApi;
-  toolbars: WidgetToolbarApi;
   workbench: WidgetWorkbenchApi;
 }
 
@@ -199,16 +197,6 @@ export interface WidgetHotkeyContribution {
   allowInEditable?: boolean;
 }
 
-export interface WidgetMenuApi {
-  register: (menu: WidgetMenuContribution) => () => void;
-}
-
-export interface WidgetMenuContribution {
-  id: string;
-  items: Array<{ commandId: string; group?: string }>;
-  source?: WidgetContributionSource;
-}
-
 export interface WidgetCommandPaletteApi {
   register: (entry: WidgetCommandPaletteContribution) => () => void;
 }
@@ -245,21 +233,6 @@ export interface WidgetSearchResult {
   commandId?: string;
 }
 
-export interface WidgetToolbarApi {
-  register: (toolbar: WidgetToolbarContribution) => () => void;
-}
-
-export interface WidgetToolbarContribution {
-  id: string;
-  location: 'center.tabs.trailing' | 'status.left' | 'status.right';
-  items: Array<{
-    commandId: string;
-    icon?: WidgetIconComponent;
-    label?: string;
-  }>;
-  source?: WidgetContributionSource;
-}
-
 export interface OpenWorkbenchWidgetOptions {
   createNew?: boolean;
   preferredRegions?: ReadonlyArray<WidgetRegion>;
@@ -275,6 +248,12 @@ export interface WidgetWorkbenchApi {
   revealWidgetInstance: (instanceId: WidgetInstanceId) => WidgetWorkbenchApiResult;
   closeWidgetInstance: (instanceId: WidgetInstanceId) => WidgetWorkbenchApiResult;
 }
+
+/**
+ * How a docked widget's body is sized. `flow` (default): the body grows with the view and scrolls as a whole. `fill`:
+ * the view gets exactly the body's height, for views that scroll or resize their own regions (lists, trees, panes).
+ */
+export type WidgetBodySizing = 'fill' | 'flow';
 
 export interface WidgetManifest {
   /** Widget runtime API contract version. Defaults to 1 during registry normalization. */
@@ -293,16 +272,16 @@ export interface WidgetManifest {
   /** Compact content uses the strip's remaining width while keeping its trigger sized to visible content. */
   compactSizing?: 'remaining-space';
   centerPlacement?: 'toolbar' | 'view';
-  /** Opt-in: the widget can be detached into a movable floating window. */
   allowFloating?: boolean;
   /** Only offered while an admin is signed in to a multi-user backend. */
   requiresAdmin?: boolean;
   chrome?: {
     header?: 'hidden' | 'visible';
+    body?: WidgetBodySizing;
   };
   /**
-   * Literal dynamic loader for all render slots. The registry owns caching,
-   * failure state, and retry; callers never invoke this directly.
+   * Literal dynamic loader for all render slots. The registry owns caching, failure state, and retry; callers never
+   * invoke this directly.
    */
   load: () => Promise<WidgetImplementation>;
   /** Load always-on runtimes and dialog shells separately so boot does not download their widget views. */

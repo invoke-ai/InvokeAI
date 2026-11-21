@@ -1,7 +1,4 @@
-/**
- * Run isolated utility graphs with unique origins. Subscribe before enqueue to cover fast completion;
- * abort/timeout best-effort cancels all accepted items, including late enqueue responses.
- */
+/** Isolated utility graphs with unique origins; subscribe before enqueue, and abort or timeout best-effort cancels. */
 
 import type { QueueBackendGraph } from '@features/queue/core/types';
 import type {
@@ -15,15 +12,14 @@ import { buildUtilityQueueItemOrigin } from '@features/queue/data/events';
 import { cancelQueueItems, getQueueItem } from '@features/queue/data/serverApi';
 import { enqueueUtility } from '@features/queue/data/submissionApi';
 import { createUuid } from '@platform/browser/randomUuid';
+import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { ApiError, getApiErrorMessage } from '@platform/transport/http';
 
-/** The default time a utility graph may run before it is abandoned. */
-export const DEFAULT_UTILITY_QUEUE_TIMEOUT_MS = 120_000;
+/** No universal deadline: model downloads, queue waits and calibration can legitimately take hours. */
+export const DEFAULT_UTILITY_QUEUE_TIMEOUT_MS = 0;
 
-/** Bounded retries for transient completed-item reconciliation failures. */
 export const DEFAULT_UTILITY_RECONCILE_RETRY_POLICY = { delayMs: 100, maxAttempts: 3 } as const;
 
-/** Thrown when a utility graph fails, is canceled, times out, is removed from the queue, or is aborted. */
 export class UtilityQueueError extends Error {
   readonly reason:
     | 'failed'
@@ -43,14 +39,13 @@ export class UtilityQueueError extends Error {
   }
 }
 
-/** The enqueue seam: posts the graph under `origin`, resolving to its backend item ids. */
 export type UtilityEnqueue = (request: {
   graph: QueueBackendGraph;
   origin: string;
+  idempotencyKey: string;
   prepend?: boolean;
-}) => Promise<{ itemIds: number[]; enqueued: number }>;
+}) => Promise<{ itemIds: number[]; enqueued: number; acknowledge?: () => void }>;
 
-/** The cancellation seam: best-effort cancels accepted backend item ids. */
 export type UtilityCancel = (itemIds: number[]) => Promise<void>;
 
 type UtilityImageOutput = { height: number; imageName: string; width: number };
@@ -74,10 +69,10 @@ const inspectUtilityEnqueueResult = (result: unknown) => {
   return { itemIds, result: valid ? { enqueued: enqueued as number, itemIds } : null };
 };
 
-/** Deterministically reads a completed queue item's target output. */
 export type UtilityCompletedOutputReconciler = (
   itemIds: number[],
-  outputNodeId?: string
+  outputNodeId?: string,
+  signal?: AbortSignal
 ) => Promise<UtilityImageOutput | null>;
 
 export interface UtilityReconcileRetryPolicy {
@@ -85,13 +80,12 @@ export interface UtilityReconcileRetryPolicy {
   maxAttempts: number;
 }
 
-/** Returns a cancellation function for one scheduled reconciliation retry. */
 export type UtilityReconcileRetryScheduler = (callback: () => void, delayMs: number) => () => void;
 
 export type UtilityReconcileErrorClassifier = (cause: unknown) => 'retry' | 'fail';
 
 export const classifyUtilityReconcileError: UtilityReconcileErrorClassifier = (cause) => {
-  if (cause instanceof TypeError) {
+  if (cause instanceof TypeError || (cause instanceof DOMException && cause.name === 'TimeoutError')) {
     return 'retry';
   }
   if (cause instanceof ApiError) {
@@ -107,52 +101,38 @@ const scheduleUtilityReconcileRetry: UtilityReconcileRetryScheduler = (callback,
   return () => clearTimeout(timer);
 };
 
-/** Dependencies for {@link runUtilityGraph} (all injectable for tests). */
+export type UtilityGraphExecutionStatus = 'pending' | 'in_progress';
+
 export interface RunUtilityGraphOptions {
-  /** The graph to enqueue and await. */
+  /** Observed state for this utility only; never inferred before enqueue acceptance. */
+  onStatus?: (status: UtilityGraphExecutionStatus) => void;
+  prepend?: boolean;
   graph: QueueBackendGraph;
-  /**
-   * The source node id whose `invocation_complete` output image is the result.
-   * When omitted, the first image-bearing completion for our origin is used.
-   */
+  /** Defaults to the first image-bearing completion for our origin. */
   outputNodeId?: string;
-  /**
-   * The socket hub. Raw listeners survive socket recreation. A queue clear, a bulk cancel or delete, and, when
-   * observable, a reconnect re-read the item in case it settled or was deleted without a status event.
-   */
+  /** Raw listeners survive socket recreation; clears, bulk cancels or deletes and reconnects re-read the item. */
   hub: UtilityHub;
-  /** Enqueue seam (defaults to the real utility enqueue API). */
   enqueue?: UtilityEnqueue;
-  /** Cancellation seam (defaults to the real queue cancellation API). */
   cancel?: UtilityCancel;
-  /** Item status seam for reconciliation (defaults to the queue item API). */
   readItemStatus?: UtilityItemStatusReader;
-  /** Abandon after this many ms (default {@link DEFAULT_UTILITY_QUEUE_TIMEOUT_MS}). `0` disables. */
+  /** `0` disables. */
   timeoutMs?: number;
   /** Cancels the await and best-effort cancels accepted backend items. */
   signal?: AbortSignal;
-  /** Injectable id source (defaults to `createUuid`). */
   createId?: () => string;
-  /** Injectable completed-item reconciliation seam. */
   reconcileCompletedOutput?: UtilityCompletedOutputReconciler;
-  /** Bounded reconciliation retry policy. */
   reconcileRetryPolicy?: UtilityReconcileRetryPolicy;
-  /** Injectable reconciliation retry timer seam. */
   scheduleReconcileRetry?: UtilityReconcileRetryScheduler;
-  /** Injectable reconciliation failure classifier. */
   classifyReconcileError?: UtilityReconcileErrorClassifier;
 }
 
-/** The resolved result of a utility graph: its single output image. */
 export interface UtilityGraphResult {
   height: number;
   imageName: string;
-  /** The origin used, for diagnostics/tests. */
   origin: string;
   width: number;
 }
 
-/** Extracts the current backend ImageOutput fields from a completion payload. */
 const extractImageOutput = (result: InvocationCompleteEvent['result'] | undefined): UtilityImageOutput | null => {
   const output = result as { height?: unknown; image?: { image_name?: unknown }; width?: unknown } | undefined;
   if (
@@ -171,9 +151,23 @@ const extractImageOutput = (result: InvocationCompleteEvent['result'] | undefine
   return { height: output.height, imageName: output.image.image_name, width: output.width };
 };
 
-export const reconcileUtilityCompletedOutput: UtilityCompletedOutputReconciler = async (itemIds, outputNodeId) => {
+export const reconcileUtilityCompletedOutput: UtilityCompletedOutputReconciler = async (
+  itemIds,
+  outputNodeId,
+  signal
+) => {
+  const owner = captureAccountScope();
   for (const itemId of itemIds) {
-    const item = await getQueueItem(itemId);
+    if (!isAccountScopeCurrent(owner)) {
+      throw new Error('Utility account scope expired.');
+    }
+    const item = await getQueueItem(
+      itemId,
+      AbortSignal.any([owner.signal, AbortSignal.timeout(10_000), ...(signal ? [signal] : [])])
+    );
+    if (!isAccountScopeCurrent(owner)) {
+      throw new Error('Utility account scope expired.');
+    }
     if (
       !item ||
       typeof item !== 'object' ||
@@ -208,17 +202,10 @@ export const reconcileUtilityCompletedOutput: UtilityCompletedOutputReconciler =
   return null;
 };
 
-/**
- * How long a submitted utility graph goes unheard from before its item is read again; the first run may download
- * models. An item still open at the read re-arms it, so the watch never gives up: it ends only on a terminal status,
- * the item's removal, or an abort.
- */
-export const DEFAULT_UTILITY_RECONCILE_INTERVAL_MS = 30 * 60_000;
+/** Overlapping reads coalesce; an open item re-arms the timer. */
+export const DEFAULT_UTILITY_RECONCILE_INTERVAL_MS = 15_000;
 
-/**
- * The outcome a terminal queue status means for a utility item: `null` for completion, the error for failure or
- * cancellation, and `undefined` while the item is still open.
- */
+/** `null` for completion, the error for failure or cancellation, `undefined` while open. */
 const toTerminalUtilityOutcome = (
   status: QueueItemStatusChangedEvent['status'],
   errorMessage: unknown,
@@ -245,7 +232,17 @@ export type UtilityItemStatusReader = (
 ) => Promise<{ status: QueueItemStatusChangedEvent['status']; errorMessage?: unknown; errorType?: unknown }>;
 
 const readUtilityItemStatus: UtilityItemStatusReader = async (itemId, signal) => {
-  const item = await getQueueItem(itemId, signal);
+  const owner = captureAccountScope();
+  const requestSignal = AbortSignal.any([owner.signal, AbortSignal.timeout(10_000), ...(signal ? [signal] : [])]);
+  const item = await getQueueItem(itemId, requestSignal);
+  if (
+    !item ||
+    typeof item !== 'object' ||
+    item.item_id !== itemId ||
+    !['pending', 'in_progress', 'waiting', 'completed', 'failed', 'canceled'].includes(item.status)
+  ) {
+    throw new UtilityQueueError('reconcile', `Queue item ${itemId} returned malformed status data.`);
+  }
   return { errorMessage: item.error_message, errorType: item.error_type, status: item.status };
 };
 
@@ -255,39 +252,39 @@ type UtilityHub = Pick<SocketHub, 'on'> & Partial<Pick<SocketHub, 'onConnectionC
 interface UtilityItemWatch {
   /** Records the accepted item ids and runs any read requested before they were known. */
   accept: (itemIds: number[]) => void;
-  /** Detaches every listener; no outcome is reported afterwards. */
   detach: () => void;
-  /** Reads each accepted item, reporting a terminal status or, on a 404, its removal. */
   read: () => Promise<void>;
 }
 
-/**
- * Watches one utility origin and reports each terminal outcome it learns of until detached: `null` for completion,
- * the error for failure, cancellation, or removal; callers settle once. Status events report directly. Events that
- * can settle or delete an item without a status event for it re-read the accepted items instead: a queue clear, a
- * bulk cancel or delete naming one of them (`queue_items_canceled` carries only the owner's ids), and a reconnect
- * after a disconnect.
- */
+/** `queue_items_canceled` carries only the owner's ids, so clears, bulk cancels or deletes and reconnects re-read. */
 const watchUtilityItems = ({
   hub,
   onOutcome,
+  onStatus,
   origin,
   readItemStatus,
-  signal,
 }: {
   hub: UtilityHub;
   onOutcome: (error: UtilityQueueError | null) => void;
+  onStatus?: (status: UtilityGraphExecutionStatus) => void;
   origin: string;
   readItemStatus: UtilityItemStatusReader;
-  signal?: AbortSignal;
 }): UtilityItemWatch => {
   let detached = false;
   let itemIds: number[] = [];
   let readRequestedBeforeAccept = false;
+  let pendingRead: Promise<void> | undefined;
+  let readAgain = false;
+  const reads = new AbortController();
+  const readFailures = new Map<number, { count: number; firstAt: number }>();
+  let timer: ReturnType<typeof setTimeout> | undefined;
   const detachers: Array<() => void> = [];
 
   const detach = (): void => {
     detached = true;
+    reads.abort();
+    readFailures.clear();
+    clearTimeout(timer);
     for (const detachListener of detachers.splice(0)) {
       try {
         detachListener();
@@ -297,27 +294,78 @@ const watchUtilityItems = ({
     }
   };
 
-  const read = async (): Promise<void> => {
+  const readItems = async (): Promise<void> => {
     for (const itemId of itemIds) {
       if (detached) {
         return;
       }
       try {
-        const item = await readItemStatus(itemId, signal);
+        const item = await readItemStatus(itemId, reads.signal);
+        readFailures.delete(itemId);
+        if (!detached && (item.status === 'pending' || item.status === 'in_progress')) {
+          onStatus?.(item.status);
+        }
         const outcome = detached ? undefined : toTerminalUtilityOutcome(item.status, item.errorMessage, item.errorType);
         if (outcome !== undefined) {
           onOutcome(outcome);
           return;
         }
       } catch (cause) {
+        if (!detached && cause instanceof UtilityQueueError) {
+          onOutcome(cause);
+          return;
+        }
         if (!detached && cause instanceof ApiError && cause.status === 404) {
           // A queue clear or bulk delete removes a pending item without a terminal event.
           onOutcome(new UtilityQueueError('removed', 'The utility graph item was removed from the queue.', cause));
           return;
         }
-        // Unreadable now; the socket or a later read can still settle it.
+        if (!detached) {
+          const previous = readFailures.get(itemId);
+          const failures = { count: (previous?.count ?? 0) + 1, firstAt: previous?.firstAt ?? Date.now() };
+          readFailures.set(itemId, failures);
+          // Event bursts cannot exhaust the health budget before two polling intervals have elapsed.
+          if (failures.count >= 3 && Date.now() - failures.firstAt >= 2 * DEFAULT_UTILITY_RECONCILE_INTERVAL_MS) {
+            onOutcome(
+              new UtilityQueueError(
+                'reconcile',
+                'Utility status could not be read repeatedly. Backend work may still be running.',
+                cause
+              )
+            );
+            return;
+          }
+        }
       }
     }
+  };
+
+  const read = (): Promise<void> => {
+    readAgain = true;
+    if (!pendingRead) {
+      pendingRead = (async () => {
+        try {
+          do {
+            readAgain = false;
+            await readItems();
+            if (detached) {
+              return;
+            }
+          } while (readAgain);
+        } finally {
+          pendingRead = undefined;
+        }
+      })();
+    }
+    return pendingRead;
+  };
+  const armTimer = (): void => {
+    if (detached) {
+      return;
+    }
+    timer = setTimeout(() => {
+      void read().then(armTimer);
+    }, DEFAULT_UTILITY_RECONCILE_INTERVAL_MS);
   };
 
   const requestRead = (): void => {
@@ -334,6 +382,9 @@ const watchUtilityItems = ({
       hub.on('queue_item_status_changed', (event: QueueItemStatusChangedEvent) => {
         if (event.origin !== origin) {
           return;
+        }
+        if (!detached && (event.status === 'pending' || event.status === 'in_progress')) {
+          onStatus?.(event.status);
         }
         const outcome = toTerminalUtilityOutcome(event.status, event.error_message, event.error_type);
         if (outcome !== undefined) {
@@ -370,6 +421,7 @@ const watchUtilityItems = ({
   return {
     accept: (acceptedItemIds) => {
       itemIds = acceptedItemIds;
+      armTimer();
       if (readRequestedBeforeAccept) {
         readRequestedBeforeAccept = false;
         void read();
@@ -380,52 +432,29 @@ const watchUtilityItems = ({
   };
 };
 
-/** Dependencies for {@link submitUtilityGraph}. */
 export interface SubmitUtilityGraphOptions {
   /** The graph to enqueue; its outputs stay wherever the graph sends them (a board, intermediates). */
   graph: QueueBackendGraph;
-  /**
-   * The socket hub. A queue clear, a bulk cancel or delete, and, when observable, a reconnect re-read the item in
-   * case its settlement was missed or it was deleted without a terminal event.
-   */
   hub: UtilityHub;
-  /** Put the item ahead of queued generations. */
   prepend?: boolean;
-  /** Enqueue seam (defaults to the real utility enqueue API). */
   enqueue?: UtilityEnqueue;
-  /** Cancellation seam for items an inconsistent enqueue response still accepted (defaults to the queue API). */
   cancel?: UtilityCancel;
-  /** Item status seam for reconciliation (defaults to the queue item API). */
   readItemStatus?: UtilityItemStatusReader;
-  /** Injectable id source (defaults to `createUuid`). */
   createId?: () => string;
-  /**
-   * Ends the watch (listener and timer) with an `aborted` settlement, for example when the account changes. The
-   * backend item is never canceled: the caller only asked to stop watching.
-   */
+  /** Ends the watch with an `aborted` settlement; the backend item is never canceled. */
   signal?: AbortSignal;
 }
 
-/** An accepted utility submission whose results are not returned, only awaited. */
 export interface UtilityGraphSubmission {
-  /** The accepted backend item ids. */
   itemIds: number[];
-  /** The origin used, for diagnostics/tests. */
   origin: string;
-  /**
-   * Resolves once the backend completes the item; rejects with {@link UtilityQueueError} when it fails, is
-   * canceled, is removed from the queue (`removed`), or the watch is aborted.
-   */
   settled: Promise<void>;
 }
 
-/**
- * Enqueue a utility graph whose results land where the graph sends them (such as a gallery board) rather than
- * being returned. Resolves when the backend accepts it; `settled` tracks the item afterwards. Rejects as
- * {@link UtilityQueueError} when the enqueue fails or its response is inconsistent.
- */
+/** Results land where the graph sends them; resolves on acceptance, and `settled` tracks the item. */
 export const submitUtilityGraph = async (options: SubmitUtilityGraphOptions): Promise<UtilityGraphSubmission> => {
   const { graph, hub, prepend, signal } = options;
+  const owner = captureAccountScope();
   const enqueue = options.enqueue ?? enqueueUtility;
   const cancel = options.cancel ?? cancelQueueItems;
   const readItemStatus = options.readItemStatus ?? readUtilityItemStatus;
@@ -443,11 +472,9 @@ export const submitUtilityGraph = async (options: SubmitUtilityGraphOptions): Pr
     settleResolve = resolve;
     settleReject = reject;
   });
-  // The watch can settle (abort, a fast terminal event) before the caller holds `settled`, and an enqueue failure
-  // never hands it over at all; callers still observe the rejection through their own handlers.
+  // The watch can settle before the caller holds `settled`; callers still see the rejection.
   settled.catch(() => {});
   let isSettled = false;
-  let timer: ReturnType<typeof setTimeout> | null = null;
   const detachers: Array<() => void> = [];
 
   const finish = (error: UtilityQueueError | null): void => {
@@ -455,10 +482,6 @@ export const submitUtilityGraph = async (options: SubmitUtilityGraphOptions): Pr
       return;
     }
     isSettled = true;
-    if (timer !== null) {
-      clearTimeout(timer);
-      timer = null;
-    }
     for (const detach of detachers) {
       try {
         detach();
@@ -484,7 +507,9 @@ export const submitUtilityGraph = async (options: SubmitUtilityGraphOptions): Pr
   // Attach before enqueue so a very fast completion is not missed.
   let watch!: UtilityItemWatch;
   try {
-    watch = watchUtilityItems({ hub, onOutcome: finish, origin, readItemStatus, signal });
+    owner.signal.addEventListener('abort', onAbort);
+    detachers.push(() => owner.signal.removeEventListener('abort', onAbort));
+    watch = watchUtilityItems({ hub, onOutcome: finish, origin, readItemStatus });
     detachers.push(watch.detach);
     if (signal) {
       if (signal.aborted) {
@@ -501,20 +526,9 @@ export const submitUtilityGraph = async (options: SubmitUtilityGraphOptions): Pr
     fail(new UtilityQueueError('setup', `Failed to attach utility graph listeners: ${detail}`, cause));
   }
 
-  /** An item still open at the periodic read re-arms it. */
-  const armReconcileTimer = (): void => {
-    if (isSettled) {
-      return;
-    }
-    timer = setTimeout(() => {
-      timer = null;
-      void watch.read().then(armReconcileTimer);
-    }, DEFAULT_UTILITY_RECONCILE_INTERVAL_MS);
-  };
-
   let result: Awaited<ReturnType<UtilityEnqueue>>;
   try {
-    result = await enqueue({ graph, origin, prepend });
+    result = await enqueue({ graph, origin, prepend, idempotencyKey: origin });
   } catch (cause) {
     fail(new UtilityQueueError('enqueue', getApiErrorMessage(cause, 'Failed to enqueue utility graph.'), cause));
   }
@@ -523,23 +537,23 @@ export const submitUtilityGraph = async (options: SubmitUtilityGraphOptions): Pr
   if (!inspected.result) {
     if (inspected.itemIds.length > 0) {
       // Whatever the backend did accept must not run unwatched; cancellation is best-effort.
-      void cancel(inspected.itemIds).catch(() => {});
+      void Promise.resolve()
+        .then(() => (isAccountScopeCurrent(owner) ? cancel(inspected.itemIds) : undefined))
+        .catch(() => {});
+      result!.acknowledge?.();
     }
     fail(new UtilityQueueError('enqueue', 'The backend returned an inconsistent utility enqueue response.'));
   }
   const { itemIds } = inspected.result!;
   watch.accept(itemIds);
-  armReconcileTimer();
+  result!.acknowledge?.();
 
   return { itemIds, origin, settled };
 };
 
-/**
- * Return utility output metadata without project routing; reject failures, cancellation, timeout, abort, and
- * enqueue errors as {@link UtilityQueueError}.
- */
 export const runUtilityGraph = (options: RunUtilityGraphOptions): Promise<UtilityGraphResult> => {
-  const { graph, hub, outputNodeId, signal } = options;
+  const { graph, hub, outputNodeId, prepend, signal } = options;
+  const owner = captureAccountScope();
   const enqueue = options.enqueue ?? enqueueUtility;
   const cancel = options.cancel ?? cancelQueueItems;
   const readItemStatus = options.readItemStatus ?? readUtilityItemStatus;
@@ -565,6 +579,8 @@ export const runUtilityGraph = (options: RunUtilityGraphOptions): Promise<Utilit
 
   return new Promise<UtilityGraphResult>((resolve, reject) => {
     let settled = false;
+    const outputReads = new AbortController();
+    const outputSignal = AbortSignal.any([owner.signal, outputReads.signal]);
     let capturedOutput: { height: number; imageName: string; width: number } | null = null;
     let cancellationRequested = false;
     let cancellationStarted = false;
@@ -576,9 +592,21 @@ export const runUtilityGraph = (options: RunUtilityGraphOptions): Promise<Utilit
     const detachers: Array<() => void> = [];
     let watch: UtilityItemWatch | null = null;
     let timer: ReturnType<typeof setTimeout> | null = null;
-
+    let executionStatus: UtilityGraphExecutionStatus | null = null;
+    const publishStatus = (status: UtilityGraphExecutionStatus): void => {
+      if (settled || completionReceived || status === executionStatus || executionStatus === 'in_progress') {
+        return;
+      }
+      executionStatus = status;
+      try {
+        options.onStatus?.(status);
+      } catch {
+        // A progress observer must not interrupt queue settlement or cancellation.
+      }
+    };
     const cancelAcceptedItems = (): void => {
       if (
+        !isAccountScopeCurrent(owner) ||
         !cancellationRequested ||
         cancellationStarted ||
         enqueueResult === null ||
@@ -591,7 +619,7 @@ export const runUtilityGraph = (options: RunUtilityGraphOptions): Promise<Utilit
       cancellationStarted = true;
       const itemIds = [...enqueueResult.itemIds];
       void Promise.resolve()
-        .then(() => cancel(itemIds))
+        .then(() => (isAccountScopeCurrent(owner) ? cancel(itemIds) : undefined))
         .catch(() => {
           // Cancellation is best-effort and must never mask the original settle reason.
         });
@@ -603,6 +631,7 @@ export const runUtilityGraph = (options: RunUtilityGraphOptions): Promise<Utilit
     };
 
     const cleanup = (): void => {
+      outputReads.abort();
       if (timer !== null) {
         clearTimeout(timer);
         timer = null;
@@ -687,7 +716,7 @@ export const runUtilityGraph = (options: RunUtilityGraphOptions): Promise<Utilit
         }
       };
       void Promise.resolve()
-        .then(() => reconcileCompletedOutput(reconciliationItemIds, outputNodeId))
+        .then(() => (settled ? null : reconcileCompletedOutput(reconciliationItemIds, outputNodeId, outputSignal)))
         .then((output) => {
           reconciliationInFlight = false;
           if (settled) {
@@ -748,14 +777,12 @@ export const runUtilityGraph = (options: RunUtilityGraphOptions): Promise<Utilit
       settleReject(new UtilityQueueError('aborted', 'The utility graph was aborted.'));
     }
 
-    // Attach listeners BEFORE enqueue so a very fast completion is not missed.
     try {
       detachers.push(
         hub.on('invocation_complete', (event: InvocationCompleteEvent) => {
           if (event.origin !== origin) {
             return;
           }
-          // Only take the target node's output (or, when unspecified, any image).
           if (outputNodeId && event.invocation_source_id !== outputNodeId) {
             return;
           }
@@ -769,6 +796,8 @@ export const runUtilityGraph = (options: RunUtilityGraphOptions): Promise<Utilit
         })
       );
 
+      owner.signal.addEventListener('abort', onAbort);
+      detachers.push(() => owner.signal.removeEventListener('abort', onAbort));
       watch = watchUtilityItems({
         hub,
         onOutcome: (error) => {
@@ -779,9 +808,9 @@ export const runUtilityGraph = (options: RunUtilityGraphOptions): Promise<Utilit
           completionReceived = true;
           reconcileCompletion();
         },
+        onStatus: options.onStatus ? publishStatus : undefined,
         origin,
         readItemStatus,
-        signal,
       });
       detachers.push(watch.detach);
     } catch (cause) {
@@ -809,15 +838,24 @@ export const runUtilityGraph = (options: RunUtilityGraphOptions): Promise<Utilit
         if (settled) {
           return;
         }
-        requestBackendCancellation();
-        settleReject(new UtilityQueueError('timeout', `The utility graph timed out after ${timeoutMs}ms.`));
+        void watch?.read().then(() => {
+          if (settled || completionReceived) {
+            return;
+          }
+          requestBackendCancellation();
+          settleReject(new UtilityQueueError('timeout', `The utility graph timed out after ${timeoutMs}ms.`));
+        });
       }, timeoutMs);
     }
 
-    // Enqueue last. A synchronous listener callback could already have fired by
-    // the time this resolves; `settled` guards against a late enqueue result.
+    // Enqueue last; `settled` guards against a late enqueue result.
     void Promise.resolve()
-      .then(() => enqueue({ graph, origin }))
+      .then(() => {
+        if (!isAccountScopeCurrent(owner)) {
+          throw new UtilityQueueError('aborted', 'The utility graph account scope expired.');
+        }
+        return enqueue({ graph, origin, idempotencyKey: origin, ...(prepend === true ? { prepend: true } : {}) });
+      })
       .then((result) => {
         const inspected = inspectUtilityEnqueueResult(result);
         const validResult = inspected.result;
@@ -825,6 +863,9 @@ export const runUtilityGraph = (options: RunUtilityGraphOptions): Promise<Utilit
           const knownItemIds = inspected.itemIds;
           enqueueResult = { enqueued: knownItemIds.length, itemIds: knownItemIds };
           requestBackendCancellation();
+          if (knownItemIds.length > 0) {
+            result.acknowledge?.();
+          }
           settleReject(
             new UtilityQueueError('enqueue', 'The backend returned an inconsistent utility enqueue response.')
           );
@@ -833,8 +874,12 @@ export const runUtilityGraph = (options: RunUtilityGraphOptions): Promise<Utilit
         enqueueResult = validResult;
         watch?.accept(validResult.itemIds);
         cancelAcceptedItems();
+        result.acknowledge?.();
         if (!settled) {
           reconcileCompletion();
+          if (options.onStatus && !completionReceived) {
+            void watch?.read();
+          }
         }
       })
       .catch((error: unknown) => {

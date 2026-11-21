@@ -6,7 +6,7 @@ vendored transformer runs at float32 on the CPU behind a fake invocation context
 cache and the tensor and conditioning stores.
 """
 
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from types import SimpleNamespace
 from typing import Any
 
@@ -14,14 +14,21 @@ import pytest
 import torch
 
 from invokeai.app.invocations.fields import DenoiseMaskField, LatentsField, MossImageConditioningField
-from invokeai.app.invocations.model import ModelIdentifierField, TransformerField, VAEField
+from invokeai.app.invocations.model import LoRAField, ModelIdentifierField, TransformerField, VAEField
 from invokeai.app.invocations.moss_image import moss_image_denoise as node_module
 from invokeai.app.invocations.moss_image.moss_image_denoise import MossImageDenoiseInvocation
-from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType, SubModelType
+from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch_module_autocast import (
+    apply_custom_layers_to_model,
+)
+from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType, SubModelType
 from invokeai.backend.moss_image import working_memory as working_memory_module
 from invokeai.backend.moss_image.pipeline_moss_image import MOSSImageTransformer
 from invokeai.backend.moss_image.sampling import get_moss_noise, get_moss_sigmas, to_model_space
 from invokeai.backend.moss_image.working_memory import MOSS_IMAGE_DENOISE_SPEC
+from invokeai.backend.patches.layer_patcher import LayerPatcher
+from invokeai.backend.patches.lora_conversions.moss_image_lora_conversion_utils import (
+    lora_model_from_moss_image_state_dict,
+)
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     ConditioningFieldData,
     MossImageConditioningInfo,
@@ -49,7 +56,7 @@ class _Loaded:
         self, working_mem_bytes: int | None = None, *, working_memory: WorkingMemoryEstimate | None = None
     ):
         self.reservations.append(working_memory if working_memory is not None else working_mem_bytes)
-        yield (None, self.model)
+        yield ({}, self.model)
 
     @contextmanager
     def model_in_ram(self):
@@ -78,8 +85,23 @@ def _identifier(key: str, submodel: SubModelType) -> ModelIdentifierField:
 
 
 class _Context:
-    def __init__(self, tensors: dict[str, torch.Tensor] | None = None, text_dim: int = _TEXT_DIM) -> None:
+    def __init__(
+        self,
+        tensors: dict[str, torch.Tensor] | None = None,
+        text_dim: int = _TEXT_DIM,
+        loras: dict[str, Any] | None = None,
+        lora_base: BaseModelType = BaseModelType.MossImage,
+        model_format: ModelFormat = ModelFormat.Checkpoint,
+    ) -> None:
         self.transformer = _Loaded(_transformer())
+        # As the model cache holds it, so the patcher can wrap a layer in a sidecar.
+        apply_custom_layers_to_model(self.transformer.model)
+        self.loras = loras or {}
+        self.configs = {
+            "transformer": SimpleNamespace(format=model_format),
+            **{key: SimpleNamespace(base=lora_base, type=ModelType.LoRA, name=key) for key in self.loras},
+        }
+        self.loaded: list[str] = []
         self.vae = _Loaded(_vae())
         self.tensors_in = dict(tensors or {})
         self.saved: dict[str, torch.Tensor] = {}
@@ -93,12 +115,19 @@ class _Context:
             )
             for name, length in (("pos", 7), ("neg", 3))
         }
-        self.models = SimpleNamespace(load=self._load_model)
+        self.models = SimpleNamespace(
+            load=self._load_model,
+            get_config=lambda identifier: self.configs[getattr(identifier, "key", identifier)],
+            exists=lambda key: key in self.configs,
+        )
         self.tensors = SimpleNamespace(load=self.tensors_in.__getitem__, save=self._save)
         self.conditioning = SimpleNamespace(load=conditionings.__getitem__)
         self.util = SimpleNamespace(sd_step_callback=lambda state, base: self.previews.append((state, base)))
 
-    def _load_model(self, identifier: ModelIdentifierField) -> _Loaded:
+    def _load_model(self, identifier: ModelIdentifierField) -> Any:
+        self.loaded.append(identifier.key)
+        if identifier.key in self.loras:
+            return SimpleNamespace(model=self.loras[identifier.key], model_in_ram=nullcontext)
         return {"transformer": self.transformer, "vae": self.vae}[identifier.key]
 
     def _save(self, tensor: torch.Tensor) -> str:
@@ -318,3 +347,108 @@ def test_a_vae_without_batchnorm_statistics_is_refused() -> None:
 
     with pytest.raises(ValueError, match="needs a FLUX.2 VAE"):
         _invocation().invoke(context)  # type: ignore[arg-type]
+
+
+_LORA_RANK = 2
+
+
+@pytest.fixture
+def float32(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The node samples in float32 on the CPU: bf16 matmuls fault on part of the hosted Windows fleet."""
+    monkeypatch.setattr(
+        node_module.TorchDevice, "choose_bfloat16_safe_dtype", staticmethod(lambda _device: torch.float32)
+    )
+
+
+def _lora(module: str = "layers.0.proj.q", seed: int = 5):
+    """A LoRA on one module of the tiny transformer, as the conversion builds it from a ComfyUI file."""
+    generator = torch.Generator().manual_seed(seed)
+    state_dict = {
+        f"diffusion_model.{module}.lora_down.weight": torch.randn(_LORA_RANK, 64, generator=generator) * 0.5,
+        f"diffusion_model.{module}.lora_up.weight": torch.randn(64, _LORA_RANK, generator=generator) * 0.5,
+    }
+    return lora_model_from_moss_image_state_dict(state_dict, name="Pixel Art")
+
+
+def _with_loras(weights: dict[str, float]) -> dict[str, Any]:
+    return {
+        "transformer": TransformerField(
+            transformer=_identifier("transformer", SubModelType.Transformer),
+            loras=[
+                LoRAField(
+                    lora=ModelIdentifierField(
+                        key=key, hash=key, name=key, base=BaseModelType.MossImage, type=ModelType.LoRA
+                    ),
+                    weight=weight,
+                )
+                for key, weight in weights.items()
+            ],
+        )
+    }
+
+
+@pytest.mark.parametrize(
+    ("model_format", "merged"),
+    [(ModelFormat.Checkpoint, True), (ModelFormat.GGUFQuantized, False)],
+    ids=["dense-merged", "gguf-sidecar"],
+)
+def test_loras_change_the_sampling_as_merging_them_by_hand_does_and_leave_the_transformer_unchanged(
+    model_format: ModelFormat, merged: bool, monkeypatch: pytest.MonkeyPatch, float32: None
+) -> None:
+    """A GGUF weight is packed and an int8 one kept in buffers: neither takes an update in place, so their LoRAs run as
+    sidecars, whatever the weights of the tiny transformer here are."""
+    # As if the layer were on the GPU: on the CPU the patcher runs every LoRA as a sidecar, whatever the format.
+    monkeypatch.setattr(LayerPatcher, "_is_any_part_of_layer_on_cpu", staticmethod(lambda _module: False))
+    patch = _lora()
+    context = _Context(loras={"lora": patch}, model_format=model_format)
+    unpatched_weight = context.transformer.model.layers[0].proj["q"].weight.detach().clone()
+    seen: dict[str, bool] = {}
+    real_denoise = node_module.denoise
+
+    def denoise(**kwargs: Any) -> torch.Tensor:
+        seen["merged"] = not torch.equal(kwargs["transformer"].layers[0].proj["q"].weight, unpatched_weight)
+        return real_denoise(**kwargs)
+
+    monkeypatch.setattr(node_module, "denoise", denoise)
+
+    patched = _run(context, **_with_loras({"lora": 0.5}))
+    merged_while_sampling = seen["merged"]
+
+    reference_context = _Context()
+    down, up = (
+        patch.layers["lora_transformer-layers.0.proj.q"].down,
+        patch.layers["lora_transformer-layers.0.proj.q"].up,
+    )
+    with torch.no_grad():
+        reference_context.transformer.model.layers[0].proj["q"].weight += 0.5 * up @ down
+    torch.testing.assert_close(patched, _run(reference_context), rtol=1e-4, atol=1e-5)
+    assert not torch.allclose(patched, _run(_Context()), atol=1e-4)
+    assert merged_while_sampling is merged
+    assert torch.equal(context.transformer.model.layers[0].proj["q"].weight, unpatched_weight)
+
+
+def test_another_familys_lora_is_refused_before_anything_loads(float32: None) -> None:
+    """Another family's loader node wired into a MOSS-Image graph hands its LoRA over unchecked; converted for that
+    family's transformer, its layers match none of this one's."""
+    context = _Context(loras={"lora": _lora()}, lora_base=BaseModelType.ZImage)
+
+    with pytest.raises(ValueError, match="LoRA 'lora' is for z-image models, not MOSS-Image"):
+        _run(context, **_with_loras({"lora": 1.0}))
+    assert context.loaded == []
+
+
+def test_the_reservation_prices_the_loras_the_sampling_applies(float32: None) -> None:
+    """The estimate prices them (`working_memory`); the node hands it those at a weight other than 0, with the
+    transformer's format: on a GGUF transformer every layer runs as a sidecar."""
+    contexts = {
+        name: _Context(loras={"lora": _lora()}, model_format=ModelFormat.GGUFQuantized)
+        for name in ("without", "at-zero", "applied")
+    }
+    _run(contexts["without"])
+    _run(contexts["at-zero"], **_with_loras({"lora": 0.0}))
+    _run(contexts["applied"], **_with_loras({"lora": 0.5}))
+    features = {name: context.transformer.reservations[0].features for name, context in contexts.items()}
+
+    assert features["without"]["lora_sidecar_bytes"] == features["at-zero"]["lora_sidecar_bytes"] == 0
+    # What the estimator makes of it is `test_working_memory.py`'s; here it is only handed the LoRA and the format.
+    assert features["applied"]["lora_sidecar_bytes"] > 0

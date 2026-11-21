@@ -1,10 +1,10 @@
 /**
- * Text clicks edit the topmost eligible hit layer or open creation at the point. Measured cache bounds fall back
- * to estimates, with inverse-transform hit testing.
+ * Text clicks edit the topmost eligible hit layer or open creation at the point. Measured cache bounds fall back to
+ * estimates, with inverse-transform hit testing.
  *
- * An open session consumes the next canvas press after committing live portal content; blur and Mod+Enter also
- * commit. Escape cancels through the portal or engine ladder. Temporary switches preserve sessions; real switches
- * cancel. Creation adds no layer until its single commit.
+ * An open session consumes the next canvas press after committing live portal content; blur and Mod+Enter also commit.
+ * Escape cancels through the portal or engine ladder. Temporary switches preserve sessions; real switches cancel.
+ * Creation adds no layer until its single commit.
  */
 
 import type {
@@ -27,7 +27,6 @@ import { layerMatrix } from './moveHitTest';
 const PRIMARY_BUTTON = 1;
 
 type TextSource = Extract<CanvasLayerSourceContract, { type: 'text' }>;
-/** A text-sourced raster layer. */
 type TextLayer = Extract<CanvasLayerContract, { type: 'raster' }> & { source: TextSource };
 
 const isTextLayer = (layer: CanvasLayerContract): layer is TextLayer =>
@@ -75,11 +74,13 @@ export const createTextTool = (): Tool => ({
     ctx.cancelTextEdit?.();
   },
   onKeyCommand: (ctx, command) => {
-    // Direct harness cancellation is a backstop; production Escape uses the engine ladder. Apply needs portal
-    // content and does nothing here.
-    if (command === 'cancel') {
-      ctx.cancelTextEdit?.();
+    // The engine ladder's text rung cancels an open session before the tool is asked, so this is a backstop. Apply
+    // needs portal content and does nothing here.
+    if (command !== 'cancel' || !ctx.stores.textEditSession.get()) {
+      return false;
     }
+    ctx.cancelTextEdit?.();
+    return true;
   },
   onPointerDown: (ctx, input) => {
     if ((input.buttons & PRIMARY_BUTTON) === 0) {

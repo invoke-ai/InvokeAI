@@ -1,6 +1,7 @@
 // eslint-disable-next-line no-restricted-imports -- the one wrapper the restriction routes every dialog through
 import { Dialog as ChakraDialog, useDialogContext } from '@chakra-ui/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
+import { useCallback } from 'react';
 
 import { registerModalPresence } from './modalPresence';
 
@@ -14,16 +15,52 @@ const ModalPresenceRegistration = () => {
 // the exit animation, but stops being present the moment it closes, and is present again if it reopens meanwhile.
 const ModalPresence = () => (useDialogContext().open ? <ModalPresenceRegistration /> : null);
 
-const DialogRoot = ({ children, ...props }: ChakraDialog.RootProps) => (
-  <ChakraDialog.Root {...props}>
-    {props.modal === false ? null : <ModalPresence />}
-    {children}
-  </ChakraDialog.Root>
-);
+type LayerDismissEvent = Parameters<NonNullable<ChakraDialog.RootProps['onRequestDismiss']>>[0];
 
 /**
- * Chakra's dialog parts with a root that announces modal presence while open, so application shortcuts behind it
- * stay inactive without each dialog registering itself. `RootProvider` is left out because it bypasses that root.
+ * The layer stack dismisses every layer registered after one being torn down, as if nested in it. A menu item can open
+ * a dialog that registers before the closing menu's layer is removed (an already-loaded dialog, a controlled menu), so
+ * that removal would close the dialog the menu just opened. A dialog is never a menu's child; only layers that really
+ * nest it may dismiss it.
+ */
+const keepOpenThroughMenuTeardown = (event: LayerDismissEvent) => {
+  if (event.detail.targetLayer?.dataset.scope === 'menu') {
+    event.preventDefault();
+  }
+};
+
+type FocusOutsideEvent = Parameters<NonNullable<ChakraDialog.RootProps['onFocusOutside']>>[0];
+
+const DialogRoot = ({ children, onFocusOutside, ...props }: Dialog.RootProps) => {
+  const isModal = props.modal !== false;
+  /**
+   * A modal dialog traps focus, so focus landing outside it is never the user leaving; Escape, a close control or a
+   * press outside are. Focus still lands outside programmatically, mostly under StrictMode: a dialog that mounts open
+   * arms a second focus trap after focus has entered it, and on close that trap returns focus into the closed dialog,
+   * which would dismiss the dialog that opened it.
+   */
+  const handleFocusOutside = useCallback(
+    (event: FocusOutsideEvent) => {
+      onFocusOutside?.(event);
+
+      if (isModal) {
+        event.preventDefault();
+      }
+    },
+    [isModal, onFocusOutside]
+  );
+
+  return (
+    <ChakraDialog.Root {...props} onFocusOutside={handleFocusOutside} onRequestDismiss={keepOpenThroughMenuTeardown}>
+      {isModal ? <ModalPresence /> : null}
+      {children}
+    </ChakraDialog.Root>
+  );
+};
+
+/**
+ * Chakra's dialog parts with a root that announces modal presence while open, so application shortcuts behind it stay
+ * inactive without each dialog registering itself. `RootProvider` is left out because it bypasses that root.
  */
 export const Dialog = {
   ActionTrigger: ChakraDialog.ActionTrigger,
@@ -48,5 +85,5 @@ export const Dialog = {
 
 export declare namespace Dialog {
   export type OpenChangeDetails = ChakraDialog.OpenChangeDetails;
-  export type RootProps = ChakraDialog.RootProps;
+  export type RootProps = Omit<ChakraDialog.RootProps, 'onRequestDismiss'>;
 }

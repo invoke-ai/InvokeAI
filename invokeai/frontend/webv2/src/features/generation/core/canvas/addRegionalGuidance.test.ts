@@ -1,7 +1,7 @@
 import {
   architectureCapabilitiesFixture,
   seedArchitectureCapabilities,
-} from '@features/generation/core/architectureCapabilities.testing';
+} from '@features/models/core/architectureCapabilities.testing';
 import { describe, expect, it } from 'vitest';
 
 import type { AddRegionalGuidanceOptions, RegionalGuidanceInput, RegionalReferenceModel } from './addRegionalGuidance';
@@ -22,7 +22,6 @@ interface TestGraph {
   edges: { source: { node_id: string; field: string }; destination: { node_id: string; field: string } }[];
 }
 
-/** A minimal SD-family base graph: pos/neg cond + collectors wired to denoise, with clip edges. */
 const sdBaseGraph = (opts: { sdxl?: boolean } = {}): TestGraph => {
   const clip2Edges = opts.sdxl
     ? [
@@ -55,7 +54,6 @@ const sdBaseGraph = (opts: { sdxl?: boolean } = {}): TestGraph => {
   };
 };
 
-/** A minimal FLUX base graph: pos cond + collector, no negative. */
 const fluxBaseGraph = (): TestGraph => ({
   edges: [
     { destination: { field: 'clip', node_id: 'pos_cond' }, source: { field: 'clip', node_id: 'model_loader' } },
@@ -76,7 +74,6 @@ const fluxBaseGraph = (): TestGraph => ({
   },
 });
 
-/** A minimal FLUX.2 graph with the collector seam used by regional conditioning. */
 const flux2BaseGraph = (): TestGraph => ({
   edges: [
     {
@@ -100,7 +97,6 @@ const flux2BaseGraph = (): TestGraph => ({
   },
 });
 
-/** A minimal Krea-2 graph with its Qwen3-VL encoder and positive collector seam. */
 const krea2BaseGraph = (): TestGraph => ({
   edges: [
     {
@@ -120,7 +116,6 @@ const krea2BaseGraph = (): TestGraph => ({
   },
 });
 
-/** A minimal Qwen3-encoder graph (Z-Image / Anima): pos + neg collectors, CFG on. */
 const qwen3BaseGraph = (encoderType: 'z_image_text_encoder' | 'anima_text_encoder'): TestGraph => ({
   edges: [
     {
@@ -171,8 +166,26 @@ const region = (overrides: Partial<RegionalGuidanceInput> = {}): RegionalGuidanc
   ...overrides,
 });
 
-const run = (graph: TestGraph, options: AddRegionalGuidanceOptions): TestGraph => {
-  addRegionalGuidance(graph as never, options);
+type RunOptions = Omit<AddRegionalGuidanceOptions, 'conditioning' | 'denoise'> &
+  Partial<Pick<AddRegionalGuidanceOptions, 'conditioning'>>;
+
+const conditioningOf = (graph: TestGraph): AddRegionalGuidanceOptions['conditioning'] => ({
+  fluxReduxCollector: null,
+  ipAdapterCollector: null,
+  negative:
+    graph.nodes.neg_cond && graph.nodes.neg_cond_collect
+      ? { collector: graph.nodes.neg_cond_collect, node: graph.nodes.neg_cond }
+      : null,
+  positive: graph.nodes.pos_cond,
+  positiveCollector: graph.nodes.pos_cond_collect,
+});
+
+const run = (graph: TestGraph, options: RunOptions): TestGraph => {
+  addRegionalGuidance(graph as never, {
+    conditioning: conditioningOf(graph),
+    denoise: graph.nodes.denoise_latents,
+    ...options,
+  });
   return graph;
 };
 
@@ -207,7 +220,6 @@ describe('isRegionalGuidanceSupportedForBase', () => {
 });
 
 describe('the support matrix and the served capabilities', () => {
-  // Every backend-supported regional base needs a local graph row.
   it('give every base the backend declares supported a row in the matrix', () => {
     const declaredSupported = architectureCapabilitiesFixture
       .filter((row) => row.features.supports_regional_guidance)
@@ -235,14 +247,19 @@ describe('getRegionalGuidanceSupport', () => {
       negativePrompt: false,
       referenceImages: 'flux_redux',
     });
-    for (const base of ['flux2', 'krea-2', 'z-image', 'anima']) {
+    for (const base of ['krea-2', 'z-image', 'anima']) {
       expect(getRegionalGuidanceSupport(base), base).toMatchObject({
-        autoNegative: false,
+        autoNegative: true,
         mode: 'masks',
-        negativePrompt: false,
+        negativePrompt: true,
         referenceImages: null,
       });
     }
+    expect(getRegionalGuidanceSupport('flux2')).toMatchObject({
+      autoNegative: false,
+      negativePrompt: false,
+      referenceImages: null,
+    });
     expect(getRegionalGuidanceSupport('sd-3')).toBeNull();
     expect(getRegionalGuidanceSupport(null)).toBeNull();
   });
@@ -254,24 +271,25 @@ describe('getRegionalGuidanceSupport', () => {
       layoutKinds: ['object', 'character', 'text'],
       mode: 'layout',
       negativePrompt: false,
+      negativesNeedCfg: false,
       referenceImages: null,
     });
-    // The structured caption has object elements only.
     expect(getRegionalGuidanceSupport('ideogram-4')).toEqual({
       autoNegative: false,
       label: 'Ideogram 4',
       layoutKinds: ['object'],
       mode: 'layout',
       negativePrompt: false,
+      negativesNeedCfg: false,
       referenceImages: null,
     });
-    // Regions become rows of the box table.
     expect(getRegionalGuidanceSupport('flux3')).toEqual({
       autoNegative: false,
       label: 'FLUX.3',
       layoutKinds: ['object'],
       mode: 'layout',
       negativePrompt: false,
+      negativesNeedCfg: false,
       referenceImages: null,
     });
   });
@@ -281,7 +299,7 @@ describe('addRegionalGuidance — Z-Image / Anima', () => {
   it.each([
     ['z-image', 'z_image_text_encoder'],
     ['anima', 'anima_text_encoder'],
-  ] as const)('%s wires a masked positive prompt through its Qwen3 encoder, positive only', (base, encoderType) => {
+  ] as const)('%s wires masked prompts through its Qwen3 encoder', (base, encoderType) => {
     const g = run(qwen3BaseGraph(encoderType), {
       base,
       regions: [region({ autoNegative: true, negativePrompt: 'blurry' })],
@@ -291,10 +309,13 @@ describe('addRegionalGuidance — Z-Image / Anima', () => {
     expect(hasEdge(g, 'model_loader', 'qwen3_encoder', 'rg_pos_cond_r1', 'qwen3_encoder')).toBe(true);
     expect(hasEdge(g, 'rg_mask_to_tensor_r1', 'mask', 'rg_pos_cond_r1', 'mask')).toBe(true);
     expect(hasEdge(g, 'rg_pos_cond_r1', 'conditioning', 'pos_cond_collect', 'item')).toBe(true);
-    // These backends discard negative masks even when a negative collector exists.
-    expect(g.nodes.rg_neg_cond_r1).toBeUndefined();
-    expect(g.nodes.rg_pos_cond_inverted_r1).toBeUndefined();
-    expect(g.edges.some((e) => e.destination.node_id === 'neg_cond_collect')).toBe(false);
+    expect(g.nodes.rg_neg_cond_r1).toMatchObject({ prompt: 'blurry', type: encoderType });
+    expect(hasEdge(g, 'model_loader', 'qwen3_encoder', 'rg_neg_cond_r1', 'qwen3_encoder')).toBe(true);
+    expect(hasEdge(g, 'rg_mask_to_tensor_r1', 'mask', 'rg_neg_cond_r1', 'mask')).toBe(true);
+    expect(hasEdge(g, 'rg_neg_cond_r1', 'conditioning', 'neg_cond_collect', 'item')).toBe(true);
+    expect(g.nodes.rg_pos_cond_inverted_r1).toMatchObject({ prompt: 'a cat', type: encoderType });
+    expect(hasEdge(g, 'rg_invert_mask_r1', 'mask', 'rg_pos_cond_inverted_r1', 'mask')).toBe(true);
+    expect(hasEdge(g, 'rg_pos_cond_inverted_r1', 'conditioning', 'neg_cond_collect', 'item')).toBe(true);
   });
 });
 
@@ -350,10 +371,8 @@ describe('addRegionalGuidance — SD1', () => {
     expect(posCond).toBeDefined();
     expect(posCond.type).toBe('compel');
     expect(posCond.prompt).toBe('a cat');
-    // mask edge + conditioning into the collector.
     expect(hasEdge(g, 'rg_mask_to_tensor_r1', 'mask', 'rg_pos_cond_r1', 'mask')).toBe(true);
     expect(hasEdge(g, 'rg_pos_cond_r1', 'conditioning', 'pos_cond_collect', 'item')).toBe(true);
-    // Copied the global posCond clip edge.
     expect(hasEdge(g, 'clip_skip', 'clip', 'rg_pos_cond_r1', 'clip')).toBe(true);
   });
 
@@ -365,13 +384,18 @@ describe('addRegionalGuidance — SD1', () => {
     expect(hasEdge(g, 'clip_skip', 'clip', 'rg_neg_cond_r1', 'clip')).toBe(true);
   });
 
+  it.each([null, ''])('adds no negative conditioning for a region whose negative prompt is %j', (negativePrompt) => {
+    const g = run(sdBaseGraph(), { base: 'sd-1', regions: [region({ negativePrompt })] });
+    expect(g.nodes.rg_neg_cond_r1).toBeUndefined();
+    expect(g.edges.some((e) => e.destination.node_id === 'neg_cond_collect')).toBe(false);
+  });
+
   it('autoNegative inverts the mask and re-encodes the positive prompt into the negative collector', () => {
     const g = run(sdBaseGraph(), { base: 'sd-1', regions: [region({ autoNegative: true })] });
     const invert = nodesOfType(g, 'invert_tensor_mask');
     expect(invert).toHaveLength(1);
     expect(invert[0].id).toBe('rg_invert_mask_r1');
     expect(hasEdge(g, 'rg_mask_to_tensor_r1', 'mask', 'rg_invert_mask_r1', 'mask')).toBe(true);
-    // The inverted-cond node uses the POSITIVE prompt but feeds the NEGATIVE collector.
     expect(g.nodes.rg_pos_cond_inverted_r1.prompt).toBe('a cat');
     expect(hasEdge(g, 'rg_invert_mask_r1', 'mask', 'rg_pos_cond_inverted_r1', 'mask')).toBe(true);
     expect(hasEdge(g, 'rg_pos_cond_inverted_r1', 'conditioning', 'neg_cond_collect', 'item')).toBe(true);
@@ -410,12 +434,40 @@ describe('addRegionalGuidance — SD1', () => {
     expect(ip.weight).toBe(0.8);
     expect(ip.image).toEqual({ image_name: 'ref.png' });
     expect(hasEdge(g, 'rg_mask_to_tensor_r1', 'mask', 'ip_adapter_ref1', 'mask')).toBe(true);
-    // A collector feeds denoise.ip_adapter.
     const collectorEdge = g.edges.find(
       (e) => e.destination.node_id === 'denoise_latents' && e.destination.field === 'ip_adapter'
     );
     expect(collectorEdge).toBeDefined();
     expect(hasEdge(g, 'ip_adapter_ref1', 'ip_adapter', collectorEdge!.source.node_id, 'item')).toBe(true);
+  });
+  it('joins the ip_adapter collector the builder already feeds the denoise from', () => {
+    const graph = sdBaseGraph();
+    const builderCollector = { id: 'ip_adapter_collector', type: 'collect' };
+    graph.nodes[builderCollector.id] = builderCollector;
+    const g = run(graph, {
+      base: 'sd-1',
+      conditioning: { ...conditioningOf(graph), ipAdapterCollector: builderCollector },
+      regions: [
+        region({
+          referenceImages: [
+            {
+              beginEndStepPct: [0, 1],
+              clipVisionModel: 'ViT-H',
+              id: 'ref1',
+              imageName: 'ref.png',
+              method: 'full',
+              model: ipModel('sd-1'),
+              type: 'ip_adapter',
+              weight: 0.8,
+            },
+          ],
+        }),
+      ],
+    });
+
+    expect(hasEdge(g, 'ip_adapter_ref1', 'ip_adapter', 'ip_adapter_collector', 'item')).toBe(true);
+    expect(g.nodes.regional_ip_adapter_collector).toBeUndefined();
+    expect(g.edges.filter((e) => e.destination.field === 'ip_adapter')).toEqual([]);
   });
 });
 
@@ -447,7 +499,6 @@ describe('addRegionalGuidance — FLUX', () => {
     expect(g.nodes.rg_pos_cond_r1.type).toBe('flux_text_encoder');
     expect(hasEdge(g, 'rg_pos_cond_r1', 'conditioning', 'pos_cond_collect', 'item')).toBe(true);
     expect(hasEdge(g, 'model_loader', 't5_encoder', 'rg_pos_cond_r1', 't5_encoder')).toBe(true);
-    // No regional negative conditioning on FLUX.
     expect(g.nodes.rg_neg_cond_r1).toBeUndefined();
   });
 
@@ -516,6 +567,7 @@ describe('addRegionalGuidance — multiple regions coexist', () => {
 
 describe('getRegionalGuidanceRejectionReason', () => {
   const params = {
+    cfgScale: 7,
     hasContent: true,
     layerName: 'Region 1',
     mainBase: 'sd-1',
@@ -538,6 +590,9 @@ describe('getRegionalGuidanceRejectionReason', () => {
 
   it('rejects a region with no prompt and no reference images', () => {
     expect(getRegionalGuidanceRejectionReason({ ...params, positivePrompt: null })).toMatch(/no prompt or reference/);
+    expect(getRegionalGuidanceRejectionReason({ ...params, negativePrompt: '', positivePrompt: null })).toMatch(
+      /no prompt or reference/
+    );
   });
 
   it('accepts an SD region that only carries a negative prompt or a reference image', () => {
@@ -567,9 +622,6 @@ describe('getRegionalGuidanceRejectionReason', () => {
   it.each([
     ['flux', 'FLUX', 0],
     ['flux2', 'FLUX.2', 1],
-    ['krea-2', 'Krea-2', 1],
-    ['z-image', 'Z-Image', 1],
-    ['anima', 'Anima', 1],
   ])('rejects a %s region that carries only what the base ignores', (mainBase, label, referenceImageCount) => {
     expect(
       getRegionalGuidanceRejectionReason({
@@ -582,6 +634,28 @@ describe('getRegionalGuidanceRejectionReason', () => {
     ).toBe(`Regional guidance "Region 1" has no prompt or reference image ${label} can use.`);
   });
 
+  it.each(['krea-2', 'z-image', 'anima'])(
+    'accepts a %s region with only a negative prompt only while CFG is above 1',
+    (mainBase) => {
+      const negativeOnly = { ...params, mainBase, negativePrompt: 'blurry', positivePrompt: null };
+
+      expect(getRegionalGuidanceRejectionReason({ ...negativeOnly, cfgScale: 1.5 })).toBeNull();
+      for (const cfgScale of [1, 0.5]) {
+        expect(getRegionalGuidanceRejectionReason({ ...negativeOnly, cfgScale })).toMatch(/no prompt or reference/);
+      }
+      expect(getRegionalGuidanceRejectionReason({ ...negativeOnly, cfgScale: 1, positivePrompt: 'a cat' })).toBeNull();
+      expect(
+        getRegionalGuidanceRejectionReason({ ...params, mainBase, positivePrompt: null, referenceImageCount: 1 })
+      ).toMatch(/no prompt or reference/);
+    }
+  );
+
+  it('accepts an SD region with only a negative prompt at CFG 1, where its graph still reads negatives', () => {
+    expect(
+      getRegionalGuidanceRejectionReason({ ...params, cfgScale: 1, negativePrompt: 'blurry', positivePrompt: null })
+    ).toBeNull();
+  });
+
   it('keeps a FLUX region that only carries a Redux reference image', () => {
     expect(
       getRegionalGuidanceRejectionReason({ ...params, mainBase: 'flux', positivePrompt: null, referenceImageCount: 1 })
@@ -591,6 +665,7 @@ describe('getRegionalGuidanceRejectionReason', () => {
 
 describe('getRegionalGuidanceRejectionReason — layout bases', () => {
   const params = {
+    cfgScale: 7,
     hasContent: true,
     layerName: 'Sign',
     mainBase: 'moss-image',
@@ -735,7 +810,6 @@ describe('getLayoutDraftRejectionReason', () => {
     expect(reason(`  \`\`\`json\n${JSON.stringify(draft, null, 2)}\n\`\`\`\n`)).toBeNull();
     expect(reason('a cafe with {curly} braces and "bbox_coord_space" words')).toBeNull();
     expect(reason('{"bbox_coord_space": ', 'z-image')).toBeNull();
-    // Ideogram 4 is a layout base too, but passes `{` prompts through and has no draft to compile.
     expect(
       reason('{"bbox_coord_space":"abs","bbox_format":"xyxy","summary":{"caption":"x"},"items":[', 'ideogram-4')
     ).toBeNull();

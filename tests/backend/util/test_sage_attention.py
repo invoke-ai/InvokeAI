@@ -606,7 +606,12 @@ class TestInstall:
         install_sage_attention()
 
         assert F.scaled_dot_product_attention is spy
-        assert any(message in r.message for r in caplog.records), [r.message for r in caplog.records]
+        logged = [r.message for r in caplog.records]
+        assert any(message in text for text in logged), logged
+        # Warnings that send the reader to the docs must name the published page, not the old GitHub Pages path.
+        linked = [text for text in logged if "See " in text]
+        if linked:
+            assert all("https://v7.invoke.ai/configuration/optimization/sage-attention/" in text for text in linked)
 
     def test_a_kernel_that_would_swallow_smooth_k_is_refused(self, monkeypatch, caplog):
         """Every real kernel ends in **kwargs, so a renamed `smooth_k` would be ignored and smoothing come back."""

@@ -14,10 +14,10 @@ export {
   getDynamicPromptsConfig,
   getDynamicPromptsSettingsPatch,
   getGenerateValuesRevertPatch,
-  getModelDefaultVae,
-  hasModelDefaultVae,
   isAspectRatioLocked,
   isFluxDypePreset,
+  isGenerateLora,
+  isIdeogram4SamplerPreset,
   isGenerateModelConfig,
   isLoraCompatibleWithModel,
   isLoraModelConfig,
@@ -26,6 +26,7 @@ export {
   isQwenImageEncoderQuantization,
   isValidMossImageSkipLayers,
   isVaeModelConfig,
+  isWanLoraTarget,
   isWanLoraTargetingMain,
   MAX_FLUX_DYPE_EXPONENT,
   MAX_FLUX_DYPE_SCALE,
@@ -41,9 +42,11 @@ export {
   MIN_TIMESTEP_SHIFT,
   MIN_ZIMAGE_SEED_VARIANCE_RANDOMIZE_PERCENT,
   normalizeDynamicPromptsSettings,
+  normalizeGenerateLora,
   normalizeGenerateSettings,
   normalizeMossImageSkipLayers,
   normalizeGenerateWidgetValues,
+  normalizeReferenceImageName,
   normalizeReferenceImages,
   syncGenerateWidgetValuesWithModels,
 } from './core/settings';
@@ -52,24 +55,32 @@ export {
   createReferenceImageId,
   getCompatibleReferenceImages,
   getDefaultGenerateSettings,
-  withAddedReferenceImages,
+  addReferenceImages,
+  getDefaultComponentSlotPolicies,
+  isDefaultVaeLoaded,
+  pruneClosedDefaultComponents,
   getGenerateModelSelectionResult,
+  getModelDefaultComponents,
+  getModelDefaultFills,
   isComponentCompatibleWithModel,
   getDimensionGrid,
   getGenerationDimensions,
   getGenerateInvocationIssues,
   getGenerationModelAvailabilityReasons,
   getGenerationUiPolicy,
-  getMaxReferenceImages,
   getPromptHistoryRecallPatch,
+  getReferenceImageRoom,
   getSchedulerOptions,
   getSettingsWithModelDefaults,
+  getRecallDefaultVae,
+  resolveModelDefaultVae,
   isArchitectureDescribed,
   isGenerateModelSelectable,
+  pickFallbackGenerateModel,
   isKnownScheduler,
   isLossyModelSwitch,
-  isReferenceImageSupported,
   isSupportedGenerateModel,
+  takesReferenceImages,
   NO_GENERATE_MODEL_ISSUE,
   SCHEDULER_OPTIONS,
   type GenerateModelSelectionResult,
@@ -85,7 +96,7 @@ export {
   type GenerationIssue,
   type GenerationIssueFix,
 } from './core/generationIssues';
-export { hasArchitectureCapabilities } from './core/architectureCapabilities';
+export { DEFAULT_COMPONENT_SLOTS, type DefaultComponentSlot } from './core/componentDefaults';
 export {
   describeExternalCanvasRefusal,
   GEMINI_TEMPERATURE_MAX,
@@ -113,17 +124,25 @@ export {
   isDiffusersMainForBase,
   isFlux2MistralEncoder,
   isFlux2Qwen3EncoderForModel,
+  isMossImageQwen35Encoder,
   isQwen3Vl4bEncoder,
   isVaeAcceptedByBase,
   isVaeCompatibleWithGenerateModel,
   isZImageQwen3Encoder,
+  servesAsType,
 } from './core/componentCompatibility';
+export {
+  getLockedAspectRatioSettings,
+  MAX_ASPECT_RATIO_PRESETS,
+  normalizeAspectRatioPresets,
+} from './core/aspectRatioPresets';
 export {
   isValidKrea2RebalanceWeights,
   normalizeRebalancePresets,
   type RebalancePreset,
 } from './core/conditioningRebalance';
 export { MIN_BATCH_COUNT, sanitizeBatchCount } from './core/batch';
+export { clampPidSteps, isPidMode } from './core/pid';
 export {
   getActiveRefiner,
   isRefinerModel,
@@ -150,8 +169,13 @@ export {
   sanitizeSampleSeed,
   type DynamicPromptsConfig,
   type DynamicPromptsSeedBehaviour,
+  type GenerateSubmissionSource,
 } from './core/dynamicPrompts';
-export { getEffectivePrompts } from './core/promptTemplates';
+export {
+  flattenPromptTemplateExpansion,
+  getEffectivePrompts,
+  type PromptTemplateSnapshot,
+} from './core/promptTemplates';
 export {
   addPromptHistoryItem,
   getPromptHistoryItemFromGenerateSettings,

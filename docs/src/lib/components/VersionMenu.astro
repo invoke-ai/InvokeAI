@@ -1,0 +1,25 @@
+---
+import { localizedHref } from '../base-path';
+import LinkMenu from './LinkMenu.astro';
+
+// v7 is this site; the v6 docs stay at invoke.ai, deployed from the v6-bugfixes branch.
+const { locale } = Astro.locals.starlightRoute;
+const { t } = Astro.locals;
+const current = 'v7';
+const versions = [
+  {
+    label: current,
+    note: t('versionMenu.currentRelease'),
+    href: localizedHref('/', { locale, base: import.meta.env.BASE_URL }),
+    isCurrent: true,
+  },
+  { label: 'v6', note: t('versionMenu.previousRelease'), href: 'https://invoke.ai/', isCurrent: false },
+];
+---
+
+<LinkMenu
+  id="docs-version-menu-list"
+  label={current}
+  accessibleLabel={t('versionMenu.label', { version: current, interpolation: { escapeValue: false } })}
+  items={versions}
+/>

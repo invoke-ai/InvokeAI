@@ -1,0 +1,13 @@
+title: Hand Refiner with MeshGraphormer
+author: blessedcoolant
+repo: https://github.com/blessedcoolant/invoke_meshgraphormer
+summary: Generate a fixed hand depth map and a hand mask, to repair hands with ControlNet.
+description: >-
+  Takes your image and generates a corrected depth map for the hands along with a mask of the hand region, which you
+  can use with ControlNet to fix badly generated hands.
+categories: [control, masks]
+dependencies: true
+thumbnail: ./hand-refiner-with-meshgraphormer.webp
+images:
+  - src: https://raw.githubusercontent.com/blessedcoolant/invoke_meshgraphormer/main/assets/preview.jpg
+    alt: The Hand Refiner node with its depth map and mask outputs

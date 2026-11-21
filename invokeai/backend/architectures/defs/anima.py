@@ -41,8 +41,8 @@ register(
         guidance_min=1.0,
         scheduler_set="anima",
         scheduler_applies_to_graph=True,
-        # Same shape as Z-Image: masked positive conditioning only.
         supports_regional_guidance=True,
+        regional_negative=True,
         # `anima_lllite` into `anima_denoise.control_lllite`. Only 3-channel (control image) adapters drive a
         # control layer; 4-channel inpainting adapters need the inpaint mask and are not control layers.
         control_kinds=frozenset({"anima_lllite"}),

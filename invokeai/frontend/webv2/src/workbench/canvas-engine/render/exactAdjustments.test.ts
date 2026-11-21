@@ -13,7 +13,6 @@ const WIDTH = 24;
 const HEIGHT = 16;
 const ORIGIN = { x: -3, y: 5 };
 
-/** A diagonal gradient with a dark block and a transparent border: edges for the kernels, and a sub-domain. */
 const source = (): Uint8ClampedArray => {
   const data = new Uint8ClampedArray(WIDTH * HEIGHT * 4);
   for (let y = 2; y < HEIGHT - 2; y += 1) {

@@ -11,6 +11,8 @@ import type { ProjectPushOutcome, ProjectSchemaRefusal } from './projectFlush';
 export interface ProjectSyncInfo {
   /** Server revision the next save is based on; null = never reached the server. */
   revision: number | null;
+  /** The caller's workspace revision the next save is based on; null while the server holds none, absent if unknown. */
+  workspaceRevision?: number | null;
   /** True when the local document differs from what the server acknowledged. */
   isPendingPush: boolean;
   /** Present when the server requires a newer canvas schema than this client supports. */

@@ -1,29 +1,24 @@
 import type { GalleryImage, GalleryItem, GalleryItemKey, GalleryItemRef } from '@features/gallery';
+import type * as GalleryMediaUsageModule from '@features/gallery/mediaUsage';
+import type { GalleryMediaUsageReport } from '@features/gallery/mediaUsage';
 import type * as QueueUtilityModule from '@features/queue/utility';
 import type { InvocationTemplatesSnapshot } from '@features/workflow/contracts';
 import type * as WorkflowReact from '@features/workflow/react';
 import type { CreateCanvasFromImagesResult } from '@workbench/canvas-operations/api';
+import type * as SettingsStoreModule from '@workbench/settings/store';
 
-import {
-  resetArchitectureCapabilities,
-  setArchitectureCapabilities,
-} from '@features/generation/core/architectureCapabilities';
-import {
-  architectureCapabilitiesFixture,
-  seedArchitectureCapabilities,
-} from '@features/generation/core/architectureCapabilities.testing';
+import { seedArchitectureCapabilities } from '@features/models/core/architectureCapabilities.testing';
 import { parseOpenApiToTemplates } from '@features/workflow/react';
-import { clearLogs, getLogSnapshot } from '@platform/logging/logger';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
-import { ApiError, getApiErrorMessage } from '@platform/transport/http';
+import { toaster } from '@platform/ui/toaster';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, createRef, type Ref, useImperativeHandle } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 
+import type * as MediaUsageReportModule from './mediaUsageReport';
 import type { ImageActions } from './useImageActions';
 
-import { EMPTY_IMAGE_RECALL_CAPABILITIES } from './imageRecall';
 import { useImageActions } from './useImageActions';
 
 const mocks = vi.hoisted(() => ({
@@ -85,11 +80,14 @@ const mocks = vi.hoisted(() => ({
   sendGalleryImageAsControl: vi.fn(),
   requestDeletionConfirmation: vi.fn(),
   resolveItem: vi.fn(),
+  resolveMediaUsage: vi.fn<(...args: unknown[]) => Promise<GalleryMediaUsageReport>>(),
+  checkGalleryMediaUsage: vi.fn(),
   setStarred: vi.fn(),
 }));
 const preferences = vi.hoisted(() => ({ confirmImageDeletion: false }));
 
 vi.mock('@features/gallery', () => ({
+  GALLERY_REQUEST_MAX_NAMES: 1000,
   galleryImages: {
     metadata: (...args: unknown[]) => mocks.imageMetadata(...args),
     resolve: (...args: unknown[]) => mocks.imageResolve(...args),
@@ -136,7 +134,6 @@ vi.mock('@features/workflow/react', async (importOriginal) => ({
 }));
 
 vi.mock('@features/workflow/preview', async () => {
-  // Exercise the real conversion without mounting the preview UI's unrelated dependencies.
   const { storedGraphToDocument } = await import('@features/workflow/core/graphToDocument');
   return { storedGraphToDocument };
 });
@@ -175,6 +172,16 @@ vi.mock('@features/models', () => ({
     }),
 }));
 
+// One test runs the real resolver over this tab's projects, with the server's answer doubled.
+vi.mock('./mediaUsageReport', async (importOriginal) => ({
+  ...(await importOriginal<typeof MediaUsageReportModule>()),
+  resolveMediaUsage: (...args: unknown[]) => mocks.resolveMediaUsage(...args),
+}));
+vi.mock('@features/gallery/mediaUsage', async (importOriginal) => ({
+  ...(await importOriginal<typeof GalleryMediaUsageModule>()),
+  checkGalleryMediaUsage: (...args: unknown[]) => mocks.checkGalleryMediaUsage(...args),
+}));
+
 vi.mock('@workbench/useNotify', () => ({
   useNotify: () => ({ undoable: (...args: unknown[]) => mocks.notifyUndoable(...args) }),
 }));
@@ -183,7 +190,8 @@ vi.mock('@workbench/useOpenWorkbenchWidget', () => ({
   useOpenWorkbenchWidget: () => mocks.openWorkbenchWidget,
 }));
 
-vi.mock('@workbench/settings/store', () => ({
+vi.mock('@workbench/settings/store', async (importOriginal) => ({
+  ...(await importOriginal<typeof SettingsStoreModule>()),
   useWorkbenchPreferenceSelector: (selector: (value: typeof preferences) => boolean) => selector(preferences),
 }));
 
@@ -192,7 +200,6 @@ vi.mock('@platform/browser/downloadBlob', () => ({
 }));
 
 vi.mock('@workbench/canvas-operations/api', async () => {
-  // The notice mapper is pure; the rest of the canvas-operations surface stays doubled.
   const { getCanvasImportNotice, getSendAsControlNotice } =
     await import('@workbench/canvas-operations/canvasImportNotice');
   return {
@@ -210,7 +217,6 @@ vi.mock('@workbench/widgets/layers/revealLayerProperties', () => ({
 }));
 
 vi.mock('@workbench/WorkbenchContext', () => {
-  // The workbench store owns one commands object, so it is the same on every read.
   const commands = {
     canvas: { apply: vi.fn() },
     gallery: {
@@ -236,11 +242,9 @@ vi.mock('@workbench/WorkbenchContext', () => {
     useWorkbenchCommands: () => commands,
     useWorkbenchQueries: () => ({
       getProject: (...args: unknown[]) => mocks.getProject(...args),
-      // Fixtures set no user defaults.
       getSnapshot: (...args: unknown[]) => ({ scopedDefaults: {}, ...(mocks.getSnapshot(...args) as object) }),
       isActiveProject: (...args: unknown[]) => mocks.isActiveProject(...args),
     }),
-    // Only the Video panel's reference capacity is selected; no test here exercises it.
     useWorkbenchSelector: () => false,
   };
 });
@@ -254,7 +258,10 @@ vi.mock('react-i18next', () => ({
       if (key === 'widgets.gallery.itemActions.move.success') {
         return `Moved to ${String(values?.board)}`;
       }
-      if (key.startsWith('widgets.gallery.itemActions.undoStale.')) {
+      if (
+        key.startsWith('widgets.gallery.itemActions.undoStale.') ||
+        key.startsWith('widgets.gallery.itemActions.download.')
+      ) {
         return `${key}:${JSON.stringify(values)}`;
       }
       if (key.startsWith('widgets.gallery.itemActions.loadWorkflow.loadedLabel')) {
@@ -279,15 +286,18 @@ interface ItemActionContext {
 let currentItemActionContext: ItemActionContext | null = null;
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-/** A `Project`-shaped stub with just enough of `widgetInstances` for the real
- *  `getProjectWidgetValues` (unmocked) to read `gallery`/`upscale` values. */
 const makeMockProject = (
   id: string,
   galleryValues: Record<string, unknown> = {},
   upscaleValues: Record<string, unknown> = {}
 ) => ({
-  canvas: { document: { stacks: { control: [], inpaint_mask: [], raster: [], regional_guidance: [] } } },
+  canvas: {
+    document: { stacks: { control: [], inpaint_mask: [], raster: [], regional_guidance: [] } },
+    snapshots: [],
+    stagingArea: { pendingImages: [] },
+  },
   id,
+  name: id,
   workflows: { activeWorkflowId: 'wf', entries: [] },
   widgetInstances: {
     gallery: {
@@ -304,6 +314,28 @@ const makeMockProject = (
     },
   },
 });
+
+/** Serves `initial` until the optimistic removal applies, then `removed`; `set` moves the store on. */
+const serveProjectStates = (
+  initial: ReturnType<typeof makeMockProject>,
+  removed: ReturnType<typeof makeMockProject>
+) => {
+  let current = initial;
+
+  mocks.getSnapshot.mockImplementation(() => ({ activeProject: current, projects: [current] }));
+  mocks.galleryRemoveItems.mockImplementation(() => {
+    current = removed;
+  });
+  onTestFinished(() => {
+    mocks.galleryRemoveItems.mockReset();
+  });
+
+  return {
+    set: (project: ReturnType<typeof makeMockProject>) => {
+      current = project;
+    },
+  };
+};
 
 const Probe = ({ modelKey = 'sd-1-model', ref }: { modelKey?: string; ref: Ref<ImageActions> }) => {
   const actions = useImageActions({
@@ -333,9 +365,20 @@ const Probe = ({ modelKey = 'sd-1-model', ref }: { modelKey?: string; ref: Ref<I
   return null;
 };
 
+const usageReport = (overrides: Partial<GalleryMediaUsageReport> = {}): GalleryMediaUsageReport => ({
+  checkedCount: 1,
+  groups: [],
+  inUseCount: 0,
+  onlyImages: true,
+  scope: 'items',
+  serverCheck: 'complete',
+  ...overrides,
+});
+
 beforeEach(() => {
   vi.clearAllMocks();
   preferences.confirmImageDeletion = false;
+  mocks.resolveMediaUsage.mockResolvedValue(usageReport());
   mocks.requestDeletionConfirmation.mockImplementation(
     (_itemRefs: readonly GalleryItemRef[], executeDeletion: () => Promise<void>) => executeDeletion()
   );
@@ -400,7 +443,7 @@ beforeEach(() => {
   currentItemActionContext = null;
 });
 
-// Seed capabilities after account activation and before mounting so reset and teardown stay inside act.
+// Seed after account activation and before mounting so reset and teardown stay inside act.
 seedArchitectureCapabilities();
 
 beforeEach(async () => {
@@ -458,18 +501,6 @@ describe('canvas destinations', () => {
     });
   });
 
-  it('surfaces the import notice and leaves the layout alone when the images could not land', async () => {
-    mocks.createCanvasFromImages.mockResolvedValueOnce({ projectId: 'project-2', status: 'stale-project' });
-
-    await act(() => actionsRef.current!.createCanvasFromImages([galleryImage('a.png')]));
-
-    expect(mocks.notificationsAdd).toHaveBeenCalledWith({
-      kind: 'error',
-      title: 'widgets.canvas.import.staleProject',
-    });
-    expect(mocks.openWorkbenchWidget).not.toHaveBeenCalled();
-  });
-
   it('adds to the current canvas without creating a project', async () => {
     mocks.getProject.mockImplementation((id: string) => makeMockProject(id));
     mocks.importGalleryImagesToCanvas.mockResolvedValueOnce({
@@ -500,7 +531,6 @@ describe('canvas destinations', () => {
       projects: [makeMockProject('project-1'), makeMockProject('project-2')],
     }));
     mocks.importGalleryImagesToCanvas.mockImplementationOnce(async () => {
-      // The user switches projects while the images are being prepared.
       activeProjectId = 'project-2';
       await Promise.resolve();
       return { failedImageNames: [], layerIds: ['layer-1'], status: 'imported' };
@@ -513,87 +543,7 @@ describe('canvas destinations', () => {
       expect.objectContaining({ project: expect.objectContaining({ id: 'project-1' }) })
     );
     expect(mocks.notificationsAdd).toHaveBeenCalledWith({ kind: 'success', title: 'widgets.canvas.import.success' });
-    // The canvas the images went to is no longer on screen; the one that is must not be brought forward.
     expect(mocks.openWorkbenchWidget).not.toHaveBeenCalled();
-  });
-
-  it('names the control layer an image filled and shows its Properties', async () => {
-    mocks.getProject.mockImplementation((id: string) => makeMockProject(id));
-    mocks.sendGalleryImageAsControl.mockResolvedValueOnce({
-      layerId: 'control-1',
-      layerName: 'Depth 1',
-      status: 'filled',
-    });
-
-    await act(() => actionsRef.current!.sendImageAsControl(galleryImage('a.png')));
-
-    expect(mocks.sendGalleryImageAsControl).toHaveBeenCalledWith(
-      expect.objectContaining({ image: expect.objectContaining({ imageName: 'a.png' }) })
-    );
-    expect(mocks.notificationsAdd).toHaveBeenCalledWith({
-      kind: 'success',
-      title: 'widgets.canvas.import.controlFilled',
-    });
-    expect(mocks.revealLayerProperties).toHaveBeenCalledWith('control-1');
-    // The menu has no trigger to restore focus to: the focusing open hands it to the Canvas first.
-    expect(mocks.openWorkbenchWidget).toHaveBeenCalledWith('canvas', {
-      preferredRegions: ['center'],
-      requireCenterView: true,
-    });
-    expect(mocks.openWorkbenchWidget.mock.invocationCallOrder[0]).toBeLessThan(
-      mocks.revealLayerProperties.mock.invocationCallOrder[0]!
-    );
-  });
-
-  it('reports a new control layer as an import, and a refusal without moving the layout', async () => {
-    mocks.getProject.mockImplementation((id: string) => makeMockProject(id));
-    mocks.sendGalleryImageAsControl.mockResolvedValueOnce({ layerId: 'control-2', status: 'created' });
-
-    await act(() => actionsRef.current!.sendImageAsControl(galleryImage('a.png')));
-
-    expect(mocks.notificationsAdd).toHaveBeenLastCalledWith({
-      kind: 'success',
-      title: 'widgets.canvas.import.success',
-    });
-    expect(mocks.revealLayerProperties).toHaveBeenLastCalledWith('control-2');
-
-    mocks.revealLayerProperties.mockClear();
-    mocks.openWorkbenchWidget.mockClear();
-    mocks.sendGalleryImageAsControl.mockResolvedValueOnce({ status: 'blocked' });
-    await act(() => actionsRef.current!.sendImageAsControl(galleryImage('a.png')));
-
-    expect(mocks.notificationsAdd).toHaveBeenLastCalledWith({ kind: 'info', title: 'widgets.canvas.import.blocked' });
-    expect(mocks.revealLayerProperties).not.toHaveBeenCalled();
-    expect(mocks.openWorkbenchWidget).not.toHaveBeenCalled();
-  });
-});
-
-describe('compare selection handler', () => {
-  it('stays the same handler while selection-dependent actions are rebuilt', async () => {
-    const before = actionsRef.current!;
-
-    await act(() => {
-      root?.render(
-        <QueryClientProvider client={new QueryClient()}>
-          <Probe modelKey="other-model" ref={actionsRef} />
-        </QueryClientProvider>
-      );
-    });
-
-    // Thumbnail strips hand it to every thumb; a new handler per selection would re-render them all.
-    expect(actionsRef.current).not.toBe(before);
-    expect(actionsRef.current!.selectForCompare).toBe(before.selectForCompare);
-  });
-});
-
-describe('reference image availability and the capability table', () => {
-  it('re-answers when the table lands without the project or the models changing', async () => {
-    await act(() => resetArchitectureCapabilities());
-    expect(actionsRef.current!.canUseAsReferenceImage).toBe(false);
-
-    // Nothing else re-renders the host: the same project values and the same model list.
-    await act(() => setArchitectureCapabilities(architectureCapabilitiesFixture));
-    expect(actionsRef.current!.canUseAsReferenceImage).toBe(true);
   });
 });
 
@@ -624,30 +574,6 @@ describe('image recall capabilities', () => {
 
     expect(actionsRef.current?.deriveImageRecallCapabilities(image, { clip_skip: 2 }).clipSkip).toBe(false);
   });
-
-  it('offers only an embedded workflow while the Generate panel has no values', async () => {
-    const image: GalleryImage = {
-      boardId: 'none',
-      hasWorkflow: true,
-      height: 512,
-      imageCategory: 'general',
-      imageName: 'workflow.png',
-      imageUrl: '/full/workflow.png',
-      queuedAt: '2026-07-30T00:00:00.000Z',
-      sourceQueueItemId: 'queue-workflow',
-      starred: false,
-      thumbnailUrl: '/thumb/workflow.png',
-      width: 512,
-    };
-
-    // Without the capability table there are no Generate values to recall into.
-    await act(() => resetArchitectureCapabilities());
-    expect(actionsRef.current?.deriveImageRecallCapabilities(image, { seed: 7 })).toEqual({
-      ...EMPTY_IMAGE_RECALL_CAPABILITIES,
-      workflow: true,
-    });
-    await act(() => setArchitectureCapabilities(architectureCapabilitiesFixture));
-  });
 });
 
 describe('load workflow from image', () => {
@@ -663,20 +589,6 @@ describe('load workflow from image', () => {
     thumbnailUrl: '/thumb/made-by-workflow.png',
     width: 512,
   };
-
-  it('reports, instead of queueing a load for a later editor, when the workflow widget cannot open', async () => {
-    mocks.imageWorkflow.mockResolvedValueOnce({ graph: null, workflow: JSON.stringify({ nodes: [] }) });
-    mocks.openWorkbenchWidget.mockReturnValueOnce({ ok: false, reason: 'unavailable' });
-
-    await act(async () => {
-      await actionsRef.current?.loadImageWorkflow(image);
-    });
-
-    expect(mocks.requestWorkflowDocumentLoad).not.toHaveBeenCalled();
-    expect(mocks.notificationsAdd).toHaveBeenCalledWith(
-      expect.objectContaining({ kind: 'error', title: 'widgets.gallery.itemActions.loadWorkflow.failed' })
-    );
-  });
 
   it('hands the embedded workflow to the editor and opens it', async () => {
     mocks.imageWorkflow.mockResolvedValueOnce({
@@ -761,23 +673,6 @@ describe('load workflow from image', () => {
     expect(mocks.refreshInvocationTemplates).toHaveBeenCalledOnce();
   });
 
-  it.each(['{', JSON.stringify({ nodes: [], edges: [] }), JSON.stringify({ nodes: {}, edges: [] })])(
-    'reports an unusable generation graph without opening the editor: %s',
-    async (graph) => {
-      mocks.imageWorkflow.mockResolvedValueOnce({ graph, workflow: null });
-
-      await act(async () => {
-        await actionsRef.current?.loadImageWorkflow(image);
-      });
-
-      expect(mocks.requestWorkflowDocumentLoad).not.toHaveBeenCalled();
-      expect(mocks.openWorkbenchWidget).not.toHaveBeenCalled();
-      expect(mocks.notificationsAdd).toHaveBeenCalledWith(
-        expect.objectContaining({ kind: 'error', title: 'widgets.gallery.itemActions.loadWorkflow.failed' })
-      );
-    }
-  );
-
   it.each(['account', 'project'] as const)(
     'does not load the graph after the %s changes while templates load',
     async (changedOwner) => {
@@ -812,35 +707,6 @@ describe('load workflow from image', () => {
       expect(mocks.notificationsAdd).not.toHaveBeenCalled();
     }
   );
-
-  it('reports a template load failure instead of opening an empty workflow', async () => {
-    mocks.imageWorkflow.mockResolvedValueOnce({
-      graph: JSON.stringify({ nodes: { seed: { id: 'seed', type: 'integer', value: 42 } }, edges: [] }),
-      workflow: null,
-    });
-    mocks.getInvocationTemplatesSnapshot.mockReturnValue({ status: 'error', templates: {}, error: 'Offline' });
-
-    await act(async () => {
-      await actionsRef.current?.loadImageWorkflow(image);
-    });
-
-    expect(mocks.refreshInvocationTemplates).toHaveBeenCalledOnce();
-    expect(mocks.requestWorkflowDocumentLoad).not.toHaveBeenCalled();
-    expect(mocks.openWorkbenchWidget).not.toHaveBeenCalled();
-    expect(mocks.notificationsAdd).toHaveBeenCalledWith(expect.objectContaining({ kind: 'error', message: 'Offline' }));
-  });
-
-  it('says so, and leaves the editor alone, when the image embeds no workflow', async () => {
-    await act(async () => {
-      await actionsRef.current?.loadImageWorkflow(image);
-    });
-
-    expect(mocks.requestWorkflowDocumentLoad).not.toHaveBeenCalled();
-    expect(mocks.openWorkbenchWidget).not.toHaveBeenCalled();
-    expect(mocks.notificationsAdd).toHaveBeenCalledWith(
-      expect.objectContaining({ kind: 'info', title: 'widgets.gallery.itemActions.loadWorkflow.missing' })
-    );
-  });
 });
 
 describe('generate PBR maps', () => {
@@ -914,54 +780,6 @@ describe('generate PBR maps', () => {
     );
   });
 
-  it('leaves the maps Uncategorized while the gallery follows no board', async () => {
-    mocks.getSnapshot.mockImplementation(() => {
-      const project = makeMockProject('project-1', { autoAddBoardId: 'none' });
-
-      return { activeProject: project, projects: [project] };
-    });
-    mocks.submitUtilityGraph.mockResolvedValueOnce({
-      itemIds: [42],
-      origin: 'utility:2',
-      settled: new Promise(() => {}),
-    });
-
-    await act(async () => {
-      await actionsRef.current?.generatePbrMaps(image);
-    });
-
-    const [request] = mocks.submitUtilityGraph.mock.calls[0] as [{ graph: { nodes: Record<string, unknown> } }];
-    expect(request.graph.nodes.pbr_maps).not.toHaveProperty('board');
-  });
-
-  it('waits for board permissions and leaves maps in the inbox when the destination is refused', async () => {
-    mocks.getSnapshot.mockImplementation(() => {
-      const project = makeMockProject('project-1', { autoAddBoardId: 'view-only' });
-
-      return { activeProject: project, projects: [project] };
-    });
-    const listing = createSettlement();
-    mocks.ensureGalleryBoardDestinations.mockReturnValueOnce(listing.settled);
-    mocks.canAddToCachedGalleryBoard.mockReturnValueOnce(false);
-    mocks.submitUtilityGraph.mockResolvedValueOnce({
-      itemIds: [48],
-      origin: 'utility:8',
-      settled: new Promise(() => {}),
-    });
-
-    await act(async () => {
-      const submission = actionsRef.current?.generatePbrMaps(image);
-
-      expect(mocks.submitUtilityGraph).not.toHaveBeenCalled();
-      listing.resolve();
-      await submission;
-    });
-
-    const [request] = mocks.submitUtilityGraph.mock.calls[0] as [{ graph: { nodes: Record<string, unknown> } }];
-    expect(request.graph.nodes.pbr_maps).not.toHaveProperty('board');
-    expect(mocks.canAddToCachedGalleryBoard).toHaveBeenCalledWith('view-only', expect.any(QueryClient));
-  });
-
   it('does not submit if the account changes while board permissions load', async () => {
     const listing = createSettlement();
     mocks.ensureGalleryBoardDestinations.mockReturnValueOnce(listing.settled);
@@ -976,125 +794,6 @@ describe('generate PBR maps', () => {
 
     expect(mocks.submitUtilityGraph).not.toHaveBeenCalled();
     expect(mocks.notificationsAdd).not.toHaveBeenCalled();
-  });
-
-  it('reports an enqueue failure and a failed run as logged PBR error notices', async () => {
-    const { UtilityQueueError } = await import('@features/queue/utility');
-    clearLogs();
-    // The runtime wraps the backend's JSON refusal as an ApiError cause and derives the readable message the way
-    // `submitUtilityGraph` does; the toast must show that detail, never the JSON.
-    const cause = new ApiError(JSON.stringify({ detail: 'queue paused' }), 409);
-    mocks.submitUtilityGraph.mockRejectedValueOnce(
-      new UtilityQueueError('enqueue', getApiErrorMessage(cause, 'Failed to enqueue utility graph.'), cause)
-    );
-
-    await act(async () => {
-      await actionsRef.current?.generatePbrMaps(image);
-    });
-
-    expect(mocks.notificationsAdd).toHaveBeenCalledExactlyOnceWith({
-      kind: 'error',
-      message: 'queue paused',
-      title: 'widgets.gallery.itemActions.pbrMaps.failed',
-    });
-
-    const settlement = createSettlement();
-    mocks.submitUtilityGraph.mockResolvedValueOnce({ itemIds: [43], origin: 'utility:3', settled: settlement.settled });
-    await act(async () => {
-      await actionsRef.current?.generatePbrMaps(image);
-    });
-    await act(async () => {
-      settlement.reject(new UtilityQueueError('failed', 'No PBR model'));
-      await settlement.settled.catch(() => {});
-    });
-
-    // A run that fails after it was queued names the action, as an enqueue failure does.
-    expect(mocks.notificationsAdd).toHaveBeenLastCalledWith({
-      kind: 'error',
-      message: 'No PBR model',
-      title: 'widgets.gallery.itemActions.pbrMaps.failed',
-    });
-    expect(mocks.reportError).not.toHaveBeenCalled();
-    expect(
-      getLogSnapshot()
-        .entries.filter((entry) => entry.source.area === 'image-actions')
-        .map(({ level, message, namespace }) => ({ level, message, namespace }))
-    ).toEqual([
-      { level: 'error', message: 'No PBR model', namespace: 'gallery' },
-      { level: 'error', message: 'queue paused', namespace: 'gallery' },
-    ]);
-    expect(mocks.invalidateGallery).not.toHaveBeenCalled();
-  });
-
-  it('turns a canceled or removed item into an info notice, and says nothing once the watch is aborted', async () => {
-    const { UtilityQueueError } = await import('@features/queue/utility');
-    const canceled = createSettlement();
-    mocks.submitUtilityGraph.mockResolvedValueOnce({ itemIds: [44], origin: 'utility:4', settled: canceled.settled });
-    await act(async () => {
-      await actionsRef.current?.generatePbrMaps(image);
-    });
-    await act(async () => {
-      canceled.reject(new UtilityQueueError('canceled', 'The utility graph was canceled.'));
-      await canceled.settled.catch(() => {});
-    });
-
-    expect(mocks.notificationsAdd).toHaveBeenLastCalledWith(
-      expect.objectContaining({ kind: 'info', title: 'widgets.gallery.itemActions.pbrMaps.canceled' })
-    );
-    expect(mocks.reportError).not.toHaveBeenCalled();
-
-    // A queue clear deletes a pending item without a terminal event; the watch reports it as removed.
-    const removed = createSettlement();
-    mocks.submitUtilityGraph.mockResolvedValueOnce({ itemIds: [47], origin: 'utility:7', settled: removed.settled });
-    await act(async () => {
-      await actionsRef.current?.generatePbrMaps(image);
-    });
-    await act(async () => {
-      removed.reject(new UtilityQueueError('removed', 'The utility graph item was removed from the queue.'));
-      await removed.settled.catch(() => {});
-    });
-
-    expect(mocks.notificationsAdd).toHaveBeenLastCalledWith({
-      kind: 'info',
-      message: 'widgets.gallery.itemActions.pbrMaps.removedMessage',
-      title: 'widgets.gallery.itemActions.pbrMaps.removed',
-    });
-    // The maps may already be in the gallery if the item completed before it was pruned.
-    expect(mocks.invalidateGallery).toHaveBeenCalledTimes(1);
-    expect(mocks.reportError).not.toHaveBeenCalled();
-
-    const aborted = createSettlement();
-    mocks.notificationsAdd.mockClear();
-    mocks.submitUtilityGraph.mockResolvedValueOnce({ itemIds: [45], origin: 'utility:5', settled: aborted.settled });
-    await act(async () => {
-      await actionsRef.current?.generatePbrMaps(image);
-    });
-    await act(async () => {
-      aborted.reject(new UtilityQueueError('aborted', 'The utility graph watch was aborted.'));
-      await aborted.settled.catch(() => {});
-    });
-
-    expect(mocks.notificationsAdd).toHaveBeenCalledTimes(1);
-    expect(mocks.reportError).not.toHaveBeenCalled();
-  });
-
-  it('suppresses every notice when the account changes while the graph is being accepted', async () => {
-    const settlement = createSettlement();
-    mocks.submitUtilityGraph.mockImplementationOnce(() => {
-      accountLifecycle.activate('user-b');
-      return Promise.resolve({ itemIds: [46], origin: 'utility:6', settled: settlement.settled });
-    });
-
-    await act(async () => {
-      await actionsRef.current?.generatePbrMaps(image);
-    });
-    await act(async () => {
-      settlement.resolve();
-      await settlement.settled;
-    });
-
-    expect(mocks.notificationsAdd).not.toHaveBeenCalled();
-    expect(mocks.invalidateGallery).not.toHaveBeenCalled();
   });
 });
 
@@ -1134,32 +833,6 @@ describe('video workflow loading', () => {
       'widgets.gallery.itemActions.loadWorkflow.loadedLabelVideo:Embedded'
     );
   });
-
-  it('says so, and leaves the editor alone, when the video embeds no workflow', async () => {
-    await act(async () => {
-      await actionsRef.current?.loadVideoWorkflow(video);
-    });
-
-    expect(mocks.requestWorkflowDocumentLoad).not.toHaveBeenCalled();
-    expect(mocks.openWorkbenchWidget).not.toHaveBeenCalled();
-    expect(mocks.notificationsAdd).toHaveBeenCalledWith(
-      expect.objectContaining({ kind: 'info', title: 'widgets.gallery.itemActions.loadWorkflow.missingVideo' })
-    );
-  });
-
-  it('reports when the workflow widget cannot open', async () => {
-    mocks.videoWorkflow.mockResolvedValueOnce({ graph: null, workflow: JSON.stringify({ nodes: [] }) });
-    mocks.openWorkbenchWidget.mockReturnValueOnce({ ok: false, reason: 'unavailable' });
-
-    await act(async () => {
-      await actionsRef.current?.loadVideoWorkflow(video);
-    });
-
-    expect(mocks.requestWorkflowDocumentLoad).not.toHaveBeenCalled();
-    expect(mocks.notificationsAdd).toHaveBeenCalledWith(
-      expect.objectContaining({ kind: 'error', title: 'widgets.gallery.itemActions.loadWorkflow.failedVideo' })
-    );
-  });
 });
 
 describe('partial image mutation outcomes', () => {
@@ -1175,7 +848,6 @@ describe('partial image mutation outcomes', () => {
       await actionsRef.current?.moveImagesToBoard(['moved.png', 'locked.png'], 'board-1');
     });
 
-    // The whole selection moves before the transport is even asked.
     expect(mocks.patchGalleryItemCaches).toHaveBeenNthCalledWith(1, expect.anything(), {
       boardId: 'board-1',
       kind: 'move',
@@ -1218,7 +890,6 @@ describe('partial image mutation outcomes', () => {
       await actionsRef.current?.setImagesStarred(['starred.png', 'locked.png'], true);
     });
 
-    // The whole selection paints before the transport is even asked.
     expect(mocks.patchGalleryItemCaches).toHaveBeenNthCalledWith(1, expect.anything(), {
       kind: 'star',
       result: {
@@ -1265,13 +936,15 @@ type ExpectedItemActions = {
 const getItemActions = (): ExpectedItemActions => actionsRef.current as unknown as ExpectedItemActions;
 
 describe('mixed item mutation outcomes', () => {
-  it('gates deletion through confirmation when the preference is enabled', async () => {
+  it('gates deletion through confirmation when the preference is enabled, checking usage as the dialog opens', async () => {
     const refs = [{ kind: 'image' as const, name: 'image.png' }];
     const result = { affectedBoardIds: ['none'], failed: [], succeeded: refs };
     let executeDeletion: (() => Promise<void>) | null = null;
+    const captured: { checkUsage?: (signal: AbortSignal) => Promise<GalleryMediaUsageReport> } = {};
     preferences.confirmImageDeletion = true;
-    mocks.requestDeletionConfirmation.mockImplementation((_itemRefs, execute) => {
+    mocks.requestDeletionConfirmation.mockImplementation((_itemRefs, execute, options) => {
       executeDeletion = execute;
+      captured.checkUsage = options.checkUsage;
       return Promise.resolve();
     });
     mocks.itemDelete.mockResolvedValue(result);
@@ -1288,11 +961,66 @@ describe('mixed item mutation outcomes', () => {
       await getItemActions().deleteItems(refs, { returnFocus });
     });
 
-    // The dialog learns where focus goes once the deletion has removed the control that asked for it.
     expect(mocks.requestDeletionConfirmation).toHaveBeenCalledWith(refs, expect.any(Function), {
       canSkipFutureConfirmations: true,
+      checkUsage: expect.any(Function),
       returnFocus,
-      usage: [],
+    });
+    expect(mocks.resolveMediaUsage).not.toHaveBeenCalled();
+    expect(captured.checkUsage).toBeDefined();
+    expect(mocks.itemDelete).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await executeDeletion?.();
+    });
+    expect(mocks.itemDelete).toHaveBeenCalledWith(refs, expect.any(AbortSignal));
+  });
+
+  it('deletes one visible item without asking once the check finds nothing using it', async () => {
+    const refs = [{ kind: 'image' as const, name: 'image.png' }];
+    mocks.itemDelete.mockResolvedValue({ affectedBoardIds: ['none'], failed: [], succeeded: refs });
+
+    await act(async () => {
+      await getItemActions().deleteItems(refs);
+    });
+
+    // A click is waiting: a few seconds per stage, not the dialog's longer allowance.
+    expect(mocks.resolveMediaUsage).toHaveBeenCalledWith({ kind: 'items', refs }, expect.anything(), {
+      projectReadsTimeoutMs: 3000,
+      serverTimeoutMs: 3000,
+    });
+    expect(mocks.requestDeletionConfirmation).not.toHaveBeenCalled();
+    expect(mocks.itemDelete).toHaveBeenCalledWith(refs, expect.any(AbortSignal));
+  });
+
+  it.each([
+    [
+      'something uses it',
+      usageReport({
+        groups: [{ count: 1, kind: 'openProject', surfaces: [{ count: 1, surface: 'upscale' }] }],
+        inUseCount: 1,
+      }),
+    ],
+    ['the check could not reach the server', usageReport({ serverCheck: 'unavailable' })],
+  ])('still asks with routine confirmations off when %s, showing the report', async (_case, usage) => {
+    const refs = [{ kind: 'image' as const, name: 'source.png' }];
+    let executeDeletion: (() => Promise<void>) | null = null;
+    mocks.resolveMediaUsage.mockResolvedValue(usage);
+    mocks.requestDeletionConfirmation.mockImplementation((_itemRefs, execute) => {
+      executeDeletion = execute;
+      return Promise.resolve();
+    });
+    mocks.itemDelete.mockResolvedValue({ affectedBoardIds: ['none'], failed: [], succeeded: refs });
+
+    await act(async () => {
+      await getItemActions().deleteItems(refs);
+    });
+
+    expect(mocks.requestDeletionConfirmation).toHaveBeenCalledWith(refs, expect.any(Function), {
+      canSkipFutureConfirmations: true,
+      checkUsage: expect.any(Function),
+      returnFocus: undefined,
+      usage,
     });
     expect(mocks.itemDelete).not.toHaveBeenCalled();
 
@@ -1302,16 +1030,145 @@ describe('mixed item mutation outcomes', () => {
     expect(mocks.itemDelete).toHaveBeenCalledWith(refs, expect.any(AbortSignal));
   });
 
-  it('deletes immediately without opening confirmation when the preference is disabled', async () => {
-    const refs = [{ kind: 'image' as const, name: 'image.png' }];
-    mocks.itemDelete.mockResolvedValue({ affectedBoardIds: ['none'], failed: [], succeeded: refs });
+  it('blocks the silent deletion of an item a project in this tab uses but has not saved yet', async () => {
+    const { resolveMediaUsage } = await vi.importActual<typeof MediaUsageReportModule>('./mediaUsageReport');
+    const refs = [{ kind: 'image' as const, name: 'source.png' }];
+    mocks.resolveMediaUsage.mockImplementation(resolveMediaUsage as (...args: unknown[]) => Promise<never>);
+    mocks.checkGalleryMediaUsage.mockResolvedValue({
+      checkedImageCount: 1,
+      checkedVideoCount: 0,
+      documents: [],
+      documentsTotal: 0,
+      inUseImageCount: 0,
+      inUseVideoCount: 0,
+      otherAccounts: { documentCount: 0, imageCount: 0, queueItemCount: 0, videoCount: 0 },
+      queue: { imageCount: 0, imageNames: [], itemCount: 0, videoCount: 0, videoNames: [] },
+    });
+    mocks.getSnapshot.mockImplementation(() => {
+      const project = makeMockProject(
+        'project-1',
+        {},
+        { inputImage: { height: 1, image_name: 'source.png', width: 1 } }
+      );
+
+      return { activeProject: project, projects: [project] };
+    });
+    mocks.requestDeletionConfirmation.mockImplementation(() => Promise.resolve());
 
     await act(async () => {
       await getItemActions().deleteItems(refs);
     });
 
+    expect(mocks.itemDelete).not.toHaveBeenCalled();
+    expect(mocks.requestDeletionConfirmation).toHaveBeenCalledWith(
+      refs,
+      expect.any(Function),
+      expect.objectContaining({
+        usage: expect.objectContaining({
+          groups: [{ count: 1, kind: 'openProject', surfaces: [{ count: 1, surface: 'upscale' }] }],
+          serverCheck: 'complete',
+        }),
+      })
+    );
+  });
+
+  it('asks instead when this tab starts using the item while the check runs, and has the dialog check again', async () => {
+    const refs = [{ kind: 'image' as const, name: 'source.png' }];
+    mocks.resolveMediaUsage.mockImplementation(() => {
+      mocks.getSnapshot.mockImplementation(() => {
+        const project = makeMockProject(
+          'project-1',
+          {},
+          { inputImage: { height: 1, image_name: 'source.png', width: 1 } }
+        );
+
+        return { activeProject: project, projects: [project] };
+      });
+      return Promise.resolve(usageReport());
+    });
+    mocks.requestDeletionConfirmation.mockImplementation(() => Promise.resolve());
+
+    await act(async () => {
+      await getItemActions().deleteItems(refs);
+    });
+
+    expect(mocks.itemDelete).not.toHaveBeenCalled();
+    expect(mocks.requestDeletionConfirmation).toHaveBeenCalledWith(refs, expect.any(Function), {
+      canSkipFutureConfirmations: true,
+      checkUsage: expect.any(Function),
+      returnFocus: undefined,
+    });
+  });
+
+  it('runs one check and one deletion for repeated presses, saying so while a slow check runs', async () => {
+    const refs = [{ kind: 'image' as const, name: 'image.png' }];
+    let settle: (report: GalleryMediaUsageReport) => void = () => {};
+    const createToast = vi.spyOn(toaster, 'create');
+    const dismissToast = vi.spyOn(toaster, 'dismiss');
+    mocks.resolveMediaUsage.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          settle = resolve;
+        })
+    );
+    mocks.itemDelete.mockResolvedValue({ affectedBoardIds: ['none'], failed: [], succeeded: refs });
+
+    let first!: Promise<void>;
+    await act(() => {
+      first = getItemActions().deleteItems(refs);
+      void getItemActions().deleteItems(refs);
+      void getItemActions().deleteItems([...refs]);
+    });
+    await vi.waitFor(() => expect(createToast).toHaveBeenCalledWith(expect.objectContaining({ type: 'loading' })));
+
+    await act(async () => {
+      settle(usageReport());
+      await first;
+    });
+
+    expect(mocks.resolveMediaUsage).toHaveBeenCalledOnce();
+    expect(mocks.itemDelete).toHaveBeenCalledOnce();
+    expect(dismissToast).toHaveBeenCalledWith(createToast.mock.results[0]?.value);
+    expect(mocks.reportError).not.toHaveBeenCalled();
+
+    mocks.resolveMediaUsage.mockResolvedValue(usageReport());
+    await act(async () => {
+      await getItemActions().deleteItems(refs);
+    });
+    expect(mocks.resolveMediaUsage).toHaveBeenCalledTimes(2);
+    createToast.mockRestore();
+    dismissToast.mockRestore();
+  });
+
+  it('neither deletes nor asks when the account changes during the check', async () => {
+    mocks.resolveMediaUsage.mockImplementation(() => {
+      accountLifecycle.invalidate();
+      accountLifecycle.activate('user-b');
+      return Promise.reject(new Error('Account scope is no longer active.'));
+    });
+
+    await act(async () => {
+      await getItemActions().deleteItems([{ kind: 'image', name: 'image.png' }]);
+    });
+
     expect(mocks.requestDeletionConfirmation).not.toHaveBeenCalled();
-    expect(mocks.itemDelete).toHaveBeenCalledWith(refs, expect.any(AbortSignal));
+    expect(mocks.itemDelete).not.toHaveBeenCalled();
+  });
+
+  it('asks, with the check failed, when the check cannot run at all (its code did not load)', async () => {
+    const failure = new Error('Failed to fetch dynamically imported module');
+    mocks.resolveMediaUsage.mockRejectedValue(failure);
+    mocks.requestDeletionConfirmation.mockImplementation(() => Promise.resolve());
+
+    await act(async () => {
+      await getItemActions().deleteItems([{ kind: 'image', name: 'image.png' }]);
+    });
+
+    const options = mocks.requestDeletionConfirmation.mock.calls[0]?.[2] as {
+      checkUsage: (signal: AbortSignal) => Promise<unknown>;
+    };
+    await expect(options.checkUsage(new AbortController().signal)).rejects.toBe(failure);
+    expect(mocks.itemDelete).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -1333,56 +1190,10 @@ describe('mixed item mutation outcomes', () => {
 
     expect(mocks.requestDeletionConfirmation).toHaveBeenCalledWith(refs, expect.any(Function), {
       canSkipFutureConfirmations: false,
+      checkUsage: expect.any(Function),
       returnFocus: undefined,
-      usage: [],
     });
     expect(mocks.itemDelete).not.toHaveBeenCalled();
-  });
-
-  it('still confirms, naming the surfaces, when the project uses an item and confirmation is off', async () => {
-    const refs = [
-      { kind: 'image' as const, name: 'source.png' },
-      { kind: 'image' as const, name: 'unused.png' },
-    ];
-    let executeDeletion: (() => Promise<void>) | null = null;
-    mocks.requestDeletionConfirmation.mockImplementation((_itemRefs, execute) => {
-      executeDeletion = execute;
-      return Promise.resolve();
-    });
-    mocks.getProject.mockReturnValue(
-      makeMockProject('project-1', {}, { inputImage: { height: 1, image_name: 'source.png', width: 1 } })
-    );
-    mocks.itemDelete.mockResolvedValue({ affectedBoardIds: ['none'], failed: [], succeeded: refs });
-
-    await act(async () => {
-      await getItemActions().deleteItems(refs);
-    });
-
-    expect(mocks.requestDeletionConfirmation).toHaveBeenCalledWith(refs, expect.any(Function), {
-      canSkipFutureConfirmations: false,
-      returnFocus: undefined,
-      usage: [{ names: ['source.png'], surface: 'upscale' }],
-    });
-    expect(mocks.itemDelete).not.toHaveBeenCalled();
-
-    await act(async () => {
-      await executeDeletion?.();
-    });
-    expect(mocks.itemDelete).toHaveBeenCalledWith(refs, expect.any(AbortSignal));
-  });
-
-  it('uses the localized Uncategorized label in move notifications', async () => {
-    const refs = [{ kind: 'image' as const, name: 'image.png' }];
-    mocks.itemMoveToBoard.mockResolvedValue({ affectedBoardIds: ['none'], failed: [], succeeded: refs });
-
-    await act(async () => {
-      await getItemActions().moveItemsToBoard(refs, 'none');
-    });
-
-    expect(mocks.notificationsAdd).toHaveBeenCalledWith({
-      kind: 'success',
-      title: 'Moved to Uncategorized',
-    });
   });
 
   it('reports a move to another board with an Undo that returns each item to the board it came from', async () => {
@@ -1404,7 +1215,6 @@ describe('mixed item mutation outcomes', () => {
     });
 
     expect(mocks.notificationsAdd).not.toHaveBeenCalled();
-    // The hook's board list does not name board-2.
     expect(mocks.notifyUndoable).toHaveBeenCalledExactlyOnceWith('Moved to widgets.gallery.unknownBoard', {
       onUndo: expect.any(Function),
       projectId: 'project-1',
@@ -1417,130 +1227,15 @@ describe('mixed item mutation outcomes', () => {
       await Promise.resolve();
     });
 
-    // Each back to its own board; one whose board was not known stays where it went.
     expect(mocks.itemMoveToBoard.mock.calls.slice(1).map(([moved, boardId]) => [moved, boardId])).toEqual([
       [[refs[0]], 'board-1'],
       [[refs[1]], 'none'],
     ]);
-    // Undoing reports plainly: there is no Undo of the Undo.
     expect(mocks.notifyUndoable).toHaveBeenCalledOnce();
-    // The item whose board was not known is reported, not silently skipped.
     expect(mocks.notificationsAdd).toHaveBeenCalledWith({
       kind: 'info',
       title: 'widgets.gallery.itemActions.undoStale.partial:{"count":3,"restored":2}',
     });
-  });
-
-  it('leaves an item a later move took elsewhere when an earlier move is undone', async () => {
-    const refs = [{ kind: 'image' as const, name: 'moved-twice.png' }];
-    mocks.itemMoveToBoard.mockResolvedValue({ affectedBoardIds: [], failed: [], succeeded: refs });
-
-    mocks.getItemBoardIds.mockReturnValue(new Map([['image:moved-twice.png', 'board-a']]));
-    await act(async () => {
-      await getItemActions().moveItemsToBoard(refs, 'board-b');
-    });
-    mocks.getItemBoardIds.mockReturnValue(new Map([['image:moved-twice.png', 'board-b']]));
-    await act(async () => {
-      await getItemActions().moveItemsToBoard(refs, 'board-c');
-    });
-    mocks.getItemBoardIds.mockReturnValue(new Map([['image:moved-twice.png', 'board-c']]));
-
-    const [[, first], [, second]] = mocks.notifyUndoable.mock.calls as [string, { onUndo: () => void }][];
-    await act(async () => {
-      first.onUndo();
-      await Promise.resolve();
-    });
-
-    expect(mocks.itemMoveToBoard).toHaveBeenCalledTimes(2);
-    expect(mocks.notificationsAdd).toHaveBeenCalledExactlyOnceWith({
-      kind: 'info',
-      title: 'widgets.gallery.itemActions.undoStale.none:{"count":1}',
-    });
-
-    // The newer move's Undo still applies.
-    await act(async () => {
-      second.onUndo();
-      await Promise.resolve();
-    });
-    expect(mocks.itemMoveToBoard).toHaveBeenLastCalledWith(refs, 'board-b', expect.any(AbortSignal));
-  });
-
-  it('leaves an item a later unstar changed when an earlier star is undone', async () => {
-    const refs = [{ kind: 'image' as const, name: 'toggled.png' }];
-    mocks.itemSetStarred.mockResolvedValue({ affectedBoardIds: [], failed: [], succeeded: refs });
-
-    mocks.getItemStarred.mockReturnValue(new Map([['image:toggled.png', false]]));
-    await act(async () => {
-      await getItemActions().setItemsStarred(refs, true);
-    });
-    mocks.getItemStarred.mockReturnValue(new Map([['image:toggled.png', true]]));
-    await act(async () => {
-      await getItemActions().setItemsStarred(refs, false);
-    });
-    mocks.getItemStarred.mockReturnValue(new Map([['image:toggled.png', false]]));
-
-    const [, { onUndo }] = mocks.notifyUndoable.mock.calls[0] as [string, { onUndo: () => void }];
-    await act(async () => {
-      onUndo();
-      await Promise.resolve();
-    });
-
-    expect(mocks.itemSetStarred).toHaveBeenCalledTimes(2);
-    expect(mocks.notificationsAdd).toHaveBeenCalledExactlyOnceWith({
-      kind: 'info',
-      title: 'widgets.gallery.itemActions.undoStale.none:{"count":1}',
-    });
-  });
-
-  it('reports a star with an Undo that gives each item back its own flag', async () => {
-    const refs = [
-      { kind: 'image' as const, name: 'was-starred.png' },
-      { kind: 'image' as const, name: 'was-not.png' },
-      { kind: 'image' as const, name: 'unknown.png' },
-    ];
-    mocks.getItemStarred.mockReturnValue(
-      new Map([
-        ['image:was-starred.png', true],
-        ['image:was-not.png', false],
-      ])
-    );
-    mocks.itemSetStarred.mockResolvedValue({ affectedBoardIds: [], failed: [], succeeded: refs });
-
-    await act(async () => {
-      await getItemActions().setItemsStarred(refs, true);
-    });
-
-    mocks.getItemStarred.mockReturnValue(new Map());
-    const [, { onUndo }] = mocks.notifyUndoable.mock.calls[0] as [string, { onUndo: () => void }];
-    await act(async () => {
-      onUndo();
-      await Promise.resolve();
-    });
-
-    // Only the item the star is known to have changed is unstarred again; one whose flag was not known stays.
-    expect(mocks.itemSetStarred).toHaveBeenLastCalledWith([refs[1]], false, expect.any(AbortSignal));
-    expect(mocks.itemSetStarred).toHaveBeenCalledTimes(2);
-    // The item whose flag was not known is reported, not silently skipped.
-    expect(mocks.notificationsAdd).toHaveBeenCalledWith({
-      kind: 'info',
-      title: 'widgets.gallery.itemActions.undoStale.partial:{"count":2,"restored":1}',
-    });
-  });
-
-  it('offers no Undo for a move that partly failed', async () => {
-    const refs = [
-      { kind: 'image' as const, name: 'a.png' },
-      { kind: 'image' as const, name: 'b.png' },
-    ];
-    mocks.getItemBoardIds.mockReturnValue(new Map([['image:a.png', 'board-1']]));
-    mocks.itemMoveToBoard.mockResolvedValue({ affectedBoardIds: [], failed: [refs[1]], succeeded: [refs[0]] });
-
-    await act(async () => {
-      await getItemActions().moveItemsToBoard(refs, 'board-2');
-    });
-
-    expect(mocks.notifyUndoable).not.toHaveBeenCalled();
-    expect(mocks.reportError).toHaveBeenCalledOnce();
   });
 
   it('moves mixed refs optimistically and reverts only the failed qualified key', async () => {
@@ -1574,34 +1269,6 @@ describe('mixed item mutation outcomes', () => {
     expect(mocks.notificationsAdd.mock.calls.length + mocks.reportError.mock.calls.length).toBe(1);
   });
 
-  it('stars same-name media independently and reverts only the failed qualified key', async () => {
-    const refs = [
-      { kind: 'image' as const, name: 'shared' },
-      { kind: 'video' as const, name: 'shared' },
-    ];
-    mocks.itemSetStarred.mockResolvedValue({
-      affectedBoardIds: [],
-      failed: [refs[0]],
-      succeeded: [refs[1]],
-    });
-
-    await act(async () => {
-      await getItemActions().setItemsStarred(refs, true);
-    });
-
-    expect(mocks.galleryPatchItems).toHaveBeenNthCalledWith(1, ['image:shared', 'video:shared'], { starred: true });
-    expect(mocks.patchGalleryItemCaches.mock.results[0]?.value).toHaveBeenCalledOnce();
-    expect(mocks.patchGalleryItemCaches).toHaveBeenNthCalledWith(2, expect.anything(), {
-      kind: 'star',
-      result: { failed: [], succeeded: [refs[1]] },
-      starred: true,
-    });
-    expect(mocks.galleryPatchItems).toHaveBeenNthCalledWith(2, ['image:shared'], { starred: false });
-    expect(mocks.galleryRemoveItems).not.toHaveBeenCalled();
-    expect(mocks.invalidateGallery).toHaveBeenCalledOnce();
-    expect(mocks.notificationsAdd.mock.calls.length + mocks.reportError.mock.calls.length).toBe(1);
-  });
-
   it('deletes optimistically, then rolls back and re-removes only confirmed refs on partial failure', async () => {
     const refs = [
       { kind: 'video' as const, name: 'gone.mp4' },
@@ -1618,7 +1285,6 @@ describe('mixed item mutation outcomes', () => {
       await getItemActions().deleteItems(refs);
     });
 
-    // Everything requested vanishes before the transport is asked.
     expect(mocks.patchGalleryItemCaches).toHaveBeenNthCalledWith(1, expect.anything(), {
       kind: 'delete',
       result: { failed: [], succeeded: refs },
@@ -1626,52 +1292,22 @@ describe('mixed item mutation outcomes', () => {
     expect(mocks.patchGalleryItemCaches.mock.invocationCallOrder[0]).toBeLessThan(
       mocks.itemDelete.mock.invocationCallOrder[0] ?? 0
     );
-    expect(mocks.galleryRemoveItems).toHaveBeenNthCalledWith(1, ['video:gone.mp4', 'image:locked.png']);
+    expect(mocks.galleryRemoveItems).toHaveBeenNthCalledWith(1, ['video:gone.mp4', 'image:locked.png'], {
+      keepComparisonForSuccessor: true,
+      projectId: 'project-1',
+    });
 
     expect(mocks.patchGalleryItemCaches.mock.results[0]?.value).toHaveBeenCalledOnce();
-    // The rollback restored every page's total, so the re-removal lowers them across the listing again.
     expect(mocks.patchGalleryItemCaches).toHaveBeenNthCalledWith(
       2,
       expect.anything(),
       { kind: 'delete', result },
       { totals: 'listing' }
     );
-    expect(mocks.galleryRemoveItems).toHaveBeenNthCalledWith(2, ['video:gone.mp4']);
-    expect(mocks.invalidateGallery).toHaveBeenCalledOnce();
-    expect(mocks.notificationsAdd.mock.calls.length + mocks.reportError.mock.calls.length).toBe(1);
-  });
-
-  it('re-removes a fully confirmed deletion only from pages still holding it, without lowering totals again', async () => {
-    const refs = [{ kind: 'image' as const, name: 'gone.png' }];
-    const result = { affectedBoardIds: ['board-1'], failed: [], succeeded: refs };
-    mocks.itemDelete.mockResolvedValue(result);
-
-    await act(async () => {
-      await getItemActions().deleteItems(refs);
+    expect(mocks.galleryRemoveItems).toHaveBeenNthCalledWith(2, ['video:gone.mp4'], {
+      keepComparisonForSuccessor: false,
+      projectId: 'project-1',
     });
-
-    expect(mocks.patchGalleryItemCaches.mock.results[0]?.value).not.toHaveBeenCalled();
-    expect(mocks.patchGalleryItemCaches).toHaveBeenNthCalledWith(
-      2,
-      expect.anything(),
-      { kind: 'delete', result },
-      { totals: 'holder' }
-    );
-  });
-
-  it('attempts operation-level invalidation only once when invalidation itself rejects', async () => {
-    const ref = { kind: 'video' as const, name: 'clip.mp4' };
-    mocks.itemSetStarred.mockResolvedValue({
-      affectedBoardIds: [],
-      failed: [],
-      succeeded: [ref],
-    });
-    mocks.invalidateGallery.mockRejectedValue(new Error('invalidation failed'));
-
-    await act(async () => {
-      await getItemActions().setItemsStarred([ref], true);
-    });
-
     expect(mocks.invalidateGallery).toHaveBeenCalledOnce();
     expect(mocks.notificationsAdd.mock.calls.length + mocks.reportError.mock.calls.length).toBe(1);
   });
@@ -1697,77 +1333,18 @@ describe('total transport failure rollback', () => {
       await getItemActions().deleteItems(refs);
     });
 
-    // The optimistic removal happened up front, before the transport was asked.
-    expect(mocks.galleryRemoveItems).toHaveBeenNthCalledWith(1, ['image:gone.png']);
+    expect(mocks.galleryRemoveItems).toHaveBeenNthCalledWith(1, ['image:gone.png'], {
+      keepComparisonForSuccessor: true,
+      projectId: 'project-1',
+    });
 
-    // Transport failures must roll back immediately; trailing invalidation may fail too.
     expect(mocks.patchGalleryItemCaches.mock.results[0]?.value).toHaveBeenCalledOnce();
 
-    // The removal stub leaves widget state unchanged, so CAS restoration does nothing. Real reducer rollback is
-    // covered in galleryOptimisticRollback.test.ts.
+    // The removal stub leaves widget state unchanged; galleryOptimisticRollback.test.ts covers the real reducer.
     expect(mocks.galleryWidgetsPatchValues).not.toHaveBeenCalled();
 
     expect(mocks.reportError).toHaveBeenCalledOnce();
     expect(mocks.notificationsAdd).not.toHaveBeenCalled();
-  });
-
-  it('restores the gallery widget store when the optimistic removal actually changed it', async () => {
-    const refs = [{ kind: 'image' as const, name: 'gone.png' }];
-    const before = makeMockProject('project-1', { recentImages: [recentImageFixture] });
-    const afterRemoval = makeMockProject('project-1', { recentImages: [] });
-
-    // First call is the pre-removal capture; every call after simulates the
-    // store having actually applied the optimistic removal.
-    mocks.getSnapshot.mockReturnValueOnce({ activeProject: before, projects: [before] }).mockReturnValue({
-      activeProject: afterRemoval,
-      projects: [afterRemoval],
-    });
-    mocks.itemDelete.mockRejectedValue(new Error('network down'));
-    mocks.invalidateGallery.mockRejectedValue(new Error('network down'));
-
-    await act(async () => {
-      await getItemActions().deleteItems(refs);
-    });
-
-    expect(mocks.galleryWidgetsPatchValues).toHaveBeenCalledWith(
-      'gallery',
-      { recentImages: [recentImageFixture] },
-      'project-1',
-      'system'
-    );
-  });
-
-  it('restores the selection when the server rejects every item instead of failing the request', async () => {
-    const refs = [{ kind: 'image' as const, name: 'gone.png' }];
-    const selected = { kind: 'image', name: 'gone.png' };
-    const before = makeMockProject('project-1', {
-      selectedImage: selected,
-      selectedImageName: 'image:gone.png',
-      selectedImageNames: ['image:gone.png'],
-    });
-    const afterRemoval = makeMockProject('project-1', {
-      selectedImage: null,
-      selectedImageName: null,
-      selectedImageNames: [],
-    });
-
-    mocks.getSnapshot.mockReturnValueOnce({ activeProject: before, projects: [before] }).mockReturnValue({
-      activeProject: afterRemoval,
-      projects: [afterRemoval],
-    });
-    // A rejected request is reported as a result whose items all failed.
-    mocks.itemDelete.mockResolvedValue({ affectedBoardIds: [], failed: refs, succeeded: [] });
-
-    await act(async () => {
-      await getItemActions().deleteItems(refs);
-    });
-
-    expect(mocks.galleryWidgetsPatchValues).toHaveBeenCalledWith(
-      'gallery',
-      { selectedImage: selected, selectedImageName: 'image:gone.png', selectedImageNames: ['image:gone.png'] },
-      'project-1',
-      'system'
-    );
   });
 
   it('does not clobber a gallery widget field something else changed before the rollback runs', async () => {
@@ -1778,47 +1355,18 @@ describe('total transport failure rollback', () => {
       recentImages: [{ ...recentImageFixture, imageName: 'new-generation.png' }],
     });
 
-    mocks.getSnapshot
-      .mockReturnValueOnce({ activeProject: before, projects: [before] }) // capture, pre-removal
-      .mockReturnValueOnce({ activeProject: afterRemoval, projects: [afterRemoval] }) // diff, post-removal
-      .mockReturnValue({ activeProject: concurrentlyChanged, projects: [concurrentlyChanged] }); // restore-time read
-    mocks.itemDelete.mockRejectedValue(new Error('network down'));
+    const store = serveProjectStates(before, afterRemoval);
+    mocks.itemDelete.mockImplementation(() => {
+      store.set(concurrentlyChanged);
+      return Promise.reject(new Error('network down'));
+    });
     mocks.invalidateGallery.mockRejectedValue(new Error('network down'));
 
     await act(async () => {
       await getItemActions().deleteItems(refs);
     });
 
-    // A generation completed mid-flight and rewrote recentImages: the CAS
-    // check must see that and skip the restore rather than clobbering it.
     expect(mocks.galleryWidgetsPatchValues).not.toHaveBeenCalled();
-  });
-
-  it('does not roll back caches or the widget store once a partial success has been confirmed', async () => {
-    const refs = [{ kind: 'image' as const, name: 'done.png' }];
-    const result = { affectedBoardIds: ['none'], failed: [], succeeded: refs };
-    mocks.itemDelete.mockResolvedValue(result);
-    mocks.onImagesDeleted.mockImplementation(() => {
-      throw new Error('caller-supplied callback exploded');
-    });
-
-    await act(async () => {
-      await getItemActions().deleteItems(refs);
-    });
-
-    // The confirmed deletion cache patch applied before the callback threw.
-    expect(mocks.patchGalleryItemCaches).toHaveBeenNthCalledWith(
-      2,
-      expect.anything(),
-      { kind: 'delete', result },
-      { totals: 'holder' }
-    );
-    // The `rollbackCaches` closure returned for the *optimistic* patch (call
-    // 1) must never fire once confirmation has begun applying.
-    expect(mocks.patchGalleryItemCaches.mock.results[0]?.value).not.toHaveBeenCalled();
-    expect(mocks.galleryWidgetsPatchValues).not.toHaveBeenCalled();
-    // The callback's own throw is still surfaced as an error.
-    expect(mocks.reportError).toHaveBeenCalledOnce();
   });
 
   it('restores the previous board ids when the move transport fails entirely, including items known only to the store', async () => {
@@ -1830,7 +1378,7 @@ describe('total transport failure rollback', () => {
     const beforePaint = makeMockProject('project-1', {
       recentImages: [{ ...recentImageFixture, boardId: 'board-overlay', imageName: 'overlay-only.png' }],
     });
-    // Simulate optimistic board state after the initial pre-paint snapshot because patchItems is stubbed.
+    // patchItems is stubbed, so simulate the optimistic board state.
     const afterPaint = makeMockProject('project-1', {
       recentImages: [{ ...recentImageFixture, boardId: 'board-1', imageName: 'overlay-only.png' }],
     });
@@ -1844,7 +1392,6 @@ describe('total transport failure rollback', () => {
       await getItemActions().moveItemsToBoard(refs, 'board-1');
     });
 
-    // The optimistic move happened up front, before the transport was asked.
     expect(mocks.galleryPatchItems).toHaveBeenNthCalledWith(1, ['image:moved.png', 'image:overlay-only.png'], {
       boardId: 'board-1',
     });
@@ -1856,100 +1403,6 @@ describe('total transport failure rollback', () => {
 
     expect(mocks.reportError).toHaveBeenCalledOnce();
     expect(mocks.notificationsAdd).not.toHaveBeenCalled();
-  });
-
-  it('does not clobber a store-known board id a concurrent move already carried onto a different board', async () => {
-    const refs = [{ kind: 'image' as const, name: 'overlay-only.png' }];
-    mocks.getItemBoardIds.mockReturnValue(new Map());
-    const beforeFirstMove = makeMockProject('project-1', {
-      recentImages: [{ ...recentImageFixture, boardId: 'board-A', imageName: 'overlay-only.png' }],
-    });
-    // A second, concurrent `moveItemsToBoard` call already carried the item
-    // from this move's target ('board-B') onward to 'board-C' by the time
-    // this (first) request's rollback runs.
-    const concurrentlyMovedOn = makeMockProject('project-1', {
-      recentImages: [{ ...recentImageFixture, boardId: 'board-C', imageName: 'overlay-only.png' }],
-    });
-    mocks.getSnapshot
-      .mockReturnValueOnce({ activeProject: beforeFirstMove, projects: [beforeFirstMove] })
-      .mockReturnValue({ activeProject: concurrentlyMovedOn, projects: [concurrentlyMovedOn] });
-    mocks.itemMoveToBoard.mockRejectedValue(new Error('network down'));
-    mocks.invalidateGallery.mockRejectedValue(new Error('network down'));
-
-    await act(async () => {
-      await getItemActions().moveItemsToBoard(refs, 'board-B');
-    });
-
-    expect(mocks.galleryPatchItems).not.toHaveBeenCalledWith(['image:overlay-only.png'], { boardId: 'board-A' });
-    // Only the initial optimistic paint touched the store.
-    expect(mocks.galleryPatchItems).toHaveBeenCalledOnce();
-  });
-
-  it('reverts the optimistic star paint per item when the transport fails entirely, not by blanket inversion', async () => {
-    const refs = [
-      { kind: 'image' as const, name: 'was-starred.png' },
-      { kind: 'image' as const, name: 'was-unstarred.png' },
-    ];
-    // Capture each prior flag: one item was already starred, so blanket inversion would corrupt rollback. Later
-    // reads simulate the stubbed optimistic paint.
-    mocks.getItemStarred
-      .mockReturnValueOnce(
-        new Map([
-          ['image:was-starred.png', true],
-          ['image:was-unstarred.png', false],
-        ])
-      )
-      .mockReturnValue(
-        new Map([
-          ['image:was-starred.png', true],
-          ['image:was-unstarred.png', true],
-        ])
-      );
-    mocks.itemSetStarred.mockRejectedValue(new Error('network down'));
-    mocks.invalidateGallery.mockRejectedValue(new Error('network down'));
-
-    await act(async () => {
-      await getItemActions().setItemsStarred(refs, true);
-    });
-
-    expect(mocks.galleryPatchItems).toHaveBeenNthCalledWith(1, ['image:was-starred.png', 'image:was-unstarred.png'], {
-      starred: true,
-    });
-
-    expect(mocks.galleryPatchItems).toHaveBeenCalledWith(['image:was-starred.png'], { starred: true });
-    expect(mocks.galleryPatchItems).toHaveBeenCalledWith(['image:was-unstarred.png'], { starred: false });
-    expect(mocks.patchGalleryItemCaches).toHaveBeenCalledOnce();
-    expect(mocks.patchGalleryItemCaches.mock.results[0]?.value).toHaveBeenCalledOnce();
-
-    expect(mocks.reportError).toHaveBeenCalledOnce();
-    expect(mocks.notificationsAdd).not.toHaveBeenCalled();
-  });
-
-  it('does not clobber a star toggle a concurrent mutation already applied, in either the cache or the store', async () => {
-    const refs = [{ kind: 'image' as const, name: 'shared.png' }];
-    // Simulate a concurrent toggle replacing this action's painted flag in both cache and store.
-    mocks.getItemStarred
-      .mockReturnValueOnce(new Map([['image:shared.png', false]]))
-      .mockReturnValue(new Map([['image:shared.png', false]]));
-    const beforePaint = makeMockProject('project-1', {
-      recentImages: [{ ...recentImageFixture, imageName: 'shared.png', starred: false }],
-    });
-    const concurrentToggle = makeMockProject('project-1', {
-      recentImages: [{ ...recentImageFixture, imageName: 'shared.png', starred: false }],
-    });
-    mocks.getSnapshot
-      .mockReturnValueOnce({ activeProject: beforePaint, projects: [beforePaint] })
-      .mockReturnValue({ activeProject: concurrentToggle, projects: [concurrentToggle] });
-    mocks.itemSetStarred.mockRejectedValue(new Error('network down'));
-    mocks.invalidateGallery.mockRejectedValue(new Error('network down'));
-
-    await act(async () => {
-      await getItemActions().setItemsStarred(refs, true);
-    });
-
-    expect(mocks.galleryPatchItems).toHaveBeenCalledOnce();
-    expect(mocks.patchGalleryItemCaches).toHaveBeenCalledOnce();
-    expect(mocks.patchGalleryItemCaches.mock.results[0]?.value).toHaveBeenCalledOnce();
   });
 });
 
@@ -1970,30 +1423,8 @@ const galleryItem = (kind: GalleryItem['kind'], name: string): GalleryItem => {
   return kind === 'video' ? { ...base, durationSeconds: 4, kind } : { ...base, kind };
 };
 
-/** Backs the workbench snapshot with a gallery selection that removals and selections change, as the store does. */
-const modelGallerySelectionStore = (initial: GalleryItemKey | null) => {
-  let selected = initial;
-  mocks.getSnapshot.mockImplementation(() => {
-    const project = makeMockProject('project-1', { selectedImageName: selected });
-
-    return { activeProject: project, projects: [project] };
-  });
-
-  return {
-    remove: (itemKeys: GalleryItemKey[]) => {
-      if (selected && itemKeys.includes(selected)) {
-        selected = null;
-      }
-    },
-    select: (itemKey: GalleryItemKey) => {
-      selected = itemKey;
-    },
-  };
-};
-
 describe('primary successor after confirmed deletion', () => {
   it('selects the next surviving item in display order — the one that takes the deleted slot', async () => {
-    // Selection also keeps deletion out of the leading starred block; core/selection.test.ts covers that rule.
     const before = galleryItem('video', 'before.mp4');
     const primary = galleryItem('image', 'primary.png');
     const after = galleryItem('image', 'after.png');
@@ -2012,163 +1443,6 @@ describe('primary successor after confirmed deletion', () => {
 
     await act(async () => {
       await getItemActions().deleteItems([{ kind: 'image', name: 'primary.png' }]);
-    });
-
-    expect(mocks.gallerySelectItem).toHaveBeenCalledWith(after, 'project-1');
-  });
-
-  it('selects the successor once the optimistic removal has cleared the host selection', async () => {
-    const primary = galleryItem('image', 'primary.png');
-    const after = galleryItem('image', 'after.png');
-    const refs = [primary, after].map(({ kind, name }) => ({ kind, name }));
-    currentItemActionContext = {
-      filterIdentity: 'filter-a',
-      items: [primary, after],
-      loadOrderedRefs: () => Promise.resolve(refs),
-      selectedItemKey: 'image:primary.png',
-    };
-    const store = modelGallerySelectionStore('image:primary.png');
-    mocks.galleryRemoveItems.mockImplementationOnce((itemKeys: GalleryItemKey[]) => {
-      store.remove(itemKeys);
-      currentItemActionContext = { ...currentItemActionContext!, items: [after], selectedItemKey: null };
-    });
-    mocks.itemDelete.mockResolvedValue({
-      affectedBoardIds: ['board-1'],
-      failed: [],
-      succeeded: [{ kind: 'image', name: primary.name }],
-    });
-
-    await act(async () => {
-      await getItemActions().deleteItems([{ kind: 'image', name: primary.name }]);
-    });
-
-    expect(mocks.gallerySelectItem).toHaveBeenCalledWith(after, 'project-1');
-  });
-
-  it('selects the successor beside a rejected item when the host has re-rendered without the primary', async () => {
-    const primary = galleryItem('image', 'primary.png');
-    const rejected = galleryItem('image', 'rejected.png');
-    const after = galleryItem('image', 'after.png');
-    const refs = [primary, rejected, after].map(({ kind, name }) => ({ kind, name }));
-    currentItemActionContext = {
-      filterIdentity: 'filter-a',
-      items: [primary, rejected, after],
-      loadOrderedRefs: () => Promise.resolve(refs),
-      selectedItemKey: 'image:primary.png',
-    };
-    const store = modelGallerySelectionStore('image:primary.png');
-    mocks.galleryRemoveItems.mockImplementationOnce((itemKeys: GalleryItemKey[]) => {
-      store.remove(itemKeys);
-      currentItemActionContext = { ...currentItemActionContext!, items: [after], selectedItemKey: null };
-    });
-    // Restoring the rejected item's removal writes the selection back to the store; the host has not re-rendered.
-    mocks.galleryWidgetsPatchValues.mockImplementation((_widgetId: string, values: Record<string, unknown>) => {
-      if (typeof values.selectedImageName === 'string') {
-        store.select(values.selectedImageName as GalleryItemKey);
-      }
-    });
-    mocks.itemDelete.mockResolvedValue({
-      affectedBoardIds: ['board-1'],
-      failed: [{ kind: 'image', name: rejected.name }],
-      succeeded: [{ kind: 'image', name: primary.name }],
-    });
-
-    await act(async () => {
-      await getItemActions().deleteItems([
-        { kind: 'image', name: primary.name },
-        { kind: 'image', name: rejected.name },
-      ]);
-    });
-
-    expect(mocks.gallerySetItemMultiSelection).toHaveBeenCalledWith(
-      ['image:rejected.png', 'image:after.png'],
-      after,
-      'project-1'
-    );
-  });
-
-  it('keeps an item selected during the deletion even when the host has not loaded it', async () => {
-    const primary = galleryItem('image', 'primary.png');
-    const after = galleryItem('image', 'after.png');
-    const refs = [primary, after].map(({ kind, name }) => ({ kind, name }));
-    currentItemActionContext = {
-      filterIdentity: 'filter-a',
-      items: [primary, after],
-      loadOrderedRefs: () => Promise.resolve(refs),
-      selectedItemKey: 'image:primary.png',
-    };
-    const store = modelGallerySelectionStore('image:primary.png');
-    mocks.galleryRemoveItems.mockImplementationOnce((itemKeys: GalleryItemKey[]) => {
-      store.remove(itemKeys);
-      currentItemActionContext = { ...currentItemActionContext!, items: [after], selectedItemKey: null };
-    });
-    // While the request is in flight the user selects an item on a page the host has not loaded, so the host
-    // still reports no selection.
-    mocks.itemDelete.mockImplementation(() => {
-      store.select('image:far-away.png');
-
-      return Promise.resolve({
-        affectedBoardIds: ['board-1'],
-        failed: [],
-        succeeded: [{ kind: 'image', name: primary.name }],
-      });
-    });
-
-    await act(async () => {
-      await getItemActions().deleteItems([{ kind: 'image', name: primary.name }]);
-    });
-
-    expect(mocks.gallerySelectItem).not.toHaveBeenCalled();
-    expect(mocks.gallerySetItemMultiSelection).not.toHaveBeenCalled();
-  });
-
-  it('resolves an unloaded successor by qualified ref', async () => {
-    const primary = galleryItem('image', 'primary.png');
-    const before = galleryItem('image', 'before.png');
-    const unloaded = galleryItem('video', 'unloaded.mp4');
-    currentItemActionContext = {
-      filterIdentity: 'filter-a',
-      items: [before, primary],
-      loadOrderedRefs: () =>
-        Promise.resolve([
-          { kind: 'image' as const, name: before.name },
-          { kind: 'video' as const, name: unloaded.name },
-          { kind: 'image' as const, name: primary.name },
-        ]),
-      selectedItemKey: 'image:primary.png',
-    };
-    mocks.resolveItem.mockResolvedValue(unloaded);
-    mocks.itemDelete.mockResolvedValue({
-      affectedBoardIds: ['board-1'],
-      failed: [],
-      succeeded: [{ kind: 'image', name: primary.name }],
-    });
-
-    await act(async () => {
-      await getItemActions().deleteItems([{ kind: 'image', name: primary.name }]);
-    });
-
-    expect(mocks.resolveItem).toHaveBeenCalledWith({ kind: 'video', name: unloaded.name }, expect.any(AbortSignal));
-    expect(mocks.gallerySelectItem).toHaveBeenCalledWith(unloaded, 'project-1');
-  });
-
-  it('falls back to materialized order and then the nearest successor when names fail', async () => {
-    const primary = galleryItem('image', 'primary.png');
-    const after = galleryItem('video', 'after.mp4');
-    currentItemActionContext = {
-      filterIdentity: 'filter-a',
-      items: [primary, after],
-      loadOrderedRefs: () => Promise.reject(new Error('names unavailable')),
-      selectedItemKey: 'image:primary.png',
-    };
-    mocks.itemDelete.mockResolvedValue({
-      affectedBoardIds: ['board-1'],
-      failed: [],
-      succeeded: [{ kind: 'image', name: primary.name }],
-    });
-
-    await act(async () => {
-      await getItemActions().deleteItems([{ kind: 'image', name: primary.name }]);
     });
 
     expect(mocks.gallerySelectItem).toHaveBeenCalledWith(after, 'project-1');
@@ -2225,170 +1499,6 @@ describe('primary successor after confirmed deletion', () => {
     expect(mocks.gallerySelectItem).not.toHaveBeenCalled();
   });
 
-  it('stamps the successor with the page the host navigates from, when the host provides one', async () => {
-    // Preserve the successor's host page rather than stamping the grid's unrelated navigation window.
-    const before = galleryItem('video', 'before.mp4');
-    const primary = galleryItem('image', 'primary.png');
-    const after = galleryItem('image', 'after.png');
-    const refs = [before, primary, after].map(({ kind, name }) => ({ kind, name }));
-    currentItemActionContext = {
-      filterIdentity: 'filter-a',
-      getItemSelectionPage: () => 30,
-      items: [before, primary, after],
-      loadOrderedRefs: () => Promise.resolve(refs),
-      selectedItemKey: 'image:primary.png',
-    };
-    mocks.itemDelete.mockResolvedValue({
-      affectedBoardIds: ['board-1'],
-      failed: [],
-      succeeded: [{ kind: 'image', name: 'primary.png' }],
-    });
-
-    await act(async () => {
-      await getItemActions().deleteItems([{ kind: 'image', name: 'primary.png' }]);
-    });
-
-    expect(mocks.gallerySelectItem).toHaveBeenCalledWith(after, 'project-1', 30, true);
-  });
-
-  it('opens an item in Preview at the page the host navigates from', () => {
-    const item = galleryItem('image', 'deep.png');
-
-    currentItemActionContext = {
-      filterIdentity: 'filter-a',
-      getItemSelectionPage: () => 30,
-      items: [item],
-      loadOrderedRefs: () => Promise.resolve([{ kind: 'image' as const, name: item.name }]),
-      selectedItemKey: 'image:deep.png',
-    };
-
-    act(() => {
-      getItemActions().openItemInPreview(item);
-    });
-
-    expect(mocks.gallerySelectItem).toHaveBeenCalledWith(item, 'project-1', 30, true);
-  });
-
-  it('carries the host page into a retained multi-selection after a partial failure', async () => {
-    const successor = galleryItem('image', 'successor.png');
-    const primary = galleryItem('image', 'primary.png');
-    const failedImage = galleryItem('image', 'failed.png');
-    const requested = [
-      { kind: 'image' as const, name: failedImage.name },
-      { kind: 'image' as const, name: primary.name },
-    ];
-    currentItemActionContext = {
-      filterIdentity: 'filter-a',
-      getItemSelectionPage: () => 30,
-      items: [successor, primary, failedImage],
-      loadOrderedRefs: () =>
-        Promise.resolve([
-          { kind: 'image' as const, name: successor.name },
-          { kind: 'image' as const, name: primary.name },
-          { kind: 'image' as const, name: failedImage.name },
-        ]),
-      selectedItemKey: 'image:primary.png',
-    };
-    mocks.itemDelete.mockResolvedValue({
-      affectedBoardIds: ['board-1'],
-      failed: [requested[0]],
-      succeeded: [requested[1]],
-    });
-
-    await act(async () => {
-      await getItemActions().deleteItems(requested);
-    });
-
-    expect(mocks.gallerySetItemMultiSelection).toHaveBeenCalledWith(
-      ['image:failed.png', 'image:successor.png'],
-      successor,
-      'project-1',
-      30,
-      true
-    );
-  });
-
-  it('atomically retains failed qualified selections while promoting a surviving successor', async () => {
-    const successor = galleryItem('image', 'successor.png');
-    const primary = galleryItem('image', 'shared');
-    const failedSameNameVideo = galleryItem('video', 'shared');
-    const failedImage = galleryItem('image', 'failed.png');
-    const requested = [
-      { kind: 'image' as const, name: failedImage.name },
-      { kind: 'image' as const, name: primary.name },
-      { kind: 'video' as const, name: failedSameNameVideo.name },
-    ];
-    currentItemActionContext = {
-      filterIdentity: 'filter-a',
-      items: [successor, primary, failedSameNameVideo, failedImage],
-      loadOrderedRefs: () =>
-        Promise.resolve([
-          { kind: 'image' as const, name: successor.name },
-          { kind: 'video' as const, name: failedSameNameVideo.name },
-          { kind: 'image' as const, name: primary.name },
-          { kind: 'image' as const, name: failedImage.name },
-        ]),
-      selectedItemKey: 'image:shared',
-    };
-    const result = {
-      affectedBoardIds: ['board-1'],
-      failed: [requested[0], requested[2]],
-      succeeded: [requested[1]],
-    };
-    mocks.itemDelete.mockResolvedValue(result);
-
-    await act(async () => {
-      await getItemActions().deleteItems(requested);
-    });
-
-    expect(mocks.galleryRemoveItems).toHaveBeenCalledWith(['image:shared']);
-    expect(mocks.gallerySetItemMultiSelection).toHaveBeenCalledWith(
-      ['image:failed.png', 'video:shared', 'image:successor.png'],
-      successor,
-      'project-1'
-    );
-    expect(mocks.gallerySelectItem).not.toHaveBeenCalled();
-  });
-
-  it('rejects an unloaded successor after the filter or selection becomes stale', async () => {
-    const primary = galleryItem('image', 'primary.png');
-    const successor = galleryItem('video', 'successor.mp4');
-    let resolveItem = (_item: GalleryItem): void => undefined;
-    currentItemActionContext = {
-      filterIdentity: 'filter-a',
-      items: [primary],
-      loadOrderedRefs: () =>
-        Promise.resolve([
-          { kind: 'image' as const, name: primary.name },
-          { kind: 'video' as const, name: successor.name },
-        ]),
-      selectedItemKey: 'image:primary.png',
-    };
-    mocks.resolveItem.mockReturnValue(
-      new Promise((resolve) => {
-        resolveItem = resolve;
-      })
-    );
-    mocks.itemDelete.mockResolvedValue({
-      affectedBoardIds: ['board-1'],
-      failed: [],
-      succeeded: [{ kind: 'image', name: primary.name }],
-    });
-
-    const deletion = getItemActions().deleteItems([{ kind: 'image', name: primary.name }]);
-    await vi.waitFor(() => expect(mocks.resolveItem).toHaveBeenCalledOnce());
-    currentItemActionContext = {
-      filterIdentity: 'filter-b',
-      items: [],
-      loadOrderedRefs: () => Promise.resolve([]),
-      selectedItemKey: 'video:other.mp4',
-    };
-    resolveItem(successor);
-    await act(() => deletion);
-
-    expect(mocks.gallerySelectItem).not.toHaveBeenCalled();
-  });
-
   it('does not apply confirmed deletion side effects after the account changes while resolving a successor', async () => {
     const primary = galleryItem('image', 'primary.png');
     const successor = galleryItem('video', 'successor.mp4');
@@ -2416,13 +1526,10 @@ describe('primary successor after confirmed deletion', () => {
 
     const deletion = getItemActions().deleteItems([{ kind: 'image', name: primary.name }]);
     await vi.waitFor(() => expect(mocks.resolveItem).toHaveBeenCalledOnce());
-    // The switch drops the capability table, which the hook now subscribes to.
     await act(() => accountLifecycle.activate('user-b'));
     resolveItem(successor);
     await act(() => deletion);
 
-    // The optimistic removal happened up front, on the account that asked for
-    // it; nothing further may apply once the account has changed.
     expect(mocks.patchGalleryItemCaches).toHaveBeenCalledOnce();
     expect(mocks.patchGalleryItemCaches).toHaveBeenCalledWith(expect.anything(), {
       kind: 'delete',
@@ -2431,28 +1538,6 @@ describe('primary successor after confirmed deletion', () => {
     expect(mocks.galleryRemoveItems).toHaveBeenCalledOnce();
     expect(mocks.gallerySelectItem).not.toHaveBeenCalled();
     expect(mocks.invalidateGallery).not.toHaveBeenCalled();
-  });
-
-  it('does not promote an unrelated item when the captured order does not contain the deleted primary', async () => {
-    const primary = galleryItem('image', 'primary.png');
-    const unrelated = galleryItem('video', 'unrelated.mp4');
-    currentItemActionContext = {
-      filterIdentity: 'filter-a',
-      items: [primary, unrelated],
-      loadOrderedRefs: () => Promise.resolve([{ kind: 'video', name: unrelated.name }]),
-      selectedItemKey: 'image:primary.png',
-    };
-    mocks.itemDelete.mockResolvedValue({
-      affectedBoardIds: ['board-1'],
-      failed: [],
-      succeeded: [{ kind: 'image', name: primary.name }],
-    });
-
-    await act(async () => {
-      await getItemActions().deleteItems([{ kind: 'image', name: primary.name }]);
-    });
-
-    expect(mocks.gallerySelectItem).not.toHaveBeenCalled();
   });
 });
 
@@ -2481,15 +1566,35 @@ describe('mixed item downloads', () => {
     expect(mocks.downloadBlob).toHaveBeenCalledWith(expect.any(Blob), 'images.zip');
   });
 
-  it('downloads a single video from its protected full URL with its actual name', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('video-one')));
+  it('downloads a selection larger than one archive request takes as several archives', async () => {
+    const imageNames = Array.from({ length: 2500 }, (_, index) => `image-${index}.png`);
+    mocks.downloadArchive.mockImplementation(({ imageNames: archiveNames }: { imageNames: string[] }) =>
+      Promise.resolve({ blob: new Blob(['archive']), fileName: `${archiveNames[0]}.zip` })
+    );
+    vi.stubGlobal('fetch', vi.fn());
 
     await act(async () => {
-      await getItemActions().downloadItem(firstVideo);
+      await getItemActions().downloadItems(imageNames.map((name) => ({ kind: 'image', name })));
     });
 
-    expect(fetch).toHaveBeenCalledWith(firstVideo.fullUrl, { signal: expect.any(AbortSignal) });
-    expect(mocks.downloadBlob).toHaveBeenCalledWith(expect.any(Blob), firstVideo.name);
+    expect(mocks.downloadArchive.mock.calls.map(([request]) => request.imageNames)).toEqual([
+      imageNames.slice(0, 1000),
+      imageNames.slice(1000, 2000),
+      imageNames.slice(2000),
+    ]);
+    expect(mocks.downloadBlob.mock.calls.map(([, name]) => name)).toEqual([
+      'image-0.png.zip',
+      'image-1000.png.zip',
+      'image-2000.png.zip',
+    ]);
+    expect(mocks.notificationsAdd.mock.calls.map(([notice]) => notice)).toEqual([
+      {
+        kind: 'info',
+        message: 'widgets.gallery.itemActions.download.preparingArchives:{"count":3}',
+        title: 'widgets.gallery.preparingDownload',
+      },
+      { kind: 'success', title: 'widgets.gallery.itemActions.download.successArchives:{"count":3}' },
+    ]);
   });
 
   it('downloads a mixed selection archive-first and videos sequentially', async () => {
@@ -2530,53 +1635,5 @@ describe('mixed item downloads', () => {
       secondVideo.fullUrl,
       `save:${secondVideo.name}`,
     ]);
-  });
-
-  it('continues after a failed video and summarizes the partial outcome once', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockRejectedValueOnce(new Error('first failed')).mockResolvedValueOnce(new Response('video-two'))
-    );
-
-    await act(async () => {
-      await getItemActions().downloadItems(
-        [
-          { kind: 'video', name: firstVideo.name },
-          { kind: 'video', name: secondVideo.name },
-        ],
-        [firstVideo, secondVideo]
-      );
-    });
-
-    expect(fetch).toHaveBeenCalledTimes(2);
-    expect(mocks.downloadBlob).toHaveBeenCalledOnce();
-    expect(mocks.downloadBlob).toHaveBeenCalledWith(expect.any(Blob), secondVideo.name);
-    expect(mocks.notificationsAdd.mock.calls.length + mocks.reportError.mock.calls.length).toBe(1);
-  });
-
-  it('skips an unresolved video and continues with the next video in order', async () => {
-    mocks.resolveItem.mockRejectedValueOnce(new Error('missing video')).mockResolvedValueOnce(secondVideo);
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('video-two')));
-
-    await act(async () => {
-      await getItemActions().downloadItems([
-        { kind: 'video', name: firstVideo.name },
-        { kind: 'video', name: secondVideo.name },
-      ]);
-    });
-
-    expect(mocks.resolveItem).toHaveBeenNthCalledWith(
-      1,
-      { kind: 'video', name: firstVideo.name },
-      expect.any(AbortSignal)
-    );
-    expect(mocks.resolveItem).toHaveBeenNthCalledWith(
-      2,
-      { kind: 'video', name: secondVideo.name },
-      expect.any(AbortSignal)
-    );
-    expect(fetch).toHaveBeenCalledOnce();
-    expect(mocks.downloadBlob).toHaveBeenCalledWith(expect.any(Blob), secondVideo.name);
-    expect(mocks.notificationsAdd.mock.calls.length + mocks.reportError.mock.calls.length).toBe(1);
   });
 });

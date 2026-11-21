@@ -1,0 +1,16 @@
+{
+  "version": "1.8.5",
+  "publishedAt": "2026-10-10T21:05:09Z",
+  "notesUrl": "https://github.com/invoke-ai/launcher/releases/tag/v1.8.5",
+  "assets": {
+    "windows": {
+      "size": 113202136
+    },
+    "macos": {
+      "size": 132949779
+    },
+    "linux": {
+      "size": 145780235
+    }
+  }
+}

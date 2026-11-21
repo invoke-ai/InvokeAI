@@ -10,6 +10,7 @@ import { useMountEffect } from '@platform/react/useMountEffect';
 import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { useWorkbenchFocus } from '@workbench/focusRegions';
 import { useProjectLibrarySelector } from '@workbench/projects/library';
+import { getProjectSyncSnapshot } from '@workbench/projects/syncStore';
 import { useExportLibraryProject } from '@workbench/projects/useProjectFileActions';
 import {
   areWorkbenchPreferencesReady,
@@ -83,8 +84,8 @@ export const GalleryUiAdapterProvider = ({ children }: { children: ReactNode }) 
   const exportProject = useExportLibraryProject();
   const openWorkbenchWidget = useOpenWorkbenchWidget();
   const { focusFloating, focusRegion } = useWorkbenchFocus();
-  // Only what the gallery needs to label other projects' boards, compared structurally: every autosave ack and
-  // library refresh rebuilds the summaries, and the gallery must not re-render for cover or timestamp churn.
+  // Only what the gallery needs to label other projects' boards, compared structurally: every autosave ack and library
+  // refresh rebuilds the summaries, and the gallery must not re-render for cover or timestamp churn.
   const projects = useProjectLibrarySelector(selectGalleryProjects, areGalleryProjectsEqual);
   const store = useWorkbenchInternalStore();
   const persistence = useWorkbenchPersistenceService();
@@ -125,13 +126,26 @@ export const GalleryUiAdapterProvider = ({ children }: { children: ReactNode }) 
       },
       galleryValues,
       generateValues,
+      // Loaded on first use, beside the item actions it shares with the item deletion dialog.
+      getBoardMediaUsage: (boardId, signal) =>
+        import('@workbench/image-actions/mediaUsageReport').then(({ resolveMediaUsage }) =>
+          resolveMediaUsage(
+            { boardId, kind: 'board' },
+            {
+              getLoadedProjects: () => queries.getSnapshot().projects,
+              getSyncBase: (targetProjectId) => getProjectSyncSnapshot().projects[targetProjectId],
+              openProjectId: projectId,
+            },
+            { signal }
+          )
+        ),
       getItemLabel,
       noteBoardBrowsed: (boardId) => {
         const values = getGalleryValues(queries.getProject(projectId), queries.getSnapshot().scopedDefaults);
 
-        // Once per account, for a project that followed the selected board as earlier builds did by default (it
-        // stored 'follow', now read as the default destination): say that browsing no longer moves results, the first
-        // time the user browses away from where they go.
+        // Once per account, for a project that followed the selected board as earlier builds did by default (it stored
+        // 'follow', now read as the default destination): say that browsing no longer moves results, the first time the
+        // user browses away from where they go.
         if (
           isLegacyFollowAutoAdd(values) &&
           !getGallerySettings(values).followSelectedBoard &&
@@ -188,8 +202,8 @@ export const GalleryUiAdapterProvider = ({ children }: { children: ReactNode }) 
       projectId,
       projectName,
       projects,
-      // A board created in or moved into a project needs the project to exist on the server, which a new project
-      // does only after its first save; the canvas path makes the same request before its first write.
+      // A board created in or moved into a project needs the project to exist on the server, which a new project does
+      // only after its first save; the canvas path makes the same request before its first write.
       ensureProjectOnServer: async () => {
         const project = store.getState().projects.find((candidate) => candidate.id === projectId);
 

@@ -182,9 +182,9 @@ const isTerminalStatus = (status: QueueServerItemDTO['status']): boolean =>
 
 /**
  * Removes finished history and keeps pending, waiting and running items. Without a scope the server prunes in one
- * sweep; a scoped prune deletes the scope's terminal root items individually, as the clear commands do. Deleting a
- * root removes its whole workflow-call chain, so children are never addressed on their own: a second delete would
- * miss, and a finished child must not take a still-waiting parent with it.
+ * sweep; a scoped prune deletes the scope's terminal root items individually, as the clear commands do. Deleting a root
+ * removes its whole workflow-call chain, so children are never addressed on their own: a second delete would miss, and
+ * a finished child must not take a still-waiting parent with it.
  */
 export const clearFinishedQueueItems = async (scope: QueueQueryScope = {}): Promise<void> => {
   const owner = captureAccountScope();
@@ -227,19 +227,9 @@ export const cancelAll = (scope: QueueQueryScope = {}, signal?: AbortSignal): Pr
     signal,
   });
 
-export const cancelQueueItem = (itemId: number, signal?: AbortSignal): Promise<unknown> =>
-  apiFetchJson(buildQueueUrl(`i/${itemId}/cancel`), { method: 'PUT', signal });
-
-export const cancelCurrentQueueItem = async (): Promise<void> => {
-  const owner = captureAccountScope();
-  const current = await getCurrentQueueItem({}, owner.signal);
-
-  assertAccountScopeCurrent(owner);
-  if (current) {
-    await cancelQueueItem(current.item_id, owner.signal);
-    assertAccountScopeCurrent(owner);
-  }
-};
+/** The item as the cancel left it: unchanged, and so not canceled, when it had already finished. */
+export const cancelQueueItem = (itemId: number, signal?: AbortSignal): Promise<QueueServerItemDTO> =>
+  apiFetchJson<QueueServerItemDTO>(buildQueueUrl(`i/${itemId}/cancel`), { method: 'PUT', signal });
 
 /** Cancels the scope in one server-side sweep; `keepCurrent` spares whatever is in progress. */
 export const cancelScopedQueueItems = async (
@@ -287,7 +277,7 @@ export const claimQueueItemDelivery = async (
   const result = await apiFetchJson<QueueItemDeliveryResultDTO>(buildQueueUrl(`i/${itemId}/delivery`), {
     body: JSON.stringify({ action, claimant }),
     method: 'POST',
-    signal: owner.signal,
+    signal: AbortSignal.any([owner.signal, AbortSignal.timeout(10_000)]),
   });
 
   assertAccountScopeCurrent(owner);

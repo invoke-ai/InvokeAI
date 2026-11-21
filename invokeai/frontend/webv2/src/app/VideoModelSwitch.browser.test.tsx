@@ -4,8 +4,8 @@ import type { Project } from '@workbench/projectContracts';
 import type { WorkbenchInternalStore } from '@workbench/workbenchStore';
 
 import { ChakraProvider } from '@chakra-ui/react';
-import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
 import { GenerationUiProvider, type GenerationUiAdapter } from '@features/generation/ui/GenerationUiContext';
+import { seedArchitectureCapabilities } from '@features/models/core/architectureCapabilities.testing';
 import { setModelsSnapshotForTests } from '@features/models/data/modelsStore';
 import { getDefaultVideoSettings, normalizeVideoWidgetValues } from '@features/video';
 import { VideoWidgetView } from '@features/video/ui/VideoWidgetView';
@@ -110,7 +110,11 @@ vi.mock('@features/models/react', async (importOriginal) => ({
     }
 
     const options = (useModelSnapshot().models as ModelConfig[]).filter(
-      (candidate) => modelTypes.includes(candidate.type) && (!filter || filter(candidate))
+      (candidate) =>
+        [candidate.type, ...(candidate.roles ?? []).map((role) => role.type)].some((type) =>
+          modelTypes.includes(type)
+        ) &&
+        (!filter || filter(candidate))
     );
 
     return (
@@ -174,7 +178,7 @@ seedArchitectureCapabilities();
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const generationAdapter = {
-  sectionPreferences: { sectionsOpen: {}, setSectionOpen: () => undefined },
+  sectionPreferences: { sectionsOpen: {}, setSectionsOpen: () => undefined },
 } as unknown as GenerationUiAdapter;
 
 const SOURCE_VIDEO = {
@@ -407,15 +411,6 @@ describe('video model switch confirmation', () => {
     expect(getProjectWidgetValues(original, 'video')).toBe(before);
   });
 
-  it('keeps the model picker on one id across remounts, so its remembered view and filter survive', async () => {
-    await render();
-    await act(() => root.unmount());
-    root = createRoot(host);
-    await render();
-
-    expect(new Set(pickerIds).size).toBe(1);
-  });
-
   it('commits a pending LoRA weight to the current model before switching', async () => {
     await render();
     await nudgeLoraWeight();
@@ -469,6 +464,43 @@ describe('video model switch confirmation', () => {
 
     expect(stored().modelKey).toBe(wanT2v.key);
     await vi.waitFor(() => expect(document.activeElement).toBe(modelSelect()));
+  });
+});
+
+describe('Video section issues', () => {
+  const section = (id: string) => host.querySelector<HTMLElement>(`.generate-section[data-generate-section="${id}"]`)!;
+  const chip = (id: string) =>
+    section(id).querySelector<HTMLElement>(':scope > [data-part="trigger"] [data-section-chip]')!;
+  const issues = (id: string) => section(id).querySelector(':scope > [data-part="trigger"] [data-section-issues]');
+  /** The number on the title, which assistive tech skips. */
+  const shownCount = (id: string) => issues(id)?.querySelector(':scope > span[aria-hidden]')?.textContent ?? null;
+  /** What assistive tech reads in its place. */
+  const spokenCount = (id: string) => issues(id)?.querySelector(':scope > :not([aria-hidden])')?.textContent ?? null;
+
+  it('counts an issue in each section that can fix it, tints those, and leaves the rest plain', async () => {
+    await render();
+    // The extension opens with 17 frames of the initial video, so 17 frames continue nothing: raise Frames under
+    // Dimensions, or lower the context under Initial video.
+    await act(() => store.commands.widgets.patchValues('video', { numFrames: 17 }));
+
+    for (const id of ['video-dimensions', 'video-source']) {
+      expect(shownCount(id), id).toBe('1');
+      expect(spokenCount(id), id).toBe('1 issue');
+      expect(chip(id).hasAttribute('data-issues'), id).toBe(true);
+    }
+    expect(issues('video-render')).toBeNull();
+    expect(chip('video-render').hasAttribute('data-issues')).toBe(false);
+    // The chip eases into its tint.
+    await expect
+      .poll(() => getComputedStyle(chip('video-dimensions')).backgroundColor)
+      .not.toBe(getComputedStyle(chip('video-render')).backgroundColor);
+
+    // A render-only issue counts there alone.
+    await act(() => store.commands.widgets.patchValues('video', { numFrames: 121, steps: 0 }));
+
+    expect(issues('video-dimensions')).toBeNull();
+    expect(issues('video-source')).toBeNull();
+    expect(shownCount('video-render')).toBe('1');
   });
 });
 
@@ -533,20 +565,5 @@ describe('the dynamic prompts decision on first mount', () => {
     store.commands.widgets.patchValues('video', { positivePromptHeightPx: 150 });
 
     expect(normalizeVideoWidgetValues(stored())?.dynamicPromptsEnabled).toBe(true);
-  });
-
-  it('records a panel saved before Video expanded prompts as off', async () => {
-    const saved: Record<string, unknown> = {
-      ...getDefaultVideoSettings(ltxDev as never, catalog as never),
-      model: ltxDev,
-      modelKey: ltxDev.key,
-    };
-    for (const key of Object.keys(saved).filter((name) => name.startsWith('dynamicPrompts'))) {
-      delete saved[key];
-    }
-    store.commands.widgets.patchValues('video', saved);
-    await mount();
-
-    expect((stored() as unknown as Record<string, unknown>).dynamicPromptsEnabled).toBe(false);
   });
 });

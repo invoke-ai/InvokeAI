@@ -1,8 +1,8 @@
 /* oxlint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-function-as-prop */
+import type * as SessionModule from '@features/identity/session';
 import type { ModelConfig } from '@features/models/core/types';
 import type * as ModelsApi from '@features/models/data/api';
 import type * as openProjects from '@workbench/projects/openProjects';
-import type { ReactNode } from 'react';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { setModelsSnapshotForTests } from '@features/models/data/modelsStore';
@@ -19,12 +19,11 @@ import {
 } from '@tanstack/react-router';
 import { applyThemeToRoot } from '@theme/applyTheme';
 import { DEFAULT_THEME_ID, system } from '@theme/system';
-import { act } from 'react';
+import { type ReactNode, act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { page, userEvent } from 'vitest/browser';
 
-/** The real shell and the real model manager; the other pages and the top bar are stand-ins. */
 const pending = vi.hoisted(() => () => new Promise<never>(() => {}));
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -37,6 +36,19 @@ vi.mock('@features/identity', async (importOriginal) => ({
   useCapabilities: () => ({ canManageModels: true, canManageNodes: true, canManageUsers: true }),
   UsersPage: () => null,
 }));
+vi.mock('@features/identity/launchpad', () => ({ UsersPage: () => null }));
+const auth = vi.hoisted(() => ({ session: null as SessionModule.AuthSession | null }));
+vi.mock('@features/identity/session', async (importOriginal) => {
+  const original = await importOriginal<typeof SessionModule>();
+
+  return {
+    ...original,
+    useAuthSession: () => {
+      const session = original.useAuthSession();
+      return auth.session ?? session;
+    },
+  };
+});
 vi.mock('@features/intermediates', () => ({ INTERMEDIATES_SETTING_ID: 'x', requestIntermediatesFocus: () => {} }));
 vi.mock('@features/fonts/launchpad', () => ({ FontsPage: () => null }));
 vi.mock('@features/nodes', () => ({ NodesPage: () => null }));
@@ -129,10 +141,10 @@ const render = async () => {
 };
 
 const rail = () => page.getByRole('navigation', { name: 'launchpad.sectionsLabel' });
+
 const rect = (element: Element) => element.getBoundingClientRect();
 const row = (key: string) => document.querySelector<HTMLElement>(`[data-list-row="${key}"] [data-list-primary]`)!;
 
-/** Inside the window and inside the scroll viewport that holds it, on both axes. */
 const isInView = (element: Element) => {
   const bounds = rect(element);
   const viewport = element.closest('[data-scope="scroll-area"][data-part="viewport"]');
@@ -160,6 +172,7 @@ beforeEach(() => {
 
 afterEach(async () => {
   projects.open = ['one', 'two'];
+  auth.session = null;
   await act(() => root.unmount());
   queryClient.clear();
   host.remove();
@@ -168,6 +181,16 @@ afterEach(async () => {
 });
 
 describe('Launchpad shell', () => {
+  it('retains selected model details across section deactivation', async () => {
+    await render();
+    await vi.waitFor(() => expect(row('b')).not.toBeNull(), { timeout: 10_000 });
+    await userEvent.click(row('b'));
+    await page.getByRole('link', { name: 'launchpad.sections.fonts' }).click();
+    await page.getByRole('link', { name: 'launchpad.sections.models' }).click();
+    await expect.element(page.getByRole('button', { name: 'common.edit', exact: true })).toBeVisible();
+    expect(host.textContent).toContain('Lora b');
+  });
+
   it('keeps the model manager usable at 720×450 (a 1440×900 window at 200%) beside an icon rail', async () => {
     await page.viewport(720, 450);
     await render();
@@ -183,7 +206,6 @@ describe('Launchpad shell', () => {
       .element(page.getByRole('link', { name: 'launchpad.sections.models' }))
       .toHaveAttribute('aria-current', 'page');
 
-    // The manager loads lazily, as in the app.
     await vi.waitFor(() => expect(row('b')).not.toBeNull(), { timeout: 10_000 });
     await userEvent.click(row('b'));
 
@@ -220,6 +242,84 @@ describe('Launchpad shell', () => {
     expect(await auditAccessibility(document.querySelector('[role="menu"]')!)).toEqual([]);
     await userEvent.keyboard('{Escape}');
     await expect.element(page.getByRole('button', { name: 'launchpad.help.label' })).toHaveFocus();
+  });
+
+  it('puts the signed-in account at the foot of the rail and opens its menu beside it', async () => {
+    const name = 'Maximiliana Bartholomew-Featherstonehaugh of the Very Long Name';
+    auth.session = {
+      accountEpoch: 1,
+      expiredUserId: null,
+      multiuserEnabled: true,
+      phase: 'ready',
+      sessionExpired: false,
+      setupRequired: false,
+      strictPasswordChecking: false,
+      switchingAccount: false,
+      user: {
+        created_at: '2026-01-01T00:00:00Z',
+        display_name: name,
+        email: 'max@example.com',
+        is_active: true,
+        is_admin: true,
+        last_login_at: null,
+        updated_at: '2026-01-01T00:00:00Z',
+        user_id: 'max',
+      },
+    };
+    const account = page.getByRole('button', { name: new RegExp(name) });
+    const help = page.getByRole('button', { name: 'launchpad.help.label' });
+    await page.viewport(1280, 900);
+    await render();
+
+    await expect.element(account).toBeVisible();
+    expect(rail().element().contains(account.element())).toBe(true);
+    expect(help.element().compareDocumentPosition(account.element()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(rect(account.element()).top).toBeGreaterThan(rect(help.element()).bottom);
+    expect(rect(rail().element()).width).toBe(224);
+    expect(rect(account.element()).right).toBeLessThanOrEqual(rect(rail().element()).right);
+    const [nameLine, emailLine] = account.element().querySelectorAll('p');
+    expect(nameLine!.textContent).toBe(name);
+    expect(nameLine!.scrollWidth).toBeGreaterThan(nameLine!.clientWidth);
+    expect(emailLine!.textContent).toBe('max@example.com');
+    const chevron = [...account.element().querySelectorAll('svg')].at(-1)!;
+    expect(rect(chevron).right).toBeLessThanOrEqual(rect(account.element()).right);
+    expect(rect(chevron).left).toBeGreaterThan(rect(nameLine!).right);
+    expect(rail().element().querySelectorAll('[role="separator"]')).toHaveLength(1);
+    expect(await auditAccessibility(rail().element())).toEqual([]);
+
+    await account.click();
+    const menu = page.getByRole('menu');
+    await expect.element(page.getByRole('menuitem', { name: 'auth.accountSettings' })).toBeVisible();
+    expect(rect(menu.element()).left).toBeGreaterThan(rect(account.element()).right);
+    expect(rect(menu.element()).bottom).toBeLessThanOrEqual(innerHeight);
+    expect(await auditAccessibility(menu.element())).toEqual([]);
+    await page.getByRole('menuitem', { name: 'users.manageUsers' }).click();
+    await expect
+      .element(page.getByRole('link', { name: 'launchpad.sections.users' }))
+      .toHaveAttribute('aria-current', 'page');
+
+    await page.viewport(720, 450);
+    await expect.poll(() => rect(rail().element()).width).toBeLessThan(64);
+    expect(await auditAccessibility(rail().element())).toEqual([]);
+    await account.hover();
+    await expect.element(page.getByRole('tooltip')).toHaveTextContent(name);
+    await account.click();
+    await expect.element(page.getByRole('menuitem', { name: 'auth.signOut' })).toBeVisible();
+    await expect
+      .poll(() => [...document.querySelectorAll('[role="tooltip"]')].some((tip) => tip.checkVisibility()))
+      .toBe(false);
+    expect(rect(menu.element()).bottom).toBeLessThanOrEqual(innerHeight);
+    await userEvent.keyboard('{Escape}');
+    await expect.element(account).toHaveFocus();
+  });
+
+  it('keeps the rail free of an account row and its separator in single-user mode', async () => {
+    await page.viewport(1280, 900);
+    await render();
+
+    await expect.element(page.getByRole('button', { name: 'launchpad.help.label' })).toBeVisible();
+    expect(rail().element().querySelector('[data-scope="avatar"]')).toBeNull();
+    expect(rail().element().querySelectorAll('[role="separator"]')).toHaveLength(0);
   });
 
   it('squeezes the open projects list to one entry before the rail scrolls', async () => {

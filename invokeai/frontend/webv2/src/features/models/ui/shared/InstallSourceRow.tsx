@@ -46,6 +46,7 @@ export const InstallSourceRow = ({
     badges={badges}
     description={description}
     isMenuOpen={isMenuOpen}
+    itemKey={source}
     tabIndex={-1}
     title={title}
     onContextMenu={(anchor) => onOpenMenu(source, anchor)}
@@ -53,8 +54,8 @@ export const InstallSourceRow = ({
 );
 
 /**
- * A file source (a scanned path or a repository URL), memoized so opening the list's menu re-renders only the
- * targeted row; callers pass stable callbacks.
+ * A file source (a scanned path or a repository URL), memoized so opening the list's menu re-renders only the targeted
+ * row; callers pass stable callbacks.
  */
 export const InstallPathRow = memo(function InstallPathRow({
   location,

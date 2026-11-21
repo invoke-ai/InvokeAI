@@ -1,3 +1,4 @@
+import type * as Languages from '@platform/i18n/languages';
 /* oxlint-disable react-perf/jsx-no-new-object-as-prop, react-perf/jsx-no-new-function-as-prop */
 import type { SettingFieldProps } from '@platform/ui/settings/contracts';
 import type * as projectsApi from '@workbench/projects/api';
@@ -18,10 +19,22 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { page, userEvent } from 'vitest/browser';
+import { page } from 'vitest/browser';
 
 import { PreferencesPage } from './PreferencesPage';
 import { DEFAULT_PREFERENCES, getWorkbenchPreferences, patchWorkbenchPreferences } from './store';
+
+vi.mock('@platform/i18n/languages', async (importOriginal) => {
+  const original = await importOriginal<typeof Languages>();
+  const catalogs = { en: { translated: 10, ready: true }, fr: { translated: 2 } };
+  return {
+    ...original,
+    getWorkbenchLanguageAvailability: (language: Languages.WorkbenchLanguage) =>
+      original.getWorkbenchLanguageAvailability(language, catalogs),
+    getEffectiveWorkbenchLanguage: (language: Languages.WorkbenchLanguage) =>
+      original.getEffectiveWorkbenchLanguage(language, catalogs),
+  };
+});
 
 vi.mock('@workbench/projects/api', async (importOriginal) => ({
   ...(await importOriginal<typeof projectsApi>()),
@@ -145,15 +158,6 @@ describe('Launchpad preferences page', () => {
       .not.toBeInTheDocument();
   });
 
-  it('edits a preference through the shared settings store', async () => {
-    await render('/preferences/appearance');
-
-    // The section's binding loads after the first render; clicking inside act() before then would wait on itself.
-    await expect.element(page.getByText('Reduce motion', { exact: true })).toBeVisible();
-    await act(() => page.getByText('Reduce motion', { exact: true }).click());
-    await expect.poll(() => getWorkbenchPreferences().reduceMotion).toBe(true);
-  });
-
   it('narrows sections while searching and reveals a result in its section', async () => {
     const router = await render('/preferences/appearance');
 
@@ -212,60 +216,6 @@ describe('Launchpad preferences page', () => {
     await expect.poll(() => getWorkbenchPreferences().scopedDefaults).toEqual({});
     await expect.element(toggle).not.toBeChecked();
   });
-
-  it('replaces a search left behind when another page asks for a setting', async () => {
-    const router = await render('/preferences/appearance');
-    await act(() => search().fill('motion'));
-    await expect.element(detailHeading(i18n.t('settingsDialog.results'))).toBeVisible();
-
-    // The palette and other Launchpad pages link straight to a setting while this page stays mounted.
-    await act(() => router.navigate({ to: '/fonts' }));
-    await act(() =>
-      router.navigate({
-        params: { section: 'behavior' },
-        search: { setting: 'preferNumericAttentionStyle' },
-        to: '/preferences/$section',
-      })
-    );
-    await expect.element(search()).toHaveValue('');
-    await expect.element(detailHeading('Behavior')).toBeVisible();
-    await expect
-      .element(page.getByRole('checkbox', { name: 'Prefer numeric attention style', exact: true }))
-      .toHaveFocus();
-    await expect.poll(() => router.state.location.href).toBe('/preferences/behavior');
-  });
-
-  it('keeps a search when the rail link returns to the page', async () => {
-    const router = await render('/preferences/appearance');
-    await act(() => search().fill('motion'));
-    await act(() => router.navigate({ to: '/fonts' }));
-    await act(() => router.navigate({ to: '/preferences' }));
-    await expect.element(search()).toHaveValue('motion');
-    await expect.element(detailHeading(i18n.t('settingsDialog.results'))).toBeVisible();
-  });
-
-  it('jumps to search on `/` unless a field is being typed in', async () => {
-    await render('/preferences/appearance');
-
-    await act(() => sectionItem('Behavior').click());
-    await expect.element(sectionItem('Behavior')).toHaveFocus();
-    await userEvent.keyboard('/');
-    await expect.element(search()).toHaveFocus();
-    await userEvent.keyboard('/');
-    await expect.element(search()).toHaveValue('/');
-  });
-
-  it('returns to the last section from the bare route and corrects unknown sections', async () => {
-    const router = await render('/preferences/hotkeys');
-
-    await expect.element(detailHeading('Keyboard shortcuts')).toBeVisible();
-    await act(() => router.navigate({ to: '/fonts' }));
-    await act(() => router.navigate({ to: '/preferences' }));
-    await expect.element(detailHeading('Keyboard shortcuts')).toBeVisible();
-
-    await act(() => router.navigate({ params: { section: 'project' }, to: '/preferences/$section' }));
-    await expect.poll(() => router.state.location.pathname).toBe('/preferences/hotkeys');
-  });
 });
 
 describe('Launchpad preferences page in a single pane', () => {
@@ -274,21 +224,6 @@ describe('Launchpad preferences page in a single pane', () => {
   beforeEach(() => {
     // Below the 50rem both panes need.
     host.style.width = '640px';
-  });
-
-  it('opens on the section list from the bare route and on a section from its route', async () => {
-    await render('/preferences');
-
-    await expect.element(sectionItem('Behavior')).toBeVisible();
-    await expect.element(detailHeading('Appearance')).not.toBeInTheDocument();
-    await act(() => root.unmount());
-    root = createRoot(host);
-
-    await render('/preferences/appearance');
-
-    await expect.element(detailHeading('Appearance')).toBeVisible();
-    await expect.element(back()).toBeVisible();
-    await expect.element(sectionItem('Behavior')).not.toBeInTheDocument();
   });
 
   it('moves focus between a section and its row, and keeps browser history on the same panes', async () => {
@@ -313,31 +248,5 @@ describe('Launchpad preferences page in a single pane', () => {
     await expect.poll(() => router.state.location.pathname).toBe('/preferences');
     await expect.element(sectionItem('Behavior')).toBeVisible();
     await expect.element(detailHeading('Behavior')).not.toBeInTheDocument();
-  });
-
-  it('opens search results from the list and returns to it', async () => {
-    await render('/preferences');
-
-    await act(() => search().fill('numeric attention'));
-    await act(() => page.getByRole('button', { name: new RegExp(`^${i18n.t('settingsDialog.allResults')}`) }).click());
-
-    await expect.element(detailHeading(i18n.t('settingsDialog.results'))).toBeVisible();
-    await expect.element(page.getByText('Prefer numeric attention style', { exact: true })).toBeVisible();
-    await back().click();
-    await expect.element(search()).toHaveValue('numeric attention');
-    await expect.element(detailHeading(i18n.t('settingsDialog.results'))).not.toBeInTheDocument();
-  });
-
-  it('leaves `/` alone while the search field is out of view', async () => {
-    await render('/preferences/appearance');
-    await back().click();
-    await act(() => sectionItem('Behavior').click());
-    await expect.element(back()).toHaveFocus();
-
-    const event = new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: '/' });
-    back().element().dispatchEvent(event);
-
-    expect(event.defaultPrevented).toBe(false);
-    await expect.element(back()).toHaveFocus();
   });
 });

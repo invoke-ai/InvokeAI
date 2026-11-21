@@ -25,6 +25,7 @@ import {
   LayoutPanelTopIcon,
   PaletteIcon,
   PanelsTopLeftIcon,
+  PencilRulerIcon,
   PenToolIcon,
   RocketIcon,
   Rows2Icon,
@@ -39,10 +40,7 @@ import {
   ZapIcon,
 } from 'lucide-react';
 
-/**
- * Persist stable icon ids; never rename them. The curated set supports quick selection, and removed/unknown ids
- * fall back safely.
- */
+/** Persisted icon ids: never rename them; unknown ids fall back safely. */
 export interface LayoutPresetIconOption {
   id: string;
   icon: LucideIcon;
@@ -76,6 +74,7 @@ export const layoutPresetIconGroups: LayoutPresetIconGroup[] = [
       option('type', TypeIcon, 'Text'),
       option('brush', BrushIcon, 'Brush'),
       option('pen-tool', PenToolIcon, 'Pen'),
+      option('pencil-ruler', PencilRulerIcon, 'Pencil and ruler'),
       option('palette', PaletteIcon, 'Palette'),
       option('layers', LayersIcon, 'Layers'),
       option('crop', CropIcon, 'Crop'),

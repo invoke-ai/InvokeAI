@@ -1,4 +1,4 @@
-"""Every node module on disk must actually have been imported, and importing them all must stay cheap.
+"""Every node module on disk must actually have been imported, and importing them all must stay cheap and quiet.
 
 The walker itself is exercised against a synthetic tree in
 `tests/backend/util/test_module_discovery.py`. What is left to check here is that this package's
@@ -32,16 +32,9 @@ def test_every_node_module_on_disk_was_imported() -> None:
     assert on_disk - set(LEGACY_MODULE_MAP) == set(load_all_modules()), "walker and filesystem disagree"
 
 
-@pytest.mark.platform_independent
-def test_loading_every_node_module_leaves_transformers_qwen3_5_unloaded() -> None:
-    """Every app start loads every node module, so their module-level imports run at boot.
-
-    transformers' Qwen3.5 modeling costs about 0.25 s there, and it imports the `causal_conv1d` and `fla` kernels
-    whenever they are installed: a wheel built against another torch would stop the server from starting. Nodes that
-    run Qwen3.5 (Anima's and MOSS-Image's prompt nodes) import it when they run. Indirect imports count as well:
-    diffusers' FLUX.3 prompt-upsampler module loads it, which is why FLUX.3's layout code ports the box helpers it
-    needs. A fresh interpreter, because this one has imported far more.
-    """
+@pytest.fixture(scope="module")
+def fresh_load() -> subprocess.CompletedProcess[str]:
+    """Load every node module in a fresh interpreter, once for all tests here: a cold start costs about ten seconds."""
     program = (
         "import sys\n"
         "from invokeai.app.invocations import load_all_modules\n"
@@ -50,6 +43,31 @@ def test_loading_every_node_module_leaves_transformers_qwen3_5_unloaded() -> Non
         "assert not loaded, loaded\n"
         "print('OK')\n"
     )
-    result = subprocess.run([sys.executable, "-c", program], capture_output=True, text=True, timeout=300)
-    assert result.returncode == 0, f"stderr:\n{result.stderr[-3000:]}"
-    assert "OK" in result.stdout
+    return subprocess.run([sys.executable, "-c", program], capture_output=True, text=True, timeout=300)
+
+
+@pytest.mark.platform_independent
+def test_loading_every_node_module_leaves_transformers_qwen3_5_unloaded(
+    fresh_load: subprocess.CompletedProcess[str],
+) -> None:
+    """Every app start loads every node module, so their module-level imports run at boot.
+
+    transformers' Qwen3.5 modeling costs about 0.25 s there, and it imports the `causal_conv1d` and `fla` kernels
+    whenever they are installed: a wheel built against another torch would stop the server from starting. Nodes that
+    run Qwen3.5 (Anima's and MOSS-Image's prompt nodes) import it when they run. Indirect imports count as well:
+    diffusers' FLUX.3 prompt-upsampler module loads it, which is why FLUX.3's layout code ports the box helpers it
+    needs. A fresh interpreter, because this one has imported far more.
+    """
+    assert fresh_load.returncode == 0, f"stderr:\n{fresh_load.stderr[-3000:]}"
+    assert "OK" in fresh_load.stdout
+
+
+@pytest.mark.platform_independent
+def test_loading_every_node_module_logs_no_default_factory_warning(
+    fresh_load: subprocess.CompletedProcess[str],
+) -> None:
+    """`InputField` warns about `default_factory` while the class body runs, so a core node passing one warns at every
+    app start. Only the log shows it: `InputField` turns the factory into a plain default, so the node's field and
+    schema come out the same. A fresh interpreter, because this one has imported the node modules already.
+    """
+    assert '"default_factory" is not supported' not in fresh_load.stderr

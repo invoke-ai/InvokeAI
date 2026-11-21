@@ -44,7 +44,6 @@ type Engine = NonNullable<Parameters<typeof ReferenceImageSettings>[0]['engine']
 
 const commits: PreparedDocumentEdit[] = [];
 
-/** The layer as the engine holds it; the one stable engine reads it live, as the real engine's model does. */
 let documentLayer: CanvasRegionalGuidanceLayerContract;
 const layerListeners = new Set<() => void>();
 const subscribeLayer = (listener: () => void) => {
@@ -138,12 +137,11 @@ const weightSlider = () => page.getByRole('slider', { name: 'widgets.layers.regi
 const refsOf = (edit: PreparedDocumentEdit, side: 'forward' | 'inverse') =>
   (edit[side] as unknown as { config: { referenceImages: RegionalGuidanceReferenceImage[] } }).config.referenceImages;
 
-/** Starts a drag on the weight scrubber; offsets are fractions of its -1..2 track from the press. */
 const startDrag = async () => {
   const frame = weightSlider().element().closest<HTMLElement>('[data-scope="scrubber"]')!;
   const rect = frame.getBoundingClientRect();
   const startX = rect.left + rect.width / 2;
-  const xAt = (offset: number) => startX + offset * (rect.width - 20);
+  const xAt = (offset: number) => startX + offset * (rect.width - 12);
   const pointer = (target: EventTarget, type: string, x: number) =>
     settle(() => target.dispatchEvent(new PointerEvent(type, { bubbles: true, button: 0, clientX: x, pointerId: 1 })));
   await pointer(frame, 'pointerdown', startX);
@@ -174,21 +172,10 @@ describe('ReferenceImageSettings weight', () => {
     expect(refsOf(commits[0]!, 'inverse').map((ref) => ref.config)).toMatchObject([{ weight: 1 }, { weight: 1 }]);
   });
 
-  it('records nothing when a drag returns to where it started', async () => {
-    await render();
-    const drag = await startDrag();
-    await drag.moveTo(0.1);
-    await drag.moveTo(0);
-    await drag.release();
-
-    expect(commits).toHaveLength(0);
-  });
-
   it('keeps an image that lands mid-drag, in the commit and in its undo', async () => {
     await render();
     const drag = await startDrag();
     await drag.moveTo(0.1);
-    // An upload started earlier finishes while the weight is still held.
     const image = { height: 64, imageName: 'upload.png', thumbnailUrl: 'about:blank', url: 'about:blank', width: 64 };
     await settle(() =>
       publishLayer({

@@ -372,7 +372,43 @@
           22
         ],
         "clip_skip": 0,
-        "strength": 0.6
+        "strength": 0.6,
+        "control_layers": [],
+        "controlnets": [],
+        "t2iAdapters": [],
+        "regions": [
+          {
+            "bbox": [
+              0,
+              0,
+              512,
+              256
+            ],
+            "caption": "a hand-lettered cafe sign",
+            "kind": "text",
+            "text": "一杯温暖\n一刻从容"
+          },
+          {
+            "bbox": [
+              64,
+              128,
+              256,
+              384
+            ],
+            "caption": "a barista pouring latte art",
+            "kind": "character"
+          },
+          {
+            "bbox": [
+              512,
+              640,
+              768,
+              1024
+            ],
+            "caption": "a steaming ceramic cup",
+            "kind": "object"
+          }
+        ]
       },
       "canvas_i2l": {
         "is_intermediate": true,
@@ -730,7 +766,43 @@
         "moss_image_uncond_skip_layers": [
           22
         ],
-        "clip_skip": 0
+        "clip_skip": 0,
+        "control_layers": [],
+        "controlnets": [],
+        "t2iAdapters": [],
+        "regions": [
+          {
+            "bbox": [
+              0,
+              0,
+              512,
+              256
+            ],
+            "caption": "a hand-lettered cafe sign",
+            "kind": "text",
+            "text": "一杯温暖\n一刻从容"
+          },
+          {
+            "bbox": [
+              64,
+              128,
+              256,
+              384
+            ],
+            "caption": "a barista pouring latte art",
+            "kind": "character"
+          },
+          {
+            "bbox": [
+              512,
+              640,
+              768,
+              1024
+            ],
+            "caption": "a steaming ceramic cup",
+            "kind": "object"
+          }
+        ]
       }
     }
   }

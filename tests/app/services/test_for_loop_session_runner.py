@@ -60,7 +60,7 @@ class ForRunnerCollectionOutput(BaseInvocationOutput):
 
 @invocation("test_for_runner_collection", version="1.0.0")
 class ForRunnerCollectionInvocation(BaseInvocation):
-    collection: list[Any] = InputField(default_factory=list, description="The completed loop collection")
+    collection: list[Any] = InputField(default=[], description="The completed loop collection")
 
     def invoke(self, context: InvocationContext) -> ForRunnerCollectionOutput:
         return ForRunnerCollectionOutput(collection=self.collection)

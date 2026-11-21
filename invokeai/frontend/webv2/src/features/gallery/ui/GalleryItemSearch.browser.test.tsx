@@ -7,6 +7,7 @@ import type { GalleryUiAdapter } from '@features/gallery/react';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { GalleryUiProvider } from '@features/gallery/react';
+import { resolvedValues } from '@platform/core/resolvedValues.testing';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import { act, useMemo, useState, type ReactNode } from 'react';
@@ -48,6 +49,7 @@ const adapter: GalleryUiAdapter = {
   ImageContextMenu: () => null,
   antialiasProgressImages: false,
   exportProject: noop,
+  getBoardMediaUsage: vi.fn(),
   gallery: {
     clearSelection: noop,
     reconcileDeletedBoardOutcome: noop,
@@ -69,7 +71,7 @@ const adapter: GalleryUiAdapter = {
     toggleItemSelection: noop,
     updateSettings: noop,
   },
-  galleryValues: {},
+  galleryValues: resolvedValues(),
   generateValues: {},
   getItemLabel: () => Promise.resolve(null),
   liveFollowEnabled: false,
@@ -370,42 +372,42 @@ describe('GalleryItemSearch semantic mode', () => {
     expect(actions.commitSemanticSearch.mock.calls).toEqual([['sun']]);
   });
 
-  it('explains why a semantic search in an archived board finds nothing', async () => {
-    await renderSearch({ boards: archivedBoards, selectedBoardId: 'old-board', semanticSearchText: 'sun' });
+  // A semantic search in an archived board finds nothing, so the field says why; a cluster lists its members and a
+  // metadata search still matches, so neither needs explaining.
+  it.each<{ gallery: Partial<HarnessGallery>; hint: string | null; label: string }>([
+    {
+      gallery: { boards: archivedBoards, selectedBoardId: 'old-board', semanticSearchText: 'sun' },
+      hint: 'widgets.gallery.semanticSearchArchivedBoard',
+      label: 'a semantic search in an archived board',
+    },
+    {
+      gallery: {
+        boards: archivedBoards,
+        selectedBoardId: 'old-board',
+        semanticImageQuery: { imageName: 'ref.png', kind: 'image' },
+      },
+      hint: 'widgets.gallery.semanticSearchArchivedBoard',
+      label: 'an image similarity search in an archived board',
+    },
+    {
+      gallery: {
+        boards: archivedBoards,
+        selectedBoardId: 'old-board',
+        semanticImageQuery: { clusterId: 'c1', kind: 'cluster', label: 'Boats' },
+      },
+      hint: null,
+      label: 'a cluster in an archived board',
+    },
+    {
+      gallery: { boards: archivedBoards, searchTerm: 'sun', selectedBoardId: 'old-board' },
+      hint: null,
+      label: 'a metadata search in an archived board',
+    },
+    { gallery: { semanticSearchText: 'sun' }, hint: null, label: 'a semantic search on a ready index' },
+  ])('shows the hint $hint for $label', async ({ gallery, hint }) => {
+    await renderSearch(gallery);
 
-    expect(host?.querySelector('[role="status"]')?.textContent).toBe('widgets.gallery.semanticSearchArchivedBoard');
-  });
-
-  it('explains why an image similarity search in an archived board finds nothing', async () => {
-    await renderSearch({
-      boards: archivedBoards,
-      selectedBoardId: 'old-board',
-      semanticImageQuery: { imageName: 'ref.png', kind: 'image' },
-    });
-
-    expect(host?.querySelector('[role="status"]')?.textContent).toBe('widgets.gallery.semanticSearchArchivedBoard');
-  });
-
-  it('leaves a cluster in an archived board unexplained, since it lists its members', async () => {
-    await renderSearch({
-      boards: archivedBoards,
-      selectedBoardId: 'old-board',
-      semanticImageQuery: { clusterId: 'c1', kind: 'cluster', label: 'Boats' },
-    });
-
-    expect(host?.querySelector('[role="status"]')).toBeNull();
-  });
-
-  it('leaves a metadata search in an archived board unexplained, since it still matches', async () => {
-    await renderSearch({ boards: archivedBoards, searchTerm: 'sun', selectedBoardId: 'old-board' });
-
-    expect(host?.querySelector('[role="status"]')).toBeNull();
-  });
-
-  it('shows no hint on a ready index', async () => {
-    await renderSearch({ semanticSearchText: 'sun' });
-
-    expect(host?.querySelector('[role="status"]')).toBeNull();
+    expect(host?.querySelector('[role="status"]')?.textContent ?? null).toBe(hint);
   });
 
   it('renders a reference as a chip with the toggle beside it, and a text ranking as the field', async () => {

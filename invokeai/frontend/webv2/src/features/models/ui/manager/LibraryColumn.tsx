@@ -46,8 +46,7 @@ export const LibraryColumn = ({ addAction }: { addAction: ManagerAddAction }) =>
   );
   const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
   const [isBulkReidentifyOpen, setIsBulkReidentifyOpen] = useState(false);
-  // Separate instances: run ignores re-entry, so sharing one would let a slow
-  // re-identify swallow a delete.
+  // Separate instances: run ignores re-entry, so sharing one would let a slow re-identify swallow a delete.
   const { run } = useScopedAction();
   const { run: runReidentify } = useScopedAction();
 
@@ -77,8 +76,7 @@ export const LibraryColumn = ({ addAction }: { addAction: ManagerAddAction }) =>
     // Compute on click because the selection memo intentionally stays empty with no selection.
     const keys = filterModels(models, filters, missingModelKeys).map((model) => model.key);
 
-    // Union: selections made under a previous filter survive, so the delete
-    // confirm always shows the true total.
+    // Union: selections made under a previous filter survive, so the delete confirm always shows the true total.
     updateModelsUi({ selectedKeys: new Set([...selectedKeys, ...keys]) });
   }, [filters, hasSelection, hasUnselectedFiltered, missingModelKeys, models, selectedKeys]);
   const handleActivate = useCallback((modelKey: string) => openModelDetail(modelKey), []);
@@ -116,8 +114,8 @@ export const LibraryColumn = ({ addAction }: { addAction: ManagerAddAction }) =>
       },
       (message) => {
         notify.error(t('models.bulkDeleteFailed'), message);
-        // The scope is current when onError runs, so the default capture inside
-        // refreshModels targets the same account the failed call did.
+        // The scope is current when onError runs, so the default capture inside refreshModels targets the same account
+        // the failed call did.
         void refreshModels();
       }
     );
@@ -131,8 +129,7 @@ export const LibraryColumn = ({ addAction }: { addAction: ManagerAddAction }) =>
         const result = await bulkReidentifyModels(keys, owner.signal);
 
         assertAccountScopeCurrent(owner);
-        // The endpoint returns keys only; the refreshed library carries the
-        // re-detected configs.
+        // The endpoint returns keys only; the refreshed library carries the re-detected configs.
         await refreshModels(owner);
         assertAccountScopeCurrent(owner);
         updateModelsUi({ selectedKeys: new Set(result.failed.map((failure) => failure.key)) });

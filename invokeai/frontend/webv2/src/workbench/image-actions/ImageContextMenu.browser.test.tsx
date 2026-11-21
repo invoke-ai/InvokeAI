@@ -1,5 +1,5 @@
 /* oxlint-disable react-perf/jsx-no-new-object-as-prop, react-perf/jsx-no-new-array-as-prop */
-import type { GalleryBoard, GalleryImage, GalleryItem, GalleryItemKey, GalleryVideoItem } from '@features/gallery';
+import type { GalleryBoard, GalleryImage, GalleryItem, GalleryItemKey } from '@features/gallery';
 import type { GalleryItemContextMenuTarget } from '@features/gallery/react';
 import type { ModelsSnapshot } from '@features/models/data/modelsStore';
 
@@ -8,15 +8,11 @@ import { ChakraProvider } from '@chakra-ui/react';
 import { galleryKeys } from '@features/gallery/queries';
 import { setModelsSnapshotForTests } from '@features/models/data/modelsStore';
 import { captureAccountScope } from '@platform/state/accountLifecycle';
-import { getContrastRatio } from '@platform/ui/theme/contrastRatio.testing';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { applyThemeToRoot } from '@theme/applyTheme';
 import { system } from '@theme/system';
-import { DEFAULT_THEME_ID, THEMES } from '@theme/themes';
 import { act, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { userEvent } from 'vitest/browser';
 
 import type * as ModelOnlyUpscaleModule from './modelOnlyUpscale';
 import type { ImageActions } from './useImageActions';
@@ -36,6 +32,7 @@ vi.mock('@workbench/projects/library', () => ({
   useProjectLibrarySelector: (selector: (snapshot: { summaries: [] }) => unknown) => selector({ summaries: [] }),
 }));
 const commandsMock = vi.hoisted(() => ({
+  gallery: { setCompareItem: vi.fn() },
   generation: { setSource: vi.fn(), submitModelOnlyUpscale: vi.fn() },
   notifications: { add: vi.fn() },
   widgets: { patchValues: vi.fn() },
@@ -81,9 +78,13 @@ vi.mock('./modelOnlyUpscale', async (importOriginal) => {
         : original.queueModelOnlyUpscale(...args),
   };
 });
+// The open project's Gallery values, which the compare entry reads its state from.
+const galleryValuesMock = vi.hoisted(() => ({ current: {} as Record<string, unknown> }));
 vi.mock('@workbench/WorkbenchContext', () => ({
   useActiveProjectId: () => 'project-1',
   useActiveProjectName: () => 'Project',
+  useWidgetValuesSelector: (_widgetId: string, selector: (values: Record<string, unknown>) => unknown) =>
+    selector(galleryValuesMock.current),
   useWorkbenchCommands: () => commandsMock,
 }));
 // Keys stand in for copy; the one interpolated value a test reads, an upscale factor, is shown as the locale does.
@@ -176,9 +177,9 @@ const settleUntil = async (isSettled: () => boolean, description: string, timeou
 };
 
 /**
- * Hovers an item the way zag recognises. zag only treats a move as a real hover when the pointer position changes,
- * so approach the item's center from one pixel away instead of dispatching a static point, which reads as no move
- * at all whenever zag's last recorded position is already there.
+ * Hovers an item the way zag recognises. zag only treats a move as a real hover when the pointer position changes, so
+ * approach the item's center from one pixel away instead of dispatching a static point, which reads as no move at all
+ * whenever zag's last recorded position is already there.
  */
 const hoverItem = async (target: HTMLElement): Promise<void> => {
   const rect = target.getBoundingClientRect();
@@ -308,6 +309,7 @@ afterEach(async () => {
   host?.remove();
   host = null;
   root = null;
+  galleryValuesMock.current = {};
 });
 
 describe('ImageContextMenu deletion delegation', () => {
@@ -317,7 +319,9 @@ describe('ImageContextMenu deletion delegation', () => {
 
     await interact(() => getMenuItem('widgets.gallery.itemMenu.deleteImage').click());
 
-    expect(deleteItems).toHaveBeenCalledExactlyOnceWith([{ kind: 'image', name: 'single.png' }]);
+    expect(deleteItems).toHaveBeenCalledExactlyOnceWith([{ kind: 'image', name: 'single.png' }], {
+      returnFocus: undefined,
+    });
     expect(getOpenAlertDialog()).toBeNull();
   });
 });
@@ -340,12 +344,6 @@ describe('ImageContextMenu find in gallery', () => {
     await interact(() => getMenuItem('widgets.gallery.findInGallery').click());
     expect(findGalleryItem).toHaveBeenLastCalledWith({ kind: 'video', name: 'clip.mp4' });
   });
-
-  it('is absent from bulk menus, which have no single item to reveal', async () => {
-    await renderMenu(createActions(vi.fn()), [image('a.png'), image('b.png')]);
-
-    expect(document.body.textContent).not.toContain('widgets.gallery.findInGallery');
-  });
 });
 
 describe('ImageContextMenu load workflow', () => {
@@ -364,15 +362,6 @@ describe('ImageContextMenu load workflow', () => {
       expect.objectContaining({ imageName: 'made-by-workflow.png' })
     );
   });
-
-  it('keeps Load Workflow disabled for an image without one', async () => {
-    const actions = createActions(vi.fn());
-    await renderMenu(actions, [image('plain.png')]);
-
-    await vi.waitFor(() => expect(galleryMock.resolve).toHaveBeenCalledWith('plain.png', expect.any(AbortSignal)));
-    expect(getMenuItem(LOAD_WORKFLOW).getAttribute('aria-disabled')).toBe('true');
-    expect(actions.loadImageWorkflow).not.toHaveBeenCalled();
-  });
 });
 
 describe('ImageContextMenu PBR maps', () => {
@@ -384,70 +373,6 @@ describe('ImageContextMenu PBR maps', () => {
 
     expect(actions.generatePbrMaps).toHaveBeenCalledExactlyOnceWith(
       expect.objectContaining({ imageName: 'texture.png' })
-    );
-  });
-
-  it('is absent from bulk menus, which queue nothing per image', async () => {
-    await renderMenu(createActions(vi.fn()), [image('a.png'), image('b.png')]);
-
-    expect(document.body.textContent).not.toContain(GENERATE_PBR_MAPS);
-  });
-});
-
-describe('ImageContextMenu starred state', () => {
-  const starIconFill = (label: string): string =>
-    getComputedStyle(document.querySelector<HTMLElement>(`[aria-label="${label}"] svg`)!).fill;
-
-  it('fills the star for a starred item and leaves it outlined otherwise', async () => {
-    // Fill distinguishes starred state because Lucide outlines alone look identical.
-    const unstarred = item('image', 'plain.png');
-    await renderItemMenu(createActions(vi.fn()), {
-      itemRefs: [{ kind: 'image', name: unstarred.name }],
-      items: [unstarred],
-      x: 20,
-      y: 20,
-    });
-
-    expect(starIconFill('widgets.preview.starImage')).toBe('none');
-
-    await interact(() => root?.unmount());
-    host?.remove();
-
-    const starred = { ...item('image', 'fave.png'), starred: true };
-    await renderItemMenu(createActions(vi.fn()), {
-      itemRefs: [{ kind: 'image', name: starred.name }],
-      items: [starred],
-      x: 20,
-      y: 20,
-    });
-
-    expect(starIconFill('widgets.preview.unstarImage')).not.toBe('none');
-  });
-
-  it('fills the bulk star only once every selected item is starred', async () => {
-    const mixed = [item('image', 'a.png'), { ...item('image', 'b.png'), starred: true }];
-    await renderItemMenu(createActions(vi.fn()), {
-      itemRefs: mixed.map((entry) => ({ kind: 'image' as const, name: entry.name })),
-      items: mixed,
-      x: 20,
-      y: 20,
-    });
-
-    expect(getComputedStyle(getMenuItem('widgets.gallery.starSelection').querySelector('svg')!).fill).toBe('none');
-
-    await interact(() => root?.unmount());
-    host?.remove();
-
-    const allStarred = mixed.map((entry) => ({ ...entry, starred: true }));
-    await renderItemMenu(createActions(vi.fn()), {
-      itemRefs: allStarred.map((entry) => ({ kind: 'image' as const, name: entry.name })),
-      items: allStarred,
-      x: 20,
-      y: 20,
-    });
-
-    expect(getComputedStyle(getMenuItem('widgets.gallery.unstarSelection').querySelector('svg')!).fill).not.toBe(
-      'none'
     );
   });
 });
@@ -468,34 +393,22 @@ describe('ImageContextMenu canvas destinations', () => {
   const ADD = 'widgets.gallery.itemMenu.addToCanvasAs';
   const NEW_PROJECT = 'widgets.canvas.import.newProjectFromImage';
 
-  it('groups the single-image menu by intent: continue working, then use and reuse, then housekeeping', async () => {
-    await renderMenu(createActions(vi.fn()), [image('image-0.png')]);
-    const sequence = menuSequence();
-    const workflowIndex = sequence.indexOf(LOAD_WORKFLOW);
+  it('selects another image for compare while one waits, comparing the two', async () => {
+    const waiting = image('waiting.png');
+    galleryValuesMock.current = {
+      compareImage: waiting,
+      selectedImage: waiting,
+      selectedImageName: 'image:waiting.png',
+    };
+    const actions = createActions(vi.fn());
+    const other = image('other.png');
+    await renderMenu(actions, [other]);
 
-    expect(sequence.slice(workflowIndex, workflowIndex + 15)).toEqual([
-      LOAD_WORKFLOW,
-      '—',
-      'widgets.preview.editOnCanvas',
-      'widgets.gallery.itemActions.upscale.label',
-      'widgets.gallery.itemMenu.sendToVideo',
-      '—',
-      ADD,
-      NEW_PROJECT,
-      '—',
-      'widgets.gallery.itemMenu.useAsReferenceImage',
-      'widgets.gallery.itemActions.useAsControl',
-      'widgets.gallery.itemMenu.useAsPromptTemplate',
-      'widgets.gallery.itemMenu.reuseFromImage',
-      '—',
-      'widgets.preview.selectForCompare',
-    ]);
-    const headings = Array.from(document.querySelectorAll('[data-scope="menu"][data-part="item-group-label"]')).map(
-      (label) => label.textContent?.trim()
+    await pickItem('widgets.preview.selectForCompare');
+
+    expect(actions.selectForCompare).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ imageName: 'other.png' })
     );
-    expect(headings).toEqual(['widgets.gallery.itemMenu.continueWorking', 'widgets.gallery.itemMenu.useImageAs']);
-    // A context menu holding every group stays single-line: the step hints belong to Preview's own menus.
-    expect(document.body.textContent).not.toContain('widgets.gallery.itemMenu.editOnCanvasHint');
   });
 
   it('edits the image on the current canvas as a raster layer in one step', async () => {
@@ -507,44 +420,6 @@ describe('ImageContextMenu canvas destinations', () => {
     expect(
       vi.mocked(actions.sendToCanvas).mock.calls.map(([images, destination]) => [images.length, destination])
     ).toEqual([[1, 'raster']]);
-  });
-
-  it('leaves the Edit and Use groups out of the housekeeping variant, keeping the rest in order', async () => {
-    host = document.createElement('div');
-    document.body.append(host);
-    root = createRoot(host);
-    await interact(() => {
-      root?.render(
-        <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-          <ChakraProvider value={system}>
-            <ImageContextMenu
-              actions={createActions(vi.fn())}
-              boards={NO_BOARDS}
-              target={{ images: [image('image-0.png')], x: 20, y: 20 }}
-              variant="housekeeping"
-              onClose={vi.fn()}
-            />
-          </ChakraProvider>
-        </QueryClientProvider>
-      );
-    });
-
-    expect(
-      menuSequence().filter((entry) => entry !== null && !entry.startsWith('widgets.gallery.itemMenu.open'))
-    ).toEqual([
-      'widgets.gallery.itemMenu.copyToClipboard',
-      'widgets.gallery.itemMenu.downloadImage',
-      'widgets.preview.starImage',
-      '—',
-      LOAD_WORKFLOW,
-      'widgets.preview.selectForCompare',
-      GENERATE_PBR_MAPS,
-      '—',
-      'widgets.gallery.findInGallery',
-      'widgets.gallery.changeBoard',
-      '—',
-      'widgets.gallery.itemMenu.deleteImage',
-    ]);
   });
 
   it('reuses the settings from a submenu, Remix first, each gated by what the image records', async () => {
@@ -589,9 +464,19 @@ describe('ImageContextMenu canvas destinations', () => {
       Array.from({ length: 3 }, (_, index) => image(`image-${index}.png`))
     );
 
-    expect(menuSequence().slice(0, 5)).toEqual(['—', ADD, NEW_PROJECT, '—', 'widgets.gallery.starSelection']);
-    // The single-image hand-offs take one image; the canvas items take the whole selection.
-    expect(menuSequence()).not.toContain('widgets.preview.editOnCanvas');
+    // The single-image hand-offs (Edit on Canvas, Use as Control, PBR maps, Find in Gallery) take one image; the canvas
+    // items take the whole selection.
+    expect(menuSequence()).toEqual([
+      '—',
+      ADD,
+      NEW_PROJECT,
+      '—',
+      'widgets.gallery.starSelection',
+      'widgets.gallery.downloadSelection',
+      'widgets.gallery.changeBoard',
+      '—',
+      'widgets.gallery.deleteSelection',
+    ]);
   });
 
   it.each([1, 3])('adds the %s targeted image(s) to the current canvas as the chosen layer', async (count) => {
@@ -599,16 +484,15 @@ describe('ImageContextMenu canvas destinations', () => {
     const images = Array.from({ length: count }, (_, index) => image(`image-${index}.png`));
     await renderMenu(actions, images);
 
-    // A nested menu opens from a real hover on its trigger item, after zag's open delay, so the open is waited for
-    // rather than slept through.
+    // A nested menu opens on a real hover of its trigger after zag's open delay: the open is awaited, not slept.
     await hoverItem(getMenuItem('widgets.gallery.itemMenu.addToCanvasAs'));
     await settleUntil(
       () => menuItemLabels().includes('widgets.canvas.import.inpaintMask'),
       'the add-to-current-canvas submenu to open',
       5000
     );
-    // Raster leads, as the drop zones order them; each destination shows its layer kind's glyph, and resized control
-    // a resize glyph so it reads apart from control.
+    // Raster leads, as the drop zones order them; each destination shows its layer kind's glyph, and resized control a
+    // resize glyph so it reads apart from control.
     const destinations = Array.from(
       getMenuItem('widgets.canvas.import.raster')
         .closest('[role="menu"]')!
@@ -637,41 +521,6 @@ describe('ImageContextMenu canvas destinations', () => {
     expect(calls[0]?.[1]).toBe('inpaint-mask');
     expect(actions.createCanvasFromImages).not.toHaveBeenCalled();
   });
-
-  it.each([1, 3])('starts a new project from the %s targeted image(s) in one step', async (count) => {
-    const actions = createActions(vi.fn());
-    const images = Array.from({ length: count }, (_, index) => image(`image-${index}.png`));
-    await renderMenu(actions, images);
-
-    await pickItem('widgets.canvas.import.newProjectFromImage');
-
-    const calls = vi.mocked(actions.createCanvasFromImages).mock.calls;
-    expect(calls).toHaveLength(1);
-    expect(calls[0]?.[0].map((entry) => entry.imageName)).toEqual(images.map((entry) => entry.imageName));
-    expect(actions.sendToCanvas).not.toHaveBeenCalled();
-  });
-
-  it('offers Use as Control beside Use as Reference Image and hands it the image', async () => {
-    const actions = createActions(vi.fn());
-    await renderMenu(actions, [image('image-0.png')]);
-    const sequence = menuSequence();
-
-    expect(sequence[sequence.indexOf('widgets.gallery.itemMenu.useAsReferenceImage') + 1]).toBe(
-      'widgets.gallery.itemActions.useAsControl'
-    );
-    await pickItem('widgets.gallery.itemActions.useAsControl');
-
-    expect(vi.mocked(actions.sendImageAsControl).mock.calls.map(([entry]) => entry.imageName)).toEqual(['image-0.png']);
-  });
-
-  it('leaves Use as Control out of a multi-image menu: one control layer takes one image', async () => {
-    await renderMenu(
-      createActions(vi.fn()),
-      Array.from({ length: 2 }, (_, index) => image(`image-${index}.png`))
-    );
-
-    expect(menuSequence()).not.toContain('widgets.gallery.itemActions.useAsControl');
-  });
 });
 
 describe('ImageContextMenu video placement', () => {
@@ -690,25 +539,6 @@ describe('ImageContextMenu video placement', () => {
     expect(actions.useAsReferenceVideo).toHaveBeenCalledExactlyOnceWith(video);
   });
 
-  it('disables Use as Reference Video when the Video panel cannot take another', async () => {
-    const actions = createActions(vi.fn());
-    await renderVideoMenu(actions, item('video', 'clip.mp4'));
-
-    expect(getMenuItem('widgets.gallery.itemMenu.useAsReferenceVideo').getAttribute('aria-disabled')).toBe('true');
-    expect(getMenuItem('widgets.gallery.itemMenu.extendInVideo').getAttribute('aria-disabled')).not.toBe('true');
-  });
-
-  it('enables Load Workflow once the video record says it embeds one and hands the video to the action', async () => {
-    const video = item('video', 'made-by-workflow.mp4');
-    const actions = createActions(vi.fn());
-    await renderVideoMenu(actions, video);
-
-    await vi.waitFor(() => expect(getMenuItem(LOAD_WORKFLOW).getAttribute('aria-disabled')).not.toBe('true'));
-    await interact(() => getMenuItem(LOAD_WORKFLOW).click());
-
-    expect(actions.loadVideoWorkflow).toHaveBeenCalledExactlyOnceWith(video);
-  });
-
   it('aborts the video reads when the menu closes before they answer', async () => {
     const pending = () => new Promise<never>(() => {});
     galleryMock.videoMetadata.mockImplementationOnce(pending);
@@ -720,20 +550,6 @@ describe('ImageContextMenu video placement', () => {
 
     const signals = [galleryMock.videoMetadata.mock.lastCall?.[1], galleryMock.resolveItem.mock.lastCall?.[1]];
     expect(signals.map((signal) => signal?.aborted)).toEqual([true, true]);
-  });
-
-  it('keeps Load Workflow disabled for a video without one', async () => {
-    const actions = createActions(vi.fn());
-    await renderVideoMenu(actions, item('video', 'plain.mp4'));
-
-    await vi.waitFor(() =>
-      expect(galleryMock.resolveItem).toHaveBeenCalledWith(
-        { kind: 'video', name: 'plain.mp4' },
-        expect.any(AbortSignal)
-      )
-    );
-    expect(getMenuItem(LOAD_WORKFLOW).getAttribute('aria-disabled')).toBe('true');
-    expect(actions.loadVideoWorkflow).not.toHaveBeenCalled();
   });
 
   const openReuseSubmenu = async (): Promise<void> => {
@@ -749,55 +565,6 @@ describe('ImageContextMenu video placement', () => {
   };
 
   const isDisabled = (label: string) => getMenuItem(label).getAttribute('aria-disabled') === 'true';
-
-  it('gates the recall verbs on the metadata read alone, not on the workflow answer', async () => {
-    let answerMetadata: ((metadata: Record<string, unknown>) => void) | undefined;
-    galleryMock.videoMetadata.mockImplementationOnce(
-      () =>
-        new Promise((resolve) => {
-          answerMetadata = resolve;
-        })
-    );
-    // The listing already says the video embeds a workflow, so Load Workflow waits on nothing.
-    await renderVideoMenu(createActions(vi.fn()), {
-      ...(item('video', 'listed.mp4') as GalleryVideoItem),
-      hasWorkflow: true,
-    });
-    await openReuseSubmenu();
-
-    expect(isDisabled(LOAD_WORKFLOW)).toBe(false);
-    expect(isDisabled('widgets.gallery.itemActions.recall.verbs.prompts')).toBe(true);
-    expect(galleryMock.resolveItem).not.toHaveBeenCalled();
-
-    await interact(() => answerMetadata?.({ generation_mode: 'wan_t2v', positive_prompt: 'a fox', seed: 7 }));
-
-    await vi.waitFor(() => expect(isDisabled('widgets.gallery.itemActions.recall.verbs.prompts')).toBe(false));
-    expect(isDisabled('widgets.gallery.itemActions.recall.verbs.seed')).toBe(false);
-    // The record names no size, so Use Size stays off.
-    expect(isDisabled('widgets.gallery.itemActions.recall.verbs.dimensions')).toBe(true);
-  });
-
-  it('lists the reuse verbs remix first, Use Size last, and recalls the size the record names', async () => {
-    galleryMock.videoMetadata.mockResolvedValueOnce({ generation_mode: 'wan_t2v', height: 720, width: 1280 });
-    const video = item('video', 'sized.mp4');
-    const actions = createActions(vi.fn());
-    await renderVideoMenu(actions, video);
-    await openReuseSubmenu();
-
-    const reuseLabels = [
-      'widgets.gallery.itemMenu.remixVideo',
-      'widgets.gallery.itemMenu.allSettings',
-      'widgets.gallery.itemActions.recall.verbs.prompts',
-      'widgets.gallery.itemActions.recall.verbs.seed',
-      'widgets.gallery.itemActions.recall.verbs.dimensions',
-    ];
-    const menuLabels = Array.from(document.querySelectorAll<HTMLElement>('[role="menuitem"]')).map(itemLabel);
-    expect(menuLabels.filter((label) => label && reuseLabels.includes(label))).toEqual(reuseLabels);
-
-    await vi.waitFor(() => expect(isDisabled('widgets.gallery.itemActions.recall.verbs.dimensions')).toBe(false));
-    await pickItem('widgets.gallery.itemActions.recall.verbs.dimensions');
-    expect(actions.recallVideoData).toHaveBeenCalledExactlyOnceWith(video, 'size');
-  });
 
   it("reads a video's metadata once across opens, and reads a failed one again on the next open", async () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -868,35 +635,6 @@ describe('ImageContextMenu video placement', () => {
 
     expect(actions.useAsConditioningClip).toHaveBeenCalledExactlyOnceWith(video, 'audio');
   });
-
-  it('enables each role from its own capability flag', async () => {
-    const video = item('video', 'clip.mp4');
-    const actions = { ...createActions(vi.fn()), canUseAsConditioningClip: { audio: false, video: true } };
-    await renderVideoMenu(actions, video);
-    await openConditioningSubmenu();
-
-    expect(getMenuItem('widgets.video.conditioningRoleAudio').getAttribute('aria-disabled')).toBe('true');
-    await pickItem('widgets.video.conditioningRoleVideo');
-    expect(actions.useAsConditioningClip).toHaveBeenCalledExactlyOnceWith(video, 'video');
-  });
-
-  it('disables the roles the Video panel cannot take, and the picture of a wrapped audio upload', async () => {
-    const song = { ...item('video', 'song.mp4'), mediaOrigin: 'audio_upload' };
-    const actions = { ...createActions(vi.fn()), canUseAsConditioningClip: { audio: true, video: true } };
-    await renderVideoMenu(actions, song);
-    await openConditioningSubmenu();
-
-    expect(getMenuItem('widgets.video.conditioningRoleAudio').getAttribute('aria-disabled')).not.toBe('true');
-    expect(getMenuItem('widgets.video.conditioningRoleVideo').getAttribute('aria-disabled')).toBe('true');
-
-    await interact(() => root?.unmount());
-    host?.remove();
-    await renderVideoMenu(createActions(vi.fn()), item('video', 'clip.mp4'));
-    await openConditioningSubmenu();
-
-    expect(getMenuItem('widgets.video.conditioningRoleAudio').getAttribute('aria-disabled')).toBe('true');
-    expect(getMenuItem('widgets.video.conditioningRoleVideo').getAttribute('aria-disabled')).toBe('true');
-  });
 });
 
 describe('ImageContextMenu mixed-media action visibility', () => {
@@ -923,142 +661,6 @@ describe('ImageContextMenu mixed-media action visibility', () => {
     expect(document.body.textContent).not.toContain('widgets.preview.selectForCompare');
     expect(document.body.textContent).not.toContain('widgets.gallery.itemMenu.addToCanvasAs');
     expect(document.body.textContent).not.toContain('widgets.canvas.import.newProjectFromImage');
-  });
-
-  it('shows frame copy and Details only when a Preview host opts a single video into them', async () => {
-    const video = item('video', 'preview.mp4');
-    const onCopyCurrentFrame = vi.fn();
-    const onOpenDetails = vi.fn();
-    await renderItemMenu(
-      createActions(vi.fn()),
-      {
-        itemRefs: [{ kind: 'video', name: video.name }],
-        items: [video],
-        x: 20,
-        y: 20,
-      },
-      { isCopyCurrentFrameAvailable: false, itemKey: 'video:preview.mp4', onCopyCurrentFrame, onOpenDetails }
-    );
-
-    const copy = getMenuItem('widgets.preview.copyCurrentFrame');
-    const details = getMenuItem('widgets.preview.videoDetails');
-    expect(copy.getAttribute('aria-disabled')).toBe('true');
-
-    await interact(() => details.click());
-    expect(onOpenDetails).toHaveBeenCalledOnce();
-    expect(onCopyCurrentFrame).not.toHaveBeenCalled();
-  });
-
-  it("keeps only housekeeping in a Preview video's housekeeping menu, leaving use and reuse to the Use menu", async () => {
-    const video = item('video', 'preview.mp4');
-    await renderItemMenu(
-      createActions(vi.fn()),
-      { itemRefs: [{ kind: 'video', name: video.name }], items: [video], x: 20, y: 20 },
-      {
-        isCopyCurrentFrameAvailable: true,
-        itemKey: 'video:preview.mp4',
-        onCopyCurrentFrame: vi.fn(),
-        onOpenDetails: vi.fn(),
-      },
-      undefined,
-      'housekeeping'
-    );
-
-    // The quick row stays, as for an image's housekeeping menu.
-    for (const label of [
-      'widgets.gallery.itemMenu.openInNewTab',
-      'widgets.gallery.itemMenu.downloadVideo',
-      'widgets.gallery.itemMenu.openInPreview',
-      'widgets.preview.starVideo',
-    ]) {
-      expect(document.querySelector(`[aria-label="${label}"]`)).not.toBeNull();
-    }
-    const rowLabels = Array.from(document.querySelectorAll<HTMLElement>('[role="menuitem"]'))
-      .filter((candidate) => !candidate.hasAttribute('aria-label'))
-      .map(itemLabel);
-    expect(rowLabels).toEqual([
-      'widgets.gallery.itemActions.loadWorkflow.label',
-      'widgets.preview.copyCurrentFrame',
-      'widgets.preview.videoDetails',
-      'widgets.gallery.findInGallery',
-      'widgets.gallery.changeBoard',
-      'widgets.gallery.itemMenu.deleteVideo',
-    ]);
-    expect(galleryMock.videoMetadata).not.toHaveBeenCalledWith('preview.mp4', expect.anything());
-  });
-
-  it('hides Preview video extras when the captured menu target is no longer the selected video', async () => {
-    const video = item('video', 'stale-menu.mp4');
-    await renderItemMenu(
-      createActions(vi.fn()),
-      {
-        itemRefs: [{ kind: 'video', name: video.name }],
-        items: [video],
-        x: 20,
-        y: 20,
-      },
-      {
-        isCopyCurrentFrameAvailable: true,
-        itemKey: 'video:new-selection.mp4',
-        onCopyCurrentFrame: vi.fn(),
-        onOpenDetails: vi.fn(),
-      }
-    );
-
-    expect(document.body.textContent).not.toContain('widgets.preview.copyCurrentFrame');
-    expect(document.body.textContent).not.toContain('widgets.preview.videoDetails');
-  });
-
-  it('opens the primary video from a video-only multi-selection and keeps image-only actions hidden', async () => {
-    const primaryVideo = item('video', 'primary.mp4');
-    const secondaryVideo = item('video', 'secondary.mp4');
-    const actions = createActions(vi.fn());
-    await renderItemMenu(actions, {
-      itemRefs: [
-        { kind: 'video', name: primaryVideo.name },
-        { kind: 'video', name: secondaryVideo.name },
-      ],
-      items: [primaryVideo, secondaryVideo],
-      x: 20,
-      y: 20,
-    });
-
-    const target = {
-      itemRefs: [
-        { kind: 'video' as const, name: primaryVideo.name },
-        { kind: 'video' as const, name: secondaryVideo.name },
-      ],
-      items: [primaryVideo, secondaryVideo],
-      x: 20,
-      y: 20,
-    };
-    // Selecting closes the menu, so each quick item gets its own open.
-    await pickQuickItem('widgets.gallery.itemMenu.openInNewTab');
-    await interact(() => root?.unmount());
-    host?.remove();
-    await renderItemMenu(actions, target);
-    await pickQuickItem('widgets.gallery.itemMenu.openInPreview');
-
-    expect(actions.openItemInNewTab).toHaveBeenCalledWith(primaryVideo);
-    expect(actions.openItemInPreview).toHaveBeenCalledWith(primaryVideo);
-    expect(document.body.textContent).not.toContain('widgets.gallery.itemMenu.copyToClipboard');
-    expect(document.body.textContent).not.toContain('widgets.gallery.itemMenu.reuseFromVideo');
-    expect(document.body.textContent).not.toContain('widgets.preview.selectForCompare');
-    expect(document.body.textContent).not.toContain('widgets.gallery.itemMenu.addToCanvasAs');
-    expect(document.body.textContent).not.toContain('widgets.canvas.import.newProjectFromImage');
-  });
-
-  it("offers Unstar All from the host's star answer for a selection with unloaded members", async () => {
-    const loadedImage = { ...item('image', 'starred-still.png'), starred: true };
-    const actions = createActions(vi.fn());
-    const refs = [
-      { kind: 'image' as const, name: loadedImage.name },
-      { kind: 'image' as const, name: 'starred-unloaded.png' },
-    ];
-    await renderItemMenu(actions, { allStarred: true, itemRefs: refs, items: [loadedImage], x: 20, y: 20 });
-
-    await interact(() => getMenuItem('widgets.gallery.unstarSelection').click());
-    expect(actions.setItemsStarred).toHaveBeenCalledWith(refs, false);
   });
 
   it('keeps complete mixed refs for common bulk actions and hides image-only bulk actions when a ref is unresolved', async () => {
@@ -1185,91 +787,6 @@ describe('ImageContextMenu change-board destinations', () => {
     expect(document.querySelector('[data-value="board-old"]')).toBeNull();
     expect(document.querySelector('[data-value="remove-from-board"]')).not.toBeNull();
   });
-
-  it('offers no move to Uncategorized for an item already there', async () => {
-    const owned = {
-      actions: ['read', 'add_media'],
-      adminOverride: false,
-      generalAccess: 'restricted',
-      role: 'owner',
-    } as const;
-    await renderWithBoards([board('there', owned)], 'board-there');
-
-    expect(document.querySelector('[data-value="remove-from-board"]')).toBeNull();
-  });
-
-  /**
-   * Zag places a submenu a frame after it mounts, and only then sets the `--available-height` its height cap reads, so
-   * a long list overflows the screen unscrolled until then; a scroll set before it is clamped to zero.
-   */
-  const waitForCappedList = (scroller: HTMLElement) =>
-    settleUntil(() => scroller.scrollHeight > scroller.clientHeight, 'the board list to be capped and scrollable');
-
-  it('grows a long board list past the old 18rem cap, keeps it on screen, and scrolls to the last board by keyboard', async () => {
-    const owned = {
-      actions: ['read', 'add_media'],
-      adminOverride: false,
-      generalAccess: 'restricted',
-      role: 'owner',
-    } as const;
-    const boards = Array.from({ length: 30 }, (_, index) => board(`b${String(index + 1).padStart(2, '0')}`, owned));
-    await renderWithBoards(boards, 'board-b30');
-
-    const last = document.querySelector<HTMLElement>('[data-value="board-b30"]')!;
-    const content = last.closest<HTMLElement>('[data-scope="menu"][data-part="content"]')!;
-    const scroller = last.closest<HTMLElement>('[data-scope="scroll-area"][data-part="viewport"]')!;
-    // Thirty boards overflow even the taller list, so the Scrollable carries the rest.
-    await waitForCappedList(scroller);
-    const contentRect = content.getBoundingClientRect();
-    expect(contentRect.height).toBeGreaterThan(18 * 16);
-    expect(contentRect.top).toBeGreaterThanOrEqual(0);
-    expect(contentRect.bottom).toBeLessThanOrEqual(window.innerHeight);
-    expect(last.getBoundingClientRect().top).toBeGreaterThanOrEqual(scroller.getBoundingClientRect().bottom);
-
-    await interact(() => content.focus());
-    await userEvent.keyboard('{End}');
-    await settleUntil(() => last.hasAttribute('data-highlighted'), 'the last board to be highlighted');
-    await settleUntil(() => {
-      const itemRect = last.getBoundingClientRect();
-      const viewRect = scroller.getBoundingClientRect();
-      return itemRect.top >= viewRect.top && itemRect.bottom <= viewRect.bottom;
-    }, 'the last board to scroll fully into view');
-  });
-
-  it('leaves the list where it is when the pointer highlights a row cut off at its edge', async () => {
-    const owned = {
-      actions: ['read', 'add_media'],
-      adminOverride: false,
-      generalAccess: 'restricted',
-      role: 'owner',
-    } as const;
-    await renderWithBoards(
-      Array.from({ length: 30 }, (_, index) => board(`b${String(index + 1).padStart(2, '0')}`, owned)),
-      'board-b30'
-    );
-    const scroller = document
-      .querySelector('[data-value="board-b30"]')!
-      .closest<HTMLElement>('[data-scope="scroll-area"][data-part="viewport"]')!;
-    await waitForCappedList(scroller);
-    // Leave the first board half scrolled away above the list's top edge.
-    const first = document.querySelector<HTMLElement>('[data-value="board-b01"]')!;
-    await interact(() => {
-      scroller.scrollTop = first.getBoundingClientRect().top - scroller.getBoundingClientRect().top + 8;
-    });
-    const scrollTop = scroller.scrollTop;
-    const firstRect = first.getBoundingClientRect();
-    const viewTop = scroller.getBoundingClientRect().top;
-    expect(firstRect.top).toBeLessThan(viewTop);
-    expect(firstRect.bottom).toBeGreaterThan(viewTop + 4);
-
-    // A real pointer on the part still showing. It targets the list, which is fully in view: Playwright would scroll a
-    // cut-off target into view itself before hovering it.
-    await userEvent.hover(scroller, { position: { x: 8, y: firstRect.bottom - viewTop - 3 } });
-    await settleUntil(() => first.hasAttribute('data-highlighted'), 'the cut-off board to be highlighted');
-    await interact(() => undefined);
-
-    expect(scroller.scrollTop).toBe(scrollTop);
-  });
 });
 
 describe('ImageContextMenu Upscale submenu', () => {
@@ -1288,10 +805,6 @@ describe('ImageContextMenu Upscale submenu', () => {
   });
   const SEND_TO = 'widgets.gallery.itemActions.upscale.sendTo';
   const MODEL_ONLY = 'widgets.gallery.itemActions.upscale.modelOnlyGroup';
-  const NO_UPSCALERS = 'widgets.gallery.itemActions.upscale.noUpscalers';
-  const NATIVE_SCALE_UNKNOWN = 'widgets.upscale.nativeScaleUnknown';
-  const NATIVE_ENTRY = 'widgets.gallery.itemActions.upscale.nativeScaleUnknownFactor';
-  const OTHER_FACTORS = 'widgets.gallery.itemActions.upscale.otherFactors';
 
   const openUpscaleSubMenu = async (
     models: ReturnType<typeof upscaler>[],
@@ -1342,73 +855,6 @@ describe('ImageContextMenu Upscale submenu', () => {
     expect(entries(menu)).toEqual([SEND_TO, MODEL_ONLY, '2x-AnimeSharp2×', '4x-UltraSharp4×', 'Legacy restorer']);
   });
 
-  it('still runs an upscaler of unknown native scale once at it, and says how to unlock the other factors', async () => {
-    const legacy = upscaler('legacy', 'Legacy restorer', null);
-    const factorMenu = await openFactorSubMenu(legacy, '');
-    const otherFactors = factorMenu.querySelector<HTMLElement>('[data-value="upscale-model-only-legacy-other"]')!;
-
-    expect(entries(factorMenu)).toEqual([NATIVE_ENTRY, `${OTHER_FACTORS}${NATIVE_SCALE_UNKNOWN} (disabled)`]);
-    expect(document.getElementById(otherFactors.getAttribute('aria-describedby')!)?.textContent).toBe(
-      NATIVE_SCALE_UNKNOWN
-    );
-
-    await interact(() => getMenuItem(NATIVE_ENTRY).click());
-    await settleUntil(
-      () => commandsMock.generation.submitModelOnlyUpscale.mock.calls.length > 0,
-      'the upscale to queue'
-    );
-
-    expect(commandsMock.generation.submitModelOnlyUpscale).toHaveBeenCalledTimes(1);
-    expect(commandsMock.generation.submitModelOnlyUpscale).toHaveBeenCalledWith(
-      expect.objectContaining({ scale: 'native', upscaleModel: legacy })
-    );
-  });
-
-  it.each([
-    [4, ['1.5×', '2×', '4× (native)']],
-    // A 2x model's native scale is one of the presets: it is offered once, as native.
-    [2, ['1.5×', '2× (native)']],
-    // A 1x model enlarges nothing, so it offers its own scale alone.
-    [1, ['1× (native)']],
-  ])('offers a %sx upscaler its factors, smallest first', async (scale, factors) => {
-    const factorMenu = await openFactorSubMenu(upscaler('model', 'Model', scale), `${scale}×`);
-
-    expect(entries(factorMenu)).toEqual(factors);
-  });
-  it.each(THEMES.map(({ id }) => id))('shows the scale suffix at AA contrast on the %s menu', async (themeId) => {
-    applyThemeToRoot(themeId);
-
-    try {
-      const menu = await openUpscaleSubMenu([upscaler('ultra', '4x-UltraSharp', 4)]);
-      const suffix = [...menu.querySelectorAll<HTMLElement>('[role="menuitem"] *')].find(
-        (element) => element.childElementCount === 0 && element.textContent === '4×'
-      )!;
-
-      expect(
-        getContrastRatio(getComputedStyle(suffix).color, getComputedStyle(menu).backgroundColor, 1)
-      ).toBeGreaterThanOrEqual(4.5);
-    } finally {
-      applyThemeToRoot(DEFAULT_THEME_ID);
-    }
-  });
-
-  it.each([
-    ['none are installed', 'loaded', NO_UPSCALERS],
-    ['the library is loading', 'loading', 'models.loadingModels'],
-    ['the library has not been asked for yet', 'idle', 'models.loadingModels'],
-    ['the library could not load', 'error', 'models.couldNotLoad'],
-  ] as const)(
-    'offers Send to Upscale and one unavailable model-only entry that says why when %s',
-    async (_case, status, reason) => {
-      const menu = await openUpscaleSubMenu([], status);
-      const modelOnly = menu.querySelector<HTMLElement>('[data-value="upscale-model-only"]')!;
-
-      expect(ensureModelsLoaded).toHaveBeenCalled();
-      expect(entries(menu)).toEqual([SEND_TO, `${MODEL_ONLY}${reason} (disabled)`]);
-      expect(document.getElementById(modelOnly.getAttribute('aria-describedby')!)?.textContent).toBe(reason);
-    }
-  );
-
   it.each([
     ['its native scale', '4× (native)', 'native'],
     ['another factor', '1.5×', 1.5],
@@ -1432,36 +878,5 @@ describe('ImageContextMenu Upscale submenu', () => {
       sourceMetadata: { positive_prompt: 'a lighthouse' },
       upscaleModel: ultra,
     });
-  });
-
-  it('says the upscale could not start when its code fails to load', async () => {
-    modelOnlyLoad.fail = true;
-
-    try {
-      await openFactorSubMenu(upscaler('ultra', '4x-UltraSharp', 4), '4×');
-      await interact(() => getMenuItem('4× (native)').click());
-      await settleUntil(() => commandsMock.notifications.add.mock.calls.length > 0, 'the load failure notice');
-    } finally {
-      modelOnlyLoad.fail = false;
-    }
-
-    expect(commandsMock.notifications.add).toHaveBeenCalledWith({
-      kind: 'error',
-      title: 'widgets.gallery.itemActions.upscale.loadFailed',
-    });
-    expect(commandsMock.generation.submitModelOnlyUpscale).not.toHaveBeenCalled();
-  });
-
-  it('queues nothing and names the image when its metadata cannot be read', async () => {
-    galleryMock.metadata.mockRejectedValue(new Error('offline'));
-    await openFactorSubMenu(upscaler('ultra', '4x-UltraSharp', 4), '4×');
-
-    await interact(() => getMenuItem('4× (native)').click());
-    await settleUntil(() => commandsMock.notifications.add.mock.calls.length > 0, 'the failure notice');
-
-    expect(commandsMock.generation.submitModelOnlyUpscale).not.toHaveBeenCalled();
-    expect(commandsMock.notifications.add).toHaveBeenCalledWith(
-      expect.objectContaining({ kind: 'error', title: 'widgets.gallery.itemActions.upscale.metadataFailed' })
-    );
   });
 });

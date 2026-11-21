@@ -4,62 +4,37 @@ import type { WidgetInstanceId } from '@workbench/widgetContracts';
 import type { FocusEvent, PointerEvent, ReactNode } from 'react';
 
 import { captureAccountScope, isAccountScopeCurrent, type AccountScope } from '@platform/state/accountLifecycle';
+import { getModalOpenGeneration } from '@platform/ui/modalPresence';
 import { createContext, use, useCallback, useSyncExternalStore } from 'react';
 
 import { useWorkbenchPreferenceSelector } from './settings/store';
 
-/** What holds workbench focus: a docked region, or one floating window. */
 export type WorkbenchFocusTarget =
   | { kind: 'region'; region: WidgetRegion }
   | { instanceId: WidgetInstanceId; kind: 'floating' };
 
 type FocusDirection = 'left' | 'right' | 'up' | 'down';
 
-/**
- * Transient workbench focus, owned by one provider above the shell and the hotkey runtime. It is never persisted:
- * the outline, the hotkey target, and focus moves all read it, and it is fenced to the project and account it was
- * set under. The center region, which every shell has, holds focus whenever nothing else does.
- */
+/** Transient and never persisted; fenced to the project and account it was set under. The center is the default. */
 export interface WorkbenchFocusController {
-  /**
-   * Record what the user focused: `'activated'` when the target changed, `'unchanged'` when it already held
-   * focus, `'refused'` for an event from a project that is no longer on screen. A pointer press on anything but a
-   * pending focus move's destination also abandons that move: the user went somewhere else on purpose.
-   */
+  /** A pointer press anywhere but a pending focus move's destination abandons that move. */
   activate(target: WorkbenchFocusTarget, options?: { byPointer?: boolean; projectId?: string }): FocusActivation;
-  /** Forget the target, so the center holds focus again, and abandon any focus move still waiting for its widget. */
   clear(): void;
-  /** Focus the nearest visible docked region in this direction, without changing its selected widget. */
   focusAdjacentRegion(direction: FocusDirection): void;
-  /** Move keyboard focus into a floating window once it shows; focus arriving there activates it. */
   focusFloating(instanceId: WidgetInstanceId): void;
-  /**
-   * Move keyboard focus into the region a control just opened a widget in, once that widget shows. Without a
-   * widget, focus moves into the region as it stands. An instance id waits for that widget's visible frame,
-   * including when another instance of the same type is still mounted but hidden.
-   */
-  focusRegion(region: WidgetRegion, typeId?: string, instanceId?: WidgetInstanceId): void;
-  /**
-   * Forget a window target whose window has docked or closed, and tell subscribers the center holds focus again.
-   * Forgetting it also keeps the same instance from taking focus back without being focused, should a preset or undo
-   * float it again.
-   */
+  /** An instance id waits for that widget's visible frame, even while a hidden instance of its type is mounted. */
+  focusRegion(region: WidgetRegion, typeId?: string, instanceId?: WidgetInstanceId, ready?: Promise<unknown>): void;
+  /** Forgetting also keeps a re-floated instance (preset, undo) from taking focus back unasked. */
   forgetClosedWindow(): void;
-  /**
-   * The focus target: the one recorded, or the center while none is recorded or the recorded one no longer describes
-   * something on screen in this project and account. Never null; the nullable type is shared with readers outside the
-   * provider, where there is no target.
-   */
+  /** Never null inside the provider; the nullable type is shared with readers outside it. */
   getTarget(): WorkbenchFocusTarget | null;
   subscribe(listener: () => void): () => void;
 }
 
 export type FocusActivation = 'activated' | 'refused' | 'unchanged';
 
-/** What the controller has to know about the workbench to keep its target honest. */
 export interface WorkbenchFocusScope {
   getProjectId(): string;
-  /** Whether the instance floats in the project on screen; a window that docked or closed holds no focus. */
   isFloating(instanceId: WidgetInstanceId): boolean;
 }
 
@@ -96,9 +71,7 @@ export const createWorkbenchFocusController = ({
       listener();
     }
   };
-  // The one place a target is judged. The owner clears eagerly on project and account changes, which is what
-  // notifies subscribers and stops moves, and forgets a closed window on the next workbench change; this read-time
-  // check covers the instant between such a change and the owner's response.
+  // The one place a target is judged; covers the instant between a project/account change and the owner's clear.
   const getTarget = (): WorkbenchFocusTarget =>
     entry &&
     entry.projectId === getProjectId() &&
@@ -107,19 +80,23 @@ export const createWorkbenchFocusController = ({
       ? entry.target
       : CENTER_TARGET;
 
-  /**
-   * Leaves focus alone while it is inside the container, and gives up if the container never shows, the project or
-   * account changes first, or the user presses somewhere else. Focus that starts inside is still watched: the opener
-   * can sit in the view the open replaces, which drops its focus a frame later.
-   */
-  const moveFocus = (target: WorkbenchFocusTarget, findContainer: () => HTMLElement | null): void => {
-    // The control that asked, where a closing menu or dialog would put focus back.
+  /** Focus that starts inside is still watched: the opener can sit in the view the open replaces. */
+  const moveFocus = (
+    target: WorkbenchFocusTarget,
+    findContainer: () => HTMLElement | null,
+    ready?: Promise<unknown>
+  ): void => {
     const opener = document.activeElement;
     const move = ++focusMove;
     const projectId = getProjectId();
     const owner = captureAccountScope();
-    const isCurrent = () => move === focusMove && projectId === getProjectId() && isAccountScopeCurrent(owner);
-    const deadline = performance.now() + FOCUS_MOVE_WAIT_MS;
+    const modalGeneration = getModalOpenGeneration();
+    const isCurrent = () =>
+      move === focusMove &&
+      modalGeneration === getModalOpenGeneration() &&
+      projectId === getProjectId() &&
+      isAccountScopeCurrent(owner);
+    let deadline: number;
 
     moveTarget = target;
 
@@ -158,38 +135,52 @@ export const createWorkbenchFocusController = ({
       }
     };
 
-    requestAnimationFrame(attempt);
+    const start = () => {
+      if (!isCurrent()) {
+        return;
+      }
+      deadline = performance.now() + FOCUS_MOVE_WAIT_MS;
+      requestAnimationFrame(attempt);
+    };
+    if (ready) {
+      void ready.then(start, start);
+    } else {
+      start();
+    }
   };
 
-  const focusRegion: WorkbenchFocusController['focusRegion'] = (region, typeId, instanceId) =>
-    moveFocus({ kind: 'region', region }, () => {
-      // Side frames are replaced when their lazy view loads; center's owning frame stays mounted.
-      // Kept-alive panels and instances of the same type may also still be mounted but hidden.
-      for (const container of visibleRegionContainers()) {
-        if (
-          container.dataset.focusRegion !== region ||
-          (region !== 'center' && container.querySelector('[data-widget-loading]'))
-        ) {
-          continue;
-        }
-        if (instanceId !== undefined) {
-          const selector = `[data-hotkey-widget-instance-id="${CSS.escape(instanceId)}"]`;
+  const focusRegion: WorkbenchFocusController['focusRegion'] = (region, typeId, instanceId, ready) =>
+    moveFocus(
+      { kind: 'region', region },
+      () => {
+        // Side frames are replaced when their lazy view loads; hidden kept-alive instances may still be mounted.
+        for (const container of visibleRegionContainers()) {
           if (
-            [container, ...container.querySelectorAll<HTMLElement>(selector)].some(
-              (element) => element.matches(selector) && element.getClientRects().length > 0
-            )
+            container.dataset.focusRegion !== region ||
+            (region !== 'center' && container.querySelector('[data-widget-loading]'))
           ) {
+            continue;
+          }
+          if (instanceId !== undefined) {
+            const selector = `[data-hotkey-widget-instance-id="${CSS.escape(instanceId)}"]`;
+            if (
+              [container, ...container.querySelectorAll<HTMLElement>(selector)].some(
+                (element) => element.matches(selector) && element.getClientRects().length > 0
+              )
+            ) {
+              return container;
+            }
+            continue;
+          }
+          if (typeId === undefined || container.querySelector(`[data-hotkey-widget-type-id="${CSS.escape(typeId)}"]`)) {
             return container;
           }
-          continue;
         }
-        if (typeId === undefined || container.querySelector(`[data-hotkey-widget-type-id="${CSS.escape(typeId)}"]`)) {
-          return container;
-        }
-      }
 
-      return null;
-    });
+        return null;
+      },
+      ready
+    );
 
   return {
     activate: (target, { byPointer = false, projectId = getProjectId() } = {}) => {
@@ -218,7 +209,6 @@ export const createWorkbenchFocusController = ({
       }
     },
     focusAdjacentRegion: (direction) => {
-      // Four docked regions at most; read their actual layout only on a navigation command.
       const regions = visibleRegionContainers().map((container) => ({
         container,
         rect: container.getBoundingClientRect(),
@@ -244,8 +234,7 @@ export const createWorkbenchFocusController = ({
       const end = horizontal ? 'right' : 'bottom';
       const crossStart = horizontal ? 'top' : 'left';
       const crossEnd = horizontal ? 'bottom' : 'right';
-      // A window can overlap several docks. Use its center on the movement axis so its outer edges cannot
-      // exclude all of them; docked regions still navigate from edge to edge.
+      // A window can overlap several docks: use its center on the movement axis.
       const originStart = target.kind === 'floating' ? (originRect[start] + originRect[end]) / 2 : originRect[start];
       const originEnd = target.kind === 'floating' ? originStart : originRect[end];
       const candidates = regions.flatMap(({ container, rect }) => {
@@ -263,8 +252,7 @@ export const createWorkbenchFocusController = ({
           Number(b.aligned) - Number(a.aligned) ||
           (a.aligned ? a.gap - b.gap || a.offset - b.offset : a.gap + 2 * a.offset - b.gap - 2 * b.offset)
       );
-      // With no dock beyond the window in this direction (for example, all side panels closed), return to
-      // the dock underneath its center instead of trapping keyboard focus in the window.
+      // With no dock beyond the window, return to the dock under its center rather than trapping focus.
       const next =
         candidates[0]?.container ??
         (target.kind === 'floating'
@@ -314,10 +302,7 @@ const highlightBase = {
 const fade = (property: string) =>
   `${property} var(--wb-motion-duration-fast) ease, opacity var(--wb-motion-duration-fast) ease`;
 
-/**
- * `inside` strokes inward from the box edge (a border), `outside` strokes outward from it (an outline). Each paints
- * its 1px from one snapped edge, so the side a stroke grows toward picks which CSS edge anchors it.
- */
+/** Each stroke paints its 1px from one snapped edge; the side it grows toward picks the anchoring CSS edge. */
 const STROKES = {
   inside: {
     hidden: { border: '1px solid', borderColor: 'transparent', transition: fade('border-color') },
@@ -331,8 +316,7 @@ const STROKES = {
 
 const regionHighlight = (inset: string, stroke: keyof typeof STROKES) => ({
   '&[data-highlighted="true"]::after': { ...STROKES[stroke].shown, opacity: 1 },
-  // The region outline represents frame focus. Controls keep their own rings, and disabling the highlight
-  // restores the browser's frame indicator as well.
+  // The region outline stands in for the browser's frame focus indicator.
   '&[data-highlighted="true"]:focus-visible, &[data-highlighted="true"] [data-hotkey-widget-instance-id]:focus-visible':
     {
       outline: 'none',
@@ -340,13 +324,8 @@ const regionHighlight = (inset: string, stroke: keyof typeof STROKES) => ({
   '&::after': { ...highlightBase, ...STROKES[stroke].hidden, inset },
 });
 
-// Sideways edges sit on the neighbouring divider or rail border rather than beside it; top and bottom stay inside
-// because the workbench row clips vertical overflow. Neighbours draw their shared edge on the same 1px column,
-// anchored from one edge of that divider: the left divider's left edge and the right divider's right edge. The
-// center strokes inward from its box, extended over both dividers; a side panel strokes outward from a box pulled
-// 1px in off its divider, which also anchors its rail-side edge on the rail border's own edge. Anchoring both
-// neighbours to one CSS edge keeps fractional zoom from snapping their columns onto different device pixels. The
-// bottom divider spans the side panels too, so only the bottom's own outline lies on it.
+// Neighbours draw their shared edge on the same 1px divider column, anchored to one CSS edge, so fractional zoom
+// cannot snap them onto different device pixels.
 const HIGHLIGHT_STYLES = {
   bottom: regionHighlight('0 0 -1px 0', 'inside'),
   center: regionHighlight('0 -1px', 'inside'),
@@ -354,7 +333,6 @@ const HIGHLIGHT_STYLES = {
   right: regionHighlight('1px 0 1px 1px', 'outside'),
 } satisfies Record<WidgetRegion, unknown>;
 
-/** Provides the workbench's focus controller (see `WorkbenchFocusProvider`) to everything below it. */
 export const FocusRegionProvider = ({
   children,
   controller,
@@ -365,10 +343,7 @@ export const FocusRegionProvider = ({
 
 const subscribeToNothing = (): (() => void) => () => {};
 
-/**
- * Subscribe to one fact about the focus target. `select` returns a primitive, so a component re-renders only
- * when its own answer changes — not every window and region on every activation.
- */
+/** `select` returns a primitive so a component re-renders only when its own answer changes. */
 const useFocusSelector = <Selected extends string | boolean | null>(
   select: (target: WorkbenchFocusTarget | null) => Selected
 ): Selected => {
@@ -389,13 +364,9 @@ const NO_FOCUS_MOVES: WorkbenchFocusMoves = {
   focusRegion: () => {},
 };
 
-/**
- * Focus moves for controls that open, float, or dock a widget. Some of those controls also render outside the
- * workbench shell, where there is nothing to move focus between and the moves do nothing.
- */
+/** Outside the workbench shell the moves do nothing. */
 export const useWorkbenchFocus = (): WorkbenchFocusMoves => use(FocusRegionContext) ?? NO_FOCUS_MOVES;
 
-/** Reads the focus target at call time, for the hotkey runtime. It has no meaning outside the provider. */
 export const useWorkbenchFocusTarget = (): (() => WorkbenchFocusTarget | null) => {
   const controller = use(FocusRegionContext);
 
@@ -406,16 +377,12 @@ export const useWorkbenchFocusTarget = (): (() => WorkbenchFocusTarget | null) =
   return controller.getTarget;
 };
 
-/** Live target for contextual guidance; unlike the highlight it does not depend on appearance preferences. */
 export const useCurrentWorkbenchFocusTarget = (): WorkbenchFocusTarget | null => {
   const controller = use(FocusRegionContext);
   return useSyncExternalStore(controller?.subscribe ?? subscribeToNothing, () => controller?.getTarget() ?? null);
 };
 
-/**
- * The region whose outline is showing, if any. Borders the outline is drawn over hide while it shows, so a shared
- * edge draws one line at any display scale. No region is outlined while a floating window holds focus.
- */
+/** Borders under the outline hide while it shows, so a shared edge draws one line at any display scale. */
 export const useHighlightedRegion = (): WidgetRegion | null => {
   const region = useFocusSelector((target) => (target?.kind === 'region' ? target.region : null));
   const showsHighlight = useShowsFocusHighlight();
@@ -449,9 +416,7 @@ export const useFocusRegionProps = (region: WidgetRegion) => {
       const container = event.currentTarget;
 
       controller.activate({ kind: 'region', region }, { byPointer: true });
-      // A press that takes no focus of its own — a resize handle, the canvas — would leave the keys in a floating
-      // window while this region shows as focused. Pull focus out of the window; a focusable target then takes
-      // it as usual.
+      // A press that takes no focus of its own would leave the keys in a floating window; pull focus out of it.
       if (
         document.activeElement?.closest('[data-floating-window]') &&
         event.target instanceof Node &&
@@ -467,11 +432,7 @@ export const useFocusRegionProps = (region: WidgetRegion) => {
   };
 };
 
-/**
- * Focus for one floating window. Pointer-down and keyboard focus activate it — hover does not — and `activate`
- * reports what happened: a window whose project has left the screen is refused, so a late event cannot raise a
- * stale one.
- */
+/** Hover does not activate; a window whose project left the screen is refused, so a late event cannot raise it. */
 export const useFloatingWindowFocus = (
   instanceId: WidgetInstanceId,
   projectId: string
@@ -486,4 +447,30 @@ export const useFloatingWindowFocus = (
   );
 
   return { activate, isHighlighted: isActive && showsHighlight };
+};
+
+/**
+ * Gives focus to `getTarget()` when a focused node leaves the document. React also runs ref cleanups on a node that
+ * stays, so removal is checked a microtask later.
+ */
+export const releaseFocusOnRemoval = (
+  node: HTMLElement,
+  getTarget: () => HTMLElement | null = () => node.closest<HTMLElement>('[role="region"]')
+): (() => void) => {
+  return () => {
+    if (document.activeElement !== node) {
+      return;
+    }
+
+    // Resolved while the node is still in place: a region found through it cannot be found once it is gone.
+    const target = getTarget();
+
+    queueMicrotask(() => {
+      const { activeElement } = document;
+
+      if (!node.isConnected && (activeElement === null || activeElement === document.body)) {
+        target?.focus({ preventScroll: true });
+      }
+    });
+  };
 };

@@ -23,10 +23,7 @@ export const getHotkeyExecutionSource = (
   activeSource: WidgetContributionSource | null
 ): WidgetContributionSource | null => (hotkey.scope.kind === 'global' ? (hotkey.source ?? null) : activeSource);
 
-/**
- * Claimed bindings suppress browser defaults unless preventDefault is explicitly false. Unclaimed events retain
- * browser behavior.
- */
+/** Claimed bindings suppress browser defaults unless preventDefault is explicitly false. */
 export const shouldPreventHotkeyDefault = (hotkey: RegisteredHotkey | null): boolean =>
   hotkey !== null && hotkey.preventDefault !== false;
 
@@ -45,8 +42,8 @@ export const WorkbenchHotkeyRuntime = () => {
   const getFocusTarget = useWorkbenchFocusTarget();
 
   const registeredHotkeys = useMemo(() => {
-    // The catalog lists every binding a widget can contribute, mounted or not. A row binds only while its command has
-    // a handler, so a key nothing is handling keeps its browser meaning; and a mounted widget's own contribution of the
+    // The catalog lists every binding a widget can contribute, mounted or not. A row binds only while its command has a
+    // handler, so a key nothing is handling keeps its browser meaning; and a mounted widget's own contribution of the
     // same id replaces the row, so one binding answers with the widget's scope and flags.
     const handledCommandIds = new Set(commandContributions.map(({ id }) => id));
     const contributedIds = new Set(extensionHotkeys.map(({ id }) => id));
@@ -86,6 +83,10 @@ export const WorkbenchHotkeyRuntime = () => {
 
     if (shouldPreventHotkeyDefault(hotkey)) {
       event.preventDefault();
+    }
+
+    if (event.repeat && hotkey.ignoreRepeat) {
+      return;
     }
 
     executeHotkey(hotkey, source);

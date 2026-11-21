@@ -52,7 +52,6 @@ describe('getPromptTriggerOptions', () => {
 });
 
 describe('getInlineTriggerOptions', () => {
-  // The trigger restricts completion kind: < for embeddings, __ for wildcards.
   it('offers only wildcards for `__`', () => {
     expect(getInlineTriggerOptions(OPTIONS, '_', '').map((option) => option.label)).toEqual(['colours', 'moods']);
   });
@@ -61,7 +60,6 @@ describe('getInlineTriggerOptions', () => {
     expect(getInlineTriggerOptions(OPTIONS, '<', '').map((option) => option.label)).toEqual(['easynegative']);
   });
 
-  // They belong to no delimiter, and stay reachable through the `+` button.
   it('offers trigger phrases under neither', () => {
     const everything = [...getInlineTriggerOptions(OPTIONS, '_', ''), ...getInlineTriggerOptions(OPTIONS, '<', '')];
 
@@ -73,7 +71,6 @@ describe('getInlineTriggerOptions', () => {
     expect(getInlineTriggerOptions(OPTIONS, '_', 'MO').map((option) => option.label)).toEqual(['moods']);
   });
 
-  // Exclude group labels from matching so __w cannot match every entry under Wildcards.
   it('ignores the group name, unlike the browse search', () => {
     expect(getInlineTriggerOptions(OPTIONS, '_', 'wildcard')).toEqual([]);
     expect(filterPromptTriggerOptions(OPTIONS, 'wildcard')).toHaveLength(2);

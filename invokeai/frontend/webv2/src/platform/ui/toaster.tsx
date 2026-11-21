@@ -78,8 +78,8 @@ const getToastActions = (meta: Record<string, unknown> | undefined): readonly To
   (meta?.[ACTIONS_META_KEY] as readonly ToastAction[] | undefined) ?? [];
 
 /**
- * Enter and Space on a focused toast button belong to that button: toasts are not modal, so without this a
- * workbench shortcut bound to the same key (a canvas session's Enter) would take the press first.
+ * Enter and Space on a focused toast button belong to that button: toasts are not modal, so without this a workbench
+ * shortcut bound to the same key (a canvas session's Enter) would take the press first.
  */
 export const isToastActivationKeyEvent = (event: KeyboardEvent): boolean =>
   (event.key === 'Enter' || event.key === ' ') &&

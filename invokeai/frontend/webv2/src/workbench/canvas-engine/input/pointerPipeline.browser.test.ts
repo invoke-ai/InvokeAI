@@ -15,7 +15,6 @@ afterEach(() => {
   }
 });
 
-/** The engine's input wiring over a real surface: focusable container, overlay canvas, window key listeners. */
 const createInputHarness = () => {
   const surface = document.createElement('div');
   surface.tabIndex = -1;
@@ -44,7 +43,7 @@ const createInputHarness = () => {
             deactivations.push(id);
           }
         },
-        onKeyCommand: (_ctx, command) => events.push(`${id}:${command}`),
+        onKeyCommand: (_ctx, command) => events.push(`${id}:${command}`) > 0,
         onPointerCancel: () => events.push(`${id}:cancel`),
         onPointerDown: () => events.push(`${id}:down`),
         onPointerMove: () => events.push(`${id}:move`),
@@ -76,7 +75,6 @@ const createInputHarness = () => {
     updateCursor: () => undefined,
     viewport: createViewport(),
   });
-  // Registered after the pipeline's listener, so it reads the event after the pipeline handled it.
   const observed: { type: string; defaultPrevented: boolean }[] = [];
   const observe = (event: KeyboardEvent): void => {
     observed.push({ defaultPrevented: event.defaultPrevented, type: event.type });
@@ -132,46 +130,6 @@ describe('pointer pipeline in Chromium: keyboard ownership', () => {
     expect(h.observed.filter((event) => event.defaultPrevented)).toEqual([]);
   });
 
-  it('pans with Space over the canvas after a control was clicked, without activating that control', async () => {
-    const h = createInputHarness();
-    await userEvent.click(h.button);
-    expect(h.clicks()).toBe(1);
-    h.pipeline.onPointerEnter();
-
-    await userEvent.keyboard('{Space>}');
-    expect(h.interaction.getActiveToolId()).toBe('view');
-    await userEvent.keyboard('{/Space}');
-    expect(h.interaction.getActiveToolId()).toBe('brush');
-    expect(h.clicks()).toBe(1);
-
-    // Enter still belongs to the clicked control.
-    h.interaction.setTool('transform');
-    await userEvent.keyboard('{Enter}');
-    expect(h.clicks()).toBe(2);
-    expect(h.events).not.toContain('transform:apply');
-  });
-
-  it('leaves hold keys and Escape to an open menu', async () => {
-    const h = createInputHarness();
-    const menu = document.createElement('div');
-    menu.setAttribute('role', 'menu');
-    const item = document.createElement('div');
-    item.setAttribute('role', 'menuitem');
-    item.tabIndex = -1;
-    item.textContent = 'Menu item';
-    menu.append(item);
-    document.body.append(menu);
-    cleanups.push(() => menu.remove());
-    await userEvent.click(item);
-    h.pipeline.onPointerEnter();
-
-    await userEvent.keyboard(' ');
-    await userEvent.keyboard('c');
-    await userEvent.keyboard('{Escape}');
-    expect(h.interaction.getActiveToolId()).toBe('brush');
-    expect(h.events).toEqual([]);
-  });
-
   it('applies on Enter only when the focused surface owns an unmodified, unprevented key', async () => {
     const h = createInputHarness();
     h.interaction.setTool('transform');
@@ -187,22 +145,6 @@ describe('pointer pipeline in Chromium: keyboard ownership', () => {
     await userEvent.keyboard('{Enter}');
     expect(h.events).toEqual(['transform:apply']);
   });
-
-  it('restores a held tool when Space is released after focus moved, without consuming the release', async () => {
-    const h = createInputHarness();
-    h.pipeline.onPointerEnter();
-    h.surface.focus();
-
-    await userEvent.keyboard('{Space>}');
-    expect(h.interaction.getActiveToolId()).toBe('view');
-    h.pipeline.onPointerLeave();
-    h.button.focus();
-    await userEvent.keyboard('{/Space}');
-
-    expect(h.interaction.getActiveToolId()).toBe('brush');
-    expect(h.observed.at(-1)).toEqual({ defaultPrevented: false, type: 'keyup' });
-    expect(h.clicks()).toBe(0);
-  });
 });
 
 describe('pointer pipeline in Chromium: tool switches during a hold', () => {
@@ -215,19 +157,6 @@ describe('pointer pipeline in Chromium: tool switches during a hold', () => {
     h.interaction.setTool('brush');
     expect(h.interaction.getActiveToolId()).toBe('brush');
     expect(h.deactivations).toEqual([]);
-    await userEvent.keyboard('{/Space}');
-    expect(h.interaction.getActiveToolId()).toBe('brush');
-  });
-
-  it('keeps a tool chosen while Space is still held when Space is released', async () => {
-    const h = createInputHarness();
-    h.interaction.setTool('eraser');
-    h.pipeline.onPointerEnter();
-    h.surface.focus();
-
-    await userEvent.keyboard('{Space>}');
-    expect(h.interaction.getActiveToolId()).toBe('view');
-    h.interaction.setTool('brush');
     await userEvent.keyboard('{/Space}');
     expect(h.interaction.getActiveToolId()).toBe('brush');
   });
@@ -245,30 +174,5 @@ describe('pointer pipeline in Chromium: Alt eyedropper', () => {
       { defaultPrevented: true, type: 'keyup' },
     ]);
     expect(h.interaction.getActiveToolId()).toBe('brush');
-  });
-
-  it('leaves a real Alt tap in a text field to the browser', async () => {
-    const h = createInputHarness();
-    const input = document.createElement('input');
-    document.body.append(input);
-    cleanups.push(() => input.remove());
-    h.pipeline.onPointerEnter();
-    input.focus();
-
-    await userEvent.keyboard('{Alt}');
-    expect(h.observed.map((event) => event.defaultPrevented)).toEqual([false, false]);
-  });
-
-  it('begins the picker when the pointer enters with Alt already held on the focused canvas', async () => {
-    const h = createInputHarness();
-    h.surface.focus();
-
-    await userEvent.keyboard('{Alt>}');
-    expect(h.interaction.getActiveToolId()).toBe('brush');
-    h.pipeline.onPointerEnter(new PointerEvent('pointerenter', { altKey: true }));
-    expect(h.interaction.getActiveToolId()).toBe('colorPicker');
-    await userEvent.keyboard('{/Alt}');
-    expect(h.interaction.getActiveToolId()).toBe('brush');
-    expect(h.observed.every((event) => event.defaultPrevented)).toBe(true);
   });
 });

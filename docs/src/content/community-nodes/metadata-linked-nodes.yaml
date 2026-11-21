@@ -1,0 +1,36 @@
+title: Metadata Linked Nodes
+author: skunkworxdark
+repo: https://github.com/skunkworxdark/metadata-linked-nodes
+summary: Collect metadata inside an Iterate node, and extract metadata from an image.
+categories: [utility]
+nodes:
+  - name: Metadata Item Linked
+    description: Collects metadata inside an iterate node, with no collect node or conversion to a metadata node.
+  - name: Metadata From Image
+    description: Provides the metadata of an image.
+  - name: Metadata To String
+    description: Extracts a string value of a label from metadata.
+  - name: Metadata To Integer
+    description: Extracts an integer value of a label from metadata.
+  - name: Metadata To Float
+    description: Extracts a float value of a label from metadata.
+  - name: Metadata To Scheduler
+    description: Extracts a scheduler value of a label from metadata.
+  - name: Metadata To Bool
+    description: Extracts bool values from metadata.
+  - name: Metadata To Model
+    description: Extracts model types from metadata.
+  - name: Metadata To SDXL Model
+    description: Extracts SDXL model types from metadata.
+  - name: Metadata To LoRAs
+    description: Extracts LoRAs from metadata.
+  - name: Metadata To SDXL LoRAs
+    description: Extracts SDXL LoRAs from metadata.
+  - name: Metadata To ControlNets
+    description: Extracts ControlNets from metadata.
+  - name: Metadata To IP-Adapters
+    description: Extracts IP-Adapters from metadata.
+  - name: Metadata To T2I-Adapters
+    description: Extracts T2I-Adapters from metadata.
+  - name: Denoise Latents + Metadata
+    description: The core `Denoise Latents` node with a metadata input and output.

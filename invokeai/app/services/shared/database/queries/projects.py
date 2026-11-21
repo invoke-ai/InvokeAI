@@ -77,6 +77,13 @@ _SUMMARIES = (
     .order_by(projects.c.created_at, projects.c.project_id)
 )
 _BOARD_ID = select(projects.c.board_id).where(*_THE_PROJECT)
+_REVISIONS = (
+    select(projects.c.project_id, projects.c.revision, _W.revision)
+    .select_from(_WITH_CALLERS_WORKSPACE)
+    .where(
+        projects.c.user_id == bindparam("user_id"), projects.c.project_id.in_(bindparam("project_ids", expanding=True))
+    )
+)
 _OWNED_IDS = select(projects.c.project_id).where(
     projects.c.user_id == bindparam("user_id"), projects.c.project_id.in_(bindparam("project_ids", expanding=True))
 )
@@ -258,6 +265,20 @@ class ProjectQueries(QueryModule):
     @read
     def board_id(self, conn: Connection, user_id: str, project_id: str) -> Optional[str]:
         return conn.execute(_BOARD_ID, {"user_id": user_id, "project_id": project_id}).scalar_one_or_none()
+
+    @read
+    def revisions(
+        self, conn: Connection, user_id: str, project_ids: Sequence[str]
+    ) -> dict[str, tuple[int, Optional[int]]]:
+        """(content revision, the account's workspace revision or None without one) of each of these project ids
+        that names one of the account's projects."""
+        found: dict[str, tuple[int, Optional[int]]] = {}
+        for chunk in itertools.batched(project_ids, IN_CHUNK):
+            rows: Sequence[Sequence[Any]] = conn.execute(
+                _REVISIONS, {"user_id": user_id, "project_ids": list(chunk)}
+            ).all()
+            found.update((str(row[0]), (int(row[1]), None if row[2] is None else int(row[2]))) for row in rows)
+        return found
 
     @read
     def owned_ids(self, conn: Connection, user_id: str, project_ids: Sequence[str]) -> set[str]:

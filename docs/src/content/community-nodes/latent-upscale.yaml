@@ -1,0 +1,7 @@
+title: Latent Upscale
+author: gogurtenjoyer
+repo: https://github.com/gogurtenjoyer/latent-upscale
+summary: Upscale SD 1.5 and SDXL latents with a small model instead of interpolation.
+description: >-
+  The model is about 2.4 MB. Upscaling with it avoids the usual downsides of the latent upscale technique.
+categories: [sizing]

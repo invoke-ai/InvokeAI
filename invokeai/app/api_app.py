@@ -32,6 +32,7 @@ from invokeai.app.api.routers import (
     boards,
     client_state,
     custom_nodes,
+    files,
     fonts,
     gallery,
     gallery_maintenance,
@@ -646,6 +647,10 @@ def _is_font_upload(method: str, path: str) -> bool:
     return method == "POST" and path in ("/api/v1/fonts", "/api/v1/fonts/validate")
 
 
+def _is_file_upload(method: str, path: str) -> bool:
+    return method == "POST" and path == "/api/v1/files/upload"
+
+
 class ProjectWriteLimitASGIMiddleware(RequestBodyLimitASGIMiddleware):
     """Bound project writes before FastAPI parses their JSON documents."""
 
@@ -733,6 +738,22 @@ app.add_middleware(
 )
 app.add_middleware(
     RequestBodyLimitASGIMiddleware,
+    matches_request=_is_file_upload,
+    too_large_detail=lambda _actual, limit: f"Managed file upload exceeds maximum request size ({limit} bytes)",
+    capacity_refusal_detail=lambda per_user: (
+        "Too many concurrent file uploads for this user; try again shortly"
+        if per_user
+        else "Too many concurrent file uploads; try again shortly"
+    ),
+    max_body_bytes=app_config.max_file_upload_size_bytes + files.FILE_UPLOAD_MULTIPART_OVERHEAD,
+    max_concurrent=files.MAX_CONCURRENT_FILE_UPLOADS,
+    max_concurrent_per_user=files.MAX_CONCURRENT_FILE_UPLOADS_PER_USER,
+    identify_user=_identify_video_upload_user_async,
+    idle_timeout_seconds=files.FILE_UPLOAD_IDLE_TIMEOUT_SECONDS,
+    max_upload_duration_seconds=files.FILE_UPLOAD_MAX_DURATION_SECONDS,
+)
+app.add_middleware(
+    RequestBodyLimitASGIMiddleware,
     matches_request=_is_font_upload,
     too_large_detail=lambda _actual, limit: f"Font upload exceeds maximum request size ({limit} bytes)",
     capacity_refusal_detail=lambda per_user: (
@@ -788,6 +809,7 @@ app.include_router(utilities.utilities_router, prefix="/api")
 app.include_router(fonts.fonts_router, prefix="/api")
 app.include_router(model_manager.model_manager_router, prefix="/api")
 app.include_router(working_memory.working_memory_router, prefix="/api")
+app.include_router(files.files_router, prefix="/api")
 app.include_router(image_moves.image_moves_router, prefix="/api")
 app.include_router(images.images_router, prefix="/api")
 app.include_router(image_map.image_map_router, prefix="/api")

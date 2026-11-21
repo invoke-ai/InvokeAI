@@ -14,8 +14,8 @@ export interface ListPagerProps {
 }
 
 /**
- * Previous/next footer for server-paged lists. `aria-disabled`, not `disabled`: a disabled button drops the
- * keyboard focus it holds, and paging is usually driven from these buttons.
+ * Previous/next footer for server-paged lists. `aria-disabled`, not `disabled`: a disabled button drops the keyboard
+ * focus it holds, and paging is usually driven from these buttons.
  */
 export const ListPager = ({ hasNext, hasPrevious, isBusy = false, page, onNext, onPrevious }: ListPagerProps) => {
   const { t } = useTranslation();

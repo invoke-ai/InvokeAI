@@ -85,7 +85,10 @@ export class BooleanMergeController {
     const eligibility = mergeDownEligibility(document, upperLayerId);
     if (eligibility.status !== 'eligible') {
       return eligibility.status === 'missing' ||
-        (eligibility.status === 'invalid-target' && eligibility.reason === 'no-layer-below')
+        (eligibility.status === 'invalid-target' &&
+          (eligibility.reason === 'no-layer-below' ||
+            eligibility.reason === 'bottom-of-group' ||
+            eligibility.reason === 'group-below'))
         ? 'missing'
         : 'unsupported';
     }

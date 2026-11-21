@@ -16,7 +16,6 @@ import type { Tool } from '@workbench/canvas-engine/tools/tool';
 import type { Vec2 } from '@workbench/canvas-engine/types';
 import type { Viewport } from '@workbench/canvas-engine/viewport';
 
-/** Dependencies for {@link createWheelHandler}. */
 export interface WheelHandlerDeps {
   viewport: Viewport;
   invalidate(payload: InvalidatePayload): void;
@@ -24,10 +23,7 @@ export interface WheelHandlerDeps {
   getActiveTool(): Tool | undefined;
   /** Steps the active brush/eraser diameter by one notch (`+1` grow, `-1` shrink). */
   stepActiveBrushSize(direction: 1 | -1): void;
-  /**
-   * Whether ctrl+wheel brush sizing is inverted. `false` (default): wheel-up
-   * grows. `true`: wheel-up shrinks. A user preference read fresh per event.
-   */
+  /** Inverts ctrl+wheel brush sizing (default false: wheel-up grows); a user preference read fresh per event. */
   getInvertBrushSizeScroll(): boolean;
   /** Whether wheel pans and ctrl+wheel (pinch) zooms. A user preference read fresh per event. */
   getTrackpadNavigation(): boolean;
@@ -90,7 +86,6 @@ const wheelDeltaPixels = (event: WheelEvent, viewport: Viewport): Vec2 => {
 const pinchZoomFactor = (deltaY: number): number =>
   Math.min(MAX_PINCH_ZOOM_STEP, Math.max(1 / MAX_PINCH_ZOOM_STEP, Math.exp(-deltaY * PINCH_ZOOM_GAIN)));
 
-/** Creates the canvas wheel handler. See module docs for routing. */
 export const createWheelHandler = (deps: WheelHandlerDeps): ((event: WheelEvent) => void) => {
   // Pinch-shaped events in the current run, when it began, and the zoom its swallowed steps would have applied (each
   // bounded like a live step, so the run zooms exactly as far as it would have with the setting on). Any other wheel

@@ -7,8 +7,8 @@ import {
   invalidateGallery,
   invalidateGalleryBoardDestinations,
 } from '@features/gallery/queries';
-import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
 import { getDefaultGenerateSettings } from '@features/generation/settings';
+import { seedArchitectureCapabilities } from '@features/models/core/architectureCapabilities.testing';
 import { queryClient } from '@platform/query/client';
 import { accountLifecycle, captureAccountScope } from '@platform/state/accountLifecycle';
 import { QueryObserver } from '@tanstack/react-query';
@@ -106,7 +106,7 @@ const submitGenerate = () => {
 
   const submission = submitResolvedInvocation({
     commands,
-    formatControlLayerError: ({ code, layerName }) => `${layerName}: ${code}`,
+    formatCanvasInvocationFailure: () => ({ message: 'canvas failure', title: 'canvas failure' }),
     formatUpscaleMetadataFailure: (name) => name,
     scopedDefaults: {},
     models: undefined,
@@ -157,6 +157,7 @@ describe('board-listing reads before a submission', () => {
     // Nothing was awaited: the run was dispatched with the listing still unanswered.
     await submission;
     expect(dispatched).toHaveBeenCalledTimes(1);
+    expect(dispatched.mock.calls[0]?.[0].runtime.boardDestinationIds).toContain('own');
     expect(server.listingReads()).toHaveLength(ageMs > 0 ? 1 : 0);
 
     // The stale listing's one background read lands for the next run; the fresh listing is left alone.
@@ -177,6 +178,7 @@ describe('board-listing reads before a submission', () => {
     server.release();
     await submission;
     expect(dispatched).toHaveBeenCalledTimes(1);
+    expect(dispatched.mock.calls[0]?.[0].runtime.boardDestinationIds).not.toContain('own');
     expect(server.listingReads()).toHaveLength(1);
   });
 });
@@ -208,8 +210,8 @@ describe('invalidating the gallery', () => {
     await settle();
     expect(server.requests).toEqual([]);
 
-    // The panel observes its own listing of live boards, invalidated above so it is read back on mount; after that,
-    // an invalidation reads back that one listing, not the one with archived boards.
+    // The panel observes its own listing of live boards, invalidated above so it is read back on mount; after that, an
+    // invalidation reads back that one listing, not the one with archived boards.
     const stopObserving = new QueryObserver(queryClient, galleryBoardsOptions()).subscribe(() => undefined);
     await vi.waitFor(() => expect(queryClient.isFetching()).toBe(0));
     server.requests.length = 0;
