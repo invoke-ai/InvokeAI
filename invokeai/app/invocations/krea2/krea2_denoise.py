@@ -748,14 +748,10 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata):
         # progress, and the un-entered wrappers keep the LoRA records shielded from eviction until the patcher pins them.
         loaded_loras = [(lora, self._load_lora(context, lora)) for lora in self.transformer.loras]
         loaded_control_lora = self._load_lora(context, control_lora) if control_lora is not None else None
-        if loaded_control_lora is not None:
-            img_in_key = f"{KREA2_LORA_TRANSFORMER_PREFIX}img_in"
-            if any(img_in_key in lora_info.model.layers for _, lora_info in loaded_loras):
-                logger.warning(
-                    "The Krea-2 Control LoRA's input projection replaces img_in for the generated image's tokens, so "
-                    "another LoRA's img_in layer has no effect on them."
-                )
-            loaded_loras = [*loaded_loras, (control_lora, loaded_control_lora)]
+        # The Control LoRA's block layers go on with the others; its input projection goes on as a hook below.
+        patch_loras = (
+            loaded_loras if loaded_control_lora is None else [*loaded_loras, (control_lora, loaded_control_lora)]
+        )
 
         # The transformer's lock reserves what the whole denoise needs beside the weights: the forward, the cached
         # reference or style K/V, regional masks and the LoRA patches applied under it.
@@ -769,7 +765,7 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata):
             reference_seq_len=reference_seq_len,
             cache_references=cache_references,
             cfg=do_cfg,
-            loras=[(lora_info.model, lora_info.config.file_size) for _, lora_info in loaded_loras],
+            loras=[(lora_info.model, lora_info.config.file_size) for _, lora_info in patch_loras],
             regional_mask_bytes=self._regional_attention_mask_bytes(pos_extension, neg_extension, inference_dtype),
             style_kv_bytes=style_extension.kv_cache_bytes(inference_dtype) if style_extension is not None else 0,
             device=device,
@@ -808,7 +804,7 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata):
                 LayerPatcher.apply_smart_model_patches(
                     model=transformer,
                     patches=(
-                        (lora_info.model, lora.weight, lora_info.model_in_ram()) for lora, lora_info in loaded_loras
+                        (lora_info.model, lora.weight, lora_info.model_in_ram()) for lora, lora_info in patch_loras
                     ),
                     prefix=KREA2_LORA_TRANSFORMER_PREFIX,
                     dtype=inference_dtype,
@@ -830,6 +826,7 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata):
                     weight=control_patch.input_projection_weight.to(device=device, dtype=inference_dtype),
                     bias=control_patch.input_projection_bias.to(device=device, dtype=inference_dtype),
                     control_tokens=control_tokens,
+                    loras=[(lora_info.model, lora.weight) for lora, lora_info in loaded_loras],
                 )
                 exit_stack.enter_context(control_projection.install(transformer))
 

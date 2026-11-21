@@ -357,10 +357,9 @@ image and choose the type the Control LoRA was trained for, **Depth** for the pu
   Control LoRA, before it loads the transformer.
 - A weight of 0 turns the Control LoRA off entirely; the denoise node then neither loads it nor reads the control
   latents.
-- For the image being generated, the Control LoRA's input projection replaces the transformer's. Another LoRA's
-  layer on that projection then has no effect on it, and the denoise node logs a warning.
-- Edit references, style reference, regional prompts, image-to-image and inpainting combine with a Control LoRA.
-  Edit references keep the transformer's own input projection.
+- Regular LoRAs (including ones that train the transformer's input projection), edit references, style reference,
+  regional prompts, image-to-image and inpainting combine with a Control LoRA. Edit references keep the
+  transformer's own input projection.
 :::
 
 ## Attention backend

@@ -17,6 +17,7 @@ from invokeai.backend.krea2.sampling_utils import prepare_position_ids, prepare_
 from invokeai.backend.patches.layers.lora_layer import LoRALayer
 from invokeai.backend.patches.lora_conversions.krea2_lora_constants import KREA2_LORA_TRANSFORMER_PREFIX
 from invokeai.backend.patches.lora_conversions.krea2_lora_conversion_utils import lora_model_from_krea2_state_dict
+from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 
 TEXT_LEN = 3
 GRID = (2, 3)
@@ -82,7 +83,7 @@ def test_an_armed_forward_is_the_reference_widened_projection_and_an_unarmed_one
     surgery.img_in.weight.copy_(inputs["weight"])
     surgery.img_in.bias.copy_(inputs["bias"])
     expected = _forward(surgery, torch.cat([inputs["x"], inputs["control"]], dim=-1), inputs["text"])
-    extension = Krea2ControlLoRAExtension(inputs["weight"], inputs["bias"], inputs["control"])
+    extension = Krea2ControlLoRAExtension(inputs["weight"], inputs["bias"], inputs["control"], loras=())
 
     with extension.install(model):
         unarmed = _forward(model, inputs["x"], inputs["text"])
@@ -99,7 +100,7 @@ def test_only_the_target_tokens_are_reprojected_next_to_joint_references() -> No
     model = _tiny_transformer()
     inputs = _inputs()
     stock_references = model.img_in(inputs["references"])
-    extension = Krea2ControlLoRAExtension(inputs["weight"], inputs["bias"], inputs["control"])
+    extension = Krea2ControlLoRAExtension(inputs["weight"], inputs["bias"], inputs["control"], loras=())
     projected: list[torch.Tensor] = []
 
     with extension.install(model):
@@ -122,11 +123,48 @@ def test_only_the_target_tokens_are_reprojected_next_to_joint_references() -> No
 
 
 @torch.no_grad()
+def test_other_loras_img_in_layers_add_to_the_latent_half_of_the_projection() -> None:
+    model = _tiny_transformer()
+    inputs = _inputs()
+    generator = torch.Generator().manual_seed(3)
+    img_in_key = f"{KREA2_LORA_TRANSFORMER_PREFIX}img_in"
+    # float64, so composing in float32 moves the layer, which must happen on a copy.
+    up, down = torch.randn(HIDDEN, 2, generator=generator).double(), torch.randn(2, 64, generator=generator).double()
+    bias_delta = torch.randn(HIDDEN, generator=generator).double()
+    layer = LoRALayer(up=up, mid=None, down=down, alpha=None, bias=bias_delta)
+    up2, down2 = torch.randn(HIDDEN, 2, generator=generator), torch.randn(2, 64, generator=generator)
+    unbiased = LoRALayer(up=up2, mid=None, down=down2, alpha=None, bias=None)
+    loras = [
+        (ModelPatchRaw(layers={img_in_key: layer}), 0.5),
+        (ModelPatchRaw(layers={img_in_key: unbiased}), 1.5),
+        # The same layer elsewhere in the transformer does not reach the projection.
+        (ModelPatchRaw(layers={f"{KREA2_LORA_TRANSFORMER_PREFIX}transformer_blocks.0.attn.to_q": unbiased}), 1.0),
+    ]
+    weight, bias = inputs["weight"].clone(), inputs["bias"].clone()
+    extension = Krea2ControlLoRAExtension(weight, bias, inputs["control"], loras=loras)
+    projected: list[torch.Tensor] = []
+
+    with extension.install(model):
+        recorder = model.img_in.register_forward_hook(lambda _m, _a, output: projected.append(output))
+        with extension.armed():
+            _forward(model, inputs["x"], inputs["text"])
+        recorder.remove()
+
+    latent_half = inputs["weight"][:, :64] + 0.5 * (up @ down).float() + 1.5 * up2 @ down2
+    expected_weight = torch.cat([latent_half, inputs["weight"][:, 64:]], dim=1)
+    expected_bias = inputs["bias"] + 0.5 * bias_delta.float()
+    expected = F.linear(torch.cat([inputs["x"], inputs["control"]], dim=-1), expected_weight, expected_bias)
+    torch.testing.assert_close(projected[0], expected)
+    assert torch.equal(weight, inputs["weight"]) and torch.equal(bias, inputs["bias"])
+    assert layer.up is up and layer.down is down and layer.bias is bias_delta
+
+
+@torch.no_grad()
 def test_the_hook_comes_off_the_transformer_when_the_forward_raises() -> None:
     model = _tiny_transformer()
     inputs = _inputs()
     stock = _forward(model, inputs["x"], inputs["text"])
-    extension = Krea2ControlLoRAExtension(inputs["weight"], inputs["bias"], inputs["control"])
+    extension = Krea2ControlLoRAExtension(inputs["weight"], inputs["bias"], inputs["control"], loras=())
 
     with pytest.raises(RuntimeError, match="cancelled"):
         with extension.install(model), extension.armed():
@@ -147,7 +185,7 @@ def test_the_hook_comes_off_the_transformer_when_the_forward_raises() -> None:
 def test_control_tokens_that_do_not_fit_the_input_are_refused(control: torch.Tensor, message: str) -> None:
     model = _tiny_transformer()
     inputs = _inputs()
-    extension = Krea2ControlLoRAExtension(inputs["weight"], inputs["bias"], control)
+    extension = Krea2ControlLoRAExtension(inputs["weight"], inputs["bias"], control, loras=())
 
     with extension.install(model), extension.armed(), pytest.raises(ValueError, match=message):
         _forward(model, inputs["x"], inputs["text"])

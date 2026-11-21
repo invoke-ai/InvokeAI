@@ -29,6 +29,8 @@ from invokeai.backend.krea2.control_lora import Krea2ControlLoRAPatch
 from invokeai.backend.krea2.sampling_utils import build_sigmas, pack_latents, unpack_latents
 from invokeai.backend.krea2.style_reference import Krea2StyleReferenceMode, capture_style_reference
 from invokeai.backend.model_manager.taxonomy import BaseModelType, Krea2VariantType, ModelFormat, ModelType
+from invokeai.backend.patches.layers.full_layer import FullLayer
+from invokeai.backend.patches.lora_conversions.krea2_lora_constants import KREA2_LORA_TRANSFORMER_PREFIX
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.quantization.dequantizing_linear import peak_dequant_transient_bytes
 from invokeai.backend.quantization.int8_convrot import Int8ConvrotLinear
@@ -2129,19 +2131,29 @@ class _ImgInTransformer(_Transformer):
         super().__init__()
         self.img_in = torch.nn.Linear(KREA2_LATENT_CHANNELS * 4, 4)
         self.reprojected: list[bool] = []
+        self.projections: list[tuple[torch.Tensor, torch.Tensor]] = []
 
     def __call__(self, *, hidden_states, **kwargs):
         stock = F.linear(hidden_states, self.img_in.weight, self.img_in.bias)
-        self.reprojected.append(not torch.allclose(self.img_in(hidden_states), stock))
+        projected = self.img_in(hidden_states)
+        self.reprojected.append(not torch.allclose(projected, stock))
+        self.projections.append((hidden_states, projected))
         return super().__call__(hidden_states=hidden_states, **kwargs)
 
 
-def test_a_control_lora_joins_the_patches_and_projects_both_cfg_passes_only(monkeypatch, tmp_path) -> None:
+@torch.no_grad()
+def test_a_control_lora_projects_both_cfg_passes_with_other_loras_img_in_layers(monkeypatch, tmp_path) -> None:
     _patch_runtime(monkeypatch)
     transformer = _ImgInTransformer()
+    control_weight, control_bias = torch.randn(4, 128), torch.randn(4)
     control_info = _LoRAInfo()
     control_info.model = Krea2ControlLoRAPatch(
-        layers={}, input_projection_weight=torch.randn(4, 128), input_projection_bias=torch.randn(4)
+        layers={}, input_projection_weight=control_weight, input_projection_bias=control_bias
+    )
+    img_in_delta, img_in_bias_delta = torch.randn(4, 64), torch.randn(4)
+    regular_info = _LoRAInfo()
+    regular_info.model = ModelPatchRaw(
+        layers={f"{KREA2_LORA_TRANSFORMER_PREFIX}img_in": FullLayer(img_in_delta, img_in_bias_delta)}
     )
     applied: list[tuple[object, float]] = []
 
@@ -2152,6 +2164,17 @@ def test_a_control_lora_joins_the_patches_and_projects_both_cfg_passes_only(monk
 
     monkeypatch.setattr("invokeai.app.invocations.krea2.krea2_denoise.LayerPatcher.apply_smart_model_patches", patcher)
     invocation = _runtime_invocation(cfg_scale=4.0)
+    invocation.transformer = TransformerField(
+        transformer=_model_identifier(),
+        loras=[
+            LoRAField(
+                lora=ModelIdentifierField(
+                    key="regular", hash="regular", name="regular", base=BaseModelType.Krea2, type=ModelType.LoRA
+                ),
+                weight=0.5,
+            )
+        ],
+    )
     invocation.style_reference = _style_reference_field()
     invocation.control_lora = _control_lora_field(weight=0.75)
     context = _with_control_lora_record(_runtime_context(tmp_path, transformer))
@@ -2160,14 +2183,22 @@ def test_a_control_lora_joins_the_patches_and_projects_both_cfg_passes_only(monk
         lambda name: torch.ones(1, KREA2_LATENT_CHANNELS, 1, 2, 2) if name == "control" else tensors(name)
     )
     transformer_info = _TransformerInfo(transformer)
-    context.models.load = lambda identifier: control_info if identifier.key == "control" else transformer_info
+    loras = {"control": control_info, "regular": regular_info}
+    context.models.load = lambda identifier: loras.get(identifier.key, transformer_info)
 
     invocation._run_diffusion(context)
 
-    assert applied == [(control_info.model, 0.75)]
-    assert transformer_info.working_memory.features["lora_count"] == 1
+    assert applied == [(regular_info.model, 0.5), (control_info.model, 0.75)]
+    assert transformer_info.working_memory.features["lora_count"] == 2
     # Per step: the style capture pass, then the conditional and unconditional target passes.
     assert transformer.reprojected == [False, True, True] * 2
+    # The regular LoRA's img_in layer, at its own weight, adds to the projection's latent half.
+    latents, projected = transformer.projections[1]
+    expected_weight = torch.cat([control_weight[:, :64] + 0.5 * img_in_delta, control_weight[:, 64:]], dim=1)
+    expected_bias = control_bias + 0.5 * img_in_bias_delta
+    torch.testing.assert_close(
+        projected, F.linear(torch.cat([latents, torch.ones_like(latents)], dim=-1), expected_weight, expected_bias)
+    )
     assert not transformer.img_in._forward_hooks
 
 

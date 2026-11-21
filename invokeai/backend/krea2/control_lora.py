@@ -8,11 +8,14 @@ target tokens with the checkpoint's whole projection, weight and bias, in both C
 block LoRAs only.
 
 The block LoRAs are an ordinary Krea-2 LoRA for ``LayerPatcher``. The projection goes on as a forward hook on
-``img_in`` instead of a patched weight, so it works whatever class ``img_in`` is (plain, autocast, GGUF, fp8, int8 or
-sidecar-patched), and it re-projects only the target tokens, leaving joint edit references as ``img_in`` made them.
+``img_in`` instead of a patched weight, so it works whatever class ``img_in`` is (plain, autocast, GGUF, fp8, int8,
+nvfp4 or sidecar-patched), and it re-projects only the target tokens, leaving joint edit references as ``img_in`` made
+them. Other LoRAs' ``img_in`` layers add their residuals to the projection's latent half and bias, as they would to
+``img_in``'s weight, so they keep their effect on the target tokens.
 """
 
-from collections.abc import Iterator, Mapping
+import copy
+from collections.abc import Iterable, Iterator, Mapping
 from contextlib import contextmanager
 from typing import Any, Optional
 
@@ -20,10 +23,15 @@ import torch
 import torch.nn.functional as F
 
 from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch
-from invokeai.backend.patches.lora_conversions.krea2_lora_constants import KREA2_CONTROL_LORA_PROJECTION_KEYS
+from invokeai.backend.patches.lora_conversions.krea2_lora_constants import (
+    KREA2_CONTROL_LORA_PROJECTION_KEYS,
+    KREA2_LORA_TRANSFORMER_PREFIX,
+)
 from invokeai.backend.patches.lora_conversions.krea2_lora_conversion_utils import lora_model_from_krea2_state_dict
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.util.calc_tensor_size import calc_tensors_size
+
+_IMG_IN_LAYER_KEY = f"{KREA2_LORA_TRANSFORMER_PREFIX}img_in"
 
 
 class Krea2ControlLoRAPatch(ModelPatchRaw):
@@ -70,15 +78,38 @@ def krea2_control_lora_from_state_dict(state_dict: dict[str, torch.Tensor]) -> K
 class Krea2ControlLoRAExtension:
     """Projects one denoise's target tokens through a Control LoRA's widened input projection.
 
-    ``control_tokens`` are the packed control latents, ``(1, target_len, 64)``. The hook re-projects only while
-    :meth:`armed`, which the denoise enters around its target predictions alone.
+    ``control_tokens`` are the packed control latents, ``(1, target_len, 64)``. ``loras`` are the other LoRAs patched
+    onto the transformer, with their weights; their ``img_in`` layers are composed into the projection here, once. The
+    hook re-projects only while :meth:`armed`, which the denoise enters around its target predictions alone.
     """
 
-    def __init__(self, weight: torch.Tensor, bias: torch.Tensor, control_tokens: torch.Tensor) -> None:
+    def __init__(
+        self,
+        weight: torch.Tensor,
+        bias: torch.Tensor,
+        control_tokens: torch.Tensor,
+        loras: Iterable[tuple[ModelPatchRaw, float]],
+    ) -> None:
         if control_tokens.dim() != 3 or control_tokens.shape[0] != 1:
             raise ValueError(f"Krea-2 control tokens must be (1, tokens, channels), got {tuple(control_tokens.shape)}.")
-        self._weight = weight
-        self._bias = bias
+        latent_width = weight.shape[1] - control_tokens.shape[-1]
+        # The residuals land on the latent half, so that half is what DoRA-style layers see as the original weight.
+        # Composed in float32 and rounded once, as the direct patcher does.
+        orig_parameters = {"weight": weight[:, :latent_width].float(), "bias": bias.float()}
+        latent_weight, composed_bias = orig_parameters["weight"], orig_parameters["bias"]
+        for patch, patch_weight in loras:
+            layer = patch.layers.get(_IMG_IN_LAYER_KEY)
+            if layer is None:
+                continue
+            # Moved as a copy: the cached patch stays on its own device and dtype.
+            layer = copy.copy(layer)
+            layer.to(device=weight.device, dtype=torch.float32)
+            residual = layer.get_parameters(orig_parameters, weight=patch_weight)
+            latent_weight = latent_weight + residual["weight"]
+            if "bias" in residual:
+                composed_bias = composed_bias + residual["bias"]
+        self._weight = torch.cat([latent_weight.to(weight.dtype), weight[:, latent_width:]], dim=1)
+        self._bias = composed_bias.to(bias.dtype)
         self._control_tokens = control_tokens
         self._armed = False
 
@@ -123,5 +154,5 @@ class Krea2ControlLoRAExtension:
         )
         if tokens.shape[1] == target_len:
             return projected
-        # Joint edit references follow the target through `img_in` and keep the stock projection.
+        # Joint edit references follow the target through `img_in` and keep its own projection.
         return torch.cat([projected, output[:, target_len:]], dim=1)
