@@ -87,6 +87,19 @@ describe('resolveGenerateWidgetValues', () => {
     expect(result?.systemPatch).not.toHaveProperty('batchCount');
   });
 
+  it('starts on the first model whose files are present, and on the first one when none are', () => {
+    const gone = createModel('gone', { is_missing: true } as Partial<MainModelConfig>);
+    const present = createModel('present');
+    const alsoGone = createModel('also-gone', { is_missing: true } as Partial<MainModelConfig>);
+
+    expect(resolveGenerateWidgetValues({ models: [gone, present], storedValues: {} })?.values.modelKey).toBe('present');
+    expect(resolveGenerateWidgetValues({ models: [gone, alsoGone], storedValues: {} })?.values.modelKey).toBe('gone');
+    // A model the project chose stays, whatever its files.
+    expect(
+      resolveGenerateWidgetValues({ models: [present, gone], storedValues: createValues(gone) })?.values.modelKey
+    ).toBe('gone');
+  });
+
   it('reads dynamic prompts as on for a project saved before the toggle, without writing the flag in', () => {
     const model = createModel('current');
     const { dynamicPromptsEnabled: _absent, ...storedValues } = createValues(model);

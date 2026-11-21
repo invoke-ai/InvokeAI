@@ -259,6 +259,22 @@ describe('graph export', () => {
     expect(response.cases.find((result) => result.id === 'ok')).toHaveProperty('batch');
   });
 
+  it('refuses a case that names a model whose files are gone like one that is not installed', () => {
+    const models = MODELS.map((entry) =>
+      entry.key === 'sdxl' || entry.key === 'sdxl-lora' ? { ...entry, is_missing: true } : entry
+    );
+    const [mainGone] = exportGraphs(request([sdxlCase('main-gone')], models)).cases;
+    const [loraGone] = exportGraphs(
+      request(
+        [sdxlCase('lora-gone', { loras: [{ key: 'sdxl-lora', weight: 1 }] })],
+        MODELS.map((entry) => (entry.key === 'sdxl-lora' ? { ...entry, is_missing: true } : entry))
+      )
+    ).cases;
+
+    expect(errorOf(mainGone!)).toBe('model_key "sdxl" is not a selectable main model. Choices: z-image-gguf.');
+    expect(errorOf(loraGone!)).toContain('"sdxl-lora" is not an installed LoRA');
+  });
+
   it('exports identical requests identically, with stable node ids', () => {
     const cases = [
       sdxlCase('t2i', { loras: [{ key: 'sdxl-lora', weight: 1 }], reference_images: ['reference.png'] }),

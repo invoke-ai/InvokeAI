@@ -11,6 +11,7 @@ import {
   getModelDefaultFills,
   isArchitectureDescribed,
   isGenerateModelSelectable,
+  pickFallbackGenerateModel,
 } from './baseGenerationPolicies';
 import { syncPromptTemplateWithCatalog } from './promptTemplates';
 import {
@@ -102,7 +103,7 @@ export const resolveGenerateWidgetValues = ({
     isArchitectureDescribed(storedModel)
       ? storedModel
       : undefined);
-  const selectedModel = chosenModel ?? supportedModels[0]!;
+  const selectedModel = chosenModel ?? pickFallbackGenerateModel(supportedModels)!;
   const canReuseStoredValues =
     isGenerateWidgetValues(storedValues) && normalizedWidgetValues?.batchCount === storedValues.batchCount;
   const baseValues: GenerateWidgetValues = canReuseStoredValues

@@ -20,6 +20,7 @@ import type {
 
 import {
   addReferenceImages,
+  getAutoFlux2ComponentSourceModel,
   coerceSchedulerForGraph,
   getComponentPolicyContext,
   getComponentSectionPolicy,
@@ -354,6 +355,26 @@ describe('component policies', () => {
     expect(
       getGenerationValidationReasons(model, createSettings(model, { qwen3EncoderModel: qwen3Encoder, vae: flux2Vae }))
     ).toEqual([]);
+  });
+
+  it('picks no FLUX.2 component source whose files are missing, whatever the catalog order', () => {
+    const klein = createModel('flux2', { format: 'checkpoint', key: 'klein-single', variant: 'klein_9b' });
+    const pipeline = (key: string, missing: boolean) => ({
+      ...createModel('flux2', { format: 'diffusers', key, name: key, variant: 'klein_9b' }),
+      ...(missing ? { is_missing: true } : {}),
+    });
+    const gone = pipeline('pipeline-gone', true);
+    const working = pipeline('pipeline-ok', false);
+    const pick = (models: unknown[]) =>
+      getAutoFlux2ComponentSourceModel(
+        klein,
+        { mistralEncoderModel: null, qwen3EncoderModel: null, vae: null },
+        models as never
+      );
+
+    expect(pick([gone, working])?.key).toBe('pipeline-ok');
+    expect(pick([working, gone])?.key).toBe('pipeline-ok');
+    expect(pick([gone])).toBeNull();
   });
 
   describe('FLUX.2 [dev] component sources', () => {
@@ -1365,6 +1386,15 @@ describe('Anima IP-Adapter references', () => {
     },
     id,
     isEnabled: true,
+  });
+
+  it('retargets an adapter-less reference only when a present IP-Adapter could take it', () => {
+    const empty = { ...animaReference('ref-1'), config: { ...animaReference('ref-1').config, model: null } };
+    const missing = { ...animaIpAdapter, is_missing: true } as ComponentModelConfig;
+    const referenceImages = [empty];
+
+    expect(getCompatibleReferenceImages(referenceImages, animaQwen3, [missing])).toBe(referenceImages);
+    expect(getCompatibleReferenceImages(referenceImages, animaQwen3, [animaIpAdapter])).not.toBe(referenceImages);
   });
 
   it('accepts four references sharing one Anima IP-Adapter and rejects a fifth', () => {

@@ -501,6 +501,13 @@ export const isSupportedGenerateModel = <T extends { base: string; type: string 
 export const isGenerateModelSelectable = <T extends ModelConfig>(model: T): model is T & GenerateModelConfig =>
   isSupportedGenerateModel(model) && !isIdeogram4UnconditionalBranch(model);
 
+/**
+ * The model a fresh project starts on, or the Generate form falls back to when none is chosen: the first one whose
+ * files are present, else the first. Where a model is stored or chosen, that one stays.
+ */
+export const pickFallbackGenerateModel = <T extends GenerateModelConfig>(models: readonly T[]): T | undefined =>
+  models.find((model) => !model.is_missing) ?? models[0];
+
 export const getPromptHistoryRecallPatch = ({
   item,
   models,
@@ -1066,6 +1073,7 @@ const hasCompatibleComponentSource = (ctx: ComponentPolicyContext): boolean =>
 
 type ComponentSourceCandidate = {
   base: string;
+  is_missing?: boolean;
   key: string;
   name: string;
   type: string;
@@ -1126,7 +1134,8 @@ export const getAutoFlux2ComponentSourceModel = (
     return null;
   }
 
-  const pipelines = models.filter(isFlux2SourceFor(model));
+  // A registered pipeline whose files are gone is listed but cannot be loaded.
+  const pipelines = models.filter((candidate) => !candidate.is_missing).filter(isFlux2SourceFor(model));
   const encoderSource = pipelines.find(isFlux2EncoderSourceForModel(model));
 
   if (!encoderModel && settings.vae) {
@@ -1983,7 +1992,15 @@ export const getModelDefaultFills = (
   return fitsVae(defaultVae.vae) ? { ...components, vae: defaultVae.vae } : components;
 };
 
-type ReferenceModelCandidate = { base: string; key: string; name: string; type: string };
+/** The IP-Adapter a reference image takes by default for `base`: the first one whose files are present. */
+const findDefaultIpAdapter = <T extends ReferenceModelCandidate>(
+  models: readonly T[],
+  base: string | undefined
+): T | null =>
+  models.find((candidate) => candidate.type === 'ip_adapter' && candidate.base === base && !candidate.is_missing) ??
+  null;
+
+type ReferenceModelCandidate = { base: string; is_missing?: boolean; key: string; name: string; type: string };
 
 // FLUX.1 Kontext starter sources from invokeai/backend/model_manager/starter_models/flux.py.
 const FLUX_KONTEXT_REPOS = [
@@ -2200,8 +2217,7 @@ const getFamilyDefaultReferenceImageConfig = (
     return { image, type: 'qwen_image_2_1_reference_image' };
   }
 
-  const adapterModel =
-    models.find((candidate) => candidate.type === 'ip_adapter' && candidate.base === modelBase) ?? null;
+  const adapterModel = findDefaultIpAdapter(models, modelBase);
 
   return {
     beginEndStepPct: [0, 1],
@@ -2381,10 +2397,7 @@ const needsStrengthOnlyRetarget = (
     return true;
   }
 
-  return (
-    config.model === null &&
-    models.some((candidate) => candidate.type === 'ip_adapter' && candidate.base === model.base)
-  );
+  return config.model === null && findDefaultIpAdapter(models, model.base) !== null;
 };
 
 /** Drops unsupported, retargets incompatible ones, keeping image/enabled state. No changes return the same array. */

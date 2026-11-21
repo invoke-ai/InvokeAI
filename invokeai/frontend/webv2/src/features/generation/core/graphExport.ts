@@ -284,8 +284,7 @@ const withFirstRequiredComponent = (
     }
 
     for (const candidate of models) {
-      // A registered model whose files are gone is listed but cannot be loaded.
-      const value = !candidate.is_missing && fitsSlot(slot, candidate, ctx) ? toSlotValue(slot, candidate) : null;
+      const value = fitsSlot(slot, candidate, ctx) ? toSlotValue(slot, candidate) : null;
 
       if (value) {
         return { ...values, [slot.key]: value };
@@ -477,7 +476,9 @@ export const compileGraphExportCase = (
 ): CompiledGraphExportCase => {
   assertModeInputs(input);
 
-  const { models } = env;
+  // A registered model whose files are gone is listed but cannot be loaded: the case sees the usable ones only, as
+  // Generate's pickers do, and a case that names a missing one fails like one that names an unknown model.
+  const models = env.models.filter((candidate) => !candidate.is_missing);
   let values = withCaseValues(getModelDefaultValues(getSelectableModel(input.modelKey, models), models), input);
   values = withSettingsOverrides(values, input.settings);
   values = withComponentPicks(values, input.components, models);

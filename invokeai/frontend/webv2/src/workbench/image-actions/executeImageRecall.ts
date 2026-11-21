@@ -21,6 +21,7 @@ import {
   isSupportedGenerateModel,
   isVaeModelConfig,
   normalizeGenerateWidgetValues,
+  pickFallbackGenerateModel,
 } from '@features/generation/settings';
 import { hasArchitectureCapabilities } from '@features/models/architectures';
 import {
@@ -281,7 +282,8 @@ export const getCurrentGenerateValues = ({
   }
 
   const fallbackModelKey = typeof generateValues.modelKey === 'string' ? generateValues.modelKey : null;
-  const fallbackModel = supportedModels.find((model) => model.key === fallbackModelKey) ?? supportedModels[0];
+  const fallbackModel =
+    supportedModels.find((model) => model.key === fallbackModelKey) ?? pickFallbackGenerateModel(supportedModels);
 
   if (!fallbackModel) {
     return null;
@@ -519,7 +521,11 @@ export const executeImageRecall = async ({
     // defaults resolve beside them, so a slot that hangs on a cleared one is not filled either. A pick recall rejected
     // leaves its slot to the default.
     if (recallsModel && !result.fields.includes('model') && !normalizeGenerateWidgetValues(getGenerateValues())) {
-      const held = [...result.appliedComponents, ...(result.fields.includes('vae') ? (['vae'] as const) : [])];
+      // A recorded pick whose files are gone stays as recalled, like the main model, LoRAs and adapters of the image,
+      // but does not hold its slot: a working default takes its place.
+      const held = [...result.appliedComponents, ...(result.fields.includes('vae') ? (['vae'] as const) : [])].filter(
+        (setting) => !result.values[setting]?.is_missing
+      );
 
       result.values = {
         ...result.values,

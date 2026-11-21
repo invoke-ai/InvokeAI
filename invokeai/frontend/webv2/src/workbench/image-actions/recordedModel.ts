@@ -14,6 +14,8 @@ export interface RecordedModelRef {
 interface ResolvableModel {
   base: string;
   hash?: string;
+  /** Registered, but its files are gone. */
+  is_missing?: boolean;
   key: string;
   name: string;
   type: string;
@@ -56,18 +58,12 @@ export const toRecordedModelRef = (value: unknown): RecordedModelRef | null => {
   return ref && (ref.key || ref.hash || (ref.name && ref.base)) ? ref : null;
 };
 
-/** Key first, then the content hash when recorded, else name and base (and type when recorded). */
-export const resolveRecordedModel = <T extends ResolvableModel>(
+/** The content hash when recorded, else name and base (and type when recorded). */
+const matchRecordedModel = <T extends ResolvableModel>(
   ref: RecordedModelRef,
   models: readonly T[],
   policy: RecordedModelPolicy
 ): T | 'ambiguous' | null => {
-  const byKey = ref.key ? models.find((model) => model.key === ref.key) : undefined;
-
-  if (byKey) {
-    return byKey;
-  }
-
   const byHash = ref.hash ? models.filter((model) => model.hash === ref.hash) : [];
   const matches =
     byHash.length > 0 || (ref.hash && policy.hashMiss === 'refuse')
@@ -79,6 +75,34 @@ export const resolveRecordedModel = <T extends ResolvableModel>(
         : [];
 
   return matches.length > 1 && policy.ambiguous === 'refuse' ? 'ambiguous' : (matches[0] ?? null);
+};
+
+/**
+ * Key first, then the content hash when recorded, else name and base (and type when recorded). A model whose files are
+ * gone is the last resort: a reinstall leaves the old record beside the new one, and the new one is what the image
+ * recorded in effect.
+ */
+export const resolveRecordedModel = <T extends ResolvableModel>(
+  ref: RecordedModelRef,
+  models: readonly T[],
+  policy: RecordedModelPolicy
+): T | 'ambiguous' | null => {
+  const present = models.filter((model) => !model.is_missing);
+  const byKey = ref.key ? present.find((model) => model.key === ref.key) : undefined;
+
+  if (byKey) {
+    return byKey;
+  }
+
+  const matched = matchRecordedModel(ref, present, policy);
+
+  if (matched !== null) {
+    return matched;
+  }
+
+  return (
+    (ref.key ? models.find((model) => model.key === ref.key) : undefined) ?? matchRecordedModel(ref, models, policy)
+  );
 };
 
 export interface ParsedMetadataLoraTarget {

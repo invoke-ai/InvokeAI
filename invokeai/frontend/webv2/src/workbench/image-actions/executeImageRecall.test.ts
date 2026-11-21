@@ -933,6 +933,37 @@ describe('executeImageRecall', () => {
       expect(values.qwen3EncoderModel?.key).toBe(fitting.key);
     });
 
+    it('lets a working default take the slot of a recorded pick whose files are missing', async () => {
+      const qwen = (key: string, extra: Record<string, unknown> = {}) =>
+        ({
+          base: 'any',
+          format: 'checkpoint',
+          key,
+          name: key,
+          type: 'qwen3_encoder',
+          variant: 'qwen3_4b',
+          ...extra,
+        }) as unknown as ModelConfig;
+      const gone = qwen('enc-gone', { is_missing: true });
+      const working = qwen('enc-working');
+      const zImage = {
+        base: 'z-image',
+        default_settings: { components: { qwen3_encoder: working.key } },
+        format: 'checkpoint',
+        key: 'z-main',
+        name: 'Z-Image',
+        type: 'main',
+      } as unknown as ModelConfig;
+
+      const values = await recallValues('remix', { positive_prompt: 'p', qwen3_encoder: { key: gone.key } }, zImage, [
+        zImage,
+        gone,
+        working,
+      ]);
+
+      expect(values.qwen3EncoderModel?.key).toBe(working.key);
+    });
+
     it('leaves the default vision tower out when the image clears the encoder it hangs on', async () => {
       const tower = { ...encoder, key: 'q21-tower', name: 'Tower', type: 'qwen3_vl_vision_tower' } as ModelConfig;
       const withTower = {
@@ -952,6 +983,29 @@ describe('executeImageRecall', () => {
       );
       expect(cleared.qwen3VLEncoderModel).toBeNull();
       expect(cleared.qwen3VLVisionTowerModel).toBeNull();
+    });
+
+    it('lets a working default VAE take the place of a recorded VAE whose files are missing', async () => {
+      const vae = (key: string, extra: Record<string, unknown> = {}) =>
+        ({ base: 'flux', format: 'checkpoint', key, name: key, type: 'vae', ...extra }) as unknown as ModelConfig;
+      const gone = vae('flux-vae-gone', { is_missing: true });
+      const working = vae('flux-vae-working');
+      const flux = {
+        base: 'flux',
+        default_settings: { vae: working.key },
+        format: 'checkpoint',
+        key: 'flux-main',
+        name: 'FLUX',
+        type: 'main',
+      } as unknown as ModelConfig;
+
+      const values = await recallValues('remix', { positive_prompt: 'p', vae: { key: gone.key } }, flux, [
+        flux,
+        gone,
+        working,
+      ]);
+
+      expect(values.vae?.key).toBe(working.key);
     });
 
     it('keeps a VAE the image records as empty cleared', async () => {

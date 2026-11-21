@@ -76,6 +76,7 @@ export {
   resolveModelDefaultVae,
   isArchitectureDescribed,
   isGenerateModelSelectable,
+  pickFallbackGenerateModel,
   isKnownScheduler,
   isLossyModelSwitch,
   isSupportedGenerateModel,

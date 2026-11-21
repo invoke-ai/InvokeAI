@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest';
 
 import { resolveRecordedModel, toRecordedModelRef, type RecordedModelPolicy } from './recordedModel';
 
-const model = (key: string, extra: Partial<{ base: string; hash: string; name: string; type: string }> = {}) => ({
+const model = (
+  key: string,
+  extra: Partial<{ base: string; hash: string; is_missing: boolean; name: string; type: string }> = {}
+) => ({
   base: 'sdxl',
   key,
   name: 'Juggernaut',
@@ -57,6 +60,32 @@ describe('resolveRecordedModel', () => {
 
     expect(resolveRecordedModel(recorded, [first, second], STRICT)).toBe('ambiguous');
     expect(resolveRecordedModel(recorded, [first, second], LENIENT)).toBe(first);
+  });
+
+  it('prefers a present record over a missing one at every step, and takes a missing one only as the last resort', () => {
+    const old = model('old', { hash: 'blake3:x', is_missing: true });
+    const reinstalled = model('new', { hash: 'blake3:x' });
+    const ref = { base: 'sdxl', hash: 'blake3:x', key: 'old', name: 'Juggernaut', type: 'main' };
+
+    // The key names the missing record, the reinstall has the same hash: the present one wins, in either order.
+    expect(resolveRecordedModel(ref, [old, reinstalled], STRICT)).toBe(reinstalled);
+    expect(resolveRecordedModel(ref, [reinstalled, old], STRICT)).toBe(reinstalled);
+    // Several missing matches beside one present one are no ambiguity.
+    expect(
+      resolveRecordedModel(
+        { ...ref, key: null },
+        [old, model('old2', { hash: 'blake3:x', is_missing: true }), reinstalled],
+        STRICT
+      )
+    ).toBe(reinstalled);
+    // Nothing present matches: the missing record stays what the image names.
+    expect(resolveRecordedModel(ref, [old], STRICT)).toBe(old);
+    expect(resolveRecordedModel({ ...ref, key: null }, [old], STRICT)).toBe(old);
+    // By name and base, too.
+    const named = { base: 'sdxl', hash: null, key: null, name: 'Juggernaut', type: null };
+    expect(resolveRecordedModel(named, [model('gone', { is_missing: true }), model('here')], LENIENT)).toMatchObject({
+      key: 'here',
+    });
   });
 
   it('matches the type only when the ref records one', () => {
