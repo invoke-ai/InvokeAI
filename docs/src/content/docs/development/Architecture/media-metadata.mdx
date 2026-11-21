@@ -1,7 +1,7 @@
 ---
 title: Media Metadata
-description: How generation metadata travels inside PNG and MP4 files, the versioned record schema, and what a recall can restore on another install.
-lastUpdated: 2026-10-31
+description: How generation metadata travels inside image and MP4 files, the versioned record schema, and what a recall can restore on another install.
+lastUpdated: 2026-11-21
 ---
 
 Every image and video InvokeAI produces carries its generation record **inside the file**, so a
@@ -19,14 +19,15 @@ separate resolved-input record. Values are JSON strings; saved workflow JSON ret
 | `invokeai_metadata` | The generation record (schema below) | when the graph produced one |
 | `invokeai_workflow` | The `WorkflowWithoutID` the session ran, verbatim | only when a workflow was run |
 | `invokeai_graph` | For generated images, the complete session source `Graph`; videos retain their existing graph record | when available |
-| `invokeai_resolved_inputs` | PNG only: compact Graph JSON containing the active invocation's resolved inputs and ordinary ancestors | images generated from a graph |
+| `invokeai_resolved_inputs` | Images only: compact Graph JSON containing the active invocation's resolved inputs and ordinary ancestors | images generated from a graph |
 
 | Container | Where the keys live | Writer | Reader |
 |---|---|---|---|
 | PNG | `tEXt` chunks, one per key | `DiskImageFileStorage.save` via Pillow's `PngInfo` | `extract_metadata_from_image` reads `Image.info` |
+| JPEG, WebP, AVIF (exports only) | One JSON object of the kept keys in the EXIF `UserComment` tag, after the `ASCII\0\0\0` prefix. A JPEG holds about 64 kB: past it the export keeps `invokeai_metadata` alone, or nothing | `encode_image` in `invokeai/app/services/images/image_export.py` | `generation_data_from_exif` beside the writer, called by `extract_metadata_from_image`; PNG text chunks win per key, and an envelope over Pillow's PNG text limit is ignored |
 | MP4 | QuickTime keyed metadata: `moov/udta/meta` with an `mdta` `keys` table and `ilst` UTF-8 `data` atoms | `DiskVideoFileStorage.save` remuxes through the bundled ffmpeg (`-movflags use_metadata_tags`, stream copy, `+faststart`) | `invokeai.app.util.mp4_metadata.read_mp4_tags`, a pure-Python box walk |
 
-Both readers feed `extract_metadata` in `invokeai/app/api/extract_metadata.py`, which owns the
+Every reader feeds `extract_metadata` in `invokeai/app/api/extract_metadata.py`, which owns the
 validation rules: the metadata must parse to a JSON object, the workflow must validate as a
 `WorkflowWithoutID`, and the graph must be an object with a `nodes` object and an `edges` list.
 Anything else degrades to "absent". The image reader additionally extracts optional

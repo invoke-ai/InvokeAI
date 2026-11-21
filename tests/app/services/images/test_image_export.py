@@ -1,10 +1,13 @@
 import io
+import json
+import logging
 from pathlib import Path
 
 import pytest
 from PIL import Image
 from PIL.PngImagePlugin import PngInfo
 
+from invokeai.app.api.extract_metadata import ExtractedMetadata, extract_metadata_from_image
 from invokeai.app.services.board_access.board_access_common import BoardViewer
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
 from invokeai.app.services.images.image_export import (
@@ -25,9 +28,9 @@ INVOKE_CHUNKS = {
 }
 
 
-def _stored_png(tmp_path: Path, image: Image.Image) -> Path:
+def _stored_png(tmp_path: Path, image: Image.Image, chunks: dict[str, str] = INVOKE_CHUNKS) -> Path:
     pnginfo = PngInfo()
-    for key, value in INVOKE_CHUNKS.items():
+    for key, value in chunks.items():
         pnginfo.add_text(key, value)
     path = tmp_path / "stored.png"
     image.save(path, "PNG", pnginfo=pnginfo)
@@ -44,13 +47,12 @@ def _decode(data: bytes) -> Image.Image:
 def test_export_decodes_as_its_format_capped_without_enlarging(tmp_path: Path, format: ImageExportFormat) -> None:
     path = _stored_png(tmp_path, Image.new("RGB", (400, 200)))
 
-    capped = encode_image(path, ImageExportOptions(format=format, long_edge=100, metadata="all"))
-    uncapped = _decode(encode_image(path, ImageExportOptions(format=format, long_edge=1000)))
+    capped = _decode(encode_image(path, ImageExportOptions(format=format, long_edge=100, metadata="all")))
+    uncapped = encode_image(path, ImageExportOptions(format=format, long_edge=1000))
 
-    assert (_decode(capped).format, _decode(capped).size) == (format.upper(), (100, 50))
-    assert uncapped.size == (400, 200)
-    if format != "png":
-        assert b"invokeai_" not in capped
+    assert (capped.format, capped.size) == (format.upper(), (100, 50))
+    assert _decode(uncapped).size == (400, 200)
+    assert b"invokeai_" not in uncapped
 
 
 @pytest.mark.parametrize(
@@ -65,6 +67,39 @@ def test_png_metadata_level_selects_invoke_chunks(
     exported = _decode(encode_image(path, ImageExportOptions(format="png", metadata=metadata, long_edge=4)))
 
     assert {key for key in exported.info if key.startswith("invokeai_")} == expected
+
+
+@pytest.mark.parametrize(
+    ("format", "notes", "keeps_workflow"),
+    [("jpeg", "", True), ("jpeg", "x" * 70_000, False), ("webp", "x" * 70_000, True), ("avif", "", True)],
+)
+def test_lossy_export_generation_data_is_recalled_on_upload(
+    tmp_path: Path, format: ImageExportFormat, notes: str, keeps_workflow: bool
+) -> None:
+    workflow = json.dumps(
+        {
+            **dict.fromkeys(["name", "author", "description", "version", "contact", "tags"], ""),
+            "notes": notes,
+            "exposedFields": [],
+            "meta": {"version": "3.0.0", "category": "user"},
+            "nodes": [],
+            "edges": [],
+        }
+    )
+    graph = '{"nodes": {}, "edges": []}'
+    chunks = {
+        "invokeai_metadata": '{"seed": 7}',
+        "invokeai_workflow": workflow,
+        "invokeai_graph": graph,
+        "invokeai_resolved_inputs": graph,
+    }
+    path = _stored_png(tmp_path, Image.new("RGB", (8, 8)), chunks)
+
+    exported = _decode(encode_image(path, ImageExportOptions(format=format, metadata="all")))
+    extracted = extract_metadata_from_image(exported, None, None, None, logging.getLogger(__name__))
+
+    kept = (workflow, graph, graph) if keeps_workflow else (None, None, None)
+    assert extracted == ExtractedMetadata(chunks["invokeai_metadata"], *kept)
 
 
 def test_hostile_board_name_and_pattern_cannot_form_a_path(mock_invoker: Invoker) -> None:

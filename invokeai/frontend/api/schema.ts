@@ -7625,7 +7625,7 @@ export type components = {
             long_edge?: number | null;
             /**
              * Metadata
-             * @description Which Invoke metadata a PNG keeps; other formats never carry any
+             * @description Which Invoke metadata the exported file keeps; a JPEG keeps only what fits in about 64 kB
              * @default none
              * @enum {string}
              */
@@ -64672,7 +64672,7 @@ export interface operations {
                 quality?: number;
                 /** @description Caps the longer side in pixels. The image is never enlarged. */
                 long_edge?: number | null;
-                /** @description Which Invoke metadata a PNG keeps; other formats never carry any */
+                /** @description Which Invoke metadata the exported file keeps; a JPEG keeps only what fits in about 64 kB */
                 metadata?: "all" | "parameters" | "none";
             };
             header?: never;

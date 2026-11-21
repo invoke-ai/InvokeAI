@@ -1,4 +1,5 @@
 import io
+import json
 import os
 import re
 import threading
@@ -10,7 +11,7 @@ from typing import TYPE_CHECKING, Annotated, Literal, Optional, Sequence, Union
 
 import anyio
 from PIL import Image, UnidentifiedImageError, features
-from PIL.PngImagePlugin import PngInfo
+from PIL.PngImagePlugin import MAX_TEXT_MEMORY, PngInfo
 from pydantic import BaseModel, Field, StringConstraints
 
 from invokeai.app.services.board_access.board_access_common import BoardAction, BoardViewer
@@ -33,6 +34,10 @@ EXPORT_MEDIA_TYPES: dict[ImageExportFormat, str] = {
 EXPORT_EXTENSIONS: dict[ImageExportFormat, str] = {"png": ".png", "jpeg": ".jpg", "webp": ".webp", "avif": ".avif"}
 _PIL_FORMATS: dict[ImageExportFormat, str] = {"png": "PNG", "jpeg": "JPEG", "webp": "WEBP", "avif": "AVIF"}
 _PIL_FEATURES: dict[ImageExportFormat, str] = {"png": "zlib", "jpeg": "jpg", "webp": "webp", "avif": "avif"}
+_EXIF_IFD = 0x8769
+_USER_COMMENT = 0x9286
+_ENVELOPE_PREFIX = b"ASCII\0\0\0"
+_JPEG_MAX_EXIF_BYTES = 65533
 
 
 def _available_cpus() -> int:
@@ -58,7 +63,7 @@ class ImageExportOptions(BaseModel):
     )
     metadata: ImageExportMetadata = Field(
         default="none",
-        description="Which Invoke metadata a PNG keeps; other formats never carry any",
+        description="Which Invoke metadata the exported file keeps; a JPEG keeps only what fits in about 64 kB",
     )
 
 
@@ -155,14 +160,14 @@ def _encode(path: Union[str, Path], options: ImageExportOptions) -> bytes:
     with _decode(Path(path).read_bytes()) as source:
         info = source.info
         icc_profile = info.get("icc_profile")
+        kept = {key: value for key, value in info.items() if isinstance(value, str) and _keeps(key, options.metadata)}
         buffer = io.BytesIO()
         if options.format == "png":
             image = _fit_png(source, options.long_edge)
             transparency = image.info.get("transparency") if image is source else None
             pnginfo = PngInfo()
-            for key, value in info.items():
-                if isinstance(value, str) and _keeps_png_text(key, options.metadata):
-                    pnginfo.add_text(key, value)
+            for key, value in kept.items():
+                pnginfo.add_text(key, value)
             image.info = {}
             image.save(buffer, "PNG", pnginfo=pnginfo, icc_profile=icc_profile, transparency=transparency)
         else:
@@ -173,11 +178,52 @@ def _encode(path: Union[str, Path], options: ImageExportOptions) -> bytes:
                 image = matte
             image.info = {}
             extra = {"max_threads": _AVIF_MAX_THREADS} if options.format == "avif" else {}
-            image.save(buffer, _PIL_FORMATS[options.format], quality=options.quality, icc_profile=icc_profile, **extra)
+            image.save(
+                buffer,
+                _PIL_FORMATS[options.format],
+                quality=options.quality,
+                icc_profile=icc_profile,
+                exif=_generation_data_exif(kept, options.format),
+                **extra,
+            )
         return buffer.getvalue()
 
 
-def _keeps_png_text(key: str, metadata: ImageExportMetadata) -> bool:
+def _generation_data_exif(kept: dict[str, str], format: ImageExportFormat) -> bytes:
+    exif = _envelope(kept)
+    if format != "jpeg" or len(exif) <= _JPEG_MAX_EXIF_BYTES:
+        return exif
+    # A JPEG EXIF marker holds about 64 kB: past it keep the parameters alone, or nothing when even they do not fit.
+    parameters = _envelope({key: value for key, value in kept.items() if key == "invokeai_metadata"})
+    return parameters if len(parameters) <= _JPEG_MAX_EXIF_BYTES else b""
+
+
+def _envelope(kept: dict[str, str]) -> bytes:
+    if not kept:
+        return b""
+    exif = Image.Exif()
+    exif.get_ifd(_EXIF_IFD)[_USER_COMMENT] = _ENVELOPE_PREFIX + json.dumps(kept).encode("ascii")
+    return exif.tobytes()
+
+
+def generation_data_from_exif(image: Image.Image) -> dict[str, object]:
+    try:
+        comment = image.getexif().get_ifd(_EXIF_IFD).get(_USER_COMMENT)
+        if (
+            isinstance(comment, bytes)
+            and comment.startswith(_ENVELOPE_PREFIX)
+            # Strings past this could not be reopened from the stored PNG's text chunks.
+            and len(comment) <= MAX_TEXT_MEMORY
+        ):
+            data = json.loads(comment[len(_ENVELOPE_PREFIX) :])
+            if isinstance(data, dict):
+                return data
+    except Exception:
+        pass
+    return {}
+
+
+def _keeps(key: str, metadata: ImageExportMetadata) -> bool:
     if metadata == "all":
         return key.startswith("invokeai_")
     return metadata == "parameters" and key == "invokeai_metadata"

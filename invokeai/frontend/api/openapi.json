@@ -7899,11 +7899,11 @@
             "schema": {
               "enum": ["all", "parameters", "none"],
               "type": "string",
-              "description": "Which Invoke metadata a PNG keeps; other formats never carry any",
+              "description": "Which Invoke metadata the exported file keeps; a JPEG keeps only what fits in about 64 kB",
               "default": "none",
               "title": "Metadata"
             },
-            "description": "Which Invoke metadata a PNG keeps; other formats never carry any"
+            "description": "Which Invoke metadata the exported file keeps; a JPEG keeps only what fits in about 64 kB"
           }
         ],
         "responses": {
@@ -25110,7 +25110,7 @@
             "type": "string",
             "enum": ["all", "parameters", "none"],
             "title": "Metadata",
-            "description": "Which Invoke metadata a PNG keeps; other formats never carry any",
+            "description": "Which Invoke metadata the exported file keeps; a JPEG keeps only what fits in about 64 kB",
             "default": "none"
           },
           "name_pattern": {
