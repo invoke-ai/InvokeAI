@@ -1,13 +1,14 @@
-"""Loaders for TextLLM models: transformers folders, and single-file Qwen3.5 vision-language models.
+"""Loaders for TextLLM models: transformers folders, single-file Qwen3.5 vision-language models, and the Text LLM view
+of single-file Qwen3-VL encoders.
 
-Both serve the model, its tokenizer and its processor as submodels, so a caller reaches the text side of either
-container the same way, through the model cache (`load_text_llm_tokenizer_and_processor`).
+Each serves the model, its tokenizer and, where it reads images, its processor as submodels, so a caller reaches the
+text side of any container the same way, through the model cache (`load_text_llm_tokenizer_and_processor`).
 """
 
 from collections.abc import Callable
 from logging import Logger
 from pathlib import Path
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 import accelerate
 import torch
@@ -23,15 +24,35 @@ from transformers.utils import GENERATION_CONFIG_NAME
 
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.configs.qwen3_5_encoder import get_qwen3_5_variant
+from invokeai.backend.model_manager.configs.qwen3_vl_encoder import Qwen3VLEncoder_Checkpoint_Config
+from invokeai.backend.model_manager.configs.roles import view_as
 from invokeai.backend.model_manager.configs.text_llm import (
     IMAGE_TEXT_TO_TEXT_LLMS,
     TextLLM_Checkpoint_Config,
     TextLLM_Diffusers_Config,
+    TextLLM_Qwen3VLEncoder_Config,
 )
 from invokeai.backend.model_manager.load.load_default import ModelLoader, _model_declared_skip_patterns
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
+from invokeai.backend.model_manager.load.model_loaders.krea2 import Qwen3VLEncoderCheckpointLoader
+from invokeai.backend.model_manager.model_on_disk import safetensors_meta_state_dict
 from invokeai.backend.model_manager.taxonomy import AnyModel, BaseModelType, ModelFormat, ModelType, SubModelType
-from invokeai.backend.quantization.fp8_scaled import cast_state_dict, reject_quantized_side_channel
+from invokeai.backend.model_manager.util.qwen3_vl import (
+    qwen3vl_lm_head_entries,
+    qwen3vl_lm_head_hints,
+    qwen3vl_lm_head_refusal,
+    qwen3vl_token_embedding,
+    read_qwen3vl_lm_head_tensors,
+)
+from invokeai.backend.quantization.fp8_scaled import (
+    FP8_WEIGHT_DTYPES,
+    cast_state_dict,
+    dequantize_fp8_scaled,
+    extract_fp8_scaled_layers,
+    fold_transient_bytes,
+    read_safetensors_metadata,
+    reject_quantized_side_channel,
+)
 from invokeai.backend.quantization.int8_convrot import (
     drop_unconsumed_quantization_sidecars,
     extract_int8_convrot_markers,
@@ -45,10 +66,15 @@ from invokeai.backend.qwen3_5.qwen3_5_vl import (
     qwen3_5_vl_config,
     qwen3_5_vl_generation_config,
 )
+from invokeai.backend.qwen3_vl.qwen3_vl_assets import (
+    load_qwen3_vl_tokenizer,
+    qwen3_vl_instruct_generation_config,
+    qwen3_vl_ties_word_embeddings,
+)
 from invokeai.backend.util.state_dict_loading import load_state_dict_ignoring_extras, reject_incomplete_load
 
 if TYPE_CHECKING:
-    from transformers import Qwen3_5ForConditionalGeneration
+    from transformers import Qwen3_5ForConditionalGeneration, Qwen3VLForConditionalGeneration
 
 # The model types with Gated DeltaNet layers, which do not run in float16: these load in bfloat16 -- float32 on a
 # device without it -- whatever precision is configured. Qwen3.5's MoE and Qwen3-Next folders load here as causal LMs.
@@ -163,6 +189,114 @@ class TextLLMCheckpointLoader(_TextLLMLoader):
             "Only the model, its Tokenizer and its Processor can be loaded from a TextLLM. "
             f"Received: {submodel_type.value if submodel_type else 'None'}"
         )
+
+
+@ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.TextLLM, format=ModelFormat.Qwen3VLEncoder)
+class TextLLMQwen3VLLoader(_TextLLMLoader):
+    """Loads the Text LLM view of a single-file Qwen3-VL encoder (`TextLLM_Qwen3VLEncoder_Config`): the whole Qwen3-VL
+    Instruct model, text only, with its own instance of the vendored Qwen3-VL tokenizer.
+
+    The language model is the encoder loader's own decode, so every quantization the encoder takes loads here alike.
+    The visual tower stays on disk. The LM head is the token embedding where the variant ties them (the 4B), and
+    otherwise the file's, widened to the compute dtype on load.
+    """
+
+    def _load_model(
+        self,
+        config: AnyModelConfig,
+        submodel_type: Optional[SubModelType] = None,
+    ) -> AnyModel:
+        if not isinstance(config, TextLLM_Qwen3VLEncoder_Config):
+            raise ValueError(f"Expected a TextLLM_Qwen3VLEncoder_Config, got {type(config).__name__}.")
+
+        match submodel_type:
+            case None:
+                return self._load_qwen3_vl(config)
+            case SubModelType.Tokenizer:
+                # Its own instance, as for Qwen3.5: the process-wide one is shared with the Qwen3-VL encoders.
+                return load_qwen3_vl_tokenizer()
+            case SubModelType.Processor:
+                raise ValueError(
+                    f"'{config.name}' runs as a text-only LLM: its vision tower is not loaded, so it cannot read images."
+                )
+
+        raise ValueError(
+            "Only the model and its Tokenizer can be loaded from a Qwen3-VL encoder serving as a TextLLM. "
+            f"Received: {submodel_type.value if submodel_type else 'None'}"
+        )
+
+    def _load_qwen3_vl(self, config: TextLLM_Qwen3VLEncoder_Config) -> "Qwen3VLForConditionalGeneration":
+        from transformers import Qwen3VLForConditionalGeneration
+
+        encoder_config = view_as(config, ModelType.Qwen3VLEncoder)
+        if not isinstance(encoder_config, Qwen3VLEncoder_Checkpoint_Config):
+            raise ValueError(f"'{config.name}' is not a single-file Qwen3-VL encoder; re-identify it.")
+        path = Path(config.path)
+        what = f"Qwen3-VL checkpoint {path.name}"
+        # As for any Text LLM: float32 on the CPU, where float16 and bfloat16 are emulated or slow. fp8 weights are
+        # folded there too, rather than dequantized on every token.
+        dtype = self._compute_dtype(config.cpu_only, avoid_float16=True)
+        device = torch.device("cpu") if config.cpu_only else None
+
+        tied = qwen3_vl_ties_word_embeddings(config.variant)
+        hints: dict[str, Any] = {}
+        head_bytes = 0
+        if not tied:
+            # Judged from the header, so a head the loader refuses costs no load; its bytes are read after the decode.
+            header = safetensors_meta_state_dict(path)
+            head_meta = qwen3vl_lm_head_entries(header)
+            hints = qwen3vl_lm_head_hints(path, read_safetensors_metadata(path, self._logger))
+            refusal = qwen3vl_lm_head_refusal(head_meta, hints, qwen3vl_token_embedding(header))
+            if refusal is not None:
+                raise ValueError(f"'{config.name}' cannot run as a Text LLM: {refusal}. Re-identify it.")
+            head_bytes = _lm_head_widening_bytes(head_meta, dtype)
+
+        encoder_loader = Qwen3VLEncoderCheckpointLoader(self._app_config, self._logger, self._ram_cache)
+        # The decode makes the one reservation, before it widens anything; the head widens after it.
+        language_model = encoder_loader.load_language_model(
+            encoder_config,
+            reserve=lambda needed: self._ram_cache.make_room(needed + head_bytes),
+            device=device,
+            dtype=dtype,
+        )
+
+        with accelerate.init_empty_weights():
+            model = Qwen3VLForConditionalGeneration(language_model.config)
+        model.model = language_model
+        if tied:
+            model.lm_head.weight = model.get_input_embeddings().weight
+        else:
+            head = read_qwen3vl_lm_head_tensors(path)
+            layers = extract_fp8_scaled_layers(head, layer_hints={"lm_head": hints})
+            dequantize_fp8_scaled(head, layers, dtype)
+            cast_state_dict(head, dtype, keep_fp8=False)
+            model.lm_head.weight = torch.nn.Parameter(head.pop("lm_head.weight"), requires_grad=False)
+        model.generation_config = qwen3_vl_instruct_generation_config()
+        reject_incomplete_load(model, what=what)
+        self._logger.info(
+            f"{what}: LM head {'tied to the token embedding' if tied else f'read from the file in {dtype}'}."
+        )
+        return model
+
+
+def _lm_head_widening_bytes(head: dict[str, Any], dtype: torch.dtype) -> int:
+    """What widening the LM head to `dtype` holds beside the language model: the result, the stored weight until it is
+    replaced (nothing when it already is `dtype`), and for scaled fp8 the float32 scales and the fold's slabs.
+
+    Reads `qwen3vl_lm_head_entries` of the header, before anything is loaded.
+    """
+    weight = head["weight"]
+    total = weight.numel() * dtype.itemsize
+    if weight.dtype != dtype:
+        total += weight.numel() * weight.element_size()
+    scale = head.get("weight_scale", head.get("scale_weight"))
+    if weight.dtype in FP8_WEIGHT_DTYPES and scale is not None:
+        scales = [
+            head[suffix] for suffix in ("weight_scale", "scale_weight", "input_scale", "scale_input") if suffix in head
+        ]
+        total += sum(tensor.numel() * torch.float32.itemsize for tensor in scales)
+        total += fold_transient_bytes(weight, scale)
+    return total
 
 
 def qwen3_5_vl_from_state_dict(

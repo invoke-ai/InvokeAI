@@ -13,12 +13,15 @@ guarantees the tower that is lent back is exactly the one that was dropped.
 """
 
 import json
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterable, Iterator, Mapping
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
 import torch
+
+from invokeai.backend.quantization.fp8_scaled import FP8_WEIGHT_DTYPES, MXFP8_FORMAT, parse_quantization_metadata
+from invokeai.backend.quantization.int8_convrot import read_comfy_quant_markers
 
 
 def normalize_qwen3vl_rope_config(config: Any) -> Any:
@@ -228,7 +231,107 @@ def _is_qwen3vl_unloaded_key(key: Any) -> bool:
     both land on ``language_model.lm_head``, which names no module. Left in, an nvfp4 head fails the install that
     way, and a scaled fp8 one is folded and reserved for, then discarded.
     """
+    return is_qwen3vl_visual_key(key) or qwen3vl_lm_head_suffix(key) is not None
+
+
+_LM_HEAD_TARGET = "language_model.lm_head."
+
+
+def qwen3vl_lm_head_suffix(key: Any) -> str | None:
+    """What follows the LM head's path in a checkpoint key (``weight``, ``weight_scale``, ``comfy_quant``, ...), in
+    either spelling (``lm_head.*``, ``model.lm_head.*``); None for a key of anything else."""
     if not isinstance(key, str):
-        return False
+        return None
     target = qwen3vl_target_key(key)
-    return target.startswith("visual.") or target.startswith("language_model.lm_head.")
+    return target[len(_LM_HEAD_TARGET) :] if target.startswith(_LM_HEAD_TARGET) else None
+
+
+def read_qwen3vl_lm_head_tensors(path: Path) -> dict[str, torch.Tensor]:
+    """Read only the LM head's tensors from a single file, keyed ``lm_head.<suffix>`` whichever spelling it uses.
+
+    For the Text LLM view of an encoder file, whose language-model load drops the head (`drop_qwen3vl_unloaded_keys`).
+    Filtered by key before anything is read, like `read_qwen3vl_visual_tower_tensors`.
+    """
+    from safetensors import safe_open
+
+    tensors: dict[str, torch.Tensor] = {}
+    with safe_open(str(path), framework="pt", device="cpu") as handle:
+        for key in handle.keys():
+            suffix = qwen3vl_lm_head_suffix(key)
+            if suffix is not None:
+                tensors[f"lm_head.{suffix}"] = handle.get_tensor(key)
+    return tensors
+
+
+def qwen3vl_lm_head_entries(state_dict: Mapping[Any, Any]) -> dict[str, Any]:
+    """The LM head's entries of a single file's state dict (`meta` or real), keyed by what follows the head's path."""
+    return {suffix: value for key, value in state_dict.items() if (suffix := qwen3vl_lm_head_suffix(key)) is not None}
+
+
+def qwen3vl_token_embedding(state_dict: Mapping[Any, Any]) -> Any:
+    """The token embedding's weight in a single file's state dict, in either spelling, or None."""
+    return next(
+        (
+            value
+            for key, value in state_dict.items()
+            if qwen3vl_target_key(str(key)) == "language_model.embed_tokens.weight"
+        ),
+        None,
+    )
+
+
+def qwen3vl_lm_head_hints(path: Path, metadata: Mapping[str, Any] | None) -> dict[str, Any]:
+    """The LM head's quantization hints: its ``.comfy_quant`` marker, overlaid by its ``_quantization_metadata`` entry.
+
+    The same two sources, in the same order, as the encoder loader reads for every other layer. The marker is read from
+    the file rather than from tensors, because identification holds `meta` tensors with no bytes to parse.
+    """
+    hints: dict[str, Any] = {}
+    for layers in (read_comfy_quant_markers(path), parse_quantization_metadata(metadata)):
+        for layer, layer_hints in layers.items():
+            if qwen3vl_lm_head_suffix(f"{layer}.weight") == "weight" and isinstance(layer_hints, Mapping):
+                hints.update(layer_hints)
+    return hints
+
+
+# Read by the Text LLM loader's fp8 extraction: the scales, and the marker it pops.
+_LM_HEAD_SIDECARS = frozenset({"weight_scale", "scale_weight", "input_scale", "scale_input", "comfy_quant"})
+_PLAIN_SCALE_DTYPES = (torch.float32, torch.float16, torch.bfloat16)
+
+
+def qwen3vl_lm_head_refusal(head: Mapping[str, Any], hints: Mapping[str, Any], embedding: Any) -> str | None:
+    """Why the Text LLM view of a Qwen3-VL file cannot widen its untied LM head, or None when it can.
+
+    Identification withholds the Text LLM role and the loader refuses for exactly these reasons, so a file serves as
+    a Text LLM only when its head loads. Reads dtypes and shapes, so a header's `meta` tensors answer it.
+
+    Args:
+        head: `qwen3vl_lm_head_entries` of the file.
+        hints: `qwen3vl_lm_head_hints` of the file.
+        embedding: The file's token embedding, whose shape an untied head shares.
+    """
+    weight = head.get("weight")
+    if not isinstance(weight, torch.Tensor):
+        return "it has no lm_head.weight to generate text with"
+    if not weight.dtype.is_floating_point:
+        return (
+            f"its LM head is stored as {weight.dtype}; only a float LM head, scaled fp8 included, loads as a Text LLM"
+        )
+    embedding_shape = tuple(getattr(embedding, "shape", ()))
+    if tuple(weight.shape) != embedding_shape:
+        return f"its LM head is {tuple(weight.shape)}, but its token embedding is {embedding_shape}"
+    unread = sorted(set(head) - {"weight"} - _LM_HEAD_SIDECARS)
+    if unread:
+        return f"its LM head carries {', '.join(f'lm_head.{suffix}' for suffix in unread)}, which is not read"
+    scale = head.get("weight_scale", head.get("scale_weight"))
+    if (
+        weight.dtype in FP8_WEIGHT_DTYPES
+        and isinstance(scale, torch.Tensor)
+        and scale.dtype not in _PLAIN_SCALE_DTYPES
+        and hints.get("format") != MXFP8_FORMAT
+    ):
+        return (
+            f"its fp8 LM head has a {scale.dtype} scale, an MX exponent grid that neither its comfy_quant marker nor "
+            f"the _quantization_metadata header names '{MXFP8_FORMAT}'"
+        )
+    return None

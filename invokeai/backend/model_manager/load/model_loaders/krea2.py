@@ -1081,13 +1081,34 @@ class Qwen3VLEncoderCheckpointLoader(_Qwen3VLEncoderSingleFileLoader[Qwen3VLEnco
         )
 
     def _load_text_encoder(self, config: Qwen3VLEncoder_Checkpoint_Config) -> AnyModel:
+        return self.load_language_model(config, reserve=self._ram_cache.make_room)
+
+    def load_language_model(
+        self,
+        config: Qwen3VLEncoder_Checkpoint_Config,
+        *,
+        reserve: Callable[[int], None],
+        device: Optional[torch.device] = None,
+        dtype: Optional[torch.dtype] = None,
+    ) -> AnyModel:
+        """Decode the file's language model into a `Qwen3VLModel`, without the visual tower and the LM head.
+
+        The encoder and the Text LLM view of the same file (`TextLLMQwen3VLLoader`) both load through here, so every
+        quantization decodes alike for both. `reserve` is asked for room once, before anything widens: the encoder
+        passes the cache's `make_room`; the Text LLM view adds the LM head it widens afterwards.
+
+        Args:
+            device: Where the model runs, which decides whether fp8 weights stay packed. The loader's device when
+                omitted; a CPU folds them.
+            dtype: The compute dtype. bfloat16 where `device` runs it when omitted, whatever precision is configured.
+        """
         import torch
         from safetensors.torch import load_file
         from transformers import Qwen3VLModel
 
         model_path = Path(config.path)
-        target_device = TorchDevice.choose_torch_device()
-        model_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
+        target_device = device or TorchDevice.choose_torch_device()
+        model_dtype = dtype or TorchDevice.choose_bfloat16_safe_dtype(target_device)
 
         sd = load_file(str(model_path))
         # Ahead of every pass that reads tensors, so the tower is never dequantized, cast, copied or
@@ -1158,7 +1179,7 @@ class Qwen3VLEncoderCheckpointLoader(_Qwen3VLEncoderSingleFileLoader[Qwen3VLEnco
             # matmul folded the scales away and then let the storage cast re-quantize the result to
             # *unscaled* fp8 -- on a scaled checkpoint that is ~3% of the weights lost to underflow,
             # for the byte count the file already had.
-            use_fp8_storage = source_is_fp8 and _device_supports_fp8_storage(self._torch_device, self._logger)
+            use_fp8_storage = source_is_fp8 and _device_supports_fp8_storage(device or self._torch_device, self._logger)
 
         # Every layer that arrived scaled, before the split folds the ones the matmul cannot take. The storage
         # pass below must leave those alone: cast again, they would be re-quantized *without* their scale.
@@ -1182,7 +1203,7 @@ class Qwen3VLEncoderCheckpointLoader(_Qwen3VLEncoderSingleFileLoader[Qwen3VLEnco
                 quantized,
                 model_dtype,
                 architecture="Qwen3-VL encoder",
-                reserve=self._ram_cache.make_room,
+                reserve=reserve,
                 skip_patterns=skip_patterns,
                 # The nvfp4 layers taken out above are held beside the int8 ones, and this is the
                 # branch's only reservation.
@@ -1217,7 +1238,7 @@ class Qwen3VLEncoderCheckpointLoader(_Qwen3VLEncoderSingleFileLoader[Qwen3VLEnco
             # weights are not kept it charges every float at `model_dtype`, folded yet or not, so the
             # number is the same on either side of the fold.
             reserve_for_load(
-                self._ram_cache.make_room,
+                reserve,
                 sd,
                 model_dtype,
                 keep_fp8=keep_fp8,
