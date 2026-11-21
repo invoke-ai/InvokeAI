@@ -108,6 +108,27 @@ describe('resolveRecordedModel', () => {
     );
   });
 
+  it('counts only the copy of those weights registered for the recorded family and type', () => {
+    // One VAE file registered as SDXL and as SD1; the image recorded the SDXL key, now missing, and no hash.
+    const vae = (key: string, base: string, extra: Partial<{ is_missing: boolean }> = {}) =>
+      model(key, { base, hash: 'blake3:vae', name: 'VAE', type: 'vae', ...extra });
+    const missing = vae('old', 'sdxl', { is_missing: true });
+    const sdxl = vae('sdxl-copy', 'sdxl');
+    const sd1 = vae('sd1-copy', 'sd-1');
+
+    expect(
+      resolveRecordedModel(
+        { base: 'sdxl', hash: null, key: 'old', name: 'VAE', type: 'vae' },
+        [missing, sd1, sdxl],
+        STRICT
+      )
+    ).toBe(sdxl);
+    // Without a recorded family, the one the missing key stood for decides.
+    expect(
+      resolveRecordedModel({ base: null, hash: null, key: 'old', name: null, type: null }, [missing, sd1, sdxl], STRICT)
+    ).toBe(sdxl);
+  });
+
   it('matches the type only when the ref records one', () => {
     const lora = model('lora', { type: 'lora' });
 

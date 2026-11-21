@@ -98,9 +98,15 @@ export const resolveRecordedModel = <T extends ResolvableModel>(
 
   // Metadata often records no hash. The catalog still knows the weights its key stood for, and a reinstall carries
   // them, so that hash outranks a name another model may share. It is only a hint: when nothing present has it, the
-  // recorded identifiers decide as before, `hashMiss` included, since the image itself recorded no hash.
+  // recorded identifiers decide as before, `hashMiss` included, since the image itself recorded no hash. The same
+  // weights can be registered for several families (one VAE file as SDXL and as SD1), so only a copy of the family and
+  // type the image recorded, else the ones its key stood for, counts.
   if (!ref.hash && missingByKey?.hash) {
-    const reinstalls = present.filter((model) => model.hash === missingByKey.hash);
+    const base = ref.base ?? missingByKey.base;
+    const type = ref.type ?? missingByKey.type;
+    const reinstalls = present.filter(
+      (model) => model.hash === missingByKey.hash && model.base === base && model.type === type
+    );
 
     if (reinstalls.length > 0) {
       return reinstalls.length > 1 && policy.ambiguous === 'refuse' ? 'ambiguous' : reinstalls[0]!;
