@@ -31,11 +31,14 @@ export const VideoConceptsSection = memo(
     model,
     onChangeLoras,
     projectId,
+    prompt,
   }: {
     loras: GenerateLora[];
     model: MainModelConfig | null;
     onChangeLoras: (update: (current: GenerateLora[]) => GenerateLora[]) => void;
     projectId: string;
+    /** The positive prompt, for marking triggers it lacks. */
+    prompt: string;
   }) {
     const { t } = useTranslation();
     const openInModelManager = useOpenModelInManager();
@@ -91,13 +94,15 @@ export const VideoConceptsSection = memo(
             </Text>
           ) : (
             <ConceptList label={t('widgets.video.concepts')} projectId={projectId}>
-              {loras.map((lora) => (
+              {loras.map((lora, index) => (
                 <ConceptRow
                   key={lora.model.key}
                   // As in Generate: a concept the model cannot load stays listed, badged and off, for the next model.
                   isCompatible={Boolean(model && isLoraCompatibleWithModel(lora.model, model))}
                   models={conceptModels}
                   lora={lora}
+                  prompt={prompt}
+                  triggerColorIndex={index}
                   onRemove={removeLora}
                   onUpdate={updateLora}
                 />
@@ -110,6 +115,7 @@ export const VideoConceptsSection = memo(
   },
   (previous, next) =>
     previous.projectId === next.projectId &&
+    previous.prompt === next.prompt &&
     previous.onChangeLoras === next.onChangeLoras &&
     areVideoModelsEquivalent(previous.model, next.model) &&
     areVideoLorasEquivalent(previous.loras, next.loras)

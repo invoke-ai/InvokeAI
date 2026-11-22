@@ -7,6 +7,7 @@ import {
   isReferenceImageSupported,
   needsEmptyCanvasFrameForReferenceBudget,
 } from '@features/generation/core/baseGenerationPolicies';
+import { getEffectivePositivePrompt } from '@features/generation/core/promptTemplates';
 import {
   type GenerateDraft,
   type GenerateSettingsUpdate,
@@ -37,6 +38,8 @@ interface GenerateGuidanceSectionProps {
 
 const selectGuidanceSettings = pickGenerateSettings([
   'loras',
+  'positivePrompt',
+  'promptTemplate',
   'qwen3VLEncoderModel',
   'qwen3VLVisionTowerModel',
   'referenceImages',
@@ -136,6 +139,7 @@ export const GenerateGuidanceSection = ({
         <GenerateConceptsContent
           loraModels={loraModels}
           loras={settings.loras}
+          prompt={getEffectivePositivePrompt(settings.positivePrompt, settings.promptTemplate)}
           projectId={projectId}
           selectedModel={selectedModel}
           onCommit={onConceptCommit}

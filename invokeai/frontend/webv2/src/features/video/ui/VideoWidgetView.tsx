@@ -975,6 +975,7 @@ export const VideoWidgetView = ({ instance }: { instance?: { id: string } }) => 
             projectId={projectId}
             loras={values.loras}
             model={values.model}
+            prompt={values.positivePrompt}
             onChangeLoras={setLoras}
           />
           <VideoComponentsSection values={values} onPatch={patch} />

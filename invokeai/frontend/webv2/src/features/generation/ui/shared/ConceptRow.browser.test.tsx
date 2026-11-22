@@ -39,7 +39,7 @@ const makeLora = (model: Partial<GenerateLora['model']> = {}): GenerateLora => (
   weight: 0.75,
 });
 
-type Handlers = Partial<Pick<ConceptRowProps, 'models' | 'onRemove' | 'onUpdate'>>;
+type Handlers = Partial<Pick<ConceptRowProps, 'models' | 'onRemove' | 'onUpdate' | 'prompt' | 'triggerColorIndex'>>;
 
 const renderList = async (loras: GenerateLora[], handlers: Handlers = {}) => {
   if (!host) {
@@ -58,6 +58,8 @@ const renderList = async (loras: GenerateLora[], handlers: Handlers = {}) => {
                 lora={lora}
                 onRemove={handlers.onRemove ?? vi.fn()}
                 onUpdate={handlers.onUpdate ?? vi.fn()}
+                prompt={handlers.prompt}
+                triggerColorIndex={handlers.triggerColorIndex}
               />
             </Profiler>
           ))}
@@ -178,6 +180,20 @@ describe('ConceptRow', () => {
     await expect.poll(() => onUpdate.mock.calls).toEqual([['lora-1', { weight: finalWeight }]]);
     await act(() => flushWorkbenchDrafts());
     expect(onUpdate).toHaveBeenCalledTimes(1);
+  });
+
+  it('marks the trigger phrases the prompt lacks, and only while the concept is on', async () => {
+    const lora = makeLora({ trigger_phrases: ['ink wash', 'sumi-e'] });
+    const missingLabels = () =>
+      [...host!.querySelectorAll('[role="group"] span')]
+        .filter((span) => span.textContent?.trim() === 'widgets.generate.triggerNotInPrompt')
+        .map((span) => span.parentElement?.firstElementChild?.textContent);
+
+    await render(lora, { prompt: 'a mountain, Ink Wash style', triggerColorIndex: 0 });
+    expect(missingLabels()).toEqual(['sumi-e']);
+
+    await render({ ...lora, isEnabled: false }, { prompt: 'a mountain', triggerColorIndex: 0 });
+    expect(missingLabels()).toEqual([]);
   });
 
   it('shows the model cover as its thumbnail', async () => {

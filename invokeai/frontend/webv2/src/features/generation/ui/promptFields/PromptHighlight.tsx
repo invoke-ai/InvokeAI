@@ -19,6 +19,8 @@ export const HIGHLIGHT_STYLE_BY_KIND: Record<
   error: { bg: 'bg.error', color: 'fg.error', textDecoration: 'underline wavy', textDecorationColor: 'fg.error' },
   escapedParen: { color: 'fg.muted' },
   group: { color: 'fg.subtle' },
+  // Tinted per LoRA by the span's `colorPalette`.
+  loraTrigger: { bg: 'colorPalette.subtle', color: 'colorPalette.fg' },
   promptFunctionArg: { bg: 'accent.subtle/20', color: 'fg' },
   promptFunctionMethod: { color: 'accent.fg' },
   promptVariable: { color: 'accent.fg' },
@@ -34,6 +36,13 @@ export const HIGHLIGHT_STYLE_BY_KIND: Record<
   wildcard: { color: 'fg.subtle' },
 };
 
+/** Distinct hues, none of them red, which the prompt keeps for errors. */
+const LORA_TRIGGER_PALETTES = ['blue', 'orange', 'green', 'purple', 'pink', 'teal', 'gold', 'cyan'] as const;
+
+/** Cycles past the eighth LoRA. */
+export const getLoraTriggerPalette = (colorIndex: number): string =>
+  LORA_TRIGGER_PALETTES[colorIndex % LORA_TRIGGER_PALETTES.length] ?? 'blue';
+
 export const usePromptHighlightSegments = (prompt: string, options: PromptHighlightOptions, enabled: boolean) =>
   useMemo(
     () =>
@@ -43,13 +52,22 @@ export const usePromptHighlightSegments = (prompt: string, options: PromptHighli
     [enabled, options, prompt]
   );
 
-export const PromptHighlightSpan = ({ kind, text }: { kind: PromptHighlightKind; text: string }) => {
+export const PromptHighlightSpan = ({
+  colorIndex,
+  kind,
+  text,
+}: {
+  colorIndex?: number;
+  kind: PromptHighlightKind;
+  text: string;
+}) => {
   const style = HIGHLIGHT_STYLE_BY_KIND[kind];
 
   return (
     <Box
       as="span"
       bg={style.bg}
+      colorPalette={colorIndex === undefined ? undefined : getLoraTriggerPalette(colorIndex)}
       borderRadius={style.bg ? '2px' : undefined}
       color={style.color}
       textDecoration={style.textDecoration}
@@ -79,6 +97,7 @@ export const HighlightedPrompt = ({
   return segments.map((segment) => (
     <PromptHighlightSpan
       key={`${segment.range.start}:${segment.range.end}:${segment.kind}`}
+      colorIndex={segment.colorIndex}
       kind={segment.kind}
       text={segment.text}
     />

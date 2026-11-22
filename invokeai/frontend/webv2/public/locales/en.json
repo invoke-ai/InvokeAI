@@ -3796,6 +3796,7 @@
       "jumpToSection": "Jump to section",
       "resetFieldNamed": "{{reset}}: {{field}}",
       "notInstalled": "Not installed",
+      "triggerNotInPrompt": "(not in the prompt)",
       "conceptWeightNamed": "{{name}} weight",
       "dropReferenceImages_one": "Drop a reference image",
       "dropReferenceImages_other": "Drop up to {{count}} reference images",
