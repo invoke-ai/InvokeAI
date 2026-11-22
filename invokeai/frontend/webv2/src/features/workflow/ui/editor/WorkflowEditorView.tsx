@@ -1068,6 +1068,12 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
   );
 
   const onNodeContextMenu = useCallback((event: ReactMouseEvent, node: WorkflowFlowNode) => {
+    // Media inside the node handled it (with the item menu). React also bubbles events up from portals: a popover,
+    // menu or dialog opened from the node keeps its own menu, and the browser's.
+    if (event.defaultPrevented || !(event.target instanceof Node && event.currentTarget.contains(event.target))) {
+      return;
+    }
+
     event.preventDefault();
     setContextMenu({
       kind: 'node',

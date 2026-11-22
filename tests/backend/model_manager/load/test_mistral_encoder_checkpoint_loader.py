@@ -20,6 +20,7 @@ from invokeai.backend.model_manager.taxonomy import MistralVariantType
 from invokeai.backend.quantization.nvfp4 import NVFP4Linear, NVFP4Payload
 from tests.fixtures.loader_seams import Seam, prepare
 from tests.fixtures.quantized_payloads import comfy_quant_marker, quantize_convrot
+from tests.fixtures.safetensors_files import record_reads
 
 # The loader derives head counts as projection rows // 128: two query heads over one key/value head, so a config
 # that mixes up the two lookups, or falls back to the cow model's, cannot build this model. Dimensions are multiples
@@ -323,3 +324,24 @@ def test_an_nvfp4_layer_missing_its_global_scale_is_refused_before_the_cache_is_
         run.load(_config(checkpoint))
 
     assert run.reserved == []
+
+
+def test_the_vision_tower_and_projector_of_a_multimodal_file_are_never_read(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Comfy-Org's Ministral file bundles a Pixtral tower and projector the encoder has no slot for. Read through
+    ``pread`` they would cost their size in process memory before being dropped."""
+    checkpoint, _, _ = _write_checkpoint(tmp_path, evidence="none")
+    language_model = load_file(checkpoint)
+    vision = {
+        "vision_tower.transformer.layers.0.attention.q_proj.weight": torch.ones(8, 8),
+        "vision_tower.patch_conv.weight": torch.ones(8, 3, 2, 2),
+        "multi_modal_projector.linear_1.weight": torch.ones(8, 8),
+    }
+    save_file({**language_model, **vision}, checkpoint)
+    log = record_reads(monkeypatch)
+    run = prepare(SEAM, monkeypatch, geometry=_fp8_matmul(False))
+
+    run.load(_config(checkpoint))
+
+    assert set(log.tensors) == set(language_model)

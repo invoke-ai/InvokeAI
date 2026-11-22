@@ -496,6 +496,60 @@ describe('WorkflowEditorView fit selection', () => {
   });
 });
 
+describe('WorkflowEditorView context menus', () => {
+  let host: HTMLDivElement;
+  let root: Root;
+
+  beforeEach(() => {
+    host = document.createElement('div');
+    host.style.cssText = 'width: 480px; height: 520px;';
+    document.body.append(host);
+    root = createRoot(host);
+  });
+
+  afterEach(async () => {
+    await act(() => root.unmount());
+    host.remove();
+    clearWorkflowViewports();
+  });
+
+  it('leaves a right-click inside a popover opened from a node to the browser', async () => {
+    await renderEditor(root, createProjectStore({ ...createProjectGraph('portal'), nodes: [addNode('only', 0, 0)] }));
+    const trigger = await vi.waitFor(() => {
+      const element = host.querySelector<HTMLElement>('button[aria-label="nodes.editFieldDescription"]');
+      expect(element).not.toBeNull();
+      return element!;
+    });
+    await userEvent.click(trigger);
+    const textarea = await vi.waitFor(() => {
+      const element = document.querySelector<HTMLElement>('textarea[aria-label="nodes.fieldDescription"]');
+      expect(element).not.toBeNull();
+      return element!;
+    });
+    expect(host.contains(textarea)).toBe(false);
+
+    const event = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
+    await act(() => textarea.dispatchEvent(event));
+
+    expect(event.defaultPrevented).toBe(false);
+    expect(document.querySelector('[role="menu"]')).toBeNull();
+  });
+
+  it('opens no node menu over a right-click the node’s content handled, as its media does', async () => {
+    await renderEditor(root, createProjectStore({ ...createProjectGraph('media'), nodes: [addNode('only', 0, 0)] }));
+    const content = await vi.waitFor(() => {
+      const element = host.querySelector<HTMLElement>('.react-flow__node[data-id="only"] input');
+      expect(element).not.toBeNull();
+      return element!;
+    });
+    content.addEventListener('contextmenu', (event) => event.preventDefault());
+
+    await act(() => content.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true })));
+
+    expect(document.querySelector('[role="menu"]')).toBeNull();
+  });
+});
+
 describe('WorkflowEditorView paste', () => {
   let host: HTMLDivElement;
   let outside: HTMLButtonElement;

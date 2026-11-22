@@ -77,6 +77,8 @@ export const tooltipSlotRecipe = defineSlotRecipe({
       borderWidth: '1px',
       boxShadow: 'lg',
       color: 'fg',
+      // Page tips sit beneath overlays, dialog backdrops (modal - 1) and toasts; Tooltip raises tips inside overlays.
+      zIndex: 'calc({zIndex.modal} - 2)',
       // Chakra's `fast` scale-fade drags on an annotation this small.
       _open: { ...chakraSlotRecipes.tooltip.base?.content?._open, animationDuration: 'faster' },
       _closed: { ...chakraSlotRecipes.tooltip.base?.content?._closed, animationDuration: 'faster' },

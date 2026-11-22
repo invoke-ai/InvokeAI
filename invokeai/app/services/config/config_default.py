@@ -158,7 +158,7 @@ class InvokeAIAppConfig(BaseSettings):
         download_proxy: Optional HTTP proxy for model downloads. The proxy must enforce the public-address policy because proxy-side DNS cannot be checked by InvokeAI.
         unsafe_disable_picklescan: UNSAFE. Disable the picklescan security check during model installation. Recommended only for development and testing purposes. This will allow arbitrary code execution during model installation, so should never be used in production.
         allow_unknown_models: Allow installation of models that we are unable to identify. If enabled, models will be marked as `unknown` in the database, and will not have any metadata associated with them. If disabled, unknown models will be rejected during installation.
-        multiuser: Enable multiuser support. When disabled, the application runs in single-user mode using a default system account with administrator privileges. When enabled, requires user authentication and authorization.
+        multiuser: Enable multiuser support (the default). Requires user authentication and authorization; the first visitor creates the administrator account. Set to false for single-user mode, which uses a default system account with administrator privileges and no sign-in: anyone who can reach the server then has full control of it. Single-user mode is deprecated.
         strict_password_checking: Enforce strict password requirements. When True, passwords must contain uppercase, lowercase, and numbers. When False (default), any password is accepted but its strength (weak/moderate/strong) is reported to the user.
         image_index_enabled: Maintain a semantic embedding index of gallery images and videos, used by the image map and semantic search features.
         image_index_model: Name of the installed CLIP Vision or SigLIP model used to embed gallery images and video thumbnails. Changing the model discards embeddings computed by the previous model.
@@ -304,7 +304,7 @@ class InvokeAIAppConfig(BaseSettings):
     allow_unknown_models:          bool = Field(default=True,              description="Allow installation of models that we are unable to identify. If enabled, models will be marked as `unknown` in the database, and will not have any metadata associated with them. If disabled, unknown models will be rejected during installation.")
 
     # MULTIUSER
-    multiuser:                     bool = Field(default=False,              description="Enable multiuser support. When disabled, the application runs in single-user mode using a default system account with administrator privileges. When enabled, requires user authentication and authorization.")
+    multiuser:                     bool = Field(default=True,               description="Enable multiuser support (the default). Requires user authentication and authorization; the first visitor creates the administrator account. Set to false for single-user mode, which uses a default system account with administrator privileges and no sign-in: anyone who can reach the server then has full control of it. Single-user mode is deprecated.")
     strict_password_checking:      bool = Field(default=False,              description="Enforce strict password requirements. When True, passwords must contain uppercase, lowercase, and numbers. When False (default), any password is accepted but its strength (weak/moderate/strong) is reported to the user.")
 
     # IMAGE INDEX
@@ -405,19 +405,15 @@ class InvokeAIAppConfig(BaseSettings):
         """
 
         if isinstance(config, dict):
-            new_config = self.model_validate(config)
+            new_config = DefaultInvokeAIAppConfig.model_validate(config)
         else:
             new_config = config
 
         for field_name in new_config.model_fields_set:
-            new_value = getattr(new_config, field_name)
-            current_value = getattr(self, field_name)
-
             if field_name in self.model_fields_set and not clobber:
                 continue
 
-            if new_value != current_value:
-                setattr(self, field_name, new_value)
+            setattr(self, field_name, getattr(new_config, field_name))
 
     def write_file(self, dest_path: Path, as_example: bool = False) -> None:
         """Write the current configuration to file. This will overwrite the existing file.
@@ -440,6 +436,8 @@ class InvokeAIAppConfig(BaseSettings):
                 exclude_none=True if as_example else False,
                 exclude={"schema_version", "legacy_models_yaml_path"},
             )
+            # Older releases default to single-user mode, so always state the choice: a rollback then keeps sign-in on.
+            config_dict["multiuser"] = self.multiuser
 
             if as_example:
                 file.write("# This is an example file with default and example settings.\n")
@@ -673,8 +671,8 @@ def migrate_v4_0_2_to_4_0_3_config_dict(config_dict: dict[str, Any]) -> dict[str
     return parsed_config_dict
 
 
-def load_and_migrate_config(config_path: Path) -> InvokeAIAppConfig:
-    """Load and migrate a config file to the latest version.
+def load_and_migrate_config(config_path: Path) -> DefaultInvokeAIAppConfig:
+    """Load and migrate a config file to the latest version, without applying environment overrides.
 
     Args:
         config_path: Path to the config file.
@@ -704,22 +702,19 @@ def load_and_migrate_config(config_path: Path) -> InvokeAIAppConfig:
 
     if migrated:
         shutil.copy(config_path, config_path.with_suffix(".yaml.bak"))
-        try:
-            # load and write without environment variables
-            migrated_config = DefaultInvokeAIAppConfig.model_validate(loaded_config_dict)
-            migrated_config.write_file(config_path)
-        except Exception as e:
-            shutil.copy(config_path.with_suffix(".yaml.bak"), config_path)
-            raise RuntimeError(f"Failed to load and migrate v3 config file {config_path}: {e}") from e
 
     try:
-        # Meta is not included in the model fields, so we need to validate it separately
-        config = InvokeAIAppConfig.model_validate(loaded_config_dict)
+        config = DefaultInvokeAIAppConfig.model_validate(loaded_config_dict)
         assert config.schema_version == CONFIG_SCHEMA_VERSION, (
             f"Invalid schema version, expected {CONFIG_SCHEMA_VERSION}: {config.schema_version}"
         )
+        if migrated:
+            config.write_file(config_path)
         return config
     except Exception as e:
+        if migrated:
+            shutil.copy(config_path.with_suffix(".yaml.bak"), config_path)
+            raise RuntimeError(f"Failed to load and migrate config file {config_path}: {e}") from e
         raise RuntimeError(f"Failed to load config file {config_path}: {e}") from e
 
 
@@ -800,6 +795,34 @@ def load_config_from_root(root: Path) -> InvokeAIAppConfig:
     return config
 
 
+def _state_multiuser_in_config_file(config_path: Path, multiuser: bool) -> None:
+    """Append `multiuser` to a config file that does not state it, leaving the existing text untouched."""
+    # Older releases default to single-user mode, so state the choice once: a rollback then keeps sign-in on.
+    encoding = locale.getpreferredencoding()
+    try:
+        text = config_path.read_text(encoding=encoding)
+        settings = yaml.safe_load(text)
+        if not isinstance(settings, dict) or "multiuser" in settings:
+            return
+        addition = ("" if text.endswith("\n") else "\n") + yaml.safe_dump({"multiuser": multiuser})
+        try:
+            safe = yaml.safe_load(text + addition) == {**settings, "multiuser": multiuser}
+        except yaml.YAMLError:
+            safe = False
+        if safe:
+            with open(config_path, "at", encoding=encoding) as file:
+                file.write(addition)
+            return
+        reason = "appending a line would change how the file reads"
+    except OSError as e:
+        reason = str(e)
+    logger.warning(
+        "Unable to add the multiuser setting to %s (%s); an older release would start without sign-in",
+        config_path,
+        reason,
+    )
+
+
 @lru_cache(maxsize=1)
 def get_config() -> InvokeAIAppConfig:
     """Get the global singleton app config.
@@ -871,6 +894,7 @@ def get_config() -> InvokeAIAppConfig:
 
     if config.config_file_path.exists():
         config_from_file = load_and_migrate_config(config.config_file_path)
+        _state_multiuser_in_config_file(config.config_file_path, config_from_file.multiuser)
         # Clobbering here will overwrite any settings that were set via environment variables
         config.update_config(config_from_file, clobber=False)
     else:

@@ -49,11 +49,11 @@ from invokeai.backend.quantization.fp8_scaled import (
     Fp8ScaledLayer,
     attach_fp8_scales,
     cast_state_dict,
-    clone_unreplaced_tensors,
     count_fp8_weights,
     dequantize_fp8_scaled,
     extract_comfy_quant_hints,
     extract_fp8_scaled_layers,
+    load_safetensors_checkpoint,
     read_safetensors_metadata,
     split_fp8_scaled_layers,
     translate_torchao_fp8_layers,
@@ -136,7 +136,11 @@ def flux3_transformer_from_single_file(
     """
     log = logger or _logger
     make_room = reserve or _reserve_nothing
-    sd = CheckpointPrefix.detect(sd).strip(sd)
+    stripped = CheckpointPrefix.detect(sd).strip(sd)
+    if stripped is not sd:
+        # The caller still holds `sd`; emptied, it cannot keep the sources alive through the cast.
+        sd.clear()
+    sd = stripped
     header_layers = flux3_header_layers(metadata, sd)
     markers = {
         key[: -len(COMFY_QUANT_SUFFIX)]: parse_comfy_quant_marker(value)
@@ -202,7 +206,6 @@ def flux3_transformer_from_single_file(
             source_tensors_cloned=bool(fp8_layers and not keep_fp8),
             modelopt_nvfp4_relayout=modelopt,
         )
-        mapped = dict(sd) if fp8_layers and not keep_fp8 else None
         if fp8_layers and not keep_fp8:
             # Kept, they would be dequantized on every forward to save memory nobody asked to save.
             dequantize_fp8_scaled(sd, fp8_layers, dtype)
@@ -211,11 +214,6 @@ def flux3_transformer_from_single_file(
         # layer whose scale `scaled_mm` cannot apply.
         fp8_layers = split_fp8_scaled_layers(sd, fp8_layers, dtype, model=model, skip_patterns=skip_patterns)
         cast_state_dict(sd, dtype, keep_fp8=keep_fp8, model=model, skip_patterns=skip_patterns)
-        if mapped is not None:
-            # Tensors the fold and cast left as they were are slices of the file mapping and would pin it, uncounted.
-            # Only on this path: kept fp8 codes stay mapped, as copying them would defeat the keep.
-            clone_unreplaced_tensors(sd, mapped)
-            mapped.clear()
         if nvfp4_payloads:
             if modelopt:
                 # After the reservation: the copies it makes are what the reservation counts for the packed layers.
@@ -302,12 +300,10 @@ class Flux3CheckpointModel(ModelLoader):
         if submodel_type is not SubModelType.Transformer:
             raise ValueError("A single-file FLUX.3 model holds only the transformer.")
 
-        from safetensors.torch import load_file
-
         model_path = Path(config.path)
         model_dtype = TorchDevice.choose_bfloat16_safe_dtype(TorchDevice.choose_torch_device())
         model = flux3_transformer_from_single_file(
-            load_file(model_path),
+            load_safetensors_checkpoint(model_path),
             model_dtype,
             self._ram_cache.make_room,
             metadata=read_safetensors_metadata(model_path, self._logger),

@@ -11,7 +11,6 @@ import json
 import diffusers
 import pytest
 import torch
-from safetensors import torch as safetensors_torch
 
 from invokeai.backend.model_manager.configs.default_settings import MainModelDefaultSettings
 from invokeai.backend.model_manager.configs.main import Main_Checkpoint_ZImage_Config
@@ -50,9 +49,6 @@ class _TinyZImage(torch.nn.Module):
 SEAM = Seam(
     loader=ZImageCheckpointModel,
     module=z_image,
-    # The loader calls `safetensors.torch.load_file` through the package, so patching the name on
-    # its own module would patch nothing and let it read the empty file the config points at.
-    load_file_host=safetensors_torch,
     patches_device=True,
 )
 

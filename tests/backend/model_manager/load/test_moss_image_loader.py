@@ -54,6 +54,11 @@ from tests.backend.model_manager.load.moss_image_fixtures import (
 from tests.backend.model_manager.load.state_dicts.moss_image_dit_keys import state_dict_keys as moss_dit_keys
 from tests.backend.model_manager.load.state_dicts.moss_image_vae_keys import state_dict_keys as moss_vae_keys
 from tests.fixtures.quantized_payloads import comfy_quant_marker
+from tests.fixtures.safetensors_files import (
+    needs_mapping_that_shows_file_writes,
+    record_reads,
+    tensors_reading_the_file,
+)
 
 # `OpenMOSS-Team/MOSS-Image-Base`'s `transformer/config.json` at 1ceede80badddd6a7812069619edaa5633587192, verbatim
 # but for `rope_base`, which no tensor records. A literal, so this fails when the detection drifts rather than agreeing
@@ -597,19 +602,11 @@ class TestTorchaoFp8Checkpoint:
         fp8_compute_only: bool = False,
         dtype: torch.dtype = torch.float32,
     ) -> tuple[Any, Any, dict[str, torch.Tensor]]:
-        """The model, its loader, and the tensors `load_file` returned for the real file.
+        """The model, its loader, and the tensors the loader read from the real file.
 
         `keep_fp8` is FP8 Storage on. `fp8_compute_only` keeps the file's fp8 layers for the fp8 matmul with FP8
         Storage off."""
-        loaded: dict[str, torch.Tensor] = {}
-        real_load_file = loader_module.load_file
-
-        def recording_load_file(path: Any) -> dict[str, torch.Tensor]:
-            tensors = real_load_file(path)
-            loaded.update(tensors)
-            return tensors
-
-        monkeypatch.setattr(loader_module, "load_file", recording_load_file)
+        loaded = record_reads(monkeypatch).tensors
         loader = _loader(MossImageCheckpointModel, monkeypatch)
         monkeypatch.setattr(
             loader_module.TorchDevice, "choose_bfloat16_safe_dtype", staticmethod(lambda _device: dtype)
@@ -721,19 +718,19 @@ class TestTorchaoFp8Checkpoint:
         for layer, (codes, scale) in quantized.items():
             assert torch.equal(model.get_submodule(layer).weight, codes.float() * scale), layer
 
-    def test_a_folded_load_does_not_leave_parameters_pinning_the_file_mapping(
-        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    @needs_mapping_that_shows_file_writes
+    @pytest.mark.parametrize("keep_fp8", [False, True], ids=["folded", "kept"])
+    def test_no_parameter_reads_the_file_after_the_load(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, keep_fp8: bool
     ) -> None:
-        """The dense tensors are stored in the compute dtype, so neither the fold nor the cast replaces them; assigned
-        as parameters they would be slices of the file's mapping, which the cache's size calculation cannot see."""
-        path, dense, _ = self._file(tmp_path)
+        """The dense tensors are stored in the compute dtype, so neither the fold nor the cast replaces them, and a kept
+        load leaves the fp8 codes as read. A parameter that is still a slice of the file's mapping pins the whole file,
+        which the cache's size calculation cannot see."""
+        path, _, _ = self._file(tmp_path)
 
-        model, _, loaded = self._load(monkeypatch, path, keep_fp8=False)
+        model, _, _ = self._load(monkeypatch, path, keep_fp8=keep_fp8)
 
-        for name in ("video_embedder.weight", "layers.0.norm1.weight"):
-            parameter = model.get_parameter(name)
-            assert parameter.data_ptr() != loaded[name].data_ptr(), name
-            assert torch.equal(parameter, dense[name])
+        assert tensors_reading_the_file(model, path) == []
 
     def test_a_kept_fp8_load_does_not_copy_the_codes(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
         path, _, _ = self._file(tmp_path)
@@ -867,3 +864,60 @@ class TestGGUFLoader:
 
         with pytest.raises(ValueError, match="holds only the transformer"):
             loader._load_model(config, SubModelType.VAE)
+
+
+@needs_mapping_that_shows_file_writes
+def test_a_float8_shard_read_by_its_index_does_not_pin_the_file(tmp_path: Path) -> None:
+    """The sharded read picks keys per shard; the bf16 norms beside a float8 weight would otherwise stay views of
+    the whole shard."""
+    shard = tmp_path / "diffusion_pytorch_model-00001-of-00001.safetensors"
+    save_file(
+        {
+            "blocks.0.norm.weight": torch.arange(65, dtype=torch.float32).to(torch.bfloat16),
+            "blocks.0.proj.weight": torch.ones(256, 256).to(torch.float8_e4m3fn),
+        },
+        str(shard),
+        metadata={"format": "pt"},
+    )
+    _write_index(tmp_path / "diffusion_pytorch_model.safetensors.index.json", {shard.name: ["blocks.0.norm.weight"]})
+
+    sd = loader_module._read_component_state_dict(tmp_path)
+
+    assert list(sd) == ["blocks.0.norm.weight"]
+    assert tensors_reading_the_file(sd, shard) == []
+
+
+def _float8_file(path: Path) -> Path:
+    save_file(
+        {
+            "blocks.0.norm.weight": torch.arange(65, dtype=torch.float32).to(torch.bfloat16),
+            "blocks.0.proj.weight": torch.ones(256, 256).to(torch.float8_e4m3fn),
+        },
+        str(path),
+        metadata={"format": "pt"},
+    )
+    return path
+
+
+@needs_mapping_that_shows_file_writes
+def test_an_unsharded_float8_component_does_not_pin_the_file(tmp_path: Path) -> None:
+    path = _float8_file(tmp_path / "diffusion_pytorch_model.safetensors")
+
+    sd = loader_module._read_component_state_dict(tmp_path)
+
+    assert tensors_reading_the_file(sd, path) == []
+
+
+@needs_mapping_that_shows_file_writes
+def test_a_single_file_float8_checkpoint_does_not_pin_the_file(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    path = _float8_file(tmp_path / "moss-image-dit.safetensors")
+    loader = _loader(MossImageCheckpointModel, monkeypatch)
+    # The read is what is under test; the transformer build one call further is covered by the loads above.
+    read: dict[str, torch.Tensor] = {}
+    monkeypatch.setattr(loader_module, "moss_image_transformer_config", lambda _sd: {})
+    monkeypatch.setattr(loader, "_load_transformer", lambda _config, sd, _geometry, _what, **_: read.update(sd))
+    config = Main_Checkpoint_MossImage_Config.model_construct(path=str(path), name="moss")
+
+    loader._load_model(config, SubModelType.Transformer)
+
+    assert tensors_reading_the_file(read, path) == []

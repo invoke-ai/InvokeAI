@@ -14,7 +14,7 @@ import psutil
 import pytest
 import yaml
 
-from invokeai.app.services.config.config_default import InvokeAIAppConfig
+from invokeai.app.services.config.config_default import InvokeAIAppConfig, load_config_from_root
 from scripts.family_e2e import server
 from scripts.family_e2e.manifest import ServerSpec
 from scripts.family_e2e.server import (
@@ -40,7 +40,7 @@ def _rows(database: str | Path, uri: bool = False) -> list[str]:
         return [row[0] for row in conn.execute("SELECT name FROM models ORDER BY name")]
 
 
-def _template(tmp_path: Path, settings: dict) -> Path:
+def _template(tmp_path: Path, settings: dict) -> ServerSpec:
     root = tmp_path / "template"
     (root / "databases").mkdir(parents=True)
     conn = sqlite3.connect(root / "databases" / "invokeai.db")
@@ -50,7 +50,7 @@ def _template(tmp_path: Path, settings: dict) -> Path:
     conn.close()
     (root / "databases" / "invokeai_backup_1.db").write_bytes(b"old")
     (root / "invokeai.yaml").write_text(yaml.safe_dump({"schema_version": "4.0.3", **settings}))
-    return root
+    return ServerSpec(template_root=root, python=Path(sys.executable))
 
 
 def test_scratch_root_points_back_at_the_template_and_keeps_run_output_local(tmp_path: Path) -> None:
@@ -58,6 +58,7 @@ def test_scratch_root_points_back_at_the_template_and_keeps_run_output_local(tmp
     template = _template(
         tmp_path,
         {
+            "multiuser": False,
             "models_dir": "my-models",
             "custom_nodes_dir": str(elsewhere),
             "outputs_dir": "out",
@@ -75,8 +76,8 @@ def test_scratch_root_points_back_at_the_template_and_keeps_run_output_local(tmp
     build_scratch_root(template, scratch, log_file, port=9321)
 
     config = yaml.safe_load((scratch / "invokeai.yaml").read_text())
-    assert config["models_dir"] == str((template / "my-models").resolve())
-    assert config["download_cache_dir"] == str((template / "models/.download_cache").resolve())
+    assert config["models_dir"] == str((template.template_root / "my-models").resolve())
+    assert config["download_cache_dir"] == str((template.template_root / "models/.download_cache").resolve())
     assert config["custom_nodes_dir"] == str(elsewhere.resolve())
     # Stores the database owns are reconciled with the scratch database, so they must not be the template's.
     for name, relative in (
@@ -87,7 +88,7 @@ def test_scratch_root_points_back_at_the_template_and_keeps_run_output_local(tmp
         ("workflow_thumbnails_dir", "workflow_thumbnails"),
     ):
         assert config[name] == str(scratch / relative), name
-    assert (config["host"], config["port"]) == ("127.0.0.1", 9321)
+    assert (config["host"], config["port"], config["multiuser"]) == ("127.0.0.1", 9321, False)
     assert config["log_handlers"] == ["console", f"file={log_file}"]
     assert (config["log_format"], config["log_level"]) == ("plain", "info")
     assert (config["image_index_enabled"], config["clear_queue_on_startup"]) == (False, True)
@@ -97,12 +98,15 @@ def test_scratch_root_points_back_at_the_template_and_keeps_run_output_local(tmp
     assert [p.name for p in (scratch / "databases").iterdir()] == ["invokeai.db"]
     assert _rows(scratch / "databases" / "invokeai.db") == ["flux"]
     # The template's database was read immutable: SQLite left no -wal/-shm beside it.
-    assert sorted(p.name for p in (template / "databases").iterdir()) == ["invokeai.db", "invokeai_backup_1.db"]
+    assert sorted(p.name for p in (template.template_root / "databases").iterdir()) == [
+        "invokeai.db",
+        "invokeai_backup_1.db",
+    ]
 
 
 def test_snapshot_includes_the_wal_of_an_unclean_stop_without_changing_it(tmp_path: Path) -> None:
-    template = _template(tmp_path, {})
-    db_dir = template / "databases"
+    template = _template(tmp_path, {"multiuser": False})
+    db_dir = template.template_root / "databases"
     live = tmp_path / "live"
     live.mkdir()
     shutil.copy(db_dir / "invokeai.db", live / "invokeai.db")
@@ -124,8 +128,8 @@ def test_snapshot_includes_the_wal_of_an_unclean_stop_without_changing_it(tmp_pa
 
 @pytest.mark.skipif(sys.platform != "win32", reason="open-file detection is Windows-only")
 def test_database_open_in_another_process_is_refused(tmp_path: Path) -> None:
-    template = _template(tmp_path, {})
-    conn = sqlite3.connect(template / "databases" / "invokeai.db")
+    template = _template(tmp_path, {"multiuser": False})
+    conn = sqlite3.connect(template.template_root / "databases" / "invokeai.db")
     try:
         conn.execute("SELECT 1").fetchall()
         with pytest.raises(ServerError, match="open in another process"):
@@ -136,14 +140,16 @@ def test_database_open_in_another_process_is_refused(tmp_path: Path) -> None:
 
 
 def test_scratch_root_is_rebuilt_from_scratch(tmp_path: Path) -> None:
-    template = _template(tmp_path, {})
+    template = _template(tmp_path, {"multiuser": False})
     scratch = tmp_path / "scratch"
     build_scratch_root(template, scratch, tmp_path / "a.log", port=1)
     (scratch / "outputs").mkdir()
     (scratch / "outputs" / "stale.png").write_bytes(b"x")
     build_scratch_root(template, scratch, tmp_path / "a.log", port=2)
     assert not (scratch / "outputs").exists()
-    assert yaml.safe_load((scratch / "invokeai.yaml").read_text())["models_dir"] == str((template / "models").resolve())
+    assert yaml.safe_load((scratch / "invokeai.yaml").read_text())["models_dir"] == str(
+        (template.template_root / "models").resolve()
+    )
 
 
 @pytest.mark.parametrize(
@@ -160,9 +166,54 @@ def test_templates_the_tool_cannot_copy_are_refused(tmp_path: Path, settings: di
     assert not (tmp_path / "scratch").exists()
 
 
+@pytest.mark.parametrize(
+    ("settings", "env"),
+    [
+        ({}, {}),
+        ({"multiuser": True}, {"INVOKEAI_MULTIUSER": "false"}),
+        ({"multiuser": False}, {"INVOKEAI_MULTIUSER": "true"}),
+        ({}, {"INVOKEAI_MULTIUSER": "invalid"}),
+    ],
+)
+def test_runner_requires_explicit_single_user_access_before_copying(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, settings: dict, env: dict[str, str]
+) -> None:
+    monkeypatch.setenv("INVOKEAI_MULTIUSER", "false")
+    spec = _template(tmp_path, settings)
+    spec.env.update(env)
+    scratch = tmp_path / "scratch"
+    with pytest.raises(ServerError, match="multiuser"):
+        build_scratch_root(spec, scratch, tmp_path / "a.log", port=1)
+    assert not scratch.exists()
+
+
+def test_manifest_can_opt_in_for_scratch_alone(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("INVOKEAI_MULTIUSER", raising=False)
+    spec = _template(tmp_path, {})
+    spec.env["INVOKEAI_MULTIUSER"] = "false"
+    scratch = tmp_path / "scratch"
+    build_scratch_root(spec, scratch, tmp_path / "a.log", port=1)
+    assert load_config_from_root(spec.template_root).multiuser
+    monkeypatch.setenv("INVOKEAI_MULTIUSER", server_env(spec)["INVOKEAI_MULTIUSER"])
+    config = load_config_from_root(scratch)
+    assert not config.multiuser
+    assert config.host == "127.0.0.1"
+    assert config.db_path == scratch / "databases" / "invokeai.db"
+
+
+@pytest.mark.parametrize("key", ["invokeai_host", "INVOKEAI_DB_URL", "INVOKEAI_OUTPUTS_DIR"])
+def test_manifest_cannot_redirect_the_scratch_listener_or_storage(tmp_path: Path, key: str) -> None:
+    spec = _template(tmp_path, {"multiuser": False})
+    spec.env[key] = "elsewhere"
+    scratch = tmp_path / "scratch"
+    with pytest.raises(ServerError, match=key):
+        build_scratch_root(spec, scratch, tmp_path / "a.log", port=1)
+    assert not scratch.exists()
+
+
 def test_template_without_database_is_refused(tmp_path: Path) -> None:
-    template = _template(tmp_path, {})
-    (template / "databases" / "invokeai.db").unlink()
+    template = _template(tmp_path, {"multiuser": False})
+    (template.template_root / "databases" / "invokeai.db").unlink()
     with pytest.raises(ServerError, match="no database"):
         build_scratch_root(template, tmp_path / "scratch", tmp_path / "a.log", port=1)
 
@@ -211,7 +262,7 @@ def test_server_env_drops_inherited_invokeai_settings(tmp_path: Path, monkeypatc
 def test_a_server_pinned_to_one_cuda_device_gets_no_other_cuda_index(
     tmp_path: Path, settings: dict, expected: dict
 ) -> None:
-    template = _template(tmp_path, settings)
+    template = _template(tmp_path, {**settings, "multiuser": False})
 
     build_scratch_root(template, tmp_path / "pinned", tmp_path / "a.log", port=1, single_cuda_device=True)
     build_scratch_root(template, tmp_path / "unpinned", tmp_path / "a.log", port=1)
