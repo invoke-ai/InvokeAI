@@ -1,7 +1,9 @@
-import { Grid, HStack } from '@chakra-ui/react';
+import { Box, Grid, HStack } from '@chakra-ui/react';
 import { PaletteButton } from '@workbench/palette/PaletteButton';
 import { SettingsDialogHost } from '@workbench/settings/SettingsDialogHost';
 import { WidgetsDialog } from '@workbench/shell/WidgetsDialog';
+import { useCustomizeSession } from '@workbench/workspace/useStructureLock';
+import { lazy, Suspense } from 'react';
 
 import { AppMenu } from './AppMenu';
 import { InvocationCluster } from './InvocationCluster';
@@ -13,6 +15,25 @@ import { TopbarProgressRail } from './TopbarProgressRail';
 
 /** Use minmax(0,1fr) side columns to center presets independently of project-name width. */
 const TOPBAR_COLUMNS = 'minmax(0, 1fr) auto minmax(0, 1fr)';
+
+/** Loads with the first Customize, outside the editor's initial payload. */
+const LazyCustomizeBar = lazy(() => import('./CustomizeBar').then((module) => ({ default: module.CustomizeBar })));
+
+// Holds the bar's height while its module loads, so the row does not jump.
+const CUSTOMIZE_BAR_PENDING = <Box h="9" />;
+
+/** The workspace tabs, or the Customize bar in their place while the active project customizes its workspace. */
+const WorkspaceStrip = () => {
+  const session = useCustomizeSession();
+
+  return session ? (
+    <Suspense fallback={CUSTOMIZE_BAR_PENDING}>
+      <LazyCustomizeBar session={session} />
+    </Suspense>
+  ) : (
+    <LayoutPresetStrip />
+  );
+};
 
 export const TopBar = () => (
   <>
@@ -39,7 +60,7 @@ export const TopBar = () => (
         <PaletteButton />
       </HStack>
 
-      <LayoutPresetStrip />
+      <WorkspaceStrip />
 
       <InvocationCluster />
 

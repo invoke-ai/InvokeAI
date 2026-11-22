@@ -40,6 +40,7 @@ import { areWidgetPlacementProjectsEqual, getWidgetPlacementProject } from '@wor
 import { createWidgetRegionViewModelFromState, getWidgetRegionItems } from '@workbench/widgetRegionViewModel';
 import { getWidgetById, getWidgetsForRegion, widgetRegistrationFailures } from '@workbench/widgetRegistry';
 import { useActiveProjectId, useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
+import { startWorkspaceLock } from '@workbench/workspace/workspaceLockRuntime';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -64,7 +65,7 @@ import { GraphPreviewInvokeScope, TopBar } from './topbar';
 const DND_MODIFIERS = [restrictToWindowEdges];
 
 export const WorkbenchShell = () => {
-  const { notifications, widgets } = useWorkbenchCommands();
+  const { layout, notifications, widgets } = useWorkbenchCommands();
   const { focusFloating, focusRegion } = useWorkbenchFocus();
   const { t } = useTranslation();
   const panels = useActiveProjectSelector((project) => project.layout.panels);
@@ -143,6 +144,7 @@ export const WorkbenchShell = () => {
       notifications.recordWidgetFailure(failure);
     }
   });
+  useMountEffect(() => startWorkspaceLock({ layout, notifications }));
 
   const handleDragStart = useCallback(
     (event: DragStartEvent) => {

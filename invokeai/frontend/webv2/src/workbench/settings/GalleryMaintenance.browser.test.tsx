@@ -153,7 +153,7 @@ const result = (
   ...overrides,
 });
 
-describe('gallery maintenance in Data & workspace settings', () => {
+describe('gallery maintenance in Workspaces & data settings', () => {
   let host: HTMLDivElement;
   let root: Root;
   let queryClient: QueryClient;

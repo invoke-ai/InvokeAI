@@ -44,7 +44,7 @@
   <!-- Project switcher -->
   <text x="94" y="52" fill="#e8eaed" font-size="15" font-weight="600">My Project</text>
   <path d="M184 44l4-4 4 4M184 52l4 4 4-4" fill="none" stroke="#9aa1ab" stroke-width="1.8" stroke-linecap="round"/>
-  <!-- Preset tabs -->
+  <!-- Workspace tabs -->
   <rect x="412" y="31" width="136" height="32" rx="7" fill="#353a42"/>
   <text x="426" y="52" fill="#e4fd1d" font-size="14" font-weight="700">T</text>
   <text x="444" y="52" fill="#e8eaed" font-size="14" font-weight="600">Compose</text>
@@ -176,11 +176,11 @@
       <circle cx="140" cy="12" r="14" fill="#e4fd1d" stroke="#14161a" stroke-width="3"/>
       <text x="140" y="17">2</text>
     </g>
-    <g class="wbl-callout" id="wbl-c3" tabindex="0" role="img" aria-label="3. Layout preset tabs: Click to switch layouts. A dot means unsaved changes; the arrow opens the preset menu">
+    <g class="wbl-callout" id="wbl-c3" tabindex="0" role="img" aria-label="3. Workspace tabs: Click to switch workspaces. A dot means unsaved changes; the arrow opens Customize and more">
       <circle cx="590" cy="12" r="14" fill="#e4fd1d" stroke="#14161a" stroke-width="3"/>
       <text x="590" y="17">3</text>
     </g>
-    <g class="wbl-callout" id="wbl-c4" tabindex="0" role="img" aria-label="4. Save as new preset: Save the current arrangement as a preset">
+    <g class="wbl-callout" id="wbl-c4" tabindex="0" role="img" aria-label="4. New workspace: Copy this workspace and customize it">
       <circle cx="765" cy="12" r="14" fill="#e4fd1d" stroke="#14161a" stroke-width="3"/>
       <text x="765" y="17">4</text>
     </g>
@@ -196,7 +196,7 @@
       <circle cx="1154" cy="260" r="14" fill="#e4fd1d" stroke="#14161a" stroke-width="3"/>
       <text x="1154" y="265">6</text>
     </g>
-    <g class="wbl-callout" id="wbl-c7" tabindex="0" role="img" aria-label="7. Rail menu (…): Add panels to this rail or remove them">
+    <g class="wbl-callout" id="wbl-c7" tabindex="0" role="img" aria-label="7. Rail menu (…): In Customize, add panels to this rail or remove them">
       <circle cx="46" cy="206" r="14" fill="#e4fd1d" stroke="#14161a" stroke-width="3"/>
       <text x="46" y="211">7</text>
     </g>
@@ -246,14 +246,14 @@
     </g>
     <g class="wbl-tip" id="wbl-t3" aria-hidden="true">
       <rect x="328" y="34" width="525" height="108" rx="9"/>
-      <text x="344" y="68" class="wbl-tip-title">Layout preset tabs</text>
-      <text x="344" y="96">Click to switch layouts. A dot means unsaved</text>
-      <text x="344" y="124">changes; the arrow opens the preset menu</text>
+      <text x="344" y="68" class="wbl-tip-title">Workspace tabs</text>
+      <text x="344" y="96">Click to switch workspaces. A dot means</text>
+      <text x="344" y="124">unsaved changes; the arrow opens Customize</text>
     </g>
     <g class="wbl-tip" id="wbl-t4" aria-hidden="true">
       <rect x="525" y="34" width="480" height="80" rx="9"/>
-      <text x="541" y="68" class="wbl-tip-title">Save as new preset</text>
-      <text x="541" y="96">Save the current arrangement as a preset</text>
+      <text x="541" y="68" class="wbl-tip-title">New workspace</text>
+      <text x="541" y="96">Copy this workspace and customize it</text>
     </g>
     <g class="wbl-tip" id="wbl-t5" aria-hidden="true">
       <rect x="682" y="34" width="514" height="108" rx="9"/>
@@ -276,7 +276,7 @@
     <g class="wbl-tip" id="wbl-t7" aria-hidden="true">
       <rect x="4" y="228" width="458" height="80" rx="9"/>
       <text x="20" y="262" class="wbl-tip-title">Rail menu (…)</text>
-      <text x="20" y="290">Add panels to this rail or remove them</text>
+      <text x="20" y="290">In Customize: add or remove panels</text>
     </g>
     <g class="wbl-tip" id="wbl-t8a" aria-hidden="true">
       <rect x="15" y="622" width="413" height="80" rx="9"/>

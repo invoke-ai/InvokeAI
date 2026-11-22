@@ -32,6 +32,7 @@ import {
   __workbenchReducerInternal,
   type __WorkbenchReducerActionInternal,
 } from './workbenchState';
+import { getCustomizeSession } from './workspace/structureLock';
 
 /** Visible-widget changes dismiss overlays that would otherwise outlive their widgets in portals. */
 const visibleWidgetsKey = (state: WorkbenchState): string => {
@@ -333,8 +334,14 @@ const createCommands = (
       /** Enters the preset; the active one is already laid out, so going home loads nothing and drops a pending switch. */
       activatePreset: (presetId: ActionPayload<'applyPreset'>['presetId']) => {
         const preset = resolveSavedLayoutPreset(getState().account, presetId);
+        const activeProject = getActiveProject(getState());
 
-        if (preset.id === getActiveProject(getState()).layout.presetId) {
+        // Navigation stays inside a workspace being customized; Done or Cancel ends it first.
+        if (preset.id !== activeProject.layout.presetId && getCustomizeSession(getState().customizing, activeProject)) {
+          return Promise.resolve(activeProject.layout.presetId);
+        }
+
+        if (preset.id === activeProject.layout.presetId) {
           dispatch({ presetId: preset.id, type: 'applyPreset' });
 
           return Promise.resolve(preset.id);
@@ -344,6 +351,17 @@ const createCommands = (
       },
       /** Pressing the active preset's tab while another is pending means "stay": the pending switch is dropped. */
       cancelPresetActivation: (): void => layoutPresetActivator.invalidate(),
+      /** A workspace switch still loading would leave the workspace being customized when it lands; it is dropped. */
+      beginCustomize: () => {
+        layoutPresetActivator.invalidate();
+        dispatch({ type: 'beginCustomize' });
+      },
+      resetCustomizeToDefault: command('resetCustomizeToDefault'),
+      clearHistory: command('clearLayoutHistory'),
+      setCustomizeDraft: command('setCustomizeDraft', (draft: ActionPayload<'setCustomizeDraft'>['draft']) => ({
+        draft,
+      })),
+      endCustomize: command('endCustomize', (revert: boolean) => ({ revert })),
       applyPreset: command('applyPreset', (presetId: ActionPayload<'applyPreset'>['presetId']) => ({ presetId })),
       createPreset: command(
         'addLayoutPreset',
@@ -734,6 +752,7 @@ export interface WorkbenchInternalAdapters {
 export interface WorkbenchSnapshot {
   activeProject: Project;
   account: WorkbenchState['account'];
+  customizing: WorkbenchState['customizing'];
   autosave: WorkbenchState['autosave'];
   backendConnection: WorkbenchState['backendConnection'];
   hasHydrated: boolean;
@@ -774,6 +793,7 @@ const createSnapshot = (state: WorkbenchState, hasHydrated: boolean): WorkbenchS
   activeProject: getActiveProject(state),
   autosave: state.autosave,
   backendConnection: state.backendConnection,
+  customizing: state.customizing,
   hasHydrated,
   notifications: state.notifications,
   projects: state.projects,

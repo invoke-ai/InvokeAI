@@ -23,6 +23,7 @@ import { WidgetSettingsButton } from '@workbench/settings/WidgetSettingsButton';
 import { resolveWidgetInstanceLabel } from '@workbench/widgetLabels';
 import { useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
 import { clampPanelSize, getPanelSizeBounds, getVisiblePanelCollapseThreshold } from '@workbench/workbenchState';
+import { useCanEditStructure } from '@workbench/workspace/useStructureLock';
 import { PictureInPicture2Icon } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -178,7 +179,8 @@ export const WidgetFloatButton = ({
     widgets.float(instanceId, dockableRegion, { height: window.innerHeight, width: window.innerWidth });
     focusFloating(instanceId);
   }, [dockableRegion, focusFloating, instanceId, widgets]);
-  const canFloat = Boolean(manifest.allowFloating) && dockableRegion !== undefined;
+  // Floating a placed widget is structure.
+  const canFloat = useCanEditStructure() && Boolean(manifest.allowFloating) && dockableRegion !== undefined;
 
   if (!canFloat) {
     return null;

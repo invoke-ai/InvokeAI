@@ -15,8 +15,17 @@ import {
 
 /** What the editor lends action handlers. Read when a toast opens (labels) and when its button is pressed. */
 export interface NotificationActionContext {
-  /** Adds the widget to the current workspace on that surface, or where it opens by default, and focuses it. */
+  /**
+   * Adds the widget to the current workspace on that surface, or where it opens by default, and focuses it. A locked
+   * workspace enters Customize with it added.
+   */
   addWidget: (widgetId: WidgetTypeId, surface?: 'stage' | 'panel') => void;
+  /** Enters Customize on the active project's workspace, unless it already is customizing. */
+  customizeWorkspace: () => void;
+  /** Whether this account rearranges without Customize; the one-time offer retires once it does not. */
+  isRearranging: () => boolean;
+  /** Turns "Rearrange without Customize" off. */
+  lockWorkspaces: () => void;
   /** The widget's label while this editor can show it; null leaves its action out. */
   getWidgetLabel: (widgetId: WidgetTypeId) => string | null;
   /** Whether the project is still open in this editor; an undo scoped to a closed project is not offered. */
@@ -59,6 +68,19 @@ const handlers: {
     label: ({ surface, widgetId }, { getWidgetLabel, t }) =>
       getWidgetLabel(widgetId) === null ? null : t(ADD_WIDGET_LABEL_KEYS[surface ?? 'any']),
     run: ({ surface, widgetId }, { addWidget }) => addWidget(widgetId, surface),
+  },
+  'customize-workspace': {
+    label: (_action, { t }) => t('shell.workspace.customize'),
+    run: (_action, { customizeWorkspace }) => customizeWorkspace(),
+  },
+  'keep-rearranging': {
+    label: (_action, { isRearranging, t }) => (isRearranging() ? t('shell.workspace.keepRearranging') : null),
+    // The button only answers the offer: its toast closes, and the setting stays as it is.
+    run: () => undefined,
+  },
+  'lock-workspaces': {
+    label: (_action, { isRearranging, t }) => (isRearranging() ? t('shell.workspace.lockWorkspaces') : null),
+    run: (_action, { lockWorkspaces }) => lockWorkspaces(),
   },
   'open-widget': {
     label: ({ widgetId }, { getWidgetLabel, t }) => {

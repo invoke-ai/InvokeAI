@@ -11,6 +11,7 @@ import {
   createEditorNotificationActionContext,
   type EditorNotificationActionSources,
 } from './editorNotificationActions';
+import { resolveNotificationActions } from './notificationActions';
 
 const englishCatalog = Object.values(
   import.meta.glob('../../../../public/locales/en.json', { eager: true, import: 'default' })
@@ -48,6 +49,38 @@ const setup = (overrides: Partial<EditorNotificationActionSources> = {}) => {
 };
 
 describe('editor notification actions', () => {
+  it('adds what a locked workspace lacks as the first edit of a Customize session, focusing the widget', () => {
+    const { context, focusMoves, project, store } = setup();
+    const placedTypes = () =>
+      project().widgetRegions.right.instanceIds.map((id) => project().widgetInstances[id]?.typeId);
+
+    expect(placedTypes()).not.toContain('layers');
+    context.addWidget('layers', 'panel');
+
+    expect(store.getSnapshot().customizing?.[project().id]?.presetId).toBe(project().layout.presetId);
+    expect(placedTypes()).toContain('layers');
+    expect(focusMoves).toEqual([['region', 'right', 'layers']]);
+  });
+
+  it('offers Lock workspaces and Keep rearranging only while the account rearranges', () => {
+    const { context } = setup();
+    const lockWorkspaces = vi.fn();
+    const offer = (isRearranging: boolean) =>
+      resolveNotificationActions([{ kind: 'lock-workspaces' }, { kind: 'keep-rearranging' }], {
+        ...context,
+        isRearranging: () => isRearranging,
+        lockWorkspaces,
+      });
+    const [lock, keep] = offer(true);
+
+    expect([lock?.label, keep?.label]).toEqual(['Lock workspaces', 'Keep rearranging']);
+    keep?.onClick();
+    expect(lockWorkspaces).not.toHaveBeenCalled();
+    lock?.onClick();
+    expect(lockWorkspaces).toHaveBeenCalledOnce();
+    expect(offer(false)).toEqual([]);
+  });
+
   it('names enabled widgets as the Gallery names itself and leaves out widgets this editor cannot show', () => {
     const [disabledGallery] = registerWidgets([{ ...galleryWidgetManifest, allowedRegions: [] }]);
     const { context } = setup();

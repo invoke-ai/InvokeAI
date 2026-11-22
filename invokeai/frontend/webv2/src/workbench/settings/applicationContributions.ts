@@ -167,8 +167,9 @@ export const serverSettings = section('server', 'Server', [
   { ...custom('imageStorage', 'Image storage', 'server'), keywords: 'images folder subfolder layout move recover' },
   custom('maxQueueHistory', 'Queue history', 'server'),
 ]);
-export const workspaceSettings = section('workspace', 'Data & workspace', [
-  custom('workspaceActions', 'Data & workspace', 'none'),
+export const workspaceSettings = section('workspace', 'Workspaces & data', [
+  preference('rearrangeWithoutCustomize', 'Rearrange without Customize', 'workspace layout lock customize widgets'),
+  custom('workspaceActions', 'Data', 'none'),
   {
     ...custom('clearSavedData', 'Clear saved data', 'none', { framed: true }),
     keywords: 'delete reset erase wipe projects',

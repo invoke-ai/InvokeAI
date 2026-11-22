@@ -222,13 +222,13 @@ for (const [engine, type] of Object.entries({ chromium, firefox, webkit })) {
             report.heldFieldRecovery = 'passed';
             // Canvas and layer thumbnails must contain fixture colour, in all three engines.
             await page
-              .getByRole('tablist', { exact: true, name: 'Layout preset' })
+              .getByRole('tablist', { exact: true, name: 'Workspaces' })
               .getByRole('tab', { name: /^Edit(, unsaved changes)?$/ })
               .click();
             await waitForRenderedMedia(page, { canvas: true });
             report.canvasPainting = 'passed';
             await page
-              .getByRole('tablist', { exact: true, name: 'Layout preset' })
+              .getByRole('tablist', { exact: true, name: 'Workspaces' })
               .getByRole('tab', { name: /^Compose(, unsaved changes)?$/ })
               .click();
             // Hold native exit delivery after the browser finishes its animation: presence still owns the popup.

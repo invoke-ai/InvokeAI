@@ -178,6 +178,7 @@ vi.mock('@workbench/WorkbenchContext', async () => {
     useActiveProjectId: () => useSyncExternalStore(keepAliveMocks.subscribe, keepAliveMocks.getProject).id,
     useActiveProjectSelector: (selector: (project: unknown) => unknown) =>
       selector(useSyncExternalStore(keepAliveMocks.subscribe, keepAliveMocks.getProject)),
+    useOptionalWorkbenchSelector: (_selector: unknown, fallback: unknown) => fallback,
     useWorkbenchCommands: () => ({ widgets: {} }),
     useWorkbenchQueries: () => ({ getSnapshot: () => ({ activeProject: keepAliveMocks.getProject() }) }),
     useWorkbenchSelector: (selector: (snapshot: object) => unknown) =>

@@ -34,7 +34,10 @@ vi.mock('@workbench/WorkbenchContext', () => {
     ) => selector(useSnapshot().activeProject),
     useDebouncedWorkbenchSelector: <Selected,>(selector: (snapshot: ReturnType<typeof useSnapshot>) => Selected) =>
       selector(useSnapshot()),
+    useOptionalWorkbenchSelector: <Selected,>(selector: (snapshot: ReturnType<typeof useSnapshot>) => Selected) =>
+      selector(useSnapshot()),
     useWorkbenchCommands: () => commands,
+    useWorkbenchQueries: () => ({}),
     useWorkbenchSelector: <Selected,>(selector: (snapshot: ReturnType<typeof useSnapshot>) => Selected) =>
       selector(useSnapshot()),
   };

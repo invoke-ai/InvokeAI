@@ -3,9 +3,11 @@ import type * as WorkbenchContextModule from '@workbench/WorkbenchContext';
 import { ChakraProvider } from '@chakra-ui/react';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { system } from '@theme/system';
+import { patchWorkbenchPreferences } from '@workbench/settings/store';
 import { getWidgetById, getWidgetsForRegion } from '@workbench/widgetRegistry';
 import { createWorkbenchStore } from '@workbench/workbenchStore';
 import { WorkbenchWidgetRegistryProvider } from '@workbench/WorkbenchWidgetRegistryContext';
+import { rearrangeWithoutCustomizeInEachTest } from '@workbench/workspace/structureLock.testing';
 import { createInstance } from 'i18next';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -22,6 +24,8 @@ vi.mock('@workbench/WorkbenchContext', async (importOriginal) => {
     ...(await importOriginal<typeof WorkbenchContextModule>()),
     useActiveProjectSelector: <Selected,>(selector: (project: unknown) => Selected) =>
       selector(useSyncExternalStore(workbench.store!.subscribe, () => workbench.store!.getSnapshot().activeProject)),
+    useOptionalWorkbenchSelector: <Selected,>(selector: (snapshot: unknown) => Selected) =>
+      selector(useSyncExternalStore(workbench.store!.subscribe, workbench.store!.getSnapshot)),
     useWorkbenchCommands: () => workbench.store!.commands,
     useWorkbenchQueries: () => workbench.store!.queries,
   };
@@ -80,16 +84,19 @@ afterEach(async () => {
   accountLifecycle.invalidate();
 });
 
+// Add, Dock and Remove are structure: this list belongs to an account that rearranges without Customize.
+rearrangeWithoutCustomizeInEachTest();
+
 describe('WidgetsDialog', () => {
   it('lists placed widgets with where they are, and brings a removed one back', async () => {
-    expect(sectionItems('In this layout')).toContain(row('queue'));
+    expect(sectionItems('In this workspace')).toContain(row('queue'));
     expect(row('queue')?.textContent).toContain('Right panel');
-    expect(sectionItems('Not in this layout')).toContain(row('type:layers'));
+    expect(sectionItems('Not in this workspace')).toContain(row('type:layers'));
 
     await act(() => page.getByRole('button', { name: 'Remove Queue (Right panel)' }).click());
 
     expect(activeProject().widgetRegions.right.instanceIds).not.toContain('queue');
-    expect(sectionItems('Not in this layout')).toContain(row('type:queue'));
+    expect(sectionItems('Not in this workspace')).toContain(row('type:queue'));
     await expect.element(page.getByRole('button', { name: 'Add Queue' })).toHaveFocus();
 
     await act(() => page.getByRole('button', { name: 'Add Queue' }).click());
@@ -167,5 +174,23 @@ describe('WidgetsDialog', () => {
     await act(() => page.getByRole('button', { name: 'Show Queue (Right panel)' }).click());
 
     await expect.element(page.getByRole('dialog', { name: 'Widgets' })).not.toBeInTheDocument();
+  });
+});
+
+describe('WidgetsDialog on a locked workspace', () => {
+  beforeEach(() => {
+    void patchWorkbenchPreferences({ rearrangeWithoutCustomize: false });
+  });
+
+  it('only shows widgets until Customize, from its footer, offers Add, Dock and Remove in place', async () => {
+    await expect.element(page.getByRole('button', { name: 'Show Queue (Right panel)' })).toBeVisible();
+    expect(page.getByRole('button', { name: 'Remove Queue (Right panel)' }).query()).toBeNull();
+    expect(page.getByRole('button', { name: 'Add Layers' }).query()).toBeNull();
+
+    await act(() => page.getByRole('button', { name: 'Customize', exact: true }).click());
+
+    await expect.element(page.getByRole('button', { name: 'Remove Queue (Right panel)' })).toBeVisible();
+    await expect.element(page.getByRole('button', { name: 'Add Layers' })).toBeVisible();
+    expect(page.getByRole('button', { name: 'Customize', exact: true }).query()).toBeNull();
   });
 });

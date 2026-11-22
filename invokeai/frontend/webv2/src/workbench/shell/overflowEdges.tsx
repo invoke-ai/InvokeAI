@@ -107,9 +107,10 @@ const createHiddenEdgesStore = ({ itemSelector, keepInViewSelector }: OverflowEd
         }
       };
       island?.addEventListener('wheel', forwardCueWheel, { passive: false });
-      // Only the row itself narrowing or widening re-reveals the kept item; its controls resize for their own reasons
-      // (a drag's measuring, a label loading), and revealing then would fight the user's own scrolling.
-      let rowWidth = element.clientWidth;
+      // The row's first layout and the row itself narrowing or widening reveal the kept item (a row mounted again, as the
+      // tabs after Customize, starts at its start); its controls resize for their own reasons (a drag's measuring, a
+      // label loading), and revealing then would fight the user's own scrolling.
+      let rowWidth: number | null = null;
       const resizes = new ResizeObserver(() => {
         if (element.clientWidth !== rowWidth) {
           rowWidth = element.clientWidth;

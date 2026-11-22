@@ -18,6 +18,7 @@ import { FocusRegionProvider, type WorkbenchFocusController } from '@workbench/f
 import { createTestFocusController } from '@workbench/focusRegions.testing';
 import { closeWorkbenchSettings } from '@workbench/settings/settingsDialogStore';
 import { createWidgetRecovery } from '@workbench/widget-frame/widgetRecoveryStore';
+import { rearrangeWithoutCustomizeInEachTest } from '@workbench/workspace/structureLock.testing';
 import i18next from 'i18next';
 import { MapIcon, TagsIcon } from 'lucide-react';
 import { act, useState } from 'react';
@@ -76,6 +77,7 @@ vi.mock('@workbench/WorkbenchContext', () => ({
   }),
   useWorkbenchCommands: () => ({ layout: windowMocks.layout, widgets: windowMocks }),
   useOptionalWorkbenchExtensions: () => windowMocks.extensions,
+  useOptionalWorkbenchSelector: (_selector: unknown, fallback: unknown) => fallback,
   useWorkbenchExtensions: () => windowMocks.extensions,
 }));
 vi.mock('@workbench/hotkeys/firstPartyCommands', () => ({ useRegisterFirstPartyCommands: () => {} }));
@@ -274,6 +276,9 @@ afterEach(async () => {
   host = null;
   root = null;
 });
+
+// Dock and Close are structure: these windows belong to an account that rearranges without Customize.
+rearrangeWithoutCustomizeInEachTest();
 
 describe('FloatingWidgetWindow chrome', () => {
   it("mounts the widget's own header actions in the title bar, for the floating region", async () => {

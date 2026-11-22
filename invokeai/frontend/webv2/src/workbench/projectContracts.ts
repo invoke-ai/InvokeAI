@@ -22,6 +22,7 @@ import type { ProjectWorkflowCollection, ProjectWorkflowHistories } from './proj
 import type { WorkbenchQueueState } from './queueHistoryContracts';
 import type { ProjectSettings, ScopedDefaults } from './settings/contracts';
 import type { WidgetFailure, WidgetInstanceContract, WidgetInstanceId, WidgetTypeId } from './widgetContracts';
+import type { CustomizeSessions } from './workspace/structureLock';
 
 export type { ProjectEvent, ProjectEventType } from './projectEventContracts';
 
@@ -83,6 +84,8 @@ export interface WorkbenchState {
   scopedDefaults: ScopedDefaults;
   /** Projects active at least once in this editor session; a first activation enters its workspace. Transient. */
   enteredProjectIds?: readonly string[];
+  /** Projects in Customize on their workspace. Transient: never persisted, synced across tabs or undone. */
+  customizing?: CustomizeSessions;
   /** Transient: never persisted, synced across tabs or undone. */
   canvasStagingFollow?: Readonly<
     Record<string, { readonly framedSlotIds: readonly string[]; readonly pinnedSlotId: string | null }>
@@ -98,7 +101,7 @@ export interface BackendConnectionState {
 
 export type WorkbenchNotificationKind = 'error' | 'success' | 'info';
 
-/** `workspace-offer`: an open that found nothing to show; a repeat coalesces into the newest one. */
+/** `workspace-offer`: an open that found nothing to show, or a locked structural gesture; a repeat coalesces. */
 export type WorkbenchNotificationCategory = 'enqueue' | 'run-outcome' | 'workspace-offer';
 
 /** Plain data, never a closure: notifications live in workbench state. */
@@ -106,6 +109,11 @@ export type WorkbenchNotificationAction =
   | { kind: 'open-widget'; widgetId: WidgetTypeId }
   /** Adds the widget to the current workspace, on the surface the open asked for: the structural add an offer makes. */
   | { kind: 'add-widget'; widgetId: WidgetTypeId; surface?: 'stage' | 'panel' }
+  /** Enters Customize on the active project's workspace: what a locked structural gesture offers. */
+  | { kind: 'customize-workspace' }
+  /** The one-time offer to existing accounts: turns "Rearrange without Customize" off, or keeps it. */
+  | { kind: 'lock-workspaces' }
+  | { kind: 'keep-rearranging' }
   | { kind: 'reveal-queue-item'; itemId: number }
   /** `canvasProjectId`: a Canvas run's project, whose rerun is staged only by a tab with it open. */
   | { kind: 'retry-queue-item'; itemIds: readonly number[]; canvasProjectId?: string }
@@ -150,6 +158,8 @@ export interface UndoRedoEntry {
   notice?: LayoutUndoNotice;
   mergeKey?: string;
   mergedAt?: string;
+  /** Customize's Reset to default: pending while this step is undoable, so Undo and Redo carry the reset with it. */
+  customizeReset?: true;
 }
 
 /** Project undo preserves the live canvas and workflow documents; the engine and workflow histories own those. */

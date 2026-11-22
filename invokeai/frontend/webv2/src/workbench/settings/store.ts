@@ -71,6 +71,8 @@ export const DEFAULT_PREFERENCES: WorkbenchPreferences = {
   preferNumericAttentionStyle: false,
   promptFontSize: 'default',
   queueJobsScope: 'all',
+  // New accounts start locked; `resolveWorkspaceLock` keeps existing ones rearranging.
+  rearrangeWithoutCustomize: false,
   reduceMotion: false,
   scopedDefaults: {},
   selectObjectAutoUpdate: DEFAULT_SELECT_OBJECT_AUTO_UPDATE,
@@ -90,6 +92,7 @@ export const DEFAULT_PREFERENCES: WorkbenchPreferences = {
   workflowShowMinimap: true,
   workflowSnapToGrid: false,
   workflowValidateConnections: true,
+  workspaceLockOfferShown: true,
 };
 
 interface WorkbenchSettingsSnapshot {
@@ -484,6 +487,7 @@ export const normalizeWorkbenchPreferences = (preferences?: WorkbenchPreferences
       ? preferences.betaNoticeAcknowledged
       : preferences?.alphaNoticeAcknowledged === true || DEFAULT_PREFERENCES.betaNoticeAcknowledged,
   galleryDestinationNoticeShown: preferences?.galleryDestinationNoticeShown === true,
+  rearrangeWithoutCustomize: preferences?.rearrangeWithoutCustomize === true,
   reduceMotion:
     typeof preferences?.reduceMotion === 'boolean' ? preferences.reduceMotion : DEFAULT_PREFERENCES.reduceMotion,
   scopedDefaults: normalizeScopedDefaults(preferences?.scopedDefaults),
@@ -551,23 +555,84 @@ export const normalizeWorkbenchPreferences = (preferences?: WorkbenchPreferences
     typeof preferences?.workflowValidateConnections === 'boolean'
       ? preferences.workflowValidateConnections
       : DEFAULT_PREFERENCES.workflowValidateConnections,
+  workspaceLockOfferShown: preferences?.workspaceLockOfferShown !== false,
 });
 
-const parsePreferences = (raw: string | null): WorkbenchPreferences | null => {
+/** Stored preferences as written, before normalization drops what this build does not know. */
+interface StoredPreferences {
+  preferences: WorkbenchPreferences;
+  raw: unknown;
+}
+
+const toStoredPreferences = (raw: unknown): StoredPreferences => ({
+  preferences: normalizeWorkbenchPreferences(raw as WorkbenchPreferencesInput),
+  raw,
+});
+
+const parseStoredPreferences = (raw: string | null): StoredPreferences | null => {
   if (!raw) {
     return null;
   }
 
   try {
-    return normalizeWorkbenchPreferences(JSON.parse(raw) as Partial<WorkbenchPreferences>);
+    return toStoredPreferences(JSON.parse(raw));
   } catch {
     return null;
   }
 };
 
+type WorkspaceLock = Pick<WorkbenchPreferences, 'rearrangeWithoutCustomize' | 'workspaceLockOfferShown'>;
+
+const NEW_ACCOUNT_LOCK: WorkspaceLock = { rearrangeWithoutCustomize: false, workspaceLockOfferShown: true };
+const EXISTING_ACCOUNT_LOCK: WorkspaceLock = { rearrangeWithoutCustomize: true, workspaceLockOfferShown: false };
+
+const readWorkspaceLock = (value: unknown): WorkspaceLock | null =>
+  isPlainRecord(value) && typeof value.rearrangeWithoutCustomize === 'boolean'
+    ? {
+        rearrangeWithoutCustomize: value.rearrangeWithoutCustomize,
+        workspaceLockOfferShown: value.workspaceLockOfferShown !== false,
+      }
+    : null;
+
+/**
+ * Decides "Rearrange without Customize" once per account. Stored preferences without it belong to an account that used
+ * an earlier build, where every gesture rearranged: it keeps rearranging and gets the one-time offer. Nothing stored is
+ * a new account, which starts locked. An older build rewrites the blob without the key, so the decision is mirrored in
+ * a local key no older build writes, and a dropped key is restored from it rather than decided, or offered, again.
+ */
+export const resolveWorkspaceLock = (stored: unknown, mirror: unknown): WorkspaceLock =>
+  readWorkspaceLock(stored) ??
+  readWorkspaceLock(mirror) ??
+  (stored === null ? NEW_ACCOUNT_LOCK : EXISTING_ACCOUNT_LOCK);
+
+const getWorkspaceLockMirrorKey = (settingsStorageKey: string): string => `${settingsStorageKey}:workspace-lock`;
+
+const readWorkspaceLockMirror = (settingsStorageKey: string): unknown => {
+  if (!isBrowser()) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(window.localStorage.getItem(getWorkspaceLockMirrorKey(settingsStorageKey)) ?? 'null');
+  } catch {
+    return null;
+  }
+};
+
+/** The stored preferences with the account's lock decided; `isNew` when the store did not hold it yet. */
+const withWorkspaceLock = (
+  stored: StoredPreferences | null,
+  settingsStorageKey: string
+): { isNew: boolean; preferences: WorkbenchPreferences } => ({
+  isNew: readWorkspaceLock(stored?.raw) === null,
+  preferences: {
+    ...(stored?.preferences ?? normalizeWorkbenchPreferences()),
+    ...resolveWorkspaceLock(stored?.raw ?? null, readWorkspaceLockMirror(settingsStorageKey)),
+  },
+});
+
 /** A pending local copy outranks the server at the next load, so going offline cannot silently revert a change. */
-interface StoredSettings {
-  preferences: WorkbenchPreferences;
+interface StoredSettings extends StoredPreferences {
   pendingPush?: boolean;
 }
 
@@ -587,13 +652,10 @@ const readLocalSettings = (storageKey: string): StoredSettings | null => {
 
     // Early builds stored the bare preferences object.
     if (!parsed.preferences) {
-      return { preferences: normalizeWorkbenchPreferences(parsed) };
+      return toStoredPreferences(parsed);
     }
 
-    return {
-      pendingPush: parsed.pendingPush === true || undefined,
-      preferences: normalizeWorkbenchPreferences(parsed.preferences),
-    };
+    return { pendingPush: parsed.pendingPush === true || undefined, ...toStoredPreferences(parsed.preferences) };
   } catch {
     return null;
   }
@@ -604,9 +666,14 @@ const writeLocalSettings = (storageKey: string, preferences: WorkbenchPreference
     return;
   }
 
-  const payload: StoredSettings = pendingPush ? { pendingPush, preferences } : { preferences };
+  const payload = pendingPush ? { pendingPush, preferences } : { preferences };
+  const lock: WorkspaceLock = {
+    rearrangeWithoutCustomize: preferences.rearrangeWithoutCustomize,
+    workspaceLockOfferShown: preferences.workspaceLockOfferShown,
+  };
 
   window.localStorage.setItem(storageKey, JSON.stringify(payload));
+  window.localStorage.setItem(getWorkspaceLockMirrorKey(storageKey), JSON.stringify(lock));
 };
 
 const removeLocalSettings = (storageKey: string): void => {
@@ -615,9 +682,10 @@ const removeLocalSettings = (storageKey: string): void => {
   }
 
   window.localStorage.removeItem(storageKey);
+  window.localStorage.removeItem(getWorkspaceLockMirrorKey(storageKey));
 };
 
-const readLegacyLocalPreferences = (storageSuffix: string): WorkbenchPreferences | null => {
+const readLegacyLocalPreferences = (storageSuffix: string): StoredPreferences | null => {
   if (!isBrowser()) {
     return null;
   }
@@ -626,19 +694,17 @@ const readLegacyLocalPreferences = (storageSuffix: string): WorkbenchPreferences
     const raw = window.localStorage.getItem(getLegacyWorkbenchStorageKey(storageSuffix));
     const parsed = raw ? (JSON.parse(raw) as { state?: { account?: { preferences?: unknown } } }) : null;
 
-    return parsed?.state?.account?.preferences
-      ? normalizeWorkbenchPreferences(parsed.state.account.preferences as Partial<WorkbenchPreferences>)
-      : null;
+    return parsed?.state?.account?.preferences ? toStoredPreferences(parsed.state.account.preferences) : null;
   } catch {
     return null;
   }
 };
 
-const loadLegacySessionPreferences = async (owner: AccountScope): Promise<WorkbenchPreferences | null> => {
+const loadLegacySessionPreferences = async (owner: AccountScope): Promise<StoredPreferences | null> => {
   const blob = await fetchSessionBlob(owner.signal);
 
   assertAccountScopeCurrent(owner);
-  return blob?.account.preferences ? normalizeWorkbenchPreferences(blob.account.preferences) : null;
+  return blob?.account.preferences ? toStoredPreferences(blob.account.preferences) : null;
 };
 
 const replaceSnapshot = (
@@ -680,28 +746,38 @@ const enqueueSettingsMutation = (
 const resolveSettings = async (
   local: StoredSettings | null,
   owner: AccountScope,
-  storageSuffix: string
+  storageSuffix: string,
+  storageKey: string
 ): Promise<WorkbenchPreferences> => {
   if (local?.pendingPush) {
-    await pushPreferences(local.preferences, owner.signal);
+    const { preferences } = withWorkspaceLock(local, storageKey);
+
+    await pushPreferences(preferences, owner.signal);
     assertAccountScopeCurrent(owner);
 
-    return local.preferences;
+    return preferences;
   }
 
-  const backendPreferences = parsePreferences(await getClientStateValue(SETTINGS_CLIENT_STATE_KEY, owner.signal));
+  const backend = parseStoredPreferences(await getClientStateValue(SETTINGS_CLIENT_STATE_KEY, owner.signal));
 
   assertAccountScopeCurrent(owner);
 
-  if (backendPreferences) {
-    return backendPreferences;
+  if (backend) {
+    const { isNew, preferences } = withWorkspaceLock(backend, storageKey);
+
+    // Stored as soon as it is decided, so the decision never changes on a later load.
+    if (isNew) {
+      await pushPreferences(preferences, owner.signal);
+      assertAccountScopeCurrent(owner);
+    }
+
+    return preferences;
   }
 
-  const preferences =
-    (await loadLegacySessionPreferences(owner)) ??
-    local?.preferences ??
-    readLegacyLocalPreferences(storageSuffix) ??
-    normalizeWorkbenchPreferences();
+  const { preferences } = withWorkspaceLock(
+    (await loadLegacySessionPreferences(owner)) ?? local ?? readLegacyLocalPreferences(storageSuffix),
+    storageKey
+  );
 
   await pushPreferences(preferences, owner.signal);
   assertAccountScopeCurrent(owner);
@@ -726,7 +802,7 @@ export const loadWorkbenchSettings = (): Promise<WorkbenchPreferences> => {
     const local = readLocalSettings(storageKey);
 
     try {
-      const preferences = await resolveSettings(local, owner, storageSuffix);
+      const preferences = await resolveSettings(local, owner, storageSuffix, storageKey);
 
       assertAccountScopeCurrent(owner);
       writeLocalSettings(storageKey, preferences);
@@ -738,10 +814,15 @@ export const loadWorkbenchSettings = (): Promise<WorkbenchPreferences> => {
         throw error;
       }
 
-      const fallback = local?.preferences ?? readLegacyLocalPreferences(storageSuffix);
-      const preferences = fallback ?? normalizeWorkbenchPreferences();
+      const fallback = local ?? readLegacyLocalPreferences(storageSuffix);
+      const { preferences } = withWorkspaceLock(fallback, storageKey);
 
-      writeLocalSettings(storageKey, preferences, local?.pendingPush);
+      // A decision made offline lives on in the mirror this write keeps, and the next load restores it from there:
+      // marking it a pending push would send an older local copy over the server's. With nothing stored here the
+      // account is unknown, and writing the defaults would read as a decision next time.
+      if (fallback) {
+        writeLocalSettings(storageKey, preferences, local?.pendingPush);
+      }
       store.setSnapshot({
         error: error instanceof Error ? error.message : 'Failed to load settings from the backend.',
         hydratedStorageKey: null,

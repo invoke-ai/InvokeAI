@@ -70,23 +70,39 @@ const waitForSettledDocument = async (page) => {
   });
 };
 
-const openRepresentativePage = async (browser, path, viewport = { height: 1_000, width: 1_440 }, themeId) => {
+const openRepresentativePage = async (
+  browser,
+  path,
+  viewport = { height: 1_000, width: 1_440 },
+  themeId,
+  { rearrangeWithoutCustomize = true } = {}
+) => {
   const resetResponse = await fetch(`${backendOrigin}/__reset?profile=representative`, { method: 'POST' });
 
   if (!resetResponse.ok) {
     throw new Error(`Could not reset representative backend: ${resetResponse.status}.`);
   }
 
-  if (themeId) {
+  if (themeId || !rearrangeWithoutCustomize) {
     const response = await fetch(
       `${backendOrigin}/api/v1/client_state/default/set_by_key?key=webv2%3Aworkbench-settings`,
       {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(JSON.stringify({ betaNoticeAcknowledged: true, whatsNewSeenVersion: 'fixture', themeId })),
+        // The representative account rearranges, as the mock seeds it (`scripts/mock-backend.mjs`), unless a journey asks
+        // for the locked default.
+        body: JSON.stringify(
+          JSON.stringify({
+            betaNoticeAcknowledged: true,
+            rearrangeWithoutCustomize,
+            ...(themeId ? { themeId } : {}),
+            whatsNewSeenVersion: 'fixture',
+            workspaceLockOfferShown: true,
+          })
+        ),
       }
     );
-    assert.ok(response.ok, `Could not set ${themeId} accessibility fixture theme.`);
+    assert.ok(response.ok, 'Could not set the accessibility fixture settings.');
   }
 
   const context = await browser.newContext({
@@ -133,7 +149,7 @@ const waitForNodes = async (page) => {
   await page.getByText('fixture-pack-01', { exact: true }).waitFor();
 };
 
-const presetStrip = (page) => page.getByRole('tablist', { exact: true, name: 'Layout preset' });
+const presetStrip = (page) => page.getByRole('tablist', { exact: true, name: 'Workspaces' });
 
 const waitForWorkbench = async (page) => {
   await page.getByRole('main', { exact: true, name: 'Fixture Project 001' }).waitFor();
@@ -828,6 +844,7 @@ const runTopbarMenuJourney = async (browser) => {
     assert.deepEqual(menuItemValues.slice(menuItemValues.indexOf('queue')), [
       'queue',
       'widgets',
+      'customize-workspace',
       'donate',
       'whats-new',
       'documentation',
@@ -835,10 +852,11 @@ const runTopbarMenuJourney = async (browser) => {
     ]);
     const queueItem = appMenu.locator('[role="menuitem"][data-value="queue"]');
     const widgetsItem = appMenu.locator('[role="menuitem"][data-value="widgets"]');
+    const customizeItem = appMenu.locator('[role="menuitem"][data-value="customize-workspace"]');
 
     await appMenu.press('End');
     assert.equal(await appMenu.getAttribute('aria-activedescendant'), await discordItem.getAttribute('id'));
-    for (const item of [documentationItem, whatsNewItem, donationItem, widgetsItem, queueItem]) {
+    for (const item of [documentationItem, whatsNewItem, donationItem, customizeItem, widgetsItem, queueItem]) {
       await appMenu.press('ArrowUp');
       assert.equal(await appMenu.getAttribute('aria-activedescendant'), await item.getAttribute('id'));
     }
@@ -902,17 +920,22 @@ const runTopbarMenuJourney = async (browser) => {
     await page.getByRole('main', { exact: true, name: otherProjectName }).waitFor();
 
     const customPresetNames = ['Custom One', 'Custom Two', 'Custom Three', 'Custom Four', 'Custom Five', 'Custom Six'];
-    for (const presetName of customPresetNames) {
-      await page.getByRole('button', { exact: true, name: 'Save this layout as a new preset' }).click();
-      const savePresetDialog = page.getByRole('dialog', { exact: true, name: 'Save as new preset' });
-      await savePresetDialog.getByRole('textbox', { exact: true, name: 'Preset name' }).fill(presetName);
-      await savePresetDialog.getByRole('button', { exact: true, name: 'Save preset' }).click();
-      await savePresetDialog.waitFor({ state: 'hidden' });
+    // New workspace copies this one and opens Customize on the copy, whose bar names it.
+    for (const [index, presetName] of customPresetNames.entries()) {
+      await page.getByRole('button', { exact: true, name: 'New workspace' }).click();
+      const customizeBar = page.locator('[data-customize-bar]');
+      await customizeBar.waitFor();
+      if (index === 0) {
+        await assertNoAxeViolations(page, `${id}:customize`);
+      }
+      await customizeBar.getByRole('textbox', { exact: true, name: 'Workspace name' }).fill(presetName);
+      await customizeBar.getByRole('button', { exact: true, name: 'Done' }).click();
+      await customizeBar.waitFor({ state: 'detached' });
     }
     for (const presetName of customPresetNames) {
       await page.getByRole('tab', { exact: true, name: presetName }).waitFor();
     }
-    assert.equal(await page.getByRole('button', { name: /^More layout presets/ }).count(), 0);
+    assert.equal(await page.getByRole('button', { name: /^More workspaces/ }).count(), 0);
     const presetScroller = page.locator('[data-layout-preset-scroll]');
     await presetScroller.waitFor();
     const presetScrollerMetrics = await presetScroller.evaluate((scroller) => ({
@@ -920,7 +943,7 @@ const runTopbarMenuJourney = async (browser) => {
       scrollWidth: scroller.scrollWidth,
     }));
     assert.ok(presetScrollerMetrics.scrollWidth > presetScrollerMetrics.clientWidth);
-    const savePresetButton = page.getByRole('button', { exact: true, name: 'Save this layout as a new preset' });
+    const savePresetButton = page.getByRole('button', { exact: true, name: 'New workspace' });
     const [scrollerBounds, savePresetBounds] = await Promise.all([
       presetScroller.boundingBox(),
       savePresetButton.boundingBox(),
@@ -945,7 +968,7 @@ const runTopbarMenuJourney = async (browser) => {
     assert.equal(presetLayoutMetrics.scrollWidth, presetLayoutMetrics.clientWidth);
 
     await page.getByRole('tab', { name: /^Edit(?:, unsaved changes)?$/ }).click({ button: 'right' });
-    const switchLayout = page.getByRole('menuitem', { exact: true, name: 'Switch to this layout' });
+    const switchLayout = page.getByRole('menuitem', { exact: true, name: 'Switch to this workspace' });
     await switchLayout.waitFor();
     assert.equal(await switchLayout.locator('svg.lucide-check').count(), 0);
     assert.equal(await switchLayout.locator('svg.lucide-arrow-right').count(), 1);
@@ -1239,6 +1262,37 @@ const runLayersPanesJourney = async (browser) => {
     }
 
     return { id: 'workbench-layers-panes', status: 'passed' };
+  } finally {
+    await context.close();
+  }
+};
+
+/** The locked default a new account starts with: structural chrome absent, the editor audited as it first appears. */
+const runLockedWorkspaceJourney = async (browser) => {
+  const { context, page, pageErrors } = await openRepresentativePage(
+    browser,
+    representativeProjectPath,
+    undefined,
+    undefined,
+    { rearrangeWithoutCustomize: false }
+  );
+  const id = 'workbench-locked-default';
+
+  try {
+    await waitForWorkbench(page);
+    const rail = page.getByRole('navigation', { exact: true, name: 'Right rail' });
+
+    await rail.getByRole('button').first().waitFor();
+    assert.equal(await rail.getByRole('button', { name: 'Right panel widgets' }).count(), 0);
+    assert.equal(await page.getByRole('button', { name: 'Status bar widgets' }).count(), 0);
+    await page.getByRole('button', { exact: true, name: 'New workspace' }).waitFor();
+    await assertNoAxeViolations(page, id);
+
+    if (pageErrors.length > 0) {
+      throw new AggregateError(pageErrors, `${id} raised uncaught browser errors.`);
+    }
+
+    return { id, status: 'passed' };
   } finally {
     await context.close();
   }
@@ -1796,7 +1850,7 @@ const runNativeUsersRecoveryJourney = async (browser) => {
     blocked = false;
     await page.getByRole('button', { name: 'Retry', exact: true }).press('Enter');
     await page.waitForFunction((previous) => performance.timeOrigin > previous, before);
-    await page.getByText('0 accounts in this workspace.', { exact: true }).waitFor();
+    await page.getByText('0 accounts on this server.', { exact: true }).waitFor();
     assert.deepEqual(requests, [503, 200]);
     await page.getByRole('button', { name: 'Add user', exact: true }).click();
     await page.getByRole('dialog').waitFor();
@@ -1854,6 +1908,9 @@ try {
   }
   if (!requestedJourney || requestedJourney === 'workbench-layers-panes') {
     reports.push(await runLayersPanesJourney(browser));
+  }
+  if (!requestedJourney || requestedJourney === 'workbench-locked-default') {
+    reports.push(await runLockedWorkspaceJourney(browser));
   }
   if (!requestedJourney || requestedJourney === 'workbench-floating-window') {
     reports.push(await runFloatingWindowJourney(browser));

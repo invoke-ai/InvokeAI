@@ -18,8 +18,15 @@ import { openCommandPaletteFrom } from '@workbench/palette/paletteStore';
 import { openWorkbenchSettings } from '@workbench/settings/settingsDialogStore';
 import { openWhatsNew } from '@workbench/shell/whatsNewStore';
 import { openWidgetsDialogFrom } from '@workbench/shell/widgetsDialogStore';
-import { useActiveProjectId, useActiveProjectSelector } from '@workbench/WorkbenchContext';
+import {
+  useActiveProjectId,
+  useActiveProjectSelector,
+  useWorkbenchCommands,
+  useWorkbenchQueries,
+} from '@workbench/WorkbenchContext';
+import { useIsCustomizing } from '@workbench/workspace/useStructureLock';
 import { useWorkspaceOpen } from '@workbench/workspace/useWorkspaceOpen';
+import { startCustomizing } from '@workbench/workspace/workspaceNavigation';
 import {
   BookOpenTextIcon,
   BlocksIcon,
@@ -28,6 +35,7 @@ import {
   HouseIcon,
   LayoutGridIcon,
   ListOrderedIcon,
+  PencilRulerIcon,
   SearchIcon,
   SettingsIcon,
   TypeIcon,
@@ -72,6 +80,13 @@ export const AppMenu = () => {
   const openSettings = useCallback(() => openWorkbenchSettings(undefined, triggerRef.current ?? undefined), []);
   const openPalette = useCallback(() => openCommandPaletteFrom(triggerRef.current), []);
   const openWidgets = useCallback(() => openWidgetsDialogFrom(getTrigger), [getTrigger]);
+  const commands = useWorkbenchCommands();
+  const queries = useWorkbenchQueries();
+  const isCustomizing = useIsCustomizing();
+  const customize = useCallback(
+    () => startCustomizing({ commands, queries }, { returnFocus: getTrigger }),
+    [commands, getTrigger, queries]
+  );
   const queryClient = useQueryClient();
   // Rendered only once loaded: a lazy() boundary would suspend on open and React delays its reveal, shifting rows.
   const [DonationMenuItem, setDonationMenuItem] = useState<ComponentType<DonationMenuItemProps> | null>(null);
@@ -169,6 +184,15 @@ export const AppMenu = () => {
                 <Icon as={LayoutGridIcon} boxSize="3.5" />
                 <Menu.ItemText>{t('shell.widgets.menuItem')}</Menu.ItemText>
               </Menu.Item>
+              {isCustomizing ? null : (
+                <ShortcutMenuItem
+                  commandId="app.customizeWorkspace"
+                  icon={PencilRulerIcon}
+                  label={t('shell.workspace.customizeWorkspace')}
+                  value="customize-workspace"
+                  onClick={customize}
+                />
+              )}
             </Menu.ItemGroup>
             {DonationMenuItem ? <DonationMenuItem separated /> : null}
             <Menu.Separator />

@@ -7,6 +7,7 @@ import {
   getWorkspaceOffer,
   goBackToPreviousWorkspace,
   openInWorkspace,
+  runWorkspaceCommand,
   toggleCenterPreview,
 } from './workspaceNavigation';
 
@@ -133,6 +134,34 @@ describe('openInWorkspace', () => {
   });
 });
 
+describe('navigation while customizing', () => {
+  it('drops a workspace switch still loading when Customize begins, so it cannot leave the workspace', async () => {
+    const { finishLoading, project, store } = createNavigation({ warm: false });
+    const switching = store.commands.layout.activatePreset('video');
+
+    store.commands.layout.beginCustomize();
+    finishLoading();
+    await switching;
+
+    expect(project().layout.presetId).toBe('compose');
+    expect(store.getSnapshot().customizing?.[project().id]?.presetId).toBe('compose');
+  });
+
+  it('stays in the workspace being customized: an open offers the add here, and switching is refused', async () => {
+    const { notices, ports, project, store } = createNavigation();
+
+    store.commands.layout.beginCustomize();
+
+    expect(openInWorkspace(ports, { surface: 'stage', typeId: 'workflow' })).toEqual({
+      ok: false,
+      reason: 'not-placed',
+    });
+    expect(notices()[0]).toMatchObject({ actions: [{ kind: 'add-widget', surface: 'stage', widgetId: 'workflow' }] });
+    await expect(store.commands.layout.activatePreset('edit')).resolves.toBe('compose');
+    expect(project().layout.presetId).toBe('compose');
+  });
+});
+
 describe('goBackToPreviousWorkspace', () => {
   it('returns once to the workspace the last navigation left', () => {
     const { ports, project } = createNavigation();
@@ -176,5 +205,28 @@ describe('toggleCenterPreview', () => {
     expect(project().widgetRegions.center.activeInstanceId).toBe('gallery:center');
     expect(toggleCenterPreview(ports)).toBe(true);
     expect(project().widgetRegions.center.activeInstanceId).toBe('preview');
+  });
+});
+
+describe('runWorkspaceCommand', () => {
+  it('answers a locked structural command with one Customize hint, and runs it once structure is editable', () => {
+    const { notices, ports } = createNavigation();
+    const save = vi.fn();
+    const run = (rearrangeWithoutCustomize: boolean) =>
+      runWorkspaceCommand(ports, { commandId: 'app.saveLayoutPreset', rearrangeWithoutCustomize }, save);
+
+    run(false);
+    run(false);
+
+    expect(save).not.toHaveBeenCalled();
+    expect(notices()).toHaveLength(1);
+    expect(notices()[0]).toMatchObject({
+      actions: [{ kind: 'customize-workspace' }],
+      occurrenceCount: 2,
+      titleKey: 'shell.workspace.locked',
+    });
+
+    run(true);
+    expect(save).toHaveBeenCalledOnce();
   });
 });

@@ -12,9 +12,11 @@ import {
   registerAccountOwnedResource,
 } from '@platform/state/accountLifecycle';
 import { getApiErrorMessage } from '@platform/transport/http';
+import { getWorkbenchPreferences, patchWorkbenchPreferences } from '@workbench/settings/store';
 import { resolveWidgetLabel } from '@workbench/widgetLabels';
 import { addWidgetToWorkspace } from '@workbench/widgetPlacementCommands';
-import { openInWorkspace } from '@workbench/workspace/workspaceNavigation';
+import { selectStructureLock } from '@workbench/workspace/structureLock';
+import { openInWorkspace, startCustomizing } from '@workbench/workspace/workspaceNavigation';
 
 import type { NotificationActionContext } from './notificationActions';
 
@@ -49,16 +51,31 @@ export const createEditorNotificationActionContext = ({
   const { notifications } = commands;
   const ports = { commands, focus, getWidgetsForRegion, queries };
   const openWidget = (widgetId: WidgetTypeId): void => void openInWorkspace(ports, { typeId: widgetId });
+  const getLock = () => selectStructureLock(queries.getSnapshot(), getWorkbenchPreferences().rearrangeWithoutCustomize);
 
   return {
     addWidget: (widgetId, surface) => {
       const widget = getWidgetById(widgetId);
 
+      if (!widget) {
+        return;
+      }
+      // Locked, the add is the first edit of a Customize session; focus goes to the widget, not the bar.
+      if (!getLock().canEditStructure) {
+        startCustomizing({ commands, queries }, { focusBar: false });
+      }
       // The add fronts it; the open that follows only moves focus there.
-      if (widget && addWidgetToWorkspace({ getWidgetsForRegion, surface, widget, widgets: commands.widgets })) {
+      if (addWidgetToWorkspace({ getWidgetsForRegion, surface, widget, widgets: commands.widgets })) {
         openInWorkspace(ports, { surface, typeId: widgetId }, { mode: 'stay' });
       }
     },
+    customizeWorkspace: () => {
+      if (!getLock().isCustomizing) {
+        startCustomizing({ commands, queries });
+      }
+    },
+    isRearranging: () => getWorkbenchPreferences().rearrangeWithoutCustomize,
+    lockWorkspaces: () => void patchWorkbenchPreferences({ rearrangeWithoutCustomize: false }),
     getWidgetLabel: (widgetId) => {
       const widget = getWidgetById(widgetId);
 

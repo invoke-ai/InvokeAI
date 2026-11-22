@@ -166,7 +166,10 @@ describe('custom setting modified indicators', () => {
 describe('workspace settings', () => {
   it('opens the intermediates manager through the surface hosting it', async () => {
     const onReveal = vi.fn();
-    await render(workspaceSettings.fields[0]!, onReveal);
+    await render(
+      workspaceSettings.fields.find(({ id }) => id === 'workspaceActions')!,
+      onReveal
+    );
     const manage = [...host.querySelectorAll('button')].find(
       (button) => button.textContent === i18n.t('settings.catalog.manageIntermediates')
     );

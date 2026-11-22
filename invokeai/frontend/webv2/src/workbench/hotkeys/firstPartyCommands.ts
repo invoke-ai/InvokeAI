@@ -35,10 +35,13 @@ import { describeCanvasInvocationFailure } from '@workbench/widgets/canvas/invok
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import { useWorkbenchCommands, useWorkbenchExtensions, useWorkbenchQueries } from '@workbench/WorkbenchContext';
 import { resolvePanelToggle } from '@workbench/workbenchState';
+import { CUSTOMIZE_WORKSPACE_COMMAND_ID } from '@workbench/workspace/structureLock';
 import {
   goBackToPreviousWorkspace,
   goBackToStage,
   openInWorkspace,
+  runWorkspaceCommand,
+  startCustomizing,
   toggleCenterPreview,
   type OpenInWorkspace,
 } from '@workbench/workspace/workspaceNavigation';
@@ -49,7 +52,7 @@ import { regionFocusHotkeys, widgetCycleHotkeys } from './catalog';
 const layoutPresetCommands = builtInLayoutPresetDescriptors.map(({ hotkeyId, preset }) => ({
   id: `app.${hotkeyId}`,
   presetId: preset.id,
-  title: `${preset.label} layout`,
+  title: `Switch to ${preset.label} workspace`,
 }));
 
 const imageRecallCommands: Record<string, ImageRecallKind> = {
@@ -81,6 +84,7 @@ export const FIRST_PARTY_APP_COMMAND_IDS = [
   'app.openSettings',
   'app.saveLayoutPreset',
   ...layoutPresetCommands.map(({ id }) => id),
+  CUSTOMIZE_WORKSPACE_COMMAND_ID,
   'app.cancelQueueItem',
   'app.clearQueue',
   'app.selectGenerateTab',
@@ -349,6 +353,13 @@ export const useRegisterFirstPartyCommands = () => {
     }
   };
 
+  const whenAvailable = (commandId: string, handler: () => unknown) => (): unknown =>
+    runWorkspaceCommand(
+      { commands, queries },
+      { commandId, rearrangeWithoutCustomize: getWorkbenchPreferences().rearrangeWithoutCustomize },
+      handler
+    );
+
   useMountEffect(() =>
     commandApi.register({
       handler: toggleCommandPalette,
@@ -423,13 +434,20 @@ export const useRegisterFirstPartyCommands = () => {
         title: 'Open settings',
       }),
       commandApi.register({
-        handler: () => layout.savePreset(queries.getSnapshot().activeProject.layout.presetId),
+        handler: whenAvailable('app.saveLayoutPreset', () =>
+          layout.savePreset(queries.getSnapshot().activeProject.layout.presetId)
+        ),
         id: 'app.saveLayoutPreset',
-        title: 'Save changes to the active layout preset',
+        title: 'Save changes to the workspace',
       }),
       ...layoutPresetCommands.map(({ id, presetId, title }) =>
-        commandApi.register({ handler: () => void layout.activatePreset(presetId), id, title })
+        commandApi.register({ handler: whenAvailable(id, () => void layout.activatePreset(presetId)), id, title })
       ),
+      commandApi.register({
+        handler: whenAvailable(CUSTOMIZE_WORKSPACE_COMMAND_ID, () => startCustomizing({ commands, queries })),
+        id: CUSTOMIZE_WORKSPACE_COMMAND_ID,
+        title: 'Customize workspace',
+      }),
       // The queue menus' own actions: scoped like them, and confirming by the same rules.
       commandApi.register({
         handler: () => requestQueueAction('cancel-current'),
@@ -556,12 +574,12 @@ export const useRegisterFirstPartyCommands = () => {
         title: 'Toggle right panel',
       }),
       // Steps back or forward through the active project's layout history; with none left, the key does nothing.
-      commandApi.register({ handler: () => layout.undo(), id: 'app.undoLayoutChange', title: 'Undo layout change' }),
-      commandApi.register({ handler: () => layout.redo(), id: 'app.redoLayoutChange', title: 'Redo layout change' }),
+      commandApi.register({ handler: () => layout.undo(), id: 'app.undoLayoutChange', title: 'Undo workspace change' }),
+      commandApi.register({ handler: () => layout.redo(), id: 'app.redoLayoutChange', title: 'Redo workspace change' }),
       commandApi.register({
-        handler: layout.reset,
+        handler: whenAvailable('app.resetPanelLayout', layout.reset),
         id: 'app.resetPanelLayout',
-        title: 'Revert layout to saved preset',
+        title: 'Revert workspace to saved',
       }),
       commandApi.register({
         handler: () => {
@@ -589,7 +607,7 @@ export const useRegisterFirstPartyCommands = () => {
         title: 'Back to main view',
       }),
       commandApi.register({
-        handler: () => goBackToPreviousWorkspace(navigation),
+        handler: whenAvailable('app.backToPreviousWorkspace', () => goBackToPreviousWorkspace(navigation)),
         id: 'app.backToPreviousWorkspace',
         title: 'Back to previous workspace',
       }),

@@ -204,7 +204,7 @@ const getDocumentVideoName = (project) =>
 
 const workflowRequests = async () => (await fetchJson('/__workflow-requests')).requests;
 
-const presetStrip = (page) => page.getByRole('tablist', { exact: true, name: 'Layout preset' });
+const presetStrip = (page) => page.getByRole('tablist', { exact: true, name: 'Workspaces' });
 
 const centerViewTrigger = (page, label) => page.getByRole('button', { exact: true, name: `Center view: ${label}` });
 

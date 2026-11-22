@@ -73,6 +73,10 @@ export interface WorkbenchPreferences {
   showFocusRegionHighlight: boolean;
   confirmImageDeletion: boolean;
   galleryDestinationNoticeShown: boolean;
+  /** Structural gestures work outside Customize. Decided once per account (`resolveWorkspaceLock` in `store.ts`). */
+  rearrangeWithoutCustomize: boolean;
+  /** The one-time offer to lock workspaces was shown, or this account never needed it. */
+  workspaceLockOfferShown: boolean;
   /** Auto-switch the Invoke source/destination to match the surface being edited; locks always win. */
   autoSwitchInvocationRoute: boolean;
   queueJobsScope: 'active-project' | 'all';

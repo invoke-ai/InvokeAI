@@ -17,9 +17,11 @@ import {
   removeFloatingPlacement,
 } from '@workbench/widgetPlacementCommands';
 import { areWidgetPlacementProjectsEqual, getWidgetPlacementProject } from '@workbench/widgetPlacementMeta';
-import { useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
+import { useActiveProjectSelector, useWorkbenchCommands, useWorkbenchQueries } from '@workbench/WorkbenchContext';
 import { useWorkbenchWidgetRegistry } from '@workbench/WorkbenchWidgetRegistryContext';
+import { useCanEditStructure } from '@workbench/workspace/useStructureLock';
 import { useWorkspaceOpen } from '@workbench/workspace/useWorkspaceOpen';
+import { startCustomizing } from '@workbench/workspace/workspaceNavigation';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -57,8 +59,12 @@ const focusRow = (row: WidgetsListRow) =>
 
 export const WidgetsDialogBody = ({ isOpen, onExitComplete }: { isOpen: boolean; onExitComplete: () => void }) => {
   const { t } = useTranslation();
-  const { widgets } = useWorkbenchCommands();
+  const commands = useWorkbenchCommands();
+  const { widgets } = commands;
+  const queries = useWorkbenchQueries();
   const open = useWorkspaceOpen();
+  // Locked, the list only shows: Add, Dock and Remove are Customize's, one press away in the footer.
+  const canEditStructure = useCanEditStructure();
   const { getWidgetById, getWidgetsForRegion } = useWorkbenchWidgetRegistry();
   const project = useActiveProjectSelector(getWidgetPlacementProject, areWidgetPlacementProjectsEqual);
   // Show moves focus to the widget; closing then must not pull it back to whatever opened the list.
@@ -124,6 +130,7 @@ export const WidgetsDialogBody = ({ isOpen, onExitComplete }: { isOpen: boolean;
         }
         focusRow(row);
       },
+      customize: () => startCustomizing({ commands, queries }, { focusBar: false }),
       show: (row: WidgetsListRow) => {
         setReturnsFocus(false);
         closeWidgetsDialog();
@@ -131,7 +138,7 @@ export const WidgetsDialogBody = ({ isOpen, onExitComplete }: { isOpen: boolean;
         open({ typeId: row.widget.manifest.id }, { mode: 'stay' });
       },
     }),
-    [getWidgetById, getWidgetsForRegion, open, project, widgets]
+    [commands, getWidgetById, getWidgetsForRegion, open, project, queries, widgets]
   );
 
   return (
@@ -158,13 +165,28 @@ export const WidgetsDialogBody = ({ isOpen, onExitComplete }: { isOpen: boolean;
             <Dialog.Body>
               <Stack data-widgets-list="" gap="4">
                 <Dialog.Description color="fg.muted" fontSize="sm">
-                  {t('shell.widgets.description')}
+                  {t(canEditStructure ? 'shell.widgets.description' : 'shell.widgets.lockedDescription')}
                 </Dialog.Description>
-                <WidgetsGroup actions={actions} label={t('shell.widgets.inLayout')} rows={placedRows} />
-                <WidgetsGroup actions={actions} label={t('shell.widgets.notInLayout')} rows={hiddenRows} />
+                <WidgetsGroup
+                  actions={actions}
+                  canEditStructure={canEditStructure}
+                  label={t('shell.widgets.inLayout')}
+                  rows={placedRows}
+                />
+                <WidgetsGroup
+                  actions={actions}
+                  canEditStructure={canEditStructure}
+                  label={t('shell.widgets.notInLayout')}
+                  rows={hiddenRows}
+                />
               </Stack>
             </Dialog.Body>
             <Dialog.Footer>
+              {canEditStructure ? null : (
+                <Button me="auto" variant="outline" onClick={actions.customize}>
+                  {t('shell.workspace.customize')}
+                </Button>
+              )}
               <Button data-widgets-done="" variant="ghost" onClick={closeWidgetsDialog}>
                 {t('common.done')}
               </Button>
@@ -180,10 +202,12 @@ type WidgetsListActions = Record<'add' | 'dock' | 'remove' | 'show', (row: Widge
 
 const WidgetsGroup = ({
   actions,
+  canEditStructure,
   label,
   rows,
 }: {
   actions: WidgetsListActions;
+  canEditStructure: boolean;
   label: string;
   rows: readonly WidgetsListRow[];
 }) =>
@@ -193,20 +217,28 @@ const WidgetsGroup = ({
       <ListSectionHeader count={rows.length} label={label} />
       <ListStack label={label} dividers>
         {rows.map((row) => (
-          <WidgetsRow key={getRowKey(row)} actions={actions} row={row} />
+          <WidgetsRow key={getRowKey(row)} actions={actions} canEditStructure={canEditStructure} row={row} />
         ))}
       </ListStack>
     </Stack>
   );
 
 /** Rows are static: their buttons are the tab stops, so a row's surface never takes focus itself. */
-const WidgetsRow = ({ actions, row }: { actions: WidgetsListActions; row: WidgetsListRow }) => {
+const WidgetsRow = ({
+  actions,
+  canEditStructure,
+  row,
+}: {
+  actions: WidgetsListActions;
+  canEditStructure: boolean;
+  row: WidgetsListRow;
+}) => {
   const { t } = useTranslation();
   const { getWidgetsForRegion } = useWorkbenchWidgetRegistry();
   const placementLabel = t(
     PLACEMENT_LABEL_KEYS[row.placement.kind === 'docked' ? row.placement.region : row.placement.kind]
   );
-  const isOpenable = canAddWidget(row.widget, getWidgetsForRegion);
+  const isOpenable = canEditStructure && canAddWidget(row.widget, getWidgetsForRegion);
   const run = (action: keyof WidgetsListActions) => () => actions[action](row);
   // A type can be placed more than once (a Gallery view and a Gallery panel), so placed rows name where they are.
   const name =
@@ -238,7 +270,7 @@ const WidgetsRow = ({ actions, row }: { actions: WidgetsListActions; row: Widget
               >
                 {t('shell.widgets.show')}
               </Button>
-              {row.placement.kind === 'floating' ? (
+              {canEditStructure && row.placement.kind === 'floating' ? (
                 <Button
                   aria-label={t('shell.widgets.dockNamed', { label: name })}
                   size="xs"
@@ -249,15 +281,17 @@ const WidgetsRow = ({ actions, row }: { actions: WidgetsListActions; row: Widget
                 </Button>
               ) : null}
               {/* The center always keeps one view, so its last one cannot be removed; the button says why. */}
-              <Button
-                aria-label={t('shell.widgets.removeNamed', { label: name })}
-                size="xs"
-                unavailableReason={row.isRequired ? t('widgets.requiredCenterView') : undefined}
-                variant="ghost"
-                onClick={run('remove')}
-              >
-                {t('shell.widgets.remove')}
-              </Button>
+              {canEditStructure ? (
+                <Button
+                  aria-label={t('shell.widgets.removeNamed', { label: name })}
+                  size="xs"
+                  unavailableReason={row.isRequired ? t('widgets.requiredCenterView') : undefined}
+                  variant="ghost"
+                  onClick={run('remove')}
+                >
+                  {t('shell.widgets.remove')}
+                </Button>
+              ) : null}
             </>
           )
         }

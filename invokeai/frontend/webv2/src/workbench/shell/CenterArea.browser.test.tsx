@@ -2,6 +2,7 @@
 import { Box, ChakraProvider, HStack, Menu, Portal, Text } from '@chakra-ui/react';
 import { system } from '@theme/system';
 import { createWidgetRecovery } from '@workbench/widget-frame/widgetRecoveryStore';
+import { rearrangeWithoutCustomizeInEachTest } from '@workbench/workspace/structureLock.testing';
 import { createInstance } from 'i18next';
 import { act, type ComponentType, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -132,6 +133,8 @@ vi.mock('@workbench/WorkbenchContext', () => ({
   useWorkbenchQueries: () => ({ getSnapshot: () => ({ activeProject: centerAreaMocks.project }) }),
   useWorkbenchSelector: (selector: (snapshot: object) => unknown) =>
     selector({ account: {}, activeProject: centerAreaMocks.project, backendConnection: { status: 'connected' } }),
+  useOptionalWorkbenchSelector: (selector: (snapshot: object) => unknown) =>
+    selector({ activeProject: centerAreaMocks.project }),
 }));
 vi.mock('@workbench/widget-frame', () => ({
   WidgetIdentityIcon: () => <Box boxSize="3.5" />,
@@ -358,6 +361,8 @@ describe('CenterArea view menu beside wide actions', () => {
 });
 
 describe('CenterArea with its last view floating', () => {
+  rearrangeWithoutCustomizeInEachTest();
+
   const dockedCenter = centerAreaMocks.project.widgetRegions.center;
 
   afterEach(() => {

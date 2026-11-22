@@ -17,6 +17,7 @@ import { createTestFocusController } from '@workbench/focusRegions.testing';
 import { createInitialWorkbenchState } from '@workbench/workbenchState';
 import { createWorkbenchStore } from '@workbench/workbenchStore';
 import { WorkbenchWidgetRegistryProvider } from '@workbench/WorkbenchWidgetRegistryContext';
+import { rearrangeWithoutCustomizeInEachTest } from '@workbench/workspace/structureLock.testing';
 import { createInstance } from 'i18next';
 import { CircleIcon } from 'lucide-react';
 import { act, type ReactNode, useState } from 'react';
@@ -190,6 +191,9 @@ afterEach(async () => {
   host.remove();
   accountLifecycle.invalidate();
 });
+
+// The widgets menu is structure: this status bar belongs to an account that rearranges without Customize.
+rearrangeWithoutCustomizeInEachTest();
 
 describe('status bar context menus', () => {
   it('leaves a right-click inside a widget popover to the popover', async () => {

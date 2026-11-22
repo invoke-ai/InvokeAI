@@ -10,6 +10,7 @@ import { Row } from '@platform/ui/Row';
 import { Tooltip } from '@platform/ui/Tooltip';
 import { useHighlightedRegion } from '@workbench/focusRegions';
 import { WidgetIcon } from '@workbench/iconResolver';
+import { useCanEditStructure } from '@workbench/workspace/useStructureLock';
 import { PictureInPicture2Icon } from 'lucide-react';
 import { type MouseEvent, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -61,6 +62,8 @@ export const WidgetBar = ({
 }: WidgetBarProps) => {
   const { t } = useTranslation();
   const isEdgeOutlined = useHighlightedRegion() === edgeRegion;
+  // Adding, removing and docking are structure: the rail offers them only while the workspace may change.
+  const canEditStructure = useCanEditStructure();
   const region = side;
   const [enableMenuTarget, setEnableMenuTarget] = useState<{
     x: number;
@@ -132,7 +135,7 @@ export const WidgetBar = ({
       flexShrink={0}
       pt="1"
       w="11"
-      onContextMenu={openEnableMenu}
+      onContextMenu={canEditStructure ? openEnableMenu : undefined}
     >
       {groups.map((group, index) => (
         <RailGroup
@@ -142,29 +145,33 @@ export const WidgetBar = ({
             index > 0 && group.railItems.length > 0 && groups.slice(0, index).some((g) => g.railItems.length > 0)
           }
           side={side}
-          onContextMenu={openInstanceMenu}
+          onContextMenu={canEditStructure ? openInstanceMenu : undefined}
           onSelect={onSelect}
         />
       ))}
 
-      <WidgetEnableMenu
-        contextTarget={enableMenuTarget}
-        groupLabel={regionWidgetsLabel}
-        items={menuItems}
-        positioning={positioning}
-        trigger={trigger}
-        triggerLabel={regionWidgetsLabel}
-        onContextClose={handleContextClose}
-        onToggle={handleMenuToggle}
-      />
+      {canEditStructure ? (
+        <>
+          <WidgetEnableMenu
+            contextTarget={enableMenuTarget}
+            groupLabel={regionWidgetsLabel}
+            items={menuItems}
+            positioning={positioning}
+            trigger={trigger}
+            triggerLabel={regionWidgetsLabel}
+            onContextClose={handleContextClose}
+            onToggle={handleMenuToggle}
+          />
 
-      <WidgetInstanceContextMenu
-        dockRegion={isMarkerMenu ? region : undefined}
-        target={instanceMenuTarget}
-        onClose={handleInstanceClose}
-        onDock={handleInstanceDock}
-        onRemove={handleInstanceRemove}
-      />
+          <WidgetInstanceContextMenu
+            dockRegion={isMarkerMenu ? region : undefined}
+            target={instanceMenuTarget}
+            onClose={handleInstanceClose}
+            onDock={handleInstanceDock}
+            onRemove={handleInstanceRemove}
+          />
+        </>
+      ) : null}
     </Flex>
   );
 };
@@ -178,7 +185,7 @@ const RailGroup = ({
   side,
 }: {
   group: WidgetBarGroup;
-  onContextMenu: (item: WidgetBarItem, event: MouseEvent) => void;
+  onContextMenu?: (item: WidgetBarItem, event: MouseEvent) => void;
   onSelect: (region: WidgetBarGroup['region'], instanceId: WidgetInstanceId) => void;
   separated: boolean;
   side: 'left' | 'right';
@@ -263,7 +270,7 @@ const WidgetSlot = ({
 }: {
   item: WidgetBarItem;
   isActive: boolean;
-  onContextMenu: (item: WidgetBarItem, event: MouseEvent) => void;
+  onContextMenu?: (item: WidgetBarItem, event: MouseEvent) => void;
   onSelect: (instanceId: WidgetInstanceId) => void;
   region: WidgetRegion;
   tooltipPlacement: 'left' | 'right';
@@ -286,7 +293,7 @@ const WidgetSlot = ({
   }, [isDisabled, item.id, onSelect]);
   const intentPreloadProps = useWidgetIntentPreloadProps(item.widget, isDisabled);
 
-  const handleContextMenu = useCallback((event: MouseEvent) => onContextMenu(item, event), [item, onContextMenu]);
+  const handleContextMenu = useCallback((event: MouseEvent) => onContextMenu?.(item, event), [item, onContextMenu]);
 
   const { dragHandleProps, setNodeRef, style } = useWidgetSortable({
     disabled: isDisabled || item.isFloating === true,
@@ -312,7 +319,7 @@ const WidgetSlot = ({
           tabIndex={isDisabled ? -1 : undefined}
           {...intentPreloadProps}
           onClick={handleClick}
-          onContextMenu={handleContextMenu}
+          onContextMenu={onContextMenu ? handleContextMenu : undefined}
         >
           <WidgetIcon icon={item.icon} boxSize="5" />
           {item.isFloating ? (

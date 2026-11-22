@@ -48,6 +48,8 @@ vi.mock('@workbench/WorkbenchWidgetRegistryContext', () => ({
   }),
 }));
 
+import { rearrangeWithoutCustomizeInEachTest } from '@workbench/workspace/structureLock.testing';
+
 import { WidgetFloatButton } from './WidgetFrames';
 
 const i18n = i18next.createInstance();
@@ -109,6 +111,9 @@ afterEach(async () => {
   host = null;
   root = null;
 });
+
+// Float is structure: this panel belongs to an account that rearranges without Customize.
+rearrangeWithoutCustomizeInEachTest();
 
 describe('WidgetFloatButton', () => {
   it('floats the instance from a docked panel, flushing drafts first', async () => {

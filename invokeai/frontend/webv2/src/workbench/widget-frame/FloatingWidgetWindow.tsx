@@ -26,6 +26,7 @@ import {
   useWorkbenchQueries,
 } from '@workbench/WorkbenchContext';
 import { useWorkbenchWidgetRegistry } from '@workbench/WorkbenchWidgetRegistryContext';
+import { useCanEditStructure } from '@workbench/workspace/useStructureLock';
 import {
   ChevronsDownUpIcon,
   ChevronsUpDownIcon,
@@ -321,6 +322,7 @@ export const FloatingWidgetWindow = ({
   const { widgets } = useWorkbenchCommands();
   const queries = useWorkbenchQueries();
   const { getWidgetById } = useWorkbenchWidgetRegistry();
+  const canEditStructure = useCanEditStructure();
   const instance = useActiveProjectSelector(
     (project) => project.widgetInstances[instanceId],
     areWidgetRenderInstancesEqual
@@ -772,22 +774,27 @@ export const FloatingWidgetWindow = ({
                 <Icon as={isMaximized ? Minimize2Icon : Maximize2Icon} boxSize="3.5" />
               </IconButton>
             </Tooltip>
-            <Tooltip content={dockLabel}>
-              <IconButton aria-label={dockLabel} color="fg.muted" size="sm" variant="ghost" onClick={handleDock}>
-                <Icon as={DOCK_DESTINATION_ICONS[state.returnRegion]} boxSize="3.5" />
-              </IconButton>
-            </Tooltip>
-            <Tooltip content={t('widgets.floating.close')}>
-              <IconButton
-                aria-label={t('widgets.floating.closeNamed', { label })}
-                color="fg.muted"
-                size="sm"
-                variant="ghost"
-                onClick={handleClose}
-              >
-                <Icon as={XIcon} boxSize="3.5" />
-              </IconButton>
-            </Tooltip>
+            {/* Docking and closing change the workspace; moving, sizing, shading and maximizing only the view. */}
+            {canEditStructure ? (
+              <>
+                <Tooltip content={dockLabel}>
+                  <IconButton aria-label={dockLabel} color="fg.muted" size="sm" variant="ghost" onClick={handleDock}>
+                    <Icon as={DOCK_DESTINATION_ICONS[state.returnRegion]} boxSize="3.5" />
+                  </IconButton>
+                </Tooltip>
+                <Tooltip content={t('widgets.floating.close')}>
+                  <IconButton
+                    aria-label={t('widgets.floating.closeNamed', { label })}
+                    color="fg.muted"
+                    size="sm"
+                    variant="ghost"
+                    onClick={handleClose}
+                  >
+                    <Icon as={XIcon} boxSize="3.5" />
+                  </IconButton>
+                </Tooltip>
+              </>
+            ) : null}
           </HStack>
         </HStack>
         {/* A shaded body is hidden, not unmounted: its local state survives, and no second copy mounts. */}

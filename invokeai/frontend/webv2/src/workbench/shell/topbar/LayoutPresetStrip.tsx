@@ -26,13 +26,11 @@ import {
   useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { useExitPresence } from '@platform/react/useExitRetainedValue';
 import { IconButton } from '@platform/ui/Button';
 import { MenuContent, MenuHeadingGroup } from '@platform/ui/Menu';
 import { HIDDEN_SCROLLBAR_CSS } from '@platform/ui/scrollStripEdges';
 import { Tabs } from '@platform/ui/Tabs';
 import { Tooltip, TooltipGroup } from '@platform/ui/Tooltip';
-import { getPlacedWidgetTypeIds, graphWidgetSources } from '@workbench/graphWidgets';
 import { useShortcutBinding, useShortcutLabel } from '@workbench/hotkeys/useShortcutBinding';
 import { preloadLayoutPresetWidgets } from '@workbench/layoutPresetActivation';
 import { getOrderedLayoutPresets } from '@workbench/layoutPresetCollection';
@@ -43,11 +41,18 @@ import {
 } from '@workbench/layoutPresets';
 import { findLayoutPresetWorkingCopy } from '@workbench/layoutPresetSnapshots';
 import { CUE_WIDTH, OverflowCue, useOverflowEdges } from '@workbench/shell/overflowEdges';
-import { useActiveProjectSelector, useWorkbenchCommands, useWorkbenchSelector } from '@workbench/WorkbenchContext';
+import {
+  useActiveProjectSelector,
+  useWorkbenchCommands,
+  useWorkbenchQueries,
+  useWorkbenchSelector,
+} from '@workbench/WorkbenchContext';
+import { useCanEditStructure } from '@workbench/workspace/useStructureLock';
+import { customizeNewWorkspace, getWorkspaceTab, startCustomizing } from '@workbench/workspace/workspaceNavigation';
 import {
   ArrowRightIcon,
   ChevronDownIcon,
-  PencilIcon,
+  PencilRulerIcon,
   PlusIcon,
   RotateCcwIcon,
   SaveIcon,
@@ -57,11 +62,8 @@ import {
 import { useCallback, useId, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import type { LayoutPresetDialogValue } from './layoutPresetDialogModel';
-
-import { LayoutPresetDialog } from './LayoutPresetDialog';
 import { resolveLayoutPresetIcon } from './layoutPresetIcons';
-import { openLayoutPresetDelete, openLayoutPresetEdit, openLayoutPresetManager } from './layoutPresetManagerStore';
+import { openLayoutPresetDelete, openLayoutPresetManager } from './layoutPresetManagerStore';
 import { HIDE_BELOW_PRESET_LABEL_WIDTH } from './topbarBreakpoints';
 import { TopbarShortcutKeys } from './TopbarShortcutKeys';
 import { useActiveLayoutPresetId, useLayoutDrift, useUnsavedInactiveLayoutPresetIds } from './useLayoutDrift';
@@ -82,9 +84,6 @@ const KEYBOARD_SENSOR_OPTIONS = {
 };
 const MOUSE_SENSOR_OPTIONS = { activationConstraint: { distance: 6 } } as const;
 const TOUCH_SENSOR_OPTIONS = { activationConstraint: { delay: 250, tolerance: 5 } } as const;
-
-const createCustomPresetId = (): string =>
-  `custom-layout-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
 /** What each built-in preset is for, as the tab's tip says under its name. */
 const BUILT_IN_PRESET_DESCRIPTION_KEYS: Record<BuiltInLayoutPresetId, string> = {
@@ -112,24 +111,21 @@ const getLabelHidden = (): boolean => matchLabelHidden().matches;
 
 const selectPresetWorkingLayouts = (project: Project) => project.presetWorkingLayouts;
 
-const selectPlacedGraphWidgetSources = (project: Project) => {
-  const placedTypeIds = getPlacedWidgetTypeIds(project);
-
-  return graphWidgetSources.filter((source) => placedTypeIds.has(source.typeId));
-};
+const NEW_WORKSPACE_ATTRIBUTE = 'data-new-workspace';
+const getNewWorkspaceButton = (): HTMLElement | null => document.querySelector(`[${NEW_WORKSPACE_ATTRIBUTE}]`);
 
 export const LayoutPresetStrip = () => {
   const { t } = useTranslation();
-  const { layout } = useWorkbenchCommands();
-  const [isSaveAsOpen, setIsSaveAsOpen] = useState(false);
-  const saveAsDialog = useExitPresence(isSaveAsOpen);
+  const commands = useWorkbenchCommands();
+  const queries = useWorkbenchQueries();
+  const { layout } = commands;
+  // Reordering workspaces is structure; with the tabs locked a drag does nothing.
+  const canEditStructure = useCanEditStructure();
   const [menuTarget, setMenuTarget] = useState<PresetMenuTarget | null>(null);
   const menuTicket = useRef(0);
 
   const account = useWorkbenchSelector((snapshot) => snapshot.account);
-  const invocation = useActiveProjectSelector((project) => project.invocation);
   const presetWorkingLayouts = useActiveProjectSelector(selectPresetWorkingLayouts, Object.is);
-  const sourceOptions = useActiveProjectSelector(selectPlacedGraphWidgetSources);
   // Labels as shown: a built-in preset not renamed by the account reads in the current language.
   const presets = useMemo(
     () => getOrderedLayoutPresets(account).map((preset) => ({ ...preset, label: getLayoutPresetLabel(preset, t) })),
@@ -139,10 +135,12 @@ export const LayoutPresetStrip = () => {
   const { hasDrifted } = useLayoutDrift();
   const activePresetId = useActiveLayoutPresetId();
   const unsavedInactiveIds = useUnsavedInactiveLayoutPresetIds();
-  // Judged against the store's active preset, not the optimistic tab, so a dot never jumps ahead of the switch.
+  // Judged against the store's active preset, not the optimistic tab, so a dot never jumps ahead of the switch. Locked,
+  // nothing reads as unsaved: only view changes happen there, and there is nothing to save or revert.
   const isPresetUnsaved = useCallback(
-    (presetId: LayoutPresetId) => (presetId === activePresetId ? hasDrifted : unsavedInactiveIds.has(presetId)),
-    [activePresetId, hasDrifted, unsavedInactiveIds]
+    (presetId: LayoutPresetId) =>
+      canEditStructure && (presetId === activePresetId ? hasDrifted : unsavedInactiveIds.has(presetId)),
+    [activePresetId, canEditStructure, hasDrifted, unsavedInactiveIds]
   );
   const [isReordering, setIsReordering] = useState(false);
   const isLabelHidden = useSyncExternalStore(subscribeLabelHidden, getLabelHidden);
@@ -186,10 +184,6 @@ export const LayoutPresetStrip = () => {
     useSensor(MouseSensor, MOUSE_SENSOR_OPTIONS),
     useSensor(TouchSensor, TOUCH_SENSOR_OPTIONS),
     useSensor(KeyboardSensor, KEYBOARD_SENSOR_OPTIONS)
-  );
-  const saveAsDefaultRoute = useMemo(
-    () => ({ destination: invocation.destination, sourceId: invocation.sourceId }),
-    [invocation.destination, invocation.sourceId]
   );
   // The latest tab press; a frame-deferred activation that a newer press superseded does not start.
   const requestedPresetIdRef = useRef<LayoutPresetId | null>(null);
@@ -248,19 +242,30 @@ export const LayoutPresetStrip = () => {
     },
     [applyPreset, presets]
   );
-  const openSaveAsDialog = useCallback(() => setIsSaveAsOpen(true), []);
-  const closeSaveAsDialog = useCallback(() => setIsSaveAsOpen(false), []);
-  const saveAsNewPreset = useCallback(
-    ({ defaultRoute, iconId, name }: LayoutPresetDialogValue) =>
-      layout.createPreset(createCustomPresetId(), name, iconId, defaultRoute),
-    [layout]
+  // Stays available while locked: it is how a new place gets made, and it opens Customize on the copy.
+  const createWorkspace = useCallback(
+    () =>
+      customizeNewWorkspace(
+        { commands, queries },
+        {
+          defaultRoute: activePreset.defaultRoute ?? null,
+          iconId: activePreset.iconId,
+          label: t('topbar.presets.copyName', { name: activePreset.label }),
+        },
+        { returnFocus: getNewWorkspaceButton }
+      ),
+    [activePreset, commands, queries, t]
+  );
+  const customize = useCallback(
+    (preset: LayoutPreset) =>
+      startCustomizing({ commands, queries }, { returnFocus: () => getWorkspaceTab(preset.id) }),
+    [commands, queries]
   );
   const openMenu = useCallback((target: Omit<PresetMenuTarget, 'ticket'>) => {
     menuTicket.current += 1;
     setMenuTarget({ ...target, ticket: menuTicket.current });
   }, []);
   const closeMenu = useCallback(() => setMenuTarget(null), []);
-  const requestEdit = useCallback((preset: LayoutPreset) => openLayoutPresetEdit(preset.id), []);
   const requestDelete = useCallback((preset: LayoutPreset) => openLayoutPresetDelete(preset.id), []);
   const handleDragStart = useCallback(() => setIsReordering(true), []);
   const handleDragCancel = useCallback(() => setIsReordering(false), []);
@@ -324,10 +329,11 @@ export const LayoutPresetStrip = () => {
                     getTriggerId={tabIds.trigger}
                     isEnabled={isTipShown}
                   >
-                    <Tabs.List aria-label={t('topbar.presets.layoutPreset')} gap="0.5">
+                    <Tabs.List aria-label={t('topbar.presets.workspaces')} gap="0.5">
                       {presets.map((preset) => (
                         <PresetTab
                           key={preset.id}
+                          canReorder={canEditStructure}
                           isActive={preset.id === selectedPresetId}
                           isUnsaved={isPresetUnsaved(preset.id)}
                           preset={preset}
@@ -349,7 +355,9 @@ export const LayoutPresetStrip = () => {
                     overflow that hides nothing. */}
                 {presets.map((preset) => (
                   <Tabs.Content key={preset.id} value={preset.id} asChild>
-                    <VisuallyHidden insetInlineStart="0" top="0">{`${preset.label} layout`}</VisuallyHidden>
+                    <VisuallyHidden insetInlineStart="0" top="0">
+                      {t('topbar.presets.workspaceNamed', { name: preset.label })}
+                    </VisuallyHidden>
                   </Tabs.Content>
                 ))}
               </Tabs.Root>
@@ -369,12 +377,13 @@ export const LayoutPresetStrip = () => {
           ) : null}
         </Box>
 
-        <Tooltip content={t('topbar.presets.saveAsTooltip')} showArrow>
+        <Tooltip content={t('topbar.presets.newWorkspace')} showArrow>
           <IconButton
-            aria-label={t('topbar.presets.saveAsTooltip')}
+            {...{ [NEW_WORKSPACE_ATTRIBUTE]: '' }}
+            aria-label={t('topbar.presets.newWorkspace')}
             size="lg"
             variant="ghost"
-            onClick={openSaveAsDialog}
+            onClick={createWorkspace}
           >
             <Icon as={PlusIcon} boxSize="4" />
           </IconButton>
@@ -384,28 +393,14 @@ export const LayoutPresetStrip = () => {
       {menuTarget ? (
         <PresetMenu
           key={menuTarget.ticket}
+          canEditStructure={canEditStructure}
           isActive={menuTarget.preset.id === selectedPresetId}
           isUnsaved={isPresetUnsaved(menuTarget.preset.id)}
           target={menuTarget}
           onApply={applyPreset}
           onClose={closeMenu}
+          onCustomize={customize}
           onDelete={requestDelete}
-          onEdit={requestEdit}
-        />
-      ) : null}
-
-      {saveAsDialog.isMounted ? (
-        <LayoutPresetDialog
-          key={saveAsDialog.generation}
-          defaultRoute={saveAsDefaultRoute}
-          isOpen={saveAsDialog.isOpen}
-          name={`${activePreset.label} copy`}
-          sourceOptions={sourceOptions}
-          submitLabel={t('topbar.presets.save')}
-          title={t('topbar.presets.saveAs')}
-          onClose={closeSaveAsDialog}
-          onExitComplete={saveAsDialog.release}
-          onSubmit={saveAsNewPreset}
         />
       ) : null}
     </>
@@ -413,6 +408,7 @@ export const LayoutPresetStrip = () => {
 };
 
 const PresetTab = ({
+  canReorder,
   isActive,
   isUnsaved,
   onGoHome,
@@ -421,6 +417,7 @@ const PresetTab = ({
   preset,
   workingArrangement,
 }: {
+  canReorder: boolean;
   isActive: boolean;
   isUnsaved: boolean;
   preset: LayoutPreset;
@@ -435,10 +432,14 @@ const PresetTab = ({
   // An unknown command id resolves to no binding, so a custom preset advertises no key.
   const shortcut = useShortcutBinding(findPresetShortcutCommandId(preset.id) ?? '');
   const keyShortcuts = [isActive ? 'ArrowDown' : null, shortcut?.aria].filter(Boolean).join(' ') || undefined;
-  const { attributes, isDragging, listeners, setNodeRef, transform, transition } = useSortable({
+  const sortable = useSortable({
     attributes: { role: 'tab', roleDescription: 'sortable', tabIndex: isActive ? 0 : -1 },
+    disabled: !canReorder,
     id: preset.id,
   });
+  const { isDragging, listeners, setNodeRef, transform, transition } = sortable;
+  // Locked, a tab is a plain tab: not announced as sortable, nor marked disabled.
+  const attributes = canReorder ? sortable.attributes : { role: 'tab', tabIndex: isActive ? 0 : -1 };
   const dndStyle = useMemo(
     () => ({
       opacity: isDragging ? 0.5 : undefined,
@@ -668,37 +669,40 @@ interface PresetMenuTarget {
   ticket: number;
 }
 
-/** Mounted only while open. */
+/** Mounted only while open. Structural items show only while the workspace may change; otherwise Customize leads. */
 const PresetMenu = ({
+  canEditStructure,
   isActive,
   isUnsaved,
   onApply,
   onClose,
+  onCustomize,
   onDelete,
-  onEdit,
   target,
 }: {
+  canEditStructure: boolean;
   isActive: boolean;
   isUnsaved: boolean;
   target: PresetMenuTarget;
   onApply: (preset: LayoutPreset) => void;
   onClose: () => void;
+  onCustomize: (preset: LayoutPreset) => void;
   onDelete: (preset: LayoutPreset) => void;
-  onEdit: (preset: LayoutPreset) => void;
 }) => {
   const { t } = useTranslation();
   const { layout } = useWorkbenchCommands();
   const saveShortcut = useShortcutLabel('app.saveLayoutPreset');
+  const customizeShortcut = useShortcutLabel('app.customizeWorkspace');
   const { preset } = target;
   const isCustom = preset.isBuiltIn !== true;
 
   const apply = useCallback(() => onApply(preset), [onApply, preset]);
   const revert = useCallback(() => layout.revertPreset(preset.id), [layout, preset.id]);
   const save = useCallback(() => layout.savePreset(preset.id), [layout, preset.id]);
-  const edit = useCallback(() => {
+  const customize = useCallback(() => {
     onClose();
-    onEdit(preset);
-  }, [onClose, onEdit, preset]);
+    onCustomize(preset);
+  }, [onClose, onCustomize, preset]);
   const remove = useCallback(() => {
     onClose();
     onDelete(preset);
@@ -733,7 +737,17 @@ const PresetMenu = ({
         <Menu.Positioner>
           <MenuContent minW="16rem">
             <MenuHeadingGroup label={preset.label} trailing={isUnsaved ? t('topbar.presets.unsaved') : null}>
-              {isActive ? null : (
+              {isActive ? (
+                <Menu.Item value="customize" onClick={customize}>
+                  <Icon as={PencilRulerIcon} boxSize="3.5" />
+                  <Menu.ItemText>{t('shell.workspace.customize')}</Menu.ItemText>
+                  {customizeShortcut ? (
+                    <Text color="fg.subtle" fontSize="xs" ms="auto">
+                      {customizeShortcut}
+                    </Text>
+                  ) : null}
+                </Menu.Item>
+              ) : (
                 <Menu.Item value="apply-preset" onClick={apply}>
                   <Icon as={ArrowRightIcon} boxSize="3.5" />
                   <Menu.ItemText>{t('topbar.presets.switch')}</Menu.ItemText>
@@ -741,7 +755,7 @@ const PresetMenu = ({
               )}
 
               {/* An inactive preset with a working copy here saves or reverts without switching to it. */}
-              {isActive || isUnsaved ? (
+              {canEditStructure && (isActive || isUnsaved) ? (
                 <>
                   {isUnsaved ? (
                     <Menu.Item value="revert-layout" onClick={revert}>
@@ -761,11 +775,7 @@ const PresetMenu = ({
                 </>
               ) : null}
 
-              <Menu.Item value="edit-preset" onClick={edit}>
-                <Icon as={PencilIcon} boxSize="3.5" />
-                <Menu.ItemText>{t('topbar.presets.editWithEllipsis')}</Menu.ItemText>
-              </Menu.Item>
-              {isCustom ? (
+              {canEditStructure && isCustom ? (
                 <Menu.Item data-danger="" value="delete-preset" onClick={remove}>
                   <Icon as={Trash2Icon} boxSize="3.5" />
                   <Menu.ItemText>{t('topbar.presets.deleteWithEllipsis')}</Menu.ItemText>
@@ -773,11 +783,15 @@ const PresetMenu = ({
               ) : null}
             </MenuHeadingGroup>
 
-            <Menu.Separator />
-            <Menu.Item value="manage-presets" onClick={manage}>
-              <Icon as={SettingsIcon} boxSize="3.5" />
-              <Menu.ItemText>{t('topbar.presets.manage')}</Menu.ItemText>
-            </Menu.Item>
+            {canEditStructure ? (
+              <>
+                <Menu.Separator />
+                <Menu.Item value="manage-presets" onClick={manage}>
+                  <Icon as={SettingsIcon} boxSize="3.5" />
+                  <Menu.ItemText>{t('topbar.presets.manage')}</Menu.ItemText>
+                </Menu.Item>
+              </>
+            ) : null}
           </MenuContent>
         </Menu.Positioner>
       </Portal>

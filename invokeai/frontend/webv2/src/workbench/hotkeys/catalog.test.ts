@@ -23,10 +23,10 @@ describe('firstPartyHotkeyCatalog', () => {
     expect(firstPartyHotkeyCatalog.map((hotkey) => hotkey.id)).toContain('app.selectVideoPreset');
   });
 
-  it('names the automate preset Workflow, keeping its id', () => {
+  it('names the automate workspace Workflow, keeping its id', () => {
     const selectWorkflow = firstPartyHotkeyCatalog.find((hotkey) => hotkey.id === 'app.selectAutomatePreset');
 
-    expect(selectWorkflow).toMatchObject({ defaultKeys: ['alt+4'], title: 'Select Workflow Preset' });
+    expect(selectWorkflow).toMatchObject({ defaultKeys: ['alt+4'], title: 'Switch to Workflow workspace' });
   });
 
   it('binds settings to the platform-standard shortcut, reachable from a text field', () => {

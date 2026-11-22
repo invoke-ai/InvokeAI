@@ -5,7 +5,9 @@ import { dragWithMouse } from '@platform/browser/mouseDrag.testing';
 import { useDebouncedValue } from '@platform/react/useDebouncedValue';
 import { shallowEqual, useExternalStoreSelector } from '@platform/state/selectors';
 import { system } from '@theme/system';
+import { patchWorkbenchPreferences } from '@workbench/settings/store';
 import { createWorkbenchStore, type WorkbenchInternalStore, type WorkbenchSnapshot } from '@workbench/workbenchStore';
+import { rearrangeWithoutCustomizeInEachTest } from '@workbench/workspace/structureLock.testing';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -24,12 +26,12 @@ vi.mock('react-i18next', () => ({
         'topbar.presets.builtInDescriptions.compose': 'Generate images from text',
         'topbar.presets.builtInDescriptions.edit': 'Edit and refine images',
         'topbar.presets.builtInDescriptions.video': 'Generate video',
-        'topbar.presets.layoutPreset': 'Layout preset',
+        'topbar.presets.newWorkspace': 'New workspace',
         'topbar.presets.reorderInstructions':
           'To reorder a layout preset, press Space. Use the Left and Right arrow keys to move it, then press Space to drop or Escape to cancel.',
-        'topbar.presets.saveAsTooltip': 'Save this layout as a new preset',
+        'topbar.presets.workspaces': 'Workspaces',
         'topbar.presets.unsaved': 'Unsaved changes',
-        'topbar.presets.unsavedLayoutChanges': 'Unsaved layout changes',
+        'topbar.presets.unsavedLayoutChanges': 'Unsaved changes',
       })[key] ?? key,
   }),
 }));
@@ -52,7 +54,13 @@ vi.mock('@workbench/WorkbenchContext', () => {
       isEqual: Equality<Selected> = Object.is,
       settlesImmediately?: (previous: Selected, next: Selected) => boolean
     ) => useDebouncedValue(useWorkbenchSelector(selector, isEqual), debounceMs, { isEqual, settlesImmediately }),
+    useOptionalWorkbenchSelector: <Selected,>(
+      selector: (snapshot: WorkbenchSnapshot) => Selected,
+      _fallback: Selected,
+      isEqual?: Equality<Selected>
+    ) => useWorkbenchSelector(selector, isEqual),
     useWorkbenchCommands: () => store.commands,
+    useWorkbenchQueries: () => store.queries,
     useWorkbenchSelector,
   };
 });
@@ -181,6 +189,10 @@ const touch = (
   return event;
 };
 
+// Reordering, saving and reverting from the strip are structure: they work here for an account that rearranges without
+// Customize. `locked workspaces` below covers the default.
+rearrangeWithoutCustomizeInEachTest();
+
 beforeEach(() => {
   store = createWorkbenchStore();
   store.commands.layout.createPreset('custom-1', 'Custom', 'star');
@@ -268,28 +280,8 @@ describe('LayoutPresetStrip', () => {
     expect(store.getSnapshot().activeProject.layout.presetId).toBe('edit');
   });
 
-  it('keeps the edit and delete dialogs opened from a preset menu', async () => {
+  it('keeps the delete confirmation opened from a workspace menu', async () => {
     await renderStrip({ withAdminDialogs: true });
-
-    await openPresetMenuItem('custom-1', 'edit-preset');
-
-    const editDialog = document.querySelector<HTMLElement>('[role="dialog"]');
-    expect(editDialog?.textContent).toMatch(/^topbar\.presets\.edit/);
-    expect(document.querySelector('[role="menu"]')).toBeNull();
-
-    const name = editDialog!.querySelector<HTMLInputElement>('input[name="layout-preset-name"]')!;
-    await act(() => userEvent.clear(name));
-    await act(() => userEvent.type(name, 'Renamed'));
-    await act(() =>
-      userEvent.click(
-        Array.from(editDialog!.querySelectorAll('button')).find(
-          (button) => button.textContent === 'topbar.presets.save'
-        )!
-      )
-    );
-    await act(() => settle());
-
-    expect(presetTab('custom-1')).toHaveAttribute('aria-label', 'Renamed');
 
     await openPresetMenuItem('custom-1', 'delete-preset');
 
@@ -307,24 +299,9 @@ describe('LayoutPresetStrip', () => {
     expect(presetTabIds()).not.toContain('custom-1');
   });
 
-  it('shows a built-in preset by its translated name and keeps it a default when saved unchanged', async () => {
-    await renderStrip({ withAdminDialogs: true });
+  it('shows a built-in workspace by its translated name', async () => {
+    await renderStrip();
 
-    expect(presetTab('automate')).toHaveAttribute('aria-label', 'Arbeitsablauf');
-
-    await openPresetMenuItem('automate', 'edit-preset');
-    const editDialog = document.querySelector<HTMLElement>('[role="dialog"]')!;
-    expect(editDialog.querySelector<HTMLInputElement>('input[name="layout-preset-name"]')!.value).toBe('Arbeitsablauf');
-    await act(() =>
-      userEvent.click(
-        Array.from(editDialog.querySelectorAll('button')).find(
-          (button) => button.textContent === 'topbar.presets.save'
-        )!
-      )
-    );
-    await act(() => settle());
-
-    expect(store.getSnapshot().account.layoutPresetMetadataOverrides?.automate).toBeUndefined();
     expect(presetTab('automate')).toHaveAttribute('aria-label', 'Arbeitsablauf');
   });
 
@@ -426,7 +403,7 @@ describe('LayoutPresetStrip', () => {
   });
 
   describe('unsaved arrangements', () => {
-    const UNSAVED = 'Unsaved layout changes';
+    const UNSAVED = 'Unsaved changes';
     const unsavedDot = (id: string) => presetTab(id)?.querySelector('[data-unsaved-dot]') ?? null;
     const label = (id: string) => presetTab(id)?.getAttribute('aria-label') ?? '';
     const activePresetId = () => store.getSnapshot().activeProject.layout.presetId;
@@ -525,5 +502,56 @@ describe('LayoutPresetStrip', () => {
         await expect.poll(tipText, POLL).toBe('Custom');
       });
     });
+  });
+});
+
+describe('locked workspaces', () => {
+  beforeEach(() => {
+    void patchWorkbenchPreferences({ rearrangeWithoutCustomize: false });
+  });
+
+  it('keeps the tab order when a tab is dragged, and does not announce tabs as sortable', async () => {
+    await renderStrip();
+    const order = presetTabIds();
+
+    expect(presetTab('compose')).not.toHaveAttribute('aria-roledescription');
+    await dragWithMouse(presetTab('compose')!, presetTab('automate')!);
+    await act(() => nextFrame());
+
+    expect(presetTabIds()).toEqual(order);
+    expect(store.getSnapshot().account.layoutPresetOrder).toEqual(['compose', 'custom-1', 'edit', 'video', 'automate']);
+  });
+
+  it('offers Customize in the active tab’s menu, and nothing that saves, reverts or deletes', async () => {
+    await act(() => store.commands.layout.setRegionSize('right', 401));
+    await renderStrip();
+    await act(() => settle(400));
+
+    // A view change is not unsaved work: there is nothing a locked account could save or revert.
+    expect(presetTab('compose')).toHaveAttribute('aria-label', 'Writing');
+    expect(presetTab('compose')?.querySelector('[data-unsaved-dot]')).toBeNull();
+
+    await act(() => userEvent.click(presetTab('compose')!, { button: 'right' }));
+    await expect.poll(() => document.querySelector('[role="menuitem"][data-value="customize"]'), POLL).not.toBeNull();
+    expect(
+      Array.from(document.querySelectorAll<HTMLElement>('[role="menuitem"]')).map((item) => item.dataset.value)
+    ).toEqual(['customize']);
+
+    await act(() => userEvent.click(document.querySelector<HTMLElement>('[role="menuitem"][data-value="customize"]')!));
+
+    expect(store.getSnapshot().customizing?.[store.getSnapshot().activeProject.id]?.presetId).toBe('compose');
+  });
+
+  it('makes a new workspace from this one and customizes the copy', async () => {
+    await renderStrip();
+
+    await act(() => userEvent.click(document.querySelector<HTMLElement>('button[aria-label="New workspace"]')!));
+
+    const { account, activeProject, customizing } = store.getSnapshot();
+    const copy = account.customLayoutPresets?.at(-1);
+
+    expect(copy?.label).toBe('topbar.presets.copyName');
+    expect(activeProject.layout.presetId).toBe(copy?.id);
+    expect(customizing?.[activeProject.id]?.presetId).toBe(copy?.id);
   });
 });

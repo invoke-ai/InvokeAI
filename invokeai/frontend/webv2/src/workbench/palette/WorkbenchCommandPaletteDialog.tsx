@@ -31,6 +31,8 @@ import {
   useWorkbenchQueries,
   useWorkbenchSelector,
 } from '@workbench/WorkbenchContext';
+import { isWorkspaceCommandAvailable } from '@workbench/workspace/structureLock';
+import { useStructureLock } from '@workbench/workspace/useStructureLock';
 import { useWorkspaceOpen } from '@workbench/workspace/useWorkspaceOpen';
 import { useCallback, useMemo, useSyncExternalStore } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -123,7 +125,7 @@ const WorkbenchCommandPaletteDialog = ({
   const paletteStore = extensions.stores.palette;
   const paletteContributions = useSyncExternalStore(paletteStore.subscribe, paletteStore.list, paletteStore.list);
   const commandTitleOverrides = useMemo(
-    () => getLayoutPresetCommandTitleOverrides(account, (name) => t('commandPalette.layoutPresetCommand', { name })),
+    () => getLayoutPresetCommandTitleOverrides(account, (name) => t('commandPalette.workspaceCommand', { name })),
     [account, t]
   );
 
@@ -145,11 +147,14 @@ const WorkbenchCommandPaletteDialog = ({
   }, [catalog, formatHotkey, getWidgetsForRegion, open, preferences.customHotkeys, t]);
   const commandStore = extensions.stores.commands;
   const commandContributions = useSyncExternalStore(commandStore.subscribe, commandStore.list, commandStore.list);
+  const { canEditStructure, isCustomizing } = useStructureLock();
+  // The palette offers what the command's hotkey would run: a locked workspace hides its structural commands.
   const isHandled = useMemo(() => {
     const handled = new Set(commandContributions.map(({ id }) => id));
+    const lock = { canEditStructure, isCustomizing };
 
-    return (commandId: string) => handled.has(commandId);
-  }, [commandContributions]);
+    return (commandId: string) => handled.has(commandId) && isWorkspaceCommandAvailable(commandId, lock);
+  }, [canEditStructure, commandContributions, isCustomizing]);
 
   const executeCommand = useCallback(
     (commandId: string) => {

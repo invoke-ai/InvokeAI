@@ -128,7 +128,7 @@ it('includes my workspace unless I turn it off, and remembers that choice for th
   try {
     await act(() => trigger.click());
     await expect.element(checkbox).toBeChecked();
-    await expect.element(checkbox).toHaveAccessibleDescription(/layout, generation settings, prompt history/);
+    await expect.element(checkbox).toHaveAccessibleDescription(/arrangement, generation settings, prompt history/);
     await expect
       .element(page.getByRole('checkbox', { name: 'Include font files' }))
       .toHaveAccessibleDescription(/install or replace fonts/);

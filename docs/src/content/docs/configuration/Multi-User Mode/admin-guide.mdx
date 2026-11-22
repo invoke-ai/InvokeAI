@@ -397,7 +397,7 @@ To restore, follow [Restore a backup](/start-here/upgrading/#restore-a-backup): 
 | Other computers cannot connect | Set `host: 0.0.0.0`, restart, and allow port 9090 (or your `port`) through the server's firewall. |
 | "Database is locked" | InvokeAI already uses write-ahead logging and waits 5 seconds for a lock. Another program is holding the database: an open `sqlite3` shell, a backup or sync tool. Find it with `fuser databases/invokeai.db` on Linux. Keep the database on a local disk: write-ahead logging may not engage on network file systems. |
 | Database update fails at startup | Set `log_level: debug` in `invokeai.yaml` and start again to see the error. With SQLite, the database was backed up first and each migration rolls back when it fails; see [Upgrading](/start-here/upgrading/) to restore the backup. With MySQL or MariaDB there is no automatic backup, and a failed migration's changes are not rolled back: it runs again from the start at the next start. Restore your own backup if it keeps failing. |
-| Slow on a large library | An administrator can run **Compact database** under **Settings → Data & workspace**. It can take a long time and pauses database activity while it runs. |
+| Slow on a large library | An administrator can run **Compact database** under **Settings → Workspaces & data**. It can take a long time and pauses database activity while it runs. |
 
 ## Not supported
 

@@ -36,6 +36,7 @@ import {
   useWorkbenchQueries,
   useWorkbenchSelector,
 } from '@workbench/WorkbenchContext';
+import { useCanEditStructure } from '@workbench/workspace/useStructureLock';
 import { getActiveAwayStage, goBackToStage } from '@workbench/workspace/workspaceNavigation';
 import { ArrowLeftIcon, CheckIcon, ChevronDownIcon, XIcon } from 'lucide-react';
 import { Activity, Suspense, useCallback, useMemo, useRef } from 'react';
@@ -191,9 +192,11 @@ export const CenterArea = () => {
     ? isRequiredCenterView(activeItem as WidgetRegionItem, centerViewItems.length)
     : true;
 
+  const canEditStructure = useCanEditStructure();
   const availableCenterItems = useMemo(
-    () => centerWidgetMenuItems.filter((item) => !item.isEnabled && item.status !== 'disabled'),
-    [centerWidgetMenuItems]
+    () =>
+      canEditStructure ? centerWidgetMenuItems.filter((item) => !item.isEnabled && item.status !== 'disabled') : [],
+    [canEditStructure, centerWidgetMenuItems]
   );
 
   return (
@@ -252,7 +255,7 @@ export const CenterArea = () => {
                 availableItems={availableCenterItems}
                 isCloseDisabled={isActiveViewRequired}
                 items={centerViewItems}
-                onClose={closeActiveCenterView}
+                onClose={canEditStructure ? closeActiveCenterView : undefined}
                 onOpen={openCenterWidget}
                 onSelect={selectCenterView}
               />
@@ -339,7 +342,8 @@ const CenterViewMenu = ({
   availableItems: WidgetEnableMenuItem[];
   isCloseDisabled: boolean;
   items: CenterWidgetItem[];
-  onClose: () => void;
+  /** Absent while the workspace is locked: closing a view removes it. */
+  onClose?: () => void;
   onOpen: (item: WidgetEnableMenuItem) => void;
   onSelect: (instanceId: string) => void;
 }) => {
@@ -420,7 +424,7 @@ const CenterViewMenu = ({
               </>
             ) : null}
 
-            {activeItem ? (
+            {activeItem && onClose ? (
               <>
                 <Menu.Separator borderColor="border.subtle" />
                 <Menu.Item disabled={isCloseDisabled} value="close-center-view" onClick={onClose}>
@@ -517,6 +521,7 @@ const FloatedCenterView = ({
   const { t } = useTranslation();
   const { widgets } = useWorkbenchCommands();
   const { focusFloating, focusRegion } = useWorkbenchFocus();
+  const canEditStructure = useCanEditStructure();
   const handleShow = useCallback(() => {
     widgets.revealFloating(instanceId);
     focusFloating(instanceId);
@@ -537,9 +542,11 @@ const FloatedCenterView = ({
         <Button variant="outline" onClick={handleShow}>
           {t('widgets.floating.showWindow')}
         </Button>
-        <Button variant="outline" onClick={handleDock}>
-          {dockLabel}
-        </Button>
+        {canEditStructure ? (
+          <Button variant="outline" onClick={handleDock}>
+            {dockLabel}
+          </Button>
+        ) : null}
       </HStack>
     </Flex>
   );

@@ -40,6 +40,8 @@ vi.mock('@workbench/WorkbenchContext', async (importOriginal) => ({
   useActiveProjectId: () => null,
   useActiveProjectSelector: (selector: (project: { queue: { items: never[] } }) => unknown) =>
     selector({ queue: { items: [] } }),
+  useWorkbenchCommands: () => ({}),
+  useWorkbenchQueries: () => ({}),
   useOptionalWorkbenchCommands: () => null,
   useOptionalWorkbenchPersistenceService: () => null,
 }));
@@ -73,7 +75,7 @@ import { WorkspaceSettings } from './CustomSettingsEditors';
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-describe('database maintenance in Data & workspace settings', () => {
+describe('database maintenance in Workspaces & data settings', () => {
   let host: HTMLDivElement;
   let root: Root;
   let queryClient: QueryClient;

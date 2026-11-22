@@ -106,6 +106,7 @@ import { createProjectId } from '@workbench/projects/ids';
 
 import type { InvocationRuntimeInputs } from './invocationContracts';
 import type { WorkbenchQueueItem as QueueItem } from './queueHistoryContracts';
+import type { CustomizeDraft } from './workspace/structureLock';
 import type { IsCenterView } from './workspace/workspaceDerivations';
 
 import {
@@ -277,6 +278,7 @@ import {
   PROJECT_SETTINGS_OWNER,
 } from './settings/projectSettings';
 import { enterWorkspace } from './workspace/entry';
+import { getCustomizeSession, pruneCustomizeSessions } from './workspace/structureLock';
 import { getWorkspaceJob } from './workspace/workspaceDerivations';
 
 interface QueueGenerateSnapshot {
@@ -321,6 +323,15 @@ type WorkbenchReducerAction =
   | { type: 'deleteLayoutPreset'; presetId: LayoutPresetId }
   | { type: 'resetActiveLayout' }
   | { type: 'revertLayoutPreset'; presetId: LayoutPresetId }
+  /** Customize the active project's workspace; its layout history starts afresh. */
+  | { type: 'beginCustomize' }
+  | { type: 'setCustomizeDraft'; draft: CustomizeDraft }
+  /** Lays out a built-in's shipped arrangement and marks the reset pending for Done. */
+  | { type: 'resetCustomizeToDefault' }
+  /** Locking: no project outside Customize keeps steps that would change structure on undo. */
+  | { type: 'clearLayoutHistory' }
+  /** Done (`revert: false`, after the caller saved) or Cancel (lays out the saved arrangement, no undo step). */
+  | { type: 'endCustomize'; revert: boolean }
   | { type: 'recoverShellLayout' }
   | { type: 'setInvocationSource'; sourceId: InvocationSourceId }
   | { type: 'setInvocationDestination'; destination: ResultDestination }
@@ -1867,7 +1878,13 @@ const undoProjectStep = (project: Project): Project => {
     ...restoreUndoSnapshot(project, undoEntry.project),
     undoRedo: {
       future: [
-        { createdAt: now(), id: createId('redo'), label: undoEntry.label, project: createUndoSnapshot(project) },
+        {
+          createdAt: now(),
+          ...(undoEntry.customizeReset ? { customizeReset: true as const } : {}),
+          id: createId('redo'),
+          label: undoEntry.label,
+          project: createUndoSnapshot(project),
+        },
         ...project.undoRedo.future,
       ].slice(0, HISTORY_LIMIT),
       past: project.undoRedo.past.slice(0, -1),
@@ -3091,6 +3108,12 @@ const enterArrivingProject = (state: WorkbenchState, context: WorkbenchReducerCo
     ? state
     : { ...enterActiveWorkspace(state, context), enteredProjectIds: [...enteredProjectIds, state.activeProjectId] };
 };
+
+/** Customize starts and ends on a fresh history, so no undo crosses its Done or Cancel to change structure. */
+const withoutLayoutHistory = (project: Project): Project =>
+  project.undoRedo.past.length === 0 && project.undoRedo.future.length === 0
+    ? project
+    : { ...project, undoRedo: { future: [], past: [] } };
 
 /** Revert: lays out the preset's saved arrangement, an undoable step; the route stays. */
 const revertActiveProjectLayoutPreset = (state: WorkbenchState, preset: LayoutPreset): WorkbenchState =>
@@ -4487,12 +4510,33 @@ const isSamePlacement = (left: Project, right: Project): boolean =>
     ]
   );
 
+/** Customize ends with its workspace: when the project closes or leaves it, or the workspace is deleted. */
+const reconcileCustomizeSessions = (previous: WorkbenchState, next: WorkbenchState): WorkbenchState => {
+  if (
+    !next.customizing ||
+    (next.customizing === previous.customizing &&
+      next.projects === previous.projects &&
+      next.account === previous.account)
+  ) {
+    return next;
+  }
+
+  const customizing = pruneCustomizeSessions(next.customizing, next.projects, (presetId) =>
+    doesLayoutPresetExist(next.account, presetId)
+  );
+
+  return customizing === next.customizing ? next : { ...next, customizing };
+};
+
 export const __workbenchReducerInternal = (
   state: WorkbenchState,
   action: WorkbenchReducerAction,
   context: WorkbenchReducerContext
 ): WorkbenchState => {
-  const reduced = reconcileCanvasStagingFollow(state, reduceWorkbenchAction(state, action, context));
+  const reduced = reconcileCustomizeSessions(
+    state,
+    reconcileCanvasStagingFollow(state, reduceWorkbenchAction(state, action, context))
+  );
   const next =
     reduced.activeProjectId === state.activeProjectId && reduced.enteredProjectIds === state.enteredProjectIds
       ? reduced
@@ -4885,6 +4929,88 @@ const reduceWorkbenchAction = (
         ...pushUndo(project, 'Update layout', { notice: { kind: 'discardCopy', presetId: action.presetId } }),
         presetWorkingLayouts: withoutPresetWorkingLayouts(project, (presetId) => presetId === action.presetId),
       }));
+    }
+    case 'beginCustomize': {
+      const activeProject = state.projects.find((project) => project.id === state.activeProjectId);
+
+      if (!activeProject || state.customizing?.[activeProject.id]?.presetId === activeProject.layout.presetId) {
+        return state;
+      }
+
+      return {
+        ...updateActiveProject(state, withoutLayoutHistory),
+        customizing: {
+          ...state.customizing,
+          [activeProject.id]: {
+            draft: {},
+            entry: createLayoutPresetSnapshot(activeProject),
+            presetId: activeProject.layout.presetId,
+          },
+        },
+      };
+    }
+    case 'resetCustomizeToDefault': {
+      const session = state.customizing?.[state.activeProjectId];
+
+      if (!session || !isBuiltInLayoutPresetId(session.presetId)) {
+        return state;
+      }
+
+      // Lays out the shipped arrangement as one undoable step that carries the reset: it is pending while that step is
+      // in the past, so Undo withdraws it and Redo brings it back. The account keeps its overrides until Done.
+      return {
+        ...updateActiveProject(state, (project) => {
+          const stepped = pushUndo(project, 'Update layout');
+          const past = stepped.undoRedo.past.map((entry, index, entries) =>
+            index === entries.length - 1 ? { ...entry, customizeReset: true as const } : entry
+          );
+
+          return applyLayoutPresetToProject(
+            { ...stepped, undoRedo: { ...stepped.undoRedo, past } },
+            getLayoutPreset(session.presetId)
+          );
+        }),
+        customizing: { ...state.customizing, [state.activeProjectId]: { ...session, draft: {} } },
+      };
+    }
+    case 'setCustomizeDraft': {
+      const session = state.customizing?.[state.activeProjectId];
+
+      return session
+        ? {
+            ...state,
+            customizing: {
+              ...state.customizing,
+              [state.activeProjectId]: { ...session, draft: { ...session.draft, ...action.draft } },
+            },
+          }
+        : state;
+    }
+    case 'clearLayoutHistory': {
+      const projects = state.projects.map((project) =>
+        getCustomizeSession(state.customizing, project) ? project : withoutLayoutHistory(project)
+      );
+
+      return projects.every((project, index) => project === state.projects[index]) ? state : { ...state, projects };
+    }
+    case 'endCustomize': {
+      const { [state.activeProjectId]: session, ...customizing } = state.customizing ?? {};
+
+      if (!session) {
+        return state;
+      }
+
+      const preset = getAvailableLayoutPreset(state, session.presetId);
+
+      // Cancel returns to what was on screen at entry, unsaved arrangement included, not to the saved workspace.
+      return {
+        ...updateActiveProject(state, (project) =>
+          withoutLayoutHistory(
+            action.revert ? applyLayoutPresetToProject(project, { ...preset, snapshot: session.entry }) : project
+          )
+        ),
+        customizing,
+      };
     }
     case 'recoverShellLayout': {
       return updateActiveLayout(state, (layout) => ({
@@ -6421,6 +6547,7 @@ const reduceWorkbenchAction = (
               ...project.undoRedo.past,
               {
                 createdAt: now(),
+                ...(redoEntry.customizeReset ? { customizeReset: true as const } : {}),
                 id: createId('undo'),
                 label: redoEntry.label,
                 project: createUndoSnapshot(project),
@@ -6485,6 +6612,15 @@ const reduceWorkbenchAction = (
         activeProjectId: state.activeProjectId === action.projectId ? project.id : state.activeProjectId,
         // The same project under its new id: already on screen, not arriving.
         enteredProjectIds: state.enteredProjectIds?.map((id) => (id === action.projectId ? project.id : id)),
+        customizing:
+          state.customizing?.[action.projectId] === undefined
+            ? state.customizing
+            : Object.fromEntries(
+                Object.entries(state.customizing).map(([id, session]) => [
+                  id === action.projectId ? project.id : id,
+                  session,
+                ])
+              ),
         projects: state.projects.some((candidate) => candidate.id === action.projectId)
           ? state.projects.map((candidate) => (candidate.id === action.projectId ? project : candidate))
           : [...state.projects, project],

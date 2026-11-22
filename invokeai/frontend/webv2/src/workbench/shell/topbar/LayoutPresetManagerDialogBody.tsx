@@ -9,14 +9,15 @@ import { Tooltip } from '@platform/ui/Tooltip';
 import { getOrderedLayoutPresets } from '@workbench/layoutPresetCollection';
 import { getLayoutPresetLabel } from '@workbench/layoutPresets';
 import { useWorkbenchCommands, useWorkbenchSelector } from '@workbench/WorkbenchContext';
-import { PencilIcon, RotateCcwIcon, Trash2Icon } from 'lucide-react';
+import { getActiveWorkspaceTab } from '@workbench/workspace/workspaceNavigation';
+import { RotateCcwIcon, Trash2Icon } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { resolveLayoutPresetIcon } from './layoutPresetIcons';
-import { closeLayoutPresetManager, openLayoutPresetDelete, openLayoutPresetEdit } from './layoutPresetManagerStore';
+import { closeLayoutPresetManager, openLayoutPresetDelete } from './layoutPresetManagerStore';
 
-/** The account-wide layout preset editor, rendered lazily from the top bar. */
+/** The account's workspaces: their order, a built-in's default, deleting a custom one. Rendered lazily. */
 export const LayoutPresetManagerDialogBody = ({
   isOpen,
   onExitComplete,
@@ -50,7 +51,14 @@ export const LayoutPresetManagerDialogBody = ({
   }, []);
 
   return (
-    <Dialog.Root lazyMount open={isOpen} unmountOnExit onExitComplete={onExitComplete} onOpenChange={handleOpenChange}>
+    <Dialog.Root
+      finalFocusEl={getReturnFocus}
+      lazyMount
+      open={isOpen}
+      unmountOnExit
+      onExitComplete={onExitComplete}
+      onOpenChange={handleOpenChange}
+    >
       <Portal>
         <Dialog.Backdrop />
         <Dialog.Positioner>
@@ -91,10 +99,16 @@ export const LayoutPresetManagerDialogBody = ({
   );
 };
 
+/**
+ * Back to the Customize bar's Manage button; when that is gone (the workspace being customized was deleted, or a menu
+ * opened the list), to the active workspace's tab.
+ */
+const getReturnFocus = (): HTMLElement | null =>
+  document.querySelector<HTMLElement>('[data-manage-workspaces]') ?? getActiveWorkspaceTab();
+
 const PresetRow = ({ isOverridden, preset }: { isOverridden: boolean; preset: LayoutPreset }) => {
   const { t } = useTranslation();
   const { layout } = useWorkbenchCommands();
-  const edit = useCallback(() => openLayoutPresetEdit(preset.id), [preset.id]);
   const deletePreset = useCallback(() => openLayoutPresetDelete(preset.id), [preset.id]);
   const restoreDefault = useCallback(() => layout.restorePresetDefault(preset.id), [layout, preset.id]);
 
@@ -102,15 +116,6 @@ const PresetRow = ({ isOverridden, preset }: { isOverridden: boolean; preset: La
     <SortableListItem
       actions={
         <>
-          <IconButton
-            aria-label={t('topbar.presets.editNamed', { name: preset.label })}
-            size="sm"
-            tooltip={t('topbar.presets.edit')}
-            variant="ghost"
-            onClick={edit}
-          >
-            <Icon as={PencilIcon} boxSize="3.5" />
-          </IconButton>
           {isOverridden ? (
             <Tooltip content={t('topbar.presets.restore')} showArrow>
               <IconButton
