@@ -27,6 +27,7 @@ import {
   getComponentSectionPolicy,
   getDefaultComponentSlotPolicies,
   getDefaultGenerateSettings,
+  getGenerateInvocationIssues,
   getGenerateModelSelectionResult,
   getGenerationDimensions,
   getGenerationModelAvailabilityReasons,
@@ -48,6 +49,7 @@ import {
   isLossyModelSwitch,
   isModelFromRepo,
   isSupportedGenerateModel,
+  needsEmptyCanvasFrameForReferenceBudget,
   type NewReferenceImage,
   type ReferenceVisionComponents,
 } from './baseGenerationPolicies';
@@ -580,6 +582,50 @@ describe('component policies', () => {
         'External Model supports at most 2048×1536.'
       );
     }
+  });
+
+  it('warns when only visible Canvas content would exceed the reference budget', () => {
+    const model: GenerateModelConfig = {
+      ...externalModel,
+      provider_id: 'seedream',
+      provider_model_id: 'seedream-4-5-251128',
+      capabilities: { modes: ['txt2img', 'img2img'], supports_reference_images: true, max_reference_images: 14 },
+    };
+    const settings = createSettings(model, {
+      referenceImages: Array.from({ length: 14 }, (_, i) => ({
+        id: `reference-${i}`,
+        isEnabled: true,
+        config: {
+          type: 'external_reference_image',
+          image: {
+            imageName: `reference-${i}.png`,
+            width: 512,
+            height: 512,
+            original: { image: { image_name: `reference-${i}.png`, width: 512, height: 512 } },
+          },
+        },
+      })),
+    });
+    const values = { ...settings, model };
+    expect(needsEmptyCanvasFrameForReferenceBudget(model, settings)).toBe(true);
+    expect(getGenerateInvocationIssues(values, { canvasFrame: { height: 512, width: 512 } })).toEqual([]);
+    expect(getGenerateInvocationIssues(values)).toEqual([]);
+    expect(getGenerationValidationReasons(model, settings, 'img2img')).toEqual([
+      'External Model supports at most 15 images total (reference + init + output), got 16.',
+    ]);
+    expect(needsEmptyCanvasFrameForReferenceBudget({ ...model, capabilities: { modes: ['txt2img'] } }, settings)).toBe(
+      false
+    );
+    settings.referenceImages[0]!.isEnabled = false;
+    expect(needsEmptyCanvasFrameForReferenceBudget(model, settings)).toBe(false);
+    settings.referenceImages.push(
+      { ...settings.referenceImages[1]!, id: 'extra-1' },
+      { ...settings.referenceImages[2]!, id: 'extra-2' }
+    );
+    expect(needsEmptyCanvasFrameForReferenceBudget(model, settings)).toBe(false);
+    expect(getGenerateInvocationIssues({ ...settings, model }).map(({ message }) => message)).toContain(
+      'External Model supports at most 15 images total (reference + init + output), got 16.'
+    );
   });
 
   it('keeps concepts but clears incompatible selections when the selected model changes', () => {
