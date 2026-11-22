@@ -15,6 +15,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import accelerate
+import safetensors.torch
 import torch
 
 from invokeai.backend.anima.anima_transformer import AnimaTransformer
@@ -26,6 +27,7 @@ from invokeai.backend.model_manager.load.load_default import (
 )
 from invokeai.backend.model_manager.load.model_loaders.anima import AnimaCheckpointModel
 from invokeai.backend.model_manager.taxonomy import SubModelType
+from tests.fixtures.safetensors_files import record_reads, served_checkpoint
 
 # Every cast-eligible module in the real Anima graph that the declared patterns protect. Pinned
 # exhaustively rather than as a substring check, so both a rename (entries disappear) and an
@@ -104,7 +106,6 @@ def test_single_file_loader_applies_fp8_layerwise_casting(monkeypatch, tmp_path)
     `tests/backend/model_manager` and `tests/backend/anima` suites green — nothing else observes
     it — so the dead toggle can come straight back with CI passing.
     """
-    import safetensors.torch
 
     import invokeai.backend.anima.anima_transformer as anima_transformer_module
 
@@ -118,7 +119,10 @@ def test_single_file_loader_applies_fp8_layerwise_casting(monkeypatch, tmp_path)
     )
 
     monkeypatch.setattr(anima_transformer_module, "AnimaTransformer", _TinyAnimaTransformer)
-    monkeypatch.setattr(safetensors.torch, "load_file", lambda _path: {"weight": torch.ones(2, 2)})
+    monkeypatch.setattr(
+        "invokeai.backend.model_manager.load.model_loaders.anima.load_safetensors_checkpoint",
+        served_checkpoint({"weight": torch.ones(2, 2)}),
+    )
     # The stand-in state dict has no DiT blocks to read a depth from, and the tiny model takes no config.
     monkeypatch.setattr(
         "invokeai.backend.model_manager.load.model_loaders.anima.anima_transformer_config", lambda _sd: {}
@@ -151,3 +155,47 @@ def test_single_file_loader_applies_fp8_layerwise_casting(monkeypatch, tmp_path)
     assert isinstance(model, _TinyAnimaTransformer)
     assert torch.equal(model.weight, torch.ones(2, 2))
     assert cast_calls == [(config, SubModelType.Transformer)]
+
+
+def test_an_all_in_ones_vae_text_encoder_and_exporter_metadata_are_never_read(monkeypatch, tmp_path) -> None:
+    """A ComfyUI bundle carries the VAE and text encoder under namespaces of their own, and exporters add sampling
+    schedules and derived buffers. Read through ``pread`` they would cost their size in process memory only to be
+    dropped."""
+    import invokeai.backend.anima.anima_transformer as anima_transformer_module
+
+    transformer = {"model.diffusion_model.weight": torch.ones(2, 2).to(torch.float8_e4m3fn)}
+    elsewhere = {
+        "first_stage_model.decoder.conv.weight": torch.ones(8, 8),
+        "cond_stage_model.layers.0.weight": torch.ones(8, 8),
+        "model.diffusion_model.pos_embedder.seq": torch.arange(4.0),
+        "model.diffusion_model.blocks.0.rope.inv_freq": torch.ones(4),
+        "model_sampling.sigmas": torch.ones(4),
+    }
+    checkpoint_path = tmp_path / "anima.safetensors"
+    safetensors.torch.save_file({**transformer, **elsewhere}, str(checkpoint_path))
+    monkeypatch.setattr(anima_transformer_module, "AnimaTransformer", _TinyAnimaTransformer)
+    monkeypatch.setattr(
+        "invokeai.backend.model_manager.load.model_loaders.anima.anima_transformer_config", lambda _sd: {}
+    )
+    monkeypatch.setattr(
+        "invokeai.backend.model_manager.load.model_loaders.anima.TorchDevice.choose_torch_device",
+        lambda: torch.device("cpu"),
+    )
+    monkeypatch.setattr(
+        "invokeai.backend.model_manager.load.model_loaders.anima.TorchDevice.choose_anima_inference_dtype",
+        lambda _device: torch.float32,
+    )
+    loader = object.__new__(AnimaCheckpointModel)
+    loader._ram_cache = SimpleNamespace(make_room=MagicMock())
+    loader._apply_fp8_layerwise_casting = lambda model, _config, _submodel: model
+    loader._torch_device = torch.device("cpu")
+    loader._logger = MagicMock()
+    log = record_reads(monkeypatch)
+
+    loader._load_from_singlefile(
+        Main_Checkpoint_Anima_Config.model_construct(
+            path=str(checkpoint_path), default_settings=MainModelDefaultSettings()
+        )
+    )
+
+    assert set(log.tensors) == set(transformer)
