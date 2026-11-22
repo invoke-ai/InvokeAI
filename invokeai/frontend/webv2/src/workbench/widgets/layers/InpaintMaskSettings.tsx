@@ -13,19 +13,10 @@ import {
   reportMaskEdit,
   useStructuralPreview,
 } from '@workbench/widgets/canvas/useStructuralCommit';
+import { MASK_FILL_STYLES } from '@workbench/widgets/layers/layerOps';
 import { PaletteIcon } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-
-const MASK_FILL_STYLES: readonly CanvasMaskFillContract['style'][] = [
-  'solid',
-  'grid',
-  'crosshatch',
-  'diagonal_left',
-  'diagonal',
-  'horizontal',
-  'vertical',
-];
 
 interface InpaintMaskSettingsProps {
   engine: (CanvasStructuralEngine & CanvasPreparedEngine & ColorSamplerEngine) | null;

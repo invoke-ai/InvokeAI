@@ -64,6 +64,17 @@ export const CANVAS_BLEND_MODES: readonly CanvasBlendMode[] = [
   'luminosity',
 ];
 
+/** Fill styles in the order every mask and region menu lists them. */
+export const MASK_FILL_STYLES: readonly CanvasMaskFillContract['style'][] = [
+  'solid',
+  'grid',
+  'crosshatch',
+  'diagonal_left',
+  'diagonal',
+  'horizontal',
+  'vertical',
+];
+
 /** Mints a fresh layer id (matches the engine's `createLayerId` shape). */
 export const createLayerId = (): string => createItemId('layer');
 

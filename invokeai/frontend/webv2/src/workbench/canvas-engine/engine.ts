@@ -498,11 +498,18 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   const groupSurfaces = rasterController.groups;
   const getGroupSurface: NonNullable<CompositeOptions['groupSurface']> = (scope, members, matrices, content) =>
     groupSurfaces.get(scope, members, matrices, content);
-  /** Picking and the picker's loupe see the same adjusted, derived and grouped pixels as the display. */
+  /** Picking and the picker's loupe see the same adjusted, derived and grouped pixels and mask hatch as the display. */
   const colorSampleProviders: ColorSampleProviders = {
     adjustedSurface: getAdjustedSurface,
     derivedSurfaces: derivedSurfaceCache,
     groupSurface: getGroupSurface,
+    maskPatterns: {
+      screen: () => {
+        const dpr = viewport.getDpr();
+        return { dpr, view: viewport.viewMatrix(dpr) };
+      },
+      tile: getMaskPatternTile,
+    },
   };
 
   const strokeListeners = new Set<(event: StrokeCommittedEvent) => void>();

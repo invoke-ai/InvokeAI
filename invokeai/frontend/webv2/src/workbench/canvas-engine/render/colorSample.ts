@@ -7,6 +7,8 @@
 import type { CanvasDocumentContractV3 } from '@workbench/canvas-engine/contracts';
 import type { Mat2d, Vec2 } from '@workbench/canvas-engine/types';
 
+import { applyToPoint } from '@workbench/canvas-engine/math/mat2d';
+
 import type { LayerCacheStore } from './layerCache';
 import type { RasterBackend, RasterSurface } from './raster';
 
@@ -20,7 +22,17 @@ export interface RgbaSample {
   a: number;
 }
 
-export type ColorSampleProviders = Pick<CompositeOptions, 'adjustedSurface' | 'derivedSurfaces' | 'groupSurface'>;
+/** The viewport's patterned-mask drawing; the hatch is laid out in screen space, so samples need its phase. */
+export interface ColorSampleMaskPatterns {
+  readonly tile: NonNullable<CompositeOptions['maskPatternTile']>;
+  /** The viewport's current backing scale and document-to-device matrix. */
+  readonly screen: () => { dpr: number; view: Mat2d };
+}
+
+export type ColorSampleProviders = Pick<CompositeOptions, 'adjustedSurface' | 'derivedSurfaces' | 'groupSurface'> & {
+  /** Absent draws patterned masks solid. */
+  maskPatterns?: ColorSampleMaskPatterns;
+};
 
 const RAW_PIXELS: ColorSampleProviders = {};
 
@@ -58,10 +70,28 @@ const sampleAt = (data: Uint8ClampedArray, offset: number): RgbaSample | null =>
   return alpha === 0 ? null : { a: alpha, b: data[offset + 2] ?? 0, g: data[offset + 1] ?? 0, r: data[offset] ?? 0 };
 };
 
+/** Where the viewport's hatch lands on a sample scratch. */
+interface HatchPlacement {
+  dpr: number;
+  /** The viewport device pixel at scratch pixel (0, 0). */
+  origin: Vec2;
+}
+
+const sameHatch = (a: HatchPlacement | null, b: HatchPlacement | null): boolean =>
+  a === b || (!!a && !!b && a.dpr === b.dpr && a.origin.x === b.origin.x && a.origin.y === b.origin.y);
+
 /** A sampler that keeps its scratch, draw plan and last sample across a picking gesture. */
 export const createColorSampler = (backend: RasterBackend): ColorSampler => {
   let preparation: CompositePreparation | null = null;
   const scratches = new Map<number, RasterSurface>();
+  // Grows to the largest area sampled; patterned masks stencil through it.
+  let stencil: RasterSurface | null = null;
+  const getStencil = (width: number, height: number): RasterSurface => {
+    if (!stencil || stencil.width < width || stencil.height < height) {
+      stencil = backend.createSurface(Math.max(width, stencil?.width ?? 0), Math.max(height, stencil?.height ?? 0));
+    }
+    return stencil;
+  };
   interface Last {
     doc: CanvasDocumentContractV3;
     layers: LayerCacheStore;
@@ -69,6 +99,7 @@ export const createColorSampler = (backend: RasterBackend): ColorSampler => {
     providers: ColorSampleProviders;
     px: number;
     py: number;
+    hatch: HatchPlacement | null;
     area: ColorSampleArea;
   }
   const lastBySize = new Map<number, Last>();
@@ -86,6 +117,17 @@ export const createColorSampler = (backend: RasterBackend): ColorSampler => {
     if (!Number.isFinite(px) || !Number.isFinite(py)) {
       return null;
     }
+    const half = (size - 1) / 2;
+    const view: Mat2d = { a: 1, b: 0, c: 0, d: 1, e: half - px, f: half - py };
+    const { maskPatterns, ...compositeProviders } = providers;
+    const screen = maskPatterns?.screen();
+    const device = screen && applyToPoint(screen.view, docPoint);
+    // The sampled pixel reads the hatch at the device pixel under the pointer, matching the viewport exactly;
+    // neighbors follow at device rather than document spacing.
+    const hatch: HatchPlacement | null =
+      screen && device
+        ? { dpr: screen.dpr, origin: { x: Math.floor(device.x) - half, y: Math.floor(device.y) - half } }
+        : null;
     const revision = layers.revision();
     const last = lastBySize.get(size);
     if (
@@ -94,7 +136,8 @@ export const createColorSampler = (backend: RasterBackend): ColorSampler => {
       last.revision === revision &&
       last.providers === providers &&
       last.px === px &&
-      last.py === py
+      last.py === py &&
+      sameHatch(last.hatch, hatch)
     ) {
       return last.area;
     }
@@ -104,15 +147,19 @@ export const createColorSampler = (backend: RasterBackend): ColorSampler => {
       scratch = backend.createSurface(size, size);
       scratches.set(size, scratch);
     }
-    const half = (size - 1) / 2;
-    preparation = reusePreparation(preparation, doc, { backend, ...providers });
-    const view: Mat2d = { a: 1, b: 0, c: 0, d: 1, e: half - px, f: half - py };
+    preparation = reusePreparation(preparation, doc, { backend, ...compositeProviders });
     // Omitting checkerboard and staged previews keeps empty space transparent.
-    compositeDocument(scratch, doc, layers, view, { backend, ...providers, preparation });
+    compositeDocument(scratch, doc, layers, view, {
+      backend,
+      ...compositeProviders,
+      ...(maskPatterns &&
+        hatch && { maskPatternTile: maskPatterns.tile, screenMask: { ...hatch, getScratch: getStencil } }),
+      preparation,
+    });
 
     const { data } = scratch.ctx.getImageData(half, half, 1, 1);
     const area: ColorSampleArea = { center: sampleAt(data, 0), pixels: scratch };
-    lastBySize.set(size, { area, doc, layers, providers, px, py, revision });
+    lastBySize.set(size, { area, doc, layers, providers, px, py, revision, hatch });
     return area;
   };
 

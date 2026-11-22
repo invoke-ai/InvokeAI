@@ -9,7 +9,7 @@ import type {
 import type { CanvasDiagnostics } from '@workbench/canvas-engine/diagnostics';
 import type { SemanticLeaf } from '@workbench/canvas-engine/document-model/semanticLeaf';
 import type { OverlayStackKind } from '@workbench/canvas-engine/document/layerStacks';
-import type { FrameDamage, Mat2d, Rect } from '@workbench/canvas-engine/types';
+import type { FrameDamage, Mat2d, Rect, Vec2 } from '@workbench/canvas-engine/types';
 
 import { compileDocumentLeaves, lookupDocumentLeaf } from '@workbench/canvas-engine/document-model/documentModel';
 import {
@@ -69,8 +69,11 @@ export interface CompositeOptions {
   skipLayerId?: string | null;
   /** Null means direct solid fill; without a provider only solid fills render. */
   maskPatternTile?: ((style: string, color: string) => RasterSurface | null) | null;
-  /** The viewport supplies its backing scale and owns the scratch used to stencil screen-space patterns. */
-  screenMask?: { dpr: number; getScratch: (width: number, height: number) => RasterSurface };
+  /**
+   * The viewport supplies its backing scale and owns the scratch used to stencil screen-space patterns. `origin` is the
+   * viewport device pixel at target pixel (0, 0), for an off-screen target such as a color sample; the viewport omits it.
+   */
+  screenMask?: { dpr: number; origin?: Vec2; getScratch: (width: number, height: number) => RasterSurface };
   /** Display-only: pixel-consuming composites must omit them, or the tint becomes generated content. */
   regionOverlays?: boolean;
   /** Layer-local output bounds, drawn through the layer transform. */
@@ -471,10 +474,12 @@ export const compositeDocument = (
 
       // Fill in viewport CSS coordinates so damage and layer transforms cannot shift the pattern.
       stencil.imageSmoothingEnabled = true;
-      stencil.setTransform(dpr, 0, 0, dpr, -area.x, -area.y);
+      const deviceX = area.x + (opts.screenMask.origin?.x ?? 0);
+      const deviceY = area.y + (opts.screenMask.origin?.y ?? 0);
+      stencil.setTransform(dpr, 0, 0, dpr, -deviceX, -deviceY);
       stencil.globalCompositeOperation = 'source-in';
       stencil.fillStyle = stencil.createPattern(tile.canvas, 'repeat') ?? fill.color;
-      stencil.fillRect(area.x / dpr, area.y / dpr, area.width / dpr, area.height / dpr);
+      stencil.fillRect(deviceX / dpr, deviceY / dpr, area.width / dpr, area.height / dpr);
       stencil.restore();
 
       ctx.save();
