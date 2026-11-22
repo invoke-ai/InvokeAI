@@ -16,7 +16,7 @@ from invokeai.backend.wan.extensions.wan_ref_image_extension import (
 def _make_fake_vae(z_dim: int = 16, spatial_scale: int = 8, temporal_scale: int = 4) -> MagicMock:
     """Stand-in for ``AutoencoderKLWan`` that returns deterministic latents.
 
-    ``encode(pixel)`` returns a fake distribution whose ``sample()`` yields
+    ``encode(pixel)`` returns a fake distribution whose ``mode()`` yields
     a tensor sized exactly as the real Wan VAE would: ``[B, z_dim, T_lat, H/8, W/8]``.
     """
     vae = MagicMock()
@@ -38,7 +38,7 @@ def _make_fake_vae(z_dim: int = 16, spatial_scale: int = 8, temporal_scale: int 
         latents = torch.zeros(b, z_dim, t_lat, h_lat, w_lat, dtype=pixel.dtype)
 
         dist = MagicMock()
-        dist.sample = MagicMock(return_value=latents)
+        dist.mode = MagicMock(return_value=latents)
         # The pipeline does ``vae.encode(...)[0]`` for non-dict returns.
         return (dist,) if return_dict is False else MagicMock(latent_dist=dist)
 
