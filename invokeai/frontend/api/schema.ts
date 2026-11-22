@@ -25310,7 +25310,7 @@ export type components = {
          *         download_proxy: Optional HTTP proxy for model downloads. The proxy must enforce the public-address policy because proxy-side DNS cannot be checked by InvokeAI.
          *         unsafe_disable_picklescan: UNSAFE. Disable the picklescan security check during model installation. Recommended only for development and testing purposes. This will allow arbitrary code execution during model installation, so should never be used in production.
          *         allow_unknown_models: Allow installation of models that we are unable to identify. If enabled, models will be marked as `unknown` in the database, and will not have any metadata associated with them. If disabled, unknown models will be rejected during installation.
-         *         multiuser: Enable multiuser support. When disabled, the application runs in single-user mode using a default system account with administrator privileges. When enabled, requires user authentication and authorization.
+         *         multiuser: Enable multiuser support (the default). Requires user authentication and authorization; the first visitor creates the administrator account. Set to false for single-user mode, which uses a default system account with administrator privileges and no sign-in: anyone who can reach the server then has full control of it. Single-user mode is deprecated.
          *         strict_password_checking: Enforce strict password requirements. When True, passwords must contain uppercase, lowercase, and numbers. When False (default), any password is accepted but its strength (weak/moderate/strong) is reported to the user.
          *         image_index_enabled: Maintain a semantic embedding index of gallery images and videos, used by the image map and semantic search features.
          *         image_index_model: Name of the installed CLIP Vision or SigLIP model used to embed gallery images and video thumbnails. Changing the model discards embeddings computed by the previous model.
@@ -25901,8 +25901,8 @@ export type components = {
             allow_unknown_models?: boolean;
             /**
              * Multiuser
-             * @description Enable multiuser support. When disabled, the application runs in single-user mode using a default system account with administrator privileges. When enabled, requires user authentication and authorization.
-             * @default false
+             * @description Enable multiuser support (the default). Requires user authentication and authorization; the first visitor creates the administrator account. Set to false for single-user mode, which uses a default system account with administrator privileges and no sign-in: anyone who can reach the server then has full control of it. Single-user mode is deprecated.
+             * @default true
              */
             multiuser?: boolean;
             /**
@@ -32826,6 +32826,13 @@ export type components = {
              * @description Store weights in FP8 to reduce VRAM usage (~50% savings). Weights are cast to compute dtype during inference.
              */
             fp8_storage?: boolean | null;
+            /**
+             * Components
+             * @description Default component models for this main model, keyed by the component slot name Generate reads, e.g. `t5_encoder`, `qwen3_encoder` or `component_source` (the component source of Qwen Image, Wan and similar families, which graphs record under their own metadata names); values are model keys. The default VAE lives in `vae`.
+             */
+            components?: {
+                [key: string]: string;
+            } | null;
         };
         /**
          * Main Model - SD1.5, SD2
@@ -40612,7 +40619,8 @@ export type components = {
          *     area cap of 768x1344. "768 lowres" pins the LONG edge to 768 instead, giving a
          *     canvas with roughly half the pixels for non-square ratios (e.g. a 2:3 source becomes
          *     512x768 instead of 768x1152) — faster and cheaper, at some cost in fidelity since it
-         *     is below the model's training resolution. Both presets round each axis to the
+         *     is below the model's training resolution. "480p" and "544p" target shorter edges
+         *     under the native area cap (16:9 gives 864x480 and 960x544). All presets round each axis to the
          *     nearest multiple of 32. Only the aspect ratio of the inputs matters. Aspect ratios
          *     beyond 1:4 / 4:1 are rejected. Wire from ``Image Primitive``'s width/height outputs
          *     and into the width/height of ``Prompt - MiniMax H3``, ``Frame Conditioning - MiniMax
@@ -40650,11 +40658,11 @@ export type components = {
             height?: number;
             /**
              * Target Resolution
-             * @description Canvas preset. '768 highres' is H3's native policy (short edge 768, soft cap 768x1344). '768 lowres' pins the long edge to 768 for smaller, faster test renders (e.g. 512x768 from a 2:3 source) at some cost in fidelity.
+             * @description Canvas preset. '768 highres' is H3's native policy (short edge 768, soft cap 768x1344). '768 lowres' pins the long edge to 768 for smaller, faster test renders (e.g. 512x768 from a 2:3 source) at some cost in fidelity. 480p and 544p target a shorter edge under the same area cap for draft renders.
              * @default 768 highres
              * @enum {string}
              */
-            target_resolution?: "768 highres" | "768 lowres";
+            target_resolution?: "768 highres" | "768 lowres" | "480p" | "544p";
             /**
              * type
              * @default minimax_h3_ideal_dimensions
@@ -50844,6 +50852,12 @@ export type components = {
              * @description Email of the first active admin user, if any
              */
             admin_email?: string | null;
+            /**
+             * Has Single User Work
+             * @description Whether work made in single-user mode exists that new accounts will not see; only during setup
+             * @default false
+             */
+            has_single_user_work?: boolean;
         };
         /**
          * Show Image

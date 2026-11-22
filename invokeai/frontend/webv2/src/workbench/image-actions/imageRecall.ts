@@ -14,6 +14,8 @@ import {
   clampAnimaInpaintAdapterWeight,
   clampDimension,
   clampPidSteps,
+  DEFAULT_COMPONENT_SLOTS,
+  type DefaultComponentSlot,
   cloneGenerateWidgetValues,
   isIdeogram4SamplerPreset,
   deriveAspectRatioId,
@@ -24,6 +26,7 @@ import {
   getGenerateModelSelectionResult,
   getGenerationUiPolicy,
   isComponentCompatibleWithModel,
+  getModelDefaultComponents,
   getSettingsWithModelDefaults,
   isKnownScheduler,
   isLoraCompatibleWithModel,
@@ -145,6 +148,8 @@ export interface ImageRecallSkip {
 }
 
 export interface ImageRecallResult {
+  /** The component settings recall set from the image, an explicit empty one included; a pick it rejected is not. */
+  appliedComponents: DefaultComponentSlot['setting'][];
   fields: RecalledField[];
   skipped: ImageRecallSkip[];
   values: GenerateWidgetValues;
@@ -884,27 +889,8 @@ const getMetadataFlux3PromptUpsampler = (
   return getString(metadata, 'generation_mode')?.startsWith('flux3_') ? { flux3PromptUpsamplerEnabled: false } : {};
 };
 
-type RecalledComponentSetting = keyof Pick<
-  GenerateWidgetValues,
-  | 'animaInpaintAdapterModel'
-  | 'clipEmbedModel'
-  | 'clipGEmbedModel'
-  | 'clipLEmbedModel'
-  | 'componentSourceModel'
-  | 'flux3PromptUpsamplerModel'
-  | 'gemma2EncoderModel'
-  | 'ideogram4UnconditionalModel'
-  | 'mistralEncoderModel'
-  | 'pidDecoderModel'
-  | 'qwen3EncoderModel'
-  | 'qwen3VLEncoderModel'
-  | 'qwen3VLVisionTowerModel'
-  | 'qwen35EncoderModel'
-  | 'qwenVLEncoderModel'
-  | 't5EncoderModel'
-  | 'wanLowNoiseModel'
-  | 'wanT5EncoderModel'
->;
+/** The component source is not recalled by its slot key: only its per-family names below recall it. */
+type RecalledComponentSetting = DefaultComponentSlot['setting'];
 
 interface RecalledComponent {
   metadataKey: string;
@@ -912,28 +898,22 @@ interface RecalledComponent {
   isMainModel?: true;
 }
 
-/** Remix silently drops a key missing here. The first recorded key wins. */
+/**
+ * Remix silently drops a key missing here. The first recorded key wins for a shared setting. Slots a model stores
+ * defaults for share their metadata key with them; the component source is recorded under per-family names, listed
+ * first.
+ */
 const RECALLED_COMPONENTS: readonly RecalledComponent[] = [
   { isMainModel: true, metadataKey: 'qwen3_source', setting: 'componentSourceModel' },
   { isMainModel: true, metadataKey: 'qwen_image_component_source', setting: 'componentSourceModel' },
   { isMainModel: true, metadataKey: 'wan_component_source', setting: 'componentSourceModel' },
-  { isMainModel: true, metadataKey: 'ideogram4_unconditional_model', setting: 'ideogram4UnconditionalModel' },
-  { isMainModel: true, metadataKey: 'wan_transformer_low_noise', setting: 'wanLowNoiseModel' },
-  { metadataKey: 'anima_inpaint_adapter', setting: 'animaInpaintAdapterModel' },
-  { metadataKey: 'clip_embed_model', setting: 'clipEmbedModel' },
-  { metadataKey: 'clip_g_model', setting: 'clipGEmbedModel' },
-  { metadataKey: 'clip_l_model', setting: 'clipLEmbedModel' },
-  { metadataKey: 'flux3_prompt_upsampler', setting: 'flux3PromptUpsamplerModel' },
-  { metadataKey: 'gemma2_encoder', setting: 'gemma2EncoderModel' },
-  { metadataKey: 'mistral_encoder', setting: 'mistralEncoderModel' },
-  { metadataKey: 'pid_decoder', setting: 'pidDecoderModel' },
-  { metadataKey: 'qwen3_encoder', setting: 'qwen3EncoderModel' },
-  { metadataKey: 'qwen3_vl_encoder', setting: 'qwen3VLEncoderModel' },
-  { metadataKey: 'qwen3_vl_vision_tower', setting: 'qwen3VLVisionTowerModel' },
-  { metadataKey: 'qwen3_5_encoder', setting: 'qwen35EncoderModel' },
-  { metadataKey: 'qwen_image_qwen_vl_encoder', setting: 'qwenVLEncoderModel' },
-  { metadataKey: 't5_encoder', setting: 't5EncoderModel' },
-  { metadataKey: 'wan_t5_encoder_model', setting: 'wanT5EncoderModel' },
+  ...DEFAULT_COMPONENT_SLOTS.filter((slot) => slot.setting !== 'componentSourceModel').map(
+    ({ isMainModel, persistenceKey, setting }) => ({
+      ...(isMainModel ? { isMainModel } : {}),
+      metadataKey: persistenceKey,
+      setting,
+    })
+  ),
 ];
 
 const getRecalledComponent = (
@@ -1511,14 +1491,22 @@ export const buildImageRecallSettings = ({
   let values: GenerateWidgetValues = cloneGenerateWidgetValues(currentValues);
   let restoredProviderSize = false;
   let referenceRecall: ReturnType<typeof readMetadataReferenceImages> | null = null;
+  const appliedComponents: RecalledComponentSetting[] = [];
 
   if (kind === 'all' || kind === 'remix') {
     const model = getSupportedMetadataModel(metadata, supportedModels);
 
     if (model) {
       const valuesWithModelDefaults = getSettingsWithModelDefaults(values, model);
-      const vae = getRecallDefaultVae(resolveModelDefaultVae(model, valuesWithModelDefaults, vaeModels));
-      values = { ...valuesWithModelDefaults, model, ...(vae === undefined ? {} : { vae }) };
+      // The recorded components below override these, and the default VAE is chosen after them. A generation record
+      // names what ran, so it takes no saved default over a component it left out.
+      values = {
+        ...valuesWithModelDefaults,
+        model,
+        ...(isGenerationRecord(metadata)
+          ? {}
+          : getModelDefaultComponents(model, valuesWithModelDefaults, models, { replace: true })),
+      };
       fields.push('model');
     }
 
@@ -1526,7 +1514,7 @@ export const buildImageRecallSettings = ({
     const recordedSettings = Object.keys(componentPatch) as RecalledComponentSetting[];
     const effectiveModel = values.model;
     // Skip components that do not fit, judged beside those already restored (a Vision Tower depends on a GGUF encoder).
-    const fittingSettings: RecalledComponentSetting[] = [];
+    const fittingSettings = appliedComponents;
 
     for (const setting of recordedSettings) {
       const component = componentPatch[setting];
@@ -1535,6 +1523,13 @@ export const buildImageRecallSettings = ({
         values = { ...values, [setting]: component };
         fittingSettings.push(setting);
       }
+    }
+
+    if (model) {
+      // Judged beside the recorded components: a component source bundles the VAE the default VAE then falls back to,
+      // and an image that cleared that source has none.
+      const defaultVae = getRecallDefaultVae(resolveModelDefaultVae(model, values, vaeModels));
+      values = { ...values, ...(defaultVae === undefined ? {} : { vae: defaultVae }) };
     }
 
     const rebalancePatch = getMetadataKrea2Rebalance(metadata, values.model);
@@ -1754,7 +1749,7 @@ export const buildImageRecallSettings = ({
     skipped.length > 0 ||
     ((kind === 'all' || kind === 'remix') &&
       (hasCanvasRecall(metadata) || referenceRecall?.partial || (referenceRecall?.names.length ?? 0) > 0))
-    ? { fields, skipped, values }
+    ? { appliedComponents, fields, skipped, values }
     : null;
 };
 

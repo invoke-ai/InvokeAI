@@ -683,33 +683,30 @@ describe('Transform tool options', () => {
       expect(labels, `one visible ${text} label, without a duplicate heading`).toHaveLength(1);
       return labels[0]!;
     };
-    const position = visibleLabel('Position');
-    const scale = visibleLabel('Scale');
-    const rotation = visibleLabel('Rotation');
+    const rows = ['Position', 'Size', 'Rotation'].map(visibleLabel);
     const resample = visibleLabel('Resample Mode');
-    const x = page.getByRole('spinbutton', { exact: true, name: 'X' }).element().getBoundingClientRect();
-    const w = page.getByRole('spinbutton', { exact: true, name: 'W %' }).element().getBoundingClientRect();
-    const angle = page.getByRole('spinbutton', { exact: true, name: 'Rotation' }).element().getBoundingClientRect();
-    expect(Math.abs(x.left - w.left)).toBeLessThan(1);
-    expect(Math.abs(x.left - angle.left)).toBeLessThan(1);
+    const fields = ['X', 'W', 'Rotation'].map((name) =>
+      page.getByRole('spinbutton', { exact: true, name }).element().getBoundingClientRect()
+    );
     const centerY = (rect: DOMRect) => rect.top + rect.height / 2;
-    expect(Math.abs(centerY(position.getBoundingClientRect()) - centerY(x))).toBeLessThan(1);
-    expect(Math.abs(centerY(scale.getBoundingClientRect()) - centerY(w))).toBeLessThan(1);
-    expect(Math.abs(centerY(rotation.getBoundingClientRect()) - centerY(angle))).toBeLessThan(1);
-    const positionRow = position.parentElement!.getBoundingClientRect();
-    const scaleRow = scale.parentElement!.getBoundingClientRect();
-    const rotationRow = rotation.parentElement!.getBoundingClientRect();
-    const positionToScale = scaleRow.top - positionRow.bottom;
-    const scaleToRotation = rotationRow.top - scaleRow.bottom;
-    expect(positionToScale).toBeGreaterThan(0);
-    expect(
-      Math.abs(positionToScale - scaleToRotation),
-      'equal space between the actual geometry row edges'
-    ).toBeLessThan(1);
+    fields.forEach((field, index) => {
+      expect(Math.abs(field.left - fields[0]!.left)).toBeLessThan(1);
+      expect(Math.abs(centerY(rows[index]!.getBoundingClientRect()) - centerY(field))).toBeLessThan(1);
+    });
+    const gaps = fields.slice(1).map((rect, index) => rect.top - fields[index]!.bottom);
+    expect(gaps[0]).toBeGreaterThan(0);
+    for (const gap of gaps) {
+      expect(Math.abs(gap - gaps[0]!), 'equal space between the geometry rows').toBeLessThan(1);
+    }
     expect(resample.scrollWidth).toBeLessThanOrEqual(resample.clientWidth);
-    expect(
-      page.getByRole('spinbutton', { exact: true, name: 'Y' }).element().getBoundingClientRect().right
-    ).toBeLessThanOrEqual(tool.getBoundingClientRect().right);
+    const right = tool.getBoundingClientRect().right;
+    const rightEdges = [
+      ...['Y', 'H'].map((name) => page.getByRole('spinbutton', { exact: true, name })),
+      ...[/^Reference point/, /aspect ratio$/, /^Flip vertical$/].map((name) => page.getByRole('button', { name })),
+    ].map((control) => control.element().getBoundingClientRect().right);
+    for (const edge of rightEdges) {
+      expect(edge).toBeLessThanOrEqual(right);
+    }
   });
 
   it('places resampling above Position in the actual tool form and edits the active session', async () => {
@@ -734,7 +731,7 @@ describe('Transform tool options', () => {
       await userEvent.fill(tool.getByRole('spinbutton', { exact: true, name: 'X' }), '40');
       await userEvent.keyboard('{Enter}');
     });
-    expect(engine!.interaction.get('transformSession')).toMatchObject({ layerId: 'l0', transform: { x: 40 } });
+    expect(engine!.interaction.get('transformSession')).toMatchObject({ layerId: 'l0', transform: { x: 8, y: 0 } });
     expect(direct).not.toHaveBeenCalled();
     await act(() => userEvent.click(tool.getByRole('button', { name: 'Fit to Frame', exact: true })));
     expect(engine!.interaction.get('transformSession')).toMatchObject({
@@ -768,7 +765,7 @@ describe('Transform tool options', () => {
       engine!.stores.transformSession.set({ ...engine!.interaction.get('transformSession')!, processing: true })
     );
     await expect.element(page.getByRole('spinbutton', { exact: true, name: 'X' })).toBeDisabled();
-    await expect.element(page.getByRole('spinbutton', { exact: true, name: 'W %' })).toBeDisabled();
+    await expect.element(page.getByRole('spinbutton', { exact: true, name: 'W' })).toBeDisabled();
     await expect.element(page.getByRole('button', { exact: true, name: 'Fit to Frame' })).toBeDisabled();
     await expect.element(page.getByRole('button', { exact: true, name: 'Apply' })).toBeDisabled();
     await expect.element(page.getByRole('button', { exact: true, name: 'Cancel' })).toBeEnabled();
@@ -799,6 +796,68 @@ describe('Transform tool options', () => {
 });
 
 describe('Transform pane', () => {
+  it('sizes by expression with the aspect link, reads X and Y at the reference point, and flips in place', async () => {
+    await mount(TransformPane, 'layer');
+    harness.appliesMutations = true;
+    await act(() => {
+      harness.project = applyCanvasProjectMutation(harness.project!, {
+        type: 'updateCanvasLayerSource',
+        id: 'l0',
+        source: { type: 'paint', bitmap: { imageName: 'test.png', width: 100, height: 50 } },
+      });
+      harness.listeners.forEach((listener) => listener());
+    });
+    const width = page.getByRole('spinbutton', { exact: true, name: 'W' });
+    const height = page.getByRole('spinbutton', { exact: true, name: 'H' });
+    const x = page.getByRole('spinbutton', { exact: true, name: 'X' });
+    const y = page.getByRole('spinbutton', { exact: true, name: 'Y' });
+    const typeInto = (field: typeof width, text: string) =>
+      act(async () => {
+        await userEvent.tripleClick(field);
+        await userEvent.keyboard(`${text}{Enter}`);
+      });
+    await expect.element(height).toHaveValue('50');
+    await expect.element(x).toHaveValue('42.29');
+    await expect.element(y).toHaveValue('45.91');
+
+    await typeInto(width, '50%');
+    await expect.element(width).toHaveValue('50');
+    await expect.element(height).toHaveValue('25');
+    await typeInto(height, '*4');
+    await expect.element(height).toHaveValue('100');
+    await expect.element(width).toHaveValue('200');
+    const layer = () => getDocumentLayer(engine!.document.getDocument()!, 'l0')!;
+    expect(layer().transform).toMatchObject({ rotation: 0.5, scaleX: 2, scaleY: 2 });
+    expect(engine!.history.getEntries().past).toEqual(['Transform layer', 'Transform layer']);
+    const { x: originX, y: originY } = layer().transform;
+    const centre = (t: { rotation: number; scaleX: number; scaleY: number; x: number; y: number }) => ({
+      x: t.x + Math.cos(t.rotation) * 50 * t.scaleX - Math.sin(t.rotation) * 25 * t.scaleY,
+      y: t.y + Math.sin(t.rotation) * 50 * t.scaleX + Math.cos(t.rotation) * 25 * t.scaleY,
+    });
+    expect(centre(layer().transform).x).toBeCloseTo(42.2935, 3);
+    expect(centre(layer().transform).y).toBeCloseTo(45.9109, 3);
+    await expect.element(x).toHaveValue('42.29');
+    await expect.element(y).toHaveValue('45.91');
+
+    await act(() => userEvent.click(page.getByRole('button', { name: 'Reference point: Center' })));
+    await act(() => userEvent.click(page.getByRole('radio', { name: 'Top left' })));
+    await expect.element(x).toHaveValue(String(Math.round(originX * 100) / 100));
+    await expect.element(y).toHaveValue(String(Math.round(originY * 100) / 100));
+
+    await act(() => userEvent.click(page.getByRole('button', { name: 'Flip horizontal' })));
+    expect(layer().transform).toMatchObject({ rotation: -0.5, scaleX: -2, scaleY: 2 });
+
+    await act(async () => {
+      await userEvent.tripleClick(width);
+      const clipboardData = new DataTransfer();
+      clipboardData.setData('text', '50%');
+      width.element().dispatchEvent(new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData }));
+    });
+    await expect.element(width).toHaveValue('50');
+    await act(() => userEvent.keyboard('{Enter}'));
+    await expect.element(width).toHaveValue('100');
+  });
+
   it('keeps resampling controls in the tool options rather than layer properties', async () => {
     await mount(TransformPane, 'layer');
     expect(page.getByRole('checkbox', { name: 'Smoothing' }).query()).toBeNull();

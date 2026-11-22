@@ -1,5 +1,5 @@
-import type { GalleryItemRef } from '@features/gallery/contracts';
-import type { GalleryProjectRef, GalleryUiAdapter } from '@features/gallery/react';
+import type { GalleryItem, GalleryItemRef } from '@features/gallery/contracts';
+import type { GalleryItemContextMenuRequest, GalleryProjectRef, GalleryUiAdapter } from '@features/gallery/react';
 import type { ProjectLibrarySnapshot } from '@workbench/projects/library';
 import type { ReactNode } from 'react';
 
@@ -8,6 +8,7 @@ import { GalleryUiProvider } from '@features/gallery/react';
 import { useAuthSession } from '@features/identity';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
+import { ApiError } from '@platform/transport/http';
 import { useWorkbenchFocus } from '@workbench/focusRegions';
 import { useProjectLibrarySelector } from '@workbench/projects/library';
 import { getProjectSyncSnapshot } from '@workbench/projects/syncStore';
@@ -30,8 +31,10 @@ import {
   useWorkbenchQueries,
   useWorkbenchSelector,
 } from '@workbench/WorkbenchContext';
-import { lazy, useMemo } from 'react';
+import { lazy, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+
+import { createGalleryItemMenu, GalleryItemMenuSlot } from './galleryItemMenu';
 
 const EMPTY_WIDGET_VALUES: Record<string, unknown> = Object.freeze({});
 
@@ -62,6 +65,8 @@ const GalleryItemActionsAdapter = lazy(() =>
 const GalleryImageContextMenu = lazy(() =>
   import('./GalleryImageActionsBridge').then((module) => ({ default: module.GalleryImageContextMenu }))
 );
+const loadGalleryItemMenu = (ref: GalleryItemRef, item: GalleryItem | undefined, signal: AbortSignal) =>
+  import('./GalleryImageActionsBridge').then((module) => module.loadGalleryItemMenu(ref, item, signal));
 
 export const GalleryUiAdapterProvider = ({ children }: { children: ReactNode }) => {
   const { projectId, projectName, galleryValues, generateValues, liveFollowEnabled } = useWorkbenchSelector(
@@ -78,7 +83,7 @@ export const GalleryUiAdapterProvider = ({ children }: { children: ReactNode }) 
   const boardSharing = useAuthSession().multiuserEnabled;
   const { gallery, notifications, widgets } = useWorkbenchCommands();
   const notify = useNotify();
-  const { t } = useTranslation();
+  const { i18n, t } = useTranslation();
   const queries = useWorkbenchQueries();
   const accountScope = captureAccountScope();
   const exportProject = useExportLibraryProject();
@@ -89,9 +94,30 @@ export const GalleryUiAdapterProvider = ({ children }: { children: ReactNode }) 
   const projects = useProjectLibrarySelector(selectGalleryProjects, areGalleryProjectsEqual);
   const store = useWorkbenchInternalStore();
   const persistence = useWorkbenchPersistenceService();
+  const [itemMenu] = useState(() => createGalleryItemMenu({ load: loadGalleryItemMenu }));
+  // Stable, unlike the adapter: media surfaces subscribe to the opener alone.
+  const [openItemContextMenu] = useState(() => (request: GalleryItemContextMenuRequest) => {
+    const requestProjectId = queries.getSnapshot().activeProject.id;
+
+    itemMenu.open(request, {
+      isCurrent: () => queries.isActiveProject(requestProjectId),
+      onFailure: (error) =>
+        notifications.reportError({
+          area: 'gallery-item-menu',
+          message: i18n.t(
+            error instanceof ApiError && (error.status === 403 || error.status === 404)
+              ? 'widgets.gallery.itemMenu.unavailable'
+              : 'widgets.gallery.itemMenu.loadFailed'
+          ),
+          namespace: 'gallery',
+        }),
+    });
+  });
   // Preload row dependencies here to avoid a second fetch wave after the gallery mounts.
   useMountEffect(() => {
     void import('./GalleryImageActionsBridge');
+
+    return itemMenu.dispose;
   });
   const adapter = useMemo<GalleryUiAdapter>(
     () => ({
@@ -199,6 +225,7 @@ export const GalleryUiAdapterProvider = ({ children }: { children: ReactNode }) 
         reportError: notifications.reportError,
         undoable: (title, notice) => notify.undoable(title, { ...notice, projectId }),
       },
+      openItemContextMenu,
       projectId,
       projectName,
       projects,
@@ -230,6 +257,7 @@ export const GalleryUiAdapterProvider = ({ children }: { children: ReactNode }) 
       livePreview,
       notifications,
       notify,
+      openItemContextMenu,
       openWorkbenchWidget,
       persistence,
       projectId,
@@ -242,5 +270,10 @@ export const GalleryUiAdapterProvider = ({ children }: { children: ReactNode }) 
     ]
   );
 
-  return <GalleryUiProvider adapter={adapter}>{children}</GalleryUiProvider>;
+  return (
+    <GalleryUiProvider adapter={adapter}>
+      {children}
+      <GalleryItemMenuSlot generateValues={generateValues} menu={itemMenu} projectId={projectId} />
+    </GalleryUiProvider>
+  );
 };

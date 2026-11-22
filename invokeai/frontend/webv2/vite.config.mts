@@ -351,6 +351,7 @@ const GALLERY_STATE_MODULES = [
   '/features/gallery/core/settings.ts',
   '/features/gallery/react.ts',
   '/features/gallery/ui/GalleryUiContext.tsx',
+  '/platform/react/contextMenuPoint.ts',
   '/features/gallery/ui/GalleryMediaUsagePanel.tsx',
   '/features/gallery/ui/galleryStateView.ts',
   '/features/queue/contracts.ts',
