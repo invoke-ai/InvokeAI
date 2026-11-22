@@ -107,7 +107,7 @@ class MiniMaxH3AdaLNOverlay(torch.nn.Module):
         the file's curve table, if it is an AdaLN-pruned checkpoint.
         """
         file_path, start_block, end_block, include_final_layer = cls._parse_selection_path(path)
-        with safe_open(file_path, framework="pt", device="cpu") as f:
+        with safe_open(file_path, framework="pt", device="cpu", backend="pread") as f:
             keys = set(f.keys())
             file_blocks = [int(m.group(1)) for key in keys if (m := _BLOCK_KEY_RE.match(key))]
             if not file_blocks or _FINAL_ADALN_KEY + "weight" not in keys:
