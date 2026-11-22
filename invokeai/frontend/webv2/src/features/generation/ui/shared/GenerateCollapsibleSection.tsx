@@ -5,6 +5,7 @@ import type { KeyboardEvent, MouseEvent, ReactNode } from 'react';
 import { Box, Collapsible, Flex, Icon, Menu, Portal, Stack, Text } from '@chakra-ui/react';
 import { useGenerationUi } from '@features/generation/ui/GenerationUiContext';
 import { canCopyText, copyText } from '@platform/browser/clipboard';
+import { getContextMenuPoint } from '@platform/react/contextMenuPoint';
 import { MenuContent, MenuItem, useContextMenu } from '@platform/ui/Menu';
 import { ChevronRightIcon, CircleAlertIcon } from 'lucide-react';
 import { useCallback, useId, useState } from 'react';
@@ -220,11 +221,6 @@ export const GenerateCollapsibleSection = ({
     const trigger = event.currentTarget;
     const root = trigger.parentElement!;
     const sections = panelSections();
-    // A keyboard-opened menu has no pointer position of its own (see `GenerateFieldContextMenu`).
-    const native = event.nativeEvent as Partial<PointerEvent>;
-    const fromKeyboard =
-      event.button === -1 || native.pointerType === '' || (event.clientX === 0 && event.clientY === 0);
-    const rect = trigger.getBoundingClientRect();
 
     setMenuFacts({
       anyFolded: sections.some((entry) => !isPanelSectionOpen(entry)),
@@ -232,11 +228,10 @@ export const GenerateCollapsibleSection = ({
       root,
     });
     open({
+      ...getContextMenuPoint(event),
       // A frame late: Zag focuses the menu a frame after a highlight, and a pick within that frame would otherwise land
       // focus back in the closing menu.
       restoreFocus: () => requestAnimationFrame(() => trigger.focus()),
-      x: fromKeyboard ? rect.left : event.clientX,
-      y: fromKeyboard ? rect.bottom : event.clientY,
     });
   };
 
