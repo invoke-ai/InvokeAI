@@ -4,7 +4,6 @@ import { Dialog } from '@platform/ui/Dialog';
 import { firstPartyHotkeyCatalog } from '@workbench/hotkeys/catalog';
 import { formatHotkeyForPlatform, MOD_KEY_LABEL } from '@workbench/hotkeys/keys';
 import { useWorkbenchPreferences } from '@workbench/settings/store';
-import { openWidgetPlacement } from '@workbench/widgetPlacementCommands';
 import { getWidgetsForRegion } from '@workbench/widgetRegistry';
 import { lazy, Suspense } from 'react';
 
@@ -44,7 +43,6 @@ const MountedWorkbenchCommandPalette = ({
         getWidgetsForRegion={getWidgetsForRegion}
         isOpen={isOpen}
         modifierKeyLabel={MOD_KEY_LABEL}
-        openWidgetPlacement={openWidgetPlacement}
         preferences={preferences}
         requestQueueItemReveal={requestQueueItemReveal}
         settingsEntryDeps={SETTINGS_ENTRY_DEPS}

@@ -35,6 +35,7 @@ const useSnapshot = <Selected,>(
   isEqual: (a: Selected, b: Selected) => boolean = shallowEqual
 ) => useExternalStoreSelector(store().subscribe, store().getSnapshot, select, isEqual);
 
+vi.mock('@workbench/workspace/useWorkspaceOpen', () => ({ useWorkspaceOpen: () => vi.fn() }));
 vi.mock('@workbench/WorkbenchContext', async (importOriginal) => ({
   ...(await importOriginal<typeof WorkbenchContextModule>()),
   useActiveProjectId: () => useSnapshot((snapshot) => snapshot.activeProject.id),

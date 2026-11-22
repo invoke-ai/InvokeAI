@@ -88,7 +88,7 @@ vi.mock('@workbench/settings/store', async (importOriginal) => ({
   useWorkbenchPreferenceSelector: () => false,
 }));
 vi.mock('@workbench/image-actions/useFindGalleryItem', () => ({ useFindGalleryItem: () => noop }));
-vi.mock('@workbench/useOpenWorkbenchWidget', () => ({ useOpenWorkbenchWidget: () => noop }));
+vi.mock('@workbench/workspace/useWorkspaceOpen', () => ({ useWorkspaceOpen: () => noop }));
 vi.mock('@workbench/WorkbenchContext', () => ({
   useActiveProjectSelector: (selector: (project: Project) => unknown) =>
     selector(useSyncExternalStore(store.subscribe, store.getSnapshot).activeProject),

@@ -1,44 +1,14 @@
-import type { WidgetRegion } from '@workbench/layoutContracts';
 import type { Project } from '@workbench/projectContracts';
-import type {
-  NormalizedWidgetManifest,
-  RegisteredWidget,
-  WidgetInstanceContract,
-  WidgetTypeId,
-} from '@workbench/widgetContracts';
+import type { WidgetInstanceContract, WidgetTypeId } from '@workbench/widgetContracts';
 import type { WorkbenchAction } from '@workbench/workbenchState.testing';
 import type { WorkbenchWidgetCommands } from '@workbench/workbenchStore';
 
 import { DEFAULT_LOGGING_CONFIG } from '@platform/logging/contracts';
 import { configureLogging, getLogSnapshot, resetLogging } from '@platform/logging/logger';
 import { createExtensionRegistry } from '@workbench/extensions/extensionRegistry';
-import { createWidgetImplementationResource } from '@workbench/widgetImplementationResource';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { cloneWidgetRuntimeState, createWidgetRuntime, getProjectWidgetRuntimeState } from './createWidgetRuntime';
-
-const TestIcon = () => null;
-const TestView = () => null;
-
-const createWidget = (
-  overrides: Partial<NormalizedWidgetManifest> & Pick<NormalizedWidgetManifest, 'id' | 'label'>
-): RegisteredWidget => ({
-  implementation: createWidgetImplementationResource(overrides.id, () => Promise.resolve({ view: TestView })),
-  manifest: {
-    apiVersion: 1,
-    allowMultiple: false,
-    allowedRegions: ['left', 'right', 'center', 'bottom'],
-    bottomPanel: 'expandable',
-    centerPlacement: 'view',
-    failurePolicy: { isolateRenderFailure: true, onRegistrationFailure: 'disable' },
-    icon: TestIcon,
-    load: () => Promise.resolve({ view: TestView }),
-    state: { createInitial: () => ({}), persistence: 'project', version: 1 },
-    version: 1,
-    ...overrides,
-  },
-  status: 'enabled',
-});
 
 const createInstance = (id = 'alpha', typeId: WidgetTypeId = 'alpha'): WidgetInstanceContract => ({
   createdAt: '2026-01-01T00:00:00.000Z',
@@ -58,6 +28,7 @@ const createDispatch = () => {
       dispatch({ instanceId, keys, projectId, type: 'clearWidgetInstanceValues' }),
     dockFloating: (instanceId) => dispatch({ instanceId, type: 'dockFloatingWidget' }),
     closeFloating: (instanceId) => dispatch({ instanceId, type: 'closeFloatingWidget' }),
+    front: (options) => dispatch({ ...options, type: 'frontRegionWidget' }),
     float: (instanceId, region) =>
       dispatch(region ? { instanceId, region, type: 'floatWidget' } : { instanceId, type: 'floatWidget' }),
     raiseFloating: (instanceId) => dispatch({ instanceId, type: 'raiseFloatingWidget' }),
@@ -87,11 +58,6 @@ const createStateApi = () => ({
   set: vi.fn(),
   useSelector: vi.fn(),
 });
-
-const createRegistry =
-  (widgetsByRegion: Partial<Record<WidgetRegion, RegisteredWidget[]>>) =>
-  (region: WidgetRegion): RegisteredWidget[] =>
-    widgetsByRegion[region] ?? [];
 
 const createPlacementProject = (
   overrides: Partial<Pick<Project, 'widgetInstances' | 'widgetRegions'>> = {}
@@ -139,8 +105,7 @@ describe('createWidgetRuntime', () => {
     const runtime = createWidgetRuntime({
       extensions: createExtensionRegistry(),
       widgets,
-      getWidgetById: () => undefined,
-      getWidgetsForRegion: createRegistry({}),
+      open: vi.fn(),
       instance: createInstance(),
       project: createPlacementProject(),
       region: 'right',
@@ -161,8 +126,7 @@ describe('createWidgetRuntime', () => {
     const runtime = createWidgetRuntime({
       extensions: createExtensionRegistry(),
       widgets,
-      getWidgetById: () => undefined,
-      getWidgetsForRegion: createRegistry({}),
+      open: vi.fn(),
       instance: createInstance('workflow:center', 'workflow'),
       project: createPlacementProject(),
       region: 'center',
@@ -186,67 +150,12 @@ describe('createWidgetRuntime', () => {
     ]);
   });
 
-  it('opens widgets through canonical validation and seeded initial values', () => {
-    const { actions, widgets } = createDispatch();
-    const createInitial = vi.fn(() => ({ seeded: true }));
-    const runtime = createWidgetRuntime({
-      extensions: createExtensionRegistry(),
-      widgets,
-      getWidgetById: () => undefined,
-      getWidgetsForRegion: createRegistry({
-        bottom: [createWidget({ bottomPanel: 'tooltip', id: 'tooltip-widget', label: 'Tooltip Widget' })],
-        center: [createWidget({ centerPlacement: 'toolbar', id: 'toolbar-widget', label: 'Toolbar Widget' })],
-        right: [
-          createWidget({
-            id: 'panel-widget',
-            label: 'Panel Widget',
-            state: { createInitial, persistence: 'project', version: 1 },
-          }),
-        ],
-      }),
-      instance: createInstance(),
-      project: createPlacementProject(),
-      region: 'right',
-      state: createStateApi(),
-    });
-
-    expect(runtime.workbench.openWidget('panel-widget', { preferredRegions: ['right'] })).toEqual({
-      ok: true,
-      region: 'right',
-    });
-    expect(runtime.workbench.openWidget('tooltip-widget', { preferredRegions: ['bottom'] })).toEqual({
-      ok: false,
-      reason: 'unavailable',
-    });
-    expect(runtime.workbench.openWidget('toolbar-widget', { preferredRegions: ['center'] })).toEqual({
-      ok: false,
-      reason: 'unavailable',
-    });
-    expect(runtime.workbench.openWidget('missing-widget', { preferredRegions: ['right'] })).toEqual({
-      ok: false,
-      reason: 'unavailable',
-    });
-
-    expect(createInitial).toHaveBeenCalledTimes(1);
-    expect(actions).toEqual([
-      {
-        createNew: undefined,
-        initialValues: { seeded: true },
-        projectId: 'project-1',
-        region: 'right',
-        type: 'openRegionWidget',
-        widgetId: 'panel-widget',
-      },
-    ]);
-  });
-
-  it('dispatches own-region close and reveal actions', () => {
+  it('reveals an instance of its own region', () => {
     const { actions, widgets } = createDispatch();
     const runtime = createWidgetRuntime({
       extensions: createExtensionRegistry(),
       widgets,
-      getWidgetById: (typeId) => createWidget({ id: typeId, label: typeId }),
-      getWidgetsForRegion: createRegistry({}),
+      open: vi.fn(),
       instance: createInstance(),
       project: createPlacementProject({
         widgetRegions: {
@@ -261,20 +170,17 @@ describe('createWidgetRuntime', () => {
     });
 
     expect(runtime.workbench.revealWidgetInstance('beta')).toEqual({ ok: true, region: 'bottom' });
-    expect(runtime.workbench.closeWidgetInstance('beta')).toEqual({ ok: true, region: 'bottom' });
     expect(actions).toEqual([
       { projectId: 'project-1', region: 'bottom', type: 'selectRegionWidget', widgetId: 'beta' },
-      { projectId: 'project-1', region: 'bottom', type: 'toggleRegionWidget', widgetId: 'beta' },
     ]);
   });
 
-  it('returns unsupported for cross-region close and reveal', () => {
+  it('returns unsupported for a reveal in another region', () => {
     const { actions, widgets } = createDispatch();
     const runtime = createWidgetRuntime({
       extensions: createExtensionRegistry(),
       widgets,
-      getWidgetById: () => undefined,
-      getWidgetsForRegion: createRegistry({}),
+      open: vi.fn(),
       instance: createInstance(),
       project: createPlacementProject(),
       region: 'right',
@@ -282,7 +188,6 @@ describe('createWidgetRuntime', () => {
     });
 
     expect(runtime.workbench.revealWidgetInstance('beta')).toEqual({ ok: false, reason: 'unsupported' });
-    expect(runtime.workbench.closeWidgetInstance('beta')).toEqual({ ok: false, reason: 'unsupported' });
     expect(actions).toEqual([]);
   });
 
@@ -292,8 +197,7 @@ describe('createWidgetRuntime', () => {
     const alphaRuntime = createWidgetRuntime({
       extensions,
       widgets,
-      getWidgetById: () => undefined,
-      getWidgetsForRegion: createRegistry({}),
+      open: vi.fn(),
       instance: createInstance('alpha', 'test-widget'),
       project: createPlacementProject(),
       region: 'right',
@@ -302,8 +206,7 @@ describe('createWidgetRuntime', () => {
     const betaRuntime = createWidgetRuntime({
       extensions,
       widgets,
-      getWidgetById: () => undefined,
-      getWidgetsForRegion: createRegistry({}),
+      open: vi.fn(),
       instance: createInstance('beta', 'test-widget'),
       project: createPlacementProject(),
       region: 'right',
@@ -333,8 +236,7 @@ describe('createWidgetRuntime', () => {
     const projectOneRuntime = createWidgetRuntime({
       extensions,
       widgets,
-      getWidgetById: () => undefined,
-      getWidgetsForRegion: createRegistry({}),
+      open: vi.fn(),
       instance: createInstance('alpha', 'test-widget'),
       project: createPlacementProject({}),
       region: 'right',
@@ -343,8 +245,7 @@ describe('createWidgetRuntime', () => {
     const projectTwoRuntime = createWidgetRuntime({
       extensions,
       widgets,
-      getWidgetById: () => undefined,
-      getWidgetsForRegion: createRegistry({}),
+      open: vi.fn(),
       instance: createInstance('alpha', 'test-widget'),
       project: { ...createPlacementProject({}), projectId: 'project-2' },
       region: 'right',
@@ -374,8 +275,7 @@ describe('createWidgetRuntime', () => {
     const runtime = createWidgetRuntime({
       extensions,
       widgets,
-      getWidgetById: () => undefined,
-      getWidgetsForRegion: createRegistry({}),
+      open: vi.fn(),
       instance: createInstance('alpha', 'test-widget'),
       project: createPlacementProject(),
       region: 'right',

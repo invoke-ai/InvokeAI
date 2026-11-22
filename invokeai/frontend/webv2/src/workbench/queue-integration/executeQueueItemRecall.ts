@@ -2,8 +2,8 @@ import type { ModelConfig } from '@features/models';
 import type { QueueGenerationMeta } from '@features/queue/contracts';
 import type { ImageRecallKind } from '@workbench/image-actions';
 import type * as CanvasRecallModule from '@workbench/image-actions/canvasRecall';
-import type { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
 import type { WorkbenchCommands, WorkbenchQueries } from '@workbench/workbenchStore';
+import type { OpenInWorkspace } from '@workbench/workspace/workspaceNavigation';
 import type { TFunction } from 'i18next';
 
 import { isSupportedGenerateModel } from '@features/generation/settings';
@@ -25,7 +25,7 @@ import {
 export interface QueueItemRecallContext {
   commands: WorkbenchCommands;
   notify: { info(title: string, description?: string): void; success(title: string, description?: string): void };
-  openWidget: ReturnType<typeof useOpenWorkbenchWidget>;
+  open: OpenInWorkspace;
   queries: WorkbenchQueries;
   t: TFunction;
 }
@@ -52,7 +52,7 @@ export const executeQueueItemRecall = async ({
   /** Null when this browser kept no snapshot for the item. */
   snapshot: LocalRecallSnapshot | null;
 }): Promise<void> => {
-  const { commands, notify, openWidget, queries, t } = context;
+  const { commands, notify, open, queries, t } = context;
   const { generation, widgets } = commands;
   const owner = captureAccountScope();
   const originalProject = queries.getSnapshot().activeProject;
@@ -95,7 +95,7 @@ export const executeQueueItemRecall = async ({
 
   if (plan.target === 'video') {
     widgets.patchValues('video', plan.patch);
-    openWidget('video', { preferredRegions: ['left'] });
+    open({ surface: 'panel', typeId: 'video' });
     notify.success(getImageRecallTitle(kind, t), t('widgets.queue.settingsRecalledIntoVideoDescription'));
     return;
   }
@@ -184,7 +184,7 @@ export const executeQueueItemRecall = async ({
       );
     }
     generation.setSettings(plan.values, originalProject.id);
-    openWidget('generate', { preferredRegions: ['left'] });
+    open({ surface: 'panel', typeId: 'generate' });
     notify.success(getImageRecallTitle(kind, t), t('widgets.queue.settingsRecalledDescription'));
   } finally {
     releaseCanvasRecall?.();

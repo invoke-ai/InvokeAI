@@ -7,7 +7,7 @@ import type { ResultDestination } from '@workbench/invocationContracts';
 import {
   adjustFocusedPromptAttention,
   flushGenerateDrafts,
-  focusPositivePrompt,
+  revealPositivePrompt,
   promptHistoryNavigation,
 } from '@features/generation/react';
 import { ensureModelsLoaded, getModelsSnapshot, openModelManager } from '@features/models';
@@ -28,18 +28,19 @@ import { openWorkbenchSettings } from '@workbench/settings/settingsDialogStore';
 import { getWorkbenchPreferences } from '@workbench/settings/store';
 import { openProjectSwitcher } from '@workbench/shell/topbar/projectSwitcherStore';
 import { openWidgetsDialog } from '@workbench/shell/widgetsDialogStore';
-import {
-  cycleRegionWidget,
-  getOpenableWidgetPlacement,
-  openWidgetPlacement,
-  toggleCenterPreview,
-} from '@workbench/widgetPlacementCommands';
+import { cycleRegionWidget } from '@workbench/widgetPlacementCommands';
 import { getWidgetPlacementProject } from '@workbench/widgetPlacementMeta';
 import { getWidgetsForRegion } from '@workbench/widgetRegistry';
 import { describeCanvasInvocationFailure } from '@workbench/widgets/canvas/invoke/canvasInvocationFailure';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import { useWorkbenchCommands, useWorkbenchExtensions, useWorkbenchQueries } from '@workbench/WorkbenchContext';
 import { resolvePanelToggle } from '@workbench/workbenchState';
+import {
+  goBackToPreviousWorkspace,
+  openInWorkspace,
+  toggleCenterPreview,
+  type OpenInWorkspace,
+} from '@workbench/workspace/workspaceNavigation';
 import { useTranslation } from 'react-i18next';
 
 import { regionFocusHotkeys, widgetCycleHotkeys } from './catalog';
@@ -101,6 +102,7 @@ export const FIRST_PARTY_APP_COMMAND_IDS = [
   'app.resetPanelLayout',
   'app.togglePanels',
   'app.togglePreview',
+  'app.backToPreviousWorkspace',
 ] as const;
 
 export const FIRST_PARTY_IMAGE_RECALL_COMMAND_IDS = Object.keys(imageRecallCommands);
@@ -127,6 +129,8 @@ export const useRegisterFirstPartyCommands = () => {
   const { t } = useTranslation();
   const { layout, notifications, widgets } = commands;
   const queryClient = useQueryClient();
+  const navigation = { commands, focus, getWidgetsForRegion, queries };
+  const open: OpenInWorkspace = (intents, options) => openInWorkspace(navigation, intents, options);
   useInvocationTemplatesSelector((snapshot) => snapshot.status);
 
   useMountEffect(() => {
@@ -177,13 +181,7 @@ export const useRegisterFirstPartyCommands = () => {
       isProjectActive: () => queries.isActiveProject(activeProject.id),
       media: { kind: item.kind, name: item.name },
       notifications,
-      openWorkflowEditor: () =>
-        openWidgetPlacement({
-          getWidgetsForRegion,
-          options: { preferredRegions: ['center'], requireCenterView: true },
-          typeId: 'workflow',
-          widgets,
-        }).ok,
+      openWorkflowEditor: () => open({ surface: 'stage', typeId: 'workflow' }).ok,
       t,
     });
   };
@@ -240,12 +238,7 @@ export const useRegisterFirstPartyCommands = () => {
 
       assertAccountScopeCurrent(owner);
       if (didRecall && queries.isActiveProject(activeProject.id)) {
-        openWidgetPlacement({
-          getWidgetsForRegion,
-          options: { preferredRegions: ['left'] },
-          typeId: 'generate',
-          widgets,
-        });
+        open({ surface: 'panel', typeId: 'generate' });
       }
     } catch (error) {
       if (!isAccountScopeCurrent(owner)) {
@@ -286,17 +279,18 @@ export const useRegisterFirstPartyCommands = () => {
 
     assertAccountScopeCurrent(owner);
     if (didRecall && queries.isActiveProject(projectId)) {
-      openWidgetPlacement({ getWidgetsForRegion, options: { preferredRegions: ['left'] }, typeId: 'video', widgets });
+      open({ surface: 'panel', typeId: 'video' });
     }
   };
 
+  /** Between the workflow's graph and its form, among the views this workspace places; it never leaves it. */
   const switchWorkflowView = () => {
     const project = queries.getSnapshot().activeProject;
     const target = getFocusTarget();
     const graphRegions = ['center', 'bottom'] as const;
     const isWorkflow = (instanceId: string) => project.widgetInstances[instanceId]?.typeId === 'workflow';
-    const hasWorkflow = (region: 'center' | 'bottom' | 'left') =>
-      project.widgetRegions[region].instanceIds.some(isWorkflow);
+    const placedIn = (region: 'center' | 'bottom' | 'left') =>
+      project.widgetRegions[region].instanceIds.find(isWorkflow);
     const visibleWorkflow = (region: 'center' | 'bottom' | 'left') => {
       const { activeInstanceId, instanceIds, isCollapsed } = project.widgetRegions[region];
       const panelOpen = region === 'center' || project.layout.panels[region === 'left' ? 'isLeftOpen' : 'isBottomOpen'];
@@ -309,77 +303,47 @@ export const useRegisterFirstPartyCommands = () => {
       target?.kind === 'floating'
         ? isWorkflow(target.instanceId)
         : (target?.region === 'center' || target?.region === 'bottom') && visibleWorkflow(target.region) !== null;
-    const floatingWorkflow = Object.keys(project.floatingWidgets ?? {}).find(isWorkflow);
-    const region = fromGraph ? 'left' : (graphRegions.find(visibleWorkflow) ?? graphRegions.find(hasWorkflow));
+    const showPlaced = (region: 'center' | 'bottom' | 'left', instanceId: string) => {
+      // The center selects rather than fronts, so a form sharing the graph's instance stays in view beside it.
+      if (region === 'center') {
+        widgets.select({ projectId: project.id, region, widgetId: instanceId });
+      } else {
+        widgets.front({ instanceId, projectId: project.id, region });
+      }
+      focus.focusRegion(region, undefined, instanceId);
+    };
 
-    if (!region && floatingWorkflow) {
+    if (fromGraph) {
+      const formId = placedIn('left');
+
+      if (formId) {
+        showPlaced('left', formId);
+      } else {
+        // The resolver would answer with the graph itself when it sits in the status bar's panel; the form is a rail's.
+        notifications.add({
+          actions: [{ kind: 'add-widget', surface: 'panel', widgetId: 'workflow' }],
+          category: 'workspace-offer',
+          kind: 'info',
+          title: t('shell.workspace.noWorkflowForm'),
+          titleKey: 'shell.workspace.noWorkflowForm',
+        });
+      }
+      return;
+    }
+
+    const graphRegion =
+      graphRegions.find((region) => visibleWorkflow(region) !== null) ??
+      graphRegions.find((region) => placedIn(region) !== undefined);
+    const floatingWorkflow = Object.keys(project.floatingWidgets ?? {}).find(isWorkflow);
+
+    if (graphRegion) {
+      showPlaced(graphRegion, visibleWorkflow(graphRegion) ?? placedIn(graphRegion)!);
+    } else if (floatingWorkflow) {
       widgets.revealFloating(floatingWorkflow);
       focus.focusFloating(floatingWorkflow);
-      return;
-    }
-
-    const destination = region ?? 'center';
-    const visibleInstance = visibleWorkflow(destination);
-
-    if (visibleInstance) {
-      focus.focusRegion(destination, undefined, visibleInstance);
-      return;
-    }
-
-    // Opening an unplaced view could dock the graph's floating window.
-    if (floatingWorkflow && !hasWorkflow(destination)) {
-      return;
-    }
-
-    const placedCenterGraph =
-      destination === 'center' ? project.widgetRegions.center.instanceIds.find(isWorkflow) : undefined;
-    if (placedCenterGraph) {
-      if (
-        getOpenableWidgetPlacement({
-          getWidgetsForRegion,
-          options: { preferredRegions: ['center'] },
-          typeId: 'workflow',
-        })
-      ) {
-        // Use the center picker's instance selection to keep the left panel in view.
-        widgets.select({ projectId: project.id, region: 'center', widgetId: placedCenterGraph });
-        focus.focusRegion('center', undefined, placedCenterGraph);
-      }
-      return;
-    }
-
-    // The Workflow preset uses a separate graph instance so opening the center leaves the form active.
-    if (!region && hasWorkflow('left')) {
-      const leftInstanceId = project.widgetRegions.left.activeInstanceId;
-      const graphInstanceId = ['workflow:center', 'workflow:bottom', 'workflow'].find(
-        (id) => id !== leftInstanceId && isWorkflow(id)
-      );
-
-      if (
-        graphInstanceId &&
-        getOpenableWidgetPlacement({
-          getWidgetsForRegion,
-          options: { preferredRegions: ['center'] },
-          typeId: 'workflow',
-        })
-      ) {
-        widgets.toggle({ projectId: project.id, region: 'center', widgetId: graphInstanceId });
-        focus.focusRegion('center', undefined, graphInstanceId);
-      }
-      return;
-    }
-
-    const opened = openWidgetPlacement({
-      getWidgetsForRegion,
-      options: { preferredRegions: [destination] },
-      projectId: project.id,
-      typeId: 'workflow',
-      widgets,
-    });
-
-    if (opened.ok) {
-      const { activeInstanceId } = queries.getSnapshot().activeProject.widgetRegions[destination];
-      focus.focusRegion(destination, undefined, activeInstanceId);
+    } else {
+      // No graph here: the resolver offers to add the editor to this workspace.
+      open({ surface: 'stage', typeId: 'workflow' }, { mode: 'stay' });
     }
   };
 
@@ -476,46 +440,22 @@ export const useRegisterFirstPartyCommands = () => {
         title: 'Cancel all queue items',
       }),
       commandApi.register({
-        handler: () =>
-          openWidgetPlacement({
-            getWidgetsForRegion,
-            options: { preferredRegions: ['left'] },
-            typeId: 'generate',
-            widgets,
-          }),
+        handler: () => open({ surface: 'panel', typeId: 'generate' }),
         id: 'app.selectGenerateTab',
         title: 'Open Generate',
       }),
       commandApi.register({
-        handler: () =>
-          openWidgetPlacement({
-            getWidgetsForRegion,
-            options: { preferredRegions: ['center'], requireCenterView: true },
-            typeId: 'canvas',
-            widgets,
-          }),
+        handler: () => open({ surface: 'stage', typeId: 'canvas' }),
         id: 'app.selectCanvasTab',
         title: 'Open Canvas',
       }),
       commandApi.register({
-        handler: () =>
-          openWidgetPlacement({
-            getWidgetsForRegion,
-            options: { preferredRegions: ['left'] },
-            typeId: 'upscale',
-            widgets,
-          }),
+        handler: () => open({ surface: 'panel', typeId: 'upscale' }),
         id: 'app.selectUpscalingTab',
         title: 'Open Upscale',
       }),
       commandApi.register({
-        handler: () =>
-          openWidgetPlacement({
-            getWidgetsForRegion,
-            options: { preferredRegions: ['center'], requireCenterView: true },
-            typeId: 'workflow',
-            widgets,
-          }),
+        handler: () => open({ surface: 'stage', typeId: 'workflow' }),
         id: 'app.selectWorkflowsTab',
         title: 'Open Workflow editor',
       }),
@@ -530,27 +470,18 @@ export const useRegisterFirstPartyCommands = () => {
         title: 'Open Model Manager',
       }),
       commandApi.register({
-        handler: () =>
-          openWidgetPlacement({
-            getWidgetsForRegion,
-            options: { preferredRegions: ['right', 'bottom'] },
-            typeId: 'queue',
-            widgets,
-          }),
+        handler: () => open({ surface: 'panel', typeId: 'queue' }),
         id: 'app.selectQueueTab',
         title: 'Open Queue',
       }),
       commandApi.register({ handler: openWidgetsDialog, id: 'app.openWidgets', title: 'Show widgets' }),
       commandApi.register({
-        handler: () => {
-          openWidgetPlacement({
-            getWidgetsForRegion,
-            options: { preferredRegions: ['left'] },
-            typeId: 'generate',
-            widgets,
-          });
-          window.requestAnimationFrame(() => focusPositivePrompt());
-        },
+        // The prompt takes focus itself, once Generate shows; a region focus move would land after it.
+        handler: () =>
+          open(
+            { surface: 'panel', typeId: 'generate' },
+            { afterShown: () => revealPositivePrompt('generate'), focus: false }
+          ),
         id: 'app.focusPrompt',
         title: 'Focus prompt',
       }),
@@ -646,14 +577,14 @@ export const useRegisterFirstPartyCommands = () => {
         title: 'Toggle panels',
       }),
       commandApi.register({
-        handler: () =>
-          toggleCenterPreview({
-            getWidgetsForRegion,
-            project: getWidgetPlacementProject(queries.getSnapshot().activeProject),
-            widgets,
-          }),
+        handler: () => toggleCenterPreview(navigation),
         id: 'app.togglePreview',
         title: 'Toggle preview in center',
+      }),
+      commandApi.register({
+        handler: () => goBackToPreviousWorkspace(navigation),
+        id: 'app.backToPreviousWorkspace',
+        title: 'Back to previous workspace',
       }),
       ...Object.entries(imageRecallCommands).map(([id, kind]) =>
         commandApi.register({ handler: () => recallSelectedImage(kind), id, title: id })

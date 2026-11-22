@@ -96,11 +96,14 @@ export interface BackendConnectionState {
 
 export type WorkbenchNotificationKind = 'error' | 'success' | 'info';
 
-export type WorkbenchNotificationCategory = 'enqueue' | 'run-outcome';
+/** `workspace-offer`: an open that found nothing to show; a repeat coalesces into the newest one. */
+export type WorkbenchNotificationCategory = 'enqueue' | 'run-outcome' | 'workspace-offer';
 
 /** Plain data, never a closure: notifications live in workbench state. */
 export type WorkbenchNotificationAction =
   | { kind: 'open-widget'; widgetId: WidgetTypeId }
+  /** Adds the widget to the current workspace, on the surface the open asked for: the structural add an offer makes. */
+  | { kind: 'add-widget'; widgetId: WidgetTypeId; surface?: 'stage' | 'panel' }
   | { kind: 'reveal-queue-item'; itemId: number }
   /** `canvasProjectId`: a Canvas run's project, whose rerun is staged only by a tab with it open. */
   | { kind: 'retry-queue-item'; itemIds: readonly number[]; canvasProjectId?: string }

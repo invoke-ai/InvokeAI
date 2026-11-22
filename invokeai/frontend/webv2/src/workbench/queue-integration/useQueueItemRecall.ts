@@ -13,8 +13,8 @@ import { useMountEffect } from '@platform/react/useMountEffect';
 import { useExternalStoreSelector } from '@platform/state/selectors';
 import { EMPTY_IMAGE_RECALL_CAPABILITIES, getCurrentGenerateValues } from '@workbench/image-actions';
 import { useNotify } from '@workbench/useNotify';
-import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
 import { useWidgetValuesSelector, useWorkbenchCommands, useWorkbenchQueries } from '@workbench/WorkbenchContext';
+import { useWorkspaceOpen } from '@workbench/workspace/useWorkspaceOpen';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -49,7 +49,7 @@ export const useQueueItemRecall = (
   const { t } = useTranslation();
   const commands = useWorkbenchCommands();
   const queries = useWorkbenchQueries();
-  const openWidget = useOpenWorkbenchWidget();
+  const open = useWorkspaceOpen();
   const notify = useNotify();
   const snapshot = useLocalRecallSnapshot(origin);
   const isPending = snapshot === undefined;
@@ -92,7 +92,7 @@ export const useQueueItemRecall = (
         return Promise.resolve();
       }
       return executeQueueItemRecall({
-        context: { commands, notify, openWidget, queries, t },
+        context: { commands, notify, open, queries, t },
         isNonGenerateRun,
         kind,
         meta,
@@ -100,7 +100,7 @@ export const useQueueItemRecall = (
         snapshot,
       });
     },
-    [commands, isNonGenerateRun, meta, models, notify, openWidget, queries, snapshot, t]
+    [commands, isNonGenerateRun, meta, models, notify, open, queries, snapshot, t]
   );
 
   return { ...availability, isPending, recall };

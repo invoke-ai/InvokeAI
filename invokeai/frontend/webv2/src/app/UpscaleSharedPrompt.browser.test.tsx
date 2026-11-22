@@ -7,9 +7,9 @@ import type { Project } from '@workbench/projectContracts';
 import type * as ProjectsApiModule from '@workbench/projects/api';
 import type { InvokeIssueAction } from '@workbench/shell/topbar/invokeIssueActions';
 import type { InvocationIssue } from '@workbench/shell/topbar/invokeIssueTargets';
-import type * as OpenWidgetModule from '@workbench/useOpenWorkbenchWidget';
 import type { RegisteredWidget } from '@workbench/widgetContracts';
 import type { WorkbenchInternalStore } from '@workbench/workbenchStore';
+import type * as WorkspaceOpenModule from '@workbench/workspace/useWorkspaceOpen';
 import type { ReactNode } from 'react';
 
 import { ChakraProvider } from '@chakra-ui/react';
@@ -154,9 +154,10 @@ vi.mock('@features/identity', async (importOriginal) => ({
   useCapabilities: () => ({ canManageModels: false }),
 }));
 vi.mock('@workbench/image-actions/useFindGalleryItem', () => ({ useFindGalleryItem: () => noop }));
-vi.mock('@workbench/useOpenWorkbenchWidget', async (importOriginal) => ({
-  ...(await importOriginal<typeof OpenWidgetModule>()),
-  useOpenWorkbenchWidget: () => noop,
+// The panel under test is already on screen, so every open shows it at once.
+vi.mock('@workbench/workspace/useWorkspaceOpen', async (importOriginal) => ({
+  ...(await importOriginal<typeof WorkspaceOpenModule>()),
+  useWorkspaceOpen: () => (_intents: unknown, options?: { afterShown?: () => void }) => options?.afterShown?.(),
 }));
 vi.mock('@workbench/WorkbenchContext', () => ({
   useActiveProjectSelector: (selector: (project: Project) => unknown) =>

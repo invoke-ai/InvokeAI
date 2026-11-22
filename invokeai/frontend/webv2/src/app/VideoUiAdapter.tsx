@@ -13,7 +13,6 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useFindGalleryItem } from '@workbench/image-actions/useFindGalleryItem';
 import { useWorkbenchPreferenceSelector } from '@workbench/settings/store';
 import { useNotify } from '@workbench/useNotify';
-import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
 import {
   getVideoSpanPlaybackState,
   requestVideoSpanPlayback,
@@ -26,6 +25,7 @@ import {
   useWorkbenchCommands,
   useWorkbenchQueries,
 } from '@workbench/WorkbenchContext';
+import { useWorkspaceOpen } from '@workbench/workspace/useWorkspaceOpen';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 
 /** Video owns its prompt in widget values; do not join the draft shared by Generate/Upscale. */
@@ -96,7 +96,7 @@ export const VideoUiAdapterProvider = ({ children }: { children: ReactNode }) =>
     () => void invalidateGalleryBoardDestinations(queryClient),
     [queryClient]
   );
-  const openWorkbenchWidget = useOpenWorkbenchWidget();
+  const open = useWorkspaceOpen();
   // Raise Preview before changing selection; refusal must leave selection untouched. Request the span last and do not
   // reveal/scroll the gallery.
   const playVideoSpanInPreview = useCallback<VideoUiAdapter['playVideoSpanInPreview']>(
@@ -106,7 +106,7 @@ export const VideoUiAdapterProvider = ({ children }: { children: ReactNode }) =>
         return null;
       }
 
-      if (!openWorkbenchWidget('preview', { preferredRegions: ['center'], requireCenterView: true }).ok) {
+      if (!open({ surface: 'stage', typeId: 'preview' }).ok) {
         return null;
       }
 
@@ -114,7 +114,7 @@ export const VideoUiAdapterProvider = ({ children }: { children: ReactNode }) =>
 
       return requestVideoSpanPlayback({ endSeconds, itemKey: toGalleryItemKey(item), startSeconds });
     },
-    [commands, openWorkbenchWidget, projectId]
+    [commands, open, projectId]
   );
   // Judged from the listing of every readable board, ensured as the upload starts: an archived or revoked board is
   // decided from a listing, not for want of one, and no listing is read while nothing uploads. The board is read before

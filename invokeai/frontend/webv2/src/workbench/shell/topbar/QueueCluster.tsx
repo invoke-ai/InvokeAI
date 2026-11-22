@@ -17,7 +17,7 @@ import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { Tooltip } from '@platform/ui/Tooltip';
 import { getDestinationLabel, getSourceLabel } from '@workbench/invocation';
 import { useQueueChromeActivity } from '@workbench/queue-integration/useActiveQueueProgress';
-import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
+import { useWorkspaceOpen } from '@workbench/workspace/useWorkspaceOpen';
 import { CloudOffIcon, ListOrderedIcon, ListXIcon, PauseIcon, XIcon } from 'lucide-react';
 import {
   useCallback,
@@ -61,7 +61,7 @@ const itemStatusLabelKeys: Record<QueueItem['status'], string> = {
 
 export const QueueCluster = () => {
   const { t } = useTranslation();
-  const openWorkbenchWidget = useOpenWorkbenchWidget();
+  const open = useWorkspaceOpen();
   const actions = useQueueActions({ includeOpenQueue: true });
   const cancelCurrent = getQueueAction(actions, 'cancel-current');
   const cancelAll = getQueueAction(actions, 'cancel-all');
@@ -98,7 +98,7 @@ export const QueueCluster = () => {
 
   const isCancelAllArmed = isCancelHovered && isShiftHeld && cancelAll !== undefined && !cancelAll.disabled;
 
-  const handleOpenQueue = useCallback(() => openWorkbenchWidget('queue'), [openWorkbenchWidget]);
+  const handleOpenQueue = useCallback(() => open({ typeId: 'queue' }), [open]);
   const handleCancelPointerEnter = useCallback((event: PointerEvent<HTMLButtonElement>) => {
     setIsCancelHovered(true);
     setIsShiftHeld(event.shiftKey);

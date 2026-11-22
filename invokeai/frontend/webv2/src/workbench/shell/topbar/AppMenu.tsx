@@ -18,8 +18,8 @@ import { openCommandPaletteFrom } from '@workbench/palette/paletteStore';
 import { openWorkbenchSettings } from '@workbench/settings/settingsDialogStore';
 import { openWhatsNew } from '@workbench/shell/whatsNewStore';
 import { openWidgetsDialogFrom } from '@workbench/shell/widgetsDialogStore';
-import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
 import { useActiveProjectId, useActiveProjectSelector } from '@workbench/WorkbenchContext';
+import { useWorkspaceOpen } from '@workbench/workspace/useWorkspaceOpen';
 import {
   BookOpenTextIcon,
   BlocksIcon,
@@ -47,7 +47,7 @@ export const AppMenu = () => {
   const { canManageModels, canManageNodes } = useCapabilities();
   const navigate = useNavigate();
   const projectId = useActiveProjectId();
-  const openWorkbenchWidget = useOpenWorkbenchWidget();
+  const open = useWorkspaceOpen();
   const queuedCount = useActiveProjectSelector((project) => getQueueSummary(project.queue.items).total);
 
   const openLaunchpad = useCallback(() => {
@@ -65,7 +65,7 @@ export const AppMenu = () => {
   const openFonts = useCallback(() => {
     void navigate({ to: '/fonts' });
   }, [navigate]);
-  const openQueue = useCallback(() => openWorkbenchWidget('queue'), [openWorkbenchWidget]);
+  const openQueue = useCallback(() => open({ typeId: 'queue' }), [open]);
   const triggerRef = useRef<HTMLButtonElement>(null);
   // The menu item is gone once a dialog it opened closes; focus returns to the menu's own button.
   const getTrigger = useCallback(() => triggerRef.current, []);

@@ -24,9 +24,10 @@ describe('shouldToastNotification', () => {
 });
 
 describe('getToastKey', () => {
-  it('re-keys coalesced run failures per occurrence but keeps ambient errors on one key', () => {
+  it('re-keys coalesced run failures and workspace offers per occurrence but keeps ambient errors on one key', () => {
     expect(getToastKey(note({ category: 'run-outcome', id: 'n-1', occurrenceCount: 2 }))).toBe('n-1:2');
     expect(getToastKey(note({ category: 'run-outcome', id: 'n-1' }))).toBe('n-1:1');
     expect(getToastKey(note({ id: 'n-2', kind: 'error', occurrenceCount: 3 }))).toBe('n-2');
+    expect(getToastKey(note({ category: 'workspace-offer', id: 'n-3', occurrenceCount: 2 }))).toBe('n-3:2');
   });
 });

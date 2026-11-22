@@ -8,23 +8,23 @@ import { Dialog } from '@platform/ui/Dialog';
 import { ListItem } from '@platform/ui/list/ListItem';
 import { ListSectionHeader } from '@platform/ui/list/ListSectionHeader';
 import { ListStack } from '@platform/ui/list/ListStack';
-import { useWorkbenchFocus } from '@workbench/focusRegions';
 import { WidgetIcon } from '@workbench/iconResolver';
-import { revealOrOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
 import { resolveWidgetLabel } from '@workbench/widgetLabels';
 import {
+  addWidgetToWorkspace,
   closeWidgetPlacement,
   dockFloatingPlacement,
   removeFloatingPlacement,
 } from '@workbench/widgetPlacementCommands';
 import { areWidgetPlacementProjectsEqual, getWidgetPlacementProject } from '@workbench/widgetPlacementMeta';
-import { useActiveProjectSelector, useWorkbenchCommands, useWorkbenchQueries } from '@workbench/WorkbenchContext';
+import { useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
 import { useWorkbenchWidgetRegistry } from '@workbench/WorkbenchWidgetRegistryContext';
+import { useWorkspaceOpen } from '@workbench/workspace/useWorkspaceOpen';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { closeWidgetsDialog, getWidgetsDialogReturnFocus } from './widgetsDialogStore';
-import { addWidgetToLayout, canAddWidget, getWidgetsListRows, type WidgetsListRow } from './widgetsListModel';
+import { canAddWidget, getWidgetsListRows, type WidgetsListRow } from './widgetsListModel';
 
 const REGIONS: readonly WidgetRegion[] = ['left', 'center', 'right', 'bottom'];
 
@@ -58,8 +58,7 @@ const focusRow = (row: WidgetsListRow) =>
 export const WidgetsDialogBody = ({ isOpen, onExitComplete }: { isOpen: boolean; onExitComplete: () => void }) => {
   const { t } = useTranslation();
   const { widgets } = useWorkbenchCommands();
-  const queries = useWorkbenchQueries();
-  const focus = useWorkbenchFocus();
+  const open = useWorkspaceOpen();
   const { getWidgetById, getWidgetsForRegion } = useWorkbenchWidgetRegistry();
   const project = useActiveProjectSelector(getWidgetPlacementProject, areWidgetPlacementProjectsEqual);
   // Show moves focus to the widget; closing then must not pull it back to whatever opened the list.
@@ -99,7 +98,7 @@ export const WidgetsDialogBody = ({ isOpen, onExitComplete }: { isOpen: boolean;
   const actions = useMemo(
     () => ({
       add: (row: WidgetsListRow) => {
-        addWidgetToLayout({ getWidgetsForRegion, widget: row.widget, widgets });
+        addWidgetToWorkspace({ getWidgetsForRegion, widget: row.widget, widgets });
         focusRow(row);
       },
       dock: (row: WidgetsListRow) => {
@@ -128,10 +127,11 @@ export const WidgetsDialogBody = ({ isOpen, onExitComplete }: { isOpen: boolean;
       show: (row: WidgetsListRow) => {
         setReturnsFocus(false);
         closeWidgetsDialog();
-        revealOrOpenWorkbenchWidget({ focus, getWidgetsForRegion, queries, widgets }, row.widget.manifest.id);
+        // The list describes this workspace, so Show stays in it.
+        open({ typeId: row.widget.manifest.id }, { mode: 'stay' });
       },
     }),
-    [focus, getWidgetById, getWidgetsForRegion, project, queries, widgets]
+    [getWidgetById, getWidgetsForRegion, open, project, widgets]
   );
 
   return (

@@ -951,6 +951,7 @@
           "source:src/workbench/image-actions/useFindGalleryItem.ts",
           "source:src/workbench/invocation.ts",
           "source:src/workbench/invocationPreparation.ts",
+          "source:src/workbench/invocationSources.ts",
           "source:src/workbench/invocationSubmit.ts",
           "source:src/workbench/launchpad/HelpMenu.tsx",
           "source:src/workbench/launchpad/KnownBrowserIssuesAlert.tsx",
@@ -1113,7 +1114,6 @@
           "source:src/workbench/shell/whatsNewStore.ts",
           "source:src/workbench/shell/widgetsDialogStore.ts",
           "source:src/workbench/useNotify.ts",
-          "source:src/workbench/useOpenWorkbenchWidget.ts",
           "source:src/workbench/widget-frame/FloatingWidgetLayer.tsx",
           "source:src/workbench/widget-frame/WidgetActionsMenu.tsx",
           "source:src/workbench/widget-frame/WidgetBar.tsx",
@@ -1182,7 +1182,11 @@
           "source:src/workbench/widgets/video/manifest.ts",
           "source:src/workbench/widgets/workflow/manifest.ts",
           "source:src/workbench/workbenchState.ts",
-          "source:src/workbench/workbenchStore.ts"
+          "source:src/workbench/workbenchStore.ts",
+          "source:src/workbench/workspace/resolveOpen.ts",
+          "source:src/workbench/workspace/useWorkspaceOpen.ts",
+          "source:src/workbench/workspace/workspaceDerivations.ts",
+          "source:src/workbench/workspace/workspaceNavigation.ts"
         ]
       },
       "owner": "workbench",

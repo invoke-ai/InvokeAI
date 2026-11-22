@@ -9,15 +9,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useFindGalleryItem } from './useFindGalleryItem';
 
 const mocks = vi.hoisted(() => ({
-  opened: [] as { options: unknown; widgetId: string }[],
+  opened: [] as unknown[],
   project: null as unknown as Project,
   reveal: vi.fn(() => Promise.resolve()),
 }));
 
-vi.mock('@workbench/useOpenWorkbenchWidget', () => ({
-  useOpenWorkbenchWidget: () => (widgetId: string, options: unknown) => {
-    mocks.opened.push({ options, widgetId });
-    return { ok: true, region: 'right' };
+vi.mock('@workbench/workspace/useWorkspaceOpen', () => ({
+  useWorkspaceOpen: () => (intents: unknown, options: unknown) => {
+    mocks.opened.push([intents, options]);
+    return { changedWorkspace: false, ok: true, region: 'right', workspaceId: 'compose' };
   },
 }));
 vi.mock('@workbench/WorkbenchContext', () => {
@@ -45,23 +45,10 @@ let host: HTMLDivElement | null = null;
 let root: Root | null = null;
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-/** The default project with a Gallery shown in the center as well as the right panel. */
-const projectWithCenterGallery = (): Project => {
-  const project = structuredClone(createInitialWorkbenchState().projects[0]!);
-  const galleryId = Object.values(project.widgetInstances).find((instance) => instance.typeId === 'gallery')!.id;
-
-  project.widgetRegions.center = {
-    ...project.widgetRegions.center,
-    instanceIds: [...project.widgetRegions.center.instanceIds, galleryId],
-  };
-
-  return project;
-};
-
 beforeEach(async () => {
   mocks.opened = [];
   mocks.reveal.mockClear();
-  mocks.project = projectWithCenterGallery();
+  mocks.project = createInitialWorkbenchState().projects[0]!;
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
@@ -80,19 +67,19 @@ afterEach(async () => {
 });
 
 describe('useFindGalleryItem', () => {
-  it('brings Preview to the center and the Gallery forward wherever it is, by default', async () => {
+  it('shows Preview on the stage and then the Gallery in one gesture, focusing the Gallery, by default', async () => {
     await act(() => findRef.current!({ kind: 'image', name: 'found.png' }));
 
-    expect(mocks.opened.map(({ widgetId }) => widgetId)).toEqual(['preview', 'gallery']);
+    expect(mocks.opened).toEqual([
+      [[{ surface: 'stage', typeId: 'preview' }, { typeId: 'gallery' }], { focus: 'gallery' }],
+    ]);
     await vi.waitFor(() => expect(mocks.reveal).toHaveBeenCalledOnce());
   });
 
-  it('leaves the center alone when asked, raising the Gallery only in a panel', async () => {
+  it('leaves the center alone when asked, showing the Gallery only as a panel', async () => {
     await act(() => findRef.current!({ kind: 'image', name: 'found.png' }, { revealPreview: false }));
 
-    expect(mocks.opened).toHaveLength(1);
-    expect(mocks.opened[0]!.widgetId).toBe('gallery');
-    expect((mocks.opened[0]!.options as { preferredRegions: string[] }).preferredRegions).not.toContain('center');
+    expect(mocks.opened).toEqual([[{ surface: 'panel', typeId: 'gallery' }, { focus: 'gallery' }]]);
     await vi.waitFor(() =>
       expect(mocks.reveal).toHaveBeenCalledWith(
         expect.anything(),

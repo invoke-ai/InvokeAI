@@ -1,12 +1,12 @@
 import type { WidgetRegion } from '@workbench/layoutContracts';
 import type { NormalizedWidgetManifest, RegisteredWidget, WidgetInstanceId } from '@workbench/widgetContracts';
 import type { WidgetPlacementProject } from '@workbench/widgetPlacementCommands';
-import type { WorkbenchWidgetCommands } from '@workbench/workbenchStore';
 
 import {
   canRenderWidgetInRegion,
+  DEFAULT_ADD_REGIONS,
   getEnabledCenterViewCount,
-  openWidgetPlacement,
+  isStatusChipWidget,
 } from '@workbench/widgetPlacementCommands';
 
 /** Where a widget is, as the Widgets list says it: a docked region, a floating window, or nowhere in this layout. */
@@ -31,21 +31,13 @@ const PLACEMENT_RANK: Record<string, number> = { bottom: 3, center: 0, floating:
 const getPlacementRank = ({ placement }: WidgetsListRow): number =>
   PLACEMENT_RANK[placement.kind === 'docked' ? placement.region : placement.kind]!;
 
-/** A widget that lives only as a status-bar chip; placement opens refuse it because it renders no panel. */
-const isStatusChip = (widget: RegisteredWidget): boolean =>
-  widget.manifest.allowedRegions.includes('bottom') &&
-  (widget.manifest.bottomPanel === 'tooltip' || widget.manifest.bottomPanel === 'popover');
-
-/** The regions an Add tries, in the order a placement open tries them. */
-const ADD_REGIONS: readonly WidgetRegion[] = ['center', 'right', 'left', 'bottom'];
-
 /** Whether a placement open can show this widget; pure, so lists can ask on every render without chunk loads. */
 export const canOpenWidget = (
   widget: RegisteredWidget,
   getWidgetsForRegion: (region: WidgetRegion) => RegisteredWidget[]
 ): boolean =>
   widget.status === 'enabled' &&
-  ADD_REGIONS.some(
+  DEFAULT_ADD_REGIONS.some(
     (region) =>
       getWidgetsForRegion(region).some((candidate) => candidate.manifest.id === widget.manifest.id) &&
       canRenderWidgetInRegion(widget, region)
@@ -55,44 +47,7 @@ export const canOpenWidget = (
 export const canAddWidget = (
   widget: RegisteredWidget,
   getWidgetsForRegion: (region: WidgetRegion) => RegisteredWidget[]
-): boolean => widget.status === 'enabled' && (isStatusChip(widget) || canOpenWidget(widget, getWidgetsForRegion));
-
-/** Puts a widget in the layout where it opens by default; a status chip goes back to the status bar. */
-export const addWidgetToLayout = ({
-  getWidgetsForRegion,
-  widget,
-  widgets,
-}: {
-  getWidgetsForRegion: (region: WidgetRegion) => RegisteredWidget[];
-  widget: RegisteredWidget;
-  widgets: WorkbenchWidgetCommands;
-}): boolean => {
-  const { allowMultiple, id: typeId, state } = widget.manifest;
-
-  if (
-    openWidgetPlacement({
-      getWidgetsForRegion,
-      options: allowMultiple ? { createNew: true } : undefined,
-      typeId,
-      widgets,
-    }).ok
-  ) {
-    return true;
-  }
-
-  if (widget.status !== 'enabled' || !isStatusChip(widget)) {
-    return false;
-  }
-
-  widgets.open({
-    createNew: allowMultiple ? true : undefined,
-    initialValues: state.createInitial(),
-    region: 'bottom',
-    widgetId: typeId,
-  });
-
-  return true;
-};
+): boolean => widget.status === 'enabled' && (isStatusChipWidget(widget) || canOpenWidget(widget, getWidgetsForRegion));
 
 const findRegion = (project: WidgetPlacementProject, instanceId: WidgetInstanceId): WidgetRegion | undefined =>
   REGION_ORDER.find((region) => project.widgetRegions[region].instanceIds.includes(instanceId));

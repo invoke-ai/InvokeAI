@@ -3,23 +3,22 @@ import type { WidgetRegion } from '@workbench/layoutContracts';
 import type { WorkbenchState } from '@workbench/projectContracts';
 import type {
   WidgetHotkeyApi,
-  OpenWorkbenchWidgetOptions,
-  RegisteredWidget,
   WidgetContributionSource,
   WidgetInstanceRuntimeMeta,
   WidgetRuntimeStateApi,
   WidgetRuntimeApi,
-  WidgetTypeId,
   WorkbenchRegion,
 } from '@workbench/widgetContracts';
 import type { WidgetPlacementProject } from '@workbench/widgetPlacementCommands';
 import type { WorkbenchWidgetCommands } from '@workbench/workbenchStore';
+import type { OpenInWorkspace } from '@workbench/workspace/workspaceNavigation';
 
 import { createLogger } from '@platform/logging/logger';
 import { isWidgetRegion as isKnownWidgetRegion } from '@workbench/layoutContracts';
-import { closeWidgetPlacement, openWidgetPlacement, revealWidgetPlacement } from '@workbench/widgetPlacementCommands';
+import { revealWidgetPlacement } from '@workbench/widgetPlacementCommands';
 import { resolveWidgetValues } from '@workbench/widgetState';
 import { useWorkbenchExtensions, useWorkbenchInternalStore } from '@workbench/WorkbenchContext';
+import { useWorkspaceOpen } from '@workbench/workspace/useWorkspaceOpen';
 import { useMemo } from 'react';
 
 const isWidgetRegion = (region: WorkbenchRegion): region is WidgetRegion => isKnownWidgetRegion(region);
@@ -69,18 +68,16 @@ export const getProjectWidgetRuntimeState = <State extends Record<string, unknow
 
 export const createWidgetRuntime = ({
   extensions,
-  getWidgetsForRegion,
-  getWidgetById,
   instance,
+  open,
   project,
   region,
   state,
   widgets,
 }: {
   extensions: ExtensionRegistry;
-  getWidgetById: (typeId: WidgetTypeId) => RegisteredWidget | undefined;
-  getWidgetsForRegion: (region: WidgetRegion) => RegisteredWidget[];
   instance: WidgetInstanceRuntimeMeta;
+  open: OpenInWorkspace;
   project: WidgetPlacementProject;
   region: WorkbenchRegion;
   state: WidgetRuntimeStateApi;
@@ -131,15 +128,7 @@ export const createWidgetRuntime = ({
     state,
     typeId: instance.typeId,
     workbench: {
-      closeWidgetInstance: (instanceId) => {
-        if (!isWidgetRegion(region)) {
-          return { ok: false, reason: 'unsupported' };
-        }
-
-        return closeWidgetPlacement({ getWidgetById, instanceId, project, region, widgets });
-      },
-      openWidget: (typeId: WidgetTypeId, options?: OpenWorkbenchWidgetOptions) =>
-        openWidgetPlacement({ getWidgetsForRegion, options, projectId: project.projectId, typeId, widgets }),
+      open: (intent) => open(intent),
       revealWidgetInstance: (instanceId) => {
         if (!isWidgetRegion(region)) {
           return { ok: false, reason: 'unsupported' };
@@ -152,20 +141,17 @@ export const createWidgetRuntime = ({
 };
 
 export const useWidgetRuntime = ({
-  getWidgetsForRegion,
-  getWidgetById,
   instance,
   project,
   region,
 }: {
-  getWidgetById: (typeId: WidgetTypeId) => RegisteredWidget | undefined;
-  getWidgetsForRegion: (region: WidgetRegion) => RegisteredWidget[];
   instance: WidgetInstanceRuntimeMeta;
   project: WidgetPlacementProject;
   region: WorkbenchRegion;
 }): WidgetRuntimeApi => {
   const store = useWorkbenchInternalStore();
   const extensions = useWorkbenchExtensions();
+  const open = useWorkspaceOpen();
   const { widgets } = store.commands;
   const projectId = project.projectId ?? store.getSnapshot().activeProject.id;
   const state = useMemo<WidgetRuntimeStateApi>(
@@ -181,14 +167,13 @@ export const useWidgetRuntime = ({
     () =>
       createWidgetRuntime({
         extensions,
-        getWidgetById,
-        getWidgetsForRegion,
         instance,
+        open,
         project,
         region,
         state,
         widgets,
       }),
-    [extensions, getWidgetById, getWidgetsForRegion, instance, project, region, state, widgets]
+    [extensions, instance, open, project, region, state, widgets]
   );
 };

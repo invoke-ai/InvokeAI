@@ -10,13 +10,11 @@ import type { WorkbenchWidgetCommands } from './workbenchStore';
 import { createWidgetImplementationResource } from './widgetImplementationResource';
 import {
   activateRailPlacement,
+  addWidgetPlacement,
   closeWidgetPlacement,
   cycleRegionWidget,
   dockFloatingPlacement,
-  openWidgetPlacement,
-  revealPlacedWidget,
   revealWidgetPlacement,
-  toggleCenterPreview,
 } from './widgetPlacementCommands';
 import { getWidgetPlacementProject } from './widgetPlacementMeta';
 import { createInitialWorkbenchState, workbenchReducer } from './workbenchState.testing';
@@ -74,6 +72,7 @@ const createWidgetCommands = (dispatch: (action: WorkbenchAction) => void): Work
   dockFloating: (instanceId) => dispatch({ instanceId, type: 'dockFloatingWidget' }),
   closeFloating: (instanceId) => dispatch({ instanceId, type: 'closeFloatingWidget' }),
   float: (instanceId) => dispatch({ instanceId, type: 'floatWidget' }),
+  front: (options) => dispatch({ ...options, type: 'frontRegionWidget' }),
   raiseFloating: (instanceId) => dispatch({ instanceId, type: 'raiseFloatingWidget' }),
   move: (options) => dispatch({ ...options, type: 'moveWidgetInstance' }),
   setAlignment: (options) => dispatch({ ...options, type: 'setWidgetInstanceAlignment' }),
@@ -133,10 +132,10 @@ describe('widget placement commands', () => {
     const widget = createWidget({ id: 'queue', label: 'Queue' });
     const nextState = applyCommand(state, (widgets) => {
       expect(
-        openWidgetPlacement({
+        addWidgetPlacement({
           widgets,
           getWidgetsForRegion: createRegistry({ right: [widget] }),
-          options: { preferredRegions: ['right'] },
+          regions: ['right'],
           typeId: 'queue',
         })
       ).toEqual({ ok: true, region: 'right' });
@@ -153,10 +152,11 @@ describe('widget placement commands', () => {
     const widgets = createWidgetCommands((action) => actions.push(action));
     const widget = createWidget({ allowMultiple: false, id: 'queue', label: 'Queue' });
 
-    openWidgetPlacement({
+    addWidgetPlacement({
+      createNew: true,
       widgets,
       getWidgetsForRegion: createRegistry({ right: [widget] }),
-      options: { createNew: true, preferredRegions: ['right'] },
+      regions: ['right'],
       typeId: 'queue',
     });
 
@@ -173,32 +173,32 @@ describe('widget placement commands', () => {
     const widgets = createWidgetCommands(dispatch);
 
     expect(
-      openWidgetPlacement({
+      addWidgetPlacement({
         widgets,
         getWidgetsForRegion: createRegistry({
           left: [createWidget({ allowedRegions: ['center'], id: 'models', label: 'Models' })],
         }),
-        options: { preferredRegions: ['left'] },
+        regions: ['left'],
         typeId: 'models',
       })
     ).toEqual({ ok: false, reason: 'unavailable' });
     expect(
-      openWidgetPlacement({
+      addWidgetPlacement({
         widgets,
         getWidgetsForRegion: createRegistry({
           bottom: [createWidget({ bottomPanel: 'tooltip', id: 'server-status', label: 'Server Status' })],
         }),
-        options: { preferredRegions: ['bottom'] },
+        regions: ['bottom'],
         typeId: 'server-status',
       })
     ).toEqual({ ok: false, reason: 'unavailable' });
     expect(
-      openWidgetPlacement({
+      addWidgetPlacement({
         widgets,
         getWidgetsForRegion: createRegistry({
           center: [createWidget({ centerPlacement: 'toolbar', id: 'toolbar-tools', label: 'Toolbar Tools' })],
         }),
-        options: { preferredRegions: ['center'] },
+        regions: ['center'],
         typeId: 'toolbar-tools',
       })
     ).toEqual({ ok: false, reason: 'unavailable' });
@@ -305,81 +305,5 @@ describe('floating window rail commands', () => {
     expect(docked.project.widgetRegions.right.instanceIds).toEqual(['gallery', 'image-map', 'queue']);
     // Nothing floats there: no dispatch, no region to move focus to.
     expect(stale.result).toBeNull();
-  });
-});
-
-const previewRegistry = createRegistry({ center: [createWidget({ id: 'preview', label: 'Preview' })] });
-
-const createPreviewToggleHarness = (
-  initial = workbenchReducer(createInitialWorkbenchState(), { presetId: 'automate', type: 'applyPreset' })
-) => {
-  let state = initial;
-  const dispatch = (action: WorkbenchAction): void => {
-    state = workbenchReducer(state, action);
-  };
-  const widgets = {
-    open: (options) => dispatch({ ...options, type: 'openRegionWidget' }),
-    select: (options) => dispatch({ ...options, type: 'selectRegionWidget' }),
-  } as WorkbenchWidgetCommands;
-  const toggle = () =>
-    toggleCenterPreview({
-      getWidgetsForRegion: previewRegistry,
-      project: getWidgetPlacementProject(getActiveProject(state)),
-      widgets,
-    });
-
-  return {
-    getProject: () => getActiveProject(state),
-    getRegions: () => getActiveProject(state).widgetRegions,
-    select: widgets.select,
-    toggle,
-  };
-};
-
-describe('toggleCenterPreview', () => {
-  it('swaps the preview into the center and back to the view it replaced', () => {
-    const { getRegions, toggle } = createPreviewToggleHarness();
-
-    expect(getRegions().center.activeInstanceId).toBe('workflow:center');
-    expect(toggle()).toBe(true);
-    expect(getRegions().center.activeInstanceId).toBe('preview');
-    expect(toggle()).toBe(true);
-    expect(getRegions().center.activeInstanceId).toBe('workflow:center');
-  });
-
-  it('docks a floating preview back to its rail slot, behind the tab already showing, and fronts it in the center', () => {
-    let state = workbenchReducer(createInitialWorkbenchState(), { presetId: 'automate', type: 'applyPreset' });
-    const railBefore = getActiveProject(state).widgetRegions.right;
-    state = workbenchReducer(state, { instanceId: 'preview', region: 'right', type: 'floatWidget' });
-    const { getProject, toggle } = createPreviewToggleHarness(state);
-
-    expect(toggle()).toBe(true);
-
-    expect(getProject().floatingWidgets).toBeUndefined();
-    expect(getProject().widgetRegions.center.activeInstanceId).toBe('preview');
-    expect(getProject().widgetRegions.right).toMatchObject({
-      activeInstanceId: railBefore.activeInstanceId,
-      instanceIds: railBefore.instanceIds,
-    });
-  });
-});
-
-describe('revealPlacedWidget', () => {
-  const reveal = (state: WorkbenchState) => {
-    let result: ReturnType<typeof revealPlacedWidget> = null;
-    const next = applyCommand(state, (widgets) => {
-      result = revealPlacedWidget({ project: getActiveProject(state), typeId: 'preview', widgets });
-    });
-    return { regions: getActiveProject(next).widgetRegions, result };
-  };
-
-  it('fronts a tab behind the rail before the one behind the center view', () => {
-    // Edit keeps Preview behind Canvas in the center and behind Layers in the right rail.
-    const edit = workbenchReducer(createInitialWorkbenchState(), { presetId: 'edit', type: 'applyPreset' });
-    const { regions, result } = reveal(edit);
-
-    expect(result).toEqual({ kind: 'docked', region: 'right' });
-    expect(regions.right.activeInstanceId).toBe('preview');
-    expect(regions.center).toBe(getActiveProject(edit).widgetRegions.center);
   });
 });

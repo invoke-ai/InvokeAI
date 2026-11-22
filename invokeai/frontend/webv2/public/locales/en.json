@@ -474,12 +474,12 @@
     },
     "invoke": {
       "actions": {
-        "addWidget": "Add {{label}}",
         "openModelManager": "Open Model Manager",
         "sendToGallery": "Send to Gallery",
         "show": "Show",
         "showLayer": "Show layer",
-        "showNode": "Show node"
+        "showNode": "Show node",
+        "showWidget": "Show {{label}}"
       },
       "addToQueue": "Add to queue",
       "expandingPrompts": "Expanding prompts…",
@@ -2789,6 +2789,15 @@
       "routeChanged": "Invoke now runs {{source}} and sends results to {{destination}}.",
       "switchedPreset": "Switched to {{preset}}"
     },
+    "workspace": {
+      "addHere": "Add to this workspace",
+      "addToCenter": "Add to the center",
+      "addToPanel": "Add to a panel",
+      "notHere": "{{widget}} isn't in this workspace",
+      "notInCenter": "{{widget}} isn't in this workspace's center",
+      "notInPanel": "{{widget}} isn't in a panel in this workspace",
+      "noWorkflowForm": "This workspace has no workflow form"
+    },
     "widgets": {
       "add": "Add",
       "addNamed": "Add {{label}}",
@@ -2917,6 +2926,7 @@
     "centerViewsAdd": "Add to center",
     "failure": {
       "compactLabel": "{{label}} failed — select to retry",
+      "details": "{{label}} error details",
       "copiedError": "Error details copied",
       "copyError": "Copy error",
       "copyErrorFailed": "Could not copy the error details",

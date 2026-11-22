@@ -998,6 +998,58 @@ describe('workbench widget region opening', () => {
   });
 });
 
+describe('fronting a placed widget', () => {
+  const edit = () => {
+    const state = workbenchReducer(createInitialWorkbenchState(), { presetId: 'edit', type: 'applyPreset' });
+
+    return workbenchReducer(state, { region: 'right', type: 'selectRegionWidget', widgetId: 'preview' });
+  };
+
+  it('never adds: an instance its region does not hold changes nothing', () => {
+    const before = edit();
+
+    expect(workbenchReducer(before, { instanceId: 'queue', region: 'right', type: 'frontRegionWidget' })).toBe(before);
+  });
+
+  it('opens and expands a closed, collapsed panel to front its member', () => {
+    const before = edit();
+    const collapsed = {
+      ...before,
+      projects: before.projects.map((project) => ({
+        ...project,
+        layout: { ...project.layout, panels: { ...project.layout.panels, isLeftOpen: false } },
+        widgetRegions: { ...project.widgetRegions, left: { ...project.widgetRegions.left, isCollapsed: true } },
+      })),
+    };
+
+    const project = getActiveProject(
+      workbenchReducer(collapsed, { instanceId: 'upscale', region: 'left', type: 'frontRegionWidget' })
+    );
+
+    expect(project.layout.panels.isLeftOpen).toBe(true);
+    expect(project.widgetRegions.left).toMatchObject({
+      activeInstanceId: 'upscale',
+      instanceIds: ['generate', 'upscale'],
+      isCollapsed: false,
+    });
+  });
+
+  it('fronts a center alternate while the rail showing the same instance fronts its neighbour', () => {
+    const project = getActiveProject(
+      workbenchReducer(edit(), { instanceId: 'preview', region: 'center', type: 'frontRegionWidget' })
+    );
+
+    expect(project.widgetRegions.center).toMatchObject({
+      activeInstanceId: 'preview',
+      instanceIds: ['canvas', 'preview'],
+    });
+    expect(project.widgetRegions.right).toMatchObject({
+      activeInstanceId: 'layers',
+      instanceIds: ['layers', 'preview'],
+    });
+  });
+});
+
 describe('adopting a project from another realm', () => {
   const galleryProject = (values: Record<string, unknown>) => {
     const project = createInitialWorkbenchState().projects[0]!;

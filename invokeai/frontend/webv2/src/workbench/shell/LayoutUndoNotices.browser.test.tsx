@@ -56,14 +56,13 @@ beforeEach(async () => {
   store().commands.layout.applyPreset('compose');
   stop = startNotificationToasts({
     actionContext: createEditorNotificationActionContext({
+      commands: store().commands,
       focus: { focusFloating: () => {}, focusRegion: () => {} },
       getWidgetById,
       getWidgetsForRegion,
-      notifications: store().commands.notifications,
       queries: store().queries,
       retryQueueItems: () => Promise.resolve([]),
       t: i18next.t,
-      widgets: store().commands.widgets,
     }),
     getNotifications: () => store().getSnapshot().notifications,
     getPreferences: () => ({ notifyOnEnqueue: true }),

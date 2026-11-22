@@ -47,7 +47,7 @@ vi.mock('@tanstack/react-router', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useNavigate: () => vi.fn(),
 }));
-vi.mock('@workbench/useOpenWorkbenchWidget', () => ({ useOpenWorkbenchWidget: () => vi.fn() }));
+vi.mock('@workbench/workspace/useWorkspaceOpen', () => ({ useWorkspaceOpen: () => vi.fn() }));
 vi.mock('@workbench/hotkeys/useShortcutBinding', () => ({
   useShortcutBinding: (commandId: string) =>
     commandId === 'app.openSettings' ? { aria: 'Control+Comma', display: 'Ctrl+,', parts: ['ctrl', ','] } : null,

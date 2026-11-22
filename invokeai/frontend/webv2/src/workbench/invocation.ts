@@ -46,6 +46,7 @@ import {
 import { isCompositableRegionalGuidanceLayer } from '@workbench/canvasLayerContent';
 
 import { describeCanvasInputIssue, getCanvasInputIssues } from './canvasGenerationInputs';
+import { getWidgetTypeIdForSourceId, invocationSources, isInvocationSourceAvailable } from './invocationSources';
 import { getActiveProjectGraph } from './projectWorkflows';
 import { getWorkbenchPreferences } from './settings/store';
 import { getProjectWidgetValues } from './widgetState';
@@ -99,24 +100,10 @@ export const isSameDynamicPromptsExpansionSource = (
       prepared.combinatorial === current.combinatorial &&
       prepared.maxPrompts === current.maxPrompts;
 
-export interface InvocationSourceMeta {
-  id: InvocationSourceId;
-  label: string;
-  available: boolean;
-}
-
 export interface ResultDestinationMeta {
   id: ResultDestination;
   label: string;
 }
-
-export const invocationSources: InvocationSourceMeta[] = [
-  { id: 'generate', label: 'Generate', available: true },
-  { id: 'workflow', label: 'Workflow', available: true },
-  { id: 'upscale', label: 'Upscale', available: true },
-  { id: 'video', label: 'Video', available: true },
-  { id: 'canvas', label: 'Canvas', available: true },
-];
 
 export const resultDestinations: ResultDestinationMeta[] = [
   { id: 'canvas', label: 'Canvas' },
@@ -127,9 +114,6 @@ const sourceLabels = new Map(invocationSources.map((source) => [source.id, sourc
 const destinationLabels = new Map(resultDestinations.map((destination) => [destination.id, destination.label]));
 
 export const getSourceLabel = (id: InvocationSourceId): string => sourceLabels.get(id) ?? 'Generate';
-
-export const isInvocationSourceAvailable = (id: InvocationSourceId): boolean =>
-  invocationSources.some((source) => source.id === id && source.available);
 
 export const getDestinationLabel = (id: ResultDestination): string => destinationLabels.get(id) ?? 'Canvas';
 
@@ -147,14 +131,6 @@ export const defaultInvocationRoute: InvocationRoute = {
 };
 
 const validDestinationIds = new Set(resultDestinations.map((destination) => destination.id));
-
-const sourceWidgetIds: Partial<Record<InvocationSourceId, WidgetId>> = {
-  canvas: 'canvas',
-  generate: 'generate',
-  upscale: 'upscale',
-  video: 'video',
-  workflow: 'workflow',
-};
 
 export interface InvocationRouteInput {
   generateValues: Record<string, unknown>;
@@ -358,7 +334,7 @@ export const resolveInvocationRouteInput = (
 ): ResolvedInvocationRoute => {
   const sourceId = route.sourceId;
   const destination = route.destination;
-  const sourceWidgetId = sourceWidgetIds[sourceId];
+  const sourceWidgetId = getWidgetTypeIdForSourceId(sourceId);
   // Route-rendering surfaces subscribe to templates and preferences because readiness reads them imperatively.
   const projectGraphReadiness =
     sourceId === 'workflow'
@@ -370,7 +346,7 @@ export const resolveInvocationRouteInput = (
 
   if (!isInvocationSourceAvailable(sourceId)) {
     validationReasons.push(`${getSourceLabel(sourceId)} is not an available invocation source.`);
-  } else if (sourceWidgetId && !isWidgetMounted(input, sourceWidgetId)) {
+  } else if (!isWidgetMounted(input, sourceWidgetId)) {
     validationReasons.push({ routeIssue: { kind: 'sourceNotMounted', sourceId } });
   }
 

@@ -517,7 +517,7 @@ export const WorkflowMenuItems = (props: WorkflowWidgetViewProps) => {
   const isHeaderHistoryHidden = headerHistoryStore.useSelector((snapshot) => Boolean(snapshot.hiddenIn[headerKey]));
 
   const openDetailsPanel = useCallback(() => {
-    widgets.open({ region: 'left', widgetId: 'workflow' });
+    widgets.open({ surface: 'panel', widgetId: 'workflow' });
     widgets.patchValues('workflow', { editTab: 'details', panelMode: 'edit' });
   }, [widgets]);
   const exportWorkflow = useCallback(() => {

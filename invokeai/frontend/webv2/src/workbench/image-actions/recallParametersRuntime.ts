@@ -7,7 +7,7 @@ import { getProjectWidgetValues } from '@workbench/widgetState';
 import type { PendingRecallEvent, RecallRevealContext, RecallRuntime } from './recallEventRuntime';
 
 import { executeRecallParameters } from './executeRecallParameters';
-import { bringRecallWidgetToFront, createRecallEventRuntime } from './recallEventRuntime';
+import { bringRecallWidgetToFront, createRecallEventRuntime, withRecallWidgetOffer } from './recallEventRuntime';
 import { isRecallParametersUpdatedEvent } from './recallParameters';
 
 /** Apply `recall_parameters_updated` events to their arrival-time project's Generate panel. */
@@ -20,7 +20,7 @@ export const createRecallParametersRuntime = ({
   reveal,
   t,
 }: {
-  commands: Pick<WorkbenchCommands, 'generation' | 'notifications' | 'widgets' | 'canvas'>;
+  commands: Pick<WorkbenchCommands, 'canvas' | 'generation' | 'layout' | 'notifications' | 'widgets'>;
   getSessionUserId?: () => string | null;
   hub: Pick<SocketHub, 'on'>;
   queries: Pick<WorkbenchQueries, 'getProject' | 'getSnapshot'>;
@@ -32,7 +32,7 @@ export const createRecallParametersRuntime = ({
   createRecallEventRuntime({
     apply: async ({ parameters }, { models, owner, projectId }) => {
       const applied = await executeRecallParameters({
-        commands,
+        commands: withRecallWidgetOffer(commands, { projectId, queries, reveal, typeId: 'generate' }),
         canvasTarget: { commands, projectId, getProject: () => queries.getProject(projectId) ?? null },
         t,
         getGenerateValues: () => {

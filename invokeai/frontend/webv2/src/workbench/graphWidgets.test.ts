@@ -3,12 +3,10 @@ import { describe, expect, it } from 'vitest';
 import {
   getNaturalDestination,
   getPlacedWidgetTypeIds,
-  getSourceIdForWidgetTypeId,
   getVisibleWidgetTypeIds,
-  getWidgetTypeIdForSourceId,
   graphWidgetSources,
-  isGraphWidgetTypeId,
 } from './graphWidgets';
+import { getSourceIdForWidgetTypeId, getWidgetTypeIdForSourceId, isGraphWidgetTypeId } from './invocationSources';
 import { createInitialWorkbenchState, workbenchReducer } from './workbenchState.testing';
 
 const applyPreset = (presetId: string) => {

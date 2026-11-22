@@ -1,6 +1,7 @@
 import type { ComponentModelConfig } from '@features/generation/contracts';
 import type { ModelsSnapshot } from '@features/models';
 import type { SocketHub } from '@platform/transport/socketHub';
+import type { RegisteredWidget } from '@workbench/widgetContracts';
 import type { TFunction } from 'i18next';
 
 import { accountLifecycle } from '@platform/state/accountLifecycle';
@@ -77,17 +78,26 @@ const promptOf = (store: ReturnType<typeof createWorkbenchStore>, projectId: str
   return project ? getProjectWidgetValues(project, 'generate').positivePrompt : 'project missing';
 };
 
+/** The registry's view of the Generate widget: placeable on the left, nothing to preload. */
+const generateWidget = {
+  implementation: { preload: () => undefined },
+  manifest: { allowedRegions: ['left'], id: 'generate' },
+  status: 'enabled',
+} as unknown as RegisteredWidget;
+
 const createRuntime = (
   store: ReturnType<typeof createWorkbenchStore>,
   hub: Pick<SocketHub, 'on'>,
   options: Partial<Parameters<typeof createRecallParametersRuntime>[0]> = {}
-  // Nothing registers in this suite, so a reveal can only select or raise an instance already in the layout.
 ) =>
   createRecallParametersRuntime({
     commands: store.commands,
     hub,
     queries: store.queries,
-    reveal: { getWidgetsForRegion: () => [], isEditingText: () => false },
+    reveal: {
+      getWidgetsForRegion: (region) => (region === 'left' ? [generateWidget] : []),
+      isEditingText: () => false,
+    },
     t,
     ...options,
   });

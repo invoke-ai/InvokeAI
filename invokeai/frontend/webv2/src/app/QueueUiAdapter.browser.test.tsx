@@ -26,7 +26,7 @@ vi.mock('@features/queue/publicApi', async (importOriginal) => ({
   getQueueReadModelOptions: () => ({ queryFn: () => null, queryKey: ['queue'], staleTime: Number.POSITIVE_INFINITY }),
 }));
 vi.mock('@workbench/useNotify', () => ({ useNotify: () => ({ error: vi.fn(), info: vi.fn(), success: vi.fn() }) }));
-vi.mock('@workbench/useOpenWorkbenchWidget', () => ({ useOpenWorkbenchWidget: () => vi.fn() }));
+vi.mock('@workbench/workspace/useWorkspaceOpen', () => ({ useWorkspaceOpen: () => vi.fn() }));
 vi.mock('@workbench/WorkbenchContext', () => ({
   useActiveProjectSelector: (selector: (project: Project) => unknown, isEqual = shallowEqual) =>
     useExternalStoreSelector(

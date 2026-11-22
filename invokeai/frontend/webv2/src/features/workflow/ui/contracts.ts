@@ -7,12 +7,6 @@ import type { ReactNode } from 'react';
 export type WorkflowRegion = 'left' | 'right' | 'bottom' | 'center' | 'dialog' | 'popover' | 'floating';
 
 /**
- * Mirror Workbench regions structurally; app/WorkflowUiAdapter widgets wiring catches drift without a forbidden
- * feature-to-workbench import.
- */
-export type WorkflowWidgetPanelRegion = 'left' | 'right' | 'bottom' | 'center';
-
-/**
  * Mirror invocation source IDs structurally; adapter and WidgetActionsMenu wiring provide type checks across the
  * ownership boundary.
  */
@@ -73,7 +67,11 @@ export interface WorkflowCommands {
 }
 
 export interface WorkflowWidgetCommands {
-  open(options: { region: WorkflowWidgetPanelRegion; widgetId: string }): void;
+  /**
+   * Shows a widget wherever the workspace places it: 'stage' asks for the center, 'panel' for a side panel. Mirrors the
+   * Workbench open intent structurally; app/WorkflowUiAdapter wiring catches drift without a forbidden import.
+   */
+  open(options: { surface?: 'stage' | 'panel'; widgetId: string }): void;
   patchValues(widgetId: string, values: Record<string, unknown>): void;
 }
 

@@ -521,6 +521,8 @@ const createCommands = (
           viewport?: ActionPayload<'floatWidget'>['viewport']
         ) => ({ instanceId, ...(region ? { region } : {}), ...(viewport ? { viewport } : {}) })
       ),
+      /** Fronts an instance its region already holds, opening the panel; never adds, moves or docks one. */
+      front: command('frontRegionWidget'),
       raiseFloating: command('raiseFloatingWidget', (instanceId: string) => ({ instanceId })),
       move: command('moveWidgetInstance'),
       open: command('openRegionWidget'),

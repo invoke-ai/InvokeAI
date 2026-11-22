@@ -48,6 +48,7 @@ vi.mock('@features/gallery', async (importOriginal) => {
   return { ...gallery, galleryTransfers: { ...gallery.galleryTransfers, upload: mocks.upload } };
 });
 
+vi.mock('@workbench/workspace/useWorkspaceOpen', () => ({ useWorkspaceOpen: () => vi.fn() }));
 vi.mock('@workbench/WorkbenchContext', async (importOriginal) => ({
   ...(await importOriginal<typeof WorkbenchContextModule>()),
   useActiveProjectId: () => PROJECT_ID,

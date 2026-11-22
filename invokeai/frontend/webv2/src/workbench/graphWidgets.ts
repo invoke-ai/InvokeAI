@@ -3,36 +3,13 @@ import type { Project } from '@workbench/projectContracts';
 import type { WidgetTypeId } from '@workbench/widgetContracts';
 
 import { autoSwitchDestinations } from './autoRoutePolicy';
-import { getSourceLabel, isInvocationSourceAvailable } from './invocation';
-
-const graphWidgetTypeIds = ['generate', 'canvas', 'upscale', 'video', 'workflow'] as const;
-
-export type GraphWidgetTypeId = (typeof graphWidgetTypeIds)[number];
-
-const sourceIdsByWidgetTypeId: Record<GraphWidgetTypeId, InvocationSourceId> = {
-  canvas: 'canvas',
-  generate: 'generate',
-  upscale: 'upscale',
-  video: 'video',
-  workflow: 'workflow',
-};
-
-const widgetTypeIdsBySourceId: Record<InvocationSourceId, GraphWidgetTypeId> = {
-  canvas: 'canvas',
-  generate: 'generate',
-  upscale: 'upscale',
-  video: 'video',
-  workflow: 'workflow',
-};
-
-export const isGraphWidgetTypeId = (typeId: WidgetTypeId): typeId is GraphWidgetTypeId =>
-  (graphWidgetTypeIds as readonly string[]).includes(typeId);
-
-export const getSourceIdForWidgetTypeId = (typeId: WidgetTypeId): InvocationSourceId | null =>
-  isGraphWidgetTypeId(typeId) ? sourceIdsByWidgetTypeId[typeId] : null;
-
-export const getWidgetTypeIdForSourceId = (sourceId: InvocationSourceId): GraphWidgetTypeId =>
-  widgetTypeIdsBySourceId[sourceId];
+import { getSourceLabel } from './invocation';
+import {
+  graphWidgetTypeIds,
+  isInvocationSourceAvailable,
+  sourceIdsByWidgetTypeId,
+  type GraphWidgetTypeId,
+} from './invocationSources';
 
 export const getNaturalDestination = (sourceId: InvocationSourceId): ResultDestination =>
   autoSwitchDestinations[sourceId];

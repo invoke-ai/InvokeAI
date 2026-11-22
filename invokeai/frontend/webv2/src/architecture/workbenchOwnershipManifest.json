@@ -70,6 +70,10 @@
     "widgets": {
       "targetOwner": "workbench",
       "targetPath": "workbench/widgets"
+    },
+    "workspace": {
+      "targetOwner": "workbench",
+      "targetPath": "workbench/workspace"
     }
   },
   "overrides": [
@@ -111,6 +115,7 @@
     "iconResolver.tsx": "workbench",
     "invocation.ts": "workbench",
     "invocationContracts.ts": "workbench",
+    "invocationSources.ts": "workbench",
     "invocationPreparation.ts": "workbench",
     "invocationSubmit.ts": "workbench",
     "layerPanelState.ts": "workbench",
@@ -134,7 +139,6 @@
     "queueHistoryContracts.ts": "workbench",
     "useCanvasProjectMutationDispatch.ts": "workbench",
     "useNotify.ts": "workbench",
-    "useOpenWorkbenchWidget.ts": "workbench",
     "widgetContracts.ts": "workbench",
     "widgetDnd.ts": "workbench",
     "widgetImplementationResource.ts": "workbench",

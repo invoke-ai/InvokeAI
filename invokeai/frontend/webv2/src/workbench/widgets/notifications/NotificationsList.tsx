@@ -83,14 +83,13 @@ export const NotificationsList = () => {
   const actionContext = useMemo(
     () =>
       createEditorNotificationActionContext({
+        commands,
         focus,
         getWidgetById,
         getWidgetsForRegion,
-        notifications: commands.notifications,
         queries,
         retryQueueItems: queueCommands.retryItems,
         t: i18n.t,
-        widgets: commands.widgets,
       }),
     [commands, focus, getWidgetById, getWidgetsForRegion, i18n, queries]
   );

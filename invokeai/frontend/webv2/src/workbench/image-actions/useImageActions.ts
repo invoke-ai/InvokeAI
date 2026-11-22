@@ -72,10 +72,10 @@ import {
 import { getProjectSyncSnapshot } from '@workbench/projects/syncStore';
 import { useWorkbenchPreferenceSelector } from '@workbench/settings/store';
 import { useNotify } from '@workbench/useNotify';
-import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
 import { useRevealLayerProperties } from '@workbench/widgets/layers/revealLayerProperties';
 import { getProjectWidgetInstance, getResolvedProjectWidgetValues } from '@workbench/widgetState';
 import { useWorkbenchCommands, useWorkbenchQueries, useWorkbenchSelector } from '@workbench/WorkbenchContext';
+import { useWorkspaceOpen } from '@workbench/workspace/useWorkspaceOpen';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -246,7 +246,7 @@ export const useImageActions = ({
   onImagesDeleted?: (imageNames: string[]) => void;
   requestDeletionConfirmation: RequestDeletionConfirmation;
 }): ImageActions => {
-  const openWorkbenchWidget = useOpenWorkbenchWidget();
+  const open = useWorkspaceOpen();
   const revealLayerProperties = useRevealLayerProperties();
   const commands = useWorkbenchCommands();
   const { gallery, generation, notifications } = commands;
@@ -1067,7 +1067,7 @@ export const useImageActions = ({
         } else {
           gallery.selectItem(item, projectId, selectionPage, true);
         }
-        openWorkbenchWidget('preview', { preferredRegions: ['center'], requireCenterView: true });
+        open({ surface: 'stage', typeId: 'preview' });
       },
       setItemsStarred,
       copyImage: async (image) => {
@@ -1204,8 +1204,7 @@ export const useImageActions = ({
           isProjectActive: () => !projectId || queries.isActiveProject(projectId),
           media: { kind: 'image', name: image.imageName },
           notifications,
-          openWorkflowEditor: () =>
-            openWorkbenchWidget('workflow', { preferredRegions: ['center'], requireCenterView: true }).ok,
+          openWorkflowEditor: () => open({ surface: 'stage', typeId: 'workflow' }).ok,
           t,
         }),
       loadVideoWorkflow: (item) =>
@@ -1213,8 +1212,7 @@ export const useImageActions = ({
           isProjectActive: () => !projectId || queries.isActiveProject(projectId),
           media: { kind: 'video', name: item.name },
           notifications,
-          openWorkflowEditor: () =>
-            openWorkbenchWidget('workflow', { preferredRegions: ['center'], requireCenterView: true }).ok,
+          openWorkflowEditor: () => open({ surface: 'stage', typeId: 'workflow' }).ok,
           t,
         }),
       recallVideoData: async (item, kind) => {
@@ -1231,7 +1229,7 @@ export const useImageActions = ({
         });
 
         if (isAccountScopeCurrent(owner) && didRecall && (!projectId || queries.isActiveProject(projectId))) {
-          openWorkbenchWidget('video', { preferredRegions: ['left'] });
+          open({ surface: 'panel', typeId: 'video' });
         }
       },
       savePromptAsTemplate: async (image) => {
@@ -1249,7 +1247,7 @@ export const useImageActions = ({
             return;
           }
 
-          openWorkbenchWidget('generate', { preferredRegions: ['left'] });
+          open({ surface: 'panel', typeId: 'generate' });
           setPendingPromptTemplateDraft({ negativePrompt, positivePrompt });
         } catch (error: unknown) {
           if (!isAccountScopeCurrent(owner)) {
@@ -1266,7 +1264,7 @@ export const useImageActions = ({
         ),
       openImageInPreview: (image) => {
         gallery.selectImage(image, projectId);
-        openWorkbenchWidget('preview', { preferredRegions: ['center'], requireCenterView: true });
+        open({ surface: 'stage', typeId: 'preview' });
       },
       recallImageData: async (image, kind) => {
         const owner = captureAccountScope();
@@ -1290,7 +1288,7 @@ export const useImageActions = ({
         });
 
         if (isAccountScopeCurrent(owner) && didRecall && (!projectId || queries.isActiveProject(projectId))) {
-          openWorkbenchWidget('generate', { preferredRegions: ['left'] });
+          open({ surface: 'panel', typeId: 'generate' });
         }
       },
       selectForCompare,
@@ -1316,7 +1314,7 @@ export const useImageActions = ({
             notifications.add({ kind: notice.kind, title: t(notice.titleKey, notice.options ?? {}) });
           }
           if (result.status === 'imported' && result.projectId !== null && queries.isActiveProject(result.projectId)) {
-            openWorkbenchWidget('canvas', { preferredRegions: ['center'], requireCenterView: true });
+            open({ surface: 'stage', typeId: 'canvas' });
           }
         } catch (error: unknown) {
           if (!isAccountScopeCurrent(owner)) {
@@ -1358,7 +1356,7 @@ export const useImageActions = ({
           notifications.add({ kind: notice.kind, title: t(notice.titleKey, notice.options ?? {}) });
 
           if (result.status === 'imported' && queries.isActiveProject(project.id)) {
-            openWorkbenchWidget('canvas', { preferredRegions: ['center'], requireCenterView: true });
+            open({ surface: 'stage', typeId: 'canvas' });
           }
         } catch (error: unknown) {
           if (!isAccountScopeCurrent(owner)) {
@@ -1396,8 +1394,7 @@ export const useImageActions = ({
 
           if ((result.status === 'filled' || result.status === 'created') && queries.isActiveProject(targetProjectId)) {
             // No trigger to return focus to, so the Canvas takes it.
-            openWorkbenchWidget('canvas', { preferredRegions: ['center'], requireCenterView: true });
-            revealLayerProperties(result.layerId);
+            revealLayerProperties(result.layerId, { focus: true });
           }
         } catch (error: unknown) {
           if (!isAccountScopeCurrent(owner)) {
@@ -1432,9 +1429,9 @@ export const useImageActions = ({
           return;
         }
 
-        openWorkbenchWidget('video', { preferredRegions: ['left'] });
+        // Values land at once; the route waits for the panel, which may be a workspace away.
         commands.widgets.patchValues('video', placement.patch, projectId);
-        generation.setSource('video');
+        open({ surface: 'panel', typeId: 'video' }, { afterShown: () => generation.setSource('video') });
         if (!placement.usable) {
           notifications.add({
             kind: 'info',
@@ -1461,7 +1458,7 @@ export const useImageActions = ({
         }
 
         commands.widgets.patchValues('video', placement.patch, projectId);
-        openWorkbenchWidget('video', { preferredRegions: ['left'] });
+        open({ surface: 'panel', typeId: 'video' });
       },
       useAsConditioningClip: (item, role) => {
         const placement = placeConditioningClip({ models, role, video: item, videoValues: getLatestVideoValues() });
@@ -1481,7 +1478,7 @@ export const useImageActions = ({
         }
 
         commands.widgets.patchValues('video', placement.patch, projectId);
-        openWorkbenchWidget('video', { preferredRegions: ['left'] });
+        open({ surface: 'panel', typeId: 'video' });
         if (placement.displaced) {
           notifications.add({
             kind: 'info',
@@ -1498,7 +1495,7 @@ export const useImageActions = ({
         }
 
         generation.patchSettings({ referenceImages: result.referenceImages }, projectId);
-        openWorkbenchWidget('generate', { preferredRegions: ['left'] });
+        open({ surface: 'panel', typeId: 'generate' });
       },
     };
   }, [
@@ -1516,7 +1513,7 @@ export const useImageActions = ({
     notifications,
     notify,
     onImagesDeleted,
-    openWorkbenchWidget,
+    open,
     projectId,
     queryClient,
     queries,

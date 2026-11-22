@@ -207,6 +207,7 @@ const PALETTE_HIDDEN_COMMANDS = new Set([
 
 /** App-category commands regrouped into palette-facing sections. */
 const APP_COMMAND_GROUPS: Record<string, string> = {
+  'app.backToPreviousWorkspace': 'Navigation',
   'app.cancelQueueItem': 'Queue',
   'app.clearQueue': 'Queue',
   'app.focusPrompt': 'Generation',

@@ -29,17 +29,16 @@ const setup = (overrides: Partial<EditorNotificationActionSources> = {}) => {
   const store = createWorkbenchStore();
   const focusMoves: FocusMove[] = [];
   const context = createEditorNotificationActionContext({
+    commands: store.commands,
     focus: {
       focusFloating: (instanceId) => focusMoves.push(['floating', instanceId]),
       focusRegion: (region, typeId) => focusMoves.push(['region', region, typeId]),
     },
     getWidgetById,
     getWidgetsForRegion,
-    notifications: store.commands.notifications,
     queries: store.queries,
     retryQueueItems: () => Promise.resolve([]),
     t: i18n.t,
-    widgets: store.commands.widgets,
     ...overrides,
   });
   const project = (): Project => store.getSnapshot().activeProject;
@@ -90,17 +89,28 @@ describe('editor notification actions', () => {
     expect(focusMoves).toEqual([['floating', 'queue']]);
   });
 
-  it('opens a widget the layout does not hold and focuses where it went', () => {
-    const { context, focusMoves, frontOf, project } = setup();
-    const holdsWorkflow = Object.values(project().widgetRegions).some((region) =>
-      region.instanceIds.some((instanceId) => project().widgetInstances[instanceId]?.typeId === 'workflow')
-    );
+  it('offers to add a widget no workspace places, and adds it here on request', () => {
+    const { context, focusMoves, frontOf, store } = setup();
 
-    expect(holdsWorkflow).toBe(false);
-    context.openWidget('workflow');
+    context.openWidget('diagnostics');
+    expect(store.getSnapshot().notifications[0]?.actions).toEqual([{ kind: 'add-widget', widgetId: 'diagnostics' }]);
+    expect(focusMoves).toEqual([]);
 
-    expect(frontOf('center')?.typeId).toBe('workflow');
-    expect(focusMoves).toEqual([['region', 'center', 'workflow']]);
+    context.addWidget('diagnostics');
+
+    expect(frontOf('right')?.typeId).toBe('diagnostics');
+    expect(focusMoves).toEqual([['region', 'right', 'diagnostics']]);
+  });
+
+  it('adds on the surface the open asked for, never replacing the stage for a panel', () => {
+    const { context, frontOf, project, store } = setup();
+    store.commands.layout.applyPreset('edit');
+
+    context.addWidget('gallery', 'panel');
+
+    expect(frontOf('right')?.typeId).toBe('gallery');
+    expect(frontOf('center')?.typeId).toBe('canvas');
+    expect(project().widgetRegions.center.instanceIds).toEqual(['canvas', 'preview']);
   });
 
   it('shows a queue item by opening the queue at it', () => {

@@ -172,7 +172,6 @@ const EDITOR_BOOT_SHARED_MODULES = [
   '/platform/ui/ProgressBadge.tsx',
   '/workbench/widgets/layers/layerPropertiesRequestStore.ts',
   '/workbench/widgets/layers/revealLayerProperties.ts',
-  '/workbench/useOpenWorkbenchWidget.ts',
   '/features/queue/reveal.ts',
   '/features/queue/ui/queueUiStore.ts',
   '/workbench/shell/notifications/editorNotificationActions.ts',

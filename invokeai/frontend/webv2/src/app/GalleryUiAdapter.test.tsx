@@ -1,9 +1,9 @@
 import type { GalleryUiAdapter } from '@features/gallery/react';
 import type { Project } from '@workbench/projectContracts';
 import type * as SettingsStoreModule from '@workbench/settings/store';
-import type * as OpenWorkbenchWidgetModule from '@workbench/useOpenWorkbenchWidget';
-import type { OpenWorkbenchWidgetOptions, RegisteredWidget, WidgetTypeId } from '@workbench/widgetContracts';
+import type { RegisteredWidget } from '@workbench/widgetContracts';
 import type { WorkbenchSnapshot } from '@workbench/workbenchStore';
+import type { OpenInWorkspace } from '@workbench/workspace/workspaceNavigation';
 import type { ReactNode } from 'react';
 
 import { accountLifecycle } from '@platform/state/accountLifecycle';
@@ -54,12 +54,17 @@ vi.mock('@workbench/widgets/preview/livePreviewFollow', () => ({
   }),
 }));
 vi.mock('@workbench/projects/useProjectFileActions', () => ({ useExportLibraryProject: () => noop }));
-// The real open command against the test store, with a registry that holds only Preview.
-vi.mock('@workbench/useOpenWorkbenchWidget', async (importOriginal) => {
-  const actual = await importOriginal<typeof OpenWorkbenchWidgetModule>();
+// The real resolver against the test store, with a registry that holds only Preview.
+vi.mock('@workbench/workspace/useWorkspaceOpen', async () => {
+  const { openInWorkspace } = await import('@workbench/workspace/workspaceNavigation');
+  const ports = () => ({
+    commands: store.commands,
+    getWidgetsForRegion: () => [previewWidget],
+    queries: store.queries,
+  });
+
   return {
-    useOpenWorkbenchWidget: () => (widgetId: WidgetTypeId, options?: OpenWorkbenchWidgetOptions) =>
-      actual.openWorkbenchWidget(store.commands.widgets, () => [previewWidget], widgetId, options),
+    useWorkspaceOpen: (): OpenInWorkspace => (intents, options) => openInWorkspace(ports(), intents, options),
   };
 });
 vi.mock('@workbench/WorkbenchContext', () => ({
@@ -91,7 +96,7 @@ const values = (projectId: string) => getProjectWidgetValues(store.queries.getPr
 beforeEach(() => {
   vi.clearAllMocks();
   accountLifecycle.activate('gallery-adapter-test');
-  store = createWorkbenchStore();
+  store = createWorkbenchStore(undefined, { isLoaded: () => true });
 });
 afterEach(() => accountLifecycle.invalidate());
 
@@ -146,7 +151,7 @@ describe('Gallery live-follow adapter', () => {
     expect(regionSummary()).toEqual(before);
   });
 
-  it('opens Preview in the center when the layout has none', () => {
+  it('enters a workspace built around Preview when this one places none', () => {
     const preview = previewId();
     for (const region of ['center', 'right', 'left', 'bottom'] as const) {
       if (activeProject().widgetRegions[region].instanceIds.includes(preview)) {
@@ -159,6 +164,7 @@ describe('Gallery live-follow adapter', () => {
 
     renderAdapter().followProgressSession('run:2', { revealPreview: true });
 
+    expect(activeProject().layout.presetId).toBe('video');
     expect(activeProject().widgetRegions.center.activeInstanceId).toBe(previewId());
   });
 

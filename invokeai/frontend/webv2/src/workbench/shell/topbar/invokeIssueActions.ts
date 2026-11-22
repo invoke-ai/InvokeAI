@@ -10,15 +10,14 @@ import { useCapabilities } from '@features/identity';
 import { openModelManager } from '@features/models';
 import { UPSCALE_SECTION_IDS } from '@features/upscale';
 import { revealWorkflowNode } from '@features/workflow/react';
-import { useWorkbenchFocus } from '@workbench/focusRegions';
-import { getWidgetTypeIdForSourceId } from '@workbench/graphWidgets';
+import { getWidgetTypeIdForSourceId } from '@workbench/invocationSources';
 import { patchWorkbenchPreferences, getWorkbenchPreferences } from '@workbench/settings/store';
-import { openWorkbenchWidget, revealOrOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
 import { resolveWidgetLabel } from '@workbench/widgetLabels';
 import { useRevealLayerProperties } from '@workbench/widgets/layers/revealLayerProperties';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import { useWorkbenchCommands, useWorkbenchQueries } from '@workbench/WorkbenchContext';
 import { useWorkbenchWidgetRegistry } from '@workbench/WorkbenchWidgetRegistryContext';
+import { useWorkspaceOpen } from '@workbench/workspace/useWorkspaceOpen';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -39,17 +38,17 @@ const isMissingModelIssue = (issue: GenerationIssue): boolean =>
 /** Each Invoke issue's ways out: a one-step fix where one exists, then a jump to where it is fixed. */
 export const useInvokeIssueActions = (): ((issue: InvocationIssue) => InvokeIssueAction[]) => {
   const { t } = useTranslation();
-  const { generation, widgets } = useWorkbenchCommands();
+  const { generation } = useWorkbenchCommands();
   const queries = useWorkbenchQueries();
-  const focus = useWorkbenchFocus();
-  const { getWidgetById, getWidgetsForRegion } = useWorkbenchWidgetRegistry();
+  const open = useWorkspaceOpen();
+  const { getWidgetById } = useWorkbenchWidgetRegistry();
   const revealLayerProperties = useRevealLayerProperties();
   const { canManageModels } = useCapabilities();
 
   return useCallback(
     ({ target }: InvocationIssue): InvokeIssueAction[] => {
-      const reveal = (widgetId: string) =>
-        revealOrOpenWorkbenchWidget({ focus, getWidgetsForRegion, queries, widgets }, widgetId);
+      // What the reveal shows inside the widget waits for it, which may be a workspace away.
+      const reveal = (widgetId: string, afterShown?: () => void) => open({ typeId: widgetId }, { afterShown });
       const show = (run: () => void): InvokeIssueAction => ({
         id: 'show',
         label: t('topbar.invoke.actions.show'),
@@ -101,8 +100,7 @@ export const useInvokeIssueActions = (): ((issue: InvocationIssue) => InvokeIssu
                   },
                 });
               }
-              reveal('generate');
-              revealGenerateIssue(issue);
+              reveal('generate', () => revealGenerateIssue(issue));
             })
           );
 
@@ -120,8 +118,7 @@ export const useInvokeIssueActions = (): ((issue: InvocationIssue) => InvokeIssu
                   },
                 });
               }
-              reveal(target.widgetId);
-              revealPositivePrompt(target.widgetId);
+              reveal(target.widgetId, () => revealPositivePrompt(target.widgetId));
             }),
           ];
         case 'layer':
@@ -139,16 +136,8 @@ export const useInvokeIssueActions = (): ((issue: InvocationIssue) => InvokeIssu
               label: t('topbar.invoke.actions.showNode'),
               run: () => {
                 // The editor shows in the center; a side panel holds the workflow's form, which has no graph to select.
-                const opened = openWorkbenchWidget(widgets, getWidgetsForRegion, 'workflow', {
-                  preferredRegions: ['center'],
-                  requireCenterView: true,
-                });
-
                 // Without an editor to show it in, a selection request would wait for one that may never mount.
-                if (opened.ok) {
-                  focus.focusRegion(opened.region, 'workflow');
-                  revealWorkflowNode(target.nodeId);
-                }
+                open({ surface: 'stage', typeId: 'workflow' }, { afterShown: () => revealWorkflowNode(target.nodeId) });
               },
             },
           ];
@@ -159,8 +148,8 @@ export const useInvokeIssueActions = (): ((issue: InvocationIssue) => InvokeIssu
           return widget
             ? [
                 {
-                  id: 'add',
-                  label: t('topbar.invoke.actions.addWidget', { label: resolveWidgetLabel(widget.manifest, t) }),
+                  id: 'show',
+                  label: t('topbar.invoke.actions.showWidget', { label: resolveWidgetLabel(widget.manifest, t) }),
                   run: () => reveal(widgetId),
                 },
               ]
@@ -179,6 +168,6 @@ export const useInvokeIssueActions = (): ((issue: InvocationIssue) => InvokeIssu
           return [show(() => reveal(target.widgetId))];
       }
     },
-    [canManageModels, focus, generation, getWidgetById, getWidgetsForRegion, queries, revealLayerProperties, t, widgets]
+    [canManageModels, generation, getWidgetById, open, queries, revealLayerProperties, t]
   );
 };

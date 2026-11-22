@@ -21,7 +21,7 @@ import {
 } from '@workbench/widget-frame';
 import { areWidgetRenderInstancesEqual } from '@workbench/widget-frame/widgetRenderInstance';
 import { resolveDockLabel, resolveWidgetLabel } from '@workbench/widgetLabels';
-import { closeWidgetPlacement, openWidgetPlacement, revealWidgetPlacement } from '@workbench/widgetPlacementCommands';
+import { addWidgetPlacement, closeWidgetPlacement, revealWidgetPlacement } from '@workbench/widgetPlacementCommands';
 import { areWidgetPlacementProjectsEqual, getWidgetPlacementProject } from '@workbench/widgetPlacementMeta';
 import {
   createWidgetRegionViewModelFromState,
@@ -45,7 +45,7 @@ import {
 type CenterWidgetItem = PlacedWidgetRegionItem<WidgetPlacementInstanceMeta>;
 
 const CENTER_MENU_POSITIONING = { placement: 'bottom-start' } as const;
-const CENTER_PREFERRED_REGIONS = ['center'] as const;
+const CENTER_REGIONS = ['center'] as const;
 
 const CENTER_CHROME_INSET_STYLE = { '--wb-center-chrome-inset': '3rem' } as React.CSSProperties;
 // Reserve a usable center width; side panels shrink to honor this floor.
@@ -133,14 +133,12 @@ export const CenterArea = () => {
 
   const openCenterWidget = useCallback(
     (item: WidgetEnableMenuItem) =>
-      openWidgetPlacement({
-        widgets,
+      addWidgetPlacement({
+        createNew: item.allowMultiple,
         getWidgetsForRegion,
-        options: {
-          createNew: item.allowMultiple,
-          preferredRegions: CENTER_PREFERRED_REGIONS,
-        },
+        regions: CENTER_REGIONS,
         typeId: item.typeId,
+        widgets,
       }),
     [widgets]
   );

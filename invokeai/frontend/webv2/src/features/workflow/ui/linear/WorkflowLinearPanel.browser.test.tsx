@@ -683,7 +683,7 @@ describe('Workflow form empty states', () => {
 
     await act(() => userEvent.click(button!));
 
-    expect(emptyStateOpen).toHaveBeenCalledExactlyOnceWith({ region: 'center', widgetId: 'workflow' });
+    expect(emptyStateOpen).toHaveBeenCalledExactlyOnceWith({ surface: 'stage', widgetId: 'workflow' });
   });
 
   it('tells a form builder how to add and arrange fields', async () => {

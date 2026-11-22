@@ -99,7 +99,7 @@ export const attachRecallParametersRuntime = ({
   reveal,
   t,
 }: {
-  commands: Pick<WorkbenchCommands, 'generation' | 'notifications' | 'widgets' | 'canvas'>;
+  commands: Pick<WorkbenchCommands, 'canvas' | 'generation' | 'layout' | 'notifications' | 'widgets'>;
   getSessionUserId?: () => string | null;
   hub: Pick<SocketHub, 'on'>;
   load?: () => Promise<RecallParametersRuntimeModule>;
@@ -132,7 +132,7 @@ export const attachVideoRecallRuntime = ({
   reveal,
   t,
 }: {
-  commands: Pick<WorkbenchCommands, 'notifications' | 'widgets'>;
+  commands: Pick<WorkbenchCommands, 'layout' | 'notifications' | 'widgets'>;
   getSessionUserId?: () => string | null;
   hub: Pick<SocketHub, 'on'>;
   load?: () => Promise<VideoRecallRuntimeModule>;

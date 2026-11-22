@@ -12,13 +12,13 @@ import { useQueryClient } from '@tanstack/react-query';
 import { isUnsubmittedQueueItem } from '@workbench/canvasStagingView';
 import { useWorkbenchPreferences } from '@workbench/settings/store';
 import { useNotify } from '@workbench/useNotify';
-import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
 import {
   useActiveProjectSelector,
   useWorkbenchCommands,
   useWorkbenchQueries,
   useWorkbenchSelector,
 } from '@workbench/WorkbenchContext';
+import { useWorkspaceOpen } from '@workbench/workspace/useWorkspaceOpen';
 import { lazy, useMemo, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -76,7 +76,7 @@ export const QueueUiAdapterProvider = ({ children }: { children: ReactNode }) =>
   const { canManageAppConfig, canManageModels } = useCapabilities();
   const session = useAuthSession();
   const { queueJobsScope } = useWorkbenchPreferences();
-  const openWorkbenchWidget = useOpenWorkbenchWidget();
+  const open = useWorkspaceOpen();
   const isConnected = useWorkbenchSelector((snapshot) => snapshot.backendConnection.status === 'connected');
   const openProjectIds = useWorkbenchSelector(
     (snapshot) => snapshot.projects.map((project) => project.id),
@@ -107,7 +107,7 @@ export const QueueUiAdapterProvider = ({ children }: { children: ReactNode }) =>
       loadingModel,
       localRuns,
       notify,
-      openQueue: () => openWorkbenchWidget('queue'),
+      openQueue: () => open({ typeId: 'queue' }),
       // A failed warm-up is no error: the details' own load reports it when they open.
       preloadItemActions: () => void importQueueItemActions().catch(() => undefined),
       queueJobsScope,
@@ -119,7 +119,7 @@ export const QueueUiAdapterProvider = ({ children }: { children: ReactNode }) =>
         import('@workbench/queue-integration/recallQueueItem')
           .then(({ recallQueueItem }) =>
             recallQueueItem({
-              context: { commands, notify, openWidget: openWorkbenchWidget, queries, t },
+              context: { commands, notify, open, queries, t },
               item,
               kind: 'all',
               owner,
@@ -145,7 +145,7 @@ export const QueueUiAdapterProvider = ({ children }: { children: ReactNode }) =>
     localRuns,
     notify,
     openProjectIds,
-    openWorkbenchWidget,
+    open,
     queries,
     queryClient,
     queue,

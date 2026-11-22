@@ -56,7 +56,7 @@ it.each(['its module loaded', 'it read the catalog'] as const)(
     };
     const store = createWorkbenchStore(state);
     const notify = { info: vi.fn(), success: vi.fn() };
-    const openWidget = vi.fn();
+    const open = vi.fn();
     const item = {
       batchId: 'batch-1',
       createdAt: '2026-01-01T00:00:00Z',
@@ -75,7 +75,7 @@ it.each(['its module loaded', 'it read the catalog'] as const)(
         context: {
           commands: store.commands,
           notify,
-          openWidget,
+          open,
           queries: store.queries,
           t: ((key: string) => key) as TFunction,
         },
@@ -108,6 +108,6 @@ it.each(['its module loaded', 'it read the catalog'] as const)(
     }
     expect(notify.success).not.toHaveBeenCalled();
     expect(notify.info).not.toHaveBeenCalled();
-    expect(openWidget).not.toHaveBeenCalled();
+    expect(open).not.toHaveBeenCalled();
   }
 );

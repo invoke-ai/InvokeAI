@@ -67,7 +67,7 @@ vi.mock('@tanstack/react-router', async (importOriginal) => ({
   useNavigate: () => vi.fn(),
 }));
 vi.mock('@workbench/palette/PaletteButton', () => ({ PaletteButton: () => null }));
-vi.mock('@workbench/useOpenWorkbenchWidget', () => ({ useOpenWorkbenchWidget: () => vi.fn() }));
+vi.mock('@workbench/workspace/useWorkspaceOpen', () => ({ useWorkspaceOpen: () => vi.fn() }));
 vi.mock('@workbench/hotkeys/useShortcutBinding', () => ({
   useShortcutBinding: () => null,
   useShortcutLabel: () => null,

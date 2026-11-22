@@ -30,10 +30,10 @@ import {
 import { resolveWidgetLabel } from '@workbench/widgetLabels';
 import {
   activateRailPlacement,
+  addWidgetPlacement,
   closeWidgetPlacement,
   dispatchWidgetDragEndPlacement,
   dockFloatingPlacement,
-  openWidgetPlacement,
   removeFloatingPlacement,
 } from '@workbench/widgetPlacementCommands';
 import { areWidgetPlacementProjectsEqual, getWidgetPlacementProject } from '@workbench/widgetPlacementMeta';
@@ -247,11 +247,12 @@ export const WorkbenchShell = () => {
         ? removeFloatingPlacement({ instanceId: item.id, project: placementProject, widgets })
         : item.isEnabled
           ? closeWidgetPlacement({ widgets, getWidgetById, instanceId: item.id, project: placementProject, region })
-          : openWidgetPlacement({
-              widgets,
+          : addWidgetPlacement({
+              createNew: item.allowMultiple,
               getWidgetsForRegion,
-              options: { createNew: item.allowMultiple, preferredRegions: [region] },
+              regions: [region],
               typeId: item.typeId,
+              widgets,
             }),
     [placementProject, widgets]
   );

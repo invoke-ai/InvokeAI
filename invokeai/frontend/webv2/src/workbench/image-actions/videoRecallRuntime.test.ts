@@ -113,6 +113,9 @@ const setup = (panelModel: ModelConfig = WAN_I2V) => {
   const socket = createFakeSocketHub();
   const projectId = store.queries.getSnapshot().activeProject.id;
 
+  // Placed behind Generate: a recall may front it but never adds it.
+  store.commands.widgets.open({ projectId, region: 'left', widgetId: 'video' });
+  store.commands.widgets.open({ projectId, region: 'left', widgetId: 'generate' });
   store.commands.widgets.patchValues(
     'video',
     {

@@ -7,6 +7,7 @@ import type { DeferredResource, DeferredResourceStatus } from './deferredResourc
 import type { GraphId } from './graphContracts';
 import type { InvocationSourceId } from './invocationContracts';
 import type { WidgetRegion } from './layoutContracts';
+import type { OpenIntent, OpenResult } from './workspace/openIntent';
 
 export type FirstPartyWidgetTypeId =
   | 'autosave-status'
@@ -233,20 +234,14 @@ export interface WidgetSearchResult {
   commandId?: string;
 }
 
-export interface OpenWorkbenchWidgetOptions {
-  createNew?: boolean;
-  preferredRegions?: ReadonlyArray<WidgetRegion>;
-  requireCenterView?: boolean;
-}
-
 export type WidgetWorkbenchApiResult =
   | { ok: true; region?: WidgetRegion }
   | { ok: false; reason: 'unavailable' | 'unsupported' | 'not-found' };
 
+/** Widgets state what they want to see; the shell decides where. They cannot add, move or remove widgets. */
 export interface WidgetWorkbenchApi {
-  openWidget: (typeId: WidgetTypeId, options?: OpenWorkbenchWidgetOptions) => WidgetWorkbenchApiResult;
+  open: (intent: OpenIntent) => OpenResult;
   revealWidgetInstance: (instanceId: WidgetInstanceId) => WidgetWorkbenchApiResult;
-  closeWidgetInstance: (instanceId: WidgetInstanceId) => WidgetWorkbenchApiResult;
 }
 
 /**

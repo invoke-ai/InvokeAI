@@ -38,6 +38,10 @@ export const manifest: WidgetManifest = {
 
 Third-party widgets should ship icons as JSX/SVG components in their compiled widget bundle.
 
+## Workbench API
+
+`runtime.workbench.open(intent)` is for user gestures only: it may switch workspace. It shows a widget type where the current workspace places it, enters the workspace that does, or offers to add it here, and reports the outcome as an `OpenResult` ([how opening resolves](../widget-frame/README.md#opening-and-workspaces)). An intent names a type and optionally the surface it needs, never a region. `revealWidgetInstance(instanceId)` fronts an instance of the widget's own region. Widgets cannot add, move, float or remove widgets: that is structure, and only the shell's controls change it.
+
 ## Settings contributions
 
 Optional `settings` contribution declares fields once and exposes a `quick` array of field IDs for the compact popover. All fields appear in the widget's full settings section and join search. Manifest with quick fields gets a shell-rendered popover plus “All settings” link; one without quick fields opens the full section directly. Widgets without preferences omit the contribution and the gear.

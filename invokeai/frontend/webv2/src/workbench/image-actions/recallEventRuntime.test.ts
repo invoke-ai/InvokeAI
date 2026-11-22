@@ -4,7 +4,7 @@ import { accountLifecycle, captureAccountScope } from '@platform/state/accountLi
 import { createWorkbenchStore } from '@workbench/workbenchStore';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { bringRecallWidgetToFront } from './recallEventRuntime';
+import { bringRecallWidgetToFront, withRecallWidgetOffer } from './recallEventRuntime';
 
 /** The registry's view of the Video widget: placeable on the left, nothing to preload. */
 const videoWidget = {
@@ -60,12 +60,25 @@ describe('bringRecallWidgetToFront', () => {
     accountLifecycle.activate('owner');
   });
 
-  it('opens the widget when the layout has none', () => {
+  it('adds nothing where the workspace has none, and offers the way there only on notices after it wrote values', () => {
     const { projectId, reveal, store } = setup();
+    const regionsBefore = store.queries.getProject(projectId)!.widgetRegions;
+    const commands = withRecallWidgetOffer(store.commands, {
+      projectId,
+      queries: store.queries,
+      reveal: testRevealContext(),
+      typeId: 'video',
+    });
 
+    commands.notifications.add({ kind: 'info', title: 'Nothing to recall' });
+    commands.widgets.patchValues('video', { positivePrompt: 'recalled' }, projectId);
+    commands.notifications.add({ kind: 'success', title: 'Recalled' });
     reveal();
 
-    expect(videoWidgetPlacement(store, projectId)).toBe('shown');
+    expect(store.queries.getProject(projectId)!.widgetRegions).toBe(regionsBefore);
+    const [recalled, nothing] = store.queries.getSnapshot().notifications;
+    expect(recalled).toMatchObject({ actions: [{ kind: 'open-widget', widgetId: 'video' }], title: 'Recalled' });
+    expect(nothing).not.toHaveProperty('actions');
   });
 
   it('selects its tab when another widget is in front of it', () => {
@@ -140,7 +153,7 @@ describe('bringRecallWidgetToFront', () => {
         };
       },
     };
-    const open = vi.spyOn(store.commands.widgets, 'open');
+    const front = vi.spyOn(store.commands.widgets, 'front');
 
     bringRecallWidgetToFront({
       commands: store.commands,
@@ -151,7 +164,7 @@ describe('bringRecallWidgetToFront', () => {
       typeId: 'video',
     });
 
-    expect(open).toHaveBeenCalledWith({ projectId, region: 'left', widgetId: 'video' });
+    expect(front).toHaveBeenCalledWith({ instanceId: videoInstanceId(store, projectId), projectId, region: 'left' });
   });
 
   it('does nothing for an account that has since signed out', () => {

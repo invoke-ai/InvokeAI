@@ -21,7 +21,6 @@ import { WidgetSettingsButton } from '@workbench/settings/WidgetSettingsButton';
 import { resolveWidgetInstanceLabel } from '@workbench/widgetLabels';
 import { areWidgetPlacementProjectsEqual, getWidgetPlacementProject } from '@workbench/widgetPlacementMeta';
 import { useActiveProjectId, useActiveProjectSelector } from '@workbench/WorkbenchContext';
-import { useWorkbenchWidgetRegistry } from '@workbench/WorkbenchWidgetRegistryContext';
 import { memo, Suspense, use, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -108,7 +107,6 @@ const WidgetChromeSlot = ({
   slot: WidgetChromeSlotName;
   widget: RegisteredWidget;
 }) => {
-  const { getWidgetById, getWidgetsForRegion } = useWorkbenchWidgetRegistry();
   const project = useActiveProjectSelector(getWidgetPlacementProject, areWidgetPlacementProjectsEqual);
   const implementation = use(widget.implementation.load());
   const instanceMeta: WidgetInstanceRuntimeMeta = useMemo(
@@ -121,8 +119,6 @@ const WidgetChromeSlot = ({
     [instance.createdAt, instance.id, instance.title, instance.typeId]
   );
   const runtime = useWidgetRuntime({
-    getWidgetById,
-    getWidgetsForRegion,
     instance: instanceMeta,
     project,
     region,
@@ -305,7 +301,6 @@ export const WidgetRecoveryAnnouncement = ({
 };
 
 const LoadedWidgetRenderer = ({ instance, presentation, region, widget }: WidgetRendererProps) => {
-  const { getWidgetById, getWidgetsForRegion } = useWorkbenchWidgetRegistry();
   const project = useActiveProjectSelector(getWidgetPlacementProject, areWidgetPlacementProjectsEqual);
   const implementation = use(widget.implementation.load());
   const View = implementation.view;
@@ -322,8 +317,6 @@ const LoadedWidgetRenderer = ({ instance, presentation, region, widget }: Widget
     [instance.createdAt, instance.id, instance.title, instance.typeId]
   );
   const runtime = useWidgetRuntime({
-    getWidgetById,
-    getWidgetsForRegion,
     instance: instanceMeta,
     project,
     region,

@@ -37,7 +37,7 @@ import {
   isWidgetInstanceDragData,
 } from '@workbench/widgetDnd';
 import { resolveWidgetLabel } from '@workbench/widgetLabels';
-import { closeWidgetPlacement, openWidgetPlacement, revealWidgetPlacement } from '@workbench/widgetPlacementCommands';
+import { addWidgetPlacement, closeWidgetPlacement, revealWidgetPlacement } from '@workbench/widgetPlacementCommands';
 import { areWidgetPlacementProjectsEqual, getWidgetPlacementProject } from '@workbench/widgetPlacementMeta';
 import {
   createWidgetRegionViewModelFromState,
@@ -182,11 +182,12 @@ export const StatusBar = ({ dropState }: { dropState: WidgetRegionDropState }) =
             project: placementProject,
             region: 'bottom',
           })
-        : openWidgetPlacement({
-            widgets,
+        : addWidgetPlacement({
+            createNew: item.allowMultiple,
             getWidgetsForRegion,
-            options: { createNew: item.allowMultiple, preferredRegions: ['bottom'] },
+            regions: ['bottom'],
             typeId: item.typeId,
+            widgets,
           }),
     [placementProject, widgets]
   );

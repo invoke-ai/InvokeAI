@@ -93,14 +93,13 @@ const toastNamed = (title: string) =>
 const startToasts = () => {
   stopToasts = startNotificationToasts({
     actionContext: createEditorNotificationActionContext({
+      commands: store().commands,
       focus: { focusFloating: () => undefined, focusRegion: () => undefined },
       getWidgetById,
       getWidgetsForRegion,
-      notifications: store().commands.notifications,
       queries: store().queries,
       retryQueueItems: retryItems,
       t: i18next.t,
-      widgets: store().commands.widgets,
     }),
     getNotifications: () => store().getSnapshot().notifications,
     getPreferences: () => ({ notifyOnEnqueue: true }),

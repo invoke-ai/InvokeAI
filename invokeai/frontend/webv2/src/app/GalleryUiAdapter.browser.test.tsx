@@ -57,7 +57,7 @@ vi.mock('@features/identity', async (importOriginal) => ({
   useAuthSession: () => session,
 }));
 vi.mock('@workbench/projects/useProjectFileActions', () => ({ useExportLibraryProject: () => noop }));
-vi.mock('@workbench/useOpenWorkbenchWidget', () => ({ useOpenWorkbenchWidget: () => noop }));
+vi.mock('@workbench/workspace/useWorkspaceOpen', () => ({ useWorkspaceOpen: () => noop }));
 vi.mock('./GalleryImageActionsBridge', () => ({
   GalleryItemActionsAdapter: () => null,
   GalleryImageContextMenu: () => null,

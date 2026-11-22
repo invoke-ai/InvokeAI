@@ -1,7 +1,6 @@
 import type { GalleryImage } from '@features/gallery/contracts';
 import type { HotkeyDefinition } from '@workbench/hotkeys/types';
 import type { WorkbenchPreferences } from '@workbench/settings/contracts';
-import type { openWidgetPlacement as OpenWidgetPlacement } from '@workbench/widgetPlacementCommands';
 import type { getWidgetsForRegion as GetWidgetsForRegion } from '@workbench/widgetRegistry';
 import type { TFunction } from 'i18next';
 
@@ -15,7 +14,6 @@ import { getModelsSnapshot } from '@features/models';
 import { getQueueQueryScope, getQueueReadModelOptions } from '@features/queue/queries';
 import { queryClient } from '@platform/query/client';
 import { useQuery } from '@tanstack/react-query';
-import { useWorkbenchFocus } from '@workbench/focusRegions';
 import { recallProjectPromptHistoryItem, selectProjectGenerateModel } from '@workbench/generationSettingsOrchestration';
 import { useFindGalleryItem } from '@workbench/image-actions/useFindGalleryItem';
 import { getLayoutPresetCommandTitleOverrides } from '@workbench/layoutPresetSnapshots';
@@ -24,7 +22,6 @@ import { useProjectActions } from '@workbench/projects/useProjectActions';
 import { openWorkbenchSettings } from '@workbench/settings/settingsDialogStore';
 import { useAvailableSettings } from '@workbench/settings/useAvailableSettings';
 import { useNotify } from '@workbench/useNotify';
-import { revealOrOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
 import { resolveWidgetLabel } from '@workbench/widgetLabels';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import {
@@ -34,6 +31,7 @@ import {
   useWorkbenchQueries,
   useWorkbenchSelector,
 } from '@workbench/WorkbenchContext';
+import { useWorkspaceOpen } from '@workbench/workspace/useWorkspaceOpen';
 import { useCallback, useMemo, useSyncExternalStore } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -89,7 +87,6 @@ const WorkbenchCommandPaletteDialog = ({
   modifierKeyLabel,
   onClose,
   onExitComplete,
-  openWidgetPlacement,
   preferences,
   requestQueueItemReveal,
   settingsEntryDeps,
@@ -101,7 +98,6 @@ const WorkbenchCommandPaletteDialog = ({
   modifierKeyLabel: string;
   onClose: () => void;
   onExitComplete: () => void;
-  openWidgetPlacement: typeof OpenWidgetPlacement;
   preferences: WorkbenchPreferences;
   requestQueueItemReveal: (itemId: number) => void;
   settingsEntryDeps: SettingsEntryDeps;
@@ -131,8 +127,7 @@ const WorkbenchCommandPaletteDialog = ({
     [account, t]
   );
 
-  const focus = useWorkbenchFocus();
-  const { widgets: widgetCommands } = useWorkbenchCommands();
+  const open = useWorkspaceOpen();
   const widgetEntries = useMemo(() => {
     const openable = listPaletteWidgets(getWidgetsForRegion);
 
@@ -140,27 +135,14 @@ const WorkbenchCommandPaletteDialog = ({
       catalog,
       customHotkeys: preferences.customHotkeys,
       formatHotkey,
-      show: (typeId) =>
-        revealOrOpenWorkbenchWidget(
-          { focus, getWidgetsForRegion, queries: workbenchQueries, widgets: widgetCommands },
-          typeId
-        ),
+      show: (typeId) => void open({ typeId }),
       t,
       widgets: openable.map((widget) => ({
         label: resolveWidgetLabel(widget.manifest, t),
         typeId: widget.manifest.id,
       })),
     });
-  }, [
-    catalog,
-    focus,
-    formatHotkey,
-    getWidgetsForRegion,
-    preferences.customHotkeys,
-    t,
-    widgetCommands,
-    workbenchQueries,
-  ]);
+  }, [catalog, formatHotkey, getWidgetsForRegion, open, preferences.customHotkeys, t]);
   const commandStore = extensions.stores.commands;
   const commandContributions = useSyncExternalStore(commandStore.subscribe, commandStore.list, commandStore.list);
   const isHandled = useMemo(() => {
@@ -243,21 +225,15 @@ const WorkbenchCommandPaletteDialog = ({
     [preferences.queueJobsScope, projectId]
   );
   const providers = useMemo<PaletteSearchProvider[]>(() => {
-    const { gallery, generation, widgets } = workbenchCommands;
+    const { gallery, generation } = workbenchCommands;
     const openWidget = (typeId: 'workflow' | 'gallery' | 'generate' | 'preview' | 'queue') =>
-      openWidgetPlacement({
-        getWidgetsForRegion,
-        options:
-          typeId === 'workflow'
-            ? { preferredRegions: ['center'], requireCenterView: true }
-            : typeId === 'generate'
-              ? { preferredRegions: ['left'] }
-              : typeId === 'queue'
-                ? { preferredRegions: ['right'] }
-                : { preferredRegions: ['center', 'right'] },
-        typeId,
-        widgets,
-      });
+      open(
+        typeId === 'workflow' || typeId === 'preview'
+          ? { surface: 'stage', typeId }
+          : typeId === 'generate' || typeId === 'queue'
+            ? { surface: 'panel', typeId }
+            : { typeId }
+      );
 
     const imageEntryDeps = {
       openPreviewWidget: () => openWidget('preview'),
@@ -365,10 +341,9 @@ const WorkbenchCommandPaletteDialog = ({
     extensions,
     i18n.resolvedLanguage,
     notify,
-    getWidgetsForRegion,
+    open,
     openProject,
     openProjects,
-    openWidgetPlacement,
     projectId,
     projectLibrary,
     promptHistory,

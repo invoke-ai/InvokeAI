@@ -1,51 +1,19 @@
-import type { InvocationRoute, InvocationSourceId } from './invocationContracts';
-import type { LayoutPreset, LayoutPresetRoute, WidgetRegion } from './layoutContracts';
+import type { InvocationRoute } from './invocationContracts';
+import type { LayoutPreset, LayoutPresetRoute } from './layoutContracts';
 
-import { getNaturalDestination, getSourceIdForWidgetTypeId, graphWidgetSources } from './graphWidgets';
-import { isInvocationSourceAvailable } from './invocation';
-
-const activeSourceRegionPriority: WidgetRegion[] = ['center', 'left', 'right', 'bottom'];
-
-const getPresetSourceIds = (preset: LayoutPreset): Set<InvocationSourceId> => {
-  const sourceIds = new Set<InvocationSourceId>();
-
-  for (const region of Object.values(preset.snapshot.widgetRegions)) {
-    for (const instanceId of region.instanceIds) {
-      const typeId = preset.snapshot.widgetInstances[instanceId]?.typeId;
-      const sourceId = typeId ? getSourceIdForWidgetTypeId(typeId) : null;
-
-      if (sourceId && isInvocationSourceAvailable(sourceId)) {
-        sourceIds.add(sourceId);
-      }
-    }
-  }
-
-  return sourceIds;
-};
+import { getNaturalDestination, graphWidgetSources } from './graphWidgets';
+import { getAvailableSourceIdForWidgetTypeId as getAvailableSourceId } from './invocationSources';
+import { getFrontSource, getPlacedSources } from './workspace/workspaceDerivations';
 
 /** Graph sources that the saved arrangement can actually mount, in routing-menu order. */
 export const getLayoutPresetSourceOptions = (preset: LayoutPreset) => {
-  const sourceIds = getPresetSourceIds(preset);
+  const sourceIds = getPlacedSources(preset.snapshot, getAvailableSourceId);
 
   return graphWidgetSources.filter((source) => sourceIds.has(source.sourceId));
 };
 
-const getActivePresetSource = (preset: LayoutPreset): InvocationSourceId | null => {
-  for (const regionId of activeSourceRegionPriority) {
-    const region = preset.snapshot.widgetRegions[regionId];
-    const typeId = preset.snapshot.widgetInstances[region.activeInstanceId]?.typeId;
-    const sourceId = typeId ? getSourceIdForWidgetTypeId(typeId) : null;
-
-    if (sourceId && isInvocationSourceAvailable(sourceId)) {
-      return sourceId;
-    }
-  }
-
-  return null;
-};
-
 const resolvePresetRouteCandidate = (invocation: InvocationRoute, preset: LayoutPreset): LayoutPresetRoute => {
-  const sourceIds = getPresetSourceIds(preset);
+  const sourceIds = getPlacedSources(preset.snapshot, getAvailableSourceId);
 
   if (preset.defaultRoute && sourceIds.has(preset.defaultRoute.sourceId)) {
     return preset.defaultRoute;
@@ -55,7 +23,7 @@ const resolvePresetRouteCandidate = (invocation: InvocationRoute, preset: Layout
     return { destination: invocation.destination, sourceId: invocation.sourceId };
   }
 
-  const activeSourceId = getActivePresetSource(preset);
+  const activeSourceId = getFrontSource(preset.snapshot, getAvailableSourceId);
 
   return activeSourceId
     ? { destination: getNaturalDestination(activeSourceId), sourceId: activeSourceId }

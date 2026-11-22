@@ -159,6 +159,8 @@ export const firstPartyHotkeyCatalog: HotkeyDefinition[] = [
   hotkey('app', 'resetPanelLayout', [], { title: 'Revert layout to saved preset' }),
   hotkey('app', 'togglePanels', ['f']),
   hotkey('app', 'togglePreview', ['z']),
+  // No default key: Alt+Left, the usual Back, is the browser's and the Gallery's.
+  hotkey('app', 'backToPreviousWorkspace', [], { title: 'Back to previous workspace' }),
   // Canvas rows mirror the Canvas widget's own tables (canvasToolCommands, canvasHotkeyCommands, canvasHeaderCommands).
   hotkey('canvas', 'tool.view', ['h'], { title: 'Select View Tool' }),
   hotkey('canvas', 'tool.move', ['v'], { title: 'Select Move Tool' }),

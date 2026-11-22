@@ -289,43 +289,44 @@ it('moves focus between the workflow graph and a collapsed workflow panel, prese
   expect(project().workflows).toBe(before.workflows);
 });
 
-it.each([
-  { graphInstanceId: 'workflow:center', leftInstanceId: 'workflow' },
-  { graphInstanceId: 'workflow:bottom', leftInstanceId: 'workflow:center' },
-])(
-  'opens the Compose workflow graph while keeping the $leftInstanceId panel visible',
-  async ({ graphInstanceId, leftInstanceId }) => {
-    await act(() => {
-      runtime.store.commands.layout.applyPreset('compose');
-      if (leftInstanceId === 'workflow') {
-        runtime.store.commands.widgets.open({ region: 'left', widgetId: 'workflow' });
-      } else {
-        runtime.store.commands.widgets.toggle({ region: 'left', widgetId: leftInstanceId });
-      }
-    });
-    const before = project();
-    const left = before.widgetRegions.left;
-    expect(before.layout.presetId).toBe('compose');
-    expect(left.activeInstanceId).toBe(leftInstanceId);
-    expect(before.widgetRegions.center.instanceIds).not.toContain(graphInstanceId);
-    await focusRegion('left');
+it('offers to add a graph to a workspace that places only the workflow form, changing nothing', async () => {
+  await act(() => {
+    runtime.store.commands.layout.applyPreset('compose');
+    runtime.store.commands.widgets.open({ region: 'left', widgetId: 'workflow' });
+  });
+  const before = project();
+  await focusRegion('left');
 
-    await press('{Shift>}Z{/Shift}');
-    await expectFocusedRegion('center');
-    expect(project().widgetRegions.left).toEqual(left);
-    expect(project().layout.panels.isLeftOpen).toBe(true);
-    expect(project().widgetRegions.center.activeInstanceId).toBe(graphInstanceId);
+  await press('{Shift>}Z{/Shift}');
 
-    await press('{Shift>}Z{/Shift}');
-    await expectFocusedRegion('left');
-    expect(project().widgetRegions.left).toEqual(left);
-    expect(project().widgetRegions.center.activeInstanceId).toBe(graphInstanceId);
-  }
-);
+  expect(project().widgetRegions).toBe(before.widgetRegions);
+  expect(runtime.store.getSnapshot().notifications[0]?.actions).toEqual([
+    { kind: 'add-widget', surface: 'stage', widgetId: 'workflow' },
+  ]);
+});
+
+it('offers a form to a workspace whose only workflow is the graph in the status bar panel', async () => {
+  await act(() => {
+    runtime.store.commands.layout.applyPreset('compose');
+    runtime.store.commands.widgets.open({ region: 'bottom', widgetId: 'workflow' });
+  });
+  const before = project();
+  await focusRegion('bottom');
+
+  await press('{Shift>}Z{/Shift}');
+
+  expect(project().widgetRegions).toBe(before.widgetRegions);
+  expect(runtime.store.getSnapshot().notifications[0]).toMatchObject({
+    actions: [{ kind: 'add-widget', surface: 'panel', widgetId: 'workflow' }],
+    titleKey: 'shell.workspace.noWorkflowForm',
+  });
+});
 
 it('selects the existing Compose graph while preserving the shared left Workflow panel', async () => {
-  await act(() => runtime.store.commands.layout.applyPreset('compose'));
-  await press('4');
+  await act(() => {
+    runtime.store.commands.layout.applyPreset('compose');
+    runtime.store.commands.widgets.open({ region: 'center', widgetId: 'workflow' });
+  });
   const graphInstanceId = project().widgetRegions.center.activeInstanceId;
   expect(project().widgetInstances[graphInstanceId]?.typeId).toBe('workflow');
 

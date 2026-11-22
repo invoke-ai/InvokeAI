@@ -49,7 +49,7 @@ import {
 } from '@platform/ui/streaming-image/streamingImageSource';
 import { useStreamingImageSource } from '@platform/ui/streaming-image/useStreamingImageSource';
 import { useQuery } from '@tanstack/react-query';
-import { releaseFocusOnRemoval, useWorkbenchFocus } from '@workbench/focusRegions';
+import { releaseFocusOnRemoval } from '@workbench/focusRegions';
 import {
   ImageContextMenu,
   useDeletionConfirmation,
@@ -59,8 +59,6 @@ import {
 } from '@workbench/image-actions';
 import { QueueProgressRail } from '@workbench/queue-integration/QueueProgressRail';
 import { useWorkbenchPreferenceSelector } from '@workbench/settings/store';
-import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
-import { revealPlacedWidget } from '@workbench/widgetPlacementCommands';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import {
   useActiveProjectId,
@@ -69,6 +67,7 @@ import {
   useWorkbenchCommands,
   useWorkbenchQueries,
 } from '@workbench/WorkbenchContext';
+import { useWorkspaceOpen } from '@workbench/workspace/useWorkspaceOpen';
 import { ImagesIcon, XIcon } from 'lucide-react';
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState, type ReactNode, type Ref } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -1132,22 +1131,8 @@ const PreviewStartingCue = ({ density, session }: { density: PreviewDensity; ses
 
 const EmptyPreview = () => {
   const { t } = useTranslation();
-  const openWidget = useOpenWorkbenchWidget();
-  const { widgets } = useWorkbenchCommands();
-  const queries = useWorkbenchQueries();
-  const { focusFloating, focusRegion } = useWorkbenchFocus();
-  // Where the layout already has the Gallery, bring that one forward and focus it; opening it would move it.
-  const showGallery = useCallback(() => {
-    const revealed = revealPlacedWidget({ project: queries.getSnapshot().activeProject, typeId: 'gallery', widgets });
-
-    if (!revealed) {
-      openWidget('gallery');
-    } else if (revealed.kind === 'floating') {
-      focusFloating(revealed.instanceId);
-    } else {
-      focusRegion(revealed.region, 'gallery');
-    }
-  }, [focusFloating, focusRegion, openWidget, queries, widgets]);
+  const open = useWorkspaceOpen();
+  const showGallery = useCallback(() => void open({ typeId: 'gallery' }), [open]);
 
   return (
     <PreviewFrame frameHeight={1} frameWidth={1} isLive={false} shouldAntialiasLiveImage source={null} variant="inset">

@@ -27,7 +27,7 @@ const GENERATE_PBR_MAPS = 'widgets.gallery.itemActions.pbrMaps.label';
 const findGalleryItem = vi.fn();
 
 vi.mock('@workbench/image-actions/useFindGalleryItem', () => ({ useFindGalleryItem: () => findGalleryItem }));
-vi.mock('@workbench/useOpenWorkbenchWidget', () => ({ useOpenWorkbenchWidget: () => vi.fn() }));
+vi.mock('@workbench/workspace/useWorkspaceOpen', () => ({ useWorkspaceOpen: () => vi.fn() }));
 vi.mock('@workbench/projects/library', () => ({
   useProjectLibrarySelector: (selector: (snapshot: { summaries: [] }) => unknown) => selector({ summaries: [] }),
 }));

@@ -15,11 +15,13 @@ import {
 
 /** What the editor lends action handlers. Read when a toast opens (labels) and when its button is pressed. */
 export interface NotificationActionContext {
+  /** Adds the widget to the current workspace on that surface, or where it opens by default, and focuses it. */
+  addWidget: (widgetId: WidgetTypeId, surface?: 'stage' | 'panel') => void;
   /** The widget's label while this editor can show it; null leaves its action out. */
   getWidgetLabel: (widgetId: WidgetTypeId) => string | null;
   /** Whether the project is still open in this editor; an undo scoped to a closed project is not offered. */
   isProjectOpen: (projectId: string) => boolean;
-  /** Brings the widget forward where the layout has it, otherwise opens it, and moves focus there. */
+  /** Opens the widget through the workspace resolver, as a gesture: here, in the workspace that has it, or an offer. */
   openWidget: (widgetId: WidgetTypeId) => void;
   revealQueueItem: (itemId: number) => void;
   /** Whether a notice may still offer Retry for these backend items: not once they were retried from one. */
@@ -43,10 +45,21 @@ interface NotificationActionHandler<Action extends WorkbenchNotificationAction> 
   withdrawal?: (action: Action) => AbortSignal | undefined;
 }
 
+const ADD_WIDGET_LABEL_KEYS = {
+  any: 'shell.workspace.addHere',
+  panel: 'shell.workspace.addToPanel',
+  stage: 'shell.workspace.addToCenter',
+} as const;
+
 /** One handler per descriptor kind; the mapped type makes a new kind a compile error until it has one. */
 const handlers: {
   [Kind in NotificationActionKind]: NotificationActionHandler<Extract<WorkbenchNotificationAction, { kind: Kind }>>;
 } = {
+  'add-widget': {
+    label: ({ surface, widgetId }, { getWidgetLabel, t }) =>
+      getWidgetLabel(widgetId) === null ? null : t(ADD_WIDGET_LABEL_KEYS[surface ?? 'any']),
+    run: ({ surface, widgetId }, { addWidget }) => addWidget(widgetId, surface),
+  },
   'open-widget': {
     label: ({ widgetId }, { getWidgetLabel, t }) => {
       const widget = getWidgetLabel(widgetId);

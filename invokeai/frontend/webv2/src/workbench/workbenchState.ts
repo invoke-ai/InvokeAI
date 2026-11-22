@@ -238,16 +238,15 @@ import {
   writeRegionOrder,
   type RegionOrderSlot,
 } from './floatingWindows';
-import { getSourceIdForWidgetTypeId } from './graphWidgets';
 import {
   defaultInvocationRoute,
   getDynamicPromptsExpansionSource,
   isInvocationRouteValid,
   isSameDynamicPromptsExpansionSource,
-  isInvocationSourceAvailable,
   isResultDestinationAvailable,
   resolveInvocationRoute,
 } from './invocation';
+import { getSourceIdForWidgetTypeId, isInvocationSourceAvailable } from './invocationSources';
 import { getOrderedLayoutPresets, normalizeLayoutPresetOrder, reorderLayoutPresetIds } from './layoutPresetCollection';
 import { getInvocationAfterLayoutPreset } from './layoutPresetRouting';
 import {
@@ -328,6 +327,7 @@ type WorkbenchReducerAction =
       projectId?: string;
     }
   | { type: 'selectRegionWidget'; region: WidgetRegion; widgetId: WidgetInstanceId; projectId?: string }
+  | { type: 'frontRegionWidget'; region: WidgetRegion; instanceId: WidgetInstanceId; projectId?: string }
   | { type: 'toggleRegionWidget'; region: WidgetRegion; widgetId: WidgetInstanceId; projectId?: string }
   | {
       type: 'moveWidgetInstance';
@@ -646,6 +646,7 @@ type WorkbenchReducerAction =
   | {
       type: 'recordNotice';
       kind: WorkbenchNotificationKind;
+      category?: WorkbenchNotificationCategory;
       title: string;
       message?: string;
       actions?: readonly WorkbenchNotificationAction[];
@@ -731,10 +732,11 @@ const createNotification = ({
 const addNotification = (state: WorkbenchState, notification: WorkbenchNotification): WorkbenchState => {
   const [newest, ...rest] = state.notifications;
 
-  // Reuse the newest matching error's id so repeats do not toast again; successes always toast.
+  // Reuse the newest matching error's or workspace offer's id so repeats do not toast again; successes always toast.
   if (
     newest &&
-    newest.kind === 'error' &&
+    (newest.kind === 'error' ||
+      (newest.category === 'workspace-offer' && notification.category === 'workspace-offer')) &&
     newest.kind === notification.kind &&
     newest.title === notification.title &&
     newest.message === notification.message
@@ -2499,6 +2501,8 @@ const updateProjectWidgetRegion = (
         },
       };
 };
+
+const PANEL_OPEN_KEYS = { bottom: 'isBottomOpen', left: 'isLeftOpen', right: 'isRightOpen' } as const;
 
 const openPanelForRegion = (layout: ProjectLayoutState, region: WidgetRegion): ProjectLayoutState => ({
   ...layout,
@@ -4945,6 +4949,38 @@ const reduceWorkbenchAction = (
         );
       });
     }
+    case 'frontRegionWidget': {
+      return updateProjectById(state, action.projectId ?? state.activeProjectId, (project) => {
+        const region = project.widgetRegions[action.region];
+        const panelKey = action.region === 'center' ? null : PANEL_OPEN_KEYS[action.region];
+
+        // View only: an instance the region does not hold is never added, and one already shown is left alone.
+        if (
+          !region.instanceIds.includes(action.instanceId) ||
+          (region.activeInstanceId === action.instanceId &&
+            !region.isCollapsed &&
+            (panelKey === null || project.layout.panels[panelKey]))
+        ) {
+          return project;
+        }
+
+        const widgetRegions = {
+          ...project.widgetRegions,
+          [action.region]: { ...region, activeInstanceId: action.instanceId, isCollapsed: false },
+        };
+
+        return applyAutoRouteForRevealedInstance(
+          {
+            ...project,
+            layout: openPanelForRegion(project.layout, action.region),
+            widgetRegions:
+              action.region === 'center' ? yieldSidePanelsTo(widgetRegions, action.instanceId) : widgetRegions,
+          },
+          action.instanceId,
+          context
+        );
+      });
+    }
     case 'toggleRegionWidget': {
       return updateProjectById(state, action.projectId ?? state.activeProjectId, (project) => {
         const previousRegion = project.widgetRegions[action.region];
@@ -6546,6 +6582,7 @@ const reduceWorkbenchAction = (
         state,
         createNotification({
           actions: action.actions,
+          category: action.category,
           kind: action.kind,
           message: action.message,
           messageKey: action.messageKey,
