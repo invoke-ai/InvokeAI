@@ -1492,7 +1492,8 @@ describe('the guidance range the architecture declares', () => {
     for (const row of architectureCapabilitiesFixture) {
       const model = createModel(row.base, { variant: row.variant ?? undefined } as Partial<MainModelConfig>);
 
-      if (!isSupportedGenerateModel(model)) {
+      // Ideogram's separate sampler override is validated with its own denoise bounds above.
+      if (!isSupportedGenerateModel(model) || model.base === 'ideogram-4') {
         continue;
       }
 
