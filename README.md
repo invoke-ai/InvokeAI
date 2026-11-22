@@ -1,174 +1,167 @@
+<!-- Images use absolute URLs because PyPI renders this file too. Sources: .github/readme/ -->
+
 <div align="center">
 
-![project hero](https://github.com/invoke-ai/InvokeAI/assets/31807370/6e3728c7-e90e-4711-905c-3b55844ff5be)
+<img src="https://raw.githubusercontent.com/invoke-ai/InvokeAI/main/.github/readme/hero.webp" alt="Invoke 7. AI image generation for creatives: the Invoke workbench with a glowing jellyfish on the canvas, the Generate panel on the left and the Layers panel on the right.">
 
-# Invoke - Professional Creative AI Tools for Visual Media
+Invoke is a free, open-source creative engine that runs on your own hardware. Generate images and video, compose them on a layered canvas and build node workflows with the latest open models, all in one workbench.
 
-[![discord badge]][discord link] [![latest release badge]][latest release link] [![github stars badge]][github stars link] [![github forks badge]][github forks link] [![latest commit to main badge]][latest commit to main link] [![github open issues badge]][github open issues link] [![github open prs badge]][github open prs link] [![translation status badge]][translation status link]
+<a href="https://v7.invoke.ai/download/"><img src="https://raw.githubusercontent.com/invoke-ai/InvokeAI/main/.github/readme/btn-download.webp" alt="Download Invoke" height="44"></a>&nbsp;
+<a href="https://v7.invoke.ai/"><img src="https://raw.githubusercontent.com/invoke-ai/InvokeAI/main/.github/readme/btn-docs.webp" alt="Read the docs" height="44"></a>&nbsp;
+<a href="https://discord.gg/ZmtBAhwWhy"><img src="https://raw.githubusercontent.com/invoke-ai/InvokeAI/main/.github/readme/btn-discord.webp" alt="Join the Discord" height="44"></a>
 
-[![Sponsor Invoke](https://img.shields.io/badge/Sponsor-Invoke-ea4aaa?logo=githubsponsors&logoColor=white)][sponsor link]
+Windows · macOS · Linux &nbsp;·&nbsp; NVIDIA · AMD · Intel Arc · Apple Silicon &nbsp;·&nbsp; Apache 2.0
+
+[![latest release badge]][latest release link] [![discord badge]][discord link] [![github stars badge]][github stars link] [![translation status badge]][translation status link]
 
 </div>
 
+## What's new in Invoke 7
 
-Invoke is a leading creative engine built to empower professionals and enthusiasts alike. Generate and create stunning visual media using the latest AI-driven technologies. Invoke offers an industry leading web-based UI, and serves as the foundation for multiple commercial products.
+[<img src="https://raw.githubusercontent.com/invoke-ai/InvokeAI/main/.github/readme/whats-new.webp" alt="What's new in Invoke 7: the workbench, one window built from panels; Projects that keep canvas, workflows, layout and boards together in one .invk file; a new canvas with pressure-sensitive brushes, gradients, shapes, text and 16 blend modes that exports to PSD; video with sound from Wan 2.2, LTX-2 and MiniMax H3 (experimental); the Image Map, which lays out every image by visual similarity; and For/ForReturn loops in workflows.">](https://v7.invoke.ai/)
 
-- Free to use under a commercially-friendly license
-- Download and install on compatible hardware
-- Generate, refine, iterate on images, and build workflows
+[Read the release notes →](https://v7.invoke.ai/releases/)
 
-![Highlighted Features - Canvas and Workflows](https://github.com/invoke-ai/InvokeAI/assets/31807370/708f7a82-084f-4860-bfbe-e2588c53548d)
+## Paint exactly where it matters
 
-# Documentation
+Mask an area, describe what belongs there and accept the result to a layer. Inpainting, outpainting, regional prompts and control layers all work on one canvas, beside pressure-sensitive brushes, 16 blend modes and PSD export.
 
-| **Quick Links**                                                                                                                                             |
-| ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [Installation and Updates][installation docs] - [Documentation and Tutorials][docs home] - [Bug Reports][github issues] - [Contributing][contributing docs] |
+<img src="https://raw.githubusercontent.com/invoke-ai/InvokeAI/main/.github/readme/canvas.webp" alt="Animation: an inpaint mask is painted over a maroon roll on a sushi plate, the prompt 'nori-wrapped roll topped with salmon roe' is typed, and a wipe reveals only that roll regenerated.">
 
-# Installation
+[Canvas introduction →](https://v7.invoke.ai/users-guide/canvas/introduction/)
 
-To get started with Invoke, [Download the Launcher](https://github.com/invoke-ai/launcher/releases/latest).
+## Wire up your own pipeline
 
-## Troubleshooting, FAQ and Support
+Chain steps into a node graph and run it from a simple form. Add community node packs with the Custom Node Manager, or follow the ComfyUI migration guide to the nodes you already know.
 
-Please review our [FAQ][faq] for solutions to common installation problems and other issues.
+<img src="https://raw.githubusercontent.com/invoke-ai/InvokeAI/main/.github/readme/workflows.webp" alt="The workflow editor with the Image to Image FLUX workflow as a node graph, and its form on the left with the model, encoders, prompt and input image.">
 
-For more help, please join our [Discord][discord link].
+[Workflows guide →](https://v7.invoke.ai/users-guide/workflows/introduction/)
 
-## Features
+## Every image, easy to find
 
-Full details on features can be found in [our documentation][features docs].
+Boards and stars keep your images and videos in order, per project and across all of them. Search by prompt, or turn on image indexing and browse everything by what it shows on the Image Map.
 
-### Web Server & UI
+<img src="https://raw.githubusercontent.com/invoke-ai/InvokeAI/main/.github/readme/find.webp" alt="The Gallery with boards and starred images on the left, a mountain landscape in Preview, and the Image Map on the right with labelled clusters such as mountains, sushi and robots, and a hover card for the selected image.">
 
-Invoke runs a locally hosted web server & React UI with an industry-leading user experience.
+[Gallery guide →](https://v7.invoke.ai/users-guide/gallery/introduction/) · [Image Map →](https://v7.invoke.ai/users-guide/image-map/introduction/)
 
-### Unified Canvas
+## The latest open models, on your own hardware
 
-The Unified Canvas is a fully integrated canvas implementation with support for all core generation capabilities, in/out-painting, brush tools, and more. This creative tool unlocks the capability for artists to create with AI as a creative collaborator, and can be used to augment AI-generated imagery, sketches, photography, renders, and more.
+Each model family has a guide to its variants, hardware needs and settings. Hosted providers add models such as GPT Image and Gemini, billed to your own account.
 
-### Workflows & Nodes
+<img src="https://raw.githubusercontent.com/invoke-ai/InvokeAI/main/.github/readme/models.webp" alt="Model families with their licenses. Image: FLUX.2, FLUX.3, FLUX.1, Z-Image, Qwen-Image-2.1, Qwen Image, Krea-2, Ideogram 4, ERNIE-Image, CogView4, Anima, SD 3.5, SDXL and SD 1.5 / 2.x, plus hosted providers OpenAI, Google Gemini, BytePlus Seedream and Alibaba Cloud. Video: Wan 2.2, LTX-2 and MiniMax H3.">
 
-Invoke offers a fully featured workflow management solution, enabling users to combine the power of node-based workflows with the ease of a UI. This allows for customizable generation pipelines to be developed and shared by users looking to create specific workflows to support their production use-cases.
+<details>
+<summary>Model families as a list, with minimum VRAM</summary>
 
-### Board & Gallery Management
+| Family | Type | License | Min. VRAM |
+| --- | --- | --- | --- |
+| [FLUX.2](https://v7.invoke.ai/users-guide/models/local-models/flux-2/) | Image | Varies by model | 8 GB |
+| [FLUX.3](https://v7.invoke.ai/users-guide/models/local-models/flux-3/) | Image | FLUX Kommunity | 12 GB |
+| [FLUX.1](https://v7.invoke.ai/users-guide/models/local-models/flux-1/) | Image | Varies by model | 10 GB |
+| [Z-Image](https://v7.invoke.ai/users-guide/models/local-models/z-image/) | Image | Apache 2.0 | 8 GB |
+| [Qwen-Image-2.1](https://v7.invoke.ai/users-guide/models/local-models/qwen-image-2-1/) | Image | Qwen Research | 16 GB |
+| [Qwen Image](https://v7.invoke.ai/users-guide/models/local-models/qwen-image/) | Image | Apache 2.0 | |
+| [Krea-2](https://v7.invoke.ai/users-guide/models/local-models/krea-2/) | Image | Krea 2 Community | 16 GB |
+| [Ideogram 4](https://v7.invoke.ai/users-guide/models/local-models/ideogram4/) | Image | Non-commercial | 24 GB |
+| [ERNIE-Image](https://v7.invoke.ai/users-guide/models/local-models/ernie-image/) | Image | Apache 2.0 | 24 GB |
+| [CogView4](https://v7.invoke.ai/users-guide/models/local-models/cogview4/) | Image | Apache 2.0 | |
+| [Anima](https://v7.invoke.ai/users-guide/models/local-models/anima/) | Image | Non-commercial | |
+| [SD 3.5](https://v7.invoke.ai/users-guide/models/local-models/sd-3/) | Image | Stability Community | |
+| [SDXL](https://v7.invoke.ai/users-guide/models/local-models/sdxl/) | Image | OpenRAIL++-M | 8 GB |
+| [SD 1.5 / 2.x](https://v7.invoke.ai/users-guide/models/local-models/stable-diffusion-1-2/) | Image | OpenRAIL-M | 4 GB |
+| [Wan 2.2](https://v7.invoke.ai/users-guide/video-generation/wan-22/) | Video | Apache 2.0 | 6 GB |
+| [LTX-2](https://v7.invoke.ai/users-guide/video-generation/ltx-2/) | Video | LTX-2 Community | |
+| [MiniMax H3](https://v7.invoke.ai/users-guide/video-generation/minimax-h3/) | Video | MiniMax Community | |
 
-Invoke features an organized gallery system for easily storing, accessing, and remixing your content in the Invoke workspace. Images can be dragged/dropped onto any Image-base UI element in the application, and rich metadata within the Image allows for easy recall of key prompts or settings used in your workflow.
+Hosted providers: [OpenAI](https://v7.invoke.ai/users-guide/models/external-models/openai/), [Google Gemini](https://v7.invoke.ai/users-guide/models/external-models/gemini/), [BytePlus Seedream](https://v7.invoke.ai/users-guide/models/external-models/seedream/) and [Alibaba Cloud](https://v7.invoke.ai/users-guide/models/external-models/alibabacloud/).
 
-### Model Support
-- SD 1.5
-- SD 2.0
-- SDXL
-- SD 3.5 Medium
-- SD 3.5 Large
-- CogView 4
-- Flux.1 Dev
-- Flux.1 Schnell
-- Flux.1 Kontext
-- Flux.1 Krea
-- Flux Redux
-- Flux Fill
-- Flux.2 Dev
-- Flux.2 Klein 4B
-- Flux.2 Klein 9B
-- Z-Image Turbo
-- Z-Image Base
-- Krea 2 Turbo
-- Krea 2 Raw
-- Anima
-- Qwen Image
-- Qwen Image Edit
-- Ideogram 4
-- ERNIE-Image
-- ERNIE-Image-Turbo
-- Nano Banana (API Only)
-- GPT Image (API Only)
-- Wan (API Only)
+</details>
 
-### Other features
+[Compare model families →](https://v7.invoke.ai/users-guide/models/model-families/)
 
-- Support for ckpt, diffusers, and some gguf models
-- Upscaling Tools
-- Embedding Manager & Support
-- Model Manager & Support
-- Workflow creation & management
-- Node-Based Architecture
-- Object Segmentation & Selection Models (SAM / SAM2)
+## Install
 
-## Contributing
+The Invoke Launcher installs, updates and launches Invoke. Pick your platform:
 
-Anyone who wishes to contribute to this project - whether documentation, features, bug fixes, code cleanup, testing, or code reviews - is very much encouraged to do so.
+<a href="https://github.com/invoke-ai/launcher/releases/latest/download/Invoke.Community.Edition.Setup.latest.exe"><img src="https://raw.githubusercontent.com/invoke-ai/InvokeAI/main/.github/readme/dl-windows.webp" alt="Download for Windows: EXE installer, NVIDIA, AMD or Intel Arc" width="282"></a>
+<a href="https://github.com/invoke-ai/launcher/releases/latest/download/Invoke.Community.Edition-latest-arm64.dmg"><img src="https://raw.githubusercontent.com/invoke-ai/InvokeAI/main/.github/readme/dl-macos.webp" alt="Download for macOS: DMG for Apple Silicon, macOS 14 or later" width="282"></a>
+<a href="https://github.com/invoke-ai/launcher/releases/latest/download/Invoke.Community.Edition-latest.AppImage"><img src="https://raw.githubusercontent.com/invoke-ai/InvokeAI/main/.github/readme/dl-linux.webp" alt="Download for Linux: AppImage, NVIDIA, AMD or Intel Arc" width="282"></a>
 
-Get started with contributing by reading our [contribution documentation][contributing docs], joining the [#dev-chat] or the GitHub discussion board.
+Check the [system requirements][system requirements] first. Prefer to set things up yourself? Use the [manual install][manual install] or [Docker][docker docs]. Trouble installing? The [FAQ][faq] and [Discord][discord link] can help.
 
-We hope you enjoy using Invoke as much as we enjoy creating it, and we hope you will elect to become part of our community.
+## Made with Invoke
+
+<img src="https://raw.githubusercontent.com/invoke-ai/InvokeAI/main/.github/readme/made-with-invoke.webp" alt="First-place art from the weekly Discord challenges: a watercolor koi by Bob, an iridescent feather by ShaneDK, a creature in a wall hole by kahn, a gargoyle with a milkshake by jintoku49, a shattered mirror by Mother, Maiden, Crow, a tortoise winning a sprint by mickr777, an amber skull with bees by SkunkWorxDark and a clockwork bird by Subsector13.">
+
+Winners of the weekly Discord challenges. [Browse the showcase →](https://v7.invoke.ai/showcase/) · [See every challenge →](https://v7.invoke.ai/showcase/challenges/)
+
+## Find your way in
+
+| Create | Run | Build |
+| --- | --- | --- |
+| [Get started][installation docs] | [Configuration](https://v7.invoke.ai/configuration/invokeai-yaml/) | [Developer guide](https://v7.invoke.ai/development/) |
+| [Canvas](https://v7.invoke.ai/users-guide/canvas/introduction/) | [Docker][docker docs] | [Contributing][contributing docs] |
+| [Workflows](https://v7.invoke.ai/users-guide/workflows/introduction/) | [Multi-user mode](https://v7.invoke.ai/configuration/multi-user-mode/admin-guide/) | [Creating nodes](https://v7.invoke.ai/development/guides/creating-nodes/) |
+| [Models](https://v7.invoke.ai/users-guide/models/introduction/) | [Low-VRAM mode](https://v7.invoke.ai/configuration/optimization/low-vram-mode/) | [Node packs](https://v7.invoke.ai/development/guides/creating-node-pack/) |
+
+## Built in the open
+
+Invoke is free software under the Apache 2.0 license, made by [contributors around the world][contributors]. The hosted Invoke.ai platform has shut down since its founding team joined Adobe. The open-source project carries on, stewarded by long-time core maintainers Lincoln Stein ([lstein](https://github.com/lstein)) and Vic ([Blessedcoolant](https://github.com/blessedcoolant)).
+
+- **Contribute code, docs or tests.** Start with the [contributing guide][contributing docs] and say hi in [#dev-chat][#dev-chat].
+- **Translate.** The app on [Weblate][translation status link], the docs on [Crowdin](https://crowdin.com/project/invoke).
+- **Train your own LoRAs** with [Invoke Training](https://github.com/invoke-ai/invoke-training).
+- **Report a bug** in [GitHub issues][github issues].
 
 ## Sponsors
 
-Invoke's open-source development is powered by our sponsors. If Invoke is valuable to you or your business, please consider [sponsoring us][sponsor link] — it directly funds maintenance, new features, and community support.
+Invoke's open-source development is funded by its sponsors. If Invoke is valuable to you or your business, [sponsor us][sponsor link]; it pays for maintenance, new features and community support.
 
-<!-- Sponsor logos can be added below, or automated with a GitHub Action
-     such as `JamesIves/github-sponsors-readme-action` to keep them in sync. -->
+<picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/invoke-ai/InvokeAI/main/.github/readme/blacksmith-dark.webp"><img src="https://raw.githubusercontent.com/invoke-ai/InvokeAI/main/.github/readme/blacksmith-light.webp" alt="CI powered by Blacksmith" width="275"></picture>
 
-[![Sponsor Invoke](https://img.shields.io/badge/Sponsor-Invoke-ea4aaa?logo=githubsponsors&logoColor=white)][sponsor link]
+[Blacksmith](https://www.blacksmith.sh/) runs Invoke's continuous integration on its virtual machines.
 
-We very much thank the following sponsors:
+**Power users ($50/mo)**
 
-### Blacksmith
+<a href="https://github.com/mickr777"><img src="https://github.com/mickr777.png?size=64" width="32" height="32" align="middle" alt=""> mickr777</a> &nbsp;
+<a href="https://github.com/Astroburner"><img src="https://github.com/Astroburner.png?size=64" width="32" height="32" align="middle" alt=""> Astroburner</a> &nbsp;
+and 2 anonymous donors
 
-[![Blacksmith](https://raw.githubusercontent.com/invoke-ai/InvokeAI/main/docs/src/content/docs/assets/blacksmith-logo.png)](https://www.blacksmith.sh/)
+**Backers ($15/mo)**
 
-Blacksmith provides InvokeAI with virtual machines for continuous
-integration and continuous deployment.
-
-### Backers ($15/mo)
-
-* [apokolypsse](https://github.com/apokolypsse)
-* [Romeotechguy](https://github.com/Romeotechguy)
-* [Pynshe9](https://github.com/Pynshe9)
-* [CarstenD74](https://github.com/CarstenD74)
-* [zamjoor](https://github.com/zamjoor)
-* [FusionBreak](https://github.com/FusionBreak)
-* and 2 anonymous donors
-
-### Power Users ($50/mo)
-
-* [mickr777](https://github.com/mickr777)
-* [Astroburner](https://github.com/Astroburner)
-* and 2 anonymous donors
+<a href="https://github.com/apokolypsse"><img src="https://github.com/apokolypsse.png?size=64" width="32" height="32" align="middle" alt=""> apokolypsse</a> &nbsp;
+<a href="https://github.com/Romeotechguy"><img src="https://github.com/Romeotechguy.png?size=64" width="32" height="32" align="middle" alt=""> Romeotechguy</a> &nbsp;
+<a href="https://github.com/Pynshe9"><img src="https://github.com/Pynshe9.png?size=64" width="32" height="32" align="middle" alt=""> Pynshe9</a> &nbsp;
+<a href="https://github.com/CarstenD74"><img src="https://github.com/CarstenD74.png?size=64" width="32" height="32" align="middle" alt=""> CarstenD74</a> &nbsp;
+<a href="https://github.com/zamjoor"><img src="https://github.com/zamjoor.png?size=64" width="32" height="32" align="middle" alt=""> zamjoor</a> &nbsp;
+<a href="https://github.com/FusionBreak"><img src="https://github.com/FusionBreak.png?size=64" width="32" height="32" align="middle" alt=""> FusionBreak</a> &nbsp;
+and 2 anonymous donors
 
 ## Thanks
 
-Invoke is a combined effort of [passionate and talented people from across the world][contributors]. We thank them for their time, hard work and effort.
+Invoke is the combined effort of hundreds of people. Thank you for your time, work and care.
+
+<a href="https://github.com/invoke-ai/InvokeAI/graphs/contributors"><img src="https://contrib.rocks/image?repo=invoke-ai/InvokeAI&max=120&columns=20" alt="Avatars of Invoke's contributors"></a>
 
 Copyright 2022-2026 InvokeAI Contributors. See [NOTICE](NOTICE).
 
-[features docs]: https://invoke.ai/
-[faq]: https://invoke.ai/troubleshooting/faq/
-[contributors]: https://invoke.ai/contributing/contributors/
+[contributors]: https://v7.invoke.ai/contributing/contributors/
+[contributing docs]: https://v7.invoke.ai/contributing/
+[installation docs]: https://v7.invoke.ai/start-here/installation/
+[system requirements]: https://v7.invoke.ai/start-here/system-requirements/
+[manual install]: https://v7.invoke.ai/start-here/manual/
+[docker docs]: https://v7.invoke.ai/configuration/docker/
+[faq]: https://v7.invoke.ai/troubleshooting/faq/
 [github issues]: https://github.com/invoke-ai/InvokeAI/issues
-[docs home]: https://invoke.ai
-[installation docs]: https://invoke.ai/start-here/installation/
 [sponsor link]: https://github.com/sponsors/invoke-ai
 [#dev-chat]: https://discord.com/channels/1020123559063990373/1049495067846524939
-[contributing docs]: https://invoke.ai/contributing/
-[CI checks on main badge]: https://flat.badgen.net/github/checks/invoke-ai/InvokeAI/main?label=CI%20status%20on%20main&cache=900&icon=github
-[CI checks on main link]: https://github.com/invoke-ai/InvokeAI/actions?query=branch%3Amain
 [discord badge]: https://flat.badgen.net/discord/members/ZmtBAhwWhy?icon=discord
 [discord link]: https://discord.gg/ZmtBAhwWhy
-[github forks badge]: https://flat.badgen.net/github/forks/invoke-ai/InvokeAI?icon=github
-[github forks link]: https://useful-forks.github.io/?repo=invoke-ai%2FInvokeAI
-[github open issues badge]: https://flat.badgen.net/github/open-issues/invoke-ai/InvokeAI?icon=github
-[github open issues link]: https://github.com/invoke-ai/InvokeAI/issues?q=is%3Aissue+is%3Aopen
-[github open prs badge]: https://flat.badgen.net/github/open-prs/invoke-ai/InvokeAI?icon=github
-[github open prs link]: https://github.com/invoke-ai/InvokeAI/pulls?q=is%3Apr+is%3Aopen
 [github stars badge]: https://flat.badgen.net/github/stars/invoke-ai/InvokeAI?icon=github
 [github stars link]: https://github.com/invoke-ai/InvokeAI/stargazers
-[latest commit to main badge]: https://flat.badgen.net/github/last-commit/invoke-ai/InvokeAI/main?icon=github&color=yellow&label=last%20dev%20commit&cache=900
-[latest commit to main link]: https://github.com/invoke-ai/InvokeAI/commits/main
 [latest release badge]: https://flat.badgen.net/github/release/invoke-ai/InvokeAI/development?icon=github
 [latest release link]: https://github.com/invoke-ai/InvokeAI/releases/latest
 [translation status badge]: https://hosted.weblate.org/widgets/invokeai/-/svg-badge.svg
 [translation status link]: https://hosted.weblate.org/engage/invokeai/
-[nvidia docker docs]: https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html
-[amd docker docs]: https://rocm.docs.amd.com/projects/install-on-linux/en/latest/how-to/docker.html
