@@ -3355,6 +3355,7 @@
       "krea2ReferenceKvCacheNeedsEditReferences": "Applies only with Edit references and an edit LoRA in Concepts.",
       "krea2ReferenceKvCacheNeedsLora": "Applies only with an edit LoRA enabled in Concepts.",
       "krea2EditReferencesNeedLora": "Edit references need an edit LoRA (pose, depth, …); without one the model copies the reference.",
+      "canvasReferenceImageBudgetHint": "When the frame contains visible content, it uses one image slot. Remove a reference image to stay within this model’s limit.",
       "styleStrength": "Style strength",
       "timestepShift": "Shift",
       "timestepShiftHelp": "Auto derives the schedule shift from the image size.",

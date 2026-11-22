@@ -34,6 +34,7 @@ import pytest
 import torch
 
 from invokeai.backend.util.devices import TorchDevice
+from tests.fixtures.safetensors_files import served_checkpoint
 
 #: Distinguishes "do not touch `read_safetensors_metadata`" from "make it return nothing". Both are
 #: real cases: a loader can be tested against a file whose header it really reads, and against that
@@ -49,9 +50,11 @@ class Seam:
     #: Where the loader's ``from x import y`` names live, and so where a patch has to land.
     module: ModuleType
     entry: str = "_load_from_singlefile"
-    #: Only for a loader that calls ``safetensors.torch.load_file`` through the package rather than
-    #: importing the name. Patching the wrong host patches a name nobody reads, and the loader then
-    #: quietly reads whatever file the config points at.
+    #: Only for a seam whose entry point makes a raw ``load_file`` read, beside or instead of the shared
+    #: ``load_safetensors_checkpoint`` helper (which is patched whenever ``module`` has it). It names where
+    #: that read resolves ``load_file``: ``safetensors.torch`` for a loader that imports the name inside the
+    #: method, the module itself for one that imports it at module level. Patching the wrong host patches a
+    #: name nobody reads, and the loader then quietly reads whatever file the config points at.
     load_file_host: ModuleType | None = None
     compute_dtype: torch.dtype = torch.float32
     #: ``TorchDevice`` is one class shared by every loader module, so this is a switch rather than a
@@ -120,8 +123,8 @@ def prepare(
     run = SeamRun(seam=seam, loader=None)
     served: list[dict[str, torch.Tensor]] = []
 
-    def load_file(_path):
-        served.append(dict(state_dict or {}))
+    def load_file(_path, *, select=None, owned: bool = False):
+        served.append(served_checkpoint(dict(state_dict or {}))(_path, select=select, owned=owned))
         return served[-1]
 
     def make_room(reserve: int) -> None:
@@ -144,7 +147,11 @@ def prepare(
     run.loader = loader
 
     if state_dict is not None:
-        monkeypatch.setattr(seam.load_file_host or seam.module, "load_file", load_file)
+        has_helper = hasattr(seam.module, "load_safetensors_checkpoint")
+        if has_helper:
+            monkeypatch.setattr(seam.module, "load_safetensors_checkpoint", load_file)
+        if seam.load_file_host is not None or not has_helper:
+            monkeypatch.setattr(seam.load_file_host or seam.module, "load_file", load_file)
     if metadata is not UNSET:
         header = dict(metadata) if metadata is not None else None
         monkeypatch.setattr(seam.module, "read_safetensors_metadata", lambda _path, _logger: header)

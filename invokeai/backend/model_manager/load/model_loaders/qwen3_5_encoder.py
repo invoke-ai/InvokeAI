@@ -22,7 +22,7 @@ from invokeai.backend.model_manager.configs.qwen3_5_encoder import (
 from invokeai.backend.model_manager.load.load_default import ModelLoader, _model_declared_skip_patterns
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.model_manager.taxonomy import AnyModel, BaseModelType, ModelFormat, ModelType, SubModelType
-from invokeai.backend.quantization.fp8_scaled import cast_state_dict, reject_quantized_side_channel
+from invokeai.backend.quantization.fp8_scaled import cast_state_dict, reject_quantized_side_channel, safetensors_backend
 from invokeai.backend.quantization.int8_convrot import (
     drop_unconsumed_quantization_sidecars,
     extract_int8_convrot_markers,
@@ -105,7 +105,7 @@ def load_qwen3_5_text_encoder(
 
     sd: dict[str, torch.Tensor] = {}
     for path, keys in keys_by_file.items():
-        with safe_open(path, framework="pt", device="cpu") as f:
+        with safe_open(path, framework="pt", device="cpu", backend=safetensors_backend(path)) as f:
             for key in keys:
                 if key in names:
                     sd[names[key]] = f.get_tensor(key)
