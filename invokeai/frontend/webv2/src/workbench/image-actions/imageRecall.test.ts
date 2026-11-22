@@ -208,7 +208,11 @@ describe('image recall', () => {
   it.each(['positivePrompt', 'negativePrompt'] as const)(
     'recalls only the %s without replacing the other prompt',
     (kind) => {
-      const currentValues = createValues({ positivePrompt: 'keep positive', negativePrompt: 'keep negative' });
+      const currentValues = createValues({
+        positivePrompt: 'keep positive',
+        negativePrompt: 'keep negative',
+        negativePromptEnabled: false,
+      });
       const result = buildImageRecallSettings({
         currentValues,
         image,
@@ -222,6 +226,75 @@ describe('image recall', () => {
       expect(result?.values).toMatchObject({
         positivePrompt: kind === 'positivePrompt' ? 'saved positive' : 'keep positive',
         negativePrompt: kind === 'negativePrompt' ? 'saved negative' : 'keep negative',
+        negativePromptEnabled: kind === 'negativePrompt',
+      });
+    }
+  );
+
+  it.each(['positivePrompt', 'negativePrompt'] as const)(
+    'preserves the other effective prompt when recalling %s clears a shared template',
+    (kind) => {
+      const result = buildImageRecallSettings({
+        currentValues: createValues({
+          positivePrompt: 'keep positive',
+          negativePrompt: 'keep negative',
+          negativePromptEnabled: false,
+          promptTemplate: {
+            id: 'template',
+            name: 'Template',
+            positivePrompt: 'cinematic {prompt}, 35mm',
+            negativePrompt: 'avoid {prompt}, blurry',
+          },
+          promptTemplateViewMode: true,
+        }),
+        image,
+        kind,
+        metadata: { positive_prompt: 'saved positive', negative_prompt: 'saved negative' },
+        models: [],
+        supportedModels: [sdxlModel],
+        vaeModels: [],
+      });
+
+      expect(result?.values).toMatchObject({
+        positivePrompt: kind === 'positivePrompt' ? 'saved positive' : 'cinematic keep positive, 35mm',
+        negativePrompt: kind === 'negativePrompt' ? 'saved negative' : 'avoid keep negative, blurry',
+        negativePromptEnabled: kind === 'negativePrompt',
+        promptTemplate: null,
+        promptTemplateViewMode: false,
+      });
+    }
+  );
+
+  it.each(['prompts', 'all', 'remix'] as const)(
+    'enables the recorded negative and preserves the unrecalled effective positive for %s',
+    (kind) => {
+      const result = buildImageRecallSettings({
+        currentValues: createValues({
+          positivePrompt: 'keep positive',
+          negativePrompt: 'old negative',
+          negativePromptEnabled: false,
+          promptTemplate: {
+            id: 'template',
+            name: 'Template',
+            positivePrompt: '{prompt}, detailed',
+            negativePrompt: 'lowres',
+          },
+          promptTemplateViewMode: true,
+        }),
+        image,
+        kind,
+        metadata: { negative_prompt: 'recorded negative' },
+        models: [],
+        supportedModels: [sdxlModel],
+        vaeModels: [],
+      });
+
+      expect(result?.values).toMatchObject({
+        positivePrompt: 'keep positive, detailed',
+        negativePrompt: 'recorded negative',
+        negativePromptEnabled: true,
+        promptTemplate: null,
+        promptTemplateViewMode: false,
       });
     }
   );
@@ -230,27 +303,38 @@ describe('image recall', () => {
     {
       kind: 'positivePrompt',
       metadata: { positive_prompt: '' },
-      expected: { positivePrompt: '', negativePrompt: 'keep negative' },
+      negativePromptEnabled: false,
+      expected: { positivePrompt: '', negativePrompt: 'keep negative lowres', negativePromptEnabled: false },
     },
     {
       kind: 'negativePrompt',
       metadata: { negative_prompt: '' },
-      expected: { positivePrompt: 'keep positive', negativePrompt: '' },
+      negativePromptEnabled: true,
+      expected: { positivePrompt: 'keep positive, detailed', negativePrompt: '', negativePromptEnabled: true },
+    },
+    {
+      kind: 'negativePrompt',
+      metadata: { negative_prompt: '' },
+      negativePromptEnabled: false,
+      expected: { positivePrompt: 'keep positive, detailed', negativePrompt: '', negativePromptEnabled: false },
     },
     {
       kind: 'negativePrompt',
       metadata: { negative_prompt: null },
-      expected: { positivePrompt: 'keep positive', negativePrompt: '' },
+      negativePromptEnabled: true,
+      expected: { positivePrompt: 'keep positive, detailed', negativePrompt: '', negativePromptEnabled: false },
     },
-    { kind: 'positivePrompt', metadata: { negative_prompt: 'recorded' }, expected: null },
-    { kind: 'negativePrompt', metadata: { positive_prompt: 'recorded' }, expected: null },
+    { kind: 'positivePrompt', metadata: { negative_prompt: 'recorded' }, negativePromptEnabled: false, expected: null },
+    { kind: 'negativePrompt', metadata: { positive_prompt: 'recorded' }, negativePromptEnabled: false, expected: null },
+    { kind: 'positivePrompt', metadata: { positive_prompt: null }, negativePromptEnabled: false, expected: null },
   ] as const)(
-    'handles empty or absent $kind metadata without recalling the other prompt',
-    ({ kind, metadata, expected }) => {
+    'handles empty or absent $kind metadata without changing the other effective prompt',
+    ({ kind, metadata, negativePromptEnabled, expected }) => {
       const result = buildImageRecallSettings({
         currentValues: createValues({
           positivePrompt: 'keep positive',
           negativePrompt: 'keep negative',
+          negativePromptEnabled,
           promptTemplate: {
             id: 'template',
             name: 'Template',

@@ -699,14 +699,30 @@ describe('executeImageRecall', () => {
       });
 
       await vi.waitFor(() => expect(finishRead).toBeDefined());
-      panel = { ...panel, steps: 42, positivePrompt: 'edited positive', negativePrompt: 'edited negative' };
+      panel = {
+        ...panel,
+        steps: 42,
+        positivePrompt: 'edited positive',
+        negativePrompt: 'edited negative',
+        negativePromptEnabled: false,
+        promptTemplate: {
+          id: 'new-template',
+          name: 'New template',
+          positivePrompt: '{prompt}, cinematic',
+          negativePrompt: '{prompt}, lowres',
+        },
+        promptTemplateViewMode: true,
+      };
       finishRead!({ positive_prompt: 'recalled positive', negative_prompt: 'recalled negative' });
 
       await expect(recall).resolves.toBe(true);
       expect(setSettings).toHaveBeenCalledWith(
         expect.objectContaining({
-          positivePrompt: kind === 'negativePrompt' ? 'edited positive' : 'recalled positive',
-          negativePrompt: kind === 'positivePrompt' ? 'edited negative' : 'recalled negative',
+          positivePrompt: kind === 'negativePrompt' ? 'edited positive, cinematic' : 'recalled positive',
+          negativePrompt: kind === 'positivePrompt' ? 'edited negative, lowres' : 'recalled negative',
+          negativePromptEnabled: kind !== 'positivePrompt',
+          promptTemplate: null,
+          promptTemplateViewMode: false,
           steps: 42,
         }),
         'project-1'

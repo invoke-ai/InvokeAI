@@ -45,6 +45,7 @@ const ENTRY_RECALL_KINDS: Partial<
   Record<string, { capability: keyof ImageRecallCapabilities; kind: ImageRecallKind }>
 > = {
   clipSkip: { capability: 'clipSkip', kind: 'clipSkip' },
+  // The shared capability gates the Generate target; parsed rows prove the individual prompt exists.
   negativePrompt: { capability: 'prompts', kind: 'negativePrompt' },
   positivePrompt: { capability: 'prompts', kind: 'positivePrompt' },
   seed: { capability: 'seed', kind: 'seed' },

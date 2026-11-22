@@ -12,6 +12,7 @@ import { galleryKeys } from '@features/gallery/queries';
 import { captureAccountScope } from '@platform/state/accountLifecycle';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
+import { EMPTY_IMAGE_RECALL_CAPABILITIES } from '@workbench/image-actions';
 import { createInstance } from 'i18next';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -490,6 +491,23 @@ describe('Preview query-driven Details', () => {
     expect(actions.recallImageData).toHaveBeenLastCalledWith(actionImage, 'negativePrompt');
   });
 
+  it('keeps prompt rows readable without offering recall when no Generate target is available', async () => {
+    galleryMocks.imageMetadata.mockResolvedValueOnce({
+      positive_prompt: 'readable positive',
+      negative_prompt: 'readable negative',
+    });
+    vi.mocked(actions.deriveImageRecallCapabilities).mockReturnValue(EMPTY_IMAGE_RECALL_CAPABILITIES);
+
+    await renderDetails({ isOpen: true, item: imageItem });
+    await act(async () => {
+      await vi.waitFor(() => expect(document.body.textContent).toContain('readable positive'));
+    });
+
+    expect(document.body.textContent).toContain('readable negative');
+    expect(document.querySelector('[aria-label="Use positive prompt"]')).toBeNull();
+    expect(document.querySelector('[aria-label="Use negative prompt"]')).toBeNull();
+  });
+
   it('keeps the video workflow and graph tabs when its metadata cannot be read, and retries the metadata', async () => {
     galleryMocks.videoMetadata
       .mockRejectedValueOnce(new Error('metadata unavailable'))
@@ -536,6 +554,7 @@ describe('Preview query-driven Details', () => {
     const seedRecall = document.querySelector<HTMLButtonElement>('[aria-label="Use seed"]');
     expect(seedRecall).not.toBeNull();
     expect(document.querySelector('[aria-label="Use positive prompt"]')).not.toBeNull();
+    expect(document.querySelector('[aria-label="Use negative prompt"]')).toBeNull();
     expect(document.querySelector('[aria-label="Use size"]')).toBeNull();
 
     const modelRow = [...(document.querySelectorAll('.chakra-data-list__item') ?? [])].find((row) =>

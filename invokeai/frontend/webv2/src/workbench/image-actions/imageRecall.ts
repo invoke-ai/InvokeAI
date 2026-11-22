@@ -19,6 +19,7 @@ import {
   deriveAspectRatioId,
   getCompatibleReferenceImages,
   getDimensionGrid,
+  getEffectivePrompts,
   getExternalProviderOptionKeys,
   getExternalResolutionPresets,
   getGenerateModelSelectionResult,
@@ -426,7 +427,10 @@ const getPromptPatch = (
   metadata: unknown,
   kind: 'prompts' | 'positivePrompt' | 'negativePrompt' = 'prompts'
 ): Partial<
-  Pick<GenerateWidgetValues, 'negativePrompt' | 'positivePrompt' | 'promptTemplate' | 'promptTemplateViewMode'>
+  Pick<
+    GenerateWidgetValues,
+    'negativePrompt' | 'negativePromptEnabled' | 'positivePrompt' | 'promptTemplate' | 'promptTemplateViewMode'
+  >
 > => {
   const positivePrompt = kind === 'negativePrompt' ? null : getString(metadata, 'positive_prompt');
   const negativePrompt = kind === 'positivePrompt' ? undefined : getNullableString(metadata, 'negative_prompt');
@@ -436,6 +440,12 @@ const getPromptPatch = (
   return {
     ...(positivePrompt !== null ? { positivePrompt } : {}),
     ...(negativePrompt !== undefined ? { negativePrompt: negativePrompt ?? '' } : {}),
+    // Empty text cannot distinguish disabled from empty; only an explicit null turns the toggle off.
+    ...(negativePrompt
+      ? { negativePromptEnabled: true }
+      : negativePrompt === null
+        ? { negativePromptEnabled: false }
+        : {}),
     ...(clearTemplate ? { promptTemplate: null, promptTemplateViewMode: false } : {}),
   };
 };
@@ -1621,7 +1631,8 @@ export const buildImageRecallSettings = ({
     const promptPatch = getPromptPatch(metadata, kind === 'all' || kind === 'remix' ? 'prompts' : kind);
 
     if (Object.keys(promptPatch).length > 0) {
-      values = { ...values, ...promptPatch };
+      // Flatten the kept side before clearing a template shared by both prompts.
+      values = { ...values, ...(values.promptTemplate ? getEffectivePrompts(values) : {}), ...promptPatch };
       fields.push('prompts');
     }
   }
