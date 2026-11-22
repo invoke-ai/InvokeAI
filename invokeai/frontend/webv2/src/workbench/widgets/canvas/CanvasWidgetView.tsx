@@ -1,5 +1,5 @@
 import type { WidgetViewProps } from '@workbench/widgetContracts';
-import type { MouseEvent as ReactMouseEvent } from 'react';
+import type { KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent } from 'react';
 
 import { Box } from '@chakra-ui/react';
 import { useDndMonitor, type DragEndEvent } from '@dnd-kit/core';
@@ -29,8 +29,10 @@ import {
   useWorkbenchCommands,
   useWorkbenchQueries,
 } from '@workbench/WorkbenchContext';
-import { lazy, Suspense, useCallback, useEffect, useEffectEvent, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+
+import type { VectorPathMenuTarget } from './VectorPathContextMenu';
 
 import { useModelGridSize } from './bboxGrid';
 import { CanvasBottomOverlay } from './CanvasBottomOverlay';
@@ -84,6 +86,10 @@ import { useCreateFromBbox } from './useCreateFromBbox';
 import { useStagedResultGallerySave } from './useStagedResultGallerySave';
 import { reportLayerOperation, reportPreparedCommit, reportStructuralCommit } from './useStructuralCommit';
 
+const VectorPathContextMenu = lazy(() =>
+  import('./VectorPathContextMenu').then((module) => ({ default: module.VectorPathContextMenu }))
+);
+
 const MissingFontsDialog = lazy(() =>
   import('./MissingFontsDialog').then((module) => ({ default: module.MissingFontsDialog }))
 );
@@ -103,10 +109,7 @@ const CanvasShortcutHintRegistration = ({
   return null;
 };
 
-/**
- * Wire reducer chrome, commands, settings, and staging around the pixel/input engine. Properties owns tool
- * settings; {@link CanvasHeaderActions} owns view controls.
- */
+/** Wire reducer chrome, commands, settings, and staging around the pixel/input engine. */
 export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
   const { t } = useTranslation();
   const notify = useNotify();
@@ -132,10 +135,20 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
   // Right-click on the canvas surface targets the selected layer (the panel is
   // the sole authority; the stack is never hit-tested) and opens either the
   // shared per-layer menu or the global menu at the pointer.
+  const [vectorMenuTarget, setVectorMenuTarget] = useState<VectorPathMenuTarget | null>(null);
+  const vectorMenuReturnFocus = useRef<HTMLElement | null>(null);
+  const closeVectorMenu = useCallback(() => {
+    setVectorMenuTarget(null);
+    const focusTarget = vectorMenuReturnFocus.current;
+    vectorMenuReturnFocus.current = null;
+    const focused = focusTarget?.ownerDocument.activeElement;
+    if (focusTarget?.isConnected && (focused === focusTarget.ownerDocument.body || focused?.closest('[role="menu"]'))) {
+      focusTarget.focus({ preventScroll: true });
+    }
+  }, []);
   const [contextMenuTarget, setContextMenuTarget] = useState<CanvasContextMenuTarget | null>(null);
   const closeContextMenu = useCallback(() => setContextMenuTarget(null), []);
-  // Feed model grid policy into the model-agnostic engine using primitive selectors for value-stable
-  // subscriptions.
+  // Feed model grid policy into the model-agnostic engine using primitive selectors for value-stable subscriptions.
   const modelBase = useActiveProjectSelector((project) => {
     const values = getProjectWidgetValues(project, 'generate') as { model?: { base?: unknown } } | undefined;
     return typeof values?.model?.base === 'string' ? values.model.base : null;
@@ -156,20 +169,18 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
       return;
     }
     for (const setting of CANVAS_SETTINGS) {
-      // Only engine-backed settings feed a store; settings consumed elsewhere
-      // in the frontend have no store and are skipped here.
+      // Only engine-backed settings feed a store; settings without one are consumed elsewhere in the frontend.
       if (setting.store) {
         engine.interaction.set(setting.store, settings[setting.key]);
       }
     }
   }, [engine, settings]);
 
-  // The pair↔engine bridge lives in a null child so per-pointermove pair
-  // edits never re-render this shell; the commands feed the X/D hotkeys below.
+  // The pair↔engine bridge lives in a null child so per-pointermove pair edits never re-render this shell; the commands
+  // feed the X/D hotkeys below.
   const colorCommands = useActiveColorCommands();
 
-  // Resolve checker colors from live theme tokens after ThemeController updates data-theme, then feed the engine
-  // store.
+  // Resolve checker colors from live theme tokens after ThemeController updates data-theme, then feed the engine store.
   const themeId = useWorkbenchSettingsSelector((snapshot) => snapshot.preferences.themeId);
   useEffect(() => {
     engine?.interaction.set('checkerColors', resolveCheckerColors());
@@ -196,9 +207,7 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
   const isDocumentEditingLocked = operationKind !== null;
   const canAcceptStagedImage = engine !== null && selectedCandidate !== undefined && !isDocumentEditingLocked;
 
-  // Files dragged in from the desktop show the gallery drag's zones and land the same way once uploaded. The upload
-  // and import load on the first drop, keeping them out of Canvas startup. A canvas held by a running operation shows
-  // no zones, so it takes no drop; the overlay says why.
+  // Files dragged in from the desktop show the gallery drag's zones and land the same way once uploaded.
   const queryClient = useQueryClient();
   const startDroppedFileUpload = useDroppedFileUpload({
     pendingKey: 'widgets.canvas.fileDrop.pending',
@@ -235,27 +244,65 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
     },
     [canvasCommands, notifications, queries, queryClient, startDroppedFileUpload, t]
   );
+  const openSurfaceContextMenu = useCallback(
+    (surface: HTMLDivElement, clientX: number, clientY: number, keyboard: boolean) => {
+      setVectorMenuTarget(null);
+      vectorMenuReturnFocus.current = null;
+      const bounds = surface.getBoundingClientRect();
+      const x = keyboard ? bounds.left + bounds.width / 2 : clientX;
+      const y = keyboard ? bounds.top + bounds.height / 2 : clientY;
+      // Keyboard invocation acts on the current path; only a pointer invocation retargets by geometry.
+      if (keyboard || engine?.layers.vectorEdit.targetContextMenu({ x: x - bounds.left, y: y - bounds.top })) {
+        const edit = engine?.interaction.get('vectorEditSession');
+        if (edit?.activePathId) {
+          const focused = surface.ownerDocument.activeElement;
+          if (keyboard && focused instanceof HTMLElement && surface.contains(focused)) {
+            vectorMenuReturnFocus.current = focused;
+          }
+          setContextMenuTarget(null);
+          setVectorMenuTarget({ x, y, layerId: edit.layerId, pathId: edit.activePathId });
+          return;
+        }
+      }
+      setContextMenuTarget(
+        resolveCanvasContextMenu({
+          clientX: x,
+          clientY: y,
+          isInlineEditor: false,
+          selectedLayerId: engine?.tools.canTargetLayerFromContextMenu() ? canvas.document.selectedLayerId : null,
+        }).target
+      );
+    },
+    [canvas.document.selectedLayerId, engine]
+  );
   const { drag: fileDrag, handlers: fileDragHandlers } = useNativeFileDrag({
     findZone: findCanvasImageDropDestination,
     onDrop: importDroppedFiles,
   });
   const handleSurfaceContextMenu = useCallback(
     (event: ReactMouseEvent<HTMLDivElement>) => {
-      // Preserve native menus in inline editors. Canvas context actions target the selected layer without changing
-      // selection.
-      const resolution = resolveCanvasContextMenu({
-        clientX: event.clientX,
-        clientY: event.clientY,
-        isInlineEditor: event.target instanceof Element && !!event.target.closest(INLINE_EDIT_SELECTOR),
-        selectedLayerId: engine?.tools.canTargetLayerFromContextMenu() ? canvas.document.selectedLayerId : null,
-      });
-      if (!resolution.preventDefault) {
+      if (event.target instanceof Element && event.target.closest(INLINE_EDIT_SELECTOR)) {
         return;
       }
       event.preventDefault();
-      setContextMenuTarget(resolution.target);
+      openSurfaceContextMenu(event.currentTarget, event.clientX, event.clientY, event.button <= 0);
     },
-    [canvas.document.selectedLayerId, engine]
+    [openSurfaceContextMenu]
+  );
+  const handleSurfaceMenuKeyDown = useCallback(
+    (event: ReactKeyboardEvent<HTMLDivElement>) => {
+      if (
+        event.defaultPrevented ||
+        (event.key !== 'ContextMenu' &&
+          !(event.key === 'F10' && event.shiftKey && !event.ctrlKey && !event.altKey && !event.metaKey)) ||
+        (event.target instanceof Element && event.target.closest(INLINE_EDIT_SELECTOR))
+      ) {
+        return;
+      }
+      event.preventDefault();
+      openSurfaceContextMenu(event.currentTarget, 0, 0, true);
+    },
+    [openSurfaceContextMenu]
   );
 
   const handleCanvasImageDrop = useCallback(
@@ -265,8 +312,8 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
         return;
       }
 
-      // Capture the destination project and mounted engine before any network
-      // work so a project switch cannot retarget this import mid-flight.
+      // Capture the destination project and mounted engine before any network work so a project switch cannot retarget
+      // this import mid-flight.
       const project = queries.getSnapshot().activeProject;
       const mountedEngine = engine;
 
@@ -438,8 +485,8 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
     [canvasDispatch]
   );
 
-  // "Show progress on canvas" gates ONLY the selected placeholder's live denoise
-  // frame; a selected finished candidate still previews (that's staging, not progress).
+  // "Show progress on canvas" gates ONLY the selected placeholder's live denoise frame; a selected finished candidate
+  // still previews (that's staging, not progress).
   const selectedPlaceholderProgressImage = useQueueItemProgressImage(
     selectedPlaceholder?.queueItemId ?? '',
     selectedPlaceholder?.itemIndex ?? 0
@@ -462,8 +509,8 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
   useEffect(() => {
     applyStagedPreview();
   }, [engine, previewKey]);
-  // Clear the preview when the widget (or engine) goes away, so an accepted /
-  // discarded candidate never lingers over the canvas.
+  // Clear the preview when the widget (or engine) goes away, so an accepted / discarded candidate never lingers over
+  // the canvas.
   useEffect(() => {
     return () => engine?.previews.setStagedPreview(null);
   }, [engine]);
@@ -481,8 +528,7 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
       document,
       engine,
       hasMultipleStagingSlots,
-      notifyLayerDuplicateFailed: () =>
-        notifications.add({ kind: 'error', title: t('widgets.layers.actions.copyFailed') }),
+      layerCommands: { engine, reportError: notify.error, t },
       pasteFromClipboard,
       reportLayerOperation: (refusal) => reportLayerOperation(refusal, notify.error, t),
       reportMergeDownRefusal: (refusal) => reportMergeDownRefusal(document, refusal, showCanvasRefusalNotice, t),
@@ -582,11 +628,25 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
           <MissingFontsDialog key={projectId} engine={engine} groups={fontReferences} />
         </Suspense>
       ) : null}
-      <CanvasSurfaceContextLayout surface={canvasSurface} onContextMenu={handleSurfaceContextMenu}>
+      <CanvasSurfaceContextLayout
+        surface={canvasSurface}
+        onContextMenu={handleSurfaceContextMenu}
+        onKeyDown={handleSurfaceMenuKeyDown}
+      >
+        {!engine ? (
+          <Box role="status" position="absolute" inset="0" display="grid" placeItems="center" color="fg.muted">
+            {t('common.loading')}
+          </Box>
+        ) : null}
         <CanvasImageDropOverlay fileDrag={fileDrag} isDocumentEditingLocked={isDocumentEditingLocked} />
         {engine ? (
           <>
             <ToolStrip engine={engine} />
+            {vectorMenuTarget ? (
+              <Suspense fallback={null}>
+                <VectorPathContextMenu engine={engine} target={vectorMenuTarget} onClose={closeVectorMenu} />
+              </Suspense>
+            ) : null}
             <CanvasFrameSizeReadout engine={engine} />
             <ControlLayerCanvasOverlay engine={engine} isFileDragActive={fileDrag !== null} />
             <CanvasLayerContextMenu

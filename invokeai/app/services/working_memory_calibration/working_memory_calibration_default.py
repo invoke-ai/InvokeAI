@@ -21,6 +21,7 @@ import torch
 from invokeai.app.invocations.call_saved_workflow import CallSavedWorkflowInvocation
 from invokeai.app.invocations.fields import WithBoard
 from invokeai.app.services.model_records import UnknownModelException
+from invokeai.app.services.model_records.missing_models import is_model_missing
 from invokeai.app.services.session_queue.session_queue_common import (
     DEFAULT_QUEUE_ID,
     QUEUE_ITEM_STATUS,
@@ -97,6 +98,7 @@ from invokeai.app.services.working_memory_calibration.working_memory_calibration
     StoreRead,
 )
 from invokeai.app.util.misc import uuid_string
+from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.load.load_default import resolve_submodel_path
 from invokeai.backend.model_manager.taxonomy import SubModelType
 from invokeai.backend.quantization.sdnq.detection import is_sdnq_folder
@@ -531,6 +533,7 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
         untiled_decode_reservation: Callable[[str, int, int, str, torch.device], int] = _untiled_decode_reservation,
         device_memory: Optional[Callable[[torch.device], DeviceMemory]] = None,
         vae_dtypes: Callable[[torch.device, Path], VaeDtypes] = _vae_dtypes,
+        is_model_missing: Callable[[AnyModelConfig, Path], bool] = is_model_missing,
     ) -> None:
         self._store = store
         self._generation_devices = generation_devices
@@ -539,6 +542,7 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
         self._untiled_decode_reservation = untiled_decode_reservation
         self._device_memory = device_memory or self._cache_memory
         self._vae_dtypes = vae_dtypes
+        self._is_model_missing = is_model_missing
         # A card's class cannot change while the process runs; reading it touches the driver.
         self._device_classes: dict[str, DeviceClass] = {}
         # Which file holds a run, so admitting an item and recording its windows do not scan every file.
@@ -1736,7 +1740,7 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
         specs = import_estimator_modules()
         return build_plan(
             target,
-            store.all_models(),
+            self._available_models(),
             device_class=self._device_class(device) if device is not None else None,
             unavailable=unavailable,
             platform=platform_for(device) if device is not None else None,
@@ -1748,6 +1752,16 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
             working_memory_floor_bytes=int(self._services.configuration.device_working_mem_gb * 2**30),
             force_tiled_decode=self._services.configuration.force_tiled_decode,
         )
+
+    def _available_models(self) -> list[AnyModelConfig]:
+        """The registered models whose files are on disk: Generate skips the others as default components and as
+        fallbacks, so a plan that counted them (a Z-Image source whose directory is gone) would size another graph."""
+        models_path = self._services.configuration.models_path
+        return [
+            model
+            for model in self._services.model_manager.store.all_models()
+            if not self._is_model_missing(model, models_path)
+        ]
 
     def _vae_dtypes_on(self, device: Optional[torch.device]) -> VaeDtypes:
         """What the VAE loaders choose on `device`, by default the one models load onto."""
@@ -1857,7 +1871,7 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
                 target,
                 self._services.configuration.precision,
                 self._vae_dtypes_on(self._present_device(class_id)),
-                store.all_models(),
+                self._available_models(),
             ),
             name_of=name_of,
             held_back=held_back,

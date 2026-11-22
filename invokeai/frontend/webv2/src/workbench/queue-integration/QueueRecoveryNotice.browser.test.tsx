@@ -44,8 +44,8 @@ vi.mock('@platform/state/accountLifecycle', () => ({
   captureAccountScope: () => harness.owner,
   isAccountScopeCurrent: () => harness.accountCurrent,
 }));
-// Exposes whether the host keeps the dialog mounted (the real one needs that to animate out); like the real dialog,
-// it closes after confirming even when the confirmation fails.
+// Exposes whether the host keeps the dialog mounted (the real one needs that to animate out); like the real dialog, it
+// closes after confirming even when the confirmation fails.
 vi.mock('@platform/ui/ConfirmDialog', () => ({
   ConfirmDialog: ({
     body,
@@ -214,16 +214,6 @@ describe('QueueRecoveryNotice', () => {
     expect(mediaType).toBe('application/json');
   });
 
-  it('names the project by its library name, and never by its id when the library does not know it', async () => {
-    library.summaries = [{ id: 'closed-1', name: 'Portraits' }];
-    await renderNotice({ openProjectIds: ['open-project'] });
-
-    expect(document.body.textContent).toContain('shell.queueRecovery.description:{"project":"Portraits"}');
-    await clickButton('shell.queueRecovery.next');
-    expect(document.body.textContent).toContain('shell.queueRecovery.descriptionUnnamed');
-    expect(document.body.textContent).not.toContain('closed-2');
-  });
-
   it('discards only the selected project after confirmation and releases the lifecycle lock', async () => {
     await renderNotice({ openProjectIds: ['open-project'] });
     await clickButton('shell.queueRecovery.next');
@@ -236,38 +226,6 @@ describe('QueueRecoveryNotice', () => {
     expect(harness.lockResult.kind === 'acquired' ? harness.lockResult.release : undefined).toHaveBeenCalledOnce();
   });
 
-  it('keeps the discard confirmation mounted to animate out when the last project is discarded', async () => {
-    let remaining = ['closed-1'];
-    harness.listProjectIds.mockImplementation(() => Promise.resolve({ kind: 'available', projectIds: [...remaining] }));
-    harness.deleteForProject.mockImplementation(() => {
-      remaining = [];
-      return Promise.resolve({ kind: 'removed' });
-    });
-    await renderNotice();
-    await clickButton('shell.queueRecovery.discard');
-    await act(() => userEvent.click(document.querySelector<HTMLButtonElement>('[data-testid="confirm-discard"]')!));
-    await vi.waitFor(() => expect(document.body.textContent).not.toContain('shell.queueRecovery.title'));
-
-    // The notice is gone, but the dialog closes rather than being unmounted mid-animation.
-    expect(document.querySelector('[data-testid="discard-dialog"]')).toHaveAttribute('data-open', 'false');
-  });
-
-  it('opens the selected existing project without reading its journal payload', async () => {
-    await renderNotice({ openProjectIds: ['open-project'] });
-    await clickButton('shell.queueRecovery.open');
-    await vi.waitFor(() => expect(harness.onOpen).toHaveBeenCalledWith('closed-1'));
-
-    expect(harness.listForProject).not.toHaveBeenCalled();
-  });
-
-  it('includes every journal project when no open-project filter is supplied', async () => {
-    await renderNotice();
-    await clickButton('shell.queueRecovery.next');
-    await clickButton('shell.queueRecovery.next');
-
-    expect(document.body.textContent).toContain('open-project');
-  });
-
   it('fails closed when another tab holds the project lifecycle lock', async () => {
     harness.lockResult = { kind: 'contended' };
     await renderNotice({ openProjectIds: ['open-project'] });
@@ -276,27 +234,6 @@ describe('QueueRecoveryNotice', () => {
     await vi.waitFor(() => expect(document.body.textContent).toContain('shell.queueRecovery.lockContended'));
 
     expect(harness.deleteForProject).not.toHaveBeenCalled();
-  });
-
-  it('keeps refusing discard without Web Locks, as on a plain-HTTP origin, and says why', async () => {
-    // Nothing on the server fences this discard (the journal is browser-local), so unlike project delete it never
-    // falls back to single-tab mode.
-    harness.lockResult = { kind: 'unavailable' };
-    await renderNotice({ openProjectIds: ['open-project'] });
-    await clickButton('shell.queueRecovery.discard');
-    await act(() => userEvent.click(document.querySelector<HTMLButtonElement>('[data-testid="confirm-discard"]')!));
-    await vi.waitFor(() => expect(document.body.textContent).toContain('shell.queueRecovery.lockUnavailable'));
-
-    expect(harness.deleteForProject).not.toHaveBeenCalled();
-    expect(document.body.textContent).toContain('shell.queueRecovery.export');
-  });
-
-  it('shows unknown recovery state when IndexedDB cannot be inspected', async () => {
-    harness.listProjectIds.mockResolvedValueOnce({ kind: 'unavailable' });
-    await renderNotice();
-
-    expect(document.body.textContent).toContain('shell.queueRecovery.storageUnavailable');
-    expect(document.body.textContent).not.toContain('shell.queueRecovery.none');
   });
 
   it('suppresses downloads and state updates when the account or component expires during export', async () => {

@@ -185,6 +185,7 @@
         "openai_quality": "auto",
         "openai_background": "auto",
         "clip_skip": 0,
+        "ref_images": [],
         "control_layers": [],
         "controlnets": [],
         "t2iAdapters": []
@@ -455,6 +456,7 @@
         "openai_quality": "auto",
         "openai_background": "auto",
         "clip_skip": 0,
+        "ref_images": [],
         "control_layers": [],
         "controlnets": [],
         "t2iAdapters": []

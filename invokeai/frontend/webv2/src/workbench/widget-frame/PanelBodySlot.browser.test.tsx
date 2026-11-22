@@ -96,13 +96,11 @@ describe('PanelBodySlot', () => {
     expect(content().getBoundingClientRect().height).toBeCloseTo(400, 0);
     expect(scrollbar().hasAttribute('data-overflow-y')).toBe(false);
 
-    // A section opens past the fold: the content element itself grows, which is what the thumb is measured from.
     await renderSections([100, 100, 700]);
     expect(content().getBoundingClientRect().height).toBeCloseTo(900, 0);
     expect(viewport().scrollHeight).toBeGreaterThan(viewport().clientHeight);
     await expect.poll(() => scrollbar().hasAttribute('data-overflow-y')).toBe(true);
 
-    // It folds again: content and scrollbar return to the viewport's height and nothing to scroll.
     await renderSections([100, 100]);
     expect(content().getBoundingClientRect().height).toBeCloseTo(400, 0);
     await expect.poll(() => scrollbar().hasAttribute('data-overflow-y')).toBe(false);

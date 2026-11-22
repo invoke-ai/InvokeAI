@@ -25,9 +25,8 @@ const latestSnapshotStore = createExternalStore<{ latestSnapshot: LatestProgress
   latestSnapshot: null,
 });
 /**
- * A swap frame is bound to the image names its backend item delivered once
- * routing lands (`bindSwapImages`); until then, and for any other image of the
- * same batch, it must not be painted — item 3's denoise frame over item 1.
+ * A swap frame is bound to the image names its backend item delivered once routing lands (`bindSwapImages`); until
+ * then, and for any other image of the same batch, it must not be painted — item 3's denoise frame over item 1.
  */
 interface SwapFrame {
   image: ProgressImageSnapshot;
@@ -107,8 +106,7 @@ export const progressImageStore = {
     targetsByKey.delete(targetKey);
 
     if (didClearLatest) {
-      // Fall back to another live slot's frame when one clears; concurrent long-running sessions must not go
-      // blank.
+      // Fall back to another live slot's frame when one clears; concurrent long-running sessions must not go blank.
       latestSnapshotStore.patchSnapshot({ latestSnapshot: getMostRecentSnapshot() });
     }
   },
@@ -117,8 +115,8 @@ export const progressImageStore = {
     const entry = swapFrames.get(queueItemId);
 
     if (entry) {
-      // A workflow may save unrelated images in several boards. One preview
-      // swaps only to the latest output selected by result routing while it decodes.
+      // A workflow may save unrelated images in several boards. One preview swaps only to the latest output selected by
+      // result routing while it decodes.
       swapFrames.set(queueItemId, { image: entry.image, imageNames: imageNames.slice(-1) });
     }
   },
@@ -187,9 +185,8 @@ export const useQueueItemProgressImage = (queueItemId: string, itemIndex: number
   snapshotsByTarget.useValue(getTargetKey({ itemIndex, queueItemId })) ?? null;
 
 /**
- * The frame to show in place of this just-finished image until it has decoded;
- * null once consumed or expired, for images the held frame did not produce, and
- * for images with no local run.
+ * The frame to show in place of this just-finished image until it has decoded; null once consumed or expired, for
+ * images the held frame did not produce, and for images with no local run.
  */
 export const useQueueItemSwapProgressImage = (
   queueItemId: string | null | undefined,

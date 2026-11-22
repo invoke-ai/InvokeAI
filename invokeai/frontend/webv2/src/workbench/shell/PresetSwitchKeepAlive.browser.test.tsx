@@ -16,13 +16,8 @@ import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import '@xyflow/react/dist/style.css';
 
-/**
- * Model preset application by replacing region ids while preserving merged widget instances for keep-alive
- * resolution.
- */
 const keepAliveMocks = vi.hoisted(() => {
   const icon = () => null;
-  // Use settled resources so center icons read synchronously without suspending.
   const loadedImplementation = () => {
     const promise: Promise<object> & { status?: string; value?: object } = Promise.resolve({});
 
@@ -286,8 +281,6 @@ vi.mock('@workbench/widget-frame', () => {
   );
 
   return {
-    // Loading state is not what this suite measures; the real component would
-    // suspend on a chunk that does not exist under the mocked registry.
     WidgetIdentityIcon: () => <Box boxSize="3.5" />,
     WidgetChromeSlotById: () => null,
     WidgetRendererById: ({ instanceId }: { instanceId: string }) => (
@@ -378,7 +371,6 @@ describe('preset switch keep-alive', () => {
 
     await setActiveInstanceId('workflow:center');
 
-    // Still in the DOM, still the same element, and hidden rather than destroyed.
     expect(centerWidget('canvas')).toBe(canvasNode);
     expect(getComputedStyle(canvasNode).display).toBe('none');
     expect(getComputedStyle(centerWidget('workflow:center') as Element).display).not.toBe('none');
@@ -556,7 +548,6 @@ describe('preset switch keep-alive', () => {
     const hiddenCanvas = centerWidget('canvas');
 
     expect(hiddenCanvas).not.toBeNull();
-    // display:none removes hidden views from accessibility, hit testing, and sequential focus.
     expect(hiddenCanvas?.getClientRects().length).toBe(0);
   });
 
@@ -566,12 +557,10 @@ describe('preset switch keep-alive', () => {
     await setActiveInstanceId('preview');
     await setActiveInstanceId('workflow:center');
 
-    // Kept and hidden while the right rail shows something else.
     expect(centerWidget('preview')).not.toBeNull();
 
     await setRightInstanceId('preview');
 
-    // A live rail placement must evict the hidden center copy to avoid mounting one instance twice.
     expect(centerWidget('preview')).toBeNull();
   });
 
@@ -583,8 +572,6 @@ describe('preset switch keep-alive', () => {
 
     await setProjectId('project-b');
 
-    // Instance ids repeat across projects, so a kept id would resolve to a real
-    // instance of the new project carrying the old project's local state.
     expect(centerWidget('workflow:center')).toBeNull();
     expect(centerWidget('canvas')).not.toBeNull();
   });

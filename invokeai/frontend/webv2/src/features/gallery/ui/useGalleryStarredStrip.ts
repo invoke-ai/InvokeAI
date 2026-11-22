@@ -17,9 +17,8 @@ export const EMPTY_GALLERY_STARRED_STRIP: GalleryStarredStrip = {
 };
 
 /**
- * The bounded starred strip for the listing `filter` describes. Disabled
- * strips report empty rather than their last cached page (or failure), so the
- * section leaves the grid the moment it stops applying.
+ * The bounded starred strip for the listing `filter` describes. Disabled strips report empty rather than their last
+ * cached page (or failure), so the section leaves the grid the moment it stops applying.
  */
 export const useGalleryStarredStrip = ({
   enabled,

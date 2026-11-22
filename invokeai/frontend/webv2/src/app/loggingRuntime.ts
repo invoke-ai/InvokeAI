@@ -14,8 +14,8 @@ interface GlobalErrorTarget {
 }
 
 /**
- * Record uncaught errors and rejections as application events without suppressing the browser's own reporting.
- * They are not attributed to whichever project happens to be active.
+ * Record uncaught errors and rejections as application events without suppressing the browser's own reporting. They are
+ * not attributed to whichever project happens to be active.
  */
 export const installGlobalErrorLogging = (target: GlobalErrorTarget): void => {
   target.addEventListener('error', (event) => {

@@ -146,8 +146,8 @@ export const useCommandPaletteController = ({
       clearDebounce();
 
       if (stage) {
-        // Stage preview needs the next synchronous row set while typing; labels
-        // are not rendered here, so the optional translator is omitted.
+        // Stage preview needs the next synchronous row set while typing; labels are not rendered here, so the optional
+        // translator is omitted.
         const nextRows = buildStageRows(stage, onStageApplied, nextQuery);
         previewRow(nextRows.find((row) => row.kind !== 'label'));
       }

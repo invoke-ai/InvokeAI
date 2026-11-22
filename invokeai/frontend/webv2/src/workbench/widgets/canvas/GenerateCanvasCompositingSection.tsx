@@ -1,8 +1,3 @@
-/**
- * Expose canvas-only infill/coherence/mask controls in Generate. Persist them in canvas values for
- * prepareCanvasInvocation and graph compilation.
- */
-
 import type { NumberInput as ChakraNumberInput, SelectValueChangeDetails } from '@chakra-ui/react';
 import type { CanvasCoherenceMode, CanvasInfillMethod } from '@workbench/widgets/canvas/invoke/canvasCompositing';
 
@@ -132,8 +127,8 @@ export const GenerateCanvasCompositingSection = () => {
     [patch]
   );
 
-  // The generate form outlives the canvas widget's engine lease, so the sampler
-  // peeks non-owningly at click time instead of holding an engine alive.
+  // The generate form outlives the canvas widget's engine lease, so the sampler peeks non-owningly at click time
+  // instead of holding an engine alive.
   const handleSampleInfillColor = useCallback(
     () => getCanvasEngine(projectId)?.tools.requestColorSample() ?? Promise.resolve(null),
     [projectId]

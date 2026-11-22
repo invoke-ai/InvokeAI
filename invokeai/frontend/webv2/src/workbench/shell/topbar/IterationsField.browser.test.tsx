@@ -53,7 +53,6 @@ const renderForUpscale = async (mode: 'refine' | 'model-only', withInvoke = fals
     root?.render(
       <ChakraProvider value={system}>
         {withInvoke ? (
-          // The cluster's join: Invoke follows the field in an attached group.
           <Group attached>
             <IterationsField />
             <Button size="lg" zIndex="2">
@@ -113,11 +112,9 @@ describe('IterationsField beside Invoke', () => {
     const field = input.parentElement!;
     const invoke = host!.querySelector('button:not([data-part])')!.getBoundingClientRect();
     const steppers = field.querySelector('[data-part="control"]')!.getBoundingClientRect();
-    // Invoke keeps full control corners in the cluster; the field's own leading corner shows that radius.
     const cornerRadius = Number.parseFloat(getComputedStyle(field).borderTopLeftRadius);
 
     expect(cornerRadius).toBeGreaterThan(0);
-    // The top and bottom borders reach where Invoke's edges turn straight, so no notch opens beside its corners.
     expect(input.getBoundingClientRect().right).toBeGreaterThanOrEqual(invoke.left + cornerRadius);
     expect(steppers.right).toBeLessThanOrEqual(invoke.left);
   });

@@ -218,8 +218,8 @@ The following commands vary depending on the version of Invoke being installed a
 
         ```ps
         uv pip install <PACKAGE_SPECIFIER>==<VERSION> `
-          "torch[device-<TARGET>]==2.13.0+rocm10.0.0" `
-          "torchvision[device-<TARGET>]==0.28.0+rocm10.0.0" `
+          "torch[device-<TARGET>]==2.13.0+rocm10.1.0" `
+          "torchvision[device-<TARGET>]==0.28.0+rocm10.1.0" `
           --index https://stable.repo.amd.com/rocm/whl-next/ `
           --index-strategy unsafe-best-match `
           --python 3.12 --python-preference only-managed `
@@ -231,8 +231,8 @@ The following commands vary depending on the version of Invoke being installed a
 
         ```sh
         uv pip install <PACKAGE_SPECIFIER>==<VERSION> \
-          "torch[device-<TARGET>]==2.13.0+rocm10.0.0" \
-          "torchvision[device-<TARGET>]==0.28.0+rocm10.0.0" \
+          "torch[device-<TARGET>]==2.13.0+rocm10.1.0" \
+          "torchvision[device-<TARGET>]==0.28.0+rocm10.1.0" \
           --index https://stable.repo.amd.com/rocm/whl-next/ \
           --index-strategy unsafe-best-match \
           --python 3.12 --python-preference only-managed \

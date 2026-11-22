@@ -195,7 +195,6 @@ describe('hide vs disable', () => {
   });
 
   it('leaves a hidden layer renderable — hiding is display-only, not disabling', () => {
-    // Rasterization and generation eligibility depend on `isEnabled`, not display hiding.
     expect(isRenderableLayer(control(true))).toBe(true);
     expect(isRenderableLayer({ ...control(true), isEnabled: false })).toBe(false);
   });

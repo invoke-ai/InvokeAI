@@ -5,8 +5,8 @@ import { useIsProcessorPaused, useQueueCounts } from './queueDataStore';
 import { useLoadingModelLabel, useQueueUi } from './QueueUiContext';
 
 /**
- * The queue widget's reading of the shared activity model, from the server's counts of the viewer's own work within
- * the queue scope setting. The top bar and status chip count the same work: the project's runs plus
+ * The queue widget's reading of the shared activity model, from the server's counts of the viewer's own work within the
+ * queue scope setting. The top bar and status chip count the same work: the project's runs plus
  * `useQueueOpenWorkElsewhere`.
  */
 export const useQueueWidgetActivity = (): {

@@ -1,12 +1,5 @@
-/**
- * PSD export separates pure geometry planning from raster baking, worker `ag-psd` serialization and download.
- * Reverse every top-first tree level for ag-psd's bottom-first children; omit empty leaves/folders and size the
- * document to exported world bounds.
- *
- * Export disabled content as hidden layers/folders; flatten only effectively enabled content for the merged
- * preview. Opacity stays in [0,1]. Bake raster adjustments into pixels, but retain opacity/blend as PSD
- * properties.
- */
+/** Trees are top-first, ag-psd children bottom-first, so every level reverses; disabled content exports hidden.
+ Adjustments bake into pixels; opacity and blend stay PSD properties. */
 
 import type { CanvasAdjustmentsContract, CanvasBlendMode, CanvasColorLabel } from '@workbench/canvas-engine/contracts';
 import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
@@ -24,10 +17,10 @@ import {
   type SpatialRunner,
 } from '@workbench/canvas-engine/render/exactAdjustments';
 
-/** Cap exports at the legacy PSD 30000px side limit to bound unbounded-canvas allocations. */
+/** The legacy PSD side limit, which also bounds unbounded-canvas allocations. */
 export const PSD_MAX_DIMENSION = 30000;
 
-/** A canvas layer transform (TRS), duplicated to keep this module contract-light. */
+/** Duplicated to keep this module contract-light. */
 export interface PsdLayerTransform {
   x: number;
   y: number;
@@ -36,10 +29,7 @@ export interface PsdLayerTransform {
   rotation: number;
 }
 
-/**
- * Maps supported blends to PSD keys; unknown values fall back to normal and populate {@link
- * PsdExportOk.unmappedBlends}.
- */
+/** Unknown values fall back to normal and populate {@link PsdExportOk.unmappedBlends}. */
 const BLEND_MODE_TO_PSD: Record<CanvasBlendMode, BlendMode> = {
   color: 'color',
   'color-burn': 'color burn',
@@ -59,50 +49,41 @@ const BLEND_MODE_TO_PSD: Record<CanvasBlendMode, BlendMode> = {
   'soft-light': 'soft light',
 };
 
-/** The ag-psd blend key for a document blend mode ('normal' for anything unmapped). */
 export const blendModeToPsd = (mode: CanvasBlendMode): BlendMode => BLEND_MODE_TO_PSD[mode] ?? 'normal';
 
-/** One raster layer's export-relevant facts, at its place in the top-first tree. */
 export interface PsdExportLayerInput {
   id: string;
   name: string;
   transform: PsdLayerTransform;
-  /** The layer's content rect in LOCAL space (origin may be negative). */
+  /** Layer-local; origin may be negative. */
   contentRect: Rect;
-  /** 0..1. */
   opacity: number;
   blendMode: CanvasBlendMode;
-  /** The layer's own flag; a disabled layer is exported with `hidden: true`, not dropped. */
+  /** A disabled layer is exported with `hidden: true`, not dropped. */
   isEnabled: boolean;
-  /** Organizational color label; PSD carries it natively as `layerColor`. */
+  /** PSD carries it natively as `layerColor`. */
   colorLabel?: CanvasColorLabel;
-  /** The layer's own non-destructive adjustments to bake into its pixels, if any (layer-local reference space). */
+  /** Layer-local reference space. */
   adjustments?: CanvasAdjustmentsContract;
-  /**
-   * Enclosing group stacks, innermost first, baked after the layer's own: PSD cannot represent them. They work in
-   * document pixels, as the groups do, but on this layer's pixels alone: an approximation of the group composite.
-   */
+  /** Innermost first; PSD cannot represent them, so they bake onto this layer alone, approximating the composite. */
   groupStacks?: readonly PsdGroupStack[];
 }
 
-/** One enclosing group's own stack, named for a refusal. */
 export interface PsdGroupStack {
   readonly id: string;
   readonly adjustments: CanvasAdjustmentsContract;
 }
 
-/** A raster group: a folder in the PSD, children top-first. */
 export interface PsdExportGroupInput {
   type: 'group';
   id: string;
   name: string;
-  /** The group's own flag; a disabled group is a hidden folder. */
   isEnabled: boolean;
-  /** 0..1; PSD folders carry opacity natively. Absent means 1. */
+  /** Absent means 1. */
   opacity?: number;
-  /** PSD folders carry a blend mode natively. Absent means 'normal'. */
+  /** Absent means 'normal'. */
   blendMode?: CanvasBlendMode;
-  /** Organizational color label; PSD carries it natively as `layerColor`. */
+  /** PSD carries it natively as `layerColor`. */
   colorLabel?: CanvasColorLabel;
   children: readonly PsdExportNodeInput[];
 }
@@ -112,27 +93,23 @@ export type PsdExportNodeInput = PsdExportLayerInput | PsdExportGroupInput;
 const isGroupInput = (input: PsdExportNodeInput): input is PsdExportGroupInput =>
   'type' in input && input.type === 'group';
 
-/** A single planned PSD layer (already in ag-psd bottom-to-top order). */
+/** Already in ag-psd bottom-to-top order. */
 export interface PsdPlanLayer {
   kind: 'layer';
   id: string;
   name: string;
-  /** Position within the PSD canvas (relative to the union origin). */
+  /** Relative to the union origin. */
   left: number;
   top: number;
   right: number;
   bottom: number;
-  /** The layer's world-space AABB (document space) the executor bakes into. */
   worldRect: Rect;
   transform: PsdLayerTransform;
-  /** Layer-local content rect (executor draws the cache at its origin). */
   contentRect: Rect;
-  /** 0..1 (ag-psd's range). */
   opacity: number;
   blendMode: BlendMode;
-  /** Canvas `globalCompositeOperation` for the flattened composite preview. */
+  /** For the flattened composite preview. */
   compositeBlend: GlobalCompositeOperation;
-  /** The layer's own visibility flag, as the PSD stores it. */
   hidden: boolean;
   /** Enabled with every folder above it enabled: the leaves the merged preview flattens. */
   contributes: boolean;
@@ -141,16 +118,14 @@ export interface PsdPlanLayer {
   groupStacks?: readonly PsdGroupStack[];
 }
 
-/** A planned PSD folder; `children` are in ag-psd bottom-to-top order. */
+/** `children` are bottom-to-top. */
 export interface PsdPlanFolder {
   kind: 'folder';
   id: string;
   name: string;
   hidden: boolean;
-  /** 0..1; written onto the folder, and applied when the preview isolates it. */
   opacity: number;
   blendMode: BlendMode;
-  /** Canvas `globalCompositeOperation` for the flattened composite preview. */
   compositeBlend: GlobalCompositeOperation;
   colorLabel?: CanvasColorLabel;
   children: PsdPlanNode[];
@@ -158,48 +133,37 @@ export interface PsdPlanFolder {
 
 export type PsdPlanNode = PsdPlanLayer | PsdPlanFolder;
 
-/** A successful export plan. */
 export interface PsdExportOk {
   status: 'ok';
-  /** PSD canvas dimensions (= union bounds). */
   width: number;
   height: number;
-  /** The union bounds in document space (origin is the PSD's (0,0)). */
+  /** Its origin is the PSD's (0,0). */
   canvasRect: Rect;
-  /** Every exported layer, flattened, in ag-psd order (bottom-to-top). */
+  /** Bottom-to-top. */
   layers: PsdPlanLayer[];
-  /** The folder tree the PSD carries, bottom-to-top at every level; `layers` are its leaves. */
+  /** Bottom-to-top at every level; `layers` are its leaves. */
   tree: PsdPlanNode[];
-  /** Distinct blend modes that had no PSD equivalent (fell back to 'normal'). */
   unmappedBlends: string[];
 }
 
-/** The plan, or a refusal (`empty` / `too-large`). */
 export type PsdExportPlan = PsdExportOk | { status: 'empty' } | { status: 'too-large'; width: number; height: number };
 
-/** Options for {@link planPsdExport}. */
 export interface PlanPsdExportOptions {
-  /** Override the per-side dimension cap (default {@link PSD_MAX_DIMENSION}). */
   maxDimension?: number;
 }
 
 const layerMatrix = (t: PsdLayerTransform): Mat2d => fromTRS({ x: t.x, y: t.y }, t.rotation, t.scaleX, t.scaleY);
 
-/** Clamps to [0, 1] (defensive against out-of-range opacities). */
 const clamp01 = (value: number): number => (value < 0 ? 0 : value > 1 ? 1 : value);
 
-/**
- * Plans world-AABB union bounds and a bottom-first PSD tree. Omit empty/degenerate leaves and empty folders;
- * return empty or too-large when applicable.
- */
+/** Omits empty or degenerate leaves and empty folders. */
 export const planPsdExport = (
   inputs: readonly PsdExportNodeInput[],
   options: PlanPsdExportOptions = {}
 ): PsdExportPlan => {
   const maxDimension = options.maxDimension ?? PSD_MAX_DIMENSION;
 
-  // Top-first depth-first leaves with effective enablement and world bounds; null bounds indicate empty or
-  // degenerate content.
+  // Null bounds mark empty or degenerate content.
   const withBounds: { input: PsdExportLayerInput; contributes: boolean; worldRect: Rect | null }[] = [];
   const walk = (nodes: readonly PsdExportNodeInput[], enabled: boolean): void => {
     for (const node of nodes) {
@@ -233,8 +197,6 @@ export const planPsdExport = (
   }
 
   const unmappedBlends = new Set<string>();
-  // ag-psd order is bottom-to-top; leaves are top-first, so reverse. Layers
-  // without content are dropped.
   const layers: PsdPlanLayer[] = [];
   const byId = new Map<string, PsdPlanLayer>();
   for (let i = withBounds.length - 1; i >= 0; i -= 1) {
@@ -272,7 +234,6 @@ export const planPsdExport = (
     byId.set(input.id, layer);
   }
 
-  // The same reversal at every level of the tree; folders keep only what survived.
   const buildTree = (nodes: readonly PsdExportNodeInput[]): PsdPlanNode[] => {
     const out: PsdPlanNode[] = [];
     for (let i = nodes.length - 1; i >= 0; i -= 1) {
@@ -282,10 +243,7 @@ export const planPsdExport = (
         if (children.length > 0) {
           const blendMode = node.blendMode ?? 'normal';
           const opacity = clamp01(node.opacity ?? 1);
-          // A default group is PASS-THROUGH: its members blend with what is
-          // below the group. Photoshop's folder default is the same, so only a
-          // group that actually composites in isolation (opacity or blend)
-          // gets an isolating folder blend key.
+          // A default group is pass-through, like Photoshop's folder default; only an isolating group gets a blend key.
           const isolated = opacity !== 1 || blendMode !== 'normal';
           const mapped = BLEND_MODE_TO_PSD[blendMode];
           if (!mapped) {
@@ -330,16 +288,14 @@ export const planPsdExport = (
   };
 };
 
-// ---- Executor (impure) -----------------------------------------------------
-
-/** Private export wire contract: only executor-owned pixels and PSD metadata, never engine resources. */
+/** Only executor-owned pixels and PSD metadata, never engine resources. */
 export interface PsdSerializationRequest {
   id: number;
   psd: Psd;
 }
 export type PsdSerializationResponse = { id: number; bytes: ArrayBuffer } | { id: number; error: string };
 
-/** One operation, one worker: termination interrupts the synchronous writer and discards its entire heap. */
+/** One worker per operation: termination interrupts the synchronous writer and discards its heap. */
 export const serializePsd = (psd: Psd, signal?: AbortSignal): Promise<ArrayBuffer> => {
   if (signal?.aborted) {
     return Promise.reject(new DOMException('PSD export was aborted.', 'AbortError'));
@@ -358,7 +314,7 @@ export const serializePsd = (psd: Psd, signal?: AbortSignal): Promise<ArrayBuffe
       reject(error);
     };
     const abort = (): void => fail(new DOMException('PSD export was aborted.', 'AbortError'));
-    // The worker is private to this call, so id 1 cannot collide with another operation or retry.
+    // The worker is private to this call, so id 1 cannot collide.
     worker.onmessage = ({ data }: MessageEvent<PsdSerializationResponse>) => {
       if (data.id !== 1) {
         return;
@@ -380,7 +336,7 @@ export const serializePsd = (psd: Psd, signal?: AbortSignal): Promise<ArrayBuffe
       const buffers: Transferable[] = [];
       const toWire = (node: AgPsdLayer): AgPsdLayer => {
         const { imageData, children, ...metadata } = node;
-        // ImageData itself is cloned even with its buffer transferred. Transfer plain PixelData instead.
+        // ImageData is cloned even with its buffer transferred; transfer plain PixelData instead.
         if (imageData) {
           buffers.push(imageData.data.buffer);
         }
@@ -402,44 +358,31 @@ export const serializePsd = (psd: Psd, signal?: AbortSignal): Promise<ArrayBuffe
 
 type Ctx = RasterSurface['ctx'];
 
-/** Reads a surface region's pixels (real DOM path; injectable for tests). */
 const defaultReadImageData = (surface: RasterSurface, rect: Rect): ImageData =>
   surface.ctx.getImageData(rect.x, rect.y, rect.width, rect.height);
 
-/** Writes pixels back to a surface (real DOM path; injectable for tests). */
 const defaultWriteImageData = (surface: RasterSurface, imageData: ImageData, x: number, y: number): void =>
   surface.ctx.putImageData(imageData, x, y);
 
-/** Triggers a browser download of the PSD bytes (Blob + anchor click). */
 const defaultDownload = async (data: ArrayBuffer, fileName: string): Promise<void> => {
   await downloadBlob(new Blob([data], { type: 'image/vnd.adobe.photoshop' }), fileName);
 };
 
-/** Injected dependencies for {@link executePsdExport}. */
 export interface ExecutePsdExportDeps {
-  /** Surface factory (usually the engine's `RasterBackend`). */
   backend: { createSurface(width: number, height: number): RasterSurface };
-  /** Cancels before the next background allocation or side effect. */
   signal?: AbortSignal;
   onStage?(stage: 'serializing' | 'downloading'): void;
-  /**
-   * Evaluates spatial adjustment runs; without it a spatial stack throws {@link AdjustmentRefusedError} rather than
-   * bake without its spatial entries.
-   */
+  /** Without it a spatial stack throws {@link AdjustmentRefusedError} rather than bake without its spatial entries. */
   runSpatial?: SpatialRunner;
-  /** Returns rasterized pixels and local content bounds, using live paint caches when available. */
+  /** Uses live paint caches when available. */
   getLayerSurface(layerId: string): Promise<{ surface: RasterSurface; rect: Rect }>;
-  /** Reads a surface region's pixels (default `getImageData`). */
   readImageData?(surface: RasterSurface, rect: Rect): ImageData;
-  /** Writes pixels back to a surface (default `putImageData`). */
   writeImageData?(surface: RasterSurface, imageData: ImageData, x: number, y: number): void;
-  /** Serializes a PSD to bytes (default: operation-owned worker). */
+  /** Default: an operation-owned worker. */
   writePsd?(psd: Psd): Promise<ArrayBuffer>;
-  /** Triggers the download (default: Blob + anchor click). */
   download?(data: ArrayBuffer, fileName: string): void | Promise<void>;
 }
 
-/** Sets a 2D context transform from a matrix. */
 const setTransform = (ctx: Ctx, m: Mat2d): void => {
   ctx.setTransform(m.a, m.b, m.c, m.d, m.e, m.f);
 };
@@ -450,7 +393,6 @@ const throwIfAborted = (signal?: AbortSignal): void => {
   }
 };
 
-/** The whole stack on `pixels` at `origin`; throws when `ownerId`'s stack cannot run or the export was aborted. */
 const evaluate = async (
   pixels: ImageData,
   adjustments: CanvasAdjustmentsContract,
@@ -468,12 +410,7 @@ const evaluate = async (
   return result.data === pixels.data ? pixels : imageDataOf(result.data, pixels.width, pixels.height);
 };
 
-/**
- * Bakes transformed pixels and adjustments into world-AABB bounds, returning surface and straight-alpha ImageData.
- * The layer's own stack adjusts all its layer-local pixels before the transform resamples them, as the display does,
- * spatial entries included; the enclosing group stacks then adjust the world pixels, which are document pixels at
- * scale 1. Opacity/blend remain PSD properties.
- */
+/** The layer's own stack adjusts layer-local pixels before resampling, as the display does; group stacks after. */
 const bakeLayer = async (
   planLayer: PsdPlanLayer,
   deps: ExecutePsdExportDeps,
@@ -499,10 +436,8 @@ const bakeLayer = async (
     const localPixels = read(source, { height: rect.height, width: rect.width, x: 0, y: 0 });
     write(source, await evaluate(localPixels, planLayer.adjustments, rect, planLayer.id, deps), 0, 0);
   }
-  // local→world then shift into AABB-local (translation only affects e/f).
   const local = layerMatrix(planLayer.transform);
   setTransform(ctx, { ...local, e: local.e - worldRect.x, f: local.f - worldRect.y });
-  // The cache holds pixels for `rect` in layer-local space; draw at that origin.
   if (rect.width > 0 && rect.height > 0) {
     ctx.drawImage(source.canvas, rect.x, rect.y);
   }
@@ -517,17 +452,13 @@ const bakeLayer = async (
     for (const stack of planLayer.groupStacks) {
       imageData = await evaluate(imageData, stack.adjustments, worldRect, stack.id, deps);
     }
-    // Write the adjusted pixels back so the flattened composite (below) reuses
-    // this surface directly.
+    // Write back so the flattened composite reuses this surface.
     write(surface, imageData, 0, 0);
   }
   return { imageData, surface };
 };
 
-/**
- * Bakes layers, builds the enabled merged preview (ag-psd does not generate it), serializes and downloads. Non-ok
- * plans do nothing.
- */
+/** ag-psd does not generate the merged preview. */
 export const executePsdExport = async (
   plan: PsdExportPlan,
   fileName: string,
@@ -590,8 +521,7 @@ export const executePsdExport = async (
       );
     const children = toChildren(plan.tree);
 
-    // Flatten bottom-first. Isolate folders with opacity/blend so the merged preview matches readers' folder
-    // compositing.
+    // Isolate folders with opacity or blend so the preview matches readers' folder compositing.
     throwIfAborted(deps.signal);
     const surfaceById = new Map(baked.map(({ planLayer, surface }) => [planLayer.id, surface]));
     const drawPreview = (ctx: Ctx, nodes: readonly PsdPlanNode[]): void => {

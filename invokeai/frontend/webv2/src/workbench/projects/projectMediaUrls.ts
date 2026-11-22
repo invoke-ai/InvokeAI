@@ -166,9 +166,9 @@ const rebuildCanvas = (canvas: CanvasStateContractV3, urls: ProjectMediaUrlResol
 };
 
 /**
- * Rebuilds every media URL a project stores from the name stored beside it. Stored URLs name the origin that saved
- * them (`http://localhost:9090/...`), which another origin or machine cannot reach, and `.invk` transfer blanks them,
- * so each load derives them again for the deployment the page runs on. Names are the durable reference; a URL is
+ * Rebuilds every media URL a project stores from the name stored beside it. Stored URLs name the origin that saved them
+ * (`http://localhost:9090/...`), which another origin or machine cannot reach, and `.invk` transfer blanks them, so
+ * each load derives them again for the deployment the page runs on. Names are the durable reference; a URL is
  * overwritten whatever it held, and an item without a name is left alone. Unchanged subtrees keep their identity.
  */
 export const rebuildProjectMediaUrls = (project: Project, urls: ProjectMediaUrlResolver): Project => {

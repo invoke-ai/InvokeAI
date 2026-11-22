@@ -18,8 +18,8 @@ export interface WorkflowPreviewStepperProps {
   canStepPrevious: boolean;
   canStepNext: boolean;
   /**
-   * Steps through the results. A step that must first read its position asks `isCurrent` before selecting what
-   * arrived: false once the stepper has gone (the preview closed) or a later step has replaced it.
+   * Steps through the results. A step that must first read its position asks `isCurrent` before selecting what arrived:
+   * false once the stepper has gone (the preview closed) or a later step has replaced it.
    */
   onStep: (delta: -1 | 1, isCurrent: () => boolean) => void;
 }

@@ -1,9 +1,7 @@
 /* oxlint-disable react-perf/jsx-no-new-function-as-prop */
-import type { GenerationModelCatalogItem as ModelConfig } from '@features/generation/contracts';
-import type { GenerateModelConfig, GenerateSettings, VaeModelConfig } from '@features/generation/core/types';
+import type { GenerateModelConfig, GenerateSettings } from '@features/generation/core/types';
 
 import { MenuActionItem } from '@platform/ui/Menu';
-import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { flushGenerateDrafts } from './generateDraftRegistry';
@@ -11,6 +9,7 @@ import { offerGenerateUndo } from './generateUndo';
 import { useGenerateValues, useGenerationUi } from './GenerationUiContext';
 import {
   describeChanges,
+  describeMissingComponents,
   describeUnset,
   getApplyModelDefaultsPlan,
   getChangedSettings,
@@ -27,10 +26,7 @@ interface MenuItemState {
   unavailableReason: string | undefined;
 }
 
-/**
- * The reset menu's items. Mounted only while the menu shows, until its exit animation ends, so edits re-render them
- * only meanwhile.
- */
+/** Mounted only while the menu shows (until its exit animation ends), so edits re-render the items only then. */
 export const GenerateResetMenuItems = ({
   resolve,
 }: {
@@ -41,10 +37,6 @@ export const GenerateResetMenuItems = ({
   const ui = useGenerationUi();
   const models = ui.models.catalog;
   const projectId = ui.project.activeProjectId;
-  const vaeModels = useMemo(
-    () => models.filter((model): model is ModelConfig & VaeModelConfig => model.type === 'vae'),
-    [models]
-  );
   const items = useGenerateValues(
     (values): { apply: MenuItemState; reset: MenuItemState } | null => {
       const resolved = resolve(values);
@@ -55,7 +47,7 @@ export const GenerateResetMenuItems = ({
 
       const { selectedModel, settings } = resolved;
       const name = selectedModel.name;
-      const plan = getApplyModelDefaultsPlan(settings, selectedModel, vaeModels);
+      const plan = getApplyModelDefaultsPlan(settings, selectedModel, models);
       const applyChanges = describeChanges(
         plan.changed,
         settings,
@@ -64,28 +56,39 @@ export const GenerateResetMenuItems = ({
         t,
         locale
       );
+      // One list of the defaults the model stores that cannot apply (not installed, or the VAE does not fit), so the
+      // wording tells each once, whether or not the slot holds a pick.
+      const missing = [...(plan.isVaeMissing ? (['vae'] as const) : []), ...plan.missingComponents];
+      const missingList = describeMissingComponents(missing, selectedModel, { ...settings, ...plan.patch }, t, locale);
+      const hasMissing = missing.length > 0;
       // A model that sets nothing leaves everything as it is; its reason says so without listing it all.
-      const setsNothing = plan.defined.length === 0 && !plan.isVaeMissing;
+      const setsNothing = plan.defined.length === 0 && !hasMissing;
       const unset = setsNothing ? null : describeUnset(plan.unset, selectedModel, t, locale);
-      // A VAE the model sets but that cannot apply is no unset setting: it gets its own sentence.
-      const withVaeNote = (hint: string | undefined) =>
-        !plan.isVaeMissing
-          ? hint
-          : hint
-            ? t('widgets.generate.modelDefaultsWithVaeMissing', { hint })
-            : t('widgets.generate.modelDefaultsVaeMissing');
-      const resetAfter = { ...settings, ...getModelDefaultsPatch(settings, selectedModel, vaeModels) };
+      const withMissingNote = (hint: string | undefined) => {
+        if (!hasMissing) {
+          return hint;
+        }
+
+        const note = t('widgets.generate.modelDefaultsMissingNote', { count: missing.length, list: missingList });
+
+        return hint ? t('widgets.generate.modelDefaultsWithMissingNote', { hint, note }) : note;
+      };
+      const resetAfter = { ...settings, ...getModelDefaultsPatch(settings, selectedModel, models) };
       const resetChanged = getChangedSettings(settings, resetAfter, selectedModel);
 
       const applyUnavailableReason = setsNothing
         ? t('widgets.generate.modelDefaultsNoneSet', { name })
         : plan.changed.length > 0
           ? undefined
-          : !plan.isVaeMissing
+          : !hasMissing
             ? t('widgets.generate.modelDefaultsAlreadyApplied', { name })
             : plan.defined.length === 0
-              ? t('widgets.generate.modelDefaultsOnlyVaeMissing', { name })
-              : t('widgets.generate.modelDefaultsAppliedExceptVae', { name });
+              ? t('widgets.generate.modelDefaultsOnlyMissing', { count: missing.length, list: missingList, name })
+              : t('widgets.generate.modelDefaultsAppliedExceptMissing', {
+                  count: missing.length,
+                  list: missingList,
+                  name,
+                });
       const applyHint =
         applyChanges && unset
           ? t('widgets.generate.modelDefaultsApplyHint', { changes: applyChanges, settings: unset })
@@ -93,14 +96,14 @@ export const GenerateResetMenuItems = ({
 
       return {
         apply: {
-          // An unavailable item's reason already tells a missing VAE; the hint tells it only once.
-          hint: applyUnavailableReason ? applyHint : withVaeNote(applyHint),
+          // An unavailable item's reason already names what is missing; the hint names it only once.
+          hint: applyUnavailableReason ? applyHint : withMissingNote(applyHint),
           unavailableReason: applyUnavailableReason,
         },
         reset: {
           hint:
             resetChanged.length > 0
-              ? withVaeNote(describeChanges(resetChanged, settings, resetAfter, selectedModel, t, locale))
+              ? withMissingNote(describeChanges(resetChanged, settings, resetAfter, selectedModel, t, locale))
               : t('widgets.generate.resetEverythingToDefaultsHint'),
           unavailableReason: resetChanged.length === 0 ? t('widgets.generate.resetEverythingAlreadyDone') : undefined,
         },
@@ -156,12 +159,12 @@ export const GenerateResetMenuItems = ({
 
   const applyModelDefaults = () =>
     commitReset(
-      (settings, model) => getApplyModelDefaultsPlan(settings, model, vaeModels).patch,
+      (settings, model) => getApplyModelDefaultsPlan(settings, model, models).patch,
       (model) => t('widgets.generate.applyModelDefaultsDone', { name: model.name })
     );
   const resetEverything = () =>
     commitReset(
-      (settings, model) => getModelDefaultsPatch(settings, model, vaeModels),
+      (settings, model) => getModelDefaultsPatch(settings, model, models),
       () => t('widgets.generate.resetEverythingToDefaultsDone')
     );
 

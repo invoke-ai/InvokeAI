@@ -31,6 +31,8 @@ def _run_text_llm(
     seed: int,
 ) -> str:
     """Shared LLM invocation body used by every text-LLM node in this module."""
+    # Asked for as a Text LLM: a Qwen3.5 encoder record whose whole-model file serves as one is offered in these fields.
+    text_llm_model = text_llm_model.model_copy(update={"type": ModelType.TextLLM})
     tokenizer, _ = load_text_llm_tokenizer_and_processor(
         lambda submodel: context.models.load(text_llm_model, submodel), with_processor=False
     )

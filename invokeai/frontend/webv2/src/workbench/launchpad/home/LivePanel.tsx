@@ -1,9 +1,6 @@
 import { lazy, Suspense } from 'react';
 
-/**
- * Load all live panels from one shared chunk while mounting independently. Use a null fallback because empty
- * panels render nothing.
- */
+/** Load all live panels from one shared chunk while mounting independently. */
 
 const loadLivePanels = () => import('./livePanels');
 

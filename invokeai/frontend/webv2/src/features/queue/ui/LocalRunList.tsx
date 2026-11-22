@@ -48,9 +48,9 @@ const getLocalRunState = (run: QueueLocalRun, isConnected: boolean): LocalRunSta
   !isConnected ? 'offline' : (run.retry?.reason ?? 'submitting');
 
 /**
- * The rows of the Submitting section (`LocalRunsSection` in `QueueWidgetView`), loaded only once this tab has a run the backend has not
- * accepted. The canceled row leaves at once; focus moves to a neighbour's Cancel, else to the filter tabs above, never
- * the page.
+ * The rows of the Submitting section (`LocalRunsSection` in `QueueWidgetView`), loaded only once this tab has a run the
+ * backend has not accepted. The canceled row leaves at once; focus moves to a neighbour's Cancel, else to the filter
+ * tabs above, never the page.
  */
 export const LocalRunList = ({ filter, runs }: { filter: QueueFilterId; runs: readonly QueueLocalRun[] }) => {
   const { t } = useTranslation();

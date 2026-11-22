@@ -1,10 +1,11 @@
 import type { GalleryImage } from '@features/gallery';
 import type * as GalleryBackendModule from '@features/gallery/data/backend';
-import type { GenerateModelConfig } from '@features/generation/contracts';
+import type { GenerateModelConfig, GenerateWidgetValues } from '@features/generation/contracts';
 import type { ModelConfig } from '@features/models';
 import type { WorkbenchCommands } from '@workbench/workbenchStore';
 import type { TFunction } from 'i18next';
 
+import { getDefaultGenerateSettings } from '@features/generation/settings';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { ApiError } from '@platform/transport/http';
 import { QueryClient } from '@tanstack/react-query';
@@ -30,11 +31,11 @@ import { galleryImageMetadataOptions, galleryKeys } from '@features/gallery/quer
 import {
   resetArchitectureCapabilities,
   setArchitectureCapabilities,
-} from '@features/generation/core/architectureCapabilities';
+} from '@features/models/core/architectureCapabilities';
 import {
   architectureCapabilitiesFixture,
   seedArchitectureCapabilities,
-} from '@features/generation/core/architectureCapabilities.testing';
+} from '@features/models/core/architectureCapabilities.testing';
 
 import { executeImageRecall, getCurrentGenerateValues } from './executeImageRecall';
 
@@ -198,7 +199,7 @@ describe('executeImageRecall', () => {
       )
       .mockResolvedValueOnce({ positive_prompt: 'recalled prompt' });
 
-    // Another reader started the read; recall joins it. Unmounting a real observer is covered by the hook's browser test.
+    // Another reader started the read and recall joins it; the hook's browser test covers unmounting an observer.
     void queryClient.prefetchQuery(galleryImageMetadataOptions(accountLifecycle.capture(), image.imageName));
     const recall = executeImageRecall({
       queryClient,
@@ -487,6 +488,7 @@ describe('executeImageRecall', () => {
     // Initialised while the table is present, so only the recall itself is gated.
     const generateValues = getCurrentGenerateValues({
       generateValues: { modelKey: model.key },
+      models: [model as GenerateModelConfig],
       supportedModels: [model as GenerateModelConfig],
     });
 
@@ -817,6 +819,233 @@ describe('executeImageRecall', () => {
     expect(galleryApi.galleryImages.metadata).not.toHaveBeenCalled();
     expect(oldCommands.setSettings).not.toHaveBeenCalled();
     expect(oldCommands.add).not.toHaveBeenCalled();
+  });
+
+  describe('in a fresh project whose model stores default components', () => {
+    const q21 = {
+      base: 'qwen-image-2-1',
+      default_settings: { components: { qwen3_vl_encoder: 'q21-encoder' } },
+      format: 'diffusers',
+      key: 'q21-main',
+      name: 'Qwen-Image-2.1',
+      type: 'main',
+      variant: 'qwen_image_21_base',
+    } as unknown as ModelConfig;
+    const encoder = {
+      base: 'any',
+      format: 'gguf_quantized',
+      key: 'q21-encoder',
+      name: 'External encoder',
+      type: 'qwen3_vl_encoder',
+      variant: 'qwen3_vl_8b',
+    } as unknown as ModelConfig;
+    const recallValues = async (
+      kind: 'prompts' | 'remix',
+      metadata: Record<string, unknown>,
+      main: ModelConfig = q21,
+      installed: ModelConfig[] = [q21, encoder]
+    ) => {
+      // The metadata is cached per image: each recall reads its own.
+      queryClient.clear();
+      const { commands, setSettings } = createCommands();
+
+      galleryApi.galleryImages.metadata.mockResolvedValue(metadata);
+      await executeImageRecall({
+        queryClient,
+        t,
+        commands,
+        // Never initialised: nothing but a model key, so the values are synthesised.
+        getGenerateValues: () => ({ modelKey: main.key }),
+        image,
+        kind,
+        models: installed,
+        projectId: 'project-1',
+      });
+
+      return setSettings.mock.calls[0]![0] as GenerateWidgetValues;
+    };
+    const recallInto = async (kind: 'prompts' | 'remix', metadata: Record<string, unknown>) =>
+      (await recallValues(kind, metadata)).qwen3VLEncoderModel;
+
+    it('lets a remix of an image made with the bundled encoder keep the bundled one', async () => {
+      await expect(
+        recallInto('remix', { generation_mode: 'txt2img', model: { key: q21.key }, positive_prompt: 'bundled' })
+      ).resolves.toBeNull();
+    });
+
+    it('keeps a component the image records as empty cleared, though the image names no model', async () => {
+      await expect(recallInto('remix', { positive_prompt: 'no model', qwen3_vl_encoder: null })).resolves.toBeNull();
+    });
+
+    it('keeps a component source recorded as empty under its alias cleared', async () => {
+      const source = {
+        base: 'wan',
+        format: 'diffusers',
+        key: 'wan-source',
+        name: 'Wan pipeline',
+        type: 'main',
+        variant: 't2v_a14b',
+      } as unknown as ModelConfig;
+      const wan = {
+        base: 'wan',
+        default_settings: { components: { component_source: source.key } },
+        format: 'gguf_quantized',
+        key: 'wan-main',
+        name: 'Wan',
+        type: 'main',
+        variant: 't2v_a14b',
+      } as unknown as ModelConfig;
+      const installed = [wan, source];
+
+      const filled = await recallValues('prompts', { positive_prompt: 'p' }, wan, installed);
+      expect(filled.componentSourceModel?.key).toBe(source.key);
+
+      const cleared = await recallValues('remix', { positive_prompt: 'p', wan_component_source: null }, wan, installed);
+      expect(cleared.componentSourceModel).toBeNull();
+    });
+
+    it('fills the default for a slot whose recorded pick recall rejected', async () => {
+      const qwen = (key: string, variant: string) =>
+        ({
+          base: 'any',
+          format: 'checkpoint',
+          key,
+          name: key,
+          type: 'qwen3_encoder',
+          variant,
+        }) as unknown as ModelConfig;
+      const small = qwen('enc-06b', 'qwen3_06b');
+      const fitting = qwen('enc-4b', 'qwen3_4b');
+      const zImage = {
+        base: 'z-image',
+        default_settings: { components: { qwen3_encoder: fitting.key } },
+        format: 'checkpoint',
+        key: 'z-main',
+        name: 'Z-Image',
+        type: 'main',
+      } as unknown as ModelConfig;
+
+      const values = await recallValues('remix', { positive_prompt: 'p', qwen3_encoder: { key: small.key } }, zImage, [
+        zImage,
+        small,
+        fitting,
+      ]);
+
+      expect(values.qwen3EncoderModel?.key).toBe(fitting.key);
+    });
+
+    it('lets a working default take the slot of a recorded pick whose files are missing', async () => {
+      const qwen = (key: string, extra: Record<string, unknown> = {}) =>
+        ({
+          base: 'any',
+          format: 'checkpoint',
+          key,
+          name: key,
+          type: 'qwen3_encoder',
+          variant: 'qwen3_4b',
+          ...extra,
+        }) as unknown as ModelConfig;
+      const gone = qwen('enc-gone', { is_missing: true });
+      const working = qwen('enc-working');
+      const zImage = {
+        base: 'z-image',
+        default_settings: { components: { qwen3_encoder: working.key } },
+        format: 'checkpoint',
+        key: 'z-main',
+        name: 'Z-Image',
+        type: 'main',
+      } as unknown as ModelConfig;
+
+      const values = await recallValues('remix', { positive_prompt: 'p', qwen3_encoder: { key: gone.key } }, zImage, [
+        zImage,
+        gone,
+        working,
+      ]);
+
+      expect(values.qwen3EncoderModel?.key).toBe(working.key);
+    });
+
+    it('leaves the default vision tower out when the image clears the encoder it hangs on', async () => {
+      const tower = { ...encoder, key: 'q21-tower', name: 'Tower', type: 'qwen3_vl_vision_tower' } as ModelConfig;
+      const withTower = {
+        ...q21,
+        default_settings: { components: { qwen3_vl_encoder: encoder.key, qwen3_vl_vision_tower: tower.key } },
+      } as unknown as ModelConfig;
+      const installed = [withTower, encoder, tower];
+
+      const filled = await recallValues('remix', { positive_prompt: 'p' }, withTower, installed);
+      expect(filled.qwen3VLVisionTowerModel?.key).toBe(tower.key);
+
+      const cleared = await recallValues(
+        'remix',
+        { positive_prompt: 'p', qwen3_vl_encoder: null },
+        withTower,
+        installed
+      );
+      expect(cleared.qwen3VLEncoderModel).toBeNull();
+      expect(cleared.qwen3VLVisionTowerModel).toBeNull();
+    });
+
+    it('lets a working default VAE take the place of a recorded VAE whose files are missing', async () => {
+      const vae = (key: string, extra: Record<string, unknown> = {}) =>
+        ({ base: 'flux', format: 'checkpoint', key, name: key, type: 'vae', ...extra }) as unknown as ModelConfig;
+      const gone = vae('flux-vae-gone', { is_missing: true });
+      const working = vae('flux-vae-working');
+      const flux = {
+        base: 'flux',
+        default_settings: { vae: working.key },
+        format: 'checkpoint',
+        key: 'flux-main',
+        name: 'FLUX',
+        type: 'main',
+      } as unknown as ModelConfig;
+
+      const values = await recallValues('remix', { positive_prompt: 'p', vae: { key: gone.key } }, flux, [
+        flux,
+        gone,
+        working,
+      ]);
+
+      expect(values.vae?.key).toBe(working.key);
+    });
+
+    it('starts a fresh project on a selectable main model, not on a standalone branch the metadata could name', async () => {
+      const make = (key: string, base: string, extra: Record<string, unknown> = {}) =>
+        ({ base, format: 'checkpoint', key, name: key, type: 'main', ...extra }) as unknown as ModelConfig;
+      const gone = make('gone', 'sdxl', { is_missing: true });
+      const branch = make('branch', 'ideogram-4', { branch: 'unconditional' });
+      const sdxl = make('sdxl-ok', 'sdxl');
+
+      const values = await recallValues('remix', { positive_prompt: 'p' }, make('unset', 'sdxl'), [gone, branch, sdxl]);
+
+      expect(values.model.key).toBe('sdxl-ok');
+      // The two families default to different step counts, so the settings show which model they were built for.
+      expect(getDefaultGenerateSettings(branch as never).steps).not.toBe(
+        getDefaultGenerateSettings(sdxl as never).steps
+      );
+      expect(values.steps).toBe(getDefaultGenerateSettings(sdxl as never).steps);
+    });
+
+    it('keeps a VAE the image records as empty cleared', async () => {
+      const vae = { base: 'flux', format: 'checkpoint', key: 'flux-vae', name: 'FLUX VAE', type: 'vae' } as ModelConfig;
+      const flux = {
+        base: 'flux',
+        default_settings: { vae: vae.key },
+        format: 'checkpoint',
+        key: 'flux-main',
+        name: 'FLUX',
+        type: 'main',
+      } as unknown as ModelConfig;
+
+      expect((await recallValues('prompts', { positive_prompt: 'p' }, flux, [flux, vae])).vae?.key).toBe(vae.key);
+      expect((await recallValues('remix', { positive_prompt: 'p', vae: null }, flux, [flux, vae])).vae).toBeNull();
+    });
+
+    it('still fills the saved default when the recall does not touch the model', async () => {
+      await expect(recallInto('prompts', { positive_prompt: 'prompt only' })).resolves.toMatchObject({
+        key: encoder.key,
+      });
+    });
   });
 });
 

@@ -22,7 +22,6 @@ describe('drawMarchingAnts', () => {
     const strokeStyles = log.filter((e) => e.op === 'set' && e.args[0] === 'strokeStyle').map((e) => e.args[1]);
     expect(strokeStyles).toContain('#000000');
     expect(strokeStyles).toContain('#ffffff');
-    // The light run is offset from the dark run so the ants appear to crawl.
     const offsets = log.filter((e) => e.op === 'set' && e.args[0] === 'lineDashOffset').map((e) => e.args[1]);
     expect(new Set(offsets).size).toBeGreaterThan(1);
   });
@@ -34,7 +33,6 @@ describe('drawMarchingAnts', () => {
   });
 });
 
-/** A controllable rAF pair + clock for driving the animator deterministically. */
 const createDriver = () => {
   let nextHandle = 1;
   const callbacks = new Map<number, () => void>();
@@ -46,7 +44,6 @@ const createDriver = () => {
     cancelFrame: (handle: number): void => {
       callbacks.delete(handle);
     },
-    /** Runs every queued frame callback once (like the browser firing a frame). */
     flush: (): void => {
       const queued = [...callbacks.entries()];
       callbacks.clear();
@@ -83,16 +80,13 @@ describe('createAntsAnimator', () => {
     // First frame steps immediately (start primes lastStep one interval back).
     driver.flush();
     expect(onStep).toHaveBeenCalledTimes(1);
-    // It rescheduled itself.
     expect(driver.pending()).toBe(1);
 
-    // A frame before the interval elapses does not step, but keeps polling.
     driver.advance(40);
     driver.flush();
     expect(onStep).toHaveBeenCalledTimes(1);
     expect(driver.pending()).toBe(1);
 
-    // Crossing the interval steps again.
     driver.advance(70);
     driver.flush();
     expect(onStep).toHaveBeenCalledTimes(2);
@@ -137,7 +131,6 @@ describe('createAntsAnimator', () => {
     expect(animator.isRunning).toBe(false);
     expect(driver.pending()).toBe(0);
 
-    // Any straggler frame that still fires must not step or reschedule.
     driver.advance(1000);
     driver.flush();
     expect(onStep).not.toHaveBeenCalled();

@@ -15,8 +15,8 @@ export const useActiveQueueProgress = () => {
 /**
  * The top bar's and status chip's reading of the queue. Progress and the image countdown come from the project's runs;
  * the count of open work adds the viewer's open work elsewhere in the queue scope (other projects, other tabs), which
- * the project's runs never include, so the two surfaces count what the queue widget counts under the same scope
- * setting without counting the project's own items twice.
+ * the project's runs never include, so the two surfaces count what the queue widget counts under the same scope setting
+ * without counting the project's own items twice.
  */
 export const useQueueChromeActivity = () => {
   const local = useActiveQueueProgress();

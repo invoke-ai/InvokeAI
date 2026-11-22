@@ -1,7 +1,7 @@
 ---
 title: Canvas guide
 description: A detailed guide to the Canvas — its tools and their options, navigation, the header buttons, the generation frame, selections, transform, filters, the staging area, menus, settings and keyboard shortcuts.
-lastUpdated: 2026-10-29
+lastUpdated: 2026-11-15
 ---
 
 import { Image } from 'astro:assets';
@@ -30,7 +30,8 @@ A tool that cannot change the selected layer says so instead of doing nothing: t
 | **Generation frame** | **C** | Move and resize the generation frame. Tap **C** to switch to it, or hold **C** to use it briefly. |
 | **Brush** | **B** | Paint on the selected raster layer, or paint a mask or region on the selected inpaint mask or regional guidance layer. **Shift**-click draws a straight line from the end of the last stroke on that layer. |
 | **Eraser** | **E** | Erase paint or mask. **Shift**-click erases a straight line, as with the Brush. |
-| **Shape** | **U** | Draw a rectangle, ellipse, triangle, star, polygon or freehand shape on a raster layer, or add a shaped area to the selected inpaint mask or regional guidance layer. Press **U** again to cycle through the shapes. |
+| **Shape** | **U** | Draw a rectangle, ellipse, triangle, star, polygon or freehand shape on a raster layer, or add a shaped area to the selected inpaint mask or regional guidance layer. On a vector layer, draw editable paths instead of pixels. Press **U** again to cycle through the shapes. |
+| **Spline Edit** | **S** | Edit points, curves and individual paths on the selected vector layer. See [Vector layers and splines](#vector-layers-and-splines). |
 | **Gradient** | **G** | Create a linear or radial gradient. |
 | **Text** | **T** | Add editable text. |
 | **Marquee select** / **Lasso select** | **M** / **L** | Select an area of pixels. Press **M** again to switch between rectangle and ellipse, or **L** again for freehand and polygon. |
@@ -51,10 +52,32 @@ A pick that changes a layer is one undoable step. Gradient stops are not picked 
 * **Eraser** — **Size**, **Opacity** and **Hardness**; and, under **Dynamics**, whether pen pressure affects the width. Pressure never changes how strongly the eraser erases.
 
 The Brush, Eraser, Shape and Text options are remembered for your account, so they are the same in every project and after a reload. Colors are the project's own.
-* **Shape** — settings for the next shape: its **Kind**, a row of buttons showing each shape (point at one for its name), and **Place on**, which draws on the **Selected layer** or on a **New layer** of its own. Only a paint layer, an inpaint mask or a regional guidance layer takes shape pixels. With anything else selected, or nothing selected, **Selected layer** is unavailable and **New layer** shows where the shape will go; a note below explains why. Your placement preference returns when you select a paint layer or mask. Under the tool's **Appearance** group, **Fill**, **Stroke** and stroke **Width** set the next shape's defaults. To edit an existing shape's appearance, use the **Layer** section below the tool options; those controls stay available with any tool active and each gesture is one undoable step. **Shift** constrains the proportions, **Alt** draws from the center, and **Shift+Alt** does both. **Ctrl** (**Cmd** on macOS) cuts the shape out of the selected paint layer or mask instead of drawing it, whatever **Place on** says: it erases like the Eraser and never adds a layer. With no paint layer or mask selected, a notice says so and nothing is drawn. For polygons, click to place points and double-click, press **Enter** or click the first point to close the shape; **Escape** drops the points without drawing anything. With an inpaint mask or regional guidance layer selected, the shape is added to the mask or region, which makes shapes a quick way to mark rectangular or geometric areas; the colors are ignored.
+* **Shape** — settings for the next shape: its **Kind**, a row of buttons showing each shape (point at one for its name), and **Place on**, which draws on the **Selected layer** or on a **New layer** of its own. On a selected vector layer, Shape draws editable paths; see [Vector layers and splines](#vector-layers-and-splines). Only a paint layer, an inpaint mask or a regional guidance layer takes shape pixels. With any other non-vector layer selected, or nothing selected, **Selected layer** is unavailable and **New layer** shows where the shape will go; a note below explains why. Your placement preference returns when you select a paint layer or mask. Under the tool's **Appearance** group, **Fill**, **Stroke** and stroke **Width** set the next shape's defaults. To edit an existing shape's appearance, use the **Layer** section below the tool options; those controls stay available with any tool active and each gesture is one undoable step. **Shift** constrains the proportions, **Alt** draws from the center, and **Shift+Alt** does both. **Ctrl** (**Cmd** on macOS) cuts the shape out of the selected paint layer or mask instead of drawing it, whatever **Place on** says: it erases like the Eraser and never adds a layer. With no paint layer or mask selected, a notice says so and nothing is drawn. For polygons, click to place points and double-click, press **Enter** or click the first point to close the shape; **Escape** drops the points without drawing anything. With an inpaint mask or regional guidance layer selected, the shape is added to the mask or region, which makes shapes a quick way to mark rectangular or geometric areas; the colors are ignored.
 * **Gradient** — **Kind** (Linear or Radial), **Angle**, and the color **Stops**, which can be added and removed or follow the foreground and background colors. Dragging creates a gradient layer the size of the generation frame, or repositions the selected gradient layer.
 * **Text** — the font **Family**, **Style** or **Weight**, **Size**, **Line height**, **Align** and **Fill** color. Click the canvas to start typing; **Ctrl+Enter** or clicking elsewhere finishes the text, and **Escape** cancels it. The text stays editable as a text layer.
 * **Marquee select** and **Lasso select** — the **Shape** and the selection **Mode** (Replace, Add, Subtract or Intersect). **Shift** adds to the selection and **Alt** subtracts from it. A polygon lasso closes like a polygon shape, and **Escape** drops its points while keeping the current selection. The **Actions** fill or erase the selection on the selected paint layer, image, control layer or mask (a mask gets full coverage), lift it to a **New layer**, **Invert** it, select everything, or **Deselect**.
+
+### Vector layers and splines
+
+Create a **Vector layer** from the **+** menu in the Layers panel, select it, then use **Shape** to draw paths. Vector paths are guides, not image pixels. You can change their **Guide color** in the layer's Properties if desired.
+
+Choose **Spline Edit** (**S**) from the Canvas toolbar and click a path or one of its control points to edit it. Drag a control point to move it, or drag its handles to reshape the curve on either side. **Shift**-click a curve to add a control point. **Ctrl**-click (**Cmd** on macOS) or drag a selection box to select multiple control points.
+
+In the tool's Properties, **Corner**, **Smooth** and **Symmetric** apply to the selected control points:
+
+* **Corner** lets each handle move independently, allowing a sharp corner.
+* **Smooth** keeps the two handles aligned, with independent lengths, for a smooth curve through the point.
+* **Symmetric** keeps the handles aligned and equal in length, so adjusting one mirrors the other.
+
+**Split** breaks a path at the selected control point; **Join** connects compatible selected endpoints. Under **Path**, the smoothing controls let you smooth the whole active path or only its selected control points. The remaining actions copy the active path, extract a copy to a new vector layer, or delete the path.
+
+Right-click an individual path on the selected vector layer, or select a path and press **Shift+F10** with the canvas focused, to access **Transform Path**, **Trace Path**, and **Fill Path** (closed paths only). These operations affect only the selected path, not the entire vector layer.
+
+To render the entire vector layer, choose **Trace/Fill** in the vector layer's Properties. **Fill** and **Stroke** determine whether this renders filled regions, traced lines, or both. **Trace Path** always traces the individual path; **Fill Path** fills the individual closed path.
+
+Both individual path operations and whole-layer rendering use the fill color, stroke color, **Stroke width**, and optional taper settings in the vector layer's Properties. These settings, along with the **Fill** and **Stroke** switches, are stored independently for each vector layer. Changing them does not change the Brush tool or other vector layers.
+
+Rendering creates a raster layer for generation and export while keeping the original vector paths editable.
 
 ### Fonts
 
@@ -117,11 +140,11 @@ The frame is the final footprint of the generation on the canvas. With **Render 
 
 Choose **Transform** from a layer's menu, or press **Shift+T**, to scale and rotate the selected layer. The handles appear at once, even when the Transform tool is already active; if a brush stroke is still being saved, the tool switches straight away and the handles appear when the stroke is saved. Transform works on any enabled layer with content, inpaint masks and regional guidance included. Painted pixels (a paint layer, or a control layer you have painted on) are redrawn at their new size; every other layer, inpaint masks and regional guidance included, keeps its pixels and only its placement changes. A transformed mask's fill pattern and new brush strokes follow its scale and rotation, and **Invert mask** on a rotated mask inverts the generation frame's bounding box as the mask sees it; generation reads the mask through its transform, so results are unaffected.
 
-* Drag a corner or edge handle to scale. **Shift** scales proportionally and **Alt**, held before or during the drag, scales from the center.
+* Drag a corner or edge handle to scale. While the aspect lock beside **Size** is on (the default), every handle keeps the layer's proportions; **Shift** scales freely for that drag, or proportionally while the lock is off. **Alt**, held before or during the drag, scales from the center.
 * Drag just outside a corner to rotate. **Shift** rotates in 15° steps.
 * Drag inside to move.
 
-Press **Enter** or click **Apply** to finish, or **Escape** or **Cancel** to undo the transform. The **Transform** tab of the Layers panel sets the position, scale and rotation numerically. A negative scale flips the layer.
+Press **Enter** or click **Apply** to finish, or **Escape** or **Cancel** to undo the transform. The tool's options and the **Transform** tab of the Layers panel set the position, size and rotation numerically. **Size** is the layer's own width and height in canvas pixels; with the aspect lock on, changing one changes the other by the same factor. Besides a number of pixels, **W** and **H** take a change of the current value: type `50%` for half, `*2` to double or `/4` for a quarter (or type the operator first, then the number), and press **Enter**. **Escape** drops the change. The reference point button beside **Position** picks which point of the layer (a corner, an edge's middle or the center, the center by default) **X** and **Y** show and place, and which point stays put when you type a size or rotation. The **Flip horizontal** and **Flip vertical** buttons beside **Rotation** mirror the layer in place across its center, whatever the reference point; they are also in the layer's menu under **Flip** and in the command palette, for the selected layer. While you are moving selected pixels, flipping their layer flips those pixels instead, until you apply or cancel the move.
 
 To crop a layer to the generation frame, choose **Crop layer to frame** from its menu; a layer entirely outside the frame is left alone. **Fit to frame** scales a layer to fit inside the frame. To crop every layer at once, use **Crop all layers to frame** in the [canvas menu](#the-canvas-menu).
 
@@ -221,7 +244,8 @@ The tool keys, **Shift+T**, **[** and **]**, and **X** and **D** also work after
 
 | Shortcut | Action |
 |---|---|
-| **H**, **V**, **Shift+T**, **C**, **B**, **E**, **U**, **G**, **T**, **M**, **L**, **I** | Select a tool (see [Tools](#tools)) |
+| **H**, **V**, **Shift+T**, **C**, **B**, **E**, **U**, **S**, **G**, **T**, **M**, **L**, **I** | Select a tool (see [Tools](#tools)) |
+| **Shift+F10** | Open the active spline path menu while the canvas has focus |
 | Hold **Space** | Pan temporarily |
 | Hold **Alt** | Pick a color (with tools that do not use **Alt** themselves) |
 | Hold / tap **C** | Use the generation frame tool until you let go / switch to it |

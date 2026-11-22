@@ -149,15 +149,15 @@ export const getProblemDownloadParts = (job: ModelInstallJob): ProblemDownloadPa
     }));
 
 /**
- * `restart_failed` only acts on errored or paused jobs with restartable parts; a cancelled job's temp dir is gone,
- * so it and anything else must be resubmitted. Restarting discards every incomplete part's partial file.
+ * `restart_failed` only acts on errored or paused jobs with restartable parts; a cancelled job's temp dir is gone, so
+ * it and anything else must be resubmitted. Restarting discards every incomplete part's partial file.
  */
 export const canRestartFailedParts = (job: ModelInstallJob): boolean =>
   job.status !== 'cancelled' && getProblemDownloadParts(job).length > 0;
 
 /**
- * Resume keeps partial files and re-requests the rest by range, which also recovers parts that failed transiently.
- * Only a part whose server refused the range needs a restart instead.
+ * Resume keeps partial files and re-requests the rest by range, which also recovers parts that failed transiently. Only
+ * a part whose server refused the range needs a restart instead.
  */
 export const canResumeInstall = (job: ModelInstallJob): boolean =>
   job.status === 'paused' && !(job.download_parts ?? []).some((part) => part.resume_required === true);

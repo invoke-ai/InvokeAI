@@ -34,7 +34,6 @@ void i18n.use(initReactI18next).init({ fallbackLng: 'en', initAsync: false, lng:
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
 
-/** The structural engine over the real reducer and history; previews flush synchronously, as a settled frame would. */
 let stub: StructuralEngineStub;
 let sampleRequests = 0;
 
@@ -42,7 +41,6 @@ const documentLayer = (): CanvasInpaintMaskLayerContract =>
   getDocumentLayer(stub.document(), 'mask-1') as CanvasInpaintMaskLayerContract;
 const commits = () => stub.commits;
 
-/** Lands a fill edit from elsewhere (a script, the tint editor) as a recorded step. */
 const commitFillFromElsewhere = (fill: Partial<CanvasMaskFillContract>): void => {
   const outcome = commitPreparedEdit(stub.engine, 'Fill', (model) => {
     const live = model.getLayer('mask-1') as CanvasInpaintMaskLayerContract;
@@ -55,7 +53,6 @@ const commitFillFromElsewhere = (fill: Partial<CanvasMaskFillContract>): void =>
   expect(outcome).toEqual({ status: 'committed' });
 };
 
-/** The stub's structural half plus the sampler the picker's eyedropper calls; built once per render. */
 let engine: Engine;
 const engineWithSampler = (): Engine =>
   ({
@@ -130,7 +127,6 @@ const openPicker = async () => {
   await settle(() => trigger.click());
 };
 
-/** Presses on the picker's color area, which previews the color under the pointer until the release commits it. */
 const pressArea = async () => {
   const area = document.querySelector<HTMLElement>('[data-scope="color-picker"][data-part="area"]')!;
   const rect = area.getBoundingClientRect();
@@ -153,7 +149,6 @@ describe('mask fill eyedropper', () => {
     await render();
     await openPicker();
 
-    // With an engine present the picker offers the canvas sampler, not the screen eyedropper.
     const sampleButton = document.querySelector<HTMLElement>('[aria-label="common.colorPicker.sampleFromCanvas"]');
     expect(sampleButton).not.toBeNull();
     await settle(() => sampleButton!.click());

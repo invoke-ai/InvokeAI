@@ -1,7 +1,7 @@
 /**
- * Bbox drags preview without dispatch. Handles resize, interior moves and outside is inert. Alt bypasses grid
- * while retaining integer pixels; Shift constrains movement/aspect, Ctrl/Command resizes symmetrically. Read
- * modifiers per sample. Release commits one changed bbox with undo; cancellation and zero change commit nothing.
+ * Bbox drags preview without dispatch. Handles resize, interior moves and outside is inert. Alt bypasses grid while
+ * retaining integer pixels; Shift constrains movement/aspect, Ctrl/Command resizes symmetrically. Read modifiers per
+ * sample. Release commits one changed bbox with undo; cancellation and zero change commit nothing.
  */
 
 import type { Rect, Vec2 } from '@workbench/canvas-engine/types';
@@ -60,8 +60,8 @@ const nextBboxFor = (
   modifiers: { alt: boolean; ctrl: boolean; meta: boolean; shift: boolean }
 ): Rect => {
   const grid = ctx.stores.bboxGrid.get();
-  // Snap to the model grid unless Alt bypasses it or the snap-to-grid setting is off.
-  // The geometry helpers still apply baseline whole-pixel alignment in either bypass case.
+  // Snap to the model grid unless Alt bypasses it or the snap-to-grid setting is off. The geometry helpers still apply
+  // baseline whole-pixel alignment in either bypass case.
   const snap = !modifiers.alt && ctx.stores.snapToGrid.get();
   const dx = point.x - state.startDoc.x;
   const dy = point.y - state.startDoc.y;
@@ -96,7 +96,6 @@ const nextBboxFor = (
   });
 };
 
-/** Creates a fresh bbox tool with its own gesture state. */
 export const createBboxTool = (): Tool => {
   let state: GestureState | null = null;
   let hoverTarget: BboxTarget | null = null;
@@ -147,7 +146,6 @@ export const createBboxTool = (): Tool => {
     },
     onPointerMove: (ctx, input) => {
       if (!state) {
-        // Idle hover: reflect the handle/interior under the pointer in the cursor.
         const doc = ctx.getDocument();
         const target = doc ? bboxTargetAt(bboxToScreen(ctx, doc.bbox), input.screenPoint) : null;
         if (target !== hoverTarget) {
@@ -182,7 +180,6 @@ export const createBboxTool = (): Tool => {
 
       const next = roundBbox(nextBboxFor(ctx, current, input.documentPoint, input.modifiers));
       if (bboxEquals(next, current.startBbox)) {
-        // Zero-delta gesture: nothing to commit.
         clearPreview(ctx);
         return;
       }

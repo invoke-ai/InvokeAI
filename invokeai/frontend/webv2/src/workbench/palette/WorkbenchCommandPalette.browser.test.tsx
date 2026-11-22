@@ -71,7 +71,6 @@ describe('WorkbenchCommandPalette host', () => {
     await act(() => workbenchDialog.onExitComplete?.());
     expect(palette()).toBeNull();
 
-    // Each open starts a fresh palette rather than reusing the one that closed.
     await act(() => openCommandPalette());
     await expect.poll(() => palette()?.dataset.open).toBe('true');
     expect(workbenchDialog.mounts).toBe(2);

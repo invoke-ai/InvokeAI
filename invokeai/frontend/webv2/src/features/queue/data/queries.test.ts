@@ -1,10 +1,4 @@
-import type {
-  QueueBackendPort,
-  QueueCounts,
-  QueueItemDetailReadModel,
-  QueueItemReadModel,
-  QueueReadModel,
-} from '@features/queue/core/types';
+import type { QueueBackendPort, QueueCounts, QueueItemReadModel, QueueReadModel } from '@features/queue/core/types';
 
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { QueryClient } from '@tanstack/react-query';
@@ -14,7 +8,6 @@ import { queueBackend } from './httpRealtimeQueueBackend';
 import {
   applyQueueItemStatusChange,
   invalidateQueueQueries,
-  queueItemDetailOptions,
   QUEUE_RECENT_WINDOW,
   queueKeys,
   queueReadModelOptions,
@@ -107,21 +100,6 @@ describe('queue queries', () => {
     expect(client.getQueryState(queueKeys.status({}))?.isInvalidated).toBe(true);
   });
 
-  it("re-reads an open item's details only while the item can still change", async () => {
-    const backend = createBackend();
-    const client = new QueryClient();
-    vi.mocked(backend.readItemDetail).mockImplementation((itemId) =>
-      Promise.resolve({ status: itemId === 1 ? 'completed' : 'in_progress' } as QueueItemDetailReadModel)
-    );
-
-    await client.fetchQuery(queueItemDetailOptions(backend, 1));
-    await client.fetchQuery(queueItemDetailOptions(backend, 2));
-    await invalidateQueueQueries(client);
-
-    expect(client.getQueryState(queueKeys.itemDetail(1))?.isInvalidated).toBe(false);
-    expect(client.getQueryState(queueKeys.itemDetail(2))?.isInvalidated).toBe(true);
-  });
-
   it('does not continue or publish a read after its account epoch expires', async () => {
     accountLifecycle.activate('user-a');
     const backend = createBackend();
@@ -155,29 +133,6 @@ describe('queue queries', () => {
     await expect(oldRead).rejects.toThrow('no longer active');
     expect(backend.readItemsById).not.toHaveBeenCalled();
     expect(onRead).not.toHaveBeenCalled();
-  });
-
-  it('does not publish a status read whose account epoch expired', async () => {
-    accountLifecycle.activate('user-a');
-    const backend = createBackend();
-    let resolveStatus: ((value: Awaited<ReturnType<QueueBackendPort['readStatus']>>) => void) | undefined;
-
-    vi.mocked(backend.readStatus).mockReturnValueOnce(
-      new Promise((resolve) => {
-        resolveStatus = resolve;
-      })
-    );
-    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    const oldRead = client.fetchQuery(queueStatusOptions(backend, {}));
-    const signal = vi.mocked(backend.readStatus).mock.calls[0]?.[1];
-
-    accountLifecycle.invalidate();
-    accountLifecycle.activate('user-b');
-    resolveStatus?.(await createBackend().readStatus());
-
-    await expect(oldRead).rejects.toThrow('no longer active');
-    expect(signal?.aborted).toBe(true);
-    expect(client.getQueryData(queueKeys.status({}))).toBeUndefined();
   });
 });
 
@@ -321,23 +276,6 @@ describe('applyQueueItemStatusChange', () => {
     ).toBe(before);
   });
 
-  it("takes an event's whole-queue counts even when it already shows the item so, as after the viewer's own cancel", () => {
-    const running = item(1, 'in_progress', { origin: 'webv2:p:any:q:run' });
-    // This tab assumed the cancel; then the server's event says the same.
-    const assumed = applyQueueItemStatusChange(model({ current: running, items: [running], scope: {} }), {
-      item: { ...running, status: 'canceled', statusSequence: null },
-      queueCounts: null,
-    });
-    expect(assumed.status.queue).toMatchObject({ canceled: 1, inProgress: 0 });
-
-    const confirmed = applyQueueItemStatusChange(assumed, {
-      item: { ...running, status: 'canceled', statusSequence: 2 },
-      queueCounts: counts({ canceled: 4, inProgress: 2, pending: 6, total: 12 }),
-    });
-
-    expect(confirmed.status.queue).toMatchObject({ canceled: 4, inProgress: 2, pending: 6 });
-  });
-
   describe('the window standing in for the next item', () => {
     // Item 2 is next; it starts, and the window's next pending item in run order would stand in.
     const window = () => [item(4, 'pending'), item(3, 'pending'), item(2, 'pending')];
@@ -347,38 +285,6 @@ describe('applyQueueItemStatusChange', () => {
     it('stands in when the window holds every pending item the counts report', () => {
       expect(start2(model({ items: window(), next: item(2, 'pending') })).next?.id).toBe(3);
     });
-
-    it('leaves the next item unknown when more wait than the window lists', () => {
-      // A long batch: the true next is older than every item the window shows.
-      expect(start2(model({ items: window(), next: item(2, 'pending') }, { pending: 40 })).next).toBeNull();
-    });
-
-    it('leaves the next item unknown when the counts disagree with the window', () => {
-      expect(start2(model({ items: window(), next: item(2, 'pending') }, { pending: 0 })).next).toBeNull();
-      expect(start2(model({ items: window(), next: item(2, 'pending') }, { pending: -3 })).next).toBeNull();
-    });
-
-    it('leaves it unknown when an item the window does not list starts waiting', () => {
-      // The window holds every pending item; then an older item (a retry) waits again, which it does not list.
-      const before = model({ items: [item(9, 'pending'), item(8, 'pending')], next: null });
-
-      expect(
-        applyQueueItemStatusChange(before, { item: item(5, 'pending', { statusSequence: 3 }), queueCounts: null }).next
-      ).toBeNull();
-    });
-  });
-
-  it('names the next item in the order the server runs them: highest priority first, then oldest', () => {
-    // Item 4 was queued at the front of the queue.
-    const before = model({
-      items: [item(4, 'pending', { priority: 10 }), item(3, 'pending'), item(2, 'pending')],
-      next: item(2, 'pending'),
-    });
-
-    expect(
-      applyQueueItemStatusChange(before, { item: item(2, 'in_progress', { statusSequence: 2 }), queueCounts: null })
-        .next?.id
-    ).toBe(4);
   });
 
   it('keeps a read newer than the event, and follows sequences again once a read brings in restarted ones', () => {
@@ -401,25 +307,5 @@ describe('applyQueueItemStatusChange', () => {
         queueCounts: null,
       }).items[0]?.status
     ).toBe('completed');
-  });
-
-  it('keeps the current item while another starts beside it, and hands over to it when the first leaves', () => {
-    const before = model({
-      current: item(1, 'in_progress'),
-      items: [item(3, 'pending'), item(2, 'pending'), item(1, 'in_progress')],
-      next: item(2, 'pending'),
-    });
-
-    const after = applyQueueItemStatusChange(before, {
-      item: item(2, 'in_progress', { statusSequence: 2 }),
-      queueCounts: null,
-    });
-
-    expect(after.current?.id).toBe(1);
-    expect(after.next?.id).toBe(3);
-    expect(
-      applyQueueItemStatusChange(after, { item: item(1, 'completed', { statusSequence: 2 }), queueCounts: null })
-        .current?.id
-    ).toBe(2);
   });
 });

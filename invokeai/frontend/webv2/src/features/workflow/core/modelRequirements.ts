@@ -1,3 +1,7 @@
+import type { ModelRole } from '@features/models';
+
+import { getModelBaseLabel } from '@features/models/architectures';
+
 import type {
   FieldInputTemplate,
   InvocationTemplate,
@@ -9,10 +13,7 @@ import type {
 import { isLoraFieldCollectionEntry, isModelFieldType, toLoraFieldCollectionList } from './fields';
 import { isInvocationNode } from './types';
 
-/**
- * Extract exact models and template-described empty required slots; blank slots are normal workflow requirements,
- * not merely a fallback.
- */
+/** Empty required model slots are ordinary workflow requirements, not merely a fallback. */
 
 export interface WorkflowModelIdentifier {
   key: string;
@@ -30,34 +31,6 @@ export interface WorkflowModelRequirementSet {
   requirements: readonly WorkflowModelRequirement[];
   primaryBase: string | null;
 }
-
-// #region Labeling
-
-/** Display labels for known model bases. Unknown bases fall back to a humanized form. */
-const BASE_LABELS: Record<string, string> = {
-  any: 'Any',
-  anima: 'Anima',
-  cogview4: 'CogView4',
-  'ernie-image': 'ERNIE-Image',
-  external: 'External',
-  flux: 'FLUX',
-  flux2: 'FLUX.2',
-  flux3: 'FLUX.3',
-  'ideogram-4': 'Ideogram 4',
-  'krea-2': 'Krea-2',
-  'minimax-h3': 'MiniMax H3',
-  'moss-image': 'MOSS-Image',
-  'qwen-image': 'Qwen Image',
-  'qwen-image-2-1': 'Qwen-Image-2.1',
-  'sd-1': 'SD 1.x',
-  'sd-2': 'SD 2.x',
-  'sd-3': 'SD 3.x',
-  sdxl: 'SDXL',
-  'sdxl-refiner': 'SDXL Refiner',
-  unknown: 'Unknown',
-  wan: 'Wan 2.2',
-  'z-image': 'Z-Image',
-};
 
 /** Display labels for known model taxonomy types. Unknown types fall back to a humanized form. */
 const MODEL_TYPE_LABELS: Record<string, string> = {
@@ -93,14 +66,12 @@ const MODEL_TYPE_LABELS: Record<string, string> = {
 
 const humanize = (value: string): string => value.replaceAll(/[_-]+/g, ' ');
 
-const getBaseLabel = (base: string): string => BASE_LABELS[base] ?? humanize(base);
-
 const getModelTypeLabel = (modelType: string): string => MODEL_TYPE_LABELS[modelType] ?? humanize(modelType);
 
 const capitalize = (value: string): string => (value.length === 0 ? value : value[0]?.toUpperCase() + value.slice(1));
 
 const buildSlotLabel = (fieldTemplate: FieldInputTemplate, base: string | null, modelType: string | null): string => {
-  const baseLabel = base ? getBaseLabel(base) : null;
+  const baseLabel = base ? getModelBaseLabel(base) : null;
   const typeLabel = modelType ? getModelTypeLabel(modelType) : null;
 
   if (baseLabel && typeLabel) {
@@ -193,10 +164,7 @@ const computePrimaryBase = (requirements: readonly WorkflowModelRequirement[]): 
   return mostFrequentBase(mainBaseCounts) ?? mostFrequentBase(allBaseCounts);
 };
 
-/**
- * Visits the model each of a node's model fields names, and each required model field left empty; connection-fed
- * inputs are owned upstream and skipped.
- */
+/** Connection-fed inputs are owned upstream and skipped. */
 const visitNodeModelNeeds = (
   node: WorkflowInvocationNode,
   template: InvocationTemplate,
@@ -217,8 +185,7 @@ const visitNodeModelNeeds = (
 
     const value = node.data.inputs[fieldTemplate.name]?.value;
 
-    // Inspect nested identifiers in LoRA collections so their requirements match equivalent selector-node
-    // graphs.
+    // Inspect nested identifiers in LoRA collections so their requirements match equivalent selector-node graphs.
     if (isLoraCollection) {
       const entries = toLoraFieldCollectionList(value);
 
@@ -228,8 +195,7 @@ const visitNodeModelNeeds = (
         }
       }
 
-      // An empty collection still falls through to the slot path below, so a required-but-blank
-      // field keeps describing what it needs the way every other blank model field does.
+      // An empty collection falls through to the slot path, so a required blank field still describes what it needs.
       if (entries.length > 0) {
         continue;
       }
@@ -257,7 +223,6 @@ const visitNodeModelNeeds = (
 const getConnectionTargets = (document: ProjectGraphState): Set<string> =>
   new Set(document.edges.map((edge) => `${edge.target}::${edge.targetHandle}`));
 
-/** Classify concrete model identifiers as exact requirements and empty required inputs as slots. */
 export const extractWorkflowModelRequirements = (
   document: ProjectGraphState,
   templates: InvocationTemplates
@@ -312,16 +277,12 @@ export const extractWorkflowModelRequirements = (
   return { primaryBase: computePrimaryBase(requirements), requirements };
 };
 
-/** One model field's requirement: the model it names, or the kind it needs while empty. */
 export interface WorkflowFieldModelRequirement {
   fieldName: string;
   requirement: WorkflowModelRequirement;
 }
 
-/**
- * The same requirements per invocation node and field, so a view can mark the node or the input that needs a model.
- * A node lists each model it names and each empty required model field; nodes with neither are absent.
- */
+/** Per node and field, so a view can mark what needs a model; nodes needing none are absent. */
 export const extractNodeModelRequirements = (
   document: ProjectGraphState,
   templates: InvocationTemplates
@@ -367,6 +328,7 @@ export interface InstalledModelSummary {
   name: string;
   base: string;
   type: string;
+  roles?: readonly ModelRole[];
 }
 
 export interface StarterCatalogEntry {
@@ -425,14 +387,16 @@ const findInstalledForExact = (
   return null;
 };
 
+/** A model fills a slot of `modelType` through its primary type or any role (null = any type). */
+const servesType = (model: InstalledModelSummary, modelType: string | null): boolean =>
+  modelType === null || model.type === modelType || (model.roles ?? []).some((role) => role.type === modelType);
+
 const findInstalledForSlot = (
   base: string | null,
   modelType: string | null,
   installedModels: readonly InstalledModelSummary[]
 ): InstalledModelSummary | null =>
-  installedModels.find(
-    (model) => (base === null || model.base === base) && (modelType === null || model.type === modelType)
-  ) ?? null;
+  installedModels.find((model) => (base === null || model.base === base) && servesType(model, modelType)) ?? null;
 
 const matchesStarterName = (starter: StarterCatalogEntry, name: string): boolean => {
   const target = name.toLowerCase();
@@ -495,10 +459,7 @@ const resolveFromStarter = (
   };
 };
 
-/**
- * Resolve exact requirements by key, hash, then name/base/type; slots by base/type. Starter fallback reports
- * installing sources, including dependencies.
- */
+/** Exact requirements match by key, hash, then name/base/type; slots by base/type; starters include dependencies. */
 export const resolveWorkflowModelRequirements = (
   requirements: readonly WorkflowModelRequirement[],
   deps: ResolutionDeps
@@ -531,10 +492,7 @@ export const resolveWorkflowModelRequirements = (
     );
   });
 
-/**
- * Link only missing requirements to Add Models. Prefer catalog names, then exact model names or raw slot
- * base/type; display prose is not searchable taxonomy.
- */
+/** Catalog names first, then exact model names or raw slot base/type: display prose is not searchable taxonomy. */
 export const getAddModelsSearchTerm = (resolved: ResolvedModelRequirement): string | null => {
   if (resolved.status === 'installed') {
     return null;
@@ -554,5 +512,3 @@ export const getAddModelsSearchTerm = (resolved: ResolvedModelRequirement): stri
 
   return requirement.base?.trim() || requirement.modelType?.trim() || null;
 };
-
-// #endregion

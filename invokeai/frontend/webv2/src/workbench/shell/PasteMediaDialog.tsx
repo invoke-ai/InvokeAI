@@ -94,10 +94,7 @@ const CanvasDestinationButton = ({
   );
 };
 
-/**
- * Upload pasted media to the current board before forwarding it to canvas/reference actions so assets remain
- * findable.
- */
+/** Uploads pasted media to the current board first so assets stay findable. */
 export const PasteMediaDialog = ({
   isOpen,
   onExitComplete,
@@ -111,10 +108,9 @@ export const PasteMediaDialog = ({
   const projectId = useActiveProjectId();
   const galleryValues = useWidgetValuesSelector('gallery', (values) => values);
   const generateValues = useWidgetValuesSelector('generate', selectGenerateValues);
-  // The gallery's own boards query (same key, shared cache): the board the
-  // person is looking at may be archived or a date bucket, which the default
-  // listing omits. Folded as the host shows boards, so a board is named here as
-  // the Gallery widget names it.
+  // The gallery's own boards query (same key, shared cache): the board the person is looking at may be archived or a
+  // date bucket, which the default listing omits. Folded as the host shows boards, so a board is named here as the
+  // Gallery widget names it.
   const gallerySettings = getGallerySettings(galleryValues);
   const boards = useHostGalleryBoards(
     useQuery(
@@ -126,12 +122,7 @@ export const PasteMediaDialog = ({
       })
     ).data
   );
-  // Uploads land where generation results do: the auto-add board — never a
-  // date bucket, which cannot hold items. Judged from the listing of every
-  // readable board, observed while this short-lived dialog is open so the
-  // label follows it as it arrives; the upload action ensures the same listing
-  // as the paste is chosen (sharing this read) and reads the getter after, so
-  // an archived or revoked board is decided from a listing, not for want of one.
+  // Uploads land where generation results do: the auto-add board — never a date bucket, which cannot hold items.
   useQuery(galleryBoardsOptions({ includeArchived: true }));
   const queryClient = useQueryClient();
   const getDestinationBoardId = useCallback(
@@ -156,8 +147,8 @@ export const PasteMediaDialog = ({
   const addReferenceImage = actions.useAsReferenceImage;
 
   const [previews, setPreviews] = useState<{ kind: GalleryItemKind; url: string }[]>([]);
-  // Object URLs are created and revoked together per mount, so StrictMode's
-  // simulated remount cannot revoke URLs a live <img> still points at.
+  // Object URLs are created and revoked together per mount, so StrictMode's simulated remount cannot revoke URLs a live
+  // <img> still points at.
   useMountEffect(() => {
     const next = request.files.slice(0, PREVIEW_LIMIT).map((file) => ({
       kind: classifyGalleryUpload(file)?.kind ?? 'image',

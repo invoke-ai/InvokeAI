@@ -115,8 +115,8 @@ describe('gallery realtime runtime', () => {
 
     runtime.start();
 
-    // A bulk drop completing one file every 300 ms for 3 s: each echo would
-    // otherwise become its own pass, cancelling the page fetches under the user.
+    // A bulk drop completing one file every 300 ms for 3 s: each echo would otherwise become its own pass, cancelling
+    // the page fetches under the user.
     for (let elapsed = 0; elapsed < 3000; elapsed += 300) {
       handlers.get('image_uploaded')?.({ image_name: `${elapsed}.png` } as never);
       vi.advanceTimersByTime(300);
@@ -209,8 +209,8 @@ describe('gallery realtime runtime', () => {
     handlers.get('image_uploaded')?.({ image_name: 'a.png' } as never);
     runtime.dispose();
 
-    // Asserting the timer is gone, not just inert: the account-scope guard alone would
-    // keep a disposed runtime's timer alive on every navigation away from the editor.
+    // Asserting the timer is gone, not just inert: the account-scope guard alone would keep a disposed runtime's timer
+    // alive on every navigation away from the editor.
     expect(vi.getTimerCount()).toBe(0);
 
     vi.advanceTimersByTime(250);
