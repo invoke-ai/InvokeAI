@@ -336,11 +336,11 @@ class ModelLoadService(ModelLoadServiceBase):
         return not self._load_settings_changed(config, current)
 
     def load_model_from_path(
-        self, model_path: Path, loader: Optional[Callable[[Path], AnyModel]] = None
+        self, model_path: Path, loader: Optional[Callable[[Path], AnyModel]] = None, cache_key: Optional[str] = None
     ) -> LoadedModelWithoutConfig:
         # Resolve the calling thread's cache once so the whole load uses a single device's cache.
         ram_cache = self.ram_cache
-        cache_key = str(model_path)
+        cache_key = cache_key or str(model_path)
         try:
             # Retrieve with a first-use claim so the record cannot be evicted between the lookup
             # and the wrapper's first lock (see ModelCache.get_with_first_use_claim).

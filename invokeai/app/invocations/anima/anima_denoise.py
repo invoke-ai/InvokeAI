@@ -18,6 +18,7 @@ Key differences from Z-Image denoise:
 
 import math
 from contextlib import ExitStack
+from pathlib import Path
 from typing import Any, Callable, Iterator, Optional
 
 import torch
@@ -61,7 +62,12 @@ from invokeai.backend.anima.control_net_lllite import (
     prepare_cond_image,
     prepare_mask,
 )
-from invokeai.backend.anima.ip_adapter import AnimaIPAdapter, AnimaIPAdapterExtension, combine_block_fns
+from invokeai.backend.anima.ip_adapter import (
+    AnimaIPAdapter,
+    AnimaIPAdapterExtension,
+    combine_block_fns,
+    load_anima_ip_adapter_lora,
+)
 from invokeai.backend.anima.regional_prompting import AnimaRegionalPromptingExtension
 from invokeai.backend.anima.scheduler_driver import AnimaSchedulerDriver
 from invokeai.backend.architectures import FeaturesFacet, require
@@ -861,6 +867,7 @@ class AnimaDenoiseInvocation(BaseInvocation, WithMetadata):
 
             # Loaded before the LoRA patching, which applies each one's bundled LoRA with the user's.
             ip_adapters: list[tuple[list[AnimaIPAdapterField], AnimaIPAdapter]] = []
+            ip_adapter_files: list[tuple[str, Path]] = []
             for ip_adapter_group in ip_adapter_groups:
                 ip_adapter_field = ip_adapter_group[0]
                 ip_adapter_info = context.models.load(ip_adapter_field.ip_adapter_model)
@@ -878,13 +885,17 @@ class AnimaDenoiseInvocation(BaseInvocation, WithMetadata):
                         "model. It was trained on a deeper Anima and cannot be used with this one."
                     )
                 ip_adapters.append((ip_adapter_group, ip_adapter_model))
+                # The record this adapter was built from, so its bundled LoRA is read from the same file.
+                ip_adapter_config = ip_adapter_info.config
+                assert ip_adapter_config is not None, "a model loaded by identifier has its config"
+                ip_adapter_files.append((ip_adapter_config.key, context.models.get_absolute_path(ip_adapter_config)))
 
             # Apply LoRA models to the transformer.
             # Note: We apply the LoRA after the transformer has been moved to its target device for faster patching.
             exit_stack.enter_context(
                 LayerPatcher.apply_smart_model_patches(
                     model=transformer,
-                    patches=self._lora_iterator(context, len(transformer.blocks), [m for _, m in ip_adapters]),
+                    patches=self._lora_iterator(context, len(transformer.blocks), ip_adapter_files),
                     prefix=ANIMA_LORA_TRANSFORMER_PREFIX,
                     dtype=inference_dtype,
                     cached_weights=cached_weights,
@@ -1170,7 +1181,7 @@ class AnimaDenoiseInvocation(BaseInvocation, WithMetadata):
         return step_callback
 
     def _lora_iterator(
-        self, context: InvocationContext, transformer_depth: int, ip_adapters: list[AnimaIPAdapter]
+        self, context: InvocationContext, transformer_depth: int, ip_adapter_files: list[tuple[str, Path]]
     ) -> Iterator[PatchSpec]:
         """LoRA models to apply to the transformer: the user's, then each IP-Adapter model's own at 1.0, once per model.
 
@@ -1192,6 +1203,13 @@ class AnimaDenoiseInvocation(BaseInvocation, WithMetadata):
                     f"matching blocks of this {transformer_depth}-block model."
                 )
             yield (patch, lora.weight, lora_info.model_in_ram())
-        # Already held on device by the caller, so no cache pin is needed.
-        for ip_adapter in ip_adapters:
-            yield (anima_lora_for_depth(ip_adapter.lora_patch(), transformer_depth)[0], 1.0)
+        # Each bundled LoRA is its own cache entry, so the cache sizes it as a LoRA rather than as part of the adapter.
+        # Keyed under the adapter's model key, so dropping the adapter's entries (delete, re-identify) drops it too;
+        # the path in the key keeps a record repointed mid-generation from pairing the old file's LoRA with the new.
+        for model_key, path in ip_adapter_files:
+            bundled = context.models.load_local_model(
+                path, load_anima_ip_adapter_lora, cache_key=f"{model_key}:bundled_lora:{path}"
+            )
+            if not isinstance(bundled.model, ModelPatchRaw):
+                raise TypeError(f"Expected the bundled LoRA of '{path.name}', got {type(bundled.model).__name__}.")
+            yield (anima_lora_for_depth(bundled.model, transformer_depth)[0], 1.0, bundled.model_in_ram())

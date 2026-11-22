@@ -833,6 +833,7 @@ class ModelsInterface(InvocationContextInterface):
         self,
         model_path: Path,
         loader: Optional[Callable[[Path], AnyModel]] = None,
+        cache_key: Optional[str] = None,
     ) -> LoadedModelWithoutConfig:
         """
         Load the model file located at the indicated path
@@ -845,13 +846,17 @@ class ModelsInterface(InvocationContextInterface):
         Args:
             path: A model Path
             loader: A Callable that expects a Path and returns a dict[str|int, Any]
+            cache_key: The model cache key; defaults to the path. A part of an installed model passes
+                `<model key>:<name>`, so that deleting, re-identifying or reconfiguring the model drops it too.
 
         Returns:
             A LoadedModelWithoutConfig object.
         """
 
         self._util.signal_progress(f"Loading model {model_path.name}")
-        return self._services.model_manager.load.load_model_from_path(model_path=model_path, loader=loader)
+        return self._services.model_manager.load.load_model_from_path(
+            model_path=model_path, loader=loader, cache_key=cache_key
+        )
 
     def load_remote_model(
         self,

@@ -1,3 +1,4 @@
+import gc
 from pathlib import Path
 
 import pytest
@@ -61,6 +62,27 @@ def test_load_from_path(mock_context: InvocationContext, embedding_file: Path) -
     assert isinstance(loaded_model_1.model, dict)
     assert isinstance(loaded_model_3.model, dict)
     assert torch.equal(loaded_model_1.model["emb_params"], loaded_model_3.model["emb_params"])
+
+
+def test_a_local_model_keyed_under_a_model_is_dropped_with_it(
+    mock_context: InvocationContext, embedding_file: Path
+) -> None:
+    """A part of an installed model read from its file (the Anima IP-Adapter's bundled LoRA) must not outlive a
+    re-identify or delete of that model, which drop its cached entries by model key."""
+    model_key = "aaaaaaaa-1111-2222-3333-444444444444"
+
+    def load(cache_key=None):
+        # Only the model is kept: a live wrapper holds its entry in a first-use window, which a drop defers.
+        model = mock_context.models.load_local_model(embedding_file, cache_key=cache_key).model
+        gc.collect()
+        return model
+
+    part = load(f"{model_key}:part")
+    assert load(f"{model_key}:part") is part
+    assert load() is not part, "the path key is separate"
+
+    assert mock_context._services.model_manager.load.drop_cached_models([model_key]) == 1
+    assert load(f"{model_key}:part") is not part
 
 
 def test_download_and_load(mock_context: InvocationContext) -> None:

@@ -15,23 +15,30 @@ from invokeai.app.invocations.anima.anima_denoise import AnimaDenoiseInvocation
 from invokeai.app.invocations.anima.anima_ip_adapter import AnimaIPAdapterField, AnimaIPAdapterInvocation
 from invokeai.app.invocations.fields import AnimaConditioningField
 from invokeai.app.invocations.model import ModelIdentifierField
-from invokeai.backend.anima.ip_adapter import AnimaIPAdapter
+from invokeai.backend.anima.ip_adapter import AnimaIPAdapter, anima_ip_adapter_lora, load_anima_ip_adapter_lora
 from invokeai.backend.model_manager.starter_models.common import siglip, siglip2_base_512
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType
+from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import AnimaConditioningInfo, ConditioningFieldData
 
 _DEPTH = 28
 
 
 class _Loaded:
-    def __init__(self, model):
+    def __init__(self, model, path: str = ""):
         self.model = model
         self.compute_device = torch.device("cpu")
-        self.config = SimpleNamespace(format=ModelFormat.Checkpoint)
+        self.config = SimpleNamespace(format=ModelFormat.Checkpoint, path=path, key=path)
+        self.pinned = False
 
     @contextmanager
     def model_on_device(self, working_mem_bytes=None):
         yield (None, self.model)
+
+    @contextmanager
+    def model_in_ram(self):
+        self.pinned = True
+        yield self.model
 
 
 class _FakeTransformer(torch.nn.Module):
@@ -54,7 +61,7 @@ class _FakeTransformer(torch.nn.Module):
         return torch.zeros_like(x)
 
 
-def _adapter() -> AnimaIPAdapter:
+def _checkpoint() -> dict[str, torch.Tensor]:
     sd: dict[str, torch.Tensor] = {}
     for n in range(_DEPTH):
         sd |= {
@@ -67,7 +74,7 @@ def _adapter() -> AnimaIPAdapter:
         }
     sd["lora.base_model.model.blocks.0.cross_attn.q_proj.lora_A.weight"] = torch.zeros(2, 8)
     sd["lora.base_model.model.blocks.0.cross_attn.q_proj.lora_B.weight"] = torch.zeros(8, 2)
-    return AnimaIPAdapter.from_state_dict(sd)
+    return sd
 
 
 def _identifier(key: str) -> ModelIdentifierField:
@@ -102,9 +109,12 @@ def _denoise(
     monkeypatch.setattr(f"{module}.TorchDevice.choose_torch_device", lambda: torch.device("cpu"))
     monkeypatch.setattr(f"{module}.TorchDevice.choose_anima_inference_dtype", lambda _d: torch.float32)
     patches: list = []
+    lora_loads: dict[str, _Loaded] = {}
 
     def apply_smart_model_patches(**kwargs):
-        patches.extend(kwargs["patches"])
+        for patch, weight, *pin in kwargs["patches"]:
+            with pin[0] if pin else nullcontext():
+                patches.append((patch, weight))
         return nullcontext()
 
     monkeypatch.setattr(f"{module}.LayerPatcher.apply_smart_model_patches", apply_smart_model_patches)
@@ -118,10 +128,22 @@ def _denoise(
         if identifier is transformer_id:
             return _Loaded(transformer)
         assert identifier.key not in adapters, f"adapter '{identifier.key}' loaded twice"
-        return _Loaded(adapters.setdefault(identifier.key, _adapter()))
+        return _Loaded(
+            adapters.setdefault(identifier.key, AnimaIPAdapter.from_state_dict(_checkpoint())), identifier.key
+        )
+
+    def load_local_model(path, loader, cache_key):
+        # The bundled LoRA, as its own cache entry read from the adapter's file, dropped along with the adapter's.
+        assert loader is load_anima_ip_adapter_lora
+        key = path.removeprefix("/models/")
+        assert cache_key == f"{key}:bundled_lora:{path}"
+        assert key in adapters and key not in lora_loads, f"LoRA of '{path}' loaded twice or without its adapter"
+        return lora_loads.setdefault(key, _Loaded(anima_ip_adapter_lora(_checkpoint())))
 
     context = context or MagicMock()
     context.models.load.side_effect = load
+    context.models.get_absolute_path.side_effect = lambda config: f"/models/{config.path}"
+    context.models.load_local_model.side_effect = load_local_model
     context.conditioning.load.side_effect = lambda _name: ConditioningFieldData(
         conditionings=[
             AnimaConditioningInfo(
@@ -142,32 +164,34 @@ def _denoise(
         ip_adapter=ip_adapter,
     )  # fmt: skip
     invocation._run_diffusion(context)
-    return transformer, patches, adapters
+    assert all(loaded.pinned for loaded in lora_loads.values()), "each bundled LoRA is pinned while it is patched in"
+    loras: dict[str, ModelPatchRaw] = {key: loaded.model for key, loaded in lora_loads.items()}
+    return transformer, patches, adapters, loras
 
 
 @pytest.mark.parametrize("scheduler", ["euler", "dpmpp_2m"])
 def test_the_positive_pass_gets_the_image_and_the_negative_pass_does_not(monkeypatch, scheduler) -> None:
-    transformer, patches, adapters = _denoise(monkeypatch, _field(), scheduler=scheduler)
+    transformer, patches, adapters, loras = _denoise(monkeypatch, _field(), scheduler=scheduler)
 
     cond, uncond = transformer.calls[0::2], transformer.calls[1::2]
     assert len(cond) == len(uncond) == 4
     assert all(blocks is not None and len(blocks) == _DEPTH and all(blocks) for blocks in cond)
     assert all(blocks is None for blocks in uncond)
     # Its bundled LoRA, once, at 1.0.
-    assert patches == [(adapters["ipa"].lora_patch(), 1.0)]
-    assert len(adapters["ipa"].lora_patch().layers) == 1
+    assert patches == [(loras["ipa"], 1.0)]
+    assert len(loras["ipa"].layers) == 1
 
 
 @pytest.mark.parametrize("scheduler", ["euler", "dpmpp_2m"])
 def test_the_step_window_turns_the_term_off_outside_it(monkeypatch, scheduler) -> None:
     # 4 steps, from 50%: floor(0.5 * 4) = 2 is the first step that gets it, as for ControlNet-LLLite.
-    transformer, _, _ = _denoise(monkeypatch, _field(begin_step_percent=0.5), scheduler=scheduler)
+    transformer, _, _, _ = _denoise(monkeypatch, _field(begin_step_percent=0.5), scheduler=scheduler)
 
     assert [blocks is not None for blocks in transformer.calls[0::2]] == [False, False, True, True]
 
 
 def test_strength_zero_is_no_adapter_at_all(monkeypatch) -> None:
-    transformer, patches, adapters = _denoise(monkeypatch, [_field(strength=0.0)])
+    transformer, patches, adapters, loras = _denoise(monkeypatch, [_field(strength=0.0)])
 
     assert all(blocks is None for blocks in transformer.calls)
     assert patches == []
@@ -175,9 +199,9 @@ def test_strength_zero_is_no_adapter_at_all(monkeypatch) -> None:
 
 
 def test_two_adapters_each_bring_their_lora(monkeypatch) -> None:
-    transformer, patches, adapters = _denoise(monkeypatch, [_field("b"), _field("a", end_step_percent=0.0)])
+    transformer, patches, adapters, loras = _denoise(monkeypatch, [_field("b"), _field("a", end_step_percent=0.0)])
 
-    assert patches == [(adapters["a"].lora_patch(), 1.0), (adapters["b"].lora_patch(), 1.0)]
+    assert patches == [(loras["a"], 1.0), (loras["b"], 1.0)]
     assert all(blocks is not None for blocks in transformer.calls[0::2])
 
 
@@ -188,12 +212,12 @@ def test_an_adapter_deeper_than_the_transformer_is_refused(monkeypatch) -> None:
 
 
 def test_images_sharing_an_adapter_are_attended_together_with_its_lora_applied_once(monkeypatch) -> None:
-    transformer, patches, adapters = _denoise(
+    transformer, patches, adapters, loras = _denoise(
         monkeypatch, [_field(tokens_name="first", strength=0.5), _field(tokens_name="second", strength=1.5)]
     )
 
     assert list(adapters) == ["ipa"]
-    assert patches == [(adapters["ipa"].lora_patch(), 1.0)]
+    assert patches == [(loras["ipa"], 1.0)]
     expected = torch.cat([torch.full((1, 3, 4), 0.5), torch.full((1, 3, 4), 3.0)], dim=1)
     for blocks in transformer.calls[0::2]:
         assert blocks is not None and len(blocks) == _DEPTH
@@ -202,7 +226,7 @@ def test_images_sharing_an_adapter_are_attended_together_with_its_lora_applied_o
 
 def test_each_image_keeps_its_own_step_window(monkeypatch) -> None:
     # 4 steps, both bounds inclusive: the first image runs to ceil(0.5 * 4) = 2, the second from floor(0.25 * 4) = 1.
-    transformer, _, _ = _denoise(
+    transformer, _, _, _ = _denoise(
         monkeypatch,
         [
             _field(tokens_name="first", end_step_percent=0.5),
@@ -221,7 +245,7 @@ def test_each_image_keeps_its_own_step_window(monkeypatch) -> None:
 
 
 def test_no_image_in_its_window_adds_no_term(monkeypatch) -> None:
-    transformer, patches, _ = _denoise(
+    transformer, patches, _, _ = _denoise(
         monkeypatch,
         [
             # floor(1.0 * 4) = 4: past the last of the 4 steps.
@@ -235,11 +259,11 @@ def test_no_image_in_its_window_adds_no_term(monkeypatch) -> None:
 
 
 def test_a_strength_zero_image_leaves_the_other_image_of_its_adapter(monkeypatch) -> None:
-    transformer, patches, adapters = _denoise(
+    transformer, patches, adapters, loras = _denoise(
         monkeypatch, [_field(tokens_name="first", strength=0.0), _field(tokens_name="second")]
     )
 
-    assert patches == [(adapters["ipa"].lora_patch(), 1.0)]
+    assert patches == [(loras["ipa"], 1.0)]
     assert all(torch.equal(_attended(blocks[0]), torch.full((1, 3, 4), 2.0)) for blocks in transformer.calls[0::2])
 
 
@@ -264,7 +288,7 @@ def test_the_images_of_an_adapter_are_attended_in_the_same_order_whatever_the_co
         orders.append([(f.image_name, f.strength) for f in group])
 
     assert orders == [[("a.png", 0.5), ("a.png", 1.0), ("b.png", 1.0)]] * 3
-    transformer, _, _ = _denoise(monkeypatch, fields[::-1])
+    transformer, _, _, _ = _denoise(monkeypatch, fields[::-1])
     expected = torch.cat([torch.full((1, 3, 4), 0.5), torch.full((1, 3, 4), 1.0), torch.full((1, 3, 4), 2.0)], 1)
     assert torch.equal(_attended(transformer.calls[0][0]), expected)
 
@@ -272,7 +296,7 @@ def test_the_images_of_an_adapter_are_attended_in_the_same_order_whatever_the_co
 def test_anima_3_8b_runs_the_adapter_with_a_warning(monkeypatch) -> None:
     context = MagicMock()
 
-    transformer, _, _ = _denoise(monkeypatch, [_field()], semantic_connector=True, context=context)
+    transformer, _, _, _ = _denoise(monkeypatch, [_field()], semantic_connector=True, context=context)
 
     assert all(blocks is not None for blocks in transformer.calls[0::2])
     warnings = [call.args[0] for call in context.logger.warning.call_args_list]
@@ -342,7 +366,7 @@ def test_a_strength_zero_node_encodes_nothing_and_denoise_ignores_it(monkeypatch
     context.models.load.assert_not_called()
     context.models.search_by_attrs.assert_not_called()
     context.images.get_pil.assert_not_called()
-    transformer, patches, adapters = _denoise(monkeypatch, [field])
+    transformer, patches, adapters, loras = _denoise(monkeypatch, [field])
     assert all(blocks is None for blocks in transformer.calls) and patches == [] and adapters == {}
 
 
