@@ -21,7 +21,7 @@ import torch
 
 from invokeai.backend.model_manager.configs.base import Config_Base
 from invokeai.backend.model_manager.configs.identification_utils import NotAMatchError
-from invokeai.backend.model_manager.configs.lora import LoRA_LyCORIS_Anima_Config, LoRA_LyCORIS_LTX2_Config
+from invokeai.backend.model_manager.configs.lora import LoRA_LyCORIS_LTX2_Config
 from invokeai.backend.model_manager.taxonomy import BaseModelType
 
 
@@ -141,7 +141,10 @@ def _anima_kohya_keys() -> dict[str, torch.Tensor]:
     return sd
 
 
-@pytest.mark.parametrize("prefix", ["", "diffusion_model.", "transformer.", "base_model.model.transformer."])
+ALL_PREFIXES = ["", "diffusion_model.", "transformer.", "base_model.model.", "base_model.model.transformer."]
+
+
+@pytest.mark.parametrize("prefix", ALL_PREFIXES)
 def test_an_ltx2_lora_identifies_as_ltx2(prefix: str) -> None:
     matched, result = _probe(LoRA_LyCORIS_LTX2_Config, _ltx2_distilled_keys(prefix))
 
@@ -149,7 +152,7 @@ def test_an_ltx2_lora_identifies_as_ltx2(prefix: str) -> None:
     assert result.base is BaseModelType.LTX2
 
 
-@pytest.mark.parametrize("prefix", ["", "diffusion_model.", "transformer.", "base_model.model.transformer."])
+@pytest.mark.parametrize("prefix", ALL_PREFIXES)
 def test_an_ltx2_lora_is_claimed_by_the_ltx2_probe_alone(prefix: str) -> None:
     """Every LoRA probe, whatever the prefix. Unprefixed or under ``transformer.`` its keys start
     with ``transformer_blocks.`` as Qwen Image's do; as wide as Qwen-Image-2.1 (4096), it names
@@ -177,13 +180,20 @@ def test_another_familys_lora_is_rejected_by_the_ltx2_probe(name: str, keys) -> 
     assert not matched
 
 
-@pytest.mark.parametrize("prefix", ["", "transformer.", "base_model.model.", "base_model.model.transformer."])
-def test_a_video_only_ltx2_lora_is_rejected_by_the_anima_probe(prefix: str) -> None:
-    """Without the audio tower nothing in the key names tells it from Anima's diffusers layout; the 4096-wide
-    attention does."""
-    video_tower = {k: v for k, v in _ltx2_distilled_keys(prefix).items() if ".attn1." in k}
+@pytest.mark.parametrize(
+    "prefix", ["", "diffusion_model.", "transformer.", "base_model.model.", "base_model.model.transformer."]
+)
+def test_a_video_stream_only_lora_is_claimed_by_no_ltx2_probe(prefix: str) -> None:
+    """LTX-Video 13B (`LTXVideoTransformer3DModel`: 48 blocks, 32 heads of 128, 4096-wide text context) names and
+    shapes its attention exactly as LTX-2's video stream does, so without an audio-side key the file cannot be told
+    from an LTX-2 one and must not be claimed as LTX-2."""
+    layers = {"attn1.to_q": 4096, "attn1.to_out.0": 4096, "attn2.to_q": 4096, "attn2.to_k": 4096, "attn2.to_v": 4096}
+    sd: dict[str, torch.Tensor] = {}
+    for name, width in layers.items():
+        sd[f"{prefix}transformer_blocks.0.{name}.lora_A.weight"] = _z(8, width)
+        sd[f"{prefix}transformer_blocks.0.{name}.lora_B.weight"] = _z(width, 8)
 
-    matched, _ = _probe(LoRA_LyCORIS_Anima_Config, video_tower)
+    matched, _ = _probe(LoRA_LyCORIS_LTX2_Config, sd)
 
     assert not matched
 
