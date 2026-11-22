@@ -7979,6 +7979,55 @@
         ]
       }
     },
+    "/api/v1/images/gone": {
+      "post": {
+        "tags": ["images"],
+        "summary": "Get Gone Images",
+        "description": "Returns the requested names whose image records are positively absent.\n\nLets a client whose delete response was lost learn which deletions committed, so it can drop\nits references to them. A name is listed only when the record is confirmed missing: a name\nthat exists (readable by the caller or not) or that storage could not check is left out, so\nan unavailable database prunes nothing. Revealing absence matches the 404 the per-image\nroutes already answer for a gone image (see `_assert_image_record_exists`).",
+        "operationId": "get_gone_images",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_get_gone_images"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array",
+                  "title": "Response Get Gone Images"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/images/uncategorized": {
       "delete": {
         "tags": ["images"],
@@ -23948,6 +23997,23 @@
         "type": "object",
         "required": ["batch"],
         "title": "Body_enqueue_batch"
+      },
+      "Body_get_gone_images": {
+        "properties": {
+          "image_names": {
+            "items": {
+              "type": "string",
+              "maxLength": 255
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "title": "Image Names",
+            "description": "The names of images to check"
+          }
+        },
+        "type": "object",
+        "required": ["image_names"],
+        "title": "Body_get_gone_images"
       },
       "Body_get_images_by_names": {
         "properties": {

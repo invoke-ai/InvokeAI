@@ -1703,6 +1703,32 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/images/gone": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Get Gone Images
+         * @description Returns the requested names whose image records are positively absent.
+         *
+         *     Lets a client whose delete response was lost learn which deletions committed, so it can drop
+         *     its references to them. A name is listed only when the record is confirmed missing: a name
+         *     that exists (readable by the caller or not) or that storage could not check is left out, so
+         *     an unavailable database prunes nothing. Revealing absence matches the 404 the per-image
+         *     routes already answer for a gone image (see `_assert_image_record_exists`).
+         */
+        post: operations["get_gone_images"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/images/uncategorized": {
         parameters: {
             query?: never;
@@ -6966,6 +6992,14 @@ export type components = {
              * @default false
              */
             prepend?: boolean;
+        };
+        /** Body_get_gone_images */
+        Body_get_gone_images: {
+            /**
+             * Image Names
+             * @description The names of images to check
+             */
+            image_names: string[];
         };
         /** Body_get_images_by_names */
         Body_get_images_by_names: {
@@ -64668,6 +64702,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DeleteImagesResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_gone_images: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Body_get_gone_images"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": string[];
                 };
             };
             /** @description Validation Error */
