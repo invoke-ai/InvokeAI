@@ -90,6 +90,7 @@ SEAM = Seam(
 DIFFUSERS_SEAM = Seam(
     loader=ideogram4.Ideogram4DiffusersModel,
     module=ideogram4,
+    load_file_host=ideogram4,
     entry="_load_one_transformer",
     patches_device=True,
     sets_torch_dtype=False,
