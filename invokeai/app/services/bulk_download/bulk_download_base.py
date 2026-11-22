@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import Optional
 
+from invokeai.app.services.images.image_export import BulkImageExportOptions
+
 
 class BulkDownloadBase(ABC):
     """Responsible for creating a zip file containing the images specified by the given image names or board id."""
@@ -12,7 +14,9 @@ class BulkDownloadBase(ABC):
         board_id: Optional[str],
         bulk_download_item_id: Optional[str],
         user_id: str = "system",
+        is_admin: bool = False,
         uncategorized_owner_id: Optional[str] = None,
+        export: Optional[BulkImageExportOptions] = None,
     ) -> None:
         """
         Create a zip file containing the images specified by the given image names or board id.
@@ -49,6 +53,10 @@ class BulkDownloadBase(ABC):
 
         :param bulk_download_item_name: The name of the bulk download item.
         """
+
+    @abstractmethod
+    def take_failure(self, bulk_download_item_name: str) -> Optional[str]:
+        """Why the item's job failed, or None; the reason is forgotten once read."""
 
     @abstractmethod
     def get_owner(self, bulk_download_item_name: str) -> Optional[str]:

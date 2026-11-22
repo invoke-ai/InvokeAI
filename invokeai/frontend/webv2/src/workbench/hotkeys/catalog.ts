@@ -13,7 +13,7 @@ const categoryScopes = {
   workflows: { kind: 'widget', typeIds: ['workflow'] },
 } as const satisfies Record<HotkeyCategory, HotkeyScope>;
 
-/** Recall and workflow loading act on the gallery selection, so they answer in both Gallery and Preview. */
+/** Recall, workflow loading and export act on the gallery selection, so they answer in both Gallery and Preview. */
 const selectedImageScope: HotkeyScope = { kind: 'widget', typeIds: ['preview', 'gallery'] };
 
 /** Keep invocation shortcuts available inside text and numeric fields so prompt editing does not swallow submission. */
@@ -249,6 +249,7 @@ export const firstPartyHotkeyCatalog: HotkeyDefinition[] = [
   hotkey('viewer', 'nextItem', ['arrowright']),
   hotkey('viewer', 'zoomToActual', ['1'], { title: 'Zoom to Actual Size' }),
   hotkey('viewer', 'zoomToFit', ['f'], { title: 'Zoom to Fit' }),
+  hotkey('viewer', 'exportImage', ['mod+shift+e'], { scope: selectedImageScope, title: 'Export Image…' }),
   hotkey('gallery', 'selectAllOnPage', ['mod+a']),
   // No default key: Esc in the Gallery is left to Preview interactions, and the Preview label's clear button deselects.
   hotkey('gallery', 'clearSelection', []),

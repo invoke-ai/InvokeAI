@@ -1,3 +1,4 @@
+import type { ImageExportEncoding, ImageExportFormat } from '@features/gallery/core/imageExport';
 import type { GalleryItem, GalleryItemKind, GalleryItemRef, GalleryItemsPage } from '@features/gallery/core/items';
 import type { GalleryMediaUsageReport } from '@features/gallery/core/mediaUsage';
 import type { GallerySemanticQuery, GallerySemanticReference } from '@features/gallery/core/semanticImageQuery';
@@ -41,7 +42,9 @@ import {
 import {
   type GalleryItemLocation,
   type GalleryItemNames,
+  exportGalleryImage,
   fetchImageIndexAvailability,
+  getGalleryImageFileSize,
   getGalleryImageMetadata,
   getGalleryItemLocation,
   getGalleryVideoMetadata,
@@ -53,6 +56,7 @@ import {
   listGalleryItemNames,
   listGalleryItems,
   listSemanticGalleryItemNames,
+  resolveGalleryExportFileNames,
 } from './backend';
 
 export { GALLERY_MAX_INFINITE_PAGES, GALLERY_MAX_ROWS, GALLERY_PAGE_SIZE, GALLERY_STARRED_STRIP_LIMIT };
@@ -286,6 +290,52 @@ const fetchFollowingCancellation = async <TData>(owner: AccountScope, fetch: () 
     }
   }
 };
+
+// Outside the `gallery` key root so invalidations never re-encode; gcTime 0 since each blob can be a full image.
+export const galleryImageExportOptions = (owner: AccountScope, imageName: string, encoding: ImageExportEncoding) =>
+  queryOptions({
+    gcTime: 0,
+    queryFn: async ({ signal }) => {
+      const blob = await exportGalleryImage(imageName, encoding, AbortSignal.any([signal, owner.signal]));
+
+      assertAccountScopeCurrent(owner);
+      return blob;
+    },
+    queryKey: ['galleryImageExport', getAccountKey(owner), imageName, encoding] as const,
+    refetchOnReconnect: false,
+    refetchOnWindowFocus: false,
+    retry: false,
+    staleTime: Number.POSITIVE_INFINITY,
+  });
+
+export const galleryImageExportNamesOptions = (
+  owner: AccountScope,
+  request: { format: ImageExportFormat; imageNames: readonly string[]; pattern: string }
+) =>
+  queryOptions({
+    queryFn: async ({ signal }) => {
+      const names = await resolveGalleryExportFileNames(request, AbortSignal.any([signal, owner.signal]));
+
+      assertAccountScopeCurrent(owner);
+      return names;
+    },
+    queryKey: ['galleryImageExportNames', getAccountKey(owner), request] as const,
+    retry: false,
+    staleTime: 30_000,
+  });
+
+export const galleryImageFileSizeOptions = (owner: AccountScope, imageName: string) =>
+  queryOptions({
+    queryFn: async ({ signal }) => {
+      const size = await getGalleryImageFileSize(imageName, AbortSignal.any([signal, owner.signal]));
+
+      assertAccountScopeCurrent(owner);
+      return size;
+    },
+    queryKey: ['galleryImageFileSize', getAccountKey(owner), imageName] as const,
+    retry: false,
+    staleTime: Number.POSITIVE_INFINITY,
+  });
 
 export const galleryImageMetadataOptions = (owner: AccountScope, imageName: string) =>
   mediaMetadataOptions(owner, galleryKeys.imageMetadata(owner, imageName), (signal) =>

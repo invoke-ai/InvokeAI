@@ -247,6 +247,7 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidg
       generateValues={generateValues}
       getItemActionContext={getItemActionContext}
       projectId={projectId}
+      runtime={runtime}
     >
       <GalleryWidgetContent
         actions={actions}

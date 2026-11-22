@@ -26,6 +26,7 @@ export interface GalleryItemActions {
   ): Promise<void>;
   downloadItem(item: GalleryItem): Promise<void>;
   downloadItems(items: GalleryItemRef[], loadedItems?: GalleryItem[]): Promise<void>;
+  exportItems(items: GalleryItemRef[], loadedItems?: GalleryItem[]): void;
   moveItemsToBoard(items: GalleryItemRef[], boardId: string): Promise<void>;
   openItemInNewTab(item: GalleryItem): void;
   openItemInPreview(item: GalleryItem): void;
@@ -46,6 +47,7 @@ export interface GalleryItemActionsOptions {
   generateValues: Record<string, unknown>;
   getItemActionContext?(): GalleryItemActionContext | null;
   projectId: string;
+  runtime?: GalleryWidgetRuntime;
 }
 
 export interface GalleryItemContextMenuTarget {

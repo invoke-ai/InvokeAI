@@ -1118,6 +1118,59 @@ class TestImageReadAuth:
         r = client.get("/api/v1/images/i/user1-private-img", headers=_auth(user2_token))
         assert r.status_code == status.HTTP_403_FORBIDDEN
 
+    @pytest.mark.parametrize(
+        ("method", "path", "body"),
+        [
+            ("get", "/api/v1/images/i/user1-export/export?format=png", None),
+            (
+                "post",
+                "/api/v1/images/export/names",
+                {"image_names": ["user1-export"], "pattern": "{n}", "format": "png"},
+            ),
+            ("post", "/api/v1/images/download", {"image_names": ["user1-export"], "export": {"format": "jpeg"}}),
+        ],
+    )
+    def test_non_owner_cannot_export_private_image(
+        self,
+        client: TestClient,
+        mock_invoker: Invoker,
+        user1_token: str,
+        user2_token: str,
+        method: str,
+        path: str,
+        body: Any,
+    ):
+        user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+        assert user1 is not None
+        _save_image(mock_invoker, "user1-export", user1.user_id)
+
+        r = client.request(method, path, json=body, headers=_auth(user2_token))
+        assert r.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_export_names_leave_out_a_board_the_caller_can_no_longer_read(
+        self,
+        client: TestClient,
+        mock_invoker: Invoker,
+        mock_sqlite_database: Database,
+        user1_token: str,
+        user2_token: str,
+    ):
+        user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+        assert user1 is not None
+        board_id = _create_board(client, user2_token, "Secret Board")
+        _share_board_with_user(mock_sqlite_database, board_id, user1.user_id, role="contributor")
+        _save_image(mock_invoker, "user1-on-shared", user1.user_id)
+        mock_invoker.services.board_image_records.add_image_to_board(board_id, "user1-on-shared")
+        body = {"image_names": ["user1-on-shared"], "pattern": "{board}-{name}", "format": "png"}
+
+        r = client.post("/api/v1/images/export/names", json=body, headers=_auth(user1_token))
+        assert r.json() == {"file_names": ["Secret Board-user1-on-shared.png"]}
+
+        _unshare_board_with_user(mock_sqlite_database, board_id, user1.user_id)
+        r = client.post("/api/v1/images/export/names", json=body, headers=_auth(user1_token))
+        assert r.status_code == status.HTTP_200_OK
+        assert r.json() == {"file_names": ["user1-on-shared.png"]}
+
     def test_owner_can_read_own_image(self, client: TestClient, mock_invoker: Invoker, user1_token: str):
         user1 = mock_invoker.services.users.get_by_email("user1@test.com")
         assert user1 is not None

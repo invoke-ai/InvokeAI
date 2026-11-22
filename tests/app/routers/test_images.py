@@ -385,6 +385,24 @@ def _save_deletable_image(mock_invoker: Invoker, storage, image_name: str) -> No
     storage.save(image=Image.new("RGB", (64, 64)), image_name=image_name)
 
 
+def test_failed_archive_answers_its_reason_to_the_next_poll_only(
+    monkeypatch: Any, mock_invoker: Invoker, tmp_path: Path, client: TestClient
+) -> None:
+    from invokeai.app.services.images.image_export import BulkImageExportOptions
+
+    storage = prepare_delete_image_test(monkeypatch, mock_invoker, tmp_path)
+    _save_deletable_image(mock_invoker, storage, "bad.png")
+    Path(storage.get_path("bad.png")).write_bytes(b"not an image")
+    export = BulkImageExportOptions(format="webp")
+    mock_invoker.services.bulk_download.handler(["bad.png"], None, "failed-job", export=export)
+
+    response = client.get("/api/v1/images/download/failed-job.zip")
+
+    assert response.status_code == 500
+    assert response.json() == {"detail": "This image's stored file is damaged or is not an image"}
+    assert client.get("/api/v1/images/download/failed-job.zip").status_code == 404
+
+
 def test_delete_image_success_deletes_files_and_record(
     monkeypatch: Any, mock_invoker: Invoker, tmp_path: Path, client: TestClient
 ) -> None:
@@ -853,6 +871,7 @@ def test_every_image_names_body_is_bounded(client: TestClient) -> None:
         "/api/v1/images/copy",
         "/api/v1/images/delete",
         "/api/v1/images/download",
+        "/api/v1/images/export/names",
         "/api/v1/images/images_by_names",
         "/api/v1/images/star",
         "/api/v1/images/unstar",

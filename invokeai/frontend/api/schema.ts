@@ -1643,6 +1643,46 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/images/i/{image_name}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Image
+         * @description Encodes a stored image in another format and size. Never enlarges; only PNG carries Invoke metadata.
+         */
+        get: operations["export_image"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/images/export/names": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Resolve Image Export Names
+         * @description Resolves a file-name pattern for a list of images, exactly as an export archive names them.
+         */
+        post: operations["resolve_image_export_names"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/images/i/{image_name}/thumbnail": {
         parameters: {
             query?: never;
@@ -6955,6 +6995,8 @@ export type components = {
              * @description The board from which image should be downloaded
              */
             board_id?: string | null;
+            /** @description Encode every image with these options and name it by the pattern. Omit for the stored files. */
+            export?: components["schemas"]["BulkImageExportOptions"] | null;
         };
         /** Body_enqueue_batch */
         Body_enqueue_batch: {
@@ -7561,6 +7603,39 @@ export type components = {
              * @default system
              */
             user_id: string;
+        };
+        /** BulkImageExportOptions */
+        BulkImageExportOptions: {
+            /**
+             * Format
+             * @description The format to encode the image in
+             * @enum {string}
+             */
+            format: "png" | "jpeg" | "webp" | "avif";
+            /**
+             * Quality
+             * @description Encoder quality for lossy formats; ignored for PNG
+             * @default 90
+             */
+            quality?: number;
+            /**
+             * Long Edge
+             * @description Caps the longer side in pixels. The image is never enlarged.
+             */
+            long_edge?: number | null;
+            /**
+             * Metadata
+             * @description Which Invoke metadata the exported file keeps; a JPEG keeps only what fits in about 64 kB
+             * @default none
+             * @enum {string}
+             */
+            metadata?: "all" | "parameters" | "none";
+            /**
+             * Name Pattern
+             * @description The file-name pattern for every exported image
+             * @default {name}
+             */
+            name_pattern?: string;
         };
         /**
          * BulkReidentifyModelsRequest
@@ -21849,6 +21924,33 @@ export type components = {
              * @description The id of the board the image belongs to, if one exists.
              */
             board_id?: string | null;
+        };
+        /** ImageExportNamesRequest */
+        ImageExportNamesRequest: {
+            /**
+             * Image Names
+             * @description The images to name, in export order
+             */
+            image_names: string[];
+            /**
+             * Pattern
+             * @description The file-name pattern
+             */
+            pattern: string;
+            /**
+             * Format
+             * @description The export format, which sets the extension
+             * @enum {string}
+             */
+            format: "png" | "jpeg" | "webp" | "avif";
+        };
+        /** ImageExportNamesResult */
+        ImageExportNamesResult: {
+            /**
+             * File Names
+             * @description One file name per requested image, in request order
+             */
+            file_names: string[];
         };
         /**
          * ImageField
@@ -64562,6 +64664,104 @@ export interface operations {
             };
         };
     };
+    export_image: {
+        parameters: {
+            query: {
+                /** @description The format to encode the image in */
+                format: "png" | "jpeg" | "webp" | "avif";
+                /** @description Encoder quality for lossy formats; ignored for PNG */
+                quality?: number;
+                /** @description Caps the longer side in pixels. The image is never enlarged. */
+                long_edge?: number | null;
+                /** @description Which Invoke metadata the exported file keeps; a JPEG keeps only what fits in about 64 kB */
+                metadata?: "all" | "parameters" | "none";
+            };
+            header?: never;
+            path: {
+                /** @description The name of the image to export */
+                image_name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Return the image encoded with the requested export options */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/png": unknown;
+                    "image/jpeg": unknown;
+                    "image/webp": unknown;
+                    "image/avif": unknown;
+                };
+            };
+            /** @description Image not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Image storage maintenance is active */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resolve_image_export_names: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImageExportNamesRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImageExportNamesResult"];
+                };
+            };
+            /** @description Image not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_image_thumbnail: {
         parameters: {
             query?: never;
@@ -64841,7 +65041,7 @@ export interface operations {
                     "application/zip": unknown;
                 };
             };
-            /** @description Image not found */
+            /** @description The archive is not ready, or unknown */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -64856,6 +65056,13 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description The archive job failed; `detail` says why */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
