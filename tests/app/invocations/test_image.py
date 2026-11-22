@@ -54,7 +54,7 @@ def _max_abs_diff_uint8(left: Image.Image, right: Image.Image) -> int:
     return int(numpy.abs(left_arr - right_arr).max())
 
 
-def _invoke_mask_from_alpha(input_image: Image.Image, invert: bool = False) -> list[int]:
+def _invoke_mask_from_alpha(input_image: Image.Image, invert: bool = False, expected_mode: str = "L") -> list[int]:
     context = MagicMock()
     # Like the real context, convert to the requested mode.
     context.images.get_pil.side_effect = lambda image_name, mode=None: (
@@ -67,7 +67,7 @@ def _invoke_mask_from_alpha(input_image: Image.Image, invert: bool = False) -> l
     MaskFromAlphaInvocation(image=ImageField(image_name="in"), invert=invert).invoke(context)
     saved_image = context.images.save.call_args.kwargs["image"]
 
-    assert saved_image.mode == "L"
+    assert saved_image.mode == expected_mode
     return numpy.asarray(saved_image).reshape(-1).tolist()
 
 
@@ -93,6 +93,21 @@ def test_mask_from_alpha_uses_a_grayscale_image_as_the_mask() -> None:
 
     assert _invoke_mask_from_alpha(input_image) == [0, 64, 200]
     assert _invoke_mask_from_alpha(input_image, invert=True) == [255, 191, 55]
+
+
+def test_mask_from_alpha_uses_a_one_bit_image_as_the_mask() -> None:
+    input_image = Image.new("1", (3, 1))
+    input_image.putdata([0, 255, 0])
+
+    assert _invoke_mask_from_alpha(input_image) == [0, 255, 0]
+    assert _invoke_mask_from_alpha(input_image, invert=True) == [255, 0, 255]
+
+
+def test_mask_from_alpha_uses_a_16_bit_grayscale_image_as_the_mask() -> None:
+    input_image = Image.fromarray(numpy.array([[0, 300, 40000]], dtype=numpy.uint16))
+    assert input_image.mode == "I;16"
+
+    assert _invoke_mask_from_alpha(input_image, expected_mode="I;16") == [0, 300, 40000]
 
 
 def test_mask_from_alpha_treats_an_rgb_image_as_opaque() -> None:

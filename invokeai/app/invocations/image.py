@@ -241,8 +241,11 @@ class MaskFromAlphaInvocation(BaseInvocation, WithMetadata, WithBoard):
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.images.get_pil(self.image.image_name)
 
-        if image.mode == "L":
-            # A grayscale image is already a mask, so use it as is.
+        if image.mode == "1":
+            # A one-bit image is already a black and white mask. Use it as an L image so that it inverts correctly.
+            image_mask = image.convert("L")
+        elif image.mode != "P" and len(image.getbands()) == 1:
+            # A grayscale image (L, I, I;16 or F) is already a mask, so use it as is.
             image_mask = image
         else:
             # Converting gives an image without an alpha channel a fully opaque one. Its last band is a color or
