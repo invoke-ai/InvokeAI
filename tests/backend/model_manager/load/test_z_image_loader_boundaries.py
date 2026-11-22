@@ -6,6 +6,7 @@ loads cleanly and generates noise. These drive `_load_from_singlefile` itself an
 reaches the module.
 """
 
+import dataclasses
 import json
 
 import diffusers
@@ -19,7 +20,7 @@ from invokeai.backend.model_manager.load.model_loaders import z_image
 from invokeai.backend.model_manager.load.model_loaders.z_image import ZImageCheckpointModel
 from invokeai.backend.quantization.int8_convrot import CONVROT_GROUP_SIZE, Int8ConvrotLinear
 from invokeai.backend.quantization.nvfp4 import NVFP4Linear
-from tests.fixtures.loader_seams import Seam, prepare
+from tests.fixtures.loader_seams import Seam, assert_fp8_storage_declined, logged_info, prepare
 from tests.fixtures.quantized_payloads import (
     comfy_quant_marker,
     nvfp4_codes,
@@ -53,7 +54,11 @@ SEAM = Seam(
 )
 
 
-def _driver(monkeypatch, tmp_path, state_dict: dict, model_class=None):
+#: The real storage cast: `SEAM` stubs it out, for the tests that are about what reaches the module.
+STORAGE_SEAM = dataclasses.replace(SEAM, casts_fp8_storage=False)
+
+
+def _driver(monkeypatch, tmp_path, state_dict: dict, model_class=None, seam: Seam = SEAM):
     checkpoint = tmp_path / "z_image_int8_convrot.safetensors"
     checkpoint.touch()
     config = Main_Checkpoint_ZImage_Config.model_construct(path=str(checkpoint), name="z-image")
@@ -61,7 +66,7 @@ def _driver(monkeypatch, tmp_path, state_dict: dict, model_class=None):
     def geometry(patch):
         patch.setattr(diffusers, "ZImageTransformer2DModel", model_class or _TinyZImage, raising=False)
 
-    return prepare(SEAM, monkeypatch, state_dict=state_dict, geometry=geometry), config
+    return prepare(seam, monkeypatch, state_dict=state_dict, geometry=geometry), config
 
 
 class _TinyMixedZImage(torch.nn.Module):
@@ -282,13 +287,23 @@ def _nvfp4_layer(
     return nvfp4_tensors(path, nvfp4_codes(positive), block_scale=grid, global_scale=global_scale)
 
 
-def test_an_nvfp4_checkpoint_loads_packed_with_its_qkv_split_on_tile_rows(monkeypatch, tmp_path) -> None:
-    """Comfy's nvfp4 Z-Image build quantizes the fused `attention.qkv` and names its layers only in the
-    safetensors header. The packed tensors have to leave the state dict before the key conversion and the
-    scaled-fp8 extraction -- which drops block scales whose weight is not float8 -- follow the QKV split on
-    whole tile rows, and come back as `NVFP4Linear` modules for the strict load. The timestep embedder is
-    decoded to the compute dtype instead, since its forward picks its activation dtype off its weight, and a
-    bundled encoder's layers are dropped with everything else the transformer does not hold."""
+def _bf16_nvfp4_header(monkeypatch, header: dict) -> None:
+    """The header naming the nvfp4 layers, and bf16 rather than the driver's float32, so a layer decoded or charged at
+    any other width shows."""
+    monkeypatch.setattr(
+        "invokeai.backend.model_manager.load.model_loaders.z_image.read_safetensors_metadata",
+        lambda _path, _logger: {"_quantization_metadata": json.dumps({"layers": header})},
+    )
+    monkeypatch.setattr(
+        "invokeai.backend.model_manager.load.model_loaders.z_image.TorchDevice.choose_bfloat16_safe_dtype",
+        lambda _device: torch.bfloat16,
+    )
+
+
+def _nvfp4_checkpoint() -> tuple[dict[str, torch.Tensor], dict, tuple[torch.Tensor, ...], torch.Tensor, torch.Tensor]:
+    """Comfy's native nvfp4 layout with the header naming its layers: the state dict, the header, the sign grids of the
+    four quantized layers (qkv, modulation, timestep embedder, a bundled encoder's), the modulation bias, and the
+    dense embedder."""
     torch.manual_seed(4)
     qkv, modulation, timestep, bundled = (
         torch.randint(0, 2, (rows, 64), dtype=torch.bool) for rows in (384, 128, 128, 128)
@@ -313,16 +328,19 @@ def test_an_nvfp4_checkpoint_loads_packed_with_its_qkv_split_on_tile_rows(monkey
             "text_encoders.qwen3.layers.0.mlp.up_proj",
         )
     }
+    return state_dict, header, (qkv, modulation, timestep, bundled), modulation_bias, embedder
+
+
+def test_an_nvfp4_checkpoint_loads_packed_with_its_qkv_split_on_tile_rows(monkeypatch, tmp_path) -> None:
+    """Comfy's nvfp4 Z-Image build quantizes the fused `attention.qkv` and names its layers only in the
+    safetensors header. The packed tensors have to leave the state dict before the key conversion and the
+    scaled-fp8 extraction -- which drops block scales whose weight is not float8 -- follow the QKV split on
+    whole tile rows, and come back as `NVFP4Linear` modules for the strict load. The timestep embedder is
+    decoded to the compute dtype instead, since its forward picks its activation dtype off its weight, and a
+    bundled encoder's layers are dropped with everything else the transformer does not hold."""
+    state_dict, header, (qkv, modulation, timestep, _bundled), modulation_bias, embedder = _nvfp4_checkpoint()
     run, config = _driver(monkeypatch, tmp_path, state_dict, model_class=_TinyNativeZImage)
-    monkeypatch.setattr(
-        "invokeai.backend.model_manager.load.model_loaders.z_image.read_safetensors_metadata",
-        lambda _path, _logger: {"_quantization_metadata": json.dumps({"layers": header})},
-    )
-    # bf16 rather than the driver's float32, so a layer decoded or charged at any other width shows.
-    monkeypatch.setattr(
-        "invokeai.backend.model_manager.load.model_loaders.z_image.TorchDevice.choose_bfloat16_safe_dtype",
-        lambda _device: torch.bfloat16,
-    )
+    _bf16_nvfp4_header(monkeypatch, header)
 
     model = run.load(config)
 
@@ -434,3 +452,89 @@ def test_an_nvfp4_layer_missing_its_global_scale_is_refused_before_the_cache_is_
         run.load(config)
 
     assert run.reserved == []
+
+
+class _TinyZImageWithCastableLayer(_TinyZImageWithTimestepEmbedder):
+    """Adds a dense layer no skip pattern protects, which is the one a storage cast would reach."""
+
+    def __init__(self, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self.all_x_embedder = torch.nn.ModuleDict({"2-1": torch.nn.Linear(8, 4)})
+
+
+def _storage_config(config: Main_Checkpoint_ZImage_Config, fp8_storage: bool) -> Main_Checkpoint_ZImage_Config:
+    return Main_Checkpoint_ZImage_Config.model_construct(
+        path=config.path, name="z-image", default_settings=MainModelDefaultSettings(fp8_storage=fp8_storage)
+    )
+
+
+def _load_with_storage(monkeypatch, tmp_path, build) -> dict:
+    """The loads of one build with FP8 Storage off and on: `{fp8_storage: (model, run)}`. `build` returns the state
+    dict, the model class and an optional header naming nvfp4 layers."""
+    monkeypatch.setattr(load_default, "_device_supports_fp8_storage", lambda _device, _logger=None: True)
+    loads = {}
+    for fp8_storage in (False, True):
+        state_dict, model_class, header = build()
+        run, config = _driver(monkeypatch, tmp_path, state_dict, model_class=model_class, seam=STORAGE_SEAM)
+        if header is not None:
+            _bf16_nvfp4_header(monkeypatch, header)
+        loads[fp8_storage] = (run.load(_storage_config(config, fp8_storage)), run)
+    return loads
+
+
+def test_fp8_storage_leaves_an_int8_build_as_loaded(monkeypatch, tmp_path) -> None:
+    """The dense layers keep the precision the build chose -- the decoded timestep embedder, and a layer that no skip
+    pattern protects, which a cast that only logged would still convert: no float8 tensor, and every tensor equal to
+    the load without FP8 Storage."""
+
+    def build():
+        torch.manual_seed(3)
+        sensitive, ordinary = (quantize_convrot(torch.randn(4, CONVROT_GROUP_SIZE)) for _ in range(2))
+        state_dict = {
+            "t_embedder.mlp.0.weight": sensitive.codes,
+            "t_embedder.mlp.0.weight_scale": sensitive.scale,
+            "t_embedder.mlp.0.comfy_quant": comfy_quant_marker(MARKER),
+            "layers.0.proj.weight": ordinary.codes,
+            "layers.0.proj.weight_scale": ordinary.scale,
+            "layers.0.proj.comfy_quant": comfy_quant_marker(MARKER),
+            "x_embedder.weight": torch.randn(4, 8),
+            "x_embedder.bias": torch.randn(4),
+        }
+        return state_dict, _TinyZImageWithCastableLayer, None
+
+    loads = _load_with_storage(monkeypatch, tmp_path, build)
+
+    model, run = loads[True]
+    assert any(isinstance(module, Int8ConvrotLinear) for module in model.modules())
+    assert_fp8_storage_declined(model, loads[False][0], logged_info(run.loader._logger), "z-image")
+
+
+def test_fp8_storage_casts_the_dense_layers_of_an_nvfp4_build_and_leaves_its_nvfp4_buffers(
+    monkeypatch, tmp_path
+) -> None:
+    """Turned on, FP8 Storage stores the dense layers in fp8. The nvfp4 layers are buffers, so they stay as stored."""
+
+    def build():
+        state_dict, header, *_ = _nvfp4_checkpoint()
+        return state_dict, _TinyNativeZImage, header
+
+    loads = _load_with_storage(monkeypatch, tmp_path, build)
+
+    (plain, _), (stored, run) = loads[False], loads[True]
+    packed = [name for name, module in stored.named_modules() if isinstance(module, NVFP4Linear)]
+    assert packed
+    for name in packed:
+        for key, buffer in stored.get_submodule(name).state_dict().items():
+            reference = plain.get_submodule(name).state_dict()[key]
+            assert buffer.dtype is reference.dtype, (name, key)
+            assert torch.equal(buffer.float(), reference.float()), (name, key)
+    dense = [
+        name
+        for name, module in stored.named_modules()
+        if isinstance(module, torch.nn.Linear) and not isinstance(module, NVFP4Linear)
+    ]
+    assert dense
+    assert any(stored.get_submodule(name).weight.dtype is torch.float8_e4m3fn for name in dense)
+    lines = logged_info(run.loader._logger)
+    assert any(line.startswith("FP8 layerwise casting enabled for z-image") for line in lines)
+    assert not any("FP8 Storage skipped" in line for line in lines)

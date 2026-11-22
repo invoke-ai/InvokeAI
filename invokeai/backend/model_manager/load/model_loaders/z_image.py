@@ -726,10 +726,10 @@ class ZImageCheckpointModel(ModelLoader):
 
         # FP8 *storage* on top. When nothing was kept quantized above, every param is uniform
         # `model_dtype` here, so the layerwise cast has one unambiguous compute dtype to restore to.
-        # When weights *were* kept fp8, `_apply_fp8_layerwise_casting` bails out on its own (and
-        # says so in the log): its hooks would restore the compute dtype before every forward, which
-        # disables the fp8 matmul where there is one and drops the `weight_scale` where there is
-        # not -- and saves no VRAM either way.
+        # When weights *were* kept fp8, or an int8 layer was kept, `_apply_fp8_layerwise_casting` bails out on its
+        # own (and says so in the log). For fp8 its hooks would restore the compute dtype before every forward,
+        # which disables the fp8 matmul where there is one and drops the `weight_scale` where there is not -- and
+        # saves no VRAM either way. An nvfp4 build is cast: its dense layers go to fp8, its nvfp4 buffers stay.
         model = self._apply_fp8_layerwise_casting(model, config, SubModelType.Transformer)
         return model
 

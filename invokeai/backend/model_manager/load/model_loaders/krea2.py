@@ -515,7 +515,8 @@ class Krea2CheckpointModel(ModelLoader):
     ``.weight_scale``) and ComfyUI 'int8_tensorwise' checkpoints (int8 weight + per-output-channel
     ``.weight_scale`` + a ``.comfy_quant`` marker, optionally convrot-rotated), in both the diffusers
     and native/ComfyUI key naming. Apply the fp8-storage setting to keep the (large) transformer
-    fp8-resident; otherwise it loads in full precision.
+    fp8-resident (not for an int8 or int4 build, which keeps every layer as shipped); otherwise it loads in
+    full precision.
 
     The int8 build stays int8-resident: `swap_in_int8_linears` installs `Int8ConvrotLinear`, which
     holds the stored codes and dequantizes per forward, so a 12.0 GiB checkpoint stays 12.0 GiB.

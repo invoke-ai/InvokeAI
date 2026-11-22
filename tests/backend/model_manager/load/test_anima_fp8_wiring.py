@@ -21,12 +21,16 @@ import torch
 from invokeai.backend.anima.anima_transformer import AnimaTransformer
 from invokeai.backend.anima.checkpoint_layout import ANIMA_TRANSFORMER_CONFIG
 from invokeai.backend.model_manager.configs.main import Main_Checkpoint_Anima_Config, MainModelDefaultSettings
+from invokeai.backend.model_manager.load import load_default
 from invokeai.backend.model_manager.load.load_default import (
     _FP8_DEFAULT_SKIP_PATTERNS,
     _FP8_SUPPORTED_PYTORCH_LAYERS,
 )
 from invokeai.backend.model_manager.load.model_loaders.anima import AnimaCheckpointModel
 from invokeai.backend.model_manager.taxonomy import SubModelType
+from invokeai.backend.quantization.int8_convrot import CONVROT_GROUP_SIZE, Int8ConvrotLinear
+from tests.fixtures.loader_seams import assert_fp8_storage_declined, logged_info
+from tests.fixtures.quantized_payloads import comfy_quant_marker, quantize_convrot
 from tests.fixtures.safetensors_files import record_reads, served_checkpoint
 
 # Every cast-eligible module in the real Anima graph that the declared patterns protect. Pinned
@@ -155,6 +159,68 @@ def test_single_file_loader_applies_fp8_layerwise_casting(monkeypatch, tmp_path)
     assert isinstance(model, _TinyAnimaTransformer)
     assert torch.equal(model.weight, torch.ones(2, 2))
     assert cast_calls == [(config, SubModelType.Transformer)]
+
+
+class _TinyInt8AnimaTransformer(torch.nn.Module):
+    """One layer an int8 build quantizes beside one it leaves dense, under the names its markers use."""
+
+    def __init__(self, **_kwargs) -> None:
+        super().__init__()
+        self.proj = torch.nn.Linear(CONVROT_GROUP_SIZE, 4, bias=False)
+        self.embed = torch.nn.Linear(8, 4)
+
+
+def test_fp8_storage_leaves_an_int8_build_as_loaded(monkeypatch, tmp_path) -> None:
+    """The int8 layer stays int8 and the dense one keeps the compute dtype: the build is the same tensor for tensor
+    as the load without FP8 Storage."""
+    import invokeai.backend.anima.anima_transformer as anima_transformer_module
+
+    quantized = quantize_convrot(torch.randn(4, CONVROT_GROUP_SIZE))
+    dense = {"embed.weight": torch.randn(4, 8), "embed.bias": torch.randn(4)}
+    state_dict = {
+        "proj.weight": quantized.codes,
+        "proj.weight_scale": quantized.scale,
+        "proj.comfy_quant": comfy_quant_marker(
+            {"format": "int8_tensorwise", "convrot": True, "convrot_groupsize": CONVROT_GROUP_SIZE}
+        ),
+        **dense,
+    }
+    checkpoint_path = tmp_path / "anima_int8.safetensors"
+    safetensors.torch.save_file(state_dict, str(checkpoint_path))
+    monkeypatch.setattr(anima_transformer_module, "AnimaTransformer", _TinyInt8AnimaTransformer)
+    monkeypatch.setattr(
+        "invokeai.backend.model_manager.load.model_loaders.anima.anima_transformer_config", lambda _sd: {}
+    )
+    monkeypatch.setattr(
+        "invokeai.backend.model_manager.load.model_loaders.anima.TorchDevice.choose_torch_device",
+        lambda: torch.device("cpu"),
+    )
+    monkeypatch.setattr(
+        "invokeai.backend.model_manager.load.model_loaders.anima.TorchDevice.choose_anima_inference_dtype",
+        lambda _device: torch.bfloat16,
+    )
+    monkeypatch.setattr(load_default, "_device_supports_fp8_storage", lambda *_args: True)
+
+    def load(fp8_storage: bool):
+        config = Main_Checkpoint_Anima_Config.model_construct(
+            path=str(checkpoint_path),
+            name="anima_int8",
+            default_settings=MainModelDefaultSettings(fp8_storage=fp8_storage),
+        )
+        loader = object.__new__(AnimaCheckpointModel)
+        loader._ram_cache = SimpleNamespace(make_room=MagicMock())
+        loader._torch_device = torch.device("cpu")
+        loader._torch_dtype = torch.bfloat16
+        loader._logger = MagicMock()
+        return loader._load_from_singlefile(config), loader
+
+    plain, _ = load(False)
+    model, loader = load(True)
+
+    assert isinstance(model.proj, Int8ConvrotLinear)
+    assert model.proj.weight.dtype is torch.int8
+    assert model.embed.weight.dtype is torch.bfloat16
+    assert_fp8_storage_declined(model, plain, logged_info(loader._logger), "anima_int8")
 
 
 def test_an_all_in_ones_vae_text_encoder_and_exporter_metadata_are_never_read(monkeypatch, tmp_path) -> None:
