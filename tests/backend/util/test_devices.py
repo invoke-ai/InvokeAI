@@ -816,6 +816,41 @@ def test_empty_cache_skips_while_peer_device_busy(monkeypatch):
         GENERATION_DEVICE_POOL.reset()
 
 
+@pytest.mark.parametrize(
+    ("session_device", "lent_off_queue", "expected"),
+    [("cuda:0", False, True), ("cuda:0", True, False), ("cuda:1", False, False), (None, False, False)],
+    ids=["session-on-the-device", "off-queue-borrow-of-the-device", "session-elsewhere", "no-session"],
+)
+def test_only_a_session_on_the_device_runs_a_session_there(monkeypatch, session_device, lent_off_queue, expected):
+    """A thread defers `empty_cache` for every busy device but its own session device, so a forced call from a session
+    on `cuda:0` stalls only its peers. A thread pinned elsewhere, or not at all, may be deferring for `cuda:0`, and an
+    off-queue borrow of `cuda:0` (image embedding, Expand Prompt) is background work."""
+    from invokeai.backend.util.device_pool import GENERATION_DEVICE_POOL
+
+    monkeypatch.setattr(GENERATION_DEVICE_POOL, "_lent_off_queue", {"cuda:0"} if lent_off_queue else set())
+    try:
+        if session_device is not None:
+            TorchDevice.set_session_device(session_device)
+        assert TorchDevice.runs_session_on(torch.device("cuda:0")) is expected
+    finally:
+        TorchDevice.clear_session_device()
+
+
+@pytest.mark.parametrize("pending", [True, False], ids=["pending-before", "nothing-pending"])
+def test_a_forced_release_that_fails_leaves_the_pending_request_as_it_was(refusing_backend, pending):
+    """The forced call cleared the deferred request before it ran; when it raises, a step-boundary flush must still
+    run a request that was pending, and must not start one that was not. An ordinary call that fails was that run:
+    re-arming it would repeat the refusal at every step."""
+    if pending:
+        TorchDevice._empty_cache_deferred.set()
+    with pytest.raises(torch.OutOfMemoryError):
+        TorchDevice.empty_cache(force=True)
+    assert TorchDevice.release_deferred() is pending
+
+    assert TorchDevice.empty_cache() is EmptyCacheOutcome.REFUSED
+    assert not TorchDevice.release_deferred()
+
+
 def test_install_peer_aware_empty_cache_wraps_torch_entry_point(monkeypatch):
     """Third-party callers (diffusers' internal empty_device_cache) invoke
     torch.cuda.empty_cache directly; the installed wrapper must apply the same

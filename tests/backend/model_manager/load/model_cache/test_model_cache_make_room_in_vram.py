@@ -308,16 +308,48 @@ class _SteppedOffload:
 def test_an_offload_that_returns_less_than_believed_continues_with_the_same_model(gpu_accounting_cache: ModelCache):
     """A partial unload frees believed sizes, and the driver gets back less (granularity, late unmapping). The last,
     largest model must not end the loop with the shortfall unmet while it still has weights on the device. A follow-up
-    asks for double the remaining shortfall, so a model that keeps returning little takes logarithmically many steps."""
+    asks for double the multiple of the remaining shortfall the previous one did, and at least 64 MB, so a model that
+    keeps returning little takes logarithmically many steps."""
     cache = gpu_accounting_cache
     _put(cache, "big", 100 * MB)
-    offload = _SteppedOffload([(64 * MB, 50 * MB), (16 * MB, 8 * MB), (16 * MB, 16 * MB)], on_device=100 * MB)
+    offload = _SteppedOffload([(40 * MB, 30 * MB), (40 * MB, 30 * MB), (20 * MB, 20 * MB)], on_device=100 * MB)
 
-    available = offload.make_room(cache, 60 * MB)
+    available = offload.make_room(cache, 80 * MB)
 
-    # 64 MB moved for the 60 MB asked and 50 MB came back; 10 MB missing -> ask 20, 8 MB came back; 2 MB missing -> 8.
-    assert offload.asked == [60 * MB, 20 * MB, 8 * MB]
-    assert available == 74 * MB
+    # 30 MB came back for the 80 MB asked; 50 MB missing -> ask twice that, 100; 30 MB more came back; 20 MB missing ->
+    # four times that, 80.
+    assert offload.asked == [80 * MB, 100 * MB, 80 * MB]
+    assert available == 80 * MB
+
+
+class _ChunkedOffload(_SteppedOffload):
+    """A model whose offload frees what is asked, and whose memory the driver gets back in whole `chunk`s only."""
+
+    def __init__(self, chunk: int, on_device: int):
+        super().__init__([], on_device)
+        self.chunk = chunk
+        self.freed = 0
+
+    def move_model_to_ram(self, cache_entry, vram_bytes_to_free, keep_required_weights_in_vram=None):
+        self.asked.append(vram_bytes_to_free)
+        believed = min(vram_bytes_to_free, self.on_device)
+        self.on_device -= believed
+        self.freed += believed
+        self.available = self.freed // self.chunk * self.chunk
+        return believed
+
+
+def test_a_sliver_left_by_a_partial_offload_takes_one_follow_up(gpu_accounting_cache: ModelCache):
+    """2 MB short after the first step, with the driver getting memory back in 32 MB chunks: asking for twice the
+    sliver, then twice that, would take four more steps (4, 8, 16, 32 MB) to reach the next chunk."""
+    cache = gpu_accounting_cache
+    _put(cache, "big", 100 * MB)
+    offload = _ChunkedOffload(32 * MB, on_device=100 * MB)
+
+    available = offload.make_room(cache, 66 * MB)
+
+    assert offload.asked == [66 * MB, 64 * MB]
+    assert available == 96 * MB
 
 
 @pytest.mark.parametrize(

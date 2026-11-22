@@ -11,6 +11,7 @@ from invokeai.backend.model_manager.load.model_cache.cached_model.cached_model_o
 from invokeai.backend.model_manager.load.model_cache.cached_model.cached_model_with_partial_load import (
     CachedModelWithPartialLoad,
 )
+from invokeai.backend.model_manager.load.model_cache.model_cache import OffloadLedger
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch_module_autocast import (
     apply_custom_layers_to_model,
 )
@@ -31,8 +32,14 @@ class FakeCache:
         self.unlock_calls = 0
         self.reserved: list[int | None] = []
 
-    def lock(self, cache_record: CacheRecord, working_mem_bytes: int | None, max_move_bytes: int | None = None) -> bool:
-        del cache_record, max_move_bytes
+    def lock(
+        self,
+        cache_record: CacheRecord,
+        working_mem_bytes: int | None,
+        max_move_bytes: int | None = None,
+        offload_ledger: OffloadLedger | None = None,
+    ) -> bool:
+        del cache_record, max_move_bytes, offload_ledger
         self.lock_calls += 1
         self.reserved.append(working_mem_bytes)
         return True

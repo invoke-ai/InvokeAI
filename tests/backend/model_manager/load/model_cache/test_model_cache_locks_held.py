@@ -91,7 +91,9 @@ def _failing_vram_load(cache: ModelCache, monkeypatch: pytest.MonkeyPatch, settl
     monkeypatch.setattr(vae.cached_model, "_compute_device", torch.device("cuda:0"))
     passes = iter([False] if settles_first else [])
 
-    def load_locked_model(cache_entry, working_mem_bytes=None, max_move_bytes=None, stream_started_at=None) -> bool:
+    def load_locked_model(
+        cache_entry, working_mem_bytes=None, max_move_bytes=None, stream_started_at=None, offload_ledger=None
+    ) -> bool:
         for settled in passes:
             return settled
         raise torch.OutOfMemoryError("no room")

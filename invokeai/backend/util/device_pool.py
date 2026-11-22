@@ -179,6 +179,15 @@ class _GenerationDevicePool:
         with self._registry_lock:
             return str(TorchDevice.normalize(device)) in self._lent
 
+    def is_lent_off_queue(self, device: torch.device) -> bool:
+        """True while ``device`` is lent to work outside the session queue (:meth:`try_borrow_off_queue`).
+
+        Such work holds the GPU as a session does, but it is background work: it must not stall a session on another
+        GPU (``TorchDevice.runs_session_on``).
+        """
+        with self._registry_lock:
+            return str(TorchDevice.normalize(device)) in self._lent_off_queue
+
     def release_borrow(self, device: torch.device) -> None:
         """Release a device taken by :meth:`try_borrow` or :meth:`try_borrow_off_queue`."""
         key = str(TorchDevice.normalize(device))

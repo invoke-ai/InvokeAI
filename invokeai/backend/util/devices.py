@@ -459,8 +459,10 @@ class TorchDevice:
         its current step: a model about to run without the driver-free working memory it needs, which on Windows
         hangs instead of failing (see `ModelCache._release_allocator_blocks_for_reserve`), and the opt-in
         `clear_vram_after_session` release, whose next session would otherwise budget its first load against memory
-        the allocator still holds, and (under cudaMallocAsync) the model cache's offload, which would otherwise
-        leave the freed weights in the pool for the load that follows to find no room in.
+        the allocator still holds, and (under cudaMallocAsync) the model cache's offload, once per lock or
+        `make_room_in_vram` call and only from a thread that runs a session on the cache's device
+        (`runs_session_on`), which would otherwise leave the freed weights in the pool for the load that follows to
+        find no room in.
 
         ``torch.cuda.empty_cache()`` is process-global: it takes EVERY device's
         caching-allocator mutex and cudaFree/hipFrees their cached blocks, and a free on a
@@ -494,7 +496,11 @@ class TorchDevice:
         complete. A context that stays broken fails the next real operation on its own. A `force` call raises the
         error instead, because its caller cannot proceed as if the release ran: a short working-memory reserve on
         Windows hangs instead of failing (`ModelCache._release_allocator_blocks_for_reserve`), and the working-memory
-        probe would record a measurement window whose baseline still counts the blocks.
+        probe would record a measurement window whose baseline still counts the blocks. (The model cache's trim past a
+        busy peer after an offload catches it, since the load after it measures the device for itself; its reserve
+        release on Windows does not.) A failed forced call leaves a release that was pending before it pending, so
+        the next flush still runs it; an ordinary call that fails was that run, and retrying a refusing context at
+        every step boundary would only repeat its warning.
         """
         if not force and cls._another_generation_device_busy():
             cls._empty_cache_deferred.set()
@@ -504,6 +510,7 @@ class TorchDevice:
             return EmptyCacheOutcome.DEFERRED
         # Clear before running: a skip that races in after this point re-sets the flag, so a
         # request is never lost, only (harmlessly) repeated.
+        was_pending = cls._empty_cache_deferred.is_set()
         cls._empty_cache_deferred.clear()
         observers = tuple(EMPTY_CACHE_OBSERVERS) if EMPTY_CACHE_OBSERVERS else ()
         for observer in observers:
@@ -521,6 +528,8 @@ class TorchDevice:
             released = True
         except RuntimeError as e:
             if force:
+                if was_pending:
+                    cls._empty_cache_deferred.set()
                 raise
             reason = str(e)
             InvokeAILogger.get_logger(cls.__name__).warning(
@@ -550,6 +559,34 @@ class TorchDevice:
         if not cls._empty_cache_deferred.is_set():
             return
         cls.empty_cache()
+
+    @classmethod
+    def release_deferred(cls) -> bool:
+        """Whether a release a peer-aware skip deferred is still pending: no release has run since it was skipped.
+
+        An ordinary release the backend refused counts as having run (it clears the request; see `empty_cache`).
+        """
+        return cls._empty_cache_deferred.is_set()
+
+    @classmethod
+    def runs_session_on(cls, device: torch.device) -> bool:
+        """Whether the calling thread runs a generation session on `device`: its queue session, or a session's borrow
+        of an idle GPU for an encoder.
+
+        Such a thread may force a release past a busy peer (`empty_cache(force=True)`): the deferral
+        (`_another_generation_device_busy`) leaves out its session device, so the devices it waited for are peers of
+        `device`, whose sessions the stall costs a step. Any other thread may not. One with no session device (an API
+        request, or on a single-GPU install the image embedding and Expand Prompt, which cannot borrow there) defers
+        for every busy device, `device` included, which may be the one GPU with the session running on it. Work
+        outside the session queue that borrowed `device` (`idle_device_borrowed` without `exclude`) is background
+        work, which must not stall a session on another GPU.
+        """
+        from invokeai.backend.util.device_pool import GENERATION_DEVICE_POOL
+
+        session_device = cls.get_session_device()
+        if session_device is None or session_device != cls.normalize(device):
+            return False
+        return not GENERATION_DEVICE_POOL.is_lent_off_queue(session_device)
 
     @classmethod
     def _another_generation_device_busy(cls) -> bool:
