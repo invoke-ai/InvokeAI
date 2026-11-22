@@ -430,6 +430,8 @@ const CANVAS_LAYER_SHARED_MODULES = [
   '/workbench/widgets/layers/colorLabels.ts',
   '/workbench/widgets/layers/layerCommands.ts',
   '/workbench/widgets/layers/layerActionSession.ts',
+  '/workbench/widgets/layers/layerChildRows.ts',
+  '/workbench/widgets/layers/layerChildSelection.ts',
   '/workbench/widgets/layers/layerContextActions.ts',
   '/workbench/widgets/layers/layerContextMenuLayout.ts',
   '/workbench/widgets/layers/layerExportActions.ts',
