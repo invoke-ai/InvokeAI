@@ -6805,6 +6805,8 @@
       "firstFrame": "First Frame",
       "firstFrameBlocked": "Clear the initial video to start from a frame instead.",
       "firstFrameHelp": "The video starts on this image.",
+      "frameWithReferencesHelp": "Used together with References; frames alone are not generated on this model. Not combined with an initial video.",
+      "lastFrameWithReferencesBlocked": "Clear the initial video to end on a frame beside the references.",
       "frameClearsConditioningClip": "Setting a frame removes the conditioning clip, whose picture supplies every frame. Use its soundtrack instead to keep both.",
       "fpsExtendLocked": "The extension inherits the source clip's frame rate.",
       "initialFrames": "Start & end images",

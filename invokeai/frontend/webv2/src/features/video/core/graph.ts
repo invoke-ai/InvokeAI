@@ -74,6 +74,9 @@ const MINIMAX_H3_GENERATION_MODES: Partial<Record<VideoGenerationMode, string>> 
   txt2vid: 'minimax_h3_t2v',
 };
 
+/** References plus first/last frames share the `reference` mode and record their own generation mode. */
+const MINIMAX_H3_REFERENCE_FRAMES_GENERATION_MODE = 'minimax_h3_ref2v_frames';
+
 /** Feed identical ordered references to conditioning and prompt nodes; chained collectors keep the rotary order. */
 const addReferenceNodes = (
   graph: BackendGraphContract,
@@ -530,7 +533,8 @@ const buildMiniMaxH3VideoGraph = (settings: VideoSettings, catalogModel: MainMod
     addEdge(graph, referenceConditioning, 'reference_conditioning', denoise, 'reference_conditioning');
   }
 
-  const needsFrameConditioning = mode !== 'txt2vid' && mode !== 'reference';
+  const hasKeyframes = Boolean(settings.firstFrameImage || settings.lastFrameImage);
+  const needsFrameConditioning = mode === 'reference' ? hasKeyframes : mode !== 'txt2vid';
   let frameConditioning: BackendInvocationContract | null = null;
 
   if (needsFrameConditioning) {
@@ -609,7 +613,10 @@ const buildMiniMaxH3VideoGraph = (settings: VideoSettings, catalogModel: MainMod
           }
         : {}),
     },
-    generationMode: MINIMAX_H3_GENERATION_MODES[mode] ?? 'minimax_h3_t2v',
+    generationMode:
+      mode === 'reference' && hasKeyframes
+        ? MINIMAX_H3_REFERENCE_FRAMES_GENERATION_MODE
+        : (MINIMAX_H3_GENERATION_MODES[mode] ?? 'minimax_h3_t2v'),
     graph,
     height: dimensions.height,
     model,

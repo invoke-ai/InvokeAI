@@ -250,6 +250,8 @@ class MiniMaxH3DenoiseInvocation(BaseInvocation, WithMetadata):
         latent_width: int,
         num_audio_latents: int,
         device: torch.device,
+        keyframe_anchors: tuple[str, ...] = (),
+        clean_condition_rows: torch.Tensor | None = None,
     ):
         """Load the encoded references and build the Ref2VA denoise state.
 
@@ -319,6 +321,8 @@ class MiniMaxH3DenoiseInvocation(BaseInvocation, WithMetadata):
             num_inference_steps=self.steps,
             seed=self.seed,
             device=device,
+            keyframe_anchors=keyframe_anchors,
+            clean_condition_rows=clean_condition_rows,
         )
 
     def _build_metadata(self) -> MetadataField:
@@ -329,7 +333,11 @@ class MiniMaxH3DenoiseInvocation(BaseInvocation, WithMetadata):
         elif existing_mode == "minimax_h3_extend_video":
             gen_mode = "minimax_h3_extend_video"
         elif getattr(self, "reference_conditioning", None) is not None:
-            gen_mode = "minimax_h3_ref2v"
+            gen_mode = (
+                "minimax_h3_ref2v_frames"
+                if getattr(self, "frame_conditioning", None) is not None
+                else "minimax_h3_ref2v"
+            )
         elif getattr(self, "frame_conditioning", None) is not None:
             anchors = set(getattr(self.frame_conditioning, "keyframe_anchors", []) or [])
             if "first" in anchors and "last" in anchors:
@@ -382,11 +390,6 @@ class MiniMaxH3DenoiseInvocation(BaseInvocation, WithMetadata):
         num_latent_frames = video_latent_num_frames(num_frames)
         num_audio_latents = audio_latent_num_frames(num_frames)
 
-        if self.frame_conditioning is not None and self.reference_conditioning is not None:
-            raise ValueError(
-                "Frame Conditioning (first/last keyframes, FL2VA) and Reference Conditioning (Ref2VA) are "
-                "mutually exclusive - wire one or the other."
-            )
         transformer_variant = self.transformer.variant
         if self.reference_conditioning is not None and transformer_variant == "fl2va":
             raise ValueError(
@@ -437,6 +440,8 @@ class MiniMaxH3DenoiseInvocation(BaseInvocation, WithMetadata):
                 latent_width,
                 num_audio_latents,
                 device,
+                keyframe_anchors,
+                clean_condition_rows,
             )
         else:
             if cond_info.reference_signature:

@@ -10,11 +10,13 @@ from unittest.mock import MagicMock, patch
 import numpy as np
 import pytest
 import torch
+from PIL import Image
 
 from invokeai.app.invocations.fields import (
     ImageField,
     MiniMaxH3ConditioningField,
     MiniMaxH3EncodedReferenceField,
+    MiniMaxH3FrameConditioningField,
     MiniMaxH3ReferenceConditioningField,
     MiniMaxH3ReferenceMediaField,
     VideoField,
@@ -160,6 +162,14 @@ def _denoise(reference_conditioning=None, variant="ref2va", num_frames="124") ->
     )
 
 
+def _denoise_with_frames(reference_conditioning=None, variant="ref2va") -> MiniMaxH3DenoiseInvocation:
+    node = _denoise(reference_conditioning, variant=variant)
+    node.frame_conditioning = MiniMaxH3FrameConditioningField(
+        condition_rows_name="rows", keyframe_anchors=["first", "last"], width=1344, height=768
+    )
+    return node
+
+
 def _context_with_conditioning(cond_info: MiniMaxH3ConditioningInfo) -> MagicMock:
     context = MagicMock()
     cond_data = MagicMock()
@@ -168,12 +178,17 @@ def _context_with_conditioning(cond_info: MiniMaxH3ConditioningInfo) -> MagicMoc
     return context
 
 
-def _cond_info(reference_signature=(), reference_num_frames=None) -> MiniMaxH3ConditioningInfo:
+def _cond_info(
+    reference_signature=(), reference_num_frames=None, keyframe_anchors=(), canvas=(1344, 768)
+) -> MiniMaxH3ConditioningInfo:
     return MiniMaxH3ConditioningInfo(
         prompt_embeds=torch.zeros(1, 3, 8),
         text_token_tags=torch.tensor([1, 1, 0]),
         reference_signature=reference_signature,
         reference_num_frames=reference_num_frames,
+        keyframe_anchors=keyframe_anchors,
+        width=canvas[0] if keyframe_anchors else None,
+        height=canvas[1] if keyframe_anchors else None,
     )
 
 
@@ -224,20 +239,88 @@ class TestDenoiseGuards:
         with pytest.raises(ValueError, match="prepared for 141 frames"):
             node.invoke(_context_with_conditioning(cond))
 
-    def test_rejects_frame_and_reference_conditioning_together(self):
-        from invokeai.app.invocations.fields import MiniMaxH3FrameConditioningField
-
-        node = MiniMaxH3DenoiseInvocation(
-            id="denoise",
-            transformer=_transformer_field(None),
-            positive_conditioning=MiniMaxH3ConditioningField(conditioning_name="cond"),
-            frame_conditioning=MiniMaxH3FrameConditioningField(
-                condition_rows_name="rows", keyframe_anchors=["first"], width=1344, height=768
-            ),
-            reference_conditioning=_reference_conditioning(["image:a:max:64x64"]),
-        )
-        with pytest.raises(ValueError, match="mutually exclusive"):
+    def test_rejects_frames_with_references_on_fl2va_transformer(self):
+        node = _denoise_with_frames(_reference_conditioning(["image:a:max:64x64"]), variant="fl2va")
+        with pytest.raises(ValueError, match="FL2VA task checkpoint"):
             node.invoke(_context_with_conditioning(_cond_info()))
+
+    def test_ref2va_transformer_still_requires_references_when_frames_are_wired(self):
+        node = _denoise_with_frames(None, variant="ref2va")
+        with pytest.raises(ValueError, match="requires reference conditioning"):
+            node.invoke(_context_with_conditioning(_cond_info(keyframe_anchors=("first", "last"))))
+
+    def test_frames_with_references_checks_prompt_keyframes(self):
+        sig = "image:a:max:64x64"
+        node = _denoise_with_frames(_reference_conditioning([sig]))
+        cond = _cond_info(reference_signature=(sig,), reference_num_frames=124)
+        with pytest.raises(ValueError, match="Keyframe mismatch"):
+            node.invoke(_context_with_conditioning(cond))
+
+    @pytest.mark.parametrize("prompt_anchors", [("first",), ("last",), ("last", "first")])
+    def test_frames_with_references_rejects_prompt_anchors_that_differ_in_subset_or_order(self, prompt_anchors):
+        sig = "image:a:max:64x64"
+        node = _denoise_with_frames(_reference_conditioning([sig]))
+        cond = _cond_info(reference_signature=(sig,), reference_num_frames=124, keyframe_anchors=prompt_anchors)
+        with pytest.raises(ValueError, match="Keyframe mismatch"):
+            node.invoke(_context_with_conditioning(cond))
+
+    def test_frames_with_references_checks_prompt_reference_signature(self):
+        node = _denoise_with_frames(_reference_conditioning(["image:a:max:64x64"]))
+        cond = _cond_info(
+            reference_signature=("image:OTHER:max:64x64",),
+            reference_num_frames=124,
+            keyframe_anchors=("first", "last"),
+        )
+        with pytest.raises(ValueError, match="Reference mismatch"):
+            node.invoke(_context_with_conditioning(cond))
+
+    def test_frames_with_references_checks_prompt_keyframe_canvas(self):
+        sig = "image:a:max:64x64"
+        node = _denoise_with_frames(_reference_conditioning([sig]))
+        cond = _cond_info(
+            reference_signature=(sig,), reference_num_frames=124, keyframe_anchors=("first", "last"), canvas=(768, 768)
+        )
+        with pytest.raises(ValueError, match="keyframes were prepared at 768x768"):
+            node.invoke(_context_with_conditioning(cond))
+
+    @pytest.mark.parametrize("anchors", [("first",), ("last",), ("first", "last")])
+    def test_builds_one_packed_state_with_keyframes_ahead_of_references(self, anchors):
+        sig = "image:a:max:1x6x2"
+        node = _denoise_with_frames(_reference_conditioning([sig]))
+        node.steps = 2
+        node.reference_conditioning.references = [
+            MiniMaxH3EncodedReferenceField(
+                kind="image", video_rows_name="ref_rows", latent_frames=1, latent_height=6, latent_width=2
+            )
+        ]
+        cond = _cond_info(reference_signature=(sig,), reference_num_frames=124, keyframe_anchors=anchors)
+        # Fixture sizes, stated outright: a 768x1344 canvas is a 48x84 latent grid with 2x2 patches
+        # (24 x 42 = 1008 rows per latent frame); 124 frames are 37 latent frames; the reference is
+        # a 1x6x2 latent image (3 rows x 96 channels).
+        rows_per_frame, target_frames, reference_rows = 1008, 37, 3
+        keyframe_rows = len(anchors) * rows_per_frame
+        text_rows = cond.text_token_tags.shape[0]
+        context = MagicMock()
+        context.tensors.load.return_value = torch.zeros(reference_rows, 96)
+
+        state = node._build_reference_state(
+            context,
+            cond,
+            124,
+            target_frames,
+            48,
+            84,
+            200,
+            torch.device("cpu"),
+            anchors,
+            torch.zeros(keyframe_rows, 96),
+        )
+
+        conditioning = keyframe_rows + reference_rows
+        assert state.layout.num_condition_video_rows == conditioning
+        assert state.video_rows.shape[0] == conditioning + target_frames * rows_per_frame
+        # Packed order: text, keyframes, the reference, then everything generated.
+        assert state.layout.video_indices[:conditioning].tolist() == list(range(text_rows, text_rows + conditioning))
 
     def test_rejects_still_image_frame_count_with_references(self):
         sig = "image:a:max:64x64"
@@ -261,14 +344,59 @@ class TestTextEncoderGuards:
             **kwargs,
         )
 
-    def test_rejects_keyframes_with_references(self):
-        node = self._node(
-            first_image=ImageField(image_name="kf.png"),
-            references=_image_ref(),
-            num_frames=124,
-        )
-        with pytest.raises(ValueError, match="mutually exclusive"):
-            node.invoke(MagicMock())
+    def _encode(self, node, images):
+        """Run the node with a stubbed model stack; returns (ref2va encoder kwargs, saved conditioning info)."""
+        context = MagicMock()
+        context.images.get_pil.side_effect = lambda name: images[name]
+        context.models.load.return_value.model_on_device.return_value.__enter__.return_value = (None, MagicMock())
+        saved = []
+        context.conditioning.save.side_effect = lambda data: saved.append(data) or "cond"
+        module = "invokeai.app.invocations.text_encoder.minimax_h3_text_encoder"
+        with (
+            patch(
+                f"{module}.encode_prompt_ref2va", return_value=(torch.zeros(1, 3, 8), torch.tensor([1, 0, 0]))
+            ) as ref,
+            patch(f"{module}.get_effective_device", return_value=torch.device("cpu")),
+        ):
+            node.invoke(context)
+        return ref.call_args.kwargs, saved[0].conditionings[0]
+
+    @pytest.mark.parametrize(
+        ("keyframes", "anchors"),
+        [
+            ({"first_image": ImageField(image_name="kf1")}, ("first",)),
+            ({"last_image": ImageField(image_name="kf2")}, ("last",)),
+            (
+                {"first_image": ImageField(image_name="kf1"), "last_image": ImageField(image_name="kf2")},
+                ("first", "last"),
+            ),
+        ],
+    )
+    def test_keyframes_with_references_encode_only_the_references_and_record_the_anchors(self, keyframes, anchors):
+        node = self._node(references=_image_ref("ref"), num_frames=124, **keyframes)
+        images = {
+            "kf1": Image.new("RGB", (40, 40), (255, 0, 0)),
+            "kf2": Image.new("RGB", (40, 40), (0, 255, 0)),
+            "ref": Image.new("RGB", (64, 64), (0, 0, 255)),
+        }
+
+        kwargs, info = self._encode(node, images)
+
+        (reference,) = kwargs["references"]
+        assert reference.kind == "image"
+        assert reference.image.getpixel((reference.image.width // 2, reference.image.height // 2)) == (0, 0, 255)
+        assert "keyframe_images" not in kwargs
+        assert info.keyframe_anchors == anchors
+        assert (info.width, info.height) == (node.width, node.height)
+        assert len(info.reference_signature) == 1
+        assert info.reference_num_frames == 124
+
+    def test_rejects_an_empty_reference_list_with_keyframes(self):
+        # The empty list is rejected like everywhere else; it must not fall back to a prompt that
+        # silently drops the keyframe vision context.
+        node = self._node(first_image=ImageField(image_name="kf1"), references=[], num_frames=124)
+        with pytest.raises(ValueError, match="at least one reference"):
+            self._encode(node, {"kf1": Image.new("RGB", (40, 40))})
 
     def test_requires_num_frames_with_references(self):
         node = self._node(references=_image_ref())

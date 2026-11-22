@@ -156,7 +156,7 @@ interface VideoVariantConfig {
   accelerator: VideoAcceleratorConfig | null;
   audioOutput: boolean;
   /** Ref2VA reference caps; present only on variants whose modes include 'reference'. */
-  references?: { maxVideos: number; maxImages: number; extend?: boolean };
+  references?: { maxVideos: number; maxImages: number; extend?: boolean; frames?: boolean };
 }
 
 export interface VideoPromptEnhancer {
@@ -308,7 +308,8 @@ const MINIMAX_H3_REF2VA: VideoVariantConfig = {
   accelerator: MINIMAX_H3_REF2V_TURBO_ACCELERATOR,
   modes: ['reference'],
   // Reference extension derives a linked tail reference from Initial Video; it does not frame-condition.
-  references: { extend: true, maxImages: 9, maxVideos: 3 },
+  // `frames`: first/last frame inputs ride along with the references (never with reference extension).
+  references: { extend: true, frames: true, maxImages: 9, maxVideos: 3 },
 };
 
 /** Below this the refine pass cannot enter its schedule anywhere near the level it asks for. */
@@ -702,7 +703,7 @@ export interface VideoModelPolicy {
     negativeUsedInGraph: boolean;
     negativeHelpTextKey?: string;
   };
-  references: { maxVideos: number; maxImages: number; extend?: boolean } | null;
+  references: { maxVideos: number; maxImages: number; extend?: boolean; frames?: boolean } | null;
   ui: {
     cfgVisible: boolean;
     cfgLowNoiseVisible: boolean;
@@ -1842,7 +1843,15 @@ export const getVideoModelSelectionResult = ({
     next.references = applyReferenceExtendNumFrames(next.references, next.numFrames);
   }
 
-  if (next.firstFrameImage && !modes.includes('first-frame') && !modes.includes('first-last')) {
+  // Kept without references too, so they can be paired with references added afterwards; validation flags the gap.
+  const framesWithReferences = Boolean(config.references?.frames);
+
+  if (
+    next.firstFrameImage &&
+    !framesWithReferences &&
+    !modes.includes('first-frame') &&
+    !modes.includes('first-last')
+  ) {
     next.firstFrameImage = null;
     losses.push({ count: 1, key: 'firstFrame' });
   }
@@ -1850,7 +1859,8 @@ export const getVideoModelSelectionResult = ({
   if (next.lastFrameImage) {
     // The end-frame anchor rides FLF2V with a first frame or source video; alone it needs the last-frame mode.
     const lastFrameSupported =
-      next.firstFrameImage || next.sourceVideo ? modes.includes('first-last') : modes.includes('last-frame');
+      framesWithReferences ||
+      (next.firstFrameImage || next.sourceVideo ? modes.includes('first-last') : modes.includes('last-frame'));
 
     if (!lastFrameSupported) {
       next.lastFrameImage = null;
@@ -2100,14 +2110,14 @@ export const getVideoPanelFields = (
     ['concepts', true],
     ['conditioningClip', modes.includes('audio-to-video') || modes.includes('video-to-audio')],
     ['extendContext', ui.extendContext !== null],
-    ['firstFrame', modes.includes('first-frame') || modes.includes('first-last')],
+    ['firstFrame', modes.includes('first-frame') || modes.includes('first-last') || Boolean(policy.references?.frames)],
     // Locked to the initial video while extending, and to a clip that sets the rate.
     [
       'fps',
       ui.fpsVisible && resolveVideoMode(settings) !== 'extend' && !getEffectiveVideoTiming(model, settings).fpsFromClip,
     ],
     ['initialVideo', supportsExtend || Boolean(policy.references?.extend)],
-    ['lastFrame', modes.includes('first-last') || modes.includes('last-frame')],
+    ['lastFrame', modes.includes('first-last') || modes.includes('last-frame') || Boolean(policy.references?.frames)],
     ['modality', ui.modalityVisible],
     ['numFrames', true],
     ['references', modes.includes('reference')],
@@ -2228,14 +2238,25 @@ export const getVideoValidationIssues = (model: MainModelConfig, settings: Video
   }
 
   if (settings.references.length > 0 && (settings.firstFrameImage || settings.lastFrameImage)) {
-    issues.push({
-      fields: [
-        'references',
-        ...when(settings.firstFrameImage, 'firstFrame'),
-        ...when(settings.lastFrameImage, 'lastFrame'),
-      ],
-      message: 'References cannot be combined with first/last frames. Clear one side.',
-    });
+    if (!config.references?.frames) {
+      issues.push({
+        fields: [
+          'references',
+          ...when(settings.firstFrameImage, 'firstFrame'),
+          ...when(settings.lastFrameImage, 'lastFrame'),
+        ],
+        message: 'References cannot be combined with first/last frames on this model. Clear one side.',
+      });
+    } else if (settings.sourceVideo) {
+      issues.push({
+        fields: [
+          'initialVideo',
+          ...when(settings.firstFrameImage, 'firstFrame'),
+          ...when(settings.lastFrameImage, 'lastFrame'),
+        ],
+        message: 'First/last frames cannot be combined with an initial video that extends from references.',
+      });
+    }
   }
 
   if (settings.references.length > 0 && settings.sourceVideo && !config.references?.extend) {
@@ -2247,7 +2268,17 @@ export const getVideoValidationIssues = (model: MainModelConfig, settings: Video
 
   if (!config.modes.includes(mode)) {
     if (referenceOnly && settings.references.length === 0) {
-      issues.push({ fields: ['references'], message: 'Reference-to-video needs at least one reference.' });
+      issues.push({
+        fields: [
+          'references',
+          ...when(settings.firstFrameImage, 'firstFrame'),
+          ...when(settings.lastFrameImage, 'lastFrame'),
+        ],
+        message:
+          settings.firstFrameImage || settings.lastFrameImage
+            ? 'First/last frames on this model work only together with at least one reference.'
+            : 'Reference-to-video needs at least one reference.',
+      });
     } else {
       issues.push({
         fields: VIDEO_MODE_FIELDS[mode],

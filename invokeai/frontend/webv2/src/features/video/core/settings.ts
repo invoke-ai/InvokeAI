@@ -251,7 +251,7 @@ const getStringArray = (value: unknown): string[] =>
 const areAcceleratorLorasPresent = (keys: readonly string[], loras: readonly GenerateLora[]): boolean =>
   keys.length > 0 && keys.every((key) => loras.some((lora) => lora.model.key === key && lora.isEnabled));
 
-/** First frame and source are exclusive; references win and may coexist with a source video for reference extension. */
+/** First frame and source are exclusive; references win and may coexist with a source video or, on Ref2VA, frames. */
 export const resolveVideoMode = (
   settings: Pick<
     VideoSettings,
@@ -313,13 +313,15 @@ export const normalizeVideoSettings = (values: unknown): VideoSettings | null =>
     return null;
   }
 
-  // References override stale frame slots; source video may coexist, with model support enforced by validation.
+  // Frames and source video may coexist with references; model support is enforced by validation.
   const references = sanitizeVideoReferences(
     values.references,
     isVideoSourceClip(values.sourceVideo) ? values.sourceVideo.video_name : undefined
   );
-  const hasReferences = references.length > 0;
-  const firstFrameImage = !hasReferences && isImageWithDims(values.firstFrameImage) ? values.firstFrameImage : null;
+  // Reference extension continues from its source video; frames never ride beside it, so a stale pair keeps the source.
+  const referenceExtension = references.length > 0 && isVideoSourceClip(values.sourceVideo);
+  const firstFrameImage =
+    !referenceExtension && isImageWithDims(values.firstFrameImage) ? values.firstFrameImage : null;
   // A stale project holding both a first frame and a source video keeps the first frame.
   const sourceVideo = !firstFrameImage && isVideoSourceClip(values.sourceVideo) ? values.sourceVideo : null;
   // One conditioning clip, never beside an initial video; a first frame excludes it only in the picture role.
@@ -374,7 +376,7 @@ export const normalizeVideoSettings = (values: unknown): VideoSettings | null =>
     autoDuration,
     acceleratorEnabled,
     acceleratorLoraKeys: acceleratorEnabled ? acceleratorLoraKeys : [],
-    lastFrameImage: !hasReferences && isImageWithDims(values.lastFrameImage) ? values.lastFrameImage : null,
+    lastFrameImage: !referenceExtension && isImageWithDims(values.lastFrameImage) ? values.lastFrameImage : null,
     loras,
     modelKey: typeof values.modelKey === 'string' ? values.modelKey : '',
     negativePrompt: typeof values.negativePrompt === 'string' ? values.negativePrompt : '',
@@ -462,6 +464,7 @@ export const isVideoSettings = (values: unknown): values is VideoSettings => {
     values.references.every(isVideoReferenceItem) &&
     !(
       (values.references as unknown[]).length > 0 &&
+      values.sourceVideo !== null &&
       (values.firstFrameImage !== null || values.lastFrameImage !== null)
     ) &&
     Array.isArray(values.loras) &&
@@ -939,12 +942,17 @@ export const getConditioningClipPatch = (
   ...(isConditioningClipExcludingFrames(conditioningClip) ? { firstFrameImage: null, lastFrameImage: null } : {}),
 });
 
-/** References displace frames, a conditioning clip, and the initial video unless the panel extends from it. */
+/**
+ * References displace a conditioning clip, the initial video unless the panel extends from it, and frames unless the
+ * model takes them alongside references.
+ */
 export const getReferencesPatch = ({
   referenceExtend,
+  referenceFrames,
   references,
 }: {
   referenceExtend: boolean;
+  referenceFrames: boolean;
   references: VideoReferenceItem[];
 }): Partial<VideoWidgetValues> => {
   const next = referenceExtend ? pinReferenceExtendAnchor(references) : references;
@@ -954,8 +962,7 @@ export const getReferencesPatch = ({
     ...(next.length > 0
       ? {
           conditioningClip: null,
-          firstFrameImage: null,
-          lastFrameImage: null,
+          ...(referenceFrames ? {} : { firstFrameImage: null, lastFrameImage: null }),
           ...(referenceExtend ? {} : { sourceVideo: null }),
         }
       : {}),

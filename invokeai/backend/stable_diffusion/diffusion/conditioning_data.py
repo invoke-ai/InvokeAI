@@ -258,7 +258,8 @@ class MiniMaxH3ConditioningInfo:
     """Per-row modality tags. Shape: (num_text_tokens,), dtype long."""
 
     keyframe_anchors: tuple[str, ...] = ()
-    """Which keyframes ("first"/"last", packed order) were part of the vision context. The
+    """Which keyframes ("first"/"last", packed order) the prompt was encoded for (in the vision
+    context, except alongside Ref2VA references, which are all the vision context then shows). The
     denoise node cross-checks this against its frame-conditioning input: keyframes must reach
     the text conditioning and the VAE condition rows together, or not at all."""
 

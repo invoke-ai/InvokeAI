@@ -1386,6 +1386,14 @@ def test_generation_mode_inference_and_upstream_preservation() -> None:
         == "minimax_h3_ref2v"
     )
     assert (
+        h3_node.model_copy(
+            update={"reference_conditioning": SimpleNamespace(), "frame_conditioning": SimpleNamespace()}
+        )
+        ._build_metadata()
+        .root["generation_mode"]
+        == "minimax_h3_ref2v_frames"
+    )
+    assert (
         h3_node.model_copy(update={"num_frames": "5"})._build_metadata().root["generation_mode"] == "minimax_h3_txt2img"
     )
 

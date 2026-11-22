@@ -595,7 +595,12 @@ describe('reference mode policy', () => {
     const settings = settingsFor(model);
 
     expect(getVideoModelPolicy(model, settings).modes).toEqual(['reference']);
-    expect(getVideoModelPolicy(model, settings).references).toEqual({ extend: true, maxImages: 9, maxVideos: 3 });
+    expect(getVideoModelPolicy(model, settings).references).toEqual({
+      extend: true,
+      frames: true,
+      maxImages: 9,
+      maxVideos: 3,
+    });
     expect(getVideoModelPolicy(h3Model(), settingsFor(h3Model())).references).toBeNull();
   });
 
@@ -631,6 +636,53 @@ describe('reference mode policy', () => {
     ).toEqual([]);
     expect(getVideoValidationReasons(model, withRefTransformer({ references: [imageReference] }))).toEqual([]);
   });
+
+  it('takes first/last frames beside references on Ref2VA only, and never beside reference extension', () => {
+    const model = ref2vaTransformer();
+    const frame = { height: 4, image_name: 'kf.png', width: 4 };
+    const withFrames = (overrides: Partial<VideoSettings>) =>
+      settingsFor(model, {
+        componentSourceModel: h3Model(),
+        firstFrameImage: frame,
+        lastFrameImage: frame,
+        references: [imageReference],
+        ...overrides,
+      });
+
+    expect(getVideoValidationReasons(model, withFrames({}))).toEqual([]);
+    expect(getVideoValidationReasons(model, withFrames({ firstFrameImage: null }))).toEqual([]);
+    expect(getVideoValidationReasons(model, withFrames({ references: [] }))).toEqual([
+      'First/last frames on this model work only together with at least one reference.',
+    ]);
+    expect(
+      getVideoValidationReasons(
+        model,
+        withFrames({
+          firstFrameImage: null,
+          sourceVideo: {
+            endFrame: 30,
+            fps: 24,
+            height: 4,
+            numFrames: 31,
+            startFrame: 0,
+            video_name: 's.mp4',
+            width: 4,
+          },
+        })
+      )
+    ).toContain('First/last frames cannot be combined with an initial video that extends from references.');
+    expect(getVideoPanelFields(model, withFrames({}))).toContain('firstFrame');
+    expect(getVideoPanelFields(model, withFrames({}))).toContain('lastFrame');
+
+    const fl2va = fl2vaTransformer();
+
+    expect(
+      getVideoValidationReasons(
+        fl2va,
+        settingsFor(fl2va, { componentSourceModel: h3Model(), firstFrameImage: frame, references: [imageReference] })
+      )
+    ).toContain('References cannot be combined with first/last frames on this model. Clear one side.');
+  });
 });
 
 describe('H3 task switches through the top model selection', () => {
@@ -643,8 +695,12 @@ describe('H3 task switches through the top model selection', () => {
       models: [flModel],
     });
 
-    expect(toRef.settings.firstFrameImage).toBeNull();
-    expect(lossKeys(toRef)).toContain('firstFrame');
+    // Kept so references can be added afterwards; validation flags the gap until then.
+    expect(toRef.settings.firstFrameImage).toEqual(first);
+    expect(lossKeys(toRef)).not.toContain('firstFrame');
+    expect(
+      getVideoValidationReasons(ref2vaTransformer(), { ...toRef.settings, componentSourceModel: h3Model() })
+    ).toEqual(['First/last frames on this model work only together with at least one reference.']);
 
     const backToFl = getVideoModelSelectionResult({
       currentSettings: { ...toRef.settings, references: [imageReference] },
@@ -654,6 +710,35 @@ describe('H3 task switches through the top model selection', () => {
 
     expect(backToFl.settings.references).toEqual([]);
     expect(lossKeys(backToFl)).toContain('references');
+  });
+
+  it('keeps frames beside references across both switch directions, losing only the references leaving Ref2VA', () => {
+    const flModel = h3Model();
+    const frames = {
+      firstFrameImage: { height: 4, image_name: 'kf.png', width: 4 },
+      lastFrameImage: { height: 4, image_name: 'lf.png', width: 4 },
+    };
+    const withBoth = getVideoModelSelectionResult({
+      currentSettings: settingsFor(ref2vaTransformer(), {
+        ...frames,
+        modelKey: ref2vaTransformer().key,
+        references: [imageReference],
+      }),
+      model: fl2vaTransformer(),
+      models: [flModel],
+    });
+
+    expect(withBoth.settings).toMatchObject({ ...frames, references: [] });
+    expect(lossKeys(withBoth)).toEqual(['references']);
+
+    const back = getVideoModelSelectionResult({
+      currentSettings: { ...withBoth.settings, references: [imageReference] },
+      model: ref2vaTransformer(),
+      models: [flModel],
+    });
+
+    expect(back.settings).toMatchObject({ ...frames, references: [imageReference] });
+    expect(lossKeys(back)).toEqual([]);
   });
 });
 

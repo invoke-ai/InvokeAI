@@ -450,9 +450,25 @@ describe('ref2va reference recall', () => {
       { conditioning: 'video_audio', kind: 'video', name: 'ref.mp4', trim: { endFrame: 47, startFrame: 2 } },
       { detail: 'match', kind: 'image', name: 'ref.png' },
     ]);
-    // References replace the frame/source slots.
+    // A references-only record carries no frames.
     expect(result?.mediaNames.firstFrameName).toBeNull();
     expect(result?.values.references).toEqual([]);
+  });
+
+  it('recalls first/last frames beside the references of a combined run', () => {
+    const result = buildVideoRecallSettings({
+      currentValues,
+      kind: 'all',
+      metadata: h3RefMetadata({
+        first_frame_image: { image_name: 'first.png' },
+        generation_mode: 'minimax_h3_ref2v_frames',
+        last_frame_image: { image_name: 'last.png' },
+      }),
+      models: catalog,
+    });
+
+    expect(result?.mediaNames).toMatchObject({ firstFrameName: 'first.png', lastFrameName: 'last.png' });
+    expect(result?.mediaNames.references).toHaveLength(2);
   });
 });
 

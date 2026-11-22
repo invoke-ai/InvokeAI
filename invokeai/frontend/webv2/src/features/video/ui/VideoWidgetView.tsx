@@ -328,6 +328,7 @@ export const VideoWidgetView = ({ instance }: { instance?: { id: string } }) => 
 
   // First frame and initial video share one slot; last frame can accompany either.
   const referenceExtend = Boolean(policy.references?.extend);
+  const referenceFrames = Boolean(policy.references?.frames);
   const maxVideoReferences = policy.references?.maxVideos ?? 3;
   const conditioningClip = values.conditioningClip;
   // A drop commits through the setter captured when it began, so what the frame displaces is read at commit time.
@@ -394,9 +395,9 @@ export const VideoWidgetView = ({ instance }: { instance?: { id: string } }) => 
       if (updated === referencesRef.current.references) {
         return;
       }
-      patch(getReferencesPatch({ referenceExtend, references: updated }));
+      patch(getReferencesPatch({ referenceExtend, referenceFrames, references: updated }));
     },
-    [patch, projectId, referenceExtend]
+    [patch, projectId, referenceExtend, referenceFrames]
   );
   const clearReferences = useCallback(() => patch({ references: [] }), [patch]);
   const setLoras = useCallback(
@@ -492,6 +493,8 @@ export const VideoWidgetView = ({ instance }: { instance?: { id: string } }) => 
   const mode = resolveVideoMode(values);
   const supportsFirstFrame = panelFields.has('firstFrame');
   const supportsLastFrame = panelFields.has('lastFrame');
+  // Ref2VA frames work only beside references, never beside an initial video.
+  const framesNeedReferences = referenceFrames && !policy.modes.includes('first-last');
   const promptEnhancer = policy.prompt.enhancer;
   const firstFrameImage = values.firstFrameImage;
   // Memoized for VideoPromptFields' equality check; both inputs keep their identity between patches.
@@ -644,7 +647,13 @@ export const VideoWidgetView = ({ instance }: { instance?: { id: string } }) => 
                     helpText={
                       values.sourceVideo
                         ? undefined
-                        : [t('widgets.video.firstFrameHelp'), frameClearsClipText].filter(Boolean).join(' ')
+                        : [
+                            t('widgets.video.firstFrameHelp'),
+                            framesNeedReferences ? t('widgets.video.frameWithReferencesHelp') : undefined,
+                            frameClearsClipText,
+                          ]
+                            .filter(Boolean)
+                            .join(' ')
                     }
                     label={t('widgets.video.firstFrame')}
                   >
@@ -661,7 +670,10 @@ export const VideoWidgetView = ({ instance }: { instance?: { id: string } }) => 
                 {supportsLastFrame ? (
                   <Field
                     helpText={[
-                      values.sourceVideo ? t('widgets.video.lastFrameExtendHelp') : t('widgets.video.lastFrameHelp'),
+                      values.sourceVideo && !framesNeedReferences
+                        ? t('widgets.video.lastFrameExtendHelp')
+                        : t('widgets.video.lastFrameHelp'),
+                      framesNeedReferences ? t('widgets.video.frameWithReferencesHelp') : undefined,
                       frameClearsClipText,
                     ]
                       .filter(Boolean)
@@ -669,6 +681,12 @@ export const VideoWidgetView = ({ instance }: { instance?: { id: string } }) => 
                     label={t('widgets.video.lastFrame')}
                   >
                     <VideoFrameImageField
+                      disabled={framesNeedReferences && Boolean(values.sourceVideo)}
+                      disabledReason={
+                        framesNeedReferences && values.sourceVideo
+                          ? t('widgets.video.lastFrameWithReferencesBlocked')
+                          : undefined
+                      }
                       dropId="video-last-frame"
                       dropLabel={t('widgets.video.dropLastFrame')}
                       image={values.lastFrameImage}

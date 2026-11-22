@@ -40,12 +40,9 @@ const TRACKED_GALLERY_REMOVAL_FIELDS: ReadonlyArray<{ key: string; widgetId: Wid
  */
 const EXCLUSIVE_RIVAL_FIELDS: ReadonlyArray<{ key: string; rivalKey: string; widgetId: WidgetTypeId }> = [
   { key: 'firstFrameImage', rivalKey: 'sourceVideo', widgetId: 'video' },
-  { key: 'firstFrameImage', rivalKey: 'references', widgetId: 'video' },
-  { key: 'lastFrameImage', rivalKey: 'references', widgetId: 'video' },
   { key: 'sourceVideo', rivalKey: 'firstFrameImage', widgetId: 'video' },
-  { key: 'references', rivalKey: 'firstFrameImage', widgetId: 'video' },
-  { key: 'references', rivalKey: 'lastFrameImage', widgetId: 'video' },
-  // sourceVideo and references coexist for Ref2VA reference-extend; as rivals, rollback would lose valid data.
+  // References coexist with sourceVideo (Ref2VA reference-extend) and with frames (Ref2VA); as rivals, rollback would
+  // lose valid data.
 ];
 
 const trackedFieldKey = (projectId: string, widgetId: WidgetTypeId, key: string): string =>

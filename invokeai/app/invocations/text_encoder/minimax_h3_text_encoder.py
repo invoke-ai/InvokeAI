@@ -57,7 +57,9 @@ class MiniMaxH3TextEncoderInvocation(BaseInvocation):
     the same width/height as the denoise node. For reference-to-video (Ref2VA), the same
     ordered references must be wired here and to the Reference Conditioning node, with the
     same Number of Frames — the references appear in the conditioning as per-modality labels
-    and vision blocks (a reference video is read at 2 fps).
+    and vision blocks (a reference video is read at 2 fps). Both can be combined on a Ref2VA
+    transformer: the text conditioning then carries the references only, and the keyframes act
+    through the Frame Conditioning rows (their images are still wired here to record the anchors).
     """
 
     prompt: str = InputField(description="Text prompt for MiniMax H3.", ui_component=UIComponent.Textarea)
@@ -75,7 +77,7 @@ class MiniMaxH3TextEncoderInvocation(BaseInvocation):
     references: MiniMaxH3ReferenceMediaField | list[MiniMaxH3ReferenceMediaField] | None = InputField(
         default=None,
         description="Ref2VA references, in conditioning order (must match Reference Conditioning - MiniMax H3). "
-        "Mutually exclusive with keyframes.",
+        "May be combined with keyframes (Ref2VA transformer).",
         input=Input.Connection,
     )
     num_frames: int | None = InputField(
@@ -129,21 +131,26 @@ class MiniMaxH3TextEncoderInvocation(BaseInvocation):
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> MiniMaxH3ConditioningOutput:
         has_keyframes = self.first_image is not None or self.last_image is not None
-        if self.references is not None and has_keyframes:
-            raise ValueError(
-                "Keyframes (first/last image) and Ref2VA references are mutually exclusive - a request is "
-                "either first/last-frame-to-video or reference-to-video."
-            )
 
         keyframes = []
         anchors: tuple[str, ...] = ()
         text_references: list[MiniMaxH3TextReference] = []
         reference_signature: tuple[str, ...] = ()
-        if has_keyframes:
+        if has_keyframes and self.references is not None:
+            # With references the keyframes stay out of the vision context: ComfyUI's combined
+            # keyframe + Ref2VA conditioning presents only the references to the text encoder, and the
+            # keyframes act through the VAE condition rows alone. The anchors are still recorded so the
+            # denoise node can check them against the Frame Conditioning node.
+            anchors = tuple(
+                anchor
+                for anchor, image in (("first", self.first_image), ("last", self.last_image))
+                if image is not None
+            )
+        elif has_keyframes:
             first = context.images.get_pil(self.first_image.image_name) if self.first_image else None
             last = context.images.get_pil(self.last_image.image_name) if self.last_image else None
             keyframes, anchors = prepare_keyframes(first, last, self.height, self.width)
-        elif self.references is not None:
+        if self.references is not None:
             if self.num_frames is None:
                 raise ValueError(
                     "num_frames is required with references: they are truncated to the generated duration."
