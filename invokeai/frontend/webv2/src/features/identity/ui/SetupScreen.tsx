@@ -1,23 +1,27 @@
-import { chakra, Input, Stack } from '@chakra-ui/react';
+import { Alert, chakra, Icon, Input, Link, Stack } from '@chakra-ui/react';
 import { createSetupSchema, PASSWORD_RULES_HINT, type SetupFormValues } from '@features/identity/core/schemas';
 import { completeAdminSetup, isLoginAttemptSupersededError, useAuthSession } from '@features/identity/session';
 import { useZodForm } from '@platform/react/useZodForm';
+import { DOCS_URL } from '@platform/runtime/appMetadata';
 import { getApiErrorMessage } from '@platform/transport/http';
 import { Button, Field } from '@platform/ui';
 import { Navigate } from '@tanstack/react-router';
-import { useCallback, useMemo, type ChangeEvent, type FormEvent } from 'react';
+import { ExternalLinkIcon } from 'lucide-react';
+import { useCallback, useId, useMemo, type ChangeEvent, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { AuthFormAlert, AuthScreen } from './AuthScreen';
 import { PasswordInput, PasswordStrengthMeter } from './PasswordInput';
 
 const INITIAL_VALUES: SetupFormValues = { confirmPassword: '', displayName: '', email: '', password: '' };
+const EARLIER_WORK_GUIDE_URL = `${DOCS_URL}configuration/multi-user-mode/admin-guide/#if-you-have-already-upgraded`;
 
 export const SetupScreen = () => {
   const { t } = useTranslation();
   const session = useAuthSession();
   const schema = useMemo(() => createSetupSchema(session.strictPasswordChecking), [session.strictPasswordChecking]);
   const form = useZodForm(schema, INITIAL_VALUES);
+  const earlierWorkDescriptionId = useId();
 
   const submit = useCallback(
     () =>
@@ -112,10 +116,50 @@ export const SetupScreen = () => {
             onChange={handleConfirmPasswordChange}
           />
         </Field>
-        <Button loading={form.isSubmitting} size="lg" type="submit" variant="solid">
+        {/* Above the submit, which it describes, so keyboard and screen-reader users hear it on reaching the button. */}
+        {session.hasSingleUserWork ? <EarlierWorkNotice descriptionId={earlierWorkDescriptionId} /> : null}
+        <Button
+          aria-describedby={session.hasSingleUserWork ? earlierWorkDescriptionId : undefined}
+          loading={form.isSubmitting}
+          size="lg"
+          type="submit"
+          variant="solid"
+        >
           {t('auth.createAdminAccount')}
         </Button>
       </chakra.form>
     </AuthScreen>
+  );
+};
+
+const EarlierWorkNotice = ({ descriptionId }: { descriptionId: string }) => {
+  const { t } = useTranslation();
+
+  return (
+    <Alert.Root borderRadius="md" role="note" status="info" variant="surface">
+      <Alert.Indicator />
+      <Alert.Content gap="1.5">
+        <Alert.Title fontSize="md" fontWeight="600">
+          {t('auth.setupEarlierWorkTitle')}
+        </Alert.Title>
+        <Alert.Description fontSize="md" id={descriptionId}>
+          {t('auth.setupEarlierWorkDescription')}
+        </Alert.Description>
+        {/* Inline, so a wrapped label keeps the icon after its last word. */}
+        <Link
+          alignSelf="flex-start"
+          display="inline"
+          fontSize="md"
+          fontWeight="600"
+          href={EARLIER_WORK_GUIDE_URL}
+          rel="noreferrer"
+          target="_blank"
+          variant="underline"
+        >
+          {t('auth.setupEarlierWorkGuide')}
+          <Icon as={ExternalLinkIcon} boxSize="3" ms="1" verticalAlign="-1px" />
+        </Link>
+      </Alert.Content>
+    </Alert.Root>
   );
 };
