@@ -38,6 +38,20 @@ from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType, SubModelType
 from invokeai.backend.util.fp8 import FP8_COMPUTE_DTYPE_ATTR
 
+_MISSING = object()
+
+# `WanTransformer3DModel` at a size that builds in milliseconds; the structure is the real one.
+WAN_TINY_KWARGS = {
+    "patch_size": (1, 2, 2),
+    "in_channels": 16,
+    "out_channels": 16,
+    "num_layers": 2,
+    "attention_head_dim": 128,
+    "num_attention_heads": 1,
+    "ffn_dim": 64,
+    "text_dim": 32,
+}
+
 
 def _make_loader(device: str = "cuda") -> ModelLoader:
     """Build a ModelLoader without going through dependency injection.
@@ -927,6 +941,74 @@ class TestComputeDtypeIsAlwaysAFloat:
         assert getattr(model, FP8_COMPUTE_DTYPE_ATTR) is torch.bfloat16
         # And the cast actually ran against that dtype rather than skipping the model.
         assert model.attn.weight.dtype is torch.float8_e4m3fn
+
+
+class TestComputeDtypeIgnoresKeepInFp32Parameters:
+    """A parameter kept in float32 on purpose says nothing about the dtype the other layers compute in.
+
+    Wan registers `scale_shift_table` (float32, in `_keep_in_fp32_modules`) before any submodule, so the
+    first float parameter is not the compute dtype: fp8 weights would be widened to float32 on every forward.
+    """
+
+    @staticmethod
+    def _cast(model: torch.nn.Module) -> None:
+        loader = _make_loader(device="cuda")
+        with patch.object(ModelLoader, "_should_use_fp8", return_value=True):
+            loader._apply_fp8_layerwise_casting(model, _make_config(ModelType.Main, fp8=True))
+
+    @staticmethod
+    def _model(keep) -> torch.nn.Module:
+        model = torch.nn.Module()
+        if keep is not _MISSING:
+            model._keep_in_fp32_modules = keep
+        model.register_parameter("scale_shift_table", torch.nn.Parameter(torch.zeros(1, 2, 4), requires_grad=False))
+        model.add_module("attn", torch.nn.Linear(4, 4).to(torch.bfloat16))
+        return model
+
+    def test_a_leading_fp32_keep_parameter_is_not_the_compute_dtype(self) -> None:
+        model = self._model(["scale_shift_table"])
+        self._cast(model)
+
+        assert getattr(model, FP8_COMPUTE_DTYPE_ATTR) is torch.bfloat16
+        assert model.attn.weight.dtype is torch.float8_e4m3fn
+
+    def test_a_bare_string_declaration_is_a_name_not_a_set_of_characters(self) -> None:
+        model = self._model("scale_shift_table")
+        self._cast(model)
+
+        assert getattr(model, FP8_COMPUTE_DTYPE_ATTR) is torch.bfloat16
+
+    @pytest.mark.parametrize("keep", [_MISSING, None, [], ["other"], [None, 3]])
+    def test_without_a_usable_declaration_the_first_float_parameter_decides(self, keep) -> None:
+        model = self._model(keep)
+        self._cast(model)
+
+        assert getattr(model, FP8_COMPUTE_DTYPE_ATTR) is torch.float32
+
+    def test_a_model_whose_only_floats_are_kept_computes_in_the_first_of_them(self) -> None:
+        model = torch.nn.Module()
+        model._keep_in_fp32_modules = ["scale_shift_table"]
+        model.register_parameter("scale_shift_table", torch.nn.Parameter(torch.zeros(1, 2, 4), requires_grad=False))
+        self._cast(model)
+
+        assert getattr(model, FP8_COMPUTE_DTYPE_ATTR) is torch.float32
+
+    def test_the_real_wan_transformer_computes_in_bf16_and_keeps_its_fp32_islands(self, tmp_path) -> None:
+        from diffusers import WanTransformer3DModel
+
+        WanTransformer3DModel(**WAN_TINY_KWARGS).save_pretrained(tmp_path)
+        model = WanTransformer3DModel.from_pretrained(tmp_path, torch_dtype=torch.bfloat16)
+        first_name, first_param = next(iter(model.named_parameters()))
+        assert first_name == "scale_shift_table"
+        assert first_param.dtype is torch.float32
+
+        self._cast(model)
+
+        assert getattr(model, FP8_COMPUTE_DTYPE_ATTR) is torch.bfloat16
+        assert model.blocks[0].attn1.to_q.weight.dtype is torch.float8_e4m3fn
+        # The fp32 island survives the cast (Wan protects it through both `_keep_in_fp32_modules` and
+        # `_skip_layerwise_casting_patterns`; `test_keep_in_fp32_modules_are_not_cast` covers the keep list alone).
+        assert model.condition_embedder.time_embedder.linear_1.weight.dtype is torch.float32
 
 
 class TestAlreadyFp8StorageGuard:
