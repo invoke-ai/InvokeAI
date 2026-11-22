@@ -4,7 +4,7 @@ import type { ModelConfig } from '@features/models/core/types';
 import { Input, Portal, Stack, Text } from '@chakra-ui/react';
 import { modelPathSchema } from '@features/models/core/schemas';
 import { updateModel } from '@features/models/data/api';
-import { replaceModelInStore } from '@features/models/data/modelsStore';
+import { refreshModels, replaceModelInStore } from '@features/models/data/modelsStore';
 import { useNotify } from '@features/models/ui/useModelsNotify';
 import { useScopedAction } from '@platform/react/useScopedAction';
 import { assertAccountScopeCurrent } from '@platform/state/accountLifecycle';
@@ -47,6 +47,8 @@ export const UpdatePathDialog = ({
 
         assertAccountScopeCurrent(owner);
         replaceModelInStore(updated);
+        // The new path may or may not hold the files: the library checks again.
+        void refreshModels();
         notify.success(t('models.pathUpdated'), model.name);
         onClose();
       },

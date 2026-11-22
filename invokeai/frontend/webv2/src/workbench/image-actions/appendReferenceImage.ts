@@ -25,7 +25,7 @@ export const appendReferenceImage = ({
   models: ModelConfig[];
 }): AppendReferenceImageResult => {
   const supportedModels = models.filter(isSupportedGenerateModel);
-  const currentValues = getCurrentGenerateValues({ generateValues, supportedModels });
+  const currentValues = getCurrentGenerateValues({ generateValues, models, supportedModels });
 
   if (!currentValues) {
     return { status: 'unsupported' };

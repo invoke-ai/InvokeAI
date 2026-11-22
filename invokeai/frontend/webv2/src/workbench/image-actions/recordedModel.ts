@@ -14,6 +14,8 @@ export interface RecordedModelRef {
 interface ResolvableModel {
   base: string;
   hash?: string;
+  /** Registered, but its files are gone. */
+  is_missing?: boolean;
   key: string;
   name: string;
   type: string;
@@ -56,18 +58,12 @@ export const toRecordedModelRef = (value: unknown): RecordedModelRef | null => {
   return ref && (ref.key || ref.hash || (ref.name && ref.base)) ? ref : null;
 };
 
-/** Key first, then the content hash when recorded, else name and base (and type when recorded). */
-export const resolveRecordedModel = <T extends ResolvableModel>(
+/** The content hash when recorded, else name and base (and type when recorded). */
+const matchRecordedModel = <T extends ResolvableModel>(
   ref: RecordedModelRef,
   models: readonly T[],
   policy: RecordedModelPolicy
 ): T | 'ambiguous' | null => {
-  const byKey = ref.key ? models.find((model) => model.key === ref.key) : undefined;
-
-  if (byKey) {
-    return byKey;
-  }
-
   const byHash = ref.hash ? models.filter((model) => model.hash === ref.hash) : [];
   const matches =
     byHash.length > 0 || (ref.hash && policy.hashMiss === 'refuse')
@@ -79,6 +75,51 @@ export const resolveRecordedModel = <T extends ResolvableModel>(
         : [];
 
   return matches.length > 1 && policy.ambiguous === 'refuse' ? 'ambiguous' : (matches[0] ?? null);
+};
+
+/**
+ * Key first, then the content hash when recorded, else name and base (and type when recorded). A model whose files are
+ * gone is the last resort: a reinstall leaves the old record beside the new one, and the new one is what the image
+ * recorded in effect.
+ */
+export const resolveRecordedModel = <T extends ResolvableModel>(
+  ref: RecordedModelRef,
+  models: readonly T[],
+  policy: RecordedModelPolicy
+): T | 'ambiguous' | null => {
+  const present = models.filter((model) => !model.is_missing);
+  const byKey = ref.key ? present.find((model) => model.key === ref.key) : undefined;
+
+  if (byKey) {
+    return byKey;
+  }
+
+  const missingByKey = ref.key ? models.find((model) => model.key === ref.key) : undefined;
+
+  // Metadata often records no hash. The catalog still knows the weights its key stood for, and a reinstall carries
+  // them, so that hash outranks a name another model may share. It is only a hint: when nothing present has it, the
+  // recorded identifiers decide as before, `hashMiss` included, since the image itself recorded no hash. The same
+  // weights can be registered for several families (one VAE file as SDXL and as SD1), so only a copy of the family and
+  // type the image recorded, else the ones its key stood for, counts.
+  if (!ref.hash && missingByKey?.hash) {
+    const base = ref.base ?? missingByKey.base;
+    const type = ref.type ?? missingByKey.type;
+    const reinstalls = present.filter(
+      (model) => model.hash === missingByKey.hash && model.base === base && model.type === type
+    );
+
+    if (reinstalls.length > 0) {
+      return reinstalls.length > 1 && policy.ambiguous === 'refuse' ? 'ambiguous' : reinstalls[0]!;
+    }
+  }
+
+  const matched = matchRecordedModel(ref, present, policy);
+
+  if (matched !== null) {
+    return matched;
+  }
+
+  return missingByKey ?? matchRecordedModel(ref, models, policy);
 };
 
 export interface ParsedMetadataLoraTarget {

@@ -62,11 +62,13 @@ def calibration_service(
     untiled_decode_reservation: Optional[Callable[[str, int, int, str, torch.device], int]] = None,
     device_memory: Optional[Callable[[torch.device], DeviceMemory]] | Literal["whole card"] = "whole card",
     vae_dtypes: VaeDtypes = GPU_VAE_DTYPES,
+    is_model_missing: Callable[[Any, Path], bool] = lambda model, models_path: False,
 ) -> WorkingMemoryCalibrationService:
     """A service storing under `root`; not started (call `start(invoker)`, and `stop(invoker)` once it registered
     the user-fit provider estimates ask). What the cache can give a calibration's lock defaults to the whole card, with
     nothing outside torch; None asks the model cache of the invoker's model manager, as the service does. The VAE
-    dtypes default to those of a GPU with bf16 under `precision: auto`."""
+    dtypes default to those of a GPU with bf16 under `precision: auto`. Models are present unless `is_model_missing` says
+    otherwise: the fakes carry no files."""
     extra = {} if untiled_decode_reservation is None else {"untiled_decode_reservation": untiled_decode_reservation}
     return WorkingMemoryCalibrationService(
         CalibrationStore(root / "working_memory"),
@@ -77,6 +79,7 @@ def calibration_service(
         if device_memory == "whole card"
         else device_memory,
         vae_dtypes=lambda device: vae_dtypes,
+        is_model_missing=is_model_missing,
         **extra,
     )
 
