@@ -1,5 +1,5 @@
 import type { WorkbenchFocusController } from '@workbench/focusRegions';
-import type { LayoutPreset, LayoutPresetId, LayoutPresetRoute, WidgetRegion } from '@workbench/layoutContracts';
+import type { LayoutPreset, LayoutPresetId, WidgetRegion } from '@workbench/layoutContracts';
 import type { Project, WorkbenchNotificationAction } from '@workbench/projectContracts';
 import type { RegisteredWidget, WidgetInstanceId, WidgetTypeId } from '@workbench/widgetContracts';
 import type { WorkbenchCommands, WorkbenchQueries, WorkbenchSnapshot } from '@workbench/workbenchStore';
@@ -9,32 +9,19 @@ import { registerAccountOwnedResource } from '@platform/state/accountLifecycle';
 import { getAvailableSourceIdForWidgetTypeId, getWidgetTypeIdForSourceId } from '@workbench/invocationSources';
 import { WIDGET_REGIONS } from '@workbench/layoutContracts';
 import { getOrderedLayoutPresets } from '@workbench/layoutPresetCollection';
-import {
-  doesLayoutPresetExist,
-  getLayoutPresetArrangement,
-  resolveSavedLayoutPreset,
-} from '@workbench/layoutPresetSnapshots';
+import { doesLayoutPresetExist } from '@workbench/layoutPresetSnapshots';
 import { resolveWidgetLabel } from '@workbench/widgetLabels';
-import { canRenderWidgetInRegion } from '@workbench/widgetPlacementCommands';
 import i18next from 'i18next';
 
 import type { OpenIntent, OpenResult } from './openIntent';
-import type {
-  OpenDecision,
-  OpenTarget,
-  RegionPresentation,
-  ResolveOpenContext,
-  WorkspaceCandidate,
-} from './resolveOpen';
+import type { OpenDecision, OpenTarget, ResolveOpenContext, WorkspaceCandidate } from './resolveOpen';
+import type { NewWorkspaceDraft } from './structureLock';
 import type { SavedWorkspace, WorkspacePlacement } from './workspaceDerivations';
 
+import { getProjectWorkspace } from './projectLayout';
+import { getRegionPresentation } from './registryAvailability';
 import { resolveOpen } from './resolveOpen';
-import {
-  getCustomizeSession,
-  isStructureCommand,
-  isWorkspaceCommandAvailable,
-  selectStructureLock,
-} from './structureLock';
+import { getCustomizeSession, isWorkspaceCommandAvailable, selectStructureLock } from './structureLock';
 import { getAwayStage, getCenterFront, getPlacedStage, getWorkspaceJobSource } from './workspaceDerivations';
 
 export interface WorkspaceNavigationPorts {
@@ -42,7 +29,7 @@ export interface WorkspaceNavigationPorts {
   /** Moves focus to what a gesture showed; omitted, nothing takes focus. */
   focus?: Pick<WorkbenchFocusController, 'focusFloating' | 'focusRegion'>;
   getWidgetsForRegion: (region: WidgetRegion) => RegisteredWidget[];
-  queries: Pick<WorkbenchQueries, 'getSnapshot'>;
+  queries: Pick<WorkbenchQueries, 'getSnapshot' | 'getWorkspaceLayout'>;
 }
 
 export interface OpenOptions {
@@ -72,22 +59,6 @@ const lastNavigations = new Map<string, { from: LayoutPresetId; stepId: string |
 
 registerAccountOwnedResource({ clear: () => lastNavigations.clear(), name: 'workspace-back' });
 
-/** The resolver's region rules for this registry: enabled types the account may use, as a view or a chip. */
-export const getRegionPresentation =
-  (getWidgetsForRegion: WorkspaceNavigationPorts['getWidgetsForRegion']) =>
-  (typeId: WidgetTypeId, region: WidgetRegion): RegionPresentation => {
-    const widget = getWidgetsForRegion(region).find((candidate) => candidate.manifest.id === typeId);
-
-    if (widget?.status !== 'enabled') {
-      return null;
-    }
-
-    return canRenderWidgetInRegion(widget, region) &&
-      !(region === 'bottom' && widget.manifest.bottomPanel === 'popover')
-      ? 'view'
-      : 'chip';
-  };
-
 /** A preset as the resolver ranks it: what it lays out and the source its job runs. */
 export const createWorkspaceCandidate = (
   preset: SavedWorkspace & Pick<LayoutPreset, 'id'>,
@@ -105,18 +76,18 @@ export const createWorkspaceCandidate = (
 };
 
 const createContext = (ports: WorkspaceNavigationPorts, mode: ResolveOpenContext['mode']): ResolveOpenContext => {
-  const { account, activeProject } = ports.queries.getSnapshot();
+  const { account, activeLayout, activeProject } = ports.queries.getSnapshot();
 
   return {
-    currentWorkspaceId: activeProject.layout.presetId,
+    currentWorkspaceId: activeProject.workspaceId,
     getPresentation: getRegionPresentation(ports.getWidgetsForRegion),
-    here: activeProject,
+    here: activeLayout,
     mode,
     workspaces:
       mode === 'stay'
         ? []
         : getOrderedLayoutPresets(account).map((preset) =>
-            createWorkspaceCandidate(preset, getLayoutPresetArrangement(activeProject, preset))
+            createWorkspaceCandidate(preset, ports.queries.getWorkspaceLayout(preset.id))
           ),
   };
 };
@@ -258,13 +229,13 @@ export const openInWorkspace = (
       changedWorkspace: false,
       ok: true,
       region: getTargetRegion(shown.target),
-      workspaceId: project.layout.presetId,
+      workspaceId: project.workspaceId,
     };
   }
 
   const { activeProject } = ports.queries.getSnapshot();
   const projectId = activeProject.id;
-  const from = activeProject.layout.presetId;
+  const from = activeProject.workspaceId;
   let hasArrived = false;
   const arrive = () => {
     if (hasArrived) {
@@ -286,7 +257,7 @@ export const openInWorkspace = (
   const activation = ports.commands.layout.activatePreset(decision.workspaceId);
   const { activeProject: entered } = ports.queries.getSnapshot();
 
-  if (entered.id === projectId && entered.layout.presetId === decision.workspaceId) {
+  if (entered.id === projectId && entered.workspaceId === decision.workspaceId) {
     arrive();
   } else {
     void activation.then((appliedId) => {
@@ -304,23 +275,18 @@ export const openInWorkspace = (
   };
 };
 
-/** A switch or revert since the navigation's own step, made by hand or by an undo of it, forgets where it came from. */
+/** A switch since the navigation's own step, made by hand or by an undo of it, forgets where it came from. */
 const isStillWhereNavigationLanded = (
   project: Project,
   navigation: { stepId: string | undefined; to: LayoutPresetId }
 ): boolean => {
-  if (project.layout.presetId !== navigation.to || navigation.stepId === undefined) {
+  if (project.workspaceId !== navigation.to || navigation.stepId === undefined) {
     return false;
   }
 
   const index = project.undoRedo.past.findIndex(({ id }) => id === navigation.stepId);
 
-  return (
-    index >= 0 &&
-    project.undoRedo.past
-      .slice(index + 1)
-      .every(({ notice }) => notice?.kind !== 'switchPreset' && notice?.kind !== 'revert')
-  );
+  return index >= 0 && project.undoRedo.past.slice(index + 1).every(({ notice }) => notice?.kind !== 'switchPreset');
 };
 
 /**
@@ -352,11 +318,10 @@ export const goBackToPreviousWorkspace = (ports: Pick<WorkspaceNavigationPorts, 
 };
 
 /** The active workspace's stage while the center shows something else (Away), else null; a snapshot selector. */
-export const getActiveAwayStage = ({
-  account,
-  activeProject,
-}: Pick<WorkbenchSnapshot, 'account' | 'activeProject'>): WidgetInstanceId | null =>
-  getAwayStage(resolveSavedLayoutPreset(account, activeProject.layout.presetId), activeProject);
+export const getActiveAwayStage = (
+  snapshot: Pick<WorkbenchSnapshot, 'account' | 'activeLayout' | 'activeProject' | 'customizing'>
+): WidgetInstanceId | null =>
+  getAwayStage(getProjectWorkspace(snapshot, snapshot.activeProject), snapshot.activeLayout);
 
 /** Ends Away: fronts the stage and keeps focus in the center. False when there is no stage to go back to. */
 export const goBackToStage = (ports: WorkspaceNavigationPorts): boolean => {
@@ -366,10 +331,10 @@ export const goBackToStage = (ports: WorkspaceNavigationPorts): boolean => {
     return false;
   }
 
-  const project = ports.queries.getSnapshot().activeProject;
+  const { activeLayout, activeProject: project } = ports.queries.getSnapshot();
 
   ports.commands.widgets.select({ projectId: project.id, region: 'center', widgetId: stage });
-  ports.focus?.focusRegion('center', project.widgetInstances[stage]?.typeId, stage);
+  ports.focus?.focusRegion('center', activeLayout.widgetInstances[stage]?.typeId, stage);
 
   return true;
 };
@@ -381,15 +346,16 @@ const PREVIEW_TYPE_ID = 'preview';
  * swaps to the center's other view and back. A center that does not place Preview gets the offer to add it.
  */
 export const toggleCenterPreview = (ports: WorkspaceNavigationPorts): boolean => {
-  const { account, activeProject: project } = ports.queries.getSnapshot();
-  const center = project.widgetRegions.center;
-  const previewId = center.instanceIds.find((id) => project.widgetInstances[id]?.typeId === PREVIEW_TYPE_ID) ?? null;
+  const snapshot = ports.queries.getSnapshot();
+  const { activeLayout: layout, activeProject: project } = snapshot;
+  const center = layout.widgetRegions.center;
+  const previewId = center.instanceIds.find((id) => layout.widgetInstances[id]?.typeId === PREVIEW_TYPE_ID) ?? null;
 
-  if (previewId === null || getCenterFront(project) !== previewId) {
+  if (previewId === null || getCenterFront(layout) !== previewId) {
     return openInWorkspace(ports, { surface: 'stage', typeId: PREVIEW_TYPE_ID }, { focus: false, mode: 'stay' }).ok;
   }
 
-  const stage = getPlacedStage(resolveSavedLayoutPreset(account, project.layout.presetId), project);
+  const stage = getPlacedStage(getProjectWorkspace(snapshot, project), layout);
   const returnId =
     stage !== null && stage !== previewId ? stage : (center.instanceIds.find((id) => id !== previewId) ?? null);
 
@@ -402,16 +368,20 @@ export const toggleCenterPreview = (ports: WorkspaceNavigationPorts): boolean =>
   return true;
 };
 
-/** Per project: the control its session's end returns focus to, and whether its bar takes focus when it mounts. */
-const sessionFocus = new Map<string, { focusBar: boolean; returnFocus: (() => HTMLElement | null) | null }>();
+/**
+ * Per project: the control its session's end returns focus to, and what in its bar takes focus once: the bar, or the
+ * name field of a new workspace's draft.
+ */
+const sessionFocus = new Map<
+  string,
+  { focus: 'bar' | 'name' | null; returnFocus: (() => HTMLElement | null) | null }
+>();
 
 registerAccountOwnedResource({ clear: () => sessionFocus.clear(), name: 'workspace-customize-focus' });
 
 type CustomizePorts = Pick<WorkspaceNavigationPorts, 'queries'> & { commands: Pick<WorkbenchCommands, 'layout'> };
 
 export interface StartCustomizeOptions {
-  /** Save as new: the session goes on in the copy and keeps the control that opened it. */
-  continues?: boolean;
   /** Whether focus moves to the bar; an add that enters Customize focuses the added widget instead. */
   focusBar?: boolean;
   /** The control focus returns to when the session ends, while it is on the page; the workspace's tab otherwise. */
@@ -420,27 +390,51 @@ export interface StartCustomizeOptions {
 
 /** Enters Customize on the active project's workspace. */
 export const startCustomizing = (ports: CustomizePorts, options: StartCustomizeOptions = {}): void => {
-  const projectId = ports.queries.getSnapshot().activeProject.id;
-  const previous = sessionFocus.get(projectId);
-
-  sessionFocus.set(projectId, {
-    focusBar: options.focusBar !== false,
-    returnFocus: options.continues ? (previous?.returnFocus ?? null) : (options.returnFocus ?? null),
+  sessionFocus.set(ports.queries.getSnapshot().activeProject.id, {
+    focus: options.focusBar === false ? null : 'bar',
+    returnFocus: options.returnFocus ?? null,
   });
   ports.commands.layout.beginCustomize();
 };
 
-/** True once after a gesture entered Customize; returning to a project already customizing moves no focus. */
-export const claimCustomizeBarFocus = (projectId: string): boolean => {
-  const focus = sessionFocus.get(projectId);
+/**
+ * Enters Customize on `workspaceId`: entering that workspace first when the project is elsewhere, and only once the
+ * entry lands (a dropped one starts nothing). Without one, or for a workspace the account lacks, the active one.
+ */
+export const customizeWorkspaceById = (ports: CustomizePorts, workspaceId?: LayoutPresetId): void => {
+  const { account, activeProject } = ports.queries.getSnapshot();
 
-  if (!focus?.focusBar) {
-    return false;
+  if (
+    workspaceId === undefined ||
+    workspaceId === activeProject.workspaceId ||
+    !doesLayoutPresetExist(account, workspaceId)
+  ) {
+    startCustomizing(ports);
+
+    return;
   }
 
-  focus.focusBar = false;
+  flushWorkbenchDrafts();
+  void ports.commands.layout.activatePreset(workspaceId).then((appliedId) => {
+    if (appliedId === workspaceId && ports.queries.getSnapshot().activeProject.id === activeProject.id) {
+      startCustomizing(ports);
+    }
+  });
+};
 
-  return true;
+/**
+ * What in the bar takes focus once after a gesture entered Customize or made its draft a new workspace; returning to a
+ * project already customizing moves no focus.
+ */
+export const claimCustomizeBarFocus = (projectId: string): 'bar' | 'name' | null => {
+  const entry = sessionFocus.get(projectId);
+  const focus = entry?.focus ?? null;
+
+  if (entry) {
+    entry.focus = null;
+  }
+
+  return focus;
 };
 
 export const getWorkspaceTab = (presetId: LayoutPresetId): HTMLElement | null =>
@@ -468,45 +462,49 @@ export const restoreFocusAfterCustomize = (projectId: string): void => {
 const createCustomPresetId = (): string =>
   `custom-layout-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
+type NewWorkspace = Omit<NewWorkspaceDraft, 'id'>;
+
 /**
- * New workspace: copies the arrangement on screen into a new workspace, moves the project onto it and customizes it
- * there. Also what Save as new does from inside Customize.
+ * New workspace: Customize on a draft copy of what is on screen, for a workspace that exists once Done creates it.
+ * Cancel leaves the account, the tabs and the project's workspace as they were. The name field takes focus.
  */
 export const customizeNewWorkspace = (
   ports: CustomizePorts,
-  workspace: { defaultRoute: LayoutPresetRoute | null; iconId?: string; label: string },
-  options?: StartCustomizeOptions
+  workspace: NewWorkspace,
+  options: Pick<StartCustomizeOptions, 'returnFocus'> = {}
 ): void => {
-  ports.commands.layout.createPreset(createCustomPresetId(), workspace.label, workspace.iconId, workspace.defaultRoute);
-  startCustomizing(ports, options);
+  sessionFocus.set(ports.queries.getSnapshot().activeProject.id, {
+    focus: 'name',
+    returnFocus: options.returnFocus ?? null,
+  });
+  ports.commands.layout.beginCustomize({ ...workspace, id: createCustomPresetId() });
 };
 
-const LOCKED_TITLE_KEY = 'shell.workspace.locked';
+/** Save as new: the session goes on as a new workspace's draft, and ends where it would have. */
+export const saveCustomizeAsNew = (ports: CustomizePorts, workspace: NewWorkspace): void =>
+  ports.commands.layout.saveCustomizeAsNew({ ...workspace, id: createCustomPresetId() });
+
+/** A name no workspace in `taken` has, ignoring case: `base`, else `base` numbered from 2. */
+export const getUniqueWorkspaceName = (base: string, taken: readonly string[]): string => {
+  const names = new Set(taken.map((name) => name.trim().toLocaleLowerCase()));
+  let candidate = base;
+
+  for (let index = 2; names.has(candidate.toLocaleLowerCase()); index += 1) {
+    candidate = `${base} ${index}`;
+  }
+
+  return candidate;
+};
 
 /**
- * Runs a workspace command only while the lock allows it, so its hotkey agrees with the palette that leaves it out. A
- * locked structural command answers with one Customize hint, a repeat coalescing into it; leaving a workspace while
- * customizing does nothing.
+ * Runs a workspace command only while the lock allows it, so its hotkey agrees with the palette that leaves it out:
+ * leaving a workspace while customizing does nothing.
  */
 export const runWorkspaceCommand = (
-  ports: Pick<WorkspaceNavigationPorts, 'queries'> & { commands: Pick<WorkbenchCommands, 'notifications'> },
+  ports: Pick<WorkspaceNavigationPorts, 'queries'>,
   { commandId, rearrangeWithoutCustomize }: { commandId: string; rearrangeWithoutCustomize: boolean },
   handler: () => unknown
-): unknown => {
-  if (
-    isWorkspaceCommandAvailable(commandId, selectStructureLock(ports.queries.getSnapshot(), rearrangeWithoutCustomize))
-  ) {
-    return handler();
-  }
-  if (isStructureCommand(commandId)) {
-    ports.commands.notifications.add({
-      actions: [{ kind: 'customize-workspace' }],
-      category: 'workspace-offer',
-      kind: 'info',
-      title: i18next.t(LOCKED_TITLE_KEY, { lng: 'en' }),
-      titleKey: LOCKED_TITLE_KEY,
-    });
-  }
-
-  return undefined;
-};
+): unknown =>
+  isWorkspaceCommandAvailable(commandId, selectStructureLock(ports.queries.getSnapshot(), rearrangeWithoutCustomize))
+    ? handler()
+    : undefined;

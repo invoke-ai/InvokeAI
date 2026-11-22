@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
 import { getActiveProjectGraph } from './projectWorkflows';
-import { isCenterViewType } from './widgetRegistry';
-import { createInitialWorkbenchState, workbenchReducer } from './workbenchState.testing';
+import { createInitialWorkbenchState, getLayoutOf, workbenchReducer } from './workbenchState.testing';
+import { createRegistryLayoutAvailability } from './workspace/registryAvailability';
 
-const preferenceOff = { autoSwitchInvocationRoute: false, isCenterView: isCenterViewType };
+const preferenceOff = { autoSwitchInvocationRoute: false, availability: createRegistryLayoutAvailability() };
 
 describe('auto invocation route switching with the preference off', () => {
   it('leaves the route alone for workflow, generate, upscale, and Canvas edits', () => {
@@ -100,7 +100,7 @@ type State = ReturnType<typeof createInitialWorkbenchState>;
 const getProject = (state: State) => state.projects.find((project) => project.id === state.activeProjectId)!;
 const getInvocation = (state: State) => getProject(state).invocation;
 const getRegion = (state: State, region: 'left' | 'right' | 'center' | 'bottom') =>
-  getProject(state).widgetRegions[region];
+  getLayoutOf(state).widgetRegions[region];
 
 /** The default layout keeps Video off the left rail; a tab has to be there before it can be brought to the front. */
 const createStateWithVideoTab = (): State =>
@@ -320,7 +320,11 @@ describe('auto invocation route switching on widget reveal', () => {
   });
 
   it('follows a tab dragged into another region, and a reorder only when it changes the front tab', () => {
-    let state = createStateWithVideoTab();
+    let state = workbenchReducer(createStateWithVideoTab(), {
+      region: 'left',
+      type: 'toggleRegionWidget',
+      widgetId: 'workflow',
+    });
 
     // Generate is routed and in front, so the drag is what moves the route.
     state = workbenchReducer(state, { region: 'left', type: 'selectRegionWidget', widgetId: 'generate' });
@@ -328,14 +332,14 @@ describe('auto invocation route switching on widget reveal', () => {
 
     state = workbenchReducer(state, {
       fromRegion: 'left',
-      instanceId: 'video',
+      instanceId: 'workflow',
       toIndex: 0,
-      toRegion: 'right',
+      toRegion: 'bottom',
       type: 'moveWidgetInstance',
     });
 
-    expect(getRegion(state, 'right').activeInstanceId).toBe('video');
-    expect(getInvocation(state)).toMatchObject({ sourceId: 'video' });
+    expect(getRegion(state, 'bottom').activeInstanceId).toBe('workflow');
+    expect(getInvocation(state)).toMatchObject({ sourceId: 'workflow' });
 
     const reordered = workbenchReducer(state, {
       instanceIds: [...getRegion(state, 'left').instanceIds].reverse(),
@@ -343,7 +347,7 @@ describe('auto invocation route switching on widget reveal', () => {
       type: 'reorderWidgetInstances',
     });
 
-    expect(getInvocation(reordered)).toMatchObject({ sourceId: 'video' });
+    expect(getInvocation(reordered)).toMatchObject({ sourceId: 'workflow' });
 
     const reselected = workbenchReducer(state, {
       activeInstanceId: 'upscale',

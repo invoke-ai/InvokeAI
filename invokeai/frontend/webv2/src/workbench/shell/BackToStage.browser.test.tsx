@@ -28,6 +28,8 @@ const useSnapshot = (): WorkbenchSnapshot => useSyncExternalStore(runtime.store.
 vi.mock('@workbench/WorkbenchContext', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useActiveProjectId: () => useSnapshot().activeProject.id,
+  useActiveLayoutSelector: <Selected,>(selector: (layout: WorkbenchSnapshot['activeLayout']) => Selected) =>
+    selector(useSnapshot().activeLayout),
   useActiveProjectSelector: <Selected,>(selector: (project: Project) => Selected) =>
     selector(useSnapshot().activeProject),
   useOptionalWorkbenchExtensions: () => runtime.extensions,
@@ -80,7 +82,7 @@ let root: Root;
 let queryClient: QueryClient;
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-const centerFront = () => runtime.store.getSnapshot().activeProject.widgetRegions.center.activeInstanceId;
+const centerFront = () => runtime.store.getSnapshot().activeLayout.widgetRegions.center.activeInstanceId;
 const centerRegion = () => host.querySelector<HTMLElement>('[data-focus-region="center"]')!;
 const backButton = () => host.querySelector<HTMLButtonElement>('button[aria-label="Back to Canvas"]');
 const press = (keys: string) => act(() => userEvent.keyboard(keys));

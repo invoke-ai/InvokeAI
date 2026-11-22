@@ -68,6 +68,9 @@ const project = {
 };
 vi.mock('@workbench/WorkbenchContext', async (importOriginal) => ({
   ...(await importOriginal<typeof WorkbenchContextModule>()),
+  useActiveLayoutSelector: (selector: (value: typeof project) => unknown) => selector(project),
+  useWorkbenchSelector: (selector: (snapshot: never) => unknown) =>
+    selector({ activeLayout: project, activeProject: project } as never),
   useActiveProjectSelector: (selector: (value: typeof project) => unknown) => selector(project),
   useWidgetValuesSelector: (widgetId: string, selector: (values: Record<string, unknown>) => unknown) =>
     selector(

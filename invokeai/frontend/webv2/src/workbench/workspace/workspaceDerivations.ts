@@ -1,11 +1,13 @@
 import type { InvocationSourceId, ResultDestination } from '@workbench/invocationContracts';
-import type { LayoutPresetRoute, PanelState, WidgetRegion, WidgetRegionState } from '@workbench/layoutContracts';
+import type { LayoutPresetRoute, WidgetRegion, WidgetRegionState } from '@workbench/layoutContracts';
 import type { WidgetInstanceId, WidgetTypeId } from '@workbench/widgetContracts';
 
-/** The placement facts a workspace's arrangement and a live project both carry. */
+/**
+ * The placement facts a saved structure and a resolved layout both carry. Read from a resolved layout, a side region
+ * is shown exactly when not collapsed.
+ */
 export interface WorkspacePlacement {
   floatingWidgets?: Readonly<Record<WidgetInstanceId, unknown>>;
-  layout: { panels: PanelState };
   widgetInstances: Readonly<Record<WidgetInstanceId, { typeId: WidgetTypeId }>>;
   widgetRegions: Readonly<
     Record<WidgetRegion, Pick<WidgetRegionState, 'activeInstanceId' | 'instanceIds' | 'isCollapsed'>>
@@ -29,25 +31,29 @@ export interface SavedWorkspace {
 
 const JOB_SOURCE_REGION_ORDER: readonly WidgetRegion[] = ['center', 'left', 'right', 'bottom'];
 
-/** Whether a widget type can be the center's view for this account: enabled, available, and not a toolbar item. */
-export type IsCenterView = (typeId: WidgetTypeId) => boolean;
+/** What a region fronts: its active instance while that is a member, else its first member. */
+export const getRegionFront = ({
+  activeInstanceId,
+  instanceIds,
+}: Pick<WidgetRegionState, 'activeInstanceId' | 'instanceIds'>): WidgetInstanceId | null =>
+  instanceIds.includes(activeInstanceId) ? activeInstanceId : (instanceIds[0] ?? null);
 
-/** What the center shows in this arrangement now: its front while that is a member, else its first member. */
-export const getCenterFront = (placement: WorkspacePlacement): WidgetInstanceId | null => {
-  const { activeInstanceId, instanceIds } = placement.widgetRegions.center;
-
-  return instanceIds.includes(activeInstanceId) ? activeInstanceId : (instanceIds[0] ?? null);
-};
+/** What the center shows in this arrangement now. */
+export const getCenterFront = (placement: Pick<WorkspacePlacement, 'widgetRegions'>): WidgetInstanceId | null =>
+  getRegionFront(placement.widgetRegions.center);
 
 /** The center view the workspace is built around: the center front of the arrangement the account saved. */
 export const getWorkspaceStage = (workspace: SavedWorkspace): WidgetInstanceId | null =>
   getCenterFront(workspace.snapshot);
 
-export const getWorkspaceHomeFronts = (placement: WorkspacePlacement): Record<WidgetRegion, WidgetInstanceId> => ({
-  bottom: placement.widgetRegions.bottom.activeInstanceId,
-  center: placement.widgetRegions.center.activeInstanceId,
-  left: placement.widgetRegions.left.activeInstanceId,
-  right: placement.widgetRegions.right.activeInstanceId,
+/** Each region's front; read from a saved arrangement, these are its home fronts. */
+export const getWorkspaceHomeFronts = (
+  placement: Pick<WorkspacePlacement, 'widgetRegions'>
+): Record<WidgetRegion, WidgetInstanceId | null> => ({
+  bottom: getRegionFront(placement.widgetRegions.bottom),
+  center: getRegionFront(placement.widgetRegions.center),
+  left: getRegionFront(placement.widgetRegions.left),
+  right: getRegionFront(placement.widgetRegions.right),
 });
 
 /** Sources the arrangement docks in any region. */
@@ -79,7 +85,8 @@ const getFrontSource = (
   const fronts = getWorkspaceHomeFronts(placement);
 
   for (const region of JOB_SOURCE_REGION_ORDER) {
-    const typeId = placement.widgetInstances[fronts[region]]?.typeId;
+    const front = fronts[region];
+    const typeId = front === null ? undefined : placement.widgetInstances[front]?.typeId;
     const sourceId = typeId ? getSourceId(typeId) : null;
 
     if (sourceId) {
@@ -95,22 +102,6 @@ export const getPlacedStage = (workspace: SavedWorkspace, placement: WorkspacePl
   const stage = getWorkspaceStage(workspace);
 
   return stage !== null && placement.widgetRegions.center.instanceIds.includes(stage) ? stage : null;
-};
-
-/** The stage entry fronts: the placed stage while it is a center view, else the first center view placed. */
-export const getEntryStage = (
-  workspace: SavedWorkspace,
-  placement: WorkspacePlacement,
-  isCenterView: IsCenterView
-): WidgetInstanceId | null => {
-  const isView = (instanceId: WidgetInstanceId) => {
-    const typeId = placement.widgetInstances[instanceId]?.typeId;
-
-    return typeId !== undefined && isCenterView(typeId);
-  };
-  const stage = getPlacedStage(workspace, placement);
-
-  return stage !== null && isView(stage) ? stage : (placement.widgetRegions.center.instanceIds.find(isView) ?? null);
 };
 
 /** The stage to go back to while the center shows something else (Away), else null. */

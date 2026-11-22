@@ -17,7 +17,7 @@ import {
   removeFloatingPlacement,
 } from '@workbench/widgetPlacementCommands';
 import { areWidgetPlacementProjectsEqual, getWidgetPlacementProject } from '@workbench/widgetPlacementMeta';
-import { useActiveProjectSelector, useWorkbenchCommands, useWorkbenchQueries } from '@workbench/WorkbenchContext';
+import { useWorkbenchCommands, useWorkbenchQueries, useWorkbenchSelector } from '@workbench/WorkbenchContext';
 import { useWorkbenchWidgetRegistry } from '@workbench/WorkbenchWidgetRegistryContext';
 import { useCanEditStructure } from '@workbench/workspace/useStructureLock';
 import { useWorkspaceOpen } from '@workbench/workspace/useWorkspaceOpen';
@@ -65,8 +65,8 @@ export const WidgetsDialogBody = ({ isOpen, onExitComplete }: { isOpen: boolean;
   const open = useWorkspaceOpen();
   // Locked, the list only shows: Add, Dock and Remove are Customize's, one press away in the footer.
   const canEditStructure = useCanEditStructure();
-  const { getWidgetById, getWidgetsForRegion } = useWorkbenchWidgetRegistry();
-  const project = useActiveProjectSelector(getWidgetPlacementProject, areWidgetPlacementProjectsEqual);
+  const { getWidgetsForRegion } = useWorkbenchWidgetRegistry();
+  const project = useWorkbenchSelector(getWidgetPlacementProject, areWidgetPlacementProjectsEqual);
   // Show moves focus to the widget; closing then must not pull it back to whatever opened the list.
   const [returnsFocus, setReturnsFocus] = useState(true);
   const allWidgets = useMemo(() => {
@@ -85,12 +85,12 @@ export const WidgetsDialogBody = ({ isOpen, onExitComplete }: { isOpen: boolean;
   const rows = useMemo(
     () =>
       getWidgetsListRows({
+        availability: queries.getAvailability(),
         getLabel: (manifest) => resolveWidgetLabel(manifest, t),
-        getWidgetById,
         project,
         widgets: allWidgets,
       }),
-    [allWidgets, getWidgetById, project, t]
+    [allWidgets, project, queries, t]
   );
   const placedRows = useMemo(() => rows.filter((row) => row.instanceId !== null), [rows]);
   const hiddenRows = useMemo(() => rows.filter((row) => row.instanceId === null), [rows]);
@@ -121,7 +121,7 @@ export const WidgetsDialogBody = ({ isOpen, onExitComplete }: { isOpen: boolean;
           removeFloatingPlacement({ instanceId: row.instanceId, project, widgets });
         } else if (row.placement.kind === 'docked') {
           closeWidgetPlacement({
-            getWidgetById,
+            availability: queries.getAvailability(),
             instanceId: row.instanceId,
             project,
             region: row.placement.region,
@@ -138,7 +138,7 @@ export const WidgetsDialogBody = ({ isOpen, onExitComplete }: { isOpen: boolean;
         open({ typeId: row.widget.manifest.id }, { mode: 'stay' });
       },
     }),
-    [commands, getWidgetById, getWidgetsForRegion, open, project, queries, widgets]
+    [commands, getWidgetsForRegion, open, project, queries, widgets]
   );
 
   return (

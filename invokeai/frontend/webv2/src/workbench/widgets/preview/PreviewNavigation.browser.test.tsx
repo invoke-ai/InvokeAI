@@ -203,6 +203,7 @@ const getWidgetValuesVersion = () => mocks.widgetValues.version;
 vi.mock('@workbench/WorkbenchContext', () => ({
   useActiveProjectId: () => 'project-1',
   useActiveProjectName: () => 'Project 1',
+  useActiveLayoutSelector: (selector: (project: typeof mocks.project) => unknown) => selector(mocks.project),
   useActiveProjectSelector: (selector: (project: typeof mocks.project) => unknown) => selector(mocks.project),
   useOptionalWorkbenchCommands: () => mocks.commands,
   useOptionalWorkbenchExtensions: () => mocks.extensions,
@@ -223,10 +224,10 @@ vi.mock('@workbench/WorkbenchContext', () => ({
   useWorkbenchExtensions: () => mocks.extensions,
   useWorkbenchInternalStore: () => null,
   useWorkbenchLiveCanvasEngines: () => ({ commitFrame: () => false }),
-  useWorkbenchQueries: () => ({ getSnapshot: () => ({ activeProject: mocks.project }) }),
+  useWorkbenchQueries: () => ({ getSnapshot: () => ({ activeLayout: mocks.project, activeProject: mocks.project }) }),
   useWorkbenchSubscription: () => () => () => {},
   useWorkbenchSelector: (selector: (snapshot: unknown) => unknown) =>
-    selector({ backendConnection: { status: 'connected' } }),
+    selector({ activeLayout: mocks.project, activeProject: mocks.project, backendConnection: { status: 'connected' } }),
 }));
 
 const mockProgressTargets = () => {

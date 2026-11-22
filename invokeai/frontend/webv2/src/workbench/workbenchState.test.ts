@@ -12,6 +12,8 @@ import type {
 import type { GraphContract } from '@workbench/graphContracts';
 import type { ExpandedPositivePrompts, InvocationSourceId } from '@workbench/invocationContracts';
 import type { Project, WorkbenchState } from '@workbench/projectContracts';
+import type { StoredProjectLayout } from '@workbench/workspace/migrateProjectLayout';
+import type { TFunction } from 'i18next';
 
 import {
   GALLERY_RECENT_IMAGE_LIMIT,
@@ -37,16 +39,23 @@ import { getCanvasStagingCandidateFingerprint, getCanvasStagingSlots } from './c
 import { getDynamicPromptsExpansionSource } from './invocation';
 import { captureInvocationRuntimeInputs } from './invocationPreparation';
 import { layoutPresets } from './layoutPresets';
-import { resolveSavedLayoutPreset } from './layoutPresetSnapshots';
+import { serializeProjectDocumentV3 } from './projects/projectDocument';
+import { deserializeProjectDocument } from './projects/projectHydration';
 import { getActiveProjectGraph } from './projectWorkflows';
+import { resolveNotificationText } from './shell/notifications/notificationToasts';
 import { getProjectWidgetValues } from './widgetState';
 import { normalizeWorkbenchAccount, normalizeWorkbenchProject } from './workbenchState';
 import {
+  addCustomWorkspace,
+  asStoredBeforeSplit,
   createInitialWorkbenchState,
+  getLayoutOf,
   nextLayerName,
   type WorkbenchAction,
   workbenchReducer as reduceWorkbench,
 } from './workbenchState.testing';
+import { getWorkspaceStructure, setWorkspaceRoute } from './workspace/accountWorkspaces';
+import { storedOn, structuralLayouts, viewOnlyLayouts } from './workspace/storedLayoutFixtures.testing';
 
 seedArchitectureCapabilities();
 
@@ -766,92 +775,211 @@ describe('model-only upscale submissions', () => {
   });
 });
 
-describe('workbench hydration invariants', () => {
-  it('preserves saved status placements and does not re-enable a removed shortcuts widget on hydration', () => {
-    const initial = createInitialWorkbenchState();
-    const project = getActiveProject(initial);
-    const bottom = {
-      ...project.widgetRegions.bottom,
-      instanceIds: ['autosave-status', 'server-status', 'notifications'],
-      alignEndInstanceIds: ['notifications'],
-    };
-    const stored = {
-      ...initial,
-      projects: [{ ...project, widgetRegions: { ...project.widgetRegions, bottom } }],
-    };
-    const hydrated = workbenchReducer(initial, { state: stored, type: 'hydrateWorkbench' });
-    expect(getActiveProject(hydrated).widgetRegions.bottom.instanceIds).toEqual(bottom.instanceIds);
-    expect(getActiveProject(hydrated).widgetRegions.bottom.alignEndInstanceIds).toEqual(['notifications']);
+describe('stored layouts from before the split', () => {
+  const legacyAccount = { activeLayoutPresetId: 'compose' } satisfies WorkbenchState['account'];
+  const hydrate = (state: WorkbenchState) =>
+    workbenchReducer(createInitialWorkbenchState(), { state, type: 'hydrateWorkbench' });
+  const sessionOf = (projects: Project[], account: WorkbenchState['account'] = legacyAccount): WorkbenchState => ({
+    ...createInitialWorkbenchState(),
+    account,
+    activeProjectId: projects[0]!.id,
+    projects,
+  });
+  const storedProject = (id: string, stored: StoredProjectLayout, storedAt?: string): Project =>
+    asStoredBeforeSplit({ ...createInitialWorkbenchState().projects[0]!, id }, { ...stored, storedAt });
+  const arrangementNotices = (state: WorkbenchState) =>
+    state.notifications.filter(({ titleKey }) => titleKey === 'shell.workspace.arrangementDroppedTitle');
+
+  it('shows what a project showed when it changed only how it looked, with nothing to tell', () => {
+    for (const [name, stored] of Object.entries(viewOnlyLayouts)) {
+      const state = hydrate(sessionOf([storedProject('viewed', stored)], createInitialWorkbenchState().account));
+      const project = getActiveProject(state);
+
+      expect(project.legacyLayout, name).toBeUndefined();
+      expect(state.account.layoutPresetOverrides, name).toEqual({});
+      expect(arrangementNotices(state), name).toEqual([]);
+      expect(Object.keys(project.views).length, name).toBeGreaterThan(0);
+    }
   });
 
-  it('builds that draft from the cached account, not the shipped defaults', () => {
+  it('adopts the opening project’s arrangement as its workspace once, and drops the others’ with one notice each', () => {
+    const adopting = storedProject('adopting', structuralLayouts['removed a widget'], '2026-01-01T00:00:00Z');
+    const other = storedProject('other', structuralLayouts['moved a tab to another rail'], '2026-02-01T00:00:00Z');
+    const state = hydrate(sessionOf([adopting, other]));
+
+    expect(state.account.workspaceLayoutsAdopted).toBe(true);
+    expect(getWorkspaceStructure(state.account, 'compose').widgetRegions.right.instanceIds).toEqual([
+      'gallery',
+      'queue',
+    ]);
+    expect(getActiveProject(state).views).toEqual({});
+    expect(getLayoutOf(state).widgetRegions.right.instanceIds).toEqual(['gallery', 'queue']);
+    expect(arrangementNotices(state)).toEqual([]);
+    // The other project shows the adopted workspace, and is told once it is looked at.
+    expect(getLayoutOf(state, getProject(state, 'other')).widgetRegions.left.instanceIds).toEqual([
+      'generate',
+      'upscale',
+    ]);
+
+    const switched = workbenchReducer(state, { projectId: 'other', type: 'switchProject' });
+
+    expect(arrangementNotices(switched)).toMatchObject([
+      { actions: [{ kind: 'customize-workspace' }], messageValues: { workspaces: 'Compose' }, projectId: 'other' },
+    ]);
+    // Shown in the reader's language, workspace names included.
+    const german = ((key: string, values?: { workspaces?: string }) =>
+      key === 'topbar.presets.builtInLabels.compose' ? 'Komponieren' : `${key}: ${values?.workspaces}`) as TFunction;
+
+    expect(resolveNotificationText(arrangementNotices(switched)[0]!, german).message).toBe(
+      'shell.workspace.arrangementDroppedMessage: Komponieren'
+    );
+    expect(
+      arrangementNotices(
+        workbenchReducer(workbenchReducer(switched, { projectId: 'adopting', type: 'switchProject' }), {
+          projectId: 'other',
+          type: 'switchProject',
+        })
+      )
+    ).toHaveLength(1);
+    // Hydrating again adopts nothing more: the account is marked.
+    const again = hydrate({
+      ...state,
+      projects: [storedProject('late', structuralLayouts['floated a widget'], '2027-01-01T00:00:00Z')],
+    });
+
+    expect(again.account.layoutPresetOverrides).toEqual(state.account.layoutPresetOverrides);
+  });
+
+  it('tells a project only about arrangements of its own, and keeps telling it until it is active', () => {
+    const adopting = storedProject('adopting', structuralLayouts['removed a widget'], '2026-02-01T00:00:00Z');
+    const untouched = storedProject('untouched', viewOnlyLayouts['fronted other tabs'], '2026-01-01T00:00:00Z');
+    const own = storedProject('own', structuralLayouts['moved a tab to another rail'], '2026-01-01T00:00:00Z');
+    const state = hydrate(sessionOf([adopting, untouched, own]));
+
+    // Its Compose matched Compose as it was, so the adopted one replaced nothing of its own.
+    expect(getProject(state, 'untouched').droppedArrangements).toBeUndefined();
+    expect(getProject(state, 'own').droppedArrangements).toEqual(['compose']);
+
+    // Stored with the project, the notice survives a reload until the project is next active.
+    const reloaded = hydrate({ ...state, projects: state.projects });
+
+    expect(getProject(reloaded, 'own').droppedArrangements).toEqual(['compose']);
+
+    const told = workbenchReducer(reloaded, { projectId: 'own', type: 'switchProject' });
+
+    expect(arrangementNotices(told)).toMatchObject([
+      { actions: [{ kind: 'customize-workspace', workspaceId: 'compose' }], projectId: 'own' },
+    ]);
+    expect(getProject(told, 'own').droppedArrangements).toBeUndefined();
+  });
+
+  it('holds what it migrated in the stored shape until the account that adopted is saved', () => {
+    const state = hydrate(
+      sessionOf([storedProject('adopting', structuralLayouts['removed a widget'], '2026-02-01T00:00:00Z')])
+    );
+    const document = (current: WorkbenchState) =>
+      serializeProjectDocumentV3(getActiveProject(current)) as unknown as Record<string, unknown>;
+
+    // Written back as stored, a load that never saved the account migrates and adopts the same way again.
+    expect(document(state)).toMatchObject({ layout: { presetId: 'compose' } });
+    expect(document(state)).not.toHaveProperty('workspaceId');
+    const reloaded = deserializeProjectDocument(document(state));
+
+    expect(reloaded.status === 'loaded' && hydrate(sessionOf([reloaded.project])).account).toEqual(state.account);
+
+    // A project opened before that save migrated against the same unsaved adoption: it is held too.
+    const opened = workbenchReducer(state, {
+      project: storedProject('arriving', viewOnlyLayouts['fronted other tabs']),
+      type: 'openProject',
+    });
+
+    expect(document(opened)).not.toHaveProperty('workspaceId');
+
+    const released = workbenchReducer(opened, { type: 'releaseHeldLayouts' });
+
+    expect(document(released)).toMatchObject({ workspaceId: 'compose' });
+    expect(document(released)).not.toHaveProperty('layout');
+    expect(document({ ...released, activeProjectId: getProject(released, 'adopting').id })).toMatchObject({
+      views: {},
+      workspaceId: 'compose',
+    });
+    // Once nothing is held, an arrival writes the new shape at once.
+    expect(
+      document(
+        workbenchReducer(released, {
+          project: storedProject('later', viewOnlyLayouts['fronted other tabs']),
+          type: 'openProject',
+        })
+      )
+    ).toHaveProperty('workspaceId', 'compose');
+  });
+
+  it('adopts the most recently stored project when the one opening has nothing stored', () => {
+    const fresh = { ...createInitialWorkbenchState().projects[0]!, id: 'fresh' };
+    const older = storedProject('older', structuralLayouts['removed a widget'], '2026-01-01T00:00:00Z');
+    const newer = storedProject('newer', structuralLayouts['moved a tab to another rail'], '2026-03-01T00:00:00Z');
+    const state = hydrate(sessionOf([fresh, older, newer]));
+
+    expect(getWorkspaceStructure(state.account, 'compose').widgetRegions.left.instanceIds).toEqual([
+      'generate',
+      'image-map',
+      'upscale',
+    ]);
+    expect(getProject(state, 'older').droppedArrangements).toEqual(['compose']);
+  });
+
+  it('never adopts into a fresh account, and drops what a project opened later stored', () => {
+    const fresh = hydrate(
+      sessionOf([storedProject('stored', structuralLayouts['removed a widget'])], createInitialWorkbenchState().account)
+    );
+
+    expect(fresh.account.layoutPresetOverrides).toEqual({});
+    expect(arrangementNotices(fresh)).toHaveLength(1);
+
+    const opened = workbenchReducer(fresh, {
+      project: storedProject('later', structuralLayouts['floated a widget']),
+      type: 'openProject',
+    });
+
+    expect(opened.account).toBe(fresh.account);
+    expect(getLayoutOf(opened).floatingWidgets).toBeUndefined();
+    expect(getActiveProject(opened).views.compose).toEqual({ fronts: { right: 'image-map' }, sizes: { left: 600 } });
+    expect(arrangementNotices(opened)).toHaveLength(2);
+  });
+
+  it('builds the draft of an empty session from the cached account, not the shipped defaults', () => {
     const initial = createInitialWorkbenchState();
-    const project = getActiveProject(initial);
-    const customizedDefault = {
-      ...resolveSavedLayoutPreset(initial.account, initial.account.activeLayoutPresetId).snapshot,
-      widgetRegions: {
-        ...project.widgetRegions,
-        left: { ...project.widgetRegions.left, instanceIds: ['generate'] },
-      },
+    const compose = layoutPresets[0]!.snapshot;
+    const customized = {
+      ...compose,
+      widgetRegions: { ...compose.widgetRegions, left: { ...compose.widgetRegions.left, instanceIds: ['generate'] } },
     };
-    const emptySession: WorkbenchState = {
+    const hydrated = hydrate({
       ...initial,
-      account: {
-        ...initial.account,
-        layoutPresetOverrides: { [initial.account.activeLayoutPresetId]: customizedDefault },
-      },
+      account: { ...initial.account, layoutPresetOverrides: { compose: customized } },
       activeProjectId: '',
       projects: [],
-    };
+    });
 
-    const hydrated = workbenchReducer(initial, { state: emptySession, type: 'hydrateWorkbench' });
-
-    expect(getActiveProject(hydrated).widgetRegions.left.instanceIds).toEqual(['generate']);
+    expect(getLayoutOf(hydrated).widgetRegions.left.instanceIds).toEqual(['generate']);
   });
 
   it('repairs an active project id that names no hydrated project', () => {
     const initial = createInitialWorkbenchState();
-    const danglingActiveId: WorkbenchState = { ...initial, activeProjectId: 'project-that-was-refused' };
-
-    const hydrated = workbenchReducer(initial, { state: danglingActiveId, type: 'hydrateWorkbench' });
+    const hydrated = hydrate({ ...initial, activeProjectId: 'project-that-was-refused' });
 
     expect(hydrated.activeProjectId).toBe(hydrated.projects[0]?.id);
   });
-});
 
-describe('workbench widget region defaults', () => {
-  it('hydrates the old default right rail to the curated Compose defaults while preserving customized rails', () => {
-    const initial = createInitialWorkbenchState();
-    const legacyDefault = {
-      ...initial,
-      projects: initial.projects.map((project) => ({
-        ...project,
-        widgetRegions: {
-          ...project.widgetRegions,
-          right: { ...project.widgetRegions.right, instanceIds: ['queue', 'gallery', 'layers'] },
-        },
-      })),
-    } satisfies WorkbenchState;
-    const customized = {
-      ...initial,
-      projects: initial.projects.map((project) => ({
-        ...project,
-        widgetRegions: {
-          ...project.widgetRegions,
-          right: { ...project.widgetRegions.right, instanceIds: ['gallery', 'layers'] },
-        },
-      })),
-    } satisfies WorkbenchState;
+  it('brings a historical default rail up to date, so the project changed nothing', () => {
+    const stored = storedProject(
+      'legacy-rail',
+      storedOn('compose', { regions: { right: { instanceIds: ['queue', 'gallery', 'layers'] } } })
+    );
+    const state = hydrate(sessionOf([stored], createInitialWorkbenchState().account));
 
-    const hydratedLegacyDefault = workbenchReducer(initial, { state: legacyDefault, type: 'hydrateWorkbench' });
-    const hydratedCustomized = workbenchReducer(initial, { state: customized, type: 'hydrateWorkbench' });
-
-    expect(getActiveProject(hydratedLegacyDefault).widgetRegions.right.instanceIds).toEqual([
-      'gallery',
-      'image-map',
-      'queue',
-    ]);
-    expect(getActiveProject(hydratedCustomized).widgetRegions.right.instanceIds).toEqual(['gallery', 'layers']);
+    expect(getLayoutOf(state).widgetRegions.right.instanceIds).toEqual(['gallery', 'image-map', 'queue']);
+    expect(arrangementNotices(state)).toEqual([]);
   });
 
   it('migrates a legacy Upscale prompt only when Generate has no prompt content', () => {
@@ -906,95 +1034,147 @@ describe('workbench widget region defaults', () => {
   });
 });
 
-describe('workbench panel resize bounds', () => {
+describe('a project’s view of its workspace', () => {
+  it('remembers fronts, sizes and collapsed panels per project and per workspace, never for another project', () => {
+    let state = workbenchReducer(createInitialWorkbenchState(), { presetId: 'compose', type: 'applyPreset' });
+    const firstId = state.activeProjectId;
+
+    state = workbenchReducer(state, { type: 'createProject' });
+    const secondId = state.activeProjectId;
+
+    state = workbenchReducer(state, { region: 'left', sizePx: 500, type: 'setRegionWidgetSize' });
+    state = workbenchReducer(state, { isCollapsed: true, region: 'right', type: 'setRegionWidgetCollapsed' });
+    state = workbenchReducer(state, { region: 'left', type: 'selectRegionWidget', widgetId: 'upscale' });
+
+    expect(getProject(state, secondId).views).toEqual({
+      compose: { collapsed: { right: true }, fronts: { left: 'upscale' }, sizes: { left: 500 } },
+    });
+    expect(getProject(state, firstId).views).toEqual({});
+    expect(state.account.layoutPresetOverrides).toBeUndefined();
+
+    state = workbenchReducer(state, { presetId: 'edit', type: 'applyPreset' });
+    expect(getLayoutOf(state).widgetRegions.left).toMatchObject({ activeInstanceId: 'generate', sizePx: 450 });
+
+    state = workbenchReducer(state, { presetId: 'compose', type: 'applyPreset' });
+    expect(getLayoutOf(state).widgetRegions.left).toMatchObject({ sizePx: 500 });
+    expect(getLayoutOf(state).widgetRegions.right.isCollapsed).toBe(true);
+  });
+
   it('reopens a collapsed region at the size it was collapsed from', () => {
     let state = createInitialWorkbenchState();
 
     state = workbenchReducer(state, { region: 'left', sizePx: 500, type: 'setRegionWidgetSize' });
 
-    const activeInstanceId = getActiveProject(state).widgetRegions.left.activeInstanceId;
+    const activeInstanceId = getLayoutOf(state).widgetRegions.left.activeInstanceId;
 
     state = workbenchReducer(state, { isCollapsed: true, region: 'left', type: 'setRegionWidgetCollapsed' });
-    expect(getActiveProject(state).widgetRegions.left).toMatchObject({ isCollapsed: true, sizePx: 500 });
+    expect(getLayoutOf(state).widgetRegions.left).toMatchObject({ isCollapsed: true, sizePx: 500 });
 
     state = workbenchReducer(state, { region: 'left', type: 'selectRegionWidget', widgetId: activeInstanceId });
-    expect(getActiveProject(state).widgetRegions.left).toMatchObject({ isCollapsed: false, sizePx: 500 });
+    expect(getLayoutOf(state).widgetRegions.left).toMatchObject({ isCollapsed: false, sizePx: 500 });
   });
 });
 
-describe('workbench widget region opening', () => {
-  it('opens and uncollapses the target panel region', () => {
-    let state = createInitialWorkbenchState();
-    const activeProject = getActiveProject(state);
-    const instanceIds: Project['widgetRegions']['bottom']['instanceIds'] = ['gallery:bottom'];
+describe('rearranging without Customize', () => {
+  it('undoes a workspace step only while the account still holds what it left, and never onto a deleted one', () => {
+    let state = workbenchReducer(createInitialWorkbenchState(), { presetId: 'compose', type: 'applyPreset' });
+    const firstId = state.activeProjectId;
 
-    state = {
-      ...state,
-      projects: state.projects.map((project) =>
-        project.id === activeProject.id
-          ? {
-              ...project,
-              layout: {
-                ...project.layout,
-                panels: { ...project.layout.panels, isBottomOpen: false },
-              },
-              widgetRegions: {
-                ...project.widgetRegions,
-                bottom: {
-                  ...project.widgetRegions.bottom,
-                  activeInstanceId: 'gallery:bottom',
-                  instanceIds,
-                  isCollapsed: true,
-                },
-              },
-            }
-          : project
-      ),
-    };
+    state = workbenchReducer(state, { region: 'right', type: 'toggleRegionWidget', widgetId: 'image-map' });
+    state = workbenchReducer(state, { type: 'createProject' });
+    state = workbenchReducer(state, { presetId: 'compose', type: 'applyPreset' });
+    state = workbenchReducer(state, { region: 'right', type: 'toggleRegionWidget', widgetId: 'queue' });
+    state = workbenchReducer(state, { projectId: firstId, type: 'switchProject' });
 
-    state = workbenchReducer(state, { region: 'bottom', type: 'openRegionWidget', widgetId: 'queue' });
+    // The other project's later change stays for everyone; this project is told why its Undo did not reach it.
+    const undone = workbenchReducer(state, { type: 'undoProjectChange' });
 
-    expect(getActiveProject(state).layout.panels.isBottomOpen).toBe(true);
-    expect(getActiveProject(state).widgetRegions.bottom.activeInstanceId).toBe('queue');
-    expect(getActiveProject(state).widgetRegions.bottom.instanceIds).toEqual(['gallery:bottom', 'queue']);
-    expect(getActiveProject(state).widgetRegions.bottom.isCollapsed).toBe(false);
+    expect(getWorkspaceStructure(undone.account, 'compose').widgetRegions.right.instanceIds).toEqual(['gallery']);
+    expect(undone.notifications[0]).toMatchObject({ titleKey: 'shell.layoutUndo.workspaceChangedTitle' });
+
+    let custom = addCustomWorkspace(createInitialWorkbenchState(), { id: 'mine', label: 'Mine' });
+
+    custom = workbenchReducer(custom, { presetId: 'edit', type: 'applyPreset' });
+    custom = workbenchReducer(custom, { presetId: 'mine', type: 'deleteLayoutPreset' });
+
+    expect(getActiveProject(workbenchReducer(custom, { type: 'undoProjectChange' })).workspaceId).toBe('edit');
   });
 
-  describe('opening a side panel’s front instance in the center', () => {
-    const editWithPreviewInRightPanel = (patch: (project: Project) => Project = (project) => project) => {
-      let state = workbenchReducer(createInitialWorkbenchState(), { presetId: 'edit', type: 'applyPreset' });
-      state = workbenchReducer(state, { region: 'right', type: 'selectRegionWidget', widgetId: 'preview' });
+  it('writes a structural gesture to the workspace for every project on it, and nothing else', () => {
+    let state = workbenchReducer(createInitialWorkbenchState(), { presetId: 'compose', type: 'applyPreset' });
+    const firstId = state.activeProjectId;
 
-      return {
-        ...state,
-        projects: state.projects.map((project) => (project.id === state.activeProjectId ? patch(project) : project)),
-      };
-    };
-    const openPreviewInCenter = (state: WorkbenchState) =>
-      getActiveProject(workbenchReducer(state, { region: 'center', type: 'openRegionWidget', widgetId: 'preview' }));
+    state = workbenchReducer(state, { type: 'createProject' });
+    state = workbenchReducer(state, { presetId: 'edit', type: 'applyPreset' });
+    const onEditId = state.activeProjectId;
 
-    it('shows the one instance in the center while the panel fronts its neighbour', () => {
-      const before = editWithPreviewInRightPanel();
-      expect(getActiveProject(before).widgetRegions.right).toMatchObject({
-        activeInstanceId: 'preview',
-        instanceIds: ['layers', 'preview'],
-      });
+    state = workbenchReducer(state, { projectId: firstId, type: 'switchProject' });
+    state = workbenchReducer(state, { region: 'right', type: 'toggleRegionWidget', widgetId: 'image-map' });
 
-      const project = openPreviewInCenter(before);
+    expect(getWorkspaceStructure(state.account, 'compose').widgetRegions.right.instanceIds).toEqual([
+      'gallery',
+      'queue',
+    ]);
+    expect(state.account.layoutPresetOverrides?.edit).toBeUndefined();
+    expect(getLayoutOf(state, getProject(state, onEditId)).widgetRegions.right.instanceIds).toEqual([
+      'layers',
+      'preview',
+    ]);
 
-      expect(project.widgetRegions.center).toMatchObject({
-        activeInstanceId: 'preview',
-        instanceIds: ['canvas', 'preview'],
-      });
-      expect(project.widgetRegions.right).toMatchObject({
-        activeInstanceId: 'layers',
-        instanceIds: ['layers', 'preview'],
-        isCollapsed: false,
-      });
-      expect(Object.values(project.widgetInstances).filter((instance) => instance.typeId === 'preview')).toHaveLength(
-        1
-      );
+    state = workbenchReducer(state, { type: 'createProject' });
+    expect(getLayoutOf(state).widgetRegions.right.instanceIds).toEqual(['gallery', 'queue']);
+  });
+
+  it('undoes a structural gesture by putting the workspace back in the account', () => {
+    const before = workbenchReducer(createInitialWorkbenchState(), { presetId: 'compose', type: 'applyPreset' });
+    const moved = workbenchReducer(before, {
+      fromRegion: 'right',
+      instanceId: 'image-map',
+      toIndex: 0,
+      toRegion: 'left',
+      type: 'moveWidgetInstance',
     });
+
+    expect(getLayoutOf(moved).widgetRegions.left).toMatchObject({ activeInstanceId: 'image-map' });
+
+    const undone = workbenchReducer(moved, { type: 'undoProjectChange' });
+
+    // Back at the shipped arrangement, the built-in follows what later releases ship again.
+    expect(undone.account.layoutPresetOverrides?.compose).toBeUndefined();
+    expect(getLayoutOf(undone).widgetRegions).toEqual(getLayoutOf(before).widgetRegions);
+
+    const redone = workbenchReducer(undone, { type: 'redoProjectChange' });
+
+    expect(getWorkspaceStructure(redone.account, 'compose').widgetRegions.left.instanceIds).toContain('image-map');
+  });
+
+  it('opens a widget in a collapsed status bar, expanding it', () => {
+    const state = workbenchReducer(createInitialWorkbenchState(), {
+      region: 'bottom',
+      type: 'openRegionWidget',
+      widgetId: 'workflow',
+    });
+    const bottom = getLayoutOf(state).widgetRegions.bottom;
+
+    expect(bottom).toMatchObject({ isCollapsed: false });
+    expect(getActiveProject(state).widgetInstances[bottom.activeInstanceId]?.typeId).toBe('workflow');
+    expect(bottom.instanceIds).toContain(bottom.activeInstanceId);
+  });
+
+  it('shows an instance opened in the center once, the rail holding it fronting its neighbour', () => {
+    let state = workbenchReducer(createInitialWorkbenchState(), { presetId: 'edit', type: 'applyPreset' });
+    state = workbenchReducer(state, { region: 'right', type: 'selectRegionWidget', widgetId: 'preview' });
+    state = workbenchReducer(state, { region: 'center', type: 'openRegionWidget', widgetId: 'preview' });
+    const layout = getLayoutOf(state);
+
+    expect(layout.widgetRegions.center).toMatchObject({
+      activeInstanceId: 'preview',
+      instanceIds: ['canvas', 'preview'],
+    });
+    expect(layout.widgetRegions.right).toMatchObject({ activeInstanceId: 'layers', isCollapsed: false });
+    expect(
+      Object.values(getActiveProject(state).widgetInstances).filter(({ typeId }) => typeId === 'preview')
+    ).toHaveLength(1);
   });
 });
 
@@ -1011,39 +1191,28 @@ describe('fronting a placed widget', () => {
     expect(workbenchReducer(before, { instanceId: 'queue', region: 'right', type: 'frontRegionWidget' })).toBe(before);
   });
 
-  it('opens and expands a closed, collapsed panel to front its member', () => {
-    const before = edit();
-    const collapsed = {
-      ...before,
-      projects: before.projects.map((project) => ({
-        ...project,
-        layout: { ...project.layout, panels: { ...project.layout.panels, isLeftOpen: false } },
-        widgetRegions: { ...project.widgetRegions, left: { ...project.widgetRegions.left, isCollapsed: true } },
-      })),
-    };
+  it('expands a collapsed panel to front its member', () => {
+    const collapsed = workbenchReducer(edit(), { isCollapsed: true, region: 'left', type: 'setRegionWidgetCollapsed' });
+    const state = workbenchReducer(collapsed, { instanceId: 'upscale', region: 'left', type: 'frontRegionWidget' });
 
-    const project = getActiveProject(
-      workbenchReducer(collapsed, { instanceId: 'upscale', region: 'left', type: 'frontRegionWidget' })
-    );
-
-    expect(project.layout.panels.isLeftOpen).toBe(true);
-    expect(project.widgetRegions.left).toMatchObject({
+    expect(getLayoutOf(state).widgetRegions.left).toMatchObject({
       activeInstanceId: 'upscale',
       instanceIds: ['generate', 'upscale'],
       isCollapsed: false,
     });
+    expect(state.account).toBe(collapsed.account);
   });
 
   it('fronts a center alternate while the rail showing the same instance fronts its neighbour', () => {
-    const project = getActiveProject(
+    const layout = getLayoutOf(
       workbenchReducer(edit(), { instanceId: 'preview', region: 'center', type: 'frontRegionWidget' })
     );
 
-    expect(project.widgetRegions.center).toMatchObject({
+    expect(layout.widgetRegions.center).toMatchObject({
       activeInstanceId: 'preview',
       instanceIds: ['canvas', 'preview'],
     });
-    expect(project.widgetRegions.right).toMatchObject({
+    expect(layout.widgetRegions.right).toMatchObject({
       activeInstanceId: 'layers',
       instanceIds: ['layers', 'preview'],
     });
@@ -1332,7 +1501,7 @@ describe('project settings', () => {
 describe('workbench widget alignment', () => {
   it('moves a bottom widget between the strip clusters and back', () => {
     const initial = createInitialWorkbenchState();
-    const instanceId = getActiveProject(initial).widgetRegions.bottom.instanceIds[0]!;
+    const instanceId = getLayoutOf(initial).widgetRegions.bottom.instanceIds[0]!;
 
     const alignedEnd = workbenchReducer(initial, {
       align: 'end',
@@ -1341,12 +1510,12 @@ describe('workbench widget alignment', () => {
       type: 'setWidgetInstanceAlignment',
     });
 
-    expect(getActiveProject(alignedEnd).widgetRegions.bottom.alignEndInstanceIds).toEqual([
-      ...(getActiveProject(initial).widgetRegions.bottom.alignEndInstanceIds ?? []),
+    expect(getLayoutOf(alignedEnd).widgetRegions.bottom.alignEndInstanceIds).toEqual([
+      ...(getLayoutOf(initial).widgetRegions.bottom.alignEndInstanceIds ?? []),
       instanceId,
     ]);
-    expect(getActiveProject(alignedEnd).widgetRegions.bottom.instanceIds).toEqual(
-      getActiveProject(initial).widgetRegions.bottom.instanceIds
+    expect(getLayoutOf(alignedEnd).widgetRegions.bottom.instanceIds).toEqual(
+      getLayoutOf(initial).widgetRegions.bottom.instanceIds
     );
 
     const alignedStart = workbenchReducer(alignedEnd, {
@@ -1356,8 +1525,8 @@ describe('workbench widget alignment', () => {
       type: 'setWidgetInstanceAlignment',
     });
 
-    expect(getActiveProject(alignedStart).widgetRegions.bottom.alignEndInstanceIds).toEqual(
-      getActiveProject(initial).widgetRegions.bottom.alignEndInstanceIds ?? []
+    expect(getLayoutOf(alignedStart).widgetRegions.bottom.alignEndInstanceIds).toEqual(
+      getLayoutOf(initial).widgetRegions.bottom.alignEndInstanceIds ?? []
     );
   });
 });
@@ -1421,7 +1590,10 @@ describe('workbench layout presets', () => {
         layoutPresetOverrides: {
           compose: {
             ...compose.snapshot,
-            layout: { ...compose.snapshot.layout, centerViewId: 'gallery' },
+            widgetRegions: {
+              ...compose.snapshot.widgetRegions,
+              center: { ...compose.snapshot.widgetRegions.center, activeInstanceId: 'gallery:center' },
+            },
           },
         },
         layoutPresetRouteOverrides: {
@@ -1433,13 +1605,14 @@ describe('workbench layout presets', () => {
     const withNewProject = workbenchReducer(customized, { type: 'createProject' });
     const project = getProject(withNewProject, withNewProject.activeProjectId);
 
+    expect(getLayoutOf(withNewProject).widgetRegions.center.activeInstanceId).toBe('gallery:center');
     expect(project.invocation).toEqual({
       destination: 'canvas',
       destinationLocked: false,
       sourceId: 'upscale',
       sourceLocked: false,
     });
-    expect(project.layout).toMatchObject({ centerViewId: 'gallery', presetId: 'compose' });
+    expect(project.workspaceId).toBe('compose');
   });
 
   it('applies each built-in preset default route with its layout', () => {
@@ -1457,11 +1630,7 @@ describe('workbench layout presets', () => {
 
   it('aims Invoke at the front source when a custom preset no longer places its explicit route’s', () => {
     let seeded = createInitialWorkbenchState();
-    seeded = workbenchReducer(seeded, {
-      label: 'Generate only',
-      presetId: 'custom-generate-only',
-      type: 'addLayoutPreset',
-    });
+    seeded = addCustomWorkspace(seeded, { id: 'custom-generate-only', label: 'Generate only' });
     const preset = seeded.account.customLayoutPresets?.[0];
     expect(preset).toBeDefined();
     if (!preset) {
@@ -1504,9 +1673,9 @@ describe('workbench layout presets', () => {
 
     state = workbenchReducer(state, { presetId: 'compose', type: 'applyPreset' });
 
-    const project = getActiveProject(state);
+    const project = getLayoutOf(state);
 
-    expect(project.layout.panels).toEqual({ isBottomOpen: false, isLeftOpen: true, isRightOpen: true });
+    expect(project.panels).toEqual({ isBottomOpen: false, isLeftOpen: true, isRightOpen: true });
     expect(project.widgetRegions.left).toMatchObject({
       activeInstanceId: 'generate',
       instanceIds: ['generate', 'upscale'],
@@ -1533,38 +1702,10 @@ describe('workbench layout presets', () => {
     });
   });
 
-  it('adds a custom preset from the active project layout and applies it later', () => {
-    let state = createInitialWorkbenchState();
-    const projectId = state.activeProjectId;
-
-    state = workbenchReducer(state, { region: 'right', sizePx: 384, type: 'setRegionWidgetSize' });
-    state = workbenchReducer(state, { region: 'right', type: 'selectRegionWidget', widgetId: 'queue' });
-    state = workbenchReducer(state, { region: 'center', type: 'selectRegionWidget', widgetId: 'preview' });
-    state = workbenchReducer(state, {
-      label: 'Queue review',
-      presetId: 'custom-layout-1',
-      type: 'addLayoutPreset',
-    });
-
-    state = workbenchReducer(state, { presetId: 'canvas', type: 'applyPreset' });
-    state = workbenchReducer(state, { presetId: 'custom-layout-1', type: 'applyPreset' });
-
-    const project = getProject(state, projectId);
-
-    expect(state.account.customLayoutPresets).toHaveLength(1);
-    expect(state.account.customLayoutPresets?.[0]).toMatchObject({ id: 'custom-layout-1', label: 'Queue review' });
-    expect(project.widgetRegions.right).toMatchObject({ activeInstanceId: 'queue', sizePx: 384 });
-    expect(project.widgetRegions.center.activeInstanceId).toBe('preview');
-  });
-
   it('persists one account-wide order through reordering and custom preset deletion', () => {
     let state = createInitialWorkbenchState();
 
-    state = workbenchReducer(state, {
-      label: 'Custom',
-      presetId: 'custom-layout-1',
-      type: 'addLayoutPreset',
-    });
+    state = addCustomWorkspace(state, { id: 'custom-layout-1', label: 'Custom' });
 
     expect(state.account.layoutPresetOrder).toEqual(['compose', 'edit', 'video', 'automate', 'custom-layout-1']);
 
@@ -1637,64 +1778,34 @@ describe('workbench layout presets', () => {
     }
   });
 
-  it('edits built-in and custom default routes without changing saved layouts', () => {
-    let state = createInitialWorkbenchState();
+  it('resets the view of one workspace as one undo step, keeping the project’s other views', () => {
+    let state = workbenchReducer(createInitialWorkbenchState(), { presetId: 'edit', type: 'applyPreset' });
 
-    state = workbenchReducer(state, {
-      defaultRoute: { destination: 'gallery', sourceId: 'upscale' },
-      presetId: 'compose',
-      type: 'setLayoutPresetRoute',
-    });
-    state = workbenchReducer(state, {
-      label: 'Custom route',
-      presetId: 'custom-layout-route',
-      type: 'addLayoutPreset',
-    });
-    const customSnapshot = state.account.customLayoutPresets?.[0]?.snapshot;
-    state = workbenchReducer(state, {
-      defaultRoute: { destination: 'canvas', sourceId: 'workflow' },
-      presetId: 'custom-layout-route',
-      type: 'setLayoutPresetRoute',
-    });
+    state = workbenchReducer(state, { region: 'right', sizePx: 600, type: 'setRegionWidgetSize' });
+    state = workbenchReducer(state, { presetId: 'compose', type: 'applyPreset' });
+    state = workbenchReducer(state, { region: 'right', type: 'selectRegionWidget', widgetId: 'queue' });
+    state = workbenchReducer(state, { region: 'left', sizePx: 600, type: 'setRegionWidgetSize' });
 
-    expect(state.account.layoutPresetRouteOverrides).toEqual({
-      compose: { destination: 'gallery', sourceId: 'upscale' },
-    });
-    expect(state.account.layoutPresetOverrides).toBeUndefined();
-    expect(state.account.customLayoutPresets?.[0]?.defaultRoute).toEqual({
-      destination: 'canvas',
-      sourceId: 'workflow',
-    });
-    expect(state.account.customLayoutPresets?.[0]?.snapshot).toBe(customSnapshot);
-  });
+    const before = getActiveProject(state);
+    const reset = workbenchReducer(state, { type: 'resetWorkspaceView', workspaceId: 'compose' });
 
-  it('renames and deletes a custom layout preset', () => {
-    let state = createInitialWorkbenchState();
-
-    state = workbenchReducer(state, {
-      label: 'Original',
-      presetId: 'custom-layout-1',
-      type: 'addLayoutPreset',
-    });
-    state = workbenchReducer(state, {
-      label: 'Renamed',
-      presetId: 'custom-layout-1',
-      type: 'renameLayoutPreset',
-    });
-    state = workbenchReducer(state, { presetId: 'custom-layout-1', type: 'deleteLayoutPreset' });
-
-    expect(state.account.customLayoutPresets).toEqual([]);
+    expect(getActiveProject(reset).views.compose).toBeUndefined();
+    expect(getActiveProject(reset).views.edit).toBe(before.views.edit);
+    expect(getLayoutOf(reset).widgetRegions.right.activeInstanceId).toBe('gallery');
+    expect(getLayoutOf(reset).widgetRegions.left.sizePx).toBe(450);
+    expect(getActiveProject(reset).undoRedo.past).toHaveLength(before.undoRedo.past.length + 1);
+    expect(getActiveProject(reset).undoRedo.past.at(-1)?.notice).toEqual({ kind: 'resetView', presetId: 'compose' });
+    expect(getActiveProject(workbenchReducer(reset, { type: 'undoProjectChange' })).views).toEqual(before.views);
+    expect(
+      getActiveProject(workbenchReducer(state, { type: 'resetWorkspaceView', workspaceId: 'edit' })).views
+    ).toEqual({ compose: before.views.compose });
   });
 
   it('moves every project off a deleted custom layout preset', () => {
     let state = createInitialWorkbenchState();
     const firstProjectId = state.activeProjectId;
 
-    state = workbenchReducer(state, {
-      label: 'Shared custom layout',
-      presetId: 'custom-layout-1',
-      type: 'addLayoutPreset',
-    });
+    state = addCustomWorkspace(state, { id: 'custom-layout-1', label: 'Shared custom layout' });
     state = workbenchReducer(state, { presetId: 'custom-layout-1', type: 'applyPreset' });
     state = workbenchReducer(state, { type: 'createProject' });
     const secondProjectId = state.activeProjectId;
@@ -1702,41 +1813,28 @@ describe('workbench layout presets', () => {
 
     state = workbenchReducer(state, { presetId: 'custom-layout-1', type: 'deleteLayoutPreset' });
 
-    expect(getProject(state, firstProjectId).layout.presetId).toBe('compose');
-    expect(getProject(state, secondProjectId).layout.presetId).toBe('compose');
+    expect(getProject(state, firstProjectId).workspaceId).toBe('compose');
+    expect(getProject(state, secondProjectId).workspaceId).toBe('compose');
+    expect(getProject(state, firstProjectId).views).not.toHaveProperty('custom-layout-1');
     expect(state.account.activeLayoutPresetId).toBe('compose');
   });
 
-  it('saves the live arrangement onto a built-in preset and restores its shipped default', () => {
+  it('restores a built-in’s shipped default for every project on it', () => {
     let state = workbenchReducer(createInitialWorkbenchState(), { presetId: 'compose', type: 'applyPreset' });
 
-    state = workbenchReducer(state, { region: 'right', sizePx: 360, type: 'setRegionWidgetSize' });
-    state = workbenchReducer(state, { presetId: 'compose', type: 'saveLayoutPreset' });
-    state = workbenchReducer(state, {
-      defaultRoute: { destination: 'canvas', sourceId: 'upscale' },
-      presetId: 'compose',
-      type: 'setLayoutPresetRoute',
-    });
+    state = workbenchReducer(state, { region: 'right', type: 'toggleRegionWidget', widgetId: 'image-map' });
+    state = {
+      ...state,
+      account: setWorkspaceRoute(state.account, 'compose', { destination: 'canvas', sourceId: 'upscale' }),
+    };
 
-    expect(state.account.layoutPresetOverrides?.compose?.widgetRegions.right.sizePx).toBe(360);
-    expect(state.account.layoutPresetRouteOverrides?.compose).toEqual({ destination: 'canvas', sourceId: 'upscale' });
-
-    state = workbenchReducer(state, { sourceId: 'workflow', type: 'setInvocationSource' });
-    state = workbenchReducer(state, { destination: 'gallery', type: 'setInvocationDestination' });
-
-    state = workbenchReducer(state, { region: 'right', sizePx: 500, type: 'setRegionWidgetSize' });
-    state = workbenchReducer(state, { type: 'resetActiveLayout' });
-
-    expect(getActiveProject(state).widgetRegions.right.sizePx).toBe(360);
-    expect(getActiveProject(state).invocation).toMatchObject({ destination: 'gallery', sourceId: 'workflow' });
+    expect(getLayoutOf(state).widgetRegions.right.instanceIds).toEqual(['gallery', 'queue']);
 
     state = workbenchReducer(state, { presetId: 'compose', type: 'restoreLayoutPresetDefault' });
-    state = workbenchReducer(state, { type: 'resetActiveLayout' });
 
     expect(state.account.layoutPresetOverrides?.compose).toBeUndefined();
     expect(state.account.layoutPresetRouteOverrides?.compose).toBeUndefined();
-    expect(getActiveProject(state).widgetRegions.right.sizePx).toBe(450);
-    expect(getActiveProject(state).invocation).toMatchObject({ destination: 'gallery', sourceId: 'workflow' });
+    expect(getLayoutOf(state).widgetRegions.right.instanceIds).toEqual(['gallery', 'image-map', 'queue']);
   });
 
   it('resolves retired built-in preset ids onto the three shipped presets', () => {
@@ -1745,16 +1843,13 @@ describe('workbench layout presets', () => {
       state: {
         ...initial,
         account: { activeLayoutPresetId: 'workflow' },
-        projects: initial.projects.map((project) => ({
-          ...project,
-          layout: { ...project.layout, presetId: 'canvas' },
-        })),
+        projects: initial.projects.map((project) => ({ ...project, workspaceId: 'canvas' })),
       } as unknown as WorkbenchState,
       type: 'hydrateWorkbench',
     });
 
     expect(hydrated.account.activeLayoutPresetId).toBe('automate');
-    expect(getActiveProject(hydrated).layout.presetId).toBe('edit');
+    expect(getActiveProject(hydrated).workspaceId).toBe('edit');
   });
 });
 
@@ -1769,41 +1864,45 @@ describe('entering a workspace', () => {
       { isCollapsed: true, region: 'left', type: 'setRegionWidgetCollapsed' }
     );
 
-  it('restores the stage and the job over a working copy, keeping its sizes and collapsed panels', () => {
+  it('restores the stage and the job, keeping the view’s sizes and collapsed panels', () => {
     const state = run(
       leaveEditOnPreview(createInitialWorkbenchState()),
       { presetId: 'compose', type: 'applyPreset' },
       { presetId: 'edit', type: 'applyPreset' }
     );
-    const project = getActiveProject(state);
+    const layout = getLayoutOf(state);
 
-    expect(project.widgetRegions.center.activeInstanceId).toBe('canvas');
-    expect(project.invocation).toMatchObject({ destination: 'canvas', sourceId: 'canvas' });
-    expect(project.widgetRegions.right.sizePx).toBe(433);
-    expect(project.widgetRegions.left.isCollapsed).toBe(true);
+    expect(layout.widgetRegions.center.activeInstanceId).toBe('canvas');
+    expect(getActiveProject(state).invocation).toMatchObject({ destination: 'canvas', sourceId: 'canvas' });
+    expect(layout.widgetRegions.right.sizePx).toBe(433);
+    expect(layout.widgetRegions.left.isCollapsed).toBe(true);
+    expect(getActiveProject(state).views.edit?.fronts).toBeUndefined();
   });
 
-  it('goes home on the active workspace without reverting it or adding an undo step', () => {
+  it('goes home on the active workspace without adding an undo step', () => {
     const away = leaveEditOnPreview(createInitialWorkbenchState());
-    const home = getActiveProject(run(away, { presetId: 'edit', type: 'applyPreset' }));
+    const state = run(away, { presetId: 'edit', type: 'applyPreset' });
+    const layout = getLayoutOf(state);
 
-    expect(home.widgetRegions.center.activeInstanceId).toBe('canvas');
-    expect(home.widgetRegions.right.sizePx).toBe(433);
-    expect(home.widgetRegions.left.isCollapsed).toBe(true);
-    expect(home.undoRedo.past).toEqual(getActiveProject(away).undoRedo.past);
+    expect(layout.widgetRegions.center.activeInstanceId).toBe('canvas');
+    expect(layout.widgetRegions.right.sizePx).toBe(433);
+    expect(layout.widgetRegions.left.isCollapsed).toBe(true);
+    expect(getActiveProject(state).undoRedo.past).toEqual(getActiveProject(away).undoRedo.past);
   });
 
   it('enters a project on its first activation in the session, not on returning to it', () => {
     const first = leaveEditOnPreview(createInitialWorkbenchState());
     const withSecond = leaveEditOnPreview(run(first, { type: 'createProject' }));
     const [firstId, secondId] = withSecond.projects.map(({ id }) => id) as [string, string];
+    const centerOf = (state: WorkbenchState, projectId: string) =>
+      getLayoutOf(state, getProject(state, projectId)).widgetRegions.center.activeInstanceId;
     let state = run(withSecond, { state: withSecond, type: 'hydrateWorkbench' });
 
-    expect(getProject(state, secondId).widgetRegions.center.activeInstanceId).toBe('canvas');
-    expect(getProject(state, firstId).widgetRegions.center.activeInstanceId).toBe('preview');
+    expect(centerOf(state, secondId)).toBe('canvas');
+    expect(centerOf(state, firstId)).toBe('preview');
 
     state = run(state, { projectId: firstId, type: 'switchProject' });
-    expect(getProject(state, firstId).widgetRegions.center.activeInstanceId).toBe('canvas');
+    expect(centerOf(state, firstId)).toBe('canvas');
 
     state = run(
       state,
@@ -1811,7 +1910,7 @@ describe('entering a workspace', () => {
       { projectId: secondId, type: 'switchProject' },
       { projectId: firstId, type: 'switchProject' }
     );
-    expect(getProject(state, firstId).widgetRegions.center.activeInstanceId).toBe('preview');
+    expect(centerOf(state, firstId)).toBe('preview');
   });
 });
 
@@ -3965,16 +4064,13 @@ describe('workbench account and project settings', () => {
       layoutPresetOrder: ['compose', 'edit', 'video', 'automate'],
       layoutPresetOverrides: {},
       layoutPresetRouteOverrides: {},
+      workspaceLayoutsAdopted: true,
     });
   });
 
   it('normalizes persisted preset routes and tolerates legacy custom presets without one', () => {
     let seeded = createInitialWorkbenchState();
-    seeded = workbenchReducer(seeded, {
-      label: 'Route fixture',
-      presetId: 'custom-route-fixture',
-      type: 'addLayoutPreset',
-    });
+    seeded = addCustomWorkspace(seeded, { id: 'custom-route-fixture', label: 'Route fixture' });
     const fixture = seeded.account.customLayoutPresets?.[0];
     expect(fixture).toBeDefined();
     if (!fixture) {
@@ -5522,130 +5618,108 @@ describe('canvas schema adoption', () => {
   });
 });
 
-describe('loading layouts that dock Diagnostics in the status bar', () => {
-  const withBottomDiagnostics = (regions: Project['widgetRegions']): Project['widgetRegions'] => ({
-    ...regions,
-    bottom: {
-      ...regions.bottom,
-      activeInstanceId: 'diagnostics:bottom',
-      alignEndInstanceIds: ['diagnostics:bottom', 'notifications'],
-      instanceIds: ['server-status', 'queue-status', 'diagnostics:bottom', 'notifications'],
-      isCollapsed: false,
-    },
-  });
-  const projectWithBottomDiagnostics = (
-    patchRegions: (regions: Project['widgetRegions']) => Project['widgetRegions'] = (regions) => regions
-  ): Project => {
+describe('loading stored layouts that dock retired widgets', () => {
+  it('drops the status-bar Diagnostics copy and collapses the bar it fronted', () => {
     const initial = createInitialWorkbenchState().projects[0]!;
-
-    return {
-      ...initial,
-      widgetInstances: {
-        ...initial.widgetInstances,
-        'diagnostics:bottom': { ...initial.widgetInstances.diagnostics!, id: 'diagnostics:bottom' },
-      },
-      widgetRegions: patchRegions(withBottomDiagnostics(initial.widgetRegions)),
-    };
-  };
-  const bottomWithoutDiagnostics = {
-    alignEndInstanceIds: ['notifications'],
-    instanceIds: ['server-status', 'queue-status', 'notifications'],
-    isCollapsed: true,
-  };
-
-  it('drops the status-bar copy from a saved project and collapses the bar it fronted', () => {
-    const project = projectWithBottomDiagnostics();
-
-    const normalized = normalizeWorkbenchProject(project);
-
-    expect(normalized.widgetRegions.bottom).toMatchObject(bottomWithoutDiagnostics);
-    expect(normalized.widgetInstances).not.toHaveProperty('diagnostics:bottom');
-    expect(normalized.widgetRegions.right).toEqual(project.widgetRegions.right);
-  });
-
-  it('drops the status-bar copy from a stored custom preset', () => {
-    const initial = createInitialWorkbenchState();
-    const preset = layoutPresets[0]!.snapshot;
-    const snapshot = {
-      ...preset,
-      widgetInstances: {
-        ...preset.widgetInstances,
-        'diagnostics:bottom': { id: 'diagnostics:bottom', typeId: 'diagnostics' },
-      },
-      widgetRegions: withBottomDiagnostics(preset.widgetRegions),
-    };
-
-    const state = workbenchReducer(initial, {
-      state: {
+    const compose = storedOn('compose');
+    const loaded = asStoredBeforeSplit(
+      {
         ...initial,
-        account: { ...initial.account, customLayoutPresets: [{ id: 'custom-chip', label: 'Chip', snapshot }] },
+        widgetInstances: {
+          ...initial.widgetInstances,
+          'diagnostics:bottom': { ...initial.widgetInstances.diagnostics!, id: 'diagnostics:bottom' },
+        },
       },
-      type: 'hydrateWorkbench',
-    });
-
-    const stored = state.account.customLayoutPresets?.[0]?.snapshot;
-    expect(stored?.widgetRegions.bottom).toMatchObject(bottomWithoutDiagnostics);
-    expect(stored?.widgetInstances).not.toHaveProperty('diagnostics:bottom');
-  });
-});
-
-describe('loading layouts that dock the retired Project panel', () => {
-  const projectInstance: Project['widgetInstances'][string] = {
-    createdAt: 'then',
-    id: 'project',
-    state: { id: 'project', label: 'Project', values: {}, version: 1 },
-    typeId: 'project',
-  };
-  const withLeftProject = (regions: Project['widgetRegions']): Project['widgetRegions'] => ({
-    ...regions,
-    left: {
-      ...regions.left,
-      activeInstanceId: 'project',
-      alignEndInstanceIds: ['project'],
-      instanceIds: ['generate', 'project', 'upscale'],
-      isCollapsed: false,
-    },
-  });
-  const leftWithoutProject = {
-    activeInstanceId: 'generate',
-    alignEndInstanceIds: [],
-    instanceIds: ['generate', 'upscale'],
-    isCollapsed: false,
-  };
-  const savedProject = (patch: (project: Project) => Project = (project) => project): Project => {
-    const initial = createInitialWorkbenchState().projects[0]!;
-
-    return patch({ ...initial, widgetInstances: { ...initial.widgetInstances, project: projectInstance } });
-  };
-
-  it('drops it from a saved project and brings the next widget in that rail to the front', () => {
-    const normalized = normalizeWorkbenchProject(
-      savedProject((project) => ({ ...project, widgetRegions: withLeftProject(project.widgetRegions) }))
+      {
+        ...compose,
+        widgetRegions: {
+          ...compose.widgetRegions,
+          bottom: {
+            ...compose.widgetRegions.bottom,
+            activeInstanceId: 'diagnostics:bottom',
+            alignEndInstanceIds: ['diagnostics:bottom', 'notifications'],
+            instanceIds: ['server-status', 'queue-status', 'diagnostics:bottom', 'notifications'],
+            isCollapsed: false,
+          },
+        },
+      }
     );
 
-    expect(normalized.widgetRegions.left).toMatchObject(leftWithoutProject);
-    expect(normalized.widgetInstances).not.toHaveProperty('project');
+    expect(loaded.legacyLayout?.widgetRegions.bottom).toMatchObject({
+      alignEndInstanceIds: ['notifications'],
+      instanceIds: ['server-status', 'queue-status', 'notifications'],
+      isCollapsed: true,
+    });
+    expect(loaded.widgetInstances).not.toHaveProperty('diagnostics:bottom');
   });
 
-  it('drops it from a stored custom preset', () => {
+  it('drops the retired Project panel from a saved project and a stored custom workspace', () => {
     const initial = createInitialWorkbenchState();
-    const preset = layoutPresets[0]!.snapshot;
-    const snapshot = {
-      ...preset,
-      widgetInstances: { ...preset.widgetInstances, project: { id: 'project', typeId: 'project' } },
-      widgetRegions: withLeftProject(preset.widgetRegions),
+    const projectInstance: Project['widgetInstances'][string] = {
+      createdAt: 'then',
+      id: 'project',
+      state: { id: 'project', label: 'Project', values: {}, version: 1 },
+      typeId: 'project',
     };
+    const compose = storedOn('compose');
+    const withLeftProject = {
+      ...compose.widgetRegions,
+      left: {
+        ...compose.widgetRegions.left,
+        activeInstanceId: 'project',
+        alignEndInstanceIds: ['project'],
+        instanceIds: ['generate', 'project', 'upscale'],
+        isCollapsed: false,
+      },
+    };
+    const leftWithoutProject = {
+      activeInstanceId: 'generate',
+      alignEndInstanceIds: [],
+      instanceIds: ['generate', 'upscale'],
+      isCollapsed: false,
+    };
+    const loaded = asStoredBeforeSplit(
+      {
+        ...initial.projects[0]!,
+        widgetInstances: { ...initial.projects[0]!.widgetInstances, project: projectInstance },
+      },
+      { ...compose, widgetRegions: withLeftProject }
+    );
 
+    expect(loaded.legacyLayout?.widgetRegions.left).toMatchObject(leftWithoutProject);
+    expect(loaded.widgetInstances).not.toHaveProperty('project');
+    // A project on today's shape keeps no retired instance either.
+    expect(
+      normalizeWorkbenchProject({
+        ...initial.projects[0]!,
+        widgetInstances: { ...initial.projects[0]!.widgetInstances, project: projectInstance },
+      }).widgetInstances
+    ).not.toHaveProperty('project');
+
+    const preset = layoutPresets[0]!.snapshot;
     const state = workbenchReducer(initial, {
       state: {
         ...initial,
-        account: { ...initial.account, customLayoutPresets: [{ id: 'custom-project', label: 'Project', snapshot }] },
+        account: {
+          ...initial.account,
+          customLayoutPresets: [
+            {
+              id: 'custom-project',
+              label: 'Project',
+              snapshot: {
+                ...preset,
+                widgetInstances: { ...preset.widgetInstances, project: { id: 'project', typeId: 'project' } },
+                widgetRegions: withLeftProject,
+              },
+            },
+          ],
+        },
       },
       type: 'hydrateWorkbench',
     });
+    const storedPreset = state.account.customLayoutPresets?.[0]?.snapshot;
 
-    const stored = state.account.customLayoutPresets?.[0]?.snapshot;
-    expect(stored?.widgetRegions.left).toMatchObject(leftWithoutProject);
-    expect(stored?.widgetInstances).not.toHaveProperty('project');
+    expect(storedPreset?.widgetRegions.left).toMatchObject(leftWithoutProject);
+    expect(storedPreset?.widgetInstances).not.toHaveProperty('project');
   });
 });

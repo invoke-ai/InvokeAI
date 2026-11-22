@@ -13,13 +13,13 @@ import {
   FLOATING_VIEWPORT_MARGIN_PX,
   resizeFloatingGeometry,
   type FloatingGeometry,
-  isAwaitedCenterView,
   type FloatingResizeEdge,
 } from '@workbench/floatingWindows';
 import { useFloatingWindowFocus, useWorkbenchFocus } from '@workbench/focusRegions';
 import { WidgetIcon } from '@workbench/iconResolver';
 import { DOCK_DESTINATION_ICONS, resolveDockLabel, resolveWidgetInstanceLabel } from '@workbench/widgetLabels';
 import {
+  useActiveLayoutSelector,
   useActiveProjectId,
   useActiveProjectSelector,
   useWorkbenchCommands,
@@ -327,6 +327,8 @@ export const FloatingWidgetWindow = ({
     (project) => project.widgetInstances[instanceId],
     areWidgetRenderInstancesEqual
   );
+  // The title is the workspace's: its structure names the instance.
+  const title = useActiveLayoutSelector((layout) => layout.widgetInstances[instanceId]?.title);
   const projectId = useActiveProjectId();
   const { activate, isHighlighted } = useFloatingWindowFocus(instanceId, projectId);
   const { focusRegion } = useWorkbenchFocus();
@@ -593,17 +595,14 @@ export const FloatingWidgetWindow = ({
   }, [focusRegion, instanceId, state.returnRegion, typeId, widgets]);
   // Close takes the window out of the layout (an Undo toast brings it back).
   const handleClose = useCallback(() => {
-    const { layout, widgetRegions } = queries.getSnapshot().activeProject;
-    const restoresCenter = isAwaitedCenterView(widgetRegions.center, instanceId);
+    const { widgetRegions } = queries.getSnapshot().activeLayout;
     const region = state.returnRegion;
-    const isRailPanelShown =
-      (region === 'left' ? layout.panels.isLeftOpen : region === 'right' && layout.panels.isRightOpen) &&
-      !widgetRegions[region].isCollapsed;
+    const isRailPanelShown = (region === 'left' || region === 'right') && !widgetRegions[region].isCollapsed;
 
     flushWorkbenchDrafts();
     widgets.closeFloating(instanceId);
-    focusRegion(restoresCenter || !isRailPanelShown ? 'center' : region, restoresCenter ? typeId : undefined);
-  }, [focusRegion, instanceId, queries, state.returnRegion, typeId, widgets]);
+    focusRegion(isRailPanelShown ? region : 'center');
+  }, [focusRegion, instanceId, queries, state.returnRegion, widgets]);
   const handleToggleShade = useCallback(() => {
     // Shading hides the body: its editors keep their state but stop running, so their drafts are saved first.
     if (mode !== 'shaded') {
@@ -652,7 +651,7 @@ export const FloatingWidgetWindow = ({
 
   // Retain window chrome for missing or failed widgets so users can dock them back to the retry surface.
   const isEnabled = widget?.status === 'enabled';
-  const label = widget ? resolveWidgetInstanceLabel(instance, widget.manifest, t) : (instance.title ?? instance.id);
+  const label = widget ? resolveWidgetInstanceLabel({ title }, widget.manifest, t) : (title ?? instance.id);
   const dockLabel = resolveDockLabel(state.returnRegion, t);
   const isMaximized = mode === 'maximized';
   const isShaded = mode === 'shaded';

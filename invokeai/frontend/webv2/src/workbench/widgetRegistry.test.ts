@@ -9,7 +9,7 @@ import {
   registerFirstPartyWidgets,
   registerWidgets,
 } from './widgetRegistry';
-import { RETIRED_REGION_WIDGET_TYPE_IDS, RETIRED_WIDGET_TYPE_IDS } from './workbenchState';
+import { RETIRED_REGION_WIDGET_TYPE_IDS, RETIRED_WIDGET_TYPE_IDS } from './workspace/storedStructure';
 
 const TestIcon = () => null;
 const TestView = () => null;

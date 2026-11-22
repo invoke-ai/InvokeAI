@@ -1,23 +1,25 @@
 import { getWidgetHosts } from '@workbench/widgetRegistry';
-import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
+import { useWorkbenchSelector } from '@workbench/WorkbenchContext';
 import { Suspense, use } from 'react';
 
 import { WidgetFailureBoundary } from './WidgetFailureBoundary';
 
-type WidgetHostProject = {
+/** What a project shows: its resolved layout. */
+type WidgetHostLayout = {
   floatingWidgets?: Record<string, unknown>;
   widgetInstances: Record<string, { typeId?: string }>;
   widgetRegions: Record<string, { instanceIds: string[] }>;
-  workflows?: { entries: Array<{ document: { nodes: unknown[] }; source?: unknown }> };
 };
 
-export const projectHasWidgetType = (project: WidgetHostProject, widgetTypeId: string): boolean => {
+type WidgetHostWorkflows = { entries: Array<{ document: { nodes: unknown[] }; source?: unknown }> };
+
+export const projectHasWidgetType = (layout: WidgetHostLayout, widgetTypeId: string): boolean => {
   return (
-    Object.values(project.widgetRegions).some((region) =>
-      region.instanceIds.some((instanceId) => project.widgetInstances[instanceId]?.typeId === widgetTypeId)
+    Object.values(layout.widgetRegions).some((region) =>
+      region.instanceIds.some((instanceId) => layout.widgetInstances[instanceId]?.typeId === widgetTypeId)
     ) ||
-    Object.keys(project.floatingWidgets ?? {}).some(
-      (instanceId) => project.widgetInstances[instanceId]?.typeId === widgetTypeId
+    Object.keys(layout.floatingWidgets ?? {}).some(
+      (instanceId) => layout.widgetInstances[instanceId]?.typeId === widgetTypeId
     )
   );
 };
@@ -44,9 +46,9 @@ const documentCallsSavedWorkflow = (document: { nodes: readonly unknown[] }): bo
 };
 
 /** Saved-workflow calls reconcile against live library records even while the editor is closed. */
-export const projectNeedsWorkflowHost = (project: WidgetHostProject): boolean =>
-  projectHasWidgetType(project, 'workflow') ||
-  (project.workflows?.entries.some((entry) => documentCallsSavedWorkflow(entry.document)) ?? false);
+export const projectNeedsWorkflowHost = (layout: WidgetHostLayout, workflows?: WidgetHostWorkflows): boolean =>
+  projectHasWidgetType(layout, 'workflow') ||
+  (workflows?.entries.some((entry) => documentCallsSavedWorkflow(entry.document)) ?? false);
 
 const WidgetHost = ({ widget }: { widget: ReturnType<typeof getWidgetHosts>[number] }) => {
   const Host = use(widget.host!.load());
@@ -79,7 +81,9 @@ const WidgetHostBoundary = ({ widget }: { widget: ReturnType<typeof getWidgetHos
 };
 
 export const WidgetHosts = () => {
-  const hasWorkflowWidget = useActiveProjectSelector(projectNeedsWorkflowHost);
+  const hasWorkflowWidget = useWorkbenchSelector(({ activeLayout, activeProject }) =>
+    projectNeedsWorkflowHost(activeLayout, activeProject.workflows)
+  );
   const widgets = getWidgetHosts().filter((widget) => widget.manifest.id !== 'workflow' || hasWorkflowWidget);
 
   return (

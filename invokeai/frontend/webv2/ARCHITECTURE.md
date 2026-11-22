@@ -60,23 +60,23 @@ The [lint configuration](.oxlintrc.json) checks hooks, dependencies, and common 
 
 Behavior specs live beside their owning code. Read the owner's document before changing its behavior. [VERIFICATION.md](VERIFICATION.md) maps user-visible flows to these owners and existing verification assets.
 
-| Topic                                                                                       | Document                                                                               |
-| ------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| Identity credential and session lifetimes                                                   | [features/identity/README.md](src/features/identity/README.md)                         |
-| Application and project event logging                                                       | [platform/logging/README.md](src/platform/logging/README.md)                           |
-| Models catalog, read fencing, and architecture table                                        | [features/models/README.md](src/features/models/README.md)                             |
-| Queue backend port and active sessions                                                      | [features/queue/README.md](src/features/queue/README.md)                               |
-| Gallery listings and reveal                                                                 | [features/gallery/README.md](src/features/gallery/README.md)                           |
-| Intermediates manager and cleanup                                                           | [features/intermediates/README.md](src/features/intermediates/README.md)               |
-| Font catalog and registration                                                               | [features/fonts/README.md](src/features/fonts/README.md)                               |
-| Project documents, workflows, persistence, and recovery                                     | [workbench/projects/README.md](src/workbench/projects/README.md)                       |
-| Widget placement, floating windows, workspace lock and Customize, focus, and shortcut hints | [workbench/widget-frame/README.md](src/workbench/widget-frame/README.md)               |
-| Notifications, toast actions, and undo notices                                              | [workbench/shell/notifications/README.md](src/workbench/shell/notifications/README.md) |
-| Settings contributions and the settings dialog                                              | [workbench/settings/README.md](src/workbench/settings/README.md)                       |
-| Widget manifests and extension discovery                                                    | [workbench/extensions/README.md](src/workbench/extensions/README.md)                   |
-| Canvas engine                                                                               | [workbench/canvas-engine/ARCHITECTURE.md](src/workbench/canvas-engine/ARCHITECTURE.md) |
-| Workflow library retention and demand                                                       | [features/workflow/data/README.md](src/features/workflow/data/README.md)               |
-| Performance gates and byte budgets                                                          | [performance/README.md](performance/README.md)                                         |
+| Topic                                                                                      | Document                                                                               |
+| ------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------- |
+| Identity credential and session lifetimes                                                  | [features/identity/README.md](src/features/identity/README.md)                         |
+| Application and project event logging                                                      | [platform/logging/README.md](src/platform/logging/README.md)                           |
+| Models catalog, read fencing, and architecture table                                       | [features/models/README.md](src/features/models/README.md)                             |
+| Queue backend port and active sessions                                                     | [features/queue/README.md](src/features/queue/README.md)                               |
+| Gallery listings and reveal                                                                | [features/gallery/README.md](src/features/gallery/README.md)                           |
+| Intermediates manager and cleanup                                                          | [features/intermediates/README.md](src/features/intermediates/README.md)               |
+| Font catalog and registration                                                              | [features/fonts/README.md](src/features/fonts/README.md)                               |
+| Project documents, workflows, persistence, and recovery                                    | [workbench/projects/README.md](src/workbench/projects/README.md)                       |
+| Workspace structure and views, widget placement, windows, lock and Customize, focus, hints | [workbench/widget-frame/README.md](src/workbench/widget-frame/README.md)               |
+| Notifications, toast actions, and undo notices                                             | [workbench/shell/notifications/README.md](src/workbench/shell/notifications/README.md) |
+| Settings contributions and the settings dialog                                             | [workbench/settings/README.md](src/workbench/settings/README.md)                       |
+| Widget manifests and extension discovery                                                   | [workbench/extensions/README.md](src/workbench/extensions/README.md)                   |
+| Canvas engine                                                                              | [workbench/canvas-engine/ARCHITECTURE.md](src/workbench/canvas-engine/ARCHITECTURE.md) |
+| Workflow library retention and demand                                                      | [features/workflow/data/README.md](src/features/workflow/data/README.md)               |
+| Performance gates and byte budgets                                                         | [performance/README.md](performance/README.md)                                         |
 
 ## Contract ownership
 

@@ -5,7 +5,7 @@ import { isToastActivationKeyEvent } from '@platform/ui/toaster';
 import { useWorkbenchFocusTarget } from '@workbench/focusRegions';
 import { useWorkbenchPreferenceSelector } from '@workbench/settings/store';
 import { areWidgetPlacementProjectsEqual, getWidgetPlacementProject } from '@workbench/widgetPlacementMeta';
-import { useActiveProjectSelector, useWorkbenchExtensions } from '@workbench/WorkbenchContext';
+import { useWorkbenchExtensions, useWorkbenchSelector } from '@workbench/WorkbenchContext';
 import { useEffect, useEffectEvent, useMemo, useSyncExternalStore } from 'react';
 import { tinykeys } from 'tinykeys';
 
@@ -37,7 +37,7 @@ export const WorkbenchHotkeyRuntime = () => {
     stores.commands.list
   );
   const customHotkeys = useWorkbenchPreferenceSelector((preferences) => preferences.customHotkeys);
-  const project = useActiveProjectSelector(getWidgetPlacementProject, areWidgetPlacementProjectsEqual);
+  const project = useWorkbenchSelector(getWidgetPlacementProject, areWidgetPlacementProjectsEqual);
   const extensionHotkeys = useExtensionHotkeyDefinitions();
   const getFocusTarget = useWorkbenchFocusTarget();
 

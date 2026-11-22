@@ -31,7 +31,7 @@ import {
   useWorkbenchQueries,
   useWorkbenchSelector,
 } from '@workbench/WorkbenchContext';
-import { isWorkspaceCommandAvailable } from '@workbench/workspace/structureLock';
+import { isWorkspaceCommandAvailable, RESET_WORKSPACE_VIEW_COMMAND_ID } from '@workbench/workspace/structureLock';
 import { useStructureLock } from '@workbench/workspace/useStructureLock';
 import { useWorkspaceOpen } from '@workbench/workspace/useWorkspaceOpen';
 import { useCallback, useMemo, useSyncExternalStore } from 'react';
@@ -148,13 +148,18 @@ const WorkbenchCommandPaletteDialog = ({
   const commandStore = extensions.stores.commands;
   const commandContributions = useSyncExternalStore(commandStore.subscribe, commandStore.list, commandStore.list);
   const { canEditStructure, isCustomizing } = useStructureLock();
+  // Reset view has nothing to do while the project shows the workspace as it is set up.
+  const hasWorkspaceView = useActiveProjectSelector((project) => project.views[project.workspaceId] !== undefined);
   // The palette offers what the command's hotkey would run: a locked workspace hides its structural commands.
   const isHandled = useMemo(() => {
     const handled = new Set(commandContributions.map(({ id }) => id));
     const lock = { canEditStructure, isCustomizing };
 
-    return (commandId: string) => handled.has(commandId) && isWorkspaceCommandAvailable(commandId, lock);
-  }, [canEditStructure, commandContributions, isCustomizing]);
+    return (commandId: string) =>
+      handled.has(commandId) &&
+      isWorkspaceCommandAvailable(commandId, lock) &&
+      (commandId !== RESET_WORKSPACE_VIEW_COMMAND_ID || hasWorkspaceView);
+  }, [canEditStructure, commandContributions, hasWorkspaceView, isCustomizing]);
 
   const executeCommand = useCallback(
     (commandId: string) => {

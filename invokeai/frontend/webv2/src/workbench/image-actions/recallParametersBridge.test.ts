@@ -60,7 +60,7 @@ const createDeps = () => {
     queries: {
       getProject: () => null,
       getSnapshot: () => ({ activeProject: active }),
-    } as unknown as Pick<WorkbenchQueries, 'getProject' | 'getSnapshot'>,
+    } as unknown as Pick<WorkbenchQueries, 'getProject' | 'getSnapshot' | 'getWorkspaceLayout'>,
     received,
     reveal: { getWidgetsForRegion: () => [], isEditingText: () => false },
     t: ((key: string) => key) as unknown as TFunction,

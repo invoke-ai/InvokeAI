@@ -39,7 +39,14 @@ import {
 import { areWidgetPlacementProjectsEqual, getWidgetPlacementProject } from '@workbench/widgetPlacementMeta';
 import { createWidgetRegionViewModelFromState, getWidgetRegionItems } from '@workbench/widgetRegionViewModel';
 import { getWidgetById, getWidgetsForRegion, widgetRegistrationFailures } from '@workbench/widgetRegistry';
-import { useActiveProjectId, useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
+import {
+  useActiveLayoutSelector,
+  useActiveProjectId,
+  useActiveProjectSelector,
+  useWorkbenchCommands,
+  useWorkbenchQueries,
+  useWorkbenchSelector,
+} from '@workbench/WorkbenchContext';
 import { startWorkspaceLock } from '@workbench/workspace/workspaceLockRuntime';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -66,15 +73,16 @@ const DND_MODIFIERS = [restrictToWindowEdges];
 
 export const WorkbenchShell = () => {
   const { layout, notifications, widgets } = useWorkbenchCommands();
+  const queries = useWorkbenchQueries();
   const { focusFloating, focusRegion } = useWorkbenchFocus();
   const { t } = useTranslation();
-  const panels = useActiveProjectSelector((project) => project.layout.panels);
+  const panels = useActiveLayoutSelector((layout) => layout.panels);
   const projectId = useActiveProjectId();
   const projectName = useActiveProjectSelector((project) => project.name);
-  const leftRegion = useActiveProjectSelector((project) => project.widgetRegions.left);
-  const rightRegion = useActiveProjectSelector((project) => project.widgetRegions.right);
+  const leftRegion = useActiveLayoutSelector((layout) => layout.widgetRegions.left);
+  const rightRegion = useActiveLayoutSelector((layout) => layout.widgetRegions.right);
   // Placement only: a window's geometry, mode, and stacking change without re-rendering the shell or its rails.
-  const placementProject = useActiveProjectSelector(getWidgetPlacementProject, areWidgetPlacementProjectsEqual);
+  const placementProject = useWorkbenchSelector(getWidgetPlacementProject, areWidgetPlacementProjectsEqual);
   const { floatingPlacements } = placementProject;
   const sensors = useSensors(
     useSensor(PrimaryMouseSensor, { activationConstraint: { distance: 6 } }),
@@ -222,7 +230,6 @@ export const WorkbenchShell = () => {
   );
   const handleRemoveFloating = useCallback(
     (instanceId: string) => {
-      const typeId = placementProject.widgetInstances[instanceId]?.typeId;
       const removed = removeFloatingPlacement({ instanceId, project: placementProject, widgets });
 
       if (!removed) {
@@ -230,11 +237,6 @@ export const WorkbenchShell = () => {
       }
 
       // The marker's menu that asked and the marker itself are both gone.
-      if (removed.restoresCenter) {
-        focusRegion('center', typeId);
-        return;
-      }
-
       const isRailPanelShown =
         removed.returnRegion === 'left' ? isLeftPanelShown : removed.returnRegion === 'right' && isRightPanelShown;
 
@@ -248,7 +250,13 @@ export const WorkbenchShell = () => {
       item.isEnabled && item.isFloating
         ? removeFloatingPlacement({ instanceId: item.id, project: placementProject, widgets })
         : item.isEnabled
-          ? closeWidgetPlacement({ widgets, getWidgetById, instanceId: item.id, project: placementProject, region })
+          ? closeWidgetPlacement({
+              availability: queries.getAvailability(),
+              instanceId: item.id,
+              project: placementProject,
+              region,
+              widgets,
+            })
           : addWidgetPlacement({
               createNew: item.allowMultiple,
               getWidgetsForRegion,
@@ -256,7 +264,7 @@ export const WorkbenchShell = () => {
               typeId: item.typeId,
               widgets,
             }),
-    [placementProject, widgets]
+    [placementProject, queries, widgets]
   );
   const handleToggleLeft = useCallback(
     (item: (typeof leftMenuItems)[number]) => toggleRailItem('left', item),

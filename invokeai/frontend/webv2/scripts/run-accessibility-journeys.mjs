@@ -170,7 +170,7 @@ const centerViewTrigger = (page, label) => page.getByRole('button', { exact: tru
 
 const selectLayoutPreset = async (page, preset, centerView) => {
   // Custom presets and Workflow tabs can share prefixes.
-  const name = new RegExp(`^${preset}(, unsaved changes)?$`);
+  const name = new RegExp(`^${preset}$`);
   const strip = presetStrip(page);
   const selected = strip.getByRole('tab', { name, selected: true });
 
@@ -920,17 +920,28 @@ const runTopbarMenuJourney = async (browser) => {
     await page.getByRole('main', { exact: true, name: otherProjectName }).waitFor();
 
     const customPresetNames = ['Custom One', 'Custom Two', 'Custom Three', 'Custom Four', 'Custom Five', 'Custom Six'];
-    // New workspace copies this one and opens Customize on the copy, whose bar names it.
+    const customizeBar = page.locator('[data-customize-bar]');
+    const workspaceTabs = page.locator('[role="tab"][data-layout-preset-id]');
+    const tabsBefore = await workspaceTabs.count();
+    // New workspace drafts a copy of this one in Customize, its name focused; Cancel leaves no tab behind.
+    await page.getByRole('button', { exact: true, name: 'New workspace' }).click();
+    await customizeBar.waitFor();
+    await expectFocused(
+      customizeBar.getByRole('textbox', { exact: true, name: 'Workspace name' }),
+      'New workspace did not focus its name.'
+    );
+    await assertNoAxeViolations(page, `${id}:customize`);
+    await customizeBar.getByRole('button', { exact: true, name: 'Cancel' }).click();
+    await customizeBar.waitFor({ state: 'detached' });
+    assert.equal(await workspaceTabs.count(), tabsBefore);
+    // Done creates it.
     for (const [index, presetName] of customPresetNames.entries()) {
       await page.getByRole('button', { exact: true, name: 'New workspace' }).click();
-      const customizeBar = page.locator('[data-customize-bar]');
       await customizeBar.waitFor();
-      if (index === 0) {
-        await assertNoAxeViolations(page, `${id}:customize`);
-      }
       await customizeBar.getByRole('textbox', { exact: true, name: 'Workspace name' }).fill(presetName);
       await customizeBar.getByRole('button', { exact: true, name: 'Done' }).click();
       await customizeBar.waitFor({ state: 'detached' });
+      assert.equal(await workspaceTabs.count(), tabsBefore + index + 1);
     }
     for (const presetName of customPresetNames) {
       await page.getByRole('tab', { exact: true, name: presetName }).waitFor();
@@ -967,7 +978,7 @@ const runTopbarMenuJourney = async (browser) => {
     }));
     assert.equal(presetLayoutMetrics.scrollWidth, presetLayoutMetrics.clientWidth);
 
-    await page.getByRole('tab', { name: /^Edit(?:, unsaved changes)?$/ }).click({ button: 'right' });
+    await page.getByRole('tab', { name: /^Edit$/ }).click({ button: 'right' });
     const switchLayout = page.getByRole('menuitem', { exact: true, name: 'Switch to this workspace' });
     await switchLayout.waitFor();
     assert.equal(await switchLayout.locator('svg.lucide-check').count(), 0);
@@ -1304,19 +1315,17 @@ const runFloatingWindowJourney = async (browser) => {
 
   try {
     await waitForWorkbench(page);
-    await selectLayoutPreset(page, 'Video', 'Preview');
+    await selectLayoutPreset(page, 'Edit', 'Canvas');
 
     const rail = page.getByRole('navigation', { exact: true, name: 'Right rail' });
-    const center = centerRegion(page);
     const floatingWindow = page.locator('[data-hotkey-widget-region="floating"]');
     const marker = rail.getByRole('button', { exact: true, name: 'Preview, floating window' });
+    // Edit's rail holds Preview beside the center's: floating it there leaves the center its Canvas.
     const floatPreviewFromRail = async () => {
-      await rail.getByRole('button', { exact: true, name: 'Right panel widgets' }).click();
-      await page.getByRole('menuitemcheckbox', { exact: true, name: 'Preview' }).click();
-      await page.keyboard.press('Escape');
       await page.getByRole('button', { exact: true, name: 'Float Window' }).click();
       await floatingWindow.waitFor();
       await marker.waitFor();
+      await centerViewTrigger(page, 'Canvas').waitFor();
     };
     const focusedRegion = () =>
       page.evaluate(() => document.activeElement?.closest('[data-focus-region]')?.getAttribute('data-focus-region'));
@@ -1333,9 +1342,9 @@ const runFloatingWindowJourney = async (browser) => {
         region
       );
 
+    await rail.getByRole('button', { exact: true, name: 'Preview' }).click();
     await floatPreviewFromRail();
     await waitForActiveWindow();
-    await center.getByText('Preview is in a floating window', { exact: true }).waitFor();
     await waitForSettledDocument(page);
     await assertNoAxeViolations(page, `${id}:floating`);
 
@@ -1377,29 +1386,22 @@ const runFloatingWindowJourney = async (browser) => {
     await marker.click({ button: 'right' });
     assert.deepEqual(await page.getByRole('menuitem').allInnerTexts(), ['Dock to right panel', 'Remove Preview']);
     await page.getByRole('menuitem', { exact: true, name: 'Remove Preview' }).click();
-    await centerViewTrigger(page, 'Preview').waitFor();
     await floatingWindow.waitFor({ state: 'detached' });
     assert.equal(await marker.count(), 0, 'Removing the window must free its rail slot.');
-    await waitForFocusedRegion('center');
+    await waitForFocusedRegion('right');
 
+    await rail.getByRole('button', { exact: true, name: 'Right panel widgets' }).click();
+    await page.getByRole('menuitemcheckbox', { exact: true, name: 'Preview' }).click();
+    await page.keyboard.press('Escape');
     await floatPreviewFromRail();
-    await waitForActiveWindow();
-    await center.getByRole('button', { exact: true, name: 'Dock to right panel' }).click();
-    await centerViewTrigger(page, 'Preview').waitFor();
-    await floatingWindow.waitFor({ state: 'detached' });
-    await rail.getByRole('button', { exact: true, name: 'Preview' }).waitFor();
-    await waitForFocusedRegion('center');
-    assert.equal(await focusedRegion(), 'center');
-
-    await page.getByRole('button', { exact: true, name: 'Float Window' }).click();
-    await floatingWindow.waitFor();
     await waitForActiveWindow();
     await floatingWindow.getByRole('button', { exact: true, name: 'Dock to right panel' }).click();
     await floatingWindow.waitFor({ state: 'detached' });
+    await rail.getByRole('button', { exact: true, name: 'Preview' }).waitFor();
     await waitForFocusedRegion('right');
+    assert.equal(await focusedRegion(), 'right');
 
-    await page.getByRole('button', { exact: true, name: 'Float Window' }).click();
-    await floatingWindow.waitFor();
+    await floatPreviewFromRail();
     await waitForActiveWindow();
     await marker.focus();
     await page.keyboard.press('Shift+F10');
@@ -1408,6 +1410,9 @@ const runFloatingWindowJourney = async (browser) => {
     await waitForFocusedRegion('right');
     await waitForSettledDocument(page);
     await assertNoAxeViolations(page, `${id}:docked`);
+
+    // Video's center holds only Preview; Image Map floats from its rails.
+    await selectLayoutPreset(page, 'Video', 'Preview');
 
     const floatImageMapFrom = async (widgetRail, menuName) => {
       await widgetRail.getByRole('button', { exact: true, name: menuName }).click();

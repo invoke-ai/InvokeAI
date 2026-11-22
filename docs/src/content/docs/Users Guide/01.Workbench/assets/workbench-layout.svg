@@ -176,7 +176,7 @@
       <circle cx="140" cy="12" r="14" fill="#e4fd1d" stroke="#14161a" stroke-width="3"/>
       <text x="140" y="17">2</text>
     </g>
-    <g class="wbl-callout" id="wbl-c3" tabindex="0" role="img" aria-label="3. Workspace tabs: Click to switch workspaces. A dot means unsaved changes; the arrow opens Customize and more">
+    <g class="wbl-callout" id="wbl-c3" tabindex="0" role="img" aria-label="3. Workspace tabs: Click to switch workspaces; the arrow opens Customize, Reset view and more">
       <circle cx="590" cy="12" r="14" fill="#e4fd1d" stroke="#14161a" stroke-width="3"/>
       <text x="590" y="17">3</text>
     </g>
@@ -247,8 +247,8 @@
     <g class="wbl-tip" id="wbl-t3" aria-hidden="true">
       <rect x="328" y="34" width="525" height="108" rx="9"/>
       <text x="344" y="68" class="wbl-tip-title">Workspace tabs</text>
-      <text x="344" y="96">Click to switch workspaces. A dot means</text>
-      <text x="344" y="124">unsaved changes; the arrow opens Customize</text>
+      <text x="344" y="96">Click to switch workspaces; the arrow opens</text>
+      <text x="344" y="124">Customize, Reset view and more</text>
     </g>
     <g class="wbl-tip" id="wbl-t4" aria-hidden="true">
       <rect x="525" y="34" width="480" height="80" rx="9"/>

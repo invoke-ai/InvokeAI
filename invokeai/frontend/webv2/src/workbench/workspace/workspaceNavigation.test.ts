@@ -17,7 +17,7 @@ const createNavigation = ({ presetId = 'compose', warm = true }: { presetId?: st
     workbenchReducer(createInitialWorkbenchState(), { presetId, type: 'applyPreset' }),
     {
       isLoaded: () => warm,
-      loadLayoutPresetWidgets: () =>
+      loadLayoutWidgets: () =>
         new Promise<void>((resolve) => {
           pendingLoads.push(resolve);
         }),
@@ -26,15 +26,17 @@ const createNavigation = ({ presetId = 'compose', warm = true }: { presetId?: st
   const focus = { focusFloating: vi.fn(), focusRegion: vi.fn() };
   const ports = { commands: store.commands, focus, getWidgetsForRegion, queries: store.queries };
   const project = () => store.queries.getSnapshot().activeProject;
+  const layout = () => store.queries.getSnapshot().activeLayout;
   const notices = () => store.queries.getSnapshot().notifications;
   const placedTypes = () =>
-    Object.values(project().widgetRegions).flatMap(({ instanceIds }) =>
-      instanceIds.map((id) => project().widgetInstances[id]?.typeId)
+    Object.values(layout().widgetRegions).flatMap(({ instanceIds }) =>
+      instanceIds.map((id) => layout().widgetInstances[id]?.typeId)
     );
 
   return {
     finishLoading: () => pendingLoads.forEach((resolve) => resolve()),
     focus,
+    layout,
     notices,
     placedTypes,
     ports,
@@ -54,7 +56,7 @@ describe('openInWorkspace', () => {
       ])
     ).toEqual({ changedWorkspace: true, ok: true, region: 'center', workspaceId: 'edit' });
 
-    expect(project().layout.presetId).toBe('edit');
+    expect(project().workspaceId).toBe('edit');
     expect(placedTypes()).not.toContain('workflow');
     expect(notices()[0]).toMatchObject({
       actions: [{ kind: 'add-widget', surface: 'stage', widgetId: 'workflow' }],
@@ -73,7 +75,7 @@ describe('openInWorkspace', () => {
   });
 
   it('shows the rest of a gesture when its first widget is unavailable, focusing the one it names', () => {
-    const { focus, ports, project } = createNavigation();
+    const { focus, layout, ports } = createNavigation();
     const withoutPreview = (region: Parameters<typeof getWidgetsForRegion>[0]) =>
       getWidgetsForRegion(region).filter(({ manifest }) => manifest.id !== 'preview');
 
@@ -83,25 +85,25 @@ describe('openInWorkspace', () => {
       { focus: 'queue' }
     );
 
-    expect(project().widgetRegions.right.activeInstanceId).toBe('queue');
+    expect(layout().widgetRegions.right.activeInstanceId).toBe('queue');
     expect(focus.focusRegion).toHaveBeenCalledExactlyOnceWith('right', 'queue', 'queue');
   });
 
   it('fronts what this workspace places for a background source, and leaves the offer to its notice', () => {
-    const { focus, notices, ports, project } = createNavigation();
-    const regionsBefore = project().widgetRegions;
+    const { focus, layout, notices, ports, project } = createNavigation();
+    const regionsBefore = layout().widgetRegions;
 
     expect(openInWorkspace(ports, { typeId: 'canvas' }, { background: true })).toEqual({
       ok: false,
       reason: 'not-placed',
     });
-    expect(project().layout.presetId).toBe('compose');
-    expect(project().widgetRegions).toBe(regionsBefore);
+    expect(project().workspaceId).toBe('compose');
+    expect(layout().widgetRegions).toBe(regionsBefore);
     expect(notices()).toEqual([]);
     expect(getWorkspaceOffer(ports, { typeId: 'canvas' })).toEqual([{ kind: 'open-widget', widgetId: 'canvas' }]);
 
     openInWorkspace(ports, { typeId: 'upscale' }, { background: true });
-    expect(project().widgetRegions.left).toMatchObject({
+    expect(layout().widgetRegions.left).toMatchObject({
       activeInstanceId: 'upscale',
       instanceIds: ['generate', 'upscale'],
     });
@@ -110,7 +112,7 @@ describe('openInWorkspace', () => {
 
   it('runs follow-up work once a cold entry lands, and never for one superseded before it does', async () => {
     const landed = createNavigation({ presetId: 'automate', warm: false });
-    const afterLanding = vi.fn(() => landed.project().layout.presetId);
+    const afterLanding = vi.fn(() => landed.project().workspaceId);
 
     openInWorkspace(landed.ports, { surface: 'panel', typeId: 'generate' }, { afterShown: afterLanding });
     expect(afterLanding).not.toHaveBeenCalled();
@@ -128,7 +130,7 @@ describe('openInWorkspace', () => {
 
     await expect(edit).resolves.toBe('edit');
     await Promise.resolve();
-    expect(dropped.project().widgetRegions.left.activeInstanceId).toBe('generate');
+    expect(dropped.layout().widgetRegions.left.activeInstanceId).toBe('generate');
     expect(afterDropped).not.toHaveBeenCalled();
     expect(goBackToPreviousWorkspace(dropped.ports)).toBe(false);
   });
@@ -143,7 +145,7 @@ describe('navigation while customizing', () => {
     finishLoading();
     await switching;
 
-    expect(project().layout.presetId).toBe('compose');
+    expect(project().workspaceId).toBe('compose');
     expect(store.getSnapshot().customizing?.[project().id]?.presetId).toBe('compose');
   });
 
@@ -158,7 +160,7 @@ describe('navigation while customizing', () => {
     });
     expect(notices()[0]).toMatchObject({ actions: [{ kind: 'add-widget', surface: 'stage', widgetId: 'workflow' }] });
     await expect(store.commands.layout.activatePreset('edit')).resolves.toBe('compose');
-    expect(project().layout.presetId).toBe('compose');
+    expect(project().workspaceId).toBe('compose');
   });
 });
 
@@ -167,10 +169,10 @@ describe('goBackToPreviousWorkspace', () => {
     const { ports, project } = createNavigation();
 
     openInWorkspace(ports, { surface: 'stage', typeId: 'workflow' });
-    expect(project().layout.presetId).toBe('automate');
+    expect(project().workspaceId).toBe('automate');
 
     expect(goBackToPreviousWorkspace(ports)).toBe(true);
-    expect(project().layout.presetId).toBe('compose');
+    expect(project().workspaceId).toBe('compose');
     expect(goBackToPreviousWorkspace(ports)).toBe(false);
   });
 
@@ -182,51 +184,45 @@ describe('goBackToPreviousWorkspace', () => {
     void store.commands.layout.activatePreset('automate');
 
     expect(goBackToPreviousWorkspace(ports)).toBe(false);
-    expect(project().layout.presetId).toBe('automate');
+    expect(project().workspaceId).toBe('automate');
   });
 });
 
 describe('toggleCenterPreview', () => {
   it('swaps Preview in and back to the stage, without leaving the workspace', () => {
-    const { ports, project, store } = createNavigation({ presetId: 'edit' });
+    const { layout, ports, project, store } = createNavigation({ presetId: 'edit' });
 
     store.commands.widgets.select({ projectId: project().id, region: 'center', widgetId: 'preview' });
     expect(toggleCenterPreview(ports)).toBe(true);
-    expect(project().widgetRegions.center.activeInstanceId).toBe('canvas');
+    expect(layout().widgetRegions.center.activeInstanceId).toBe('canvas');
     expect(toggleCenterPreview(ports)).toBe(true);
-    expect(project().widgetRegions.center.activeInstanceId).toBe('preview');
-    expect(project().layout.presetId).toBe('edit');
+    expect(layout().widgetRegions.center.activeInstanceId).toBe('preview');
+    expect(project().workspaceId).toBe('edit');
   });
 
   it('swaps a Preview stage with the center’s other view', () => {
-    const { ports, project } = createNavigation({ presetId: 'compose' });
+    const { layout, ports } = createNavigation({ presetId: 'compose' });
 
     expect(toggleCenterPreview(ports)).toBe(true);
-    expect(project().widgetRegions.center.activeInstanceId).toBe('gallery:center');
+    expect(layout().widgetRegions.center.activeInstanceId).toBe('gallery:center');
     expect(toggleCenterPreview(ports)).toBe(true);
-    expect(project().widgetRegions.center.activeInstanceId).toBe('preview');
+    expect(layout().widgetRegions.center.activeInstanceId).toBe('preview');
   });
 });
 
 describe('runWorkspaceCommand', () => {
-  it('answers a locked structural command with one Customize hint, and runs it once structure is editable', () => {
-    const { notices, ports } = createNavigation();
-    const save = vi.fn();
-    const run = (rearrangeWithoutCustomize: boolean) =>
-      runWorkspaceCommand(ports, { commandId: 'app.saveLayoutPreset', rearrangeWithoutCustomize }, save);
+  it('leaves the workspace only while not customizing', () => {
+    const { ports, store } = createNavigation();
+    const leave = vi.fn();
+    const run = () =>
+      runWorkspaceCommand(ports, { commandId: 'app.selectEditPreset', rearrangeWithoutCustomize: false }, leave);
 
-    run(false);
-    run(false);
+    store.commands.layout.beginCustomize();
+    run();
+    expect(leave).not.toHaveBeenCalled();
 
-    expect(save).not.toHaveBeenCalled();
-    expect(notices()).toHaveLength(1);
-    expect(notices()[0]).toMatchObject({
-      actions: [{ kind: 'customize-workspace' }],
-      occurrenceCount: 2,
-      titleKey: 'shell.workspace.locked',
-    });
-
-    run(true);
-    expect(save).toHaveBeenCalledOnce();
+    store.commands.layout.cancelCustomize();
+    run();
+    expect(leave).toHaveBeenCalledOnce();
   });
 });

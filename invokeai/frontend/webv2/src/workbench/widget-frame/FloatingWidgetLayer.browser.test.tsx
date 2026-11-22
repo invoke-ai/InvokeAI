@@ -11,6 +11,7 @@ const layerMocks = vi.hoisted(() => ({
 vi.mock('@workbench/WorkbenchContext', () => ({
   shallowEqual: Object.is,
   useActiveProjectId: () => layerMocks.project.id,
+  useActiveLayoutSelector: (selector: (project: typeof layerMocks.project) => unknown) => selector(layerMocks.project),
   useActiveProjectSelector: (selector: (project: typeof layerMocks.project) => unknown) => selector(layerMocks.project),
 }));
 

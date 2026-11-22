@@ -1,6 +1,6 @@
-import type { WidgetRegion, WidgetRegionState } from '@workbench/layoutContracts';
-import type { Project } from '@workbench/projectContracts';
+import type { FloatingWidgetState, WidgetRegion, WidgetRegionState } from '@workbench/layoutContracts';
 import type { WidgetInstanceId } from '@workbench/widgetContracts';
+import type { ResolvedLayout } from '@workbench/workspace/resolveLayout';
 
 import type { FloatingWidgetPlacement } from './floatingWindows';
 import type { WidgetPlacementProject } from './widgetPlacementCommands';
@@ -10,7 +10,7 @@ export type WidgetPlacementRegionState = Pick<WidgetRegionState, 'activeInstance
 
 /** Every instance the layout shows somewhere: region members, and windows, which belong to no region. */
 export const getWidgetPlacementMeta = (
-  project: Pick<Project, 'floatingWidgets' | 'widgetInstances' | 'widgetRegions'>
+  project: Pick<ResolvedLayout, 'floatingWidgets' | 'widgetInstances' | 'widgetRegions'>
 ): WidgetPlacementMeta => {
   const placedInstanceIds = new Set<WidgetInstanceId>(Object.keys(project.floatingWidgets ?? {}));
 
@@ -36,7 +36,7 @@ const NO_FLOATING_PLACEMENTS: Record<WidgetInstanceId, FloatingWidgetPlacement> 
  * leaves this projection equal and its subscribers — the rails among them — do not re-render.
  */
 const getFloatingPlacements = (
-  floatingWidgets: Project['floatingWidgets']
+  floatingWidgets: Record<WidgetInstanceId, FloatingWidgetState> | undefined
 ): Record<WidgetInstanceId, FloatingWidgetPlacement> =>
   floatingWidgets
     ? Object.fromEntries(
@@ -47,13 +47,18 @@ const getFloatingPlacements = (
       )
     : NO_FLOATING_PLACEMENTS;
 
-export const getWidgetPlacementProject = (
-  project: Pick<Project, 'floatingWidgets' | 'id' | 'widgetInstances' | 'widgetRegions'>
-): WidgetPlacementProject => ({
-  floatingPlacements: getFloatingPlacements(project.floatingWidgets),
-  projectId: project.id,
-  widgetInstances: getWidgetPlacementMeta(project),
-  widgetRegions: project.widgetRegions,
+/** The placement a project shows, from its resolved layout; a snapshot selector over the active project. */
+export const getWidgetPlacementProject = ({
+  activeLayout,
+  activeProject,
+}: {
+  activeLayout: Pick<ResolvedLayout, 'floatingWidgets' | 'widgetInstances' | 'widgetRegions'>;
+  activeProject: { id: string };
+}): WidgetPlacementProject => ({
+  floatingPlacements: getFloatingPlacements(activeLayout.floatingWidgets),
+  projectId: activeProject.id,
+  widgetInstances: getWidgetPlacementMeta(activeLayout),
+  widgetRegions: activeLayout.widgetRegions,
 });
 
 const areFloatingPlacementsEqual = (

@@ -1,6 +1,6 @@
 import type { LayoutPreset, LayoutPresetId } from './layoutContracts';
 
-import { getLayoutWidgetTypeIds } from './layoutWidgetSet';
+import { getLayoutWidgetTypeIds, type LayoutWidgetSource } from './layoutWidgetSet';
 import { loadWidgets, warmWidgets } from './widgetRegistry';
 
 /**
@@ -82,9 +82,10 @@ export const createLayoutPresetActivator = ({
   };
 };
 
-export const preloadLayoutPresetWidgets = (preset: LayoutPreset): void => {
-  warmWidgets(getLayoutWidgetTypeIds(preset.snapshot));
+/** `layout` is what entering the workspace shows: its structure seen through the project's view of it. */
+export const preloadLayoutWidgets = (layout: LayoutWidgetSource): void => {
+  warmWidgets(getLayoutWidgetTypeIds(layout));
 };
 
-export const loadLayoutPresetWidgets = (preset: LayoutPreset): Promise<unknown> =>
-  loadWidgets(getLayoutWidgetTypeIds(preset.snapshot));
+export const loadLayoutWidgets = (layout: LayoutWidgetSource): Promise<unknown> =>
+  loadWidgets(getLayoutWidgetTypeIds(layout));

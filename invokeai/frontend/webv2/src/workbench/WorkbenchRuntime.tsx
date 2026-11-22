@@ -154,7 +154,7 @@ export const WorkbenchFocusProvider = ({ children }: { children: ReactNode }) =>
   const [controller] = useState(() =>
     createWorkbenchFocusController({
       getProjectId: () => getSnapshot().activeProject.id,
-      isFloating: (instanceId) => getSnapshot().activeProject.floatingWidgets?.[instanceId] !== undefined,
+      isFloating: (instanceId) => getSnapshot().activeLayout.floatingWidgets?.[instanceId] !== undefined,
     })
   );
 

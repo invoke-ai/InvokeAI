@@ -82,10 +82,11 @@ const renderAdapter = () => {
   return adapter;
 };
 const activeProject = () => store.getSnapshot().activeProject;
+const activeLayout = () => store.getSnapshot().activeLayout;
 const previewId = () =>
   Object.values(activeProject().widgetInstances).find((instance) => instance.typeId === 'preview')!.id;
 const regionSummary = () => {
-  const { center, right } = activeProject().widgetRegions;
+  const { center, right } = activeLayout().widgetRegions;
   return {
     center: { active: center.activeInstanceId, ids: center.instanceIds },
     right: { active: right.activeInstanceId, ids: right.instanceIds },
@@ -106,21 +107,21 @@ describe('Gallery live-follow adapter', () => {
 
     expect(owner.followedProgressSessionId).toBe('run:1');
 
-    const { center } = activeProject().widgetRegions;
+    const { center } = activeLayout().widgetRegions;
     const galleryView = center.instanceIds.find((id) => id !== previewId())!;
     store.commands.widgets.select({ region: 'center', widgetId: galleryView });
 
     owner.followProgressSession('run:2', { revealPreview: false });
     expect(livePreviewFollow).toHaveBeenCalledExactlyOnceWith('run:2');
-    expect(activeProject().widgetRegions.center.activeInstanceId).toBe(galleryView);
+    expect(activeLayout().widgetRegions.center.activeInstanceId).toBe(galleryView);
 
     owner.followProgressSession('run:2', { revealPreview: true });
-    expect(activeProject().widgetRegions.center.activeInstanceId).toBe(previewId());
+    expect(activeLayout().widgetRegions.center.activeInstanceId).toBe(previewId());
   });
 
   it('reveals a rail-docked Preview in its rail and leaves the Gallery in the center', () => {
     const preview = previewId();
-    const { center, right } = activeProject().widgetRegions;
+    const { center, right } = activeLayout().widgetRegions;
     const galleryView = center.instanceIds.find((id) => id !== preview)!;
     const otherRailTab = right.instanceIds[0]!;
     store.commands.widgets.move({ fromRegion: 'center', instanceId: preview, toIndex: 0, toRegion: 'right' });
@@ -139,7 +140,7 @@ describe('Gallery live-follow adapter', () => {
 
   it('unshades a floating Preview without docking it', () => {
     const preview = previewId();
-    const galleryView = activeProject().widgetRegions.center.instanceIds.find((id) => id !== preview)!;
+    const galleryView = activeLayout().widgetRegions.center.instanceIds.find((id) => id !== preview)!;
     store.commands.widgets.select({ region: 'center', widgetId: galleryView });
     store.commands.widgets.float(preview, 'center');
     store.commands.widgets.setFloatingMode(preview, 'shaded');
@@ -147,25 +148,25 @@ describe('Gallery live-follow adapter', () => {
 
     renderAdapter().followProgressSession('run:2', { revealPreview: true });
 
-    expect(activeProject().floatingWidgets?.[preview]?.mode).toBe('windowed');
+    expect(activeLayout().floatingWidgets?.[preview]?.mode).toBe('windowed');
     expect(regionSummary()).toEqual(before);
   });
 
   it('enters a workspace built around Preview when this one places none', () => {
     const preview = previewId();
     for (const region of ['center', 'right', 'left', 'bottom'] as const) {
-      if (activeProject().widgetRegions[region].instanceIds.includes(preview)) {
+      if (activeLayout().widgetRegions[region].instanceIds.includes(preview)) {
         store.commands.widgets.toggle({ region, widgetId: preview });
       }
     }
-    expect(Object.values(activeProject().widgetRegions).some((region) => region.instanceIds.includes(preview))).toBe(
+    expect(Object.values(activeLayout().widgetRegions).some((region) => region.instanceIds.includes(preview))).toBe(
       false
     );
 
     renderAdapter().followProgressSession('run:2', { revealPreview: true });
 
-    expect(activeProject().layout.presetId).toBe('video');
-    expect(activeProject().widgetRegions.center.activeInstanceId).toBe(previewId());
+    expect(activeProject().workspaceId).toBe('video');
+    expect(activeLayout().widgetRegions.center.activeInstanceId).toBe(previewId());
   });
 
   it('shows live frames in the Gallery only while Auto-switch is In progress', () => {

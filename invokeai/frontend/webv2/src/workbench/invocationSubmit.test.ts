@@ -10,6 +10,7 @@ import { captureAccountScope } from '@platform/state/accountLifecycle';
 import { ApiError } from '@platform/transport/http';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+const layoutOf = (project: Parameters<typeof getLayoutOf>[1]) => getLayoutOf(createInitialWorkbenchState(), project);
 const templatesMock = vi.hoisted(() => ({
   snapshot: { error: null, status: 'idle', templates: {} } as {
     error: string | null;
@@ -59,7 +60,7 @@ vi.mock('@features/workflow/generators', async (importOriginal) => ({
 
 import { resolveInvocationRoute } from './invocation';
 import { submitResolvedInvocation } from './invocationSubmit';
-import { createInitialWorkbenchState, workbenchReducer } from './workbenchState.testing';
+import { createInitialWorkbenchState, getLayoutOf, workbenchReducer } from './workbenchState.testing';
 
 const getActiveProject = (state: ReturnType<typeof createInitialWorkbenchState>) => {
   const project = state.projects.find((candidate) => candidate.id === state.activeProjectId);
@@ -199,7 +200,7 @@ describe('submitResolvedInvocation with a workflow generator', () => {
 
   const submit = async () => {
     const project = buildProject();
-    const route = resolveInvocationRoute(project, 'global', workflowRoute);
+    const route = resolveInvocationRoute(project, layoutOf(project), 'global', workflowRoute);
     const commands = createWorkbenchStore().commands;
     const submitResolved = vi.spyOn(commands.generation, 'submitResolved');
     const notify = vi.spyOn(commands.notifications, 'add');
@@ -261,7 +262,7 @@ describe('submitResolvedInvocation with a workflow generator', () => {
         owner: captureAccountScope(),
         prepareCanvasInvocation: vi.fn(),
         project,
-        route: resolveInvocationRoute(project, 'global', workflowRoute),
+        route: resolveInvocationRoute(project, layoutOf(project), 'global', workflowRoute),
       });
 
       // The listing read did not hold generator resolution back: both started at once.
@@ -330,7 +331,7 @@ describe('submitResolvedInvocation with a workflow generator', () => {
       owner: captureAccountScope(),
       prepareCanvasInvocation: vi.fn(),
       project,
-      route: resolveInvocationRoute(project, 'global', workflowRoute),
+      route: resolveInvocationRoute(project, layoutOf(project), 'global', workflowRoute),
       workflowId,
     });
 
@@ -351,7 +352,7 @@ describe('submitResolvedInvocation with a workflow generator', () => {
       owner: captureAccountScope(),
       prepareCanvasInvocation: vi.fn(),
       project,
-      route: resolveInvocationRoute(project, 'global', workflowRoute),
+      route: resolveInvocationRoute(project, layoutOf(project), 'global', workflowRoute),
       workflowId: 'removed',
     });
 
@@ -433,7 +434,7 @@ describe('submitResolvedInvocation with a random dynamic prompt', () => {
       dynamicPromptsKeys.expansion({ combinatorial: false, max_prompts: 4, prompt: 'a {red|green} cat', seed: 7 }),
       { error: null, prompts: ['a green cat'] }
     );
-    const route = resolveInvocationRoute(project, 'global', {
+    const route = resolveInvocationRoute(project, layoutOf(project), 'global', {
       destination: 'gallery',
       destinationLocked: false,
       sourceId,
@@ -495,7 +496,7 @@ describe('submitResolvedInvocation without dynamic prompts', () => {
         values: { ...getDefaultGenerateSettings(model), model, modelKey: model.key, positivePrompt },
       })
     );
-    const route = resolveInvocationRoute(project, 'global', {
+    const route = resolveInvocationRoute(project, layoutOf(project), 'global', {
       destination: 'gallery',
       destinationLocked: false,
       sourceId: 'generate',
@@ -568,7 +569,7 @@ describe('submitResolvedInvocation without dynamic prompts', () => {
       prepareCanvasInvocation: vi.fn(),
       prepend: true,
       project,
-      route: resolveInvocationRoute(project, 'global', workflowRoute),
+      route: resolveInvocationRoute(project, layoutOf(project), 'global', workflowRoute),
     });
 
     expect(submitResolved).toHaveBeenCalledTimes(1);
@@ -622,6 +623,7 @@ describe('submitResolvedInvocation for Video', () => {
       project,
       route: resolveInvocationRoute(
         project,
+        layoutOf(project),
         'global',
         { destination: 'gallery', destinationLocked: false, sourceId: 'video', sourceLocked: false },
         [wanModel]
@@ -716,6 +718,7 @@ describe('submitResolvedInvocation when the prompt changes while it expands', ()
         project,
         route: resolveInvocationRoute(
           project,
+          layoutOf(project),
           'global',
           { destination: 'gallery', destinationLocked: false, sourceId, sourceLocked: false },
           models
@@ -769,7 +772,7 @@ describe("submitResolvedInvocation reads the user's defaults", () => {
       }
     );
     const project = getActiveProject(state);
-    const route = resolveInvocationRoute(project, 'global', {
+    const route = resolveInvocationRoute(project, layoutOf(project), 'global', {
       destination: 'gallery',
       destinationLocked: false,
       sourceId: 'canvas',
@@ -852,7 +855,7 @@ describe('submitResolvedInvocation for Upscale', () => {
       owner: captureAccountScope(),
       prepareCanvasInvocation: vi.fn(),
       project,
-      route: resolveInvocationRoute(project, 'global', upscaleRoute, [upscaler]),
+      route: resolveInvocationRoute(project, layoutOf(project), 'global', upscaleRoute, [upscaler]),
     });
 
     return { notify, submitResolved };

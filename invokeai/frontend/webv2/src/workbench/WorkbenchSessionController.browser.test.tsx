@@ -34,6 +34,7 @@ vi.mock('./WorkbenchContext', () => ({
   useWorkbenchQueries: () => ({
     getSnapshot: () => ({
       account: {},
+      activeLayout: getLayoutPreset('compose').snapshot,
       activeProject: {
         ...getLayoutPreset('compose').snapshot,
         invocation: { sourceId: 'upscale', sourceLocked: true },

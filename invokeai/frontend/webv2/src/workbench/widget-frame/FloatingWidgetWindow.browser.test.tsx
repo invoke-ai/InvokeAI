@@ -66,9 +66,13 @@ const recoveryOwner = vi.hoisted(() => ({
 vi.mock('@workbench/WorkbenchContext', () => ({
   useWorkbenchInternalStore: () => recoveryOwner,
   useWorkbenchReload: () => async () => {},
+  useActiveLayoutSelector: (selector: (project: unknown) => unknown) => selector(project),
+  useWorkbenchSelector: (selector: (snapshot: never) => unknown) =>
+    selector({ activeLayout: project, activeProject: project } as never),
   useActiveProjectSelector: (selector: (project: unknown) => unknown) => selector(project),
   useActiveProjectId: () => project.id,
   useWorkbenchQueries: () => ({
+    getAvailability: () => ({ getPresentation: () => 'view' }),
     getProject: (projectId: string) => (projectId === project.id ? project : null),
     getSnapshot: () => ({
       activeProject: { ...project, layout: { panels: { isBottomOpen: true, isLeftOpen: true, isRightOpen: true } } },

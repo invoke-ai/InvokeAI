@@ -1,4 +1,5 @@
 import type * as WorkbenchContextModule from '@workbench/WorkbenchContext';
+import type { WorkbenchSnapshot } from '@workbench/workbenchStore';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
@@ -22,6 +23,10 @@ vi.mock('@workbench/WorkbenchContext', async (importOriginal) => {
 
   return {
     ...(await importOriginal<typeof WorkbenchContextModule>()),
+    useActiveLayoutSelector: <Selected,>(selector: (layout: WorkbenchSnapshot['activeLayout']) => Selected) =>
+      selector(useSyncExternalStore(workbench.store!.subscribe, workbench.store!.getSnapshot).activeLayout),
+    useWorkbenchSelector: <Selected,>(selector: (snapshot: WorkbenchSnapshot) => Selected) =>
+      selector(useSyncExternalStore(workbench.store!.subscribe, workbench.store!.getSnapshot)),
     useActiveProjectSelector: <Selected,>(selector: (project: unknown) => Selected) =>
       selector(useSyncExternalStore(workbench.store!.subscribe, () => workbench.store!.getSnapshot().activeProject)),
     useOptionalWorkbenchSelector: <Selected,>(selector: (snapshot: unknown) => Selected) =>
@@ -49,6 +54,7 @@ let root: Root | null = null;
 
 const store = () => workbench.store!;
 const activeProject = () => store().getSnapshot().activeProject;
+const activeLayout = () => store().getSnapshot().activeLayout;
 const row = (key: string) => page.getByRole('dialog').element().querySelector(`[data-widgets-row="${key}"]`);
 const sectionItems = (name: string) => page.getByRole('list', { name }).getByRole('listitem').elements();
 
@@ -95,7 +101,7 @@ describe('WidgetsDialog', () => {
 
     await act(() => page.getByRole('button', { name: 'Remove Queue (Right panel)' }).click());
 
-    expect(activeProject().widgetRegions.right.instanceIds).not.toContain('queue');
+    expect(activeLayout().widgetRegions.right.instanceIds).not.toContain('queue');
     expect(sectionItems('Not in this workspace')).toContain(row('type:queue'));
     await expect.element(page.getByRole('button', { name: 'Add Queue' })).toHaveFocus();
 
@@ -104,18 +110,18 @@ describe('WidgetsDialog', () => {
   });
 
   it('adds a removed status-bar chip back to the status bar', async () => {
-    const autosave = activeProject().widgetRegions.bottom.instanceIds.find(
+    const autosave = activeLayout().widgetRegions.bottom.instanceIds.find(
       (instanceId) => activeProject().widgetInstances[instanceId]?.typeId === 'autosave-status'
     )!;
 
     await act(() => page.getByRole('button', { name: 'Remove Autosave (Status bar)' }).click());
-    expect(activeProject().widgetRegions.bottom.instanceIds).not.toContain(autosave);
+    expect(activeLayout().widgetRegions.bottom.instanceIds).not.toContain(autosave);
     await expect.element(page.getByRole('button', { name: 'Add Autosave' })).toHaveFocus();
 
     await act(() => page.getByRole('button', { name: 'Add Autosave' }).click());
 
     expect(
-      activeProject().widgetRegions.bottom.instanceIds.some(
+      activeLayout().widgetRegions.bottom.instanceIds.some(
         (instanceId) => activeProject().widgetInstances[instanceId]?.typeId === 'autosave-status'
       )
     ).toBe(true);
@@ -123,7 +129,7 @@ describe('WidgetsDialog', () => {
 
   it('keeps the last center view, saying why its Remove is unavailable', async () => {
     await act(() => page.getByRole('button', { name: 'Remove Gallery (Center)' }).click());
-    const center = [...activeProject().widgetRegions.center.instanceIds];
+    const center = [...activeLayout().widgetRegions.center.instanceIds];
     const remove = page.getByRole('button', { name: 'Remove Preview (Center)' });
 
     await expect.element(remove).toHaveAttribute('aria-disabled', 'true');
@@ -132,7 +138,7 @@ describe('WidgetsDialog', () => {
     // A pointer click would be refused as disabled; dispatch one to prove the action itself is blocked.
     await act(() => (remove.element() as HTMLElement).click());
 
-    expect(activeProject().widgetRegions.center.instanceIds).toEqual(center);
+    expect(activeLayout().widgetRegions.center.instanceIds).toEqual(center);
     await expect.element(page.getByRole('dialog', { name: 'Widgets' })).toBeVisible();
   });
 
@@ -166,7 +172,7 @@ describe('WidgetsDialog', () => {
 
     await act(() => page.getByRole('button', { name: 'Dock Queue (Floating window)' }).click());
 
-    expect(activeProject().floatingWidgets?.queue).toBeUndefined();
+    expect(activeLayout().floatingWidgets?.queue).toBeUndefined();
     expect(row('queue')?.textContent).toContain('Right panel');
   });
 

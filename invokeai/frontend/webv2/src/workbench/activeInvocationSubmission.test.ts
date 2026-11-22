@@ -19,7 +19,7 @@ import type { WorkbenchCommands, WorkbenchQueries } from './workbenchStore';
 import { submitActiveInvocation, type ActiveInvocationSubmissionRuntime } from './activeInvocationSubmission';
 import { beginInvocationPreparation, endInvocationPreparation, isInvocationPreparing } from './invocationPreparation';
 import { submitResolvedInvocation } from './invocationSubmit';
-import { createInitialWorkbenchState, workbenchReducer } from './workbenchState.testing';
+import { createInitialWorkbenchState, getLayoutOf, workbenchReducer } from './workbenchState.testing';
 import { createWorkbenchStore } from './workbenchStore';
 
 // A loaded definition for the one node the workflow route needs; readiness reads templates imperatively.
@@ -48,6 +48,7 @@ const createArgs = (state = createInitialWorkbenchState()) => {
     queries: {
       getSnapshot: () => ({
         account: state.account,
+        activeLayout: getLayoutOf(state, state.projects[0]),
         activeProject: state.projects[0],
         autosave: state.autosave,
         backendConnection: state.backendConnection,
@@ -346,14 +347,8 @@ describe('active invocation submission for a graph preview’s source', () => {
     return state.projects.find((candidate) => candidate.id === state.activeProjectId)!;
   };
   type TestProject = ReturnType<typeof projectWith>;
-  // Mount Canvas, so the route counts that source available.
-  const withCanvasMounted = (project: TestProject): TestProject => ({
-    ...project,
-    widgetRegions: {
-      ...project.widgetRegions,
-      center: { ...project.widgetRegions.center, activeInstanceId: 'canvas', instanceIds: ['canvas'] },
-    },
-  });
+  // On Edit, which places Canvas, so the route counts that source available.
+  const withCanvasMounted = (project: TestProject): TestProject => ({ ...project, workspaceId: 'edit' });
   const animaProject = () =>
     projectWith({
       ...getDefaultGenerateSettings(animaModel),
@@ -389,6 +384,7 @@ describe('active invocation submission for a graph preview’s source', () => {
         onStarted,
         queries: {
           getSnapshot: () => ({
+            activeLayout: getLayoutOf(createInitialWorkbenchState(), project),
             activeProject: project,
             backendConnection: { status: 'connected' },
             scopedDefaults: {},

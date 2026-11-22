@@ -13,6 +13,7 @@ import type {
 } from '@workbench/invocationContracts';
 import type { Project } from '@workbench/projectContracts';
 import type { WidgetId } from '@workbench/widgetContracts';
+import type { WorkspacePlacement } from '@workbench/workspace/workspaceDerivations';
 
 import { getLayoutDraftRejectionReason } from '@features/generation/graph';
 import {
@@ -35,7 +36,7 @@ import { getVideoWidgetValidationReasons, normalizeVideoWidgetValues } from '@fe
 import { getProjectGraphReadiness } from '@features/workflow/graph';
 import { getInvocationTemplatesSnapshot } from '@features/workflow/react';
 import { localizeWorkflowReadinessReason } from '@features/workflow/utility';
-import { areArraysEqual, createStableSelector } from '@platform/state/selectors';
+import { areArraysEqual } from '@platform/state/selectors';
 import {
   compileContributingLayers,
   compileDocumentLeaves,
@@ -150,22 +151,15 @@ export interface InvocationRouteInput {
   canvasRegionalLayersInFrame: readonly CanvasRegionalGuidanceLayerContract[];
 }
 
-const getMountedWidgetIds = (project: Project): WidgetId[] => {
+/** The widget types the layout places, windows included: a source runs only while its widget is placed. */
+const getMountedWidgetIds = (layout: WorkspacePlacement): WidgetId[] => {
   const mountedWidgetIds = new Set<WidgetId>();
 
-  for (const region of Object.values(project.widgetRegions)) {
-    for (const instanceId of region.instanceIds) {
-      const widgetId = project.widgetInstances[instanceId]?.typeId;
-
-      if (widgetId) {
-        mountedWidgetIds.add(widgetId);
-      }
-    }
-  }
-
-  // A floated instance is mounted in its window, not in a region.
-  for (const instanceId of Object.keys(project.floatingWidgets ?? {})) {
-    const widgetId = project.widgetInstances[instanceId]?.typeId;
+  for (const instanceId of [
+    ...Object.values(layout.widgetRegions).flatMap((region) => region.instanceIds),
+    ...Object.keys(layout.floatingWidgets ?? {}),
+  ]) {
+    const widgetId = layout.widgetInstances[instanceId]?.typeId;
 
     if (widgetId) {
       mountedWidgetIds.add(widgetId);
@@ -230,7 +224,8 @@ const getRegionalLayersInFrame = (
   return inFrame.length > 0 ? inFrame : NO_REGIONAL_LAYERS;
 };
 
-export const getInvocationRouteInput = (project: Project): InvocationRouteInput => {
+/** `layout` is what the project shows: its workspace's structure seen through its view. */
+export const getInvocationRouteInput = (project: Project, layout: WorkspacePlacement): InvocationRouteInput => {
   const generateValues = getProjectWidgetValues(project, 'generate');
   // Measured whatever source is selected: a graph preview resolves the Canvas route from this input.
   const measuresRaster =
@@ -250,7 +245,7 @@ export const getInvocationRouteInput = (project: Project): InvocationRouteInput 
     videoValues: getProjectWidgetValues(project, 'video'),
     workflowValues: getProjectWidgetValues(project, 'workflow'),
     invocation: project.invocation,
-    mountedWidgetIds: getMountedWidgetIds(project),
+    mountedWidgetIds: getMountedWidgetIds(layout),
     projectGraph: getActiveProjectGraph(project),
     projectId: project.id,
   };
@@ -271,8 +266,22 @@ export const areInvocationRouteInputsEqual = (left: InvocationRouteInput, right:
   areArraysEqual(left.canvasRegionalLayersInFrame, right.canvasRegionalLayersInFrame) &&
   areArraysEqual(left.mountedWidgetIds, right.mountedWidgetIds);
 
-export const createInvocationRouteInputSelector = () =>
-  createStableSelector(getInvocationRouteInput, areInvocationRouteInputsEqual);
+export const createInvocationRouteInputSelector = (): ((
+  project: Project,
+  layout: WorkspacePlacement
+) => InvocationRouteInput) => {
+  let last: { input: InvocationRouteInput; layout: WorkspacePlacement; project: Project } | undefined;
+
+  return (project, layout) => {
+    if (last?.project !== project || last.layout !== layout) {
+      const next = getInvocationRouteInput(project, layout);
+
+      last = { input: last && areInvocationRouteInputsEqual(last.input, next) ? last.input : next, layout, project };
+    }
+
+    return last.input;
+  };
+};
 
 const isWidgetMounted = (input: InvocationRouteInput, widgetId: WidgetId): boolean =>
   input.mountedWidgetIds.includes(widgetId);
@@ -309,6 +318,7 @@ export const isResultDestinationAvailable = (destination: ResultDestination): bo
 
 export const resolveInvocationRoute = (
   project: Project,
+  layout: WorkspacePlacement,
   mode: InvocationMode = 'global',
   route: InvocationRoute = project.invocation,
   models?: readonly ModelConfig[],
@@ -317,8 +327,8 @@ export const resolveInvocationRoute = (
 ): ResolvedInvocationRoute =>
   resolveInvocationRouteInput(
     workflowDocument
-      ? { ...getInvocationRouteInput(project), projectGraph: workflowDocument }
-      : getInvocationRouteInput(project),
+      ? { ...getInvocationRouteInput(project, layout), projectGraph: workflowDocument }
+      : getInvocationRouteInput(project, layout),
     mode,
     route,
     models,

@@ -8,12 +8,7 @@ import type {
 import { describe, expect, it, vi } from 'vitest';
 
 import { createWidgetImplementationResource } from './widgetImplementationResource';
-import {
-  canRemoveItem,
-  createWidgetRegionViewModel,
-  getWidgetRegionItems,
-  isRequiredCenterView,
-} from './widgetRegionViewModel';
+import { createWidgetRegionViewModel, getWidgetRegionItems } from './widgetRegionViewModel';
 
 const TestIcon = () => null;
 const TestView = () => null;
@@ -104,29 +99,6 @@ describe('widget region view model', () => {
 
     expect(viewModel.availableItems).toHaveLength(1);
     expect(viewModel.availableItems[0]).toMatchObject({ allowMultiple: true, isEnabled: false, typeId: 'alpha' });
-  });
-
-  it('identifies the last enabled center view as required', () => {
-    const viewModel = createWidgetRegionViewModel({
-      instanceIds: ['canvas', 'toolbar-tools'],
-      region: 'center',
-      widgetInstances: {
-        canvas: createInstance('canvas', 'canvas'),
-        'toolbar-tools': createInstance('toolbar-tools', 'toolbar-tools'),
-      },
-      widgets: [
-        createWidget({ centerPlacement: 'view', id: 'canvas', label: 'Canvas' }),
-        createWidget({ centerPlacement: 'toolbar', id: 'toolbar-tools', label: 'Toolbar Tools' }),
-      ],
-    });
-    const canvas = viewModel.placedItems.find((item) => item.id === 'canvas');
-    const toolbar = viewModel.placedItems.find((item) => item.id === 'toolbar-tools');
-
-    expect(canvas).toBeDefined();
-    expect(toolbar).toBeDefined();
-    expect(isRequiredCenterView(canvas!, 1)).toBe(true);
-    expect(canRemoveItem(canvas!, viewModel)).toBe(false);
-    expect(canRemoveItem(toolbar!, viewModel)).toBe(true);
   });
 
   it('does not call createInitial while deriving available items', () => {

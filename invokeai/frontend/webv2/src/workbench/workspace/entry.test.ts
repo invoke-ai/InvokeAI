@@ -1,19 +1,35 @@
 import type { InvocationRoute } from '@workbench/invocationContracts';
-import type { WidgetRegion } from '@workbench/layoutContracts';
 
 import { getNaturalDestination } from '@workbench/graphWidgets';
 import { getAvailableSourceIdForWidgetTypeId } from '@workbench/invocationSources';
 import { getLayoutPreset } from '@workbench/layoutPresets';
-import { isCenterViewType } from '@workbench/widgetRegistry';
 import { describe, expect, it } from 'vitest';
 
-import type { SavedWorkspace, WorkspacePlacement } from './workspaceDerivations';
+import type { WorkspaceStructure } from './structure';
+import type { WorkspaceView } from './view';
+import type { SavedWorkspace } from './workspaceDerivations';
 
 import { enterWorkspace } from './entry';
+import { registryAvailability } from './layoutFixtures.testing';
+import { resolveLayout } from './resolveLayout';
+import { normalizeStructure } from './structure';
+import { frontRegion, setRegionCollapsed } from './view';
 
 const sources = { getNaturalDestination, getSourceId: getAvailableSourceIdForWidgetTypeId };
-const enter = (input: Omit<Parameters<typeof enterWorkspace>[0], 'isCenterView' | 'sources'>) =>
-  enterWorkspace({ ...input, isCenterView: isCenterViewType, sources });
+const enter = (
+  workspace: SavedWorkspace & { snapshot: WorkspaceStructure },
+  view: WorkspaceView | undefined,
+  invocation = route()
+) =>
+  enterWorkspace({
+    invocation,
+    resolve: (candidate) => resolveLayout(workspace.snapshot, candidate, registryAvailability),
+    sources,
+    structure: workspace.snapshot,
+    surfaces: registryAvailability,
+    view,
+    workspace,
+  });
 const route = (overrides: Partial<InvocationRoute> = {}): InvocationRoute => ({
   destination: 'gallery',
   destinationLocked: false,
@@ -22,119 +38,103 @@ const route = (overrides: Partial<InvocationRoute> = {}): InvocationRoute => ({
   ...overrides,
 });
 
-/** The saved arrangement with some regions fronting another member, or collapsed. */
-const laidOut = (
-  workspace: SavedWorkspace,
-  regions: Partial<Record<WidgetRegion, { front?: string; isCollapsed?: boolean }>>
-): WorkspacePlacement => ({
-  ...workspace.snapshot,
-  widgetRegions: Object.fromEntries(
-    Object.entries(workspace.snapshot.widgetRegions).map(([region, state]) => [
-      region,
-      {
-        ...state,
-        activeInstanceId: regions[region as WidgetRegion]?.front ?? state.activeInstanceId,
-        isCollapsed: regions[region as WidgetRegion]?.isCollapsed ?? state.isCollapsed,
-      },
-    ])
-  ) as WorkspacePlacement['widgetRegions'],
-});
-
 const edit = getLayoutPreset('edit');
 const compose = getLayoutPreset('compose');
 const video = getLayoutPreset('video');
 
 describe('enterWorkspace', () => {
   it('ends Away: Edit left on Preview comes back to Canvas, aimed Canvas to Canvas', () => {
-    expect(
-      enter({
-        invocation: route(),
-        placement: laidOut(edit, { center: { front: 'preview' } }),
-        workspace: edit,
-      })
-    ).toEqual({
-      fronts: { center: 'canvas' },
-      invocation: route({ destination: 'canvas', sourceId: 'canvas' }),
+    const away = frontRegion(undefined, edit.snapshot, 'center', 'preview', registryAvailability);
+    const entry = enter(edit, away);
+
+    expect(entry).toEqual({ invocation: route({ destination: 'canvas', sourceId: 'canvas' }), view: undefined });
+    expect(resolveLayout(edit.snapshot, entry.view, registryAvailability).widgetRegions.center.activeInstanceId).toBe(
+      'canvas'
+    );
+  });
+
+  it('brings the stage back to the center from a rail that was asked for its instance', () => {
+    const snapshot = normalizeStructure({
+      ...edit.snapshot,
+      widgetRegions: {
+        ...edit.snapshot.widgetRegions,
+        center: { ...edit.snapshot.widgetRegions.center, activeInstanceId: 'preview' },
+        right: { ...edit.snapshot.widgetRegions.right, activeInstanceId: 'preview' },
+      },
     });
+    const railed = frontRegion(undefined, snapshot, 'right', 'preview', registryAvailability);
+    const shown = (view: WorkspaceView | undefined) =>
+      resolveLayout(snapshot, view, registryAvailability).widgetRegions;
+
+    expect(shown(railed).center.activeInstanceId).toBe('canvas');
+
+    const entry = enter({ ...edit, snapshot }, railed);
+
+    expect(shown(entry.view).center.activeInstanceId).toBe('preview');
+    expect(shown(entry.view).right.activeInstanceId).toBe('layers');
   });
 
   it('keeps each locked half of the route and still restores the stage', () => {
-    const entry = enter({
-      invocation: route({ sourceLocked: true }),
-      placement: laidOut(edit, { center: { front: 'preview' } }),
-      workspace: edit,
-    });
+    const entry = enter(
+      edit,
+      frontRegion(undefined, edit.snapshot, 'center', 'preview', registryAvailability),
+      route({ sourceLocked: true })
+    );
 
-    expect(entry.fronts).toEqual({ center: 'canvas' });
+    expect(entry.view).toBeUndefined();
     expect(entry.invocation).toEqual(route({ destination: 'canvas', sourceLocked: true }));
   });
 
-  it('fronts the job’s source in a collapsed panel without opening it', () => {
-    expect(
-      enter({
-        invocation: route({ sourceId: 'upscale' }),
-        placement: laidOut(compose, { left: { front: 'upscale', isCollapsed: true } }),
-        workspace: compose,
-      })
-    ).toEqual({ fronts: { left: 'generate' }, invocation: route() });
+  it('fronts the job’s source in a collapsed panel without opening it, keeping the rest of the view', () => {
+    const view = setRegionCollapsed(
+      frontRegion(
+        frontRegion(undefined, compose.snapshot, 'left', 'upscale', registryAvailability),
+        compose.snapshot,
+        'right',
+        'queue',
+        registryAvailability
+      ),
+      compose.snapshot,
+      'left',
+      true
+    );
+
+    expect(enter(compose, view, route({ sourceId: 'upscale' }))).toEqual({
+      invocation: route(),
+      view: { collapsed: { left: true }, fronts: { right: 'queue' } },
+    });
   });
 
   it('re-fronts Video in the Video rail after Upscale was fronted there', () => {
     expect(
-      enter({
-        invocation: route({ sourceId: 'upscale' }),
-        placement: laidOut(video, { left: { front: 'upscale' } }),
-        workspace: video,
-      })
-    ).toEqual({ fronts: { left: 'video' }, invocation: route({ sourceId: 'video' }) });
+      enter(
+        video,
+        frontRegion(undefined, video.snapshot, 'left', 'upscale', registryAvailability),
+        route({ sourceId: 'upscale' })
+      )
+    ).toEqual({ invocation: route({ sourceId: 'video' }), view: undefined });
   });
 
   it('leaves the route of a workspace with no source as it was', () => {
-    const review: SavedWorkspace = {
-      snapshot: {
-        layout: { panels: { isBottomOpen: false, isLeftOpen: false, isRightOpen: true } },
-        widgetInstances: { gallery: { typeId: 'gallery' }, 'image-map': { typeId: 'image-map' } },
-        widgetRegions: {
-          bottom: { activeInstanceId: '', instanceIds: [], isCollapsed: true },
-          center: { activeInstanceId: 'image-map', instanceIds: ['image-map'], isCollapsed: false },
-          left: { activeInstanceId: '', instanceIds: [], isCollapsed: false },
-          right: { activeInstanceId: 'gallery', instanceIds: ['gallery'], isCollapsed: false },
-        },
-      },
-    };
-    const invocation = route({ destination: 'canvas', sourceId: 'canvas' });
-
-    expect(enter({ invocation, placement: review.snapshot, workspace: review })).toEqual({
-      fronts: {},
-      invocation,
-    });
-  });
-
-  it('fronts the first center view it can show when the laid-out arrangement no longer places the stage', () => {
-    const placement = laidOut(edit, {});
-    const withoutCanvas: WorkspacePlacement = {
-      ...placement,
-      widgetRegions: {
-        ...placement.widgetRegions,
-        center: { activeInstanceId: 'queue', instanceIds: ['queue', 'gallery:center', 'preview'], isCollapsed: false },
+    const structure = normalizeStructure({
+      layout: {
+        centerViewId: 'gallery',
+        panels: { isBottomOpen: false, isLeftOpen: false, isRightOpen: true },
+        presetId: 'review',
       },
       widgetInstances: {
-        ...placement.widgetInstances,
-        'gallery:center': { typeId: 'gallery' },
-        queue: { typeId: 'queue' },
+        gallery: { id: 'gallery', typeId: 'gallery' },
+        'image-map': { id: 'image-map', typeId: 'image-map' },
       },
-    };
+      widgetRegions: {
+        bottom: { activeInstanceId: '', instanceIds: [], isCollapsed: true, sizePx: 96 },
+        center: { activeInstanceId: 'image-map', instanceIds: ['image-map'], isCollapsed: false, sizePx: 0 },
+        left: { activeInstanceId: '', instanceIds: [], isCollapsed: true, sizePx: 360 },
+        right: { activeInstanceId: 'gallery', instanceIds: ['gallery'], isCollapsed: false, sizePx: 360 },
+      },
+    });
     const invocation = route({ destination: 'canvas', sourceId: 'canvas' });
 
-    expect(enter({ invocation, placement: withoutCanvas, workspace: edit }).fronts.center).toBe('gallery:center');
-    expect(
-      enterWorkspace({
-        invocation,
-        isCenterView: (typeId) => typeId === 'preview',
-        placement: withoutCanvas,
-        sources,
-        workspace: edit,
-      }).fronts.center
-    ).toBe('preview');
+    expect(enter({ snapshot: structure }, undefined, invocation)).toEqual({ invocation, view: undefined });
   });
 });

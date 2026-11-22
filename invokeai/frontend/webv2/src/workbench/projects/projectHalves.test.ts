@@ -1,7 +1,8 @@
 import type { Project } from '@workbench/projectContracts';
 
 import { addProjectWorkflow, createBlankWorkflowDocument, recordProjectWorkflowRun } from '@workbench/projectWorkflows';
-import { createInitialWorkbenchState } from '@workbench/workbenchState.testing';
+import { asStoredBeforeSplit, createInitialWorkbenchState } from '@workbench/workbenchState.testing';
+import { structuralLayouts, workingCopyOf } from '@workbench/workspace/storedLayoutFixtures.testing';
 import { describe, expect, it } from 'vitest';
 
 import type { ProjectWithWorkspaceDTO } from './api';
@@ -69,23 +70,38 @@ describe('splitting a project into content and workspace', () => {
     );
   });
 
-  it('carries every field of the document in one half or the other', () => {
+  it('carries every field of the document in one half or the other, in either layout shape', () => {
     const project = workedOnProject();
-    const geometry = { height: 300, width: 400, x: 10, y: 20 };
-    const optional = {
+    const geometry = { heightPx: 300, widthPx: 400, x: 10, y: 20 };
+    const current = serializeProjectDocumentV3({
       ...project,
-      floatingWidgets: { gallery: { ...geometry, zIndex: 1 } },
+      droppedArrangements: ['edit'],
       lastFloatingGeometry: { gallery: geometry },
-      presetWorkingLayouts: [{ presetId: project.layout.presetId, layout: project.layout }],
-    } as unknown as Project;
-    const document = serializeProjectDocumentV3(optional);
-    const { content, workspace } = splitProjectDocument(document);
+      views: { compose: { sizes: { left: 500 } } },
+    });
+    // A project loaded from a document stored before structure and view split writes that layout back until migrated.
+    const stored = serializeProjectDocumentV3(
+      asStoredBeforeSplit(project, {
+        ...structuralLayouts['floated a widget'],
+        presetWorkingLayouts: [workingCopyOf('edit', { right: { sizePx: 401 } })],
+      })
+    );
+    const fields = new Set<string>();
 
-    for (const [field, half] of Object.entries(PROJECT_DOCUMENT_HALVES)) {
-      const holders = [field in content && 'content', field in workspace && 'workspace'].filter(Boolean);
-      expect(holders, field).toEqual(half === 'both' ? ['content', 'workspace'] : [half]);
+    for (const document of [current, stored]) {
+      const { content, workspace } = splitProjectDocument(document);
+
+      for (const field of Object.keys(document)) {
+        const half = PROJECT_DOCUMENT_HALVES[field as keyof typeof PROJECT_DOCUMENT_HALVES];
+        const holders = [field in content && 'content', field in workspace && 'workspace'].filter(Boolean);
+
+        fields.add(field);
+        expect(holders, field).toEqual(half === 'both' ? ['content', 'workspace'] : [half]);
+      }
     }
-    expect(Object.keys(document).sort()).toEqual(Object.keys(PROJECT_DOCUMENT_HALVES).sort());
+    expect([...fields].sort()).toEqual(Object.keys(PROJECT_DOCUMENT_HALVES).sort());
+    expect(splitProjectDocument(current).workspace.documentSchemaVersion).toBe(5);
+    expect(splitProjectDocument(stored).workspace.documentSchemaVersion).toBe(4);
   });
 
   it('keeps how one member works out of the shared content', () => {
@@ -119,7 +135,7 @@ describe('splitting a project into content and workspace', () => {
     const before = splitProjectDocument(serializeProjectDocumentV3(project));
 
     const relaid = splitProjectDocument(
-      serializeProjectDocumentV3({ ...project, layout: { ...project.layout, centerViewId: 'gallery' } })
+      serializeProjectDocumentV3({ ...project, views: { compose: { fronts: { center: 'gallery:center' } } } })
     );
     const renamed = splitProjectDocument(serializeProjectDocumentV3({ ...project, name: 'Renamed' }));
 
@@ -211,6 +227,7 @@ describe('joining a project for a member', () => {
   it('refuses a workspace of another document schema', () => {
     const { content, workspace } = splitProjectDocument(serializeProjectDocumentV3(workedOnProject()));
 
-    expect(join({ content, workspace: { ...workspace, documentSchemaVersion: 5 } }).status).toBe('malformed');
+    expect(join({ content, workspace: { ...workspace, documentSchemaVersion: 6 } }).status).toBe('malformed');
+    expect(join({ content, workspace: { ...workspace, documentSchemaVersion: 3 } }).status).toBe('malformed');
   });
 });

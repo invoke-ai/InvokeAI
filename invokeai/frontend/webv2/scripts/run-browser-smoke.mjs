@@ -223,13 +223,13 @@ for (const [engine, type] of Object.entries({ chromium, firefox, webkit })) {
             // Canvas and layer thumbnails must contain fixture colour, in all three engines.
             await page
               .getByRole('tablist', { exact: true, name: 'Workspaces' })
-              .getByRole('tab', { name: /^Edit(, unsaved changes)?$/ })
+              .getByRole('tab', { name: /^Edit$/ })
               .click();
             await waitForRenderedMedia(page, { canvas: true });
             report.canvasPainting = 'passed';
             await page
               .getByRole('tablist', { exact: true, name: 'Workspaces' })
-              .getByRole('tab', { name: /^Compose(, unsaved changes)?$/ })
+              .getByRole('tab', { name: /^Compose$/ })
               .click();
             // Hold native exit delivery after the browser finishes its animation: presence still owns the popup.
             await page.getByRole('button', { exact: true, name: 'Gallery settings' }).evaluate((trigger) => {

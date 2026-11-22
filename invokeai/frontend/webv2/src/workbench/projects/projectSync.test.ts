@@ -40,10 +40,10 @@ describe('project document serialization', () => {
       label: 'test',
       project: {
         invocation: project.invocation,
-        layout: project.layout,
+        views: project.views,
         widgetGraphs: {},
         widgetInstances: project.widgetInstances,
-        widgetRegions: project.widgetRegions,
+        workspaceId: project.workspaceId,
       },
     });
     project.queue.items.push({} as never);
@@ -62,15 +62,15 @@ describe('project document serialization', () => {
         'documentSchemaVersion',
         'id',
         'invocation',
-        'layout',
         'name',
         'promptHistory',
         'settings',
         'settingsLayering',
+        'views',
         'widgetGraphs',
         'widgetInstances',
-        'widgetRegions',
         'workflows',
+        'workspaceId',
       ].sort()
     );
     expect(document.documentSchemaVersion).toBe(3);
@@ -233,7 +233,8 @@ describe('project document serialization', () => {
       throw new Error(`Expected the project to load, got ${loaded.status}.`);
     }
     expect(loaded.project.name).toBe('Shared');
-    expect(loaded.project.layout).toEqual(fresh.layout);
+    expect(loaded.project.workspaceId).toBe(fresh.workspaceId);
+    expect(loaded.project.views).toEqual(fresh.views);
     expect(loaded.project.settings).toEqual(fresh.settings);
     expect(Object.keys(loaded.project.widgetInstances).sort()).toEqual(Object.keys(fresh.widgetInstances).sort());
     expect(loaded.project.workflows.activeWorkflowId).toBe(shared.workflows.entries[0]!.document.id);

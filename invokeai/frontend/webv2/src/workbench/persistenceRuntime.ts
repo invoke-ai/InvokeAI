@@ -10,6 +10,7 @@ import { WorkbenchBackendUnavailableError } from './projects/syncedPersistence';
 
 export interface PersistenceAggregatePort {
   assignProjectBoard(assignment: WorkbenchSaveResult['projectBoardAssignments'][number]): void;
+  releaseHeldLayouts(): void;
   getPersistedRevision(): number;
   getState(): WorkbenchState;
   hydrate(state: WorkbenchState): void;
@@ -190,6 +191,10 @@ export const createWorkbenchPersistenceRuntime = ({
   const applySaveResult = (result: WorkbenchSaveResult): void => {
     for (const assignment of result.projectBoardAssignments) {
       aggregate.assignProjectBoard(assignment);
+    }
+    // Every state after hydration carries the account that adopted, so any acknowledged session write saved it.
+    if (result.accountSaved) {
+      aggregate.releaseHeldLayouts();
     }
   };
 

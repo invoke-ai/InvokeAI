@@ -1,0 +1,712 @@
+{
+  "changed only how it looked": {
+    "account": {},
+    "document": {
+      "layout": {
+        "centerViewId": "preview",
+        "panels": {
+          "isBottomOpen": false,
+          "isLeftOpen": true,
+          "isRightOpen": true
+        },
+        "presetId": "compose"
+      },
+      "widgetInstances": {
+        "shortcuts": "shortcuts",
+        "autosave-status": "autosave-status",
+        "canvas": "canvas",
+        "diagnostics": "diagnostics",
+        "gallery": "gallery",
+        "gallery:bottom": "gallery",
+        "gallery:center": "gallery",
+        "generate": "generate",
+        "image-map": "image-map",
+        "upscale": "upscale",
+        "video": "video",
+        "layers": "layers",
+        "notifications": "notifications",
+        "preview": "preview",
+        "queue": "queue",
+        "server-status": "server-status",
+        "workflow": "workflow",
+        "workflow:bottom": "workflow",
+        "workflow:center": "workflow",
+        "queue-status": "queue-status"
+      },
+      "widgetRegions": {
+        "bottom": {
+          "activeInstanceId": "gallery:bottom",
+          "alignEndInstanceIds": ["shortcuts", "notifications"],
+          "instanceIds": [
+            "server-status",
+            "queue-status",
+            "gallery:bottom",
+            "shortcuts",
+            "notifications",
+            "autosave-status"
+          ],
+          "isCollapsed": true,
+          "sizePx": 180
+        },
+        "center": {
+          "activeInstanceId": "preview",
+          "instanceIds": ["preview", "gallery:center"],
+          "isCollapsed": false,
+          "sizePx": 0
+        },
+        "left": {
+          "activeInstanceId": "generate",
+          "instanceIds": ["generate", "upscale"],
+          "isCollapsed": false,
+          "sizePx": 600
+        },
+        "right": {
+          "activeInstanceId": "queue",
+          "instanceIds": ["gallery", "image-map", "queue"],
+          "isCollapsed": true,
+          "sizePx": 450
+        }
+      }
+    }
+  },
+  "floated a widget": {
+    "account": {},
+    "document": {
+      "floatingWidgets": {
+        "image-map": {
+          "heightPx": 440,
+          "widthPx": 520,
+          "x": 96,
+          "y": 96,
+          "mode": "windowed",
+          "returnIndex": 1,
+          "returnRegion": "right",
+          "stackOrder": 1
+        }
+      },
+      "layout": {
+        "centerViewId": "preview",
+        "panels": {
+          "isBottomOpen": false,
+          "isLeftOpen": true,
+          "isRightOpen": true
+        },
+        "presetId": "compose"
+      },
+      "widgetInstances": {
+        "shortcuts": "shortcuts",
+        "autosave-status": "autosave-status",
+        "canvas": "canvas",
+        "diagnostics": "diagnostics",
+        "gallery": "gallery",
+        "gallery:bottom": "gallery",
+        "gallery:center": "gallery",
+        "generate": "generate",
+        "image-map": "image-map",
+        "upscale": "upscale",
+        "video": "video",
+        "layers": "layers",
+        "notifications": "notifications",
+        "preview": "preview",
+        "queue": "queue",
+        "server-status": "server-status",
+        "workflow": "workflow",
+        "workflow:bottom": "workflow",
+        "workflow:center": "workflow",
+        "queue-status": "queue-status"
+      },
+      "widgetRegions": {
+        "bottom": {
+          "activeInstanceId": "gallery:bottom",
+          "alignEndInstanceIds": ["shortcuts", "notifications"],
+          "instanceIds": [
+            "server-status",
+            "queue-status",
+            "gallery:bottom",
+            "shortcuts",
+            "notifications",
+            "autosave-status"
+          ],
+          "isCollapsed": true,
+          "sizePx": 180
+        },
+        "center": {
+          "activeInstanceId": "preview",
+          "instanceIds": ["preview", "gallery:center"],
+          "isCollapsed": false,
+          "sizePx": 0
+        },
+        "left": {
+          "activeInstanceId": "generate",
+          "instanceIds": ["generate", "upscale"],
+          "isCollapsed": false,
+          "sizePx": 450
+        },
+        "right": {
+          "activeInstanceId": "gallery",
+          "instanceIds": ["gallery", "queue"],
+          "isCollapsed": false,
+          "sizePx": 450
+        }
+      }
+    }
+  },
+  "moved a tab to another rail": {
+    "account": {},
+    "document": {
+      "layout": {
+        "centerViewId": "preview",
+        "panels": {
+          "isBottomOpen": false,
+          "isLeftOpen": true,
+          "isRightOpen": true
+        },
+        "presetId": "compose"
+      },
+      "widgetInstances": {
+        "shortcuts": "shortcuts",
+        "autosave-status": "autosave-status",
+        "canvas": "canvas",
+        "diagnostics": "diagnostics",
+        "gallery": "gallery",
+        "gallery:bottom": "gallery",
+        "gallery:center": "gallery",
+        "generate": "generate",
+        "image-map": "image-map",
+        "upscale": "upscale",
+        "video": "video",
+        "layers": "layers",
+        "notifications": "notifications",
+        "preview": "preview",
+        "queue": "queue",
+        "server-status": "server-status",
+        "workflow": "workflow",
+        "workflow:bottom": "workflow",
+        "workflow:center": "workflow",
+        "queue-status": "queue-status"
+      },
+      "widgetRegions": {
+        "bottom": {
+          "activeInstanceId": "gallery:bottom",
+          "alignEndInstanceIds": ["shortcuts", "notifications"],
+          "instanceIds": [
+            "server-status",
+            "queue-status",
+            "gallery:bottom",
+            "shortcuts",
+            "notifications",
+            "autosave-status"
+          ],
+          "isCollapsed": true,
+          "sizePx": 180
+        },
+        "center": {
+          "activeInstanceId": "preview",
+          "instanceIds": ["preview", "gallery:center"],
+          "isCollapsed": false,
+          "sizePx": 0
+        },
+        "left": {
+          "activeInstanceId": "image-map",
+          "instanceIds": ["image-map", "generate", "upscale"],
+          "isCollapsed": false,
+          "sizePx": 450
+        },
+        "right": {
+          "activeInstanceId": "gallery",
+          "instanceIds": ["gallery", "queue"],
+          "isCollapsed": false,
+          "sizePx": 450
+        }
+      }
+    }
+  },
+  "removed a widget": {
+    "account": {},
+    "document": {
+      "layout": {
+        "centerViewId": "preview",
+        "panels": {
+          "isBottomOpen": false,
+          "isLeftOpen": true,
+          "isRightOpen": true
+        },
+        "presetId": "compose"
+      },
+      "widgetInstances": {
+        "shortcuts": "shortcuts",
+        "autosave-status": "autosave-status",
+        "canvas": "canvas",
+        "diagnostics": "diagnostics",
+        "gallery": "gallery",
+        "gallery:bottom": "gallery",
+        "gallery:center": "gallery",
+        "generate": "generate",
+        "image-map": "image-map",
+        "upscale": "upscale",
+        "video": "video",
+        "layers": "layers",
+        "notifications": "notifications",
+        "preview": "preview",
+        "queue": "queue",
+        "server-status": "server-status",
+        "workflow": "workflow",
+        "workflow:bottom": "workflow",
+        "workflow:center": "workflow",
+        "queue-status": "queue-status"
+      },
+      "widgetRegions": {
+        "bottom": {
+          "activeInstanceId": "gallery:bottom",
+          "alignEndInstanceIds": ["shortcuts", "notifications"],
+          "instanceIds": [
+            "server-status",
+            "queue-status",
+            "gallery:bottom",
+            "shortcuts",
+            "notifications",
+            "autosave-status"
+          ],
+          "isCollapsed": true,
+          "sizePx": 180
+        },
+        "center": {
+          "activeInstanceId": "preview",
+          "instanceIds": ["preview", "gallery:center"],
+          "isCollapsed": false,
+          "sizePx": 0
+        },
+        "left": {
+          "activeInstanceId": "generate",
+          "instanceIds": ["generate", "upscale"],
+          "isCollapsed": false,
+          "sizePx": 450
+        },
+        "right": {
+          "activeInstanceId": "gallery",
+          "instanceIds": ["gallery", "image-map"],
+          "isCollapsed": false,
+          "sizePx": 450
+        }
+      }
+    }
+  },
+  "rearranged an inactive workspace": {
+    "account": {},
+    "document": {
+      "layout": {
+        "centerViewId": "preview",
+        "panels": {
+          "isBottomOpen": false,
+          "isLeftOpen": true,
+          "isRightOpen": true
+        },
+        "presetId": "compose"
+      },
+      "presetWorkingLayouts": [
+        {
+          "presetId": "edit",
+          "snapshot": {
+            "layout": {
+              "centerViewId": "canvas",
+              "panels": {
+                "isBottomOpen": false,
+                "isLeftOpen": true,
+                "isRightOpen": true
+              },
+              "presetId": "edit"
+            },
+            "widgetInstances": {
+              "generate": {
+                "id": "generate",
+                "typeId": "generate"
+              },
+              "upscale": {
+                "id": "upscale",
+                "typeId": "upscale"
+              },
+              "layers": {
+                "id": "layers",
+                "typeId": "layers"
+              },
+              "gallery:bottom": {
+                "id": "gallery:bottom",
+                "typeId": "gallery"
+              },
+              "server-status": {
+                "id": "server-status",
+                "typeId": "server-status"
+              },
+              "queue-status": {
+                "id": "queue-status",
+                "typeId": "queue-status"
+              },
+              "shortcuts": {
+                "id": "shortcuts",
+                "typeId": "shortcuts"
+              },
+              "notifications": {
+                "id": "notifications",
+                "typeId": "notifications"
+              },
+              "autosave-status": {
+                "id": "autosave-status",
+                "typeId": "autosave-status"
+              },
+              "canvas": {
+                "id": "canvas",
+                "typeId": "canvas"
+              },
+              "preview": {
+                "id": "preview",
+                "typeId": "preview"
+              }
+            },
+            "widgetRegions": {
+              "bottom": {
+                "activeInstanceId": "gallery:bottom",
+                "alignEndInstanceIds": ["shortcuts", "notifications"],
+                "instanceIds": [
+                  "server-status",
+                  "queue-status",
+                  "gallery:bottom",
+                  "shortcuts",
+                  "notifications",
+                  "autosave-status"
+                ],
+                "isCollapsed": true,
+                "sizePx": 180
+              },
+              "center": {
+                "activeInstanceId": "canvas",
+                "instanceIds": ["canvas", "preview"],
+                "isCollapsed": false,
+                "sizePx": 0
+              },
+              "left": {
+                "activeInstanceId": "generate",
+                "instanceIds": ["generate", "upscale"],
+                "isCollapsed": false,
+                "sizePx": 450
+              },
+              "right": {
+                "activeInstanceId": "layers",
+                "instanceIds": ["layers"],
+                "isCollapsed": false,
+                "sizePx": 450
+              }
+            }
+          }
+        }
+      ],
+      "widgetInstances": {
+        "shortcuts": "shortcuts",
+        "autosave-status": "autosave-status",
+        "canvas": "canvas",
+        "diagnostics": "diagnostics",
+        "gallery": "gallery",
+        "gallery:bottom": "gallery",
+        "gallery:center": "gallery",
+        "generate": "generate",
+        "image-map": "image-map",
+        "upscale": "upscale",
+        "video": "video",
+        "layers": "layers",
+        "notifications": "notifications",
+        "preview": "preview",
+        "queue": "queue",
+        "server-status": "server-status",
+        "workflow": "workflow",
+        "workflow:bottom": "workflow",
+        "workflow:center": "workflow",
+        "queue-status": "queue-status"
+      },
+      "widgetRegions": {
+        "bottom": {
+          "activeInstanceId": "gallery:bottom",
+          "alignEndInstanceIds": ["shortcuts", "notifications"],
+          "instanceIds": [
+            "server-status",
+            "queue-status",
+            "gallery:bottom",
+            "shortcuts",
+            "notifications",
+            "autosave-status"
+          ],
+          "isCollapsed": true,
+          "sizePx": 180
+        },
+        "center": {
+          "activeInstanceId": "preview",
+          "instanceIds": ["preview", "gallery:center"],
+          "isCollapsed": false,
+          "sizePx": 0
+        },
+        "left": {
+          "activeInstanceId": "generate",
+          "instanceIds": ["generate", "upscale"],
+          "isCollapsed": false,
+          "sizePx": 450
+        },
+        "right": {
+          "activeInstanceId": "gallery",
+          "instanceIds": ["gallery", "image-map", "queue"],
+          "isCollapsed": false,
+          "sizePx": 450
+        }
+      }
+    }
+  },
+  "on a custom workspace": {
+    "account": {
+      "customLayoutPresets": [
+        {
+          "defaultRoute": {
+            "destination": "gallery",
+            "sourceId": "generate"
+          },
+          "id": "custom-desk",
+          "label": "Desk",
+          "snapshot": {
+            "layout": {
+              "centerViewId": "preview",
+              "panels": {
+                "isBottomOpen": false,
+                "isLeftOpen": true,
+                "isRightOpen": true
+              },
+              "presetId": "custom-desk"
+            },
+            "widgetInstances": {
+              "generate": {
+                "id": "generate",
+                "typeId": "generate"
+              },
+              "upscale": {
+                "id": "upscale",
+                "typeId": "upscale"
+              },
+              "gallery": {
+                "id": "gallery",
+                "typeId": "gallery"
+              },
+              "image-map": {
+                "id": "image-map",
+                "typeId": "image-map"
+              },
+              "queue": {
+                "id": "queue",
+                "typeId": "queue"
+              },
+              "gallery:bottom": {
+                "id": "gallery:bottom",
+                "typeId": "gallery"
+              },
+              "server-status": {
+                "id": "server-status",
+                "typeId": "server-status"
+              },
+              "queue-status": {
+                "id": "queue-status",
+                "typeId": "queue-status"
+              },
+              "shortcuts": {
+                "id": "shortcuts",
+                "typeId": "shortcuts"
+              },
+              "notifications": {
+                "id": "notifications",
+                "typeId": "notifications"
+              },
+              "autosave-status": {
+                "id": "autosave-status",
+                "typeId": "autosave-status"
+              },
+              "preview": {
+                "id": "preview",
+                "typeId": "preview"
+              },
+              "gallery:center": {
+                "id": "gallery:center",
+                "typeId": "gallery"
+              }
+            },
+            "widgetRegions": {
+              "bottom": {
+                "activeInstanceId": "gallery:bottom",
+                "alignEndInstanceIds": ["shortcuts", "notifications"],
+                "instanceIds": [
+                  "server-status",
+                  "queue-status",
+                  "gallery:bottom",
+                  "shortcuts",
+                  "notifications",
+                  "autosave-status"
+                ],
+                "isCollapsed": true,
+                "sizePx": 180
+              },
+              "center": {
+                "activeInstanceId": "preview",
+                "instanceIds": ["preview", "gallery:center"],
+                "isCollapsed": false,
+                "sizePx": 0
+              },
+              "left": {
+                "activeInstanceId": "generate",
+                "instanceIds": ["generate", "upscale"],
+                "isCollapsed": false,
+                "sizePx": 450
+              },
+              "right": {
+                "activeInstanceId": "gallery",
+                "instanceIds": ["gallery", "image-map", "queue"],
+                "isCollapsed": false,
+                "sizePx": 450
+              }
+            }
+          }
+        }
+      ],
+      "layoutPresetOrder": ["compose", "edit", "video", "automate", "custom-desk"]
+    },
+    "document": {
+      "layout": {
+        "centerViewId": "preview",
+        "panels": {
+          "isBottomOpen": false,
+          "isLeftOpen": true,
+          "isRightOpen": true
+        },
+        "presetId": "custom-desk"
+      },
+      "widgetInstances": {
+        "shortcuts": "shortcuts",
+        "autosave-status": "autosave-status",
+        "canvas": "canvas",
+        "diagnostics": "diagnostics",
+        "gallery": "gallery",
+        "gallery:bottom": "gallery",
+        "gallery:center": "gallery",
+        "generate": "generate",
+        "image-map": "image-map",
+        "upscale": "upscale",
+        "video": "video",
+        "layers": "layers",
+        "notifications": "notifications",
+        "preview": "preview",
+        "queue": "queue",
+        "server-status": "server-status",
+        "workflow": "workflow",
+        "workflow:bottom": "workflow",
+        "workflow:center": "workflow",
+        "queue-status": "queue-status"
+      },
+      "widgetRegions": {
+        "bottom": {
+          "activeInstanceId": "gallery:bottom",
+          "alignEndInstanceIds": ["shortcuts", "notifications"],
+          "instanceIds": [
+            "server-status",
+            "queue-status",
+            "gallery:bottom",
+            "shortcuts",
+            "notifications",
+            "autosave-status"
+          ],
+          "isCollapsed": true,
+          "sizePx": 180
+        },
+        "center": {
+          "activeInstanceId": "preview",
+          "instanceIds": ["preview", "gallery:center"],
+          "isCollapsed": false,
+          "sizePx": 0
+        },
+        "left": {
+          "activeInstanceId": "generate",
+          "instanceIds": ["generate", "upscale"],
+          "isCollapsed": false,
+          "sizePx": 450
+        },
+        "right": {
+          "activeInstanceId": "gallery",
+          "instanceIds": ["gallery", "queue"],
+          "isCollapsed": false,
+          "sizePx": 450
+        }
+      }
+    }
+  },
+  "added a second Upscale": {
+    "account": {},
+    "document": {
+      "layout": {
+        "centerViewId": "preview",
+        "panels": {
+          "isBottomOpen": false,
+          "isLeftOpen": true,
+          "isRightOpen": true
+        },
+        "presetId": "compose"
+      },
+      "widgetInstances": {
+        "shortcuts": "shortcuts",
+        "autosave-status": "autosave-status",
+        "canvas": "canvas",
+        "diagnostics": "diagnostics",
+        "gallery": "gallery",
+        "gallery:bottom": "gallery",
+        "gallery:center": "gallery",
+        "generate": "generate",
+        "image-map": "image-map",
+        "upscale": "upscale",
+        "video": "video",
+        "layers": "layers",
+        "notifications": "notifications",
+        "preview": "preview",
+        "queue": "queue",
+        "server-status": "server-status",
+        "workflow": "workflow",
+        "workflow:bottom": "workflow",
+        "workflow:center": "workflow",
+        "queue-status": "queue-status",
+        "widget-upscale-mwquv89z-cfipv6": "upscale"
+      },
+      "widgetRegions": {
+        "bottom": {
+          "activeInstanceId": "gallery:bottom",
+          "alignEndInstanceIds": ["shortcuts", "notifications"],
+          "instanceIds": [
+            "server-status",
+            "queue-status",
+            "gallery:bottom",
+            "shortcuts",
+            "notifications",
+            "autosave-status"
+          ],
+          "isCollapsed": true,
+          "sizePx": 180
+        },
+        "center": {
+          "activeInstanceId": "preview",
+          "instanceIds": ["preview", "gallery:center"],
+          "isCollapsed": false,
+          "sizePx": 0
+        },
+        "left": {
+          "activeInstanceId": "widget-upscale-mwquv89z-cfipv6",
+          "instanceIds": ["generate", "upscale", "widget-upscale-mwquv89z-cfipv6"],
+          "isCollapsed": false,
+          "sizePx": 450
+        },
+        "right": {
+          "activeInstanceId": "gallery",
+          "instanceIds": ["gallery", "image-map", "queue"],
+          "isCollapsed": false,
+          "sizePx": 450
+        }
+      }
+    }
+  }
+}

@@ -134,7 +134,7 @@ export const createVideoRecallRuntime = ({
   commands: Pick<WorkbenchCommands, 'layout' | 'notifications' | 'widgets'>;
   getSessionUserId?: () => string | null;
   hub: Pick<SocketHub, 'on'>;
-  queries: Pick<WorkbenchQueries, 'getProject' | 'getSnapshot'>;
+  queries: Pick<WorkbenchQueries, 'getProject' | 'getSnapshot' | 'getWorkspaceLayout'>;
   replay?: readonly PendingRecallEvent[];
   reveal: RecallRevealContext;
   /** Resolves against the current language at call time; captured once, at attach. */

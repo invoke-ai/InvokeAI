@@ -93,8 +93,9 @@ const renderProbe = () =>
 
 const store = () => workbench.store!;
 const project = () => store().getSnapshot().activeProject;
+const layout = () => store().getSnapshot().activeLayout;
 const isPlaced = (typeId: string) =>
-  Object.values(project().widgetRegions).some((region) =>
+  Object.values(layout().widgetRegions).some((region) =>
     region.instanceIds.some((instanceId) => project().widgetInstances[instanceId]?.typeId === typeId)
   );
 const actionsFor = (issue: InvocationIssue) => getActions!(issue);
@@ -191,8 +192,8 @@ describe('useInvokeIssueActions', () => {
   it('enters the workspace built around the workflow editor to show a node', async () => {
     await run({ message: 'Missing input.', target: { kind: 'workflowNode', nodeId: 'node-1' } }, 'show');
 
-    expect(project().layout.presetId).toBe('automate');
-    const center = project().widgetRegions.center;
+    expect(project().workspaceId).toBe('automate');
+    const center = layout().widgetRegions.center;
     expect(project().widgetInstances[center.activeInstanceId]?.typeId).toBe('workflow');
   });
 
@@ -201,7 +202,7 @@ describe('useInvokeIssueActions', () => {
 
     await run({ message: 'Not in this layout.', target: { kind: 'mountSource', sourceId: 'video' } }, 'show');
 
-    expect(project().layout.presetId).toBe('video');
+    expect(project().workspaceId).toBe('video');
     expect(isPlaced('video')).toBe(true);
   });
 

@@ -57,10 +57,13 @@ let root: Root | null = null;
 let stopToasts: (() => void) | null = null;
 const popoverProps = { presentation: 'expanded', region: 'popover' } as WidgetViewProps;
 
+// Measured rows render after the list itself, so a loaded list is its first row or its empty state.
 const listLoaded = () =>
   vi.waitFor(() =>
     expect(
-      host?.querySelector('[role="list"][aria-label="Notifications"], [role="group"][aria-label="No notifications"]')
+      host?.querySelector(
+        '[role="list"][aria-label="Notifications"] [role="listitem"], [role="group"][aria-label="No notifications"]'
+      )
     ).not.toBeNull()
   );
 

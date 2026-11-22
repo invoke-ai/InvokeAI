@@ -1,7 +1,7 @@
-/* oxlint-disable react-perf/jsx-no-new-function-as-prop */
 import type { ExtensionRegistry } from '@workbench/extensions/extensionRegistry';
 import type { Project } from '@workbench/projectContracts';
-import type { WorkbenchInternalStore } from '@workbench/workbenchStore';
+/* oxlint-disable react-perf/jsx-no-new-function-as-prop */
+import type { WorkbenchInternalStore, WorkbenchSnapshot } from '@workbench/workbenchStore';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { createExternalStore } from '@platform/state/externalStore';
@@ -25,6 +25,11 @@ const runtimeMocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@workbench/WorkbenchContext', () => ({
+  useActiveLayoutSelector: <Selected,>(selector: (layout: WorkbenchSnapshot['activeLayout']) => Selected) =>
+    selector(runtimeMocks.store.getSnapshot().activeLayout),
+  useWorkbenchSelector: <Selected,>(selector: (snapshot: WorkbenchSnapshot) => Selected) =>
+    selector(runtimeMocks.store.getSnapshot()),
+  useActiveWorkspaceId: () => runtimeMocks.store.getSnapshot().activeProject.workspaceId,
   useActiveProjectSelector: <Selected,>(selector: (project: Project) => Selected) =>
     selector(runtimeMocks.store.getSnapshot().activeProject),
   useOptionalWorkbenchExtensions: () => runtimeMocks.extensions,

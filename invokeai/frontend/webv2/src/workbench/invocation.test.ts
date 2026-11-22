@@ -12,6 +12,7 @@ import type {
   CanvasRegionalGuidanceLayerContract,
 } from '@workbench/canvas-engine/api';
 import type { InvocationRoute, InvocationValidationReason } from '@workbench/invocationContracts';
+import type { Project } from '@workbench/projectContracts';
 import type { WidgetId } from '@workbench/widgetContracts';
 
 import { galleryKeys } from '@features/gallery/queries';
@@ -60,7 +61,7 @@ import {
   resolveInvocationRouteInput,
 } from './invocation';
 import { submitResolvedInvocation } from './invocationSubmit';
-import { createInitialWorkbenchState, workbenchReducer } from './workbenchState.testing';
+import { createInitialWorkbenchState, getLayoutOf, workbenchReducer } from './workbenchState.testing';
 import { createWorkbenchStore } from './workbenchStore';
 
 // Production words rejections from the locale; tests only need the structured rejection to reach the notice.
@@ -129,20 +130,22 @@ const getActiveProject = (values: GenerateWidgetValues, canvasValues?: Record<st
 
 seedArchitectureCapabilities();
 
+const layoutOf = (project: Project) => getLayoutOf(createInitialWorkbenchState(), project);
+
 describe('resolveInvocationRoute', () => {
   it('invalidates Anima generation until required components are selected', () => {
-    const missingComponentsRoute = resolveInvocationRoute(
-      getActiveProject(createGenerateValues(animaModel, { vae: animaVae }))
-    );
+    const missing = getActiveProject(createGenerateValues(animaModel, { vae: animaVae }));
+    const missingComponentsRoute = resolveInvocationRoute(missing, layoutOf(missing));
 
     expect(missingComponentsRoute.sourceValid).toBe(false);
     expect(missingComponentsRoute.validationReasons.map(reasonText)).toContain(
       'Generate needs a Qwen3 Encoder for Anima models.'
     );
 
-    const validRoute = resolveInvocationRoute(
-      getActiveProject(createGenerateValues(animaModel, { qwen3EncoderModel: qwen3Encoder, vae: animaVae }))
+    const valid = getActiveProject(
+      createGenerateValues(animaModel, { qwen3EncoderModel: qwen3Encoder, vae: animaVae })
     );
+    const validRoute = resolveInvocationRoute(valid, layoutOf(valid));
 
     expect(validRoute.sourceValid).toBe(true);
     expect(validRoute.validationReasons).toEqual([]);
@@ -171,7 +174,7 @@ describe('resolveInvocationRoute — upscale source', () => {
 
     const project = state.projects.find((candidate) => candidate.id === state.activeProjectId)!;
 
-    return getInvocationRouteInput(project);
+    return getInvocationRouteInput(project, layoutOf(project));
   };
 
   it('is ready only with a mounted widget and installed compatible required models', () => {
@@ -215,7 +218,7 @@ describe('resolveInvocationRoute — canvas source', () => {
     const project = getActiveProject(overrides.generateValues ?? validGenerateValues);
 
     return {
-      ...getInvocationRouteInput(project),
+      ...getInvocationRouteInput(project, layoutOf(project)),
       canvasBbox: overrides.bbox ?? { height: 512, width: 512 },
       canvasLayers: overrides.layers ?? [],
       canvasRasterInFrame: overrides.rasterInFrame ?? false,
@@ -368,7 +371,8 @@ describe('resolveInvocationRoute — canvas source', () => {
         invocation: { ...project.invocation, sourceId },
       };
     };
-    const inputFor = (...args: Parameters<typeof projectFor>) => getInvocationRouteInput(projectFor(...args));
+    const inputFor = (...args: Parameters<typeof projectFor>) =>
+      getInvocationRouteInput(projectFor(...args), layoutOf(projectFor(...args)));
     const reasonsFor = (
       model: MainModelConfig,
       overrides: Partial<GenerateWidgetValues>,
@@ -430,7 +434,7 @@ const listGalleryBoardsInCache = (...boardIds: string[]) =>
 
 describe('submitResolvedInvocation', () => {
   const routeFor = (project: Parameters<typeof resolveInvocationRoute>[0], route: InvocationRoute) =>
-    resolveInvocationRoute(project, 'global', route);
+    resolveInvocationRoute(project, layoutOf(project), 'global', route);
 
   beforeEach(() => {
     queryClient.clear();
@@ -634,7 +638,7 @@ describe('resolveInvocationRoute — video destination compatibility', () => {
   it('blocks the canvas destination for a video source and allows the gallery', () => {
     const state = createInitialWorkbenchState();
     const project = state.projects.find((candidate) => candidate.id === state.activeProjectId)!;
-    const input = getInvocationRouteInput(project);
+    const input = getInvocationRouteInput(project, layoutOf(project));
     const canvasRoute: InvocationRoute = {
       destination: 'canvas',
       destinationLocked: false,

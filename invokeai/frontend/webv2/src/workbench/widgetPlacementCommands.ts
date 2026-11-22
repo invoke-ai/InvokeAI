@@ -12,11 +12,12 @@ import type { FloatingWidgetPlacement } from './floatingWindows';
 import type { WidgetDragEndResolution } from './widgetDnd';
 import type { WidgetPlacementMeta } from './widgetRegionViewModel';
 import type { WorkbenchWidgetCommands } from './workbenchStore';
+import type { LayoutAvailability } from './workspace/resolveLayout';
 
-import { isAwaitedCenterView } from './floatingWindows';
+import { takesLastCenterView } from './workspace/structureReducer';
 
 export interface WidgetPlacementProject {
-  /** Where each floating window returns to; absent means none float, as with `Project.floatingWidgets`. */
+  /** Where each floating window returns to; absent means none float. */
   floatingPlacements?: Record<WidgetInstanceId, FloatingWidgetPlacement>;
   projectId?: string;
   widgetInstances: WidgetPlacementMeta;
@@ -128,25 +129,15 @@ export const addWidgetToWorkspace = ({
   return true;
 };
 
-export const getEnabledCenterViewCount = (
-  project: WidgetPlacementProject,
-  getWidgetById: (typeId: WidgetTypeId) => RegisteredWidget | undefined
-): number =>
-  project.widgetRegions.center.instanceIds.filter((instanceId) => {
-    const instance = project.widgetInstances[instanceId];
-    const widget = instance ? getWidgetById(instance.typeId) : undefined;
-
-    return widget?.status === 'enabled' && widget.manifest.centerPlacement !== 'toolbar';
-  }).length;
-
 export const closeWidgetPlacement = ({
-  getWidgetById,
+  availability,
   instanceId,
   project,
   region,
   widgets,
 }: {
-  getWidgetById: (typeId: WidgetTypeId) => RegisteredWidget | undefined;
+  /** What the center's last view is read by (`takesLastCenterView`). */
+  availability: Pick<LayoutAvailability, 'getPresentation'>;
   project: WidgetPlacementProject;
   region: WidgetRegion;
   instanceId: WidgetInstanceId;
@@ -160,14 +151,8 @@ export const closeWidgetPlacement = ({
     return { ok: false, reason: 'unsupported' };
   }
 
-  if (region === 'center') {
-    const instance = project.widgetInstances[instanceId];
-    const widget = getWidgetById(instance.typeId);
-    const isCenterView = widget?.manifest.centerPlacement !== 'toolbar';
-
-    if (isCenterView && getEnabledCenterViewCount(project, getWidgetById) === 1) {
-      return { ok: false, reason: 'unsupported' };
-    }
+  if (region === 'center' && takesLastCenterView(project, instanceId, availability)) {
+    return { ok: false, reason: 'unsupported' };
   }
 
   flushWorkbenchDrafts();
@@ -287,8 +272,7 @@ export const dockFloatingPlacement = ({
 
 /**
  * Close a floating window outright — never dock-then-toggle, which would pop its panel open and retarget the route on
- * the way. Reports where the window would have returned and whether the reducer hands an emptied center its view back,
- * so focus can go somewhere instead of dying with the window.
+ * the way. Reports where the window would have returned, so focus can go somewhere instead of dying with the window.
  */
 export const removeFloatingPlacement = ({
   instanceId,
@@ -298,19 +282,17 @@ export const removeFloatingPlacement = ({
   project: WidgetPlacementProject;
   instanceId: WidgetInstanceId;
   widgets: WorkbenchWidgetCommands;
-}): { restoresCenter: boolean; returnRegion: WidgetRegion } | null => {
+}): { returnRegion: WidgetRegion } | null => {
   const placement = project.floatingPlacements?.[instanceId];
 
   if (!placement) {
     return null;
   }
 
-  const restoresCenter = isAwaitedCenterView(project.widgetRegions.center, instanceId);
-
   flushWorkbenchDrafts();
   widgets.closeFloating(instanceId);
 
-  return { restoresCenter, returnRegion: placement.returnRegion };
+  return { returnRegion: placement.returnRegion };
 };
 
 export const dispatchWidgetDragEndPlacement = ({

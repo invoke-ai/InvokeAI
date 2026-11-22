@@ -9,6 +9,7 @@ import { Tooltip } from '@platform/ui/Tooltip';
 import { getOrderedLayoutPresets } from '@workbench/layoutPresetCollection';
 import { getLayoutPresetLabel } from '@workbench/layoutPresets';
 import { useWorkbenchCommands, useWorkbenchSelector } from '@workbench/WorkbenchContext';
+import { getCustomizeSession } from '@workbench/workspace/structureLock';
 import { getActiveWorkspaceTab } from '@workbench/workspace/workspaceNavigation';
 import { RotateCcwIcon, Trash2Icon } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
@@ -34,6 +35,12 @@ export const LayoutPresetManagerDialogBody = ({
     [account, t]
   );
   const presetIds = useMemo(() => presets.map(({ id }) => id), [presets]);
+  // The workspace being customized resets as a draft edit in its bar, not here.
+  const customizedId = useWorkbenchSelector((snapshot) => {
+    const session = getCustomizeSession(snapshot.customizing, snapshot.activeProject);
+
+    return session?.newWorkspaceId === undefined ? session?.presetId : undefined;
+  });
   const overriddenPresetIds = useMemo(
     () =>
       new Set([
@@ -81,6 +88,7 @@ export const LayoutPresetManagerDialogBody = ({
                 {presets.map((preset) => (
                   <PresetRow
                     key={preset.id}
+                    canRestore={preset.id !== customizedId}
                     isOverridden={preset.isBuiltIn === true && overriddenPresetIds.has(preset.id)}
                     preset={preset}
                   />
@@ -106,7 +114,15 @@ export const LayoutPresetManagerDialogBody = ({
 const getReturnFocus = (): HTMLElement | null =>
   document.querySelector<HTMLElement>('[data-manage-workspaces]') ?? getActiveWorkspaceTab();
 
-const PresetRow = ({ isOverridden, preset }: { isOverridden: boolean; preset: LayoutPreset }) => {
+const PresetRow = ({
+  canRestore,
+  isOverridden,
+  preset,
+}: {
+  canRestore: boolean;
+  isOverridden: boolean;
+  preset: LayoutPreset;
+}) => {
   const { t } = useTranslation();
   const { layout } = useWorkbenchCommands();
   const deletePreset = useCallback(() => openLayoutPresetDelete(preset.id), [preset.id]);
@@ -116,7 +132,7 @@ const PresetRow = ({ isOverridden, preset }: { isOverridden: boolean; preset: La
     <SortableListItem
       actions={
         <>
-          {isOverridden ? (
+          {isOverridden && canRestore ? (
             <Tooltip content={t('topbar.presets.restore')} showArrow>
               <IconButton
                 aria-label={t('topbar.presets.restoreNamed', { name: preset.label })}

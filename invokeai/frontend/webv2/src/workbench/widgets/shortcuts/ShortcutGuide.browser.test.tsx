@@ -4,7 +4,7 @@ import type { Project } from '@workbench/projectContracts';
 import type * as SettingsStoreModule from '@workbench/settings/store';
 import type * as WidgetFrameModule from '@workbench/widget-frame';
 import type * as WorkbenchContextModule from '@workbench/WorkbenchContext';
-import type { WorkbenchInternalStore } from '@workbench/workbenchStore';
+import type { WorkbenchInternalStore, WorkbenchSnapshot } from '@workbench/workbenchStore';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { DndContext, useSensor, useSensors } from '@dnd-kit/core';
@@ -33,6 +33,10 @@ const runtime = vi.hoisted(() => ({
 }));
 vi.mock('@workbench/WorkbenchContext', async (importOriginal) => ({
   ...(await importOriginal<typeof WorkbenchContextModule>()),
+  useActiveLayoutSelector: <Selected,>(selector: (layout: WorkbenchSnapshot['activeLayout']) => Selected) =>
+    selector(useSyncExternalStore(runtime.store.subscribe, runtime.store.getSnapshot).activeLayout),
+  useWorkbenchSelector: <Selected,>(selector: (snapshot: WorkbenchSnapshot) => Selected) =>
+    selector(useSyncExternalStore(runtime.store.subscribe, runtime.store.getSnapshot)),
   useActiveProjectSelector: <Selected,>(selector: (project: Project) => Selected) => {
     const state = useSyncExternalStore(runtime.store.subscribe, runtime.store.getSnapshot);
     return selector(state.activeProject);

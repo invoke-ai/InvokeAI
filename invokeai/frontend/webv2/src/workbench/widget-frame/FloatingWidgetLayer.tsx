@@ -1,7 +1,7 @@
 import type { FloatingWidgetState } from '@workbench/layoutContracts';
 import type { WidgetInstanceId } from '@workbench/widgetContracts';
 
-import { shallowEqual, useActiveProjectId, useActiveProjectSelector } from '@workbench/WorkbenchContext';
+import { shallowEqual, useActiveLayoutSelector, useActiveProjectId } from '@workbench/WorkbenchContext';
 import { lazy, Suspense } from 'react';
 
 // The window chrome loads only once a widget actually floats, keeping it out of the shell's eager bundle — nothing
@@ -15,10 +15,7 @@ const EMPTY_FLOATING: Record<WidgetInstanceId, FloatingWidgetState> = {};
 /** Windows render in a fixed DOM order and stack by z-index: moving a node would drop its keyboard focus. */
 export const FloatingWidgetLayer = () => {
   const projectId = useActiveProjectId();
-  const floatingWidgets = useActiveProjectSelector(
-    (project) => project.floatingWidgets ?? EMPTY_FLOATING,
-    shallowEqual
-  );
+  const floatingWidgets = useActiveLayoutSelector((layout) => layout.floatingWidgets ?? EMPTY_FLOATING, shallowEqual);
   const instanceIds = Object.keys(floatingWidgets).sort();
 
   if (instanceIds.length === 0) {

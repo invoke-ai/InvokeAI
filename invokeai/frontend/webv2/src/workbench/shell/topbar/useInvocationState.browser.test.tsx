@@ -15,6 +15,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const harness = vi.hoisted(() => ({
+  layout: null as unknown,
   project: null as unknown,
   submit: vi.fn((_args: Record<string, unknown>) => Promise.resolve()),
   useDynamicPrompts: vi.fn((prompt: string, config: { enabled: boolean } | null) => {
@@ -103,16 +104,21 @@ vi.mock('@workbench/invocationPreparation', async (importOriginal) => ({
   useIsInvocationPreparing: () => false,
 }));
 vi.mock('@workbench/WorkbenchContext', () => ({
+  useActiveLayoutSelector: (selector: (layout: unknown) => unknown) => selector(harness.layout),
   useActiveProjectSelector: (selector: (project: Project) => unknown) => selector(harness.project as Project),
   useWorkbenchCommands: () => ({}),
   useWorkbenchQueries: () => ({}),
   useWorkbenchSelector: (selector: (snapshot: unknown) => unknown) =>
-    selector({ backendConnection: { status: 'connected' } }),
+    selector({
+      activeLayout: harness.layout,
+      activeProject: harness.project as Project,
+      backendConnection: { status: 'connected' },
+    }),
 }));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 
 import { stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
-import { createInitialWorkbenchState, workbenchReducer } from '@workbench/workbenchState.testing';
+import { createInitialWorkbenchState, getLayoutOf, workbenchReducer } from '@workbench/workbenchState.testing';
 
 import { useInvocationState } from './useInvocationState';
 
@@ -172,6 +178,7 @@ const Probe = ({ sourceId }: { sourceId?: 'video' }): ReactNode => {
 };
 
 const renderProbe = async (project: Project, sourceId?: 'video') => {
+  harness.layout = getLayoutOf(createInitialWorkbenchState(), project);
   harness.project = project;
   host = document.createElement('div');
   document.body.append(host);

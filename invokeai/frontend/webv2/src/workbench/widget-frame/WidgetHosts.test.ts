@@ -27,34 +27,27 @@ describe('projectHasWidgetType', () => {
 
   it('mounts the workflow host for a call-saved-workflow graph without a workflow widget', () => {
     expect(
-      projectNeedsWorkflowHost({
-        ...project([]),
-        workflows: {
-          entries: [{ document: { nodes: [{ data: { type: 'call_saved_workflow' }, type: 'invocation' }] } }],
-        },
+      projectNeedsWorkflowHost(project([]), {
+        entries: [{ document: { nodes: [{ data: { type: 'call_saved_workflow' }, type: 'invocation' }] } }],
       })
     ).toBe(true);
   });
 
   it('does not mount the workflow host for unrelated graphs', () => {
     expect(
-      projectNeedsWorkflowHost({
-        ...project([]),
-        workflows: { entries: [{ document: { nodes: [{ data: { type: 'noise' }, type: 'invocation' }] } }] },
+      projectNeedsWorkflowHost(project([]), {
+        entries: [{ document: { nodes: [{ data: { type: 'noise' }, type: 'invocation' }] } }],
       })
     ).toBe(false);
   });
 
   it('mounts the workflow host when an inactive workflow calls a saved workflow', () => {
     expect(
-      projectNeedsWorkflowHost({
-        ...project([]),
-        workflows: {
-          entries: [
-            { document: { nodes: [] } },
-            { document: { nodes: [{ data: { type: 'call_saved_workflow' }, type: 'invocation' }] } },
-          ],
-        },
+      projectNeedsWorkflowHost(project([]), {
+        entries: [
+          { document: { nodes: [] } },
+          { document: { nodes: [{ data: { type: 'call_saved_workflow' }, type: 'invocation' }] } },
+        ],
       })
     ).toBe(true);
   });

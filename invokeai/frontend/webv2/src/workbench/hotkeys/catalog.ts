@@ -125,12 +125,12 @@ export const firstPartyHotkeyCatalog: HotkeyDefinition[] = [
   // Use mod for the platform settings chord: Command on macOS, Control elsewhere.
   hotkey('app', 'openSettings', ['mod+,']),
   // The ids keep "Preset" and "Layout" so saved bindings survive; the UI calls them workspaces.
-  hotkey('app', 'saveLayoutPreset', [], { title: 'Save changes to the workspace' }),
   hotkey('app', 'selectComposePreset', ['alt+1'], { title: 'Switch to Compose workspace' }),
   hotkey('app', 'selectEditPreset', ['alt+2'], { title: 'Switch to Edit workspace' }),
   hotkey('app', 'selectVideoPreset', ['alt+3'], { title: 'Switch to Video workspace' }),
   hotkey('app', 'selectAutomatePreset', ['alt+4'], { title: 'Switch to Workflow workspace' }),
   hotkey('app', 'customizeWorkspace', [], { title: 'Customize workspace' }),
+  hotkey('app', 'resetWorkspaceView', [], { title: 'Reset workspace view' }),
   // Each press stops one item; holding the key must not walk down the queue.
   hotkey('app', 'cancelQueueItem', ['shift+x'], { ignoreRepeat: true, title: 'Cancel current or next queue item' }),
   hotkey('app', 'clearQueue', ['mod+shift+x'], { ignoreRepeat: true, title: 'Cancel all queue items' }),
@@ -156,9 +156,6 @@ export const firstPartyHotkeyCatalog: HotkeyDefinition[] = [
   // Workspace history: Mod+Z belongs to whichever editor holds focus, so workspace steps take Alt with it.
   hotkey('app', 'undoLayoutChange', ['mod+alt+z'], { title: 'Undo workspace change' }),
   hotkey('app', 'redoLayoutChange', ['mod+alt+shift+z'], { title: 'Redo workspace change' }),
-  // No default key: it throws away unsaved arrangement (Undo workspace change brings it back), and Mod+Shift+R is the
-  // browser's hard reload. The id keeps "Reset" so saved bindings survive.
-  hotkey('app', 'resetPanelLayout', [], { title: 'Revert workspace to saved' }),
   hotkey('app', 'togglePanels', ['f']),
   hotkey('app', 'togglePreview', ['z']),
   // Escape's last meaning in the center: anything else that handles it (a field, menu, popover, widget) goes first.

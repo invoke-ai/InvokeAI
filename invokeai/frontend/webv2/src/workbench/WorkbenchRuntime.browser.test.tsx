@@ -187,7 +187,7 @@ describe('WorkbenchFocusProvider', () => {
     await act(() => commands.widgets.dockFloating('image-map'));
     await act(() => commands.widgets.float('image-map'));
 
-    expect(runtimeMocks.store.getSnapshot().activeProject.floatingWidgets?.['image-map']).toBeDefined();
+    expect(runtimeMocks.store.getSnapshot().activeLayout.floatingWidgets?.['image-map']).toBeDefined();
     expect(api.getTarget()).toEqual(CENTER);
   });
 

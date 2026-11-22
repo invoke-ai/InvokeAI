@@ -26,7 +26,7 @@ import {
   useCompactWidgetCapacityResource,
 } from '@workbench/widget-frame/compactWidgetCapacity';
 import { areWidgetPlacementProjectsEqual, getWidgetPlacementProject } from '@workbench/widgetPlacementMeta';
-import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
+import { useWorkbenchSelector } from '@workbench/WorkbenchContext';
 import { KeyboardIcon } from 'lucide-react';
 import { type KeyboardEvent, useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -75,7 +75,7 @@ const SURFACE_HINTS: Record<string, ShortcutHintSnapshot> = {
 };
 
 export const ShortcutGuide = ({ presentation = 'compact' }: Pick<WidgetViewProps, 'presentation'> = {}) => {
-  const project = useActiveProjectSelector(getWidgetPlacementProject, areWidgetPlacementProjectsEqual);
+  const project = useWorkbenchSelector(getWidgetPlacementProject, areWidgetPlacementProjectsEqual);
   return <ConnectedShortcutGuide key={project.projectId} presentation={presentation} project={project} />;
 };
 

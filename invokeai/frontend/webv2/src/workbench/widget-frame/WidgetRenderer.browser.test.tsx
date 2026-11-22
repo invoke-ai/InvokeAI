@@ -52,9 +52,14 @@ vi.mock('@workbench/WorkbenchContext', async (importOriginal) => ({
   shallowEqual: Object.is,
   useActiveProjectId: () => workbenchMocks.project.id,
   useWorkbenchQueries: () => ({
+    getAvailability: () => ({ getPresentation: () => 'view' }),
     getProject: (projectId: string) => (projectId === workbenchMocks.project.id ? workbenchMocks.project : null),
     isActiveProject: (projectId: string) => projectId === workbenchMocks.project.id,
   }),
+  useActiveLayoutSelector: (selector: (project: typeof workbenchMocks.project) => unknown) =>
+    selector(workbenchMocks.project),
+  useWorkbenchSelector: (selector: (snapshot: never) => unknown) =>
+    selector({ activeLayout: workbenchMocks.project, activeProject: workbenchMocks.project } as never),
   useActiveProjectSelector: (selector: (project: typeof workbenchMocks.project) => unknown) =>
     selector(workbenchMocks.project),
   useWorkbenchCommands: () => ({ layout: { setRegionCollapsed: () => {}, setRegionSize: () => {} } }),

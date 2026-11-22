@@ -21,9 +21,10 @@ import { createTestFocusController } from '@workbench/focusRegions.testing';
 import { FloatingWidgetWindow } from '@workbench/widget-frame/FloatingWidgetWindow';
 import { WidgetRendererById } from '@workbench/widget-frame/WidgetRenderer';
 import { createWidgetImplementationResource } from '@workbench/widgetImplementationResource';
-import { createInitialWorkbenchState, getPanelSizeBounds } from '@workbench/workbenchState';
+import { createInitialWorkbenchState, withArrangement } from '@workbench/workbenchState.testing';
 import { createWorkbenchStore } from '@workbench/workbenchStore';
 import { WorkbenchWidgetRegistryProvider } from '@workbench/WorkbenchWidgetRegistryContext';
+import { getRegionSizeBounds } from '@workbench/workspace/structure';
 import { createInstance } from 'i18next';
 import { CircleIcon } from 'lucide-react';
 import { act, useState, useSyncExternalStore, useCallback } from 'react';
@@ -54,6 +55,8 @@ vi.mock('@workbench/WorkbenchContext', async (importOriginal) => ({
   useOptionalWorkbenchExtensions: () => extensions,
   useActiveProjectId: () =>
     useExternalStoreSelector(runtime.store.subscribe, runtime.store.getSnapshot, (s) => s.activeProject.id),
+  useActiveLayoutSelector: <Selected,>(selector: (layout: WorkbenchSnapshot['activeLayout']) => Selected) =>
+    selector(runtime.store.getSnapshot().activeLayout),
   useActiveProjectSelector: <T,>(select: (project: Project) => T, equal?: (a: T, b: T) => boolean) =>
     useExternalStoreSelector(runtime.store.subscribe, runtime.store.getSnapshot, (s) => select(s.activeProject), equal),
   useWorkbenchSelector: <T,>(select: (snapshot: WorkbenchSnapshot) => T, equal?: (a: T, b: T) => boolean) =>
@@ -83,7 +86,7 @@ const Neighbor = () => {
   );
 };
 const DROP_STATE = { helperText: '', isActive: false, isAllowed: false };
-const NEIGHBOR_PANEL_WIDTH_PX = getPanelSizeBounds('left').min;
+const NEIGHBOR_PANEL_WIDTH_PX = getRegionSizeBounds('left').min;
 type Host = 'center' | 'floating' | 'status' | 'dialog';
 type Failure = 'lazy' | 'label' | 'actions' | 'body' | 'tooltip' | 'compact';
 let host: HTMLDivElement;
@@ -183,36 +186,39 @@ const ActualHost = () => {
       </div>
     );
   }
-  const window = snapshot.activeProject.floatingWidgets?.fixture;
+  const window = snapshot.activeLayout.floatingWidgets?.fixture;
   return window ? <FloatingWidgetWindow instanceId="fixture" stackRank={0} state={window} /> : null;
 };
-const makeState = (hostMode: Host): WorkbenchState => {
-  const state = createInitialWorkbenchState();
-  const project = state.projects[0]!;
-  project.widgetInstances = Object.fromEntries(
+const makeState = (hostMode: Host, also: Partial<Record<WidgetRegion, string[]>> = {}): WorkbenchState => {
+  const hosting = hostMode === 'center' ? 'center' : hostMode === 'status' ? 'bottom' : 'right';
+  const regions: Record<WidgetRegion, string[]> = { bottom: [], center: [], left: ['neighbor'], right: [], ...also };
+  const state = withArrangement(
+    createInitialWorkbenchState(),
+    'compose',
+    { ...regions, [hosting]: [...new Set(['fixture', ...regions[hosting]])] },
+    { fixture: 'fixture', neighbor: 'neighbor' }
+  );
+  const compose = state.account.layoutPresetOverrides!.compose!;
+
+  state.account.layoutPresetOverrides!.compose = {
+    ...compose,
+    widgetRegions: {
+      ...compose.widgetRegions,
+      left: { ...compose.widgetRegions.left, sizePx: NEIGHBOR_PANEL_WIDTH_PX },
+    },
+  };
+  state.projects[0]!.widgetInstances = Object.fromEntries(
     ['fixture', 'neighbor'].map((id) => [
       id,
       { id, typeId: id, createdAt: '2026-11-05', state: { id, label: id, values: {}, version: 1 } },
     ])
   );
-  for (const region of Object.values(project.widgetRegions)) {
-    region.instanceIds = [];
-    region.activeInstanceId = '';
-  }
-  project.widgetRegions.left.sizePx = NEIGHBOR_PANEL_WIDTH_PX;
-  project.widgetRegions.left.isCollapsed = false;
-  project.widgetRegions.left.instanceIds = ['neighbor'];
-  project.widgetRegions.left.activeInstanceId = 'neighbor';
-  const region = project.widgetRegions[hostMode === 'center' ? 'center' : hostMode === 'status' ? 'bottom' : 'right'];
-  region.instanceIds = ['fixture'];
-  region.activeInstanceId = 'fixture';
-  region.isCollapsed = false;
   return state;
 };
 const render = async (accountKey = 'recovery-hosts', extra?: React.ReactNode) => {
   const focus = createTestFocusController({
     getProjectId: () => runtime.store.getSnapshot().activeProject.id,
-    isFloating: (id) => !!runtime.store.getSnapshot().activeProject.floatingWidgets?.[id],
+    isFloating: (id) => !!runtime.store.getSnapshot().activeLayout.floatingWidgets?.[id],
   });
   await act(() =>
     root.render(
@@ -705,9 +711,7 @@ describe('real shell recovery hosts', () => {
     mode = 'status';
     failure = 'tooltip';
     runtime.widgets[0]!.manifest.bottomPanel = 'tooltip';
-    const state = makeState(mode);
-    state.projects[0]!.widgetRegions.right.instanceIds = ['fixture'];
-    state.projects[0]!.widgetRegions.right.activeInstanceId = 'fixture';
+    const state = makeState(mode, { right: ['fixture'] });
     runtime.store = createWorkbenchStore(state);
     await render();
     const row = host.querySelector<HTMLElement>('[data-status-bar-widget="fixture"] [role="button"]')!;

@@ -30,8 +30,6 @@ vi.mock('react-i18next', () => ({
         'topbar.presets.reorderInstructions':
           'To reorder a layout preset, press Space. Use the Left and Right arrow keys to move it, then press Space to drop or Escape to cancel.',
         'topbar.presets.workspaces': 'Workspaces',
-        'topbar.presets.unsaved': 'Unsaved changes',
-        'topbar.presets.unsavedLayoutChanges': 'Unsaved changes',
       })[key] ?? key,
   }),
 }));
@@ -44,6 +42,11 @@ vi.mock('@workbench/WorkbenchContext', () => {
   ) => useExternalStoreSelector(store.subscribe, store.getSnapshot, selector, isEqual);
 
   return {
+    useActiveWorkspaceId: () => useWorkbenchSelector((snapshot) => snapshot.activeProject.workspaceId),
+    useActiveLayoutSelector: <Selected,>(
+      selector: (layout: WorkbenchSnapshot['activeLayout']) => Selected,
+      isEqual?: Equality<Selected>
+    ) => useWorkbenchSelector((snapshot) => selector(snapshot.activeLayout), isEqual),
     useActiveProjectSelector: <Selected,>(
       selector: (project: WorkbenchSnapshot['activeProject']) => Selected,
       isEqual?: Equality<Selected>
@@ -70,8 +73,8 @@ vi.mock('@workbench/layoutPresetActivation', async (importOriginal) => {
 
   return {
     ...actual,
-    loadLayoutPresetWidgets: () => Promise.resolve(),
-    preloadLayoutPresetWidgets: () => undefined,
+    loadLayoutWidgets: () => Promise.resolve(),
+    preloadLayoutWidgets: () => undefined,
   };
 });
 
@@ -189,16 +192,20 @@ const touch = (
   return event;
 };
 
-// Reordering, saving and reverting from the strip are structure: they work here for an account that rearranges without
-// Customize. `locked workspaces` below covers the default.
+// Reordering from the strip is structure: it works here for an account that rearranges without Customize. `locked
+// workspaces` below covers the default.
 rearrangeWithoutCustomizeInEachTest();
 
 beforeEach(() => {
   store = createWorkbenchStore();
-  store.commands.layout.createPreset('custom-1', 'Custom', 'star');
+  store.commands.layout.beginCustomize({ defaultRoute: null, iconId: 'star', id: 'custom-1', label: 'Custom' });
+  store.commands.layout.finishCustomize();
   store.commands.layout.applyPreset('compose');
   store.commands.layout.reorderPresets('custom-1', 'edit');
-  store.commands.layout.renamePreset('compose', 'Writing');
+  store.commands.layout.applyPreset('compose');
+  store.commands.layout.beginCustomize();
+  store.commands.layout.setCustomizeDraft({ label: 'Writing' });
+  store.commands.layout.finishCustomize();
 });
 
 afterEach(async () => {
@@ -209,7 +216,7 @@ afterEach(async () => {
 });
 
 describe('the active preset’s tab', () => {
-  const centerFront = () => store.getSnapshot().activeProject.widgetRegions.center.activeInstanceId;
+  const centerFront = () => store.getSnapshot().activeLayout.widgetRegions.center.activeInstanceId;
   const leaveHome = () =>
     act(() =>
       store.commands.widgets.select({
@@ -268,6 +275,24 @@ describe('the active preset’s tab', () => {
 });
 
 describe('LayoutPresetStrip', () => {
+  it('stays on the workspace when its tab is pressed again while a slow switch away is still loading', async () => {
+    store = createWorkbenchStore(store.getState(), {
+      isLoaded: () => false,
+      loadLayoutWidgets: () => new Promise(() => {}),
+    });
+    await act(() => store.commands.layout.setRegionSize('right', 401));
+    await renderStrip();
+
+    await act(() => userEvent.click(presetTab('edit')!));
+    expect(presetTab('edit')).toHaveAttribute('aria-selected', 'true');
+    await act(() => userEvent.click(presetTab('compose')!));
+
+    await act(() => settle(600));
+    expect(store.getSnapshot().activeProject.workspaceId).toBe('compose');
+    expect(store.getSnapshot().activeLayout.widgetRegions.right.sizePx).toBe(401);
+    expect(presetTab('compose')).toHaveAttribute('aria-selected', 'true');
+  });
+
   it('renders the account order without preset descriptions and still activates a clicked tab', async () => {
     await renderStrip();
 
@@ -277,7 +302,7 @@ describe('LayoutPresetStrip', () => {
 
     await act(() => userEvent.click(presetTab('edit')!));
 
-    expect(store.getSnapshot().activeProject.layout.presetId).toBe('edit');
+    expect(store.getSnapshot().activeProject.workspaceId).toBe('edit');
   });
 
   it('keeps the delete confirmation opened from a workspace menu', async () => {
@@ -308,7 +333,7 @@ describe('LayoutPresetStrip', () => {
   it('selects a dragged tab on the press and reorders it in the same gesture', async () => {
     await renderStrip();
     await act(() => userEvent.click(presetTab('edit')!));
-    expect(store.getSnapshot().activeProject.layout.presetId).toBe('edit');
+    expect(store.getSnapshot().activeProject.workspaceId).toBe('edit');
     const source = presetTab('compose');
     const target = presetTab('automate');
     expect(source).not.toBeNull();
@@ -330,7 +355,7 @@ describe('LayoutPresetStrip', () => {
     await act(() => nextFrame());
 
     expect(store.getSnapshot().account.layoutPresetOrder).toEqual(['custom-1', 'edit', 'video', 'automate', 'compose']);
-    expect(store.getSnapshot().activeProject.layout.presetId).toBe('compose');
+    expect(store.getSnapshot().activeProject.workspaceId).toBe('compose');
   });
 
   it('supports keyboard reordering with sortable drag semantics', async () => {
@@ -355,7 +380,7 @@ describe('LayoutPresetStrip', () => {
     await act(() => userEvent.keyboard('{Space}'));
 
     expect(store.getSnapshot().account.layoutPresetOrder).toEqual(['custom-1', 'compose', 'edit', 'video', 'automate']);
-    expect(store.getSnapshot().activeProject.layout.presetId).toBe('compose');
+    expect(store.getSnapshot().activeProject.workspaceId).toBe('compose');
     expect(store.getSnapshot().account.activeLayoutPresetId).toBe('compose');
 
     const movedSource = presetTab('compose');
@@ -402,82 +427,6 @@ describe('LayoutPresetStrip', () => {
     expect(store.getSnapshot().account.layoutPresetOrder).toEqual(['custom-1', 'edit', 'video', 'automate', 'compose']);
   });
 
-  describe('unsaved arrangements', () => {
-    const UNSAVED = 'Unsaved changes';
-    const unsavedDot = (id: string) => presetTab(id)?.querySelector('[data-unsaved-dot]') ?? null;
-    const label = (id: string) => presetTab(id)?.getAttribute('aria-label') ?? '';
-    const activePresetId = () => store.getSnapshot().activeProject.layout.presetId;
-    const waitForActivePreset = (id: string) => expect.poll(activePresetId, POLL).toBe(id);
-
-    const rearrange = (presetId: string, sizePx: number) => {
-      store.commands.layout.applyPreset(presetId);
-      store.commands.layout.setRegionSize('right', sizePx);
-    };
-
-    it('marks every preset with unsaved changes over its icon and in its accessible name', async () => {
-      await renderStrip();
-      expect(unsavedDot('compose')).toBeNull();
-      expect(label('compose')).toBe('Writing');
-
-      await act(() => store.commands.layout.setRegionSize('right', 401));
-
-      await expect.poll(() => label('compose'), POLL).toBe(`Writing, ${UNSAVED}`);
-      expect(unsavedDot('compose')?.parentElement?.querySelector('svg')).not.toBeNull();
-
-      await act(() => userEvent.click(presetTab('edit')!));
-      await waitForActivePreset('edit');
-
-      expect(label('compose')).toBe(`Writing, ${UNSAVED}`);
-      expect(label('edit')).not.toContain(UNSAVED);
-      expect(unsavedDot('edit')).toBeNull();
-
-      await act(() => store.commands.layout.setRegionSize('right', 433));
-
-      await expect.poll(() => unsavedDot('edit'), POLL).not.toBeNull();
-      expect(unsavedDot('compose')).not.toBeNull();
-      expect(unsavedDot('video')).toBeNull();
-    });
-
-    it('saves or reverts an inactive preset’s unsaved arrangement from its menu without switching', async () => {
-      rearrange('compose', 401);
-      store.commands.layout.applyPreset('edit');
-      await renderStrip();
-
-      await openPresetMenuItem('compose', 'revert-layout');
-
-      await expect.poll(() => unsavedDot('compose'), POLL).toBeNull();
-      expect(activePresetId()).toBe('edit');
-
-      rearrange('compose', 461);
-      await act(() => store.commands.layout.applyPreset('edit'));
-      await openPresetMenuItem('compose', 'save-layout');
-
-      await expect.poll(() => unsavedDot('compose'), POLL).toBeNull();
-      expect(activePresetId()).toBe('edit');
-      expect(store.getSnapshot().account.layoutPresetOverrides?.compose?.widgetRegions.right.sizePx).toBe(461);
-    });
-
-    it('stays on an unsaved preset when it is pressed again while a slow switch away is still loading', async () => {
-      store = createWorkbenchStore(store.getState(), {
-        isLoaded: () => false,
-        loadLayoutPresetWidgets: () => new Promise(() => {}),
-      });
-      await act(() => store.commands.layout.setRegionSize('right', 401));
-      await renderStrip();
-      await expect.poll(() => label('compose'), POLL).toContain(UNSAVED);
-
-      await act(() => userEvent.click(presetTab('edit')!));
-      expect(presetTab('edit')).toHaveAttribute('aria-selected', 'true');
-      await act(() => userEvent.click(presetTab('compose')!));
-
-      await act(() => settle(600));
-      expect(activePresetId()).toBe('compose');
-      expect(store.getSnapshot().activeProject.widgetRegions.right.sizePx).toBe(401);
-      expect(presetTab('compose')).toHaveAttribute('aria-selected', 'true');
-      expect(label('compose')).toContain(UNSAVED);
-    });
-  });
-
   describe('preset tips', () => {
     const tipText = () => openTooltip()?.textContent ?? null;
     const tipKeycap = () => openTooltip()?.querySelector('kbd') ?? null;
@@ -522,36 +471,36 @@ describe('locked workspaces', () => {
     expect(store.getSnapshot().account.layoutPresetOrder).toEqual(['compose', 'custom-1', 'edit', 'video', 'automate']);
   });
 
-  it('offers Customize in the active tab’s menu, and nothing that saves, reverts or deletes', async () => {
+  it('offers Customize and Reset view in the active tab’s menu, and nothing that deletes', async () => {
+    const menuItems = () =>
+      Array.from(document.querySelectorAll<HTMLElement>('[role="menuitem"]')).map((item) => item.dataset.value);
+    const menuItem = (value: string) => document.querySelector<HTMLElement>(`[role="menuitem"][data-value="${value}"]`);
+
     await act(() => store.commands.layout.setRegionSize('right', 401));
     await renderStrip();
     await act(() => settle(400));
 
-    // A view change is not unsaved work: there is nothing a locked account could save or revert.
     expect(presetTab('compose')).toHaveAttribute('aria-label', 'Writing');
-    expect(presetTab('compose')?.querySelector('[data-unsaved-dot]')).toBeNull();
 
     await act(() => userEvent.click(presetTab('compose')!, { button: 'right' }));
-    await expect.poll(() => document.querySelector('[role="menuitem"][data-value="customize"]'), POLL).not.toBeNull();
-    expect(
-      Array.from(document.querySelectorAll<HTMLElement>('[role="menuitem"]')).map((item) => item.dataset.value)
-    ).toEqual(['customize']);
+    await expect.poll(() => menuItem('customize'), POLL).not.toBeNull();
+    expect(menuItems()).toEqual(['customize', 'reset-view']);
 
-    await act(() => userEvent.click(document.querySelector<HTMLElement>('[role="menuitem"][data-value="customize"]')!));
+    await act(() => userEvent.click(menuItem('reset-view')!));
+
+    expect(store.getSnapshot().activeProject.views.compose).toBeUndefined();
+    expect(store.getSnapshot().activeLayout.widgetRegions.right.sizePx).toBe(450);
+
+    await act(() => userEvent.click(presetTab('edit')!, { button: 'right' }));
+    await expect.poll(() => menuItem('reset-view'), POLL).not.toBeNull();
+    // Nothing to reset: the item stays, unavailable, and says why.
+    expect(menuItem('reset-view')).toHaveAttribute('aria-disabled', 'true');
+    await act(() => userEvent.keyboard('{Escape}'));
+
+    await act(() => userEvent.click(presetTab('compose')!, { button: 'right' }));
+    await expect.poll(() => menuItem('customize'), POLL).not.toBeNull();
+    await act(() => userEvent.click(menuItem('customize')!));
 
     expect(store.getSnapshot().customizing?.[store.getSnapshot().activeProject.id]?.presetId).toBe('compose');
-  });
-
-  it('makes a new workspace from this one and customizes the copy', async () => {
-    await renderStrip();
-
-    await act(() => userEvent.click(document.querySelector<HTMLElement>('button[aria-label="New workspace"]')!));
-
-    const { account, activeProject, customizing } = store.getSnapshot();
-    const copy = account.customLayoutPresets?.at(-1);
-
-    expect(copy?.label).toBe('topbar.presets.copyName');
-    expect(activeProject.layout.presetId).toBe(copy?.id);
-    expect(customizing?.[activeProject.id]?.presetId).toBe(copy?.id);
   });
 });

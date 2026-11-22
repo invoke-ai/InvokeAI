@@ -46,8 +46,13 @@ import {
   isExpandableBottomItem,
   isPopoverBottomItem,
 } from '@workbench/widgetRegionViewModel';
-import { getWidgetById, getWidgetsForRegion } from '@workbench/widgetRegistry';
-import { useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
+import { getWidgetsForRegion } from '@workbench/widgetRegistry';
+import {
+  useActiveLayoutSelector,
+  useWorkbenchCommands,
+  useWorkbenchQueries,
+  useWorkbenchSelector,
+} from '@workbench/WorkbenchContext';
 import { useCanEditStructure } from '@workbench/workspace/useStructureLock';
 import { ArrowRightToLineIcon } from 'lucide-react';
 import {
@@ -125,9 +130,10 @@ export const StatusBar = ({ dropState }: { dropState: WidgetRegionDropState }) =
   const [capacity] = useState(createCompactWidgetCapacity);
   const bindSpacer = useCallback((element: HTMLDivElement | null) => capacity.bindSpacer(element), [capacity]);
   const { t } = useTranslation();
-  const placementProject = useActiveProjectSelector(getWidgetPlacementProject, areWidgetPlacementProjectsEqual);
-  const bottomRegion = useActiveProjectSelector((project) => project.widgetRegions.bottom);
+  const placementProject = useWorkbenchSelector(getWidgetPlacementProject, areWidgetPlacementProjectsEqual);
+  const bottomRegion = useActiveLayoutSelector((layout) => layout.widgetRegions.bottom);
   const { widgets } = useWorkbenchCommands();
+  const queries = useWorkbenchQueries();
   const [enableMenuTarget, setEnableMenuTarget] = useState<{ x: number; y: number } | null>(null);
   const [instanceMenuTarget, setInstanceMenuTarget] = useState<WidgetInstanceContextMenuTarget | null>(null);
   const getWidgetLabel = useCallback(
@@ -177,8 +183,8 @@ export const StatusBar = ({ dropState }: { dropState: WidgetRegionDropState }) =
     (item: WidgetEnableMenuItem) =>
       item.isEnabled
         ? closeWidgetPlacement({
+            availability: queries.getAvailability(),
             widgets,
-            getWidgetById,
             instanceId: item.id,
             project: placementProject,
             region: 'bottom',
@@ -190,7 +196,7 @@ export const StatusBar = ({ dropState }: { dropState: WidgetRegionDropState }) =
             typeId: item.typeId,
             widgets,
           }),
-    [placementProject, widgets]
+    [placementProject, queries, widgets]
   );
   const handleSelect = useCallback(
     (instanceId: WidgetInstanceId) =>

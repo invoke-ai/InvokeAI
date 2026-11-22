@@ -20,7 +20,7 @@ import { WidgetOverlayOwnerContext } from '@platform/ui/widgetOverlays';
 import { WidgetSettingsButton } from '@workbench/settings/WidgetSettingsButton';
 import { resolveWidgetInstanceLabel } from '@workbench/widgetLabels';
 import { areWidgetPlacementProjectsEqual, getWidgetPlacementProject } from '@workbench/widgetPlacementMeta';
-import { useActiveProjectId, useActiveProjectSelector } from '@workbench/WorkbenchContext';
+import { useActiveProjectId, useActiveProjectSelector, useWorkbenchSelector } from '@workbench/WorkbenchContext';
 import { memo, Suspense, use, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -107,16 +107,18 @@ const WidgetChromeSlot = ({
   slot: WidgetChromeSlotName;
   widget: RegisteredWidget;
 }) => {
-  const project = useActiveProjectSelector(getWidgetPlacementProject, areWidgetPlacementProjectsEqual);
+  const project = useWorkbenchSelector(getWidgetPlacementProject, areWidgetPlacementProjectsEqual);
   const implementation = use(widget.implementation.load());
+  // The title is the workspace's: its structure names the instance.
+  const title = project.widgetInstances[instance.id]?.title;
   const instanceMeta: WidgetInstanceRuntimeMeta = useMemo(
     () => ({
       createdAt: instance.createdAt,
       id: instance.id,
-      title: instance.title,
+      title,
       typeId: instance.typeId,
     }),
-    [instance.createdAt, instance.id, instance.title, instance.typeId]
+    [instance.createdAt, instance.id, title, instance.typeId]
   );
   const runtime = useWidgetRuntime({
     instance: instanceMeta,
@@ -301,20 +303,22 @@ export const WidgetRecoveryAnnouncement = ({
 };
 
 const LoadedWidgetRenderer = ({ instance, presentation, region, widget }: WidgetRendererProps) => {
-  const project = useActiveProjectSelector(getWidgetPlacementProject, areWidgetPlacementProjectsEqual);
+  const project = useWorkbenchSelector(getWidgetPlacementProject, areWidgetPlacementProjectsEqual);
   const implementation = use(widget.implementation.load());
   const View = implementation.view;
   useMountEffect(() => {
     markSemanticReady(getWidgetReadyMark(region, instance.typeId));
   });
+  // The title is the workspace's: its structure names the instance.
+  const title = project.widgetInstances[instance.id]?.title;
   const instanceMeta: WidgetInstanceRuntimeMeta = useMemo(
     () => ({
       createdAt: instance.createdAt,
       id: instance.id,
-      title: instance.title,
+      title,
       typeId: instance.typeId,
     }),
-    [instance.createdAt, instance.id, instance.title, instance.typeId]
+    [instance.createdAt, instance.id, title, instance.typeId]
   );
   const runtime = useWidgetRuntime({
     instance: instanceMeta,

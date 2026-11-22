@@ -563,18 +563,16 @@
       "reorderNamed": "Reorder {{name}}",
       "restore": "Reset the built-in workspace to its shipped arrangement, name, icon and route",
       "restoreNamed": "Reset built-in {{name}} to default",
-      "revert": "Revert to saved",
       "saveAs": "Save as new workspace",
-      "saveChanges": "Save changes",
       "switch": "Switch to this workspace",
-      "unsaved": "Unsaved changes",
-      "unsavedLayoutChanges": "Unsaved changes",
       "autoRoute": "Auto",
       "autoRouteHint": "Invoke runs the first source this workspace fronts.",
       "copyName": "{{name}} copy",
       "nameRequired": "Name the workspace first",
       "newWorkspace": "New workspace",
       "resetToDefault": "Reset to default",
+      "resetView": "Reset view",
+      "resetViewUnavailable": "This project already shows the workspace as it is set up",
       "route": "Route",
       "routeNamed": "Route: {{route}}",
       "routeSummary": "{{source}} → {{destination}}",
@@ -2788,12 +2786,14 @@
   },
   "shell": {
     "layoutUndo": {
-      "discardedCopy": "Discarded unsaved changes to {{preset}}",
       "removedWidget": "{{label}} removed",
       "removedWidgetHint": "Add it again any time from Widgets.",
-      "reverted": "Reverted {{preset}} to its saved arrangement",
+      "resetView": "This project's view of {{preset}} was reset",
       "routeChanged": "Invoke now runs {{source}} and sends results to {{destination}}.",
-      "switchedPreset": "Switched to {{preset}}"
+      "switchedPreset": "Switched to {{preset}}",
+      "updatedWorkspace": "{{preset}} updated",
+      "workspaceChangedMessage": "The workspace changed after this step, so only how this project looks at it was put back.",
+      "workspaceChangedTitle": "Workspace not changed back"
     },
     "workspace": {
       "addHere": "Add to this workspace",
@@ -2808,10 +2808,12 @@
       "customizeWorkspace": "Customize workspace",
       "customizing": "Customize {{name}}",
       "keepRearranging": "Keep rearranging",
-      "locked": "Widgets and workspaces change in Customize",
       "lockOfferMessage": "Lock them so widgets stay where you put them, and change a workspace any time with Customize. Settings can switch this back.",
       "lockOfferTitle": "Workspaces can now be locked",
-      "lockWorkspaces": "Lock workspaces"
+      "lockWorkspaces": "Lock workspaces",
+      "arrangementDroppedMessage_one": "Workspaces now look the same in every project, so this project's own arrangement of {{workspaces}} was not kept. Customize the workspace to arrange it again.",
+      "arrangementDroppedMessage_other": "Workspaces now look the same in every project, so this project's own arrangements of {{workspaces}} were not kept. Customize a workspace to arrange it again.",
+      "arrangementDroppedTitle": "Workspaces are now shared"
     },
     "widgets": {
       "add": "Add",
@@ -2956,7 +2958,6 @@
       "retrying": "Retrying {{label}}"
     },
     "floating": {
-      "centerFloating": "{{label}} is in a floating window",
       "destinations": {
         "bottom": "bottom panel",
         "center": "center",
@@ -2975,7 +2976,6 @@
       "resizeValue": "{{width}} by {{height}} pixels",
       "restore": "Restore",
       "shade": "Collapse",
-      "showWindow": "Show window",
       "unshade": "Expand"
     },
     "loadingLabel": "Loading {{label}}",

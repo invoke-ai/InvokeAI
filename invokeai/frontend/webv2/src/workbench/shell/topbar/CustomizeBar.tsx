@@ -1,7 +1,7 @@
 import type { LayoutPresetRoute } from '@workbench/layoutContracts';
-import type { Project } from '@workbench/projectContracts';
+import type { ResolvedLayout } from '@workbench/workspace/resolveLayout';
 import type { CustomizeSession } from '@workbench/workspace/structureLock';
-import type { ChangeEvent, ReactNode } from 'react';
+import type { ChangeEvent, MouseEvent, ReactNode } from 'react';
 
 import { Box, HStack, Icon, Input, Popover, Portal, Separator, Text } from '@chakra-ui/react';
 import { Button, IconButton } from '@platform/ui/Button';
@@ -11,25 +11,25 @@ import { Tooltip, useTooltipTriggerIds } from '@platform/ui/Tooltip';
 import { getPlacedWidgetTypeIds, graphWidgetSources } from '@workbench/graphWidgets';
 import { useShortcutLabel } from '@workbench/hotkeys/useShortcutBinding';
 import { getDestinationLabel } from '@workbench/invocation';
+import { getOrderedLayoutPresets } from '@workbench/layoutPresetCollection';
 import { getLayoutPresetLabel, layoutPresets } from '@workbench/layoutPresets';
-import {
-  areLayoutPresetSnapshotsEqual,
-  createLayoutPresetSnapshot,
-  resolveSavedLayoutPreset,
-} from '@workbench/layoutPresetSnapshots';
 import { CUE_WIDTH, OverflowCue, useOverflowEdges } from '@workbench/shell/overflowEdges';
 import { openWidgetsDialogFrom } from '@workbench/shell/widgetsDialogStore';
 import {
+  useActiveLayoutSelector,
   useActiveProjectSelector,
   useWorkbenchCommands,
   useWorkbenchQueries,
   useWorkbenchSelector,
 } from '@workbench/WorkbenchContext';
-import { getCustomizeSession, isCustomizeResetPending } from '@workbench/workspace/structureLock';
+import { getCustomizeBase } from '@workbench/workspace/customizeDraft';
+import { createShippedStructureSelector } from '@workbench/workspace/projectLayout';
+import { getCustomizeSession } from '@workbench/workspace/structureLock';
 import {
   claimCustomizeBarFocus,
-  customizeNewWorkspace,
+  getUniqueWorkspaceName,
   restoreFocusAfterCustomize,
+  saveCustomizeAsNew,
 } from '@workbench/workspace/workspaceNavigation';
 import {
   ChevronDownIcon,
@@ -42,7 +42,7 @@ import {
   Undo2Icon,
   WaypointsIcon,
 } from 'lucide-react';
-import { useCallback, useRef } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { getInitialLayoutPresetIconId, resolveLayoutPresetRoute } from './layoutPresetDialogModel';
@@ -55,66 +55,77 @@ import { HIDE_BELOW_PRESET_LABEL_WIDTH } from './topbarBreakpoints';
 const POPOVER_POSITIONING = { placement: 'bottom' } as const;
 const BAR_FOCUS_RING = { outline: '2px solid', outlineColor: 'accent.focusRing', outlineOffset: '1px' } as const;
 
-const selectPlacedGraphWidgetSources = (project: Project) => {
-  const placedTypeIds = getPlacedWidgetTypeIds(project);
+const selectPlacedGraphWidgetSources = (layout: ResolvedLayout) => {
+  const placedTypeIds = getPlacedWidgetTypeIds(layout);
 
   return graphWidgetSources.filter((source) => placedTypeIds.has(source.typeId));
 };
-const selectHistory = (project: Project) =>
-  `${project.undoRedo.past.length > 0 ? 'u' : ''}${project.undoRedo.future.length > 0 ? 'r' : ''}`;
 
 const isSameRoute = (left: LayoutPresetRoute | null, right: LayoutPresetRoute | null): boolean =>
   left?.sourceId === right?.sourceId && left?.destination === right?.destination;
 
 /**
- * Replaces the workspace tabs while the active project customizes its workspace. Name, icon and route are edited here
- * and land with Done; the arrangement is edited live in the shell. Done saves it if this session changed it; Cancel
- * lays out what was on screen when Customize began.
+ * Replaces the workspace tabs while the active project customizes its workspace, or drafts a new one. Name, icon and
+ * route are edited here and the arrangement live in the shell, all on a draft with one Undo history: Done writes the
+ * draft, with what is on screen as its defaults, to the account in one step (creating a new workspace); Cancel drops
+ * it, leaving the account and this project's view as they were.
  */
 export const CustomizeBar = ({ session }: { session: CustomizeSession }) => {
   const { t } = useTranslation();
   const commands = useWorkbenchCommands();
   const { layout } = commands;
   const queries = useWorkbenchQueries();
-  const { draft, entry, presetId } = session;
+  const { draft, history, presetId } = session;
   const projectId = useActiveProjectSelector((project) => project.id);
   const account = useWorkbenchSelector((snapshot) => snapshot.account);
-  const sourceOptions = useActiveProjectSelector(selectPlacedGraphWidgetSources, areSourceListsEqual);
-  const history = useActiveProjectSelector(selectHistory);
-  const isResetPending = useActiveProjectSelector(isCustomizeResetPending);
+  const sourceOptions = useActiveLayoutSelector(selectPlacedGraphWidgetSources, areSourceListsEqual);
+  const canUndo = history.past.length > 0;
+  const canRedo = history.future.length > 0;
+  const isNew = session.newWorkspaceId !== undefined;
   const undoShortcut = useShortcutLabel('app.undoLayoutChange');
   const redoShortcut = useShortcutLabel('app.redoLayoutChange');
   const widgetsButtonRef = useRef<HTMLButtonElement>(null);
+  const nameInputRef = useRef<HTMLInputElement>(null);
   const { attach: attachScroller, hiddenEdges, scrollTo } = useOverflowEdges();
 
-  const shipped = layoutPresets.find((preset) => preset.id === presetId);
-  // A pending reset shows, and Done measures against, what the built-in ships with.
-  const base = isResetPending && shipped ? shipped : resolveSavedLayoutPreset(account, presetId);
-  const baseLabel = getLayoutPresetLabel(base, t);
+  const shipped = isNew ? undefined : layoutPresets.find((preset) => preset.id === presetId);
+  const base = getCustomizeBase(account, session);
+  const baseLabel = base ? getLayoutPresetLabel(base, t) : '';
+  const shippedLabel = shipped ? getLayoutPresetLabel(shipped, t) : undefined;
   const allowsAuto = shipped?.defaultRoute === undefined;
-  const name = draft.label ?? baseLabel;
-  const iconId = getInitialLayoutPresetIconId(draft.iconId ?? base.iconId);
+  // A built-in's shipped name is stored untranslated and shown in the reader's language.
+  const name = draft.label === undefined ? baseLabel : draft.label === shipped?.label ? shippedLabel! : draft.label;
+  const iconId = getInitialLayoutPresetIconId(draft.iconId ?? base?.iconId);
   const route = resolveLayoutPresetRoute(
-    draft.defaultRoute === undefined ? base.defaultRoute : draft.defaultRoute,
+    draft.defaultRoute === undefined ? base?.defaultRoute : draft.defaultRoute,
     sourceOptions,
     allowsAuto
   );
   const isNamed = name.trim().length > 0;
-  const hasOverride =
+  const selectShippedStructure = useMemo(() => createShippedStructureSelector(queries.getAvailability()), [queries]);
+  const isShippedStructure = useWorkbenchSelector(selectShippedStructure);
+  // Offered while the draft differs from what the built-in ships with, whatever the account holds.
+  const canResetToDefault =
     shipped !== undefined &&
-    !isResetPending &&
-    [account.layoutPresetMetadataOverrides, account.layoutPresetOverrides, account.layoutPresetRouteOverrides].some(
-      (overrides) => overrides?.[shipped.id] !== undefined
-    );
+    (!isShippedStructure ||
+      name !== shippedLabel ||
+      iconId !== getInitialLayoutPresetIconId(shipped.iconId) ||
+      !isSameRoute(route, resolveLayoutPresetRoute(shipped.defaultRoute, sourceOptions, false)));
 
-  // Entering by a gesture moves focus here. However the session ends while this project is on screen, focus goes back;
-  // switching projects unmounts the bar too, and that leaves focus alone.
+  // Entering by a gesture moves focus here, to a new workspace's name field. However the session ends while this
+  // project is on screen, focus goes back; switching projects unmounts the bar too, and that leaves focus alone.
   const bindBar = useCallback(
     (element: HTMLDivElement | null) => {
       if (!element) {
         return;
       }
-      if (claimCustomizeBarFocus(projectId)) {
+
+      const focus = claimCustomizeBarFocus(projectId);
+
+      if (focus === 'name' && nameInputRef.current) {
+        nameInputRef.current.focus({ preventScroll: true });
+        nameInputRef.current.select();
+      } else if (focus !== null) {
         element.focus({ preventScroll: true });
       }
 
@@ -129,8 +140,12 @@ export const CustomizeBar = ({ session }: { session: CustomizeSession }) => {
     [projectId, queries]
   );
   const setName = useCallback(
-    (event: ChangeEvent<HTMLInputElement>) => layout.setCustomizeDraft({ label: event.currentTarget.value }),
-    [layout]
+    (event: ChangeEvent<HTMLInputElement>) => {
+      const { value } = event.currentTarget;
+
+      layout.setCustomizeDraft({ label: shipped && value === shippedLabel ? shipped.label : value });
+    },
+    [layout, shipped, shippedLabel]
   );
   const setIcon = useCallback((nextIconId: string) => layout.setCustomizeDraft({ iconId: nextIconId }), [layout]);
   const setRoute = useCallback(
@@ -140,59 +155,39 @@ export const CustomizeBar = ({ session }: { session: CustomizeSession }) => {
   const undo = useCallback(() => layout.undo(), [layout]);
   const redo = useCallback(() => layout.redo(), [layout]);
   const openWidgets = useCallback(() => openWidgetsDialogFrom(() => widgetsButtonRef.current), []);
-  const resetToDefault = useCallback(() => layout.resetCustomizeToDefault(), [layout]);
-  const saveAsNew = useCallback(
-    () =>
-      customizeNewWorkspace(
-        { commands, queries },
-        {
-          defaultRoute: route,
-          iconId,
-          label:
-            name.trim() && name.trim() !== baseLabel ? name.trim() : t('topbar.presets.copyName', { name: baseLabel }),
-        },
-        { continues: true }
-      ),
-    [baseLabel, commands, iconId, name, queries, route, t]
+  // The button goes once the draft is the shipped one; focus stays in the bar.
+  const resetToDefault = useCallback(
+    (event: MouseEvent<HTMLButtonElement>) => {
+      event.currentTarget.closest<HTMLElement>('[data-customize-bar]')?.focus();
+      layout.resetCustomizeToDefault();
+    },
+    [layout]
   );
-  const cancel = useCallback(() => layout.endCustomize(true), [layout]);
-  const done = useCallback(() => {
-    const label = name.trim();
+  const saveAsNew = useCallback(() => {
+    const label =
+      name.trim() && name.trim() !== baseLabel ? name.trim() : t('topbar.presets.copyName', { name: baseLabel });
 
-    if (!label) {
-      return;
-    }
-
-    if (isResetPending) {
-      layout.restorePresetDefault(presetId);
-    }
-    if (draft.defaultRoute !== undefined && !isSameRoute(route, base.defaultRoute ?? null)) {
-      layout.setPresetRoute(presetId, route);
-    }
-    if (label !== baseLabel) {
-      layout.renamePreset(presetId, label, shipped ? getLayoutPresetLabel(shipped, t) : undefined);
-    }
-    if (draft.iconId !== undefined && draft.iconId !== base.iconId) {
-      layout.setPresetIcon(presetId, draft.iconId);
-    }
-
-    const live = createLayoutPresetSnapshot(queries.getSnapshot().activeProject);
-
-    // Only an arrangement this session changed is saved: saving one merely looked at differently would pin a built-in
-    // to it instead of letting it follow the shipped one. After a reset, the saved arrangement is the shipped one.
-    if (
-      isResetPending ? !areLayoutPresetSnapshotsEqual(live, base.snapshot) : !areLayoutPresetSnapshotsEqual(live, entry)
-    ) {
-      layout.savePreset(presetId);
-    }
-
-    layout.endCustomize(false);
-  }, [base, baseLabel, draft, entry, isResetPending, layout, name, presetId, queries, route, shipped, t]);
+    saveCustomizeAsNew(
+      { commands, queries },
+      {
+        defaultRoute: route,
+        iconId,
+        label: getUniqueWorkspaceName(
+          label,
+          getOrderedLayoutPresets(account).map((preset) => getLayoutPresetLabel(preset, t))
+        ),
+      }
+    );
+    nameInputRef.current?.focus();
+    nameInputRef.current?.select();
+  }, [account, baseLabel, commands, iconId, name, queries, route, t]);
+  const cancel = useCallback(() => layout.cancelCustomize(), [layout]);
+  const done = useCallback(() => layout.finishCustomize(), [layout]);
 
   return (
     <HStack
       ref={bindBar}
-      aria-label={t('shell.workspace.customizing', { name: baseLabel })}
+      aria-label={isNew ? t('topbar.presets.newWorkspace') : t('shell.workspace.customizing', { name: baseLabel })}
       bg="bg.subtle"
       borderColor="accent.solid"
       borderWidth="1px"
@@ -225,7 +220,7 @@ export const CustomizeBar = ({ session }: { session: CustomizeSession }) => {
           <HStack color="accent.fg" flexShrink={0} gap="1.5">
             <Icon as={PencilRulerIcon} boxSize="3.5" />
             <Text css={HIDE_BELOW_PRESET_LABEL_WIDTH} fontWeight="600">
-              {t('shell.workspace.customize')}
+              {isNew ? t('topbar.presets.newWorkspace') : t('shell.workspace.customize')}
             </Text>
           </HStack>
           <Separator flexShrink={0} h="5" mx="0.5" orientation="vertical" />
@@ -233,6 +228,7 @@ export const CustomizeBar = ({ session }: { session: CustomizeSession }) => {
             <LayoutPresetIconPicker iconId={iconId} onChange={setIcon} />
           </IconPopover>
           <Input
+            ref={nameInputRef}
             aria-invalid={!isNamed}
             aria-label={t('topbar.presets.name')}
             autoComplete="off"
@@ -257,7 +253,7 @@ export const CustomizeBar = ({ session }: { session: CustomizeSession }) => {
           <Separator flexShrink={0} h="5" mx="0.5" orientation="vertical" />
           <IconButton
             aria-label={t('common.undo')}
-            disabled={!history.includes('u')}
+            disabled={!canUndo}
             size="sm"
             tooltip={undoShortcut ? `${t('common.undo')} (${undoShortcut})` : t('common.undo')}
             variant="ghost"
@@ -267,7 +263,7 @@ export const CustomizeBar = ({ session }: { session: CustomizeSession }) => {
           </IconButton>
           <IconButton
             aria-label={t('common.redo')}
-            disabled={!history.includes('r')}
+            disabled={!canRedo}
             size="sm"
             tooltip={redoShortcut ? `${t('common.redo')} (${redoShortcut})` : t('common.redo')}
             variant="ghost"
@@ -286,7 +282,7 @@ export const CustomizeBar = ({ session }: { session: CustomizeSession }) => {
           >
             <Icon as={LayoutGridIcon} boxSize="3.5" />
           </IconButton>
-          {hasOverride ? (
+          {canResetToDefault ? (
             <IconButton
               aria-label={t('topbar.presets.resetToDefault')}
               size="sm"
@@ -297,15 +293,17 @@ export const CustomizeBar = ({ session }: { session: CustomizeSession }) => {
               <Icon as={RotateCcwIcon} boxSize="3.5" />
             </IconButton>
           ) : null}
-          <IconButton
-            aria-label={t('topbar.presets.saveAs')}
-            size="sm"
-            tooltip={t('topbar.presets.saveAs')}
-            variant="ghost"
-            onClick={saveAsNew}
-          >
-            <Icon as={CopyPlusIcon} boxSize="3.5" />
-          </IconButton>
+          {isNew ? null : (
+            <IconButton
+              aria-label={t('topbar.presets.saveAs')}
+              size="sm"
+              tooltip={t('topbar.presets.saveAs')}
+              variant="ghost"
+              onClick={saveAsNew}
+            >
+              <Icon as={CopyPlusIcon} boxSize="3.5" />
+            </IconButton>
+          )}
           <IconButton
             aria-label={t('topbar.presets.manage')}
             size="sm"

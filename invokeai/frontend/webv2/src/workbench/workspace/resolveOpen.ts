@@ -12,7 +12,7 @@ export type RegionPresentation = 'view' | 'chip' | null;
 
 export interface WorkspaceCandidate {
   id: LayoutPresetId;
-  /** What entering it lays out for this project. */
+  /** What entering it shows for this project: its structure seen through the project's view of it. */
   arrangement: WorkspacePlacement;
   jobSourceTypeId: WidgetTypeId | null;
   /** Its stage's type while that arrangement places the stage, whatever the project last left fronted there. */
@@ -52,7 +52,6 @@ interface Placement {
 
 /** Rails before the status bar, the center last: a widget docked beside the work surface shows without replacing it. */
 const PLACEMENT_ORDER: readonly WidgetRegion[] = ['right', 'left', 'bottom', 'center'];
-const PANEL_OPEN_KEYS = { bottom: 'isBottomOpen', left: 'isLeftOpen', right: 'isRightOpen' } as const;
 
 const satisfiesSurface = (intent: OpenIntent, region: WidgetRegion, presentation: RegionPresentation): boolean => {
   if (presentation === 'chip') {
@@ -83,8 +82,7 @@ const listPlacements = (
     }
 
     const state = placement.widgetRegions[region];
-    const isShown =
-      region === 'center' || (!state.isCollapsed && placement.layout.panels[PANEL_OPEN_KEYS[region]] === true);
+    const isShown = region === 'center' || !state.isCollapsed;
 
     // Every region renders its front, even one instance the center fronts too (a workflow's graph and its form).
     for (const instanceId of state.instanceIds.filter(isType)) {

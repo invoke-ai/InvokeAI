@@ -6,6 +6,7 @@ export type BuiltInLayoutPresetId = 'compose' | 'edit' | 'automate' | 'video';
 
 export type LayoutPresetId = BuiltInLayoutPresetId | (string & {});
 
+/** The stored snapshot's center view field: older builds validate it, so writes keep it naming the stage's type. */
 export type CenterViewId = 'canvas' | 'gallery' | 'preview' | 'workflow';
 
 export interface PanelState {
@@ -52,8 +53,9 @@ export interface WidgetRegionState {
   sizePx: number;
 }
 
-export interface ProjectLayoutState {
+export interface LayoutPresetSnapshotLayout {
   presetId: LayoutPresetId;
+  /** Never read: the center's home front is the stage. Written consistent with it, as older builds require. */
   centerViewId: CenterViewId;
   panels: PanelState;
 }
@@ -65,17 +67,11 @@ export interface LayoutPresetWidgetInstanceSnapshot {
 }
 
 export interface LayoutPresetSnapshot {
-  layout: ProjectLayoutState;
+  layout: LayoutPresetSnapshotLayout;
   widgetInstances: Record<WidgetInstanceId, LayoutPresetWidgetInstanceSnapshot>;
   widgetRegions: Record<WidgetRegion, WidgetRegionState>;
   /** Capture windows with widgetRegions so floated instances survive presets; absent means none. */
   floatingWidgets?: Record<WidgetInstanceId, FloatingWidgetState>;
-}
-
-/** A project's unsaved arrangement of one preset; see `Project.presetWorkingLayouts`. */
-export interface LayoutPresetWorkingCopy {
-  presetId: LayoutPresetId;
-  snapshot: LayoutPresetSnapshot;
 }
 
 /**
@@ -103,7 +99,7 @@ export interface LayoutPreset {
   snapshot: LayoutPresetSnapshot;
 }
 
-/** Account overrides store edits to code-owned built-ins and drive both drift checks and revert. */
+/** Account overrides: the structures of code-owned built-ins as this account customized them. */
 export type LayoutPresetOverrides = Partial<Record<BuiltInLayoutPresetId, LayoutPresetSnapshot>>;
 
 /** Per-account edits to the default routes shipped with built-in presets. */

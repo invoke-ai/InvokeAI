@@ -1,5 +1,5 @@
-import type { Project } from '@workbench/projectContracts';
 import type { WidgetInstanceContract, WidgetTypeId } from '@workbench/widgetContracts';
+import type { WidgetPlacementProject } from '@workbench/widgetPlacementCommands';
 import type { WorkbenchAction } from '@workbench/workbenchState.testing';
 import type { WorkbenchWidgetCommands } from '@workbench/workbenchStore';
 
@@ -60,8 +60,8 @@ const createStateApi = () => ({
 });
 
 const createPlacementProject = (
-  overrides: Partial<Pick<Project, 'widgetInstances' | 'widgetRegions'>> = {}
-): Pick<Project, 'widgetInstances' | 'widgetRegions'> & { projectId: string } => ({
+  overrides: Partial<Pick<WidgetPlacementProject, 'widgetInstances' | 'widgetRegions'>> = {}
+): WidgetPlacementProject => ({
   projectId: 'project-1',
   widgetInstances: {
     alpha: createInstance('alpha'),
@@ -69,10 +69,10 @@ const createPlacementProject = (
     ...overrides.widgetInstances,
   },
   widgetRegions: {
-    bottom: { activeInstanceId: 'alpha', instanceIds: [], isCollapsed: false, sizePx: 240 },
-    center: { activeInstanceId: 'alpha', instanceIds: [], isCollapsed: false, sizePx: 240 },
-    left: { activeInstanceId: 'alpha', instanceIds: [], isCollapsed: false, sizePx: 240 },
-    right: { activeInstanceId: 'alpha', instanceIds: ['alpha'], isCollapsed: false, sizePx: 240 },
+    bottom: { activeInstanceId: 'alpha', instanceIds: [] },
+    center: { activeInstanceId: 'alpha', instanceIds: [] },
+    left: { activeInstanceId: 'alpha', instanceIds: [] },
+    right: { activeInstanceId: 'alpha', instanceIds: ['alpha'] },
     ...overrides.widgetRegions,
   },
 });
@@ -159,10 +159,10 @@ describe('createWidgetRuntime', () => {
       instance: createInstance(),
       project: createPlacementProject({
         widgetRegions: {
-          bottom: { activeInstanceId: 'alpha', instanceIds: ['alpha', 'beta'], isCollapsed: false, sizePx: 240 },
-          center: { activeInstanceId: 'alpha', instanceIds: [], isCollapsed: false, sizePx: 240 },
-          left: { activeInstanceId: 'alpha', instanceIds: [], isCollapsed: false, sizePx: 240 },
-          right: { activeInstanceId: 'alpha', instanceIds: [], isCollapsed: false, sizePx: 240 },
+          bottom: { activeInstanceId: 'alpha', instanceIds: ['alpha', 'beta'] },
+          center: { activeInstanceId: 'alpha', instanceIds: [] },
+          left: { activeInstanceId: 'alpha', instanceIds: [] },
+          right: { activeInstanceId: 'alpha', instanceIds: [] },
         },
       }),
       region: 'bottom',

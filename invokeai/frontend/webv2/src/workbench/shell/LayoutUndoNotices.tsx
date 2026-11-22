@@ -33,18 +33,21 @@ export const describeLayoutUndoNotice = (
   }
 
   const preset = getLayoutPresetLabel(resolveSavedLayoutPreset(account, notice.presetId), t);
+
+  if (notice.kind === 'resetView') {
+    return { title: t('shell.layoutUndo.resetView', { preset }) };
+  }
+  if (notice.kind === 'updateWorkspace') {
+    return { title: t('shell.layoutUndo.updatedWorkspace', { preset }) };
+  }
+
   const routeMessage = isSameRoute(entry.project.invocation, project.invocation)
     ? undefined
     : t('shell.layoutUndo.routeChanged', {
         destination: t(ROUTE_LABEL_KEYS[project.invocation.destination]),
         source: t(ROUTE_LABEL_KEYS[project.invocation.sourceId]),
       });
-  const title =
-    notice.kind === 'switchPreset'
-      ? t('shell.layoutUndo.switchedPreset', { preset })
-      : notice.kind === 'revert'
-        ? t('shell.layoutUndo.reverted', { preset })
-        : t('shell.layoutUndo.discardedCopy', { preset });
+  const title = t('shell.layoutUndo.switchedPreset', { preset });
 
   return routeMessage === undefined ? { title } : { message: routeMessage, title };
 };

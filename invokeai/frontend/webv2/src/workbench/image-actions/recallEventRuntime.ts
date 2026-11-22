@@ -49,7 +49,7 @@ export const createRecallEventRuntime = <Event extends { user_id: string }>({
   getSessionUserId?: () => string | null;
   hub: Pick<SocketHub, 'on'>;
   isEvent: (payload: unknown) => payload is Event;
-  queries: Pick<WorkbenchQueries, 'getSnapshot'>;
+  queries: Pick<WorkbenchQueries, 'getSnapshot' | 'getWorkspaceLayout'>;
   replay?: readonly PendingRecallEvent[];
 }): RecallRuntime => {
   let disposed = false;
@@ -145,7 +145,7 @@ export const withRecallWidgetOffer = <
     typeId,
   }: {
     projectId: string;
-    queries: Pick<WorkbenchQueries, 'getSnapshot'>;
+    queries: Pick<WorkbenchQueries, 'getSnapshot' | 'getWorkspaceLayout'>;
     reveal: RecallRevealContext;
     typeId: WidgetTypeId;
   }
@@ -203,7 +203,7 @@ export const bringRecallWidgetToFront = ({
   commands: Pick<WorkbenchCommands, 'layout' | 'notifications' | 'widgets'>;
   owner: AccountScope;
   projectId: string;
-  queries: Pick<WorkbenchQueries, 'getSnapshot'>;
+  queries: Pick<WorkbenchQueries, 'getSnapshot' | 'getWorkspaceLayout'>;
   reveal: RecallRevealContext;
   typeId: WidgetTypeId;
 }): void => {

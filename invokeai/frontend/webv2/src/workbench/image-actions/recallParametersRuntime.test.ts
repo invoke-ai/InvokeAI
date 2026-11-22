@@ -305,7 +305,7 @@ describe('createRecallParametersRuntime', () => {
     store.commands.widgets.open({ projectId, region: 'left', widgetId: 'video' });
     const activeType = () => {
       const project = store.queries.getProject(projectId)!;
-      const active = project.widgetRegions.left.activeInstanceId;
+      const active = store.getSnapshot().activeLayout.widgetRegions.left.activeInstanceId;
       return active ? project.widgetInstances[active]?.typeId : undefined;
     };
     expect(activeType()).toBe('video');

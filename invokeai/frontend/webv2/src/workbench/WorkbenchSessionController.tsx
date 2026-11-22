@@ -36,10 +36,10 @@ const HydratedSessionController = ({ search }: { search: WorkbenchSearch }) => {
       if (intent) {
         commands.layout.applyPreset(intent.presetId);
 
-        const { account, activeProject } = queries.getSnapshot();
+        const { account, activeLayout } = queries.getSnapshot();
         const jobSourceId = getWorkspaceJobSource(
           resolveSavedLayoutPreset(account, intent.presetId),
-          activeProject,
+          activeLayout,
           getAvailableSourceIdForWidgetTypeId
         );
 

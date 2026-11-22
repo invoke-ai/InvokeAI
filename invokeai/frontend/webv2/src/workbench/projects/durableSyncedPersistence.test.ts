@@ -18,6 +18,8 @@ import {
   createInitialWorkbenchState,
   withAuthoritativeProjectBoard,
 } from '@workbench/workbenchState';
+import { asStoredBeforeSplit, workbenchReducer } from '@workbench/workbenchState.testing';
+import { structuralLayouts, viewOnlyLayouts } from '@workbench/workspace/storedLayoutFixtures.testing';
 import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 
 import type { ProjectSummaryDTO, ProjectWithWorkspaceDTO } from './api';
@@ -1082,6 +1084,7 @@ describe('durable project persistence', () => {
       };
       const aggregate: PersistenceAggregatePort = {
         assignProjectBoard: () => {},
+        releaseHeldLayouts: () => {},
         getPersistedRevision: () => revision,
         getState: () => state,
         hydrate: (next) => {
@@ -1613,6 +1616,89 @@ describe('durable project persistence', () => {
     expect(api.records.get(project.id)?.name).toBe('safe server edit');
   });
 
+  it('saves a project loaded with a layout stored before the split once the editor migrates it, workspace only', async () => {
+    const owner = captureAccountScope();
+    const api = createApi();
+    const project = asStoredBeforeSplit(createDraftProject([]), viewOnlyLayouts['resized and collapsed']);
+    const record = toSplitRecord(project);
+    api.records.set(project.id, record);
+    vi.mocked(api.loadSession).mockResolvedValue({
+      account: createInitialWorkbenchState().account,
+      activeProjectId: project.id,
+      openProjectIds: [project.id],
+    });
+    const service = createService(owner, api);
+
+    expect(record.workspace?.data).toMatchObject({ documentSchemaVersion: 4, widgetRegions: expect.any(Object) });
+
+    const loaded = await service.loadWorkbench();
+
+    // Pending, so the runtime saves the migration the hydration makes without waiting for an edit.
+    expect(loaded.state.projects[0]?.legacyLayout).toBeDefined();
+    expect(service.hasPendingChanges()).toBe(true);
+
+    const hydrated = workbenchReducer(createInitialWorkbenchState(), { state: loaded.state, type: 'hydrateWorkbench' });
+
+    await service.saveWorkbench(hydrated);
+
+    expect(api.updateProject).not.toHaveBeenCalled();
+    const saved = api.records.get(project.id)?.workspace?.data;
+
+    expect(saved).toMatchObject({
+      documentSchemaVersion: 5,
+      views: { compose: { collapsed: { right: true }, sizes: { left: 600 } } },
+      workspaceId: 'compose',
+    });
+    for (const field of ['floatingWidgets', 'layout', 'presetWorkingLayouts', 'widgetRegions']) {
+      expect(saved).not.toHaveProperty(field);
+    }
+
+    const reloaded = await createService(owner, api).loadWorkbench();
+
+    expect(reloaded.state.projects[0]?.legacyLayout).toBeUndefined();
+    expect(reloaded.state.projects[0]?.views).toEqual(hydrated.projects[0]?.views);
+  });
+
+  it('writes no project in the new shape before the session carrying its adoption is saved', async () => {
+    const owner = captureAccountScope();
+    const api = createApi();
+    const project = asStoredBeforeSplit(createDraftProject([]), structuralLayouts['removed a widget']);
+    api.records.set(project.id, toSplitRecord(project));
+    // An account from before the split: its first load adopts the project's arrangement.
+    vi.mocked(api.loadSession).mockResolvedValue({
+      account: { activeLayoutPresetId: 'compose' },
+      activeProjectId: project.id,
+      openProjectIds: [project.id],
+    });
+    vi.mocked(api.saveSession).mockRejectedValue(new Error('offline'));
+    const hydrate = async () =>
+      workbenchReducer(createInitialWorkbenchState(), {
+        state: (await createService(owner, api).loadWorkbench()).state,
+        type: 'hydrateWorkbench',
+      });
+    const hydrated = await hydrate();
+    const service = createService(owner, api);
+
+    await service.loadWorkbench();
+    const failed = await service.saveWorkbench(hydrated);
+
+    expect(failed.accountSaved).toBe(false);
+    expect(api.records.get(project.id)?.workspace?.data).toMatchObject({
+      documentSchemaVersion: 4,
+      widgetRegions: expect.any(Object),
+    });
+    // The next load adopts again, the same way.
+    expect((await hydrate()).account).toEqual(hydrated.account);
+
+    vi.mocked(api.saveSession).mockResolvedValue(undefined);
+    const saved = await service.saveWorkbench(hydrated);
+    const released = workbenchReducer(hydrated, { type: 'releaseHeldLayouts' });
+
+    expect(saved.accountSaved).toBe(true);
+    await service.saveWorkbench(released);
+    expect(api.records.get(project.id)?.workspace?.data).toMatchObject({ documentSchemaVersion: 5 });
+  });
+
   it('rewrites a loaded legacy project once in the current document schema', async () => {
     const owner = captureAccountScope();
     const api = createApi();
@@ -1637,7 +1723,7 @@ describe('durable project persistence', () => {
     expect(vi.mocked(api.updateProject).mock.calls[0]![1]).toMatchObject({
       data: { documentSchemaVersion: 4 },
       minimum_document_schema_version: 4,
-      workspace: { data: { documentSchemaVersion: 4 }, expected_revision: null },
+      workspace: { data: { documentSchemaVersion: 5 }, expected_revision: null },
     });
     expect(api.saveProjectWorkspace).not.toHaveBeenCalled();
     expect(api.records.get(project.id)).toMatchObject({
@@ -2689,7 +2775,7 @@ describe('splitting a project the server holds whole', () => {
     expect(api.records.get(project.id)).toMatchObject({
       minimum_document_schema_version: 4,
       name: 'Renamed',
-      workspace: { data: { documentSchemaVersion: 4, settings: loaded.settings }, revision: 1 },
+      workspace: { data: { documentSchemaVersion: 5, settings: loaded.settings }, revision: 1 },
     });
   });
 });
@@ -2813,7 +2899,7 @@ describe('saving a conflicted draft as a new project', () => {
     expect(vi.mocked(api.createProject).mock.calls[0]![0]).toMatchObject({
       data: { documentSchemaVersion: 4 },
       minimum_document_schema_version: 4,
-      workspace: { documentSchemaVersion: 4, settings: local.settings },
+      workspace: { documentSchemaVersion: 5, settings: local.settings },
     });
     expect(api.saveProjectWorkspace).not.toHaveBeenCalled();
     expect(api.records.get(copy.targetProjectId)?.workspace).toMatchObject({

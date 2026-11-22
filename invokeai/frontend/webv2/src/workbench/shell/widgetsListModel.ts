@@ -1,13 +1,10 @@
 import type { WidgetRegion } from '@workbench/layoutContracts';
 import type { NormalizedWidgetManifest, RegisteredWidget, WidgetInstanceId } from '@workbench/widgetContracts';
 import type { WidgetPlacementProject } from '@workbench/widgetPlacementCommands';
+import type { LayoutAvailability } from '@workbench/workspace/resolveLayout';
 
-import {
-  canRenderWidgetInRegion,
-  DEFAULT_ADD_REGIONS,
-  getEnabledCenterViewCount,
-  isStatusChipWidget,
-} from '@workbench/widgetPlacementCommands';
+import { canRenderWidgetInRegion, DEFAULT_ADD_REGIONS, isStatusChipWidget } from '@workbench/widgetPlacementCommands';
+import { takesLastCenterView } from '@workbench/workspace/structureReducer';
 
 /** Where a widget is, as the Widgets list says it: a docked region, a floating window, or nowhere in this layout. */
 export type WidgetsListPlacement = { kind: 'docked'; region: WidgetRegion } | { kind: 'floating' } | { kind: 'hidden' };
@@ -54,13 +51,14 @@ const findRegion = (project: WidgetPlacementProject, instanceId: WidgetInstanceI
 
 /** Placed instances first, then each widget type the layout lacks, so every widget can be brought back here. */
 export const getWidgetsListRows = ({
+  availability,
   getLabel,
-  getWidgetById,
   project,
   widgets,
 }: {
+  /** What marks the center's last view required (`takesLastCenterView`). */
+  availability: Pick<LayoutAvailability, 'getPresentation'>;
   getLabel: (manifest: NormalizedWidgetManifest) => string;
-  getWidgetById: (typeId: string) => RegisteredWidget | undefined;
   project: WidgetPlacementProject;
   /** Every widget this account can place, enabled ones only. */
   widgets: readonly RegisteredWidget[];
@@ -69,7 +67,6 @@ export const getWidgetsListRows = ({
     left.label.localeCompare(right.label) ||
     getPlacementRank(left) - getPlacementRank(right) ||
     (left.instanceId ?? '').localeCompare(right.instanceId ?? '');
-  const centerViewCount = getEnabledCenterViewCount(project, getWidgetById);
   const placed = Object.values(project.widgetInstances).flatMap((instance): WidgetsListRow[] => {
     const widget = widgets.find((candidate) => candidate.manifest.id === instance.typeId);
     const region = project.floatingPlacements?.[instance.id] ? undefined : findRegion(project, instance.id);
@@ -81,7 +78,7 @@ export const getWidgetsListRows = ({
     return [
       {
         instanceId: instance.id,
-        isRequired: region === 'center' && widget.manifest.centerPlacement !== 'toolbar' && centerViewCount === 1,
+        isRequired: region === 'center' && takesLastCenterView(project, instance.id, availability),
         label: instance.title ?? getLabel(widget.manifest),
         placement: region ? { kind: 'docked', region } : { kind: 'floating' },
         widget,

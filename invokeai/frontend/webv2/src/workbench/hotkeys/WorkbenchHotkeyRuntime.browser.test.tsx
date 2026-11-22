@@ -1,8 +1,8 @@
-/* oxlint-disable react-perf/jsx-no-new-object-as-prop */
 import type { ExtensionRegistry } from '@workbench/extensions/extensionRegistry';
 import type { Project } from '@workbench/projectContracts';
 import type { WidgetContributionSource } from '@workbench/widgetContracts';
-import type { WorkbenchInternalStore } from '@workbench/workbenchStore';
+/* oxlint-disable react-perf/jsx-no-new-object-as-prop */
+import type { WorkbenchInternalStore, WorkbenchSnapshot } from '@workbench/workbenchStore';
 
 import { ChakraProvider, createListCollection, Menu, Portal, Select } from '@chakra-ui/react';
 import { PromptTextarea } from '@features/generation/components';
@@ -26,6 +26,11 @@ const runtimeMocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@workbench/WorkbenchContext', () => ({
+  useActiveLayoutSelector: <Selected,>(selector: (layout: WorkbenchSnapshot['activeLayout']) => Selected) =>
+    selector(runtimeMocks.store.getSnapshot().activeLayout),
+  useWorkbenchSelector: <Selected,>(selector: (snapshot: WorkbenchSnapshot) => Selected) =>
+    selector(runtimeMocks.store.getSnapshot()),
+  useActiveWorkspaceId: () => runtimeMocks.store.getSnapshot().activeProject.workspaceId,
   useActiveProjectSelector: <Selected,>(selector: (project: Project) => Selected) =>
     selector(runtimeMocks.store.getSnapshot().activeProject),
   useOptionalWorkbenchExtensions: () => runtimeMocks.extensions,

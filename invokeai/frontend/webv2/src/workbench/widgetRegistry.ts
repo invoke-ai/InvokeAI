@@ -98,27 +98,19 @@ export const registeredWidgets = registerFirstPartyWidgets();
  * Admin widgets require a multi-user admin session; the route resolves session before mounting and remounts on user
  * changes.
  */
-const isWidgetAvailable = (widget: RegisteredWidget): boolean => {
-  if (!widget.manifest.requiresAdmin) {
-    return true;
-  }
-
+export const isAdminWidgetSession = (): boolean => {
   const session = getAuthSession();
 
   return session.multiuserEnabled && session.user?.is_admin === true;
 };
 
+const isWidgetAvailable = (widget: RegisteredWidget): boolean =>
+  !widget.manifest.requiresAdmin || isAdminWidgetSession();
+
 export const getWidgetsForRegion = (region: WidgetRegion): RegisteredWidget[] =>
   registeredWidgets.filter(
     (widget) =>
       widget.status !== 'hidden' && widget.manifest.allowedRegions.includes(region) && isWidgetAvailable(widget)
-  );
-
-/** Whether the center can show this type as its view: enabled, available to this session, and not a toolbar item. */
-export const isCenterViewType = (typeId: WidgetTypeId): boolean =>
-  getWidgetsForRegion('center').some(
-    (widget) =>
-      widget.manifest.id === typeId && widget.status === 'enabled' && widget.manifest.centerPlacement !== 'toolbar'
   );
 
 export const getWidgetHosts = (): RegisteredWidget[] =>

@@ -1,4 +1,4 @@
-import type { RegisteredWidget, WidgetManifest, WidgetTypeId, WorkbenchRegion } from '@workbench/widgetContracts';
+import type { WidgetManifest, WorkbenchRegion } from '@workbench/widgetContracts';
 /* oxlint-disable react-perf/jsx-no-new-object-as-prop */
 import type * as workbenchContext from '@workbench/WorkbenchContext';
 
@@ -14,7 +14,7 @@ import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const floatMocks = vi.hoisted(() => ({
-  centerInstanceIds: ['image-map-instance'] as string[],
+  centerInstanceIds: ['preview', 'image-map-instance'] as string[],
   float: vi.fn(),
   flushWorkbenchDrafts: vi.fn(),
 }));
@@ -25,13 +25,12 @@ vi.mock('@platform/react/draftRegistry', () => ({
 
 vi.mock('@workbench/WorkbenchContext', async (importOriginal) => ({
   ...(await importOriginal<typeof workbenchContext>()),
-  useActiveProjectSelector: (selector: (project: unknown) => unknown) =>
+  useActiveLayoutSelector: (selector: (layout: unknown) => unknown) =>
     selector({
-      id: 'project-1',
       widgetInstances: Object.fromEntries(
         floatMocks.centerInstanceIds.map((instanceId) => [
           instanceId,
-          { createdAt: 0, id: instanceId, state: { values: {} }, typeId: 'image-map' },
+          { id: instanceId, typeId: instanceId === 'image-map-instance' ? 'image-map' : 'preview' },
         ])
       ),
       widgetRegions: {
@@ -39,13 +38,7 @@ vi.mock('@workbench/WorkbenchContext', async (importOriginal) => ({
       },
     }),
   useWorkbenchCommands: () => ({ widgets: { float: floatMocks.float } }),
-}));
-
-vi.mock('@workbench/WorkbenchWidgetRegistryContext', () => ({
-  useWorkbenchWidgetRegistry: () => ({
-    getWidgetById: (typeId: WidgetTypeId) =>
-      ({ manifest: { id: typeId }, status: 'enabled' }) as unknown as RegisteredWidget,
-  }),
+  useWorkbenchQueries: () => ({ getAvailability: () => ({ getPresentation: () => 'view' }) }),
 }));
 
 import { rearrangeWithoutCustomizeInEachTest } from '@workbench/workspace/structureLock.testing';
@@ -96,7 +89,7 @@ const renderButton = async (region: WorkbenchRegion, allowFloating = true) => {
 };
 
 beforeEach(() => {
-  floatMocks.centerInstanceIds = ['image-map-instance'];
+  floatMocks.centerInstanceIds = ['preview', 'image-map-instance'];
   floatMocks.float.mockClear();
   floatMocks.flushWorkbenchDrafts.mockClear();
   focusFloating.mockClear();
@@ -135,5 +128,11 @@ describe('WidgetFloatButton', () => {
       floatMocks.float.mock.invocationCallOrder[0]
     );
     expect(focusFloating).toHaveBeenCalledWith('image-map-instance');
+  });
+
+  it('is not offered when floating would take the center’s last view', async () => {
+    floatMocks.centerInstanceIds = ['image-map-instance'];
+
+    expect(await renderButton('right')).toBeNull();
   });
 });

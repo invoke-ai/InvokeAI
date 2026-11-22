@@ -1,5 +1,4 @@
 import type { ResolvedValues } from '@platform/core/resolvedValues';
-import type { ProjectLayoutState } from '@workbench/layoutContracts';
 import type { Project } from '@workbench/projectContracts';
 import type { EffectiveProjectSettings } from '@workbench/settings/contracts';
 import type { WidgetInstanceId, WidgetTypeId } from '@workbench/widgetContracts';
@@ -15,6 +14,7 @@ import { createContext, use, useSyncExternalStore, useState, type ReactNode } fr
 import { useTranslation } from 'react-i18next';
 
 import type { ProjectPushOutcome } from './projects/projectFlush';
+import type { ResolvedLayout } from './workspace/resolveLayout';
 
 import { WorkbenchSplashScreen } from './components/WorkbenchSplashScreen';
 import { WorkbenchUnavailableScreen } from './components/WorkbenchUnavailableScreen';
@@ -289,10 +289,16 @@ export const useActiveProjectId = (): string => useWorkbenchSelector((snapshot) 
 
 export const useActiveProjectName = (): string => useActiveProjectSelector((project) => project.name);
 
-export const useActiveProjectLayoutSelector = <Selected,>(
-  selector: (layout: ProjectLayoutState) => Selected,
+/**
+ * A part of what the active project shows. The resolved layout keeps the identity of every part that did not change,
+ * so a selection of one region re-renders only when that region does.
+ */
+export const useActiveLayoutSelector = <Selected,>(
+  selector: (layout: ResolvedLayout) => Selected,
   isEqual?: EqualityFn<Selected>
-): Selected => useActiveProjectSelector((project) => selector(project.layout), isEqual);
+): Selected => useWorkbenchSelector((snapshot) => selector(snapshot.activeLayout), isEqual);
+
+export const useActiveWorkspaceId = (): string => useActiveProjectSelector((project) => project.workspaceId);
 
 /** The active project's settings with every layered flag resolved (pin, then the user's default, then built-in). */
 export const useActiveProjectSettingsSelector = <Selected,>(

@@ -35,7 +35,7 @@ import { describeCanvasInvocationFailure } from '@workbench/widgets/canvas/invok
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import { useWorkbenchCommands, useWorkbenchExtensions, useWorkbenchQueries } from '@workbench/WorkbenchContext';
 import { resolvePanelToggle } from '@workbench/workbenchState';
-import { CUSTOMIZE_WORKSPACE_COMMAND_ID } from '@workbench/workspace/structureLock';
+import { CUSTOMIZE_WORKSPACE_COMMAND_ID, RESET_WORKSPACE_VIEW_COMMAND_ID } from '@workbench/workspace/structureLock';
 import {
   goBackToPreviousWorkspace,
   goBackToStage,
@@ -82,9 +82,9 @@ export const FIRST_PARTY_APP_COMMAND_IDS = [
   'app.openCommandPalette',
   'app.openProjectSwitcher',
   'app.openSettings',
-  'app.saveLayoutPreset',
   ...layoutPresetCommands.map(({ id }) => id),
   CUSTOMIZE_WORKSPACE_COMMAND_ID,
+  RESET_WORKSPACE_VIEW_COMMAND_ID,
   'app.cancelQueueItem',
   'app.clearQueue',
   'app.selectGenerateTab',
@@ -104,7 +104,6 @@ export const FIRST_PARTY_APP_COMMAND_IDS = [
   'app.toggleRightPanel',
   'app.undoLayoutChange',
   'app.redoLayoutChange',
-  'app.resetPanelLayout',
   'app.togglePanels',
   'app.togglePreview',
   'app.backToStage',
@@ -291,17 +290,18 @@ export const useRegisterFirstPartyCommands = () => {
 
   /** Between the workflow's graph and its form, among the views this workspace places; it never leaves it. */
   const switchWorkflowView = () => {
-    const project = queries.getSnapshot().activeProject;
+    const { activeLayout: layout, activeProject: project } = queries.getSnapshot();
     const target = getFocusTarget();
     const graphRegions = ['center', 'bottom'] as const;
-    const isWorkflow = (instanceId: string) => project.widgetInstances[instanceId]?.typeId === 'workflow';
+    const isWorkflow = (instanceId: string) => layout.widgetInstances[instanceId]?.typeId === 'workflow';
     const placedIn = (region: 'center' | 'bottom' | 'left') =>
-      project.widgetRegions[region].instanceIds.find(isWorkflow);
+      layout.widgetRegions[region].instanceIds.find(isWorkflow);
     const visibleWorkflow = (region: 'center' | 'bottom' | 'left') => {
-      const { activeInstanceId, instanceIds, isCollapsed } = project.widgetRegions[region];
-      const panelOpen = region === 'center' || project.layout.panels[region === 'left' ? 'isLeftOpen' : 'isBottomOpen'];
+      const { activeInstanceId, instanceIds, isCollapsed } = layout.widgetRegions[region];
 
-      return panelOpen && !isCollapsed && instanceIds.includes(activeInstanceId) && isWorkflow(activeInstanceId)
+      return (region === 'center' || !isCollapsed) &&
+        instanceIds.includes(activeInstanceId) &&
+        isWorkflow(activeInstanceId)
         ? activeInstanceId
         : null;
     };
@@ -340,7 +340,7 @@ export const useRegisterFirstPartyCommands = () => {
     const graphRegion =
       graphRegions.find((region) => visibleWorkflow(region) !== null) ??
       graphRegions.find((region) => placedIn(region) !== undefined);
-    const floatingWorkflow = Object.keys(project.floatingWidgets ?? {}).find(isWorkflow);
+    const floatingWorkflow = Object.keys(layout.floatingWidgets ?? {}).find(isWorkflow);
 
     if (graphRegion) {
       showPlaced(graphRegion, visibleWorkflow(graphRegion) ?? placedIn(graphRegion)!);
@@ -355,7 +355,7 @@ export const useRegisterFirstPartyCommands = () => {
 
   const whenAvailable = (commandId: string, handler: () => unknown) => (): unknown =>
     runWorkspaceCommand(
-      { commands, queries },
+      { queries },
       { commandId, rearrangeWithoutCustomize: getWorkbenchPreferences().rearrangeWithoutCustomize },
       handler
     );
@@ -384,19 +384,15 @@ export const useRegisterFirstPartyCommands = () => {
             if (target?.kind !== 'region') {
               return;
             }
-            const project = queries.getSnapshot().activeProject;
+            const snapshot = queries.getSnapshot();
             const { region } = target;
-            const panels = project.layout.panels;
-            const isOpen =
-              region === 'center' ||
-              (region === 'left' ? panels.isLeftOpen : region === 'right' ? panels.isRightOpen : panels.isBottomOpen);
-            if (!isOpen || project.widgetRegions[region].isCollapsed) {
+            if (region !== 'center' && snapshot.activeLayout.widgetRegions[region].isCollapsed) {
               return;
             }
             const instanceId = cycleRegionWidget({
               direction,
               getWidgetsForRegion,
-              project: getWidgetPlacementProject(project),
+              project: getWidgetPlacementProject(snapshot),
               region,
               widgets,
             });
@@ -433,13 +429,6 @@ export const useRegisterFirstPartyCommands = () => {
         id: 'app.openSettings',
         title: 'Open settings',
       }),
-      commandApi.register({
-        handler: whenAvailable('app.saveLayoutPreset', () =>
-          layout.savePreset(queries.getSnapshot().activeProject.layout.presetId)
-        ),
-        id: 'app.saveLayoutPreset',
-        title: 'Save changes to the workspace',
-      }),
       ...layoutPresetCommands.map(({ id, presetId, title }) =>
         commandApi.register({ handler: whenAvailable(id, () => void layout.activatePreset(presetId)), id, title })
       ),
@@ -447,6 +436,13 @@ export const useRegisterFirstPartyCommands = () => {
         handler: whenAvailable(CUSTOMIZE_WORKSPACE_COMMAND_ID, () => startCustomizing({ commands, queries })),
         id: CUSTOMIZE_WORKSPACE_COMMAND_ID,
         title: 'Customize workspace',
+      }),
+      commandApi.register({
+        handler: whenAvailable(RESET_WORKSPACE_VIEW_COMMAND_ID, () =>
+          layout.resetWorkspaceView(queries.getSnapshot().activeProject.workspaceId)
+        ),
+        id: RESET_WORKSPACE_VIEW_COMMAND_ID,
+        title: 'Reset workspace view',
       }),
       // The queue menus' own actions: scoped like them, and confirming by the same rules.
       commandApi.register({
@@ -553,7 +549,7 @@ export const useRegisterFirstPartyCommands = () => {
       }),
       commandApi.register({
         handler: () => {
-          const toggle = resolvePanelToggle(queries.getSnapshot().activeProject.widgetRegions, ['left']);
+          const toggle = resolvePanelToggle(queries.getSnapshot().activeLayout.widgetRegions, ['left']);
 
           for (const region of toggle.regions) {
             layout.setRegionCollapsed(region, toggle.shouldCollapse);
@@ -564,7 +560,7 @@ export const useRegisterFirstPartyCommands = () => {
       }),
       commandApi.register({
         handler: () => {
-          const toggle = resolvePanelToggle(queries.getSnapshot().activeProject.widgetRegions, ['right']);
+          const toggle = resolvePanelToggle(queries.getSnapshot().activeLayout.widgetRegions, ['right']);
 
           for (const region of toggle.regions) {
             layout.setRegionCollapsed(region, toggle.shouldCollapse);
@@ -577,13 +573,8 @@ export const useRegisterFirstPartyCommands = () => {
       commandApi.register({ handler: () => layout.undo(), id: 'app.undoLayoutChange', title: 'Undo workspace change' }),
       commandApi.register({ handler: () => layout.redo(), id: 'app.redoLayoutChange', title: 'Redo workspace change' }),
       commandApi.register({
-        handler: whenAvailable('app.resetPanelLayout', layout.reset),
-        id: 'app.resetPanelLayout',
-        title: 'Revert workspace to saved',
-      }),
-      commandApi.register({
         handler: () => {
-          const toggle = resolvePanelToggle(queries.getSnapshot().activeProject.widgetRegions, [
+          const toggle = resolvePanelToggle(queries.getSnapshot().activeLayout.widgetRegions, [
             'left',
             'right',
             'bottom',

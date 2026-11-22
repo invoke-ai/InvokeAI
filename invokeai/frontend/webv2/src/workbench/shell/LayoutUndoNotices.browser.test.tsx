@@ -40,6 +40,7 @@ let stop: (() => void) | null = null;
 
 const store = () => workbench.store!;
 const activeProject = () => store().getSnapshot().activeProject;
+const activeLayout = () => store().getSnapshot().activeLayout;
 
 const toastNamed = (title: string): HTMLElement | null =>
   [...document.querySelectorAll<HTMLElement>('[data-part="root"][data-scope="toast"]')].find(
@@ -94,7 +95,7 @@ afterEach(async () => {
 describe('LayoutUndoNotices', () => {
   it('reports a removed widget with an Undo that puts it back, and keeps the notice in the center', async () => {
     const region = (['left', 'right'] as const).find((candidate) =>
-      activeProject().widgetRegions[candidate].instanceIds.includes('gallery')
+      activeLayout().widgetRegions[candidate].instanceIds.includes('gallery')
     )!;
 
     await act(() => store().commands.widgets.toggle({ region, widgetId: 'gallery' }));
@@ -107,7 +108,7 @@ describe('LayoutUndoNotices', () => {
     ).toContain('Gallery removed');
     await act(() => toast.querySelector<HTMLButtonElement>('button:not([data-part="close-trigger"])')!.click());
 
-    expect(activeProject().widgetRegions[region].instanceIds).toContain('gallery');
+    expect(activeLayout().widgetRegions[region].instanceIds).toContain('gallery');
   });
 
   it('reports a preset switch as a toast only, saying where Invoke now runs when the switch moved it', async () => {
@@ -125,12 +126,12 @@ describe('LayoutUndoNotices', () => {
     ).not.toContain('Switched to Workflow');
 
     await act(() => toast.querySelector<HTMLButtonElement>('button:not([data-part="close-trigger"])')!.click());
-    expect(activeProject().layout.presetId).toBe('compose');
+    expect(activeProject().workspaceId).toBe('compose');
   });
 
   it('withdraws the toast once its step is undone by the layout undo command', async () => {
     const region = (['left', 'right'] as const).find((candidate) =>
-      activeProject().widgetRegions[candidate].instanceIds.includes('gallery')
+      activeLayout().widgetRegions[candidate].instanceIds.includes('gallery')
     )!;
 
     await act(() => store().commands.widgets.toggle({ region, widgetId: 'gallery' }));
@@ -138,12 +139,12 @@ describe('LayoutUndoNotices', () => {
     await act(() => store().commands.layout.undo());
 
     await expect.poll(() => toastNamed('Gallery removed')?.getAttribute('data-state') ?? 'gone').not.toBe('open');
-    expect(activeProject().widgetRegions[region].instanceIds).toContain('gallery');
+    expect(activeLayout().widgetRegions[region].instanceIds).toContain('gallery');
   });
 
   it('withdraws the toast once another step lands on top, so its Undo cannot take that work with it', async () => {
     const region = (['left', 'right'] as const).find((candidate) =>
-      activeProject().widgetRegions[candidate].instanceIds.includes('gallery')
+      activeLayout().widgetRegions[candidate].instanceIds.includes('gallery')
     )!;
 
     await act(() => store().commands.widgets.toggle({ region, widgetId: 'gallery' }));

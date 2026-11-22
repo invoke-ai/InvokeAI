@@ -23,6 +23,11 @@ vi.mock('@workbench/WorkbenchContext', () => {
   ) => useExternalStoreSelector(store.subscribe, store.getSnapshot, selector, isEqual);
 
   return {
+    useActiveWorkspaceId: () => useWorkbenchSelector((snapshot) => snapshot.activeProject.workspaceId),
+    useActiveLayoutSelector: <Selected,>(
+      selector: (layout: WorkbenchSnapshot['activeLayout']) => Selected,
+      isEqual?: Equality<Selected>
+    ) => useWorkbenchSelector((snapshot) => selector(snapshot.activeLayout), isEqual),
     useActiveProjectSelector: <Selected,>(
       selector: (project: WorkbenchSnapshot['activeProject']) => Selected,
       isEqual?: Equality<Selected>
@@ -42,8 +47,8 @@ vi.mock('@workbench/WorkbenchContext', () => {
 
 vi.mock('@workbench/layoutPresetActivation', async (importOriginal) => ({
   ...(await importOriginal<typeof LayoutPresetActivationModule>()),
-  loadLayoutPresetWidgets: () => Promise.resolve(),
-  preloadLayoutPresetWidgets: () => undefined,
+  loadLayoutWidgets: () => Promise.resolve(),
+  preloadLayoutWidgets: () => undefined,
 }));
 
 vi.mock('@workbench/hotkeys/useShortcutBinding', () => ({
@@ -77,7 +82,7 @@ let root: Root | null = null;
 const bar = () => document.querySelector<HTMLElement>('[data-customize-bar]');
 const composeTab = () => document.querySelector<HTMLElement>('[role="tab"][data-layout-preset-id="compose"]');
 const snapshot = () => store.getSnapshot();
-const rightRail = () => snapshot().activeProject.widgetRegions.right.instanceIds;
+const rightRail = () => snapshot().activeLayout.widgetRegions.right.instanceIds;
 const removeQueue = () => act(() => store.commands.widgets.toggle({ region: 'right', widgetId: 'queue' }));
 const rename = async (name: string) => {
   const input = page.getByRole('textbox', { name: 'Workspace name' });
@@ -207,7 +212,8 @@ describe('Customize bar', () => {
   });
 
   it('returns focus to the active tab when the workspace being customized is deleted', async () => {
-    await act(() => store.commands.layout.createPreset('mine', 'Mine'));
+    await act(() => store.commands.layout.beginCustomize({ defaultRoute: null, id: 'mine', label: 'Mine' }));
+    await act(() => store.commands.layout.finishCustomize());
     await act(() =>
       userEvent.click(document.querySelector<HTMLElement>('[role="tab"][data-layout-preset-id="mine"]')!, {
         button: 'right',
@@ -220,6 +226,28 @@ describe('Customize bar', () => {
 
     expect(bar()).toBeNull();
     await expect.poll(() => document.activeElement).toBe(composeTab());
+  });
+
+  it('drafts New workspace with its name focused: Cancel adds no tab and Done adds one, the project on it', async () => {
+    const tabCount = () => document.querySelectorAll('[role="tab"][data-layout-preset-id]').length;
+    const name = page.getByRole('textbox', { name: 'Workspace name' });
+    const account = snapshot().account;
+
+    await act(() => page.getByRole('button', { name: 'New workspace' }).click());
+    await expect.poll(() => document.activeElement).toBe(name.element());
+    await expect.element(name).toHaveValue('Compose copy');
+    await act(() => page.getByRole('button', { name: 'Cancel' }).click());
+
+    expect(snapshot().account).toBe(account);
+    expect(tabCount()).toBe(4);
+
+    await act(() => page.getByRole('button', { name: 'New workspace' }).click());
+    await rename('Review');
+    await act(() => page.getByRole('button', { name: 'Done' }).click());
+
+    expect(tabCount()).toBe(5);
+    await expect.element(page.getByRole('tab', { name: 'Review' })).toHaveAttribute('aria-selected', 'true');
+    expect(snapshot().account.layoutPresetOverrides?.compose).toBeUndefined();
   });
 
   it('keeps Cancel and Done in view in a narrow window, with a cue for the controls scrolled away', async () => {

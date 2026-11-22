@@ -7,13 +7,10 @@ import {
   graphWidgetSources,
 } from './graphWidgets';
 import { getSourceIdForWidgetTypeId, getWidgetTypeIdForSourceId, isGraphWidgetTypeId } from './invocationSources';
-import { createInitialWorkbenchState, workbenchReducer } from './workbenchState.testing';
+import { createInitialWorkbenchState, getLayoutOf, workbenchReducer } from './workbenchState.testing';
 
-const applyPreset = (presetId: string) => {
-  const state = workbenchReducer(createInitialWorkbenchState(), { presetId, type: 'applyPreset' });
-
-  return state.projects.find((candidate) => candidate.id === state.activeProjectId)!;
-};
+const applyPreset = (presetId: string) =>
+  getLayoutOf(workbenchReducer(createInitialWorkbenchState(), { presetId, type: 'applyPreset' }));
 
 describe('graph widget sources', () => {
   it('recognises only the graph-bearing widget types', () => {
@@ -53,7 +50,7 @@ describe('graph widget sources', () => {
   it('counts a floated widget as both visible and placed', () => {
     let state = workbenchReducer(createInitialWorkbenchState(), { presetId: 'edit', type: 'applyPreset' });
     state = workbenchReducer(state, { instanceId: 'upscale', type: 'floatWidget' });
-    const project = state.projects.find((candidate) => candidate.id === state.activeProjectId)!;
+    const project = getLayoutOf(state);
 
     expect(project.floatingWidgets?.upscale).toBeDefined();
     expect(getVisibleWidgetTypeIds(project).has('upscale')).toBe(true);

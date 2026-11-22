@@ -5,7 +5,7 @@ import { MissingWidgetFrame, WidgetRendererById } from '@workbench/widget-frame'
 import { areWidgetRenderInstancesEqual } from '@workbench/widget-frame/widgetRenderInstance';
 import { resolveWidgetLabel } from '@workbench/widgetLabels';
 import { getWidgetById } from '@workbench/widgetRegistry';
-import { useActiveProjectId, useActiveProjectSelector } from '@workbench/WorkbenchContext';
+import { useActiveLayoutSelector, useActiveProjectId, useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import { Activity } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -29,8 +29,8 @@ export const RightPanel = ({ instanceId }: { instanceId: WidgetInstanceId }) => 
 /** Keeps shown panels mounted to preserve scroll, selection and virtualization across presets. */
 export const WidgetPanelSlot = ({ instanceId, region }: { instanceId: WidgetInstanceId; region: PanelRegion }) => {
   const projectId = useActiveProjectId();
-  const activeIdsElsewhere = useActiveProjectSelector(
-    (project) => getActiveInstanceIdsOutside(project.widgetRegions, region, project.floatingWidgets),
+  const activeIdsElsewhere = useActiveLayoutSelector(
+    (layout) => getActiveInstanceIdsOutside(layout.widgetRegions, region, layout.floatingWidgets),
     areInstanceIdListsEqual
   );
   const mountedIds = withoutInstancesShownElsewhere(

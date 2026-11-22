@@ -7,12 +7,18 @@ import { describe, expect, it } from 'vitest';
 import type { OpenIntent } from './openIntent';
 import type { ResolveOpenContext, WorkspaceCandidate } from './resolveOpen';
 
+import { registryAvailability } from './layoutFixtures.testing';
+import { getRegionPresentation } from './registryAvailability';
+import { resolveLayout } from './resolveLayout';
 import { resolveOpen } from './resolveOpen';
-import { createWorkspaceCandidate, getRegionPresentation } from './workspaceNavigation';
+import { createWorkspaceCandidate } from './workspaceNavigation';
 
 const presentation = getRegionPresentation(getWidgetsForRegion);
 
-const builtIns: WorkspaceCandidate[] = layoutPresets.map((preset) => createWorkspaceCandidate(preset, preset.snapshot));
+// What a project with no view of them sees: each built-in's structure, resolved.
+const builtIns: WorkspaceCandidate[] = layoutPresets.map((preset) =>
+  createWorkspaceCandidate(preset, resolveLayout(preset.snapshot, undefined, registryAvailability))
+);
 
 const resolveFrom = (
   workspaceId: string,
@@ -51,7 +57,6 @@ const customWorkspace = (
 
   const arrangement = {
     floatingWidgets: Object.fromEntries(floating.map((typeId) => [typeId, {}])),
-    layout: { panels: { isBottomOpen: true, isLeftOpen: true, isRightOpen: true } },
     widgetInstances: Object.fromEntries(typeIds.map((typeId) => [typeId, { typeId }])),
     widgetRegions: {
       bottom: region(regions.bottom),

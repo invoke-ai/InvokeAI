@@ -39,6 +39,7 @@ const snapshot = (state: WorkbenchState, savedAt = '2026-07-17T00:00:00.000Z'): 
 });
 
 const saveResult = (state: WorkbenchState, savedAt?: string): WorkbenchSaveResult => ({
+  accountSaved: true,
   awaitsDecision: false,
   conflicts: [],
   error: null,
@@ -92,6 +93,9 @@ const createAggregate = (initialState = createInitialWorkbenchState()) => {
     },
     getPersistedRevision: () => revision,
     getState: () => state,
+    releaseHeldLayouts: () => {
+      events.push('releaseHeldLayouts');
+    },
     hydrate: (nextState) => {
       state = structuredClone(nextState);
       revision += 1;
@@ -381,6 +385,36 @@ describe('Workbench persistence runtime', () => {
     clock.runAll();
     await flushPromises();
     expect(persistence.saveWorkbench).toHaveBeenCalledTimes(2);
+  });
+
+  it('releases projects held for adoption only once a save has written the account', async () => {
+    const aggregate = createAggregate();
+    const { persistence } = createPersistence(() => Promise.resolve(null));
+    vi.mocked(persistence.saveWorkbench)
+      .mockResolvedValueOnce({
+        ...saveResult(aggregate.state),
+        accountSaved: false,
+        hasPendingChanges: true,
+        hasRetryablePendingChanges: true,
+      })
+      .mockResolvedValueOnce(saveResult(aggregate.state));
+    const clock = new FakeClock();
+    const runtime = createWorkbenchPersistenceRuntime({ aggregate: aggregate.port, clock, persistence });
+
+    runtime.start();
+    await flushPromises();
+    aggregate.edit();
+    clock.runAll();
+    await flushPromises();
+
+    expect(persistence.saveWorkbench).toHaveBeenCalledOnce();
+    expect(aggregate.events).not.toContain('releaseHeldLayouts');
+
+    clock.runAll();
+    await flushPromises();
+
+    expect(persistence.saveWorkbench).toHaveBeenCalledTimes(2);
+    expect(aggregate.events.filter((event) => event === 'releaseHeldLayouts')).toHaveLength(1);
   });
 
   it('ignores server outcomes once its account lifetime has ended', async () => {

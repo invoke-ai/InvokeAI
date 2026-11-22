@@ -22,8 +22,8 @@ Hover over a numbered circle, or tap it on a touchscreen, for a short descriptio
 | --- | --- | --- |
 | 1 | **App menu** | Links to the Launchpad, **Settings** and the command palette, then Projects, the Model Manager, Fonts, the Queue, **Widgets…** and help. The search button beside the project switcher also opens the command palette. |
 | 2 | **Project switcher** | Shows the active project and switches between projects. See [Working with Projects](/users-guide/projects/introduction/). |
-| 3 | **Workspace tabs** | One tab per workspace. With [Rearrange without Customize](#rearrange-without-customize) on, a dot on a tab's icon means that workspace's arrangement in this project differs from the saved one. The active tab's arrow opens the workspace menu, with **Customize**. While you customize, the Customize bar takes the tabs' place. When there are more tabs than fit, the row fades at its edge and an arrow scrolls to the rest. |
-| 4 | **New workspace** | Copies the workspace you are on into a new one and opens Customize on it. |
+| 3 | **Workspace tabs** | One tab per workspace. The active tab's arrow opens the workspace menu, with **Customize** and **Reset view**. While you customize, the Customize bar takes the tabs' place. When there are more tabs than fit, the row fades at its edge and an arrow scrolls to the rest. |
+| 4 | **New workspace** | Opens Customize on a copy of what is on screen. The new workspace exists once you press **Done**. |
 | 5 | **Invoke controls** | The number of iterations and the **Invoke** button. Its card, shown on hover, sets the route: where the settings come from and where results go. See [When Invoke is blocked](#when-invoke-is-blocked). |
 | 6 | **Rails** | A strip of icons down each edge of the window, one icon per panel placed on that side. |
 | 7 | **Rail menu (…)** | In Customize, adds panels to a rail or removes them. **Widgets…** at its foot lists every panel. |
@@ -91,7 +91,7 @@ The status bar along the bottom holds small chips. Hover over **Server Status**,
 
 A window remembers where it was. Dock or remove a floating panel and float it again later, and it reopens at the same position and size.
 
-If the panel you float was also the only view in the center, the center shows where it went, with **Show window** and, in Customize, a dock button. Docking or removing the window gives the center its view back.
+The center's only view can't float: the center always keeps one view docked.
 
 A floating Preview is handy in the **Edit** workspace: keep the canvas in the center and watch results in a small window beside your work.
 
@@ -152,17 +152,17 @@ On a touchscreen, press and hold an icon briefly before dragging.
 | <kbd>F</kbd> | Collapse or expand all side and bottom panels at once, for a clear view of the center |
 | <kbd>Z</kbd> | Swap the Preview into or out of the center |
 | <kbd>Esc</kbd> | With the center focused, go back to the workspace's main view |
-| <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Z</kbd> | Undo the last workspace change: adding, removing, moving or resizing a panel, floating or docking a window, a workspace switch, a revert, a route change |
+| <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Z</kbd> | Undo the last workspace change: adding, removing, moving or resizing a panel, floating or docking a window, a workspace switch, a route change |
 | <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> | Redo the workspace change you undid |
 | <kbd>Alt</kbd>+<kbd>1</kbd> to <kbd>Alt</kbd>+<kbd>4</kbd> | Switch to the Compose, Edit, Video or Workflow workspace; on the active workspace, return to its main view |
 
 On macOS, use <kbd>Cmd</kbd> in place of <kbd>Ctrl</kbd>. These shortcuts don't fire while you are typing in a text field. You can change any of them; see [Hotkeys](/users-guide/workbench/hotkeys/).
 
-Workspace undo only moves panels, windows and routing back. What you typed or set inside a panel since then, such as a prompt, stays as it is, and a panel the undo takes out of the workspace keeps its settings for when you add it again. The **Undo** in a workspace notice works while that change is still your latest; after another workspace change, or once you have undone it with the shortcut, the notice goes away. Customize starts and ends with a fresh history, so an undo never reaches back across **Done** or **Cancel**.
+Workspace undo only moves panels, windows and routing back. What you typed or set inside a panel since then, such as a prompt, stays as it is, and a panel the undo takes out of the workspace keeps its settings for when you add it again. The **Undo** in a workspace notice works while that change is still your latest; after another workspace change, or once you have undone it with the shortcut, the notice goes away. Workspaces are shared, so if a workspace changed after your step (in another project, or in Customize), undoing it puts back only how this project looks at it, and a notice says so. Customize keeps its own history, which also steps through the name, icon and route you change and **Reset to default**; it starts and ends with Customize, so an undo never reaches back across **Done** or **Cancel**.
 
 ## Workspaces
 
-A **workspace** is a place for one kind of work: a saved arrangement of panels. The tabs in the middle of the top bar switch between them, so you can move from generating to canvas editing to building workflows without rearranging anything by hand.
+A **workspace** is a place for one kind of work, with its own arrangement of panels, shared by every project. The tabs in the middle of the top bar switch between them, so you can move from generating to canvas editing to building workflows without rearranging anything by hand.
 
 ### Built-in workspaces
 
@@ -181,11 +181,13 @@ New projects open with Compose unless you choose a different starting point when
 
 ### Switching workspaces
 
-Click a workspace's tab, or press <kbd>Alt</kbd>+<kbd>1</kbd> to <kbd>Alt</kbd>+<kbd>4</kbd> for the built-in workspaces. Switching changes only the arrangement: every panel keeps its contents, so a half-written prompt or a scrolled gallery is exactly as you left it. A short notice confirms the switch with **Undo**, and says so when the switch changed what **Invoke** runs or where results go.
+Click a workspace's tab, or press <kbd>Alt</kbd>+<kbd>1</kbd> to <kbd>Alt</kbd>+<kbd>4</kbd> for the built-in workspaces. Switching changes only the arrangement: every panel keeps its contents, so a half-written prompt or a scrolled gallery is exactly as you left it. A short notice confirms the switch with **Undo**, and says so when the switch changed what **Invoke** runs or where results go. On a tab that isn't active, the tab's menu also offers **Switch to this workspace**.
 
 Arriving in a workspace always puts its job on screen. The center shows the workspace's main view, even if you left it on another one; the panel **Invoke** runs from comes to the front of its rail, so Video shows the Video panel even if you last looked at Upscale there; and **Invoke** is aimed at it, unless you locked the route. Everything else stays as you left it: panel sizes, collapsed panels (a panel brought to the front of a collapsed rail stays collapsed), the other rails and floating windows. The first time a project comes to the front after Invoke loads does the same, whether you opened it or it was restored with the others after a reload; switching back to a project you have already looked at since then shows it as you left it.
 
 Click the active workspace's tab, or press its shortcut, to go home: the same reset of what is in front, without changing the arrangement and without a notice.
+
+**Reset view**, in any workspace tab's menu and in the command palette for the workspace you are on, goes further: this project forgets how it looked at that workspace, so every panel in front, size, collapsed panel and window position is the workspace's own again. It is one step **Undo** takes back. When the project already shows the workspace as it is set up, the item is unavailable and says so.
 
 When the window is narrow, the tabs show only their icons. Hover over one to see its name.
 
@@ -195,21 +197,21 @@ Anything you open goes to where it lives. **Edit image on Canvas** from Compose 
 
 ### Customizing a workspace
 
-Workspaces are locked. In normal use you can switch views, bring a panel to the front, collapse or resize panels, and move, resize, collapse or maximize floating windows. Adding, removing, moving, floating or docking panels, and renaming, reordering or deleting workspaces, change the workspace itself, so they happen in **Customize**. A shortcut for one of them, such as **Save changes to the workspace**, shows a notice with a **Customize** button instead.
+Workspaces are locked. In normal use you can switch views, bring a panel to the front, collapse or resize panels, and move, resize, collapse or maximize floating windows. Adding, removing, moving, floating or docking panels, and renaming, reordering or deleting workspaces, change the workspace itself, so they happen in **Customize**.
 
 To customize the workspace you are on, choose **Customize** from its tab's menu (click the arrow on the active tab, or right-click it), **Customize workspace** from the app menu, or the same command in the command palette. The **Customize bar** takes the place of the tabs and focus moves to it. The rails, the status bar, the center view menu and floating windows show their menus, drag handles and remove buttons. The bar holds:
 
 - the workspace's **name** and **icon**;
 - its **route**: **Auto**, where Invoke runs the first source the workspace brings to the front, or a chosen source and destination. A built-in workspace always has a route;
-- **Undo** and **Redo** for the changes you make while customizing;
+- **Undo** and **Redo** for every change you make while customizing, in order: panels, what is in front, sizes, the name, icon and route, and a reset;
 - **Widgets**, the list of every panel;
-- **Reset to default**, for a built-in workspace you have changed: its arrangement, name, icon and route go back to the ones Invoke ships when you press **Done**; **Cancel** keeps your version;
-- **Save as new workspace**, which keeps your changes in a new workspace and goes on customizing it, leaving the original as it was saved;
-- **Manage workspaces**, to reorder the tabs, reset a built-in or delete a workspace you made;
-- **Cancel**, which puts the panels back as they were when you started customizing and drops the name, icon and route you changed;
-- **Done**, which saves the name, icon and route, and the arrangement if you changed it while customizing.
+- **Reset to default**, while a built-in workspace differs from the one Invoke ships: the shipped arrangement, name, icon and route take the place of yours. It is a change like any other: **Undo** takes it back, **Done** saves it, removing your changes to that built-in, and **Cancel** keeps your version;
+- **Save as new workspace**, which goes on customizing your changes so far as a new workspace and leaves the one you started from exactly as it was. Its name field takes focus with a name such as *Compose copy*;
+- **Manage workspaces**, to reorder the tabs, reset another built-in or delete a workspace you made;
+- **Cancel**, which drops everything you changed in the bar and the panels: they are back as they were when you started customizing, with the same name, icon and route. What you did in **Manage workspaces** (reordering tabs, deleting a workspace, resetting another built-in) takes effect at once and stays;
+- **Done**, which saves your changes in one step. A notice confirms it with **Undo**, which puts the workspace back as it was before you customized it, as long as nothing has changed it since.
 
-When **Done** saves the arrangement, whatever each rail, the status bar and the center show at the front is what they show when you arrive in the workspace; the center's view becomes the workspace's main view. The center always keeps at least one view. After **Done** or **Cancel**, focus returns to where you started Customize, or to the workspace's tab.
+Nothing you change while customizing is saved before **Done**. When **Done** saves the arrangement, whatever each rail, the status bar and the center show at the front is what they show when you arrive in the workspace; the center's view becomes the workspace's main view. The center always keeps at least one view: Customize never offers to remove or float its last one. After **Done** or **Cancel**, focus returns to where you started Customize, or to the workspace's tab.
 
 Invoke keeps working while you customize, and you can switch projects; coming back to the project shows the Customize bar again. Switching workspaces waits for **Done** or **Cancel**: anything you open meanwhile comes to the front here, or offers to add it to this workspace.
 
@@ -217,44 +219,39 @@ Changes to a built-in workspace replace the original for your account only, and 
 
 ### Rearrange without Customize
 
-If you rearrange panels all the time, turn on **Rearrange without Customize** under **Workspaces & data** in Settings. Every menu, drag and remove button then works in normal use, as in earlier versions of Invoke: each change is a step you can undo, a dot on the tab marks unsaved changes, and the workspace menu offers **Save changes**, **Revert to saved**, **Delete workspace…** and **Manage workspaces**. You can also reorder the tabs by dragging them in the top bar; with the keyboard, focus a tab, press <kbd>Space</kbd>, move it with the arrow keys, and press <kbd>Space</kbd> again to drop it. The Customize bar is still there when you want it. Turning the setting off clears the list of workspace changes **Undo** can step back through, so an undo never moves panels in a locked workspace.
+If you rearrange panels all the time, turn on **Rearrange without Customize** under **Workspaces & data** in Settings. Every menu, drag and remove button then works in normal use, as in earlier versions of Invoke: each change is a step you can undo and changes the workspace itself, for all of your projects, and the workspace menu offers **Delete workspace…** and **Manage workspaces**. You can also reorder the tabs by dragging them in the top bar; with the keyboard, focus a tab, press <kbd>Space</kbd>, move it with the arrow keys, and press <kbd>Space</kbd> again to drop it. The Customize bar is still there when you want it. Turning the setting off clears the list of workspace changes **Undo** can step back through, so an undo never moves panels in a locked workspace.
 
 Accounts that used Invoke before workspaces could be locked keep this setting on, and see a notice once offering **Lock workspaces** or **Keep rearranging**. New accounts start locked.
 
-### Unsaved changes
+### How each project looks at a workspace
 
-With **Rearrange without Customize** on, when a workspace's arrangement in this project differs from its saved one, its tab shows a dot on its icon; hover over or focus the tab to see **Unsaved changes**. Locked workspaces show no dot: switching views, resizing and collapsing panels change nothing you would save. Nothing is lost if you switch away: each workspace keeps the arrangement you left it in, floating windows included, and switching back brings that arrangement back, so several workspaces can have unsaved changes at once. These working arrangements belong to the project and are saved with it; other projects open each workspace as it was saved.
+A workspace is the same in every project: which panels it has and where. Each project remembers only how it looks at each workspace: the panel in front in each rail and in the center, panel sizes, collapsed panels, and where its floating windows sit and whether they are maximized or collapsed. Switching projects brings those back without changing the workspace, and none of it is a change you would save. When **Done** saves an arrangement, what is in front, the sizes, collapsed panels and window positions become the workspace's own, and projects that have not changed them show them that way.
 
-With **Rearrange without Customize** on, the workspace menu also offers:
+Projects saved by earlier versions of Invoke kept a whole arrangement each. The first time you open Invoke after updating, the arrangements in the project you used most recently become your workspaces'. In other projects, a workspace arranged differently from that keeps its sizes and the panels in front, while panels that project moved, added, removed or floated are dropped. The first time you look at such a project, even after reloading, a notice says which workspaces changed and offers **Customize** on the first of them. A project that only kept a workspace as it was is not told anything.
 
-- **Save changes**, which stores the arrangement in the workspace, so it opens that way from now on. On a tab that isn't active, it saves the arrangement that workspace was left in without switching to it.
-- **Revert to saved**, which puts the panels back as the workspace saved them. On a tab that isn't active, it forgets that workspace's unsaved arrangement. Either way, **Undo** in the notice, or <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Z</kbd>, brings the arrangement back.
-
-On a tab that isn't active, **Switch to this workspace** switches to it.
+After updating, projects you save can no longer be opened by an earlier version of Invoke: it lists them as projects it cannot open, and leaves them as they are.
 
 ### Making your own workspace
 
-1. Click the **+** button to the right of the tabs (**New workspace**). It copies the workspace you are on, floating windows and their positions included, switches to the copy and opens Customize on it.
+1. Click the **+** button to the right of the tabs (**New workspace**). Customize opens on a copy of what is on screen, floating windows and their positions included, with the name field focused and a name such as *Compose copy* in it.
 2. In the Customize bar, give it a **name** and an **icon** for its tab, and choose its **route**.
 3. Arrange the panels the way you like them.
 4. Click **Done**.
 
-The new workspace gets a tab at the end of the row; the workspace you started from keeps its saved arrangement. **Cancel** keeps the copy as it was made.
+The new workspace exists from **Done**: it gets a tab at the end of the row and the project moves onto it. The workspace you started from is unchanged. **Cancel** leaves no new workspace behind. **Save as new workspace** in the Customize bar does the same from a workspace you have started changing.
 
 ### Managing workspaces
 
 **Manage workspaces**, in the Customize bar (and in the workspace menu with **Rearrange without Customize** on), lists every workspace in tab order. From there you can:
 
 - drag workspaces by their grip to change the order of the tabs;
-- reset a built-in workspace you have changed to the one Invoke ships. Changed built-ins are marked with a dot;
+- reset a built-in workspace you have changed to the one Invoke ships. Changed built-ins are marked with a dot. The workspace you are customizing resets from the Customize bar instead;
 - delete workspaces you created, after confirming. Built-in workspaces can't be deleted. A project that was on a deleted workspace moves to Compose.
 
 ## What is saved where
 
-- **The current arrangement belongs to the project.** Each project remembers its own panels, sizes, center view and floating windows, so switching projects also switches what is on screen. See [Working with Projects](/users-guide/projects/introduction/).
-- **Workspaces belong to your account.** Custom workspaces, changes to built-in workspaces, the order of the tabs and **Rearrange without Customize** are available in all of your projects. With [multiple users](/configuration/multi-user-mode/user-guide/), each person has their own workspaces.
-
-To start over with **Rearrange without Customize** on, choose **Revert to saved** in the workspace menu or **Revert workspace to saved** in the command palette. They put the current project's panels back as the workspace saved them. This is different from **Reset to default**, which resets a built-in *workspace itself* to the version Invoke ships with.
+- **How a workspace looks belongs to the project.** Each project remembers what is in front, panel sizes, collapsed panels and floating window positions, so switching projects also switches what is on screen. See [Working with Projects](/users-guide/projects/introduction/).
+- **Workspaces belong to your account.** Which panels each workspace has and where, custom workspaces, changes to built-in workspaces, the order of the tabs and **Rearrange without Customize** are available in all of your projects. With [multiple users](/configuration/multi-user-mode/user-guide/), each person has their own workspaces.
 
 ## Tips
 

@@ -43,21 +43,22 @@ const setup = (overrides: Partial<EditorNotificationActionSources> = {}) => {
     ...overrides,
   });
   const project = (): Project => store.getSnapshot().activeProject;
-  const frontOf = (region: WidgetRegion) => project().widgetInstances[project().widgetRegions[region].activeInstanceId];
+  const layout = () => store.getSnapshot().activeLayout;
+  const frontOf = (region: WidgetRegion) => project().widgetInstances[layout().widgetRegions[region].activeInstanceId];
 
-  return { context, focusMoves, frontOf, project, store };
+  return { context, focusMoves, frontOf, layout, project, store };
 };
 
 describe('editor notification actions', () => {
   it('adds what a locked workspace lacks as the first edit of a Customize session, focusing the widget', () => {
-    const { context, focusMoves, project, store } = setup();
+    const { context, focusMoves, layout, project, store } = setup();
     const placedTypes = () =>
-      project().widgetRegions.right.instanceIds.map((id) => project().widgetInstances[id]?.typeId);
+      layout().widgetRegions.right.instanceIds.map((id) => project().widgetInstances[id]?.typeId);
 
     expect(placedTypes()).not.toContain('layers');
     context.addWidget('layers', 'panel');
 
-    expect(store.getSnapshot().customizing?.[project().id]?.presetId).toBe(project().layout.presetId);
+    expect(store.getSnapshot().customizing?.[project().id]?.presetId).toBe(project().workspaceId);
     expect(placedTypes()).toContain('layers');
     expect(focusMoves).toEqual([['region', 'right', 'layers']]);
   });
@@ -93,13 +94,13 @@ describe('editor notification actions', () => {
   });
 
   it('focuses a widget already showing without changing the layout', () => {
-    const { context, focusMoves, frontOf, project } = setup();
-    const before = project().widgetRegions;
+    const { context, focusMoves, frontOf, layout } = setup();
+    const before = layout().widgetRegions;
 
     expect(frontOf('right')?.typeId).toBe('gallery');
     context.openWidget('gallery');
 
-    expect(project().widgetRegions).toBe(before);
+    expect(layout().widgetRegions).toBe(before);
     expect(focusMoves).toEqual([['region', 'right', 'gallery']]);
   });
 
@@ -113,12 +114,12 @@ describe('editor notification actions', () => {
   });
 
   it('raises a floating window instead of docking another copy', () => {
-    const { context, focusMoves, project, store } = setup();
+    const { context, focusMoves, layout, store } = setup();
     store.commands.widgets.float('queue');
 
     context.openWidget('queue');
 
-    expect(Object.keys(project().floatingWidgets ?? {})).toEqual(['queue']);
+    expect(Object.keys(layout().floatingWidgets ?? {})).toEqual(['queue']);
     expect(focusMoves).toEqual([['floating', 'queue']]);
   });
 
@@ -136,14 +137,14 @@ describe('editor notification actions', () => {
   });
 
   it('adds on the surface the open asked for, never replacing the stage for a panel', () => {
-    const { context, frontOf, project, store } = setup();
+    const { context, frontOf, layout, store } = setup();
     store.commands.layout.applyPreset('edit');
 
     context.addWidget('gallery', 'panel');
 
     expect(frontOf('right')?.typeId).toBe('gallery');
     expect(frontOf('center')?.typeId).toBe('canvas');
-    expect(project().widgetRegions.center.instanceIds).toEqual(['canvas', 'preview']);
+    expect(layout().widgetRegions.center.instanceIds).toEqual(['canvas', 'preview']);
   });
 
   it('shows a queue item by opening the queue at it', () => {

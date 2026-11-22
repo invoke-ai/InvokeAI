@@ -223,6 +223,8 @@ const awaitDatabaseDeletion = async (
 };
 
 export interface DurableWorkbenchSaveResult {
+  /** The session write carrying the account this save was given is acknowledged (or the server already holds it). */
+  accountSaved: boolean;
   awaitsDecision: boolean;
   conflicts: ProjectConflictInfo[];
   error: string | null;
@@ -367,6 +369,12 @@ const toProjectSummary = (record: ProjectWithWorkspaceDTO): ProjectSummaryDTO =>
 /** A project the server holds whole is split by its next save, unless it must stay whole (`toProjectCreation`). */
 const recordRequiresDocumentUpgrade = (record: ProjectRecordDTO, project: Project): boolean =>
   !isSplitProjectRecord(record) && findRepeatedWorkflowItem(project.workflows.entries) === null;
+
+/**
+ * A project loaded with the layout stored before structure and view split saves once the editor has migrated it, so
+ * the server holds the new shape and the migration and its notice do not repeat on every load.
+ */
+const requiresLayoutMigrationSave = (project: Project): boolean => project.legacyLayout !== undefined;
 
 const toSyncEntry = (record: ProjectWithWorkspaceDTO, project: Project): SyncEntry => {
   const { workspace } = record;
@@ -2363,6 +2371,9 @@ export const createDurableSyncedWorkbenchPersistence = (
       projectsRequiringDocumentUpgrade.add(projectId);
       pendingProjectIds.add(projectId);
       hasPending = true;
+    } else if (requiresLayoutMigrationSave(result.project)) {
+      pendingProjectIds.add(projectId);
+      hasPending = true;
     }
     if (!loadedDraft) {
       reportOwnedProjectSync();
@@ -2434,6 +2445,8 @@ export const createDurableSyncedWorkbenchPersistence = (
         projectsRequiringDocumentUpgrade.delete(record.project_id);
         if (recordRequiresDocumentUpgrade(record, result.project)) {
           projectsRequiringDocumentUpgrade.add(record.project_id);
+          pendingProjectIds.add(record.project_id);
+        } else if (requiresLayoutMigrationSave(result.project)) {
           pendingProjectIds.add(record.project_id);
         }
       }
@@ -3163,6 +3176,9 @@ export const createDurableSyncedWorkbenchPersistence = (
             projectsRequiringDocumentUpgrade.add(projectId);
             pendingProjectIds.add(projectId);
             hasPending = true;
+          } else if (requiresLayoutMigrationSave(serverLoad.project)) {
+            pendingProjectIds.add(projectId);
+            hasPending = true;
           }
           if (!loadedDraft) {
             loadedProjects.set(projectId, serverLoad.project);
@@ -3864,7 +3880,8 @@ export const createDurableSyncedWorkbenchPersistence = (
         });
         let shouldRetry = false;
         const session = await getEditorSessionForService();
-        if (!(await persistCurrentSession(currentState, session.id))) {
+        const accountSaved = await persistCurrentSession(currentState, session.id);
+        if (!accountSaved) {
           shouldRetry = true;
         } else {
           await acknowledgeAwaitingExplicitRetargets();
@@ -3898,6 +3915,7 @@ export const createDurableSyncedWorkbenchPersistence = (
         const projectBoardAssignments = [...pendingBoardAssignments.values()];
         pendingBoardAssignments.clear();
         return {
+          accountSaved,
           awaitsDecision: conflicts.size > 0 || schemaRefusals.size > 0,
           conflicts: [...conflicts.values()],
           error:

@@ -6,23 +6,21 @@ import type { GraphContract } from './graphContracts';
 import type { InvocationControllerState } from './invocationContracts';
 import type {
   FloatingWidgetGeometry,
-  FloatingWidgetState,
   LayoutPreset,
   LayoutPresetId,
   LayoutPresetMetadataOverrides,
   LayoutPresetOverrides,
   LayoutPresetRouteOverrides,
-  LayoutPresetWorkingCopy,
-  ProjectLayoutState,
-  WidgetRegion,
-  WidgetRegionState,
 } from './layoutContracts';
 import type { ProjectEvent } from './projectEventContracts';
 import type { ProjectWorkflowCollection, ProjectWorkflowHistories } from './projectWorkflows';
 import type { WorkbenchQueueState } from './queueHistoryContracts';
 import type { ProjectSettings, ScopedDefaults } from './settings/contracts';
 import type { WidgetFailure, WidgetInstanceContract, WidgetInstanceId, WidgetTypeId } from './widgetContracts';
+import type { WorkspaceRecord } from './workspace/accountWorkspaces';
+import type { StoredProjectLayout } from './workspace/migrateProjectLayout';
 import type { CustomizeSessions } from './workspace/structureLock';
+import type { WorkspaceViews } from './workspace/view';
 
 export type { ProjectEvent, ProjectEventType } from './projectEventContracts';
 
@@ -30,19 +28,30 @@ export interface Project {
   id: string;
   name: string;
   settings: ProjectSettings;
-  layout: ProjectLayoutState;
+  /** The workspace the project is on; what it shows is that workspace's structure seen through `views`. */
+  workspaceId: LayoutPresetId;
+  /** How the project looks at each workspace: sparse overrides of its structure's defaults. */
+  views: WorkspaceViews;
   invocation: InvocationControllerState;
   workflows: ProjectWorkflowCollection;
   /** Session-only graph edit histories by workflow id; never persisted. */
   workflowHistories: ProjectWorkflowHistories;
+  /** Widget values by instance id; an instance a structure drops keeps its values for when it is placed again. */
   widgetInstances: Record<WidgetInstanceId, WidgetInstanceContract>;
-  widgetRegions: Record<WidgetRegion, WidgetRegionState>;
-  /** Floating instances leave their region's instanceIds; absent in older projects means no floating windows. */
-  floatingWidgets?: Record<WidgetInstanceId, FloatingWidgetState>;
-  /** Convenience, not layout: presets, layout drift and undo leave it out. */
+  /** Convenience, not layout: undo leaves it out. */
   lastFloatingGeometry?: Record<WidgetInstanceId, FloatingWidgetGeometry>;
-  /** Inactive presets' differing arrangements, oldest first, one per preset; never the active preset's. */
-  presetWorkingLayouts?: LayoutPresetWorkingCopy[];
+  /**
+   * The arrangement a document stored before structure and view split, as loaded: set only between loading such a
+   * document and the reducer step that migrates it against the account, and written back unchanged until then.
+   */
+  legacyLayout?: StoredProjectLayout;
+  /**
+   * The stored layout a project migrated during its account's adoption is written back with, unchanged, until the
+   * account that adopted is saved: a load that never saved it migrates and adopts again. Transient.
+   */
+  heldLegacyLayout?: StoredProjectLayout;
+  /** Workspaces whose own arrangement this project lost when its stored layout migrated: told once, then cleared. */
+  droppedArrangements?: readonly LayoutPresetId[];
   widgetGraphs: Partial<Record<WidgetTypeId, GraphContract>>;
   canvas: CanvasStateContractV3;
   promptHistory: PromptHistoryItem[];
@@ -110,7 +119,8 @@ export type WorkbenchNotificationAction =
   /** Adds the widget to the current workspace, on the surface the open asked for: the structural add an offer makes. */
   | { kind: 'add-widget'; widgetId: WidgetTypeId; surface?: 'stage' | 'panel' }
   /** Enters Customize on the active project's workspace: what a locked structural gesture offers. */
-  | { kind: 'customize-workspace' }
+  /** Customize, on the named workspace (entering it first) or else on the one the project is on. */
+  | { kind: 'customize-workspace'; workspaceId?: LayoutPresetId }
   /** The one-time offer to existing accounts: turns "Rearrange without Customize" off, or keeps it. */
   | { kind: 'lock-workspaces' }
   | { kind: 'keep-rearranging' }
@@ -129,6 +139,8 @@ export interface WorkbenchNotification {
   message?: string;
   messageKey?: string;
   messageValues?: Readonly<Record<string, string | number>>;
+  /** Values that are lists of names, each translated by its key (else shown as its text) when the message is shown. */
+  messageListValues?: Readonly<Record<string, readonly { key?: string; text: string }[]>>;
   createdAt: string;
   projectId?: string;
   isRead: boolean;
@@ -145,10 +157,10 @@ export interface PromptHistoryItem {
 }
 
 export type LayoutUndoNotice =
-  | { kind: 'revert'; presetId: LayoutPresetId }
-  | { kind: 'discardCopy'; presetId: LayoutPresetId }
   | { kind: 'switchPreset'; presetId: LayoutPresetId }
-  | { kind: 'removeWidget'; instanceId: WidgetInstanceId };
+  | { kind: 'removeWidget'; instanceId: WidgetInstanceId }
+  | { kind: 'resetView'; presetId: LayoutPresetId }
+  | { kind: 'updateWorkspace'; presetId: LayoutPresetId };
 
 export interface UndoRedoEntry {
   id: string;
@@ -158,20 +170,20 @@ export interface UndoRedoEntry {
   notice?: LayoutUndoNotice;
   mergeKey?: string;
   mergedAt?: string;
-  /** Customize's Reset to default: pending while this step is undoable, so Undo and Redo carry the reset with it. */
-  customizeReset?: true;
+  /**
+   * A step that changed a workspace in the account (a structural gesture outside Customize, or Done): what the account
+   * held for it before and after. Undoing puts `before` back, for every project on that workspace, only while the
+   * account still holds `after`; redo the other way round.
+   */
+  workspace?: { workspaceId: LayoutPresetId; before: WorkspaceRecord; after: WorkspaceRecord };
 }
 
 /** Project undo preserves the live canvas and workflow documents; the engine and workflow histories own those. */
 export interface ProjectUndoSnapshot {
-  layout: ProjectLayoutState;
+  workspaceId: LayoutPresetId;
+  views: WorkspaceViews;
   invocation: InvocationControllerState;
   widgetInstances: Record<WidgetInstanceId, WidgetInstanceContract>;
-  widgetRegions: Record<WidgetRegion, WidgetRegionState>;
-  /** Captured with widgetRegions: regions and floating windows are one placement fact. */
-  floatingWidgets?: Record<WidgetInstanceId, FloatingWidgetState>;
-  /** Captured with `layout.presetId`, so undoing a preset switch brings back the working copies it moved. */
-  presetWorkingLayouts?: Project['presetWorkingLayouts'];
   widgetGraphs: Partial<Record<WidgetTypeId, GraphContract>>;
 }
 
@@ -194,4 +206,9 @@ export interface AccountState {
   layoutPresetMetadataOverrides?: LayoutPresetMetadataOverrides;
   layoutPresetOverrides?: LayoutPresetOverrides;
   layoutPresetRouteOverrides?: LayoutPresetRouteOverrides;
+  /**
+   * Set once the account's workspaces took over the arrangements projects stored before structure and view split
+   * (the most recently used project's became its workspaces). A fresh account starts with it.
+   */
+  workspaceLayoutsAdopted?: true;
 }

@@ -1,6 +1,6 @@
 import type { ProjectGraphState, ProjectWorkflowSource } from '@features/workflow/contracts';
 import type { ProjectGraphAction } from '@features/workflow/utility';
-import type { LayoutPreset } from '@workbench/layoutContracts';
+import type { LayoutPresetId } from '@workbench/layoutContracts';
 import type { Project, WorkbenchState } from '@workbench/projectContracts';
 
 import {
@@ -17,33 +17,33 @@ import { hasActiveQueueRuns, hasInFlightQueueRuns } from '@workbench/queue-integ
 
 import type { CanvasEditIntent } from './autoRoutePolicy';
 import type { CanvasProjectMutation } from './canvasProjectMutations';
+import type { LayoutAvailability, ResolvedLayout } from './workspace/resolveLayout';
 
 import { clearLayerPanelStates, reconcileLayerPanelStates } from './layerPanelState';
-import { createLayoutPresetActivator, loadLayoutPresetWidgets } from './layoutPresetActivation';
-import { getLayoutPresetArrangement, resolveSavedLayoutPreset } from './layoutPresetSnapshots';
-import { getLayoutWidgetTypeIds } from './layoutWidgetSet';
+import { createLayoutPresetActivator, loadLayoutWidgets } from './layoutPresetActivation';
+import { resolveSavedLayoutPreset } from './layoutPresetSnapshots';
+import { getLayoutWidgetTypeIds, type LayoutWidgetSource } from './layoutWidgetSet';
 import { createBlankWorkflowDocument, findProjectWorkflow } from './projectWorkflows';
 import { getWorkbenchPreferences } from './settings/store';
 import { createWidgetRecovery, type WidgetRecoveryStore } from './widget-frame/widgetRecoveryStore';
-import { areWidgetsLoaded, isCenterViewType } from './widgetRegistry';
+import { areWidgetsLoaded } from './widgetRegistry';
 import { getProjectWidgetValues } from './widgetState';
 import {
   createInitialWorkbenchState,
   __workbenchReducerInternal,
   type __WorkbenchReducerActionInternal,
 } from './workbenchState';
+import { resolveProjectLayout } from './workspace/projectLayout';
+import { createLayoutAvailabilitySource } from './workspace/registryAvailability';
+import { createLayoutResolver } from './workspace/resolveLayout';
 import { getCustomizeSession } from './workspace/structureLock';
 
 /** Visible-widget changes dismiss overlays that would otherwise outlive their widgets in portals. */
-const visibleWidgetsKey = (state: WorkbenchState): string => {
-  const project = state.projects.find((candidate) => candidate.id === state.activeProjectId);
-  if (!project) {
-    return '';
-  }
-  const regions = Object.entries(project.widgetRegions).map(
+const visibleWidgetsKey = (projectId: string, layout: ResolvedLayout): string => {
+  const regions = Object.entries(layout.widgetRegions).map(
     ([region, { activeInstanceId }]) => `${region}=${activeInstanceId}`
   );
-  return [project.id, ...regions, ...Object.keys(project.floatingWidgets ?? {})].join('|');
+  return [projectId, ...regions, ...Object.keys(layout.floatingWidgets ?? {})].join('|');
 };
 
 type WorkbenchAction = __WorkbenchReducerActionInternal;
@@ -337,11 +337,11 @@ const createCommands = (
         const activeProject = getActiveProject(getState());
 
         // Navigation stays inside a workspace being customized; Done or Cancel ends it first.
-        if (preset.id !== activeProject.layout.presetId && getCustomizeSession(getState().customizing, activeProject)) {
-          return Promise.resolve(activeProject.layout.presetId);
+        if (preset.id !== activeProject.workspaceId && getCustomizeSession(getState().customizing, activeProject)) {
+          return Promise.resolve(activeProject.workspaceId);
         }
 
-        if (preset.id === activeProject.layout.presetId) {
+        if (preset.id === activeProject.workspaceId) {
           dispatch({ presetId: preset.id, type: 'applyPreset' });
 
           return Promise.resolve(preset.id);
@@ -351,32 +351,30 @@ const createCommands = (
       },
       /** Pressing the active preset's tab while another is pending means "stay": the pending switch is dropped. */
       cancelPresetActivation: (): void => layoutPresetActivator.invalidate(),
-      /** A workspace switch still loading would leave the workspace being customized when it lands; it is dropped. */
-      beginCustomize: () => {
+      /**
+       * A workspace switch still loading would leave the workspace being customized when it lands; it is dropped. With
+       * `newWorkspace`, Customize drafts a workspace that Done creates.
+       */
+      beginCustomize: (newWorkspace?: ActionPayload<'beginCustomize'>['newWorkspace']) => {
         layoutPresetActivator.invalidate();
-        dispatch({ type: 'beginCustomize' });
+        dispatch(newWorkspace ? { newWorkspace, type: 'beginCustomize' } : { type: 'beginCustomize' });
       },
       resetCustomizeToDefault: command('resetCustomizeToDefault'),
+      saveCustomizeAsNew: command(
+        'saveCustomizeAsNew',
+        (workspace: ActionPayload<'saveCustomizeAsNew'>['workspace']) => ({ workspace })
+      ),
+      resetWorkspaceView: command(
+        'resetWorkspaceView',
+        (workspaceId: ActionPayload<'resetWorkspaceView'>['workspaceId']) => ({ workspaceId })
+      ),
       clearHistory: command('clearLayoutHistory'),
       setCustomizeDraft: command('setCustomizeDraft', (draft: ActionPayload<'setCustomizeDraft'>['draft']) => ({
         draft,
       })),
-      endCustomize: command('endCustomize', (revert: boolean) => ({ revert })),
+      cancelCustomize: command('cancelCustomize'),
+      finishCustomize: command('finishCustomize'),
       applyPreset: command('applyPreset', (presetId: ActionPayload<'applyPreset'>['presetId']) => ({ presetId })),
-      createPreset: command(
-        'addLayoutPreset',
-        (
-          presetId: ActionPayload<'addLayoutPreset'>['presetId'],
-          label: string,
-          iconId?: string,
-          defaultRoute?: ActionPayload<'addLayoutPreset'>['defaultRoute']
-        ) => ({
-          defaultRoute,
-          iconId,
-          label,
-          presetId,
-        })
-      ),
       reorderPresets: command(
         'reorderLayoutPresets',
         (
@@ -384,48 +382,18 @@ const createCommands = (
           overId: ActionPayload<'reorderLayoutPresets'>['overId']
         ) => ({ activeId, overId })
       ),
-      setPresetIcon: command(
-        'setLayoutPresetIcon',
-        (presetId: ActionPayload<'setLayoutPresetIcon'>['presetId'], iconId: string) => ({ iconId, presetId })
-      ),
-      setPresetRoute: command(
-        'setLayoutPresetRoute',
-        (
-          presetId: ActionPayload<'setLayoutPresetRoute'>['presetId'],
-          defaultRoute: ActionPayload<'setLayoutPresetRoute'>['defaultRoute']
-        ) => ({ defaultRoute, presetId })
-      ),
       deletePreset: command('deleteLayoutPreset', (presetId: ActionPayload<'deleteLayoutPreset'>['presetId']) => ({
         presetId,
       })),
-      recover: command('recoverShellLayout'),
-      renamePreset: command(
-        'renameLayoutPreset',
-        (presetId: ActionPayload<'renameLayoutPreset'>['presetId'], label: string, localizedDefaultLabel?: string) => ({
-          label,
-          presetId,
-          ...(localizedDefaultLabel === undefined ? {} : { localizedDefaultLabel }),
-        })
-      ),
-      reset: command('resetActiveLayout'),
       undo: command('undoProjectChange', (projectId?: string, throughEntryId?: string) => ({
         ...(projectId === undefined ? {} : { projectId }),
         ...(throughEntryId === undefined ? {} : { throughEntryId }),
       })),
       redo: command('redoProjectChange', (projectId?: string) => (projectId === undefined ? {} : { projectId })),
-      revertPreset: command('revertLayoutPreset', (presetId: ActionPayload<'revertLayoutPreset'>['presetId']) => ({
-        presetId,
-      })),
-      savePreset: command('saveLayoutPreset', (presetId: ActionPayload<'saveLayoutPreset'>['presetId']) => ({
-        presetId,
-      })),
       restorePresetDefault: command(
         'restoreLayoutPresetDefault',
         (presetId: ActionPayload<'restoreLayoutPresetDefault'>['presetId']) => ({ presetId })
       ),
-      setCenterView: command('setCenterView', (centerViewId: ActionPayload<'setCenterView'>['centerViewId']) => ({
-        centerViewId,
-      })),
       setRegionCollapsed: command(
         'setRegionWidgetCollapsed',
         (region: ActionPayload<'setRegionWidgetCollapsed'>['region'], isCollapsed: boolean) => ({
@@ -704,6 +672,8 @@ const createPersistenceAdapter = (dispatch: WorkbenchDispatch, getState: () => W
     },
     getState,
     hydrate: command('hydrateWorkbench', (state: WorkbenchState) => ({ state })),
+    /** The account that adopted is saved: projects migrated with it stop writing their stored layout back. */
+    releaseHeldLayouts: command('releaseHeldLayouts'),
     replaceProjectFromServer: command('replaceProjectFromServer'),
     retargetProject: (payload: ActionPayload<'retargetProject'>): ProjectCommandResult => {
       const state = getState();
@@ -751,6 +721,8 @@ export interface WorkbenchInternalAdapters {
 
 export interface WorkbenchSnapshot {
   activeProject: Project;
+  /** What the active project shows: its workspace's structure seen through its view, parts kept across changes. */
+  activeLayout: ResolvedLayout;
   account: WorkbenchState['account'];
   customizing: WorkbenchState['customizing'];
   autosave: WorkbenchState['autosave'];
@@ -762,8 +734,12 @@ export interface WorkbenchSnapshot {
 }
 
 export interface WorkbenchQueries {
+  /** What this session's registry can show, the same object while it does not change: what layouts resolve with. */
+  getAvailability(): LayoutAvailability;
   getProject(projectId: string): Project | null;
   getSnapshot(): WorkbenchSnapshot;
+  /** What the active project would show on a workspace: its structure seen through the project's view of it. */
+  getWorkspaceLayout(workspaceId: LayoutPresetId): ResolvedLayout;
   isActiveProject(projectId: string): boolean;
 }
 
@@ -781,15 +757,23 @@ export interface WorkbenchInternalStore {
 }
 
 export interface WorkbenchStoreOptions {
-  isLoaded?: (preset: LayoutPreset) => boolean;
-  loadLayoutPresetWidgets?: (preset: LayoutPreset) => Promise<unknown>;
+  /** Test seam: the registry's availability, which the store otherwise builds for its session. */
+  getAvailability?: () => LayoutAvailability;
+  /** Test seams over what entering a workspace would show. */
+  isLoaded?: (layout: LayoutWidgetSource, workspaceId: LayoutPresetId) => boolean;
+  loadLayoutWidgets?: (layout: LayoutWidgetSource, workspaceId: LayoutPresetId) => Promise<unknown>;
 }
 
 const getActiveProject = (state: WorkbenchState): Project =>
   state.projects.find((project) => project.id === state.activeProjectId) ?? state.projects[0];
 
-const createSnapshot = (state: WorkbenchState, hasHydrated: boolean): WorkbenchSnapshot => ({
+const createSnapshot = (
+  state: WorkbenchState,
+  hasHydrated: boolean,
+  activeLayout: ResolvedLayout
+): WorkbenchSnapshot => ({
   account: state.account,
+  activeLayout,
   activeProject: getActiveProject(state),
   autosave: state.autosave,
   backendConnection: state.backendConnection,
@@ -979,13 +963,33 @@ export const createWorkbenchStore = (
 ): WorkbenchInternalStore => {
   // Seeded so a workbench created after settings load reads the user's defaults on first render.
   let state: WorkbenchState = { ...initialState, scopedDefaults: getWorkbenchPreferences().scopedDefaults };
+  const getAvailability: () => LayoutAvailability = options.getAvailability ?? createLayoutAvailabilitySource();
+  // One resolver per open project, so each keeps the identities its subscribers hold; a closed project's goes.
+  const resolvers = new Map<string, ReturnType<typeof createLayoutResolver>>();
+  const getLayout = (project: Project): ResolvedLayout => {
+    let resolver = resolvers.get(project.id);
+
+    if (!resolver) {
+      resolver = createLayoutResolver();
+      resolvers.set(project.id, resolver);
+    }
+
+    return resolveProjectLayout(state, project, getAvailability(), resolver);
+  };
+  const forgetClosedProjects = (projects: readonly Project[]): void => {
+    for (const projectId of resolvers.keys()) {
+      if (!projects.some((project) => project.id === projectId)) {
+        resolvers.delete(projectId);
+      }
+    }
+  };
   const widgetRecovery = new Map(
     Object.keys(getActiveProject(state).widgetInstances).map((id) => [id, createWidgetRecovery()])
   );
   let hasHydrated = false;
   let persistedRevision = 0;
   let invalidateLayoutPresetActivation = (): void => undefined;
-  const snapshotStore = createExternalStore(createSnapshot(state, hasHydrated));
+  const snapshotStore = createExternalStore(createSnapshot(state, hasHydrated, getLayout(getActiveProject(state))));
   const diagnostics: AutosaveDiagnosticState = { loggedRetryReason: null };
 
   const setSnapshotState = (nextState: WorkbenchState, nextHasHydrated = hasHydrated): void => {
@@ -1014,21 +1018,21 @@ export const createWorkbenchStore = (
         }
       }
     }
+    if (nextState.projects !== state.projects) {
+      forgetClosedProjects(nextState.projects);
+    }
     state = nextState;
     hasHydrated = nextHasHydrated;
-    snapshotStore.setSnapshot(createSnapshot(state, hasHydrated));
+    snapshotStore.setSnapshot(createSnapshot(state, hasHydrated, getLayout(project)));
   };
 
   const dispatch = (action: WorkbenchAction): void => {
     const previousState = state;
+    const previousLayout = snapshotStore.getSnapshot().activeLayout;
     const nextState = __workbenchReducerInternal(state, action, {
       autoSwitchInvocationRoute: getWorkbenchPreferences().autoSwitchInvocationRoute,
-      isCenterView: isCenterViewType,
+      availability: getAvailability(),
     });
-
-    if (nextState !== previousState && visibleWidgetsKey(nextState) !== visibleWidgetsKey(previousState)) {
-      closeWidgetOverlays();
-    }
 
     if (
       action.type === 'applyPreset' ||
@@ -1046,10 +1050,27 @@ export const createWorkbenchStore = (
     }
 
     setSnapshotState(nextState);
+
+    const { activeLayout, activeProject } = snapshotStore.getSnapshot();
+
+    if (
+      nextState !== previousState &&
+      visibleWidgetsKey(activeProject.id, activeLayout) !==
+        visibleWidgetsKey(getActiveProject(previousState).id, previousLayout)
+    ) {
+      closeWidgetOverlays();
+    }
     recordDiagnosticForAction(action, previousState, nextState, diagnostics);
   };
 
   const getState = (): WorkbenchState => state;
+  const getWorkspaceLayout = (workspaceId: LayoutPresetId): ResolvedLayout => {
+    const project = getActiveProject(state);
+
+    return workspaceId === project.workspaceId
+      ? getLayout(project)
+      : resolveProjectLayout(state, { ...project, workspaceId }, getAvailability());
+  };
   const layoutPresetActivator = createLayoutPresetActivator({
     apply: (presetId) => dispatch({ presetId, type: 'applyPreset' }),
     getActiveProjectId: () => state.activeProjectId,
@@ -1059,17 +1080,13 @@ export const createWorkbenchStore = (
       return current.id === preset.id && current.snapshot === preset.snapshot;
     },
     isLoaded: (preset) => {
-      const incoming = { ...preset, snapshot: getLayoutPresetArrangement(getActiveProject(state), preset) };
+      const incoming = getWorkspaceLayout(preset.id);
 
       return options.isLoaded
-        ? options.isLoaded(incoming)
-        : areWidgetsLoaded(getLayoutWidgetTypeIds(incoming.snapshot));
+        ? options.isLoaded(incoming, preset.id)
+        : areWidgetsLoaded(getLayoutWidgetTypeIds(incoming));
     },
-    load: (preset) =>
-      (options.loadLayoutPresetWidgets ?? loadLayoutPresetWidgets)({
-        ...preset,
-        snapshot: getLayoutPresetArrangement(getActiveProject(state), preset),
-      }),
+    load: (preset) => (options.loadLayoutWidgets ?? loadLayoutWidgets)(getWorkspaceLayout(preset.id), preset.id),
   });
   invalidateLayoutPresetActivation = layoutPresetActivator.invalidate;
   const commands = createCommands(dispatch, getState, layoutPresetActivator);
@@ -1085,8 +1102,10 @@ export const createWorkbenchStore = (
       setScopedDefaults: (scopedDefaults) => dispatch({ scopedDefaults, type: 'setScopedDefaults' }),
     },
     queries: {
+      getAvailability,
       getProject: (projectId) => state.projects.find((project) => project.id === projectId) ?? null,
       getSnapshot: snapshotStore.getSnapshot,
+      getWorkspaceLayout,
       isActiveProject: (projectId) => state.activeProjectId === projectId,
     },
     setHasHydrated: (nextHasHydrated) => setSnapshotState(state, nextHasHydrated),

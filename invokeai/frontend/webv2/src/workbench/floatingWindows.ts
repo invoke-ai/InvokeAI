@@ -216,12 +216,6 @@ export const writeRegionOrder = (
   };
 };
 
-/** Emptiness is by membership, not by what can render: state has no widget registry to ask. */
-export const isAwaitedCenterView = (
-  center: Pick<WidgetRegionState, 'activeInstanceId' | 'instanceIds'>,
-  instanceId: WidgetInstanceId
-): boolean => center.instanceIds.length === 0 && center.activeInstanceId === instanceId;
-
 const FLOATING_WIDGET_MODES: readonly FloatingWidgetMode[] = ['windowed', 'maximized', 'shaded'];
 
 const validateFloatingWidgets = (

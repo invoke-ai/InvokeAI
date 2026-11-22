@@ -1,8 +1,8 @@
-/* oxlint-disable react-perf/jsx-no-new-object-as-prop */
 import type { ExtensionRegistry } from '@workbench/extensions/extensionRegistry';
 import type { WidgetRegion } from '@workbench/layoutContracts';
 import type { Project } from '@workbench/projectContracts';
-import type { WorkbenchInternalStore } from '@workbench/workbenchStore';
+/* oxlint-disable react-perf/jsx-no-new-object-as-prop */
+import type { WorkbenchInternalStore, WorkbenchSnapshot } from '@workbench/workbenchStore';
 
 import { Box, ChakraProvider } from '@chakra-ui/react';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
@@ -13,7 +13,7 @@ import { createExtensionRegistry } from '@workbench/extensions/extensionRegistry
 import { useFloatingWindowFocus, useFocusRegionProps } from '@workbench/focusRegions';
 import { patchWorkbenchPreferences } from '@workbench/settings/store';
 import { WorkbenchFocusProvider } from '@workbench/WorkbenchRuntime';
-import { createInitialWorkbenchState } from '@workbench/workbenchState';
+import { createInitialWorkbenchState, withArrangement } from '@workbench/workbenchState.testing';
 import { createWorkbenchStore } from '@workbench/workbenchStore';
 import { act, useSyncExternalStore } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -26,6 +26,10 @@ const runtime = vi.hoisted(() => ({
 }));
 vi.mock('@workbench/WorkbenchContext', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
+  useActiveLayoutSelector: <Selected,>(selector: (layout: WorkbenchSnapshot['activeLayout']) => Selected) =>
+    selector(useSyncExternalStore(runtime.store.subscribe, runtime.store.getSnapshot).activeLayout),
+  useWorkbenchSelector: <Selected,>(selector: (snapshot: WorkbenchSnapshot) => Selected) =>
+    selector(useSyncExternalStore(runtime.store.subscribe, runtime.store.getSnapshot)),
   useActiveProjectSelector: <Selected,>(selector: (project: Project) => Selected) => {
     const snapshot = useSyncExternalStore(runtime.store.subscribe, runtime.store.getSnapshot);
     return selector(snapshot.activeProject);
@@ -57,7 +61,7 @@ const positions = {
 };
 
 const Region = ({ region }: { region: WidgetRegion }) => {
-  const { activeProject: project } = useSyncExternalStore(runtime.store.subscribe, runtime.store.getSnapshot);
+  const { activeLayout: project } = useSyncExternalStore(runtime.store.subscribe, runtime.store.getSnapshot);
   const state = project.widgetRegions[region];
   return (
     <Box
@@ -105,6 +109,7 @@ let root: Root;
 let queryClient: QueryClient;
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 const project = () => runtime.store.getSnapshot().activeProject;
+const layout = () => runtime.store.getSnapshot().activeLayout;
 const regionElement = (region: WidgetRegion) => host.querySelector<HTMLElement>(`[data-focus-region="${region}"]`)!;
 const press = (keys: string) => act(() => userEvent.keyboard(keys));
 const regionChord = (arrow: string) =>
@@ -119,24 +124,17 @@ const expectFocusedRegion = (region: WidgetRegion) =>
 beforeEach(async () => {
   accountLifecycle.activate('workbench-navigation-test');
   await patchWorkbenchPreferences({ customHotkeys: {}, showFocusRegionHighlight: true });
-  const state = createInitialWorkbenchState();
-  const initial = state.projects[0]!;
-  initial.widgetInstances['generate-second'] = { ...initial.widgetInstances.generate!, id: 'generate-second' };
-  const ids = {
-    left: ['generate', 'generate-second'],
-    center: ['preview', 'canvas'],
-    right: ['gallery', 'layers'],
-    bottom: ['queue'],
-  };
-  for (const region of Object.keys(ids) as WidgetRegion[]) {
-    initial.widgetRegions[region] = {
-      ...initial.widgetRegions[region],
-      activeInstanceId: ids[region][0]!,
-      instanceIds: ids[region],
-      isCollapsed: false,
-    };
-  }
-  initial.layout.panels = { isBottomOpen: true, isLeftOpen: true, isRightOpen: true };
+  const state = withArrangement(
+    createInitialWorkbenchState(),
+    'compose',
+    {
+      bottom: ['gallery:bottom'],
+      center: ['preview', 'canvas'],
+      left: ['generate', 'generate-second'],
+      right: ['gallery', 'layers'],
+    },
+    { 'generate-second': 'generate' }
+  );
   runtime.store = createWorkbenchStore(state);
   runtime.store.commands.widgets.open({ region: 'center', widgetId: 'image-map' });
   runtime.store.commands.widgets.float('image-map');
@@ -211,17 +209,17 @@ it('switches instances of the same type from a text field, wraps, and transfers 
   await act(() => textarea.focus());
   await press('draft');
   await press('{Alt>}{PageDown}{/Alt}');
-  expect(project().widgetRegions.left.activeInstanceId).toBe('generate-second');
+  expect(layout().widgetRegions.left.activeInstanceId).toBe('generate-second');
   await expectFocusedRegion('left');
   expect(getComputedStyle(document.activeElement!).outlineStyle).toBe('none');
   await press('{Tab}');
   expect(document.activeElement?.getAttribute('aria-label')).toBe('generate-second text');
   await press('{Alt>}{PageDown}{/Alt}');
-  expect(project().widgetRegions.left.activeInstanceId).toBe('generate');
+  expect(layout().widgetRegions.left.activeInstanceId).toBe('generate');
   await expectFocusedRegion('left');
   expect(textarea.value).toBe('draft');
   await press('{Alt>}{PageUp}{/Alt}');
-  expect(project().widgetRegions.left.activeInstanceId).toBe('generate-second');
+  expect(layout().widgetRegions.left.activeInstanceId).toBe('generate-second');
   await expectFocusedRegion('left');
 });
 
@@ -248,7 +246,7 @@ it('respects modal suspension and custom bindings', async () => {
     await press(regionChord('ArrowRight'));
     await press('{Alt>}{PageDown}{/Alt}');
     await expectFocusedRegion('left');
-    expect(project().widgetRegions.left.activeInstanceId).toBe('generate');
+    expect(layout().widgetRegions.left.activeInstanceId).toBe('generate');
   } finally {
     release();
   }
@@ -258,9 +256,9 @@ it('respects modal suspension and custom bindings', async () => {
     })
   );
   await press('{Alt>}{PageDown}{/Alt}');
-  expect(project().widgetRegions.left.activeInstanceId).toBe('generate');
+  expect(layout().widgetRegions.left.activeInstanceId).toBe('generate');
   await press('{Alt>}{Shift>}w{/Shift}{/Alt}');
-  expect(project().widgetRegions.left.activeInstanceId).toBe('generate-second');
+  expect(layout().widgetRegions.left.activeInstanceId).toBe('generate-second');
   await expectFocusedRegion('left');
   await press(regionChord('ArrowRight'));
   await expectFocusedRegion('left');
@@ -275,16 +273,17 @@ it('moves focus between the workflow graph and a collapsed workflow panel, prese
     runtime.store.commands.layout.setRegionCollapsed('left', true);
   });
   const before = project();
-  expect(before.widgetRegions.left.isCollapsed).toBe(true);
+  const beforeLayout = layout();
+  expect(beforeLayout.widgetRegions.left.isCollapsed).toBe(true);
   await focusRegion('center');
 
   await press('{Shift>}Z{/Shift}');
   await expectFocusedRegion('left');
-  expect(project().widgetRegions.left).toEqual({ ...before.widgetRegions.left, isCollapsed: false });
+  expect(layout().widgetRegions.left).toEqual({ ...beforeLayout.widgetRegions.left, isCollapsed: false });
 
   await press('{Shift>}Z{/Shift}');
   await expectFocusedRegion('center');
-  expect(project().widgetRegions.center).toEqual(before.widgetRegions.center);
+  expect(layout().widgetRegions.center).toEqual(beforeLayout.widgetRegions.center);
   expect(project().widgetInstances).toBe(before.widgetInstances);
   expect(project().workflows).toBe(before.workflows);
 });
@@ -294,12 +293,12 @@ it('offers to add a graph to a workspace that places only the workflow form, cha
     runtime.store.commands.layout.applyPreset('compose');
     runtime.store.commands.widgets.open({ region: 'left', widgetId: 'workflow' });
   });
-  const before = project();
+  const beforeLayout = layout();
   await focusRegion('left');
 
   await press('{Shift>}Z{/Shift}');
 
-  expect(project().widgetRegions).toBe(before.widgetRegions);
+  expect(layout().widgetRegions).toBe(beforeLayout.widgetRegions);
   expect(runtime.store.getSnapshot().notifications[0]?.actions).toEqual([
     { kind: 'add-widget', surface: 'stage', widgetId: 'workflow' },
   ]);
@@ -310,12 +309,12 @@ it('offers a form to a workspace whose only workflow is the graph in the status 
     runtime.store.commands.layout.applyPreset('compose');
     runtime.store.commands.widgets.open({ region: 'bottom', widgetId: 'workflow' });
   });
-  const before = project();
+  const beforeLayout = layout();
   await focusRegion('bottom');
 
   await press('{Shift>}Z{/Shift}');
 
-  expect(project().widgetRegions).toBe(before.widgetRegions);
+  expect(layout().widgetRegions).toBe(beforeLayout.widgetRegions);
   expect(runtime.store.getSnapshot().notifications[0]).toMatchObject({
     actions: [{ kind: 'add-widget', surface: 'panel', widgetId: 'workflow' }],
     titleKey: 'shell.workspace.noWorkflowForm',
@@ -327,32 +326,32 @@ it('selects the existing Compose graph while preserving the shared left Workflow
     runtime.store.commands.layout.applyPreset('compose');
     runtime.store.commands.widgets.open({ region: 'center', widgetId: 'workflow' });
   });
-  const graphInstanceId = project().widgetRegions.center.activeInstanceId;
+  const graphInstanceId = layout().widgetRegions.center.activeInstanceId;
   expect(project().widgetInstances[graphInstanceId]?.typeId).toBe('workflow');
 
   await act(() => {
     runtime.store.commands.widgets.open({ region: 'left', widgetId: 'workflow' });
     runtime.store.commands.widgets.select({ region: 'center', widgetId: 'preview' });
   });
-  const before = project();
-  expect(before.widgetRegions.left.activeInstanceId).toBe(graphInstanceId);
-  expect(before.widgetRegions.center.activeInstanceId).toBe('preview');
-  expect(before.widgetRegions.center.instanceIds).toContain(graphInstanceId);
+  const beforeLayout = layout();
+  expect(beforeLayout.widgetRegions.left.activeInstanceId).toBe(graphInstanceId);
+  expect(beforeLayout.widgetRegions.center.activeInstanceId).toBe('preview');
+  expect(beforeLayout.widgetRegions.center.instanceIds).toContain(graphInstanceId);
   await focusRegion('left');
 
   await press('{Shift>}Z{/Shift}');
   await expectFocusedRegion('center');
-  expect(project().widgetRegions.left).toEqual(before.widgetRegions.left);
-  expect(project().layout.panels.isLeftOpen).toBe(true);
-  expect(project().widgetRegions.center).toEqual({
-    ...before.widgetRegions.center,
+  expect(layout().widgetRegions.left).toEqual(beforeLayout.widgetRegions.left);
+  expect(layout().panels.isLeftOpen).toBe(true);
+  expect(layout().widgetRegions.center).toEqual({
+    ...beforeLayout.widgetRegions.center,
     activeInstanceId: graphInstanceId,
   });
 
   await press('{Shift>}Z{/Shift}');
   await expectFocusedRegion('left');
-  expect(project().widgetRegions.left).toEqual(before.widgetRegions.left);
-  expect(project().widgetRegions.center.activeInstanceId).toBe(graphInstanceId);
+  expect(layout().widgetRegions.left).toEqual(beforeLayout.widgetRegions.left);
+  expect(layout().widgetRegions.center.activeInstanceId).toBe(graphInstanceId);
 });
 
 it('reopens a bottom workflow graph using the remapped shortcut only from workflow surfaces', async () => {
@@ -362,14 +361,15 @@ it('reopens a bottom workflow graph using the remapped shortcut only from workfl
     runtime.store.commands.layout.setRegionCollapsed('bottom', true);
   });
   const before = project();
-  expect(before.widgetRegions.bottom.isCollapsed).toBe(true);
+  const beforeLayout = layout();
+  expect(beforeLayout.widgetRegions.bottom.isCollapsed).toBe(true);
 
   await focusRegion('right');
   await press('{Shift>}Z{/Shift}');
   await expectFocusedRegion('right');
   expect(project()).toBe(before);
 
-  const workflowId = before.widgetRegions.left.activeInstanceId;
+  const workflowId = beforeLayout.widgetRegions.left.activeInstanceId;
   const textarea = host.querySelector<HTMLTextAreaElement>(`[aria-label="${workflowId} text"]`)!;
   await act(() => textarea.focus());
   await press('{Shift>}Z{/Shift}');
@@ -385,8 +385,8 @@ it('reopens a bottom workflow graph using the remapped shortcut only from workfl
 
   await press('{Shift>}J{/Shift}');
   await expectFocusedRegion('bottom');
-  expect(project().widgetRegions.bottom).toEqual({ ...before.widgetRegions.bottom, isCollapsed: false });
-  expect(project().widgetRegions.center).toEqual(before.widgetRegions.center);
+  expect(layout().widgetRegions.bottom).toEqual({ ...beforeLayout.widgetRegions.bottom, isCollapsed: false });
+  expect(layout().widgetRegions.center).toEqual(beforeLayout.widgetRegions.center);
   await press('{Shift>}J{/Shift}');
   await expectFocusedRegion('left');
 });

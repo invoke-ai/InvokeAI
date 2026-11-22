@@ -16,7 +16,7 @@ import { getWorkbenchPreferences, patchWorkbenchPreferences } from '@workbench/s
 import { resolveWidgetLabel } from '@workbench/widgetLabels';
 import { addWidgetToWorkspace } from '@workbench/widgetPlacementCommands';
 import { selectStructureLock } from '@workbench/workspace/structureLock';
-import { openInWorkspace, startCustomizing } from '@workbench/workspace/workspaceNavigation';
+import { customizeWorkspaceById, openInWorkspace, startCustomizing } from '@workbench/workspace/workspaceNavigation';
 
 import type { NotificationActionContext } from './notificationActions';
 
@@ -25,7 +25,7 @@ export interface EditorNotificationActionSources {
   focus: Pick<WorkbenchFocusController, 'focusFloating' | 'focusRegion'>;
   getWidgetById: (widgetId: WidgetTypeId) => RegisteredWidget | undefined;
   getWidgetsForRegion: (region: WidgetRegion) => RegisteredWidget[];
-  queries: Pick<WorkbenchQueries, 'getSnapshot'>;
+  queries: Pick<WorkbenchQueries, 'getSnapshot' | 'getWorkspaceLayout'>;
   /** Queue's retry command (`queueCommands.retryItems`): the ids of the items that re-run the given ones. */
   retryQueueItems: (itemIds: number[]) => Promise<number[]>;
   t: TFunction;
@@ -69,9 +69,9 @@ export const createEditorNotificationActionContext = ({
         openInWorkspace(ports, { surface, typeId: widgetId }, { mode: 'stay' });
       }
     },
-    customizeWorkspace: () => {
+    customizeWorkspace: (workspaceId) => {
       if (!getLock().isCustomizing) {
-        startCustomizing({ commands, queries });
+        customizeWorkspaceById({ commands, queries }, workspaceId);
       }
     },
     isRearranging: () => getWorkbenchPreferences().rearrangeWithoutCustomize,

@@ -103,9 +103,13 @@ const deleteConfirmation = (): HTMLElement | null => document.querySelector<HTML
 
 beforeEach(() => {
   store = createWorkbenchStore();
-  store.commands.layout.createPreset('custom-1', 'Custom', 'star');
+  store.commands.layout.beginCustomize({ defaultRoute: null, iconId: 'star', id: 'custom-1', label: 'Custom' });
+  store.commands.layout.finishCustomize();
   store.commands.layout.reorderPresets('custom-1', 'edit');
-  store.commands.layout.renamePreset('compose', 'Writing');
+  store.commands.layout.applyPreset('compose');
+  store.commands.layout.beginCustomize();
+  store.commands.layout.setCustomizeDraft({ label: 'Writing' });
+  store.commands.layout.finishCustomize();
 });
 
 afterEach(async () => {

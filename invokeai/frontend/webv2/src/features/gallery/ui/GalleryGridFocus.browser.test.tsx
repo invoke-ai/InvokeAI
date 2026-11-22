@@ -1,11 +1,11 @@
-/* oxlint-disable react-perf/jsx-no-new-object-as-prop */
 import type { GalleryItem, GalleryItemRef } from '@features/gallery/contracts';
 import type { QueueProgressSession } from '@features/queue/contracts';
 import type { ExtensionRegistry } from '@workbench/extensions/extensionRegistry';
 import type { Project } from '@workbench/projectContracts';
 import type * as projectsApi from '@workbench/projects/api';
 import type { WidgetContributionSource } from '@workbench/widgetContracts';
-import type { WorkbenchInternalStore } from '@workbench/workbenchStore';
+/* oxlint-disable react-perf/jsx-no-new-object-as-prop */
+import type { WorkbenchInternalStore, WorkbenchSnapshot } from '@workbench/workbenchStore';
 
 import { Box, ChakraProvider } from '@chakra-ui/react';
 import { toGalleryItemKey, toGalleryItemRef } from '@features/gallery/core/items';
@@ -47,6 +47,10 @@ const runtimeMocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@workbench/WorkbenchContext', () => ({
+  useActiveLayoutSelector: <Selected,>(selector: (layout: WorkbenchSnapshot['activeLayout']) => Selected) =>
+    selector(runtimeMocks.store.getSnapshot().activeLayout),
+  useWorkbenchSelector: <Selected,>(selector: (snapshot: WorkbenchSnapshot) => Selected) =>
+    selector(runtimeMocks.store.getSnapshot()),
   useActiveProjectSelector: <Selected,>(selector: (project: Project) => Selected) =>
     selector(runtimeMocks.store.getSnapshot().activeProject),
   useOptionalWorkbenchExtensions: () => runtimeMocks.extensions,
@@ -450,10 +454,10 @@ beforeEach(() => {
   accountLifecycle.activate('grid-focus-user');
   runtimeMocks.store = createWorkbenchStore();
   runtimeMocks.extensions = createExtensionRegistry();
-  const project = runtimeMocks.store.getSnapshot().activeProject;
+  const { activeLayout, activeProject: project } = runtimeMocks.store.getSnapshot();
 
   gallerySource = {
-    instanceId: project.widgetRegions.right.activeInstanceId,
+    instanceId: activeLayout.widgetRegions.right.activeInstanceId,
     projectId: project.id,
     region: 'right',
     typeId: 'gallery',

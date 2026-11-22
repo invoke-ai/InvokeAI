@@ -2,14 +2,17 @@ import type { InvocationRoute, InvocationSourceId } from '@workbench/invocationC
 import type { WidgetRegion } from '@workbench/layoutContracts';
 import type { WidgetInstanceId } from '@workbench/widgetContracts';
 
-import type { IsCenterView, SavedWorkspace, WorkspacePlacement, WorkspaceSources } from './workspaceDerivations';
+import type { WorkspaceStructure } from './structure';
+import type { SurfaceAvailability, WorkspaceView } from './view';
+import type { SavedWorkspace, WorkspacePlacement, WorkspaceSources } from './workspaceDerivations';
 
-import { getEntryStage, getWorkspaceHomeFronts, getWorkspaceJob } from './workspaceDerivations';
+import { frontRegion } from './view';
+import { getRegionFront, getWorkspaceHomeFronts, getWorkspaceJob } from './workspaceDerivations';
 
-/** What entering a workspace changes: region fronts and the route. Nothing else is written. */
+/** What entering a workspace changes: the project's view of it and the route. Nothing else is written. */
 export interface WorkspaceEntry {
-  fronts: Partial<Record<WidgetRegion, WidgetInstanceId>>;
   invocation: InvocationRoute;
+  view: WorkspaceView | undefined;
 }
 
 const SIDE_REGION_ORDER: readonly WidgetRegion[] = ['left', 'right', 'bottom'];
@@ -27,12 +30,13 @@ const findJobSourceFront = (
     return typeId !== undefined && getSourceId(typeId) === sourceId;
   };
   const homeFronts = getWorkspaceHomeFronts(workspace.snapshot);
-  const home = SIDE_REGION_ORDER.find(
-    (region) => runsJob(homeFronts[region]) && placement.widgetRegions[region].instanceIds.includes(homeFronts[region])
-  );
 
-  if (home) {
-    return { instanceId: homeFronts[home], region: home };
+  for (const region of SIDE_REGION_ORDER) {
+    const home = homeFronts[region];
+
+    if (home !== null && runsJob(home) && placement.widgetRegions[region].instanceIds.includes(home)) {
+      return { instanceId: home, region };
+    }
   }
 
   for (const region of SIDE_REGION_ORDER) {
@@ -49,52 +53,52 @@ const findJobSourceFront = (
 };
 
 /**
- * Entering a workspace puts its job on screen: the center fronts the stage (Away ends), the job's source is fronted in
- * its region, and the route becomes the job, each lock kept. A collapsed or closed panel stays so, and sizes, other
- * fronts and windows are untouched. A workspace with no job leaves the route as it was.
+ * Entering a workspace puts its job on screen, writing view only: the stage is fronted in the center (`frontRegion`,
+ * so Away ends and a side region's explicit front of the stage's own instance goes: the stage is in the center after
+ * every entry), the job's source is fronted in its region, and the route becomes the job, each lock kept. A collapsed
+ * panel stays so, and sizes, other fronts and windows are untouched. A workspace with no job leaves the route as it was.
  */
 export const enterWorkspace = ({
   invocation,
-  isCenterView,
-  placement,
+  resolve,
   sources,
+  structure,
+  surfaces,
+  view,
   workspace,
 }: {
   invocation: InvocationRoute;
-  isCenterView: IsCenterView;
-  /** What is laid out for this project now. */
-  placement: WorkspacePlacement;
+  /** What the structure shows seen through a view. */
+  resolve: (view: WorkspaceView | undefined) => WorkspacePlacement;
   sources: WorkspaceSources;
+  structure: WorkspaceStructure;
+  surfaces: SurfaceAvailability;
+  view: WorkspaceView | undefined;
   workspace: SavedWorkspace;
 }): WorkspaceEntry => {
-  const fronts: WorkspaceEntry['fronts'] = {};
-  const stage = getEntryStage(workspace, placement, isCenterView);
-
-  if (stage !== null && placement.widgetRegions.center.activeInstanceId !== stage) {
-    fronts.center = stage;
-  }
-
+  const stage = getRegionFront(structure.widgetRegions.center);
+  const home = stage === null ? view : frontRegion(view, structure, 'center', stage, surfaces);
+  const placement = resolve(home);
   const job = getWorkspaceJob(workspace, placement, sources);
 
   if (!job) {
-    return { fronts, invocation };
+    return { invocation, view: home };
   }
 
   // Side regions only: a source in the center is the stage itself, or the stage outranks it.
   const source = findJobSourceFront(workspace, placement, job.sourceId, sources.getSourceId);
-
-  if (source && placement.widgetRegions[source.region].activeInstanceId !== source.instanceId) {
-    fronts[source.region] = source.instanceId;
-  }
-
   const sourceId = invocation.sourceLocked ? invocation.sourceId : job.sourceId;
   const destination = invocation.destinationLocked ? invocation.destination : job.destination;
 
   return {
-    fronts,
     invocation:
       sourceId === invocation.sourceId && destination === invocation.destination
         ? invocation
         : { ...invocation, destination, sourceId },
+    // The stage's own instance in a side region stays behind the center, where it already shows.
+    view:
+      source && source.instanceId !== stage
+        ? frontRegion(home, structure, source.region, source.instanceId, surfaces)
+        : home,
   };
 };

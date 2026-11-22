@@ -1,4 +1,5 @@
 import type { ToastAction } from '@platform/ui/toaster';
+import type { LayoutPresetId } from '@workbench/layoutContracts';
 import type { WorkbenchNotification, WorkbenchNotificationAction } from '@workbench/projectContracts';
 import type { WidgetTypeId } from '@workbench/widgetContracts';
 import type { TFunction } from 'i18next';
@@ -20,8 +21,8 @@ export interface NotificationActionContext {
    * workspace enters Customize with it added.
    */
   addWidget: (widgetId: WidgetTypeId, surface?: 'stage' | 'panel') => void;
-  /** Enters Customize on the active project's workspace, unless it already is customizing. */
-  customizeWorkspace: () => void;
+  /** Enters Customize on the named workspace (switching to it first) or the active one, unless already customizing. */
+  customizeWorkspace: (workspaceId?: LayoutPresetId) => void;
   /** Whether this account rearranges without Customize; the one-time offer retires once it does not. */
   isRearranging: () => boolean;
   /** Turns "Rearrange without Customize" off. */
@@ -71,7 +72,7 @@ const handlers: {
   },
   'customize-workspace': {
     label: (_action, { t }) => t('shell.workspace.customize'),
-    run: (_action, { customizeWorkspace }) => customizeWorkspace(),
+    run: ({ workspaceId }, { customizeWorkspace }) => customizeWorkspace(workspaceId),
   },
   'keep-rearranging': {
     label: (_action, { isRearranging, t }) => (isRearranging() ? t('shell.workspace.keepRearranging') : null),
