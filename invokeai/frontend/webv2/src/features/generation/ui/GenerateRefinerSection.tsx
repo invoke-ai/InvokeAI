@@ -1,8 +1,8 @@
-/* oxlint-disable react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-jsx-as-prop */
+/* oxlint-disable react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop */
 import type { GenerationModelCatalogItem as ModelConfig } from '@features/generation/contracts';
 import type { GenerateModelConfig, GenerateSettings } from '@features/generation/core/types';
 
-import { Badge, Stack } from '@chakra-ui/react';
+import { Stack } from '@chakra-ui/react';
 import { getGenerationUiPolicy, getSchedulerOptions } from '@features/generation/core/baseGenerationPolicies';
 import {
   DEFAULT_REFINER_CFG_SCALE,
@@ -141,10 +141,10 @@ export const GenerateRefinerSection = ({
     <GenerateCollapsibleSection
       label={t('widgets.generate.refiner')}
       defaultOpen={false}
-      badges={refiner ? <Badge>{isActive ? refiner.name : t('commandPalette.settings.off')}</Badge> : null}
+      summary={refiner ? [isActive ? refiner.name : t('commandPalette.settings.off')] : undefined}
       sectionId="refiner"
     >
-      <Stack gap="2" p="2">
+      <Stack gap="2.5">
         <GenerateIssueNotes section="refiner" />
         <Field hint="refinerModel" label={t('widgets.generate.refinerModel')}>
           {/* The picker owns the loading and empty states, so no refiner installed reads as one message. */}

@@ -28,12 +28,10 @@ describe('classifySystemPrompts', () => {
 
     expect(classified.personalPrompts).toEqual([mine]);
     expect(classified.sharedPrompts).toEqual([sharedByOther]);
-    // Another user's private prompt is not visible at all.
     expect(classified.prompts).toEqual([mine, sharedByOther]);
   });
 
   it('treats everything as personal in single-user mode', () => {
-    // The synthetic system identity also owns ordinary single-user records.
     const seeded = record('a', 'system', true);
     const created = record('b', 'system', false);
 
@@ -83,7 +81,6 @@ describe('resolveSelectedSystemPromptId', () => {
   });
 
   it('falls back when the stored id no longer exists', () => {
-    // Recover selection at read time after deletion/unsharing without corrective persistence.
     expect(resolveSelectedSystemPromptId(prompts, 'deleted')).toBe('a');
   });
 
@@ -130,7 +127,6 @@ describe('canEditSystemPrompt', () => {
   });
 
   it('never lets a manager edit another user’s private prompt', () => {
-    // Private-prompt moderation rights do not grant everyday editing controls.
     const privateOfOther = record('c', 'someone', false);
 
     expect(canEditSystemPrompt(privateOfOther, MANAGER)).toBe(false);

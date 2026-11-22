@@ -291,7 +291,6 @@ describe('failure', () => {
     expect(harness.spies.reportError).toHaveBeenCalledOnce();
     expect(rasterizer.getFailure(layer)).toBe('unreadable');
 
-    // Another image is another failure, worth its own notice.
     const replaced = rasterLayer({ source: { image: { height: 4, imageName: 'b.png', width: 4 }, type: 'image' } });
     harness.document.value = documentOf([replaced]);
     expect(rasterizer.getFailure(replaced)).toBeNull();
@@ -315,7 +314,6 @@ describe('failure', () => {
     await rasterizer.getOrStartLayerRasterization(layer, harness.document.value);
     expect(rasterizer.isBackingOff(layer)).toBe(true);
     timers.at(-1)!.callback();
-    // The backoff's end lets the display try again, and says so; the failure itself is still on record.
     expect(rasterizer.isBackingOff(layer)).toBe(false);
     expect(rasterizer.getFailure(layer)).toBe('unreadable');
     expect(harness.spies.invalidateLayerRender).toHaveBeenCalledWith('layer-1');
@@ -353,10 +351,8 @@ describe('failure', () => {
       RASTERIZATION_RETRY_BASE_MS,
       RASTERIZATION_RETRY_BASE_MS * 2,
     ]);
-    // The notice carries the wrapper, which names the image, with the resolver's error as its cause.
     expect(harness.spies.reportError.mock.calls).toEqual([['Layer thumbnail rasterization failed', 'layer-1', outage]]);
 
-    // Once the image is gone for good, the same key reads as unreadable, and that new kind is reported.
     const gone = new Error('decode failed');
     harness.rasterize.mockRejectedValue(gone);
     await expect(rasterizer.getOrStartLayerRasterization(layer, harness.document.value)).resolves.toBe('error');

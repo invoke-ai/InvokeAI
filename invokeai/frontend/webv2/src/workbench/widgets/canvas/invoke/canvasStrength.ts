@@ -1,7 +1,4 @@
-/**
- * Share the persisted canvas denoising key/default/clamp between UI and invocation preparation. img2img consumes
- * it; txt2img ignores it.
- */
+/** Persisted canvas denoising key, default and clamp, shared by UI and invocation; txt2img ignores it. */
 
 /** The persisted key inside the canvas widget's `state.values`. */
 export const CANVAS_DENOISING_STRENGTH_KEY = 'denoisingStrength';

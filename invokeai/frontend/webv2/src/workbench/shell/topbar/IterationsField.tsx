@@ -8,23 +8,9 @@ import { useTranslation } from 'react-i18next';
 
 import { getBatchCount, isBatchCountFixed } from './useInvocationState';
 
-/**
- * Invoke's rounded corners overlap this field, so its edge facing Invoke is hidden and a tail continues the frame
- * beneath them. The input is a replaced element, so the root carries the tail; it overlaps the input by 2px so the
- * opaque border rows join without a sub-pixel seam.
- */
-const TAIL_UNDER_INVOKE_AFTER_CSS = {
-  '& input': { borderInlineEndColor: 'transparent' },
-  '&::after': {
-    borderBlockWidth: '1px',
-    content: '""',
-    pointerEvents: 'none',
-    position: 'absolute',
-    borderColor: 'border',
-    insetBlock: 0,
-    insetInlineStart: 'calc(100% - 2px)',
-    width: 'calc({radii.control} + 2px)',
-  },
+/** Invoke's corners overlap this field; a zero-width edge, not a transparent one, so state colors cannot repaint it. */
+const RUN_UNDER_INVOKE_CSS = {
+  '& input': { borderInlineEndWidth: '0', width: 'calc(100% + {radii.control})' },
 } as const;
 
 export const IterationsField = () => {
@@ -71,7 +57,7 @@ export const IterationsField = () => {
           say why it cannot change. */}
       <NumberInput.Root
         allowMouseWheel
-        css={TAIL_UNDER_INVOKE_AFTER_CSS}
+        css={RUN_UNDER_INVOKE_CSS}
         cursor={isFixed ? 'not-allowed' : undefined}
         flexShrink={0}
         opacity={isFixed ? 0.55 : undefined}

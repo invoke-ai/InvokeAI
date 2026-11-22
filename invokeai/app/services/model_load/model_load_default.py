@@ -16,6 +16,7 @@ from invokeai.app.services.model_load.model_load_base import ModelLoadServiceBas
 from invokeai.app.services.model_load.model_load_common import distinct_caches, load_settings_changed
 from invokeai.app.services.model_records import UnknownModelException
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
+from invokeai.backend.model_manager.configs.roles import ModelRoleError, view_as
 from invokeai.backend.model_manager.load import (
     LoadedModel,
     LoadedModelWithoutConfig,
@@ -188,7 +189,7 @@ class ModelLoadService(ModelLoadServiceBase):
                 # The record changed after the caller read it: loading what it says now is what this call
                 # would have done had it been made a moment later. Retried here rather than by callers so
                 # every caller gets it.
-                return self._load(self._current_record(model_config.key), submodel_type)
+                return self._load(self._record_as(model_config), submodel_type)
             except FileNotFoundError:
                 # The same, when the model was moved and its record updated to the new path; a missing
                 # file under an unchanged (or deleted) record is the caller's real error.
@@ -276,6 +277,19 @@ class ModelLoadService(ModelLoadServiceBase):
         self._record_edits.wait_idle(key)
         return self._invoker.services.model_manager.store.get_model(key)
 
+    @staticmethod
+    def _as_role_of(config: AnyModelConfig, current: AnyModelConfig) -> AnyModelConfig:
+        """`current` in the role `config` is a view of; `current` itself when `config` is a stored record.
+        Raises ModelRoleError when the record no longer serves that role."""
+        if getattr(config, "role_of", None) is None:
+            return current
+        return view_as(current, config.type)
+
+    def _record_as(self, config: AnyModelConfig) -> AnyModelConfig:
+        """The stored record for `config`'s key, in the role `config` is loaded as. A role view is compared with the
+        view of the stored record: its type and class never equal the stored record's."""
+        return self._as_role_of(config, self._current_record(config.key))
+
     def _moved_record(self, config: AnyModelConfig) -> Optional[AnyModelConfig]:
         """The stored record for `config`'s key if it now loads differently from `config`, else None."""
         if not hasattr(self, "_invoker"):
@@ -283,6 +297,11 @@ class ModelLoadService(ModelLoadServiceBase):
         try:
             current = self._current_record(config.key)
         except UnknownModelException:
+            return None
+        try:
+            current = self._as_role_of(config, current)
+        except ModelRoleError:
+            # Runs in the FileNotFoundError handler: the original error is the caller's.
             return None
         if self._load_settings_changed(config, current):
             return current
@@ -310,6 +329,10 @@ class ModelLoadService(ModelLoadServiceBase):
         except UnknownModelException:
             # Nothing newer to load instead, and the key can no longer be requested.
             return True
+        try:
+            current = self._as_role_of(config, current)
+        except ModelRoleError:
+            return False
         return not self._load_settings_changed(config, current)
 
     def load_model_from_path(

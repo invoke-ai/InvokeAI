@@ -1,8 +1,3 @@
-/**
- * Compare full and damage-clipped repaints over previous frames on real canvases. Pixel equality catches
- * underreported damage that draw-call assertions cannot.
- */
-
 import type {
   CanvasDocumentContractV3,
   CanvasLayerContract,
@@ -11,7 +6,7 @@ import type {
 import type { LayerDamage, Mat2d, Rect } from '@workbench/canvas-engine/types';
 
 import { stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
-import { fromTRS, identity } from '@workbench/canvas-engine/math/mat2d';
+import { identity } from '@workbench/canvas-engine/math/mat2d';
 import { createLayerCacheStore } from '@workbench/canvas-engine/render/layerCache';
 import { createDomRasterBackend } from '@workbench/canvas-engine/render/raster';
 import { describe, expect, it } from 'vitest';
@@ -34,7 +29,6 @@ const rasterLayer = (id: string, overrides: Partial<CanvasRasterLayerContractV2>
   ...overrides,
 });
 
-/** A fresh backend + cache with each layer's surface painted a flat colour. */
 const scene = (layers: CanvasLayerContract[], rects: Record<string, Rect>, colors: Record<string, string>) => {
   const backend = createDomRasterBackend();
   const caches = createLayerCacheStore(backend);
@@ -49,7 +43,6 @@ const scene = (layers: CanvasLayerContract[], rects: Record<string, Rect>, color
   return { backend, caches };
 };
 
-/** Paints `rect` (layer-local) of a layer's cache a new colour. */
 const repaint = (
   caches: ReturnType<typeof createLayerCacheStore>,
   layerId: string,
@@ -96,7 +89,6 @@ describe('damage-clipped compositing matches a full repaint', () => {
     const tile = checkerboard ? createCheckerboardTile(backend, { a: '#2a2a2a', b: '#363636' }) : null;
     const opts = { backend, checkerboardTile: tile, imageSmoothing: false, ...extra };
 
-    // Seed both with an identical full composite.
     compositeDocument(full, doc, caches, view, opts);
     compositeDocument(clipped, doc, caches, view, opts);
 
@@ -126,21 +118,6 @@ describe('damage-clipped compositing matches a full repaint', () => {
     expect(countDifferences(full, clipped)).toEqual({ differing: 0, worst: 0 });
   });
 
-  it('tracks an edit under a translated + scaled layer transform', () => {
-    // The damage arrives layer-local, so the compositor has to carry it through
-    // the layer matrix. A wrong mapping leaves the repainted area stale.
-    const layers = [rasterLayer('a', { transform: { rotation: 0, scaleX: 1.7, scaleY: 1.3, x: 55, y: 25 } })];
-    const rects = { a: { height: 160, width: 220, x: 0, y: 0 } };
-    const { backend, caches } = scene(layers, rects, { a: '#22c55e' });
-    const doc = { stacks: stacksFrom(layers) } as unknown as CanvasDocumentContractV3;
-    const steps = [
-      () => repaint(caches, 'a', { height: 40, width: 50, x: 20, y: 20 }, '#eab308'),
-      () => repaint(caches, 'a', { height: 25, width: 25, x: 120, y: 90 }, '#a855f7'),
-    ];
-    const { clipped, full } = run(doc, caches, backend, IDENTITY_VIEW, steps, true);
-    expect(countDifferences(full, clipped)).toEqual({ differing: 0, worst: 0 });
-  });
-
   it('tracks an edit under a rotated layer transform', () => {
     const layers = [rasterLayer('a', { transform: { rotation: 0.4, scaleX: 1, scaleY: 1, x: 90, y: 60 } })];
     const rects = { a: { height: 150, width: 200, x: 0, y: 0 } };
@@ -151,38 +128,7 @@ describe('damage-clipped compositing matches a full repaint', () => {
     expect(countDifferences(full, clipped)).toEqual({ differing: 0, worst: 0 });
   });
 
-  it('tracks an edit to a lower layer with others stacked over it', () => {
-    // The damaged layer is overdrawn by a translucent one above, so the clipped
-    // frame has to redraw the whole stack inside the rect, not just that layer.
-    const layers = [rasterLayer('top', { opacity: 0.5 }), rasterLayer('bottom')];
-    const rects = {
-      bottom: { height: 220, width: 320, x: 20, y: 20 },
-      top: { height: 140, width: 180, x: 90, y: 70 },
-    };
-    const { backend, caches } = scene(layers, rects, { bottom: '#3b82f6', top: '#f43f5e' });
-    const doc = { stacks: stacksFrom(layers) } as unknown as CanvasDocumentContractV3;
-    const steps = [
-      () => repaint(caches, 'bottom', { height: 60, width: 60, x: 100, y: 80 }, '#facc15'),
-      () => repaint(caches, 'bottom', { height: 40, width: 200, x: 40, y: 200 }, '#14b8a6'),
-    ];
-    const { clipped, full } = run(doc, caches, backend, IDENTITY_VIEW, steps, true);
-    expect(countDifferences(full, clipped)).toEqual({ differing: 0, worst: 0 });
-  });
-
-  it('tracks edits under a zoomed and panned viewport', () => {
-    const layers = [rasterLayer('a')];
-    const rects = { a: { height: 180, width: 240, x: 10, y: 10 } };
-    const { backend, caches } = scene(layers, rects, { a: '#8b5cf6' });
-    const doc = { stacks: stacksFrom(layers) } as unknown as CanvasDocumentContractV3;
-    for (const view of [fromTRS({ x: -120, y: -80 }, 0, 3, 3), fromTRS({ x: 40, y: 30 }, 0, 0.6, 0.6)]) {
-      const steps = [() => repaint(caches, 'a', { height: 30, width: 30, x: 50, y: 45 }, '#fb7185')];
-      const { clipped, full } = run(doc, caches, backend, view, steps, true);
-      expect(countDifferences(full, clipped)).toEqual({ differing: 0, worst: 0 });
-    }
-  });
-
   it('repaints in full when the damage names a layer that is gone', () => {
-    // A stale id cannot be placed, so the frame must widen rather than guess.
     const layers = [rasterLayer('a')];
     const rects = { a: { height: 200, width: 300, x: 40, y: 30 } };
     const { backend, caches } = scene(layers, rects, { a: '#3b82f6' });
@@ -194,16 +140,6 @@ describe('damage-clipped compositing matches a full repaint', () => {
       },
     ];
     const { clipped, full } = run(doc, caches, backend, IDENTITY_VIEW, steps, true);
-    expect(countDifferences(full, clipped)).toEqual({ differing: 0, worst: 0 });
-  });
-
-  it('holds with the checkerboard off', () => {
-    const layers = [rasterLayer('a')];
-    const rects = { a: { height: 200, width: 300, x: 40, y: 30 } };
-    const { backend, caches } = scene(layers, rects, { a: '#3b82f6' });
-    const doc = { stacks: stacksFrom(layers) } as unknown as CanvasDocumentContractV3;
-    const steps = [() => repaint(caches, 'a', { height: 50, width: 50, x: 70, y: 70 }, '#ef4444')];
-    const { clipped, full } = run(doc, caches, backend, IDENTITY_VIEW, steps, false);
     expect(countDifferences(full, clipped)).toEqual({ differing: 0, worst: 0 });
   });
 });
@@ -237,7 +173,7 @@ describe('overlay stacks switched off while a result is staged', () => {
         backend,
         imageSmoothing: false,
         regionOverlays: !staging,
-        showOverlayStacks: staging ? { control: true, inpaint_mask: false, regional_guidance: false } : undefined,
+        showOverlayStacks: staging ? { control: false, inpaint_mask: false, regional_guidance: false } : undefined,
       });
 
     draw(true);

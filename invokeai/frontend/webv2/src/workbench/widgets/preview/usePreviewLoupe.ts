@@ -22,12 +22,7 @@ import {
 import { capturePointer, releasePointer, trackPointerDown } from './loupeGestures';
 import { getActualZoomLimits } from './previewHeaderStore';
 
-/**
- * Use the whole stage for wheel zoom, drag pan, fit/100% toggle, and touch pinch. Apply rAF-batched CSS transforms
- * outside React; publish rounded actual-pixel zoom and the exact fit, with scale 1 meaning fit, and re-render only when
- * zooming starts or ends. Zoom never goes below the smaller of fit and 100%, so an image the fit enlarges can still be
- * seen at its own size.
- */
+/** Stage-wide zoom and pan via rAF-batched CSS outside React; scale 1 means fit. */
 
 /** Switch to pixelated rendering at/above this actual-pixel zoom. */
 const PIXELATED_ACTUAL_ZOOM = 2;
@@ -66,11 +61,7 @@ interface PinchGesture {
   startTransform: LoupeTransform;
 }
 
-/**
- * Clamp one axis of the translation: content smaller than the stage is
- * centered; content larger may pan but never leaves a gap at either edge.
- * `base` is the content's untransformed layout offset within the stage.
- */
+/** Smaller content centers; larger content pans without edge gaps; `base` is its untransformed offset. */
 const clampAxis = (t: number, stageLen: number, base: number, scaledLen: number): number =>
   scaledLen <= stageLen ? (stageLen - scaledLen) / 2 - base : Math.min(-base, Math.max(stageLen - scaledLen - base, t));
 
@@ -100,7 +91,8 @@ export const usePreviewLoupe = ({
   const lastSourceTokenRef = useRef<string | null | undefined>(undefined);
   /** Wheel zoom's snap memory, in actual zoom, with the fit ratio it was measured at; other zoom changes drop it. */
   const wheelSnapRef = useRef<{ fitRatio: number; snap: WheelZoomSnap } | null>(null);
-  const [isZoomed, setIsZoomed] = useState(false);
+  // Not `isZoomed`: below fit (an enlarged image at 100%) is zoomed but fits, so a drag still moves the image out.
+  const [isPannable, setIsPannable] = useState(false);
   const publishedRef = useRef<PreviewZoomState>(FIT_UNMEASURED);
   // Keep gesture/ref identity stable across images; callback cleanup must not cancel the frame clearing an old
   // transform.
@@ -139,7 +131,6 @@ export const usePreviewLoupe = ({
       }
 
       publishedRef.current = next;
-      setIsZoomed(next.isZoomed);
       onZoomChangeRef.current?.(next);
     },
     [measureFitRatio]
@@ -175,18 +166,15 @@ export const usePreviewLoupe = ({
 
       const actualZoom = getActualZoom(transform.scale);
 
-      // `image-rendering` is inherited, so setting it on the content box
-      // reaches the img (whose own style leaves it unset while the loupe is
-      // enabled).
+      // `image-rendering` is inherited, so setting it on the content box reaches the img (whose own style leaves it
+      // unset while the loupe is enabled).
       content.style.imageRendering = !isFit && actualZoom >= PIXELATED_ACTUAL_ZOOM ? 'pixelated' : '';
+      setIsPannable(transform.scale > 1);
       publish(transform.scale);
     });
   }, [getActualZoom, publish]);
 
-  /**
-   * Reset transforms when the displayed-image token changes without remounting decoded media; null disables the
-   * loupe.
-   */
+  /** Resets on a new image token without remounting decoded media; null disables the loupe. */
   const syncDisplayedSource = (token: string | null): void => {
     if (lastSourceTokenRef.current === token) {
       return;
@@ -267,8 +255,8 @@ export const usePreviewLoupe = ({
     [constrainScale, setTransform]
   );
 
-  // Both commands drop a gesture in flight: a live pinch resolves every move
-  // from the transform it started on, so its next move would undo the command.
+  // Both commands drop a gesture in flight: a live pinch resolves every move from the transform it started on, so its
+  // next move would undo the command.
   const reset = useCallback(() => {
     pinchRef.current = null;
     wheelSnapRef.current = null;
@@ -370,12 +358,7 @@ export const usePreviewLoupe = ({
     return pinchRef.current;
   }, []);
 
-  /**
-   * Ends one pointer, wherever it lifted. Lifting one finger of a three-finger
-   * gesture re-pinches on what is left; lifting to a single finger hands the
-   * gesture over to a pan, so the image keeps following that finger without a
-   * release and re-touch.
-   */
+  /** Lifting to one finger hands the gesture to a pan without a re-touch. */
   const endPointer = useCallback(
     (pointerId: number): void => {
       const pointers = pointersRef.current;
@@ -455,8 +438,8 @@ export const usePreviewLoupe = ({
         zoomAroundPoint(stageX, stageY, snap.zoom / fitRatio);
       };
 
-      // Track pointer positions/releases document-wide so off-stage movement cannot leave phantom pinch origins;
-      // stage handlers still drive gestures.
+      // Track pointer positions/releases document-wide so off-stage movement cannot leave phantom pinch origins; stage
+      // handlers still drive gestures.
       const handleDocumentPointerMove = (event: PointerEvent): void => {
         const pointers = pointersRef.current;
 
@@ -487,10 +470,7 @@ export const usePreviewLoupe = ({
     [constrainScale, endPointer, measureFitRatio, zoomAroundPoint]
   );
 
-  /**
-   * Cancel dnd's pending/active image drag when pinch takes over using a document-targeted non-bubbling
-   * pointercancel. Only do so when a finger began on the image, leaving stage handlers untouched.
-   */
+  /** Cancels dnd's image drag with a document-targeted non-bubbling pointercancel, only for image touches. */
   const cancelPointerDrag = (): void => {
     const stage = stageRef.current;
 
@@ -608,7 +588,7 @@ export const usePreviewLoupe = ({
   if (!enabled) {
     return {
       contentRefCallback: null,
-      isZoomed: false,
+      isPannable: false,
       reset,
       stageProps: null,
       stageRefCallback: null,
@@ -618,7 +598,7 @@ export const usePreviewLoupe = ({
 
   return {
     contentRefCallback,
-    isZoomed,
+    isPannable,
     reset,
     stageProps: {
       onDoubleClick: handleDoubleClick,
@@ -632,9 +612,6 @@ export const usePreviewLoupe = ({
 
 const FIT_UNMEASURED: PreviewZoomState = { fitPercent: null, isZoomed: false, percent: null };
 
-/**
- * A resize republishes the fit only once it moves by 0.1%, not on every pixel, which still tells a 100.2% fit from an
- * exact 100%.
- */
+/** Republishes fit only on 0.1% moves, which still tells a 100.2% fit from 100%. */
 const getFitStep = (fitPercent: number | null): number | null =>
   fitPercent === null ? null : Math.round(fitPercent * 10);

@@ -1,6 +1,8 @@
+/* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-function-as-prop -- List slots take JSX and callbacks; the React Compiler memoizes them. */
+import type { ListRowProps } from '@platform/ui/list/List';
 import type { ProjectWithWorkspaceDTO } from '@workbench/projects/api';
 
-import { Icon, Portal, Spinner, Stack, Text } from '@chakra-ui/react';
+import { Box, Icon, Portal, Spinner, Text } from '@chakra-ui/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import {
   assertAccountScopeCurrent,
@@ -9,12 +11,14 @@ import {
 } from '@platform/state/accountLifecycle';
 import { areArraysEqual } from '@platform/state/selectors';
 import { getApiErrorMessage } from '@platform/transport/http';
-import { Button, CloseButton, Row, Scrollable } from '@platform/ui';
+import { Button, CloseButton } from '@platform/ui/Button';
 import { Dialog } from '@platform/ui/Dialog';
-import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
-import { MIN_SUPPORTED_CANVAS_SCHEMA_VERSION } from '@workbench/canvasSchemaVersion';
+import { getListContentHeight, List } from '@platform/ui/list/List';
+import { ListItem } from '@platform/ui/list/ListItem';
+import { listRowsFromItems } from '@platform/ui/list/listRows';
 import { formatRelativeTime } from '@workbench/launchpad/formatRelativeTime';
 import { ProjectCompatibilityBadge } from '@workbench/launchpad/projects/ProjectCompatibilityBadge';
+import { ProjectsLoadError } from '@workbench/launchpad/projects/ProjectsLoadError';
 import {
   isProjectSummaryCompatible,
   refreshProjectLibrary,
@@ -30,10 +34,15 @@ import {
   useWorkbenchSelector,
 } from '@workbench/WorkbenchContext';
 import { ArrowRightIcon, FileUpIcon } from 'lucide-react';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const disabledRowStyles = { opacity: 0.6 } as const;
+/** Title, edited time and an inline compatibility badge fit the comfortable pitch. */
+const LIST_DENSITY = 'comfortable';
+/** Five rows and a bit, so a longer library visibly scrolls. */
+const MAX_LIST_HEIGHT_PX = 288;
+
+const getSummaryKey = (summary: ProjectSummary) => summary.id;
 
 const ProjectLibraryRefresh = () => {
   useMountEffect(() => {
@@ -51,6 +60,7 @@ export const OpenProjectDialog = ({ isOpen, onClose }: { isOpen: boolean; onClos
   const notify = useNotify();
   const { t } = useTranslation();
   const summaries = useProjectLibrarySelector((snapshot) => snapshot.summaries);
+  const libraryStatus = useProjectLibrarySelector((snapshot) => snapshot.status);
   const [busyProjectId, setBusyProjectId] = useState<string | null>(null);
 
   const openProjectIds = useMemo(() => new Set(projectIds), [projectIds]);
@@ -58,23 +68,29 @@ export const OpenProjectDialog = ({ isOpen, onClose }: { isOpen: boolean; onClos
     () => summaries.filter((summary) => !openProjectIds.has(summary.id)),
     [openProjectIds, summaries]
   );
+  const rows = useMemo(() => listRowsFromItems(available, getSummaryKey), [available]);
+  // Keyboard users start on the first project they can open; incompatible ones stay reachable with the arrows.
+  const firstOpenableKey = available.find(isProjectSummaryCompatible)?.id ?? null;
+  const listRef = useRef<HTMLDivElement>(null);
+  const importRef = useRef<HTMLButtonElement>(null);
+  // After a retry recovers: the list's tab stop, or Import when nothing came back to open.
+  const getRecoveryFocus = useCallback(
+    () => listRef.current?.querySelector<HTMLElement>('button[tabindex="0"]') ?? importRef.current,
+    []
+  );
+  // A failed listing with nothing listed earlier is not an empty library; earlier rows stay usable after a failure.
+  const listStatus =
+    summaries.length > 0
+      ? 'ready'
+      : libraryStatus === 'error'
+        ? 'error'
+        : libraryStatus === 'ready'
+          ? 'ready'
+          : 'loading';
 
   const openProject = useCallback(
     async (summary: ProjectSummary) => {
       const owner = captureAccountScope();
-
-      if (!isProjectSummaryCompatible(summary)) {
-        notify.error(
-          t('projects.couldNotOpen'),
-          t(
-            summary.minimumCanvasSchemaVersion < MIN_SUPPORTED_CANVAS_SCHEMA_VERSION
-              ? 'projects.file.legacyCanvasProject'
-              : 'projects.file.updateClient'
-          )
-        );
-
-        return;
-      }
 
       setBusyProjectId(summary.id);
 
@@ -144,6 +160,29 @@ export const OpenProjectDialog = ({ isOpen, onClose }: { isOpen: boolean; onClos
 
   const startImport = useCallback(() => void handleImport(), [handleImport]);
 
+  // An incompatible project stays listed, dimmed, with its badge saying why it cannot open here.
+  const renderItem = (summary: ProjectSummary, rowProps: ListRowProps) => {
+    const isCompatible = isProjectSummaryCompatible(summary);
+
+    return (
+      <ListItem
+        {...rowProps}
+        badges={isCompatible ? undefined : <ProjectCompatibilityBadge summary={summary} />}
+        description={t('projects.editedRelative', { time: formatRelativeTime(summary.updatedAt) })}
+        isDisabled={!isCompatible}
+        title={summary.name}
+        trailing={
+          busyProjectId === summary.id ? (
+            <Spinner color="fg.muted" />
+          ) : isCompatible ? (
+            <Icon as={ArrowRightIcon} boxSize="3.5" />
+          ) : undefined
+        }
+        onPress={() => void openProject(summary)}
+      />
+    );
+  };
+
   return (
     <Dialog.Root lazyMount open={isOpen} size="sm" unmountOnExit onOpenChange={handleOpenChange}>
       {isOpen ? <ProjectLibraryRefresh /> : null}
@@ -155,27 +194,37 @@ export const OpenProjectDialog = ({ isOpen, onClose }: { isOpen: boolean; onClos
               <Dialog.Title>{t('projects.openProject')}</Dialog.Title>
             </Dialog.Header>
             <Dialog.Body>
-              <Scrollable maxH="72">
-                <Stack gap="1">
-                  {available.map((summary) => (
-                    <OpenProjectRow
-                      key={summary.id}
-                      isBusy={busyProjectId === summary.id}
-                      isDisabled={busyProjectId !== null || !isProjectSummaryCompatible(summary)}
-                      summary={summary}
-                      onOpen={openProject}
-                    />
-                  ))}
-                  {available.length === 0 ? (
-                    <Text color="fg.muted" fontSize="md" px="2.5" py="4" textAlign="center">
+              <Box
+                ref={listRef}
+                h={
+                  rows.length > 0
+                    ? `${Math.min(getListContentHeight(rows, LIST_DENSITY), MAX_LIST_HEIGHT_PX)}px`
+                    : undefined
+                }
+                // Row surfaces bleed into the dialog padding so their text lines up with the title.
+                mx="-2"
+              >
+                <List
+                  defaultFocusKey={firstOpenableKey}
+                  density={LIST_DENSITY}
+                  dividers
+                  inset="none"
+                  emptyState={
+                    <Text color="fg.muted" fontSize="md" py="2" textAlign="center">
                       {summaries.length === 0 ? t('projects.noSavedProjects') : t('projects.allSavedAlreadyOpen')}
                     </Text>
-                  ) : null}
-                </Stack>
-              </Scrollable>
+                  }
+                  errorState={<ProjectsLoadError getRecoveryFocus={getRecoveryFocus} layout="state" />}
+                  isBusy={busyProjectId !== null}
+                  label={t('projects.openProject')}
+                  renderItem={renderItem}
+                  rows={rows}
+                  status={listStatus}
+                />
+              </Box>
             </Dialog.Body>
             <Dialog.Footer justifyContent="space-between">
-              <Button variant="outline" onClick={startImport}>
+              <Button ref={importRef} variant="outline" onClick={startImport}>
                 <FileUpIcon />
                 {t('projects.importWithEllipsis')}
               </Button>
@@ -190,35 +239,5 @@ export const OpenProjectDialog = ({ isOpen, onClose }: { isOpen: boolean; onClos
         </Dialog.Positioner>
       </Portal>
     </Dialog.Root>
-  );
-};
-
-const OpenProjectRow = ({
-  isBusy,
-  isDisabled,
-  onOpen,
-  summary,
-}: {
-  isBusy: boolean;
-  isDisabled: boolean;
-  onOpen: (summary: ProjectSummary) => Promise<void>;
-  summary: ProjectSummary;
-}) => {
-  const open = useCallback(() => void onOpen(summary), [onOpen, summary]);
-  const { t } = useTranslation();
-
-  return (
-    <Row asChild gap="2.5" px="2.5" py="2" rounded="md" _disabled={disabledRowStyles}>
-      <button disabled={isDisabled} type="button" onClick={open}>
-        <Stack flex="1" gap="0" minW="0">
-          <MiddleTruncate fontSize="md" fontWeight="600" text={summary.name} />
-          <Text color="fg.muted" fontSize="xs">
-            {t('projects.editedRelative', { time: formatRelativeTime(summary.updatedAt) })}
-          </Text>
-          <ProjectCompatibilityBadge summary={summary} />
-        </Stack>
-        {isBusy ? <Spinner color="fg.muted" /> : <Icon as={ArrowRightIcon} boxSize="3.5" color="fg.muted" />}
-      </button>
-    </Row>
   );
 };

@@ -423,37 +423,3 @@ class TestInputValidation:
 
             # Cleanup
             user_service.delete(user.user_id)
-
-
-class TestRateLimiting:
-    """Tests for rate limiting and brute force protection.
-
-    Note: Rate limiting is not currently implemented in the codebase.
-    These tests document expected behavior for future implementation.
-    """
-
-    @pytest.mark.skip(reason="Rate limiting not yet implemented")
-    def test_login_rate_limiting(self, monkeypatch: Any, mock_invoker: Invoker, client: TestClient):
-        """Test that excessive login attempts are rate limited."""
-        monkeypatch.setattr("invokeai.app.api.routers.auth.ApiDependencies", MockApiDependencies(mock_invoker))
-
-        setup_test_user(mock_invoker, "test@example.com", "TestPass123")
-
-        # Try many login attempts with wrong password
-        for i in range(20):
-            response = client.post(
-                "/api/v1/auth/login",
-                json={
-                    "email": "test@example.com",
-                    "password": "WrongPassword",
-                    "remember_me": False,
-                },
-            )
-
-            if i < 10:
-                # First attempts should return 401
-                assert response.status_code == 401
-            else:
-                # After many attempts, should be rate limited (429)
-                # This is expected behavior for future implementation
-                pass

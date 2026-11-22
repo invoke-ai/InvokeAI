@@ -59,11 +59,9 @@ export const imageUrlToStreamingSource = ({
 export const resolveStreamingImageSource = ({
   fallbackImage,
   finalImage,
-  heldLiveImage,
   liveImage,
 }: {
   fallbackImage?: StreamingImageSource | null;
   finalImage?: StreamingImageSource | null;
-  heldLiveImage?: StreamingImageSource | null;
   liveImage?: StreamingImageSource | null;
-}): StreamingImageSource | null => finalImage ?? liveImage ?? heldLiveImage ?? fallbackImage ?? null;
+}): StreamingImageSource | null => finalImage ?? liveImage ?? fallbackImage ?? null;

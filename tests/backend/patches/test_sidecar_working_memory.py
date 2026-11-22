@@ -1,6 +1,8 @@
-"""`lora_sidecar_bytes` for a layer wrapped to swap its halves, measured against what its sidecar forward allocates.
+"""`lora_sidecar_bytes` for a layer wrapped to swap its halves or merged from row ranges, measured against what its
+sidecar forward allocates.
 
-FLUX's output modulation in BFL's row order is the wrapped case (`SwappedHalvesLayerPatch`). The unwrapped kinds are
+FLUX's output modulation in BFL's row order is the swapped case (`SwappedHalvesLayerPatch`), a MOSS-Image LoKr on a
+fused qkv cut into rows the merged one (`MergedLayerPatch`). The plain kinds are
 measured through the Qwen-Image-2.1 denoise node, which prices with the same helper
 (`test_qwen_image_2_1_nodes.py::test_a_sidecar_reserves_what_its_forward_allocates`).
 """
@@ -18,6 +20,7 @@ from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch
 )
 from invokeai.backend.model_manager.taxonomy import ModelFormat
 from invokeai.backend.patches.layer_patcher import LayerPatcher
+from invokeai.backend.patches.layers.merged_layer_patch import MergedLayerPatch, Range
 from invokeai.backend.patches.layers.swapped_halves_layer_patch import SwappedHalvesLayerPatch
 from invokeai.backend.patches.layers.utils import any_lora_layer_from_state_dict
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
@@ -54,10 +57,10 @@ class _PeakAllocation(TorchDispatchMode):
         return out
 
 
-def _swapped_layer(kind: str) -> ModelPatchRaw:
-    """One layer of `kind` on the modulation, wrapped to swap its halves."""
+def _layer_values(kind: str) -> dict[str, torch.Tensor]:
+    """The values of one layer of `kind` that update the `_W`-wide weight."""
     r = 2
-    values = {
+    return {
         "low-rank": {"lora_down.weight": torch.randn(r, _W), "lora_up.weight": torch.randn(_W, r)},
         "full": {"diff": torch.randn(_W, _W)},
         "lokr": {
@@ -74,23 +77,37 @@ def _swapped_layer(kind: str) -> ModelPatchRaw:
             "dora_magnitude": torch.rand(_W) + 1,
         },
     }[kind]
+
+
+def _swapped_layer(kind: str) -> ModelPatchRaw:
+    """One layer of `kind` on the modulation, wrapped to swap its halves."""
     return ModelPatchRaw(
-        layers={PREFIX + "norm_out.linear": SwappedHalvesLayerPatch(any_lora_layer_from_state_dict(values))}
+        layers={
+            PREFIX + "norm_out.linear": SwappedHalvesLayerPatch(any_lora_layer_from_state_dict(_layer_values(kind)))
+        }
     )
 
 
-@pytest.mark.parametrize(
-    "kinds",
-    [["low-rank"], ["full"], ["lokr"], ["loha"], ["dora"], ["low-rank", "low-rank"], ["low-rank", "low-rank", "lokr"]],
-    ids=lambda kinds: "+".join(kinds),
-)
-def test_a_swapped_halves_sidecar_reserves_what_its_forward_allocates(
-    kinds: list[str], monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Measured: what a sidecar forward on an fp8 weight allocates for its LoRAs -- the layer's own forward aside, which
-    an activation estimate covers -- is what is reserved for them, within half a weight copy. A wrapped layer forms its
-    update whatever its kind and swaps the weight it reads and the update it returns; DoRA is priced a copy above the
-    CPU's measure for the column norm CUDA adds."""
+def _merged_lokr(cuts: list[int]) -> ModelPatchRaw:
+    """One LoKr piece per row range between `cuts`, merged on the modulation: a LoKr on a fused qkv cut through the
+    blocks of its `lokr_w2`, as MOSS-Image's conversion makes it."""
+    ranges = [Range(start, stop) for start, stop in itertools.pairwise(cuts)]
+    layers = [
+        any_lora_layer_from_state_dict(
+            {
+                "lokr_w1": torch.randn(1, 4),
+                "lokr_w2_a": torch.randn(r.end - r.start, 2),
+                "lokr_w2_b": torch.randn(2, _W // 4),
+            }
+        )
+        for r in ranges
+    ]
+    return ModelPatchRaw(layers={PREFIX + "norm_out.linear": MergedLayerPatch(layers, ranges)})
+
+
+def _measure(patches: list[ModelPatchRaw], monkeypatch: pytest.MonkeyPatch) -> tuple[int, int]:
+    """`(bytes reserved for the LoRAs, bytes their sidecar forward on an fp8 weight peaks at)`, the layers' own tensors
+    -- which exist before the forward -- and the module's own forward left out of both."""
     torch.manual_seed(0)
     transformer = torch.nn.Module()
     transformer.norm_out = torch.nn.Module()
@@ -99,7 +116,6 @@ def test_a_swapped_halves_sidecar_reserves_what_its_forward_allocates(
     transformer.norm_out.linear.weight = torch.nn.Parameter(weight, requires_grad=False)
     apply_custom_layers_to_model(transformer)
     linear = transformer.norm_out.linear
-    patches = [_swapped_layer(kind) for kind in kinds]
     seq_len = 2
 
     mode = _PeakAllocation()
@@ -122,8 +138,7 @@ def test_a_swapped_halves_sidecar_reserves_what_its_forward_allocates(
         with mode:
             linear(torch.randn(1, seq_len, _W))
 
-    # fp8 weights take every layer as a sidecar, whatever the format says. The layers' own tensors exist before the
-    # measured forward.
+    # fp8 weights take every layer as a sidecar, whatever the format says.
     reserved = lora_sidecar_bytes(
         patches,
         transformer,
@@ -133,6 +148,35 @@ def test_a_swapped_halves_sidecar_reserves_what_its_forward_allocates(
         per_sample_rows={},
         dtype=torch.float32,
     ) - sum(patch.calc_size() for patch in patches)
+    return reserved, mode.peak
+
+
+@pytest.mark.parametrize(
+    "kinds",
+    [["low-rank"], ["full"], ["lokr"], ["loha"], ["dora"], ["low-rank", "low-rank"], ["low-rank", "low-rank", "lokr"]],
+    ids=lambda kinds: "+".join(kinds),
+)
+def test_a_swapped_halves_sidecar_reserves_what_its_forward_allocates(
+    kinds: list[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Measured: what a sidecar forward on an fp8 weight allocates for its LoRAs -- the layer's own forward aside, which
+    an activation estimate covers -- is what is reserved for them, within half a weight copy. A wrapped layer forms its
+    update whatever its kind and swaps the weight it reads and the update it returns; DoRA is priced a copy above the
+    CPU's measure for the column norm CUDA adds."""
+    reserved, peak = _measure([_swapped_layer(kind) for kind in kinds], monkeypatch)
     weight_copy = _W * _W * torch.float32.itemsize
     beyond_cpu = weight_copy if "dora" in kinds else 0
-    assert abs(reserved - beyond_cpu - mode.peak) < weight_copy / 2, (reserved / weight_copy, mode.peak / weight_copy)
+    assert abs(reserved - beyond_cpu - peak) < weight_copy / 2, (reserved / weight_copy, peak / weight_copy)
+
+
+@pytest.mark.parametrize("cuts", [[0, _W // 2, _W], [0, 24, 40, _W]], ids=["halves", "uneven-thirds"])
+def test_a_merged_lokr_sidecar_reserves_what_its_forward_allocates(
+    cuts: list[int], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Measured: what a sidecar forward allocates for a LoKr merged from row ranges (MOSS-Image's on a fused qkv) is
+    covered by what is reserved, at most two copies over where the rows are cut small. The merge adds each range's
+    update to a zero tensor of the whole weight."""
+    reserved, peak = _measure([_merged_lokr(cuts)], monkeypatch)
+    weight_copy = _W * _W * torch.float32.itemsize
+    excess = (reserved - peak) / weight_copy
+    assert -0.1 < excess < 2, (reserved / weight_copy, peak / weight_copy)

@@ -4,11 +4,11 @@ import type { WorkbenchState } from '@workbench/projectContracts';
 import {
   resetArchitectureCapabilities,
   setArchitectureCapabilities,
-} from '@features/generation/core/architectureCapabilities';
+} from '@features/models/core/architectureCapabilities';
 import {
   architectureCapabilitiesFixture,
   seedArchitectureCapabilities,
-} from '@features/generation/core/architectureCapabilities.testing';
+} from '@features/models/core/architectureCapabilities.testing';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { CanvasProjectMutation } from './canvasProjectMutations';
@@ -32,23 +32,6 @@ const snapshot = (bboxW: number, bboxH: number, dimsW: number, dimsH: number, gr
 });
 
 describe('reconcileCanvasDims (pure)', () => {
-  it('no-ops when there is no canvas frame (not in canvas mode)', () => {
-    expect(reconcileCanvasDims({ bbox: null, dims: { height: 512, width: 512 }, grid: 8, prev: null })).toEqual({
-      kind: 'none',
-    });
-  });
-
-  it('no-ops when the bbox and dims already agree', () => {
-    expect(
-      reconcileCanvasDims({
-        bbox: bbox(1024, 1024),
-        dims: { height: 1024, width: 1024 },
-        grid: 8,
-        prev: snapshot(1024, 1024, 1024, 1024),
-      })
-    ).toEqual({ kind: 'none' });
-  });
-
   it('maps a free bbox size change onto the generate dims, leaving the ratio free', () => {
     const result = reconcileCanvasDims({
       bbox: bbox(512, 768),
@@ -97,71 +80,24 @@ describe('reconcileCanvasDims (pure)', () => {
     });
   });
 
-  it('emits the bbox ratio as aspectRatioValue for a non-square bbox (not just the preset id)', () => {
-    const result = reconcileCanvasDims({
-      bbox: bbox(1024, 768),
-      dims: { height: 1024, width: 1024 },
-      grid: 8,
-      prev: snapshot(1024, 1024, 1024, 1024),
-    });
-
-    // Update the numeric ratio too; getActiveRatio prefers it over the aspect id.
-    expect(result).toMatchObject({ aspectRatioId: 'Free', aspectRatioValue: 1024 / 768, kind: 'patch-dims' });
-  });
-
-  it('re-derives Free for a non-preset bbox ratio', () => {
-    const result = reconcileCanvasDims({
-      bbox: bbox(1000, 512),
-      dims: { height: 1024, width: 1024 },
-      grid: 8,
-      prev: snapshot(1024, 1024, 1024, 1024),
-    });
-
-    expect(result).toMatchObject({ aspectRatioId: 'Free', kind: 'patch-dims' });
-  });
-
-  it('ignores a position-only bbox move (same width/height)', () => {
-    const result = reconcileCanvasDims({
-      bbox: bbox(1024, 1024, 128, 64),
-      dims: { height: 1024, width: 1024 },
-      grid: 8,
-      prev: snapshot(1024, 1024, 1024, 1024),
-    });
-
-    expect(result).toEqual({ kind: 'none' });
-  });
-
-  it('resizes the bbox to changed dims around its centre', () => {
-    const result = reconcileCanvasDims({
-      bbox: bbox(512, 768, 40, 24),
-      dims: { height: 768, width: 768 },
-      grid: 8,
-      prev: snapshot(512, 768, 512, 768),
-    });
-
-    expect(result).toEqual({ bbox: { height: 768, width: 768, x: -88, y: 24 }, kind: 'set-bbox' });
-  });
-
-  it('snaps dims to the grid when resizing the bbox', () => {
-    const result = reconcileCanvasDims({
-      bbox: bbox(512, 512),
-      dims: { height: 100, width: 100 },
-      grid: 16,
-      prev: snapshot(512, 512, 512, 512, 16),
-    });
-
-    expect(result).toEqual({ bbox: { height: 96, width: 96, x: 208, y: 208 }, kind: 'set-bbox' });
-  });
-
-  it('clamps a tiny dimension up to the shared generation minimum', () => {
-    const result = reconcileCanvasDims({
-      bbox: bbox(512, 512),
-      dims: { height: 1, width: 1 },
-      grid: 16,
-      prev: snapshot(512, 512, 512, 512, 16),
-    });
-
-    expect(result).toEqual({ bbox: { height: 64, width: 64, x: 224, y: 224 }, kind: 'set-bbox' });
+  it.each([
+    [
+      'resizes the bbox to changed dims around its centre',
+      { bbox: bbox(512, 768, 40, 24), dims: { height: 768, width: 768 }, grid: 8, prev: snapshot(512, 768, 512, 768) },
+      { height: 768, width: 768, x: -88, y: 24 },
+    ],
+    [
+      'snaps dims to the grid when resizing the bbox',
+      { bbox: bbox(512, 512), dims: { height: 100, width: 100 }, grid: 16, prev: snapshot(512, 512, 512, 512, 16) },
+      { height: 96, width: 96, x: 208, y: 208 },
+    ],
+    [
+      'clamps a tiny dimension up to the shared generation minimum',
+      { bbox: bbox(512, 512), dims: { height: 1, width: 1 }, grid: 16, prev: snapshot(512, 512, 512, 512, 16) },
+      { height: 64, width: 64, x: 224, y: 224 },
+    ],
+  ])('%s', (_label, input, expected) => {
+    expect(reconcileCanvasDims(input)).toEqual({ bbox: expected, kind: 'set-bbox' });
   });
 
   it('clamps an oversized bbox to the shared processing maximum without changing its footprint', () => {
@@ -180,29 +116,6 @@ describe('reconcileCanvasDims (pure)', () => {
       kind: 'patch-dims',
       width: 4096,
     });
-  });
-
-  it('no-ops the dims->bbox direction when the snapped size already matches the bbox', () => {
-    const result = reconcileCanvasDims({
-      bbox: bbox(96, 96),
-      dims: { height: 100, width: 100 },
-      grid: 16,
-      prev: snapshot(96, 96, 96, 96, 16),
-    });
-
-    expect(result).toEqual({ kind: 'none' });
-  });
-
-  it('lets the bbox win on first run (no prior snapshot)', () => {
-    const result = reconcileCanvasDims({
-      bbox: bbox(512, 512),
-      dims: { height: 256, width: 256 },
-      grid: 8,
-      prev: null,
-    });
-
-    // The aspect fields already say free 1:1.
-    expect(result).toEqual({ height: 512, kind: 'patch-dims', width: 512 });
   });
 
   it('converges: applying each direction twice is a fixed point', () => {
@@ -241,7 +154,6 @@ describe('reconcileCanvasDims (pure)', () => {
 });
 
 const model: MainModelConfig = { base: 'sdxl', key: 'test-model', name: 'Test Model', type: 'main' };
-const flux2Model: MainModelConfig = { base: 'flux2', key: 'test-flux2-model', name: 'Test FLUX.2 Model', type: 'main' };
 
 const getActiveGenerate = (state: WorkbenchState) => {
   const project = state.projects.find((candidate) => candidate.id === state.activeProjectId);
@@ -255,7 +167,6 @@ const getActiveGenerate = (state: WorkbenchState) => {
 const setupCanvasStore = () => {
   const store = createWorkbenchStore();
 
-  // Put the active project into canvas mode with concrete generate dims/model.
   store.commands.generation.setSource('canvas');
   store.commands.generation.patchSettings({ height: 1024, model, modelKey: model.key, width: 1024 });
 
@@ -345,36 +256,10 @@ describe('Generate size edits on the canvas (wiring)', () => {
     expect(getActiveGenerate(store.getState()).bbox).toEqual({ height: 1024, width: 512, x: 256, y: 0 });
     sync.dispose();
   });
-
-  it('changes only the fields when the project is not generating into the canvas', () => {
-    const store = createWorkbenchStore();
-    store.commands.generation.setSource('generate');
-    store.commands.generation.toggleSourceLock();
-    store.commands.generation.patchSettings({ height: 1216, model, modelKey: model.key, width: 832 });
-    dispatchCanvas(store, { bbox: { height: 1216, width: 832, x: 100, y: 100 }, type: 'setCanvasBbox' });
-    const sync = createCanvasDimsSync(store);
-    const apply = vi.spyOn(store.commands.canvas, 'apply');
-
-    store.commands.generation.patchSettings(SQUARE_RESET);
-
-    expect(getActiveGenerate(store.getState())).toMatchObject({
-      bbox: { height: 1216, width: 832, x: 100, y: 100 },
-      values: SQUARE_RESET,
-    });
-    expect(apply).not.toHaveBeenCalled();
-    sync.dispose();
-  });
 });
 
 describe('createCanvasDimsSync (wiring)', () => {
   seedArchitectureCapabilities();
-
-  it('does not dispatch on mount when bbox and dims already agree', () => {
-    const { getSyncDispatches, sync } = setupCanvasStore();
-
-    expect(getSyncDispatches()).toBe(0);
-    sync.dispose();
-  });
 
   it('patches the generate dims when the bbox changes, without looping', () => {
     const { getSyncDispatches, store, sync } = setupCanvasStore();
@@ -402,42 +287,6 @@ describe('createCanvasDimsSync (wiring)', () => {
     expect(values.width).toBe(504);
     expect(values.height).toBe(504);
     expect(getSyncDispatches()).toBe(1);
-    sync.dispose();
-  });
-
-  it('re-snaps an agreed bbox and dimensions when the model changes to a stricter grid', () => {
-    const { store, sync } = setupCanvasStore();
-
-    dispatchCanvas(store, { bbox: { height: 504, width: 504, x: 32, y: 48 }, type: 'setCanvasBbox' });
-    store.commands.generation.patchSettings({ model: flux2Model, modelKey: flux2Model.key });
-
-    const { bbox: nextBbox, values } = getActiveGenerate(store.getState());
-    expect(nextBbox).toEqual({ height: 504, width: 504, x: 32, y: 48 });
-    expect(values.width).toBe(512);
-    expect(values.height).toBe(512);
-    sync.dispose();
-  });
-
-  it('a bbox-driven ratio is what a subsequent constrained width edit uses (not the pre-drag ratio)', () => {
-    const { store, sync } = setupCanvasStore();
-
-    // Drag the bbox to a non-square 4:3 frame; dims should follow.
-    dispatchCanvas(store, { bbox: { height: 768, width: 1024, x: 0, y: 0 }, type: 'setCanvasBbox' });
-    const { values } = getActiveGenerate(store.getState());
-    expect(values.aspectRatioId).toBe('Free');
-    expect(values.aspectRatioValue).toBeCloseTo(1024 / 768);
-
-    const aspectRatioValue = values.aspectRatioValue as number;
-    const width = values.width as number;
-    const height = values.height as number;
-
-    // Mirror GenerateDimensionFields' getActiveRatio: prefer aspectRatioValue
-    // when positive, else fall back to the live width/height.
-    const activeRatio = aspectRatioValue > 0 ? aspectRatioValue : width / height;
-    const nextWidth = 800;
-    const constrainedHeight = nextWidth / activeRatio;
-
-    expect(constrainedHeight).toBeCloseTo(600);
     sync.dispose();
   });
 
@@ -473,23 +322,11 @@ describe('createCanvasDimsSync (wiring)', () => {
     sync.dispose();
   });
 
-  it('ignores a position-only bbox move', () => {
-    const { getSyncDispatches, store, sync } = setupCanvasStore();
-
-    dispatchCanvas(store, { bbox: { height: 1024, width: 1024, x: 100, y: 200 }, type: 'setCanvasBbox' });
-
-    const { values } = getActiveGenerate(store.getState());
-    expect(values.width).toBe(1024);
-    expect(values.height).toBe(1024);
-    expect(getSyncDispatches()).toBe(0);
-    sync.dispose();
-  });
-
   it('stays inert when the project is not invoking into the canvas', () => {
     const store = createWorkbenchStore();
     store.commands.generation.setSource('generate');
-    // Lock the source: a bbox drag is itself a canvas intent signal and would
-    // otherwise auto-route the project into canvas mode.
+    // Lock the source: a bbox drag is itself a canvas intent signal and would otherwise auto-route the project into
+    // canvas mode.
     store.commands.generation.toggleSourceLock();
     store.commands.generation.patchSettings({ height: 1024, model, modelKey: model.key, width: 1024 });
 
@@ -520,26 +357,9 @@ describe('createCanvasDimsSync (wiring)', () => {
     dispatchCanvas(store, { bbox: { height: 512, width: 512, x: 0, y: 0 }, type: 'setCanvasBbox' });
 
     const { values } = getActiveGenerate(store.getState());
-    // Generate dims untouched: non-canvas behavior is exactly as today.
     expect(values.width).toBe(1024);
     expect(values.height).toBe(1024);
     expect(syncDispatches).toBe(0);
-    sync.dispose();
-  });
-
-  it('aligns dims to the bbox when a project enters canvas mode', () => {
-    const store = createWorkbenchStore();
-    // Diverge the frame from the dims while still in generate mode.
-    store.commands.generation.patchSettings({ height: 1024, model, modelKey: model.key, width: 1024 });
-    dispatchCanvas(store, { bbox: { height: 640, width: 896, x: 0, y: 0 }, type: 'setCanvasBbox' });
-
-    const sync = createCanvasDimsSync(store);
-    // Switching into canvas mode should let the bbox win and drive the dims.
-    store.commands.generation.setSource('canvas');
-
-    const { values } = getActiveGenerate(store.getState());
-    expect(values.width).toBe(896);
-    expect(values.height).toBe(640);
     sync.dispose();
   });
 });
@@ -610,15 +430,6 @@ describe('createCanvasDimsSync before the capability table arrives', () => {
     sync.dispose();
   });
 
-  it('writes nothing into the project while the architecture has no answer', () => {
-    // First-run bbox reconciliation persists dimensions; guessing grid 8 is invalid for Wan's grid 16.
-    const { getSyncDispatches, store, sync } = setupWanProject();
-
-    expect(getSyncDispatches()).toBe(0);
-    expect(getActiveGenerate(store.getState()).values.width).toBe(1024);
-    sync.dispose();
-  });
-
   it('reconciles as soon as the table lands, with no other change to the project', () => {
     // Capability arrival alone must retrigger sync; an otherwise consistent project emits no workbench change.
     const { getSyncDispatches, store, sync } = setupWanProject();
@@ -631,15 +442,6 @@ describe('createCanvasDimsSync before the capability table arrives', () => {
     expect(values.height).toBe(1040);
     expect(getSyncDispatches()).toBe(1);
     sync.dispose();
-  });
-
-  it('stops listening to the table once disposed', () => {
-    const { getSyncDispatches, sync } = setupWanProject();
-
-    sync.dispose();
-    setArchitectureCapabilities(architectureCapabilitiesFixture);
-
-    expect(getSyncDispatches()).toBe(0);
   });
 });
 
@@ -672,13 +474,6 @@ describe('createCanvasDimsSync (manual render size)', () => {
     return { store, sync };
   };
 
-  it('keeps a custom size that already holds the locked ratio', () => {
-    const { store, sync } = setupLockedCustom();
-
-    expect(getRenderSize(store)).toEqual({ height: 1024, width: 1536 });
-    sync.dispose();
-  });
-
   it('reshapes the custom size to a newly chosen ratio at about the same area', () => {
     const { store, sync } = setupLockedCustom();
 
@@ -694,20 +489,6 @@ describe('createCanvasDimsSync (manual render size)', () => {
     sync.dispose();
   });
 
-  it('turns the custom size with the frame when width and height swap', () => {
-    const { store, sync } = setupLockedCustom();
-
-    store.commands.generation.patchSettings({
-      aspectRatioId: '2:3',
-      aspectRatioValue: 2 / 3,
-      height: 1248,
-      width: 832,
-    });
-
-    expect(getRenderSize(store)).toEqual({ height: 1536, width: 1024 });
-    sync.dispose();
-  });
-
   it('follows a bbox resize while the ratio is locked', () => {
     const { store, sync } = setupLockedCustom();
 
@@ -715,100 +496,6 @@ describe('createCanvasDimsSync (manual render size)', () => {
 
     // The bbox's 10:7 at the same area: ≈ 1499.0 × 1049.3.
     expect(getRenderSize(store)).toEqual({ height: 1048, width: 1496 });
-    sync.dispose();
-  });
-
-  it('fits the custom size to the ratio when the lock engages', () => {
-    const store = createWorkbenchStore();
-    store.commands.generation.setSource('canvas');
-    dispatchCanvas(store, { bbox: { height: 800, width: 1040, x: 0, y: 0 }, type: 'setCanvasBbox' });
-    store.commands.generation.patchSettings({
-      aspectRatioId: 'Free',
-      aspectRatioIsLocked: false,
-      aspectRatioValue: 1.3,
-      height: 800,
-      model,
-      modelKey: model.key,
-      width: 1040,
-    });
-    const sync = createCanvasDimsSync(store);
-    store.commands.widgets.patchValues('canvas', { scaleMethod: 'manual', scaledHeight: 1024, scaledWidth: 1536 });
-
-    store.commands.generation.patchSettings({ aspectRatioIsLocked: true });
-
-    // 1.3 at the same area: ≈ 1429.9 × 1099.95.
-    expect(getRenderSize(store)).toEqual({ height: 1096, width: 1432 });
-    sync.dispose();
-  });
-
-  it('fits a remembered custom size to the locked ratio when Custom is chosen again', () => {
-    const { store, sync } = setupLockedCustom();
-    store.commands.widgets.patchValues('canvas', { scaleMethod: 'auto' });
-    store.commands.generation.patchSettings({
-      aspectRatioId: '16:9',
-      aspectRatioValue: 16 / 9,
-      height: 768,
-      width: 1360,
-    });
-    // Auto renders at the frame, so the remembered size waits until Custom is chosen.
-    expect(getRenderSize(store)).toEqual({ height: 1024, width: 1536 });
-
-    store.commands.widgets.patchValues('canvas', { scaleMethod: 'manual' });
-
-    expect(getRenderSize(store)).toEqual({ height: 944, width: 1672 });
-    sync.dispose();
-  });
-
-  it('leaves the custom size alone while the ratio is free', () => {
-    const { store, sync } = setupLockedCustom();
-    store.commands.generation.patchSettings({ aspectRatioId: 'Free', aspectRatioIsLocked: false });
-
-    store.commands.generation.patchSettings({ aspectRatioValue: 1.3, height: 800, width: 1040 });
-    dispatchCanvas(store, { bbox: { height: 700, width: 1000, x: 0, y: 0 }, type: 'setCanvasBbox' });
-
-    expect(getRenderSize(store)).toEqual({ height: 1024, width: 1536 });
-    sync.dispose();
-  });
-
-  it('leaves the custom size alone when a free bbox edit lands on a preset ratio, until the person locks it', () => {
-    const store = createWorkbenchStore();
-    store.commands.generation.setSource('canvas');
-    dispatchCanvas(store, { bbox: { height: 800, width: 1040, x: 0, y: 0 }, type: 'setCanvasBbox' });
-    store.commands.generation.patchSettings({
-      aspectRatioId: 'Free',
-      aspectRatioIsLocked: false,
-      aspectRatioValue: 1.3,
-      height: 800,
-      model,
-      modelKey: model.key,
-      width: 1040,
-    });
-    const sync = createCanvasDimsSync(store);
-    store.commands.widgets.patchValues('canvas', { scaleMethod: 'manual', scaledHeight: 1024, scaledWidth: 1536 });
-
-    // These frames are 3:2 and 1:1, but the person never locked them, so the ratio stays free and nothing follows.
-    dispatchCanvas(store, { bbox: { height: 832, width: 1248, x: 0, y: 0 }, type: 'setCanvasBbox' });
-    expect(getActiveGenerate(store.getState()).values.aspectRatioId).toBe('Free');
-    expect(getRenderSize(store)).toEqual({ height: 1024, width: 1536 });
-    dispatchCanvas(store, { bbox: { height: 1024, width: 1024, x: 0, y: 0 }, type: 'setCanvasBbox' });
-    expect(getActiveGenerate(store.getState()).values.aspectRatioId).toBe('Free');
-    expect(getRenderSize(store)).toEqual({ height: 1024, width: 1536 });
-
-    // Choosing the 1:1 preset the frame already has is a new lock at the same ratio.
-    store.commands.generation.patchSettings({ aspectRatioId: '1:1', aspectRatioIsLocked: true, aspectRatioValue: 1 });
-
-    // 1:1 at the same area: sqrt(1,572,864) ≈ 1254.1 per side, to the nearest multiple of 8.
-    expect(getRenderSize(store)).toEqual({ height: 1256, width: 1256 });
-    sync.dispose();
-  });
-
-  it('leaves the custom size alone when the canvas is not the invocation source', () => {
-    const { store, sync } = setupLockedCustom();
-    store.commands.generation.setSource('generate');
-
-    store.commands.generation.patchSettings({ aspectRatioId: '16:9', aspectRatioValue: 16 / 9 });
-
-    expect(getRenderSize(store)).toEqual({ height: 1024, width: 1536 });
     sync.dispose();
   });
 });

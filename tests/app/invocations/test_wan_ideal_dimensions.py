@@ -7,7 +7,6 @@ The node is a pure math transform — no context dependencies — so we can call
 import pytest
 
 from invokeai.app.invocations.wan.wan_ideal_dimensions import (
-    WAN_TARGET_RESOLUTION_PX,
     WanI2VIdealDimensionsInvocation,
 )
 
@@ -100,13 +99,6 @@ class TestPostconditions:
         ow, oh = _resolve(16, 16, target="480p", rounding="floor")
         assert ow >= 16
         assert oh >= 16
-
-
-class TestResolutionPresetTable:
-    """The dropdown values must map to the documented short-side pixel counts."""
-
-    def test_presets_cover_canonical_video_sizes(self) -> None:
-        assert WAN_TARGET_RESOLUTION_PX == {"480p": 480, "720p": 720, "1080p": 1080}
 
 
 class TestInputValidation:

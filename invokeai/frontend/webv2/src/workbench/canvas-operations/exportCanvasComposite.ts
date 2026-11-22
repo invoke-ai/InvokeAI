@@ -23,8 +23,8 @@ export type CanvasCompositeExportEngine = {
 };
 
 /**
- * Flushes in-flight paint uploads, then composites the visible raster layers
- * of either the whole canvas content or the post-flush generation bbox.
+ * Flushes in-flight paint uploads, then composites the visible raster layers of either the whole canvas content or the
+ * post-flush generation bbox.
  */
 export const exportCanvasComposite = async (
   engine: CanvasCompositeExportEngine,

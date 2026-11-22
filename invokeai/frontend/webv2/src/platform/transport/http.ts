@@ -1,7 +1,4 @@
-/**
- * Each request captures the Identity-owned credential once and reports its outcome (a replacement token, a 401)
- * against that capture, so a late response can never renew or expire a newer credential.
- */
+/** A late response can never renew or expire a newer credential: outcomes report against the request's own capture. */
 
 import { recordLogEvent } from '@platform/logging/logger';
 import { captureAccountScope } from '@platform/state/accountLifecycle';
@@ -23,11 +20,8 @@ export interface HttpCredential {
 export interface HttpAuthAdapter {
   /** One synchronous read, so a request never pairs a token with a different identity lifetime. */
   capture(): HttpCredential;
-  /** A response to a request sent with `credential` carried a replacement token. */
   onRefreshedToken(credential: HttpCredential, token: string): void;
-  /** A request sent with `credential` was rejected with 401. */
   onUnauthorized(credential: HttpCredential): void;
-  /** Notifies when the token of the current identity lifetime is replaced in place. */
   subscribe(listener: () => void): () => void;
 }
 
@@ -68,7 +62,6 @@ export const getBackendSocketPath = (): string => {
 
 export const buildApiUrl = (path: string): string => `${API_BASE_URL || getDeploymentBaseUrl()}${path}`;
 
-/** Resolve a backend-relative resource URL (e.g. image URLs in DTOs) against the API host. */
 export const absolutizeApiUrl = (url: string): string => {
   try {
     const parsed = new URL(url);
@@ -161,32 +154,27 @@ export const assertOk = async (response: Response): Promise<Response> => {
 };
 
 interface AuthenticatedResponse {
-  /** The identity lifetime the request was captured in. */
   identity: unknown;
   response: Response;
   /** The captured credential when it authenticated the request; null for anonymous or caller-authorized requests. */
   sent: HttpCredential | null;
 }
 
-/** Throws if the identity lifetime ended before the response arrived; reports a replacement token otherwise. */
 const fetchAuthenticated = async (path: string, init: RequestInit | undefined): Promise<AuthenticatedResponse> => {
   const credential = authAdapter.capture();
   const headers = new Headers(init?.headers);
   const method = (init?.method ?? 'GET').toUpperCase();
-  // Breadcrumbs carry the path only; query strings can hold tokens and user input. They are fenced to the account
-  // that started the request so late settlements never land in the next account's history.
+  // Breadcrumbs carry the path only (queries can hold tokens), fenced to the account that started the request.
   const safePath = path.split(/[?#]/, 1)[0] ?? path;
   const owner = captureAccountScope();
-  // A caller-supplied Authorization header (a lease released for an earlier account) is not this tab's credential,
-  // so its response reports nothing about it.
+  // A caller-supplied Authorization header is not this tab's credential, so its response reports nothing.
   const sent = credential.token !== null && !headers.has('Authorization') ? credential : null;
 
   if (sent) {
     headers.set('Authorization', `Bearer ${sent.token}`);
   }
 
-  // Use same-origin credentials so login stores the media cookie. Cross-origin API callers must opt into include
-  // and configure server credential support.
+  // Same-origin credentials so login stores the media cookie; cross-origin callers must opt into include.
   let response: Response;
 
   try {
@@ -233,7 +221,6 @@ const fetchAuthenticated = async (path: string, init: RequestInit | undefined): 
   return { identity: credential.identity, response, sent };
 };
 
-/** Authenticated fetch that leaves status handling, including 401s, to the caller. */
 export const apiFetchRaw = async (path: string, init?: RequestInit): Promise<Response> =>
   (await fetchAuthenticated(path, init)).response;
 
@@ -261,7 +248,6 @@ export const apiFetch = async (path: string, init?: RequestInit): Promise<Respon
   }
 };
 
-/** Unwrap FastAPI's detail field from ApiError's raw body for display. */
 export const getApiErrorMessage = (error: unknown, fallback: string): string => {
   if (error instanceof ApiError) {
     try {
@@ -279,7 +265,6 @@ export const getApiErrorMessage = (error: unknown, fallback: string): string => 
         }
       }
 
-      // Validation errors come as a list of issues; surface the first one.
       if (Array.isArray(parsed.detail)) {
         const message = getValidationIssueMessage(parsed.detail[0]);
 
@@ -297,10 +282,7 @@ export const getApiErrorMessage = (error: unknown, fallback: string): string => 
   return error instanceof Error && error.message ? error.message : fallback;
 };
 
-/**
- * The `code` of a structured FastAPI detail (`{"code": ..., "message": ...}`), which names why a request was refused
- * independently of its wording; null for any other body.
- */
+/** Names why a request was refused independently of its wording; null for any other body. */
 export const getApiErrorCode = (error: unknown): string | null => {
   if (!(error instanceof ApiError)) {
     return null;

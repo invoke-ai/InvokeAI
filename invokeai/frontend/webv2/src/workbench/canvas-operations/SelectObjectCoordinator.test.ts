@@ -22,7 +22,7 @@ const layer: CanvasRasterLayerContractV2 = {
 };
 const guard: LayerExportGuard = { cacheVersion: 1, documentGeneration: 1, layer, layerId: layer.id, projectId: 'p1' };
 
-const createCoordinator = (readAutoProcessPreference: () => boolean) => {
+const createCoordinator = (readAutoUpdatePreference: () => boolean) => {
   const stores = createCanvasOperationStores();
   const deps: CanvasSelectObjectCoordinatorDeps = {
     captureGuard: () => guard,
@@ -46,7 +46,7 @@ const createCoordinator = (readAutoProcessPreference: () => boolean) => {
     }),
     projectId: 'p1',
     publishPreview: vi.fn(),
-    readAutoProcessPreference,
+    readAutoUpdatePreference,
     replaceSelection: vi.fn(),
     replaceTemporaryRestoreTool: vi.fn(),
     runGraph: vi.fn(),
@@ -72,6 +72,27 @@ describe('createSelectObjectOperationCoordinator', () => {
 
     expect(coordinator.start(layer.id)).toBe('started');
     expect(stores.samSession.get()?.autoProcess).toBe(false);
+    coordinator.cancel();
+  });
+
+  it('starts on visual input, restores each input type across switches, and Reset empties both', () => {
+    const { coordinator, stores } = createCoordinator(() => false);
+    const emptyVisual = { bbox: null, excludePoints: [], includePoints: [], type: 'visual' };
+    coordinator.start(layer.id);
+    expect(stores.samSession.get()?.input).toEqual(emptyVisual);
+
+    coordinator.update({ input: { bbox: null, excludePoints: [], includePoints: [{ x: 1, y: 2 }], type: 'visual' } });
+    coordinator.update({ inputType: 'prompt' });
+    coordinator.update({ input: { prompt: 'cat', type: 'prompt' } });
+    coordinator.update({ inputType: 'visual' });
+    expect(stores.samSession.get()?.input).toMatchObject({ includePoints: [{ x: 1, y: 2 }], type: 'visual' });
+    coordinator.update({ inputType: 'prompt' });
+    expect(stores.samSession.get()?.input).toEqual({ prompt: 'cat', type: 'prompt' });
+
+    expect(coordinator.reset()).toBe('updated');
+    expect(stores.samSession.get()?.input).toEqual(emptyVisual);
+    coordinator.update({ inputType: 'prompt' });
+    expect(stores.samSession.get()?.input).toEqual({ prompt: '', type: 'prompt' });
     coordinator.cancel();
   });
 });

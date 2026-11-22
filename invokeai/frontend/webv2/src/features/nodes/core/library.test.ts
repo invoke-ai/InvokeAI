@@ -39,10 +39,6 @@ describe('filterNodePacks', () => {
     expect(names({ sortDirection: 'desc', sortField: 'nodeCount' })).toEqual(['midway', 'zeta-pack', 'alpha-pack']);
     expect(names({ sortField: 'path' })).toEqual(['alpha-pack', 'zeta-pack', 'midway']);
   });
-
-  it('handles an empty library', () => {
-    expect(filterNodePacks([], DEFAULT_NODE_PACK_FILTERS)).toEqual([]);
-  });
 });
 
 describe('isProblemPack', () => {

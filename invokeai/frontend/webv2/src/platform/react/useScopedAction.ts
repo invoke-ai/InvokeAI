@@ -4,8 +4,8 @@ import { useCallback, useRef, useState } from 'react';
 export const getErrorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 
 /**
- * Reject overlapping runs; return true only for current-account success. Actions must assertAccountScopeCurrent
- * before store writes; the wrapper cannot fence writes inside them.
+ * Reject overlapping runs; return true only for current-account success. Actions must assertAccountScopeCurrent before
+ * store writes; the wrapper cannot fence writes inside them.
  */
 export const useScopedAction = () => {
   const [isBusy, setIsBusy] = useState(false);

@@ -25,8 +25,8 @@ interface RecordListQuery {
 }
 
 /**
- * Picks one server record by id for `{ [idProp]: id }` values. A stored id the list no longer holds stays put and
- * is shown as missing: readiness cannot see the list, so the backend reports the stale reference on invoke.
+ * Picks one server record by id for `{ [idProp]: id }` values. A stored id the list no longer holds stays put and is
+ * shown as missing: readiness cannot see the list, so the backend reports the stale reference on invoke.
  */
 const RecordPickerInput = ({
   idProp,

@@ -4,7 +4,6 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { createRenderScheduler } from './scheduler';
 
-/** A controllable fake rAF: `flush()` runs the pending callback, if any. */
 const createFakeRaf = () => {
   let nextHandle = 1;
   const callbacks = new Map<number, FrameRequestCallback>();
@@ -12,7 +11,6 @@ const createFakeRaf = () => {
     cancelFrame: (handle: number): void => {
       callbacks.delete(handle);
     },
-    /** Runs all currently-queued frame callbacks (like the browser firing a frame). */
     flush: (): void => {
       const queued = [...callbacks.entries()];
       callbacks.clear();
@@ -40,7 +38,6 @@ describe('createRenderScheduler', () => {
     scheduler.invalidate({ layers: ['b'] });
     scheduler.invalidate({ overlay: true });
 
-    // Only one frame is scheduled despite four invalidations.
     expect(raf.pendingCount()).toBe(1);
     expect(render).not.toHaveBeenCalled();
 
@@ -67,7 +64,6 @@ describe('createRenderScheduler', () => {
 
     expect(render).toHaveBeenCalledTimes(2);
     const second = render.mock.calls[1]![0];
-    // No leftover 'a' or view flag from the first frame.
     expect(second.view).toBe(false);
     expect([...second.layers]).toEqual(['b']);
   });
@@ -91,7 +87,6 @@ describe('createRenderScheduler', () => {
     scheduler.invalidate({ layers: ['a'] });
     scheduler.invalidate({ view: true });
 
-    // Nothing scheduled while paused.
     expect(raf.pendingCount()).toBe(0);
 
     scheduler.resume();
@@ -168,7 +163,6 @@ describe('createRenderScheduler', () => {
 
     scheduler.invalidate({ view: true });
     raf.flush();
-    // The re-entrant invalidate scheduled another frame rather than being lost.
     expect(raf.pendingCount()).toBe(1);
   });
 
@@ -318,8 +312,6 @@ describe('damage coalescing', () => {
   });
 
   it('keeps overlay-only invalidations from widening the frame', () => {
-    // The overlay is a separate canvas redrawn whole; it says nothing about
-    // which composited pixels changed.
     const { raf, render, scheduler } = setup();
     scheduler.invalidate({ damage: damage('a', 0), layers: ['a'] });
     scheduler.invalidate({ overlay: true });
@@ -355,8 +347,6 @@ describe('damage coalescing', () => {
   });
 
   it('ignores damage that does not name the single invalidated layer', () => {
-    // Damage describes one layer's region; anything else in the same payload
-    // changed without a region, so the frame cannot be narrowed.
     const { raf, render, scheduler } = setup();
     scheduler.invalidate({ damage: damage('a', 0), layers: ['a', 'b'] });
     raf.flush();

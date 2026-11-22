@@ -1092,8 +1092,8 @@
     },
     {
       "category": "MULTIUSER",
-      "default": false,
-      "description": "Enable multiuser support. When disabled, the application runs in single-user mode using a default system account with administrator privileges. When enabled, requires user authentication and authorization.",
+      "default": true,
+      "description": "Enable multiuser support (the default). Requires user authentication and authorization; the first visitor creates the administrator account. Set to false for single-user mode, which uses a default system account with administrator privileges and no sign-in: anyone who can reach the server then has full control of it. Single-user mode is deprecated.",
       "env_var": "INVOKEAI_MULTIUSER",
       "literal_values": [],
       "name": "multiuser",

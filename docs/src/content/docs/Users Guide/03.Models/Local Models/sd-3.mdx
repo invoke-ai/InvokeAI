@@ -1,46 +1,48 @@
 ---
 title: Stable Diffusion 3.5
-description: Generate images with Stability AI's Stable Diffusion 3.5 Medium and Large models, including text encoder options and PiD super-resolution decoding.
-lastUpdated: 2026-10-12
+description: Generate images with Stability AI's Stable Diffusion 3.5 Medium and Large models, as Diffusers pipelines or GGUF transformers, including LoRAs, text encoder options and PiD super-resolution decoding.
+lastUpdated: 2026-10-21
 sidebar:
   order: 12
 ---
 
 Stable Diffusion 3.5 is Stability AI's diffusion-transformer text-to-image family. It encodes prompts
 with three text encoders at once: **CLIP-L**, **CLIP-G** and **T5**. It uses a 16-channel VAE. InvokeAI
-supports two checkpoints:
+supports these checkpoints:
 
 - **SD3.5 Medium**: the smaller model and the one InvokeAI's default settings are tuned for.
 - **SD3.5 Large**: the larger model.
+- **SD3.5 Large Turbo**: Large distilled for few-step generation.
 
-Both appear in InvokeAI under the **SD 3.x** base.
+All appear in InvokeAI under the **SD 3.x** base.
 
 ## License
 
-SD 3.5 Medium and Large are released under the **Stability AI Community License**: free for individuals and organizations with less than $1M in annual revenue, above which an Enterprise license is needed. The downloads are gated: accept the license on the model's HuggingFace page and add your HuggingFace token under **API Keys** in the Model Manager.
+SD 3.5 Medium and Large are released under the **Stability AI Community License**: free for individuals and organizations with less than $1M in annual revenue, above which an Enterprise license is needed. The downloads are gated: accept the license on the model's HuggingFace page and add your HuggingFace token under **API Keys** in the Model Manager. The same license applies to the community GGUF builds. Those downloads are not gated, but the only SD3 VAE download is, so a GGUF setup still needs the license accepted unless you already have an SD3.5 Diffusers model installed (see [GGUF transformers](#gguf-transformers)).
 
 This is a summary, not legal advice. Read the full license on the model's HuggingFace page before using a model commercially.
 
 ## Hardware
 
 The Diffusers downloads are about **16 GB** for Medium and **28 GB** for Large, including the text
-encoders and VAE. Medium is the better choice on smaller cards. See
-[System Requirements](/start-here/system-requirements/) for general guidance, and the
-[Low VRAM guide](/configuration/optimization/low-vram-mode/) if you run out of memory.
+encoders and VAE. The GGUF transformers are smaller, for example **2.9 GB** for Medium at Q8_0 and
+**4.8 GB** for Large at Q4_0, plus the separately installed text encoders and VAE. Medium is the better
+choice on smaller cards. See [System Requirements](/start-here/system-requirements/) for general
+guidance, and the [Low VRAM guide](/configuration/optimization/low-vram-mode/) if you run out of memory.
 
 ## Installing
 
-Both models are **starter models** in the Model Manager. Search for **SD3.5 Medium** or **SD3.5 Large**.
-This family has no starter bundle.
+Both Diffusers models are **starter models** in the Model Manager. Search for **SD3.5 Medium** or
+**SD3.5 Large**. This family has no starter bundle.
 
 | Starter model | Source                                   | Size   |
 | ------------- | ---------------------------------------- | ------ |
 | SD3.5 Medium  | `stabilityai/stable-diffusion-3.5-medium` | ~16 GB |
 | SD3.5 Large   | `stabilityai/stable-diffusion-3.5-large`  | ~28 GB |
 
-SD3 models install in **Diffusers** format only. Each Diffusers folder contains everything the model
-needs: the transformer, both CLIP encoders, the T5 encoder and the VAE. InvokeAI does not recognize
-single-file or GGUF SD3 main models.
+Each Diffusers folder contains everything the model needs: the transformer, both CLIP encoders, the T5
+encoder and the VAE. SD3 main models also install as [GGUF transformers](#gguf-transformers), which hold
+the transformer only. Single-file (safetensors) SD3 main models are not recognized.
 
 :::note[Gated downloads]
 If the download fails with a permission error, open the model's HuggingFace page, accept its license
@@ -50,8 +52,8 @@ terms, and add your HuggingFace token in the Model Manager's API Keys section. S
 
 ### Optional component overrides
 
-By default, every component comes from the main model. In the **Components** section next to the model,
-you can replace any of them with a model you have installed separately:
+For a Diffusers model, every component comes from the main model by default. In the **Components**
+section next to the model, you can replace any of them with a model you have installed separately:
 
 - **T5 Encoder**
 - **CLIP L**
@@ -63,22 +65,64 @@ about half the VRAM. A standalone T5 encoder (single-file, Diffusers folder or G
 (about 19 GB of RAM for T5-XXL, except GGUF, which stays quantized); see
 [Model Format Support](/users-guide/models/model-format-support/#text-encoders).
 
-The CLIP encoders can also be the single files ComfyUI uses, `clip_l` and `clip_g`; SD 3 then still tokenizes
-with the main model's tokenizers.
+The CLIP encoders can also be the single files ComfyUI uses, `clip_l` and `clip_g`; with a Diffusers
+model, SD 3 then still tokenizes with the main model's tokenizers.
+
+### GGUF transformers
+
+Quantized GGUF builds of SD3.5 Medium, Large and Large Turbo install like any other model file: paste
+their URL or path into the Model Manager. Two kinds load:
+
+- **city96's builds** (`city96/stable-diffusion-3.5-medium-gguf`, `city96/stable-diffusion-3.5-large-gguf`
+  and `city96/stable-diffusion-3.5-large-turbo-gguf`), which hold the transformer alone.
+- **stable-diffusion.cpp conversions**, such as `second-state/stable-diffusion-3.5-medium-GGUF`, which
+  bundle the VAE beside the transformer. InvokeAI reads only the transformer.
+
+A GGUF brings no text encoders and no VAE, and there are no starter models for SD3 GGUFs, so install all
+four components separately and select each one in the **Components** section. Generate stays disabled
+until all four are set. Paste these sources into the Model Manager:
+
+| Component  | Source                                                                                                                                                         | Gated |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- |
+| T5 Encoder | A T5 starter model: **t5_base_encoder** (bf16), **t5_bnb_int8_quantized_encoder**, or the GGUF builds **t5_gguf_q6_k_encoder** and **t5_gguf_q3_k_s_encoder** | no    |
+| CLIP L     | The **clip-vit-large-patch14** starter, or `second-state/stable-diffusion-3.5-medium-GGUF::clip_l.safetensors`                                                 | no    |
+| CLIP G     | `second-state/stable-diffusion-3.5-medium-GGUF::clip_g.safetensors`, which includes the `text_projection` SD 3 needs                                           | no    |
+| VAE        | `stabilityai/stable-diffusion-3.5-medium::vae`                                                                                                                 | yes   |
+
+If you already have an SD3.5 Diffusers model installed, you can reuse its parts instead: install its
+`text_encoder` (CLIP L), `text_encoder_2` (CLIP G) and `vae` subfolders by path. Its T5 subfolder,
+`text_encoder_3`, is not recognized as a T5 encoder on its own, so take T5 from the starter models or
+use one of ComfyUI's single files, `t5xxl_fp16` or `t5xxl_fp8_e4m3fn_scaled`.
+
+The `t5xxl_*` GGUFs that some repositories ship beside `clip_g` are not recognized as T5 encoders: they
+keep transformers' tensor names, and InvokeAI reads a T5 GGUF only in llama.cpp's naming, as the T5 GGUF
+starter models use. A single-file SD3 VAE
+from elsewhere works too, if its name or folder says SD3 (such as `sd3_vae.safetensors`); otherwise change
+its **Base** to SD 3.x after installing it.
+
+With a GGUF, each CLIP encoder also brings its own tokenizer. CLIP-G pads the prompt the way SD3's own
+CLIP-G tokenizer does, so its conditioning matches the Diffusers pipeline's.
 
 ## Generation settings
 
-When you select an SD3 model, InvokeAI applies these defaults, which come from the SD3.5 Medium
-reference settings:
+When you select an SD3 model, InvokeAI applies these defaults. A model whose name, or file or folder
+name, contains "turbo" gets the Large Turbo column, a Diffusers model as well as a GGUF:
 
-| Setting    | Default     |
-| ---------- | ----------- |
-| Steps      | 40          |
-| CFG Scale  | 4.5         |
-| Resolution | 1024 × 1024 |
+| Setting    | Default     | Large Turbo |
+| ---------- | ----------- | ----------- |
+| Steps      | 40          | 4           |
+| CFG Scale  | 4.5         | 1 (off)     |
+| Resolution | 1024 × 1024 | 1024 × 1024 |
 
-- **CFG Scale** applies true classifier-free guidance. Stability's reference setting for **Large** is
-  about **28 steps at CFG 3.5**. Use that as a starting point when you switch to Large.
+The default steps and CFG follow the SD3.5 Medium model card's example; the Large Turbo ones follow
+Stability's step count and guidance for SD3.5 Large Turbo. Stability's SD3.5 models also shift the noise
+schedule by 3.0, which InvokeAI's SD3 denoise does not do for any SD3 model. The missing shift matters most
+at Turbo's 4 steps: the images are usable, but objects can fall apart in places. If Turbo output looks
+undercooked, raise the steps to about 8, which looked about as clean as 4 shifted steps in our tests.
+
+- **CFG Scale** applies true classifier-free guidance. The SD3.5 Large model card's example is about
+  **28 steps at CFG 3.5**. Large gets Medium's defaults, so use that as a starting point when you
+  switch to Large.
 - **Width and height** must be multiples of **16**.
 - **Negative prompts** are supported and always used.
 - **No scheduler choice.** SD3 always uses its own flow-matching sampler, so the Scheduler control is
@@ -108,8 +152,9 @@ blocks beyond the model's depth, or name only SD 3 modules without one complete 
   before the transformer is moved to the GPU. Text-encoder work, including CLIP LoRAs, can already have run by then.
 - **SD 3.5 Medium LoRAs on SD 3 Medium.** SD 3.5 Medium adds a second attention to its first 13 blocks. A LoRA that
   trains it does not fit SD 3 Medium and is refused there.
-- **FP8 Storage.** With FP8 Storage the LoRA is applied alongside the weights instead of being merged into them; it then
-  stays in VRAM for the whole generation, and InvokeAI reserves room for it.
+- **FP8 Storage and GGUF.** With FP8 Storage, and always on a [GGUF transformer](#gguf-transformers), whose packed
+  weights cannot be merged into, the LoRA is applied alongside the weights instead; it then stays in VRAM for the whole
+  generation, and InvokeAI reserves room for it.
 
 Earlier versions identified some SD 3 LoRAs as Qwen-Image LoRAs and others not at all. Select such a LoRA in the Model
 Manager and use **Re-identify** to fix it. If the file is one Invoke now refuses (for example a LoRA with layers that
@@ -127,7 +172,8 @@ pass. Two decoders are available as starter models: **PiD Decoder SD3 (2K)** and
 
 The SD3 nodes are **Main Model - SD3**, **Prompt - SD3**, **Denoise - SD3**, **Image to Latents - SD3**
 and **Latents to Image - SD3**. **Latents to Image - SD3 + PiD (4x SR)** decodes with PiD instead of the
-VAE.
+VAE. With a GGUF main model, **Main Model - SD3** needs all four of its component inputs, T5, CLIP L,
+CLIP G and VAE, and fails with a message naming the missing ones.
 
 The **T5Encoder** input of **Prompt - SD3** is optional. SD3 was trained with text-encoder dropout, so
 leaving T5 unconnected still produces images and saves the time and memory of loading T5. When T5 is connected, it reads at most **256 tokens** of the

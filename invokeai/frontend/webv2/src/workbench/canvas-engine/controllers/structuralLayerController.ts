@@ -185,8 +185,8 @@ export class StructuralLayerController {
   /**
    * Starts an owned preview: `apply` coalesces live dispatches to one per frame and captures the values the first
    * preview of each field replaces, `commit` records the gesture as one step from its prepared baseline without
-   * dispatching again when the preview already reached it, restoring the baseline when it is refused. A newer
-   * session, any commit, a history replay or disposal ends this one first, restoring its baseline.
+   * dispatching again when the preview already reached it, restoring the baseline when it is refused. A newer session,
+   * any commit, a history replay or disposal ends this one first, restoring its baseline.
    */
   beginPreview(): StructuralPreviewSession | null {
     if (!this.canCommit()) {
@@ -427,9 +427,9 @@ export class StructuralLayerController {
   }
 
   /**
-   * A reducer that refuses a replay (its target changed since) is expected: the entry moves as a no-op and the
-   * refusal is reported. A mirror that cannot follow an accepted replay is not: the opposite action restores the
-   * reducer and the step stays where it was.
+   * A reducer that refuses a replay (its target changed since) is expected: the entry moves as a no-op and the refusal
+   * is reported. A mirror that cannot follow an accepted replay is not: the opposite action restores the reducer and
+   * the step stays where it was.
    */
   private replay(label: string, action: CanvasProjectMutation, opposite: CanvasProjectMutation): void {
     try {

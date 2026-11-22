@@ -1,10 +1,15 @@
 /* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
-import type { ModelConfig } from '@features/models/core/types';
 import type { ListRowProps } from '@platform/ui/list/List';
 import type { ListContextMenuAnchor } from '@platform/ui/list/ListItem';
 
 import { Box, Flex, HStack, Icon, Image } from '@chakra-ui/react';
-import { filterModels, groupModelsByType, type ModelLibraryFilters } from '@features/models/core/library';
+import {
+  filterModels,
+  groupModelsByType,
+  type ModelGroupEntry,
+  type ModelLibraryFilters,
+} from '@features/models/core/library';
+import { getModelTypeLabel } from '@features/models/core/taxonomy';
 import { getModelImageUrl } from '@features/models/data/api';
 import { useModelsSelector } from '@features/models/data/modelsStore';
 import { MissingFileBadge, ModelBaseBadge, ModelFormatBadge } from '@features/models/ui/detail/ModelBadges';
@@ -22,7 +27,8 @@ import { useTranslation } from 'react-i18next';
 
 import { ModelRowContextMenu, type ModelContextMenuTarget } from './ModelRowContextMenu';
 
-const getModelKey = (model: ModelConfig): string => model.key;
+/** A role row repeats the model under another type's section, so its row key carries that type. */
+const getRowKey = ({ model, viaType }: ModelGroupEntry): string => (viaType ? `${viaType}:${model.key}` : model.key);
 
 export const ModelLibraryList = ({
   activeModelKey,
@@ -57,12 +63,15 @@ export const ModelLibraryList = ({
       left.status === right.status
   );
   const deferredFilters = useDeferredValue(filters);
-  const [contextMenuTarget, setContextMenuTarget] = useState<ModelContextMenuTarget | null>(null);
+  const [contextMenuTarget, setContextMenuTarget] = useState<(ModelContextMenuTarget & { rowKey: string }) | null>(
+    null
+  );
   const openAddModels = () => {
     openModelManagerTab('add');
   };
   const handleContextMenu = useCallback(
-    (modelKey: string, anchor: ListContextMenuAnchor) => setContextMenuTarget({ ...anchor, modelKey }),
+    (modelKey: string, anchor: ListContextMenuAnchor, rowKey: string) =>
+      setContextMenuTarget({ ...anchor, modelKey, rowKey }),
     []
   );
   const handleCloseContextMenu = useCallback(() => {
@@ -73,12 +82,14 @@ export const ModelLibraryList = ({
   const rows = useMemo(
     () =>
       listRowsFromSections(
-        groupModelsByType(filterModels(models, deferredFilters, missingModelKeys)).map((group) => ({
-          items: group.models,
-          key: group.type,
-          label: group.label,
-        })),
-        getModelKey
+        groupModelsByType(filterModels(models, deferredFilters, missingModelKeys), deferredFilters.typeFilter).map(
+          (group) => ({
+            items: group.entries,
+            key: group.type,
+            label: group.label,
+          })
+        ),
+        getRowKey
       ),
     [deferredFilters, missingModelKeys, models]
   );
@@ -90,24 +101,31 @@ export const ModelLibraryList = ({
     [instanceId]
   );
 
-  const renderItem = (model: ModelConfig, rowProps: ListRowProps) => (
-    <ModelRow
-      {...rowProps}
-      base={model.base}
-      coverImage={model.cover_image}
-      fileSize={model.file_size}
-      format={model.format}
-      imageVersion={coverImageVersions[model.key]}
-      isMenuOpen={contextMenuTarget?.modelKey === model.key}
-      isMissing={missingModelKeys.has(model.key)}
-      isSelected={selectedKeys.has(model.key)}
-      modelKey={model.key}
-      name={model.name}
-      onActivate={onActivate}
-      onContextMenu={handleContextMenu}
-      onToggleSelected={onToggleSelected}
-    />
-  );
+  const renderItem = (entry: ModelGroupEntry, rowProps: ListRowProps) => {
+    const { model, viaType } = entry;
+    const rowKey = getRowKey(entry);
+
+    return (
+      <ModelRow
+        {...rowProps}
+        base={model.base}
+        coverImage={model.cover_image}
+        fileSize={model.file_size}
+        format={model.format}
+        imageVersion={coverImageVersions[model.key]}
+        isMenuOpen={contextMenuTarget?.rowKey === rowKey}
+        isMissing={missingModelKeys.has(model.key)}
+        isSelected={selectedKeys.has(model.key)}
+        modelKey={model.key}
+        name={model.name}
+        pressLabel={viaType ? t('models.listedAs', { name: model.name, type: getModelTypeLabel(viaType) }) : undefined}
+        onActivate={onActivate}
+        onContextMenu={handleContextMenu}
+        onToggleSelected={onToggleSelected}
+        rowKey={rowKey}
+      />
+    );
+  };
 
   return (
     <>
@@ -154,9 +172,12 @@ interface ModelRowProps extends ListRowProps {
   isSelected: boolean;
   modelKey: string;
   name: string;
+  /** Role rows repeat a model under another section; the name says which one, since sections are not announced. */
+  pressLabel?: string;
   onActivate: (modelKey: string) => void;
-  onContextMenu: (modelKey: string, anchor: ListContextMenuAnchor) => void;
+  onContextMenu: (modelKey: string, anchor: ListContextMenuAnchor, rowKey: string) => void;
   onToggleSelected: (modelKey: string) => void;
+  rowKey: string;
 }
 
 const ModelRow = memo(function ModelRow({
@@ -169,9 +190,11 @@ const ModelRow = memo(function ModelRow({
   isSelected,
   modelKey,
   name,
+  pressLabel,
   onActivate,
   onContextMenu,
   onToggleSelected,
+  rowKey,
   ...rowProps
 }: ModelRowProps) {
   // Per-row subscription: a keystroke in one model's draft re-renders only a row whose marker flips.
@@ -179,8 +202,8 @@ const ModelRow = memo(function ModelRow({
   const handlePress = useCallback(() => onActivate(modelKey), [modelKey, onActivate]);
   const handleCheckedChange = useCallback(() => onToggleSelected(modelKey), [modelKey, onToggleSelected]);
   const handleContextMenu = useCallback(
-    (anchor: ListContextMenuAnchor) => onContextMenu(modelKey, anchor),
-    [modelKey, onContextMenu]
+    (anchor: ListContextMenuAnchor) => onContextMenu(modelKey, anchor, rowKey),
+    [modelKey, onContextMenu, rowKey]
   );
 
   return (
@@ -204,6 +227,7 @@ const ModelRow = memo(function ModelRow({
           modelKey={modelKey}
         />
       }
+      pressLabel={pressLabel}
       title={name}
       trailing={formatBytes(fileSize)}
       onCheckedChange={handleCheckedChange}

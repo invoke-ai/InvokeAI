@@ -11,7 +11,7 @@
 ## Persistence and lifecycle
 
 - Preserve atomicity, revision checks, idempotency, explicit conflicts. Stored-data change: read migrations and old-record readers; add needed migration/compatibility tests.
-- SQL lives only in `services/shared/database/`, reached through `Database.queries`. `tests/app/test_database_access_guard.py` enforces this.
+- SQL lives only in `services/shared/database/`, reached through `Database.queries`. The [database access guard](../../tests/app/test_database_access_guard.py) enforces this: add queries there, never exempt callers. The guard proves nothing about transactions, authorization, or concurrency.
 - Query modules build statements once, at module level, with `bindparam()` (per-call building costs several times execution). Read rows by position; build DTOs with `@mapped(...)` outside the transaction. Shape-dependent statement: cached builder whose shapes a client cannot multiply (normalize lists and flags, round list lengths; see the guide).
 - Multi-record writes: one transaction owner, `with db.queries.transaction() as q:`, pass `q` to helpers. Second transaction on the same thread raises `NestedTransactionError`. See `services/shared/database/database.py`.
 - Concurrency. SQLite serialises everything behind one lock; MySQL/MariaDB do not.
@@ -19,12 +19,15 @@
   - Invariant spanning rows (last active administrator): a `DatabaseLock`. Every transaction that changes rows the invariant reads acquires the lock as its first call (`q.locks.acquire(...)`). A migration adds its row.
   - Decision about one row (may this board be claimed?): lock that row before reading what the decision uses (`@locking` query method, `SELECT ... FOR UPDATE`). Every transaction changing those inputs writes or locks the same row. Lock rows in one order (e.g. project before its board).
   - Unit with no effects outside the database: run with `db.queries.run(work)`; it retries after a deadlock.
-- Tables live in `services/shared/database/schema/` and must match the migrated SQLite schema exactly (`test_schema_parity.py`). Change schema with a migration plus the same metadata change, in one change.
+- Tables live in `services/shared/database/schema/` and must match the migrated SQLite schema exactly ([schema parity check](../../tests/app/services/shared/database/test_schema_parity.py)). Change schema with a migration plus the same metadata change, in one change.
 - No database has triggers. Queries set `updated_at` (upserts too) and the queue's `started_at`, `completed_at`, `session_revision`.
 - New migrations: `PortableMigration`s (Alembic operations; tables via `context.create_table()`), idempotent. MySQL/MariaDB commit DDL as it runs, so a half-failed migration runs again. On SQLite they run with foreign keys off and are checked before commit. Migrations up to `PORTABLE_CUTOVER` stay SQLite-only and unchanged. See the Database Migrations guide.
 - Preserve project/account isolation, document bounds, queue admission/receipts, lost-response retry safety. Never silently discard recovery data. Never resolve conflicts with last-write-wins.
 - Bound concurrency. Support cancellation, timeouts/retries, file/process/listener/task cleanup. Keep CPU and blocking I/O off the async server loop.
 - Preserve file/path validation, remote-fetch protections, sanitized errors. Never modify real user models, databases, outputs, or credentials in tests or debugging.
+- Every denoise invocation (`*denoise*` in `invokeai/app/invocations/`) must inherit `WithMetadata`, must not inherit `WithBoard`, must return `LatentsMetaOutput` (or an output subclassing `MetadataOutput` for multi-tensor outputs), and must build a new `MetadataField` via `build_denoise_metadata` without mutating `self.metadata.root`. Never create new `*_denoise_meta` wrapper nodes; enforced by `tests/app/invocations/test_denoise_metadata.py`.
+- Every metadata label, standalone model identifier, or generation parameter emitted into workflow metadata must be registered in `CORE_METADATA_REGISTRY` in `invokeai/app/invocations/metadata_constants.py` using its `MetadataType` (`T.MODEL`, `T.STRING`, `T.FLOAT`, etc.). Never declare or hardcode separate label sets or literals in `metadata_linked.py` or `metadata.py`; all dropdown literals and `CORE_MODEL_LABELS` are derived automatically from this registry and enforced by `tests/app/invocations/test_core_metadata.py`.
+
 
 ## Efficiency and verification
 
@@ -32,4 +35,4 @@
 - Transaction, migration, revision, ownership tests: real temporary SQLite. Cover affected malformed input, cross-user access, cancellation, repeated requests, partial failures. Database-fixture tests also run against MySQL and MariaDB when `INVOKEAI_TEST_DB_URL` is set (`tests/fixtures/database.py`).
 - Read `tests/AGENTS.md`. Use `tests/app/` or the existing owning suite. Run focused pytest and root Ruff. Milestones: broaden to relevant service/router/invocation suites.
 - Graph execution: read `services/shared/README.md`. Test scheduling and invocation lifecycles through owning interfaces.
-- Report schema generation, migration validation, unavailable integration/hardware checks.
+- Report schema generation, migration validation, unavailable integration/hardware checks, and the database dialects exercised. SQLite alone does not prove MySQL/MariaDB locking or interrupted-DDL recovery.

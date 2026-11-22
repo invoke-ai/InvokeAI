@@ -160,8 +160,8 @@ export const validateChunkSourceManifest = (value) => {
 };
 
 /**
- * Use the lower byte bound: b + max(b × 1%, 4 KB), where b = max(reference, committed), or committed +
- * max(committed × 10%, 32 KB). The committed hard bound prevents cumulative growth; request counts remain exact.
+ * Use the lower byte bound: b + max(b × 1%, 4 KB), where b = max(reference, committed), or committed + max(committed ×
+ * 10%, 32 KB). The committed hard bound prevents cumulative growth; request counts remain exact.
  */
 export const GROWTH_ALLOWANCE_PERCENT = 0.01;
 export const GROWTH_ALLOWANCE_FLOOR_BYTES = 4096;
@@ -270,8 +270,7 @@ export const referenceIncompatibility = (reference, kind, metricKeys) => {
 };
 
 /**
- * Only expected version/metric drift may fall back; other reference errors fail with the configured variable and
- * path.
+ * Only expected version/metric drift may fall back; other reference errors fail with the configured variable and path.
  */
 export const loadPerformanceReference = async ({ directory, fileName, kind, metricKeys, root }) => {
   const path = resolve(root, directory, fileName);
@@ -306,8 +305,8 @@ export const loadPerformanceReference = async ({ directory, fileName, kind, metr
 export const isBudgetFailure = (message) => / reached \d+ .*\(limit /.test(message);
 
 /**
- * Apply reference byte measurements while retaining committed ceilings; report uncovered routes and use their
- * committed baselines.
+ * Apply reference byte measurements while retaining committed ceilings; report uncovered routes and use their committed
+ * baselines.
  */
 export const applyBuildReference = (build, reference) => {
   if (!reference) {
@@ -475,36 +474,7 @@ const validateBrowserRoute = (route, path) => {
   assertNonEmptyString(route.scriptSourceOwnerSet, `${path}.scriptSourceOwnerSet`);
 };
 
-export const assertTimingEnforcementIsConfigured = (baseline, fixtures) => {
-  if (!baseline.timingPolicy.enforce) {
-    return;
-  }
-
-  const { runner } = baseline.timingPolicy;
-  if (!runner.stable || runner.id === 'unconfigured') {
-    throw new Error('Timing enforcement requires an explicitly identified stable runner.');
-  }
-  if (runner.observedStableRuns < runner.minimumStableRuns) {
-    throw new Error(
-      `Timing enforcement requires at least ${String(runner.minimumStableRuns)} stable runs; received ${String(
-        runner.observedStableRuns
-      )}.`
-    );
-  }
-  for (const fixture of fixtures.routes) {
-    assertNonEmptyString(fixture.readyMark, `architecture fixtures.routes.${fixture.id}.readyMark`);
-    const route = baseline.routes.find(
-      (candidate) => candidate.id === fixture.id && candidate.stateProfile === fixture.stateProfile
-    );
-    if (!route || route.readyMark !== fixture.readyMark) {
-      throw new Error(
-        `Timing enforcement requires ${fixture.id}/${fixture.stateProfile} to have a matching semantic-ready mark.`
-      );
-    }
-  }
-};
-
-export const validateBrowserBaseline = (value, fixtures) => {
+export const validateBrowserBaseline = (value) => {
   assertExactKeys(
     value,
     ['browserExecutable', 'capturedAt', 'routes', 'sampling', 'schemaVersion', 'scriptSourceOwnerSets', 'timingPolicy'],
@@ -525,33 +495,10 @@ export const validateBrowserBaseline = (value, fixtures) => {
     throw new Error('browser baseline must configure at least one scored sample and exactly one trace sample.');
   }
 
-  assertExactKeys(
-    value.timingPolicy,
-    ['enforce', 'longTaskTargetMs', 'runner', 'tolerancePercent'],
-    'browser baseline.timingPolicy'
-  );
-  if (typeof value.timingPolicy.enforce !== 'boolean') {
-    throw new TypeError('browser baseline.timingPolicy.enforce must be boolean.');
+  // Timing distributions are report-only and nothing reads the rest of this block; only reject a claim of enforcement.
+  if (value.timingPolicy?.enforce !== false) {
+    throw new Error('browser baseline.timingPolicy.enforce must be false: timing enforcement is not implemented.');
   }
-  assertNonNegativeNumber(value.timingPolicy.longTaskTargetMs, 'browser baseline.timingPolicy.longTaskTargetMs');
-  assertNonNegativeNumber(value.timingPolicy.tolerancePercent, 'browser baseline.timingPolicy.tolerancePercent');
-  assertExactKeys(
-    value.timingPolicy.runner,
-    ['id', 'minimumStableRuns', 'observedStableRuns', 'stable'],
-    'browser baseline.timingPolicy.runner'
-  );
-  assertNonEmptyString(value.timingPolicy.runner.id, 'browser baseline.timingPolicy.runner.id');
-  if (typeof value.timingPolicy.runner.stable !== 'boolean') {
-    throw new TypeError('browser baseline.timingPolicy.runner.stable must be boolean.');
-  }
-  assertNonNegativeNumber(
-    value.timingPolicy.runner.minimumStableRuns,
-    'browser baseline.timingPolicy.runner.minimumStableRuns'
-  );
-  assertNonNegativeNumber(
-    value.timingPolicy.runner.observedStableRuns,
-    'browser baseline.timingPolicy.runner.observedStableRuns'
-  );
 
   if (!Array.isArray(value.routes)) {
     throw new TypeError('browser baseline.routes must be an array.');
@@ -568,7 +515,6 @@ export const validateBrowserBaseline = (value, fixtures) => {
       );
     }
   }
-  assertTimingEnforcementIsConfigured(value, fixtures);
   return value;
 };
 
@@ -788,9 +734,9 @@ export const createBrowserSamplePlan = ({ scoredSamples, traceSamples, warmups }
 };
 
 // Routine checks need repeated resource observations, but only full profiles can compare timings.
-export const createBrowserRunPlan = ({ sampling, timingPolicy, profile = false, updateBaseline = false }) => {
+export const createBrowserRunPlan = ({ sampling, profile = false, updateBaseline = false }) => {
   const fullPlan = createBrowserSamplePlan(sampling);
-  if (profile || updateBaseline || timingPolicy.enforce) {
+  if (profile || updateBaseline) {
     return { mode: 'profile', sampling, samples: fullPlan };
   }
   return {
@@ -899,7 +845,7 @@ export const summarizeBrowserResources = (resources) => {
   };
 };
 
-export const checkBrowserRouteBudget = (route, expected, timingPolicy, expectedScriptSourceOwners) => {
+export const checkBrowserRouteBudget = (route, expected, expectedScriptSourceOwners) => {
   const failures = [];
   const label = `${route.id}/${route.stateProfile}`;
   const committedResources = expected.committedResourceBaseline ?? expected.resourceBaseline;
@@ -941,33 +887,6 @@ export const checkBrowserRouteBudget = (route, expected, timingPolicy, expectedS
       `${label} script source-owner set changed.${sourceDiff.added.length > 0 ? ` Added: ${sourceDiff.added.join(', ')}.` : ''}${
         sourceDiff.removed.length > 0 ? ` Removed: ${sourceDiff.removed.join(', ')}.` : ''
       }`
-    );
-  }
-
-  if (!timingPolicy.enforce) {
-    return failures;
-  }
-
-  const timingLimit = (value) => value * (1 + timingPolicy.tolerancePercent);
-  const timingChecks = [
-    ['domContentLoadedMedianMs', 'DOMContentLoaded median'],
-    ['layoutAckMedianMs', 'layout-ack median'],
-    ['layoutReturnSwitchMedianMs', 'layout-return-switch median'],
-    ['layoutSwitchMedianMs', 'layout-switch median'],
-    ['loadMedianMs', 'load median'],
-    ['projectSwitchMedianMs', 'project-switch median'],
-    ['routeReadyMedianMs', 'semantic route-ready median'],
-  ];
-  for (const [key, metricLabel] of timingChecks) {
-    if (expected[key] > 0 && route[key] > timingLimit(expected[key])) {
-      failures.push(
-        `${label} ${metricLabel} exceeded its timing tolerance (owner ${route.owner}, remediation ${route.remediationTicket}).`
-      );
-    }
-  }
-  if (route.longestTaskMaxMs > Math.max(timingPolicy.longTaskTargetMs, timingLimit(expected.longestTaskMaxMs))) {
-    failures.push(
-      `${label} longest task exceeded its timing tolerance (owner ${route.owner}, remediation ${route.remediationTicket}).`
     );
   }
 

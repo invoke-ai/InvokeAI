@@ -13,7 +13,9 @@ import type {
 import type { CanvasMutationOrigin } from '@workbench/canvas-engine/mutationContracts';
 import type { StrokeCommittedEvent } from '@workbench/canvas-engine/tools/tool';
 import type { LayerTransform } from '@workbench/canvas-engine/transform/transformMath';
+import type { VectorEditSession } from '@workbench/canvas-engine/vectorEditState';
 
+import type { CanvasVectorLayerContract } from './contracts';
 import type { BooleanRasterResult } from './controllers/booleanMergeController';
 import type { CopyLayerResult } from './controllers/copyLayerController';
 import type { CropAllLayersResult, CropLayerResult } from './controllers/cropLayerController';
@@ -46,6 +48,7 @@ import type {
   ShapeToolOptions,
   TextEditSession,
   TextToolOptions,
+  TransformOptions,
   TransformSession,
 } from './engineStores';
 import type { RasterCompositeExportRequest, RasterCompositeExportResult } from './exportRasterComposite';
@@ -60,7 +63,6 @@ import type { AdjustmentRefusal } from './render/exactAdjustments';
 import type { Rect, ToolId, Vec2 } from './types';
 import type { Viewport } from './viewport';
 
-/** Opaque snapshot identity carried through asynchronous layer operations. */
 export interface LayerExportGuard {
   readonly projectId: string;
   readonly layerId: string;
@@ -69,16 +71,12 @@ export interface LayerExportGuard {
   readonly documentGeneration: number;
 }
 
-/**
- * Guarded mutations can decline as busy (another edit or gesture), stale (pixels changed), aborted (caller
- * signal), not-ready (pixels still loading), over-budget (too large to undo or prepare), or command-specific
- * refusals. Structural commits use {@link StructuralCommitResult}.
- */
+/** Refusals shared by guarded mutations; structural commits use {@link StructuralCommitResult}. */
 export type GuardedMutationRefusal =
   | SubsetOf<CanvasTransactionOutcome, 'aborted' | 'busy' | 'stale' | 'not-ready' | 'over-budget'>
   | SubsetOf<CanvasCommandRefusal, 'locked' | 'missing' | 'unsupported'>;
 
-/** A destructive mask edit (clear, invert); `nothing` when the mask holds no pixels to change. */
+/** `nothing` when the mask holds no pixels to change. */
 export type MaskEditResult =
   | { status: 'committed' }
   | { status: SubsetOf<CanvasTransactionOutcome, 'busy' | 'not-ready' | 'over-budget' | 'stale'> }
@@ -100,16 +98,12 @@ export interface CommitRasterFilterOptions {
   mode: 'replace' | 'copy';
   filter?: RasterFilterSettings;
   target?: RasterFilterCommitTarget;
-  /**
-   * For `target: 'control'` copies: the control type the filter implies, or null for an untyped copy. A typed copy
-   * uses its pixels as-is (`detection: null`); either way the copy keeps no derivation of its source layer.
-   */
+  /** `target: 'control'` only: null makes an untyped copy; either way the copy keeps no derivation of its source. */
   controlCopy?: { controlType: ControlType | null };
   requireExactImageDimensions?: boolean;
   signal?: AbortSignal;
 }
 
-/** What a control-map commit must still match: the document session and the detection input it ran on. */
 export interface ControlDetectionGuard {
   readonly projectId: string;
   readonly layerId: string;
@@ -141,37 +135,24 @@ export type ControlMapCommitResult =
       message?: string;
     };
 
-/**
- * Edits that keep a control layer's derived map in step with its type, detector and original. Neither commit takes
- * the operation edit lease: both refuse `busy` while a modal operation, gesture, replay or layer session is running,
- * and the caller retries later.
- */
+/** Neither commit takes the operation edit lease: both refuse `busy` while anything else holds the document. */
 export interface CanvasControlDerivationCapability {
-  /**
-   * Replaces one control layer's contract as one user-origin history entry; refused `stale` unless the live layer
-   * still equals `expected`. Consecutive patches of the same layer with the same `coalesceKey` replace the top entry.
-   */
+  /** One user-origin entry, `stale` unless the layer equals `expected`; a repeated `coalesceKey` replaces it. */
   commitControlLayerPatch(options: {
     label: string;
     expected: CanvasControlLayerContract;
     next: CanvasControlLayerContract;
     coalesceKey?: string;
   }): ControlLayerPatchResult;
-  /** What a detection run must still match to commit; null when the layer is missing or not a control layer. */
+  /** Null when the layer is missing or not a control layer. */
   captureControlDetectionGuard(layerId: string): ControlDetectionGuard | null;
-  /**
-   * Installs a detected map (a persisted image) as the layer's `source`, keeping the original, as a system-origin
-   * entry. Paired with the intent entry that requested it when that is still the newest step.
-   */
+  /** Installs a detected map as `source`, keeping the original, as a system-origin entry. */
   commitControlMap(options: {
     guard: ControlDetectionGuard;
     image: CanvasImageRef;
     rect: Rect;
     detection: CanvasControlDetectionContract;
-    /**
-     * Makes `image` durable. Awaited only once the guard holds and nothing holds the document, just before decoding,
-     * so a refused or stale result is never promoted; a rejection refuses the commit `failed`.
-     */
+    /** Awaited once the guard holds, so a refused or stale result is never promoted; rejection refuses `failed`. */
     makeDurable(): Promise<void>;
     signal?: AbortSignal;
   }): Promise<ControlMapCommitResult>;
@@ -189,56 +170,57 @@ export type CommitMaskImageResult = { status: 'committed'; layerId: string } | {
 export type PsdExportStatus = 'idle' | 'preparing' | 'serializing' | 'downloading' | 'cancelling';
 
 export interface CanvasInteractionState {
+  vectorEditSession: VectorEditSession | null;
+  vectorToolsStatus: 'idle' | 'loading' | 'ready' | 'failed';
   psdExportStatus: PsdExportStatus;
   activeTool: ToolId;
   bboxGrid: number;
   bboxOptions: BboxToolOptions;
   bboxOverlay: boolean;
+  /** Null when no Frame tool drag is under way. */
+  bboxPreview: Rect | null;
   brushOptions: BrushOptions;
   canRedo: boolean;
   canUndo: boolean;
   checkerboard: boolean;
   checkerColors: CheckerColors;
   clipToBbox: boolean;
-  /** The mirrored workbench pair; the engine reads it at gesture start, never writes it. */
+  /** The engine reads it at gesture start, never writes it. */
   colorPair: ActiveColorPairState;
-  /** The control layer shown as its kept original or as original under its map; null shows every map. */
+  /** Null shows every map. */
   controlLayerView: ControlLayerView | null;
   documentEditingLocked: boolean;
   eraserOptions: EraserOptions;
   gradientOptions: GradientToolOptions;
   hasFloatingSelection: boolean;
   hasSelection: boolean;
-  /** Monotonic signal for engine history-stack mutations (see the History pane). */
   historyEpoch: number;
   invertBrushSizeScroll: boolean;
   lassoOptions: LassoToolOptions;
-  /** Q quick-switch memory; callers write the bookmark, the engine maintains the previous selection. */
+  /** Callers write the bookmark; the engine maintains the previous selection. */
   layerQuickSwitch: LayerQuickSwitchState;
   marqueeOptions: MarqueeToolOptions;
-  /** Monotonic signal: some layer published new cache pixels (thumbnails, overview). */
   layerPixelEpoch: number;
-  /** Monotonic signal: the mirrored document changed (an edit, sync or swap), after the engine reacted to it. */
+  /** Advances after the engine reacted to the document change. */
   documentEpoch: number;
   ruleOfThirds: boolean;
   shapeOptions: ShapeToolOptions;
   showBbox: boolean;
   showGrid: boolean;
   snapToGrid: boolean;
+  /** Whether a staged preview hides control layers, masks and regions; an edit of one shows them meanwhile. */
+  stagingHidesOverlays: boolean;
   textEditSession: TextEditSession | null;
   textOptions: TextToolOptions;
+  transformOptions: TransformOptions;
   transformSession: TransformSession | null;
-  /**
-   * The layer `layers.beginTransform` is waiting on: its session opens once the layer's fresh pixels are persisted.
-   * Null when nothing waits; it also clears on a tool switch, a selection change, Escape, the layer's removal, a
-   * document replacement or a persistence failure with no retry to follow.
-   */
+  /** Waits for fresh pixels to persist; clears on tool switch, selection change, Escape, removal or failure. */
   pendingTransformLayerId: string | null;
   viewportReady: boolean;
   zoom: number;
 }
 
-/** Settings callers may write; every other interaction key is engine-owned state they only observe. */
+/** Every other interaction key is engine-owned and read-only to callers. */
 export type CanvasWritableInteractionKey = Extract<
   keyof CanvasInteractionState,
   | 'bboxOptions'
@@ -260,6 +242,7 @@ export type CanvasWritableInteractionKey = Extract<
   | 'showGrid'
   | 'snapToGrid'
   | 'textOptions'
+  | 'transformOptions'
 >;
 
 export interface CanvasInteractionStateCapability {
@@ -270,25 +253,17 @@ export interface CanvasInteractionStateCapability {
   getLayerThumbnailVersion(layerId: string): number | undefined;
   subscribeLayerThumbnailStatus(layerId: string, listener: () => void): () => void;
   subscribeLayerThumbnailVersion(layerId: string, listener: () => void): () => void;
-  /** Whether the canvas shows a layer's or raster group's spatial adjustments exactly (`idle`), or why not. */
   getLayerAdjustmentStatus(layerId: string): LayerAdjustmentStatus | 'idle';
   subscribeLayerAdjustmentStatus(layerId: string, listener: () => void): () => void;
 }
 
-/**
- * Font resolution shared by Canvas rasterization and the editing portal.
- * Implementations may return a browser-only family alias, but that alias must
- * never be written into a persisted text source.
- */
+/** Implementations may return a browser-only family alias, which must never be persisted in a text source. */
 export interface CanvasFontCapability {
   resolveFamily(source: Extract<CanvasLayerSourceContract, { type: 'text' }>): string;
-  /** Starts/joins a live editor preview and isolates caller cancellation. */
   ensurePreview(source: Extract<CanvasLayerSourceContract, { type: 'text' }>, signal?: AbortSignal): Promise<string>;
   waitForReady(source: Extract<CanvasLayerSourceContract, { type: 'text' }>, signal?: AbortSignal): Promise<string>;
   subscribe(listener: () => void): () => void;
-  /** Groups exact persisted custom references for missing-font recovery UI. */
   collectReferences(document: CanvasDocumentContractV3): readonly CanvasFontReferenceGroup[];
-  /** Replaces every matching text source in one undoable structural edit. */
   replaceAllReferences(from: CanvasTextFontRef, target: CanvasFontReplacementTarget): CanvasFontReplacementResult;
 }
 
@@ -296,22 +271,16 @@ export interface CanvasCoreStoreCapability {
   readonly interaction: CanvasInteractionStateCapability;
 }
 
-/**
- * Which workbench region a key belongs to, as the host's focus judge decides: this canvas (`surface`), a widget
- * that acts on this canvas's layers (`companion`), or anything else (`elsewhere`).
- */
+/** Owner of a key as the host's focus judge decides; `companion` acts on this canvas's layers. */
 export type CanvasKeyOwner = 'surface' | 'companion' | 'elsewhere';
 
 export interface CanvasSurfaceAttachOptions {
-  /**
-   * Names the owner of a keydown the canvas would otherwise act on. Asked only on keydown, after the pipeline's own
-   * refusals (editable target, open menu or dialog). Without it the canvas judges ownership from focus alone.
-   */
+  /** Asked only on keydown, after the pipeline's own refusals; without it ownership comes from focus alone. */
   readonly resolveKeyOwner?: (event: KeyboardEvent) => CanvasKeyOwner;
 }
 
 export interface CanvasSurfaceCapability {
-  /** `keyboardRoot` is the focusable element whose focus gives the canvas its session keys; defaults to the overlay. */
+  /** `keyboardRoot` gets the canvas its session keys while focused; defaults to the overlay. */
   attach(
     screenCanvas: HTMLCanvasElement,
     overlayCanvas: HTMLCanvasElement,
@@ -325,29 +294,18 @@ export interface CanvasSurfaceCapability {
 export interface CanvasDocumentCapability {
   captureSnapshot(): CanvasDocumentSnapshot | null;
   getDocument(): CanvasDocumentContractV3 | null;
-  /**
-   * Counts every reducer document identity change, including previews, selection and syncs, to reject stale
-   * prepared edits. Unlike raster `documentGeneration` or wholesale-swap `documentRevision`, it advances on each
-   * edit.
-   */
+  /** Advances on every reducer document identity change (previews, selection, syncs) to reject stale prepared edits. */
   getEditRevision(): number;
-  /** Where a new `stack` layer lands: above `aboveId` when it belongs to the stack, else the stack top. */
   captureInsertionAnchor(stack: LayerStackKind, aboveId: string | null): CanvasNodeInsertionAnchor;
-  /** The anchor that restores `nodeId` between its current siblings; null when absent. */
   captureRestoreAnchor(nodeId: string): CanvasNodeInsertionAnchor | null;
-  /** Swaps in a whole new document; the mirror treats it as a document swap and history clears. */
+  /** History clears. */
   replaceDocument(document: CanvasDocumentContractV3): boolean;
-  /**
-   * Restores one of the canvas's restore points, a document swap like `replaceDocument` (a Discard all point only
-   * re-stages its results). `keepCurrentAs` keeps the replaced canvas as a point in its place. False when nothing
-   * changed.
-   */
+  /** A document swap; `keepCurrentAs` keeps the replaced canvas as a point. False when nothing changed. */
   restoreSnapshot(snapshotId: string, keepCurrentAs?: { id: string; name: string; createdAt: string }): boolean;
-  /** The pure model over the current document; the same instance until the document changes. */
+  /** The same instance until the document changes. */
   model(): CanvasDocumentModel | null;
 }
 
-/** Immutable reducer canvas state captured at one engine document generation. */
 export interface CanvasDocumentSnapshot {
   readonly canvas: CanvasStateContractV3;
   readonly documentGeneration: number;
@@ -371,7 +329,6 @@ export interface CanvasPsdExportCapability {
 export interface CanvasViewportCapability {
   getViewport(): Viewport;
   fitToView(): void;
-  /** Fit only on first show; reattaching a kept-alive widget must preserve zoom and pan. */
   fitToViewOnFirstShow(): void;
   setBboxGrid(size: number): void;
 }
@@ -381,25 +338,18 @@ export interface CanvasToolCapability {
   stepBrushSize(direction: 1 | -1): void;
 }
 
-/** Labels of the retained undo/redo steps, for the History pane. */
 export interface CanvasHistoryEntries {
-  /** Applied steps, oldest first; the last is what `undo()` reverts. */
+  /** Oldest first; the last is what `undo()` reverts. */
   past: readonly string[];
-  /** Undone steps, next-redo first. */
+  /** Next-redo first. */
   future: readonly string[];
-  /** The oldest steps dropped to stay within the history's entry cap or memory budget since it was last cleared. */
+  /** Oldest steps dropped for the entry cap or memory budget since the last clear. */
   evicted: number;
-  /**
-   * Present while nonzero: the steps this canvas's previous engine held when it was disposed, which this one could
-   * not take over. Cleared with the history (Clear history, a document swap).
-   */
+  /** Steps the previous engine held at disposal that this one could not take over; present while nonzero. */
   dropped?: number;
 }
 
-/**
- * How a replay ended: `applied`, nothing to replay (`empty`), another replay or edit in progress (`busy`/`refused`),
- * or `failed`, in which case the step stayed where it was and the engine reported why.
- */
+/** `failed` leaves the step where it was; the engine reported why. */
 export type CanvasHistoryReplayStatus = 'applied' | 'empty' | 'busy' | 'refused' | 'failed';
 
 export interface CanvasHistoryCapability {
@@ -408,46 +358,42 @@ export interface CanvasHistoryCapability {
   clearHistory(): void;
   getEntries(): CanvasHistoryEntries;
   getHeldAssetRefs(): { images: readonly string[]; videos: readonly string[] };
-  /** Replays `offset` steps, one at a time, stopping at the first that does not apply. */
+  /** Stops at the first step that does not apply. */
   stepBy(offset: number): Promise<CanvasHistoryReplayStatus>;
 }
 
-/**
- * Where an eyedropper sample is in its pick: `preview` on every sampled move while the pick is held, `commit` once on
- * release, `cancel` once when the pick ends without a release over the canvas (Escape, a tool change, an aborted
- * hold), carrying the last previewed color.
- */
+/** `commit` and `cancel` fire once per pick; `cancel` carries the last previewed color. */
 export type ColorSamplePhase = 'preview' | 'commit' | 'cancel';
 
-/**
- * A tool press the selected layer cannot take, named so the notice can say which layer and why: it is hidden (disabled,
- * itself or through a group), locked, has its transparency locked against the eraser, or its pixels have not loaded
- * yet (the engine has started loading them; the next press can edit).
- */
+/** Names the layer and why it cannot take the edit; `transform-session` names the session Fill and Erase wait for. */
 export interface CanvasLayerEditRefusal {
-  readonly status: 'layer-hidden' | 'layer-locked' | 'layer-alpha-locked' | 'layer-loading';
+  readonly status:
+    | 'layer-hidden'
+    | 'layer-display-hidden'
+    | 'layer-locked'
+    | 'layer-alpha-locked'
+    | 'layer-loading'
+    | 'layer-unpaintable'
+    | 'erase-unsupported'
+    | 'selection-erase-unsupported'
+    | 'gradient-unsupported'
+    | 'transform-session';
   readonly layerId: string;
   readonly layerName: string;
-  /** The brush would have painted this image layer in place; a new paint layer above it can take the stroke. */
+  /** A new paint layer above this image layer can take the stroke instead. */
   readonly canPaintNewLayer?: boolean;
 }
 
-/** A shape cut out with the mod key found no selected paint layer or mask to erase its footprint from. */
-export interface CanvasShapeCutoutRefusal {
-  readonly status: 'cutout-no-target';
+export interface CanvasNoTargetRefusal {
+  readonly status: 'cutout-no-target' | 'erase-no-target' | 'selection-erase-no-target';
 }
 
-/**
- * Why the engine refused an edit the user started without a caller to report to (a stroke, a shape). An
- * `AdjustmentRefusal` names a layer whose spatial adjustments cannot run, so its pixels cannot be baked for painting;
- * a `CanvasLayerEditRefusal` names a layer the active tool cannot edit; a `CanvasShapeCutoutRefusal` has no layer to
- * name.
- */
+/** Edits the user started with no caller to report a refusal to (a stroke, a shape). */
 export type CanvasEditRefusal =
   | SubsetOf<CanvasTransactionOutcome, 'busy' | 'gesture-active' | 'not-ready' | 'over-budget'>
   | AdjustmentRefusal
   | CanvasLayerEditRefusal
-  | CanvasShapeCutoutRefusal;
+  | CanvasNoTargetRefusal;
 
 export type LayerThumbnailRequestResult =
   | 'ready'
@@ -504,17 +450,17 @@ export type ExportBakedLayerBlobResult =
   | AdjustmentRefusal;
 
 export interface CanvasSelectionCapability {
+  /** Otherwise reports why through `tools.onEditRefused`; Cut asks before it writes the clipboard. */
+  admitSelectionErase(): boolean;
   deselect(): void;
   eraseSelection(): void;
   fillSelection(): void;
   getSelectionBounds(): Rect | null;
   getSelectionMaskRect(): Rect | null;
   invertSelection(): void;
-  /** Returns the active layer's selected pixels as PNG, or null if empty. The widget owns system clipboard writes. */
+  /** Null if empty. The widget owns system clipboard writes. */
   exportSelectionBlob(): Promise<Blob | null>;
-  /** Inserts decoded pixels as a new raster layer above the active one. */
   pasteImage(pixels: ImageData, center?: Vec2): NewRasterLayerResult;
-  /** Copies the selection's pixels into a new layer above the active one, leaving the source intact. */
   liftSelectionToLayer(): NewRasterLayerResult;
   replaceSelectionFromImage(
     guard: LayerExportGuard,
@@ -532,14 +478,7 @@ export type ReplaceSelectionFromImageResult =
   | { status: GuardedMutationRefusal }
   | { status: 'failed'; message: string };
 
-/**
- * The runtime outcome of a structural document commit. `busy`, `gesture-active`, `not-ready`, and
- * `stale` refuse before dispatch. `dispatch-rejected` means the reducer left the document unchanged,
- * which includes a forward that would not change anything. `postcondition-failed` means the reducer
- * accepted but the result could not be verified; `recovered` says how far the inverse got, and any
- * outcome short of `reverted` was reported. Exactly one history entry is recorded, and only for
- * `committed`.
- */
+/** `dispatch-rejected` includes a no-op forward; one history entry is recorded, only for `committed`. */
 export type StructuralCommitResult =
   | { status: 'committed' }
   | {
@@ -550,49 +489,41 @@ export type StructuralCommitResult =
   | { status: SubsetOf<CanvasTransactionOutcome, 'stale'>; expectedRevision: number; actualRevision: number }
   | { status: 'postcondition-failed'; recovered: 'reverted' | 'reverted-unmirrored' | 'unreverted' };
 
+export type FlipLayerResult =
+  | StructuralCommitResult
+  | { status: 'previewed' }
+  | { status: 'locked' | 'missing' | 'empty' };
+
 export type CanvasFontReplacementResult =
   | (CanvasFontReplacementSummary & { status: 'committed' | 'unchanged' })
   | Exclude<StructuralCommitResult, { status: 'committed' }>;
 
 export interface StructuralCommitOptions {
-  /** The edit revision the edit was prepared against; a mismatch refuses as `stale`. */
+  /** A mismatch refuses as `stale`. */
   expectedRevision?: number;
-  /** An extra reducer postcondition beyond "the document changed". */
   verify?: (document: CanvasDocumentContractV3) => boolean;
 }
 
-/** The narrowest engine surface a structural edit needs. */
 export type { CanvasLayerPreviewMutation } from './mutationContracts';
 
 export interface CanvasStructuralEngine {
   readonly layers: CanvasLayerCapability;
 }
 
-/**
- * An owned live preview of a structural edit. `apply` publishes previews at most once per frame and captures, before
- * the first one lands, the values it replaces: the session's baseline. `commit` records the gesture as one undo step
- * from its prepared baseline, without dispatching again when the preview already reached it, and returns to the
- * baseline when it is refused; `cancel` drops pending previews and restores the baseline, unrecorded. A newer
- * session, a commit from elsewhere, a history replay or disposal ends the session first, restoring its baseline and
- * dropping pending previews, so the previewed values never land over a replayed document or inside another step;
- * later calls on an ended session are refused (`commit` reports `busy`). While edits are locked, `apply` and
- * `commit` refuse. A session previews one mutation kind on one node; its baseline holds every field it previewed, and
- * a commit records from that baseline narrowed to the fields its edit names.
- */
+/** Previews apply at most once per frame; ending the session for any reason restores the baseline, unrecorded. */
 export interface StructuralPreviewSession {
   apply(action: CanvasLayerPreviewMutation): boolean;
-  /** The values its previews replaced, as the mutation that restores them; null until it previews, and once ended. */
+  /** Null until it previews, and once ended. */
   baseline(): CanvasLayerPreviewMutation | null;
   cancel(): void;
   commit(label: string, edit: PreparedDocumentEdit): StructuralCommitResult;
-  /** True until the session ends: its own commit or cancel, a newer session, a commit from elsewhere or a replay. */
   isActive(): boolean;
 }
 
 export interface CanvasLayerCapability {
-  /** Starts a preview session, or null while edits are refused. */
+  /** Null while edits are refused. */
   beginStructuralPreview(): StructuralPreviewSession | null;
-  /** Ends an open preview session, restoring its baseline, so an edit prepared next sees the committed document. */
+  /** Restores the baseline, so an edit prepared next sees the committed document. */
   endStructuralPreview(): void;
   canCommitStructural(): boolean;
   commitGeneratedImageResult(options: CommitGeneratedImageOptions): Promise<CommitGeneratedImageResult>;
@@ -603,7 +534,6 @@ export interface CanvasLayerCapability {
     inverse: CanvasProjectMutation,
     options?: StructuralCommitOptions
   ): StructuralCommitResult;
-  /** Runs a prepared flat edit through the transaction: refusals, dispatch, verification and history. */
   commitPrepared(label: string, edit: PreparedDocumentEdit, options?: PreparedCommitOptions): StructuralCommitResult;
   invertMask(layerId: string): MaskEditResult;
 }
@@ -651,19 +581,13 @@ export interface CanvasLifecycleCapability {
   beginCooldown(): Promise<'cooled' | 'dirty'>;
   dispose(): void;
   getLifecycleState(): CanvasLifecycleState;
-  /**
-   * Persists unsaved pixels. With `waitForHeldPixels: false` it rejects instead of waiting while an open edit
-   * holds dirty pixels.
-   */
+  /** With `waitForHeldPixels: false` it rejects instead of waiting on an open edit's dirty pixels. */
   flushPendingUploads(options?: { readonly waitForHeldPixels?: boolean }): Promise<void>;
 }
 
 export type CanvasEditCapability = CanvasEditGate;
 
-/**
- * Persisted filter result for {@link CanvasEnginePreviewCapability.setGuardedFilterPreview}, decoded by
- * `imageResolver`, with its document-space rect and producing filter.
- */
+/** Decoded by `imageResolver`. */
 export interface FilterPreviewInput {
   imageName: string;
   rect: Rect;
@@ -676,10 +600,6 @@ export type DuplicateLayersResult =
       readonly status: SubsetOf<CanvasTransactionOutcome, 'busy' | 'not-ready' | 'stale'> | 'nothing' | 'over-budget';
     }
   | LayerUnreadable;
-/**
- * Layer pixel operations report a distinct outcome: refused before anything changed (`busy`, `not-ready`,
- * `over-budget` when the edit could never be undone), nothing to do, or `failed` when the document refused it.
- */
 export type {
   BooleanRasterResult,
   ConvertLayerToControlResult,
@@ -714,51 +634,73 @@ export interface CanvasDiagnosticsSnapshot {
   readonly compositeFrames: number;
   readonly overlayFrames: number;
   readonly rasterOverageBytes: number;
-  /** Group composite backing stores allocated or resized. */
   readonly groupSurfaceAllocations: number;
-  /** Whole-surface group redraws (new content, geometry, or unknown member damage). */
+  /** Whole-surface redraws (new content, geometry, or unknown member damage). */
   readonly groupSurfaceRebuilds: number;
-  /** Group redraws limited to the region members damaged. */
   readonly groupSurfaceRefreshes: number;
 }
 
 export interface CanvasEngineToolCapability extends CanvasToolCapability {
-  /**
-   * Whether the canvas context menu may act on a layer. The menu targets the
-   * document's SELECTED layer (never the layer under the pointer); this reports
-   * only whether an in-progress gesture/session should suppress it.
-   */
+  /** The menu targets the selected layer, never the one under the pointer; this only reports gesture suppression. */
   canTargetLayerFromContextMenu(): boolean;
   handleEscapePriority(options: { gestureWasActive: boolean }): void;
   onStrokeCommitted(listener: (event: StrokeCommittedEvent) => void): () => void;
-  /** Refusals of edits that have no caller to report to, such as a stroke too large to undo. */
   onEditRefused(listener: (refusal: CanvasEditRefusal) => void): () => void;
-  /**
-   * Samples the composite once as `#rrggbb`, or null on Escape, tool change or disposal. Restores the previous
-   * tool on either outcome.
-   */
+  /** Null on Escape, tool change or disposal; restores the previous tool either way. */
   requestColorSample(): Promise<string | null>;
-  /**
-   * Routes unclaimed eyedropper samples to the active color target by phase. A pick previews each sample, then
-   * commits or cancels exactly once; a declined `preview` falls back to the brush color. Disposal removes only this
-   * router, preserving newer registrations.
-   */
+  /** A declined `preview` falls back to the brush color; disposal removes only this router. */
   setColorSampleRouter(router: (hex: string, phase: ColorSamplePhase) => boolean): () => void;
 }
 
-/** Why `beginTransform` opened no session; refusals leave the selection and the active tool unchanged. */
+/** Refusals leave the selection and the active tool unchanged. */
 export type BeginTransformResult =
   | 'started'
   | SubsetOf<CanvasCommandRefusal, 'missing' | 'locked'>
   | 'ineligible'
   | SubsetOf<CanvasTransactionOutcome, 'busy'>;
 
+export interface CanvasVectorEditCapability {
+  /** Loads vector support before exposing its synchronous editing commands. */
+  prepare(): Promise<boolean>;
+  createLayer(input: { id: string; name?: string }): Promise<CanvasVectorLayerContract | null>;
+  transformPath(): void;
+  extractPath(): void;
+  targetContextMenu(screenPoint: Vec2): boolean;
+  deletePath(): void;
+  nudge(dx: number, dy: number): void;
+  setPointType(type: 'corner' | 'smooth' | 'symmetric'): void;
+  smooth(selectedOnly: boolean): void;
+  deleteSelection(): void;
+  copyPath(): void;
+  split(): void;
+  join(): void;
+  canSplit(): boolean;
+  canJoin(): boolean;
+}
+
+export type VectorTraceResult = {
+  status:
+    | 'committed'
+    | 'empty'
+    | 'aborted'
+    | 'stale'
+    | 'too-complex'
+    | 'busy'
+    | 'gesture-active'
+    | 'not-ready'
+    | 'over-budget'
+    | 'failed';
+};
+
 export interface CanvasEngineLayerCapability extends CanvasLayerCapability {
+  /** Omit pathId to trace all paths; otherwise trace only that exact curve using the layer's Trace settings. */
+  traceVectorLayer(layerId: string, pathId?: string): Promise<VectorTraceResult>;
+  traceFillVectorLayer(layerId: string): Promise<VectorTraceResult>;
+  fillVectorPath(layerId: string, pathId: string): Promise<VectorTraceResult>;
+  cancelVectorTrace(): void;
+  readonly vectorEdit: CanvasVectorEditCapability;
   applyTransform(): void;
-  /**
-   * Selects `layerId`, switches to the transform tool and opens its session, even when transform is already active.
-   * An open session on another layer is cancelled first.
-   */
+  /** Opens a session even when transform is already active; another layer's session is cancelled first. */
   beginTransform(layerId: string): BeginTransformResult;
   booleanMergeRasterLayers(upperLayerId: string, operation: BooleanRasterOperation): Promise<BooleanRasterResult>;
   cancelTextEdit(): void;
@@ -774,35 +716,25 @@ export interface CanvasEngineLayerCapability extends CanvasLayerCapability {
   commitMaskImageResult(options: CommitMaskImageResultOptions): Promise<CommitMaskImageResult>;
   commitOpenTextSession(): boolean;
   commitRasterFilterResult(options: CommitRasterFilterOptions): Promise<CommitRasterFilterResult>;
-  /** `null` when there was nothing to commit: an empty creation or an unchanged edit. */
+  /** Null when there was nothing to commit: an empty creation or an unchanged edit. */
   commitTextEdit(content: string, styleChanges?: Partial<TextToolOptions>): StructuralCommitResult | null;
-  /**
-   * Converts a raster image or paint layer to a control layer in place, baking its own adjustments (exactly, or
-   * refused) and transform into paint pixels; undo restores the raster layer with its adjustments and pixels. An empty
-   * layer converts as a plain clone of its source and transform. A layer whose stack changes nothing can use the
-   * cheaper `commitLayerConversion`, which keeps its source and transform.
-   */
+  /** Bakes adjustments (exactly, or refused) and transform into paint pixels; undo restores the raster layer. */
   convertLayerToControl(label: string, expectedLiveLayer: CanvasLayerContract): Promise<ConvertLayerToControlResult>;
-  /**
-   * Adds a control-layer copy holding the layer's baked pixels, as `copyLayerToRaster` does for raster copies; an empty
-   * raster layer's copy is a plain clone of its source and transform.
-   */
+  /** An empty raster layer's copy is a plain clone of its source and transform. */
   copyLayerToControl(layerId: string): Promise<CopyLayerResult>;
   copyLayerToRaster(layerId: string): Promise<CopyLayerResult>;
-  /**
-   * Crops every raster, control, regional and inpaint leaf to the frame as one undo step, hidden and disabled leaves
-   * included; locked leaves are skipped and counted, and leaves outside the frame are emptied in place.
-   */
+  /** One undo step, hidden and disabled leaves included; locked leaves are skipped and counted. */
   cropAllLayersToBbox(): Promise<CropAllLayersResult>;
   cropLayerToBbox(layerId: string): Promise<CropLayerResult>;
-  duplicateLayers(layerIds: readonly string[]): Promise<DuplicateLayersResult>;
-  /** Unions the masks' coverage into one new inpaint mask above the topmost source, removing the sources. */
+  duplicateLayers(label: string, layerIds: readonly string[]): Promise<DuplicateLayersResult>;
   mergeInpaintMasks(layerIds: readonly string[]): Promise<MergeInpaintMasksResult>;
   mergeLayerDown(upperLayerId: string): Promise<MergeDownResult>;
   mergeSelectedRasterLayers(layerIds: readonly string[]): Promise<MergeVisibleResult>;
   mergeVisibleRasterLayers(): Promise<MergeVisibleResult>;
   /** `dispatch-rejected` also covers a selection with nothing eligible to move. */
   nudgeSelectedLayer(dx: number, dy: number): StructuralCommitResult;
+  /** Mirrors about the content centre; a live float or transform session on the layer flips as a preview instead. */
+  flipLayer(layerId: string, direction: 'horizontal' | 'vertical', label: string): FlipLayerResult;
   openTextCreate(docPoint: Vec2): void;
   openTextEdit(layerId: string): void;
   rasterizeLayer(layerId: string): Promise<RasterizeLayerResult>;
@@ -815,23 +747,13 @@ export interface CanvasEngineExportCapability extends CanvasExportCapability, Ca
   extractMaskedArea(maskLayerId: string): Promise<ExtractMaskedAreaResult>;
 }
 
-/** How a control layer displays: its detected map (the default), the kept original, or the original under the map. */
+/** Default `map`. */
 export type ControlLayerViewMode = 'original' | 'map' | 'overlay';
 
-/**
- * `missing`: no control layer with a kept original; `locked`: an operation holds the document;
- * `stale`: a newer request or an edit of the layer superseded it; `over-budget`: the original's pixels do not fit the
- * raster budget; `failed`: the original could not be decoded.
- */
 export type ControlLayerViewOutcome = 'shown' | 'missing' | 'locked' | 'stale' | 'over-budget' | 'failed';
 
 export interface CanvasEnginePreviewCapability extends CanvasPreviewCapability {
-  /**
-   * Sizes `target` to fit `maxSizePx` (never above 1:1) and draws the committed document's extent into it: the frame
-   * joined with every enabled renderable layer's bounds, the same extent `fitToView` fits. Returns that
-   * document-space rect, which the caller maps between target pixels and document space with (target pixel =
-   * (document point - rect origin) * target.width / rect.width); null without a document or 2D context.
-   */
+  /** Draws the `fitToView` extent at most 1:1 and returns that document rect; null without a document or 2D context. */
   drawDocumentOverview(target: HTMLCanvasElement, maxSizePx: number): Rect | null;
   preloadStagedPreview(imageName: string): void;
   setGuardedFilterPreview(
@@ -840,21 +762,12 @@ export interface CanvasEnginePreviewCapability extends CanvasPreviewCapability {
     guard: LayerExportGuard
   ): Promise<'shown' | SubsetOf<CanvasCommandRefusal, 'missing'> | SubsetOf<CanvasTransactionOutcome, 'stale'>>;
   setStagedPreview(input: StagedPreviewInput | null): void;
-  /**
-   * Overlay chrome only: outlines where each pending result (staged candidate or result still generating) will land,
-   * the selected one emphasized. Absolute document rects; an equal list repaints nothing.
-   */
+  /** Overlay chrome only, absolute document rects; an equal list repaints nothing. */
   setStagedRegions(regions: readonly StagedRegion[]): void;
-  /**
-   * Display-only: shows a control layer as its kept original, the original under its map at half strength, or
-   * (`map`) as usual. One layer holds a view at a time; refused while an operation holds the document. Any edit or
-   * stroke on the layer, a selection change, an operation taking the document, a document replacement and the other
-   * resets in ARCHITECTURE.md return it to the map. Never recorded in history, persisted or exported.
-   */
+  /** Display-only, one layer at a time; never recorded in history, persisted or exported. */
   setControlLayerView(layerId: string, view: ControlLayerViewMode): Promise<ControlLayerViewOutcome>;
 }
 
-/** Public capability-only handle. Construction and mutable stores are intentionally absent. */
 export interface CanvasEngine {
   readonly projectId: string;
   readonly surface: CanvasSurfaceCapability;
@@ -884,14 +797,10 @@ export type BooleanRasterOperation = 'intersect' | 'cutout' | 'cutaway' | 'exclu
 export interface StagedPreviewPlacement extends Rect {
   opacity: number;
 }
-/**
- * A staged preview always lands at absolute document coordinates pinned at submission: a candidate at its placement,
- * a progress frame (scaled to fill) at the rect its run was submitted with. Later bbox edits never move either.
- */
+/** Lands at document coordinates pinned at submission; `hidden` keeps the screen as if the candidate showed. */
 export type StagedPreviewInput =
-  | { imageName: string; placement: StagedPreviewPlacement }
+  | { imageName: string; placement: StagedPreviewPlacement; hidden?: boolean }
   | { dataUrl: string; placement: StagedPreviewPlacement };
-/** One pending result's landing rect in document space, for the staged-region overlay. */
 export interface StagedRegion {
   readonly rect: Rect;
   readonly selected: boolean;
@@ -914,6 +823,7 @@ export type {
   ShapeToolTarget,
   TextEditSession,
   TextToolOptions,
+  TransformOptions,
   TransformSession,
 } from './engineStores';
 export {
@@ -930,7 +840,18 @@ export {
   TEXT_FONT_FAMILIES,
   TEXT_FONT_WEIGHTS,
 } from './engineStores';
-export type { LayerTransform } from './transform/transformMath';
+export {
+  layerPointToDocument,
+  localHandlePoint,
+  moveLocalPointTo,
+  retransformAbout,
+  scaleAxis,
+  scaleForLength,
+  transformedSize,
+  type LayerTransform,
+  type TransformAnchor,
+} from './transform/transformMath';
+export { hittableLayerRect } from './tools/moveHitTest';
 export { CanvasImageMissingError, type ImageResolver } from './render/rasterizers';
 export type { Rect, SelectionOp, ToolId, Vec2 } from './types';
 export { adjustmentsKey, buildCurveLut, isIdentityAdjustments } from './render/adjustments';
@@ -962,7 +883,11 @@ export { documentToExportLocalSamPoint } from './samCoordinates';
 export { bboxEquals, bboxMinSize, roundBbox } from './tools/bboxHitTest';
 export { isEmpty, union } from './math/rect';
 export { ZOOM_PRESETS } from './math/snapping';
-export { isLeafPixelEditEligible } from './editing/controlPixelEdit';
+export {
+  isLeafPixelEditEligible,
+  selectionPixelEditRefusal,
+  type SelectionPixelEditRefusal,
+} from './editing/controlPixelEdit';
 export {
   getSiblingOrder,
   haveSameStructure,
