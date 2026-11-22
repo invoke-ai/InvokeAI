@@ -80,7 +80,10 @@ export const isRenderableLayer = (layer: CanvasLayerContract): boolean => {
  * Untransformed local cache extent: native image size, shape/text extent, explicit gradient extent (legacy: document
  * dims), or paint bitmap size at its offset (legacy: zero). Empty paint is an empty rect; unsupported sources throw.
  */
-export const getSourceContentRect = (layer: CanvasLayerContract, doc: CanvasDocumentContractV3): Rect => {
+export const getSourceContentRect = (
+  layer: CanvasLayerContract,
+  doc: Pick<CanvasDocumentContractV3, 'width' | 'height'>
+): Rect => {
   // Guide geometry owns no pixels, even when it has paths.
   if (layer.type === 'vector') {
     return { height: 0, width: 0, x: 0, y: 0 };

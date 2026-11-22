@@ -1,6 +1,7 @@
 import type { CanvasControlLayerContract, CanvasLayerContract } from '@workbench/canvas-engine/contracts';
 import type { TransformSession } from '@workbench/canvas-engine/engineStores';
 import type { CanvasProjectMutation } from '@workbench/canvas-engine/mutationContracts';
+import type { FloatingSelection } from '@workbench/canvas-engine/selection/floatingSelection';
 import type { ToolId } from '@workbench/canvas-engine/types';
 
 import { createCanvasMutationContext } from '@workbench/canvas-engine/controllers/mutationContext';
@@ -114,6 +115,7 @@ const createHarness = (
   let pending: string | null = null;
   const state = {
     canEdit: true,
+    float: null as FloatingSelection | null,
     floating: false,
     gesture: false,
     tool: 'brush' as ToolId,
@@ -127,11 +129,18 @@ const createHarness = (
     reportRefusal: vi.fn(),
     restoreCache: vi.fn(),
     select: vi.fn((layerId: string) => dispatch({ id: layerId, type: 'setCanvasSelectedLayer' })),
+    setFloatingTransform: vi.fn(() => true),
     setOverride: vi.fn(),
   };
   const controller = new TransformEditingController({
     backend,
-    getOptions: () => ({ fitMode: 'contain', resampleMode: 'lanczos', smoothing: !!options.resample }),
+    getOptions: () => ({
+      aspectLinked: true,
+      fitMode: 'contain',
+      referencePoint: 'center',
+      resampleMode: 'lanczos',
+      smoothing: !!options.resample,
+    }),
     resample: options.resample,
     canEdit: () => state.canEdit,
     commitStructural: calls.commitStructural,
@@ -141,6 +150,8 @@ const createHarness = (
     getDocument: () => mirror.getDocument(),
     getUserToolId: () => state.tool,
     hasFloatingSelection: () => state.floating,
+    getFloatingSelection: () => state.float,
+    setFloatingTransform: calls.setFloatingTransform,
     invalidate: vi.fn(),
     isGestureActive: () => state.gesture,
     peekCacheRect: (layerId) => caches.peek(layerId)?.rect,
@@ -218,6 +229,20 @@ describe('TransformEditingController', () => {
     );
     expect(h.calls.restoreCache).not.toHaveBeenCalled();
     expect(h.session()).toBeNull();
+  });
+
+  it('flips a live float on the layer as a preview, leaving the layer alone', () => {
+    const h = createHarness(shape);
+    h.state.float = {
+      layerId: 'shape',
+      pixels: { rect: { height: 2, width: 4, x: 0, y: 0 } },
+      transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 3, y: 0 },
+    } as FloatingSelection;
+
+    expect(h.controller.flip('shape', 'horizontal', 'Flip horizontal')).toEqual({ status: 'previewed' });
+    expect(h.calls.setFloatingTransform).toHaveBeenCalledWith(expect.objectContaining({ scaleX: -1, x: 7, y: 0 }));
+    expect(h.calls.commitStructural).not.toHaveBeenCalled();
+    expect(h.layer()?.transform).toEqual(shape.transform);
   });
 
   it('keeps the session open and reports a refused commit', () => {

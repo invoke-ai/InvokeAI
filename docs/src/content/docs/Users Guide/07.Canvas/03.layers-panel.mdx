@@ -98,6 +98,7 @@ The icons at the top **Arrange** the layer (move it to the front, forward, backw
   * **Delete layer**.
 * **Raster layers:**
   * **Transform** (**Shift+T**) — shows the transform handles at once. It works on any enabled layer with content: raster and control layers, inpaint masks and regional guidance.
+  * **Flip** — **Flip horizontal** or **Flip vertical** mirrors the layer in place across its center, as one undoable step. It works on raster, control and vector layers, inpaint masks and regional guidance.
   * **Add adjustment** — Brightness/Contrast, Exposure, Levels, Curves, Saturation, Hue, Invert, Texture, Clarity, Dehaze or Noise. Adjustments are non-destructive and appear as child rows. Texture, Clarity and Dehaze change detail and contrast; Noise adds film grain.
   * **Add regenerate region** — regenerates where the layer has content, as a live inpaint mask: everything on the layer marks the area to regenerate, and it follows the layer as you keep editing it. The menu sums this up under the item as "Inpaint where this layer has content."
   * **Filter**, **Select object** and **Run workflow** — process the layer; see the [Canvas guide](/users-guide/canvas/canvas-guide/#filters-and-object-selection).
@@ -221,7 +222,7 @@ A regional guidance layer's reference image is a child row. Select it to set:
 
 ## Transform and Overview
 
-The **Transform** tab sets the selected layer's **Position**, **Scale** and **Rotation** as numbers. Each change is a separate undoable step.
+The **Transform** tab sets the selected layer's **Position**, **Size** and **Rotation** as numbers, as the Transform tool's options do: the reference point beside **Position** sets which point of the layer the numbers place and hold still, and the aspect lock beside **Size** keeps its proportions. **W** and **H** also take `50%`, `*2` or `/4` of the current size. The flip buttons beside **Rotation** mirror the layer in place across its center. Each change is a separate undoable step.
 
 The **Overview** tab shows a thumbnail of the whole canvas with the visible area outlined. Click it to move the view.
 
