@@ -653,8 +653,8 @@ export const createIndexedDbProjectDraftStore = (
             .catch(() => undefined);
           void transaction.store.put(entry).catch(() => undefined);
         }
-        // An unloading document aborts transactions still waiting on it; one committed now outlives it. Nothing is
-        // read first, because a read's callback never runs during unload.
+        // An unloading document aborts transactions still waiting on it; one committed now outlives it. Nothing is read
+        // first, because a read's callback never runs during unload.
         transaction.commit();
         return { kind: 'started', written };
       } catch {
@@ -885,8 +885,8 @@ export const createIndexedDbProjectDraftStore = (
           if (outcome === 'unavailable') {
             return { kind: 'unavailable' };
           }
-          // A retained or unwritten entry waits for a later load; the rest are done. Removing an entry after its
-          // draft committed is safe to repeat: a second pass finds that draft and discards the entry as superseded.
+          // A retained or unwritten entry waits for a later load; the rest are done. Removing an entry after its draft
+          // committed is safe to repeat: a second pass finds that draft and discards the entry as superseded.
           if (outcome !== 'corrupt' && outcome !== 'quota' && !(await deleteJournalKeys(journalKey))) {
             return { kind: 'unavailable' };
           }

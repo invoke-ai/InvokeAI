@@ -253,8 +253,7 @@ describe('mergeGalleryItemWindow', () => {
   });
 
   it('places an overlaid recent by its instant, not by timestamp shape, against backend items', () => {
-    // SQLite and ISO timestamps must sort chronologically; an older recent cannot outrank newer backend rows by
-    // separator.
+    // SQLite and ISO timestamps sort chronologically: an older recent cannot outrank newer backend rows by separator.
     const backendItems = [
       createBackendItem('newer.png', '2026-08-29 13:01:20.649'),
       createBackendItem('middle.png', '2026-08-29 12:00:00.000'),

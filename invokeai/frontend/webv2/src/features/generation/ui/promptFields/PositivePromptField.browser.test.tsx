@@ -23,7 +23,6 @@ await i18n.use(initReactI18next).init({ fallbackLng: 'en', lng: 'en', resources:
 
 type HistoryItem = { negativePrompt: string | null; positivePrompt: string };
 
-/** The project's history as the workbench keeps it: Clear and Restore change it and re-render its readers. */
 const ui = vi.hoisted(() => {
   let history: readonly HistoryItem[] = [];
   const listeners = new Set<() => void>();
@@ -72,7 +71,6 @@ vi.mock('@features/generation/data/promptUtilities', async (importOriginal) => (
 }));
 
 vi.mock('@features/generation/data/wildcards', async (importOriginal) => ({
-  // Partial: the real module's other exports (constants, mappers) stay available to what imports them.
   ...(await importOriginal<Record<string, unknown>>()),
   createWildcard: vi.fn(),
   deleteWildcard: vi.fn(),
@@ -168,7 +166,6 @@ it('colours and weights attention syntax only while the selected model reads it'
     });
   const textarea = () => host!.querySelector('textarea')!;
   const colouredSegments = () => [...host!.querySelectorAll('pre span')].map((span) => span.textContent);
-  /** Select "cat" and run the weighting command the Ctrl+Up hotkey runs. */
   const weightCat = async () => {
     let weighted = false;
 
@@ -289,7 +286,6 @@ describe('prompt history', () => {
 
     expect(onUsePrompt).toHaveBeenCalledWith({ negativePrompt: null, positivePrompt: 'a fox in snow' });
     expect(textarea().value).toBe('a fox in snow');
-    // The popover hands focus to the prompt, where Ctrl+Z undoes the write, not back to its trigger.
     await expect.poll(() => document.activeElement).toBe(textarea());
 
     await act(() => {
@@ -318,7 +314,6 @@ describe('prompt history', () => {
 });
 
 describe('the dynamic prompts notice under the prompt', () => {
-  /** The notice's live region: mounted empty, so screen readers announce what appears in it. */
   const notice = () =>
     host!.querySelector('[aria-live="polite"][role="status"]:not([id^="DndLiveRegion"])')?.textContent;
 
@@ -379,7 +374,6 @@ it('shows a JSON prompt under a template whole, as it generates, and never expan
     showSyntaxHighlighting: true,
     value: layout,
   });
-  // Past the dynamic prompts debounce, when a dynamic prompt would have been parsed.
   await act(async () => {
     await new Promise((resolve) => {
       window.setTimeout(resolve, 700);
@@ -387,7 +381,6 @@ it('shows a JSON prompt under a template whole, as it generates, and never expan
   });
 
   expect(textarea().value).toBe(layout);
-  // The merged-view overlay lines up with the textarea: no template text around the layout.
   expect(host!.querySelector('pre')?.textContent).toBe(layout);
   const dynamicButton = [...host!.querySelectorAll('button')].find((button) =>
     button.textContent?.includes('widgets.generate.dynamicButton')

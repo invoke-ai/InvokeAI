@@ -4,8 +4,8 @@ import type { QueueItemReadModel } from '@features/queue/contracts';
 import type { Project } from '@workbench/projectContracts';
 import type { TFunction } from 'i18next';
 
-import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
 import { getDefaultGenerateSettings } from '@features/generation/settings';
+import { seedArchitectureCapabilities } from '@features/models/core/architectureCapabilities.testing';
 import { buildQueueItemOrigin } from '@features/queue/contracts';
 import { accountLifecycle, captureAccountScope } from '@platform/state/accountLifecycle';
 import { QueryClient } from '@tanstack/react-query';

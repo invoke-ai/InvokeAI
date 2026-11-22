@@ -22,8 +22,7 @@ export const getOwnerLabel = (row: IntermediatesRow, t: TFunction): string =>
   row.userDisplayName || row.userEmail || t('intermediates.owner.unknownAccount');
 
 /**
- * Adds the email to a display name, or a short id to an account with neither, so rows of different accounts stay
- * distinguishable to assistive tech.
+ * Adds the email to a display name, or a short id to an account with neither, keeping rows distinct for assistive tech.
  */
 const getOwnerAccessibleLabel = (row: IntermediatesRow, t: TFunction): string =>
   row.userDisplayName && row.userEmail

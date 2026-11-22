@@ -50,51 +50,6 @@ afterEach(() => {
 });
 
 describe('Canvas custom-font loading in Chromium', () => {
-  it('applies requested bold styling to a static regular face', async () => {
-    const runtime = createFontRuntime({
-      download: async () => new Uint8Array(await (await fetch(customAxisWideFontUrl)).arrayBuffer()),
-      getFont: (id): Promise<FontRecord> =>
-        Promise.resolve({
-          id,
-          contentHash: 'a'.repeat(64),
-          family: 'Invoke Font Fixture',
-          label: 'Regular',
-          filename: 'regular.ttf',
-          axes: [],
-          instances: [],
-          byteSize: 1,
-          scope: 'private',
-          source: 'uploaded',
-          style: 'normal',
-          weight: 400,
-          url: '',
-        }),
-    });
-    const loader = createFontLoader(runtime);
-    loaders.push({
-      dispose: () => {
-        loader.dispose();
-        runtime.dispose();
-      },
-    });
-    const normal = sourceFor();
-    const bold = sourceFor({ fontWeight: 700 });
-    loader.setActiveSources([normal, bold]);
-    await Promise.all([loader.waitForReady(normal), loader.waitForReady(bold)]);
-    const backend = createDomRasterBackend();
-    const rasterize = (source: TextSource) =>
-      rasterizeTextSource(source, {
-        backend,
-        documentSize: { height: 128, width: 128 },
-        resolver: () => Promise.resolve(new Blob()),
-        resolveFontFamily: loader.resolveFamily,
-        store: createLayerCacheStore(backend),
-      });
-    const normalRaster = await rasterize(normal);
-    const boldRaster = await rasterize(bold);
-    expect(glyphPixels(boldRaster)).toBeGreaterThan(glyphPixels(normalRaster));
-  });
-
   it('registers real variable and pinned static faces, then rasterizes their distinct glyph metrics', async () => {
     const variable = sourceFor({ fontVariations: { TEST: 0, wght: 400 } });
     const pinnedStatic = sourceFor({

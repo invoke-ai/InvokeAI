@@ -43,8 +43,8 @@ test('starts a preview server without a shell and stops it again', async (t) => 
     }
   });
 
-  // Verify the child is Vite itself: Windows .cmd shims fail without a shell, and shell wrappers obscure the
-  // server PID.
+  // Verify the child is Vite itself: Windows .cmd shims fail without a shell, and shell wrappers obscure the server
+  // PID.
   const spawned = await new Promise((resolve) => {
     preview.once('spawn', () => resolve(true));
     preview.once('error', () => resolve(false));

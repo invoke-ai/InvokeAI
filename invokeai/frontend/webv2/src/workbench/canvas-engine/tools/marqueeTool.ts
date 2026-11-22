@@ -1,7 +1,7 @@
 /**
  * Rect/ellipse marquee previews do not change the mask. Shift constrains aspect; Alt draws from center. On release
- * those same modifiers choose the shared boolean op, intentionally composing shape and operation.
- * Degenerate/cancelled drags do not commit; engine selection history records accepted changes.
+ * those same modifiers choose the shared boolean op, intentionally composing shape and operation. Degenerate/cancelled
+ * drags do not commit; engine selection history records accepted changes.
  */
 
 import type { Vec2 } from '@workbench/canvas-engine/types';
@@ -24,8 +24,8 @@ interface GestureState {
   startScreen: Vec2;
   moved: boolean;
   /**
-   * Shift/alt held at the press pick the boolean op (add/subtract); the same
-   * keys pressed mid-drag shape the rect instead (square / from centre).
+   * Shift/alt held at the press pick the boolean op (add/subtract); the same keys pressed mid-drag shape the rect
+   * instead (square / from centre).
    */
   opModifiers: { shift: boolean; alt: boolean };
   /** Op keys let go during the drag: pressing one again shapes like any mid-drag press. */
@@ -46,7 +46,6 @@ const constraintsFor = (modifiers: { shift: boolean; alt: boolean }, state: Gest
   };
 };
 
-/** Creates a fresh marquee tool with its own gesture state. */
 export const createMarqueeTool = (): Tool => {
   let state: GestureState | null = null;
 
@@ -120,8 +119,7 @@ export const createMarqueeTool = (): Tool => {
       }
       const rect = dragRect(current.startDoc, input.documentPoint, constraintsFor(input.modifiers, current));
       if (rect.width < 1 || rect.height < 1) {
-        // Degenerate drag: selecting nothing would silently wipe the selection
-        // under `replace`, so treat it as a no-op instead.
+        // Degenerate drag: selecting nothing would silently wipe the selection under `replace`, so it is a no-op.
         return;
       }
       const { kind } = ctx.stores.marqueeOptions.get();

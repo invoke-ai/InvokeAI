@@ -51,9 +51,8 @@ export const findInstalledLocalPathKey = (
 const starterIdentity = (base: string, type: string, name: string): string => `${base}\u0000${type}\u0000${name}`;
 
 /**
- * The installed model a starter entry stands for, matched the way the backend
- * marks starters installed: by install source (or a previous source), else by name (or a previous
- * name) together with base and type.
+ * The installed model a starter entry stands for, matched the way the backend marks starters installed: by install
+ * source (or a previous source), else by name (or a previous name) together with base and type.
  */
 export const findInstalledStarterModelKey = (
   starter: Pick<StarterModel, 'base' | 'name' | 'previous_names' | 'previous_sources' | 'source' | 'type'>,

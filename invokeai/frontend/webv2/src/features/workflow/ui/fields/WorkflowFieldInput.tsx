@@ -45,7 +45,11 @@ import {
   getCachedGalleryBoard,
   invalidateGallery,
 } from '@features/gallery/queries';
-import { useHostGalleryBoards, useOptionalGalleryHostProjectContext } from '@features/gallery/react';
+import {
+  useGalleryItemContextMenu,
+  useHostGalleryBoards,
+  useOptionalGalleryHostProjectContext,
+} from '@features/gallery/react';
 import { galleryImageUrls, galleryVideoUrls } from '@features/gallery/utility';
 import { DEFAULT_LORA_WEIGHT_CONFIG, sanitizeBatchCount, SCHEDULER_OPTIONS } from '@features/generation/settings';
 import { isInvocationNode } from '@features/workflow/contracts';
@@ -124,6 +128,7 @@ import {
   useState,
   useSyncExternalStore,
   type ChangeEvent,
+  type MouseEventHandler,
 } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -139,7 +144,6 @@ const LoadingFallback = ({ labelKey }: { labelKey: string }) => {
 };
 const MODEL_SELECT_FALLBACK = <LoadingFallback labelKey="models.loadingModels" />;
 const RECORD_PICKER_FALLBACK = <LoadingFallback labelKey="common.loading" />;
-// Generator settings load with their node; a plain workflow never pays for them.
 const GeneratorFieldInput = lazy(() =>
   import('./GeneratorFieldInput').then((module) => ({ default: module.GeneratorFieldInput }))
 );
@@ -160,26 +164,20 @@ export interface WorkflowFieldInputProps {
   id?: string;
   invalid?: boolean;
   disabled?: boolean;
-  /** Owning invocation node, when known — lets widgets read sibling fields (e.g. the frame scrubber's companion video). */
+  /** Lets widgets read sibling fields (e.g. the frame scrubber's companion video). */
   nodeId?: string;
   /** Owning project workflow, when known — an upload that finishes after a switch still lands in this one. */
   workflowId?: string;
   template: FieldInputTemplate;
   value: unknown;
   onChange: (value: unknown) => void;
-  /** The instance's seed mode; read only for seed inputs (`isSeedInputField`), which render the mode menu. */
   seedMode?: SeedMode;
   onSeedModeChange?: (seedMode: SeedMode) => void;
-  /**
-   * The form element's authored control (dropdown, slider, text area) for a scalar string or number field; the
-   * template's bounds are expected to be narrowed by `applyNodeFieldFormSettings` already.
-   */
+  /** Authored control for a scalar field; template bounds are already narrowed by `applyNodeFieldFormSettings`. */
   formSettings?: NodeFieldFormSettings | null;
 }
 
-// The media well's hover matches DropZone's accent preview; an invalid well keeps its error border and tints instead.
-// The well draws its button's hover, and keeps it while the button is pointed: the gallery picker marks its trigger
-// `data-hover` while it is open.
+// Matches DropZone's accent preview; the gallery picker marks its trigger `data-hover` while open, so it persists.
 const MEDIA_WELL_HOVER = { borderColor: 'accent.solid' };
 const MEDIA_WELL_INVALID_HOVER = { bg: 'bg.error/60', borderColor: 'border.error' };
 const MEDIA_WELL_PROPS = { _hover: MEDIA_WELL_HOVER, css: { '[data-hover] > &': MEDIA_WELL_HOVER } };
@@ -189,7 +187,6 @@ const MEDIA_WELL_INVALID_PROPS = {
   css: { '[data-hover] > &': MEDIA_WELL_INVALID_HOVER },
 };
 
-/** A row of a list names itself by position; a scalar field is named by its title. */
 type ScalarInputProps = WorkflowFieldInputProps & { ariaLabel?: string };
 
 const StringInput = ({ ariaLabel, formSettings, id, invalid, onChange, template, value }: ScalarInputProps) => {
@@ -263,7 +260,6 @@ const StringInput = ({ ariaLabel, formSettings, id, invalid, onChange, template,
   );
 };
 
-/** A number field renders the authored slider when its (narrowed) template bounds both ends; otherwise the input. */
 const NumberFieldInput = (props: ScalarInputProps) => {
   const { formSettings, template } = props;
   const component = formSettings?.kind === 'number' ? formSettings.component : 'number-input';
@@ -286,10 +282,7 @@ const NumberFieldInput = (props: ScalarInputProps) => {
   );
 };
 
-/**
- * Plan stepping previews from workflow iterations and template defaults; nokey prevents node shortcuts inside the
- * row and portalled menu.
- */
+/** `nokey` keeps node shortcuts out of the row and its portalled menu. */
 const WorkflowSeedInput = ({
   id,
   invalid,
@@ -346,8 +339,7 @@ const SWITCH_CHECKED_PROPS = { bg: 'accent.solid' };
 
 const BooleanInput = ({ id, invalid, onChange, template, value }: WorkflowFieldInputProps) => {
   const onCheckedChange = useCallback((event: { checked: boolean }) => onChange(event.checked), [onChange]);
-  // The host id goes through zag's id map: the root is a `<label for>` pointing at zag's hidden-input
-  // id, so an `id` set on the element itself would leave the label pointing at nothing (an inert switch).
+  // Through zag's id map: the root is a `<label for>` at zag's hidden input, so an element `id` makes the switch inert.
   const switchIds = useMemo(() => (id ? { hiddenInput: `${id}-switch-input` } : undefined), [id]);
 
   return (
@@ -471,8 +463,7 @@ const ModelIdentifierInput = ({ id, invalid, onChange, template, value }: Workfl
   const filter = useCallback(
     (model: ModelConfig) =>
       (allowedBases ? allowedBases.includes(model.base) : true) &&
-      // A components-only folder carries no transformer, so it can only fill a field that asks for
-      // folders explicitly (e.g. a loader's Components field), never a format-agnostic model field.
+      // A components-only folder has no transformer: only fields that ask for folders (a loader's Components) take it.
       (allowedFormats ? allowedFormats.includes(model.format) : model.components_only !== true),
     [allowedBases, allowedFormats]
   );
@@ -523,12 +514,10 @@ const FIXED_BOARD_GROUP = '';
 
 const BoardInput = ({ id, invalid, onChange, template, value }: WorkflowFieldInputProps) => {
   const { t } = useTranslation();
-  // The gallery's own listing, so grants, revocations and new boards reach the field as they reach the panel.
   const { data } = useQuery(galleryBoardsOptions());
   const listedBoards = useHostGalleryBoards(data);
   const host = useOptionalGalleryHostProjectContext();
-  // Only boards a node's results may land on: someone else's board the caller can only view would refuse them after
-  // the run.
+  // Only boards a node's results may land on: a view-only board would refuse them after the run.
   const boards = useMemo(
     () => listedBoards.filter((board) => board.kind === 'board' && canOnBoard(board, 'add_media')),
     [listedBoards]
@@ -545,8 +534,7 @@ const BoardInput = ({ id, invalid, onChange, template, value }: WorkflowFieldInp
     chosenAutoBoardId !== 'none' &&
     !listedBoards.some((board) => board.id === chosenAutoBoardId);
   useQuery({ ...galleryBoardsOptions({ includeArchived: true }), enabled: needsArchivedListing });
-  // Compilation sends Auto to the gallery's auto-add board, deciding from the cached listings; the label names the
-  // board the same decision resolves to now. Either listing arriving re-renders the field, which reads it again.
+  // The board compilation's Auto resolves to from the cached listings; either listing arriving re-renders the field.
   const autoBoardId = useWorkflowProjectSelector((project) =>
     getGalleryAutoAddBoardId(project.galleryValues, (boardId) => canAddToCachedGalleryBoard(boardId, queryClient))
   );
@@ -580,7 +568,6 @@ const BoardInput = ({ id, invalid, onChange, template, value }: WorkflowFieldInp
       { group: FIXED_BOARD_GROUP, label: t('nodes.boardAuto', { board: autoBoardLabel }), value: 'auto' },
       { group: FIXED_BOARD_GROUP, label: t('widgets.gallery.uncategorized'), value: 'none' },
       ...groups.flatMap((group) =>
-        // Without a gallery host there are no group headings; boards list after the fixed choices.
         group.boards.map((board) => ({
           group: host ? group.id : FIXED_BOARD_GROUP,
           label: getGalleryBoardLabel(board, translate),
@@ -657,10 +644,7 @@ const IMAGE_ONLY = ['image'] as const;
 const VIDEO_ONLY = ['video'] as const;
 const MEDIA_INPUT_FOCUS_PROPS = { outline: '2px solid {colors.accent.focusRing}', outlineOffset: '2px' } as const;
 
-/**
- * Apply uploads only to their originating mounted widget/project. Late successes still refresh Gallery and direct
- * users there instead of mutating another project.
- */
+/** Applies uploads only to their originating widget and project; late successes still refresh Gallery. */
 const useMediaUpload = ({
   kind,
   multiple = false,
@@ -699,8 +683,7 @@ const useMediaUpload = ({
         return;
       }
 
-      // `accept` on the input is advisory only ("All Files" bypasses it); an
-      // unknown type (empty string) is left for the server to judge.
+      // `accept` is advisory ("All Files" bypasses it); an unknown (empty) type is left to the server.
       if (files.some((file) => file.type && !file.type.startsWith(`${kind}/`))) {
         toaster.create({
           title: `Please choose ${multiple ? `${config.noun} files` : `a ${config.noun} file`}`,
@@ -718,9 +701,8 @@ const useMediaUpload = ({
         const names: string[] = [];
         const failedFiles: string[] = [];
 
-        // Uploads follow the gallery's selected board, unless it takes none: a date board, or someone else's board
-        // the caller can only view or no longer read. Then they go to the project's inbox, where results go in the
-        // same case. The listing is ensured first, so the board is judged from one and never trusted unseen.
+        // Uploads follow the gallery's selected board unless it takes none (a date board, or one the caller cannot
+        // write); then the project's inbox. The listing is ensured first, so the board is never trusted unseen.
         if (selectedBoardId !== 'none') {
           await ensureGalleryBoardDestinations(queryClient);
         }
@@ -733,7 +715,6 @@ const useMediaUpload = ({
             ? selectedBoardId
             : (projectBoardId ?? 'none');
 
-        // Each file lands or fails on its own; what landed is adopted either way.
         for (const file of files) {
           try {
             names.push(
@@ -754,8 +735,7 @@ const useMediaUpload = ({
           return;
         }
 
-        // What landed is listed; a board that refused a file leaves the listing's view of it stale. Either way the
-        // gallery reads again.
+        // A board that refused a file leaves the listing stale; the gallery reads again either way.
         void invalidateGallery(queryClient, owner);
 
         if (names.length > 0) {
@@ -816,9 +796,17 @@ const ImageCollectionTile = ({
   const { findInGallery } = useWorkflowUi();
   const onRemoveClick = useCallback(() => onRemove(index), [index, onRemove]);
   const onFind = useCallback(() => findInGallery({ kind: 'image', name }), [findInGallery, name]);
+  const onContextMenu = useGalleryItemContextMenu({ kind: 'image', name });
 
   return (
-    <Box aspectRatio="1" bg="bg.subtle" className="group" position="relative" rounded="xs">
+    <Box
+      aspectRatio="1"
+      bg="bg.subtle"
+      className="group"
+      position="relative"
+      rounded="xs"
+      onContextMenu={onContextMenu}
+    >
       <Image
         alt=""
         h="full"
@@ -906,8 +894,7 @@ const ImageCollectionInput = ({
   const { project } = useWorkflowUi();
   const names = useMemo(() => getImageCollectionNames(value), [value]);
   const invalidAriaProps = useMemo(() => (invalid ? { 'aria-invalid': true } : {}), [invalid]);
-  // An upload finishing later appends to the field as it stands then, read from the document, not
-  // to the list this render saw.
+  // A late upload appends to the field as the document holds it then, not to this render's list.
   const appendNames = useCallback(
     (added: string[]) => {
       const snapshot = project.getSnapshot();
@@ -979,7 +966,6 @@ const ImageCollectionInput = ({
             ))}
           </SimpleGrid>
         ) : (
-          // The empty state keeps the drop target tall enough to hit and doubles as the picker trigger.
           <GalleryPickerPopover accept={IMAGE_ONLY} label={pickerLabel} selection={pickerSelection} onPick={onPick}>
             <chakra.button
               className="nodrag"
@@ -1081,11 +1067,9 @@ const MediaInput = ({ id, invalid, kind, onChange, value }: WorkflowFieldInputPr
     }
   }, [findInGallery, kind, mediaName]);
 
-  // Replace failed stale thumbnails with media icons; retry when the value changes.
   const [failedThumbnail, setFailedThumbnail] = useState<string | null>(null);
   const onThumbnailError = useCallback(() => setFailedThumbnail(mediaName), [mediaName]);
 
-  // Resolve badge metadata best-effort; name-based preview remains usable if lookup fails.
   const { data: mediaItem } = useQuery({
     enabled: mediaName !== null && mediaName !== '',
     queryFn: ({ signal }) => galleryItems.resolve({ kind, name: mediaName ?? '' }, signal),
@@ -1093,6 +1077,8 @@ const MediaInput = ({ id, invalid, kind, onChange, value }: WorkflowFieldInputPr
     retry: false,
     staleTime: 60_000,
   });
+  const shownItem = mediaItem?.kind === kind && mediaItem.name === mediaName ? mediaItem : null;
+  const onContextMenu = useGalleryItemContextMenu(shownItem ?? (mediaName ? { kind, name: mediaName } : null));
   const badge =
     mediaItem && mediaItem.name === mediaName && mediaItem.width > 0
       ? `${mediaItem.width}x${mediaItem.height}${
@@ -1111,11 +1097,18 @@ const MediaInput = ({ id, invalid, kind, onChange, value }: WorkflowFieldInputPr
   return (
     <Box position="relative" w="full" {...invalidAriaProps}>
       <MediaDropMonitor dropId={dropId} kind={kind} onDrop={onMediaDrop} />
-      {/* The whole preview area is the drop target, like the legacy editor's widget. */}
-      <Box ref={setNodeRef} className="nodrag group" h="32" position="relative" rounded="sm" w="full">
+      {/* The whole preview area is the drop target. */}
+      <Box
+        ref={setNodeRef}
+        className="nodrag group"
+        h="32"
+        position="relative"
+        rounded="sm"
+        w="full"
+        onContextMenu={onContextMenu}
+      >
         <GalleryPickerPopover accept={pickerAccept} label={pickerLabel} onPick={onPick}>
           <chakra.button
-            // A chosen item shows only its thumbnail; the empty face names itself with its visible text.
             aria-label={mediaName ? pickerLabel : undefined}
             className="nodrag"
             display="block"
@@ -1229,12 +1222,18 @@ const VideoFramePicker = lazy(() =>
 );
 
 /** The picker's box and button row while its player loads, so the node does not change size. */
-const VideoFramePickerFallback = ({ posterUrl }: { posterUrl: string }) => {
+const VideoFramePickerFallback = ({
+  onContextMenu,
+  posterUrl,
+}: {
+  onContextMenu: MouseEventHandler<HTMLElement> | undefined;
+  posterUrl: string;
+}) => {
   const { t } = useTranslation();
 
   return (
     <Flex direction="column" gap="1" w="full">
-      <Box bg="black" borderWidth="1px" h="32" overflow="hidden" rounded="sm" w="full">
+      <Box bg="black" borderWidth="1px" h="32" overflow="hidden" rounded="sm" w="full" onContextMenu={onContextMenu}>
         <Image alt="" h="full" objectFit="contain" src={posterUrl} w="full" />
       </Box>
       <Button alignSelf="flex-start" disabled size="sm" variant="outline">
@@ -1244,24 +1243,15 @@ const VideoFramePickerFallback = ({ posterUrl }: { posterUrl: string }) => {
   );
 };
 
-/**
- * Convention shared with the legacy editor: a `video-frame-index` field's
- * source video lives on a sibling field named `video` on the same node.
- */
+/** Legacy-editor convention: a `video-frame-index` field's source video is the sibling `video` field. */
 const COMPANION_VIDEO_FIELD_NAME = 'video';
 
-/**
- * The frame input is the value; the player beside it shows that frame and can pick another. Fall back to plain input
- * when the companion video/rate cannot resolve.
- */
+/** Falls back to the plain input when the companion video or frame rate cannot resolve. */
 const VideoFrameIndexInput = (props: WorkflowFieldInputProps) => {
   const { t } = useTranslation();
   const { nodeId, onChange, value } = props;
 
-  // A connected `video` field keeps its stored value in the document, so the
-  // sibling value alone would preview a stale video while invoke uses the
-  // upstream one. Resolved edges are the same "connected" signal the editor
-  // and Linear panel use to hide the video widget itself.
+  // A connected `video` field's stored value is stale; resolved edges are the editor's "connected" signal.
   const isVideoConnected = useWorkflowProjectSelector(
     (project) =>
       nodeId !== undefined &&
@@ -1282,8 +1272,7 @@ const VideoFrameIndexInput = (props: WorkflowFieldInputProps) => {
   });
   const videoName = isVideoConnected ? null : siblingVideoName;
 
-  // Same query key as the media widget's badge lookup, so the two share a cache
-  // entry when a frame field sits next to a populated video field (the common case).
+  // Same query key as the media widget's badge lookup, so a neighbouring video field shares the cache entry.
   const { data, isError } = useQuery({
     enabled: videoName !== null,
     queryFn: ({ signal }) => galleryItems.resolve({ kind: 'video', name: videoName ?? '' }, signal),
@@ -1300,9 +1289,7 @@ const VideoFrameIndexInput = (props: WorkflowFieldInputProps) => {
   const frameCount =
     video && fps && video.durationSeconds > 0 ? Math.max(1, Math.round(video.durationSeconds * fps)) : null;
 
-  // Resolve negative indices (-1 = last frame) for display only — the field
-  // value is preserved verbatim so users can still type "-1" and have the
-  // backend resolve it against the actual frame count.
+  // Resolves negative indices (-1 = last) for display only; the stored value stays verbatim for the backend.
   const numericValue = typeof value === 'number' && Number.isFinite(value) ? value : 0;
   const resolvedIndex =
     frameCount === null
@@ -1310,9 +1297,11 @@ const VideoFrameIndexInput = (props: WorkflowFieldInputProps) => {
       : Math.max(0, Math.min(frameCount - 1, numericValue < 0 ? frameCount + numericValue : numericValue));
 
   const posterUrl = video?.thumbnailUrl ?? null;
+  const onVideoContextMenu = useGalleryItemContextMenu(video);
   const pickerFallback = useMemo(
-    () => (posterUrl === null ? null : <VideoFramePickerFallback posterUrl={posterUrl} />),
-    [posterUrl]
+    () =>
+      posterUrl === null ? null : <VideoFramePickerFallback posterUrl={posterUrl} onContextMenu={onVideoContextMenu} />,
+    [onVideoContextMenu, posterUrl]
   );
 
   return (
@@ -1329,6 +1318,7 @@ const VideoFrameIndexInput = (props: WorkflowFieldInputProps) => {
             resolvedIndex={resolvedIndex}
             videoUrl={video.fullUrl}
             onChange={onChange}
+            onContextMenu={onVideoContextMenu}
           />
         </Suspense>
       ) : (
@@ -1376,7 +1366,6 @@ const ColorInput = ({ invalid, onChange, value }: WorkflowFieldInputProps) => {
   const handleChange = useCallback((next: string) => onChange(toColorFieldValue(next)), [onChange]);
 
   return (
-    // `nodrag` keeps a click on the swatch from panning the node canvas.
     <HStack className="nodrag" gap="2" w="full" {...invalidProps(invalid)}>
       <ColorPicker aria-label="Color" value={color} withAlpha withValueText onValueChange={handleChange} />
     </HStack>
@@ -1385,12 +1374,8 @@ const ColorInput = ({ invalid, onChange, value }: WorkflowFieldInputProps) => {
 
 const LORA_MODEL_TYPES: ModelTaxonomyType[] = ['lora'];
 
-/**
- * Edit LoRA collections by index so imported duplicate keys and unreadable entries remain independent and
- * preserved.
- */
+/** Edits by index, so imported duplicate keys and unreadable entries stay independent and preserved. */
 const LoRACollectionInput = ({ id, invalid, onChange, template, value }: WorkflowFieldInputProps) => {
-  // The raw list, unreadable items included — see `toLoraFieldCollectionList`.
   const entries = useMemo(() => toLoraFieldCollectionList(value), [value]);
   const selectedKeys = useMemo(
     () => new Set(entries.filter(isLoraFieldCollectionEntry).map((entry) => entry.lora.key)),
@@ -1406,7 +1391,6 @@ const LoRACollectionInput = ({ id, invalid, onChange, template, value }: Workflo
   const commit = useCallback((next: unknown[]) => onChange(next.length === 0 ? undefined : next), [onChange]);
   const onAdd = useCallback(
     (model: ModelConfig | null) => {
-      // The picker already excludes what is in the list; the guard covers a stale selection.
       if (!model || selectedKeys.has(model.key)) {
         return;
       }
@@ -1513,8 +1497,7 @@ const LoRACollectionRow = ({
   const label = entry ? entry.lora.name : t('nodes.loraEntryUnreadable');
   const removeLabel = t('nodes.loraEntryRemove', { name: label });
   const onRemoveClick = useCallback(() => onRemove(index), [index, onRemove]);
-  // The shared numeric control commits as typed; a cleared or out-of-range weight stays on screen and blocks
-  // invoking through the field's own reason instead of being clamped.
+  // Commits as typed; a cleared or out-of-range weight blocks invoking through the field's reason instead of clamping.
   const onValueChange = useCallback(
     (weight: unknown) => onWeightChange(index, typeof weight === 'number' ? weight : null),
     [index, onWeightChange]
@@ -1558,7 +1541,6 @@ const ScalarCollectionInput = ({ id, invalid, onChange, template, value }: Workf
   const { t } = useTranslation();
   const items = useMemo<readonly unknown[]>(() => (Array.isArray(value) ? value : []), [value]);
   const isString = template.type.name === 'StringField';
-  // Each row edits one scalar on a single line, whatever the list's own ui_component says.
   const itemTemplate = useMemo<FieldInputTemplate>(
     () => ({ ...template, type: { ...template.type, cardinality: 'SINGLE' }, uiComponent: null }),
     [template]
@@ -1575,8 +1557,7 @@ const ScalarCollectionInput = ({ id, invalid, onChange, template, value }: Workf
   );
   const addButtonRef = useRef<HTMLButtonElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
-  // Rows are keyed by position, so a removal only unmounts the last row's controls. Move keyboard focus off
-  // anything about to unmount before the commit lands, or it falls to the canvas and its delete shortcut.
+  // Rows are keyed by position: move focus off the unmounting row first, or it falls to the canvas's delete shortcut.
   const onClear = useCallback(() => {
     addButtonRef.current?.focus();
     commit([]);
@@ -1856,9 +1837,7 @@ const SavedWorkflowInput = ({ nodeId, onChange, template, value }: WorkflowField
 };
 
 export const WorkflowFieldInput = (props: WorkflowFieldInputProps) => {
-  // COLLECTION fields hold arrays; only image and scalar lists have a list widget. Other
-  // collections stay connection-only even when a migrated linear-form element
-  // points at them, since the single-value widget would write a bare value.
+  // Only image and scalar lists have a list widget; a single-value widget would write a bare value into a collection.
   if (props.template.type.cardinality === 'COLLECTION') {
     switch (props.template.type.name) {
       case 'ImageField':
@@ -2067,7 +2046,6 @@ const SavedWorkflowSnapshot = ({ workflowId }: { workflowId: string }) => {
   );
 };
 
-/** Renders authored values without mounting editors or resolving runtime diagnostics. */
 export const WorkflowFieldSnapshot = ({
   seedMode = 'fixed',
   template,
@@ -2133,7 +2111,6 @@ export const WorkflowFieldSnapshot = ({
   if (template.type.name === 'StringField') {
     return (
       <Box
-        // The node row's value well, so the export matches the editor.
         bg="var(--wb-control-well, transparent)"
         borderColor="border"
         borderRadius="control"

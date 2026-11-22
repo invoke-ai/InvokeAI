@@ -62,7 +62,6 @@ const SOURCE = {
 const overlaps = (a: DOMRect, b: DOMRect): boolean =>
   a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
 
-// A 16:9 clip in stages down to a small floating window, where the frame fills the stage and its bar is most of it.
 it.each([
   [480, 300],
   [290, 200],

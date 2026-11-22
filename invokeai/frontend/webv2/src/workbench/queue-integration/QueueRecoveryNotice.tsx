@@ -171,8 +171,8 @@ export const QueueRecoveryNotice = ({
     );
   }
 
-  // The discard confirmation renders beside whichever notice applies, so the refetch that follows a discard can
-  // remove the notice while the dialog animates closed.
+  // The discard confirmation renders beside whichever notice applies, so the refetch that follows a discard can remove
+  // the notice while the dialog animates closed.
   let notice: ReactNode = null;
   if (query.data?.kind === 'unavailable' || query.isError) {
     notice = (

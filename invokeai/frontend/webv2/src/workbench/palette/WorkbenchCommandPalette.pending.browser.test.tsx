@@ -5,7 +5,6 @@ import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
 
-/** Holds the palette's module back, as a slow connection does on its first open. */
 const chunk = vi.hoisted(() => {
   let arrive = () => {};
   const arrived = new Promise<void>((resolve) => {
@@ -55,7 +54,5 @@ it('suspends shortcuts from the moment the palette opens, while its module is st
     await chunk.arrived;
   });
   await expect.poll(() => host.querySelector('[data-testid="palette"]')).not.toBeNull();
-  // The stand-in steps aside for the loaded dialog, which this test replaces with one that announces nothing.
-  // Its passive effect cleanup can run after the loaded dialog reaches the DOM.
   await expect.poll(() => isModalPresent()).toBe(false);
 });

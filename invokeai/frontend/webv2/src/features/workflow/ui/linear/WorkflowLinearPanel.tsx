@@ -57,8 +57,8 @@ export const areWorkflowPanelStatesEqual = (left: WorkflowPanelState, right: Wor
   left.mode === right.mode && left.editTab === right.editTab && left.inspectorSizePct === right.inspectorSizePct;
 
 /**
- * Use tabs for roving focus and arrow selection; hidden content nodes preserve aria-controls while edit panels
- * retain their splitter layout.
+ * Use tabs for roving focus and arrow selection; hidden content nodes preserve aria-controls while edit panels retain
+ * their splitter layout.
  */
 export const PanelModeToggle = ({ mode, onChange }: { mode: PanelMode; onChange: (mode: PanelMode) => void }) => {
   const { t } = useTranslation();

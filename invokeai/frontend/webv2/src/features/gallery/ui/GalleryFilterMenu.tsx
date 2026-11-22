@@ -11,8 +11,8 @@ import { useMenuTriggerIds } from './galleryMenuIds';
 const FILTER_MENU_POSITIONING = { placement: 'bottom-end' } as const;
 
 /**
- * The Gallery's "Filter & sort" menu, shared by the boards and media toolbars so their trigger and grouped menu
- * cannot drift apart. It stays open on selection so several groups can be set in one visit.
+ * The Gallery's "Filter & sort" menu, shared by the boards and media toolbars so their trigger and grouped menu cannot
+ * drift apart. It stays open on selection so several groups can be set in one visit.
  */
 export const GalleryFilterMenu = ({
   children,

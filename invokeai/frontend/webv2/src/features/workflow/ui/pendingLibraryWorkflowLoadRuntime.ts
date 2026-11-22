@@ -10,9 +10,8 @@ export interface PendingWorkflowLoadRuntimeDeps {
 }
 
 /**
- * Serial request consumer. A newer token replaces queued work while one load
- * is in flight, and compare-and-clear prevents an old completion from
- * consuming that newer request.
+ * Serial request consumer. A newer token replaces queued work while one load is in flight, and compare-and-clear
+ * prevents an old completion from consuming that newer request.
  */
 export const startPendingWorkflowLoadRuntime = (deps: PendingWorkflowLoadRuntimeDeps): (() => void) => {
   let isRunning = true;

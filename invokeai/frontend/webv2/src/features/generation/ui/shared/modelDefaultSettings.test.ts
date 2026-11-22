@@ -44,9 +44,7 @@ describe('reset labels', () => {
 
     expect(getFieldResetLabel('steps', model, getBaseLabel, t)).toBe('Reset to model default');
     expect(getFieldResetLabel('size', model, getBaseLabel, t)).toBe('Reset to SDXL default');
-    // One side from the model, the other from the base.
     expect(getFieldResetLabel('size', sdxl({ width: 896 }), getBaseLabel, t)).toBe('Reset to model and SDXL default');
-    // An external model's fallbacks belong to no base.
     expect(getFieldResetLabel('size', external, getBaseLabel, t)).toBe('Reset to default');
   });
 

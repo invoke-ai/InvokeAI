@@ -50,14 +50,12 @@ interface GraphPreviewDialogProps {
   sourceId?: WorkflowInvocationSourceId;
   /** e.g. "Generate": the title, unless the source's document has a name of its own. */
   sourceLabel: string;
-  /** The host's Invoke for this source, in the footer; none for a source that is not run from here (a review). */
   invoke?: GraphPreviewInvoke;
   onOpenChange: (isOpen: boolean) => void;
   /** Conditional hosts must unmount after close completion so exit animation can run. */
   onExitComplete?: () => void;
 }
 
-/** Stage and rail side by side; a narrow dialog puts the rail under the stage. */
 const BODY_CSS: SystemStyleObject = {
   display: 'grid',
   flex: '1',
@@ -66,16 +64,13 @@ const BODY_CSS: SystemStyleObject = {
   gridTemplateColumns: 'minmax(0, 1fr)',
   gridTemplateRows: 'minmax(0, 1fr) auto',
   minH: '0',
-  // As wide as the library's detail rail.
   md: { gridTemplateColumns: 'minmax(0, 1fr) 18rem', gridTemplateRows: 'minmax(0, 1fr)' },
 };
 const RAIL_CSS: SystemStyleObject = { maxH: '10rem', md: { maxH: 'none' } };
 const STAGE_LOADING = <WorkflowPreviewStageLoading />;
 
-/** "Generate → Seed" names the setting "Seed": the label a set field takes in the drawing. */
 const getSettingName = (provenance: string) => provenance.split('→').at(-1)!.trim() || provenance;
 
-/** What the drawing was built from, and what was built. */
 interface ModelState {
   graph: GraphPreviewSourceState['graph'];
   sourceDocument: ProjectGraphState | undefined;
@@ -101,12 +96,7 @@ interface Drawing {
   carriedNodeId: string | null;
 }
 
-/**
- * A compiled graph, or the workflow document it compiles from, drawn as the library previews a workflow: the same
- * graph, node card, find, Inputs view (for a document) and JSON view, with the source's facts and notices in a rail
- * beside it. A live source redraws in place as it recompiles: a value change redraws only the chips it changes; a
- * structure change draws afresh, keeping an open card whose node survives. Nothing is built while it is closed.
- */
+/** A live source redraws in place as it recompiles; nothing is built while the dialog is closed. */
 export const GraphPreviewDialog = ({
   graphId,
   isOpen,
@@ -132,10 +122,8 @@ export const GraphPreviewDialog = ({
   const { document: sourceDocument, getProvenance, graph, positionHints, resolvedInputOverrides } = source;
   const templates = templatesSnapshot.status === 'loaded' ? templatesSnapshot.templates : null;
   /**
-   * One model path: a compiled graph is drawn as a document whose form is what the person set, named by the setting.
-   * Rebuilt when the graph or document itself changes (not the source object around them: a host may hand a fresh one
-   * each render); its provenance, overrides and position hints come with each compile. Each rebuild hands the last
-   * model on, so what a recompile did not change keeps its identity. Nothing is built while the dialog is closed.
+   * Rebuilt when the graph or document changes, not the source object around them (a host may hand a fresh one each
+   * render); each rebuild hands the last model on, so unchanged parts keep their identity.
    */
   const [modelState, setModelState] = useState<ModelState>(NO_MODEL);
   let built = modelState;
@@ -173,14 +161,12 @@ export const GraphPreviewDialog = ({
     setModelState(built);
   }
   const { document, model } = built;
-  // The drawing at a wider chip, where the graph's stage has the room.
   const relayout = useCallback(
     (metrics: WorkflowPreviewMetrics, previous: WorkflowPreviewModel | null) =>
       buildWorkflowPreviewModel(document!, templates!, metrics, previous),
     [document, templates]
   );
   const needsModel = useNodesNeedingModel(model);
-  // The open card, as the graph reports it, so a structure change can carry it into the new drawing.
   const [cardNodeId, setCardNodeId] = useState<string | null>(null);
   const structureKey = model?.structureKey ?? null;
   const [drawing, setDrawing] = useState<Drawing>({ carriedNodeId: null, key: 0, structureKey });
@@ -192,14 +178,12 @@ export const GraphPreviewDialog = ({
     });
   }
   const find = useWorkflowPreviewFind(graphRef, drawing.key);
-  // A node a notice or an input asked to show opens selected in its drawing; asking again opens it again.
   const [shownNode, setShownNode] = useState<{ drawing: number; nodeId: string; request: number } | null>(null);
   const requestedNodeId = shownNode?.drawing === drawing.key ? shownNode.nodeId : null;
 
   const closeDialog = useCallback(() => onOpenChange(false), [onOpenChange]);
   const handleOpenChange = useCallback((event: { open: boolean }) => onOpenChange(event.open), [onOpenChange]);
   const { reset: resetFind } = find;
-  // Reopened, the preview starts on the graph again, unfiltered, no card open.
   const handleExitComplete = useCallback(() => {
     setIsPresent(false);
     setView('nodes');
@@ -258,7 +242,6 @@ export const GraphPreviewDialog = ({
   );
   const getJsonText = useCallback(() => (graph ? getGraphJsonText(graph) : ''), [graph]);
 
-  // Only a document has a form to show. The Graph view always shows: the compiled graph, or why there is none.
   const hasInputs = sourceDocument !== undefined;
   const viewTabs = useMemo(
     () => getWorkflowPreviewViewTabs(model, { hasGraph: true, hasInputs }, t),
@@ -274,16 +257,13 @@ export const GraphPreviewDialog = ({
   // A document still draws when it does not compile; a compiled source has nothing to draw.
   const isBlocked = blockedReason !== null && !sourceDocument;
   const showsNodes = shownView === 'nodes' && !isBlocked && model !== null && model.nodes.size > 0;
-  // The run's facts: the source's summary, then where results go.
   const facts = [
     ...source.summaryRows,
     ...(source.destinationLabel === null
       ? []
       : [{ id: 'destination', label: t('graphPreview.destination'), value: source.destinationLabel }]),
   ];
-  // The rail says what the graph alone does not: the run's facts, notices, and why a drawn document does not compile.
   const hasRail = facts.length > 0 || source.notices.length > 0 || (blockedReason !== null && !isBlocked);
-  // The footer decides the run: whether it can, Invoke, and for a compiled source the way to edit it as a workflow.
   const canEditAsWorkflow = invoke !== undefined && !sourceDocument && sourceId !== 'workflow' && graph !== null;
   const subtitle = source.isLive ? t('graphPreview.liveHint') : null;
   const title = sourceDocument?.name.trim() || sourceLabel;
@@ -471,7 +451,6 @@ export const GraphPreviewDialog = ({
   );
 };
 
-/** Something about the source the graph alone does not say (a seed drawn each run), with a jump to its node. */
 const Notice = ({
   message,
   nodeId,
@@ -514,10 +493,7 @@ const Notice = ({
   );
 };
 
-/**
- * The footer's readiness line: whether Invoke can run (its control's card says why not), a polite live region of its
- * own so a recompile says nothing until the answer changes.
- */
+/** A polite live region of its own, so a recompile says nothing until the answer changes. */
 const ReadinessLine = ({ isReady }: { isReady: boolean }) => {
   const { t } = useTranslation();
 

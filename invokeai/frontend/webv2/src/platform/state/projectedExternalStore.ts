@@ -1,6 +1,5 @@
 import type { EqualityFn } from './selectorCore';
 
-/** Domain-neutral read-only external store. */
 export interface ReadableExternalStore<Snapshot> {
   getSnapshot(): Snapshot;
   subscribe(listener: () => void): () => void;

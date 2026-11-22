@@ -108,7 +108,6 @@ describe('Launchpad command-palette hotkeys', () => {
 
     await press({ code: 'KeyK', ctrlKey: true, key: 'k' });
     expectPaletteState('open');
-    // The lazy dialog's footer renders this as the Mod+Enter hint's first keycap.
     await expect
       .poll(() => document.querySelector('[data-testid="launchpad-palette"]')?.getAttribute('data-modifier-key-label'))
       .toBe(navigator.platform.toLowerCase().includes('mac') ? 'cmd' : 'ctrl');

@@ -30,26 +30,17 @@ import {
   type WorkflowGraphIndex,
 } from '@features/workflow/utility';
 
-/**
- * Rebuild from document truth while preserving unchanged identities and selection. Precompute connection/exposure
- * facts so nodes need no workbench subscriptions.
- */
+/** Rebuilds from the document, keeping unchanged identities and selection; nodes need no workbench subscriptions. */
 
-/**
- * Whether node definitions are known yet. A node without a template is unknown only once they have loaded; until then
- * it is waiting, and after a failed load nothing can be said about its type.
- */
+/** A node without a template is unknown only once templates have loaded; until then it is waiting. */
 export type InvocationTemplateStatus = 'error' | 'loaded' | 'loading';
 
 export type InvocationFlowNode = FlowNode<
   {
     canUseCache: boolean;
     documentNode: WorkflowInvocationNode;
-    /** Source handle names with an outgoing edge. */
     connectedSourceHandles: string[];
-    /** Target handle names with an incoming edge. */
     connectedTargetHandles: string[];
-    /** Field names of this node exposed in the Linear UI form. */
     exposedFieldNames: string[];
     /** Large workflows render unselected nodes without field controls until selected. */
     isCompact: boolean;
@@ -322,7 +313,6 @@ export const toFlowNodes = (
   });
 };
 
-/** Returns nodes with exactly `selectedIds` selected, preserving identity where unchanged. */
 export const withNodeSelection = (nodes: WorkflowFlowNode[], selectedIds: Set<string>): WorkflowFlowNode[] =>
   nodes.map((node) => {
     const selected = selectedIds.has(node.id);
@@ -347,16 +337,12 @@ export const withNodeSelection = (nodes: WorkflowFlowNode[], selectedIds: Set<st
     return { ...node, selected };
   });
 
-/** xyflow edge component per the user's connection-style preference. */
 export type FlowEdgeType = 'default' | 'step';
 export type WorkflowFlowEdgeType = FlowEdgeType | 'loop_linkage';
 
 /** The edge component names the edge from these facts, so the copy follows the UI language. */
 export interface WorkflowEdgeData extends Record<string, unknown> {
-  /**
-   * Set on the one edge drawn between two collapsed nodes: every document edge it stands for, itself first. The rest
-   * are hidden, and selecting or deleting the drawn edge acts on all of them.
-   */
+  /** On the one edge drawn between two collapsed nodes: every document edge it stands for, itself first. */
   collapsedEdgeIds?: string[];
   /** The carried field type's name; null for a loop linkage or a type no template declares. */
   fieldTypeLabel: string | null;
@@ -449,14 +435,9 @@ const isSameEdgeData = (a: WorkflowEdgeData | undefined, b: WorkflowEdgeData): b
 const isCollapsedInvocation = (node: WorkflowNode | undefined): boolean =>
   node?.type === 'invocation' && !node.data.isOpen;
 
-/** How collapsed nodes reshape a document's edges in the editor; the document itself is never changed. */
 export interface CollapsedEdgeLayout {
-  /** Nodes drawn collapsed. */
   collapsedNodeIds: ReadonlySet<string>;
-  /**
-   * Each edge between two collapsed nodes, keyed to every edge between the same pair in document order (legacy's
-   * collapsed edge). The first draws for all of them; selecting or deleting any acts on all.
-   */
+  /** Each edge between two collapsed nodes, keyed to all edges between that pair in document order; the first draws. */
   groupByEdge: ReadonlyMap<string, readonly string[]>;
 }
 
@@ -506,7 +487,6 @@ export const getCollapsedEdgeLayout = (document: Pick<ProjectGraphState, 'edges'
   return layout;
 };
 
-/** Edge ids widened to every document edge a collapsed edge stands for, so selection and deletion act on all. */
 export const withCollapsedEdgeSiblings = (
   document: Pick<ProjectGraphState, 'edges' | 'nodes'>,
   edgeIds: readonly string[]
@@ -517,11 +497,8 @@ export const withCollapsedEdgeSiblings = (
 };
 
 /**
- * Edge changes with each collapsed group selected as one. A group follows its drawn edge: its state after this batch
- * (its current state, or the change addressed to it) goes to every member. Changes addressed to hidden members are
- * dropped: xyflow reports them only because their state differs, as when a click re-selects the drawn edge and
- * xyflow deselects everything else, so they would otherwise overturn the drawn edge. One lookup per call; the changes
- * pass through untouched when nothing is collapsed.
+ * A collapsed group follows its drawn edge. Changes to hidden members are dropped: xyflow reports them only because
+ * their state differs, and they would overturn the drawn edge.
  */
 export const withCollapsedGroupSelection = <Change extends { id?: string; type: string }>(
   document: Pick<ProjectGraphState, 'edges' | 'nodes'>,
@@ -574,11 +551,7 @@ export const withCollapsedGroupSelection = <Change extends { id?: string; type: 
   return [...kept, ...memberChanges];
 };
 
-/**
- * Which ends of an edge may be dragged to reconnect it. An end at a collapsed node's merged port stays put, as legacy's
- * did: that port stands for every field, so a drag there could not say which connection moves, and an edge between two
- * collapsed nodes may stand for several connections. The end at an open node still moves, as one ordinary edge.
- */
+/** An end at a collapsed node's merged port stands for every field, so it cannot be dragged; an open end can. */
 const getReconnectableEnds = (
   edge: WorkflowEdge,
   collapsedNodeIds: ReadonlySet<string>
@@ -615,7 +588,6 @@ export const toFlowEdges = (
     // The edge keeps its own type data, so a view drawing every node open (the image export) draws it as itself.
     const data: WorkflowEdgeData = collapsedGroup ? { ...typedData, collapsedEdgeIds: [...collapsedGroup] } : typedData;
     const reconnectable = getReconnectableEnds(edge, collapsedNodeIds);
-    // A group is selected as one: its drawn edge and the edges it stands for always agree.
     const selected = collapsedGroup
       ? collapsedGroup.some((id) => previousById.get(id)?.selected)
       : (previous?.selected ?? false);

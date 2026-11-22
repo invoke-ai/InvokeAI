@@ -1,8 +1,4 @@
-/**
- * Pure transform geometry maps local content through TRS then screen projection for fixed-size hit regions. Derive
- * fresh transforms from gesture-start values; allow negative-scale flips while clamping absolute scale to {@link
- * MIN_ABS_SCALE} to avoid singular matrices.
- */
+/** Derive fresh transforms from gesture-start values; negative scales are flips. */
 
 import type { CanvasLayerBaseContract } from '@workbench/canvas-engine/contracts';
 import type { Mat2d, Vec2 } from '@workbench/canvas-engine/types';
@@ -10,13 +6,9 @@ import type { Mat2d, Vec2 } from '@workbench/canvas-engine/types';
 import { applyToPoint, fromTRS, multiply } from '@workbench/canvas-engine/math/mat2d';
 import { snapMovedPoint } from '@workbench/canvas-engine/math/snapping';
 
-/** The editable layer transform (translate + per-axis scale + rotation in radians). */
 export type LayerTransform = CanvasLayerBaseContract['transform'];
 
-/**
- * All frames and anchors derive from local content rects, including negative paint offsets, never assumed
- * origin-zero bounds.
- */
+/** Frames and anchors derive from local content rects (negative offsets included), never origin-zero bounds. */
 export interface TransformRect {
   x: number;
   y: number;
@@ -24,8 +16,9 @@ export interface TransformRect {
   height: number;
 }
 
-/** The eight scale handles: four corners + four edge midpoints. */
 export type TransformHandle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w';
+
+export type TransformAnchor = TransformHandle | 'center';
 
 export type TransformTarget =
   | { kind: 'scale'; handle: TransformHandle }
@@ -35,28 +28,25 @@ export type TransformTarget =
 /** Handles in hit-test priority order: corners first (they win over adjacent edges). */
 export const TRANSFORM_HANDLES: readonly TransformHandle[] = ['nw', 'ne', 'se', 'sw', 'n', 'e', 's', 'w'];
 
-/** The four corner handles (also the rotate-zone anchors). */
 export const CORNER_HANDLES: readonly TransformHandle[] = ['nw', 'ne', 'se', 'sw'];
 
-/** Side length (screen px) of a scale handle's square grab area. */
+/** Screen px. */
 export const TRANSFORM_HANDLE_HIT_PX = 14;
 
-/** Radius (screen px) of a corner's rotate zone, measured from the corner outward. */
+/** Screen px, from the corner outward. */
 export const TRANSFORM_ROTATE_ZONE_PX = 22;
 
-/** Screen-pixel rotation-nub length shared by drawing and hit testing. */
+/** Screen px; shared by drawing and hit testing. */
 export const TRANSFORM_ROTATE_NUB_PX = 18;
 
-/** Screen-px grab radius around the rotation nub/knob (the capsule half-width). */
+/** Screen px. */
 export const TRANSFORM_ROTATE_NUB_HIT_PX = 11;
 
-/** Rotation snap increment under shift: 15°. */
 export const ROTATE_SNAP_RAD = Math.PI / 12;
 
 /** Smallest permitted |scaleX|/|scaleY| — keeps the layer matrix invertible. */
 export const MIN_ABS_SCALE = 0.01;
 
-/** The corner/edge opposite a handle (the fixed anchor for a non-alt scale). */
 const OPPOSITE: Record<TransformHandle, TransformHandle> = {
   e: 'w',
   n: 's',
@@ -68,41 +58,73 @@ const OPPOSITE: Record<TransformHandle, TransformHandle> = {
   w: 'e',
 };
 
-const hasWest = (h: TransformHandle): boolean => h === 'nw' || h === 'w' || h === 'sw';
-const hasEast = (h: TransformHandle): boolean => h === 'ne' || h === 'e' || h === 'se';
-const hasNorth = (h: TransformHandle): boolean => h === 'nw' || h === 'n' || h === 'ne';
-const hasSouth = (h: TransformHandle): boolean => h === 'sw' || h === 's' || h === 'se';
+const hasWest = (h: TransformAnchor): boolean => h === 'nw' || h === 'w' || h === 'sw';
+const hasEast = (h: TransformAnchor): boolean => h === 'ne' || h === 'e' || h === 'se';
+const hasNorth = (h: TransformAnchor): boolean => h === 'nw' || h === 'n' || h === 'ne';
+const hasSouth = (h: TransformAnchor): boolean => h === 'sw' || h === 's' || h === 'se';
 
-/** True for the four corner handles (two-letter ids). */
 export const isCornerHandle = (h: TransformHandle): boolean => h.length === 2;
 
-/** A handle's position on the layer's local content rect (off-origin aware). */
-export const localHandlePoint = (rect: TransformRect, handle: TransformHandle): Vec2 => ({
+export const localHandlePoint = (rect: TransformRect, handle: TransformAnchor): Vec2 => ({
   x: rect.x + (hasWest(handle) ? 0 : hasEast(handle) ? rect.width : rect.width / 2),
   y: rect.y + (hasNorth(handle) ? 0 : hasSouth(handle) ? rect.height : rect.height / 2),
 });
 
-/** The local content rect's center (the rotation pivot / alt-scale anchor). */
 const localCenter = (rect: TransformRect): Vec2 => ({
   x: rect.x + rect.width / 2,
   y: rect.y + rect.height / 2,
 });
 
-/** The layer's local→document affine matrix from its transform. */
 export const layerTransformMatrix = (t: LayerTransform): Mat2d =>
   fromTRS({ x: t.x, y: t.y }, t.rotation, t.scaleX, t.scaleY);
 
-/** The rotation matrix for `rad` (linear part only). */
 const rotationMat = (rad: number): { a: number; b: number; c: number; d: number } => {
   const cos = Math.cos(rad);
   const sin = Math.sin(rad);
   return { a: cos, b: sin, c: -sin, d: cos };
 };
 
-/** Applies a rotation matrix's linear part to a vector. */
 const applyLinear = (m: { a: number; b: number; c: number; d: number }, v: Vec2): Vec2 => ({
   x: m.a * v.x + m.c * v.y,
   y: m.b * v.x + m.d * v.y,
+});
+
+type LinearTransform = Pick<LayerTransform, 'rotation' | 'scaleX' | 'scaleY'>;
+
+/** The translation that puts `local` at `doc`: T = doc − R·(sx·local.x, sy·local.y). */
+export const moveLocalPointTo = (linear: LinearTransform, local: Vec2, doc: Vec2): LayerTransform => {
+  const rs = applyLinear(rotationMat(linear.rotation), { x: linear.scaleX * local.x, y: linear.scaleY * local.y });
+  return { rotation: linear.rotation, scaleX: linear.scaleX, scaleY: linear.scaleY, x: doc.x - rs.x, y: doc.y - rs.y };
+};
+
+export const layerPointToDocument = (transform: LayerTransform, local: Vec2): Vec2 =>
+  applyToPoint(layerTransformMatrix(transform), local);
+
+export const retransformAbout = (start: LayerTransform, local: Vec2, next: Partial<LinearTransform>): LayerTransform =>
+  moveLocalPointTo({ ...start, ...next }, local, layerPointToDocument(start, local));
+
+/** Mirrors in document space about the content centre, so the angle negates and one local axis flips. */
+export const flipTransform = (
+  transform: LayerTransform,
+  rect: TransformRect,
+  direction: 'horizontal' | 'vertical'
+): LayerTransform => {
+  const center = localCenter(rect);
+  return moveLocalPointTo(
+    {
+      rotation: -transform.rotation,
+      scaleX: direction === 'horizontal' ? -transform.scaleX : transform.scaleX,
+      scaleY: direction === 'vertical' ? -transform.scaleY : transform.scaleY,
+    },
+    center,
+    layerPointToDocument(transform, center)
+  );
+};
+
+/** The layer's own box in document pixels (not its rotated bounds). */
+export const transformedSize = (transform: LayerTransform, rect: TransformRect): { width: number; height: number } => ({
+  height: rect.height * Math.abs(transform.scaleY),
+  width: rect.width * Math.abs(transform.scaleX),
 });
 
 /** A handle's outward normal in LOCAL space (y-down, matching document/screen). */
@@ -111,23 +133,14 @@ const localOutward = (handle: TransformHandle): Vec2 => ({
   y: hasNorth(handle) ? -1 : hasSouth(handle) ? 1 : 0,
 });
 
-/**
- * Geometry the overlay needs to draw the transform frame, in DOCUMENT space
- * (the overlay projects each point through the view). `handles` is ordered to
- * match {@link TRANSFORM_HANDLES}.
- */
+/** Document space; `handles` follows {@link TRANSFORM_HANDLES}. */
 export interface TransformOverlayGeometry {
-  /** The four rotated-rect corners (nw, ne, se, sw) for the bounds polygon. */
   corners: Vec2[];
-  /** The eight scale-handle positions (order = {@link TRANSFORM_HANDLES}). */
   handles: Vec2[];
-  /** The layer center (rotation pivot). */
   center: Vec2;
-  /** The top edge midpoint (root of the rotation indicator nub). */
   rotationAnchor: Vec2;
 }
 
-/** Document-space geometry for the transform overlay of a layer at `transform`. */
 export const transformOverlayGeometry = (transform: LayerTransform, rect: TransformRect): TransformOverlayGeometry => {
   const m = layerTransformMatrix(transform);
   return {
@@ -138,7 +151,6 @@ export const transformOverlayGeometry = (transform: LayerTransform, rect: Transf
   };
 };
 
-/** True when `pt` is inside the convex polygon `poly` (consistent-winding cross test). */
 const pointInConvexPolygon = (poly: readonly Vec2[], pt: Vec2): boolean => {
   let pos = false;
   let neg = false;
@@ -158,7 +170,6 @@ const pointInConvexPolygon = (poly: readonly Vec2[], pt: Vec2): boolean => {
   return true;
 };
 
-/** Distance (screen px) from `p` to the segment `a`→`b`. */
 const distanceToSegment = (p: Vec2, a: Vec2, b: Vec2): number => {
   const abx = b.x - a.x;
   const aby = b.y - a.y;
@@ -167,23 +178,16 @@ const distanceToSegment = (p: Vec2, a: Vec2, b: Vec2): number => {
   return Math.hypot(p.x - (a.x + t * abx), p.y - (a.y + t * aby));
 };
 
-/** Parameters for {@link transformTargetAt}. */
 export interface TransformHitTestParams {
   transform: LayerTransform;
   rect: TransformRect;
-  /** Projects a document-space point to screen space (CSS px). */
   toScreen: (docPoint: Vec2) => Vec2;
-  /** The screen-space pointer position (CSS px). */
   point: Vec2;
-  /** Scale-handle grab-area side length (screen px). */
   handleHitPx?: number;
-  /** Corner rotate-zone radius (screen px). */
   rotateZonePx?: number;
-  /** Rotation-nub grab radius (screen px). */
   rotateNubHitPx?: number;
 }
 
-/** Hit priority: scale handles (corners before edges), rotation targets, interior move, then null. */
 export const transformTargetAt = (params: TransformHitTestParams): TransformTarget | null => {
   const { point, rect, toScreen, transform } = params;
   const half = (params.handleHitPx ?? TRANSFORM_HANDLE_HIT_PX) / 2;
@@ -202,8 +206,7 @@ export const transformTargetAt = (params: TransformHitTestParams): TransformTarg
     return { kind: 'move' };
   }
 
-  // Test the outward top-edge nub after interior and before corner rotate zones. Missing this hit would
-  // reopen/reset the session instead of rotating.
+  // The nub is tested after the interior and before corner rotate zones; a miss would reset the session.
   const anchorScreen = screenOf('n');
   const centerScreen = toScreen(applyToPoint(m, { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 }));
   const outX = anchorScreen.x - centerScreen.x;
@@ -227,13 +230,9 @@ export const transformTargetAt = (params: TransformHitTestParams): TransformTarg
   return null;
 };
 
-/** The four resize cursors, indexed by the quantized 45° bucket of the outward normal. */
 const RESIZE_CURSORS = ['ew-resize', 'nesw-resize', 'ns-resize', 'nwse-resize'] as const;
 
-/**
- * Rotate/scale the handle normal and quantize its angle to four resize cursors. Uniform nonrotating viewport scale
- * preserves the document angle.
- */
+/** A uniform nonrotating viewport scale preserves the document angle. */
 export const resizeCursorForHandle = (transform: LayerTransform, handle: TransformHandle): string => {
   const m = layerTransformMatrix(transform);
   const dir = applyLinear(m, localOutward(handle));
@@ -245,7 +244,6 @@ export const resizeCursorForHandle = (transform: LayerTransform, handle: Transfo
   return RESIZE_CURSORS[bucket]!;
 };
 
-/** Clamps |s| to at least {@link MIN_ABS_SCALE}, preserving sign (0 → +MIN). */
 const clampScale = (s: number): number => {
   if (!Number.isFinite(s) || s === 0) {
     return MIN_ABS_SCALE;
@@ -254,7 +252,21 @@ const clampScale = (s: number): number => {
   return Math.abs(s) < MIN_ABS_SCALE ? sign * MIN_ABS_SCALE : s;
 };
 
-/** Applies shift axis-constraint to a document-space delta (dominant axis wins). */
+export const scaleForLength = (length: number, rectLength: number, current: number): number =>
+  (current < 0 ? -1 : 1) * Math.max(MIN_ABS_SCALE, length / rectLength);
+
+export const scaleAxis = (
+  start: LayerTransform,
+  axis: 'x' | 'y',
+  scale: number,
+  linked: boolean
+): Pick<LayerTransform, 'scaleX' | 'scaleY'> => {
+  const next = clampScale(scale);
+  const [own, other] = axis === 'x' ? [start.scaleX, start.scaleY] : [start.scaleY, start.scaleX];
+  const linkedOther = linked ? clampScale(other * Math.abs(next / own)) : other;
+  return axis === 'x' ? { scaleX: next, scaleY: linkedOther } : { scaleX: linkedOther, scaleY: next };
+};
+
 export const constrainMoveDelta = (delta: Vec2, shift: boolean): Vec2 => {
   if (!shift) {
     return delta;
@@ -262,53 +274,37 @@ export const constrainMoveDelta = (delta: Vec2, shift: boolean): Vec2 => {
   return Math.abs(delta.x) >= Math.abs(delta.y) ? { x: delta.x, y: 0 } : { x: 0, y: delta.y };
 };
 
-/**
- * Translate by document delta with optional axis lock. Snap only moved axes' resulting origins; grid zero disables
- * snapping.
- */
 export const applyMove = (start: LayerTransform, deltaDoc: Vec2, shift: boolean, grid = 0): LayerTransform => ({
   ...start,
   ...snapMovedPoint(start, constrainMoveDelta(deltaDoc, shift), grid),
 });
 
-/** Parameters for {@link applyScale}. */
 export interface ScaleParams {
   start: LayerTransform;
   rect: TransformRect;
   handle: TransformHandle;
-  /** Pointer position (document space) at gesture start. */
   startPointerDoc: Vec2;
-  /** Current pointer position (document space). */
   pointerDoc: Vec2;
-  /** Preserve aspect ratio (corner handles only). */
-  shift: boolean;
-  /** Scale about the layer center instead of the opposite handle. */
+  constrain: boolean;
   alt: boolean;
-  /** Grid the dragged handle lands on (document space); `0`/absent = no snap. */
   grid?: number;
 }
 
-/**
- * Scale about opposite handle or Alt center; edges affect one axis, Shift corners preserve aspect. Allow flips
- * with minimum absolute scale. Snap the handle's document target, not scale factors, to preserve the anchor.
- */
+/** Free edges affect one axis; flips allowed down to the minimum absolute scale. */
 export const applyScale = (p: ScaleParams): LayerTransform => {
-  const { alt, handle, rect, shift, start } = p;
+  const { alt, constrain, handle, rect, start } = p;
   const m = layerTransformMatrix(start);
   const handleLocal = localHandlePoint(rect, handle);
   const anchorLocal = alt ? localCenter(rect) : localHandlePoint(rect, OPPOSITE[handle]);
   const anchorDoc = applyToPoint(m, anchorLocal);
   const handleDoc = applyToPoint(m, handleLocal);
-  // `snapMovedPoint`'s per-axis rule matters here too: an axis the pointer never
-  // moved along must keep its scale, or a purely horizontal corner drag would
-  // resize the layer vertically just because the handle did not start on a line.
+  // An axis the pointer never moved along keeps its scale.
   const targetDoc = snapMovedPoint(
     handleDoc,
     { x: p.pointerDoc.x - p.startPointerDoc.x, y: p.pointerDoc.y - p.startPointerDoc.y },
     p.grid ?? 0
   );
 
-  // Un-rotate the anchor→target vector into the layer's scaled-local frame.
   const cos = Math.cos(start.rotation);
   const sin = Math.sin(start.rotation);
   const dx = targetDoc.x - anchorDoc.x;
@@ -321,42 +317,37 @@ export const applyScale = (p: ScaleParams): LayerTransform => {
   let sx = dlx !== 0 ? vx / dlx : start.scaleX;
   let sy = dly !== 0 ? vy / dly : start.scaleY;
 
-  if (shift && isCornerHandle(handle)) {
+  if (constrain) {
     const fx = start.scaleX !== 0 ? sx / start.scaleX : 1;
     const fy = start.scaleY !== 0 ? sy / start.scaleY : 1;
-    const f = Math.abs(fx) >= Math.abs(fy) ? fx : fy;
-    sx = start.scaleX * f;
-    sy = start.scaleY * f;
+    if (isCornerHandle(handle)) {
+      const f = Math.abs(fx) >= Math.abs(fy) ? fx : fy;
+      sx = start.scaleX * f;
+      sy = start.scaleY * f;
+    } else if (dlx !== 0) {
+      sy = start.scaleY * Math.abs(fx);
+    } else {
+      sx = start.scaleX * Math.abs(fy);
+    }
   }
 
-  sx = clampScale(sx);
-  sy = clampScale(sy);
-
-  // Keep the anchor fixed: T = anchorDoc − R·(sx·anchorLocal.x, sy·anchorLocal.y).
-  const rs = applyLinear(rotationMat(start.rotation), { x: sx * anchorLocal.x, y: sy * anchorLocal.y });
-  return {
-    rotation: start.rotation,
-    scaleX: sx,
-    scaleY: sy,
-    x: anchorDoc.x - rs.x,
-    y: anchorDoc.y - rs.y,
-  };
+  return moveLocalPointTo(
+    { rotation: start.rotation, scaleX: clampScale(sx), scaleY: clampScale(sy) },
+    anchorLocal,
+    anchorDoc
+  );
 };
 
-/** Snaps a radian angle to the nearest {@link ROTATE_SNAP_RAD} increment. */
 export const snapRotation = (rad: number): number => Math.round(rad / ROTATE_SNAP_RAD) * ROTATE_SNAP_RAD;
 
-/** Parameters for {@link applyRotate}. */
 export interface RotateParams {
   start: LayerTransform;
   rect: TransformRect;
   startPointerDoc: Vec2;
   pointerDoc: Vec2;
-  /** Snap the resulting absolute rotation to 15° increments. */
   shift: boolean;
 }
 
-/** Rotate around center by pointer angle delta; Shift snaps absolute rotation to 15 degrees without changing scale. */
 export const applyRotate = (p: RotateParams): LayerTransform => {
   const { rect, start } = p;
   const m = layerTransformMatrix(start);
@@ -368,38 +359,16 @@ export const applyRotate = (p: RotateParams): LayerTransform => {
   if (p.shift) {
     rotation = snapRotation(rotation);
   }
-  // Keep the center fixed: T = center − R(rotation)·(sx·cx, sy·cy).
-  const rs = applyLinear(rotationMat(rotation), {
-    x: start.scaleX * centerLocal.x,
-    y: start.scaleY * centerLocal.y,
-  });
-  return {
-    rotation,
-    scaleX: start.scaleX,
-    scaleY: start.scaleY,
-    x: center.x - rs.x,
-    y: center.y - rs.y,
-  };
+  return moveLocalPointTo({ rotation, scaleX: start.scaleX, scaleY: start.scaleY }, centerLocal, center);
 };
 
-/**
- * Bake matrix maps local pixels through TRS into document space, preserving appearance when the layer transform
- * resets to identity.
- */
 export const bakeMatrix = (transform: LayerTransform): Mat2d => layerTransformMatrix(transform);
 
-/** The identity transform (a reset layer transform after a bake). */
 export const IDENTITY_TRANSFORM: LayerTransform = { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 };
 
-/** Relative tolerance for treating a composite's axes as perpendicular. */
 const SHEAR_TOLERANCE = 1e-9;
 
-/**
- * The transform that applies `inner`, then `outer`; null when the composite shears (a non-uniform scale outside a
- * rotation) or collapses an axis, which translate/scale/rotate cannot express. A composite flip keeps the sign of
- * `outer.scaleX × inner.scaleX` on `scaleX`, so composing a flip with the identity returns the flip rather than a
- * half-turn.
- */
+/** Null when the composite shears or collapses an axis, which a TRS transform cannot express. */
 export const composeLayerTransforms = (outer: LayerTransform, inner: LayerTransform): LayerTransform | null => {
   const { a, b, c, d, e, f } = multiply(layerTransformMatrix(outer), layerTransformMatrix(inner));
   const xAxis = Math.hypot(a, b);

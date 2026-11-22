@@ -40,8 +40,7 @@ describe('image cluster registry', () => {
   });
 
   it('prunes a deleted video member, which is why the delete patch keys by kind', () => {
-    // Video deletions must prune client-owned cluster members; refetching cannot repair their counts or trailing
-    // pages.
+    // Video deletions must prune client-owned cluster members; refetching cannot repair their counts or trailing pages.
     const clusterId = registerImageCluster(['image:a.png', 'video:clip.mp4'], 'beaches');
 
     const rollback = pruneImageClusterMembers(['video:clip.mp4']);
@@ -62,11 +61,9 @@ describe('image cluster registry', () => {
   });
 
   it('rolls back only its own removals when another prune interleaves', () => {
-    // Two deletions overlap: the first fails and rolls back while the second
-    // has already pruned. Restoring the captured list wholesale would
-    // resurrect the second deletion's image; an identity guard would skip the
-    // restore entirely and strand the failed deletion's image outside the
-    // cluster for good.
+    // Two deletions overlap: the first fails and rolls back while the second has already pruned. Restoring the captured
+    // list wholesale would resurrect the second deletion's image; an identity guard would skip the restore entirely and
+    // strand the failed deletion's image outside the cluster for good.
     const clusterId = registerImageCluster(['image:a.png', 'image:b.png', 'image:c.png'], 'beaches');
     const rollbackFirst = pruneImageClusterMembers(['image:a.png']);
 
@@ -84,8 +81,7 @@ describe('image cluster registry', () => {
     pruneImageClusterMembers(['image:other.png']);
     expect(getImageCluster(clusterId)?.itemKeys).toEqual(['image:a.png']);
 
-    // A rollback captured before a newer registration must not resurrect the
-    // old list into the newer cluster's slot.
+    // A rollback captured before a newer registration must not resurrect the old list into the newer cluster's slot.
     const rollback = pruneImageClusterMembers(['image:a.png']);
     const newerId = registerImageCluster(['image:x.png'], 'newer');
 
@@ -113,8 +109,7 @@ describe('semanticReferenceFromDataTransfer', () => {
   });
 
   it("converts this app's own image URLs into by-name queries", () => {
-    // Dragging the preview image in must not round-trip through the URL
-    // downloader (the server would refuse fetching itself).
+    // Dragging the preview image in must skip the URL downloader: the server would refuse to fetch itself.
     const reference = semanticReferenceFromDataTransfer(
       dataTransfer([], 'http://localhost:5174/api/v1/images/i/ab%20c.png/full')
     );
@@ -169,15 +164,13 @@ describe('parseGallerySemanticReference', () => {
       kind: 'cluster',
       label: 'beaches',
     });
-    // A missing label falls back to the registered one rather than dropping
-    // the reference.
+    // A missing label falls back to the registered one rather than dropping the reference.
     expect(parseGallerySemanticReference({ clusterId, kind: 'cluster' })).toEqual({
       clusterId,
       kind: 'cluster',
       label: 'beaches',
     });
-    // Registering evicts prior entries, so a stale key reads as no search —
-    // exactly how a reload behaves.
+    // Registering evicts prior entries, so a stale key reads as no search — exactly how a reload behaves.
     registerImageCluster(['image:c.png'], 'newer');
     expect(parseGallerySemanticReference({ clusterId, kind: 'cluster', label: 'beaches' })).toBe(null);
   });

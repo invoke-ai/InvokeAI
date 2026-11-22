@@ -24,8 +24,8 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 /**
- * Credential cards share controls while preserving storage ownership: HuggingFace/providers on the server, Civitai
- * in this browser.
+ * Credential cards share controls while preserving storage ownership: HuggingFace/providers on the server, Civitai in
+ * this browser.
  */
 export const ApiKeysSection = () => {
   const notify = useNotify();

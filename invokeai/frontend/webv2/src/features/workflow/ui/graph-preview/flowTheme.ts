@@ -5,8 +5,8 @@ import { WORKFLOW_NODE_DIAMOND_ROTATION, WORKFLOW_NODE_SURFACE_TOKEN } from '@fe
 import { THEMES_BY_ID } from '@theme/themes';
 
 /**
- * Override xyflow light/dark defaults with inherited Chakra-backed variables; workbench variables also color grids
- * and inline handles.
+ * Override xyflow light/dark defaults with inherited Chakra-backed variables; workbench variables also color grids and
+ * inline handles.
  */
 export const flowThemeCss: SystemStyleObject = {
   '--wb-edge-badge-fg': '{colors.fg}',
@@ -23,8 +23,8 @@ export const flowThemeCss: SystemStyleObject = {
   '--xy-minimap-node-background-color': '{colors.bg.emphasized}',
   '--xy-selection-background-color': '{colors.accent.solid/10}',
   '--xy-selection-border': '1px dashed {colors.accent.solid}',
-  // A port keeps its 12px dot but takes pointers over 24×24 centred on it. It inherits the handle's pointer events,
-  // so a handle that cannot connect (previews) stays inert.
+  // A port keeps its 12px dot but takes pointers over 24×24 centred on it. It inherits the handle's pointer events, so
+  // a handle that cannot connect (previews) stays inert.
   '& .react-flow__handle::before': {
     content: '""',
     height: '24px',
@@ -40,5 +40,4 @@ export const flowThemeCss: SystemStyleObject = {
   },
 };
 
-/** The xyflow color mode matching a workbench theme. */
 export const getFlowColorMode = (themeId: WorkbenchThemeId): 'light' | 'dark' => THEMES_BY_ID[themeId].colorScheme;

@@ -131,8 +131,8 @@ export const useDeletionConfirmation = (): {
   const [isDeleting, setIsDeleting] = useState(false);
   // Read only when deletion is confirmed, so ticking it and then cancelling changes nothing.
   const [skipFutureConfirmations, setSkipFutureConfirmations] = useState(false);
-  // With routine confirmations already off, the dialog only appears because the media is in use or the request
-  // cannot skip it, which the opt-out does not cover.
+  // With routine confirmations already off, the dialog only appears because the media is in use or the request cannot
+  // skip it, which the opt-out does not cover.
   const confirmsRoutineDeletions = useWorkbenchPreferenceSelector((preferences) => preferences.confirmImageDeletion);
   const skipHintId = useId();
 
@@ -259,8 +259,8 @@ export const useDeletionConfirmation = (): {
       void patchWorkbenchPreferences({ confirmImageDeletion: false });
     }
 
-    // Deleting anyway while the check runs: its answer no longer matters, and the panel stops saying it is checking.
-    // A retry's earlier answer stays; a first check leaves nothing to show.
+    // Deleting anyway while the check runs: its answer no longer matters, and the panel stops saying it is checking. A
+    // retry's earlier answer stays; a first check leaves nothing to show.
     pending.usageCheckController.abort();
     setUsageCheck((current) =>
       current?.pending !== pending || current.check.status !== 'checking'

@@ -18,10 +18,9 @@ import { WorkflowWidgetLabel } from './WorkflowWidgetChrome';
 // The later open's real import resolves from the module cache rather than an on-demand transform under suite load.
 await import('@platform/ui/ScrollableMenuContent');
 
-// The switcher's scrolling list loads on first use. Here its chunk fails to load at first, as a stale or dropped chunk
-// does: the import rejects. Its own file, because a page keeps a module that has loaded, and the rejection comes from
-// the deferred module's import seam: a `vi.mock` factory that rejects is not an import failure in browser mode, since
-// Vitest's module interception reports it as an unhandled error and never answers the request.
+// The switcher's scrolling list loads on first use; here its chunk first fails, as a stale or dropped chunk does. Its
+// own file, because a page keeps a loaded module. The rejection comes from the deferred module's import seam: in
+// browser mode a rejecting `vi.mock` factory is reported as an unhandled error and never answers the request.
 const scrollableChunk = vi.hoisted(() => ({ fails: false, rejected: 0 }));
 vi.mock('@platform/react/deferredModule', async (importOriginal) => {
   const actual = await importOriginal<typeof DeferredModuleModule>();

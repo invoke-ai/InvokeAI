@@ -52,11 +52,7 @@ const selectSelectedLayerDisplayed = (project: { canvas: { document: CanvasDocum
 // Below the center view's header row, as the tool strip sits.
 const TOP_SLOT_TOP = 'var(--wb-center-chrome-inset, var(--chakra-spacing-2))';
 
-/**
- * Canvas chrome for the selected control layer: a hint over an empty layer pointing at the image sources, a
- * top-center chip while its map is detected in the background, and in its place once the map is current, an
- * Original / Map / Overlay switch comparing the map with the picture it was detected from.
- */
+/** Selected control layer chrome: empty-layer hint, detection chip, or Original / Map / Overlay switch. */
 export const ControlLayerCanvasOverlay = ({
   engine,
   isFileDragActive,
@@ -138,13 +134,10 @@ const SelectedControlLayerOverlay = ({
       : persistedState
   );
   const isImageDrag = isFileDragActive || isGalleryImageDragData(active?.data.current);
-  // Draw hides the hint: the user is about to give the layer its pixels by hand. An image dragged from the gallery or
-  // the desktop shows the drop zones in its place. An upload from Properties keeps the card up, saying so.
+  // Draw hides the hint: the user is about to give the layer its pixels by hand.
   const isHintVisible =
     imageState === 'empty' && (isUploading || (!isImageDrag && activeTool !== 'brush' && activeTool !== 'eraser'));
-  // Idle status keeps the switch and the detection chip apart: one or the other occupies the slot. The engine refuses
-  // a view while an operation holds the document, and a layer that does not draw has nothing to compare: hidden,
-  // disabled, or off the screen while a staged result shows only raster layers.
+  // Idle status keeps the switch and the detection chip apart: one or the other occupies the slot.
   const isViewSwitchVisible =
     layer.original !== undefined &&
     !!layer.detection &&
