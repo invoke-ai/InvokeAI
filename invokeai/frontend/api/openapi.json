@@ -8180,6 +8180,31 @@
         ]
       }
     },
+    "/api/v1/images/download/claim": {
+      "post": {
+        "tags": ["images"],
+        "summary": "Claim Orphaned Bulk Downloads",
+        "description": "Claims the caller's own bulk downloads whose polling client went away, such as ones prepared across a sign-in.\n\nEach claimed item must be fetched soon; a second call returns it again only after its lease lapses.",
+        "operationId": "claim_orphaned_bulk_downloads",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrphanedBulkDownloads"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/images/download/{bulk_download_item_name}": {
       "get": {
         "tags": ["images"],
@@ -8212,7 +8237,10 @@
             }
           },
           "404": {
-            "description": "Image not found"
+            "description": "The bulk download item is not ready yet"
+          },
+          "410": {
+            "description": "The bulk download item does not exist, failed, or was already fetched"
           },
           "422": {
             "description": "Validation Error",
@@ -102671,6 +102699,21 @@
         "output": {
           "$ref": "#/components/schemas/ImageCollectionOutput"
         }
+      },
+      "OrphanedBulkDownloads": {
+        "properties": {
+          "bulk_download_item_names": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Bulk Download Item Names",
+            "description": "The caller's bulk download items now claimed for fetching"
+          }
+        },
+        "type": "object",
+        "required": ["bulk_download_item_names"],
+        "title": "OrphanedBulkDownloads"
       },
       "OrphanedModelInfo": {
         "properties": {

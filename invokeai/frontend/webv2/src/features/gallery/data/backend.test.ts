@@ -27,6 +27,7 @@ import {
   deleteGalleryBoard,
   deleteGalleryImages,
   downloadGalleryArchive,
+  resumeGalleryArchives,
   getGalleryImageByName,
   getGalleryImagesByNames,
   getGalleryItemLocation,
@@ -150,6 +151,54 @@ describe('downloadGalleryArchive', () => {
     expect(pollSignal?.aborted).toBe(true);
     expect(sleepSignal.aborted).toBe(true);
     expect(mocks.apiFetchRaw).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects when the server no longer has the archive', async () => {
+    mocks.apiFetchJson.mockResolvedValue({ bulk_download_item_name: 'failed.zip' });
+    mocks.apiFetchRaw.mockResolvedValue(new Response(null, { status: 410 }));
+
+    await expect(downloadGalleryArchive({ imageNames: ['a.png'] })).rejects.toThrow('no longer available');
+  });
+
+  it('resumes claimed archives once ready and skips ones that are gone', async () => {
+    mocks.apiFetchJson.mockResolvedValue({ bulk_download_item_names: ['ready.zip', 'gone.zip'] });
+    const responses: Record<string, Response[]> = {
+      'gone.zip': [new Response(null, { status: 410 })],
+      'ready.zip': [new Response(null, { status: 404 }), new Response('zip-bytes', { status: 200 })],
+    };
+    mocks.apiFetchRaw.mockImplementation((url: string) => responses[url.split('/').at(-1)!]!.shift());
+    mocks.sleep.mockResolvedValue(undefined);
+    const archives: { blob: Blob; fileName: string }[] = [];
+
+    await resumeGalleryArchives(new AbortController().signal, (archive) => archives.push(archive));
+
+    expect(mocks.apiFetchJson).toHaveBeenCalledWith(
+      '/api/v1/images/download/claim',
+      expect.objectContaining({ method: 'POST' })
+    );
+    expect(archives.map((archive) => archive.fileName)).toEqual(['ready.zip']);
+    await expect(archives[0]?.blob.text()).resolves.toBe('zip-bytes');
+  });
+
+  it('delivers a fetched archive before a sibling still preparing is cut off', async () => {
+    mocks.apiFetchJson.mockResolvedValue({ bulk_download_item_names: ['ready.zip', 'slow.zip'] });
+    mocks.apiFetchRaw.mockImplementation((url: string) =>
+      Promise.resolve(url.endsWith('ready.zip') ? new Response('zip-bytes') : new Response(null, { status: 404 }))
+    );
+    mocks.sleep.mockImplementation(
+      (_ms: number, signal: AbortSignal) =>
+        new Promise((_resolve, reject) => {
+          signal.addEventListener('abort', () => reject(signal.reason));
+        })
+    );
+    const delivered: string[] = [];
+
+    const resume = resumeGalleryArchives(new AbortController().signal, ({ fileName }) => delivered.push(fileName));
+    await vi.waitFor(() => expect(delivered).toEqual(['ready.zip']));
+    accountLifecycle.invalidate();
+
+    await expect(resume).rejects.toThrow();
+    expect(delivered).toEqual(['ready.zip']);
   });
 });
 

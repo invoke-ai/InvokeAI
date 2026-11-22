@@ -6535,6 +6535,7 @@
         "working": "Working…"
       },
       "preparingDownload": "Preparing download",
+      "recoveredDownload": "Recovered an interrupted download",
       "renameBoard": "Rename board",
       "resizeBoardPanel": "Resize board panel",
       "retryLoadingBoards": "Retry loading boards",

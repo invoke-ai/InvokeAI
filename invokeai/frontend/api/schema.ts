@@ -1815,6 +1815,28 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/images/download/claim": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Claim Orphaned Bulk Downloads
+         * @description Claims the caller's own bulk downloads whose polling client went away, such as ones prepared across a sign-in.
+         *
+         *     Each claimed item must be fetched soon; a second call returns it again only after its lease lapses.
+         */
+        post: operations["claim_orphaned_bulk_downloads"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/images/download/{bulk_download_item_name}": {
         parameters: {
             query?: never;
@@ -43540,6 +43562,14 @@ export type components = {
              */
             type: "openai_image_generation";
         };
+        /** OrphanedBulkDownloads */
+        OrphanedBulkDownloads: {
+            /**
+             * Bulk Download Item Names
+             * @description The caller's bulk download items now claimed for fetching
+             */
+            bulk_download_item_names: string[];
+        };
         /**
          * OrphanedModelInfo
          * @description Information about an orphaned model directory.
@@ -64833,6 +64863,26 @@ export interface operations {
             };
         };
     };
+    claim_orphaned_bulk_downloads: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrphanedBulkDownloads"];
+                };
+            };
+        };
+    };
     get_bulk_download_item: {
         parameters: {
             query?: never;
@@ -64854,8 +64904,15 @@ export interface operations {
                     "application/zip": unknown;
                 };
             };
-            /** @description Image not found */
+            /** @description The bulk download item is not ready yet */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The bulk download item does not exist, failed, or was already fetched */
+            410: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -58,3 +58,37 @@ class BulkDownloadBase(ABC):
         :param bulk_download_item_name: The name of the bulk download item.
         :return: The user_id of the owner, or None if not tracked.
         """
+
+    @abstractmethod
+    def register(self, bulk_download_item_name: str, user_id: str) -> None:
+        """
+        Start tracking a download for its owner, with a fresh lease. Does nothing if it is already tracked.
+
+        :param bulk_download_item_name: The name of the bulk download item.
+        :param user_id: The ID of the user who initiated the download.
+        """
+
+    @abstractmethod
+    def renew_lease(self, bulk_download_item_name: str) -> None:
+        """
+        Mark a tracked download as polled now. Only a download polled at least once can be claimed as orphaned.
+
+        :param bulk_download_item_name: The name of the bulk download item.
+        """
+
+    @abstractmethod
+    def forget(self, bulk_download_item_name: str) -> None:
+        """
+        Stop tracking a download, so it is reported gone and can no longer be claimed. Its file is left alone.
+
+        :param bulk_download_item_name: The name of the bulk download item.
+        """
+
+    @abstractmethod
+    def claim_orphaned(self, user_id: str) -> list[str]:
+        """
+        Atomically take over the user's polled downloads that nobody has polled recently, renewing their leases.
+
+        :param user_id: The ID of the user whose downloads to claim.
+        :return: The names of the claimed bulk download items.
+        """

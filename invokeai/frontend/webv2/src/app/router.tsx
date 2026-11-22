@@ -62,6 +62,7 @@ import { useTranslation } from 'react-i18next';
 
 import type * as DefaultsRulesModule from './modelDefaultsRulesReader';
 
+import { BulkDownloadRecoveryRuntime } from './BulkDownloadRecoveryRuntime';
 import { RouterErrorScreen } from './RouterErrorScreen';
 import { SocketHubRuntime } from './SocketHubRuntime';
 import { createStartupRedirects } from './startupRedirect';
@@ -203,6 +204,7 @@ const AuthenticatedLayout = () => {
       {session.multiuserEnabled ? <SessionExpiryNotice /> : null}
       <Fragment key={session.accountEpoch}>
         <SocketHubRuntime />
+        <BulkDownloadRecoveryRuntime />
         <ModelInstallRuntime />
         <FontsRuntimeProvider>
           <ProjectFileOptionsProvider>
