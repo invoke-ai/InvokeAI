@@ -195,6 +195,7 @@ export interface WidgetHotkeyContribution {
   source?: WidgetContributionSource;
   preventDefault?: boolean;
   allowInEditable?: boolean;
+  ignoreRepeat?: boolean;
 }
 
 export interface WidgetCommandPaletteApi {

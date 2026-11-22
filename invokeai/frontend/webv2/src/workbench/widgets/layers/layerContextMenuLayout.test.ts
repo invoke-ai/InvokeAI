@@ -88,6 +88,7 @@ describe('getLayerContextMenuLayout', () => {
           'transform',
           'rename',
           'fit-to-bbox',
+          'flip(flip-horizontal,flip-vertical)',
           'add-adjustment(add-brightness-contrast,add-exposure,add-levels,add-curves,add-hsl,add-hue,add-invert,add-texture,add-clarity,add-dehaze,add-noise-adjustment)',
           'add-regenerate-region',
           'filter',
@@ -133,6 +134,7 @@ describe('getLayerContextMenuLayout', () => {
         'transform',
         'rename',
         'fit-to-bbox',
+        'flip(flip-horizontal,flip-vertical)',
         'add-noise',
         'add-denoise-limit',
         'extract-masked-area',
@@ -141,7 +143,15 @@ describe('getLayerContextMenuLayout', () => {
     });
     expect(summarize(regional)[1]).toEqual({
       id: 'primary',
-      items: ['open-properties', 'transform', 'rename', 'fit-to-bbox', 'regional-auto-negative', 'add-reference-image'],
+      items: [
+        'open-properties',
+        'transform',
+        'rename',
+        'fit-to-bbox',
+        'flip(flip-horizontal,flip-vertical)',
+        'regional-auto-negative',
+        'add-reference-image',
+      ],
       presentation: 'list',
     });
   });
@@ -159,6 +169,7 @@ describe('getLayerContextMenuLayout', () => {
         'transform',
         'rename',
         'fit-to-bbox',
+        'flip(flip-horizontal,flip-vertical)',
         'select-object',
         'run-workflow',
         'control-transparency-effect',
