@@ -13,6 +13,7 @@ from fastapi.responses import FileResponse
 from fastapi.routing import APIRouter
 from fontTools.ttLib import TTFont
 from PIL import ImageFont
+from PIL.Image import Image
 from pydantic import BaseModel, Field
 from transformers import AutoProcessor, LlavaOnevisionForConditionalGeneration, LlavaOnevisionProcessor
 
@@ -33,6 +34,7 @@ from invokeai.app.services.wildcard_records.wildcard_records_common import build
 from invokeai.app.util.dynamicprompts import expand_dynamic_prompt
 from invokeai.app.util.misc import SEED_MAX, get_random_seed
 from invokeai.backend.llava_onevision_pipeline import LlavaOnevisionPipeline
+from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.configs.roles import serves_as, view_as
 from invokeai.backend.model_manager.taxonomy import ModelType
 from invokeai.backend.text_llm_pipeline import (
@@ -433,34 +435,40 @@ def _make_progress_callback(events: EventServiceBase, task_id: str | None, user_
     return progress_callback
 
 
-def _run_expand_prompt(
+def _as_text_llm(model_config: AnyModelConfig, *, reads_image: bool) -> AnyModelConfig:
+    """The model's Text LLM config (its record, or the view of the role it serves as one), refusing a model that is no
+    Text LLM, or cannot read the image the request brings, before anything loads."""
+    if not serves_as(model_config, ModelType.TextLLM):
+        raise ValueError(f"Model '{model_config.key}' is not a TextLLM model (got {model_config.type})")
+    text_llm = view_as(model_config, ModelType.TextLLM)
+    # Only the TextLLM config carries the flag (the record type is a union); older records validate to False.
+    if reads_image and not getattr(text_llm, "supports_images", False):
+        role = next((r for r in model_config.roles if r.type == ModelType.TextLLM), None)
+        # A role stored before identification recorded the capability: the file may carry a vision tower after all.
+        hint = (
+            " Re-identify it to check whether its file carries a vision tower."
+            if model_config.type != ModelType.TextLLM and role is not None and role.supports_images is None
+            else ""
+        )
+        raise ValueError(f"Model '{text_llm.name}' cannot read images; choose a vision-capable text LLM.{hint}")
+    return text_llm
+
+
+def _run_text_llm(
+    model_config: AnyModelConfig,
+    *,
     prompt: str,
-    model_key: str,
+    system_prompt: str,
     max_tokens: int,
-    system_prompt: str | None,
-    seed: int | None,
+    seed: int,
+    image: Image | None,
     task_id: str | None,
     user_id: str,
-    image_name: str | None = None,
-) -> tuple[str, int]:
-    """Run text LLM inference synchronously (called from thread)."""
+    purpose: str,
+) -> str:
+    """Generate with a Text LLM config (`_as_text_llm`) outside the session queue, on an idle GPU when one is free."""
     model_manager = ApiDependencies.invoker.services.model_manager
     events = ApiDependencies.invoker.services.events
-    model_config = model_manager.store.get_model(model_key)
-
-    if not serves_as(model_config, ModelType.TextLLM):
-        raise ValueError(f"Model '{model_key}' is not a TextLLM model (got {model_config.type})")
-    model_config = view_as(model_config, ModelType.TextLLM)
-    # Only the TextLLM config carries the flag (the record type is a union); older records validate to False.
-    if image_name is not None and not getattr(model_config, "supports_images", False):
-        raise ValueError(f"Model '{model_config.name}' cannot read images; choose a vision-capable text LLM")
-
-    # Read before the model load so a missing image fails fast.
-    image = (
-        ApiDependencies.invoker.services.images.get_pil_image(image_name).convert("RGB")
-        if image_name is not None
-        else None
-    )
 
     if task_id is not None:
         events.emit_llm_task_progress(task_id=task_id, user_id=user_id, phase="loading_model", message="Loading model")
@@ -477,27 +485,57 @@ def _run_expand_prompt(
     # borrowing never blocks, so this ordering cannot deadlock.
     with ExitStack() as gpu:
         with _model_load_lock:
-            gpu.enter_context(idle_device_borrowed(purpose="Expand Prompt"))
+            gpu.enter_context(idle_device_borrowed(purpose=purpose))
             loaded_model = model_manager.load.load_model(model_config, user_id=user_id)
 
         with torch.no_grad(), loaded_model.model_on_device() as (_, model):
             pipeline = TextLLMPipeline(model, tokenizer, processor)
-            model_device = next(model.parameters()).device
-
-            progress_callback = _make_progress_callback(events, task_id, user_id)
-
-            effective_seed = seed if seed is not None else get_random_seed()
-            output = pipeline.run(
+            return pipeline.run(
                 prompt=prompt,
-                system_prompt=system_prompt or DEFAULT_SYSTEM_PROMPT,
+                system_prompt=system_prompt,
                 max_new_tokens=max_tokens,
-                seed=effective_seed,
-                device=model_device,
+                seed=seed,
+                device=next(model.parameters()).device,
                 dtype=TorchDevice.choose_torch_dtype(),
-                progress_callback=progress_callback,
+                progress_callback=_make_progress_callback(events, task_id, user_id),
                 image=image,
             )
 
+
+def _run_expand_prompt(
+    prompt: str,
+    model_key: str,
+    max_tokens: int,
+    system_prompt: str | None,
+    seed: int | None,
+    task_id: str | None,
+    user_id: str,
+    image_name: str | None = None,
+) -> tuple[str, int]:
+    """Run text LLM inference synchronously (called from thread)."""
+    model_config = _as_text_llm(
+        ApiDependencies.invoker.services.model_manager.store.get_model(model_key), reads_image=image_name is not None
+    )
+
+    # Read before the model load so a missing image fails fast.
+    image = (
+        ApiDependencies.invoker.services.images.get_pil_image(image_name).convert("RGB")
+        if image_name is not None
+        else None
+    )
+
+    effective_seed = seed if seed is not None else get_random_seed()
+    output = _run_text_llm(
+        model_config,
+        prompt=prompt,
+        system_prompt=system_prompt or DEFAULT_SYSTEM_PROMPT,
+        max_tokens=max_tokens,
+        seed=effective_seed,
+        image=image,
+        task_id=task_id,
+        user_id=user_id,
+        purpose="Expand Prompt",
+    )
     return output, effective_seed
 
 
@@ -556,7 +594,7 @@ async def expand_prompt(current_user: CurrentUserOrDefault, body: ExpandPromptRe
 
 class ImageToPromptRequest(BaseModel):
     image_name: str
-    model_key: str
+    model_key: str = Field(description="A LLaVA OneVision model, or a Text LLM whose `supports_images` is true.")
     instruction: str = "Describe this image in detail for use as an AI image generation prompt."
     task_id: str | None = Field(
         default=None, description="Client-supplied task ID used to correlate socket progress events to this request"
@@ -568,6 +606,15 @@ class ImageToPromptResponse(BaseModel):
     error: str | None = None
 
 
+# A Text LLM's system turn for Image to Prompt. The request's instruction is the user turn, beside the image; this
+# keeps the answer to the prompt itself, without the preamble chat models open with.
+IMAGE_TO_PROMPT_SYSTEM_PROMPT = (
+    "You write prompts for AI image generation from images. Only output the prompt, nothing else."
+)
+# LLaVA OneVision's cap, so either kind of model writes prompts of the same length.
+IMAGE_TO_PROMPT_MAX_TOKENS = 400
+
+
 def _run_image_to_prompt(
     image_name: str,
     model_key: str,
@@ -575,13 +622,30 @@ def _run_image_to_prompt(
     task_id: str | None,
     user_id: str,
 ) -> str:
-    """Run LLaVA OneVision inference synchronously (called from thread)."""
+    """Describe an image synchronously (called from thread), with LLaVA OneVision or a Text LLM that reads images."""
     model_manager = ApiDependencies.invoker.services.model_manager
     events = ApiDependencies.invoker.services.events
     model_config = model_manager.store.get_model(model_key)
 
     if model_config.type != ModelType.LlavaOnevision:
-        raise ValueError(f"Model '{model_key}' is not a LLaVA OneVision model (got {model_config.type})")
+        if not serves_as(model_config, ModelType.TextLLM):
+            raise ValueError(
+                f"Model '{model_key}' is neither a LLaVA OneVision model nor a Text LLM (got {model_config.type})"
+            )
+        text_llm = _as_text_llm(model_config, reads_image=True)
+        # Read before the model load so a missing image fails fast.
+        image = ApiDependencies.invoker.services.images.get_pil_image(image_name).convert("RGB")
+        return _run_text_llm(
+            text_llm,
+            prompt=instruction,
+            system_prompt=IMAGE_TO_PROMPT_SYSTEM_PROMPT,
+            max_tokens=IMAGE_TO_PROMPT_MAX_TOKENS,
+            seed=get_random_seed(),
+            image=image,
+            task_id=task_id,
+            user_id=user_id,
+            purpose="Image to Prompt",
+        )
 
     if task_id is not None:
         events.emit_llm_task_progress(task_id=task_id, user_id=user_id, phase="loading_model", message="Loading model")

@@ -7,7 +7,7 @@ export interface ExpandPromptRequest {
   max_tokens?: number;
   seed?: number | null;
   system_prompt?: string | null;
-  /** Needs a model whose record has `supports_images`. */
+  /** Needs a model that reads images as a Text LLM (`isVisionTextLlm`). */
   image_name?: string;
 }
 
@@ -19,6 +19,7 @@ export interface ExpandPromptResponse {
 
 export interface ImageToPromptRequest {
   image_name: string;
+  /** A LLaVA OneVision model, or a Text LLM that reads images. */
   model_key: string;
   task_id: string;
   instruction?: string;

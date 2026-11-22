@@ -29,7 +29,7 @@ import {
 } from '@chakra-ui/react';
 import { galleryImageUrls } from '@features/gallery/utility';
 import { isSuggestedExpandPromptModel } from '@features/generation/core/baseGenerationPolicies';
-import { servesAsType } from '@features/generation/core/componentCompatibility';
+import { isImageToPromptModel, isVisionTextLlm, servesAsType } from '@features/generation/core/componentCompatibility';
 import { filterPromptHistory } from '@features/generation/core/promptHistory';
 import { resolveSelectedSystemPromptId } from '@features/generation/core/systemPrompts';
 import { llmTaskProgressStore } from '@features/generation/data/llmTaskProgress';
@@ -73,7 +73,7 @@ import { useTranslation } from 'react-i18next';
 
 const POPOVER_POSITIONING_BOTTOM_END = { placement: 'bottom-end' } as const;
 const TEXT_LLM_MODEL_TYPES = ['text_llm'];
-const LLAVA_MODEL_TYPES = ['llava_onevision'];
+const IMAGE_TO_PROMPT_MODEL_TYPES = ['llava_onevision', 'text_llm'];
 /** Keep triggers available so missing-model states can explain recovery. */
 const OpenModelManagerButton = ({ modelType }: { modelType?: string }) => {
   const { t } = useTranslation();
@@ -693,7 +693,7 @@ const ExpandPromptButton = ({
     [handleModelChange, suggestedModel]
   );
   const suggestedImage = suggestion?.image ?? null;
-  const canReadImages = selectedModel?.supports_images === true;
+  const canReadImages = selectedModel !== null && isVisionTextLlm(selectedModel);
   const isImageIncluded = suggestedImage !== null && excludedImageName !== suggestedImage.image_name;
   const conditioningImage = suggestedImage && canReadImages && isImageIncluded ? suggestedImage : null;
   // The list is behind the popover, so a closed button has nothing to fetch.
@@ -919,16 +919,19 @@ const ImageToPromptButton = ({
     projectId,
     title: t('widgets.generate.promptFromImage'),
   });
-  const llavaModels = models.filter((model) => model.type === 'llava_onevision');
+  const visionModels = models.filter(isImageToPromptModel);
+  // Without a pick, LLaVA OneVision: a fraction of the size of the Text LLMs that read images.
+  const suggestedModelKey = getFirstModelByName(visionModels.filter((model) => model.type === 'llava_onevision'))?.key;
   const onSaveModelKey = savedPromptModels?.onChange;
   const saveModelKey = useMemo(
     () => (onSaveModelKey ? (key: string) => onSaveModelKey({ imageToPromptModelKey: key }) : undefined),
     [onSaveModelKey]
   );
   const { model: selectedModel, pick: handleModelChange } = usePromptModelPick({
-    candidates: llavaModels,
+    candidates: visionModels,
     onSave: saveModelKey,
     savedKey: savedPromptModels?.imageToPromptModelKey,
+    suggestedKey: suggestedModelKey,
   });
   const image = droppedImage.image ?? selectedImage;
   const droppedImageName = droppedImage.image?.imageName ?? null;
@@ -991,18 +994,20 @@ const ImageToPromptButton = ({
                 <Text color="fg.subtle" fontSize="xs" fontWeight="700" textTransform="uppercase">
                   {t('widgets.generate.imageToPrompt')}
                 </Text>
-                {llavaModels.length === 0 ? (
+                {visionModels.length === 0 ? (
                   <>
                     <Text color="fg.subtle" fontSize="md">
                       {t('widgets.generate.installVisionModelToGeneratePrompts')}
                     </Text>
-                    <OpenModelManagerButton modelType="llava_onevision" />
+                    {/* Unfiltered: two model types qualify. */}
+                    <OpenModelManagerButton />
                   </>
                 ) : (
                   <>
                     <ModelSelect
                       isClearable={false}
-                      modelTypes={LLAVA_MODEL_TYPES}
+                      filter={isImageToPromptModel}
+                      modelTypes={IMAGE_TO_PROMPT_MODEL_TYPES}
                       placeholder={t('widgets.generate.selectVisionModel')}
                       value={selectedModel?.key ?? null}
                       onChange={handleModelChange}

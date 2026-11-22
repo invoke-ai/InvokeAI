@@ -169,6 +169,8 @@ export type ModelRole = {
   type: ModelTaxonomyType;
   format?: string | null;
   variant?: string | null;
+  /** Text LLM roles: whether the model reads images in this role. Null for a role recorded before identification set it. */
+  supports_images?: boolean | null;
 };
 
 /**

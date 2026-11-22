@@ -15,7 +15,7 @@ Takes your short prompt and expands it into a detailed, vivid description suitab
 
 1. Type a brief prompt (e.g. "a cat in a garden")
 2. Click **Expand prompt** (the pencil-and-sparkles button) in the prompt toolbar
-3. Select a Text LLM model from the dropdown. The panel remembers your choice for the project. The list includes models that also serve as a Text LLM, such as a Qwen3.5 9B encoder single file with LM head and vision tower.
+3. Select a Text LLM model from the dropdown. The panel remembers your choice for the project. The list includes models that also serve as a Text LLM, such as a Qwen3.5 9B encoder single file with LM head and vision tower, or a single-file Qwen3-VL encoder that holds the whole chat model ([which files](/users-guide/models/model-format-support/#text-llms)).
 4. Choose a **System prompt**, the instructions that tell the model how to rewrite your prompt
 5. Click **Expand**
 6. Your prompt is replaced with the expanded version, which you can edit before generating
@@ -26,7 +26,7 @@ InvokeAI ships with a **Default** system prompt and several tuned for particular
 
 You can duplicate, edit and delete your own system prompts. Shared system prompts, including the built-in ones, are marked **Shared**. On a multi-user installation only administrators can edit them, and changes apply to every user.
 
-**Compatible models:** Any HuggingFace model with a `ForCausalLM` architecture, plus Gemma-4 (`Gemma4ForConditionalGeneration`) and Qwen3.5 vision-language models (`Qwen3_5ForConditionalGeneration`), which can also read an image. The FLUX.3 prompt upsampler is one of these, as a folder or as ComfyUI's single file; see [Model Format Support](/users-guide/models/model-format-support/#text-llms). Recommended options:
+**Compatible models:** Any HuggingFace model with a `ForCausalLM` architecture, plus Gemma-4 (`Gemma4ForConditionalGeneration`) and Qwen3.5 vision-language models (`Qwen3_5ForConditionalGeneration`), which can also read an image. The FLUX.3 prompt upsampler is one of these, as a folder or as ComfyUI's single file. The single-file Qwen3-VL encoders of Krea-2, FLUX.3, Ideogram 4 and Qwen-Image-2.1 serve as Text LLMs too: every 4B file, and an 8B file that carries its LM head. They read an image as well when the file carries its whole vision tower, as ComfyUI's builds do. See [Model Format Support](/users-guide/models/model-format-support/#text-llms). Recommended options:
 
 | Model | Size | HuggingFace ID |
 |-------|------|----------------|
@@ -71,11 +71,16 @@ Upload an image and generate a descriptive prompt from it using a vision-languag
 
 1. Select an image in the Gallery or Preview, or drag an image from the Gallery onto the prompt box (**Describe this image**), which opens the tool for you
 2. Click **Image to prompt** in the prompt toolbar if it is not already open
-3. Select a LLaVA OneVision model from the dropdown
+3. Select a LLaVA OneVision model or a Text LLM that reads images from the dropdown
 4. Click **Generate Prompt**
 5. The generated description replaces your prompt
 
-**Compatible models:** LLaVA OneVision models (already supported by InvokeAI).
+**Compatible models:** LLaVA OneVision models, and every Text LLM that reads images: Gemma-4 and Qwen3.5 folders with
+their processor files, Qwen3.5 9B single files such as the FLUX.3 prompt upsampler (also when installed as a Qwen3.5
+encoder), and single-file Qwen3-VL encoders that carry their vision tower. A Text LLM gets the image with the
+instruction and answers with the prompt alone. A Qwen3-VL encoder installed before its Text LLM role recorded whether it
+reads images is offered once it is re-identified (**Re-identify** in the Model Manager). See
+[Model Format Support](/users-guide/models/model-format-support/#text-llms).
 
 ## Replacing your prompt
 
@@ -124,6 +129,6 @@ The workflow editor provides **Text LLM** and **Text LLM (with System Prompt Pre
 
 Using the same seed reproduces sampling when the model, prompt, settings, hardware, and software versions remain the same. Results may differ across devices or software versions. The prompt area's **Expand Prompt** tool chooses a fresh seed for each request so repeated expansions can vary.
 
-API callers can pass an optional seed to **Expand Prompt**; the response returns the effective seed for replay. They can also pass an `image_name` to condition the rewrite on a stored image, which requires a Text LLM whose `supports_images` is true.
+API callers can pass an optional seed to **Expand Prompt**; the response returns the effective seed for replay. They can also pass an `image_name` to condition the rewrite on a stored image, which requires a model that reads images as a Text LLM: `supports_images` is true on its Text LLM record, or on its Text LLM role. **Image to Prompt** takes a LLaVA OneVision model or such a Text LLM.
 
 When a saved `1.0.0` Text LLM workflow is migrated, its new seed defaults to `0`, so repeated runs become deterministic. Connect a random integer node to **seed** if the workflow should vary between runs.

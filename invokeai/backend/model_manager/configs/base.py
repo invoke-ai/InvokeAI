@@ -44,6 +44,11 @@ class ModelRole(BaseModel):
         description="The format the model loads in for this role, when it differs from the record's format",
     )
     variant: AnyVariant | None = Field(default=None, description="The variant the model serves as in this role")
+    supports_images: bool | None = Field(
+        default=None,
+        description="A Text LLM role only: whether the model reads images in it. None when identification did not "
+        "record it, as for a role stored before the field existed; re-identify to refresh",
+    )
 
 
 class Config_Base(ABC, BaseModel):

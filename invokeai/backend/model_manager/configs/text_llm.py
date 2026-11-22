@@ -3,7 +3,7 @@ from typing import (
     Self,
 )
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from typing_extensions import Any
 
 from invokeai.backend.model_manager.configs.base import (
@@ -36,6 +36,7 @@ from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
     ModelFormat,
     ModelType,
+    Qwen3VLVariantType,
 )
 from invokeai.backend.qwen3_5.qwen3_5_vl import QWEN3_5_VL_LANGUAGE_MODEL_PREFIX
 
@@ -174,3 +175,38 @@ class TextLLM_Checkpoint_Config(Checkpoint_Config_Base, Config_Base):
         raise_for_unsupported_qwen3_5_quantization(mod, state_dict)
         variant = get_qwen3_5_variant(state_dict, QWEN3_5_VL_LANGUAGE_MODEL_PREFIX)
         return cls(**override_fields, roles=[ModelRole(type=ModelType.Qwen35Encoder, variant=variant)])
+
+
+class TextLLM_Qwen3VLEncoder_Config(Checkpoint_Config_Base, Config_Base):
+    """A single-file Qwen3-VL encoder in its Text LLM role: the whole Qwen3-VL Instruct chat model, reading images
+    when the file's vision tower loads.
+
+    Never identified and never stored. `Qwen3VLEncoder_Checkpoint_Config` records the role, with this format, the
+    variant and the image capability, when its file can generate, and `roles.view_as` builds this config from the
+    encoder record. The format names what the view loads, the encoder's file through the encoder's decode. A class of
+    its own keeps the Qwen3.5 checkpoint config as it is: no `variant` on its records, and no Qwen3-VL load path a
+    record could be edited into.
+    """
+
+    type: Literal[ModelType.TextLLM] = Field(default=ModelType.TextLLM)
+    format: Literal[ModelFormat.Qwen3VLEncoder] = Field(default=ModelFormat.Qwen3VLEncoder)
+    base: Literal[BaseModelType.Any] = Field(default=BaseModelType.Any)
+    variant: Qwen3VLVariantType = Field(description="Which Qwen3-VL the encoder file is")
+    cpu_only: bool | None = Field(default=None, description="Whether this model should run on CPU only")
+    # From the encoder's Text LLM role. A role stored before it recorded the capability leaves the view text only: the
+    # tower stays on disk and there is no processor.
+    supports_images: bool = Field(default=False, description=_SUPPORTS_IMAGES_DESCRIPTION)
+
+    @model_validator(mode="after")
+    def _is_an_encoder_view(self) -> Self:
+        # `view_as` lists the encoder among the view's roles. Without it the fields come from elsewhere, such as a
+        # Qwen3-VL encoder folder whose type was changed by hand, which this view cannot load.
+        if not any(role.type == ModelType.Qwen3VLEncoder for role in self.roles):
+            raise ValueError("a Qwen3-VL encoder's Text LLM view names the encoder among its roles")
+        return self
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise NotAMatchError(
+            "a Qwen3-VL encoder file serves as a Text LLM through its role; it is identified as the encoder"
+        )

@@ -8,12 +8,14 @@ from invokeai.app.services.shared.invocation_context import ModelsInterface
 from invokeai.backend.model_manager.configs.base import ModelRole
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.configs.qwen3_5_encoder import Qwen35Encoder_Checkpoint_Config
+from invokeai.backend.model_manager.configs.qwen3_vl_encoder import Qwen3VLEncoder_Checkpoint_Config
 from invokeai.backend.model_manager.configs.text_llm import TextLLM_Checkpoint_Config, TextLLM_Diffusers_Config
 from invokeai.backend.model_manager.taxonomy import (
     ModelFormat,
     ModelSourceType,
     ModelType,
     Qwen3VariantType,
+    Qwen3VLVariantType,
     Qwen35VariantType,
 )
 
@@ -40,6 +42,20 @@ def encoder_file(key: str, variant: Qwen35VariantType = Qwen35VariantType.Qwen35
     """A Qwen3.5 encoder record; it serves as a Text LLM when the file is a whole model."""
     roles = [ModelRole(type=ModelType.TextLLM)] if serves_text_llm else []
     return Qwen35Encoder_Checkpoint_Config(**_common(key, f"{key} encoder"), variant=variant, roles=roles)
+
+
+def qwen3_vl_encoder_file(
+    key: str, variant: Qwen3VLVariantType = Qwen3VLVariantType.Qwen3VL_4B, reads_images: bool | None = None
+):
+    """A single-file Qwen3-VL encoder record whose file is a whole Instruct model, so it serves as a Text LLM.
+
+    `reads_images` is what its role records about the file's vision tower: None for a role stored before it did."""
+    roles = [
+        ModelRole(
+            type=ModelType.TextLLM, format=ModelFormat.Qwen3VLEncoder, variant=variant, supports_images=reads_images
+        )
+    ]
+    return Qwen3VLEncoder_Checkpoint_Config(**_common(key, f"{key} encoder"), variant=variant, roles=roles)
 
 
 def text_llm_qwen3_folder(key: str, variant: Qwen3VariantType | None = Qwen3VariantType.Qwen3_4B):
