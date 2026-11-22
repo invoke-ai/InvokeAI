@@ -200,6 +200,7 @@ export const firstPartyHotkeyCatalog: HotkeyDefinition[] = [
   hotkey('canvas', 'nudgeRightLarge', ['shift+arrowright']),
   hotkey('canvas', 'nudgeUpLarge', ['shift+arrowup']),
   hotkey('canvas', 'nudgeDownLarge', ['shift+arrowdown']),
+  hotkey('canvas', 'newRasterLayer', [], { ignoreRepeat: true }),
   hotkey('canvas', 'duplicateLayer', ['mod+j']),
   hotkey('canvas', 'groupLayers', ['mod+g']),
   hotkey('canvas', 'ungroupLayers', ['mod+shift+g']),
