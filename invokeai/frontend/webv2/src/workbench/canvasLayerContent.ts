@@ -5,8 +5,8 @@ import type {
 } from '@workbench/canvas-engine/api';
 
 /**
- * Shared pixel-content predicates for composite planning, invocation readiness and control-image state; depends only
- * on layer contracts.
+ * Shared pixel-content predicates for composite planning, invocation readiness and control-image state; depends only on
+ * layer contracts.
  */
 
 /** True when a control layer holds an image source or committed paint pixels. */

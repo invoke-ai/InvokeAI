@@ -39,7 +39,6 @@ import {
 import { HistoryPane } from './panes/HistoryPane';
 import { LayerColorPane, LayerEditorPanes } from './panes/LayerEditorPanes';
 import { useCanvasCompanionHotkeys } from './useCanvasCompanionHotkeys';
-import { useLayerSelectionCommands } from './useLayerSelectionCommands';
 
 const TREE_TABS_ID_BASE = 'layer-tree';
 const TREE_TABS: ReadonlyArray<{ id: LayerTreeTabId; labelKey: string }> = [
@@ -66,7 +65,6 @@ export const LayersWidgetView = ({ runtime }: WidgetViewProps) => {
   const nodeCount = getDocumentIndex(document).nodes.length;
   const degraded = nodeCount > LAYER_PANEL_DEGRADE_THRESHOLD;
 
-  const selectionCommands = useLayerSelectionCommands(engine, projectId, panel.selectedIds, editingLocked);
   useCanvasCompanionHotkeys(runtime, engine);
   const handleFilter = useCallback(
     (filter: string) => setLayerPanelFilter(projectId, selectedLayerId, filter),
@@ -186,9 +184,11 @@ export const LayersWidgetView = ({ runtime }: WidgetViewProps) => {
               </Flex>
             )}
             <LayersPanelFooter
-              commands={selectionCommands}
               degraded={degraded}
+              editingLocked={editingLocked}
+              engine={engine}
               filter={panel.filter}
+              selectedIds={panel.selectedIds}
               onFilterChange={handleFilter}
             />
             {addMenuAnchor ? <AddLayerContextMenu anchor={addMenuAnchor} onClose={closeAddMenu} /> : null}

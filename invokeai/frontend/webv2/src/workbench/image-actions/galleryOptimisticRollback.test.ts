@@ -12,10 +12,7 @@ import {
   type GalleryWidgetRestorePatch,
 } from './galleryOptimisticRollback';
 
-/**
- * Exercise deletion rollback against the real reducer so capture/diff/restore follows actual removal and
- * widget-patch contracts.
- */
+/** Deletion rollback against the real reducer, so capture/diff/restore follow real removal and patch contracts. */
 
 const galleryItem: GalleryItem = {
   boardId: 'none',
@@ -98,8 +95,8 @@ describe('gallery optimistic rollback against the real reducer', () => {
     const before = captureGalleryWidgetKeyValues(state.projects);
     const afterRemoval = workbenchReducer(state, { itemKeys: ['image:a.png'], type: 'removeGalleryItems' });
 
-    // Sanity: the removal really did clear everything we're about to assert
-    // gets restored, otherwise this test would pass trivially.
+    // Sanity: the removal really did clear everything we're about to assert gets restored, otherwise this test would
+    // pass trivially.
     const clearedValues = getProjectWidgetValues(getProject(afterRemoval, projectId), 'gallery');
 
     expect(clearedValues).toMatchObject({
@@ -137,8 +134,7 @@ describe('gallery optimistic rollback against the real reducer', () => {
     const afterRemoval = workbenchReducer(state, { itemKeys: ['image:a.png'], type: 'removeGalleryItems' });
     const entries = diffGalleryWidgetKeyValues(before, afterRemoval.projects);
 
-    // A new generation completes mid-flight and rewrites `recentImages`
-    // before the rollback runs. Nothing else changes.
+    // A new generation completes mid-flight and rewrites `recentImages` before the rollback runs. Nothing else changes.
     const concurrentImage = { ...recentImage, imageName: 'new-generation.png' };
     const concurrentlyChanged = workbenchReducer(afterRemoval, {
       projectId,
@@ -190,8 +186,8 @@ describe('gallery optimistic rollback against the real reducer', () => {
 
     const entries = diffGalleryWidgetKeyValues(before, afterRemoval.projects);
 
-    // The slot freed up, so the user drops an initial video — exactly the
-    // patch `setSourceVideo` makes — before the server delete fails.
+    // The slot freed up, so the user drops an initial video — exactly the patch `setSourceVideo` makes — before the
+    // server delete fails.
     const claimed = workbenchReducer(afterRemoval, {
       projectId,
       type: 'patchWidgetValues',

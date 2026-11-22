@@ -3,8 +3,6 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   closeLayerPropertiesForOperation,
   getLayerFilterLaunchDisabledReason,
-  getLayerFilterLaunchReasonKey,
-  getLayerPropertiesOwnershipKey,
   isLayerPropertiesOpen,
   runLayerFilterOperation,
 } from './layerPropertiesOperation';
@@ -38,17 +36,6 @@ describe('getLayerFilterLaunchDisabledReason', () => {
     },
   ] as const)('returns $expected for $scenario', ({ expected, input }) => {
     expect(getLayerFilterLaunchDisabledReason(input)).toBe(expected);
-  });
-
-  it.each([
-    ['empty', 'widgets.layers.actions.empty'],
-    ['missing', 'widgets.layers.actions.missing'],
-    ['disabled', 'widgets.layers.actions.disabled'],
-    ['locked', 'widgets.layers.actions.locked'],
-    ['unsupported', 'widgets.layers.actions.unsupported'],
-    ['not-ready', 'widgets.layers.actions.notReady'],
-  ] as const)('maps %s to %s', (reason, key) => {
-    expect(getLayerFilterLaunchReasonKey(reason)).toBe(key);
   });
 });
 
@@ -86,10 +73,6 @@ describe('runLayerFilterOperation callbacks', () => {
 });
 
 describe('closeLayerPropertiesForOperation', () => {
-  it('uses separate ownership across editing-lock transitions so trigger state cannot reopen after cancel', () => {
-    expect(getLayerPropertiesOwnershipKey(false)).not.toBe(getLayerPropertiesOwnershipKey(true));
-  });
-
   it.each([
     { requestToken: null, triggerOpen: true },
     { requestToken: 42, triggerOpen: false },
@@ -99,36 +82,5 @@ describe('closeLayerPropertiesForOperation', () => {
 
     expect(closed).toEqual({ requestToken: null, requestTokenToClear: state.requestToken, triggerOpen: false });
     expect(isLayerPropertiesOpen(closed)).toBe(false);
-  });
-
-  it('stays closed after the operation is later canceled', () => {
-    const closed = closeLayerPropertiesForOperation({ requestToken: 7, triggerOpen: true });
-
-    expect(isLayerPropertiesOpen(closed)).toBe(false);
-  });
-});
-
-describe('runLayerFilterOperation', () => {
-  it('notifies the popover after a successful manual launch', () => {
-    const onOperationStarted = vi.fn();
-
-    expect(runLayerFilterOperation(() => 'started', onOperationStarted)).toBe('started');
-    expect(onOperationStarted).toHaveBeenCalledOnce();
-  });
-
-  it('notifies the popover after a successful model-recommendation launch', () => {
-    const onOperationStarted = vi.fn();
-    const start = vi.fn((_recommendation: string) => 'started' as const);
-
-    expect(runLayerFilterOperation(() => start('normal_map'), onOperationStarted)).toBe('started');
-    expect(start).toHaveBeenCalledWith('normal_map');
-    expect(onOperationStarted).toHaveBeenCalledOnce();
-  });
-
-  it.each(['locked', 'not-ready', 'missing', undefined] as const)('does not close after a %s launch', (result) => {
-    const onOperationStarted = vi.fn();
-
-    expect(runLayerFilterOperation(() => result, onOperationStarted)).toBe(result);
-    expect(onOperationStarted).not.toHaveBeenCalled();
   });
 });

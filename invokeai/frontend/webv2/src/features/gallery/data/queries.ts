@@ -74,22 +74,17 @@ interface CanonicalGalleryBoardsQuery {
 
 export interface GalleryItemsFilter {
   boardId: string;
-  /** Inclusive lower-bound calendar day (YYYY-MM-DD) on created_at. */
+  /** Inclusive calendar day (YYYY-MM-DD) on created_at. */
   createdFrom?: string;
-  /** Inclusive upper-bound calendar day (YYYY-MM-DD) on created_at. */
   createdTo?: string;
   galleryView: GalleryView;
-  /** Only this media kind; absent lists both. Applies to ordinary and semantic listings alike. */
+  /** Absent lists both; applies to ordinary and semantic listings alike. */
   mediaKind?: GalleryItemKind;
   orderDir?: GalleryOrderDir;
   searchTerm: string;
-  /**
-   * When set, items come from semantic image-similarity search over the board
-   * (relevance order) instead of the board listing; order/starred controls do
-   * not apply to a ranked result set.
-   */
+  /** Relevance order over the board, where order and starred do not apply. */
   semanticQuery?: GallerySemanticReference | null;
-  /** true = only starred items, false = only unstarred; absent = all. */
+  /** Absent = all. */
   starred?: boolean;
 }
 
@@ -102,15 +97,12 @@ export interface CanonicalGalleryItemsFilter {
   mediaKind?: GalleryItemKind;
   orderDir: GalleryOrderDir;
   searchTerm: string;
-  /** Label-free semantic reference: a file query is keyed by its registry id. */
+  /** Label-free: a file query is keyed by its registry id. */
   semantic?: GallerySemanticQuery;
   starred?: boolean;
 }
 
-/**
- * Offset anchors a page-aligned infinite window with GALLERY_MAX_ROWS reach. Board, search, and view changes reset
- * it to zero.
- */
+/** Board, search and view changes zero the anchor offset. */
 export type GalleryItemsWindow = { kind: 'anchor'; offset: number } | { kind: 'infinite'; offset?: number };
 
 interface GalleryAccountKey {
@@ -130,7 +122,6 @@ type GalleryItemsAnchorQueryKey = readonly [...GalleryItemsInfiniteQueryKey, 'an
 
 export type GalleryItemsPageQueryKey = readonly [...GalleryItemsInfiniteQueryKey, 'page', number];
 
-/** The bounded starred strip: one `GalleryItemsPage`, not an infinite window. */
 type GalleryItemsStripQueryKey = readonly [...GalleryItemsInfiniteQueryKey, 'strip'];
 
 export type GalleryItemsListQueryKey =
@@ -150,8 +141,7 @@ export const canonicalizeGalleryItemsFilter = (filter: GalleryItemsFilter): Cano
   const semantic = filter.semanticQuery ? toGallerySemanticQuery(filter.semanticQuery) : undefined;
 
   if (semantic) {
-    // Pin irrelevant filter fields to canonical values: rankings depend only on the query and its board (a cluster is
-    // a fixed member list with no board), and distinct keys would repeat uploads or downloads.
+    // Pin irrelevant filter fields to canonical values: distinct keys would repeat uploads or downloads.
     return {
       boardId: semantic.kind === 'cluster' ? '' : filter.boardId,
       galleryView: 'images',
@@ -180,10 +170,8 @@ const getAccountKey = (owner: AccountScope): GalleryAccountKey => ({
 });
 
 /**
- * Where a board's media is still used, for one opening of its deletion dialog: a reopened dialog asks again, and
- * nothing refetches it while open. `opening` is null while the dialog is closed, so a closing dialog leaves its
- * opening's key, which stops a check still running there. Kept outside the `gallery` root so gallery invalidations
- * never re-run a check the user is reading.
+ * One check per dialog opening; nothing refetches it while open. Kept outside the `gallery` root so gallery
+ * invalidations never re-run a check the user is reading.
  */
 export const galleryBoardMediaUsageQueryOptions = ({
   boardId,
@@ -248,25 +236,17 @@ export const galleryKeys = {
   itemNames: (owner: AccountScope, filter: CanonicalGalleryItemsFilter) =>
     [...galleryKeys.itemNamesForAccount(owner), filter] as const,
   imageIndexAvailability: (owner: AccountScope) => [...galleryKeys.all, 'image-index', getAccountKey(owner)] as const,
-  /** An image's generation metadata: one entry shared by its menus, Preview Details, and recall commands. */
   imageMetadata: (owner: AccountScope, imageName: string) =>
     [...galleryKeys.itemsRoot(), 'image-metadata', getAccountKey(owner), imageName] as const,
-  /** Whether an image embeds a workflow, for listings that do not say. */
   imageHasWorkflow: (owner: AccountScope, imageName: string) =>
     [...galleryKeys.itemsRoot(), 'image-has-workflow', getAccountKey(owner), imageName] as const,
-  /** A video's generation metadata: one entry shared by its menu, Preview Details, and recall commands. */
   videoMetadata: (owner: AccountScope, videoName: string) =>
     [...galleryKeys.itemsRoot(), 'video-metadata', getAccountKey(owner), videoName] as const,
-  /** Whether a video embeds a workflow, for listings that do not say. */
   videoHasWorkflow: (owner: AccountScope, videoName: string) =>
     [...galleryKeys.itemsRoot(), 'video-has-workflow', getAccountKey(owner), videoName] as const,
 };
 
-/**
- * Media generation metadata. Null when it records none or the server no longer has the item (404); any other failure
- * rejects, so the errored entry holds no answer and is read again by its next consumer. Metadata never changes for an
- * item, so an answer is never read again.
- */
+/** Null when none is recorded or the item is gone (404); other failures reject. Metadata never changes. */
 const mediaMetadataOptions = <TKey extends QueryKey>(
   owner: AccountScope,
   queryKey: TKey,
@@ -290,16 +270,11 @@ const mediaMetadataOptions = <TKey extends QueryKey>(
       return metadata;
     },
     queryKey,
-    // One policy whoever starts the read: a failure surfaces at once, and the next open or recall reads again.
     retry: false,
     staleTime: Infinity,
   });
 
-/**
- * Read a shared metadata entry outside React. A reader that unmounts mid-read cancels the fetch this call may have
- * joined; the read then starts its own instead of failing. An explicit `cancelQueries` on the key is followed the same
- * way while the account is current. An account change ends it.
- */
+/** A reader that unmounts mid-read cancels the shared fetch; this read then starts its own instead of failing. */
 const fetchFollowingCancellation = async <TData>(owner: AccountScope, fetch: () => Promise<TData>): Promise<TData> => {
   for (;;) {
     try {
@@ -312,13 +287,11 @@ const fetchFollowingCancellation = async <TData>(owner: AccountScope, fetch: () 
   }
 };
 
-/** An image's generation metadata; see `mediaMetadataOptions`. */
 export const galleryImageMetadataOptions = (owner: AccountScope, imageName: string) =>
   mediaMetadataOptions(owner, galleryKeys.imageMetadata(owner, imageName), (signal) =>
     getGalleryImageMetadata(imageName, signal)
   );
 
-/** Read an image's metadata through the shared entry outside React; see `fetchFollowingCancellation`. */
 export const fetchGalleryImageMetadata = (
   client: QueryClient,
   owner: AccountScope,
@@ -326,13 +299,11 @@ export const fetchGalleryImageMetadata = (
 ): Promise<GalleryImageMetadata | null> =>
   fetchFollowingCancellation(owner, () => client.fetchQuery(galleryImageMetadataOptions(owner, imageName)));
 
-/** A video's generation metadata; see `mediaMetadataOptions`. */
 export const galleryVideoMetadataOptions = (owner: AccountScope, videoName: string) =>
   mediaMetadataOptions(owner, galleryKeys.videoMetadata(owner, videoName), (signal) =>
     getGalleryVideoMetadata(videoName, signal)
   );
 
-/** Read a video's metadata through the shared entry outside React; see `fetchFollowingCancellation`. */
 export const fetchGalleryVideoMetadata = (
   client: QueryClient,
   owner: AccountScope,
@@ -364,10 +335,7 @@ const galleryItemNamesOptionsForOwner = (owner: AccountScope, filter: CanonicalG
     staleTime: 60_000,
   });
 
-/**
- * Lazy item-name query options. Constructing these does not subscribe or
- * request; range selection fetches them explicitly on first Shift-click.
- */
+/** Constructing them subscribes to nothing; range selection fetches on first Shift-click. */
 export const galleryItemNamesOptions = (inputFilter: GalleryItemsFilter) => {
   const owner = captureAccountScope();
 
@@ -397,7 +365,6 @@ interface GalleryPageLifecycle {
 
 const lifecycles = new WeakMap<QueryClient, GalleryPageLifecycle>();
 
-/** The account-and-filter prefix that every cached window and page of one item listing shares. */
 export const getGalleryItemListingKey = (queryKey: QueryKey): QueryKey => queryKey.slice(0, 5);
 
 const getSparsePageIdentity = (queryKey: QueryKey): { listingKey: QueryKey; listingHash: string } | null => {
@@ -500,8 +467,7 @@ const ensureLifecycle = (client: QueryClient): GalleryPageLifecycle => {
       return;
     }
 
-    // Local cache patches and rollbacks are manual successes in Query. They must not certify an invalidated
-    // page as fresh, including when cancellation restores the state captured by one of those manual writes.
+    // Local cache patches are manual successes in Query; they must not certify an invalidated page as fresh.
     if (event.type === 'updated') {
       if (event.query.state.isInvalidated || event.action.type === 'error') {
         lifecycle.pageReadFreshness.set(event.query, false);
@@ -510,9 +476,7 @@ const ensureLifecycle = (client: QueryClient): GalleryPageLifecycle => {
       }
     }
 
-    // A failed page waits for its own Retry only while it stays in view. Once nothing observes it, forget the failure
-    // so returning to the page reads it again, whether its last observer left or it failed with none left to see it.
-    // (A read its last observer leaves mid-flight is cancelled back to its prior state before `observerRemoved`.)
+    // A failed page waits for Retry only while observed; once unobserved, forget it so returning reads it again.
     if (
       (event.type === 'observerRemoved' || (event.type === 'updated' && event.action.type === 'error')) &&
       event.query.state.status === 'error' &&
@@ -540,7 +504,6 @@ const ensureLifecycle = (client: QueryClient): GalleryPageLifecycle => {
   return lifecycle;
 };
 
-/** A successful page read remains authoritative through local patches, but only another read ends invalidation. */
 export const getFreshGalleryItemsPage = (client: QueryClient, queryHash: string): GalleryItemsPage | undefined => {
   const query = client.getQueryCache().get<GalleryItemsPage>(queryHash);
 
@@ -552,7 +515,7 @@ export const getFreshGalleryItemsPage = (client: QueryClient, queryHash: string)
     : undefined;
 };
 
-/** Manual or unobserved cache seeds are unknown, not suspended; only an invalidation or failure requires a reread. */
+/** Manual or unobserved cache seeds are unknown, not suspended. */
 export const isGalleryItemsPageAwaitingRefresh = (client: QueryClient, queryHash: string): boolean => {
   const query = client.getQueryCache().get(queryHash);
 
@@ -636,14 +599,12 @@ const schedulePageFetch = <T>(
     pump();
   });
 
-/** Query deduplicates same-key calls before they enter this per-client bounded scheduler. */
 const fetchGalleryPageWithLifecycle = <T>(
   client: QueryClient,
   signal: AbortSignal,
   run: () => Promise<T>
 ): Promise<T> => schedulePageFetch(ensureLifecycle(client), signal, run);
 
-/** One Query-owned page at an absolute offset. Shared by every consumer of the same account/listing/page. */
 export const galleryItemsPageOptions = (inputFilter: GalleryItemsFilter, offset: number) => {
   const owner = captureAccountScope();
   const filter = canonicalizeGalleryItemsFilter(inputFilter);
@@ -667,7 +628,6 @@ export const galleryItemsPageOptions = (inputFilter: GalleryItemsFilter, offset:
   });
 };
 
-/** A bounded count-only read shared by every page of one account-scoped listing. */
 export const galleryItemsTotalOptions = (inputFilter: GalleryItemsFilter) => {
   const owner = captureAccountScope();
   const filter = canonicalizeGalleryItemsFilter(inputFilter);
@@ -720,8 +680,7 @@ const fetchSharedQuery = <T, TQueryKey extends QueryKey>(
   let sharedState = consumers.get(queryHash);
 
   if (!sharedState) {
-    // The explicit Query observer keeps TanStack from aborting a signal-aware read when its last UI observer leaves
-    // but an imperative reveal/location caller still awaits the shared request.
+    // Keeps TanStack from aborting the read when its last UI observer leaves while an imperative caller still awaits.
     const observer = new QueryObserver(client, { ...options, enabled: false });
 
     sharedState = { count: 0, unsubscribeObserver: observer.subscribe(() => undefined) };
@@ -793,7 +752,6 @@ const fetchSharedQuery = <T, TQueryKey extends QueryKey>(
   });
 };
 
-/** Fetch one shared page while tracking every imperative consumer that cannot be seen by Query observers. */
 export const fetchGalleryItemsPage = (
   queryClient: QueryClient,
   inputFilter: GalleryItemsFilter,
@@ -834,7 +792,6 @@ const galleryItemLocationOptionsForOwner = (
   });
 };
 
-/** Account-fenced location for one item in an ordinary, fully filtered gallery listing. */
 export const galleryItemLocationOptions = (inputFilter: GalleryItemsFilter, ref: GalleryItemRef) =>
   galleryItemLocationOptionsForOwner(captureAccountScope(), inputFilter, ref);
 
@@ -892,10 +849,7 @@ const isValidLocation = (location: GalleryItemLocation, ref: GalleryItemRef): bo
 /** Gallery invalidation cancels in-flight list reads; a locator re-reads after that many before giving up. */
 const MAX_CANCELLED_LOCATOR_READS = 2;
 
-/**
- * Resolve the target's current rank and fetch only its aligned page. A mismatch means the listing shifted between
- * the rank and page reads; refresh both once, then leave failure to the caller without changing Gallery state.
- */
+/** A rank/page mismatch means the listing shifted; refresh both once, then leave failure to the caller. */
 export const fetchVerifiedGalleryItemPage = async (
   queryClient: QueryClient,
   inputFilter: GalleryItemsFilter,
@@ -912,7 +866,6 @@ export const fetchVerifiedGalleryItemPage = async (
 
   const fenceError = <T>(request: Promise<T>): Promise<T> =>
     request.catch((error: unknown) => {
-      // Account lifetime errors remain authoritative even though the owner signal also cancels Query work.
       assertAccountScopeCurrent(owner);
       requestSignal.throwIfAborted();
       throw error;
@@ -947,8 +900,7 @@ export const fetchVerifiedGalleryItemPage = async (
       throw new Error('Gallery account changed before the target page could be fetched.');
     }
 
-    // A cached page can have a fresh staleTime while an external insert/delete has shifted its offsets. Always read
-    // the one resolved page from the backend before treating a locator result as verified.
+    // A cached page can be fresh by staleTime yet shifted by an external insert or delete.
     let page: GalleryItemsPage;
 
     try {
@@ -959,8 +911,7 @@ export const fetchVerifiedGalleryItemPage = async (
         })
       );
     } catch (error: unknown) {
-      // An invalidation cancelled the read because the listing changed; its rank may have moved too, so both are
-      // read again. Account and navigation aborts were already rethrown by the fence.
+      // The rank may have moved too, so both are read again.
       if (isCancelledError(error) && cancelledReads < MAX_CANCELLED_LOCATOR_READS) {
         cancelledReads += 1;
         continue;
@@ -987,12 +938,7 @@ export const fetchVerifiedGalleryItemPage = async (
 
 const dateBoardNamesConsumers = new WeakMap<QueryClient, Map<string, number>>();
 
-/**
- * A name-list request (date boards and semantic searches) is shared by
- * infinite and paginated consumers. One consumer may stop waiting immediately
- * without cancelling work still needed by another; the final departing
- * consumer owns cancellation.
- */
+/** The last consumer to leave owns cancellation. */
 const fetchSharedDateBoardNames = (
   client: QueryClient,
   queryKey: QueryKey,
@@ -1062,10 +1008,7 @@ const fetchSharedDateBoardNames = (
   });
 };
 
-/**
- * Share one range reader between pages and rebuilds. Name-list filters hydrate slices of a shared fetch to avoid
- * repeating semantic uploads; clamp to limit.
- */
+/** Name-list filters hydrate slices of one shared fetch so semantic uploads are not repeated. */
 export const fetchGalleryItemsRange = async (
   client: QueryClient,
   owner: AccountScope,
@@ -1115,10 +1058,7 @@ export const fetchGalleryItemsRange = async (
   return { ...result, items, itemIndices: truncatedIndices, offset };
 };
 
-/**
- * Poll missing-model and failed statuses only. Settled status refreshes on a new stale consumer, including after
- * layout changes.
- */
+/** Only missing-model and failed statuses poll. */
 export const IMAGE_INDEX_UNAVAILABLE_POLL_MS = 30_000;
 const IMAGE_INDEX_STALE_MS = 5 * 60_000;
 
@@ -1166,7 +1106,6 @@ export const galleryBoardsOptions = (query: GalleryBoardsQuery = {}) => {
   });
 };
 
-/** The boards query the gallery grid resolves its selected board against. */
 export const getGalleryListingBoardsQuery = (settings: GallerySettings): GalleryBoardsQuery => ({
   includeArchived: settings.showArchivedBoards,
   includeDateBoards: settings.showDateBoards,
@@ -1206,16 +1145,14 @@ export const galleryItemsInfiniteOptions = (
     GalleryItemsListQueryKey,
     number
   >({
-    // Anchored windows (paginated pages and deep infinite reveals) are
-    // transient views; only the base window's cache is worth keeping around.
+    // Anchored windows are transient: only the base window's cache is kept.
     ...(isBaseInfiniteWindow ? {} : { gcTime: 0 }),
     getNextPageParam: (lastPage, allPages, lastPageParam) =>
       allPages.length >= GALLERY_MAX_INFINITE_PAGES
         ? undefined
         : getNextPageParam(normalizedWindow, lastPage, lastPageParam),
     getPreviousPageParam: (_firstPage, allPages, firstPageParam) => {
-      // Infinite windows cannot prepend above their anchor without shifting the viewport. Paginated windows may
-      // prepend because consumers select by pageParam.
+      // Infinite windows cannot prepend above their anchor without shifting the viewport.
       const lowestPageParam = normalizedWindow.kind === 'infinite' ? normalizedWindow.offset : 0;
 
       return allPages.length < GALLERY_MAX_INFINITE_PAGES && firstPageParam - GALLERY_PAGE_SIZE >= lowestPageParam
@@ -1235,11 +1172,7 @@ export const galleryItemsInfiniteOptions = (
   });
 };
 
-/**
- * The starred strip shares the list key family (and so the account-wide
- * invalidation and mutation patching) with the listing it sits above, keyed
- * on that listing's filter plus `starred: true`.
- */
+/** Shares the list key family, and so its invalidation and mutation patching, with the listing below it. */
 export const galleryStarredStripOptions = (inputFilter: GalleryItemsFilter) => {
   const owner = captureAccountScope();
   const filter: CanonicalGalleryItemsFilter = { ...canonicalizeGalleryItemsFilter(inputFilter), starred: true };

@@ -19,7 +19,9 @@ media's video, audio, or both video and audio.
 
 MiniMax H3 ships as two task transformers that share every other component. **FL2VA** — *first/last-frame to video with audio* — covers text-to-video, first frame, last frame, both, and extend. **Ref2VA** — *reference to video with audio* — conditions a new clip on **reference media**: up to 3 videos and 9 images, in an order you choose (order changes the result). Every generation from either includes a **jointly generated stereo soundtrack**, muxed into the MP4 as AAC.
 
-The panel switches task by transformer: select the Ref2VA single-file transformer as the **Model** and the conditioning sections become the ordered **References** list; select the FL2VA transformer to get the five frame/extend modes back. A video reference can contribute its image track, its soundtrack, or both; soundtrack-only references can be used on their own. New image references use "Match generation size", which is several times faster than the high-detail 2048 px encoding ("Max detail") at some fidelity cost; switch a reference to "Max detail" when its fine detail matters.
+The panel defaults to the transformer's detected task: select a Ref2VA single-file transformer to get the ordered **References** list, or an FL2VA transformer for the frame/extend modes. Some community checkpoints combine both tasks in one file. For those, open the **Model** picker, select **Ref2VA** or **FL2VA** under **Load H3 checkpoint as**, and then choose the checkpoint. **Detected** follows the current catalog classification, including later re-identification or variant edits. Only an explicit **FL2VA** or **Ref2VA** choice is saved as a task override; **Reset all to model defaults** clears it. These picker choices appear only when a selectable H3 checkpoint is installed. Selecting a task limits H3 choices to checkpoints; choose **Detected** to select an H3 Diffusers main. The chosen task applies to the generation without changing the saved model record. You can also use **Switch mode** under the selected model; clear incompatible media and the optional hybrid quality base first. The Turbo toggle uses a task-specific adapter, so choose the appropriate Turbo again after switching tasks. An override changes the conditioning path; it cannot make a checkpoint support a task it was not designed for.
+
+A video reference can contribute its image track, its soundtrack, or both; soundtrack-only references can be used on their own. New image references use "Match generation size", which is several times faster than the high-detail 2048 px encoding ("Max detail") at some fidelity cost; switch a reference to "Max detail" when its fine detail matters.
 
 What makes it different from Wan in practice:
 
@@ -30,9 +32,13 @@ What makes it different from Wan in practice:
 * **Fixed 24 fps** and a fixed frame grid: 90–345 frames
     in steps of 17 (about 3.8 to 14.4 seconds), default 124.
 
-* **Two fixed resolutions** "768 highres" pins the short edge to 768
+* **Resolution presets** "768 highres" pins the short edge to 768
   (native quality); "768 lowres" pins the *long* edge to 768 for fast
-  previews.
+  previews. **480p** and **544p** target a shorter edge for drafts; at 16:9
+  they produce 864×480 and 960×544. All presets keep the 32-pixel grid and
+  native area cap, so extreme aspect ratios may reduce the target short edge.
+  Drafts run below the training resolution and may lose detail; speed and
+  memory use depend on the model, hardware, and conditioning.
 
 * **Aspect ratios** from 1:4 to 4:1 are supported, wider than the
  preset list.

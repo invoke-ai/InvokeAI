@@ -11,9 +11,9 @@ import { isAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { getApiErrorMessage } from '@platform/transport/http';
 
 /**
- * The image menu's one-click upscale: read the image's metadata, then queue the upscaler alone on it at `scale` (`'native'`,
- * or another of `getModelOnlyUpscaleFactors`). Results go to the gallery's auto-add board, so its listing is read alongside when none
- * is cached, as an Invoke to the gallery does.
+ * The image menu's one-click upscale: read the image's metadata, then queue the upscaler alone on it at `scale`
+ * (`'native'`, or another of `getModelOnlyUpscaleFactors`). Results go to the gallery's auto-add board, so its listing
+ * is read alongside when none is cached, as an Invoke to the gallery does.
  */
 export const queueModelOnlyUpscale = async ({
   commands,

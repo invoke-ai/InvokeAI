@@ -110,11 +110,9 @@ describe('scanDynamicPromptSyntax', () => {
 
     expect(scan('__colours__')).toEqual(['wildcard']);
     expect(scan('__nope__')).toEqual(['error']);
-    // may cross slashes and must resolve to at least one catalog match.
     expect(scan('__animals/*__')).toEqual(['wildcard']);
     expect(scan('__*s__')).toEqual(['wildcard']);
     expect(scan('__nope/*__')).toEqual(['error']);
-    // The sampler and the parameters are not part of the name being looked up.
     expect(scan('__~colours__')).toEqual(['wildcard']);
     expect(scan('__colours(mood=warm)__')).toEqual(['wildcard']);
   });
@@ -142,7 +140,6 @@ describe('scanDynamicPromptSyntax', () => {
     ]);
   });
 
-  // A `:` in the assigned value belongs to the value, not to this variable.
   it('marks only the first operator in a variable', () => {
     expect(annotate(`\${caption=a:b:c}`)).toEqual([
       ['promptVariable', `\${caption=a:b:c}`],
@@ -165,7 +162,6 @@ describe('scanDynamicPromptSyntax', () => {
     ]);
   });
 
-  // The sampler binds tighter than the count: `{2$$~a|b}` has `~a` as a value.
   it('takes the sampler before the count, and only there', () => {
     expect(annotate('{~2$$red|green}')).toEqual([
       ['variantBrace', '{'],

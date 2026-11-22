@@ -8,7 +8,6 @@ export type FormElementMetaKey = 'container-column' | 'container-row' | 'divider
 
 export interface FormElementMeta {
   icon: LucideIcon;
-  /** Translation key of the element's display name. */
   labelKey: string;
 }
 

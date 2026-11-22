@@ -15,6 +15,35 @@ vi.mock('./engineRegistry', () => ({
 
 import { createCanvasEngineResource, createImageResolver } from './useCanvasEngine';
 
+const resourceEngine = (hasVectors = false) => {
+  let status = 'idle';
+  const listeners = new Map<string, Set<() => void>>();
+  const publish = (key: string) => listeners.get(key)?.forEach((listener) => listener());
+  const setStatus = (value: string) => {
+    status = value;
+    publish('vectorToolsStatus');
+  };
+  const prepare = vi.fn(() => {
+    setStatus('loading');
+    return Promise.resolve(true);
+  });
+  const engine = {
+    projectId: 'project-a',
+    document: { getDocument: () => ({ stacks: { vector: hasVectors ? [{}] : [] } }) },
+    interaction: {
+      get: () => status,
+      subscribe: (key: string, listener: () => void) => {
+        const subscribers = listeners.get(key) ?? new Set<() => void>();
+        listeners.set(key, subscribers);
+        subscribers.add(listener);
+        return () => subscribers.delete(listener);
+      },
+    },
+    layers: { vectorEdit: { prepare } },
+  } as unknown as CanvasEngine;
+  return { engine, prepare, setStatus, listeners };
+};
+
 describe('Canvas engine React resource', () => {
   beforeEach(() => {
     registry.acquire.mockReset();
@@ -22,7 +51,7 @@ describe('Canvas engine React resource', () => {
   });
 
   it('acquires only while subscribed and balances one lease across subscribers', () => {
-    const engine = { projectId: 'project-a' } as CanvasEngine;
+    const { engine } = resourceEngine();
     registry.acquire.mockReturnValue(engine);
     const resource = createCanvasEngineResource('project-a', {} as never);
     const firstListener = vi.fn();
@@ -47,7 +76,7 @@ describe('Canvas engine React resource', () => {
   });
 
   it('reacquires after the last subscriber releases the resource', () => {
-    const engine = { projectId: 'project-a' } as CanvasEngine;
+    const { engine } = resourceEngine();
     registry.acquire.mockReturnValue(engine);
     const resource = createCanvasEngineResource('project-a', {} as never);
 
@@ -56,6 +85,33 @@ describe('Canvas engine React resource', () => {
 
     expect(registry.acquire).toHaveBeenCalledTimes(2);
     expect(registry.release).toHaveBeenCalledTimes(2);
+  });
+  it('holds a persisted vector document until its tools are ready and removes subscriptions on release', () => {
+    const { engine, prepare, setStatus, listeners } = resourceEngine(true);
+    registry.acquire.mockReturnValue(engine);
+    const resource = createCanvasEngineResource('project-a', {} as never);
+    const changed = vi.fn();
+    const release = resource.subscribe(changed);
+    expect(prepare).toHaveBeenCalledOnce();
+    expect(resource.getSnapshot()).toBeNull();
+    setStatus('ready');
+    expect(resource.getSnapshot()).toBe(engine);
+    expect(changed).toHaveBeenCalled();
+    release();
+    expect([...listeners.values()].every((set) => set.size === 0)).toBe(true);
+    changed.mockClear();
+    setStatus('loading');
+    expect(changed).not.toHaveBeenCalled();
+  });
+
+  it('leaves raster documents usable without requesting vector support', () => {
+    const { engine, prepare } = resourceEngine();
+    registry.acquire.mockReturnValue(engine);
+    const resource = createCanvasEngineResource('project-a', {} as never);
+    const release = resource.subscribe(() => undefined);
+    expect(resource.getSnapshot()).toBe(engine);
+    expect(prepare).not.toHaveBeenCalled();
+    release();
   });
 });
 

@@ -31,6 +31,8 @@ describe('resolveWidgetValues', () => {
     expect(getGallerySettings(getResolvedProjectWidgetValues(pinned, 'gallery', defaults)).thumbnailFit).toBe('square');
     // The pins themselves are untouched: persistence and write paths read these.
     expect(getProjectWidgetValues(following, 'gallery')).toEqual({ showDateBoards: true });
+    // @ts-expect-error Readers of layered keys reject stored pins.
+    getGallerySettings(getProjectWidgetValues(following, 'gallery'));
   });
 
   it("returns the instance's own values while its type has no defaults", () => {

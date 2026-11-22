@@ -29,9 +29,9 @@ const opensUnhandled = (event: DragEvent): boolean => {
 
 /**
  * Keeps a file or link dragged in from the desktop or another window from replacing the app. Surfaces that accept a
- * drop take it first and are left alone, as are native file inputs, and text fields for links; anywhere else the
- * drag shows that it cannot be dropped, and a drop that still arrives is swallowed. Plain text drags never navigate
- * and stay untouched.
+ * drop take it first and are left alone, as are native file inputs, and text fields for links; anywhere else the drag
+ * shows that it cannot be dropped, and a drop that still arrives is swallowed. Plain text drags never navigate and stay
+ * untouched.
  */
 export const preventFileDropNavigation = (): (() => void) => {
   const handleDragOver = (event: DragEvent) => {

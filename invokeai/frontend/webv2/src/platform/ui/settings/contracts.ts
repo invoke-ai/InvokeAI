@@ -61,8 +61,8 @@ export interface SettingFieldProps {
   field: SettingDefinition;
   surface: 'quick' | 'dialog';
   /**
-   * Undefined: the field edits the user's default (the Launchpad, or a surface without a project or widget to pin
-   * to). Present: it edits that project's pin, and is disabled while the target is not current.
+   * Undefined: the field edits the user's default (the Launchpad, or a surface without a project or widget to pin to).
+   * Present: it edits that project's pin, and is disabled while the target is not current.
    */
   target?: SettingsTarget;
   /** Shows another setting on the surface hosting this one (the dialog or the Launchpad page). */

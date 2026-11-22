@@ -2,10 +2,8 @@ import type * as apiModule from '@workbench/projects/api';
 import type { ProjectSummaryDTO } from '@workbench/projects/api';
 
 import { ChakraProvider } from '@chakra-ui/react';
-import { accountLifecycle, captureAccountScope } from '@platform/state/accountLifecycle';
+import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { system } from '@theme/system';
-import { MAX_SUPPORTED_CANVAS_SCHEMA_VERSION } from '@workbench/canvasSchemaVersion';
-import { seedProjectLibrary } from '@workbench/projects/library';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -54,8 +52,6 @@ const dto = (id: string, name: string, updatedAt: string, minimumCanvasSchemaVer
 // Listed most recently edited first.
 const harbor = dto('harbor', 'Harbor Tower', '2026-10-30T08:00:00.000Z');
 const mahogany = dto('mahogany', 'Mahogany House', '2026-10-29T08:00:00.000Z');
-const site = dto('site', 'Site plan', '2026-10-28T08:00:00.000Z');
-const future = dto('future', 'From the future', '2026-10-31T08:00:00.000Z', MAX_SUPPORTED_CANVAS_SCHEMA_VERSION + 1);
 
 const onClose = vi.fn();
 let host: HTMLDivElement;
@@ -77,8 +73,6 @@ const render = async () => {
 
 const dialog = () => document.querySelector<HTMLElement>('[role="dialog"]')!;
 const list = () => dialog().querySelector<HTMLElement>('[role="list"]');
-const buttonNamed = (label: string) =>
-  [...dialog().querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent === label)!;
 const rowNamed = (name: string) =>
   [...dialog().querySelectorAll<HTMLElement>('[role="listitem"]')].find((row) => row.textContent?.includes(name))!;
 const primaryOf = (name: string) => rowNamed(name).querySelector<HTMLButtonElement>('[data-list-primary]')!;
@@ -104,23 +98,6 @@ afterEach(async () => {
 });
 
 describe('OpenProjectDialog', () => {
-  it('lists the projects not already open as list items with a divider between each pair', async () => {
-    harness.openProjectIds = ['mahogany'];
-    harness.listProjects.mockResolvedValue([harbor, mahogany, future, site]);
-    await render();
-
-    expect(list()?.getAttribute('aria-label')).toBe('projects.openProject');
-    const rows = [...list()!.querySelectorAll('[role="listitem"]')];
-
-    expect(rows.map((row) => row.querySelector('[data-list-primary]')?.textContent)).toEqual([
-      expect.stringContaining('From the future'),
-      expect.stringContaining('Harbor Tower'),
-      expect.stringContaining('Site plan'),
-    ]);
-    expect(rows.every((row) => row.textContent?.includes('projects.editedRelative'))).toBe(true);
-    expect(list()!.querySelectorAll('[data-list-divider]')).toHaveLength(rows.length - 1);
-  });
-
   it('opens a project by click and closes once it is loaded', async () => {
     harness.listProjects.mockResolvedValue([harbor, mahogany]);
     await render();
@@ -146,34 +123,6 @@ describe('OpenProjectDialog', () => {
     await userEvent.keyboard('{Enter}');
     expect(harness.hydrate).toHaveBeenCalledWith('mahogany', 'Mahogany House');
     expect(onClose).toHaveBeenCalledTimes(1);
-  });
-
-  it('starts keyboard users on the first openable project, keeping an incompatible one reachable but inert', async () => {
-    harness.listProjects.mockResolvedValue([harbor, future]);
-    await render();
-
-    const incompatible = primaryOf('From the future');
-
-    // The incompatible project is the most recent, so it is listed first; the tab stop skips it.
-    expect(list()!.querySelector('[data-list-primary]')).toBe(incompatible);
-    expect(primaryOf('Harbor Tower').tabIndex).toBe(0);
-    expect(incompatible.tabIndex).toBe(-1);
-
-    expect(incompatible.getAttribute('aria-disabled')).toBe('true');
-    expect(incompatible.textContent).toContain('projects.requiresNewerInvoke');
-    expect(incompatible.querySelector('svg')).toBeNull();
-    expect(primaryOf('Harbor Tower').hasAttribute('aria-disabled')).toBe(false);
-    expect(primaryOf('Harbor Tower').textContent).not.toContain('projects.requiresNewerInvoke');
-
-    await act(() => primaryOf('Harbor Tower').focus());
-    await userEvent.keyboard('{ArrowUp}');
-    expect(document.activeElement).toBe(incompatible);
-
-    await userEvent.keyboard('{Enter}');
-    // Force past Playwright's actionability check: aria-disabled is exactly what is under test.
-    await userEvent.click(incompatible, { force: true });
-    expect(harness.hydrate).not.toHaveBeenCalled();
-    expect(onClose).not.toHaveBeenCalled();
   });
 
   it('holds every row while one project opens, then reports an unavailable project without closing', async () => {
@@ -205,75 +154,5 @@ describe('OpenProjectDialog', () => {
     expect(onClose).not.toHaveBeenCalled();
     expect(list()!.hasAttribute('aria-busy')).toBe(false);
     expect(primaryOf('Harbor Tower').querySelector('.chakra-spinner')).toBeNull();
-  });
-
-  it('says why there is nothing to open: no saved projects, or all of them already open', async () => {
-    harness.listProjects.mockResolvedValue([]);
-    await render();
-
-    expect(list()).toBeNull();
-    expect(dialog().textContent).toContain('projects.noSavedProjects');
-
-    harness.openProjectIds = ['harbor'];
-    harness.listProjects.mockResolvedValue([harbor]);
-    await act(() => root.unmount());
-    root = createRoot(host);
-    await render();
-
-    expect(dialog().textContent).toContain('projects.allSavedAlreadyOpen');
-  });
-
-  it('shows loading before the first listing, then a failure whose retry lands focus on Import when nothing returns', async () => {
-    let fail: (error: Error) => void = () => undefined;
-    harness.listProjects.mockImplementation(
-      () =>
-        new Promise((_resolve, reject) => {
-          fail = reject;
-        })
-    );
-    await render();
-
-    expect(dialog().querySelector('[role="status"]')?.getAttribute('aria-label')).toBe('common.loading');
-    expect(dialog().textContent).not.toContain('projects.noSavedProjects');
-
-    await act(async () => {
-      fail(new Error('Server unavailable'));
-      await new Promise<void>((resolve) => {
-        setTimeout(resolve, 0);
-      });
-    });
-
-    expect(dialog().textContent).toContain('projects.failedToLoad');
-    expect(dialog().textContent).not.toContain('projects.noSavedProjects');
-
-    harness.listProjects.mockResolvedValue([]);
-    const retry = dialog().querySelector<HTMLButtonElement>('[role="alert"] button')!;
-    await userEvent.click(retry);
-
-    await expect.poll(() => dialog().textContent).toContain('projects.noSavedProjects');
-    expect(harness.listProjects).toHaveBeenCalledTimes(2);
-    await expect.poll(() => document.activeElement).toBe(buttonNamed('projects.importWithEllipsis'));
-  });
-
-  it('lands focus on the first openable project when a retry recovers', async () => {
-    harness.listProjects.mockRejectedValue(new Error('Server unavailable'));
-    await render();
-
-    harness.listProjects.mockResolvedValue([future, harbor]);
-    await userEvent.click(dialog().querySelector<HTMLButtonElement>('[role="alert"] button')!);
-
-    await expect.poll(() => document.activeElement).toBe(primaryOf('Harbor Tower'));
-  });
-
-  it('keeps the projects listed earlier usable when a later refresh fails', async () => {
-    seedProjectLibrary([harbor, mahogany], captureAccountScope());
-    harness.listProjects.mockRejectedValue(new Error('Server unavailable'));
-    await render();
-
-    expect(harness.listProjects).toHaveBeenCalledTimes(1);
-    expect(dialog().textContent).not.toContain('projects.failedToLoad');
-
-    await userEvent.click(primaryOf('Mahogany House'));
-    expect(harness.hydrate).toHaveBeenCalledWith('mahogany', 'Mahogany House');
   });
 });

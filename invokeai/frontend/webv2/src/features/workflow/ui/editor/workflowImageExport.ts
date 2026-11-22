@@ -486,7 +486,8 @@ const prepareExportClone = (clone: HTMLElement, bounds: Rect, plan: WorkflowImag
     .forEach((element) => {
       setExportElementStyle(element, 'display', 'none');
     });
-  // Chakra names a flat dotted token's variable with the dot escaped (`bg.emphasized` -> `--chakra-colors-bg\.emphasized`).
+  // Chakra names a flat dotted token's variable with the dot escaped (`bg.emphasized` ->
+  // `--chakra-colors-bg\.emphasized`).
   clone.querySelectorAll<HTMLElement>('[data-workflow-node-shell="true"]').forEach((element) => {
     setExportElementStyle(element, 'border-color', 'var(--chakra-colors-border\\.emphasized)');
     setExportElementStyle(element, 'box-shadow', 'var(--chakra-shadows-sm)');

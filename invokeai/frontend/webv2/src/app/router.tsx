@@ -21,8 +21,8 @@ import {
   ModelsUiProvider,
   type CalibrationGraphCompiler,
   type ModelsUiAdapter,
-  type SchedulerPolicySource,
-  type SchedulerPolicyState,
+  type ModelDefaultsRulesSource,
+  type ModelDefaultsRulesState,
 } from '@features/models';
 import { createLogger } from '@platform/logging/logger';
 import { captureAccountScope } from '@platform/state/accountLifecycle';
@@ -55,22 +55,19 @@ import {
   useWorkbenchPreferenceSelector,
 } from '@workbench/settings/store';
 import { loadAppVersion } from '@workbench/shell/whatsNewStore';
+import { getResolvedProjectWidgetValues } from '@workbench/widgetState';
 import i18next from 'i18next';
 import { Fragment, useCallback, useMemo, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import type * as SchedulerRules from './modelSchedulerPolicyReader';
+import type * as DefaultsRulesModule from './modelDefaultsRulesReader';
 
 import { RouterErrorScreen } from './RouterErrorScreen';
 import { SocketHubRuntime } from './SocketHubRuntime';
 import { createStartupRedirects } from './startupRedirect';
 
-/**
- * The authenticated layout owns setup/login guards; lazy /app keeps editor code out of Launchpad. Hash history
- * supports the relative base without server deep-path fallback.
- */
+/** Lazy /app keeps editor code out of the Launchpad; hash history needs no server deep-path fallback. */
 
-/** Route render and loader failures reach the router's catch boundary; record them once there. */
 const routerLogger = createLogger({ area: 'router', namespace: 'app' });
 
 const RouterError = ({ error, reset }: ErrorComponentProps) => {
@@ -89,67 +86,65 @@ const RouterError = ({ error, reset }: ErrorComponentProps) => {
 
 const rootRoute = createRootRoute({ component: Outlet, errorComponent: RouterError });
 
-const SCHEDULER_RULES_LOADING: SchedulerPolicyState = { status: 'loading' };
-const SCHEDULER_RULES_UNAVAILABLE: SchedulerPolicyState = { status: 'unavailable' };
-let schedulerPolicyState: SchedulerPolicyState = SCHEDULER_RULES_LOADING;
-let schedulerRules: Promise<typeof SchedulerRules> | null = null;
-const schedulerPolicyChannel = createListenerChannel();
+const DEFAULTS_RULES_LOADING: ModelDefaultsRulesState = { status: 'loading' };
+const DEFAULTS_RULES_UNAVAILABLE: ModelDefaultsRulesState = { status: 'unavailable' };
+let defaultsRulesState: ModelDefaultsRulesState = DEFAULTS_RULES_LOADING;
+let defaultsRulesModule: Promise<typeof DefaultsRulesModule> | null = null;
+const defaultsRulesChannel = createListenerChannel();
 
-const publishSchedulerPolicy = (next: SchedulerPolicyState): void => {
-  schedulerPolicyState = next;
-  schedulerPolicyChannel.notify();
+const publishDefaultsRules = (next: ModelDefaultsRulesState): void => {
+  defaultsRulesState = next;
+  defaultsRulesChannel.notify();
 };
 
-/**
- * Generate's scheduler rules for the Model Manager's defaults. They and the architecture table they read live in
- * Generation, which the Launchpad does not load at startup, so they arrive with the first Default settings section.
- */
-const schedulerPolicySource: SchedulerPolicySource = {
-  getSnapshot: () => schedulerPolicyState,
+/** The defaults rules and Models' architecture table arrive with the first Default settings section, not at startup. */
+const defaultsRulesSource: ModelDefaultsRulesSource = {
+  getSnapshot: () => defaultsRulesState,
   load: () => {
-    if (!schedulerRules) {
-      if (schedulerPolicyState.status === 'unavailable') {
-        publishSchedulerPolicy(SCHEDULER_RULES_LOADING);
+    if (!defaultsRulesModule) {
+      if (defaultsRulesState.status === 'unavailable') {
+        publishDefaultsRules(DEFAULTS_RULES_LOADING);
       }
-      schedulerRules = import('./modelSchedulerPolicyReader').then((rules) => {
-        rules.startSchedulerPolicyReader(publishSchedulerPolicy);
+      defaultsRulesModule = import('./modelDefaultsRulesReader').then((rules) => {
+        rules.startModelDefaultsRulesReader(publishDefaultsRules);
         return rules;
       });
     }
     // Asked on every load: it retries a failed table, and an account change clears the table.
-    schedulerRules
-      .then((rules) => rules.ensureSchedulerRulesLoaded())
+    defaultsRulesModule
+      .then((rules) => rules.ensureDefaultsRulesLoaded())
       .catch(() => {
         // The rules' chunk failed to load; the next load (Retry, or another section) imports it again.
-        schedulerRules = null;
-        publishSchedulerPolicy(SCHEDULER_RULES_UNAVAILABLE);
+        defaultsRulesModule = null;
+        publishDefaultsRules(DEFAULTS_RULES_UNAVAILABLE);
       });
   },
-  subscribe: schedulerPolicyChannel.subscribe,
+  subscribe: defaultsRulesChannel.subscribe,
 };
 
 const setInstallInPlace = (installInPlace: boolean) => void patchWorkbenchPreferences({ installInPlace });
 const NO_ACTIVE_PROJECT = () => false;
 
-/**
- * The account's Models port for every authenticated route: the Model Manager renders on the Launchpad, and the editor
- * narrows this with its active project. Composed here because a new module would enter the Launchpad's startup graph.
- */
+/** Composed here because a new module would enter the Launchpad's startup graph. */
 export const AccountModelsUiProvider = ({ children }: { children: ReactNode }) => {
   const enableModelDescriptions = useWorkbenchPreferenceSelector((value) => value.enableModelDescriptions);
   const installInPlace = useWorkbenchPreferenceSelector((value) => value.installInPlace);
+  const galleryValues = useWorkbenchPreferenceSelector((value) =>
+    getResolvedProjectWidgetValues(undefined, 'gallery', value.scopedDefaults)
+  );
   const { canManageModels } = useCapabilities();
   const adapter = useMemo<ModelsUiAdapter>(
     () => ({
       canManageModels,
       enableModelDescriptions,
+      galleryValues,
       installInPlace,
       isProjectActive: NO_ACTIVE_PROJECT,
       managerProjectId: null,
-      schedulerPolicy: schedulerPolicySource,
+      defaultsRules: defaultsRulesSource,
       setInstallInPlace,
     }),
-    [canManageModels, enableModelDescriptions, installInPlace]
+    [canManageModels, enableModelDescriptions, galleryValues, installInPlace]
   );
 
   return <ModelsUiProvider adapter={adapter}>{children}</ModelsUiProvider>;
@@ -159,7 +154,6 @@ const NO_SEARCH = {};
 const returnToSearch = (returnTo: string) => ({ returnTo });
 const isLoginHref = (href: string): boolean => href === '/login' || href.startsWith('/login?');
 
-/** While the session resolves or follows another tab to a different account: say so, never a blank page. */
 const AccountPending = ({ messageKey }: { messageKey: string }) => {
   const { t } = useTranslation();
 
@@ -173,10 +167,7 @@ const AccountPending = ({ messageKey }: { messageKey: string }) => {
   );
 };
 
-/**
- * Sends a signed-out session to the login screen; an expired one carries the way back (`returnTo`). Only this child
- * follows the location, so navigation never re-renders the layout's runtime providers.
- */
+/** Only this child follows the location, so navigation never re-renders the layout's providers. */
 const SignedOutRedirect = ({ sessionExpired }: { sessionExpired: boolean }) => {
   const href = useRouterState({ select: (state) => state.location.href });
   const loginReturnTo = useRouterState({
@@ -189,10 +180,7 @@ const SignedOutRedirect = ({ sessionExpired }: { sessionExpired: boolean }) => {
   return <Navigate replace search={returnTo === undefined ? NO_SEARCH : returnToSearch(returnTo)} to="/login" />;
 };
 
-/**
- * Keep socket and install progress alive across authenticated routes; mount heavier feature listeners only where
- * needed. A sign-in by the expired account, here or followed from another tab, returns to `returnTo`.
- */
+/** A sign-in by the expired account, here or in another tab, returns to `returnTo`. */
 const AuthenticatedLayout = () => {
   'use no memo';
   // Account transitions are infrequent; provider composition does not need a memo cache.
@@ -228,10 +216,7 @@ const AuthenticatedLayout = () => {
   );
 };
 
-/**
- * Captures the initial load before the router's history starts. Only accounts that chose the most recent project pay
- * for the decision: a session peek and, for an empty session, a project listing without waiting for covers.
- */
+/** Captures the initial load before history starts; only most-recent-project accounts pay for the peek. */
 const startupRedirects = createStartupRedirects(
   {
     hash: window.location.hash,
@@ -313,7 +298,6 @@ const requireLaunchpadCapability = async (
   }
 };
 
-/** Loads Generate's compiler only once the Model Manager prepares a working-memory calibration. */
 const compileCalibrationGraphs: CalibrationGraphCompiler = (cases, models, signal) =>
   import('./calibrationGraphs').then((module) => module.compileCalibrationGraphs(cases, models, signal));
 
@@ -402,9 +386,7 @@ const workbenchRoute = createRoute({
     // Preload the editor during the session peek; the module loader deduplicates the lazy-route import.
     void import('./WorkbenchApp');
 
-    // Redirect a definitively empty session to Home unless ?project/?new is supplied. Unknown sessions fall
-    // through. Check only entries: search changes can precede autosave, and hover preloads must not fetch the
-    // session. A launch redirect that just found open projects hands over its proof instead of a second peek.
+    // Only entries: search changes can precede autosave, and hover preloads must not fetch the session.
     if (cause !== 'enter' || search.project || search.new || startupRedirects.takeOpenSessionProof()) {
       return;
     }
@@ -492,10 +474,7 @@ export const router = createRouter({
   ]),
 });
 
-/**
- * Following another tab's sign-in to a different account lands on Home, as signing in here would: the page this tab
- * showed belonged to the previous account (its project, or a manager the new account may not use).
- */
+/** Following another tab's sign-in to a different account lands on Home; the old page belonged to the old account. */
 let wasSwitchingAccount = false;
 const unsubscribeAccountSwitchLanding = subscribeAuthSession(() => {
   const { switchingAccount, user } = getAuthSession();

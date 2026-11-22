@@ -19,10 +19,7 @@ interface LivePreviewFollow {
   pinnedSessionId: string | null;
   /** The session Auto-switch shows (`getAutoSwitchFollowedLive`); else null, and the Preview keeps the selected result. */
   followedSessionId: string | null;
-  /**
-   * The newest running session still without a frame of its own (loading its model, encoding its prompt) while no
-   * running session is followed: what the Preview says it waits for.
-   */
+  /** The newest running session without a frame while none is followed: what Preview waits for. */
   startingSession: QueueActiveSession | null;
   /** Sets Auto-switch to In progress and pins `sessionId`: a tile click, or an arrow step onto a tile. */
   follow(sessionId: string): void;

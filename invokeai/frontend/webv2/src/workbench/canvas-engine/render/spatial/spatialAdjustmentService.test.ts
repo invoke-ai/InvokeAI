@@ -21,14 +21,12 @@ const HEIGHT = 2;
 const PIXEL_BYTES = WIDTH * HEIGHT * 4;
 const STEPS: readonly SpatialAdjustmentStep[] = [{ amount: 50, kind: 'clarity', size: 8 }];
 
-/** Pixels whose first byte names the job, so the executor's view shows which job it got. */
 const tagged = (tag: number): Uint8ClampedArray => {
   const pixels = new Uint8ClampedArray(PIXEL_BYTES);
   pixels[0] = tag;
   return pixels;
 };
 
-/** An executor whose jobs settle only when the test says so. */
 const createManualExecutors = () => {
   const executors: { disposed: boolean; started: number[] }[] = [];
   const pending: { job: SpatialExecutorJob; settle: (status: SpatialExecutorResult['status'] | 'crash') => void }[] =
@@ -64,7 +62,6 @@ const createManualExecutors = () => {
         }),
     };
   };
-  /** Settles the oldest unsettled job, then lets the service start the next one. */
   const settleNext = async (status: SpatialExecutorResult['status'] | 'crash' = 'ok') => {
     const next = pending.shift();
     if (!next) {
@@ -104,7 +101,6 @@ const setup = (budgetBytes = 1 << 20) => {
   return { ...manual, reserved, run, service };
 };
 
-/** Records results as they settle so tests can assert resolution without awaiting the job. */
 const track = (promise: Promise<SpatialRunResult>) => {
   const state: { result: SpatialRunResult | null } = { result: null };
   void promise.then((result) => {

@@ -61,7 +61,6 @@ describe('CanvasFrameLockFeed', () => {
     await act(() => store.commands.generation.setSource('canvas'));
     expect(bboxOptions()).toEqual({ aspectLocked: true, aspectRatio: 16 / 9 });
 
-    // A preset label alone (no lock of the person's) leaves the frame free.
     await act(() =>
       store.commands.generation.patchSettings({ aspectRatioId: '1:1', aspectRatioIsLocked: false, aspectRatioValue: 1 })
     );

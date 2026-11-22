@@ -51,7 +51,6 @@ const toastTexts = () =>
     title: toast.querySelector('[data-part="title"]')?.textContent,
   }));
 
-/** The notices over a real structural engine; `emit` plays a refusal the way the engine's tools report one. */
 const mount = async (layers: readonly CanvasNodeContract[], selectedLayerId: string | null) => {
   const stub = createStructuralEngineStub({ layers, selectedLayerId });
   const listeners = new Set<(refusal: CanvasEditRefusal) => void>();
@@ -164,7 +163,6 @@ describe('CanvasEditRefusalNotices', () => {
       'Unlock the layer to paint on it, or paint on a new layer above it.',
       ['Paint on a new layer'],
     ],
-    // A status a new layer would not escape keeps its own words and makes no offer.
     ['layer-loading', '“Sky” is still loading', 'Its pixels are on their way. Try again in a moment.', []],
     [
       'layer-alpha-locked',
@@ -206,7 +204,6 @@ describe('CanvasEditRefusalNotices', () => {
     await emit(refusal('layer-locked', 'photo', 'Photo', true));
     await emit(refusal('layer-locked', 'photo', 'Photo', true));
     await emit(refusal('layer-hidden', 'top', 'Top', true));
-    // A repeated press replaces its layer's offer.
     await expect.poll(() => toastTexts().map(({ title }) => title)).toEqual(['“Top” is hidden', '“Photo” is locked']);
     expect(toastTexts()[1]).toEqual({
       actions: ['Paint on a new layer'],

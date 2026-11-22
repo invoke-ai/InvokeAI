@@ -16,7 +16,6 @@ import { startNotificationToasts } from './notifications/notificationToasts';
 
 const workbench = vi.hoisted(() => ({ store: null as ReturnType<typeof createWorkbenchStore> | null }));
 
-// A real store without the provider's persistence: the notices read and undo through it.
 vi.mock('@workbench/WorkbenchContext', async (importOriginal) => ({
   ...(await importOriginal<typeof WorkbenchContextModule>()),
   useOptionalWorkbenchCommands: () => workbench.store?.commands ?? null,
@@ -130,7 +129,6 @@ describe('LayoutUndoNotices', () => {
     expect(activeProject().layout.presetId).toBe('compose');
   });
 
-  // Undone another way, the step is gone: an Undo still offered would do nothing.
   it('withdraws the toast once its step is undone by the layout undo command', async () => {
     const region = (['left', 'right'] as const).find((candidate) =>
       activeProject().widgetRegions[candidate].instanceIds.includes('gallery')

@@ -28,8 +28,8 @@ export const DocumentTitleProgress = () => {
     document.title = title;
   }, [title]);
 
-  // Separate from the write above so switching titles does not flash the base
-  // one in between; this only runs when the shell itself goes away.
+  // Separate from the write above so switching titles does not flash the base one in between; this only runs when the
+  // shell itself goes away.
   useMountEffect(() => () => {
     document.title = DOCUMENT_TITLE_BASE;
   });

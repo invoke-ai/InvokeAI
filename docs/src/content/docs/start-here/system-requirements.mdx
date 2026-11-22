@@ -140,7 +140,6 @@ Differences from Windows x64, all because the underlying package has no Windows 
 - The image map projects with PCA instead of UMAP, so it is less structured.
 - `xformers` is not available; torch's own attention kernels are used.
 - `.woff2` fonts cannot be read: the font list skips them, and an upload is rejected with a message that the format is not supported on this platform. `.ttf`, `.otf` and `.woff` work.
-- PyPatchMatch has no prebuilt library for Windows ARM64, so the `patchmatch` infill method is unavailable.
 
 GPU generation on RTX Spark has not yet been validated by the Invoke team on hardware; installation and the CPU code paths are exercised in CI on Windows ARM64 runners.
 
@@ -262,7 +261,7 @@ An alternative to installing ROCm locally is to use a [ROCm docker container] to
 [Intel Arc & Iris Xe Graphics driver]: https://www.intel.com/content/www/us/en/download/785597/intel-arc-iris-xe-graphics-windows.html
 [Intel client GPU install guide]: https://dgpu-docs.intel.com/driver/client/overview.html
 [ROCm Documentation]: https://rocmdocs.amd.com
-[ROCm compatibility matrix]: https://rocm.docs.amd.com/en/docs-10.0.0/compatibility/compatibility-matrix.html
+[ROCm compatibility matrix]: https://rocm.docs.amd.com/en/docs-10.1.0/compatibility/compatibility-matrix.html
 [AMD Software: Adrenalin Edition]: https://www.amd.com/en/support/download/drivers.html
 [ROCm docker container]: https://rocmdocs.amd.com/en/latest/Deep_learning/Deep_learning.html#docker-containers
 [ROCm/ROCm#6522]: https://github.com/ROCm/ROCm/issues/6522

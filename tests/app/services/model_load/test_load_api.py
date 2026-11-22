@@ -2,7 +2,6 @@ from pathlib import Path
 
 import pytest
 import torch
-from diffusers import AutoencoderTiny
 
 from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.app.services.invocation_services import InvocationServices
@@ -62,13 +61,6 @@ def test_load_from_path(mock_context: InvocationContext, embedding_file: Path) -
     assert isinstance(loaded_model_1.model, dict)
     assert isinstance(loaded_model_3.model, dict)
     assert torch.equal(loaded_model_1.model["emb_params"], loaded_model_3.model["emb_params"])
-
-
-@pytest.mark.skip(reason="This requires a test model to load")
-def test_load_from_dir(mock_context: InvocationContext, vae_directory: Path) -> None:
-    loaded_model = mock_context.models.load_local_model(vae_directory)
-    assert isinstance(loaded_model, LoadedModelWithoutConfig)
-    assert isinstance(loaded_model.model, AutoencoderTiny)
 
 
 def test_download_and_load(mock_context: InvocationContext) -> None:

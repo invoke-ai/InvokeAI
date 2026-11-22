@@ -91,7 +91,6 @@ describe('real PSD serialization lifecycle', () => {
     let finished = false;
     class ObservedWorker extends NativeWorker {
       constructor(url: string | URL, options?: WorkerOptions) {
-        // Import the production handler, then observe its synchronous call without delaying or replacing its work.
         const bootstrap = URL.createObjectURL(
           new Blob(
             [
@@ -126,7 +125,6 @@ describe('real PSD serialization lifecycle', () => {
     }
     vi.stubGlobal('Worker', ObservedWorker);
     const backend = createDomRasterBackend();
-    // Enough real pixel/RLE work to keep the writer occupied after its entry message reaches the page.
     const side = 1536;
     const rect = { x: 0, y: 0, width: side, height: side };
     const source = backend.createSurface(side, side);

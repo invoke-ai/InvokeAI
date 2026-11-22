@@ -90,8 +90,6 @@ describe('PreviewFrame hold', () => {
 
     render(frame(finished, held, onSourceLoaded));
 
-    // Synchronously after the commit the finished image has not loaded: the
-    // held frame is painted and the finished image only holds the geometry.
     const hold = host?.querySelector<HTMLImageElement>('img[aria-hidden="true"]');
     expect(hold?.getAttribute('src')).toBe(held.src);
     expect(host?.querySelector<HTMLImageElement>('img[alt="finished"]')?.style.visibility).toBe('hidden');
