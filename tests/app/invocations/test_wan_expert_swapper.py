@@ -202,6 +202,8 @@ def test_lifecycle_high_only():
 
     assert log == [
         "models.load:high",
+        # Once before the lock, to size the LoRAs' working memory, and once for the patcher.
+        "lora-factory-call:HIGH",
         "device-enter:HIGH",
         "lora-factory-call:HIGH",
         "lora-enter",
@@ -245,8 +247,9 @@ def test_lifecycle_dual_expert_swap():
         swapper.close()
 
     expected = [
-        # enter HIGH (models.load first, then device, then lora)
+        # enter HIGH (models.load first, the LoRAs sized for the reservation, then device, then lora)
         "models.load:high",
+        "lora-factory-call:HIGH",
         "device-enter:HIGH",
         "lora-factory-call:HIGH",
         "lora-enter",
@@ -257,6 +260,7 @@ def test_lifecycle_dual_expert_swap():
         "device-exit:HIGH",
         "full-unload:HIGH",
         "models.load:low",
+        "lora-factory-call:LOW",
         "device-enter:LOW",
         "lora-factory-call:LOW",
         "lora-enter",

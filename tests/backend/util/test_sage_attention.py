@@ -120,6 +120,11 @@ def _cuda_build(
     monkeypatch.setattr(sage, "_cuda_index", lambda q, k, v: 0)
     monkeypatch.setattr(sage, "_health", _health_with_validated(_all_variants(capabilities)))
     monkeypatch.setattr(torch.cuda, "device", lambda index: contextlib.nullcontext())
+    monkeypatch.setattr(torch.cuda, "mem_get_info", lambda index=None: (2**40, 2**40))
+    monkeypatch.setattr(torch.cuda, "memory_reserved", lambda index=None: 0)
+    monkeypatch.setattr(torch.cuda, "memory_allocated", lambda index=None: 0)
+    monkeypatch.setattr(torch.cuda, "memory_stats", lambda index=None: {})
+    monkeypatch.setattr(sage.TorchDevice, "cuda_mem_get_info", lambda device: torch.cuda.mem_get_info(device.index))
     return module, torch_calls
 
 
@@ -429,6 +434,30 @@ class TestFailures:
         assert len(module.calls) == 2, "the next scope tries SageAttention again"
         assert any("ran out of memory" in r.message for r in caplog.records if r.levelno == logging.INFO)
         assert not [r for r in caplog.records if r.levelno >= logging.WARNING]
+
+    def test_a_call_whose_quantized_copies_do_not_fit_runs_on_torch(self, installed, monkeypatch):
+        """Windows spills an allocation that does not fit to system memory instead of raising OOM, so the wrapper has
+        to check first. Memory torch has cached but not allocated counts as free; the next call is checked anew."""
+        module, torch_calls = installed
+        q, k = _q(1, 2, QUERY_LEN, 64), _q(1, 2, KEY_LEN, 64)
+        needed = sage.SAGE_BYTES_PER_ELEMENT * (q.numel() + 2 * k.numel())
+        monkeypatch.setattr(torch.cuda, "mem_get_info", lambda index=None: (needed // 2, 2**40))
+        monkeypatch.setattr(torch.cuda, "memory_reserved", lambda index=None: needed // 2 - 1)
+
+        with sage_attention_scope() as usage:
+            F.scaled_dot_product_attention(q, k, k)
+            assert len(module.calls) == 0 and len(torch_calls) == 1
+            assert usage.fell_back["memory"] == 1
+            # Free space inside partly used segments cannot hold a contiguous copy.
+            monkeypatch.setattr(torch.cuda, "memory_reserved", lambda index=None: needed // 2 - 1 + 4096)
+            monkeypatch.setattr(
+                torch.cuda, "memory_stats", lambda index=None: {"inactive_split_bytes.all.current": 4096}
+            )
+            F.scaled_dot_product_attention(q, k, k)
+            assert len(module.calls) == 0 and usage.fell_back["memory"] == 2
+            monkeypatch.setattr(torch.cuda, "memory_stats", lambda index=None: {})
+            F.scaled_dot_product_attention(q, k, k)
+        assert len(module.calls) == 1 and usage.served == 1
 
     def test_a_triton_cache_failure_falls_back_for_that_call_only(self, installed, caplog):
         """On Windows two GPUs compiling the same kernel can race for its cache file; that says nothing about it."""
