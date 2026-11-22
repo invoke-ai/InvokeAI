@@ -56,6 +56,12 @@ def autocast_linear_forward_sidecar_patches(
         patch = copy.copy(patch)
         patch.to(input.device)
 
+        if isinstance(patch, LoRALayer):
+            # The patcher casts patches to the model's compute dtype, but an fp32 module in a bf16 model (e.g. MiniMax
+            # H3's patch projections) still receives fp32 input, and F.linear refuses mixed dtypes. Other patches are
+            # aggregated in their own dtype below and cast afterwards.
+            patch.to(dtype=input.dtype)
+
         if isinstance(patch, FluxControlLoRALayer):
             # Note that we use the original input here, not the sliced input.
             output += linear_lora_forward(orig_input, patch, patch_weight)

@@ -12,6 +12,9 @@
 #     blocks.0.adaln_proj.linear.lora_A.weight        (AdaLN time-conditioning)
 #     token_refiner.blocks.0.attn.qkv_proj.lora_A.weight
 #     final_layer.adaln_proj.linear.lora_A.weight
+#     audio_patch_proj.lora_A.weight                  (top-level projections: video_patch_proj,
+#                                                      audio_patch_proj, condition_proj,
+#                                                      final_layer.{video,audio}_out)
 #
 # ComfyUI users sometimes re-key these with a ``diffusion_model.`` prefix; a bare
 # ``transformer.`` / ``base_model.model.transformer.`` PEFT prefix is also accepted.
@@ -63,9 +66,9 @@ _H3_FINAL_LAYER_RE = re.compile(_PEFT_PREFIX_RE + r"final_layer\.adaln_proj\.lin
 
 MINIMAX_H3_KOHYA_PREFIX = "lora_unet_"
 
-# Native module vocabulary for un-flattening kohya keys. Only Linears with a LoRA conversion
-# are leaves, so a flattened path that names anything else fails to reconstruct rather than
-# being rewritten into a key that matches no module. Refiner blocks have no ``adaln_proj``.
+# Native module vocabulary for un-flattening kohya keys and validating dotted ones. Only Linears
+# with a LoRA conversion are leaves, so a path that names anything else is rejected rather than
+# converted into a layer that matches no module (a silent no-op). Refiner blocks have no ``adaln_proj``.
 _H3_KOHYA_BLOCK_SUBTREE: ParsingTree = {
     "attn": {"qkv_proj": {}, "out_proj": {}},
     "mlp": {"fc1": {}, "fc2": {}},
@@ -73,7 +76,10 @@ _H3_KOHYA_BLOCK_SUBTREE: ParsingTree = {
 _H3_KOHYA_PARSING_TREE: ParsingTree = {
     "blocks": {INDEX_PLACEHOLDER: {**_H3_KOHYA_BLOCK_SUBTREE, "adaln_proj": {"linear": {}}}},
     "token_refiner": {"blocks": {INDEX_PLACEHOLDER: _H3_KOHYA_BLOCK_SUBTREE}},
-    "final_layer": {"adaln_proj": {"linear": {}}},
+    "final_layer": {"adaln_proj": {"linear": {}}, "video_out": {}, "audio_out": {}},
+    "video_patch_proj": {},
+    "audio_patch_proj": {},
+    "condition_proj": {},
 }
 
 
@@ -170,7 +176,8 @@ def group_minimax_h3_lora_keys(str_keys: Iterable[str]) -> dict[str, dict[str, s
 
     Layer paths are kohya-un-flattened and stripped of the optional PEFT prefix, i.e. what the
     converter maps onto runtime modules. Raises naming the first defect: a key whose tail is not a
-    LoRA parameter name (DoRA ``lora_magnitude_vector``, full weights, ...), two raw keys naming
+    LoRA parameter name (DoRA ``lora_magnitude_vector``, full weights, ...), a layer path outside the
+    supported H3 Linears, two raw keys naming
     the same tensor (e.g. a layer present both dotted and kohya-flattened), or a layer whose
     tensors are not exactly one ``lora_A``/``lora_B`` or ``lora_down``/``lora_up`` pair plus an
     optional ``alpha``. Converting any of these would crash, or silently drop or overwrite tensors.
@@ -189,6 +196,8 @@ def group_minimax_h3_lora_keys(str_keys: Iterable[str]) -> dict[str, dict[str, s
             raise ValueError(f"{layer_params[param]!r} and {raw_key!r} are the same tensor in two spellings")
         layer_params[param] = raw_key
     for layer, layer_params in grouped.items():
+        if not kohya_module_path_is_leaf(layer, _H3_KOHYA_PARSING_TREE):
+            raise ValueError(f"layer {layer!r} is not a layer MiniMax H3 LoRAs support")
         if frozenset(layer_params) not in _VALID_LAYER_PARAM_SETS:
             raise ValueError(
                 f"layer {layer!r} carries {sorted(layer_params)}; expected exactly lora_A/lora_B or "
