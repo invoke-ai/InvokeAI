@@ -114,6 +114,13 @@ export const getWidgetsForRegion = (region: WidgetRegion): RegisteredWidget[] =>
       widget.status !== 'hidden' && widget.manifest.allowedRegions.includes(region) && isWidgetAvailable(widget)
   );
 
+/** Whether the center can show this type as its view: enabled, available to this session, and not a toolbar item. */
+export const isCenterViewType = (typeId: WidgetTypeId): boolean =>
+  getWidgetsForRegion('center').some(
+    (widget) =>
+      widget.manifest.id === typeId && widget.status === 'enabled' && widget.manifest.centerPlacement !== 'toolbar'
+  );
+
 export const getWidgetHosts = (): RegisteredWidget[] =>
   registeredWidgets.filter(
     (widget) => widget.status === 'enabled' && widget.host !== undefined && isWidgetAvailable(widget)

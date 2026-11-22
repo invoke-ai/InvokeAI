@@ -106,6 +106,7 @@ import { createProjectId } from '@workbench/projects/ids';
 
 import type { InvocationRuntimeInputs } from './invocationContracts';
 import type { WorkbenchQueueItem as QueueItem } from './queueHistoryContracts';
+import type { IsCenterView } from './workspace/workspaceDerivations';
 
 import {
   getChangedValueKeys,
@@ -238,6 +239,7 @@ import {
   writeRegionOrder,
   type RegionOrderSlot,
 } from './floatingWindows';
+import { getNaturalDestination } from './graphWidgets';
 import {
   defaultInvocationRoute,
   getDynamicPromptsExpansionSource,
@@ -246,9 +248,12 @@ import {
   isResultDestinationAvailable,
   resolveInvocationRoute,
 } from './invocation';
-import { getSourceIdForWidgetTypeId, isInvocationSourceAvailable } from './invocationSources';
+import {
+  getAvailableSourceIdForWidgetTypeId,
+  getSourceIdForWidgetTypeId,
+  isInvocationSourceAvailable,
+} from './invocationSources';
 import { getOrderedLayoutPresets, normalizeLayoutPresetOrder, reorderLayoutPresetIds } from './layoutPresetCollection';
-import { getInvocationAfterLayoutPreset } from './layoutPresetRouting';
 import {
   defaultLayoutPreset,
   getLayoutPreset,
@@ -271,6 +276,8 @@ import {
   normalizeProjectSettings,
   PROJECT_SETTINGS_OWNER,
 } from './settings/projectSettings';
+import { enterWorkspace } from './workspace/entry';
+import { getWorkspaceJob } from './workspace/workspaceDerivations';
 
 interface QueueGenerateSnapshot {
   negativePromptNodeId: string;
@@ -281,6 +288,8 @@ interface QueueGenerateSnapshot {
 
 export interface WorkbenchReducerContext {
   autoSwitchInvocationRoute: boolean;
+  /** The widget registry's answer to which types can be the center's view; entry fronts only those. */
+  isCenterView: IsCenterView;
 }
 
 type WorkbenchReducerAction =
@@ -2364,6 +2373,9 @@ export const clampPanelSize = (region: WidgetRegion, sizePx: number): number => 
 
 const createCanvasState = (): CanvasStateContractV3 => createNewCanvasState();
 
+const WORKSPACE_SOURCES = { getNaturalDestination, getSourceId: getAvailableSourceIdForWidgetTypeId };
+
+// Laid out from the saved arrangement, so only the route needs the job; its first activation enters it (fronts).
 const createProject = (index: number, id: string, preset: LayoutPreset): Project =>
   applyLayoutPresetToProject(
     {
@@ -2377,7 +2389,7 @@ const createProject = (index: number, id: string, preset: LayoutPreset): Project
         },
       ],
       id,
-      invocation: getInvocationAfterLayoutPreset(defaultInvocationRoute, preset),
+      invocation: { ...defaultInvocationRoute, ...getWorkspaceJob(preset, preset.snapshot, WORKSPACE_SOURCES) },
       layout: { ...defaultLayoutPreset.snapshot.layout, panels: { ...defaultLayoutPreset.snapshot.layout.panels } },
       name: `Project Name #${index}`,
       promptHistory: [],
@@ -3041,36 +3053,77 @@ const applyLayoutPresetToProject = (project: Project, preset: LayoutPreset): Pro
   };
 };
 
-const updateActiveProjectLayoutPreset = (
-  state: WorkbenchState,
-  preset: LayoutPreset,
-  { applyDefaultRoute }: { applyDefaultRoute: boolean }
-): WorkbenchState =>
+/** Applies the entry rule to what the project lays out for `preset` (its saved definition): view and route only. */
+const enterProjectWorkspace = (project: Project, preset: LayoutPreset, context: WorkbenchReducerContext): Project => {
+  const { fronts, invocation } = enterWorkspace({
+    invocation: project.invocation,
+    isCenterView: context.isCenterView,
+    placement: project,
+    sources: WORKSPACE_SOURCES,
+    workspace: preset,
+  });
+  let widgetRegions = project.widgetRegions;
+
+  for (const region of WIDGET_REGIONS) {
+    const instanceId = fronts[region];
+
+    if (instanceId !== undefined) {
+      widgetRegions = { ...widgetRegions, [region]: { ...widgetRegions[region], activeInstanceId: instanceId } };
+    }
+  }
+
+  return widgetRegions === project.widgetRegions && invocation === project.invocation
+    ? project
+    : { ...project, invocation, widgetRegions };
+};
+
+/** Going home: the entry rule over the active project's own layout, with no undo step. */
+const enterActiveWorkspace = (state: WorkbenchState, context: WorkbenchReducerContext): WorkbenchState =>
+  updateActiveProject(state, (project) =>
+    enterProjectWorkspace(project, resolveSavedLayoutPreset(state.account, project.layout.presetId), context)
+  );
+
+/** A project's first activation in this editor session is an entry; returning to one already entered is not. */
+const enterArrivingProject = (state: WorkbenchState, context: WorkbenchReducerContext): WorkbenchState => {
+  const enteredProjectIds = state.enteredProjectIds ?? [];
+
+  return enteredProjectIds.includes(state.activeProjectId)
+    ? state
+    : { ...enterActiveWorkspace(state, context), enteredProjectIds: [...enteredProjectIds, state.activeProjectId] };
+};
+
+/** Revert: lays out the preset's saved arrangement, an undoable step; the route stays. */
+const revertActiveProjectLayoutPreset = (state: WorkbenchState, preset: LayoutPreset): WorkbenchState =>
   updateActiveProject(state, (project) => {
     const nextProject = pushUndo(project, 'Update layout', { notice: { kind: 'revert', presetId: preset.id } });
-    const nextLayoutProject = applyLayoutPresetToProject(nextProject, preset);
 
     return {
-      ...nextLayoutProject,
+      ...applyLayoutPresetToProject(nextProject, preset),
       events: prependProjectEvent(nextProject.events, {
         createdAt: now(),
         id: createId('event'),
         summary: 'Updated active layout',
         type: 'layout-updated',
       }),
-      invocation: applyDefaultRoute
-        ? getInvocationAfterLayoutPreset(nextProject.invocation, preset)
-        : nextLayoutProject.invocation,
     };
   });
 
-const switchActiveProjectLayoutPreset = (state: WorkbenchState, preset: LayoutPreset): WorkbenchState =>
+/** Lays out the preset's working copy here (else its saved arrangement) and enters it, as one undoable step. */
+const switchActiveProjectLayoutPreset = (
+  state: WorkbenchState,
+  preset: LayoutPreset,
+  context: WorkbenchReducerContext
+): WorkbenchState =>
   updateActiveProject(state, (project) => {
     const nextProject = pushUndo(project, 'Update layout', { notice: { kind: 'switchPreset', presetId: preset.id } });
     const workingArrangement = findLayoutPresetWorkingCopy(project.presetWorkingLayouts, preset.id);
-    const nextLayoutProject = applyLayoutPresetToProject(
-      nextProject,
-      workingArrangement ? { ...preset, snapshot: workingArrangement } : preset
+    const nextLayoutProject = enterProjectWorkspace(
+      applyLayoutPresetToProject(
+        nextProject,
+        workingArrangement ? { ...preset, snapshot: workingArrangement } : preset
+      ),
+      preset,
+      context
     );
 
     return {
@@ -3081,7 +3134,6 @@ const switchActiveProjectLayoutPreset = (state: WorkbenchState, preset: LayoutPr
         summary: 'Updated active layout',
         type: 'layout-updated',
       }),
-      invocation: getInvocationAfterLayoutPreset(nextProject.invocation, preset),
       presetWorkingLayouts: captureOutgoingWorkingLayout(state.account, project, preset.id),
     };
   });
@@ -3093,7 +3145,7 @@ const resetActiveLayoutToSaved = (state: WorkbenchState): WorkbenchState => {
       state.account.activeLayoutPresetId
   );
 
-  return updateActiveProjectLayoutPreset(state, preset, { applyDefaultRoute: false });
+  return revertActiveProjectLayoutPreset(state, preset);
 };
 
 const updateActiveInvocation = (
@@ -4339,6 +4391,7 @@ export const createInitialWorkbenchState = (): WorkbenchState => {
     account: { activeLayoutPresetId: defaultLayoutPreset.id },
     activeProjectId: draft.id,
     autosave: { status: 'idle' },
+    enteredProjectIds: [draft.id],
     backendConnection: { status: 'connecting' },
     notifications: [],
     projects: [draft],
@@ -4439,7 +4492,11 @@ export const __workbenchReducerInternal = (
   action: WorkbenchReducerAction,
   context: WorkbenchReducerContext
 ): WorkbenchState => {
-  const next = reconcileCanvasStagingFollow(state, reduceWorkbenchAction(state, action, context));
+  const reduced = reconcileCanvasStagingFollow(state, reduceWorkbenchAction(state, action, context));
+  const next =
+    reduced.activeProjectId === state.activeProjectId && reduced.enteredProjectIds === state.enteredProjectIds
+      ? reduced
+      : enterArrivingProject(reduced, context);
   const describeStep = RECORDED_LAYOUT_ACTIONS[action.type];
 
   if (!describeStep || next === state || next.projects === state.projects) {
@@ -4507,14 +4564,16 @@ const reduceWorkbenchAction = (
 
       const projectIndex = state.projects.findIndex((project) => project.id === action.projectId);
       const projects = state.projects.filter((project) => project.id !== action.projectId);
+      // Opening it again later is an entry.
+      const enteredProjectIds = state.enteredProjectIds?.filter((id) => id !== action.projectId);
 
       if (action.projectId !== state.activeProjectId) {
-        return { ...state, projects };
+        return { ...state, enteredProjectIds, projects };
       }
 
       const fallbackProject = projects[Math.max(0, projectIndex - 1)];
 
-      return { ...state, activeProjectId: fallbackProject.id, projects };
+      return { ...state, activeProjectId: fallbackProject.id, enteredProjectIds, projects };
     }
     case 'switchProject': {
       return { ...state, activeProjectId: action.projectId };
@@ -4531,11 +4590,11 @@ const reduceWorkbenchAction = (
     case 'applyPreset': {
       const preset = getAvailableLayoutPreset(state, action.presetId);
       const activeProject = state.projects.find((project) => project.id === state.activeProjectId);
-      // Choosing the preset already in use reapplies its saved arrangement, which is how its shortcut reverts.
+      // Choosing the preset already in use goes home: navigation, not a step.
       const nextState =
         activeProject && activeProject.layout.presetId !== preset.id
-          ? switchActiveProjectLayoutPreset(state, preset)
-          : updateActiveProjectLayoutPreset(state, preset, { applyDefaultRoute: true });
+          ? switchActiveProjectLayoutPreset(state, preset, context)
+          : enterActiveWorkspace(state, context);
 
       return {
         ...nextState,
@@ -6375,6 +6434,7 @@ const reduceWorkbenchAction = (
       return {
         ...normalizeWorkbenchState(action.state),
         backendConnection: state.backendConnection,
+        enteredProjectIds: [],
         scopedDefaults: state.scopedDefaults,
       };
     }
@@ -6423,6 +6483,8 @@ const reduceWorkbenchAction = (
       return {
         ...state,
         activeProjectId: state.activeProjectId === action.projectId ? project.id : state.activeProjectId,
+        // The same project under its new id: already on screen, not arriving.
+        enteredProjectIds: state.enteredProjectIds?.map((id) => (id === action.projectId ? project.id : id)),
         projects: state.projects.some((candidate) => candidate.id === action.projectId)
           ? state.projects.map((candidate) => (candidate.id === action.projectId ? project : candidate))
           : [...state.projects, project],

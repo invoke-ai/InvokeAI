@@ -2793,6 +2793,7 @@
       "addHere": "Add to this workspace",
       "addToCenter": "Add to the center",
       "addToPanel": "Add to a panel",
+      "backToStage": "Back to {{stage}}",
       "notHere": "{{widget}} isn't in this workspace",
       "notInCenter": "{{widget}} isn't in this workspace's center",
       "notInPanel": "{{widget}} isn't in a panel in this workspace",

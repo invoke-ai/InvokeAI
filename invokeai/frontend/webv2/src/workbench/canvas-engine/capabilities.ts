@@ -638,7 +638,8 @@ export interface CanvasDiagnosticsSnapshot {
 export interface CanvasEngineToolCapability extends CanvasToolCapability {
   /** The menu targets the selected layer, never the one under the pointer; this only reports gesture suppression. */
   canTargetLayerFromContextMenu(): boolean;
-  handleEscapePriority(options: { gestureWasActive: boolean }): void;
+  /** True when the press cancelled or cleared something. */
+  handleEscapePriority(options: { gestureWasActive: boolean }): boolean;
   onStrokeCommitted(listener: (event: StrokeCommittedEvent) => void): () => void;
   onEditRefused(listener: (refusal: CanvasEditRefusal) => void): () => void;
   /** Null on Escape, tool change or disposal; restores the previous tool either way. */

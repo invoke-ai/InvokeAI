@@ -449,9 +449,9 @@ describe('normalization of persisted floating windows', () => {
 });
 
 describe('interaction with presets and undo', () => {
-  it('applying a preset docks all floating widgets (no double render)', () => {
+  it('reverting to a preset docks all floating widgets (no double render)', () => {
     const floated = floatGallery();
-    const state = workbenchReducer(floated, { presetId: 'compose', type: 'applyPreset' });
+    const state = workbenchReducer(floated, { presetId: 'compose', type: 'revertLayoutPreset' });
     const project = getActiveProject(state);
 
     expect(project.floatingWidgets ?? {}).toEqual({});
@@ -470,7 +470,7 @@ describe('interaction with presets and undo', () => {
     state = workbenchReducer(state, { presetId: 'compose', type: 'saveLayoutPreset' });
     // Dock it, then revert to the preset that was saved with it floating.
     state = workbenchReducer(state, { instanceId: 'gallery', type: 'dockFloatingWidget' });
-    state = workbenchReducer(state, { presetId: 'compose', type: 'applyPreset' });
+    state = workbenchReducer(state, { presetId: 'compose', type: 'revertLayoutPreset' });
     const project = getActiveProject(state);
 
     expect(project.floatingWidgets?.gallery).toBeDefined();

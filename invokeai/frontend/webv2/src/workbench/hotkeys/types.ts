@@ -26,6 +26,11 @@ export interface HotkeyDefinition {
   ignoreRepeat?: boolean;
   /** Claim the key only while the press targets an element matching this selector; elsewhere it keeps its meaning. */
   targetSelector?: string;
+  /**
+   * Below every other binding, global included. Runs once the press has reached every listener, and only when none
+   * marked it used (`defaultPrevented`: a popover, menu, widget handler or the Canvas engine took it).
+   */
+  fallback?: boolean;
   unavailableReason?: string;
   source?: WidgetContributionSource;
 }

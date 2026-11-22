@@ -158,12 +158,23 @@ describe('goBackToPreviousWorkspace', () => {
 });
 
 describe('toggleCenterPreview', () => {
-  it('swaps Preview into the center and back to the view it replaced, without leaving the workspace', () => {
-    const { ports, project } = createNavigation({ presetId: 'automate' });
+  it('swaps Preview in and back to the stage, without leaving the workspace', () => {
+    const { ports, project, store } = createNavigation({ presetId: 'edit' });
 
+    store.commands.widgets.select({ projectId: project().id, region: 'center', widgetId: 'preview' });
+    expect(toggleCenterPreview(ports)).toBe(true);
+    expect(project().widgetRegions.center.activeInstanceId).toBe('canvas');
     expect(toggleCenterPreview(ports)).toBe(true);
     expect(project().widgetRegions.center.activeInstanceId).toBe('preview');
+    expect(project().layout.presetId).toBe('edit');
+  });
+
+  it('swaps a Preview stage with the center’s other view', () => {
+    const { ports, project } = createNavigation({ presetId: 'compose' });
+
     expect(toggleCenterPreview(ports)).toBe(true);
-    expect(project().widgetRegions.center.activeInstanceId).toBe('workflow:center');
+    expect(project().widgetRegions.center.activeInstanceId).toBe('gallery:center');
+    expect(toggleCenterPreview(ports)).toBe(true);
+    expect(project().widgetRegions.center.activeInstanceId).toBe('preview');
   });
 });

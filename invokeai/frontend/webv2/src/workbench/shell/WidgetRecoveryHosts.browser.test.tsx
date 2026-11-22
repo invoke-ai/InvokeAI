@@ -4,7 +4,7 @@ import type { Project, WorkbenchState } from '@workbench/projectContracts';
 import type { RegisteredWidget, WidgetImplementation, WidgetViewProps } from '@workbench/widgetContracts';
 import type * as WidgetRegistry from '@workbench/widgetRegistry';
 import type * as WorkbenchContext from '@workbench/WorkbenchContext';
-import type { WorkbenchInternalStore } from '@workbench/workbenchStore';
+import type { WorkbenchInternalStore, WorkbenchSnapshot } from '@workbench/workbenchStore';
 
 import { ChakraProvider, Portal } from '@chakra-ui/react';
 import { DndContext } from '@dnd-kit/core';
@@ -56,6 +56,8 @@ vi.mock('@workbench/WorkbenchContext', async (importOriginal) => ({
     useExternalStoreSelector(runtime.store.subscribe, runtime.store.getSnapshot, (s) => s.activeProject.id),
   useActiveProjectSelector: <T,>(select: (project: Project) => T, equal?: (a: T, b: T) => boolean) =>
     useExternalStoreSelector(runtime.store.subscribe, runtime.store.getSnapshot, (s) => select(s.activeProject), equal),
+  useWorkbenchSelector: <T,>(select: (snapshot: WorkbenchSnapshot) => T, equal?: (a: T, b: T) => boolean) =>
+    useExternalStoreSelector(runtime.store.subscribe, runtime.store.getSnapshot, select, equal),
 }));
 vi.mock('@workbench/widgetRegistry', async (importOriginal) => ({
   ...(await importOriginal<typeof WidgetRegistry>()),

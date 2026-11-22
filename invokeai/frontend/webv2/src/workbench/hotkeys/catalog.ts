@@ -159,6 +159,15 @@ export const firstPartyHotkeyCatalog: HotkeyDefinition[] = [
   hotkey('app', 'resetPanelLayout', [], { title: 'Revert layout to saved preset' }),
   hotkey('app', 'togglePanels', ['f']),
   hotkey('app', 'togglePreview', ['z']),
+  // Escape's last meaning in the center: anything else that handles it (a field, menu, popover, widget) goes first.
+  {
+    ...hotkey('app', 'backToStage', ['esc'], {
+      scope: { kind: 'focused-region', region: 'center' },
+      title: 'Back to main view',
+    }),
+    fallback: true,
+    preventDefault: false,
+  },
   // No default key: Alt+Left, the usual Back, is the browser's and the Gallery's.
   hotkey('app', 'backToPreviousWorkspace', [], { title: 'Back to previous workspace' }),
   // Canvas rows mirror the Canvas widget's own tables (canvasToolCommands, canvasHotkeyCommands, canvasHeaderCommands).

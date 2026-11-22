@@ -81,6 +81,8 @@ export interface WorkbenchState {
   account: AccountState;
   widgetFailures: WidgetFailure[];
   scopedDefaults: ScopedDefaults;
+  /** Projects active at least once in this editor session; a first activation enters its workspace. Transient. */
+  enteredProjectIds?: readonly string[];
   /** Transient: never persisted, synced across tabs or undone. */
   canvasStagingFollow?: Readonly<
     Record<string, { readonly framedSlotIds: readonly string[]; readonly pinnedSlotId: string | null }>

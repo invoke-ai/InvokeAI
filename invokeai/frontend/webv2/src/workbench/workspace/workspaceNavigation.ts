@@ -2,14 +2,18 @@ import type { WorkbenchFocusController } from '@workbench/focusRegions';
 import type { LayoutPreset, LayoutPresetId, WidgetRegion } from '@workbench/layoutContracts';
 import type { Project, WorkbenchNotificationAction } from '@workbench/projectContracts';
 import type { RegisteredWidget, WidgetInstanceId, WidgetTypeId } from '@workbench/widgetContracts';
-import type { WorkbenchCommands, WorkbenchQueries } from '@workbench/workbenchStore';
+import type { WorkbenchCommands, WorkbenchQueries, WorkbenchSnapshot } from '@workbench/workbenchStore';
 
 import { flushWorkbenchDrafts } from '@platform/react/draftRegistry';
 import { registerAccountOwnedResource } from '@platform/state/accountLifecycle';
 import { getAvailableSourceIdForWidgetTypeId, getWidgetTypeIdForSourceId } from '@workbench/invocationSources';
 import { WIDGET_REGIONS } from '@workbench/layoutContracts';
 import { getOrderedLayoutPresets } from '@workbench/layoutPresetCollection';
-import { doesLayoutPresetExist, getLayoutPresetArrangement } from '@workbench/layoutPresetSnapshots';
+import {
+  doesLayoutPresetExist,
+  getLayoutPresetArrangement,
+  resolveSavedLayoutPreset,
+} from '@workbench/layoutPresetSnapshots';
 import { resolveWidgetLabel } from '@workbench/widgetLabels';
 import { canRenderWidgetInRegion } from '@workbench/widgetPlacementCommands';
 import i18next from 'i18next';
@@ -22,10 +26,10 @@ import type {
   ResolveOpenContext,
   WorkspaceCandidate,
 } from './resolveOpen';
-import type { WorkspacePlacement } from './workspaceDerivations';
+import type { SavedWorkspace, WorkspacePlacement } from './workspaceDerivations';
 
 import { resolveOpen } from './resolveOpen';
-import { getWorkspaceJobSource } from './workspaceDerivations';
+import { getAwayStage, getCenterFront, getPlacedStage, getWorkspaceJobSource } from './workspaceDerivations';
 
 export interface WorkspaceNavigationPorts {
   commands: Pick<WorkbenchCommands, 'layout' | 'notifications' | 'widgets'>;
@@ -80,12 +84,18 @@ export const getRegionPresentation =
 
 /** A preset as the resolver ranks it: what it lays out and the source its job runs. */
 export const createWorkspaceCandidate = (
-  preset: Pick<LayoutPreset, 'defaultRoute' | 'id'>,
+  preset: SavedWorkspace & Pick<LayoutPreset, 'id'>,
   arrangement: WorkspacePlacement
 ): WorkspaceCandidate => {
-  const jobSource = getWorkspaceJobSource(preset.defaultRoute, arrangement, getAvailableSourceIdForWidgetTypeId);
+  const jobSource = getWorkspaceJobSource(preset, arrangement, getAvailableSourceIdForWidgetTypeId);
+  const stage = getPlacedStage(preset, arrangement);
 
-  return { arrangement, id: preset.id, jobSourceTypeId: jobSource ? getWidgetTypeIdForSourceId(jobSource) : null };
+  return {
+    arrangement,
+    id: preset.id,
+    jobSourceTypeId: jobSource ? getWidgetTypeIdForSourceId(jobSource) : null,
+    stageTypeId: stage === null ? null : (arrangement.widgetInstances[stage]?.typeId ?? null),
+  };
 };
 
 const createContext = (ports: WorkspaceNavigationPorts, mode: ResolveOpenContext['mode']): ResolveOpenContext => {
@@ -326,39 +336,53 @@ export const goBackToPreviousWorkspace = (ports: Pick<WorkspaceNavigationPorts, 
   return true;
 };
 
+/** The active workspace's stage while the center shows something else (Away), else null; a snapshot selector. */
+export const getActiveAwayStage = ({
+  account,
+  activeProject,
+}: Pick<WorkbenchSnapshot, 'account' | 'activeProject'>): WidgetInstanceId | null =>
+  getAwayStage(resolveSavedLayoutPreset(account, activeProject.layout.presetId), activeProject);
+
+/** Ends Away: fronts the stage and keeps focus in the center. False when there is no stage to go back to. */
+export const goBackToStage = (ports: WorkspaceNavigationPorts): boolean => {
+  const stage = getActiveAwayStage(ports.queries.getSnapshot());
+
+  if (stage === null) {
+    return false;
+  }
+
+  const project = ports.queries.getSnapshot().activeProject;
+
+  ports.commands.widgets.select({ projectId: project.id, region: 'center', widgetId: stage });
+  ports.focus?.focusRegion('center', project.widgetInstances[stage]?.typeId, stage);
+
+  return true;
+};
+
 const PREVIEW_TYPE_ID = 'preview';
 
-/** The center view each project showed before Preview was toggled in; session-only. */
-const previewReturns = new Map<string, WidgetInstanceId>();
-
-registerAccountOwnedResource({ clear: () => previewReturns.clear(), name: 'center-preview-toggle' });
-
 /**
- * Swaps Preview into the center and back to the view it replaced, within this workspace: a center that does not place
- * Preview gets the offer to add it.
+ * Swaps Preview into the center (Away) and back to the stage, within this workspace. Where Preview is the stage, it
+ * swaps to the center's other view and back. A center that does not place Preview gets the offer to add it.
  */
 export const toggleCenterPreview = (ports: WorkspaceNavigationPorts): boolean => {
-  const project = ports.queries.getSnapshot().activeProject;
+  const { account, activeProject: project } = ports.queries.getSnapshot();
   const center = project.widgetRegions.center;
   const previewId = center.instanceIds.find((id) => project.widgetInstances[id]?.typeId === PREVIEW_TYPE_ID) ?? null;
 
-  if (previewId !== null && center.activeInstanceId === previewId) {
-    const remembered = previewReturns.get(project.id);
-    const returnId =
-      remembered !== undefined && remembered !== previewId && center.instanceIds.includes(remembered)
-        ? remembered
-        : (center.instanceIds.find((id) => id !== previewId) ?? null);
-
-    if (returnId === null) {
-      return false;
-    }
-
-    ports.commands.widgets.select({ projectId: project.id, region: 'center', widgetId: returnId });
-
-    return true;
+  if (previewId === null || getCenterFront(project) !== previewId) {
+    return openInWorkspace(ports, { surface: 'stage', typeId: PREVIEW_TYPE_ID }, { focus: false, mode: 'stay' }).ok;
   }
 
-  previewReturns.set(project.id, center.activeInstanceId);
+  const stage = getPlacedStage(resolveSavedLayoutPreset(account, project.layout.presetId), project);
+  const returnId =
+    stage !== null && stage !== previewId ? stage : (center.instanceIds.find((id) => id !== previewId) ?? null);
 
-  return openInWorkspace(ports, { surface: 'stage', typeId: PREVIEW_TYPE_ID }, { focus: false, mode: 'stay' }).ok;
+  if (returnId === null) {
+    return false;
+  }
+
+  ports.commands.widgets.select({ projectId: project.id, region: 'center', widgetId: returnId });
+
+  return true;
 };

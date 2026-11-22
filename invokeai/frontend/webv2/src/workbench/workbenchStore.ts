@@ -25,7 +25,7 @@ import { getLayoutWidgetTypeIds } from './layoutWidgetSet';
 import { createBlankWorkflowDocument, findProjectWorkflow } from './projectWorkflows';
 import { getWorkbenchPreferences } from './settings/store';
 import { createWidgetRecovery, type WidgetRecoveryStore } from './widget-frame/widgetRecoveryStore';
-import { areWidgetsLoaded } from './widgetRegistry';
+import { areWidgetsLoaded, isCenterViewType } from './widgetRegistry';
 import { getProjectWidgetValues } from './widgetState';
 import {
   createInitialWorkbenchState,
@@ -330,9 +330,19 @@ const createCommands = (
       toggleSourceLock: command('toggleSourceLock'),
     },
     layout: {
-      activatePreset: (presetId: ActionPayload<'applyPreset'>['presetId']) =>
-        layoutPresetActivator.activate(resolveSavedLayoutPreset(getState().account, presetId)),
-      /** Choosing the active preset while another is pending means "stay", not a revert. */
+      /** Enters the preset; the active one is already laid out, so going home loads nothing and drops a pending switch. */
+      activatePreset: (presetId: ActionPayload<'applyPreset'>['presetId']) => {
+        const preset = resolveSavedLayoutPreset(getState().account, presetId);
+
+        if (preset.id === getActiveProject(getState()).layout.presetId) {
+          dispatch({ presetId: preset.id, type: 'applyPreset' });
+
+          return Promise.resolve(preset.id);
+        }
+
+        return layoutPresetActivator.activate(preset);
+      },
+      /** Pressing the active preset's tab while another is pending means "stay": the pending switch is dropped. */
       cancelPresetActivation: (): void => layoutPresetActivator.invalidate(),
       applyPreset: command('applyPreset', (presetId: ActionPayload<'applyPreset'>['presetId']) => ({ presetId })),
       createPreset: command(
@@ -993,6 +1003,7 @@ export const createWorkbenchStore = (
     const previousState = state;
     const nextState = __workbenchReducerInternal(state, action, {
       autoSwitchInvocationRoute: getWorkbenchPreferences().autoSwitchInvocationRoute,
+      isCenterView: isCenterViewType,
     });
 
     if (nextState !== previousState && visibleWidgetsKey(nextState) !== visibleWidgetsKey(previousState)) {

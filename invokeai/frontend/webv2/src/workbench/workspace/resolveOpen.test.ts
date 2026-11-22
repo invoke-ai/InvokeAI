@@ -49,19 +49,21 @@ const customWorkspace = (
   });
   const typeIds = [...Object.values(regions).flatMap((fixture) => fixture.members), ...floating];
 
+  const arrangement = {
+    floatingWidgets: Object.fromEntries(floating.map((typeId) => [typeId, {}])),
+    layout: { panels: { isBottomOpen: true, isLeftOpen: true, isRightOpen: true } },
+    widgetInstances: Object.fromEntries(typeIds.map((typeId) => [typeId, { typeId }])),
+    widgetRegions: {
+      bottom: region(regions.bottom),
+      center: region(regions.center),
+      left: region(regions.left),
+      right: region(regions.right),
+    },
+  };
+
   return createWorkspaceCandidate(
-    { defaultRoute: route ? { destination: 'gallery', sourceId: route } : undefined, id },
-    {
-      floatingWidgets: Object.fromEntries(floating.map((typeId) => [typeId, {}])),
-      layout: { panels: { isBottomOpen: true, isLeftOpen: true, isRightOpen: true } },
-      widgetInstances: Object.fromEntries(typeIds.map((typeId) => [typeId, { typeId }])),
-      widgetRegions: {
-        bottom: region(regions.bottom),
-        center: region(regions.center),
-        left: region(regions.left),
-        right: region(regions.right),
-      },
-    }
+    { defaultRoute: route ? { destination: 'gallery', sourceId: route } : undefined, id, snapshot: arrangement },
+    arrangement
   );
 };
 
@@ -198,6 +200,26 @@ describe('resolveOpen with custom workspaces', () => {
         { workspaces: [canvasOnly, formBehind, graphInStatusBar, job] }
       )
     ).toMatchObject({ step: 'elsewhere', workspaceId: 'job' });
+  });
+
+  it('ranks a workspace by its saved stage, not by what the project last left in its center', () => {
+    const edit = layoutPresets.find(({ id }) => id === 'edit')!;
+    const compose = layoutPresets.find(({ id }) => id === 'compose')!;
+    const editLeftOnPreview = createWorkspaceCandidate(edit, {
+      ...edit.snapshot,
+      widgetRegions: {
+        ...edit.snapshot.widgetRegions,
+        center: { ...edit.snapshot.widgetRegions.center, activeInstanceId: 'preview' },
+      },
+    });
+
+    expect(
+      resolveFrom(
+        'canvas-only',
+        { surface: 'stage', typeId: 'preview' },
+        { workspaces: [canvasOnly, editLeftOnPreview, createWorkspaceCandidate(compose, compose.snapshot)] }
+      )
+    ).toMatchObject({ step: 'elsewhere', workspaceId: 'compose' });
   });
 
   it('stays where a run-as-app workspace places the workflow form', () => {

@@ -1183,6 +1183,7 @@
           "source:src/workbench/widgets/workflow/manifest.ts",
           "source:src/workbench/workbenchState.ts",
           "source:src/workbench/workbenchStore.ts",
+          "source:src/workbench/workspace/entry.ts",
           "source:src/workbench/workspace/resolveOpen.ts",
           "source:src/workbench/workspace/useWorkspaceOpen.ts",
           "source:src/workbench/workspace/workspaceDerivations.ts",

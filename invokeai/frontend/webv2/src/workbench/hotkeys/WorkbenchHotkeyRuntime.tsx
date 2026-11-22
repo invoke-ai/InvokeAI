@@ -81,6 +81,17 @@ export const WorkbenchHotkeyRuntime = () => {
       return;
     }
 
+    // The Canvas engine also listens on window and may come after this listener: a fallback waits for the whole
+    // dispatch, so a press any handler marked as used is never also taken here.
+    if (hotkey.fallback) {
+      globalThis.setTimeout(() => {
+        if (!event.defaultPrevented) {
+          executeHotkey(hotkey, source);
+        }
+      });
+      return;
+    }
+
     if (shouldPreventHotkeyDefault(hotkey)) {
       event.preventDefault();
     }

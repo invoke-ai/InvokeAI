@@ -4,8 +4,6 @@ import type { WidgetInstanceId, WidgetTypeId } from '@workbench/widgetContracts'
 import type { OpenIntent } from './openIntent';
 import type { WorkspacePlacement } from './workspaceDerivations';
 
-import { getWorkspaceStage } from './workspaceDerivations';
-
 /**
  * How a widget type shows in a region, or null where it cannot. A `chip` is always on screen and opens nothing: a
  * status-bar tooltip or popover, or a center toolbar item.
@@ -17,6 +15,8 @@ export interface WorkspaceCandidate {
   /** What entering it lays out for this project. */
   arrangement: WorkspacePlacement;
   jobSourceTypeId: WidgetTypeId | null;
+  /** Its stage's type while that arrangement places the stage, whatever the project last left fronted there. */
+  stageTypeId: WidgetTypeId | null;
 }
 
 export interface ResolveOpenContext {
@@ -136,13 +136,9 @@ const rankWorkspace = (
   workspace: WorkspaceCandidate,
   getPresentation: ResolveOpenContext['getPresentation']
 ): number => {
-  const { arrangement } = workspace;
-  const stage = getWorkspaceStage(arrangement);
-
   if (
-    stage !== null &&
     intent.surface !== 'panel' &&
-    arrangement.widgetInstances[stage]?.typeId === intent.typeId &&
+    workspace.stageTypeId === intent.typeId &&
     getPresentation(intent.typeId, 'center') === 'view'
   ) {
     return 0;
@@ -152,7 +148,7 @@ const rankWorkspace = (
     return 1;
   }
 
-  return listPlacements(intent, arrangement, getPresentation).some((placement) => placement.isFront) ? 2 : 3;
+  return listPlacements(intent, workspace.arrangement, getPresentation).some((placement) => placement.isFront) ? 2 : 3;
 };
 
 /**

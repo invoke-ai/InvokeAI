@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
 import { getActiveProjectGraph } from './projectWorkflows';
+import { isCenterViewType } from './widgetRegistry';
 import { createInitialWorkbenchState, workbenchReducer } from './workbenchState.testing';
 
-const preferenceOff = { autoSwitchInvocationRoute: false };
+const preferenceOff = { autoSwitchInvocationRoute: false, isCenterView: isCenterViewType };
 
 describe('auto invocation route switching with the preference off', () => {
   it('leaves the route alone for workflow, generate, upscale, and Canvas edits', () => {

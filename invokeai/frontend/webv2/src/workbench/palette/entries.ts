@@ -164,6 +164,7 @@ const groupRank = (group: string): number => {
 
 /** Omit navigation, caret nudges, and the palette toggle from searchable rows. */
 const PALETTE_HIDDEN_COMMANDS = new Set([
+  'app.backToStage',
   'app.openCommandPalette',
   // Both palettes already ship `buildOpenSettingsEntry` under this id, and it carries search keywords and an
   // empty-state slot the catalog entry lacks.

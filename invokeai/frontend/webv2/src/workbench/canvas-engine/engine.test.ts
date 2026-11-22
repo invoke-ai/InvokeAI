@@ -7687,7 +7687,7 @@ describe('transform session', () => {
     engine.lifecycle.dispose();
   });
 
-  it('handleEscapePriority cancels an open transform session (chain: transform → deselect)', () => {
+  it('handleEscapePriority cancels an open transform session and reports whether it acted', () => {
     const { store } = createReactiveStore(selectedImageDoc());
     const engine = createCanvasEngine({
       backend: createTestStubRasterBackend(),
@@ -7697,11 +7697,13 @@ describe('transform session', () => {
       store,
     });
 
+    expect(engine.tools.handleEscapePriority({ gestureWasActive: false })).toBe(false);
+
     engine.tools.setTool('transform');
     engine.layers.updateTransformSession({ rotation: 0, scaleX: 2, scaleY: 2, x: 5, y: 6 });
     expect(engine.stores.transformSession.get()).not.toBeNull();
 
-    engine.tools.handleEscapePriority({ gestureWasActive: false });
+    expect(engine.tools.handleEscapePriority({ gestureWasActive: false })).toBe(true);
     expect(engine.stores.transformSession.get()).toBeNull();
 
     engine.lifecycle.dispose();

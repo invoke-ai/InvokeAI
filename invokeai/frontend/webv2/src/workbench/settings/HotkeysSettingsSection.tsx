@@ -75,6 +75,10 @@ const titleFromId = (id: string): string =>
 const getHotkeyTitle = (hotkey: HotkeyDefinition): string => hotkey.title || titleFromId(hotkey.id);
 
 const getScopeRank = (hotkey: HotkeyDefinition): number => {
+  if (hotkey.fallback) {
+    return 0;
+  }
+
   if (hotkey.scope.kind === 'instance') {
     return 400;
   }

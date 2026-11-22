@@ -1,7 +1,11 @@
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { areArraysEqual } from '@platform/state/selectors';
 import { useNavigate } from '@tanstack/react-router';
+import { getAvailableSourceIdForWidgetTypeId, getWidgetTypeIdForSourceId } from '@workbench/invocationSources';
 import { resolveLaunchpadIntent } from '@workbench/launchpad/intents';
+import { resolveSavedLayoutPreset } from '@workbench/layoutPresetSnapshots';
+import { useWorkspaceOpen } from '@workbench/workspace/useWorkspaceOpen';
+import { getWorkspaceJobSource } from '@workbench/workspace/workspaceDerivations';
 import { useTranslation } from 'react-i18next';
 
 import type { WorkbenchSearch } from './projects/session';
@@ -11,11 +15,14 @@ import {
   useWorkbenchCommands,
   useWorkbenchHasHydrated,
   useWorkbenchPersistenceService,
+  useWorkbenchQueries,
   useWorkbenchSelector,
 } from './WorkbenchContext';
 
 const HydratedSessionController = ({ search }: { search: WorkbenchSearch }) => {
   const commands = useWorkbenchCommands();
+  const open = useWorkspaceOpen();
+  const queries = useWorkbenchQueries();
   const navigate = useNavigate();
   const persistence = useWorkbenchPersistenceService();
   const projectIds = useWorkbenchSelector((snapshot) => snapshot.projects.map((project) => project.id), areArraysEqual);
@@ -28,7 +35,21 @@ const HydratedSessionController = ({ search }: { search: WorkbenchSearch }) => {
 
       if (intent) {
         commands.layout.applyPreset(intent.presetId);
-        commands.generation.setSource(intent.sourceId);
+
+        const { account, activeProject } = queries.getSnapshot();
+        const jobSourceId = getWorkspaceJobSource(
+          resolveSavedLayoutPreset(account, intent.presetId),
+          activeProject,
+          getAvailableSourceIdForWidgetTypeId
+        );
+
+        // An intent that is not the workspace's job (Upscale in Compose) shows its own source and aims Invoke at it.
+        if (jobSourceId !== intent.sourceId) {
+          open(
+            { typeId: getWidgetTypeIdForSourceId(intent.sourceId) },
+            { afterShown: () => commands.generation.setSource(intent.sourceId), focus: false, mode: 'stay' }
+          );
+        }
       }
 
       void navigate({ replace: true, search: {}, to: '/app' });

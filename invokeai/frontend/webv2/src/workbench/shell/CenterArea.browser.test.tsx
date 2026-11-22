@@ -12,6 +12,7 @@ interface CenterAreaTestProject {
   floatingWidgets?: Record<string, { returnIndex: number; returnRegion: string }>;
   id: string;
   invocation: { sourceId: string };
+  layout: { presetId: string };
   queue: { items: never[] };
   widgetInstances: Record<string, { id: string; title?: string; typeId: string }>;
   widgetRegions: {
@@ -50,6 +51,7 @@ const centerAreaMocks = vi.hoisted(() => {
   const project: CenterAreaTestProject = {
     id: 'test-project',
     invocation: { sourceId: 'generate' },
+    layout: { presetId: 'compose' },
     queue: { items: [] },
     widgetInstances: {},
     widgetRegions: {
@@ -127,8 +129,9 @@ vi.mock('@workbench/WorkbenchContext', () => ({
   useWorkbenchCommands: () => ({
     widgets: { dockFloating: centerAreaMocks.dockFloating, revealFloating: centerAreaMocks.revealFloating },
   }),
-  useWorkbenchSelector: (selector: (snapshot: { backendConnection: { status: string } }) => unknown) =>
-    selector({ backendConnection: { status: 'connected' } }),
+  useWorkbenchQueries: () => ({ getSnapshot: () => ({ activeProject: centerAreaMocks.project }) }),
+  useWorkbenchSelector: (selector: (snapshot: object) => unknown) =>
+    selector({ account: {}, activeProject: centerAreaMocks.project, backendConnection: { status: 'connected' } }),
 }));
 vi.mock('@workbench/widget-frame', () => ({
   WidgetIdentityIcon: () => <Box boxSize="3.5" />,

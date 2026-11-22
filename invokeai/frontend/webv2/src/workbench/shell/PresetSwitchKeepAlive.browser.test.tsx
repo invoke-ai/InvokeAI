@@ -63,6 +63,7 @@ const keepAliveMocks = vi.hoisted(() => {
     floatingWidgets: [],
     id: projectId,
     invocation: { sourceId: 'generate' },
+    layout: { presetId: 'edit' },
     queue: { items: [] },
     widgetInstances,
     widgetRegions: {
@@ -178,8 +179,13 @@ vi.mock('@workbench/WorkbenchContext', async () => {
     useActiveProjectSelector: (selector: (project: unknown) => unknown) =>
       selector(useSyncExternalStore(keepAliveMocks.subscribe, keepAliveMocks.getProject)),
     useWorkbenchCommands: () => ({ widgets: {} }),
-    useWorkbenchSelector: (selector: (snapshot: { backendConnection: { status: string } }) => unknown) =>
-      selector({ backendConnection: { status: 'connected' } }),
+    useWorkbenchQueries: () => ({ getSnapshot: () => ({ activeProject: keepAliveMocks.getProject() }) }),
+    useWorkbenchSelector: (selector: (snapshot: object) => unknown) =>
+      selector({
+        account: {},
+        activeProject: useSyncExternalStore(keepAliveMocks.subscribe, keepAliveMocks.getProject),
+        backendConnection: { status: 'connected' },
+      }),
   };
 });
 vi.mock('@workbench/widget-frame', () => {

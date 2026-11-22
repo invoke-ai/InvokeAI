@@ -53,7 +53,9 @@ The center panel shows one **view** at a time. The button in its top-left corner
 - **Add to center** lists other panels that can be shown in the center.
 - **Close** removes the current view. The center always keeps at least one view.
 
-Press <kbd>Z</kbd> to swap the Preview into the center and back to the view you had before. It is a quick way to check a result while you work on the canvas or a workflow.
+Each preset is built around one center view, its **main view**: the Canvas in Edit, the Preview in Compose and Video, the Workflow editor in Workflow. While the center shows another view, a **Back to** button (for example **Back to Canvas**) leads its top-left corner; in a narrow center it shows only its arrow. Click it, or press <kbd>Esc</kbd> while the center has focus, to return to the main view. <kbd>Esc</kbd> goes back only when nothing else is using it: a text field, an open menu and a Preview comparison keep their own <kbd>Esc</kbd>, and so do the Canvas and the Workflow editor while they have something to cancel or deselect.
+
+Press <kbd>Z</kbd> to swap the Preview into the center and back to the main view. It is a quick way to check a result while you work on the canvas or a workflow. Where the Preview is the main view (Compose, Video), <kbd>Z</kbd> swaps it with the center's other view instead, such as the Gallery in Compose.
 
 The Preview's **Auto-switch** button, in its header, shows the current mode as its icon (hover over it to see the name) and opens a menu that chooses what the Preview shows while work runs:
 
@@ -148,9 +150,10 @@ On a touchscreen, press and hold an icon briefly before dragging.
 | <kbd>G</kbd> | Collapse or expand the right panel |
 | <kbd>F</kbd> | Collapse or expand all side and bottom panels at once, for a clear view of the center |
 | <kbd>Z</kbd> | Swap the Preview into or out of the center |
+| <kbd>Esc</kbd> | With the center focused, go back to the preset's main view |
 | <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Z</kbd> | Undo the last layout change: adding, removing, moving or resizing a panel, floating or docking a window, a preset switch, a revert, a route change |
 | <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> | Redo the layout change you undid |
-| <kbd>Alt</kbd>+<kbd>1</kbd> to <kbd>Alt</kbd>+<kbd>4</kbd> | Switch to the Compose, Edit, Video or Workflow preset |
+| <kbd>Alt</kbd>+<kbd>1</kbd> to <kbd>Alt</kbd>+<kbd>4</kbd> | Switch to the Compose, Edit, Video or Workflow preset; on the active preset, return to its main view |
 
 On macOS, use <kbd>Cmd</kbd> in place of <kbd>Ctrl</kbd>. These shortcuts don't fire while you are typing in a text field. You can change any of them; see [Hotkeys](/users-guide/workbench/hotkeys/).
 
@@ -179,6 +182,10 @@ New projects open with Compose unless you choose a different starting point when
 
 Click a preset's tab, or press <kbd>Alt</kbd>+<kbd>1</kbd> to <kbd>Alt</kbd>+<kbd>4</kbd> for the built-in presets. Switching changes only the arrangement: every panel keeps its contents, so a half-written prompt or a scrolled gallery is exactly as you left it. A short notice confirms the switch with **Undo**, and says so when the switch changed what **Invoke** runs or where results go.
 
+Arriving in a preset always puts its job on screen. The center shows the preset's main view, even if you left it on another one; the panel **Invoke** runs from comes to the front of its rail, so Video shows the Video panel even if you last looked at Upscale there; and **Invoke** is aimed at it, unless you locked the route. Everything else stays as you left it: panel sizes, collapsed panels (a panel brought to the front of a collapsed rail stays collapsed), the other rails and floating windows. The first time a project comes to the front after Invoke loads does the same, whether you opened it or it was restored with the others after a reload; switching back to a project you have already looked at since then shows it as you left it.
+
+Click the active preset's tab, or press its shortcut, to go home: the same reset of what is in front, without changing the arrangement and without a notice.
+
 When the window is narrow, the tabs show only their icons. Hover over one to see its name.
 
 ### Opening something from another preset
@@ -192,7 +199,7 @@ Once you move, add or remove panels, the active preset's tab shows a dot on its 
 Click the arrow on the active tab, or right-click any tab, to open the preset menu:
 
 - **Save changes** stores the preset's arrangement in the preset, so it opens that way from now on. On a tab that isn't active, it saves the arrangement that preset was left in without switching to it.
-- **Revert layout to saved preset** puts the panels back as the preset saved them. Choosing the active preset again with its shortcut (<kbd>Alt</kbd>+<kbd>1</kbd> to <kbd>Alt</kbd>+<kbd>4</kbd>) or from the command palette does the same. On a tab that isn't active, it forgets that preset's unsaved arrangement. Either way, **Undo** in the notice, or <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Z</kbd>, brings the arrangement back.
+- **Revert layout to saved preset** puts the panels back as the preset saved them. On a tab that isn't active, it forgets that preset's unsaved arrangement. Either way, **Undo** in the notice, or <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Z</kbd>, brings the arrangement back.
 - **Edit preset…** changes the preset's name, icon and default routing.
 - **Delete preset…** removes a preset you created.
 - **Manage presets** opens the list of all presets.

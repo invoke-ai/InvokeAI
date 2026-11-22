@@ -1,6 +1,7 @@
 import type * as LayoutPresetActivationModule from '@workbench/layoutPresetActivation';
 
 import { ChakraProvider } from '@chakra-ui/react';
+import { dragWithMouse } from '@platform/browser/mouseDrag.testing';
 import { useDebouncedValue } from '@platform/react/useDebouncedValue';
 import { shallowEqual, useExternalStoreSelector } from '@platform/state/selectors';
 import { system } from '@theme/system';
@@ -193,6 +194,65 @@ afterEach(async () => {
   host?.remove();
   host = null;
   root = null;
+});
+
+describe('the active preset’s tab', () => {
+  const centerFront = () => store.getSnapshot().activeProject.widgetRegions.center.activeInstanceId;
+  const leaveHome = () =>
+    act(() =>
+      store.commands.widgets.select({
+        projectId: store.getSnapshot().activeProject.id,
+        region: 'center',
+        widgetId: 'gallery:center',
+      })
+    );
+
+  it('goes home when clicked or activated with Enter', async () => {
+    await renderStrip();
+    await leaveHome();
+
+    await act(() => userEvent.click(presetTab('compose')!));
+    expect(centerFront()).toBe('preview');
+
+    await leaveHome();
+    presetTab('compose')!.focus();
+    await act(() => userEvent.keyboard('{Enter}'));
+    expect(centerFront()).toBe('preview');
+  });
+
+  it('never goes home when it is dragged', async () => {
+    await renderStrip();
+    await leaveHome();
+    const source = presetTab('compose')!;
+    const { left, top, width, height } = source.getBoundingClientRect();
+
+    // A real drag: the browser clicks the tab it was pressed and released on.
+    source.dispatchEvent(
+      new PointerEvent('pointerdown', {
+        bubbles: true,
+        button: 0,
+        clientX: left + width / 2,
+        clientY: top + height / 2,
+      })
+    );
+    await dragWithMouse(source, presetTab('automate')!);
+    await act(() => presetTab('compose')!.click());
+    await act(() => nextFrame());
+    expect(store.getSnapshot().account.layoutPresetOrder?.at(-1)).toBe('compose');
+    expect(centerFront()).toBe('gallery:center');
+  });
+
+  it('never goes home when reordered with the keyboard', async () => {
+    await renderStrip();
+    await leaveHome();
+
+    presetTab('compose')!.focus();
+    await act(() => userEvent.keyboard('{Space}'));
+    await act(() => userEvent.keyboard('{ArrowRight}'));
+    await act(() => userEvent.keyboard('{Space}'));
+    expect(store.getSnapshot().account.layoutPresetOrder?.[0]).not.toBe('compose');
+    expect(centerFront()).toBe('gallery:center');
+  });
 });
 
 describe('LayoutPresetStrip', () => {

@@ -197,7 +197,6 @@ export const LayoutPresetStrip = () => {
   const requestPreset = useCallback(
     (presetId: LayoutPresetId) => {
       // Pressing the preset the workbench is still on, while another is pending, means stay: cancel the pending switch.
-      // Applying it would reapply its saved arrangement and discard its unsaved changes.
       if (presetId === activePresetId) {
         requestedPresetIdRef.current = null;
         layout.cancelPresetActivation();
@@ -221,6 +220,15 @@ export const LayoutPresetStrip = () => {
       });
     },
     [activePresetId, layout]
+  );
+  /** Pressing the active tab goes home, unless that press only cancelled a pending switch. */
+  const goHome = useCallback(
+    (presetId: LayoutPresetId) => {
+      if (presetId === activePresetId && pendingPresetId === null) {
+        layout.applyPreset(presetId);
+      }
+    },
+    [activePresetId, layout, pendingPresetId]
   );
   const applyPreset = useCallback(
     (preset: LayoutPreset) => {
@@ -328,6 +336,7 @@ export const LayoutPresetStrip = () => {
                               ? undefined
                               : findLayoutPresetWorkingCopy(presetWorkingLayouts, preset.id)
                           }
+                          onGoHome={goHome}
                           onOpenMenu={openMenu}
                           onRequest={requestPreset}
                         />
@@ -406,6 +415,7 @@ export const LayoutPresetStrip = () => {
 const PresetTab = ({
   isActive,
   isUnsaved,
+  onGoHome,
   onOpenMenu,
   onRequest,
   preset,
@@ -416,6 +426,7 @@ const PresetTab = ({
   preset: LayoutPreset;
   /** This project's working copy, which switching to the preset lays out and so is what preloading warms. */
   workingArrangement: LayoutPresetSnapshot | undefined;
+  onGoHome: (presetId: LayoutPresetId) => void;
   onOpenMenu: (target: Omit<PresetMenuTarget, 'ticket'>) => void;
   onRequest: (presetId: LayoutPresetId) => void;
 }) => {
@@ -445,6 +456,9 @@ const PresetTab = ({
   );
   const unsavedLabel = t('topbar.presets.unsavedLayoutChanges');
 
+  // Whether the press began on the tab already active: a press that switched to it is not also a press to go home.
+  const pressStartedActiveRef = useRef(false);
+
   // Use a span chevron recognized by the tab handler; nested buttons are invalid.
   const handleClick = useCallback(
     (event: MouseEvent<HTMLButtonElement>) => {
@@ -454,9 +468,11 @@ const PresetTab = ({
         event.preventDefault();
         event.stopPropagation();
         onOpenMenu({ anchor: trigger.getBoundingClientRect(), preset });
+      } else if (event.detail === 0 ? isActive : pressStartedActiveRef.current) {
+        onGoHome(preset.id);
       }
     },
-    [onOpenMenu, preset]
+    [isActive, onGoHome, onOpenMenu, preset]
   );
 
   // Activate on primary press for immediate feedback; right-click must preserve the inactive preset's menu actions.
@@ -464,6 +480,7 @@ const PresetTab = ({
     (event: PointerEvent<HTMLButtonElement>) => {
       // Chain dnd-kit's activator so a sensor change cannot silently lose drag initiation.
       (listeners as { onPointerDown?: (value: unknown) => void } | undefined)?.onPointerDown?.(event);
+      pressStartedActiveRef.current = isActive;
 
       if (event.button === 0 && event.pointerType !== 'touch' && !isActive) {
         onRequest(preset.id);

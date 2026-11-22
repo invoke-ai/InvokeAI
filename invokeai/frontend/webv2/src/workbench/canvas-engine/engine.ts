@@ -1964,49 +1964,52 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     interactionController.setTool(toolId, options);
   };
 
-  /** Escape order: text edit, transform, float, tool session, operation, then selection. */
-  const handleEscapePriority = ({ gestureWasActive }: { gestureWasActive: boolean }): void => {
+  /** Escape order: text edit, transform, float, tool session, operation, then selection; true when a step acted. */
+  const handleEscapePriority = ({ gestureWasActive }: { gestureWasActive: boolean }): boolean => {
     if (vectorTraceAbort) {
       vectorTraceAbort.abort();
-      return;
+      return true;
     }
     if (tools.get('shape')?.hasSession?.()) {
       tools.get('shape')?.onKeyCommand?.(toolContext, 'cancel');
-      return;
+      return true;
     }
     if (vectorRuntime?.editor.hasSession()) {
       vectorRuntime?.editor.onKeyCommand(toolContext, 'cancel');
-      return;
+      return true;
     }
     if (colorSamples.onEscape()) {
-      return;
+      return true;
     }
     if (stores.textEditSession.get()) {
       cancelTextEdit();
-      return;
+      return true;
     }
     if (stores.transformSession.get()) {
       cancelTransform();
-      return;
+      return true;
     }
     if (editingController.transform.onEscape()) {
-      return;
+      return true;
     }
     if (floatingSelection.has()) {
       floatingSelection.cancel();
-      return;
+      return true;
     }
     // The tool the user is really on: a Space-held pan mid-polygon keeps the polygon's session on the held tool.
     const sessionTool = tools.get(pipeline.heldRestoreToolId() ?? interactionController.getActiveToolId());
     if (sessionTool?.onKeyCommand?.(toolContext, 'cancel')) {
-      return;
+      return true;
     }
     if (applicationEscapeHandler?.(gestureWasActive)) {
-      return;
+      return true;
     }
     if (!gestureWasActive && selection.hasSelection()) {
       selection.clear();
+      return true;
     }
+
+    return false;
   };
 
   const pipeline: PointerPipeline = createPointerPipeline({

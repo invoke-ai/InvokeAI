@@ -37,6 +37,7 @@ import { useWorkbenchCommands, useWorkbenchExtensions, useWorkbenchQueries } fro
 import { resolvePanelToggle } from '@workbench/workbenchState';
 import {
   goBackToPreviousWorkspace,
+  goBackToStage,
   openInWorkspace,
   toggleCenterPreview,
   type OpenInWorkspace,
@@ -102,6 +103,7 @@ export const FIRST_PARTY_APP_COMMAND_IDS = [
   'app.resetPanelLayout',
   'app.togglePanels',
   'app.togglePreview',
+  'app.backToStage',
   'app.backToPreviousWorkspace',
 ] as const;
 
@@ -324,7 +326,7 @@ export const useRegisterFirstPartyCommands = () => {
           actions: [{ kind: 'add-widget', surface: 'panel', widgetId: 'workflow' }],
           category: 'workspace-offer',
           kind: 'info',
-          title: t('shell.workspace.noWorkflowForm'),
+          title: t('shell.workspace.noWorkflowForm', { lng: 'en' }),
           titleKey: 'shell.workspace.noWorkflowForm',
         });
       }
@@ -580,6 +582,11 @@ export const useRegisterFirstPartyCommands = () => {
         handler: () => toggleCenterPreview(navigation),
         id: 'app.togglePreview',
         title: 'Toggle preview in center',
+      }),
+      commandApi.register({
+        handler: () => goBackToStage(navigation),
+        id: 'app.backToStage',
+        title: 'Back to main view',
       }),
       commandApi.register({
         handler: () => goBackToPreviousWorkspace(navigation),

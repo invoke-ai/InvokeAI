@@ -180,12 +180,6 @@ describe('layout preset working copies', () => {
     expect(isActiveDirty(state)).toBe(false);
     state = run(state, { type: 'undoProjectChange' });
     expect(getActiveProject(state).widgetRegions.right.sizePx).toBe(433);
-
-    // Choosing the active preset again (its shortcut) is a revert too, and undoable the same way.
-    state = run(state, switchTo('edit'));
-    expect(isActiveDirty(state)).toBe(false);
-    state = run(state, { type: 'undoProjectChange' });
-    expect(getActiveProject(state).widgetRegions.right.sizePx).toBe(433);
   });
 
   it('keeps a renamed preset’s copy and drops a deleted preset’s from every open project', () => {

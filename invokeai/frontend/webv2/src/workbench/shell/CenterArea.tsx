@@ -29,8 +29,15 @@ import {
   isRequiredCenterView,
 } from '@workbench/widgetRegionViewModel';
 import { getWidgetById, getWidgetsForRegion } from '@workbench/widgetRegistry';
-import { useActiveProjectId, useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
-import { CheckIcon, ChevronDownIcon, XIcon } from 'lucide-react';
+import {
+  useActiveProjectId,
+  useActiveProjectSelector,
+  useWorkbenchCommands,
+  useWorkbenchQueries,
+  useWorkbenchSelector,
+} from '@workbench/WorkbenchContext';
+import { getActiveAwayStage, goBackToStage } from '@workbench/workspace/workspaceNavigation';
+import { ArrowLeftIcon, CheckIcon, ChevronDownIcon, XIcon } from 'lucide-react';
 import { Activity, Suspense, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -71,15 +78,24 @@ const compactViewMenu = <T extends object>(styles: T) => ({ [COMPACT_CHROME]: st
 const VIEW_MENU_TRIGGER_CSS = compactViewMenu({ flexShrink: 0, minW: '8', px: '0' });
 const VIEW_MENU_CONTENT_CSS = { gap: '2', ...compactViewMenu({ gap: '1' }) };
 const VIEW_MENU_LABEL_CSS = compactViewMenu({ display: 'none' });
-/** The start island gives way first, down to this width: the view menu at its floor, clear of the end cue. */
-const START_ISLAND_MIN_WIDTH = getChromeIslandMinWidth(VIEW_MENU_MIN_WIDTH);
-const END_ISLAND_MAX_WIDTH = `calc(100% - ${START_ISLAND_MIN_WIDTH} - {spacing.2})`;
+/** Back to the stage compacts with the view menu, to its icon, which stays on screen at the island's floor. */
+const BACK_COMPACT_WIDTH = '2rem';
+const BACK_TRIGGER_CSS = compactViewMenu({ flexShrink: 0, minW: BACK_COMPACT_WIDTH, px: '0' });
+/** The start island gives way first, down to this width: the view menu at its floor (and Back, while Away). */
+const getEndIslandMaxWidth = (startControlsWidth: string) =>
+  `calc(100% - ${getChromeIslandMinWidth(startControlsWidth)} - {spacing.2})`;
+const END_ISLAND_MAX_WIDTH = getEndIslandMaxWidth(VIEW_MENU_MIN_WIDTH);
+const END_ISLAND_MAX_WIDTH_AWAY = getEndIslandMaxWidth(`(${VIEW_MENU_MIN_WIDTH} + ${BACK_COMPACT_WIDTH} + 2px)`);
 
 export const CenterArea = () => {
   const { t } = useTranslation();
   const placementProject = useActiveProjectSelector(getWidgetPlacementProject, areWidgetPlacementProjectsEqual);
   const centerRegion = useActiveProjectSelector((project) => project.widgetRegions.center);
-  const { widgets } = useWorkbenchCommands();
+  const commands = useWorkbenchCommands();
+  const { widgets } = commands;
+  const queries = useWorkbenchQueries();
+  const focus = useWorkbenchFocus();
+  const awayStageId = useWorkbenchSelector(getActiveAwayStage, Object.is);
   const getWidgetLabel = useCallback(
     (manifest: Parameters<typeof resolveWidgetLabel>[0]) => resolveWidgetLabel(manifest, t),
     [t]
@@ -114,6 +130,11 @@ export const CenterArea = () => {
     ? centerRegion.activeInstanceId
     : centerViewItems[0]?.id;
   const activeItem = centerViewItems.find((item) => item.id === activeCenterViewId);
+  const awayStage = awayStageId === null ? undefined : centerViewItems.find((item) => item.id === awayStageId);
+  const goBack = useCallback(
+    () => goBackToStage({ commands, focus, getWidgetsForRegion, queries }),
+    [commands, focus, queries]
+  );
   // The center emptied because its last view floated away: say so, rather than call the view unavailable.
   const floatedInstance =
     centerRegion.instanceIds.length === 0 ? placementProject.widgetInstances[centerRegion.activeInstanceId] : undefined;
@@ -225,6 +246,7 @@ export const CenterArea = () => {
         >
           <Box css={START_ISLAND_ROOM_CSS}>
             <ChromeIsland>
+              {awayStage ? <BackToStageButton label={awayStage.label} onBack={goBack} /> : null}
               <CenterViewMenu
                 activeItem={activeItem}
                 availableItems={availableCenterItems}
@@ -246,7 +268,7 @@ export const CenterArea = () => {
           </Box>
 
           {activeItem && activeItem.widget.manifest.chrome?.header !== 'hidden' ? (
-            <ChromeIsland flexShrink={0} maxW={END_ISLAND_MAX_WIDTH}>
+            <ChromeIsland flexShrink={0} maxW={awayStage ? END_ISLAND_MAX_WIDTH_AWAY : END_ISLAND_MAX_WIDTH}>
               {centerToolbarItems.map((toolbarItem) => (
                 <WidgetRendererById
                   key={toolbarItem.id}
@@ -264,6 +286,43 @@ export const CenterArea = () => {
         </Flex>
       </Box>
     </Flex>
+  );
+};
+
+/** The header's first control while Away; Escape in the center does the same. */
+const BackToStageButton = ({ label, onBack }: { label: string; onBack: () => void }) => {
+  const { t } = useTranslation();
+  const text = t('shell.workspace.backToStage', { stage: label });
+  const labelRef = useRef<HTMLParagraphElement>(null);
+  // Named by the tooltip while its label is truncated or, compact, hidden.
+  const isLabelClipped = useCallback(() => {
+    const label = labelRef.current;
+
+    return !label || label.getClientRects().length === 0 || label.scrollWidth > label.clientWidth;
+  }, []);
+
+  return (
+    <ClippedTooltip content={text} isClipped={isLabelClipped}>
+      <Button
+        aria-label={text}
+        color="fg"
+        // The button recipe refuses to shrink; the label truncates to the floor, then the control compacts.
+        css={BACK_TRIGGER_CSS}
+        flexShrink={1}
+        gap="1.5"
+        minW={VIEW_MENU_MIN_WIDTH}
+        overflow="hidden"
+        px="2"
+        size="sm"
+        variant="ghost"
+        onClick={onBack}
+      >
+        <Icon as={ArrowLeftIcon} boxSize="3.5" flexShrink={0} />
+        <Text ref={labelRef} css={VIEW_MENU_LABEL_CSS} fontWeight="600" truncate>
+          {text}
+        </Text>
+      </Button>
+    </ClippedTooltip>
   );
 };
 

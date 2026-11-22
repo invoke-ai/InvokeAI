@@ -2,6 +2,7 @@
 import type { WorkbenchState } from '@workbench/projectContracts';
 
 import { captureInvocationRuntimeInputs } from './invocationPreparation';
+import { isCenterViewType } from './widgetRegistry';
 import {
   createInitialWorkbenchState,
   __workbenchReducerInternal,
@@ -14,7 +15,10 @@ type Submission = Extract<__WorkbenchReducerActionInternal, { runtime: unknown }
 type OptionalRuntime<T> = T extends Submission ? Omit<T, 'runtime'> & { runtime?: T['runtime'] } : T;
 type TestAction = OptionalRuntime<__WorkbenchReducerActionInternal>;
 
-const DEFAULT_TEST_CONTEXT: WorkbenchReducerContext = { autoSwitchInvocationRoute: true };
+const DEFAULT_TEST_CONTEXT: WorkbenchReducerContext = {
+  autoSwitchInvocationRoute: true,
+  isCenterView: isCenterViewType,
+};
 
 export const workbenchReducer = (
   state: WorkbenchState,

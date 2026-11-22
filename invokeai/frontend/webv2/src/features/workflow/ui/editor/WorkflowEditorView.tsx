@@ -61,6 +61,7 @@ import {
   useRef,
   useState,
   startTransition,
+  type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
 } from 'react';
@@ -136,6 +137,17 @@ const edgeTypes: EdgeTypes = {
 // 25px matches v6 so workflows aligned there stay on the grid here.
 const GRID_SIZE = 25;
 const SNAP_GRID: [number, number] = [GRID_SIZE, GRID_SIZE];
+
+/** React Flow unselects a focused, selected node or edge on Escape without marking the press; mark it as used. */
+const markFlowEscape = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+  if (
+    event.key === 'Escape' &&
+    event.target instanceof Element &&
+    event.target.closest('.react-flow__node.selected, .react-flow__edge.selected')
+  ) {
+    event.preventDefault();
+  }
+};
 
 const DELETE_KEY_CODES = ['Backspace', 'Delete'];
 const RECONNECT_DISCONNECT_DISTANCE_PX = 5;
@@ -1399,6 +1411,7 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
       position="relative"
       w="full"
       onContextMenuCapture={onEditorContextMenuCapture}
+      onKeyDown={markFlowEscape}
       onPointerEnter={onEditorPointerMove}
       onPointerLeave={onEditorPointerLeave}
       onPointerMove={onEditorPointerMove}

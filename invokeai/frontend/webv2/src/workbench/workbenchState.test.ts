@@ -1455,7 +1455,7 @@ describe('workbench layout presets', () => {
     expect(getActiveProject(state).invocation).toMatchObject({ destination: 'gallery', sourceId: 'workflow' });
   });
 
-  it('falls back safely when a custom preset no longer contains its default source', () => {
+  it('aims Invoke at the front source when a custom preset no longer places its explicit route’s', () => {
     let seeded = createInitialWorkbenchState();
     seeded = workbenchReducer(seeded, {
       label: 'Generate only',
@@ -1492,32 +1492,11 @@ describe('workbench layout presets', () => {
       account: { ...seeded.account, customLayoutPresets: [generateOnlyPreset] },
     };
 
-    let liveRouteStillPresent = workbenchReducer(seeded, {
-      destination: 'canvas',
-      type: 'setInvocationDestination',
-    });
-    liveRouteStillPresent = workbenchReducer(liveRouteStillPresent, {
-      presetId: generateOnlyPreset.id,
-      type: 'applyPreset',
-    });
-    expect(getActiveProject(liveRouteStillPresent).invocation).toMatchObject({
-      destination: 'canvas',
-      sourceId: 'generate',
-    });
+    let state = workbenchReducer(seeded, { sourceId: 'canvas', type: 'setInvocationSource' });
+    state = workbenchReducer(state, { destination: 'canvas', type: 'setInvocationDestination' });
+    state = workbenchReducer(state, { presetId: generateOnlyPreset.id, type: 'applyPreset' });
 
-    let liveRouteMissing = workbenchReducer(seeded, { sourceId: 'canvas', type: 'setInvocationSource' });
-    liveRouteMissing = workbenchReducer(liveRouteMissing, {
-      destination: 'canvas',
-      type: 'setInvocationDestination',
-    });
-    liveRouteMissing = workbenchReducer(liveRouteMissing, {
-      presetId: generateOnlyPreset.id,
-      type: 'applyPreset',
-    });
-    expect(getActiveProject(liveRouteMissing).invocation).toMatchObject({
-      destination: 'gallery',
-      sourceId: 'generate',
-    });
+    expect(getActiveProject(state).invocation).toMatchObject({ destination: 'gallery', sourceId: 'generate' });
   });
 
   it('applies the Compose preset as a full widget-region layout', () => {
@@ -1776,6 +1755,63 @@ describe('workbench layout presets', () => {
 
     expect(hydrated.account.activeLayoutPresetId).toBe('automate');
     expect(getActiveProject(hydrated).layout.presetId).toBe('edit');
+  });
+});
+
+describe('entering a workspace', () => {
+  const run = (state: WorkbenchState, ...actions: WorkbenchAction[]) => actions.reduce(workbenchReducer, state);
+  const leaveEditOnPreview = (state: WorkbenchState) =>
+    run(
+      state,
+      { presetId: 'edit', type: 'applyPreset' },
+      { region: 'center', type: 'selectRegionWidget', widgetId: 'preview' },
+      { region: 'right', sizePx: 433, type: 'setRegionWidgetSize' },
+      { isCollapsed: true, region: 'left', type: 'setRegionWidgetCollapsed' }
+    );
+
+  it('restores the stage and the job over a working copy, keeping its sizes and collapsed panels', () => {
+    const state = run(
+      leaveEditOnPreview(createInitialWorkbenchState()),
+      { presetId: 'compose', type: 'applyPreset' },
+      { presetId: 'edit', type: 'applyPreset' }
+    );
+    const project = getActiveProject(state);
+
+    expect(project.widgetRegions.center.activeInstanceId).toBe('canvas');
+    expect(project.invocation).toMatchObject({ destination: 'canvas', sourceId: 'canvas' });
+    expect(project.widgetRegions.right.sizePx).toBe(433);
+    expect(project.widgetRegions.left.isCollapsed).toBe(true);
+  });
+
+  it('goes home on the active workspace without reverting it or adding an undo step', () => {
+    const away = leaveEditOnPreview(createInitialWorkbenchState());
+    const home = getActiveProject(run(away, { presetId: 'edit', type: 'applyPreset' }));
+
+    expect(home.widgetRegions.center.activeInstanceId).toBe('canvas');
+    expect(home.widgetRegions.right.sizePx).toBe(433);
+    expect(home.widgetRegions.left.isCollapsed).toBe(true);
+    expect(home.undoRedo.past).toEqual(getActiveProject(away).undoRedo.past);
+  });
+
+  it('enters a project on its first activation in the session, not on returning to it', () => {
+    const first = leaveEditOnPreview(createInitialWorkbenchState());
+    const withSecond = leaveEditOnPreview(run(first, { type: 'createProject' }));
+    const [firstId, secondId] = withSecond.projects.map(({ id }) => id) as [string, string];
+    let state = run(withSecond, { state: withSecond, type: 'hydrateWorkbench' });
+
+    expect(getProject(state, secondId).widgetRegions.center.activeInstanceId).toBe('canvas');
+    expect(getProject(state, firstId).widgetRegions.center.activeInstanceId).toBe('preview');
+
+    state = run(state, { projectId: firstId, type: 'switchProject' });
+    expect(getProject(state, firstId).widgetRegions.center.activeInstanceId).toBe('canvas');
+
+    state = run(
+      state,
+      { region: 'center', type: 'selectRegionWidget', widgetId: 'preview' },
+      { projectId: secondId, type: 'switchProject' },
+      { projectId: firstId, type: 'switchProject' }
+    );
+    expect(getProject(state, firstId).widgetRegions.center.activeInstanceId).toBe('preview');
   });
 });
 

@@ -68,7 +68,10 @@ const createInputHarness = () => {
     getInputElement: () => canvas,
     getKeyboardRoot: () => surface,
     getToolContext: () => ctx,
-    handleEscape: () => events.push('escape'),
+    handleEscape: () => {
+      events.push('escape');
+      return true;
+    },
     hasTool: (id) => id in tools,
     isReplaying: () => false,
     setTool: (id, options) => interaction.setTool(id, options),
