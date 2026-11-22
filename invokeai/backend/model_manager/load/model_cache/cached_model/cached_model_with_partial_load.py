@@ -178,10 +178,22 @@ class CachedModelWithPartialLoad:
         ```
         """
         state_dict_keys_by_module_prefix: dict[str, list[str]] = {}
+        named_modules = dict(self._model.named_modules(remove_duplicate=False))
         for key in state_dict.keys():
-            split = key.rsplit(".", 1)
-            # `split` will have length 1 if the root module has parameters.
-            module_name = split[0] if len(split) > 1 else ""
+            # Bitsandbytes serializes metadata for a parameter below its key (e.g. `weight.quant_state.*`). Those
+            # keys belong to the module that owns `weight`, not to a child module named `weight`.
+            parts = key.split(".")
+            module_name = None
+            for split_at in range(len(parts) - 1, -1, -1):
+                candidate = ".".join(parts[:split_at])
+                module = named_modules.get(candidate)
+                if module is not None and parts[split_at] in module._parameters | module._buffers:
+                    module_name = candidate
+                    break
+            if module_name is None:
+                split = key.rsplit(".", 1)
+                # `split` will have length 1 if the root module has parameters.
+                module_name = split[0] if len(split) > 1 else ""
             if module_name not in state_dict_keys_by_module_prefix:
                 state_dict_keys_by_module_prefix[module_name] = []
             state_dict_keys_by_module_prefix[module_name].append(key)

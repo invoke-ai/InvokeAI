@@ -140,6 +140,7 @@ def load_qwen3_5_text_encoder(
             architecture="Qwen3.5",
             reserve=loader.ram_cache.make_room,
             skip_patterns=skip_patterns,
+            source_tensors_mapped=True,
         )
         loader._logger.info(
             f"{what}: kept {len(int8_layers)} of {len(markers)} layer(s) in int8 (int8_tensorwise checkpoint, "
@@ -158,6 +159,7 @@ def load_qwen3_5_text_encoder(
             skip_patterns=skip_patterns,
             fp8_layers={},
             nvfp4_payloads={},
+            source_tensors_mapped=True,
         )
         kept = cast_state_dict(sd, model_dtype, keep_fp8=keep_fp8, model=model, skip_patterns=skip_patterns)
 

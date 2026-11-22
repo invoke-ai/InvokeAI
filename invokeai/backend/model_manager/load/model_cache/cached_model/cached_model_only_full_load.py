@@ -218,6 +218,7 @@ class CachedModelOnlyFullLoad:
         if self._has_packed_params:
             self._move_packed_params(self._compute_device)
         self._model.to(self._compute_device)
+        self._move_quantized_param_sidecars(self._compute_device)
 
         self._retie_shared_weights()
         self._is_in_vram = True
@@ -241,6 +242,7 @@ class CachedModelOnlyFullLoad:
         if self._has_packed_params:
             self._move_packed_params(self._offload_device)
         self._model.to(self._offload_device)
+        self._move_quantized_param_sidecars(self._offload_device)
 
         self._retie_shared_weights()
         self._is_in_vram = False
@@ -284,6 +286,25 @@ class CachedModelOnlyFullLoad:
                         moved = torch.nn.Parameter(moved, requires_grad=param.requires_grad)
                     moved_by_id[id(param)] = moved
                 module._parameters[name] = moved_by_id[id(param)]
+
+    def _move_quantized_param_sidecars(self, device: torch.device) -> None:
+        """Move bitsandbytes' CB/SCB attributes, which ``Module.to`` does not update with parameter data."""
+        if not isinstance(self._model, torch.nn.Module):
+            return
+        for module in self._model.modules():
+            for param in module._parameters.values():
+                if param is None:
+                    continue
+                for name in ("CB", "SCB"):
+                    sidecar = getattr(param, name, None)
+                    if not isinstance(sidecar, torch.Tensor):
+                        continue
+                    if name == "CB" and sidecar.shape == param.data.shape and sidecar.dtype == param.data.dtype:
+                        # bitsandbytes' quantized CB is the packed parameter data; keep one storage allocation after
+                        # Module.to() has replaced param.data and the old CB reference became stale.
+                        param.CB = param.data  # type: ignore[attr-defined]
+                    elif sidecar.device != device:
+                        setattr(param, name, sidecar.to(device))
 
     def _move_alias_groups_to_device(self, state_dict: dict[str, torch.Tensor], device: torch.device) -> None:
         """Move ordinary tied groups once; `.to()` handles all remaining tensors and buffers."""

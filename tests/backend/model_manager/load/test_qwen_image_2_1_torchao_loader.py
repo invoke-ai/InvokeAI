@@ -81,7 +81,7 @@ def _checkpoint() -> tuple[dict[str, torch.Tensor], dict[str, torch.Tensor], dic
 
 def _load(
     monkeypatch: pytest.MonkeyPatch, tmp_path, *, keep_fp8: bool
-) -> tuple[torch.nn.Module, dict[str, torch.Tensor]]:
+) -> tuple[torch.nn.Module, dict[str, torch.Tensor], object]:
     """The model, and the tensors `load_file` returned for the real file the loader read."""
     state_dict, _, _ = _checkpoint()
     checkpoint = tmp_path / "Qwen-Image-2.1-FP8.safetensors"
@@ -104,11 +104,11 @@ def _load(
         patch.setattr(qwen_image_2_1, "_build_transformer", lambda _sd: _TinyTransformer())
 
     run = prepare(SEAM, monkeypatch, metadata=None, geometry=install)
-    return run.load(config, SubModelType.Transformer), loaded
+    return run.load(config, SubModelType.Transformer), loaded, run
 
 
 def test_the_fp8_layers_stay_quantized_with_a_flat_per_row_scale(monkeypatch, tmp_path) -> None:
-    model, _ = _load(monkeypatch, tmp_path, keep_fp8=True)
+    model, _, _ = _load(monkeypatch, tmp_path, keep_fp8=True)
     _, codes, scales = _checkpoint()
 
     layer = model.transformer_blocks[0].attn.to_q
@@ -130,7 +130,7 @@ def test_the_fp8_layers_stay_quantized_with_a_flat_per_row_scale(monkeypatch, tm
 
 @pytest.mark.parametrize("keep_fp8", [True, False])
 def test_a_folded_layer_is_exactly_the_codes_times_the_scale(monkeypatch, tmp_path, keep_fp8: bool) -> None:
-    model, _ = _load(monkeypatch, tmp_path, keep_fp8=keep_fp8)
+    model, _, _ = _load(monkeypatch, tmp_path, keep_fp8=keep_fp8)
     _, codes, scales = _checkpoint()
 
     folded = codes["norm_out.linear"].float() * scales["norm_out.linear"]
@@ -145,7 +145,10 @@ PREFIX = "model.diffusion_model."
 def test_a_folded_load_does_not_leave_parameters_pinning_the_file_mapping(monkeypatch, tmp_path) -> None:
     """`img_in` is stored in the compute dtype, so neither the fold nor the cast replaces it; assigned as a parameter it
     would be a slice of the file's mapping, which the cache's size calculation cannot see."""
-    model, loaded = _load(monkeypatch, tmp_path, keep_fp8=False)
+    model, loaded, run = _load(monkeypatch, tmp_path, keep_fp8=False)
+
+    assert run.reservation_kwargs[-1]["source_tensors_mapped"] is True
+    assert run.reservation_kwargs[-1]["source_tensors_cloned"] is True
 
     for name in ("img_in.weight", "img_in.bias"):
         parameter = model.get_parameter(name)
@@ -154,7 +157,7 @@ def test_a_folded_load_does_not_leave_parameters_pinning_the_file_mapping(monkey
 
 
 def test_a_kept_fp8_load_does_not_copy_the_codes(monkeypatch, tmp_path) -> None:
-    model, loaded = _load(monkeypatch, tmp_path, keep_fp8=True)
+    model, loaded, _ = _load(monkeypatch, tmp_path, keep_fp8=True)
 
     codes = model.transformer_blocks[0].attn.to_q.weight
     assert codes.data_ptr() == loaded[PREFIX + "transformer_blocks.0.attn.to_q._weight_qdata"].data_ptr()

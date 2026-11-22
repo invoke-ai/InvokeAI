@@ -21,6 +21,65 @@ from tests.backend.model_manager.load.model_cache.cached_model.utils import (
 )
 
 
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="requires CUDA and bitsandbytes NF4 kernels")
+def test_nf4_quant_state_sidecars_move_with_weight_without_ram_copy():
+    """A no-shadow partial transfer must keep the NF4 weight and all quantization metadata together."""
+    from invokeai.backend.quantization.bnb_nf4 import InvokeLinearNF4
+
+    torch.manual_seed(0)
+    source = torch.nn.Linear(64, 4)
+    layer = InvokeLinearNF4(64, 4)
+    layer.load_state_dict(source.state_dict())
+    layer.to("cuda")
+    input = torch.randn(2, 64, device="cuda")
+    expected = layer(input)
+
+    # Start from a pre-quantized CPU layer, as the model loader does.
+    cpu_state_dict = {key: value.to("cpu") for key, value in layer.state_dict().items()}
+    layer.load_state_dict(cpu_state_dict)
+    model = torch.nn.Module()
+    model.linear = layer
+
+    cached_model = CachedModelWithPartialLoad(model, torch.device("cuda"), keep_ram_copy=False)
+    assert cached_model.partial_load_to_vram(cached_model.total_bytes()) == cached_model.total_bytes()
+
+    assert model.linear.weight.device.type == "cuda"
+    assert model.linear.weight.quant_state is not None
+    assert model.linear.weight.quant_state.absmax.device.type == "cuda"
+    assert model.linear.weight.quant_state.code.device.type == "cuda"
+    assert torch.allclose(model.linear(input), expected, atol=1e-5)
+
+    cached_model.full_unload_from_vram()
+    assert model.linear.weight.device.type == "cpu"
+    assert model.linear.weight.quant_state.absmax.device.type == "cpu"
+    assert model.linear.weight.quant_state.code.device.type == "cpu"
+
+    cached_model.full_load_to_vram()
+    assert model.linear.weight.quant_state.absmax.device.type == "cuda"
+    assert model.linear.weight.quant_state.code.device.type == "cuda"
+    assert torch.allclose(model.linear(input), expected, atol=1e-5)
+
+
+def test_sidecars_group_under_both_paths_of_shared_child():
+    shared = torch.nn.Linear(2, 2, bias=False)
+    model = torch.nn.Module()
+    model.a = shared
+    model.b = shared
+    cached_model = CachedModelWithPartialLoad(model, torch.device("cpu"), keep_ram_copy=False)
+
+    state_dict = {
+        "a.weight": shared.weight,
+        "a.weight.absmax": torch.ones(1),
+        "b.weight": shared.weight,
+        "b.weight.absmax": torch.ones(1),
+    }
+
+    grouped = cached_model._group_state_dict_keys_by_module_prefix(state_dict)
+
+    assert grouped["a"] == ["a.weight", "a.weight.absmax"]
+    assert grouped["b"] == ["b.weight", "b.weight.absmax"]
+
+
 @pytest.fixture
 def model():
     model = DummyModule()

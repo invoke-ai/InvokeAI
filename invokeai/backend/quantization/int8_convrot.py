@@ -1187,6 +1187,7 @@ def install_int8_convrot_layers(
     extra_reserved_bytes: int = 0,
     extra_host_bytes: int = 0,
     read: Callable[[str], torch.Tensor] | None = None,
+    source_tensors_mapped: bool = False,
 ) -> dict[str, dict[str, Any]]:
     """Take a marked int8 or int4 checkpoint from state dict to installed ``Int8ConvrotLinear`` and
     ``Int4ConvrotLinear`` modules.
@@ -1215,7 +1216,9 @@ def install_int8_convrot_layers(
     also holds layers of another scheme -- Krea-2 and Z-Image add what their nvfp4 layers will cost,
     so the one reservation covers the whole load. ``read`` is for a loader that hands over the file's header as
     ``meta`` tensors: steps 1 and 2 need only keys, shapes and dtypes, so each ``meta`` entry is read through it after
-    the reservation, and no payload lands on an unreserved cache. Returns the layers that stayed int8.
+    the reservation, and no payload lands on an unreserved cache. ``source_tensors_mapped`` marks file-backed source
+    tensors whose pages remain retained while decoded outputs and dtype-cast dense tensors are installed. Returns the
+    layers that stayed int8.
     """
     reject_foreign_quantization_scales(sd, quantized, architecture, model)
     reserved_bytes = predict_int8_cast_size(sd, dtype, quantized, model=model, skip_patterns=skip_patterns)
@@ -1244,18 +1247,39 @@ def install_int8_convrot_layers(
                 read_peak = max(read_peak, held + raw_bytes)
             held += target_bytes
         materialized_source_bytes = held
-    dequant_delta, dequant_peak = _predict_int8_dequant_peak(sd, quantized, surviving, dtype, materialized_source_bytes)
+    dequant_delta, dequant_peak, dequant_output_bytes = _predict_int8_dequant_peak(
+        sd,
+        quantized,
+        surviving,
+        dtype,
+        materialized_source_bytes,
+        source_tensors_mapped=source_tensors_mapped,
+    )
     cast_sd = {key: tensor for key, tensor in sd.items() if key not in pinned and is_castable_float(tensor)}
     if has_meta:
+        cast_peak = 0
+        mapped_cast_bytes = 0
+    elif source_tensors_mapped:
+        # Dense cast destinations remain live after the split; mapped source pages do not count as allocated RAM.
+        mapped_cast_bytes = sum(
+            tensor.nelement() * dtype.itemsize for tensor in cast_sd.values() if tensor.dtype != dtype
+        )
         cast_peak = 0
     else:
         _, cast_peak = state_dict_cast_bytes(cast_sd, dtype, in_place=True)
         cast_peak = materialized_source_bytes + dequant_delta + cast_peak
+        mapped_cast_bytes = 0
     del cast_sd
     int8_target_bytes = reserved_bytes - extra_reserved_bytes
-    host_peak = max(int8_target_bytes, dequant_peak, cast_peak)
-    host_peak = max(host_peak, read_peak)
-    host_bytes_needed = max(0, host_peak - source_bytes, int8_target_bytes - source_bytes + extra_host_bytes)
+    if source_tensors_mapped:
+        # Mapped source pages remain retained while the split and cast replace their state-dict entries. Count the
+        # complete decoded outputs and cast destinations, rather than crediting their source bytes as reclaimed.
+        mapped_peak = max(dequant_peak, dequant_output_bytes + mapped_cast_bytes + extra_host_bytes)
+        host_bytes_needed = max(0, mapped_peak, read_peak - source_bytes)
+    else:
+        host_peak = max(int8_target_bytes, dequant_peak, cast_peak)
+        host_peak = max(host_peak, read_peak)
+        host_bytes_needed = max(0, host_peak - source_bytes, int8_target_bytes - source_bytes + extra_host_bytes)
     try:
         parameters = inspect.signature(reserve).parameters.values()
     except (TypeError, ValueError):
@@ -1289,10 +1313,13 @@ def _predict_int8_dequant_peak(
     surviving: Mapping[str, Any],
     dtype: torch.dtype,
     materialized_source_bytes: int,
-) -> tuple[int, int]:
-    """Return net split growth and peak bytes while keeping decode locals out of later cast phases."""
+    *,
+    source_tensors_mapped: bool = False,
+) -> tuple[int, int, int]:
+    """Return net split growth, peak bytes and total decoded outputs, keeping decode locals out of later casts."""
     dequant_delta = 0
     dequant_peak = 0
+    completed_outputs = 0
     for path, marker in quantized.items():
         if path in surviving:
             continue
@@ -1321,9 +1348,13 @@ def _predict_int8_dequant_peak(
                 )
         else:
             transient_peak = output_bytes
-        dequant_peak = max(dequant_peak, materialized_source_bytes + dequant_delta + transient_peak)
+        if source_tensors_mapped:
+            dequant_peak = max(dequant_peak, completed_outputs + transient_peak)
+        else:
+            dequant_peak = max(dequant_peak, materialized_source_bytes + dequant_delta + transient_peak)
         dequant_delta += output_bytes - old_bytes
-    return dequant_delta, dequant_peak
+        completed_outputs += output_bytes
+    return dequant_delta, dequant_peak, completed_outputs
 
 
 def reject_foreign_quantization_scales(

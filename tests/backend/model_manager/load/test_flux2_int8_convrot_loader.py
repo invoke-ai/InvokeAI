@@ -303,6 +303,32 @@ def test_a_dense_checkpoint_still_reaches_the_fp8_storage_pass(monkeypatch, tmp_
     assert not any(isinstance(module, Int8ConvrotLinear) for module in model.modules())
 
 
+def test_a_mapped_bfloat16_checkpoint_has_no_cast_host_demand(monkeypatch, tmp_path) -> None:
+    state_dict, originals = _checkpoint()
+    for path in QUANTIZED:
+        del state_dict[f"{path}.comfy_quant"]
+        del state_dict[f"{path}.weight_scale"]
+        state_dict[f"{path}.weight"] = originals[path].to(torch.bfloat16)
+    state_dict = {
+        key: value.to(torch.bfloat16) if value.is_floating_point() else value for key, value in state_dict.items()
+    }
+
+    host_bytes: list[int] = []
+    original_reserve_for_load = flux.reserve_for_load
+
+    def record_reservation(*args, **kwargs):
+        def reserve(bytes_needed: int, **reserve_kwargs):
+            host_bytes.append(reserve_kwargs["host_bytes_needed"])
+            return args[0](bytes_needed, **reserve_kwargs)
+
+        return original_reserve_for_load(reserve, *args[1:], **kwargs)
+
+    monkeypatch.setattr(flux, "reserve_for_load", record_reservation)
+    _load(monkeypatch, tmp_path, state_dict)
+
+    assert host_bytes == [0, 0]
+
+
 def test_a_file_mixing_int8_with_scaled_fp8_is_refused(monkeypatch, tmp_path) -> None:
     """Inside the int8 branch the fp8 pipeline is skipped entirely.
 

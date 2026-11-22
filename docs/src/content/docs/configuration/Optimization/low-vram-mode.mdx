@@ -58,8 +58,20 @@ around it:
   or browsers, can push Invoke's memory out too: close them. If it keeps happening, lower the image size, set
   `max_cache_vram_gb` lower or `device_working_mem_gb` higher, and restart Invoke to get the memory back into VRAM.
 </SetupVariant>
-<SetupVariant gpu="intel arm64">
+<SetupVariant gpu="intel">
 Nothing to change for this GPU: the [settings](#settings) below apply as they are.
+</SetupVariant>
+<SetupVariant os="windows" gpu="arm64">
+**RTX Spark (N1X): leave CUDA - Sysmem Fallback Policy at Driver Default.**
+
+RTX Spark uses unified LPDDR memory. Its shared GPU memory is GPU-local,
+unlike the PCIe-accessed system memory of discrete NVIDIA GPUs.
+Shared allocations may still be slower due to smaller pages and contention.
+NVIDIA manages allocation placement automatically.
+
+The discrete-GPU recommendation to disable fallback has not been
+validated on RTX Spark. Leave the setting unchanged. See NVIDIA's
+[RTX Spark Unified Memory Guide](https://docs.nvidia.com/rtx-spark/rtx-spark-porting-guide/latest/uma/umacuda.html).
 </SetupVariant>
 <SetupVariant os="linux" gpu="nvidia amd">
 Nothing to change for this GPU: the [settings](#settings) below apply as they are.
@@ -423,7 +435,7 @@ But the same seed will not reproduce an untiled result exactly.
 | Out-of-memory errors during generation | Raise `device_working_mem_gb` to 4 or more. Check that `max_cache_vram_gb` is not set too high (see [The VRAM budget](#the-vram-budget)). |
 | Out of memory while decoding a large image | Check the [tiling table](#tiled-vae-decode-and-encode): set `force_tiled_decode: true`, or turn on **Tiled** in the node. SD 1.5 and SDXL are not tiled automatically. |
 | A generation runs fine once, then runs out of memory or slows down sharply when repeated | `clear_vram_after_session: true`. |
-| Generation is very slow and Task Manager shows shared GPU memory in use (Windows) | NVIDIA: turn off the sysmem fallback. AMD: close other programs using the GPU and see the AMD notes. Both under [Platform notes](#platform-notes). |
+| Generation is very slow and Task Manager shows shared GPU memory in use (Windows) | Discrete NVIDIA GPUs: turn off the sysmem fallback. AMD: close other programs using the GPU and see the AMD notes. Both under [Platform notes](#platform-notes). |
 | Switching between, say, SDXL and FLUX.1 takes a few seconds every time | If both fit in VRAM together, `offload_on_architecture_switch: false`. |
 | RAM use is consistently high | `keep_ram_copy_of_weights: false`, or a lower `max_cache_ram_gb`. |
 | Invoke exits with error code `3221225477` on Windows, or crashes with `0xc0000005` in `eventvwr.msc` | The Windows page file ran out: see below. |

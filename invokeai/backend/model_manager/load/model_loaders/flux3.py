@@ -115,6 +115,7 @@ def flux3_transformer_from_single_file(
     *,
     metadata: Optional[Mapping[str, Any]] = None,
     keep_fp8: bool = False,
+    source_tensors_mapped: bool = False,
     logger: Optional[Logger] = None,
 ) -> torch.nn.Module:
     """The transformer of a single-file FLUX.3 state dict (Black Forest Labs' names, or diffusers' for the torchao
@@ -170,7 +171,14 @@ def flux3_transformer_from_single_file(
     if int8_markers:
         # No int8 build carries nvfp4 or scaled fp8 layers beside them; `reject_unloadable_quantization` refused that.
         int8_layers = install_int8_convrot_layers(
-            model, sd, int8_markers, dtype, architecture="FLUX.3", reserve=make_room, skip_patterns=skip_patterns
+            model,
+            sd,
+            int8_markers,
+            dtype,
+            architecture="FLUX.3",
+            reserve=make_room,
+            skip_patterns=skip_patterns,
+            source_tensors_mapped=source_tensors_mapped,
         )
         how = (
             "multiplied in int8 where int8 Compute's kernels cover them, dequantized per forward elsewhere"
@@ -190,6 +198,8 @@ def flux3_transformer_from_single_file(
             fp8_layers=fp8_layers,
             nvfp4_payloads=nvfp4_payloads,
             source_tensors_retained=bool(fp8_layers and not keep_fp8),
+            source_tensors_mapped=source_tensors_mapped,
+            source_tensors_cloned=bool(fp8_layers and not keep_fp8),
             modelopt_nvfp4_relayout=modelopt,
         )
         mapped = dict(sd) if fp8_layers and not keep_fp8 else None
@@ -302,6 +312,7 @@ class Flux3CheckpointModel(ModelLoader):
             self._ram_cache.make_room,
             metadata=read_safetensors_metadata(model_path, self._logger),
             keep_fp8=self._keep_fp8_weights(config, SubModelType.Transformer),
+            source_tensors_mapped=True,
             logger=self._logger,
         )
         if any(isinstance(module, DequantizingLinear) for module in model.modules()):

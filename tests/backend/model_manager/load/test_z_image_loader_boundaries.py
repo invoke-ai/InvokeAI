@@ -330,6 +330,8 @@ def test_an_nvfp4_checkpoint_loads_packed_with_its_qkv_split_on_tile_rows(monkey
 
     model = run.load(config)
 
+    assert run.reservation_kwargs[-1]["source_tensors_mapped"] is True
+
     bf16 = torch.bfloat16
     # A float32 activation, not the compute dtype: torch 2.7's CPU bf16 GEMM faults with an illegal instruction
     # on part of GitHub's windows runner fleet. These values are exact in either width, and the bias below is

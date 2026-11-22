@@ -366,6 +366,7 @@ class QwenImageCheckpointModel(ModelLoader):
                 skip_patterns=skip_patterns,
                 extra_reserved_bytes=predict_nvfp4_install_size(model, nvfp4_payloads, model_dtype, skip_patterns),
                 extra_host_bytes=predict_nvfp4_install_host_size(model, nvfp4_payloads, model_dtype, skip_patterns),
+                source_tensors_mapped=True,
             )
             logger.info(
                 f"Qwen Image: kept {len(quantized)} of {len(int8_markers)} layer(s) in int8 "
@@ -383,6 +384,7 @@ class QwenImageCheckpointModel(ModelLoader):
                 skip_patterns=skip_patterns,
                 fp8_layers=fp8_layers,
                 nvfp4_payloads=nvfp4_payloads,
+                source_tensors_mapped=True,
             )
 
             if fp8_layers and not keep_fp8:
@@ -584,6 +586,7 @@ class QwenVLEncoderCheckpointLoader(ModelLoader):
                 skip_patterns=skip_patterns,
                 extra_reserved_bytes=predict_nvfp4_install_size(model, nvfp4_payloads, model_dtype, skip_patterns),
                 extra_host_bytes=predict_nvfp4_install_host_size(model, nvfp4_payloads, model_dtype, skip_patterns),
+                source_tensors_mapped=True,
             )
             logger.info(
                 f"Qwen VL encoder: kept {len(quantized)} of {len(int8_markers)} layer(s) in int8 "
@@ -615,6 +618,7 @@ class QwenVLEncoderCheckpointLoader(ModelLoader):
                 skip_patterns=skip_patterns,
                 fp8_layers=fp8_layers,
                 nvfp4_payloads=nvfp4_payloads,
+                source_tensors_mapped=True,
             )
             if fp8_layers and not keep_fp8:
                 dequantize_fp8_scaled(sd, fp8_layers, model_dtype)

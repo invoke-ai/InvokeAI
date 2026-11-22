@@ -384,6 +384,7 @@ def _load_qwen3vl_visual_tower(
             # The branch's only reservation, and the nvfp4 layers are no longer in `sd`.
             extra_reserved_bytes=predict_nvfp4_install_size(tower, nvfp4_payloads, dtype, skip_patterns),
             extra_host_bytes=predict_nvfp4_install_host_size(tower, nvfp4_payloads, dtype, skip_patterns),
+            source_tensors_mapped=True,
         )
     else:
         # Whole keys were renamed, so each `.weight_scale` still sits beside its `.weight`.
@@ -397,6 +398,7 @@ def _load_qwen3vl_visual_tower(
             fp8_layers=fp8_layers,
             nvfp4_payloads=nvfp4_payloads,
             skip_patterns=skip_patterns,
+            source_tensors_mapped=True,
         )
         dequantize_fp8_scaled(sd, fp8_layers, dtype)
         fp8_layers = {}
@@ -670,6 +672,7 @@ class Krea2CheckpointModel(ModelLoader):
                 skip_patterns=skip_patterns,
                 extra_reserved_bytes=nvfp4_bytes,
                 extra_host_bytes=predict_nvfp4_install_host_size(model, nvfp4_payloads, model_dtype, skip_patterns),
+                source_tensors_mapped=True,
             )
             self._logger.info(
                 f"Krea-2: kept {len(quantized)} of {len(int8_markers)} layer(s) quantized "
@@ -696,6 +699,7 @@ class Krea2CheckpointModel(ModelLoader):
                 skip_patterns=skip_patterns,
                 fp8_layers=fp8_layers,
                 nvfp4_payloads=nvfp4_payloads,
+                source_tensors_mapped=True,
             )
 
             if fp8_layers and not keep_fp8:
@@ -1192,6 +1196,7 @@ class Qwen3VLEncoderCheckpointLoader(_Qwen3VLEncoderSingleFileLoader[Qwen3VLEnco
                 # branch's only reservation.
                 extra_reserved_bytes=predict_nvfp4_install_size(model, nvfp4_payloads, model_dtype, skip_patterns),
                 extra_host_bytes=predict_nvfp4_install_host_size(model, nvfp4_payloads, model_dtype, skip_patterns),
+                source_tensors_mapped=True,
             )
             self._logger.info(
                 f"Qwen3-VL encoder: kept {len(quantized)} of {len(int8_markers)} layer(s) in int8 "
@@ -1230,6 +1235,7 @@ class Qwen3VLEncoderCheckpointLoader(_Qwen3VLEncoderSingleFileLoader[Qwen3VLEnco
                 fp8_layers=fp8_layers,
                 nvfp4_payloads=nvfp4_payloads,
                 skip_patterns=skip_patterns,
+                source_tensors_mapped=True,
             )
             if fp8_layers and not keep_fp8:
                 # Neither consumer wants them packed: fold the scales into the weights. Both consumers

@@ -162,6 +162,20 @@ def test_one_reservation_holds_the_int8_codes_at_one_byte(monkeypatch: pytest.Mo
     assert run.reserved == [codes + 4 * scales + 4 * dense]
 
 
+def test_int8_install_receives_the_mapped_source_flag(monkeypatch: pytest.MonkeyPatch) -> None:
+    seen: dict[str, object] = {}
+    original = flux3_loaders.install_int8_convrot_layers
+
+    def install(*args, **kwargs):
+        seen.update(kwargs)
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(flux3_loaders, "install_int8_convrot_layers", install)
+    _load(monkeypatch, _build("int8_convrot"))
+
+    assert seen["source_tensors_mapped"] is True
+
+
 @pytest.mark.parametrize("scheme", ["nvfp4_comfy", "nvfp4_bfl"])
 def test_one_reservation_holds_the_nvfp4_layers_as_stored(monkeypatch: pytest.MonkeyPatch, scheme: str) -> None:
     """Counted by hand: each packed layer at its stored size (codes, grid, float32 global scale), every dense tensor at
@@ -187,6 +201,8 @@ def test_one_reservation_holds_a_folded_fp8r_build_at_the_compute_dtype(monkeypa
 
     run, _ = _load(monkeypatch, build)
 
+    assert run.reservation_kwargs[-1]["source_tensors_mapped"] is True
+    assert run.reservation_kwargs[-1]["source_tensors_cloned"] is True
     assert run.reserved == [4 * sum(t.numel() for t in build.state_dict.values())]
 
 

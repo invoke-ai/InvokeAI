@@ -124,8 +124,17 @@ def _assert_loaded(model: Qwen35Encoder, expected: dict[str, torch.Tensor]) -> N
 
 
 def test_a_multimodal_export_loads_its_language_model_and_never_reads_the_vision_tower(
-    tmp_path: Path, loader, tensors_read: list[str]
+    tmp_path: Path, loader, tensors_read: list[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    reservations: list[dict[str, object]] = []
+    reserve_for_load = loader_module.reserve_for_load
+
+    def record_reservation(*args: object, **kwargs: object) -> None:
+        reservations.append(kwargs)
+        reserve_for_load(*args, **kwargs)
+
+    monkeypatch.setattr(loader_module, "reserve_for_load", record_reservation)
+
     weights = _reference(final_norm=True).state_dict()
     path = tmp_path / "qwen3_5_9b.safetensors"
     save_file({**{f"language_model.{k}": v for k, v in weights.items()}, **_random(_VISION_TOWER)}, path)
@@ -136,6 +145,7 @@ def test_a_multimodal_export_loads_its_language_model_and_never_reads_the_vision
     assert [key for key in tensors_read if not key.startswith("language_model.")] == []
     loader._ram_cache.make_room.assert_called_once()
     assert loader._ram_cache.make_room.call_args.args == (_bytes(weights),)
+    assert reservations[0]["source_tensors_mapped"] is True
 
 
 def test_shards_load_as_one_checkpoint(tmp_path: Path, loader, tensors_read: list[str]) -> None:

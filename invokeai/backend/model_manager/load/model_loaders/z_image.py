@@ -624,6 +624,7 @@ class ZImageCheckpointModel(ModelLoader):
                 skip_patterns=skip_patterns,
                 extra_reserved_bytes=nvfp4_bytes,
                 extra_host_bytes=predict_nvfp4_install_host_size(model, nvfp4_payloads, model_dtype, skip_patterns),
+                source_tensors_mapped=True,
             )
             # What did not stay int8 was widened to the compute dtype, so a load that kept far fewer
             # layers than the file marked is the explanation for a resident size twice what the file
@@ -668,6 +669,7 @@ class ZImageCheckpointModel(ModelLoader):
                 skip_patterns=skip_patterns,
                 fp8_layers=fp8_layers,
                 nvfp4_payloads=nvfp4_payloads,
+                source_tensors_mapped=True,
             )
 
             if fp8_layers and not keep_fp8:
@@ -1295,6 +1297,7 @@ class Qwen3EncoderCheckpointLoader(ModelLoader):
                 skip_patterns=skip_patterns,
                 extra_reserved_bytes=nvfp4_bytes,
                 extra_host_bytes=predict_nvfp4_install_host_size(model, nvfp4_payloads, model_dtype, skip_patterns),
+                source_tensors_mapped=True,
             )
             logger.info(f"Kept {len(kept)} of {len(int8_markers)} layer(s) in int8 (dequantized per forward)")
         else:
@@ -1323,6 +1326,7 @@ class Qwen3EncoderCheckpointLoader(ModelLoader):
                 skip_patterns=skip_patterns,
                 fp8_layers=fp8_layers,
                 nvfp4_payloads=nvfp4_payloads,
+                source_tensors_mapped=True,
             )
             if fp8_layers and not keep_fp8:
                 dequantize_fp8_scaled(sd, fp8_layers, model_dtype)

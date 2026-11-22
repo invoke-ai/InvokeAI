@@ -452,6 +452,7 @@ class CLIPSingleFileLoader(ModelLoader):
             model=model,
             fp8_layers={},
             nvfp4_payloads={},
+            source_tensors_mapped=True,
         )
         cast_state_dict(sd, self._torch_dtype, keep_fp8=False)
         # Ignored: `logit_scale` and a CLIP-L projection, which belong to the full CLIP model, and the persistent
@@ -993,6 +994,7 @@ class FluxCheckpointModel(ModelLoader):
                 architecture="FLUX",
                 reserve=self._ram_cache.make_room,
                 skip_patterns=skip_patterns,
+                source_tensors_mapped=True,
             )
             load_state_dict_ignoring_extras(model, sd, source="FLUX transformer checkpoint", assign=True)
 
@@ -1019,6 +1021,7 @@ class FluxCheckpointModel(ModelLoader):
             skip_patterns=skip_patterns,
             fp8_layers=fp8_layers,
             nvfp4_payloads={},
+            source_tensors_mapped=True,
         )
 
         if fp8_layers and not keep_fp8:
@@ -1528,6 +1531,7 @@ class Flux2CheckpointModel(ModelLoader):
                 architecture="FLUX.2",
                 reserve=self._ram_cache.make_room,
                 skip_patterns=skip_patterns,
+                source_tensors_mapped=True,
             )
         else:
             # The same reservation FLUX.1 makes above, and for the same reason: the split

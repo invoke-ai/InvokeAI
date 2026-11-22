@@ -255,6 +255,7 @@ class QwenImage21CheckpointModel(ModelLoader):
                 architecture="Qwen-Image-2.1",
                 reserve=self._ram_cache.make_room,
                 skip_patterns=skip_patterns,
+                source_tensors_mapped=True,
             )
             self._logger.info(
                 f"Qwen-Image-2.1: kept {len(quantized)} of {len(int8_markers)} layer(s) in int8 "
@@ -272,6 +273,8 @@ class QwenImage21CheckpointModel(ModelLoader):
                 fp8_layers=fp8_layers,
                 nvfp4_payloads={},
                 source_tensors_retained=bool(fp8_layers and not keep_fp8),
+                source_tensors_mapped=True,
+                source_tensors_cloned=bool(fp8_layers and not keep_fp8),
             )
             mapped = dict(sd) if fp8_layers and not keep_fp8 else None
             if fp8_layers and not keep_fp8:

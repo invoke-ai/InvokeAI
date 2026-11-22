@@ -708,6 +708,41 @@ class TestTheSharedInstall:
         expected_host = intermediate_peak + net_growth_before_second
         assert asked == [(final_bytes, {"host_bytes_needed": expected_host})]
 
+    def test_mapped_sources_charge_all_decoded_outputs_and_dense_cast(self) -> None:
+        model = self._model()
+        model.second = torch.nn.Linear(CONVROT_GROUP_SIZE, 4, bias=False)
+        model.third = torch.nn.Linear(CONVROT_GROUP_SIZE, 4, bias=False)
+        dense_elements = 4096
+        sd = {
+            **self._int8_layer("widens"),
+            **self._int8_layer("second"),
+            **self._int8_layer("third"),
+            "dense.weight": torch.zeros(dense_elements, dtype=torch.float32),
+        }
+        asked: list[tuple[int, dict[str, int]]] = []
+
+        def reserve(bytes_needed: int, **kwargs: int) -> None:
+            asked.append((bytes_needed, kwargs))
+
+        install_int8_convrot_layers(
+            model,
+            sd,
+            {"widens": MARKER, "second": MARKER, "third": MARKER},
+            torch.bfloat16,
+            architecture="FLUX.3",
+            reserve=reserve,
+            skip_patterns=("widens", "second", "third"),
+            source_tensors_mapped=True,
+            extra_host_bytes=2048,
+        )
+
+        output_bytes = 4 * CONVROT_GROUP_SIZE * torch.bfloat16.itemsize
+        decoded_outputs = 3 * output_bytes
+        decode_scratch = 2 * 4 * CONVROT_GROUP_SIZE * torch.float32.itemsize
+        dense_cast = dense_elements * torch.bfloat16.itemsize
+        expected_host = max(2 * output_bytes + decode_scratch, decoded_outputs + dense_cast + 2048)
+        assert asked == [(decoded_outputs + dense_cast, {"host_bytes_needed": expected_host})]
+
     def test_a_mixed_int8_and_int4_file_installs_each_layer_in_its_own_storage(self) -> None:
         """The published int4 builds are all mixed: some layers int8, the sensitive ones kept wider. Each layer is
         installed as its marker declares and charged as stored -- half a byte per weight for the packed one."""

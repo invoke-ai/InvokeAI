@@ -234,6 +234,8 @@ class _MossImageTransformerLoading(ModelLoader):
             sd.clear()
             sd.update(kept_sd)
             del kept_sd
+            # `sd` is mostly safetensors-backed, but `rope.bands` is owned. Mapped accounting conservatively avoids
+            # crediting the file-backed pages as reclaimed; this slightly overestimates for the small RoPE buffer.
             kept = install_int8_convrot_layers(
                 model,
                 sd,
@@ -242,6 +244,7 @@ class _MossImageTransformerLoading(ModelLoader):
                 architecture="MOSS-Image",
                 reserve=self._ram_cache.make_room,
                 skip_patterns=skip_patterns,
+                source_tensors_mapped=True,
             )
             self._logger.info(
                 f"{what}: kept {len(kept)} of {len(markers)} layer(s) in int8 (int8_tensorwise checkpoint, "
@@ -264,6 +267,8 @@ class _MossImageTransformerLoading(ModelLoader):
                 fp8_layers=fp8_layers,
                 nvfp4_payloads={},
                 source_tensors_retained=bool(fp8_layers and not keep_fp8),
+                source_tensors_mapped=True,
+                source_tensors_cloned=bool(fp8_layers and not keep_fp8),
             )
             mapped = dict(sd) if fp8_layers and not keep_fp8 else None
             if fp8_layers and not keep_fp8:

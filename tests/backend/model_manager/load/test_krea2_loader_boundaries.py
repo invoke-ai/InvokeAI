@@ -986,6 +986,8 @@ def test_a_quantized_norm_keeps_its_scale_through_the_native_rename(monkeypatch,
 
     model = run.load(config)
 
+    assert run.reservation_kwargs[-1]["source_tensors_mapped"] is True
+
     block = model.transformer_blocks[0]
     # The controls: Linears, whose parameter *is* named `weight`, with and without a bias beside it.
     assert torch.allclose(block.attn.to_q.weight.float(), linear_payload.dequantized, atol=1e-5)

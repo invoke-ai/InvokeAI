@@ -152,6 +152,8 @@ def test_an_nvfp4_mixed_checkpoint_keeps_its_nvfp4_layers_packed_under_either_fp
 
     model = run.load(_config(checkpoint))
 
+    assert run.reservation_kwargs[-1]["source_tensors_mapped"] is True
+
     assert len(model.layers) == LAYERS
     assert (model.config.num_attention_heads, model.config.num_key_value_heads) == (2, 1)
     for path, weight in expected.items():

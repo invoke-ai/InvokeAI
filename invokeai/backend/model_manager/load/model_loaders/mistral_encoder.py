@@ -1270,6 +1270,7 @@ class MistralEncoderCheckpointLoader(ModelLoader):
             skip_patterns=skip_patterns,
             fp8_layers=fp8_layers,
             nvfp4_payloads=nvfp4_payloads,
+            source_tensors_mapped=True,
         )
 
         if not fp8_layers:

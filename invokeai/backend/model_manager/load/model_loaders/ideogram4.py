@@ -215,16 +215,19 @@ class Ideogram4DiffusersModel(ModelLoader):
                 and tensor.dtype != torch.float8_e4m3fn
                 and tensor.dtype != (torch.float32 if tensor_key.endswith(".weight_scale") else compute_dtype)
             )
-            unscaled_fp8_weights = {
+            scaled_fp8_weights = {
                 tensor_key: tensor
                 for tensor_key, tensor in sd.items()
                 if tensor_key.endswith(".weight")
                 and tensor.dtype == torch.float8_e4m3fn
-                and f"{tensor_key}_scale" not in sd
+                and f"{tensor_key}_scale" in sd
             }
-            additional_bytes += sum(
-                tensor.nelement() * compute_dtype.itemsize for tensor in unscaled_fp8_weights.values()
-            )
+            raw_fp8_tensors = {
+                tensor_key: tensor
+                for tensor_key, tensor in sd.items()
+                if tensor.dtype == torch.float8_e4m3fn and tensor_key not in scaled_fp8_weights
+            }
+            additional_bytes += sum(tensor.nelement() * compute_dtype.itemsize for tensor in raw_fp8_tensors.values())
             require_ram_headroom(
                 self._ram_cache.make_room(reserved_bytes, host_bytes_needed=additional_bytes), additional_bytes
             )
@@ -235,7 +238,7 @@ class Ideogram4DiffusersModel(ModelLoader):
                 model = Ideogram4Transformer(Ideogram4Config())
             with accelerate.init_empty_weights(include_buffers=True):
                 swap_linears_to_fp8(model, sd, compute_dtype=compute_dtype)
-            for tensor_key in unscaled_fp8_weights:
+            for tensor_key in raw_fp8_tensors:
                 sd[tensor_key] = sd[tensor_key].to(dtype=compute_dtype)
             load_fp8_state_dict(model, sd, device=torch.device("cpu"), dtype=compute_dtype, assign=True)
             model.eval()
@@ -492,6 +495,7 @@ class Ideogram4CheckpointModel(ModelLoader):
                 architecture="Ideogram 4",
                 reserve=self._ram_cache.make_room,
                 skip_patterns=skip_patterns,
+                source_tensors_mapped=True,
             )
             kept = 0
         else:
@@ -510,6 +514,7 @@ class Ideogram4CheckpointModel(ModelLoader):
                 skip_patterns=skip_patterns,
                 fp8_layers=fp8_layers,
                 nvfp4_payloads={},
+                source_tensors_mapped=True,
             )
             if fp8_layers and not keep_fp8:
                 # Neither consumer asked. Fold the scales in: staying quantized would halve VRAM but

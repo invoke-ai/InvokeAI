@@ -147,6 +147,7 @@ class TextLLMCheckpointLoader(_TextLLMLoader):
                     reserve=self._ram_cache.make_room,
                     what=what,
                     logger=self._logger,
+                    source_tensors_mapped=True,
                 )
                 reject_incomplete_load(model, what=what)
                 return model
@@ -172,6 +173,7 @@ def qwen3_5_vl_from_state_dict(
     reserve: Callable[[int], None],
     what: str,
     logger: Logger,
+    source_tensors_mapped: bool = False,
 ) -> "Qwen3_5ForConditionalGeneration":
     """Build a `Qwen3_5ForConditionalGeneration` from a single file's state dict, bf16 or `int8_tensorwise`.
 
@@ -186,6 +188,8 @@ def qwen3_5_vl_from_state_dict(
         reserve: The cache's `make_room`, asked once before anything is widened.
         what: Names the checkpoint in errors and log lines.
         logger: For the dropped and kept counts.
+        source_tensors_mapped: Whether the state dict came from a file-backed safetensors mapping. The production
+            checkpoint path passes this; callers with owned or meta tensors retain the conservative default.
     """
     from transformers import Qwen3_5ForConditionalGeneration
 
@@ -220,6 +224,7 @@ def qwen3_5_vl_from_state_dict(
             architecture="Qwen3.5",
             reserve=reserve,
             skip_patterns=(*skip_patterns, *_DEQUANTIZED_ON_LOAD),
+            source_tensors_mapped=source_tensors_mapped,
         )
         logger.info(
             f"{what}: kept {len(kept)} of {len(markers)} layer(s) in int8 (int8_tensorwise checkpoint, dequantized "
@@ -237,6 +242,7 @@ def qwen3_5_vl_from_state_dict(
             skip_patterns=skip_patterns,
             fp8_layers={},
             nvfp4_payloads={},
+            source_tensors_mapped=source_tensors_mapped,
         )
         cast_state_dict(sd, dtype, keep_fp8=False, model=model, skip_patterns=skip_patterns)
 

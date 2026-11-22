@@ -221,6 +221,44 @@ def test_tied_invoke_int8_parameter_uses_specialized_conversion(keep_ram_copy: b
         cached_model.full_unload_from_vram()
 
 
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="requires CUDA and bitsandbytes int8 kernels")
+def test_prequantized_int8_sidecars_move_with_weight_without_ram_copy():
+    """A no-shadow full transfer must move pre-quantized CB and SCB with the parameter and preserve inference."""
+    from invokeai.backend.quantization.bnb_llm_int8 import InvokeLinear8bitLt
+
+    torch.manual_seed(0)
+    source = torch.nn.Linear(64, 32)
+    layer = InvokeLinear8bitLt(input_features=64, output_features=32, has_fp16_weights=False)
+    layer.load_state_dict(source.state_dict())
+    layer.to("cuda")
+    inputs = torch.randn(2, 64, device="cuda")
+    expected = layer(inputs)
+
+    # Start from a pre-quantized CPU layer, as the model loader does.
+    cpu_state_dict = {key: value.to("cpu") for key, value in layer.state_dict().items()}
+    layer.load_state_dict(cpu_state_dict)
+
+    cached_model = CachedModelOnlyFullLoad(layer, torch.device("cuda"), total_bytes=100, keep_ram_copy=False)
+    cached_model.full_load_to_vram()
+    assert layer.weight.device.type == "cuda"
+    assert layer.weight.CB is not None and layer.weight.CB.device.type == "cuda"
+    assert layer.weight.CB.data_ptr() == layer.weight.data.data_ptr()
+    assert layer.weight.SCB is not None and layer.weight.SCB.device.type == "cuda"
+    assert torch.allclose(layer(inputs), expected, atol=1e-5)
+
+    cached_model.full_unload_from_vram()
+    assert layer.weight.device.type == "cpu"
+    assert layer.weight.CB is not None and layer.weight.CB.device.type == "cpu"
+    assert layer.weight.CB.data_ptr() == layer.weight.data.data_ptr()
+    assert layer.weight.SCB is not None and layer.weight.SCB.device.type == "cpu"
+
+    cached_model.full_load_to_vram()
+    assert layer.weight.CB is not None and layer.weight.CB.device.type == "cuda"
+    assert layer.weight.CB.data_ptr() == layer.weight.data.data_ptr()
+    assert layer.weight.SCB is not None and layer.weight.SCB.device.type == "cuda"
+    assert torch.allclose(layer(inputs), expected, atol=1e-5)
+
+
 @pytest.mark.parametrize("keep_ram_copy", [False, True])
 def test_last_unlock_preserves_tied_invoke_int8_state_for_reload(keep_ram_copy: bool):
     """The unlock dtype restore must not replace quantized data under a live CB/SCB pair."""

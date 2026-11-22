@@ -88,6 +88,18 @@ def _record_fold(monkeypatch: pytest.MonkeyPatch, loader, log: list[bool], *name
         monkeypatch.setattr(qwen_image, name, recording)
 
 
+def _record_reservation(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, object]]:
+    reservations: list[dict[str, object]] = []
+    original = qwen_image.reserve_for_load
+
+    def recording(*_args, **kwargs):
+        reservations.append(kwargs)
+        return original(*_args, **kwargs)
+
+    monkeypatch.setattr(qwen_image, "reserve_for_load", recording)
+    return reservations
+
+
 class _TinyQwenImageTransformer(torch.nn.Module):
     """The diffusers module names Comfy's Qwen-Image build uses, at toy width."""
 
@@ -143,6 +155,7 @@ def test_the_transformer_keeps_nvfp4_packed_and_scaled_fp8_only_where_something_
     state_dict["img_in.bias"] = torch.randn(128)
 
     log = _patch_common(monkeypatch, state_dict, {"_quantization_metadata": json.dumps({"layers": header})})
+    reservations = _record_reservation(monkeypatch)
     monkeypatch.setattr(diffusers, "QwenImageTransformer2DModel", _TinyQwenImageTransformer, raising=False)
     monkeypatch.setattr(qwen_image, "should_keep_fp8_weights", lambda _device: mode == "fp8_compute")
     monkeypatch.setattr(load_default, "_device_supports_fp8_storage", lambda *_args: True)
@@ -213,6 +226,7 @@ def test_the_transformer_keeps_nvfp4_packed_and_scaled_fp8_only_where_something_
     call = loader._ram_cache.make_room.call_args
     assert call.args == (packed + fp8_weight + dense * COMPUTE_DTYPE.itemsize + recovered_scale,)
     assert call.kwargs["host_bytes_needed"] > 0
+    assert reservations[-1]["source_tensors_mapped"] is True
 
 
 class _TinyQwenVL(torch.nn.Module):
@@ -259,6 +273,7 @@ def test_the_encoder_keeps_marker_named_nvfp4_layers_packed_under_their_transfor
     state_dict["visual.proj.bias"] = torch.randn(4)
 
     log = _patch_common(monkeypatch, state_dict, {})
+    reservations = _record_reservation(monkeypatch)
     monkeypatch.setattr(transformers, "Qwen2_5_VLForConditionalGeneration", _TinyQwenVL, raising=False)
     monkeypatch.setattr(
         transformers.AutoConfig,
@@ -301,6 +316,7 @@ def test_the_encoder_keeps_marker_named_nvfp4_layers_packed_under_their_transfor
     call = loader._ram_cache.make_room.call_args
     assert call.args == (packed + widened * COMPUTE_DTYPE.itemsize + recovered_scale,)
     assert call.kwargs["host_bytes_needed"] > 0
+    assert reservations[-1]["source_tensors_mapped"] is True
 
 
 #: The shared encoder seam computes in float32; the int8 cells need bf16, since a blanket cast to it is what would ruin

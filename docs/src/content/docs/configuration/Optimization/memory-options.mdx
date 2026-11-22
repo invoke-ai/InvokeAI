@@ -24,7 +24,7 @@ nvfp4: see the [format comparison](#format-comparison).
 NF4 models need bitsandbytes. The macOS install leaves it out, so NF4 doesn't load on Apple silicon; on Intel GPUs and
 the CPU, NF4 is untested and not supported. Pick a GGUF, int8 or SDNQ build of the model instead.
 </MemoryOption>
-<MemoryOption id="sysmem-fallback" title="Windows with NVIDIA: turn off the sysmem fallback">
+<MemoryOption id="sysmem-fallback" title="Windows with a discrete NVIDIA GPU: turn off the sysmem fallback">
 The Windows driver moves memory that doesn't fit in VRAM into system RAM, which slows generation down massively. Set
 **CUDA - Sysmem Fallback Policy** to **Prefer No Sysmem Fallback**: [steps](/configuration/optimization/low-vram-mode/#platform-notes).
 </MemoryOption>

@@ -186,6 +186,7 @@ class AnimaCheckpointModel(ModelLoader):
                 architecture="Anima",
                 reserve=self._ram_cache.make_room,
                 skip_patterns=skip_patterns,
+                source_tensors_mapped=True,
             )
             logger.info(
                 f"Anima: kept {len(quantized)} of {len(int8_markers)} layer(s) in int8 "
@@ -210,6 +211,7 @@ class AnimaCheckpointModel(ModelLoader):
                 skip_patterns=skip_patterns,
                 fp8_layers=fp8_layers,
                 nvfp4_payloads={},
+                source_tensors_mapped=True,
             )
 
             if fp8_layers and not keep_fp8:

@@ -107,6 +107,7 @@ def test_single_file_loader_applies_fp8_layerwise_casting(monkeypatch, tmp_path)
     import safetensors.torch
 
     import invokeai.backend.anima.anima_transformer as anima_transformer_module
+    import invokeai.backend.model_manager.load.model_loaders.anima as loader_module
 
     checkpoint_path = tmp_path / "anima.safetensors"
     checkpoint_path.touch()
@@ -132,6 +133,15 @@ def test_single_file_loader_applies_fp8_layerwise_casting(monkeypatch, tmp_path)
         lambda _device: torch.float32,
     )
 
+    reservations: list[dict[str, object]] = []
+    reserve_for_load = loader_module.reserve_for_load
+
+    def record_reservation(*args: object, **kwargs: object) -> None:
+        reservations.append(kwargs)
+        reserve_for_load(*args, **kwargs)
+
+    monkeypatch.setattr(loader_module, "reserve_for_load", record_reservation)
+
     cast_calls: list[tuple[object, object]] = []
 
     def _record_cast(model, cfg, submodel):
@@ -151,3 +161,42 @@ def test_single_file_loader_applies_fp8_layerwise_casting(monkeypatch, tmp_path)
     assert isinstance(model, _TinyAnimaTransformer)
     assert torch.equal(model.weight, torch.ones(2, 2))
     assert cast_calls == [(config, SubModelType.Transformer)]
+    assert reservations[0]["source_tensors_mapped"] is True
+
+
+def test_single_file_loader_passes_mapped_source_to_int8_installer(monkeypatch, tmp_path) -> None:
+    """The int8 installer must receive the same already-mapped source contract as reservation."""
+    import safetensors.torch
+
+    import invokeai.backend.anima.anima_transformer as anima_transformer_module
+    import invokeai.backend.model_manager.load.model_loaders.anima as loader_module
+
+    checkpoint_path = tmp_path / "anima.safetensors"
+    checkpoint_path.touch()
+    config = Main_Checkpoint_Anima_Config.model_construct(path=str(checkpoint_path))
+    monkeypatch.setattr(anima_transformer_module, "AnimaTransformer", _TinyAnimaTransformer)
+    monkeypatch.setattr(safetensors.torch, "load_file", lambda _path: {"weight": torch.ones(2, 2)})
+    monkeypatch.setattr(loader_module, "anima_transformer_config", lambda _sd: {})
+    monkeypatch.setattr(loader_module.TorchDevice, "choose_torch_device", lambda: torch.device("cpu"))
+    monkeypatch.setattr(loader_module.TorchDevice, "choose_anima_inference_dtype", lambda _device: torch.float32)
+    monkeypatch.setattr(loader_module, "extract_int8_convrot_markers", lambda _sd: {"weight": {"format": "int8"}})
+    monkeypatch.setattr(loader_module, "reject_unmarked_int8_weights", lambda *_args: None)
+
+    install_calls: list[dict[str, object]] = []
+
+    def _record_install(_model, _sd, quantized, _dtype, **kwargs):
+        install_calls.append(kwargs)
+        return quantized
+
+    monkeypatch.setattr(loader_module, "install_int8_convrot_layers", _record_install)
+    loader = object.__new__(AnimaCheckpointModel)
+    loader._ram_cache = SimpleNamespace(make_room=MagicMock())
+    loader._apply_fp8_layerwise_casting = lambda model, _config, _submodel: model
+    loader._torch_device = torch.device("cpu")
+    loader._logger = MagicMock()
+
+    model = loader._load_from_singlefile(config)
+
+    assert isinstance(model, _TinyAnimaTransformer)
+    assert len(install_calls) == 1
+    assert install_calls[0]["source_tensors_mapped"] is True

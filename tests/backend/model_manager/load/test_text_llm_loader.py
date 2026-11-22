@@ -244,10 +244,19 @@ class TestTheCheckpointLoader:
         self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     ) -> None:
         reference = _reference()
+        seen: dict[str, bool] = {}
+        original_install = loader_module.install_int8_convrot_layers
+
+        def install(*args, **kwargs):
+            seen["source_tensors_mapped"] = kwargs["source_tensors_mapped"]
+            return original_install(*args, **kwargs)
+
+        monkeypatch.setattr(loader_module, "install_int8_convrot_layers", install)
         run = prepare(SEAM, monkeypatch, state_dict=_int8_checkpoint(reference), geometry=_tiny_geometry)
 
         model = run.load(_config(tmp_path), None)
 
+        assert seen["source_tensors_mapped"] is True
         kept = {name for name, module in model.named_modules() if isinstance(module, Int8ConvrotLinear)}
         assert kept == set(_QUANTIZED) - _WIDENED
         assert not any(name.startswith("mtp") for name in model.state_dict())
@@ -283,9 +292,27 @@ class TestTheCheckpointLoader:
 
         model = run.load(_config(tmp_path), None)
 
+        assert run.reservation_kwargs[-1]["source_tensors_mapped"] is True
         assert not any(isinstance(module, Int8ConvrotLinear) for module in model.modules())
         torch.testing.assert_close(_text_logits(model), _text_logits(reference))
         assert run.reserved == [_nbytes(model.state_dict())]
+
+    def test_owned_dense_state_dict_reserves_as_unmapped(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        _tiny_geometry(monkeypatch)
+        state_dict = {key: value.detach().clone() for key, value in _reference().state_dict().items()}
+        seen: dict[str, bool] = {}
+        original_reserve_for_load = loader_module.reserve_for_load
+
+        def reserve_for_load(*args, **kwargs):
+            seen["source_tensors_mapped"] = kwargs["source_tensors_mapped"]
+            return original_reserve_for_load(*args, **kwargs)
+
+        monkeypatch.setattr(loader_module, "reserve_for_load", reserve_for_load)
+        qwen3_5_vl_from_state_dict(
+            state_dict, torch.float32, reserve=lambda _nbytes: None, what="owned", logger=MagicMock()
+        )
+
+        assert seen["source_tensors_mapped"] is False
 
     @pytest.mark.parametrize(
         ("cpu_only", "expected"), [(None, torch.bfloat16), (True, torch.float32)], ids=["on the device", "cpu only"]

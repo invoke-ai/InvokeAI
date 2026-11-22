@@ -100,6 +100,8 @@ def test_a_dense_bf16_file_loads_every_tensor_reserving_before_the_cast(monkeypa
     )
     model = run.load(_checkpoint_config(tmp_path, sd))
 
+    assert run.reservation_kwargs[-1]["source_tensors_mapped"] is True
+
     assert not any(p.is_meta for p in model.parameters())
     assert {p.dtype for p in model.parameters()} == {COMPUTE_DTYPE}
     assert model.config.use_keyframes_abs_pos_embedding is True
@@ -271,13 +273,20 @@ def test_a_quantized_component_file_is_refused_before_any_room_is_made(monkeypat
 def test_the_folder_sizes_the_files_a_submodel_is_read_from(tmp_path) -> None:
     """`_load_and_cache` reserves `get_size_fs` before the read; a folder has no `<submodel>/` dir
     to size, so the read would otherwise land on an unreserved cache."""
-    for name, size in (
-        ("p.safetensors", 100),
-        ("vc.safetensors", 200),
-        ("ac.safetensors", 300),
-        ("v.safetensors", 1000),
-    ):
-        (tmp_path / name).write_bytes(b"\0" * size)
+    connector_files = {
+        "p.safetensors": "text_embedding_projection.",
+        "vc.safetensors": "video_embeddings_connector.",
+        "ac.safetensors": "audio_embeddings_connector.",
+    }
+    expected_connector_bytes = 0
+    for name, prefix in connector_files.items():
+        matching = torch.zeros(5)
+        unrelated = torch.zeros(100)
+        safetensors.torch.save_file(
+            {f"{prefix}matching": matching, "transformer_blocks.unrelated": unrelated}, tmp_path / name
+        )
+        expected_connector_bytes += matching.nelement() * matching.element_size()
+    (tmp_path / "v.safetensors").write_bytes(b"\0" * 1000)
     config = Main_Diffusers_LTX2_Config.model_construct(
         path=str(tmp_path),
         components={
@@ -288,7 +297,7 @@ def test_the_folder_sizes_the_files_a_submodel_is_read_from(tmp_path) -> None:
         },
     )
     loader = _folder_loader()
-    assert loader.get_size_fs(config, tmp_path, SubModelType.Connectors) == 600
+    assert loader.get_size_fs(config, tmp_path, SubModelType.Connectors) == expected_connector_bytes
     assert loader.get_size_fs(config, tmp_path, SubModelType.VAE) == 1000
     assert loader.get_size_fs(config, tmp_path, SubModelType.Vocoder) == 0
 
@@ -335,11 +344,18 @@ def test_the_connectors_are_read_out_of_a_bundled_transformer_file_by_key(monkey
     config = Main_Diffusers_LTX2_Config.model_construct(
         path=str(tmp_path),
         components={
+            "transformer": "bundle.safetensors",
             "text_projection": "bundle.safetensors",
             "video_connector": "bundle.safetensors",
             "audio_connector": "bundle.safetensors",
         },
     )
+    connector_bytes = sum(
+        tensor.nelement() * tensor.element_size()
+        for key, tensor in official.items()
+        if ltx2.layout.strip_transformer_prefix(key).startswith(ltx2._CONNECTOR_KEY_PREFIXES)
+    )
+    assert _folder_loader().get_size_fs(config, tmp_path, SubModelType.Connectors) == connector_bytes
     _cpu(monkeypatch)
     model = _folder_loader()._load_model(config, SubModelType.Connectors)
     torch.testing.assert_close(model.video_connector.learnable_registers, reference.video_connector.learnable_registers)
