@@ -322,9 +322,10 @@ const getFocusedElement = (): HTMLElement | null => {
 const isGalleryItem = (media: GalleryItem | GalleryItemRef): media is GalleryItem => 'fullUrl' in media;
 
 /**
- * The item menu on right-click (or the context-menu key) for an element showing gallery media; pass the item itself
- * when the surface has it, so the menu opens without a fetch. Undefined without media or outside the workbench (a
- * `GalleryHostProvider` host), where the browser's own menu stays.
+ * The item menu for gallery media: an `onContextMenu` handler for an element showing it (right-click or the context-menu
+ * key), or an `onClick` handler for a button that opens it, below the button. Pass the item itself when the surface has
+ * it, so the menu opens without a fetch. Undefined without media or outside the workbench (a `GalleryHostProvider`
+ * host), where the browser's own menu stays.
  *
  * `anchor` opens the menu below what it returns, or else below the handler's element, whatever the event's position:
  * for an element that only highlights the media (a field driving `aria-activedescendant`).
@@ -357,10 +358,13 @@ export const useGalleryItemContextMenu = (
       // Not stopped: owners around the media (a workflow node) read `defaultPrevented`, and window listeners (a touch
       // hold disarming its drag) must still hear the event.
       event.preventDefault();
-      const opener = getFocusedElement();
+      // A pressed button is the opener even where a click does not focus it.
+      const isPress = event.type !== 'contextmenu';
+      const opener = isPress ? currentTarget : getFocusedElement();
+      const below = anchor ? (anchor() ?? currentTarget) : isPress ? currentTarget : null;
 
       open({
-        ...(anchor ? getContextMenuPointBelow(anchor() ?? currentTarget) : getContextMenuPoint(event)),
+        ...(below ? getContextMenuPointBelow(below) : getContextMenuPoint(event)),
         item,
         ref: { kind, name },
         returnFocus: () => (opener?.isConnected ? opener : null),
