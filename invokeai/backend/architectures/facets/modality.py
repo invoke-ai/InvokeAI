@@ -30,6 +30,7 @@ GenerationModeKind = Literal[
     "interpolate",
     "extend_video",
     "ref2v",
+    "ref2v_frames",
     "a2v",
     "v2a",
 ]
@@ -37,7 +38,8 @@ GenerationModeKind = Literal[
 
 `t2v`/`i2v` produce video, as do the conditioning variants: `lf2v` (last frame to video), `flf2v`
 (first and last frame to video), `interpolate` (between two given images), `extend_video`
-(continue an existing clip), `ref2v` (video from a set of image and video references) and `a2v`
+(continue an existing clip), `ref2v` (video from a set of image and video references), `ref2v_frames`
+(references together with a first and/or last frame) and `a2v`
 (picture for an existing soundtrack). `v2a` is the one video mode that produces *sound* rather than
 picture: it takes a clip and generates the soundtrack for it. The rest produce images."""
 
