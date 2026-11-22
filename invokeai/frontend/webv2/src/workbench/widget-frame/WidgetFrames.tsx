@@ -51,7 +51,7 @@ export const WidgetPanelFrame = ({
   const { layout } = useWorkbenchCommands();
   const isLeft = region === 'left';
   const isBottom = region === 'bottom';
-  // The resolved size is clamped already (`resolveLayout`, repair 5).
+  // The resolved size is clamped already (`resolveLayout`, repair 6).
   const displaySizePx = regionState.sizePx;
   const frameRef = useRef<HTMLDivElement | null>(null);
   const [measuredSizePx, setMeasuredSizePx] = useState<number | null>(null);
@@ -157,11 +157,9 @@ export const WidgetPanelFrame = ({
 
 export const WidgetFloatButton = ({
   instanceId,
-  manifest,
   region,
 }: {
   instanceId: WidgetInstanceId;
-  manifest: WidgetManifest;
   region: WorkbenchRegion;
 }) => {
   const { t } = useTranslation();
@@ -182,9 +180,8 @@ export const WidgetFloatButton = ({
   const availability = useWorkbenchQueries().getAvailability();
   // Floating takes the instance from every region; the structure refuses to take the center's last view.
   const takesCenterView = useActiveLayoutSelector((layout) => takesLastCenterView(layout, instanceId, availability));
-  // Floating a placed widget is structure.
-  const canFloat =
-    useCanEditStructure() && Boolean(manifest.allowFloating) && dockableRegion !== undefined && !takesCenterView;
+  // Floating a placed widget is structure; any widget a side region holds can float.
+  const canFloat = useCanEditStructure() && dockableRegion !== undefined && !takesCenterView;
 
   if (!canFloat) {
     return null;
@@ -235,7 +232,7 @@ export const WidgetHeaderActionsGroup = ({
           runtime={runtime}
         />
       ) : null}
-      <WidgetFloatButton instanceId={instance.id} manifest={manifest} region={region} />
+      <WidgetFloatButton instanceId={instance.id} region={region} />
       <WidgetActionsMenu
         HeaderMenu={HeaderMenu}
         instance={instance}

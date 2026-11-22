@@ -102,7 +102,7 @@ import type { LayoutAvailability, ResolvedLayout } from './workspace/resolveLayo
 import type { WorkspaceStructure } from './workspace/structure';
 import type { CustomizeDraft, NewWorkspaceDraft } from './workspace/structureLock';
 import type { StructureAction } from './workspace/structureReducer';
-import type { WorkspaceView } from './workspace/view';
+import type { GuestSurface, WorkspaceView } from './workspace/view';
 
 import {
   getChangedValueKeys,
@@ -220,7 +220,12 @@ import {
   isCancellableQueueItem,
   isUnsubmittedQueueItem,
 } from './canvasStagingView';
-import { fitWindowIntoViewport, normalizeLastFloatingGeometry, rememberClosedWindows } from './floatingWindows';
+import {
+  cascadeDefaultGeometry,
+  fitWindowIntoViewport,
+  normalizeLastFloatingGeometry,
+  rememberClosedWindows,
+} from './floatingWindows';
 import { getNaturalDestination } from './graphWidgets';
 import {
   defaultInvocationRoute,
@@ -287,14 +292,19 @@ import { getCustomizeSession, pruneCustomizeSessions } from './workspace/structu
 import { captureLayout, getAddedInstanceId, reduceStructure } from './workspace/structureReducer';
 import {
   frontRegion,
-  getViewedWindow,
+  getGuestInstanceId,
+  getGuestWindowRegion,
+  getWindowView,
+  isGuestSuperseded,
   normalizeViews,
   pruneView,
   raiseWindow,
+  removeGuest,
   setRegionCollapsed,
   setRegionSize,
   setWindowGeometry,
   setWindowMode,
+  showGuest,
   withView,
 } from './workspace/view';
 import { getWorkspaceJob } from './workspace/workspaceDerivations';
@@ -397,6 +407,21 @@ type WorkbenchReducerAction =
   | { type: 'setFloatingWidgetMode'; instanceId: WidgetInstanceId; mode: FloatingWidgetMode }
   | { type: 'raiseFloatingWidget'; instanceId: WidgetInstanceId }
   | { type: 'revealFloatingWidget'; instanceId: WidgetInstanceId }
+  /**
+   * Shows a widget type the active project's workspace does not place on that surface as its guest (view only), with a
+   * values record made on demand; showing it again fronts it.
+   */
+  | {
+      type: 'showGuest';
+      typeId: WidgetTypeId;
+      surface: GuestSurface;
+      initialValues?: Record<string, unknown>;
+      viewport?: { width: number; height: number };
+    }
+  /** Forgets a guest; its values stay. */
+  | { type: 'closeGuest'; instanceId: WidgetInstanceId }
+  /** "Keep in workspace": places the guest on its surface, a guest window as a window; structural. */
+  | { type: 'keepGuest'; instanceId: WidgetInstanceId }
   | { type: 'setGenerateSettings'; values: GenerateWidgetValues; projectId?: string; origin?: WorkbenchActionOrigin }
   | {
       type: 'patchGenerateSettings';
@@ -744,11 +769,10 @@ const createNotification = ({
 const addNotification = (state: WorkbenchState, notification: WorkbenchNotification): WorkbenchState => {
   const [newest, ...rest] = state.notifications;
 
-  // Reuse the newest matching error's or workspace offer's id so repeats do not toast again; successes always toast.
+  // Reuse the newest matching error's id so repeats do not toast again; successes always toast.
   if (
     newest &&
-    (newest.kind === 'error' ||
-      (newest.category === 'workspace-offer' && notification.category === 'workspace-offer')) &&
+    newest.kind === 'error' &&
     newest.kind === notification.kind &&
     newest.title === notification.title &&
     newest.message === notification.message
@@ -3946,6 +3970,7 @@ const RECORDED_LAYOUT_ACTIONS: Partial<
   closeFloatingWidget: () => ({ label: 'Remove widget' }),
   dockFloatingWidget: () => ({ label: 'Dock window' }),
   floatWidget: () => ({ label: 'Float widget' }),
+  keepGuest: () => ({ label: 'Add widget' }),
   moveWidgetInstance: () => ({ label: 'Move widget' }),
   openRegionWidget: () => ({ label: 'Open widget' }),
   reorderWidgetInstances: () => ({ label: 'Reorder widgets' }),
@@ -4659,7 +4684,7 @@ const reduceWorkbenchAction = (
 
           // Revealing a shaded window expands it too.
           return action.type === 'revealFloatingWidget' &&
-            getViewedWindow(structure, top, action.instanceId)?.mode === 'shaded'
+            getWindowView(structure, top, action.instanceId)?.mode === 'shaded'
             ? setWindowMode(top, structure, action.instanceId, 'windowed')
             : top;
         });
@@ -4667,6 +4692,106 @@ const reduceWorkbenchAction = (
         // Only an actual raise should re-route or dirty the project.
         return raised === project ? project : applyAutoRouteForRevealedInstance(raised, action.instanceId, context);
       });
+    }
+    case 'showGuest': {
+      return updateActiveProject(state, (project) => {
+        const structure = getProjectStructure(state, project);
+        const guest = { surface: action.surface, typeId: action.typeId };
+        const { getPresentation } = context.availability;
+        const canShow =
+          action.surface === 'center'
+            ? getPresentation(action.typeId, 'center') === 'view'
+            : getGuestWindowRegion(getPresentation, action.typeId) !== null;
+        // The guest of the type this view shows already is the one shown again.
+        const shownId = Object.entries(getProjectView(state, project)?.guests ?? {}).find(
+          ([id, shown]) => shown.typeId === action.typeId && !Object.hasOwn(structure.widgetInstances, id)
+        )?.[0];
+        const instanceId =
+          shownId ??
+          getGuestInstanceId(
+            structure,
+            action.typeId,
+            Object.values(project.widgetInstances)
+              .filter((instance) => instance.typeId === action.typeId)
+              .map((instance) => instance.id)
+          );
+        const existing = project.widgetInstances[instanceId];
+
+        if (
+          !canShow ||
+          isGuestSuperseded(structure, instanceId, guest, context.availability) ||
+          (existing && existing.typeId !== action.typeId)
+        ) {
+          return project;
+        }
+
+        const windowCount = Object.keys(getLayout(state, project, context).floatingWidgets ?? {}).length;
+        const remembered = project.lastFloatingGeometry?.[instanceId] ?? cascadeDefaultGeometry(windowCount);
+        const geometry = action.viewport ? fitWindowIntoViewport(remembered, action.viewport) : remembered;
+        const withValues = existing
+          ? project
+          : {
+              ...project,
+              widgetInstances: {
+                ...project.widgetInstances,
+                [instanceId]: createWidgetInstance(action.typeId, instanceId, action.initialValues),
+              },
+            };
+        const shown = updateProjectView(state, withValues, (view, edited) =>
+          showGuest(view, edited, instanceId, guest, geometry)
+        );
+
+        return shown === withValues ? project : applyAutoRouteForRevealedInstance(shown, instanceId, context);
+      });
+    }
+    case 'closeGuest': {
+      return updateActiveProject(state, (project) => {
+        const closed = updateProjectView(state, project, (view) => removeGuest(view, action.instanceId));
+
+        return closed === project
+          ? project
+          : rememberLayoutWindows(closed, getLayout(state, project, context), getLayout(state, closed, context));
+      });
+    }
+    case 'keepGuest': {
+      const project = state.projects.find((candidate) => candidate.id === state.activeProjectId);
+      const guest = project && getProjectView(state, project)?.guests?.[action.instanceId];
+      const window = project && getLayout(state, project, context).floatingWidgets?.[action.instanceId];
+
+      if (!project || !guest) {
+        return state;
+      }
+
+      if (guest.surface === 'center') {
+        return applyStructureGesture(
+          state,
+          project,
+          {
+            createNew: true,
+            mintId: action.instanceId,
+            region: 'center',
+            type: 'addWidget',
+            typeId: guest.typeId,
+          },
+          context,
+          { compose: (next, source) => showInRegion(source, next, 'center', action.instanceId, context.availability) }
+        );
+      }
+
+      return window
+        ? applyStructureGesture(
+            state,
+            project,
+            {
+              geometry: { heightPx: window.heightPx, widthPx: window.widthPx, x: window.x, y: window.y },
+              instanceId: action.instanceId,
+              region: window.returnRegion,
+              type: 'addWindow',
+              typeId: guest.typeId,
+            },
+            context
+          )
+        : state;
     }
     case 'moveWidgetInstance': {
       const project = state.projects.find((candidate) => candidate.id === state.activeProjectId);

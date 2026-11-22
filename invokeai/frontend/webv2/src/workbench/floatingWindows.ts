@@ -1,5 +1,6 @@
 import type {
   FloatingWidgetGeometry,
+  FloatingWidgetMembership,
   FloatingWidgetMode,
   FloatingWidgetState,
   WidgetRegion,
@@ -172,8 +173,32 @@ export const getRegionOrder = (
   return slots;
 };
 
+type AlsoIn = NonNullable<FloatingWidgetState['alsoIn']>;
+
+/** Regions in a fixed order, the return region and ill-typed entries left out: one shape for reducers and reloads. */
+const normalizeAlsoIn = (value: unknown, returnRegion: WidgetRegion): AlsoIn | undefined => {
+  if (!value || typeof value !== 'object') {
+    return undefined;
+  }
+
+  const entries = WIDGET_REGIONS.flatMap((region): [WidgetRegion, FloatingWidgetMembership][] => {
+    const entry = (value as Record<string, unknown>)[region] as Partial<FloatingWidgetMembership> | undefined;
+
+    if (region === returnRegion || !entry || typeof entry !== 'object' || !isFiniteNumber(entry.index)) {
+      return [];
+    }
+
+    const index = Math.max(0, Math.floor(entry.index));
+
+    return [[region, entry.isFront === true ? { index, isFront: true } : { index }]];
+  });
+
+  return entries.length > 0 ? Object.fromEntries(entries) : undefined;
+};
+
 /** Persistence compares documents as JSON, key order included: reducers and reloads must serialize alike. */
 export const toFloatingWidgetState = ({
+  alsoIn,
   heightPx,
   mode,
   returnIndex,
@@ -182,16 +207,21 @@ export const toFloatingWidgetState = ({
   widthPx,
   x,
   y,
-}: FloatingWidgetState): FloatingWidgetState => ({
-  heightPx,
-  widthPx,
-  x,
-  y,
-  mode,
-  returnIndex,
-  returnRegion,
-  stackOrder,
-});
+}: FloatingWidgetState): FloatingWidgetState => {
+  const memberships = normalizeAlsoIn(alsoIn, returnRegion);
+
+  return {
+    heightPx,
+    widthPx,
+    x,
+    y,
+    mode,
+    returnIndex,
+    returnRegion,
+    stackOrder,
+    ...(memberships ? { alsoIn: memberships } : {}),
+  };
+};
 
 export const writeRegionOrder = (
   slots: readonly RegionOrderSlot[],
@@ -253,6 +283,7 @@ const validateFloatingWidgets = (
 
     floatingWidgets[instanceId] = toFloatingWidgetState({
       ...clampSizeToMinimum({ heightPx: state.heightPx, widthPx: state.widthPx, x: state.x, y: state.y }),
+      alsoIn: state.alsoIn,
       mode: state.mode as FloatingWidgetMode,
       returnIndex: state.returnIndex,
       returnRegion,

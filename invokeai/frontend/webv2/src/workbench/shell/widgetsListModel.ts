@@ -1,5 +1,10 @@
 import type { WidgetRegion } from '@workbench/layoutContracts';
-import type { NormalizedWidgetManifest, RegisteredWidget, WidgetInstanceId } from '@workbench/widgetContracts';
+import type {
+  NormalizedWidgetManifest,
+  RegisteredWidget,
+  WidgetInstanceId,
+  WidgetTypeId,
+} from '@workbench/widgetContracts';
 import type { WidgetPlacementProject } from '@workbench/widgetPlacementCommands';
 import type { LayoutAvailability } from '@workbench/workspace/resolveLayout';
 
@@ -16,6 +21,8 @@ export interface WidgetsListRow {
   placement: WidgetsListPlacement;
   /** Why Remove is refused: the center always shows one view. */
   isRequired: boolean;
+  /** For a placed row, the available types it `needs` that this workspace does not place: advice, never a block. */
+  missingNeeds: readonly WidgetTypeId[];
   widget: RegisteredWidget;
 }
 
@@ -67,7 +74,9 @@ export const getWidgetsListRows = ({
     left.label.localeCompare(right.label) ||
     getPlacementRank(left) - getPlacementRank(right) ||
     (left.instanceId ?? '').localeCompare(right.instanceId ?? '');
-  const placed = Object.values(project.widgetInstances).flatMap((instance): WidgetsListRow[] => {
+  // A guest shows here but is not placed: its type is listed as one this workspace lacks.
+  const instances = Object.values(project.widgetInstances).filter(({ id }) => project.guests?.[id] === undefined);
+  const placed = instances.flatMap((instance): WidgetsListRow[] => {
     const widget = widgets.find((candidate) => candidate.manifest.id === instance.typeId);
     const region = project.floatingPlacements?.[instance.id] ? undefined : findRegion(project, instance.id);
 
@@ -80,18 +89,28 @@ export const getWidgetsListRows = ({
         instanceId: instance.id,
         isRequired: region === 'center' && takesLastCenterView(project, instance.id, availability),
         label: instance.title ?? getLabel(widget.manifest),
+        missingNeeds: [],
         placement: region ? { kind: 'docked', region } : { kind: 'floating' },
         widget,
       },
     ];
   });
   const placedTypeIds = new Set(placed.map((row) => row.widget.manifest.id));
+  const isAvailable = (typeId: WidgetTypeId) => widgets.some((widget) => widget.manifest.id === typeId);
+
+  for (const row of placed) {
+    row.missingNeeds = (row.widget.manifest.needs ?? []).filter(
+      (typeId) => isAvailable(typeId) && !placedTypeIds.has(typeId)
+    );
+  }
+
   const hidden = widgets
     .filter((widget) => widget.manifest.allowMultiple || !placedTypeIds.has(widget.manifest.id))
     .map((widget): WidgetsListRow => ({
       instanceId: null,
       isRequired: false,
       label: getLabel(widget.manifest),
+      missingNeeds: [],
       placement: { kind: 'hidden' },
       widget,
     }));

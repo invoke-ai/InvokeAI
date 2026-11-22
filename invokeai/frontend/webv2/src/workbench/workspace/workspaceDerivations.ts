@@ -8,6 +8,8 @@ import type { WidgetInstanceId, WidgetTypeId } from '@workbench/widgetContracts'
  */
 export interface WorkspacePlacement {
   floatingWidgets?: Readonly<Record<WidgetInstanceId, unknown>>;
+  /** A resolved layout's guests: shown, but not placed. */
+  guests?: Readonly<Record<WidgetInstanceId, unknown>>;
   widgetInstances: Readonly<Record<WidgetInstanceId, { typeId: WidgetTypeId }>>;
   widgetRegions: Readonly<
     Record<WidgetRegion, Pick<WidgetRegionState, 'activeInstanceId' | 'instanceIds' | 'isCollapsed'>>

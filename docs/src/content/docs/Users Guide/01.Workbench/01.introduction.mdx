@@ -6,7 +6,7 @@ lastUpdated: 2026-11-21
 
 import WorkbenchLayout from './assets/workbench-layout.svg';
 
-Invoke's main window, the **workbench**, is built from panels arranged into **workspaces**: Compose, Edit, Video, Workflow and any you make. A workspace keeps its panels where they are, so nothing moves by accident. When you want a different arrangement, put the tools you use side by side, move the gallery to whichever side you prefer or float the Preview over the canvas in [Customize](#customizing-a-workspace), or save it as a new workspace you can return to with one click.
+Invoke's main window, the **workbench**, is built from panels arranged into **workspaces**: Compose, Edit, Video, Workflow and any you make. A workspace keeps its panels where they are, so nothing moves by accident. When you want a different arrangement, put the tools you use side by side, move the gallery to whichever side you prefer or float any panel over the canvas in [Customize](#customizing-a-workspace), or save it as a new workspace you can return to with one click.
 
 ## The parts of the workbench
 
@@ -31,7 +31,7 @@ Hover over a numbered circle, or tap it on a touchscreen, for a short descriptio
 | 9 | **Resize handle** | Drag to make a side panel wider or narrower, or to collapse it. |
 | 10 | **Center panel** | The main work area: Preview, Canvas, Gallery, Workflow editor or Image Map. |
 | 11 | **Center view menu** | Switches what the center shows; in Customize, also adds or closes center views. |
-| 12 | **Floating window** | A panel detached from its rail, which you can move and resize anywhere. |
+| 12 | **Floating window** | A panel detached from its rail, or a guest the workspace does not have, which you can move and resize anywhere. |
 | 13 | **Floating panel's rail slot** | A dashed icon that marks where a floating panel came from. Click it to bring the window to the front; in Customize, right-click it to dock or remove the panel. |
 | 14 | **Status bar** | Small status chips: server connection, queue, gallery, autosave and notifications. |
 
@@ -51,10 +51,11 @@ The center panel shows one **view** at a time. The button in its top-left corner
 
 - **Center views** lists the views already placed in the center. Choose one to switch to it.
 - In Customize, **Add to center** lists other panels that can be shown in the center, and **Close** removes the current view. The center always keeps at least one view.
+- While the center shows a [guest](#guests), the menu offers **Keep … in workspace** and **Close** for it.
 
 Each workspace is built around one center view, its **main view**: the Canvas in Edit, the Preview in Compose and Video, the Workflow editor in Workflow. While the center shows another view, a **Back to** button (for example **Back to Canvas**) leads its top-left corner; in a narrow center it shows only its arrow. Click it, or press <kbd>Esc</kbd> while the center has focus, to return to the main view. <kbd>Esc</kbd> goes back only when nothing else is using it: a text field, an open menu and a Preview comparison keep their own <kbd>Esc</kbd>, and so do the Canvas and the Workflow editor while they have something to cancel or deselect.
 
-Press <kbd>Z</kbd> to swap the Preview into the center and back to the main view. It is a quick way to check a result while you work on the canvas or a workflow. Where the Preview is the main view (Compose, Video), <kbd>Z</kbd> swaps it with the center's other view instead, such as the Gallery in Compose.
+Press <kbd>Z</kbd> to swap the Preview into the center and back to the main view. It is a quick way to check a result while you work on the canvas or a workflow. Where the Preview is the main view (Compose, Video), <kbd>Z</kbd> swaps it with the center's other view instead, such as the Gallery in Compose. In a workspace whose center has no Preview, <kbd>Z</kbd> shows it there as a guest.
 
 The Preview's **Auto-switch** button, in its header, shows the current mode as its icon (hover over it to see the name) and opens a menu that chooses what the Preview shows while work runs:
 
@@ -78,14 +79,14 @@ The status bar along the bottom holds small chips. Hover over **Server Status**,
 
 ### Floating windows
 
-**Preview** and **Image Map** can float in their own windows above the rest of the workbench. In Customize, click **Float Window** in the panel's header to detach it. Moving, resizing, collapsing and maximizing a window work at any time; docking and closing it change the workspace, so they are in Customize:
+Any panel that sits in a rail or the bottom panel can float in its own window above the rest of the workbench. In Customize, click **Float Window** in the panel's header, or right-click its rail icon and choose **Float Window** (Layers has no header), to detach it. A floating panel looks and scrolls as it does in its side panel. Moving, resizing, collapsing and maximizing a window work at any time; docking and closing it change the workspace, so they are in Customize:
 
 - Drag the title bar to move the window, and drag any edge or corner to resize it.
 - From the keyboard, focus the title bar and press the arrow keys to move the window, or focus the grip in the bottom-right corner and press the arrow keys to resize it. Hold <kbd>Shift</kbd> for larger steps; <kbd>Home</kbd> on the grip shrinks the window to its smallest size.
 - Double-click the title bar, or use **Maximize**, to fill the workbench; double-click again, or use **Restore**, to return to the previous size and position. Double-clicking a collapsed window's title bar expands it.
 - **Collapse** shrinks the window to just its title bar and **Expand** opens it again. The panel keeps what you were doing while collapsed.
 - Click a window, or move keyboard focus into it, to make it the active one: it comes to the front and is outlined like a focused panel, and keyboard shortcuts for its panel apply to it.
-- The dock button in the title bar, named for where the window came from (for example **Dock to right panel**), returns the panel to the place it floated from.
+- The dock button in the title bar, named for where the window came from (for example **Dock to right panel**), returns the panel to the place it floated from. A panel that was in two places, such as the Preview in Edit's center and right rail, goes back to both.
 - The **×** button closes the window and takes the panel out of the workspace. **Undo** in the notice that follows brings it back.
 - The panel's dashed rail icon keeps its place while the window floats. Click it to bring the window to the front and expand it; in Customize, right-click it to dock or remove the panel.
 
@@ -94,6 +95,10 @@ A window remembers where it was. Dock or remove a floating panel and float it ag
 The center's only view can't float: the center always keeps one view docked.
 
 A floating Preview is handy in the **Edit** workspace: keep the canvas in the center and watch results in a small window beside your work.
+
+### When a panel's subject is hidden
+
+Some panels work on another one: **Layers** edits the Canvas. When the Canvas is not on screen, for example while the center shows the Preview, the top of the Layers panel says **Canvas is hidden** with a **Show Canvas** button that brings it back. In a workspace without a Canvas the line reads **Canvas is not in this workspace**, and the button takes you to the workspace that has one, or shows the Canvas here as a guest. The panel itself keeps working as usual.
 
 ### When Invoke is blocked
 
@@ -112,18 +117,18 @@ Adding, removing, moving, floating and docking panels change the workspace, so t
 
 Each panel can be placed only where it makes sense:
 
-| Panel | Left rail | Right rail | Center | Bottom | Can float |
-| --- | :---: | :---: | :---: | :---: | :---: |
-| Generate, Upscale, Video | ✓ | | | | |
-| Workflow | ✓ | | ✓ | ✓ | |
-| Canvas | | | ✓ | | |
-| Gallery | ✓ | ✓ | ✓ | ✓ | |
-| Image Map | ✓ | ✓ | ✓ | | ✓ |
-| Preview | | ✓ | ✓ | | ✓ |
-| Layers, Queue | | ✓ | | | |
-| Diagnostics | | ✓ | | | |
+| Panel | Left rail | Right rail | Center | Bottom |
+| --- | :---: | :---: | :---: | :---: |
+| Generate, Upscale, Video | ✓ | | | |
+| Workflow | ✓ | | ✓ | ✓ |
+| Canvas | | | ✓ | |
+| Gallery | ✓ | ✓ | ✓ | ✓ |
+| Image Map | ✓ | ✓ | ✓ | |
+| Preview | | ✓ | ✓ | |
+| Layers, Queue | | ✓ | | |
+| Diagnostics | | ✓ | | |
 
-A panel can appear in more than one place at once, for example the Gallery in the right rail *and* in the center, but only once in each place.
+A panel can appear in more than one place at once, for example the Gallery in the right rail *and* in the center, but only once in each place. Every panel a rail or the bottom panel can hold can also [float](#floating-windows); a floating Workflow shows its form when it came from the left rail and its graph otherwise.
 
 ### Adding and removing panels
 
@@ -131,7 +136,7 @@ In Customize, click the **…** button at the bottom of a rail, or right-click a
 
 To remove a panel quickly, right-click its rail icon and choose **Remove**. Removing a panel only takes it out of the workspace. Its contents and settings are kept, and it comes back as you left it when you add it again. A notice confirms the removal with an **Undo** button.
 
-**Widgets…**, in the app menu, at the foot of each rail menu and in the command palette (**Show widgets**), opens one list of every panel, split into those in this workspace and those not. Each row says where the panel is (a rail, the center, the status bar or a floating window) and offers **Show** to bring it forward; in Customize it also offers **Add** to put a panel in the workspace, **Dock** for a floating window, and **Remove**. Outside Customize, **Customize** at the foot of the list starts it without closing the list. The command palette also has a **Show** entry for each panel, such as **Show Image Map**.
+**Widgets…**, in the app menu, at the foot of each rail menu and in the command palette (**Show widgets**), opens one list of every panel, split into those in this workspace and those not. Each row says where the panel is (a rail, the center, the status bar or a floating window) and offers **Show** to bring it forward; **Show** on a panel this workspace does not have shows it here as a [guest](#guests). In Customize it also offers **Add** to put a panel in the workspace, **Dock** for a floating window, and **Remove**, and a panel that works on one this workspace lacks says so, for example **Needs Canvas, not in this workspace** beside Layers. Outside Customize, **Customize** at the foot of the list starts it without closing the list. The command palette also has a **Show** entry for each panel, such as **Show Image Map**.
 
 Center views are added and closed from the [center view menu](#the-center-panel).
 
@@ -193,7 +198,7 @@ When the window is narrow, the tabs show only their icons. Hover over one to see
 
 ### Opening something from another workspace
 
-Anything you open goes to where it lives. **Edit image on Canvas** from Compose switches to Edit; loading a workflow to edit switches to Workflow; **Send to Upscale** from Edit shows Upscale in its left rail without switching. When the current workspace has the panel, it comes to the front where it is; when no workspace has it, a notice offers **Add to this workspace** (or **Add to the center**, **Add to a panel**, when it is only on the other kind of surface here), which opens Customize with the panel added. Opening never moves or adds panels by itself, and a switch it makes shows the usual notice with **Undo**. **Back to previous workspace**, in the command palette and assignable in Settings, returns to the workspace you came from, as long as you have not switched again since. Changes that arrive from outside, such as a recall sent to Invoke by another app, never switch workspaces: their notice offers a button to open the panel instead.
+Anything you open goes to where it lives. **Edit image on Canvas** from Compose switches to Edit; loading a workflow to edit switches to Workflow; **Send to Upscale** from Edit shows Upscale in its left rail without switching. When the current workspace has the panel, it comes to the front where it is. When no workspace has it, it opens here as a [guest](#guests): in a floating window, or in the center when it is a center view such as the Canvas. A panel that works on another, such as Layers on the Canvas, only switches to a workspace that has both. Opening never moves or adds panels by itself, and a switch it makes shows the usual notice with **Undo**. **Back to previous workspace**, in the command palette and assignable in Settings, returns to the workspace you came from, as long as you have not switched again since. Changes that arrive from outside, such as a recall sent to Invoke by another app, never switch workspaces: their notice offers a button to open the panel instead.
 
 ### Customizing a workspace
 
@@ -213,9 +218,17 @@ To customize the workspace you are on, choose **Customize** from its tab's menu 
 
 Nothing you change while customizing is saved before **Done**. When **Done** saves the arrangement, whatever each rail, the status bar and the center show at the front is what they show when you arrive in the workspace; the center's view becomes the workspace's main view. The center always keeps at least one view: Customize never offers to remove or float its last one. After **Done** or **Cancel**, focus returns to where you started Customize, or to the workspace's tab.
 
-Invoke keeps working while you customize, and you can switch projects; coming back to the project shows the Customize bar again. Switching workspaces waits for **Done** or **Cancel**: anything you open meanwhile comes to the front here, or offers to add it to this workspace.
+Invoke keeps working while you customize, and you can switch projects; coming back to the project shows the Customize bar again. Switching workspaces waits for **Done** or **Cancel**: anything you open meanwhile comes to the front here, or opens as a guest, which **Done** does not add to the workspace.
 
 Changes to a built-in workspace replace the original for your account only, and **Reset to default** brings the original back.
+
+### Guests
+
+A locked workspace never keeps you from a panel. When you open something the workspace does not have, it shows here as a **guest**: a floating window, or the center's view while you are away from the main view (**Back to** returns, and the guest closes). A guest window has the usual move, resize, **Collapse**, **Maximize** and **×** buttons, but no dock button, since it has no place in the workspace to return to, and **×** works whether or not you are customizing.
+
+- **Keep in workspace** (the pin in a guest window's title bar, or **Keep … in workspace** in the center view menu) makes the guest part of the workspace where it is: a guest window stays a floating window, a center guest becomes a center view. In a locked workspace it opens Customize with the panel already added; **Done** keeps it and **Cancel** leaves it a guest. With **Rearrange without Customize** on it is added straight away.
+- Closing a guest forgets it; what you set inside it is kept for the next time you open it.
+- Guests belong to the workspace they opened in and to this project: they hide when you switch away, come back when you return, and are saved with the project. **Reset view** removes them.
 
 ### Rearrange without Customize
 
@@ -225,7 +238,7 @@ Accounts that used Invoke before workspaces could be locked keep this setting on
 
 ### How each project looks at a workspace
 
-A workspace is the same in every project: which panels it has and where. Each project remembers only how it looks at each workspace: the panel in front in each rail and in the center, panel sizes, collapsed panels, and where its floating windows sit and whether they are maximized or collapsed. Switching projects brings those back without changing the workspace, and none of it is a change you would save. When **Done** saves an arrangement, what is in front, the sizes, collapsed panels and window positions become the workspace's own, and projects that have not changed them show them that way.
+A workspace is the same in every project: which panels it has and where. Each project remembers only how it looks at each workspace: the panel in front in each rail and in the center, panel sizes, collapsed panels, where its floating windows sit and whether they are maximized or collapsed, and its guests. Switching projects brings those back without changing the workspace, and none of it is a change you would save. When **Done** saves an arrangement, what is in front, the sizes, collapsed panels and window positions become the workspace's own, and projects that have not changed them show them that way.
 
 Projects saved by earlier versions of Invoke kept a whole arrangement each. The first time you open Invoke after updating, the arrangements in the project you used most recently become your workspaces'. In other projects, a workspace arranged differently from that keeps its sizes and the panels in front, while panels that project moved, added, removed or floated are dropped. The first time you look at such a project, even after reloading, a notice says which workspaces changed and offers **Customize** on the first of them. A project that only kept a workspace as it was is not told anything.
 

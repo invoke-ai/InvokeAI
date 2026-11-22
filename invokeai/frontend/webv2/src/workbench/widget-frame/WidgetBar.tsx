@@ -43,6 +43,9 @@ interface WidgetBarProps {
   projectId: string;
   /** Dock the floating window a marker stands for. */
   onDock: (instanceId: WidgetInstanceId) => void;
+  /** Float a tab into a window; absent for one that cannot leave the rail (the center's last view). */
+  onFloat: (instanceId: WidgetInstanceId) => void;
+  canFloat: (instanceId: WidgetInstanceId) => boolean;
   /** Remove the floating window a marker stands for, asked from that marker's own menu. */
   onRemoveFloating: (instanceId: WidgetInstanceId) => void;
   onSelect: (region: WidgetBarGroup['region'], instanceId: WidgetInstanceId) => void;
@@ -50,10 +53,12 @@ interface WidgetBarProps {
 }
 
 export const WidgetBar = ({
+  canFloat,
   edgeRegion,
   groups,
   menuItems,
   onDock,
+  onFloat,
   onRemoveFloating,
   onSelect,
   onToggle,
@@ -112,6 +117,7 @@ export const WidgetBar = ({
   const handleMenuToggle = useCallback((item: WidgetEnableMenuItem) => onToggle(item as WidgetBarItem), [onToggle]);
   const handleInstanceClose = useCallback(() => setInstanceMenu(null), []);
   const handleInstanceDock = useCallback((item: WidgetEnableMenuItem) => onDock(item.id), [onDock]);
+  const handleInstanceFloat = useCallback((item: WidgetEnableMenuItem) => onFloat(item.id), [onFloat]);
   // A marker's menu closes and its marker goes with the window, unlike the enable menu, which stays open: the caller
   // has focus to place only for this one.
   const handleInstanceRemove = useCallback(
@@ -168,6 +174,11 @@ export const WidgetBar = ({
             target={instanceMenuTarget}
             onClose={handleInstanceClose}
             onDock={handleInstanceDock}
+            onFloat={
+              !isMarkerMenu && instanceMenuTarget && canFloat(instanceMenuTarget.item.id)
+                ? handleInstanceFloat
+                : undefined
+            }
             onRemove={handleInstanceRemove}
           />
         </>

@@ -1394,7 +1394,7 @@ export const useImageActions = ({
 
           if ((result.status === 'filled' || result.status === 'created') && queries.isActiveProject(targetProjectId)) {
             // No trigger to return focus to, so the Canvas takes it.
-            revealLayerProperties(result.layerId, { focus: true });
+            revealLayerProperties(result.layerId, { focus: 'canvas' });
           }
         } catch (error: unknown) {
           if (!isAccountScopeCurrent(owner)) {

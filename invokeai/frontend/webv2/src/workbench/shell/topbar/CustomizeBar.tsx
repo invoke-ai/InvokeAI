@@ -8,7 +8,7 @@ import { Button, IconButton } from '@platform/ui/Button';
 import { PopoverContent } from '@platform/ui/Popover';
 import { HIDDEN_SCROLLBAR_CSS } from '@platform/ui/scrollStripEdges';
 import { Tooltip, useTooltipTriggerIds } from '@platform/ui/Tooltip';
-import { getPlacedWidgetTypeIds, graphWidgetSources } from '@workbench/graphWidgets';
+import { getGraphWidgetSources, getPlacedWidgetTypeIds } from '@workbench/graphWidgets';
 import { useShortcutLabel } from '@workbench/hotkeys/useShortcutBinding';
 import { getDestinationLabel } from '@workbench/invocation';
 import { getOrderedLayoutPresets } from '@workbench/layoutPresetCollection';
@@ -58,7 +58,7 @@ const BAR_FOCUS_RING = { outline: '2px solid', outlineColor: 'accent.focusRing',
 const selectPlacedGraphWidgetSources = (layout: ResolvedLayout) => {
   const placedTypeIds = getPlacedWidgetTypeIds(layout);
 
-  return graphWidgetSources.filter((source) => placedTypeIds.has(source.typeId));
+  return getGraphWidgetSources().filter((source) => placedTypeIds.has(source.typeId));
 };
 
 const isSameRoute = (left: LayoutPresetRoute | null, right: LayoutPresetRoute | null): boolean =>

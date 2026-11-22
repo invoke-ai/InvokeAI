@@ -54,7 +54,15 @@ export type StructureAction =
   /** Without geometry the window cascades from the others. */
   | { type: 'floatWidget'; instanceId: WidgetInstanceId; region?: WidgetRegion; geometry?: FloatingWidgetGeometry }
   | { type: 'dockWindow'; instanceId: WidgetInstanceId }
-  | { type: 'closeWindow'; instanceId: WidgetInstanceId };
+  | { type: 'closeWindow'; instanceId: WidgetInstanceId }
+  /** Places a new instance as a window returning to `region`: what keeping a guest window makes of it. */
+  | {
+      type: 'addWindow';
+      region: WidgetRegion;
+      typeId: WidgetTypeId;
+      instanceId: WidgetInstanceId;
+      geometry: FloatingWidgetGeometry;
+    };
 
 type Availability = Pick<LayoutAvailability, 'getPresentation'>;
 
@@ -176,7 +184,10 @@ const insertAtDockedIndex = (
   return [...others.slice(0, position), { instanceId, isFloating: false }, ...others.slice(position)];
 };
 
-/** Docks a window into its return slot. */
+/**
+ * Docks a window into its return slot, and back into every other region the float took it from, at its position
+ * there and as that region's front where it was one.
+ */
 const dockWindow = (structure: WorkspaceStructure, instanceId: WidgetInstanceId): WorkspaceStructure => {
   const window = structure.floatingWidgets?.[instanceId];
 
@@ -184,9 +195,8 @@ const dockWindow = (structure: WorkspaceStructure, instanceId: WidgetInstanceId)
     return structure;
   }
 
-  const { returnRegion } = window;
-
-  return afterFirstMember(
+  const { alsoIn, returnRegion } = window;
+  const returned = afterFirstMember(
     updateRegionOrder(structure, returnRegion, (slots) =>
       slots.map((slot) => (slot.instanceId === instanceId ? { ...slot, isFloating: false } : slot))
     ),
@@ -194,6 +204,24 @@ const dockWindow = (structure: WorkspaceStructure, instanceId: WidgetInstanceId)
     structure.widgetRegions[returnRegion].instanceIds.length === 0,
     instanceId
   );
+
+  return WIDGET_REGIONS.reduce((next, region) => {
+    const membership = alsoIn?.[region];
+
+    if (!membership || next.widgetRegions[region].instanceIds.includes(instanceId)) {
+      return next;
+    }
+
+    const wasEmpty = next.widgetRegions[region].instanceIds.length === 0;
+    const inserted = updateRegionOrder(next, region, (slots) =>
+      insertAtDockedIndex(slots, instanceId, membership.index)
+    );
+    const fronted = membership.isFront
+      ? withRegion(inserted, region, (state) => ({ ...state, activeInstanceId: instanceId }))
+      : inserted;
+
+    return afterFirstMember(fronted, region, wasEmpty, instanceId);
+  }, returned);
 };
 
 const floatWidget = (
@@ -209,10 +237,23 @@ const floatWidget = (
     return structure;
   }
 
+  const alsoIn = Object.fromEntries(
+    memberRegions
+      .filter((regionId) => regionId !== returnRegion)
+      .map((regionId) => {
+        const { activeInstanceId, instanceIds } = structure.widgetRegions[regionId];
+
+        return [
+          regionId,
+          { index: instanceIds.indexOf(instanceId), ...(activeInstanceId === instanceId ? { isFront: true } : {}) },
+        ];
+      })
+  ) as FloatingWidgetState['alsoIn'];
   let floatingWidgets: Record<WidgetInstanceId, FloatingWidgetState> | undefined = {
     ...structure.floatingWidgets,
     [instanceId]: toFloatingWidgetState({
       ...(geometry ?? cascadeDefaultGeometry(Object.keys(structure.floatingWidgets ?? {}).length)),
+      alsoIn,
       mode: 'windowed',
       returnRegion,
       stackOrder: nextStackOrder(structure.floatingWidgets),
@@ -358,6 +399,22 @@ const applyAction = (
       return floatWidget(structure, action);
     case 'dockWindow':
       return dockWindow(structure, action.instanceId);
+    case 'addWindow': {
+      const added = addWidget(
+        structure,
+        { createNew: true, mintId: action.instanceId, region: action.region, type: 'addWidget', typeId: action.typeId },
+        availability
+      );
+
+      return added === structure
+        ? structure
+        : floatWidget(added, {
+            geometry: action.geometry,
+            instanceId: action.instanceId,
+            region: action.region,
+            type: 'floatWidget',
+          });
+    }
     case 'closeWindow': {
       const window = structure.floatingWidgets?.[action.instanceId];
 
@@ -374,16 +431,23 @@ const applyAction = (
 
 /** What "the center keeps a view" reads: a structure, a resolved layout, or the shell's placement projection. */
 interface CenterPlacement {
+  /** A resolved layout's guests, which the structure does not place. */
+  guests?: Readonly<Record<WidgetInstanceId, unknown>>;
   widgetInstances: Readonly<Record<WidgetInstanceId, { typeId: WidgetTypeId } | undefined>>;
   widgetRegions: { center: Pick<WidgetRegionState, 'instanceIds'> };
 }
 
-/** The center's views (`availability` says a type is a view there), leaving out `without`. */
+/** The center's placed views (`availability` says a type is a view there), leaving out `without`. */
 const countCenterViews = (placement: CenterPlacement, availability: Availability, without?: WidgetInstanceId) =>
   placement.widgetRegions.center.instanceIds.filter((instanceId) => {
     const typeId = placement.widgetInstances[instanceId]?.typeId;
 
-    return instanceId !== without && typeId !== undefined && availability.getPresentation(typeId, 'center') === 'view';
+    return (
+      instanceId !== without &&
+      placement.guests?.[instanceId] === undefined &&
+      typeId !== undefined &&
+      availability.getPresentation(typeId, 'center') === 'view'
+    );
   }).length;
 
 /**

@@ -38,9 +38,13 @@ export const manifest: WidgetManifest = {
 
 Third-party widgets should ship icons as JSX/SVG components in their compiled widget bundle.
 
+- `allowedRegions` says where the widget may be placed; any widget a side region may hold can also float in a window, with no opt-in.
+- `needs` names the widget types this one acts on (Layers: `['canvas']`). Declare only what leaves the widget with nothing to act on, not a convenience. While a need is not on screen the shell shows a one-line notice in the widget's frame with the gesture that shows it, and navigation only enters workspaces that also place it ([needs](../widget-frame/README.md#needs)). The widget itself checks nothing.
+- `graphBearing.sourceId` is the one mapping from a widget type to the invocation source it runs: `workbench/invocationSources.ts` derives both directions from the first-party manifests, read on first use. `graphBearing.surfaces` lists the regions where the widget renders a surface of its own (a workflow's graph in the center, its form in the left rail); a window shows the surface of the region it returns to, passed as `WidgetViewProps.surface`.
+
 ## Workbench API
 
-`runtime.workbench.open(intent)` is for user gestures only: it may switch workspace. It shows a widget type where the current workspace places it, enters the workspace that does, or offers to add it here, and reports the outcome as an `OpenResult` ([how opening resolves](../widget-frame/README.md#opening-and-workspaces)). An intent names a type and optionally the surface it needs, never a region. `revealWidgetInstance(instanceId)` fronts an instance of the widget's own region. Widgets cannot add, move, float or remove widgets: that is structure, and only the shell's controls change it.
+`runtime.workbench.open(intent)` is for user gestures only: it may switch workspace. It shows a widget type where the current workspace places it, enters the workspace that does, or shows it here as a guest, and reports the outcome as an `OpenResult` ([how opening resolves](../widget-frame/README.md#opening-and-workspaces)); it fails only for a type that is unavailable. An intent names a type and optionally the surface it needs, never a region. `revealWidgetInstance(instanceId)` fronts an instance of the widget's own region. Widgets cannot add, move, float or remove widgets: that is structure, and only the shell's controls change it.
 
 ## Settings contributions
 

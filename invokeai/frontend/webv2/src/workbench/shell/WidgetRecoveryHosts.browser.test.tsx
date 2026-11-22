@@ -256,7 +256,6 @@ beforeEach(async () => {
       version: 1,
       icon: CircleIcon,
       allowedRegions: ['left', 'right', 'bottom', 'center'],
-      allowFloating: true,
       allowMultiple: false,
       bottomPanel: 'expandable',
       load,

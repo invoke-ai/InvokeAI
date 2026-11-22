@@ -25,7 +25,7 @@ import { getInvocationTemplatesSnapshot, subscribeInvocationTemplates } from '@f
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { useExternalStoreSelector } from '@platform/state/selectors';
 import { submitActiveInvocation } from '@workbench/activeInvocationSubmission';
-import { getPlacedWidgetTypeIds, getVisibleWidgetTypeIds, graphWidgetSources } from '@workbench/graphWidgets';
+import { getGraphWidgetSources, getPlacedWidgetTypeIds, getVisibleWidgetTypeIds } from '@workbench/graphWidgets';
 import {
   createInvocationRouteInputSelector,
   isInvocationRouteValid,
@@ -119,7 +119,7 @@ export interface InvocationState {
   workflowBatchSize?: number | null;
   isPreparing: boolean;
   isValid: boolean;
-  sources: GraphWidgetSource[];
+  sources: readonly GraphWidgetSource[];
   visibleTypeIds: ReadonlySet<WidgetTypeId>;
   placedTypeIds: ReadonlySet<WidgetTypeId>;
   promptExpansion: DynamicPromptsExpansion;
@@ -265,7 +265,7 @@ export const useInvocationState = ({ sourceId }: { sourceId?: InvocationSourceId
     placedTypeIds,
     promptExpansion,
     sourceValues,
-    sources: graphWidgetSources,
+    sources: getGraphWidgetSources(),
     visibleTypeIds,
     ...(resolvedRoute.workflowBatch ? { workflowBatchSize: resolvedRoute.workflowBatch.size } : {}),
   };

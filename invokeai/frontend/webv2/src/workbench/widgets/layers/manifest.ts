@@ -7,13 +7,14 @@ import { COLOR_PANE_DEFAULTS, LAYER_EDITOR_PANE_DEFAULTS } from './panes/editorP
 export const layersWidgetManifest: WidgetManifest = {
   allowMultiple: false,
   allowedRegions: ['right'],
-  // The rail context menu still offers close/move; the panel body is the chrome.
+  // The rail context menu offers float, move and remove; the panel body is the chrome.
   chrome: { body: 'fill', header: 'hidden' },
   failurePolicy: { isolateRenderFailure: true, onRegistrationFailure: 'disable' },
   icon: LayersIcon,
   id: 'layers',
   label: (t) => t('widgets.labels.layers'),
   load: () => import('./implementation').then((module) => module.widgetImplementation),
+  needs: ['canvas'],
   state: {
     createInitial: () => ({ colorPane: { ...COLOR_PANE_DEFAULTS }, editorPanes: { ...LAYER_EDITOR_PANE_DEFAULTS } }),
     persistence: 'project',

@@ -1,11 +1,14 @@
 import { getWidgetsForRegion } from '@workbench/widgetRegistry';
-import { createInitialWorkbenchState, workbenchReducer } from '@workbench/workbenchState.testing';
+import { createInitialWorkbenchState, withArrangement, workbenchReducer } from '@workbench/workbenchState.testing';
 import { createWorkbenchStore } from '@workbench/workbenchStore';
 import { describe, expect, it, vi } from 'vitest';
 
+import { getWorkspaceStructure } from './accountWorkspaces';
 import {
   getWorkspaceOffer,
   goBackToPreviousWorkspace,
+  goBackToStage,
+  keepGuestInWorkspace,
   openInWorkspace,
   runWorkspaceCommand,
   toggleCenterPreview,
@@ -46,32 +49,32 @@ const createNavigation = ({ presetId = 'compose', warm = true }: { presetId?: st
 };
 
 describe('openInWorkspace', () => {
-  it('lets only the first intent of a gesture change workspace, and offers to add what the new one lacks', () => {
-    const { notices, placedTypes, ports, project } = createNavigation();
+  it('lets only the first intent of a gesture change workspace; what the new one lacks shows there as a guest', () => {
+    const { layout, placedTypes, ports, project, store } = createNavigation();
+    const account = store.getSnapshot().account;
 
-    expect(
-      openInWorkspace(ports, [
-        { surface: 'stage', typeId: 'canvas' },
-        { surface: 'stage', typeId: 'workflow' },
-      ])
-    ).toEqual({ changedWorkspace: true, ok: true, region: 'center', workspaceId: 'edit' });
+    expect(openInWorkspace(ports, [{ surface: 'stage', typeId: 'canvas' }, { typeId: 'diagnostics' }])).toEqual({
+      changedWorkspace: true,
+      ok: true,
+      region: 'center',
+      workspaceId: 'edit',
+    });
 
     expect(project().workspaceId).toBe('edit');
-    expect(placedTypes()).not.toContain('workflow');
-    expect(notices()[0]).toMatchObject({
-      actions: [{ kind: 'add-widget', surface: 'stage', widgetId: 'workflow' }],
-      titleKey: 'shell.workspace.notHere',
-    });
+    expect(placedTypes()).not.toContain('diagnostics');
+    expect(Object.values(layout().guests)).toEqual(['window']);
+    expect(getWorkspaceStructure(store.getSnapshot().account, 'edit')).toBe(getWorkspaceStructure(account, 'edit'));
   });
 
-  it('coalesces repeated offers for one widget into the newest notice', () => {
-    const { notices, ports } = createNavigation();
+  it('focuses the guest a repeated open already shows instead of making another', () => {
+    const { focus, layout, ports } = createNavigation();
 
-    openInWorkspace(ports, { typeId: 'diagnostics' });
+    expect(openInWorkspace(ports, { typeId: 'diagnostics' })).toMatchObject({ changedWorkspace: false, ok: true });
     openInWorkspace(ports, { typeId: 'diagnostics' });
 
-    expect(notices()).toHaveLength(1);
-    expect(notices()[0]).toMatchObject({ occurrenceCount: 2, titleKey: 'shell.workspace.notHere' });
+    const guests = Object.keys(layout().guests);
+    expect(guests).toHaveLength(1);
+    expect(focus.focusFloating.mock.calls).toEqual([[guests[0]], [guests[0]]]);
   });
 
   it('shows the rest of a gesture when its first widget is unavailable, focusing the one it names', () => {
@@ -95,10 +98,11 @@ describe('openInWorkspace', () => {
 
     expect(openInWorkspace(ports, { typeId: 'canvas' }, { background: true })).toEqual({
       ok: false,
-      reason: 'not-placed',
+      reason: 'unavailable',
     });
     expect(project().workspaceId).toBe('compose');
     expect(layout().widgetRegions).toBe(regionsBefore);
+    expect(layout().guests).toEqual({});
     expect(notices()).toEqual([]);
     expect(getWorkspaceOffer(ports, { typeId: 'canvas' })).toEqual([{ kind: 'open-widget', widgetId: 'canvas' }]);
 
@@ -149,18 +153,108 @@ describe('navigation while customizing', () => {
     expect(store.getSnapshot().customizing?.[project().id]?.presetId).toBe('compose');
   });
 
-  it('stays in the workspace being customized: an open offers the add here, and switching is refused', async () => {
-    const { notices, ports, project, store } = createNavigation();
+  it('stays in the workspace being customized: an open shows a guest outside the draft, and switching is refused', async () => {
+    const { layout, ports, project, store } = createNavigation();
 
     store.commands.layout.beginCustomize();
+    const draft = store.getSnapshot().customizing?.[project().id]?.structure;
 
-    expect(openInWorkspace(ports, { surface: 'stage', typeId: 'workflow' })).toEqual({
-      ok: false,
-      reason: 'not-placed',
+    expect(openInWorkspace(ports, { surface: 'stage', typeId: 'workflow' })).toMatchObject({
+      changedWorkspace: false,
+      ok: true,
+      region: 'center',
     });
-    expect(notices()[0]).toMatchObject({ actions: [{ kind: 'add-widget', surface: 'stage', widgetId: 'workflow' }] });
+    expect(Object.values(layout().guests)).toEqual(['center']);
+    expect(store.getSnapshot().customizing?.[project().id]?.structure).toBe(draft);
     await expect(store.commands.layout.activatePreset('edit')).resolves.toBe('compose');
     expect(project().workspaceId).toBe('compose');
+
+    store.commands.layout.finishCustomize();
+    const saved = getWorkspaceStructure(store.getSnapshot().account, 'compose');
+    expect(Object.values(saved.widgetInstances).map(({ typeId }) => typeId)).not.toContain('workflow');
+    expect(Object.values(layout().guests)).toEqual(['center']);
+  });
+});
+
+describe('guests', () => {
+  it('belong to the workspace’s view: hidden on leaving, back on return, forgotten on close, gone with Reset view', () => {
+    const { layout, ports, project, store } = createNavigation();
+    const guestOf = () => Object.keys(layout().guests)[0];
+
+    openInWorkspace(ports, { typeId: 'diagnostics' });
+    const guestId = guestOf()!;
+    store.commands.widgets.patchInstanceValues(guestId, { kept: true });
+
+    void store.commands.layout.activatePreset('edit');
+    expect(layout().guests).toEqual({});
+    void store.commands.layout.activatePreset('compose');
+    expect(guestOf()).toBe(guestId);
+
+    store.commands.widgets.closeGuest(guestId);
+    expect(layout().guests).toEqual({});
+    expect(project().widgetInstances[guestId]?.state.values).toMatchObject({ kept: true });
+
+    openInWorkspace(ports, { typeId: 'diagnostics' });
+    store.commands.layout.resetWorkspaceView('compose');
+    expect(layout().guests).toEqual({});
+  });
+
+  it('shows a guest beside a placement the workspace cannot show (Layers stored in the left rail)', () => {
+    const store = createWorkbenchStore(
+      withArrangement(
+        workbenchReducer(createInitialWorkbenchState(), { presetId: 'compose', type: 'applyPreset' }),
+        'compose',
+        { left: ['generate', 'layers'] }
+      )
+    );
+    const focus = { focusFloating: vi.fn(), focusRegion: vi.fn() };
+    const layout = () => store.queries.getSnapshot().activeLayout;
+
+    expect(layout().widgetRegions.left.instanceIds).not.toContain('layers');
+    expect(
+      openInWorkspace(
+        { commands: store.commands, focus, getWidgetsForRegion, queries: store.queries },
+        { typeId: 'layers' },
+        { mode: 'stay' }
+      )
+    ).toMatchObject({ ok: true });
+    expect(Object.values(layout().guests)).toEqual(['window']);
+  });
+
+  it('a center guest is Away: Back to the stage forgets it', () => {
+    const { layout, ports, project } = createNavigation({ presetId: 'edit' });
+
+    openInWorkspace(ports, { surface: 'stage', typeId: 'workflow' }, { mode: 'stay' });
+    expect(layout().widgetInstances[layout().widgetRegions.center.activeInstanceId]?.typeId).toBe('workflow');
+
+    expect(goBackToStage(ports)).toBe(true);
+    expect(layout().widgetRegions.center.activeInstanceId).toBe('canvas');
+    expect(layout().guests).toEqual({});
+    expect(project().views.edit?.guests).toBeUndefined();
+  });
+
+  it('Keep in workspace adds a locked guest to a Customize draft, kept on Cancel, and to the workspace while rearranging', () => {
+    const { layout, ports, project, store } = createNavigation();
+    const typesIn = (structure: ReturnType<typeof getWorkspaceStructure>) =>
+      Object.values(structure.widgetInstances).map(({ typeId }) => typeId);
+
+    openInWorkspace(ports, { typeId: 'diagnostics' });
+    const guestId = Object.keys(layout().guests)[0]!;
+    const window = layout().floatingWidgets?.[guestId];
+
+    keepGuestInWorkspace(ports, guestId, { canEditStructure: false });
+    const draft = store.getSnapshot().customizing?.[project().id]?.structure;
+    expect(draft?.floatingWidgets?.[guestId]).toMatchObject({ x: window?.x, y: window?.y });
+    expect(layout().guests).toEqual({});
+
+    store.commands.layout.cancelCustomize();
+    expect(typesIn(getWorkspaceStructure(store.getSnapshot().account, 'compose'))).not.toContain('diagnostics');
+    expect(Object.keys(layout().guests)).toEqual([guestId]);
+
+    keepGuestInWorkspace(ports, guestId, { canEditStructure: true });
+    expect(store.getSnapshot().customizing?.[project().id]).toBeUndefined();
+    expect(getWorkspaceStructure(store.getSnapshot().account, 'compose').floatingWidgets?.[guestId]).toBeDefined();
+    expect(layout().guests).toEqual({});
   });
 });
 

@@ -198,8 +198,9 @@ const areListsEqual = (left: readonly string[], right: readonly string[]): boole
 
 /**
  * Whether two structures place the same instances the same way: the instance set with types and titles, each region's
- * members and order, the status bar's end cluster, and which instances float and where they return. Home fronts,
- * default sizes, collapsed panels and window geometry are what a view overrides, so they are not compared.
+ * members and order, the status bar's end cluster, and which instances float and every region docking puts them back
+ * in. Home fronts, default sizes, collapsed panels and window geometry are what a view overrides, so they are not
+ * compared.
  */
 export const isSamePlacement = (leftStructure: WorkspaceStructure, rightStructure: WorkspaceStructure): boolean => {
   const left = normalizeStructure(leftStructure);
@@ -223,7 +224,11 @@ export const isSamePlacement = (leftStructure: WorkspaceStructure, rightStructur
     leftWindows.every(
       (instanceId) =>
         left.floatingWidgets?.[instanceId]?.returnRegion === right.floatingWidgets?.[instanceId]?.returnRegion &&
-        left.floatingWidgets?.[instanceId]?.returnIndex === right.floatingWidgets?.[instanceId]?.returnIndex
+        left.floatingWidgets?.[instanceId]?.returnIndex === right.floatingWidgets?.[instanceId]?.returnIndex &&
+        areJsonValuesStructurallyEqual(
+          left.floatingWidgets?.[instanceId]?.alsoIn ?? null,
+          right.floatingWidgets?.[instanceId]?.alsoIn ?? null
+        )
     )
   );
 };

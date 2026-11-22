@@ -3,18 +3,21 @@ import { useCallback } from 'react';
 
 import { requestLayerProperties } from './layerPropertiesRequestStore';
 
-/** Brings a layer's Properties into view beside the Canvas; focus stays with the caller unless `focus` asks for it. */
-export const useRevealLayerProperties = (): ((layerId: string, options?: { focus?: boolean }) => void) => {
+/**
+ * Brings a layer's Properties into view beside the Canvas. Focus stays with the caller unless `focus` names the widget
+ * to take it, wherever that shows: a rail, a window or a guest.
+ */
+export const useRevealLayerProperties = (): ((layerId: string, options?: { focus?: 'canvas' | 'layers' }) => void) => {
   const open = useWorkspaceOpen();
 
   return useCallback(
-    (layerId: string, { focus = false }: { focus?: boolean } = {}) => {
+    (layerId: string, { focus }: { focus?: 'canvas' | 'layers' } = {}) => {
       open(
         [
           { surface: 'stage', typeId: 'canvas' },
           { surface: 'panel', typeId: 'layers' },
         ],
-        { afterShown: () => requestLayerProperties(layerId), focus }
+        { afterShown: () => requestLayerProperties(layerId), focus: focus ?? false }
       );
     },
     [open]

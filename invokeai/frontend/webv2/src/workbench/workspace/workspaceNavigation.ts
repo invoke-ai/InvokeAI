@@ -7,19 +7,17 @@ import type { WorkbenchCommands, WorkbenchQueries, WorkbenchSnapshot } from '@wo
 import { flushWorkbenchDrafts } from '@platform/react/draftRegistry';
 import { registerAccountOwnedResource } from '@platform/state/accountLifecycle';
 import { getAvailableSourceIdForWidgetTypeId, getWidgetTypeIdForSourceId } from '@workbench/invocationSources';
-import { WIDGET_REGIONS } from '@workbench/layoutContracts';
 import { getOrderedLayoutPresets } from '@workbench/layoutPresetCollection';
 import { doesLayoutPresetExist } from '@workbench/layoutPresetSnapshots';
-import { resolveWidgetLabel } from '@workbench/widgetLabels';
-import i18next from 'i18next';
 
 import type { OpenIntent, OpenResult } from './openIntent';
 import type { OpenDecision, OpenTarget, ResolveOpenContext, WorkspaceCandidate } from './resolveOpen';
 import type { NewWorkspaceDraft } from './structureLock';
+import type { GuestSurface } from './view';
 import type { SavedWorkspace, WorkspacePlacement } from './workspaceDerivations';
 
 import { getProjectWorkspace } from './projectLayout';
-import { getRegionPresentation } from './registryAvailability';
+import { getRegionPresentation, getWidgetNeeds } from './registryAvailability';
 import { resolveOpen } from './resolveOpen';
 import { getCustomizeSession, isWorkspaceCommandAvailable, selectStructureLock } from './structureLock';
 import { getAwayStage, getCenterFront, getPlacedStage, getWorkspaceJobSource } from './workspaceDerivations';
@@ -39,8 +37,8 @@ export interface OpenOptions {
    */
   afterShown?: () => void;
   /**
-   * A socket event, finished run or other non-gesture: shows only what this workspace places and moves no focus. It
-   * records no notice; its own notice offers what this workspace lacks (`getWorkspaceOffer`).
+   * A socket event, finished run or other non-gesture: shows only what this workspace places, moves no focus and
+   * shows no guest; its own notice offers what this workspace lacks (`getWorkspaceOffer`).
    */
   background?: boolean;
   /** Which intent's widget takes focus: the first by default, another by its type id, or none. */
@@ -80,6 +78,7 @@ const createContext = (ports: WorkspaceNavigationPorts, mode: ResolveOpenContext
 
   return {
     currentWorkspaceId: activeProject.workspaceId,
+    getNeeds: getWidgetNeeds(ports.getWidgetsForRegion),
     getPresentation: getRegionPresentation(ports.getWidgetsForRegion),
     here: activeLayout,
     mode,
@@ -126,66 +125,89 @@ const focusTarget = (ports: WorkspaceNavigationPorts, typeId: WidgetTypeId, targ
   }
 };
 
-const NOT_HERE_TITLE_KEYS = {
-  nowhere: 'shell.workspace.notHere',
-  panel: 'shell.workspace.notInPanel',
-  stage: 'shell.workspace.notInCenter',
-} as const;
+/** The guest of a type the active layout shows, once showing it landed. */
+const findGuest = (ports: WorkspaceNavigationPorts, typeId: WidgetTypeId): WidgetInstanceId | undefined => {
+  const { activeLayout } = ports.queries.getSnapshot();
 
-/** Offers the structural add on the surface the open asked for; a repeat coalesces into the newest offer. */
-const offerAdd = (
-  ports: WorkspaceNavigationPorts,
-  intent: OpenIntent,
-  decision: Extract<OpenDecision, { step: 'not-placed' }>
-): void => {
-  const widget = WIDGET_REGIONS.map((region) =>
-    ports.getWidgetsForRegion(region).find((candidate) => candidate.manifest.id === intent.typeId)
-  ).find((candidate) => candidate !== undefined);
-
-  if (!widget) {
-    return;
-  }
-
-  const titleKey = NOT_HERE_TITLE_KEYS[decision.placedHere && intent.surface ? intent.surface : 'nowhere'];
-  const titleValues = { widget: resolveWidgetLabel(widget.manifest, i18next.t) };
-
-  ports.commands.notifications.add({
-    actions: [{ kind: 'add-widget', widgetId: intent.typeId, ...(intent.surface ? { surface: intent.surface } : {}) }],
-    category: 'workspace-offer',
-    kind: 'info',
-    title: i18next.t(titleKey, { ...titleValues, lng: 'en' }),
-    titleKey,
-    titleValues,
-  });
+  return Object.keys(activeLayout.guests).find((id) => activeLayout.widgetInstances[id]?.typeId === typeId);
 };
 
-/** Shows each intent where this workspace places it, in order, and returns the first one's decision. */
+const getViewport = (): { height: number; width: number } | undefined =>
+  typeof window === 'undefined' ? undefined : { height: window.innerHeight, width: window.innerWidth };
+
+/** Shows a widget this workspace does not place as a guest, writing view only; its target, once it shows. */
+const showAsGuest = (
+  ports: WorkspaceNavigationPorts,
+  typeId: WidgetTypeId,
+  surface: GuestSurface
+): OpenTarget | null => {
+  const widget = (['left', 'right', 'bottom', 'center'] as const)
+    .flatMap((region) => ports.getWidgetsForRegion(region))
+    .find((candidate) => candidate.manifest.id === typeId);
+
+  widget?.implementation.preload();
+  ports.commands.widgets.showGuest({
+    initialValues: widget?.manifest.state.createInitial(),
+    surface,
+    typeId,
+    viewport: getViewport(),
+  });
+
+  const instanceId = findGuest(ports, typeId);
+
+  return instanceId === undefined
+    ? null
+    : surface === 'center'
+      ? { instanceId, kind: 'region', region: 'center' }
+      : { instanceId, kind: 'floating' };
+};
+
+/** What one intent showed here: where, or null when nothing did. */
+type Shown = { decision: OpenDecision; target: OpenTarget | null };
+
+/**
+ * Shows a type as this workspace's guest on the asked surface whatever it places, and focuses it: for a gesture that
+ * wants one surface the resolver would not pick (the workflow's form while its graph sits in the status bar's panel).
+ */
+export const openGuest = (ports: WorkspaceNavigationPorts, typeId: WidgetTypeId, surface: GuestSurface): boolean => {
+  const target = showAsGuest(ports, typeId, surface);
+
+  if (target) {
+    focusTarget(ports, typeId, target);
+  }
+
+  return target !== null;
+};
+
+/** Shows each intent where this workspace places it, else as a guest (never for a background source), in order. */
 const showHere = (
   ports: WorkspaceNavigationPorts,
   intents: readonly OpenIntent[],
   { background, focusIndex }: { background: boolean; focusIndex: number }
-): OpenDecision[] =>
+): Shown[] =>
   intents.map((intent, index) => {
     const project = ports.queries.getSnapshot().activeProject;
     const decision = resolveOpen(intent, createContext(ports, 'stay'));
+    let target: OpenTarget | null = null;
 
     if (isShown(decision)) {
       show(ports, project, decision.target, decision.step === 'visible');
-
-      if (index === focusIndex) {
-        focusTarget(ports, intent.typeId, decision.target);
-      }
-    } else if (decision.step === 'not-placed' && !background) {
-      offerAdd(ports, intent, decision);
+      target = decision.target;
+    } else if (decision.step === 'guest' && !background) {
+      target = showAsGuest(ports, intent.typeId, decision.surface);
     }
 
-    return decision;
+    if (target && index === focusIndex) {
+      focusTarget(ports, intent.typeId, target);
+    }
+
+    return { decision, target };
   });
 
 /**
  * The one way to open, show, send to or recall something: shows it where this workspace places it, else enters the
- * workspace that does (first intent only, so one gesture crosses at most one workspace), else offers to add it here.
- * Never adds, moves, floats or removes a widget.
+ * workspace that does (first intent only, so one gesture crosses at most one workspace), else shows it here as a
+ * guest. Never adds, moves, floats or removes a widget.
  */
 export const openInWorkspace = (
   ports: WorkspaceNavigationPorts,
@@ -219,8 +241,8 @@ export const openInWorkspace = (
     // An unavailable first intent leaves the rest of the gesture to show what it can.
     const [shown] = showHere(ports, list, { background, focusIndex });
 
-    if (!shown || !isShown(shown)) {
-      return { ok: false, reason: shown?.step === 'not-placed' ? 'not-placed' : 'unavailable' };
+    if (!shown?.target) {
+      return { ok: false, reason: 'unavailable' };
     }
 
     options.afterShown?.();
@@ -247,7 +269,7 @@ export const openInWorkspace = (
 
     lastNavigations.set(projectId, { from, stepId: entered.undoRedo.past.at(-1)?.id, to: decision.workspaceId });
 
-    if (isShown(showHere(ports, list, { background, focusIndex })[0] ?? { step: 'unavailable' })) {
+    if (showHere(ports, list, { background, focusIndex })[0]?.target) {
       options.afterShown?.();
     }
   };
@@ -343,7 +365,7 @@ const PREVIEW_TYPE_ID = 'preview';
 
 /**
  * Swaps Preview into the center (Away) and back to the stage, within this workspace. Where Preview is the stage, it
- * swaps to the center's other view and back. A center that does not place Preview gets the offer to add it.
+ * swaps to the center's other view and back. A center that does not place Preview shows it as its guest.
  */
 export const toggleCenterPreview = (ports: WorkspaceNavigationPorts): boolean => {
   const snapshot = ports.queries.getSnapshot();
@@ -387,6 +409,22 @@ export interface StartCustomizeOptions {
   /** The control focus returns to when the session ends, while it is on the page; the workspace's tab otherwise. */
   returnFocus?: () => HTMLElement | null;
 }
+
+/**
+ * "Keep in workspace": puts a guest in the workspace on its surface, in Customize's draft (entering Customize first
+ * while structure is locked) or, rearranging without Customize, in the workspace itself.
+ */
+export const keepGuestInWorkspace = (
+  ports: Pick<WorkspaceNavigationPorts, 'queries'> & { commands: Pick<WorkbenchCommands, 'layout' | 'widgets'> },
+  instanceId: WidgetInstanceId,
+  { canEditStructure, returnFocus }: { canEditStructure: boolean } & Pick<StartCustomizeOptions, 'returnFocus'>
+): void => {
+  if (!canEditStructure) {
+    startCustomizing(ports, { focusBar: false, returnFocus });
+  }
+
+  ports.commands.widgets.keepGuest(instanceId);
+};
 
 /** Enters Customize on the active project's workspace. */
 export const startCustomizing = (ports: CustomizePorts, options: StartCustomizeOptions = {}): void => {

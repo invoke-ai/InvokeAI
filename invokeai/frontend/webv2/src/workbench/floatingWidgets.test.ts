@@ -52,7 +52,7 @@ describe('floating a placed widget', () => {
     expect(getWorkspaceStructure(state.account, 'compose').floatingWidgets?.gallery).toBeDefined();
   });
 
-  it('returns to the region the float was asked from, not the first member region', () => {
+  it('returns to the region the float was asked from, and to every other region it left', () => {
     let state = workbenchReducer(createInitialWorkbenchState(), { presetId: 'edit', type: 'applyPreset' });
     state = workbenchReducer(state, { instanceId: 'preview', region: 'center', type: 'floatWidget' });
 
@@ -64,8 +64,11 @@ describe('floating a placed widget', () => {
       activeInstanceId: 'preview',
       instanceIds: ['canvas', 'preview'],
     });
-    // The rail membership was given up on float; docking restores the one recorded origin.
-    expect(docked.widgetRegions.right.instanceIds).not.toContain('preview');
+    // Floating took it from the rail too; docking puts it back there, behind the rail's own front.
+    expect(docked.widgetRegions.right).toMatchObject({
+      activeInstanceId: 'layers',
+      instanceIds: ['layers', 'preview'],
+    });
   });
 
   it('closes a window without docking, leaving the rail and the instance’s values', () => {

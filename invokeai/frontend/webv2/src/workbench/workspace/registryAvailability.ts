@@ -30,6 +30,23 @@ export const getRegionPresentation =
       region
     );
 
+const NO_NEEDS: readonly WidgetTypeId[] = [];
+
+/** The types a widget type acts on, from its manifest. */
+export const getWidgetNeeds =
+  (lookup: (region: WidgetRegion) => RegisteredWidget[]) =>
+  (typeId: WidgetTypeId): readonly WidgetTypeId[] => {
+    for (const region of WIDGET_REGIONS) {
+      const widget = lookup(region).find((candidate) => candidate.manifest.id === typeId);
+
+      if (widget) {
+        return widget.manifest.needs ?? NO_NEEDS;
+      }
+    }
+
+    return NO_NEEDS;
+  };
+
 /** The registry's answers for one session, read once: what each type shows as in each region. */
 export const createRegistryLayoutAvailability = (): LayoutAvailability => {
   const presentations = new Map(

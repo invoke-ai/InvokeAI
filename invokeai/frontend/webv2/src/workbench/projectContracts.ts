@@ -110,15 +110,11 @@ export interface BackendConnectionState {
 
 export type WorkbenchNotificationKind = 'error' | 'success' | 'info';
 
-/** `workspace-offer`: an open that found nothing to show, or a locked structural gesture; a repeat coalesces. */
-export type WorkbenchNotificationCategory = 'enqueue' | 'run-outcome' | 'workspace-offer';
+export type WorkbenchNotificationCategory = 'enqueue' | 'run-outcome';
 
 /** Plain data, never a closure: notifications live in workbench state. */
 export type WorkbenchNotificationAction =
   | { kind: 'open-widget'; widgetId: WidgetTypeId }
-  /** Adds the widget to the current workspace, on the surface the open asked for: the structural add an offer makes. */
-  | { kind: 'add-widget'; widgetId: WidgetTypeId; surface?: 'stage' | 'panel' }
-  /** Enters Customize on the active project's workspace: what a locked structural gesture offers. */
   /** Customize, on the named workspace (entering it first) or else on the one the project is on. */
   | { kind: 'customize-workspace'; workspaceId?: LayoutPresetId }
   /** The one-time offer to existing accounts: turns "Rearrange without Customize" off, or keeps it. */

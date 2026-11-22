@@ -1,4 +1,4 @@
-import { graphWidgetSources } from '@workbench/graphWidgets';
+import { getGraphWidgetSources } from '@workbench/graphWidgets';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -15,7 +15,7 @@ describe('workspace route and icon model', () => {
   });
 
   it('keeps an available saved route and repairs a stale source from the first available option', () => {
-    const options = graphWidgetSources.filter(
+    const options = getGraphWidgetSources().filter(
       (source) => source.sourceId === 'generate' || source.sourceId === 'canvas'
     );
 
@@ -31,7 +31,7 @@ describe('workspace route and icon model', () => {
   });
 
   it('keeps Auto only where a workspace may go without a route', () => {
-    const options = graphWidgetSources.filter((source) => source.sourceId === 'generate');
+    const options = getGraphWidgetSources().filter((source) => source.sourceId === 'generate');
 
     expect(resolveLayoutPresetRoute(null, options, true)).toBeNull();
     expect(resolveLayoutPresetRoute(null, options, false)).toEqual({ destination: 'gallery', sourceId: 'generate' });

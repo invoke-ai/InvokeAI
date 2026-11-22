@@ -5,7 +5,6 @@ import { EyeIcon } from 'lucide-react';
 import { previewSettingsContribution } from './settingsContribution';
 
 export const previewWidgetManifest: WidgetManifest = {
-  allowFloating: true,
   allowMultiple: false,
   allowedRegions: ['center', 'right'],
   chrome: { body: 'fill' },

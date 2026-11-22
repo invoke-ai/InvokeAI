@@ -1,5 +1,5 @@
 import type { ProjectGraphState, ProjectWorkflowSource, WorkflowNode } from '@features/workflow/core/types';
-import type { WorkflowRegion, WorkflowRuntimeApi } from '@features/workflow/ui/contracts';
+import type { WorkflowRegion, WorkflowRuntimeApi, WorkflowWidgetViewProps } from '@features/workflow/ui/contracts';
 import type {
   WorkflowProjectPersistence,
   WorkflowReadPort,
@@ -407,7 +407,11 @@ describe('WorkflowHeaderActions', () => {
 
   const renderHeader = async (
     source?: ProjectWorkflowSource,
-    { history = NO_HISTORY, region = 'center' }: { history?: HistoryState; region?: WorkflowRegion } = {}
+    {
+      history = NO_HISTORY,
+      region = 'center',
+      surface,
+    }: { history?: HistoryState; region?: WorkflowRegion; surface?: WorkflowWidgetViewProps['surface'] } = {}
   ) => {
     const graph = createProjectGraph('workflow-1');
     project = createMutablePort({ ...projectSnapshot(graph, source), ...history });
@@ -427,7 +431,7 @@ describe('WorkflowHeaderActions', () => {
       root.render(
         <ChakraProvider value={system}>
           <WorkflowUiProvider adapter={adapter}>
-            <WorkflowHeaderActions region={region} runtime={TEST_RUNTIME} />
+            <WorkflowHeaderActions region={region} runtime={TEST_RUNTIME} surface={surface} />
           </WorkflowUiProvider>
         </ChakraProvider>
       );
@@ -464,6 +468,11 @@ describe('WorkflowHeaderActions', () => {
     expect(actionLabels()).toEqual(['Undo', 'Redo', 'Workflow library']);
     await renderHeader(undefined, { region: 'left' });
     expect(actionLabels()).toEqual(['Workflow library']);
+    // A window shows the surface of the region it stands for.
+    await renderHeader(undefined, { region: 'floating', surface: 'left' });
+    expect(actionLabels()).toEqual(['Workflow library']);
+    await renderHeader(undefined, { region: 'floating', surface: 'bottom' });
+    expect(actionLabels()).toEqual(['Undo', 'Redo', 'Workflow library']);
   });
 
   it('keeps keyboard focus on Undo when it steps back over the last edit', async () => {

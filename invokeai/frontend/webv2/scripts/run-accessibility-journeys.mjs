@@ -1309,6 +1309,58 @@ const runLockedWorkspaceJourney = async (browser) => {
   }
 };
 
+/**
+ * A locked workspace is never a dead end: a widget no workspace places opens as a guest window, and a tool whose
+ * subject is hidden says so in its frame with the way back.
+ */
+const runGuestsAndNeedsJourney = async (browser) => {
+  const { context, page, pageErrors } = await openRepresentativePage(
+    browser,
+    representativeProjectPath,
+    undefined,
+    undefined,
+    { rearrangeWithoutCustomize: false }
+  );
+  const id = 'workbench-guests-and-needs';
+
+  try {
+    await waitForWorkbench(page);
+    await selectLayoutPreset(page, 'Edit', 'Canvas');
+
+    await page.getByRole('button', { exact: true, name: 'Open menu' }).click();
+    await page.getByRole('menuitem', { exact: true, name: 'Widgets…' }).click();
+    await page
+      .getByRole('dialog', { exact: true, name: 'Widgets' })
+      .getByRole('button', { exact: true, name: 'Show Diagnostics' })
+      .click();
+    const guestWindow = page.locator('[data-floating-window]');
+    await guestWindow.getByRole('button', { exact: true, name: 'Keep Diagnostics in workspace' }).waitFor();
+    assert.equal(await guestWindow.getByRole('button', { name: /^Dock to/ }).count(), 0, 'A guest has no Dock.');
+    await waitForSettledDocument(page);
+    await assertNoAxeViolations(page, `${id}:guest-window`);
+    await guestWindow.getByRole('button', { exact: true, name: 'Close Diagnostics window' }).click();
+    await guestWindow.waitFor({ state: 'detached' });
+
+    await selectCenterView(page, 'Canvas', 'Preview');
+    const showCanvas = page.getByRole('button', { exact: true, name: 'Show Canvas' });
+    await showCanvas.waitFor();
+    await page.getByText('Canvas is hidden', { exact: true }).first().waitFor();
+    await waitForSettledDocument(page);
+    await assertNoAxeViolations(page, `${id}:unmet-need`);
+    await showCanvas.click();
+    await centerViewTrigger(page, 'Canvas').waitFor();
+    await showCanvas.waitFor({ state: 'detached' });
+
+    if (pageErrors.length > 0) {
+      throw new AggregateError(pageErrors, `${id} raised uncaught browser errors.`);
+    }
+
+    return { id, status: 'passed' };
+  } finally {
+    await context.close();
+  }
+};
+
 const runFloatingWindowJourney = async (browser) => {
   const { context, page, pageErrors } = await openRepresentativePage(browser, representativeProjectPath);
   const id = 'workbench-floating-window';
@@ -1321,8 +1373,12 @@ const runFloatingWindowJourney = async (browser) => {
     const floatingWindow = page.locator('[data-hotkey-widget-region="floating"]');
     const marker = rail.getByRole('button', { exact: true, name: 'Preview, floating window' });
     // Edit's rail holds Preview beside the center's: floating it there leaves the center its Canvas.
+    // Every panel floats; the Preview panel's own button floats Preview.
     const floatPreviewFromRail = async () => {
-      await page.getByRole('button', { exact: true, name: 'Float Window' }).click();
+      await page
+        .getByRole('group', { exact: true, name: 'Preview' })
+        .getByRole('button', { exact: true, name: 'Float Window' })
+        .click();
       await floatingWindow.waitFor();
       await marker.waitFor();
       await centerViewTrigger(page, 'Canvas').waitFor();
@@ -1418,7 +1474,10 @@ const runFloatingWindowJourney = async (browser) => {
       await widgetRail.getByRole('button', { exact: true, name: menuName }).click();
       await page.getByRole('menuitemcheckbox', { exact: true, name: 'Image Map' }).click();
       await page.keyboard.press('Escape');
-      await page.getByRole('button', { exact: true, name: 'Float Window' }).click();
+      await page
+        .getByRole('group', { exact: true, name: 'Image Map' })
+        .getByRole('button', { exact: true, name: 'Float Window' })
+        .click();
       await floatingWindow.waitFor();
       await waitForActiveWindow();
     };
@@ -1919,6 +1978,9 @@ try {
   }
   if (!requestedJourney || requestedJourney === 'workbench-floating-window') {
     reports.push(await runFloatingWindowJourney(browser));
+  }
+  if (!requestedJourney || requestedJourney === 'workbench-guests-and-needs') {
+    reports.push(await runGuestsAndNeedsJourney(browser));
   }
   if (!requestedJourney || requestedJourney === 'workbench-settings') {
     reports.push(await runSettingsJourney(browser));

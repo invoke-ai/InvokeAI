@@ -14,9 +14,8 @@ import {
 import { getApiErrorMessage } from '@platform/transport/http';
 import { getWorkbenchPreferences, patchWorkbenchPreferences } from '@workbench/settings/store';
 import { resolveWidgetLabel } from '@workbench/widgetLabels';
-import { addWidgetToWorkspace } from '@workbench/widgetPlacementCommands';
 import { selectStructureLock } from '@workbench/workspace/structureLock';
-import { customizeWorkspaceById, openInWorkspace, startCustomizing } from '@workbench/workspace/workspaceNavigation';
+import { customizeWorkspaceById, openInWorkspace } from '@workbench/workspace/workspaceNavigation';
 
 import type { NotificationActionContext } from './notificationActions';
 
@@ -54,21 +53,6 @@ export const createEditorNotificationActionContext = ({
   const getLock = () => selectStructureLock(queries.getSnapshot(), getWorkbenchPreferences().rearrangeWithoutCustomize);
 
   return {
-    addWidget: (widgetId, surface) => {
-      const widget = getWidgetById(widgetId);
-
-      if (!widget) {
-        return;
-      }
-      // Locked, the add is the first edit of a Customize session; focus goes to the widget, not the bar.
-      if (!getLock().canEditStructure) {
-        startCustomizing({ commands, queries }, { focusBar: false });
-      }
-      // The add fronts it; the open that follows only moves focus there.
-      if (addWidgetToWorkspace({ getWidgetsForRegion, surface, widget, widgets: commands.widgets })) {
-        openInWorkspace(ports, { surface, typeId: widgetId }, { mode: 'stay' });
-      }
-    },
     customizeWorkspace: (workspaceId) => {
       if (!getLock().isCustomizing) {
         customizeWorkspaceById({ commands, queries }, workspaceId);

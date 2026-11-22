@@ -1,11 +1,15 @@
 import { getLayoutPreset } from '@workbench/layoutPresets';
 import { describe, expect, it } from 'vitest';
 
+import type { WorkspaceStructure } from './structure';
+
 import { registryAvailability } from './layoutFixtures.testing';
 import { normalizeStructure } from './structure';
 import { reduceStructure } from './structureReducer';
 import {
   frontRegion,
+  getGuestInstanceId,
+  MAX_GUESTS,
   normalizeView,
   normalizeViews,
   pruneView,
@@ -13,6 +17,7 @@ import {
   setRegionCollapsed,
   setRegionSize,
   setWindowGeometry,
+  showGuest,
 } from './view';
 
 const compose = normalizeStructure(getLayoutPreset('compose').snapshot);
@@ -85,6 +90,48 @@ describe('workspace views', () => {
     ).toEqual({
       compose: { fronts: { left: 'upscale' } },
     });
+  });
+
+  it('read guests back as stored, one per type and one in the center, at most the bound, junk dropped', () => {
+    const geometry = { heightPx: 300, widthPx: 400, x: 20, y: 30 };
+    const view = showGuest(
+      showGuest(undefined, compose, 'workflow', { surface: 'center', typeId: 'workflow' }, geometry),
+      compose,
+      'diagnostics',
+      { surface: 'window', typeId: 'diagnostics' },
+      geometry
+    );
+
+    expect(normalizeView(JSON.parse(JSON.stringify(view)))).toEqual(view);
+    expect(
+      normalizeView({
+        guests: {
+          a: { surface: 'center', typeId: 'canvas' },
+          b: { surface: 'center', typeId: 'workflow' },
+          c: { surface: 'window', typeId: 'canvas' },
+          d: { surface: 'dock', typeId: 'queue' },
+          e: { surface: 'window' },
+          '': { surface: 'window', typeId: 'queue' },
+        },
+      })
+    ).toEqual({ guests: { a: { surface: 'center', typeId: 'canvas' } } });
+
+    const many = Object.fromEntries(
+      Array.from({ length: MAX_GUESTS + 5 }, (_, index) => [`g${index}`, { surface: 'window', typeId: `t${index}` }])
+    );
+
+    expect(Object.keys(normalizeView({ guests: many })?.guests ?? {})).toHaveLength(MAX_GUESTS);
+  });
+
+  it('make a guest one of the project’s own instances the workspace does not use, named after the type first', () => {
+    const using = (...ids: string[]) =>
+      ({ widgetInstances: Object.fromEntries(ids.map((id) => [id, { id, typeId: 'gallery' }])) }) as WorkspaceStructure;
+    const owned = ['gallery:center', 'gallery', 'gallery:bottom'];
+
+    expect(getGuestInstanceId(using('gallery:center'), 'gallery', owned)).toBe('gallery');
+    expect(getGuestInstanceId(using('gallery'), 'gallery', owned)).toBe('gallery:bottom');
+    expect(getGuestInstanceId(using(...owned), 'gallery', owned)).toBe('gallery:guest');
+    expect(getGuestInstanceId(using(...owned, 'gallery:guest'), 'gallery', owned)).toBe('gallery:guest-2');
   });
 
   it('drop overrides a changed structure no longer has, or now has as its defaults', () => {

@@ -12,13 +12,15 @@ import type { FloatingWidgetPlacement } from './floatingWindows';
 import type { WidgetDragEndResolution } from './widgetDnd';
 import type { WidgetPlacementMeta } from './widgetRegionViewModel';
 import type { WorkbenchWidgetCommands } from './workbenchStore';
-import type { LayoutAvailability } from './workspace/resolveLayout';
+import type { LayoutAvailability, ResolvedLayout } from './workspace/resolveLayout';
 
 import { takesLastCenterView } from './workspace/structureReducer';
 
 export interface WidgetPlacementProject {
-  /** Where each floating window returns to; absent means none float. */
+  /** Where each placed window returns to; absent means none float. Guest windows return nowhere and are not here. */
   floatingPlacements?: Record<WidgetInstanceId, FloatingWidgetPlacement>;
+  /** What the layout shows that the workspace does not place (`ResolvedLayout.guests`). */
+  guests?: ResolvedLayout['guests'];
   projectId?: string;
   widgetInstances: WidgetPlacementMeta;
   widgetRegions: Record<WidgetRegion, Pick<WidgetRegionState, 'activeInstanceId' | 'instanceIds'>>;
@@ -26,9 +28,6 @@ export interface WidgetPlacementProject {
 
 /** Where a structural add puts a widget when the control names no region. */
 export const DEFAULT_ADD_REGIONS: readonly WidgetRegion[] = ['center', 'right', 'left', 'bottom'];
-
-/** The regions an add on a surface tries: the center for the stage, rails before the status bar for a panel. */
-const SURFACE_ADD_REGIONS = { panel: ['right', 'left', 'bottom'], stage: ['center'] } as const;
 
 /** A widget that lives only as a status-bar chip: it renders no panel, so a region add refuses it. */
 export const isStatusChipWidget = (widget: RegisteredWidget): boolean =>
@@ -55,8 +54,7 @@ export const canRenderWidgetInRegion = (widget: RegisteredWidget, region: Widget
 
 /**
  * Structural: adds the widget to the first of `regions` that renders it, or fronts the instance that region already
- * holds. Only the shell's add controls and "Add to this workspace" call it; navigation opens through the workspace
- * resolver.
+ * holds. Only the shell's add controls call it; navigation opens through the workspace resolver.
  */
 export const addWidgetPlacement = ({
   createNew,
@@ -94,28 +92,25 @@ export const addWidgetPlacement = ({
 };
 
 /**
- * Structural: puts a widget in this workspace on the asked surface, or where it opens by default; a status chip goes
- * back to the status bar. The Widgets list's Add and the "Add to this workspace" offer use it.
+ * Structural: puts a widget in this workspace where it opens by default; a status chip goes back to the status bar.
+ * The Widgets list's Add uses it.
  */
 export const addWidgetToWorkspace = ({
   getWidgetsForRegion,
-  surface,
   widget,
   widgets,
 }: {
   getWidgetsForRegion: (region: WidgetRegion) => RegisteredWidget[];
-  surface?: 'stage' | 'panel';
   widget: RegisteredWidget;
   widgets: WorkbenchWidgetCommands;
 }): boolean => {
   const { allowMultiple, id: typeId, state } = widget.manifest;
-  const regions = surface ? SURFACE_ADD_REGIONS[surface] : DEFAULT_ADD_REGIONS;
 
-  if (addWidgetPlacement({ createNew: allowMultiple, getWidgetsForRegion, regions, typeId, widgets }).ok) {
+  if (addWidgetPlacement({ createNew: allowMultiple, getWidgetsForRegion, typeId, widgets }).ok) {
     return true;
   }
 
-  if (surface || widget.status !== 'enabled' || !isStatusChipWidget(widget)) {
+  if (widget.status !== 'enabled' || !isStatusChipWidget(widget)) {
     return false;
   }
 

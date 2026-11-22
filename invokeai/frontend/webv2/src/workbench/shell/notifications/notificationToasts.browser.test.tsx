@@ -151,32 +151,6 @@ describe('notification toasts in the editor', () => {
     ]);
   });
 
-  it('answers every repeat of an offer with one toast: again after it closed, in place while it shows', async () => {
-    const offer = {
-      actions: [{ kind: 'add-widget', widgetId: 'diagnostics' }],
-      category: 'workspace-offer',
-      kind: 'info',
-      title: "Diagnostics isn't in this workspace",
-    } as const;
-    const openCount = () =>
-      [...document.querySelectorAll('[data-part="root"][data-scope="toast"]')].filter(
-        (toast) => toast.getAttribute('data-state') === 'open' && toast.textContent?.includes(offer.title)
-      ).length;
-
-    await act(() => store().commands.notifications.add(offer));
-    const toast = await openToast(offer.title);
-    await act(() => toast.querySelector<HTMLButtonElement>('[data-part="close-trigger"]')!.click());
-    await expect.poll(() => isGone(offer.title)).toBe(true);
-
-    await act(() => store().commands.notifications.add(offer));
-    await openToast(offer.title);
-    await act(() => store().commands.notifications.add(offer));
-
-    await expect.poll(() => recordedNotifications()[0]?.occurrenceCount).toBe(3);
-    await expect.poll(openCount).toBe(1);
-    expect(recordedNotifications()).toHaveLength(1);
-  });
-
   it('keeps a failed run on screen in the current language, with a way to the failed item', async () => {
     await act(() =>
       store().commands.notifications.add({

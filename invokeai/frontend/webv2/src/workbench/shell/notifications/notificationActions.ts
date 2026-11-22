@@ -16,11 +16,6 @@ import {
 
 /** What the editor lends action handlers. Read when a toast opens (labels) and when its button is pressed. */
 export interface NotificationActionContext {
-  /**
-   * Adds the widget to the current workspace on that surface, or where it opens by default, and focuses it. A locked
-   * workspace enters Customize with it added.
-   */
-  addWidget: (widgetId: WidgetTypeId, surface?: 'stage' | 'panel') => void;
   /** Enters Customize on the named workspace (switching to it first) or the active one, unless already customizing. */
   customizeWorkspace: (workspaceId?: LayoutPresetId) => void;
   /** Whether this account rearranges without Customize; the one-time offer retires once it does not. */
@@ -31,7 +26,7 @@ export interface NotificationActionContext {
   getWidgetLabel: (widgetId: WidgetTypeId) => string | null;
   /** Whether the project is still open in this editor; an undo scoped to a closed project is not offered. */
   isProjectOpen: (projectId: string) => boolean;
-  /** Opens the widget through the workspace resolver, as a gesture: here, in the workspace that has it, or an offer. */
+  /** Opens the widget through the workspace resolver, as a gesture: here, in the workspace that has it, or a guest. */
   openWidget: (widgetId: WidgetTypeId) => void;
   revealQueueItem: (itemId: number) => void;
   /** Whether a notice may still offer Retry for these backend items: not once they were retried from one. */
@@ -55,21 +50,10 @@ interface NotificationActionHandler<Action extends WorkbenchNotificationAction> 
   withdrawal?: (action: Action) => AbortSignal | undefined;
 }
 
-const ADD_WIDGET_LABEL_KEYS = {
-  any: 'shell.workspace.addHere',
-  panel: 'shell.workspace.addToPanel',
-  stage: 'shell.workspace.addToCenter',
-} as const;
-
 /** One handler per descriptor kind; the mapped type makes a new kind a compile error until it has one. */
 const handlers: {
   [Kind in NotificationActionKind]: NotificationActionHandler<Extract<WorkbenchNotificationAction, { kind: Kind }>>;
 } = {
-  'add-widget': {
-    label: ({ surface, widgetId }, { getWidgetLabel, t }) =>
-      getWidgetLabel(widgetId) === null ? null : t(ADD_WIDGET_LABEL_KEYS[surface ?? 'any']),
-    run: ({ surface, widgetId }, { addWidget }) => addWidget(widgetId, surface),
-  },
   'customize-workspace': {
     label: (_action, { t }) => t('shell.workspace.customize'),
     run: ({ workspaceId }, { customizeWorkspace }) => customizeWorkspace(workspaceId),

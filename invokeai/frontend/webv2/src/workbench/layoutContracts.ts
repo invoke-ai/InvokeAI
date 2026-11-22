@@ -38,6 +38,17 @@ export interface FloatingWidgetState {
   returnIndex?: number;
   /** Z-order within the floating layer; higher renders on top. */
   stackOrder: number;
+  /**
+   * Other regions that held the instance when it floated (Preview in a center and a rail), each with its position
+   * among that region's docked members and whether it was the region's front: docking puts it back in each. Optional
+   * and additive: a build that predates it reads the window without it.
+   */
+  alsoIn?: Partial<Record<WidgetRegion, FloatingWidgetMembership>>;
+}
+
+export interface FloatingWidgetMembership {
+  index: number;
+  isFront?: true;
 }
 
 /** Where a window sat and how large it was, kept after it docks or closes so floating it again reopens it there. */

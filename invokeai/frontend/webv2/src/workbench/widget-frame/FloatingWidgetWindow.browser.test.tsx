@@ -44,6 +44,7 @@ const windowMocks = vi.hoisted(() => ({
 }));
 
 const project = {
+  guests: {},
   id: 'project-1',
   widgetInstances: {
     'image-map-instance': {
@@ -118,7 +119,6 @@ import { FloatingWidgetWindow } from './FloatingWidgetWindow';
 import { MissingWidgetFrame } from './WidgetRenderer';
 
 const manifest = {
-  allowFloating: true,
   allowedRegions: ['center', 'left', 'right'],
   failurePolicy: { isolateRenderFailure: false, onRegistrationFailure: 'disable' },
   icon: MapIcon,

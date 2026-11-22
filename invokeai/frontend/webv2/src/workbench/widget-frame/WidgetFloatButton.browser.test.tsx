@@ -1,4 +1,4 @@
-import type { WidgetManifest, WorkbenchRegion } from '@workbench/widgetContracts';
+import type { WorkbenchRegion } from '@workbench/widgetContracts';
 /* oxlint-disable react-perf/jsx-no-new-object-as-prop */
 import type * as workbenchContext from '@workbench/WorkbenchContext';
 
@@ -7,7 +7,6 @@ import { system } from '@theme/system';
 import { FocusRegionProvider } from '@workbench/focusRegions';
 import { createTestFocusController } from '@workbench/focusRegions.testing';
 import i18next from 'i18next';
-import { MapIcon } from 'lucide-react';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
@@ -52,18 +51,6 @@ await i18n.use(initReactI18next).init({
   resources: { en: { translation: { widgets: { floating: { floatWindow: 'Float Window' } } } } },
 });
 
-const manifest = (allowFloating: boolean): WidgetManifest =>
-  ({
-    allowFloating,
-    allowedRegions: ['center', 'left', 'right'],
-    failurePolicy: { isolateRenderFailure: true, onRegistrationFailure: 'disable' },
-    icon: MapIcon,
-    id: 'image-map',
-    label: () => 'Image Map',
-    load: () => Promise.resolve({ view: () => null }),
-    version: 1,
-  }) as unknown as WidgetManifest;
-
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -71,13 +58,13 @@ let root: Root | null = null;
 const focusController = createTestFocusController();
 const focusFloating = vi.spyOn(focusController, 'focusFloating');
 
-const renderButton = async (region: WorkbenchRegion, allowFloating = true) => {
+const renderButton = async (region: WorkbenchRegion) => {
   await act(async () => {
     root?.render(
       <I18nextProvider i18n={i18n}>
         <ChakraProvider value={system}>
           <FocusRegionProvider controller={focusController}>
-            <WidgetFloatButton instanceId="image-map-instance" manifest={manifest(allowFloating)} region={region} />
+            <WidgetFloatButton instanceId="image-map-instance" region={region} />
           </FocusRegionProvider>
         </ChakraProvider>
       </I18nextProvider>

@@ -11,6 +11,7 @@ import {
 import { restrictToWindowEdges } from '@dnd-kit/modifiers';
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { GalleryDragCursor, GalleryDragScope } from '@features/gallery/utility';
+import { flushWorkbenchDrafts } from '@platform/react/draftRegistry';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { useWorkbenchFocus } from '@workbench/focusRegions';
 import { WidgetIcon } from '@workbench/iconResolver';
@@ -47,6 +48,7 @@ import {
   useWorkbenchQueries,
   useWorkbenchSelector,
 } from '@workbench/WorkbenchContext';
+import { takesLastCenterView } from '@workbench/workspace/structureReducer';
 import { startWorkspaceLock } from '@workbench/workspace/workspaceLockRuntime';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -228,6 +230,22 @@ export const WorkbenchShell = () => {
     },
     [focusRegion, placementProject, widgets]
   );
+  const handleFloat = useCallback(
+    (region: 'left' | 'right', instanceId: string) => {
+      // Floating unmounts the docked view; its drafts commit first. Focus follows it into its window.
+      flushWorkbenchDrafts();
+      widgets.float(instanceId, region, { height: window.innerHeight, width: window.innerWidth });
+      focusFloating(instanceId);
+    },
+    [focusFloating, widgets]
+  );
+  const handleFloatLeft = useCallback((instanceId: string) => handleFloat('left', instanceId), [handleFloat]);
+  const handleFloatRight = useCallback((instanceId: string) => handleFloat('right', instanceId), [handleFloat]);
+  // Floating takes the instance from every region; the structure refuses to take the center's last view.
+  const canFloat = useCallback(
+    (instanceId: string) => !takesLastCenterView(placementProject, instanceId, queries.getAvailability()),
+    [placementProject, queries]
+  );
   const handleRemoveFloating = useCallback(
     (instanceId: string) => {
       const removed = removeFloatingPlacement({ instanceId, project: placementProject, widgets });
@@ -331,12 +349,14 @@ export const WorkbenchShell = () => {
                 role="region"
               >
                 <WidgetBar
+                  canFloat={canFloat}
                   edgeRegion={isLeftPanelShown ? 'left' : 'center'}
                   groups={leftRailGroups}
                   menuItems={leftMenuItems}
                   projectId={projectId}
                   side="left"
                   onDock={handleDock}
+                  onFloat={handleFloatLeft}
                   onRemoveFloating={handleRemoveFloating}
                   onSelect={handleSelect}
                   onToggle={handleToggleLeft}
@@ -345,12 +365,14 @@ export const WorkbenchShell = () => {
                 <CenterArea />
                 {isRightPanelShown ? <RightPanel instanceId={rightRegion.activeInstanceId} /> : null}
                 <WidgetBar
+                  canFloat={canFloat}
                   edgeRegion={isRightPanelShown ? 'right' : 'center'}
                   groups={rightRailGroups}
                   menuItems={rightMenuItems}
                   projectId={projectId}
                   side="right"
                   onDock={handleDock}
+                  onFloat={handleFloatRight}
                   onRemoveFloating={handleRemoveFloating}
                   onSelect={handleSelect}
                   onToggle={handleToggleRight}

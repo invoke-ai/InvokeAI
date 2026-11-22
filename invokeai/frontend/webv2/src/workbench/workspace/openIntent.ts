@@ -10,4 +10,4 @@ export interface OpenIntent {
 
 export type OpenResult =
   | { ok: true; workspaceId: LayoutPresetId; changedWorkspace: boolean; region?: WidgetRegion }
-  | { ok: false; reason: 'unavailable' | 'not-placed' };
+  | { ok: false; reason: 'unavailable' };

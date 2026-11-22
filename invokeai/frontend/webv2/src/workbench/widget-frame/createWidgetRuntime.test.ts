@@ -28,6 +28,9 @@ const createDispatch = () => {
       dispatch({ instanceId, keys, projectId, type: 'clearWidgetInstanceValues' }),
     dockFloating: (instanceId) => dispatch({ instanceId, type: 'dockFloatingWidget' }),
     closeFloating: (instanceId) => dispatch({ instanceId, type: 'closeFloatingWidget' }),
+    closeGuest: (instanceId) => dispatch({ instanceId, type: 'closeGuest' }),
+    keepGuest: (instanceId) => dispatch({ instanceId, type: 'keepGuest' }),
+    showGuest: (options) => dispatch({ ...options, type: 'showGuest' }),
     front: (options) => dispatch({ ...options, type: 'frontRegionWidget' }),
     float: (instanceId, region) =>
       dispatch(region ? { instanceId, region, type: 'floatWidget' } : { instanceId, type: 'floatWidget' }),

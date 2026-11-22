@@ -4,29 +4,26 @@ import type { WorkspacePlacement } from '@workbench/workspace/workspaceDerivatio
 
 import { autoSwitchDestinations } from './autoRoutePolicy';
 import { getSourceLabel } from './invocation';
-import {
-  graphWidgetTypeIds,
-  isInvocationSourceAvailable,
-  sourceIdsByWidgetTypeId,
-  type GraphWidgetTypeId,
-} from './invocationSources';
+import { findWidgetTypeIdForSourceId, invocationSources } from './invocationSources';
 
 export const getNaturalDestination = (sourceId: InvocationSourceId): ResultDestination =>
   autoSwitchDestinations[sourceId];
 
 export interface GraphWidgetSource {
   sourceId: InvocationSourceId;
-  typeId: GraphWidgetTypeId;
+  typeId: WidgetTypeId;
   label: string;
 }
 
-export const graphWidgetSources: GraphWidgetSource[] = graphWidgetTypeIds
-  .map((typeId) => ({
-    label: getSourceLabel(sourceIdsByWidgetTypeId[typeId]),
-    sourceId: sourceIdsByWidgetTypeId[typeId],
-    typeId,
-  }))
-  .filter((source) => isInvocationSourceAvailable(source.sourceId));
+let graphWidgetSources: GraphWidgetSource[] | undefined;
+
+/** Every available source a widget runs, with that widget type, in picker order. */
+export const getGraphWidgetSources = (): readonly GraphWidgetSource[] =>
+  (graphWidgetSources ??= invocationSources.flatMap(({ available, id }) => {
+    const typeId = available ? findWidgetTypeIdForSourceId(id) : null;
+
+    return typeId ? [{ label: getSourceLabel(id), sourceId: id, typeId }] : [];
+  }));
 
 /** Floating graph widgets are both visible and placed, so include them in invocation-source discovery. */
 const addFloatingWidgetTypeIds = (layout: WorkspacePlacement, typeIds: Set<WidgetTypeId>): void => {

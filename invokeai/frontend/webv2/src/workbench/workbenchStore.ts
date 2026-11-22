@@ -558,6 +558,11 @@ const createCommands = (
       },
       reorder: command('reorderWidgetInstances'),
       revealFloating: command('revealFloatingWidget', (instanceId: string) => ({ instanceId })),
+      /** Shows a type this workspace does not place as a guest; view only. */
+      showGuest: command('showGuest'),
+      closeGuest: command('closeGuest', (instanceId: string) => ({ instanceId })),
+      /** Structural: places a guest in the workspace on its surface. */
+      keepGuest: command('keepGuest', (instanceId: string) => ({ instanceId })),
       setAlignment: command('setWidgetInstanceAlignment'),
       select: command('selectRegionWidget'),
       setFloatingGeometry: command(

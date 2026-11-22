@@ -3,7 +3,7 @@ import type { WidgetRegion } from '@workbench/layoutContracts';
 import { Icon, Menu, Portal, Text } from '@chakra-ui/react';
 import { MenuContent } from '@platform/ui/Menu';
 import { DOCK_DESTINATION_ICONS, resolveDockLabel } from '@workbench/widgetLabels';
-import { ArrowLeftToLineIcon, ArrowRightToLineIcon, XIcon } from 'lucide-react';
+import { ArrowLeftToLineIcon, ArrowRightToLineIcon, PictureInPicture2Icon, XIcon } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -25,6 +25,8 @@ interface WidgetInstanceContextMenuProps {
   removeDisabledLabel?: string;
   onClose: () => void;
   onDock?: (item: WidgetEnableMenuItem) => void;
+  /** Offers floating the target into a window. */
+  onFloat?: (item: WidgetEnableMenuItem) => void;
   onRemove: (item: WidgetEnableMenuItem) => void;
   onSetAlignment?: (item: WidgetEnableMenuItem, align: 'start' | 'end') => void;
 }
@@ -37,6 +39,7 @@ export const WidgetInstanceContextMenu = ({
   isRemoveDisabled,
   onClose,
   onDock,
+  onFloat,
   onRemove,
   onSetAlignment,
   removeDisabledLabel,
@@ -70,6 +73,11 @@ export const WidgetInstanceContextMenu = ({
       onDock?.(target.item);
     }
   }, [onDock, target]);
+  const handleFloat = useCallback(() => {
+    if (target) {
+      onFloat?.(target.item);
+    }
+  }, [onFloat, target]);
   const handleRemove = useCallback(() => {
     if (target && isRemoveDisabled?.(target.item) !== true) {
       onRemove(target.item);
@@ -93,6 +101,12 @@ export const WidgetInstanceContextMenu = ({
                 <Menu.Item value="dock-widget" onClick={handleDock}>
                   <Icon as={DOCK_DESTINATION_ICONS[dockRegion]} boxSize="3.5" />
                   <Menu.ItemText>{resolveDockLabel(dockRegion, t)}</Menu.ItemText>
+                </Menu.Item>
+              ) : null}
+              {onFloat ? (
+                <Menu.Item value="float-widget" onClick={handleFloat}>
+                  <Icon as={PictureInPicture2Icon} boxSize="3.5" />
+                  <Menu.ItemText>{t('widgets.floating.floatWindow')}</Menu.ItemText>
                 </Menu.Item>
               ) : null}
               {onSetAlignment && target.item.isEnabled ? (

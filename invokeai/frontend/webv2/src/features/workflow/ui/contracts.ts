@@ -28,6 +28,8 @@ export interface WorkflowWidgetViewProps {
   region: WorkflowRegion;
   runtime: WorkflowRuntimeApi;
   presentation?: 'compact' | 'expanded' | 'tooltip';
+  /** In a window, the docked region whose surface it shows. */
+  surface?: 'left' | 'right' | 'bottom' | 'center';
 }
 
 export interface WorkflowWidgetLabelProps {

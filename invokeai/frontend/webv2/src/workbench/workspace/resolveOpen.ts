@@ -2,6 +2,7 @@ import type { LayoutPresetId, WidgetRegion } from '@workbench/layoutContracts';
 import type { WidgetInstanceId, WidgetTypeId } from '@workbench/widgetContracts';
 
 import type { OpenIntent } from './openIntent';
+import type { GuestSurface } from './view';
 import type { WorkspacePlacement } from './workspaceDerivations';
 
 /**
@@ -21,10 +22,12 @@ export interface WorkspaceCandidate {
 
 export interface ResolveOpenContext {
   currentWorkspaceId: LayoutPresetId;
+  /** The types a widget type acts on (its manifest's `needs`). */
+  getNeeds: (typeId: WidgetTypeId) => readonly WidgetTypeId[];
   /** Availability and region rules for this account: disabled, hidden and admin-only types answer null everywhere. */
   getPresentation: (typeId: WidgetTypeId, region: WidgetRegion) => RegionPresentation;
   here: WorkspacePlacement;
-  /** 'stay' never leaves this workspace. */
+  /** 'stay' never leaves this workspace; Customize resolves in it. */
   mode: 'navigate' | 'stay';
   /** In tab order. */
   workspaces: readonly WorkspaceCandidate[];
@@ -40,8 +43,8 @@ export type OpenDecision =
   /** Placed here behind a tab, in a closed or collapsed panel, or as a center alternate: front it. */
   | { step: 'hidden'; target: OpenTarget }
   | { step: 'elsewhere'; target: OpenTarget; workspaceId: LayoutPresetId }
-  /** Nothing here serves the intent; `placedHere` when this workspace has the type on another surface. */
-  | { step: 'not-placed'; placedHere: boolean }
+  /** Placed nowhere this open may go: shown here as a guest, fronted in the center (Away) or in a window. */
+  | { step: 'guest'; surface: GuestSurface }
   | { step: 'unavailable' };
 
 interface Placement {
@@ -61,12 +64,16 @@ const satisfiesSurface = (intent: OpenIntent, region: WidgetRegion, presentation
   return region === 'center' ? intent.surface !== 'panel' : intent.surface !== 'stage';
 };
 
+/** Where the placement shows the intent; another workspace's guests are not placed there, so `guests` leaves them out. */
 const listPlacements = (
   intent: OpenIntent,
   placement: WorkspacePlacement,
-  getPresentation: ResolveOpenContext['getPresentation']
+  getPresentation: ResolveOpenContext['getPresentation'],
+  guests: 'include' | 'exclude' = 'include'
 ): Placement[] => {
-  const isType = (instanceId: WidgetInstanceId) => placement.widgetInstances[instanceId]?.typeId === intent.typeId;
+  const isType = (instanceId: WidgetInstanceId) =>
+    placement.widgetInstances[instanceId]?.typeId === intent.typeId &&
+    (guests === 'include' || placement.guests?.[instanceId] === undefined);
   const placements: Placement[] =
     intent.surface === 'stage'
       ? []
@@ -102,9 +109,10 @@ const listPlacements = (
 const resolvePlacedHere = (
   intent: OpenIntent,
   placement: WorkspacePlacement,
-  getPresentation: ResolveOpenContext['getPresentation']
+  getPresentation: ResolveOpenContext['getPresentation'],
+  guests: 'include' | 'exclude' = 'include'
 ): Extract<OpenDecision, { step: 'hidden' | 'visible' }> | null => {
-  const placements = listPlacements(intent, placement, getPresentation);
+  const placements = listPlacements(intent, placement, getPresentation, guests);
   const visible = placements.find((candidate) => candidate.isVisible);
 
   if (visible) {
@@ -146,13 +154,51 @@ const rankWorkspace = (
     return 1;
   }
 
-  return listPlacements(intent, workspace.arrangement, getPresentation).some((placement) => placement.isFront) ? 2 : 3;
+  return listPlacements(intent, workspace.arrangement, getPresentation, 'exclude').some(
+    (placement) => placement.isFront
+  )
+    ? 2
+    : 3;
+};
+
+/** Whether the arrangement places a type at all, its guests aside. */
+const placesType = (placement: WorkspacePlacement, typeId: WidgetTypeId): boolean => {
+  const isType = (instanceId: WidgetInstanceId) =>
+    placement.widgetInstances[instanceId]?.typeId === typeId && placement.guests?.[instanceId] === undefined;
+
+  return (
+    Object.keys(placement.floatingWidgets ?? {}).some(isType) ||
+    Object.values(placement.widgetRegions).some(({ instanceIds }) => instanceIds.some(isType))
+  );
+};
+
+const isAvailable = (typeId: WidgetTypeId, getPresentation: ResolveOpenContext['getPresentation']): boolean =>
+  (['left', 'right', 'bottom', 'center'] as const).some((region) => getPresentation(typeId, region) !== null);
+
+/**
+ * Step 4's surface: the center for a stage, or for a type no side region shows as a panel; a window otherwise. Null
+ * for a type only a chip can show, which no surface outside the status bar can.
+ */
+const getGuestSurface = (
+  intent: OpenIntent,
+  getPresentation: ResolveOpenContext['getPresentation']
+): GuestSurface | null => {
+  const isCenterView = getPresentation(intent.typeId, 'center') === 'view';
+  const isPanel = (['left', 'right', 'bottom'] as const).some(
+    (region) => getPresentation(intent.typeId, region) === 'view'
+  );
+
+  if (intent.surface === 'stage') {
+    return isCenterView ? 'center' : null;
+  }
+
+  return isPanel ? 'window' : intent.surface !== 'panel' && isCenterView ? 'center' : null;
 };
 
 /**
  * Where an open lands. First match wins: on screen here, placed here but hidden, placed in another workspace (only in
- * 'navigate' mode), placed nowhere. A type that cannot render for this intent is unavailable. Reads placement only, so
- * built-in and custom workspaces resolve alike.
+ * 'navigate' mode, and for a widget with `needs` only one that places what it needs), else a guest here. A type that
+ * cannot render for this intent is unavailable. Reads placement only, so built-in and custom workspaces resolve alike.
  */
 export const resolveOpen = (intent: OpenIntent, context: ResolveOpenContext): OpenDecision => {
   const { getPresentation } = context;
@@ -168,13 +214,15 @@ export const resolveOpen = (intent: OpenIntent, context: ResolveOpenContext): Op
   }
 
   if (context.mode === 'navigate') {
+    const needs = context.getNeeds(intent.typeId).filter((typeId) => isAvailable(typeId, getPresentation));
     let best: { rank: number; target: OpenTarget; workspaceId: LayoutPresetId } | null = null;
 
     for (const workspace of context.workspaces) {
       const there =
-        workspace.id === context.currentWorkspaceId
+        workspace.id === context.currentWorkspaceId ||
+        !needs.every((typeId) => placesType(workspace.arrangement, typeId))
           ? null
-          : resolvePlacedHere(intent, workspace.arrangement, getPresentation);
+          : resolvePlacedHere(intent, workspace.arrangement, getPresentation, 'exclude');
       const rank = there ? rankWorkspace(intent, workspace, getPresentation) : Infinity;
 
       if (there && (best === null || rank < best.rank)) {
@@ -187,10 +235,7 @@ export const resolveOpen = (intent: OpenIntent, context: ResolveOpenContext): Op
     }
   }
 
-  const isType = (instanceId: WidgetInstanceId) => context.here.widgetInstances[instanceId]?.typeId === intent.typeId;
-  const placedHere =
-    Object.keys(context.here.floatingWidgets ?? {}).some(isType) ||
-    Object.values(context.here.widgetRegions).some(({ instanceIds }) => instanceIds.some(isType));
+  const surface = getGuestSurface(intent, getPresentation);
 
-  return { placedHere, step: 'not-placed' };
+  return surface === null ? { step: 'unavailable' } : { step: 'guest', surface };
 };

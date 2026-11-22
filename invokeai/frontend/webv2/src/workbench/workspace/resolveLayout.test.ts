@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { LayoutAvailability, ResolvedLayout } from './resolveLayout';
 import type { WorkspaceStructure } from './structure';
+import type { WorkspaceView } from './view';
 
 import {
   createRandom,
@@ -19,11 +20,23 @@ import {
 import { createLayoutResolver, resolveLayout } from './resolveLayout';
 import { normalizeStructure, PANEL_OPEN_KEYS } from './structure';
 import { reduceStructure } from './structureReducer';
-import { frontRegion, setRegionSize, setWindowGeometry } from './view';
+import { frontRegion, getGuestWindowRegion, pruneView, setRegionSize, setWindowGeometry, showGuest } from './view';
 
 const structureOf = (presetId: string) => normalizeStructure(getLayoutPreset(presetId).snapshot);
 const edit = structureOf('edit');
 const compose = structureOf('compose');
+const withoutType = (structure: WorkspaceStructure, typeId: string): WorkspaceStructure =>
+  WIDGET_REGIONS.reduce(
+    (next, region) =>
+      next.widgetRegions[region].instanceIds
+        .filter((instanceId) => next.widgetInstances[instanceId]?.typeId === typeId)
+        .reduce(
+          (current, instanceId) =>
+            reduceStructure(current, { instanceId, region, type: 'removeWidget' }, registryAvailability),
+          next
+        ),
+    structure
+  );
 
 /** The resolved layout read back as a structure, so resolving it again must change nothing. */
 const asStructure = (layout: ResolvedLayout, structure: WorkspaceStructure): WorkspaceStructure => ({
@@ -39,7 +52,12 @@ const arrangementOf = ({ floatingWidgets, panels, widgetRegions }: ResolvedLayou
   widgetRegions,
 });
 
-const expectValid = (layout: ResolvedLayout, availability: LayoutAvailability) => {
+const expectValid = (
+  layout: ResolvedLayout,
+  structure: WorkspaceStructure,
+  view: WorkspaceView | undefined,
+  availability: LayoutAvailability
+) => {
   const typeOf = (instanceId: string) => layout.widgetInstances[instanceId]?.typeId ?? '';
   const windows = layout.floatingWidgets ?? {};
   const centerFront = layout.widgetRegions.center.activeInstanceId;
@@ -98,15 +116,81 @@ const expectValid = (layout: ResolvedLayout, availability: LayoutAvailability) =
     expect(window.heightPx).toBeGreaterThanOrEqual(200);
   }
 
-  // Return markers are canonical: each window's index is its slot among what its region shows.
-  for (const region of WIDGET_REGIONS) {
-    const order = writeRegionOrder(
-      getRegionOrder(region, layout.widgetRegions[region].instanceIds, layout.floatingWidgets),
-      layout.floatingWidgets
+  // A guest shows where it is: a center guest fronted there, at most one, and a guest window among the windows.
+  const guests = Object.entries(layout.guests);
+  const centerGuests = guests.filter(([, surface]) => surface === 'center').map(([instanceId]) => instanceId);
+
+  expect(centerGuests.length).toBeLessThanOrEqual(1);
+  expect(centerGuests.every((instanceId) => instanceId === centerFront)).toBe(true);
+  const panelSurface = (typeId: string, region: WidgetRegion) =>
+    availability.hasDistinctSurface(typeId, region) ? region : 'panel';
+  // Whether the layout shows a placed instance of the type, in a rail or a window, on a guest window's surface.
+  const showsSameSurface = (typeId: string) => {
+    const own = panelSurface(typeId, getGuestWindowRegion(availability.getPresentation, typeId)!);
+    const isPlaced = (id: string) => typeOf(id) === typeId && layout.guests[id] === undefined;
+
+    return (
+      WIDGET_REGIONS.some(
+        (region) =>
+          region !== 'center' &&
+          layout.widgetRegions[region].instanceIds.some(isPlaced) &&
+          panelSurface(typeId, region) === own
+      ) ||
+      Object.entries(windows).some(([id, window]) => isPlaced(id) && panelSurface(typeId, window.returnRegion) === own)
+    );
+  };
+
+  for (const [instanceId, surface] of guests) {
+    // A guest is the structure's instance only as the center's fallback stage.
+    expect(Object.hasOwn(structure.widgetInstances, instanceId) && instanceId !== availability.fallbackStage?.id).toBe(
+      false
     );
 
-    expect(order.floatingWidgets).toBe(layout.floatingWidgets);
+    if (surface !== 'window') {
+      continue;
+    }
+
+    const typeId = typeOf(instanceId);
+
+    expect(Object.hasOwn(windows, instanceId)).toBe(true);
+    expect(WIDGET_REGIONS.some((region) => layout.widgetRegions[region].instanceIds.includes(instanceId))).toBe(false);
+    expect(showsSameSurface(typeId)).toBe(false);
   }
+
+  // Conversely, a well-formed guest window the layout shows nothing in place of is shown.
+  for (const [instanceId, guest] of Object.entries(view?.guests ?? {})) {
+    const isOnlyOfType = Object.values(view?.guests ?? {}).filter(({ typeId }) => typeId === guest.typeId).length === 1;
+
+    if (
+      guest.surface === 'window' &&
+      isOnlyOfType &&
+      !Object.hasOwn(structure.widgetInstances, instanceId) &&
+      getGuestWindowRegion(availability.getPresentation, guest.typeId) !== null &&
+      !showsSameSurface(guest.typeId)
+    ) {
+      expect(layout.guests[instanceId]).toBe('window');
+    }
+  }
+
+  // Return markers are canonical: each placed window's index is its slot among what its region shows.
+  const placedWindows = Object.fromEntries(
+    Object.entries(windows).filter(([instanceId]) => layout.guests[instanceId] === undefined)
+  );
+
+  for (const region of WIDGET_REGIONS) {
+    const order = writeRegionOrder(
+      getRegionOrder(region, layout.widgetRegions[region].instanceIds, placedWindows),
+      placedWindows
+    );
+
+    expect(order.floatingWidgets).toBe(placedWindows);
+  }
+};
+
+const withoutGuests = (view: WorkspaceView | undefined): WorkspaceView | undefined => {
+  const { guests: _guests, ...rest } = view ?? {};
+
+  return view && rest;
 };
 
 describe('resolveLayout repairs', () => {
@@ -140,7 +224,21 @@ describe('resolveLayout repairs', () => {
     const layout = resolveLayout(canvasOnly, undefined, withUnavailable(registryAvailability, ['canvas']));
 
     expect(layout.widgetRegions.center).toMatchObject({ activeInstanceId: 'preview', instanceIds: ['preview'] });
-    expect(layout.guests).toEqual(['preview']);
+    expect(layout.guests).toEqual({ preview: 'center' });
+
+    // A guest window already showing that instance wins: nothing shows twice.
+    const noPreview = withoutType(canvasOnly, 'preview');
+    const window = showGuest(
+      undefined,
+      noPreview,
+      'preview',
+      { surface: 'window', typeId: 'preview' },
+      { heightPx: 300, widthPx: 400, x: 0, y: 0 }
+    );
+    const withWindow = resolveLayout(noPreview, window, withUnavailable(registryAvailability, ['canvas']));
+
+    expect(withWindow.guests).toEqual({ preview: 'window' });
+    expect(withWindow.widgetRegions.center.instanceIds).not.toContain('preview');
   });
 
   it('4: an instance the center fronts is shown once, unless its type has a surface in both regions', () => {
@@ -200,7 +298,109 @@ describe('resolveLayout repairs', () => {
     expect(graphAndForm.widgetRegions.center.activeInstanceId).toBe('flow');
   });
 
-  it('5: clamps sizes and window sizes to their limits', () => {
+  it('5: drops a guest the structure supersedes, by its id or by the same surface anywhere, and keeps it in the view only until pruned', () => {
+    const geometry = { heightPx: 300, widthPx: 400, x: 40, y: 40 };
+    const withoutGallery = withoutType(edit, 'gallery');
+    const galleryGuest = showGuest(
+      undefined,
+      withoutGallery,
+      'gallery',
+      { surface: 'window', typeId: 'gallery' },
+      geometry
+    );
+    const guested = resolveLayout(withoutGallery, galleryGuest, registryAvailability);
+
+    expect(guested.guests).toEqual({ gallery: 'window' });
+    expect(guested.floatingWidgets?.gallery).toMatchObject({ ...geometry, returnRegion: 'left' });
+
+    // Placed in another rail, as another instance: the rail is what shows, and pruning forgets the guest.
+    const inRightRail = reduceStructure(
+      withoutGallery,
+      { createNew: true, mintId: 'gallery:center', region: 'right', type: 'addWidget', typeId: 'gallery' },
+      registryAvailability
+    );
+
+    expect(resolveLayout(inRightRail, galleryGuest, registryAvailability).guests).toEqual({});
+    expect(pruneView(galleryGuest, inRightRail, registryAvailability)).toBeUndefined();
+
+    // Its own id placed in the center: hidden at once, forgotten on pruning, so removing that view brings nothing back.
+    const byId = reduceStructure(
+      withoutGallery,
+      { createNew: true, mintId: 'gallery', region: 'center', type: 'addWidget', typeId: 'gallery' },
+      registryAvailability
+    );
+    const pruned = pruneView(galleryGuest, byId, registryAvailability);
+
+    expect(resolveLayout(byId, galleryGuest, registryAvailability).floatingWidgets?.gallery).toBeUndefined();
+    expect(pruned).toBeUndefined();
+    expect(
+      resolveLayout(
+        reduceStructure(byId, { instanceId: 'gallery', region: 'center', type: 'removeWidget' }, registryAvailability),
+        pruned,
+        registryAvailability
+      ).guests
+    ).toEqual({});
+    expect(
+      resolveLayout(withoutGallery, galleryGuest, withUnavailable(registryAvailability, ['gallery'])).guests
+    ).toEqual({});
+
+    // A workflow's form in a window is not its graph in the status bar's panel.
+    const graphBelow = reduceStructure(
+      withoutType(edit, 'workflow'),
+      { mintId: 'workflow', region: 'bottom', type: 'addWidget', typeId: 'workflow' },
+      registryAvailability
+    );
+    const formGuest = showGuest(
+      undefined,
+      graphBelow,
+      'workflow:guest',
+      { surface: 'window', typeId: 'workflow' },
+      geometry
+    );
+
+    expect(resolveLayout(graphBelow, formGuest, registryAvailability).guests).toEqual({ 'workflow:guest': 'window' });
+
+    // A placement repair 1 hides (Layers stored in the left rail, where it cannot show) supersedes nothing.
+    const hiddenLayers = normalizeStructure({
+      ...withoutType(edit, 'layers'),
+      widgetRegions: {
+        ...withoutType(edit, 'layers').widgetRegions,
+        left: {
+          ...edit.widgetRegions.left,
+          instanceIds: [...edit.widgetRegions.left.instanceIds, 'layers'],
+        },
+      },
+      widgetInstances: { ...withoutType(edit, 'layers').widgetInstances, layers: { id: 'layers', typeId: 'layers' } },
+    });
+    const layersGuest = showGuest(
+      undefined,
+      hiddenLayers,
+      'layers:guest',
+      { surface: 'window', typeId: 'layers' },
+      geometry
+    );
+
+    expect(resolveLayout(hiddenLayers, layersGuest, registryAvailability).guests).toEqual({ 'layers:guest': 'window' });
+    expect(pruneView(layersGuest, hiddenLayers, registryAvailability)).toBe(layersGuest);
+
+    // Placed in a rail only, Preview still shows as the center's guest.
+    const railPreview = reduceStructure(
+      edit,
+      { instanceId: 'preview', region: 'center', type: 'removeWidget' },
+      registryAvailability
+    );
+    const away = resolveLayout(
+      railPreview,
+      showGuest(undefined, railPreview, 'preview:guest', { surface: 'center', typeId: 'preview' }, geometry),
+      registryAvailability
+    );
+
+    expect(railPreview.widgetRegions.right.instanceIds).toContain('preview');
+    expect(away.widgetRegions.center.activeInstanceId).toBe('preview:guest');
+    expect(away.guests).toEqual({ 'preview:guest': 'center' });
+  });
+
+  it('6: clamps sizes and window sizes to their limits', () => {
     const floated = reduceStructure(compose, { instanceId: 'queue', type: 'floatWidget' }, registryAvailability);
     const view = { sizes: { left: 2000 }, windows: { queue: { heightPx: 10, widthPx: 10 } } };
     const layout = resolveLayout(floated, view, registryAvailability);
@@ -218,11 +418,16 @@ describe('resolveLayout over generated inputs', () => {
       const view = generateView(random, structure);
       const availability = random.int(2) ? generateAvailability(random, structure) : registryAvailability;
       const layout = resolveLayout(structure, view, availability);
+      const placed = resolveLayout(structure, withoutGuests(view), availability);
 
-      expectValid(layout, availability);
+      expectValid(layout, structure, view, availability);
       expect(resolveLayout(structure, view, availability)).toEqual(layout);
-      expect(arrangementOf(resolveLayout(asStructure(layout, structure), undefined, availability))).toEqual(
-        arrangementOf(layout)
+      expect(resolveLayout(structure, view, availability, layout)).toBe(layout);
+      // The view's fronts stay: an explicit side front of an instance the center shares is an ask no structure holds.
+      const asks = view?.fronts ? { fronts: view.fronts } : undefined;
+
+      expect(arrangementOf(resolveLayout(asStructure(placed, structure), asks, availability))).toEqual(
+        arrangementOf(placed)
       );
     }
   });

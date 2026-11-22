@@ -30,8 +30,8 @@ import {
 } from '@workbench/WorkbenchContext';
 import { takesLastCenterView } from '@workbench/workspace/structureReducer';
 import { useCanEditStructure } from '@workbench/workspace/useStructureLock';
-import { getActiveAwayStage, goBackToStage } from '@workbench/workspace/workspaceNavigation';
-import { ArrowLeftIcon, CheckIcon, ChevronDownIcon, XIcon } from 'lucide-react';
+import { getActiveAwayStage, goBackToStage, keepGuestInWorkspace } from '@workbench/workspace/workspaceNavigation';
+import { ArrowLeftIcon, CheckIcon, ChevronDownIcon, PinIcon, XIcon } from 'lucide-react';
 import { Activity, Suspense, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -181,6 +181,23 @@ export const CenterArea = () => {
     : true;
 
   const canEditStructure = useCanEditStructure();
+  // A guest is not the workspace's: it can be kept, and closed while the center has a view of its own to show.
+  const isGuest = activeItem !== undefined && placementProject.guests?.[activeItem.id] !== undefined;
+  const activeId = activeItem?.id;
+  const activeTypeId = activeItem?.typeId;
+  const canCloseGuest = isGuest && centerViewItems.some((item) => item.id !== activeId);
+  const keepGuest = useCallback(() => {
+    if (activeId !== undefined) {
+      keepGuestInWorkspace({ commands, queries }, activeId, { canEditStructure });
+      focus.focusRegion('center', activeTypeId, activeId);
+    }
+  }, [activeId, activeTypeId, canEditStructure, commands, focus, queries]);
+  const closeGuest = useCallback(() => {
+    if (activeId !== undefined) {
+      widgets.closeGuest(activeId);
+      focus.focusRegion('center');
+    }
+  }, [activeId, focus, widgets]);
   const availableCenterItems = useMemo(
     () =>
       canEditStructure ? centerWidgetMenuItems.filter((item) => !item.isEnabled && item.status !== 'disabled') : [],
@@ -232,9 +249,11 @@ export const CenterArea = () => {
               <CenterViewMenu
                 activeItem={activeItem}
                 availableItems={availableCenterItems}
+                onCloseGuest={canCloseGuest ? closeGuest : undefined}
+                onKeepGuest={isGuest ? keepGuest : undefined}
                 isCloseDisabled={isActiveViewRequired}
                 items={centerViewItems}
-                onClose={canEditStructure ? closeActiveCenterView : undefined}
+                onClose={canEditStructure && !isGuest ? closeActiveCenterView : undefined}
                 onOpen={openCenterWidget}
                 onSelect={selectCenterView}
               />
@@ -314,12 +333,18 @@ const CenterViewMenu = ({
   isCloseDisabled,
   items,
   onClose,
+  onCloseGuest,
+  onKeepGuest,
   onOpen,
   onSelect,
 }: {
   activeItem?: CenterWidgetItem;
   availableItems: WidgetEnableMenuItem[];
   isCloseDisabled: boolean;
+  /** Set while the active view is the center's guest and the center has a view of its own to go back to. */
+  onCloseGuest?: () => void;
+  /** Set while the active view is the center's guest. */
+  onKeepGuest?: () => void;
   items: CenterWidgetItem[];
   /** Absent while the workspace is locked: closing a view removes it. */
   onClose?: () => void;
@@ -400,6 +425,22 @@ const CenterViewMenu = ({
                     <CenterViewMenuRow key={item.id} item={item} onOpen={onOpen} />
                   ))}
                 </Menu.ItemGroup>
+              </>
+            ) : null}
+
+            {activeItem && onKeepGuest ? (
+              <>
+                <Menu.Separator borderColor="border.subtle" />
+                <Menu.Item value="keep-guest" onClick={onKeepGuest}>
+                  <Icon as={PinIcon} boxSize="3.5" color="fg.subtle" />
+                  <Menu.ItemText>{t('widgets.guest.keepNamed', { label: activeItem.label })}</Menu.ItemText>
+                </Menu.Item>
+                {onCloseGuest ? (
+                  <Menu.Item value="close-guest" onClick={onCloseGuest}>
+                    <Icon as={XIcon} boxSize="3.5" color="fg.subtle" />
+                    <Menu.ItemText>{t('widgets.centerViewClose', { label: activeItem.label })}</Menu.ItemText>
+                  </Menu.Item>
+                ) : null}
               </>
             ) : null}
 

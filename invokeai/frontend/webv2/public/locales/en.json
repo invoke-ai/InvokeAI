@@ -2796,14 +2796,7 @@
       "workspaceChangedTitle": "Workspace not changed back"
     },
     "workspace": {
-      "addHere": "Add to this workspace",
-      "addToCenter": "Add to the center",
-      "addToPanel": "Add to a panel",
       "backToStage": "Back to {{stage}}",
-      "notHere": "{{widget}} isn't in this workspace",
-      "notInCenter": "{{widget}} isn't in this workspace's center",
-      "notInPanel": "{{widget}} isn't in a panel in this workspace",
-      "noWorkflowForm": "This workspace has no workflow form",
       "customize": "Customize",
       "customizeWorkspace": "Customize workspace",
       "customizing": "Customize {{name}}",
@@ -2818,7 +2811,7 @@
     "widgets": {
       "add": "Add",
       "addNamed": "Add {{label}}",
-      "description": "Every widget and where it is in this workspace. Show brings one forward, Dock returns a window to its panel, and Remove takes it out of the workspace.",
+      "description": "Every widget and where it is in this workspace. Show brings one forward, or shows one this workspace lacks as a guest; Dock returns a window to its panel, and Remove takes it out of the workspace.",
       "dock": "Dock",
       "dockNamed": "Dock {{label}}",
       "inLayout": "In this workspace",
@@ -2838,7 +2831,8 @@
       "show": "Show",
       "showNamed": "Show {{label}}",
       "title": "Widgets",
-      "lockedDescription": "Every widget and where it is in this workspace. Show brings one forward; Customize adds, docks and removes them."
+      "lockedDescription": "Every widget and where it is in this workspace. Show brings one forward, or shows one this workspace lacks as a guest; Customize adds, docks and removes them.",
+      "missingNeeds": "{{placement}} · Needs {{widgets}}, not in this workspace"
     },
     "backendUnavailable": {
       "connectionFailed": "Could not reach the project server",
@@ -7044,6 +7038,15 @@
       "skippedHint": "These items repeatedly failed to embed and were given up on.",
       "unavailableTitle": "Image map unavailable",
       "updating": "updating…"
+    },
+    "guest": {
+      "keep": "Keep in workspace",
+      "keepNamed": "Keep {{label}} in workspace"
+    },
+    "needs": {
+      "elsewhere": "{{widget}} is not in this workspace",
+      "hidden": "{{widget}} is hidden",
+      "show": "Show {{widget}}"
     }
   },
   "workflowLibrary": {

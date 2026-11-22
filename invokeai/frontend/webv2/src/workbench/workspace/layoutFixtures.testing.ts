@@ -13,7 +13,16 @@ import type { WorkspaceView } from './view';
 import { createRegistryLayoutAvailability } from './registryAvailability';
 import { normalizeStructure, type WorkspaceStructure } from './structure';
 import { reduceStructure } from './structureReducer';
-import { frontRegion, raiseWindow, setRegionCollapsed, setRegionSize, setWindowGeometry, setWindowMode } from './view';
+import {
+  frontRegion,
+  getGuestInstanceId,
+  raiseWindow,
+  setRegionCollapsed,
+  setRegionSize,
+  setWindowGeometry,
+  setWindowMode,
+  showGuest,
+} from './view';
 
 export const builtInStructures: readonly WorkspaceStructure[] = layoutPresets.map(({ snapshot }) =>
   normalizeStructure(snapshot)
@@ -117,19 +126,63 @@ export const generateStructure = (
     structure = reduceStructure(structure, randomStructureAction(random, structure, step), availability);
   }
 
-  return structure;
+  if (random.int(3) > 0) {
+    return structure;
+  }
+
+  // A stored or imported structure may place a type where it cannot show, which no edit would; repair 1 hides it.
+  const region = random.pick(WIDGET_REGIONS);
+  const typeId = random.pick(
+    [...new Set(WIDGET_REGIONS.flatMap(typesFor))].filter((type) => !typesFor(region).includes(type))
+  );
+  const instanceId = `unallowed-${typeId}`;
+
+  return normalizeStructure({
+    ...structure,
+    widgetInstances: { ...structure.widgetInstances, [instanceId]: { id: instanceId, typeId } },
+    widgetRegions: {
+      ...structure.widgetRegions,
+      [region]: {
+        ...structure.widgetRegions[region],
+        instanceIds: [...structure.widgetRegions[region].instanceIds, instanceId],
+      },
+    },
+  });
 };
 
 /** A view built by the writers, then given stale or ill-fitting entries no writer would store. */
 export const generateView = (random: Random, structure: WorkspaceStructure): WorkspaceView | undefined => {
-  const windowIds = Object.keys(structure.floatingWidgets ?? {});
+  const typeIds = [...new Set(WIDGET_REGIONS.flatMap(typesFor))];
   let view: WorkspaceView | undefined;
 
   for (let step = random.int(8); step > 0; step -= 1) {
     const region = random.pick(WIDGET_REGIONS);
+    const windowIds = [...Object.keys(structure.floatingWidgets ?? {}), ...Object.keys(view?.guests ?? {})];
     const windowId = windowIds.length > 0 ? random.pick(windowIds) : 'ghost';
 
-    switch (random.int(6)) {
+    switch (random.int(7)) {
+      case 6: {
+        // Types and ids the structure already has too: the resolver must not show what it supersedes.
+        const structureIds = Object.keys(structure.widgetInstances);
+        // Often the type of a placement repair 1 hides, when there is one: it must not keep the guest away.
+        const hiddenIds = structureIds.filter((id) => id.startsWith('unallowed-'));
+        const typeId =
+          hiddenIds.length > 0 && random.int(2) === 0
+            ? structure.widgetInstances[random.pick(hiddenIds)]!.typeId
+            : random.int(2)
+              ? random.pick(typeIds)
+              : (structure.widgetInstances[random.pick(structureIds)]?.typeId ?? random.pick(typeIds));
+        const instanceId = random.int(4) === 0 ? random.pick(structureIds) : getGuestInstanceId(structure, typeId, []);
+
+        view = showGuest(
+          view,
+          structure,
+          instanceId,
+          { surface: random.pick(['center', 'window'] as const), typeId },
+          randomGeometry(random)
+        );
+        break;
+      }
       case 0:
         view = frontRegion(
           view,
@@ -165,6 +218,10 @@ export const generateView = (random: Random, structure: WorkspaceStructure): Wor
   return {
     ...view,
     fronts: { ...view?.fronts, [random.pick(WIDGET_REGIONS)]: anyId() },
+    guests: {
+      ...view?.guests,
+      [anyId()]: { surface: random.pick(['center', 'window'] as const), typeId: random.pick(typeIds) },
+    },
     sizes: { ...view?.sizes, [random.pick(['left', 'right', 'bottom'] as const)]: random.int(2000) - 500 },
     windows: { ...view?.windows, [anyId()]: { heightPx: random.int(50), widthPx: random.int(50) } },
   };

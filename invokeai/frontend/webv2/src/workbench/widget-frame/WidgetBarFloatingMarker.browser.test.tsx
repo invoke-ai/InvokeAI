@@ -84,7 +84,14 @@ await i18n.use(initReactI18next).init({
   },
 });
 
-const handlers = { onDock: vi.fn(), onRemoveFloating: vi.fn(), onSelect: vi.fn(), onToggle: vi.fn() };
+const handlers = {
+  canFloat: vi.fn(() => true),
+  onDock: vi.fn(),
+  onFloat: vi.fn(),
+  onRemoveFloating: vi.fn(),
+  onSelect: vi.fn(),
+  onToggle: vi.fn(),
+};
 const GROUPS: WidgetBarGroup[] = [
   {
     activeId: 'gallery',

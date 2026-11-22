@@ -117,7 +117,7 @@ describe('reduceStructure', () => {
     ).toEqual(compose);
   });
 
-  it('floats a widget out of every region and docks it back to the same slot; closing removes it', () => {
+  it('floats a widget out of every region and docks it back to each slot it left; closing removes it', () => {
     const shared = reduce(compose, add('right', 'preview', { index: 1 }));
     const floated = reduce(shared, {
       geometry: { heightPx: 300, widthPx: 400, x: 10, y: 20 },
@@ -129,14 +129,14 @@ describe('reduceStructure', () => {
     expect(floated.widgetRegions.center.instanceIds).toEqual(['gallery:center']);
     expect(floated.widgetRegions.right.instanceIds).toEqual(['gallery', 'image-map', 'queue']);
     expect(floated.floatingWidgets?.preview).toMatchObject({
+      alsoIn: { center: { index: 0, isFront: true } },
       heightPx: 300,
       mode: 'windowed',
       returnIndex: 1,
       returnRegion: 'right',
     });
-    expect(reduce(floated, { instanceId: 'preview', type: 'dockWindow' }).widgetRegions.right).toEqual(
-      shared.widgetRegions.right
-    );
+    // The center gets back the stage the float took from it, in front again.
+    expect(reduce(floated, { instanceId: 'preview', type: 'dockWindow' }).widgetRegions).toEqual(shared.widgetRegions);
 
     const closed = reduce(floated, { instanceId: 'preview', type: 'closeWindow' });
 

@@ -3,31 +3,32 @@ import { describe, expect, it } from 'vitest';
 import {
   getNaturalDestination,
   getPlacedWidgetTypeIds,
+  getGraphWidgetSources,
   getVisibleWidgetTypeIds,
-  graphWidgetSources,
 } from './graphWidgets';
-import { getSourceIdForWidgetTypeId, getWidgetTypeIdForSourceId, isGraphWidgetTypeId } from './invocationSources';
+import { getSourceIdForWidgetTypeId, getWidgetTypeIdForSourceId } from './invocationSources';
+import { firstPartyWidgetManifests } from './widgets/manifests';
 import { createInitialWorkbenchState, getLayoutOf, workbenchReducer } from './workbenchState.testing';
 
 const applyPreset = (presetId: string) =>
   getLayoutOf(workbenchReducer(createInitialWorkbenchState(), { presetId, type: 'applyPreset' }));
 
 describe('graph widget sources', () => {
-  it('recognises only the graph-bearing widget types', () => {
-    expect(isGraphWidgetTypeId('generate')).toBe(true);
-    expect(isGraphWidgetTypeId('canvas')).toBe(true);
-    expect(isGraphWidgetTypeId('upscale')).toBe(true);
-    expect(isGraphWidgetTypeId('workflow')).toBe(true);
-    expect(isGraphWidgetTypeId('gallery')).toBe(false);
-    expect(isGraphWidgetTypeId('preview')).toBe(false);
-    expect(getSourceIdForWidgetTypeId('gallery')).toBeNull();
-    expect(getSourceIdForWidgetTypeId('workflow')).toBe('workflow');
-    expect(getWidgetTypeIdForSourceId('upscale')).toBe('upscale');
+  it('maps widgets and sources only through manifest graphBearing', () => {
+    for (const manifest of firstPartyWidgetManifests) {
+      const sourceId = manifest.graphBearing?.sourceId ?? null;
+
+      expect(getSourceIdForWidgetTypeId(manifest.id)).toBe(sourceId);
+      if (sourceId) {
+        expect(getWidgetTypeIdForSourceId(sourceId)).toBe(manifest.id);
+      }
+    }
+    expect(getSourceIdForWidgetTypeId('third-party')).toBeNull();
   });
 
   // Keep unplaced sources selectable so switching sources does not require manual layout changes.
   it('offers every graph widget as a source', () => {
-    expect(graphWidgetSources.map((source) => source.sourceId)).toEqual([
+    expect(getGraphWidgetSources().map((source) => source.sourceId)).toEqual([
       'generate',
       'canvas',
       'upscale',

@@ -27,11 +27,13 @@ import {
 } from '@workbench/WorkbenchContext';
 import { useWorkbenchWidgetRegistry } from '@workbench/WorkbenchWidgetRegistryContext';
 import { useCanEditStructure } from '@workbench/workspace/useStructureLock';
+import { keepGuestInWorkspace } from '@workbench/workspace/workspaceNavigation';
 import {
   ChevronsDownUpIcon,
   ChevronsUpDownIcon,
   Maximize2Icon,
   Minimize2Icon,
+  PinIcon,
   TriangleAlertIcon,
   XIcon,
 } from 'lucide-react';
@@ -319,10 +321,13 @@ export const FloatingWidgetWindow = ({
   state: FloatingWidgetState;
 }) => {
   const { t } = useTranslation();
-  const { widgets } = useWorkbenchCommands();
+  const commands = useWorkbenchCommands();
+  const { widgets } = commands;
   const queries = useWorkbenchQueries();
   const { getWidgetById } = useWorkbenchWidgetRegistry();
   const canEditStructure = useCanEditStructure();
+  // A guest window returns to no region: it closes, or is kept in the workspace, but never docks.
+  const isGuest = useActiveLayoutSelector((layout) => layout.guests[instanceId] !== undefined);
   const instance = useActiveProjectSelector(
     (project) => project.widgetInstances[instanceId],
     areWidgetRenderInstancesEqual
@@ -331,7 +336,7 @@ export const FloatingWidgetWindow = ({
   const title = useActiveLayoutSelector((layout) => layout.widgetInstances[instanceId]?.title);
   const projectId = useActiveProjectId();
   const { activate, isHighlighted } = useFloatingWindowFocus(instanceId, projectId);
-  const { focusRegion } = useWorkbenchFocus();
+  const { focusFloating, focusRegion } = useWorkbenchFocus();
   const windowRef = useRef<HTMLDivElement>(null);
   const viewportProbeRef = useRef<HTMLDivElement>(null);
   const gestureRef = useRef<WindowGesture | null>(null);
@@ -593,16 +598,26 @@ export const FloatingWidgetWindow = ({
       focusRegion(state.returnRegion, typeId);
     }
   }, [focusRegion, instanceId, state.returnRegion, typeId, widgets]);
-  // Close takes the window out of the layout (an Undo toast brings it back).
+  // Close takes the window out of the layout (an Undo toast brings it back); a guest's is forgotten.
   const handleClose = useCallback(() => {
     const { widgetRegions } = queries.getSnapshot().activeLayout;
     const region = state.returnRegion;
-    const isRailPanelShown = (region === 'left' || region === 'right') && !widgetRegions[region].isCollapsed;
+    const isRailPanelShown =
+      !isGuest && (region === 'left' || region === 'right') && !widgetRegions[region].isCollapsed;
 
     flushWorkbenchDrafts();
-    widgets.closeFloating(instanceId);
+    if (isGuest) {
+      widgets.closeGuest(instanceId);
+    } else {
+      widgets.closeFloating(instanceId);
+    }
     focusRegion(isRailPanelShown ? region : 'center');
-  }, [focusRegion, instanceId, queries, state.returnRegion, widgets]);
+  }, [focusRegion, instanceId, isGuest, queries, state.returnRegion, widgets]);
+  const handleKeep = useCallback(() => {
+    keepGuestInWorkspace({ commands, queries }, instanceId, { canEditStructure });
+    // The window stays where it is, now placed; its Keep button is gone.
+    focusFloating(instanceId);
+  }, [canEditStructure, commands, focusFloating, instanceId, queries]);
   const handleToggleShade = useCallback(() => {
     // Shading hides the body: its editors keep their state but stop running, so their drafts are saved first.
     if (mode !== 'shaded') {
@@ -744,7 +759,13 @@ export const FloatingWidgetWindow = ({
                 onDoubleClick={stopChromeEvent}
                 onPointerDown={stopChromeEvent}
               >
-                <WidgetChromeSlotById instanceId={instanceId} region="floating" slot="viewActions" widget={widget} />
+                <WidgetChromeSlotById
+                  instanceId={instanceId}
+                  region="floating"
+                  slot="viewActions"
+                  surface={state.returnRegion}
+                  widget={widget}
+                />
               </HStack>
             </Suspense>
           ) : null}
@@ -773,8 +794,34 @@ export const FloatingWidgetWindow = ({
                 <Icon as={isMaximized ? Minimize2Icon : Maximize2Icon} boxSize="3.5" />
               </IconButton>
             </Tooltip>
-            {/* Docking and closing change the workspace; moving, sizing, shading and maximizing only the view. */}
-            {canEditStructure ? (
+            {/* Docking and closing change the workspace; moving, sizing, shading and maximizing only the view. A
+                guest is not the workspace's: it closes whatever the lock, and has nowhere to dock. */}
+            {isGuest ? (
+              <>
+                <Tooltip content={t('widgets.guest.keep')}>
+                  <IconButton
+                    aria-label={t('widgets.guest.keepNamed', { label })}
+                    color="fg.muted"
+                    size="sm"
+                    variant="ghost"
+                    onClick={handleKeep}
+                  >
+                    <Icon as={PinIcon} boxSize="3.5" />
+                  </IconButton>
+                </Tooltip>
+                <Tooltip content={t('widgets.floating.close')}>
+                  <IconButton
+                    aria-label={t('widgets.floating.closeNamed', { label })}
+                    color="fg.muted"
+                    size="sm"
+                    variant="ghost"
+                    onClick={handleClose}
+                  >
+                    <Icon as={XIcon} boxSize="3.5" />
+                  </IconButton>
+                </Tooltip>
+              </>
+            ) : canEditStructure ? (
               <>
                 <Tooltip content={dockLabel}>
                   <IconButton aria-label={dockLabel} color="fg.muted" size="sm" variant="ghost" onClick={handleDock}>
@@ -800,7 +847,12 @@ export const FloatingWidgetWindow = ({
         <Activity mode={isShaded ? 'hidden' : 'visible'}>
           <Flex direction="column" flex="1" minH="0" overflow="hidden">
             {isEnabled && widget ? (
-              <WidgetRendererById instanceId={instance.id} region="floating" widget={widget} />
+              <WidgetRendererById
+                instanceId={instance.id}
+                region="floating"
+                surface={state.returnRegion}
+                widget={widget}
+              />
             ) : (
               <HStack color="fg.error" gap="1.5" p="3">
                 <Icon as={TriangleAlertIcon} boxSize="3.5" />

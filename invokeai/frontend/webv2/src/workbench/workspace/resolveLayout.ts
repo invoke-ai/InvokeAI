@@ -11,11 +11,11 @@ import { clampSizeToMinimum, getRegionOrder, toFloatingWidgetState } from '@work
 import { WIDGET_REGIONS } from '@workbench/layoutContracts';
 
 import type { RegionPresentation } from './resolveOpen';
-import type { WorkspaceStructure } from './structure';
-import type { WorkspaceView } from './view';
+import type { SideRegion, WorkspaceStructure } from './structure';
+import type { GuestSurface, WorkspaceView } from './view';
 
 import { clampRegionSize, getRegionDefaults, PANEL_OPEN_KEYS, SIDE_REGIONS } from './structure';
-import { getViewedWindow, showsOnceWithCenter } from './view';
+import { getGuestWindowRegion, getViewedWindow, getWindowView, isGuestSuperseded, showsOnceWithCenter } from './view';
 
 /** What this account and session can show, from the widget registry; the resolver reads nothing else. */
 export interface LayoutAvailability {
@@ -39,9 +39,14 @@ export interface ResolvedLayout {
   panels: PanelState;
   /** Instance identity for everything placed above, guests included. */
   widgetInstances: Readonly<Record<WidgetInstanceId, LayoutPresetWidgetInstanceSnapshot>>;
-  /** Shown though the structure does not place them here: the center's fallback stage. */
-  guests: readonly WidgetInstanceId[];
+  /**
+   * Shown though the structure does not place them: the view's guests, a center one fronted in the center and a
+   * window one among `floatingWidgets`, and the center's fallback stage.
+   */
+  guests: Readonly<Record<WidgetInstanceId, GuestSurface>>;
 }
+
+const NO_GUESTS: Readonly<Record<WidgetInstanceId, GuestSurface>> = {};
 
 const areListsEqual = (left: readonly string[] | undefined, right: readonly string[] | undefined): boolean =>
   left === right ||
@@ -67,7 +72,8 @@ const areWindowsEqual = (left: FloatingWidgetState, right: FloatingWidgetState |
   left.mode === right.mode &&
   left.stackOrder === right.stackOrder &&
   left.returnRegion === right.returnRegion &&
-  left.returnIndex === right.returnIndex;
+  left.returnIndex === right.returnIndex &&
+  JSON.stringify(left.alsoIn) === JSON.stringify(right.alsoIn);
 
 /** The first candidate equal to `next`, so an unchanged part keeps the identity its subscribers hold. */
 const share = <Value>(
@@ -90,12 +96,16 @@ const shareRecord = <Value>(
  * What is on screen for a structure seen through a project's view. Pure, total and idempotent; the only repairs:
  * 1. An instance whose type is unavailable in its region is skipped (the structure keeps it).
  * 2. A front that is not an available member falls back to the home front, then the first available member.
- * 3. A center with no available view shows the fallback stage as a guest.
+ * 3. A center with no available view, and no guest of its own, shows the fallback stage as a guest, unless a window
+ *    (placed or a guest) shows that instance already.
  * 4. An instance is shown once where `showsOnceWithCenter` says so. The center keeps it over a side region's home
  *    front; an open side region the view explicitly fronts it in keeps it instead, unless the view fronts it in the
  *    center too, and the center fronts its next view (with none, both show it). Every other side region holding it
  *    fronts its next member, or collapses.
- * 5. Sizes and window sizes are clamped by the panel and window limits.
+ * 5. A guest the structure supersedes (`isGuestSuperseded`: it uses the guest's id, or places its type where the
+ *    guest shows it) is dropped: the placed one is what shows. So is (repair 1) one whose type cannot show there.
+ * 6. Sizes and window sizes are clamped by the panel and window limits.
+ * The view's center guest is fronted in the center; its window guests are windows returning to no region.
  * Parts equal to `previous` (or to the structure's own) are returned as those objects.
  */
 export const resolveLayout = (
@@ -144,20 +154,52 @@ export const resolveLayout = (
       ) ?? null,
     ])
   ) as Record<WidgetRegion, WidgetInstanceId | null>;
-  const guests: WidgetInstanceId[] = [];
+  // Repair 5, and 1 for guests.
+  const viewGuests = Object.entries(view?.guests ?? {}).filter(
+    ([instanceId, guest]) =>
+      !isGuestSuperseded(structure, instanceId, guest, availability) &&
+      (guest.surface === 'center'
+        ? availability.getPresentation(guest.typeId, 'center') === 'view'
+        : getGuestWindowRegion(availability.getPresentation, guest.typeId) !== null)
+  );
+  const guests: Record<WidgetInstanceId, GuestSurface> = Object.fromEntries(
+    viewGuests.map(([instanceId, guest]) => [instanceId, guest.surface])
+  );
+
+  if (viewGuests.length > 0) {
+    widgetInstances = {
+      ...widgetInstances,
+      ...Object.fromEntries(
+        viewGuests.map(([id, { typeId }]) => {
+          const kept = previous?.widgetInstances[id];
+
+          return [id, kept?.typeId === typeId && kept.title === undefined ? kept : { id, typeId }];
+        })
+      ),
+    };
+  }
+
+  const centerGuest = viewGuests.find(([, guest]) => guest.surface === 'center')?.[0];
+
+  if (centerGuest !== undefined) {
+    members.center = [...members.center, centerGuest];
+    fronts.center = centerGuest;
+  }
+
   const stage = availability.fallbackStage;
 
-  // Repair 3: a window already shows the fallback, so it is not shown twice.
+  // Repair 3: a window, placed or a guest, already shows the fallback, so it is not shown twice.
   if (
     fronts.center === null &&
     stage !== null &&
     availability.getPresentation(stage.typeId, 'center') === 'view' &&
     !Object.hasOwn(storedWindows, stage.id) &&
+    guests[stage.id] === undefined &&
     (widgetInstances[stage.id]?.typeId ?? stage.typeId) === stage.typeId
   ) {
     members.center = [...members.center, stage.id];
     fronts.center = stage.id;
-    guests.push(stage.id);
+    guests[stage.id] = 'center';
     widgetInstances = Object.hasOwn(widgetInstances, stage.id)
       ? widgetInstances
       : { ...widgetInstances, [stage.id]: stage };
@@ -218,14 +260,27 @@ export const resolveLayout = (
         ...(alignEnd ? { alignEndInstanceIds: alignEnd.filter((instanceId) => instanceIds.includes(instanceId)) } : {}),
         instanceIds,
         isCollapsed: collapsed[region],
-        // Repair 5.
+        // Repair 6.
         sizePx: region === 'center' ? stored.sizePx : clampRegionSize(region, view?.sizes?.[region] ?? stored.sizePx),
       };
 
       return [region, share(next, areRegionsEqual, previous?.widgetRegions[region], stored)];
     })
   ) as Record<WidgetRegion, WidgetRegionState>;
-  const floatingWidgets = resolveWindows(structure, view, docked, members, shownWindowIds, previous?.floatingWidgets);
+  const guestWindows = viewGuests.flatMap(([instanceId, guest]) => {
+    const region = guest.surface === 'window' ? getGuestWindowRegion(availability.getPresentation, guest.typeId) : null;
+
+    return region === null ? [] : [{ instanceId, region }];
+  });
+  const floatingWidgets = resolveWindows(
+    structure,
+    view,
+    docked,
+    members,
+    shownWindowIds,
+    guestWindows,
+    previous?.floatingWidgets
+  );
   const panels: PanelState = {
     isBottomOpen: !collapsed.bottom,
     isLeftOpen: !collapsed.left,
@@ -233,7 +288,7 @@ export const resolveLayout = (
   };
   const next: ResolvedLayout = {
     floatingWidgets,
-    guests: share(guests, areListsEqual, previous?.guests),
+    guests: Object.keys(guests).length === 0 ? NO_GUESTS : shareRecord(guests, previous?.guests),
     panels: share(
       panels,
       (left, right) =>
@@ -251,16 +306,20 @@ export const resolveLayout = (
     : next;
 };
 
-/** Shown windows as the view places them, each return index its position among what its region shows. */
+/**
+ * Shown windows as the view places them, each return index its position among what its region shows, then the guest
+ * windows, which have no return index: their region is only where "Keep in workspace" docks them.
+ */
 const resolveWindows = (
   structure: WorkspaceStructure,
   view: WorkspaceView | undefined,
   docked: Record<WidgetRegion, WidgetInstanceId[]>,
   members: Record<WidgetRegion, WidgetInstanceId[]>,
   shownWindowIds: ReadonlySet<WidgetInstanceId>,
+  guestWindows: readonly { instanceId: WidgetInstanceId; region: SideRegion }[],
   previous: Record<WidgetInstanceId, FloatingWidgetState> | undefined
 ): Record<WidgetInstanceId, FloatingWidgetState> | undefined => {
-  if (shownWindowIds.size === 0) {
+  if (shownWindowIds.size === 0 && guestWindows.length === 0) {
     return undefined;
   }
 
@@ -281,6 +340,18 @@ const resolveWindows = (
         windows[slot.instanceId] = share(next, areWindowsEqual, previous?.[slot.instanceId]);
       }
     });
+  }
+
+  for (const { instanceId, region } of guestWindows) {
+    const { heightPx, mode, stackOrder, widthPx, x, y } = getWindowView(structure, view, instanceId)!;
+    const next = toFloatingWidgetState({
+      ...clampSizeToMinimum({ heightPx, widthPx, x, y }),
+      mode,
+      returnRegion: region,
+      stackOrder,
+    });
+
+    windows[instanceId] = share(next, areWindowsEqual, previous?.[instanceId]);
   }
 
   return shareRecord(windows, previous);

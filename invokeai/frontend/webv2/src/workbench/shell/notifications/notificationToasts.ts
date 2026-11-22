@@ -2,7 +2,7 @@ import type { WorkbenchNotification, WorkbenchNotificationKind } from '@workbenc
 import type { WorkbenchPreferences } from '@workbench/settings/contracts';
 import type { TFunction } from 'i18next';
 
-import { ACTION_TOAST_DURATION_MS, createActionToast, toaster } from '@platform/ui/toaster';
+import { ACTION_TOAST_DURATION_MS, createActionToast } from '@platform/ui/toaster';
 import i18next from 'i18next';
 
 import {
@@ -13,7 +13,7 @@ import {
   retainNotificationActions,
   type NotificationActionContext,
 } from './notificationActions';
-import { getToastKey, replacesItsToast, shouldToastNotification } from './toastPolicy';
+import { getToastKey, shouldToastNotification } from './toastPolicy';
 
 const notificationToastType: Record<WorkbenchNotificationKind, 'error' | 'info' | 'success'> = {
   error: 'error',
@@ -82,8 +82,6 @@ export const startNotificationToasts = ({
   // Records are immutable, so one listed before is the same object when Clear's Undo puts it back: it stays quiet.
   const listedRecords = new WeakSet<WorkbenchNotification>(notifications);
   let undoProjectIds: string[] = [];
-  // The toast each replacing notification shows, by record id, so its repeat closes it first.
-  const replaceableToasts = new Map<string, string>();
 
   const retain = (): void => {
     retainNotificationActions(notifications, actionContext);
@@ -100,14 +98,7 @@ export const startNotificationToasts = ({
         ? ACTION_TOAST_DURATION_MS
         : undefined;
 
-    const shownId = replaceableToasts.get(notification.id);
-
-    if (shownId !== undefined) {
-      toaster.dismiss(shownId);
-      replaceableToasts.delete(notification.id);
-    }
-
-    const toastId = createActionToast({
+    createActionToast({
       actions,
       description: text.message,
       ...(duration === undefined ? {} : { duration }),
@@ -126,10 +117,6 @@ export const startNotificationToasts = ({
       title: text.title,
       type: notificationToastType[notification.kind],
     });
-
-    if (toastId !== null && replacesItsToast(notification)) {
-      replaceableToasts.set(notification.id, toastId);
-    }
     holdNotificationActions(descriptors);
   };
 
@@ -147,11 +134,6 @@ export const startNotificationToasts = ({
 
     notifications = next;
     retain();
-    for (const notificationId of replaceableToasts.keys()) {
-      if (!next.some(({ id }) => id === notificationId)) {
-        replaceableToasts.delete(notificationId);
-      }
-    }
     const fresh = next
       .filter((notification) => !toastedKeys.has(getToastKey(notification)) && !listedRecords.has(notification))
       .reverse();

@@ -26,7 +26,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { closeWidgetsDialog, getWidgetsDialogReturnFocus } from './widgetsDialogStore';
-import { canAddWidget, getWidgetsListRows, type WidgetsListRow } from './widgetsListModel';
+import { canAddWidget, canOpenWidget, getWidgetsListRows, type WidgetsListRow } from './widgetsListModel';
 
 const REGIONS: readonly WidgetRegion[] = ['left', 'center', 'right', 'bottom'];
 
@@ -134,7 +134,7 @@ export const WidgetsDialogBody = ({ isOpen, onExitComplete }: { isOpen: boolean;
       show: (row: WidgetsListRow) => {
         setReturnsFocus(false);
         closeWidgetsDialog();
-        // The list describes this workspace, so Show stays in it.
+        // The list describes this workspace, so Show stays in it: one it lacks shows as a guest.
         open({ typeId: row.widget.manifest.id }, { mode: 'stay' });
       },
     }),
@@ -233,16 +233,37 @@ const WidgetsRow = ({
   canEditStructure: boolean;
   row: WidgetsListRow;
 }) => {
-  const { t } = useTranslation();
+  const { i18n, t } = useTranslation();
   const { getWidgetsForRegion } = useWorkbenchWidgetRegistry();
   const placementLabel = t(
     PLACEMENT_LABEL_KEYS[row.placement.kind === 'docked' ? row.placement.region : row.placement.kind]
   );
-  const isOpenable = canEditStructure && canAddWidget(row.widget, getWidgetsForRegion);
+  const isAddable = canEditStructure && canAddWidget(row.widget, getWidgetsForRegion);
+  const canShowAsGuest = canOpenWidget(row.widget, getWidgetsForRegion);
   const run = (action: keyof WidgetsListActions) => () => actions[action](row);
   // A type can be placed more than once (a Gallery view and a Gallery panel), so placed rows name where they are.
   const name =
     row.instanceId === null ? row.label : t('shell.widgets.rowName', { label: row.label, placement: placementLabel });
+  const missingNeeds = canEditStructure
+    ? row.missingNeeds.flatMap((typeId) => {
+        const needed = REGIONS.flatMap((region) => getWidgetsForRegion(region)).find(
+          (widget) => widget.manifest.id === typeId
+        );
+
+        return needed ? [resolveWidgetLabel(needed.manifest, t)] : [];
+      })
+    : [];
+  // The row's first action is its primary one: Show for a placed widget, Add for a missing one while editable.
+  const showButton = (variant: 'ghost' | 'outline') => (
+    <Button
+      aria-label={t('shell.widgets.showNamed', { label: name })}
+      size="xs"
+      variant={variant}
+      onClick={run('show')}
+    >
+      {t('shell.widgets.show')}
+    </Button>
+  );
 
   return (
     // The list item carries the keys focusRow looks rows up by; ListItem renders the row inside it.
@@ -250,26 +271,22 @@ const WidgetsRow = ({
       <ListItem
         actions={
           row.instanceId === null ? (
-            isOpenable ? (
-              <Button
-                aria-label={t('shell.widgets.addNamed', { label: name })}
-                size="xs"
-                variant="outline"
-                onClick={run('add')}
-              >
-                {t('shell.widgets.add')}
-              </Button>
-            ) : null
+            <>
+              {isAddable ? (
+                <Button
+                  aria-label={t('shell.widgets.addNamed', { label: name })}
+                  size="xs"
+                  variant="outline"
+                  onClick={run('add')}
+                >
+                  {t('shell.widgets.add')}
+                </Button>
+              ) : null}
+              {canShowAsGuest ? showButton(isAddable ? 'ghost' : 'outline') : null}
+            </>
           ) : (
             <>
-              <Button
-                aria-label={t('shell.widgets.showNamed', { label: name })}
-                size="xs"
-                variant="outline"
-                onClick={run('show')}
-              >
-                {t('shell.widgets.show')}
-              </Button>
+              {showButton('outline')}
               {canEditStructure && row.placement.kind === 'floating' ? (
                 <Button
                   aria-label={t('shell.widgets.dockNamed', { label: name })}
@@ -295,7 +312,16 @@ const WidgetsRow = ({
             </>
           )
         }
-        description={placementLabel}
+        description={
+          missingNeeds.length > 0
+            ? t('shell.widgets.missingNeeds', {
+                placement: placementLabel,
+                widgets: new Intl.ListFormat(i18n.resolvedLanguage, { style: 'long', type: 'conjunction' }).format(
+                  missingNeeds
+                ),
+              })
+            : placementLabel
+        }
         leading={<WidgetIcon boxSize="4" color="fg.muted" flexShrink={0} icon={row.widget.manifest.icon} />}
         role="presentation"
         title={row.label}

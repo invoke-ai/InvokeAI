@@ -32,18 +32,19 @@ export const getWidgetPlacementMeta = (
 const NO_FLOATING_PLACEMENTS: Record<WidgetInstanceId, FloatingWidgetPlacement> = {};
 
 /**
- * Only where each window returns to. Geometry, mode, and stacking stay out, so moving, shading, or raising a window
- * leaves this projection equal and its subscribers — the rails among them — do not re-render.
+ * Only where each placed window returns to; a guest window returns nowhere, so no rail marks it. Geometry, mode, and
+ * stacking stay out, so moving, shading, or raising a window leaves this projection equal and its subscribers — the
+ * rails among them — do not re-render.
  */
 const getFloatingPlacements = (
-  floatingWidgets: Record<WidgetInstanceId, FloatingWidgetState> | undefined
+  floatingWidgets: Record<WidgetInstanceId, FloatingWidgetState> | undefined,
+  guests: ResolvedLayout['guests']
 ): Record<WidgetInstanceId, FloatingWidgetPlacement> =>
   floatingWidgets
     ? Object.fromEntries(
-        Object.entries(floatingWidgets).map(([instanceId, { returnIndex, returnRegion }]) => [
-          instanceId,
-          { returnIndex, returnRegion },
-        ])
+        Object.entries(floatingWidgets).flatMap(([instanceId, { returnIndex, returnRegion }]) =>
+          guests[instanceId] === undefined ? [[instanceId, { returnIndex, returnRegion }]] : []
+        )
       )
     : NO_FLOATING_PLACEMENTS;
 
@@ -52,10 +53,11 @@ export const getWidgetPlacementProject = ({
   activeLayout,
   activeProject,
 }: {
-  activeLayout: Pick<ResolvedLayout, 'floatingWidgets' | 'widgetInstances' | 'widgetRegions'>;
+  activeLayout: Pick<ResolvedLayout, 'floatingWidgets' | 'guests' | 'widgetInstances' | 'widgetRegions'>;
   activeProject: { id: string };
 }): WidgetPlacementProject => ({
-  floatingPlacements: getFloatingPlacements(activeLayout.floatingWidgets),
+  floatingPlacements: getFloatingPlacements(activeLayout.floatingWidgets, activeLayout.guests),
+  guests: activeLayout.guests,
   projectId: activeProject.id,
   widgetInstances: getWidgetPlacementMeta(activeLayout),
   widgetRegions: activeLayout.widgetRegions,
@@ -99,6 +101,7 @@ export const areWidgetPlacementMetaEqual = (left: WidgetPlacementMeta, right: Wi
 
 export const areWidgetPlacementProjectsEqual = (left: WidgetPlacementProject, right: WidgetPlacementProject): boolean =>
   left.projectId === right.projectId &&
+  left.guests === right.guests &&
   areWidgetPlacementMetaEqual(left.widgetInstances, right.widgetInstances) &&
   areFloatingPlacementsEqual(left.floatingPlacements, right.floatingPlacements) &&
   (Object.keys(left.widgetRegions) as WidgetRegion[]).every((region) => {

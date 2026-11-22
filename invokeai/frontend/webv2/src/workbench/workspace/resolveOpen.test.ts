@@ -8,12 +8,13 @@ import type { OpenIntent } from './openIntent';
 import type { ResolveOpenContext, WorkspaceCandidate } from './resolveOpen';
 
 import { registryAvailability } from './layoutFixtures.testing';
-import { getRegionPresentation } from './registryAvailability';
+import { getRegionPresentation, getWidgetNeeds } from './registryAvailability';
 import { resolveLayout } from './resolveLayout';
 import { resolveOpen } from './resolveOpen';
 import { createWorkspaceCandidate } from './workspaceNavigation';
 
 const presentation = getRegionPresentation(getWidgetsForRegion);
+const needs = getWidgetNeeds(getWidgetsForRegion);
 
 // What a project with no view of them sees: each built-in's structure, resolved.
 const builtIns: WorkspaceCandidate[] = layoutPresets.map((preset) =>
@@ -31,6 +32,7 @@ const resolveFrom = (
 ) =>
   resolveOpen(intent, {
     currentWorkspaceId: workspaceId,
+    getNeeds: needs,
     getPresentation,
     here: workspaces.find((workspace) => workspace.id === workspaceId)!.arrangement,
     mode,
@@ -238,7 +240,7 @@ describe('resolveOpen with custom workspaces', () => {
     ).toEqual({ step: 'hidden', target: { instanceId: 'workflow', kind: 'region', region: 'left' } });
   });
 
-  it('leaves the workspace only in navigate mode, and reports a widget no workspace places', () => {
+  it('enters the first workspace placing Queue, and shows a guest window where it may not leave or none does', () => {
     const workspaces = [canvasOnly, ...builtIns];
 
     expect(resolveFrom('canvas-only', { typeId: 'queue' }, { workspaces })).toMatchObject({
@@ -246,24 +248,69 @@ describe('resolveOpen with custom workspaces', () => {
       workspaceId: 'automate',
     });
     expect(resolveFrom('canvas-only', { typeId: 'queue' }, { mode: 'stay', workspaces })).toEqual({
-      placedHere: false,
-      step: 'not-placed',
+      step: 'guest',
+      surface: 'window',
     });
     expect(resolveFrom('canvas-only', { typeId: 'diagnostics' }, { workspaces })).toEqual({
-      placedHere: false,
-      step: 'not-placed',
+      step: 'guest',
+      surface: 'window',
     });
   });
 
-  it('says a widget is here on another surface when nothing here serves the asked one', () => {
+  it('shows a guest in the center for the stage or a center-only widget, and never for a chip', () => {
     const railPreview = customWorkspace('rail-preview', {
-      center: { front: 'canvas', members: ['canvas'] },
+      center: { front: 'gallery', members: ['gallery'] },
       right: { front: 'preview', members: ['preview'] },
+    });
+    const workspaces = [railPreview];
+
+    expect(resolveFrom('rail-preview', { surface: 'stage', typeId: 'preview' }, { workspaces })).toEqual({
+      step: 'guest',
+      surface: 'center',
+    });
+    expect(resolveFrom('rail-preview', { typeId: 'canvas' }, { workspaces })).toEqual({
+      step: 'guest',
+      surface: 'center',
+    });
+    expect(resolveFrom('rail-preview', { surface: 'panel', typeId: 'canvas' }, { workspaces })).toEqual({
+      step: 'unavailable',
+    });
+    expect(resolveFrom('rail-preview', { typeId: 'server-status' }, { workspaces })).toEqual({
+      step: 'unavailable',
+    });
+  });
+
+  it('enters only a workspace that also places what the widget needs, else shows it as a guest', () => {
+    const layersAlone = customWorkspace('layers-alone', {
+      center: { front: 'gallery', members: ['gallery'] },
+      right: { front: 'layers', members: ['layers'] },
+    });
+    const layersBehind = customWorkspace('layers-behind', {
+      center: { front: 'canvas', members: ['canvas'] },
+      right: { front: 'queue', members: ['queue', 'layers'] },
     });
 
     expect(
-      resolveFrom('rail-preview', { surface: 'stage', typeId: 'preview' }, { mode: 'stay', workspaces: [railPreview] })
-    ).toEqual({ placedHere: true, step: 'not-placed' });
+      resolveFrom('canvas-only', { typeId: 'layers' }, { workspaces: [canvasOnly, layersAlone, layersBehind] })
+    ).toMatchObject({ step: 'elsewhere', workspaceId: 'layers-behind' });
+    expect(resolveFrom('canvas-only', { typeId: 'layers' }, { workspaces: [canvasOnly, layersAlone] })).toEqual({
+      step: 'guest',
+      surface: 'window',
+    });
+  });
+
+  it('never counts another workspace’s guest as placed there', () => {
+    const withGuest = customWorkspace(
+      'with-guest',
+      { center: { front: 'canvas', members: ['canvas'] } },
+      { floating: ['queue'] }
+    );
+    const guested = { ...withGuest, arrangement: { ...withGuest.arrangement, guests: { queue: 'window' } } };
+
+    expect(resolveFrom('canvas-only', { typeId: 'queue' }, { workspaces: [canvasOnly, guested] })).toEqual({
+      step: 'guest',
+      surface: 'window',
+    });
   });
 
   it('shows a rail copy of the center view in its rail only when a panel is asked for', () => {

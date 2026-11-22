@@ -50,19 +50,6 @@ const setup = (overrides: Partial<EditorNotificationActionSources> = {}) => {
 };
 
 describe('editor notification actions', () => {
-  it('adds what a locked workspace lacks as the first edit of a Customize session, focusing the widget', () => {
-    const { context, focusMoves, layout, project, store } = setup();
-    const placedTypes = () =>
-      layout().widgetRegions.right.instanceIds.map((id) => project().widgetInstances[id]?.typeId);
-
-    expect(placedTypes()).not.toContain('layers');
-    context.addWidget('layers', 'panel');
-
-    expect(store.getSnapshot().customizing?.[project().id]?.presetId).toBe(project().workspaceId);
-    expect(placedTypes()).toContain('layers');
-    expect(focusMoves).toEqual([['region', 'right', 'layers']]);
-  });
-
   it('offers Lock workspaces and Keep rearranging only while the account rearranges', () => {
     const { context } = setup();
     const lockWorkspaces = vi.fn();
@@ -123,28 +110,18 @@ describe('editor notification actions', () => {
     expect(focusMoves).toEqual([['floating', 'queue']]);
   });
 
-  it('offers to add a widget no workspace places, and adds it here on request', () => {
-    const { context, focusMoves, frontOf, store } = setup();
+  it('shows a widget no workspace places as a guest window and focuses it, writing no structure', () => {
+    const { context, focusMoves, layout, store } = setup();
+    const account = store.getSnapshot().account;
 
     context.openWidget('diagnostics');
-    expect(store.getSnapshot().notifications[0]?.actions).toEqual([{ kind: 'add-widget', widgetId: 'diagnostics' }]);
-    expect(focusMoves).toEqual([]);
 
-    context.addWidget('diagnostics');
-
-    expect(frontOf('right')?.typeId).toBe('diagnostics');
-    expect(focusMoves).toEqual([['region', 'right', 'diagnostics']]);
-  });
-
-  it('adds on the surface the open asked for, never replacing the stage for a panel', () => {
-    const { context, frontOf, layout, store } = setup();
-    store.commands.layout.applyPreset('edit');
-
-    context.addWidget('gallery', 'panel');
-
-    expect(frontOf('right')?.typeId).toBe('gallery');
-    expect(frontOf('center')?.typeId).toBe('canvas');
-    expect(layout().widgetRegions.center.instanceIds).toEqual(['canvas', 'preview']);
+    const [guestId] = Object.keys(layout().guests);
+    expect(guestId && layout().floatingWidgets?.[guestId]).toBeDefined();
+    expect(layout().widgetInstances[guestId!]?.typeId).toBe('diagnostics');
+    expect(store.getSnapshot().account).toBe(account);
+    expect(store.getSnapshot().notifications).toEqual([]);
+    expect(focusMoves).toEqual([['floating', guestId]]);
   });
 
   it('shows a queue item by opening the queue at it', () => {
