@@ -12,6 +12,7 @@ Currently covers:
 - VAE: handled in ``vae.py`` (registered for type=VAE generically).
 """
 
+import re
 from itertools import chain
 from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping, Optional
@@ -68,7 +69,12 @@ from invokeai.backend.quantization.fp8_scaled import (
     warn_on_unattached_scales,
 )
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
-from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader, unpack_ggml_at_load
+from invokeai.backend.quantization.gguf.loaders import (
+    _UNQUANTIZED_GGML_TYPES,
+    WrappedGGUFReader,
+    gguf_sd_loader,
+    unpack_ggml_at_load,
+)
 from invokeai.backend.quantization.int8_convrot import (
     drop_unconsumed_quantization_sidecars,
     extract_int8_convrot_markers,
@@ -836,6 +842,9 @@ def _umt5_compute_dtype(device: torch.device) -> torch.dtype:
     return torch.float32 if dtype == torch.float16 else dtype
 
 
+_UMT5_GGUF_LINEAR_WEIGHT = re.compile(r"enc\.blk\.[0-9]+\.(?:attn_[qkvo]|ffn_(?:gate|up|down))\.weight")
+
+
 @ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.WanT5Encoder, format=ModelFormat.GGUFQuantized)
 class WanT5EncoderGGUFLoader(ModelLoader):
     """Loader for a UMT5-XXL encoder in one llama.cpp GGUF file (``city96/umt5-xxl-encoder-gguf``).
@@ -844,17 +853,53 @@ class WanT5EncoderGGUFLoader(ModelLoader):
     dequantize per forward. Unpacked once at load is what a module cannot read packed -- the token
     embedding and every block's relative attention bias (``nn.Embedding`` indexes its weight; UMT5 has
     a bias per block where T5 v1.1 has one), and the RMS norms -- and Linear weights the file stores
-    unquantized (F32/F16/BF16), which unpacking does not enlarge and which packed would be converted
-    on every forward. The tokenizer is built from the file's metadata.
+    unquantized (F32/F16/BF16), which otherwise would be converted on every forward. The tokenizer is
+    built from the file's metadata.
     """
+
+    def _encoder_execution_device(self, config: AnyModelConfig) -> torch.device:
+        return self._get_execution_device(config, SubModelType.TextEncoder) or self._ram_cache.execution_device
+
+    def _encoder_dtype(self, device: torch.device) -> torch.dtype:
+        if device.type == "cpu":
+            return torch.float32
+
+        # The cache key, the reservation and the GGUF wrappers must agree on this load's dtype.
+        decisions: dict[torch.device, torch.dtype] = self.__dict__.setdefault("_encoder_dtype_decisions", {})
+        if device not in decisions:
+            decisions[device] = _umt5_compute_dtype(device)
+        return decisions[device]
+
+    def _cache_key_variant(self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> str:
+        if submodel_type is not SubModelType.TextEncoder:
+            return ""
+        device = self._encoder_execution_device(config)
+        # A pinned accelerator entry can survive a cpu_only edit even when both targets use FP32.
+        target = "cpu" if device.type == "cpu" else "accelerator"
+        dtype = str(self._encoder_dtype(device)).removeprefix("torch.")
+        return f"{target}:{dtype}"
 
     def get_size_fs(
         self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
     ) -> int:
-        # The tokenizer comes from the header, not from the tensors the file size counts.
+        # The tokenizer reads the header and does not load tensor payloads.
         if submodel_type is SubModelType.Tokenizer:
             return 0
-        return super().get_size_fs(config, model_path, submodel_type)
+        file_bytes = super().get_size_fs(config, model_path, submodel_type)
+        if submodel_type is not SubModelType.TextEncoder:
+            return file_bytes
+
+        # Before copying the payload, budget for the held weights too. Only quantized projection
+        # weights can stay packed in the llama.cpp layout. The unpacker adds its workspace later.
+        itemsize = self._encoder_dtype(self._encoder_execution_device(config)).itemsize
+        with WrappedGGUFReader(model_path) as reader:
+            held_bytes = sum(
+                int(tensor.n_bytes)
+                if tensor.tensor_type not in _UNQUANTIZED_GGML_TYPES and _UMT5_GGUF_LINEAR_WEIGHT.fullmatch(tensor.name)
+                else int(tensor.n_elements) * itemsize
+                for tensor in reader.tensors
+            )
+        return max(file_bytes, held_bytes)
 
     def _load_model(
         self,
@@ -878,7 +923,7 @@ class WanT5EncoderGGUFLoader(ModelLoader):
         import accelerate
         from transformers import UMT5Config, UMT5EncoderModel
 
-        compute_dtype = _umt5_compute_dtype(TorchDevice.choose_torch_device())
+        compute_dtype = self._encoder_dtype(self._encoder_execution_device(config))
         sd = convert_llamacpp_t5_keys(gguf_sd_loader(Path(config.path), compute_dtype=compute_dtype))
 
         with accelerate.init_empty_weights():
