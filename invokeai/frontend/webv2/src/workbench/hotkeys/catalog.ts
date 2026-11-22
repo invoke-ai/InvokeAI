@@ -209,6 +209,8 @@ export const firstPartyHotkeyCatalog: HotkeyDefinition[] = [
   hotkey('canvas', 'layerToFront', ['mod+shift+]']),
   hotkey('canvas', 'layerToBack', ['mod+shift+[']),
   hotkey('canvas', 'cropAllLayersToFrame', []),
+  hotkey('canvas', 'flipHorizontal', []),
+  hotkey('canvas', 'flipVertical', []),
   hotkey('canvas', 'fitBboxToLayers', ['shift+n'], { title: 'Fit Frame To Layers' }),
   hotkey('canvas', 'fitBboxToMasks', ['shift+b'], { title: 'Fit Frame To Masks' }),
   // The gallery saves have no default keys; they are assignable through the hotkeys settings.
