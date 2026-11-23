@@ -1,7 +1,7 @@
 ---
 title: Multi-User Guide
 description: Sign in to a shared InvokeAI server, share boards and workflows, and work alongside other users.
-lastUpdated: 2026-10-26
+lastUpdated: 2026-11-20
 sidebar:
   order: 3
 ---
@@ -10,7 +10,7 @@ import { LinkCard, Badge } from '@astrojs/starlight/components';
 
 In multi-user mode, several people share one InvokeAI server. Everyone signs in with their own account and has their own projects, boards, workflows and settings. This guide is for everyone who uses such a server.
 
-<LinkCard title="Setting up a server?" href="/configuration/multi-user-mode/admin-guide/" description="The administrator guide covers turning on multi-user mode, creating the first administrator, and adding, editing or removing users." />
+<LinkCard title="Setting up a server?" href="/configuration/multi-user-mode/admin-guide/" description="The administrator guide covers creating the first administrator, and adding, editing or removing users." />
 
 ## Signing in
 
@@ -20,7 +20,7 @@ You stay signed in for 24 hours after your last change, or a week with **Keep me
 
 ### Your account
 
-Open the account menu: your name in the Launchpad's top bar, or the app menu in a project. It has:
+Open the account menu: your name at the bottom of the Launchpad's sidebar (only your initials when the sidebar is narrow). From inside a project, go to the Launchpad first: open the app menu (the Invoke logo at the top left) and choose **Launchpad**. The menu has:
 
 - **Account settings**: change your display name, which other users see instead of your email, and your password. Changing the password needs your current one, and signs out your other browsers and devices. Your email cannot be changed.
 - **Manage users**: shown only to administrators, who also see an **Admin** badge under their name.
@@ -84,10 +84,10 @@ Library workflows have a visibility:
 | Visibility | Who can see it | Who can change it |
 | --- | --- | --- |
 | **Private** (default for new workflows) | You and administrators | You |
-| **Public** | Every signed-in user of this server, under **Shared**. It is not published to the internet | You; others can open, duplicate or download it |
-| Saved in single-user mode, or before workflows had owners | Every signed-in user, under **Shared** | No one is offered rename, delete or visibility controls; anyone can open, duplicate or download it |
+| **Public** | Every signed-in user of this server, under **Shared with me**. It is not published to the internet | You; others can open, duplicate or download it |
+| Saved in single-user mode, or before workflows had owners | Every signed-in user, under **Shared with me** | No one is offered rename, delete or visibility controls; anyone can open, duplicate or download it |
 
-- To change visibility, select the workflow under **Yours** and use **Visibility** in its detail panel.
+- To change visibility, select the workflow under **My library** and use **Visibility** in its detail panel.
 - **Save to library…** has a **Public workflow** option for the new Library copy. It does not make the project's own workflow public.
 - Changing visibility does not publish unsaved project edits. **Update library template** writes them to the Library copy and keeps its visibility. Only the template's owner or an administrator can update it; anyone else can use **Save as new** to create their own.
 - Public workflows that can be called from other workflows also appear in the **Call Saved Workflow** node's picker.

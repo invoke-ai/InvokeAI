@@ -14,6 +14,8 @@ so we can verify the swapper hands back the right model and routes the right
 LoRA factory at each step.
 """
 
+import gc
+import weakref
 from types import SimpleNamespace
 from typing import Iterable, Tuple
 from unittest.mock import patch
@@ -701,3 +703,69 @@ def test_slots_cleared_when_device_exit_raises():
 
     assert log.count("lora-exit") == 1
     assert log.count("device-exit:HIGH") == 1
+
+
+def test_outgoing_expert_is_collectable_when_the_next_expert_loads():
+    """While the swapper (or the caller) still references the outgoing expert, both experts are
+    resident through the incoming load. Handles are built per load and kept nowhere else, so any
+    surviving reference is the swapper's."""
+    log: list[str] = []
+    refs: dict[str, weakref.ref] = {}
+    outgoing_collected: list[bool] = []
+
+    class _Models:
+        def load(self, model_id):
+            if model_id == "low":
+                gc.collect()
+                outgoing_collected.append(refs["high"]() is None)
+            model = nn.Linear(1, 1)
+            refs[model_id] = weakref.ref(model)
+            return _FakeInfo(model_id.upper(), model, log)
+
+    swapper = _ExpertSwapper(
+        context=SimpleNamespace(models=_Models()),
+        high_model="high",
+        low_model="low",
+        inference_dtype=torch.bfloat16,
+        high_lora_factory=None,
+        low_lora_factory=None,
+    )
+    swapper.get(_ExpertSwapper.HIGH)
+    swapper.get(_ExpertSwapper.LOW)
+    swapper.close()
+
+    assert outgoing_collected == [True]
+
+
+def test_float8_weights_are_counted_in_the_working_memory_asked_for_the_expert():
+    """A kept scaled-fp8 layer is widened per forward with its scale applied: the widened weight and its product with the
+    scale are alive at once. The expert's working memory has to cover that largest layer, or the cache plans for a
+    dense one."""
+    log: list[str] = []
+    expert = nn.Sequential(nn.Linear(8, 16, bias=False), nn.Linear(16, 4, bias=False))
+    expert[0].weight = nn.Parameter(expert[0].weight.detach().to(torch.float8_e4m3fn), requires_grad=False)
+    expert[0].register_buffer("weight_scale", torch.tensor(2.0), persistent=False)
+    expert[1].weight = nn.Parameter(expert[1].weight.detach().to(torch.float8_e4m3fn), requires_grad=False)
+    asked: list[int | None] = []
+
+    class _RecordingInfo(_FakeInfo):
+        def model_on_device(self, working_mem_bytes=None):
+            asked.append(working_mem_bytes)
+            return super().model_on_device(working_mem_bytes)
+
+    ctx = _FakeContext({"high": _RecordingInfo("HIGH", expert, log)}, log)
+    stub, _calls = _stub_lora_context_manager(log)
+    with patch("invokeai.app.invocations.wan.wan_denoise.LayerPatcher.apply_smart_model_patches", side_effect=stub):
+        swapper = _ExpertSwapper(
+            context=ctx,
+            high_model="high",
+            low_model=None,
+            inference_dtype=torch.bfloat16,
+            high_lora_factory=_make_factory(log, "HIGH"),
+            low_lora_factory=None,
+        )
+        swapper.get(_ExpertSwapper.HIGH)
+        swapper.close()
+
+    # The scaled layer: two bf16 copies of 8 * 16 weights. The unscaled one (16 * 4) is smaller either way.
+    assert asked == [2 * 8 * 16 * torch.bfloat16.itemsize]

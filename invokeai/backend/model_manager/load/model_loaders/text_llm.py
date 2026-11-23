@@ -11,7 +11,6 @@ from typing import TYPE_CHECKING, Optional
 
 import accelerate
 import torch
-from safetensors.torch import load_file
 from transformers import (
     AutoConfig,
     AutoModelForCausalLM,
@@ -31,7 +30,11 @@ from invokeai.backend.model_manager.configs.text_llm import (
 from invokeai.backend.model_manager.load.load_default import ModelLoader, _model_declared_skip_patterns
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.model_manager.taxonomy import AnyModel, BaseModelType, ModelFormat, ModelType, SubModelType
-from invokeai.backend.quantization.fp8_scaled import cast_state_dict, reject_quantized_side_channel
+from invokeai.backend.quantization.fp8_scaled import (
+    cast_state_dict,
+    load_safetensors_checkpoint,
+    reject_quantized_side_channel,
+)
 from invokeai.backend.quantization.int8_convrot import (
     drop_unconsumed_quantization_sidecars,
     extract_int8_convrot_markers,
@@ -75,6 +78,12 @@ class _TextLLMLoader(ModelLoader):
         if submodel_type in (SubModelType.Tokenizer, SubModelType.Processor):
             return 0
         return super().get_size_fs(config, model_path, submodel_type)
+
+    def _without_mtp_head(self, names: dict[str, str], what: str) -> dict[str, str]:
+        """What of a single file is worth reading: not the multi-token-prediction head, which is never read at all."""
+        kept = {key: value for key, value in names.items() if not is_multi_token_prediction_key(key)}
+        _log_dropped_mtp(self._logger, what, len(names) - len(kept))
+        return kept
 
     def _compute_dtype(self, cpu_only: bool | None, *, avoid_float16: bool) -> torch.dtype:
         # float32 for CPU-only models: CPU float16 is emulated and slow.
@@ -142,7 +151,7 @@ class TextLLMCheckpointLoader(_TextLLMLoader):
                 path = Path(config.path)
                 what = f"Qwen3.5 checkpoint {path.name}"
                 model = qwen3_5_vl_from_state_dict(
-                    load_file(path),
+                    load_safetensors_checkpoint(path, select=lambda names: self._without_mtp_head(names, what)),
                     self._compute_dtype(config.cpu_only, avoid_float16=True),
                     reserve=self._ram_cache.make_room,
                     what=what,
@@ -163,6 +172,16 @@ class TextLLMCheckpointLoader(_TextLLMLoader):
             "Only the model, its Tokenizer and its Processor can be loaded from a TextLLM. "
             f"Received: {submodel_type.value if submodel_type else 'None'}"
         )
+
+
+def is_multi_token_prediction_key(key: str) -> bool:
+    """The `mtp.*` head the int8 build ships: generation never runs it."""
+    return key.startswith("mtp.")
+
+
+def _log_dropped_mtp(logger: Logger, what: str, count: int) -> None:
+    if count:
+        logger.info(f"{what}: dropped {count} multi-token-prediction tensor(s) (mtp.*), which generation never runs.")
 
 
 def qwen3_5_vl_from_state_dict(
@@ -189,13 +208,10 @@ def qwen3_5_vl_from_state_dict(
     """
     from transformers import Qwen3_5ForConditionalGeneration
 
-    mtp = [key for key in sd if key.startswith("mtp.")]
-    for key in mtp:
+    dropped = [key for key in sd if is_multi_token_prediction_key(key)]
+    for key in dropped:
         del sd[key]
-    if mtp:
-        logger.info(
-            f"{what}: dropped {len(mtp)} multi-token-prediction tensor(s) (mtp.*), which generation never runs."
-        )
+    _log_dropped_mtp(logger, what, len(dropped))
 
     markers = extract_int8_convrot_markers(sd)
     # Outside the int8 branch, so an int8 weight whose marker is missing or unreadable is refused, not cast as codes.

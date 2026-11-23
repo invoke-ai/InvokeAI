@@ -50,7 +50,6 @@ describe('external model record mapping', () => {
       supportsReferenceImages: true,
       supportsSeed: true,
     });
-    // A record with no capability matrix reads as the backend's defaults: txt2img, negative prompt, nothing else.
     expect(
       toExternalModelValues({ ...geminiModel, capabilities: null, default_settings: null, provider_id: undefined })
     ).toMatchObject({

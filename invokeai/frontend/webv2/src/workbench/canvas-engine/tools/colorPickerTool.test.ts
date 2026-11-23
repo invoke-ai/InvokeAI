@@ -12,10 +12,8 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { createColorPickerTool } from './colorPickerTool';
 
-/** A mutable RGBA pixel a test can change between gesture steps, injected into every `getImageData` call. */
 type MutablePixel = { current: readonly [number, number, number, number] };
 
-/** A minimal `RasterBackend` whose scratch surfaces report `pixel.current` for every `getImageData` call. */
 const createFixedPixelBackend = (pixel: MutablePixel): RasterBackend => ({
   createImageBitmap: () => Promise.resolve({} as ImageBitmap),
   createSurface: (width: number, height: number): RasterSurface => {
@@ -202,7 +200,6 @@ describe('color picker tool', () => {
     h.pixel.current = [255, 0, 0, 255];
     move(tool, h.ctx, pointer(20, 20));
     up(tool, h.ctx, pointer(20, 20, { buttons: 0 }));
-    // The next hover move after release samples nothing and settles nothing.
     move(tool, h.ctx, pointer(30, 30, { buttons: 0 }));
 
     expect(routed).toEqual([
@@ -285,7 +282,6 @@ describe('color picker tool', () => {
     });
 
     it('falls through to the brush color when no request is pending', () => {
-      // The alt-hold flow: `resolveColorSample` exists but reports nothing armed.
       const h = createHarness(makeDoc());
       const tool = createColorPickerTool();
       const resolveColorSample = vi.fn(() => false);

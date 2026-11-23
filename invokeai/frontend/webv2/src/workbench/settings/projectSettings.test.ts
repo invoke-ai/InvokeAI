@@ -48,8 +48,8 @@ describe('normalizeProjectSettings', () => {
   });
 
   /**
-   * Discard legacy project highlighting/attention settings and the retired per-project antialias flag so imports
-   * cannot overwrite personal preferences.
+   * Discard legacy project highlighting/attention settings and the retired per-project antialias flag so imports cannot
+   * overwrite personal preferences.
    */
   it('drops preferences that older documents still carry in project settings', () => {
     const normalized = normalizeProjectSettings({

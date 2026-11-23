@@ -27,10 +27,7 @@ import { HomePage } from './pages/HomePage';
 import { ProjectsPage } from './pages/ProjectsPage';
 import { ProjectActionsMenuProvider } from './projects/ProjectActionsMenuHost';
 
-/**
- * Launchpad owns grouped home/admin pages without mounting workbench runtimes. Model management loads on demand
- * across the route split.
- */
+/** Launchpad owns grouped home/admin pages without mounting workbench runtimes. */
 
 type LaunchpadSectionId = 'home' | 'projects' | 'models' | 'nodes' | 'users' | 'fonts' | 'preferences';
 

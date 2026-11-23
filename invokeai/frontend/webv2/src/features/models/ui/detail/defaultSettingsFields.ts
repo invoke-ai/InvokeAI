@@ -6,7 +6,7 @@ import { loraDefaultSettingsSchema, mainDefaultSettingsSchema } from '@features/
 
 export type DefaultSettingsModel = Pick<
   ModelConfig,
-  'base' | 'default_settings' | 'format' | 'key' | 'type' | 'variant'
+  'base' | 'default_settings' | 'format' | 'key' | 'name' | 'submodels' | 'type' | 'variant'
 >;
 
 const CONTROL_ADAPTER_TYPES = new Set(['controlnet', 't2i_adapter', 'control_lora']);
@@ -38,8 +38,11 @@ export type DefaultSettingsControl =
   | {
       kind: 'model';
       modelTypes: readonly ModelTaxonomyType[];
-      /** Restrict candidates to the edited model's base. */
-      sameBase: boolean;
+      /**
+       * Candidates are the VAEs Generate accepts for the edited model, which can be of another base. Until Generate's
+       * rules arrive none is offered, though a stored one stays visible and clearable.
+       */
+      generateVaeRule: boolean;
       /** Placeholder shown for the backend's 'default' sentinel. */
       placeholderKey: string;
     };
@@ -47,10 +50,7 @@ export type DefaultSettingsControl =
 export interface FieldSpec {
   key: keyof AnyModelDefaultSettings;
   labelKey: string;
-  /**
-   * Omitted for a boolean default, where the row's own enable switch already
-   * expresses both states.
-   */
+  /** Omitted for a boolean default, where the row's own enable switch already expresses both states. */
   control?: DefaultSettingsControl;
   /** Value used when the toggle is switched on; also previewed while off. */
   defaultValue: unknown;
@@ -75,9 +75,9 @@ const FP8_STORAGE_FIELD: FieldSpec = {
 };
 
 const VAE_FIELD: FieldSpec = {
-  control: { kind: 'model', modelTypes: ['vae'], placeholderKey: 'models.defaultVae', sameBase: true },
-  // The backend sentinel for "the compatible default VAE" — what legacy
-  // writes when the toggle is on but no specific model is picked.
+  control: { kind: 'model', modelTypes: ['vae'], generateVaeRule: true, placeholderKey: 'models.defaultVae' },
+  // The backend sentinel for "the compatible default VAE" — what legacy writes when the toggle is on but no specific
+  // model is picked.
   defaultValue: 'default',
   inheritLabelKey: 'models.defaultFieldInherited.vae',
   key: 'vae',
@@ -190,14 +190,12 @@ const CONTROL_ADAPTER_FIELDS: FieldSpec[] = [
 ];
 
 /**
- * `fp8StorageSupported` is the backend's answer (see `data/fp8StorageSupportStore`), not a rule applied
- * here. It used to be `type === 'main' || 'controlnet' || 't2i_adapter'`, which offered the control for
- * 19 of the 52 loader keys that ignore it: the answer also depends on the model's format, and on
- * whether its loader implements the cast at all — neither of which this module can see.
+ * `fp8StorageSupported` is the backend's answer (see `data/fp8StorageSupportStore`), not a rule applied here: it
+ * depends on the model's type, its format and whether its loader implements the cast, which this module cannot see.
  *
- * `schedulerRules` is Generate's rule set for a main model's base. Where the base's graph ignores the
- * scheduler the row is left out, as Generate hides it, unless a stored value needs a row to be cleared. While the
- * rules load or after they fail the row shows disabled, so it neither jumps in later nor silently disappears.
+ * `schedulerRules` is Generate's rule set for a main model's base. Where the base's graph ignores the scheduler the row
+ * is left out, as Generate hides it, unless a stored value needs a row to be cleared. While the rules load or after
+ * they fail the row shows disabled, so it neither jumps in later nor silently disappears.
  */
 export const getFieldsForModel = (
   model: Pick<ModelConfig, 'default_settings' | 'type'>,
@@ -232,6 +230,7 @@ export const validateDefaults = (
     const result = mainDefaultSettingsSchema.safeParse({
       cfgRescaleMultiplier: settings.cfg_rescale_multiplier ?? null,
       cfgScale: settings.cfg_scale ?? null,
+      components: settings.components ?? null,
       guidance: settings.guidance ?? null,
       height: settings.height ?? null,
       scheduler: settings.scheduler ?? null,

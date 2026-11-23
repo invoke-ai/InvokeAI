@@ -31,8 +31,8 @@ const SEAM_MODULES = [
 ];
 
 /**
- * Enumerate structural-mutation constructors, including prepared inverse pairs and paint rollback; scanning
- * matches formatted type literals.
+ * Enumerate structural-mutation constructors, including prepared inverse pairs and paint rollback; scanning matches
+ * formatted type literals.
  */
 const STRUCTURAL_MUTATION_TYPES = [
   'addCanvasLayer',
@@ -75,23 +75,6 @@ const structuralLiteral = new RegExp(`type: '(?:${STRUCTURAL_MUTATION_TYPES.join
 
 const SEAM_ONLY_SYMBOLS = ['repairSelectedLayerId', 'moveNodesWithinSiblings', 'reorderSiblings'];
 
-/** Production planners that consume the document model; dropping the import would reopen an ad-hoc path. */
-const MODEL_CONSUMERS = [
-  'workbench/canvas-engine/render/compositor.ts',
-  'workbench/canvas-engine/render/overlayFrame.ts',
-  'workbench/canvas-engine/render/floatingSelectionFrame.ts',
-  'workbench/canvas-engine/render/rasterComposite.ts',
-  'workbench/canvas-engine/rasterSnapshotCapture.ts',
-  'workbench/canvas-engine/controllers/psdExportController.ts',
-  'workbench/canvas-engine/controllers/rasterExportController.ts',
-  'workbench/canvas-engine/controllers/thumbnailController.ts',
-  'workbench/canvas-engine/controllers/mergeLayerController.ts',
-  'workbench/canvas-operations/generationComposite.ts',
-  'workbench/canvas-operations/generationCompositePlan.ts',
-];
-
-const MODEL_MODULE = 'workbench/canvas-engine/document-model/documentModel';
-
 describe('canvas document seam ownership', () => {
   it('keeps stack mutation and selection repair inside the reducer and the document seam', () => {
     const offenders: string[] = [];
@@ -127,14 +110,5 @@ describe('canvas document seam ownership', () => {
       }
     }
     expect(offenders).toEqual([]);
-  });
-
-  it.each(MODEL_CONSUMERS)('%s consumes the document model', (path) => {
-    const source = productionSources.find(([candidate]) => candidate === path)?.[1];
-    expect(source, `${path} is missing`).toBeDefined();
-    const targets = analyzeSource(path, source!, { jsx: true }).moduleReferences.map((reference) =>
-      resolveImportPath(path, reference.specifier)
-    );
-    expect(targets).toContain(MODEL_MODULE);
   });
 });

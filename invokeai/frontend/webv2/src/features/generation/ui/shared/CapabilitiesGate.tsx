@@ -5,17 +5,17 @@ import {
   ensureArchitectureCapabilitiesLoaded,
   getArchitectureCapabilitiesSnapshot,
   useArchitectureCapabilitiesSelector,
-} from '@features/generation/data/architectureCapabilitiesStore';
+} from '@features/models/architecturesStore';
 import { focusIfUnclaimed } from '@platform/react/focusIfUnclaimed';
 import { Button } from '@platform/ui/Button';
 import { useCallback, useRef, useState } from 'react';
 
 export interface CapabilitiesGateProps {
   /**
-   * Whether the form can render. Until it can, the gate shows the load, and a retry once it fails.
-   * Generate passes a finished load, which is also when its values resolve; Upscale passes the table
-   * itself (a nonzero registry revision), which is what its sync and validation read. In the app the
-   * two agree: the table arrives only with a successful load and leaves only with the account.
+   * Whether the form can render. Until it can, the gate shows the load, and a retry once it fails. Generate passes a
+   * finished load, which is also when its values resolve; Upscale passes the table itself (a nonzero registry
+   * revision), which is what its sync and validation read. In the app the two agree: the table arrives only with a
+   * successful load and leaves only with the account.
    */
   isReady: boolean;
   /** Translated copy, so each widget keeps its own strings. */
@@ -24,8 +24,8 @@ export interface CapabilitiesGateProps {
 }
 
 /**
- * Holds back a form whose defaults and validation come from the served architecture table, so no
- * edit made before it loads can persist a fallback in place of a served default.
+ * Holds back a form whose defaults and validation come from the served architecture table, so no edit made before it
+ * loads can persist a fallback in place of a served default.
  */
 export const CapabilitiesGate = ({ children, isReady, labels }: CapabilitiesGateProps) => {
   const status = useArchitectureCapabilitiesSelector((snapshot) => snapshot.status);

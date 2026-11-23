@@ -1,11 +1,6 @@
-/**
- * Per-project settings layered over the user's defaults: which keys layer, the project settings as stored (the
- * project's pins) and as read (resolved over the user's defaults). Pure, so the document codec, reducers and the
- * settings store share it without loading each other; it boots on both routes, so the table adds no startup module.
- */
+/** Pure, so the codec, reducers and settings store share it; it boots on both routes. */
 import type { EffectiveProjectSettings, ProjectSettings, ViewerAutoSwitchMode } from '@workbench/settings/contracts';
 
-/** What each project setting is when neither the project nor the user's default says otherwise. */
 export const BUILT_IN_PROJECT_SETTINGS: EffectiveProjectSettings = {
   useCpuNoise: true,
   useNsfwChecker: false,
@@ -18,22 +13,16 @@ export const BUILT_IN_PROJECT_SETTINGS: EffectiveProjectSettings = {
 export const LAYERED_PROJECT_SETTING_KEYS = ['useCpuNoise', 'useNsfwChecker', 'useWatermark'] as const;
 export type LayeredProjectSettingKey = (typeof LAYERED_PROJECT_SETTING_KEYS)[number];
 
-/**
- * The `scopedDefaults` owner of the layered project settings: the Generate widget's type id, whose settings show them.
- * Its defaults layer over `ProjectSettings`, never over the Generate widget's own values.
- */
+/** Its defaults layer over `ProjectSettings`, never over the Generate widget's own values. */
 export const PROJECT_SETTINGS_OWNER = 'generate';
 
-/** One layerable key as of `settingsLayering: 1`: its built-in, and how its owner read a stored value then. */
 export interface LayeredSettingKey {
   builtIn: unknown;
   read: (value: unknown) => unknown;
 }
 
 export interface LayeredSettingsTable {
-  /** Per widget type id, keys of the instance's `state.values`. */
   widgetValues: Readonly<Record<string, Readonly<Record<string, LayeredSettingKey>>>>;
-  /** Keys of `ProjectSettings`, owned by {@link PROJECT_SETTINGS_OWNER}. */
   projectSettings: Readonly<Record<LayeredProjectSettingKey, LayeredSettingKey>>;
 }
 
@@ -51,12 +40,8 @@ const oneOf = (builtIn: string, others: readonly string[]): LayeredSettingKey =>
 let layeredSettingsV1: LayeredSettingsTable | undefined;
 
 /**
- * Every layerable key, per owner, as of `settingsLayering: 1`. The one list of what layers: resolution merges only
- * these keys from the user's defaults, the settings store keeps only these, and the document codec drops a stored
- * value the owner read as the built-in from a document without the marker. The codec's meaning is frozen: a later
- * change to an owner's built-in or normalizer does not edit an entry here (it would change what old documents lose);
- * a new layerable key is added, and tests keep the keys equal to the settings contributions'. Built on first use: a
- * module-scope table of calls would make this boot module side-effectful to the bundler.
+ * Frozen as of `settingsLayering: 1`: changing an entry would change what old documents lose; add new keys instead.
+ * Built on first use, since a module-scope table of calls would make this boot module side-effectful.
  */
 export const getLayeredSettings = (): LayeredSettingsTable =>
   (layeredSettingsV1 ??= {
@@ -114,16 +99,21 @@ export const getLayeredSettings = (): LayeredSettingsTable =>
     },
   });
 
-/** The layerable keys of an owner's `scopedDefaults` record: a widget type's values, or the project settings. */
 export const getLayeredKeys = (ownerId: string): Readonly<Record<string, LayeredSettingKey>> | undefined => {
   const table = getLayeredSettings();
   return ownerId === PROJECT_SETTINGS_OWNER ? table.projectSettings : table.widgetValues[ownerId];
 };
 
-export const isViewerAutoSwitchMode = (value: unknown): value is ViewerAutoSwitchMode =>
-  value === 'off' || value === 'latest' || value === 'progress';
+/** A record, not the policy's list, to keep the Queue contracts out of the boot graph; exhaustive by type. */
+const VIEWER_AUTO_SWITCH_MODES: Readonly<Record<ViewerAutoSwitchMode, true>> = {
+  latest: true,
+  off: true,
+  progress: true,
+};
 
-/** Keeps the project's own pins (absent follows the user's default) and drops everything else it does not own. */
+export const isViewerAutoSwitchMode = (value: unknown): value is ViewerAutoSwitchMode =>
+  typeof value === 'string' && Object.hasOwn(VIEWER_AUTO_SWITCH_MODES, value);
+
 export const normalizeProjectSettings = (settings?: Partial<ProjectSettings>): ProjectSettings => {
   const normalized: ProjectSettings = {
     // Absent means a project saved before the mode existed, whatever its old progress toggle said: it starts `off`.
@@ -147,10 +137,7 @@ let effectiveProjectSettingsCache:
     >
   | undefined;
 
-/**
- * Resolves each layered flag as project pin, then the user's default, then built-in. Memoized on the settings
- * object, so repeated reads of an unchanged project and defaults return the same object.
- */
+/** Memoized on the settings object, so unchanged reads return the same object. */
 export const getEffectiveProjectSettings = (
   settings: ProjectSettings,
   defaults: Readonly<Record<string, unknown>> | undefined

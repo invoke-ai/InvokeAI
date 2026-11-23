@@ -19,7 +19,6 @@ describe('createControlLayer', () => {
       type: 'control',
       withTransparencyEffect: true,
     });
-    // The defaults' mutable step range is copied, never shared.
     expect(layer.adapter.beginEndStepPct).not.toBe(CONTROL_ADAPTER_DEFAULTS.controlnet.beginEndStepPct);
   });
 

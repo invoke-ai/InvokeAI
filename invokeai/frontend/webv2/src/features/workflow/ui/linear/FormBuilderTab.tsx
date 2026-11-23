@@ -174,8 +174,8 @@ const BuilderCardBase = ({
   const { editGraph } = useProjectGraphCommands();
   const { activeElementId, form } = use(BuilderDndContext);
   const { attributes, listeners, setActivatorNodeRef, setNodeRef: setDragRef } = useDraggable({ id: element.id });
-  // Set both draggable and activator refs on title bars so keyboard actions bubbling from child buttons cannot
-  // lift cards.
+  // Set both draggable and activator refs on title bars so keyboard actions bubbling from child buttons cannot lift
+  // cards.
   const setDragHandleRef = useCallback(
     (node: HTMLElement | null) => {
       setDragRef(node);
@@ -294,7 +294,6 @@ const ContainerDropZoneBase = ({ container, isEmpty }: { container: ContainerFor
 
 const ContainerDropZone = memo(ContainerDropZoneBase);
 
-/** The shared description popover, bound through the form element. */
 /** Seed fields own a dice already; other numeric fields opt into one per form element. */
 const ShuffleToggleAction = ({
   element,
@@ -478,9 +477,11 @@ const BuilderElementBase = ({
         <BuilderCard element={element} title={title}>
           <Input
             aria-label={t('widgets.workflow.formBuilder.headingLabel')}
-            fontSize="lg"
-            fontWeight="700"
+            fontSize="xs"
+            fontWeight="semibold"
+            letterSpacing="wider"
             placeholder={t('widgets.workflow.formBuilder.headingPlaceholder')}
+            textTransform="uppercase"
             value={element.data.content}
             variant="flushed"
             onChange={(event: ChangeEvent<HTMLInputElement>) =>
@@ -630,12 +631,12 @@ export const FormBuilderTab = ({ projectGraph }: { projectGraph: ProjectGraphSta
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(KeyboardSensor)
   );
-  // Droppable rects freeze at drag start by default; the builder's drop
-  // indicators and container hints appear mid-drag, so re-measure continuously.
+  // Droppable rects freeze at drag start by default; the builder's drop indicators and container hints appear mid-drag,
+  // so re-measure continuously.
   const measuring = useMemo(() => ({ droppable: { strategy: MeasuringStrategy.Always } }), []);
   const form = projectGraph.form;
-  // Capture collision pointerCoordinates; drag delta includes scroll adjustment and cannot be added to clientY
-  // without overshooting.
+  // Capture collision pointerCoordinates; drag delta includes scroll adjustment and cannot be added to clientY without
+  // overshooting.
   const pointerYRef = useRef<number | null>(null);
   const collisionDetection: CollisionDetection = useCallback(
     (args) => {

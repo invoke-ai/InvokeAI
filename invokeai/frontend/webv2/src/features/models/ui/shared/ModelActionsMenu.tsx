@@ -11,8 +11,8 @@ import { RefreshCcwIcon, Trash2Icon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 /**
- * Keep confirmation dialogs outside menus so they survive menu closure; capture targets so disappearing source
- * rows cannot change pending actions.
+ * Keep confirmation dialogs outside menus so they survive menu closure; capture targets so disappearing source rows
+ * cannot change pending actions.
  */
 
 export type ModelActionsModel = Pick<ModelConfig, 'base' | 'format' | 'key' | 'name' | 'type'>;

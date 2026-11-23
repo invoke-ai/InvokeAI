@@ -94,7 +94,6 @@ describe('notification undo registry', () => {
 
   it('caps only undos no notice lists, so a listed Undo outlasts many unlisted ones', () => {
     const listed: string[] = [];
-    // Each recorded the way the editor does it: registered, then listed.
     for (let index = 0; index < 30; index += 1) {
       listed.push(registerNotificationUndo(vi.fn()));
       retainNotificationUndos(new Set(listed));

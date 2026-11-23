@@ -6,9 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { useGalleryWidget } from './GalleryWidgetContext';
 
 /**
- * Restricts the listing to starred items. Inert (but still focusable, so the
- * tooltip can explain why) under a ranked similarity result, which the
- * starred filter does not apply to.
+ * Restricts the listing to starred items; inert but focusable (its tooltip says why) under a ranked similarity result.
  */
 export const GalleryStarredFilterToggle = () => {
   const { t } = useTranslation();

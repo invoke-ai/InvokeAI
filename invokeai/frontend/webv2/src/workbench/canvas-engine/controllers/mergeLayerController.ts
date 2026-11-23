@@ -91,8 +91,8 @@ export type MergeInpaintMasksResult =
 
 /**
  * What tells one merge of selected leaves into a new leaf from another: who may merge (checked before the pixels are
- * read and again before publishing), which stack the result joins above the topmost contributor, what it is, and
- * the history label.
+ * read and again before publishing), which stack the result joins above the topmost contributor, what it is, and the
+ * history label.
  */
 interface SelectedMergeSpec {
   readonly label: string;
@@ -180,8 +180,8 @@ export class MergeLayerController {
    * Bakes the upper layer into the one below as one undo step: the lower layer keeps its id and takes the merged
    * pixels, with each layer's own adjustment stack baked in layer-local pixels before the upper one is resampled, so
    * the merged layer (whose contract has no stack) shows what the canvas showed. Undo restores the lower contract and
-   * raw pixels, then reinserts the upper layer with its own. A spatial stack without an exact display copy is
-   * evaluated in the spatial worker first; the merge then lands only if neither layer nor the document changed.
+   * raw pixels, then reinserts the upper layer with its own. A spatial stack without an exact display copy is evaluated
+   * in the spatial worker first; the merge then lands only if neither layer nor the document changed.
    */
   async mergeDown(upperLayerId: string): Promise<MergeDownResult> {
     const { ctx } = this.deps;
@@ -229,8 +229,8 @@ export class MergeLayerController {
                 : transformBounds(matrix, upperRect)
           );
     const snapshotBytes = rgbaBytes(upperRect) + rgbaBytes(belowRect);
-    // Each stack applies to its layer's raw pixels before compositing: the display's exact adjusted copy when it
-    // has one, else a layer-local copy (surface plus ImageData) adjusted here.
+    // Each stack applies to its layer's raw pixels before compositing: the display's exact adjusted copy when it has
+    // one, else a layer-local copy (surface plus ImageData) adjusted here.
     const ownStack = (layer: CanvasLayerContract, cache: LayerCacheEntry | undefined) =>
       cache && layer.type === 'raster' && layer.adjustments && !isIdentityAdjustments(layer.adjustments)
         ? { adjustments: layer.adjustments, displayed: this.deps.peekAdjustedSurface(layer, cache) }
@@ -466,8 +466,8 @@ export class MergeLayerController {
       ) {
         return 'not-ready';
       }
-      // Leaf identity misses a mid-await ancestor-stack edit or an order-preserving
-      // re-parent; the scope plan folds both.
+      // Leaf identity misses a mid-await ancestor-stack edit or an order-preserving re-parent; the scope plan folds
+      // both.
       const scopes = planGroupCompositeScopes(contributorLeaves, collectCompositedGroups(document));
       const liveScopes = planGroupCompositeScopes(liveLeaves, collectCompositedGroups(liveDocument));
       if (JSON.stringify(liveScopes) !== JSON.stringify(scopes)) {
@@ -496,9 +496,9 @@ export class MergeLayerController {
         const context = pixels.ctx;
         context.setTransform(1, 0, 0, 1, 0, 0);
         context.clearRect(0, 0, rect.width, rect.height);
-        // Composite the group to preserve member opacity and blending in merged pixels. A group stack works in
-        // document pixels; the buffer is `rect` at scale 1. `rect` holds every member, so a spatial stack sees all
-        // of its group's content (its alpha-bounds domain ignores the transparent margin).
+        // Composite the group to preserve member opacity and blending in merged pixels. A group stack works in document
+        // pixels; the buffer is `rect` at scale 1. `rect` holds every member, so a spatial stack sees all of its
+        // group's content (its alpha-bounds domain ignores the transparent margin).
         const drawMerged = async (
           target: RasterSurface['ctx'],
           from: number,
@@ -724,8 +724,8 @@ export class MergeLayerController {
         return { status: layerEditRefusal(txn.status) };
       }
       try {
-        // Besides already-reserved baked exports, the transaction simultaneously
-        // owns raw undo snapshots, the flattened result, and its prepared cache.
+        // Besides already-reserved baked exports, the transaction simultaneously owns raw undo snapshots, the flattened
+        // result, and its prepared cache.
         if (!txn.reserveRaster(rawBytes + mergedBytes * 2)) {
           return { status: 'over-budget' };
         }

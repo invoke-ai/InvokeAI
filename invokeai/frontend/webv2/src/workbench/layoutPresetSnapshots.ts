@@ -86,8 +86,8 @@ export const getLayoutPresetArrangement = (project: Project, preset: LayoutPrese
     : findLayoutPresetWorkingCopy(project.presetWorkingLayouts, preset.id)) ?? preset.snapshot;
 
 /**
- * Presets this project holds an unsaved arrangement of besides the active one, whose drift is the live layout's.
- * A copy that matches its saved preset (saved since, here or in another project) is not unsaved.
+ * Presets this project holds an unsaved arrangement of besides the active one, whose drift is the live layout's. A copy
+ * that matches its saved preset (saved since, here or in another project) is not unsaved.
  */
 export const getUnsavedInactiveLayoutPresetIds = (
   presetWorkingLayouts: Project['presetWorkingLayouts'],
@@ -133,8 +133,8 @@ export const createLayoutPresetSnapshot = (project: Project): LayoutPresetSnapsh
     }
   }
 
-  // A floated instance sits in no region, so it has to be named here too or
-  // applying the preset would recreate neither the window nor a docked copy.
+  // A floated instance sits in no region, so it has to be named here too or applying the preset would recreate neither
+  // the window nor a docked copy.
   for (const instanceId of Object.keys(project.floatingWidgets ?? {})) {
     referencedInstanceIds.add(instanceId);
   }
@@ -158,8 +158,8 @@ export const createLayoutPresetSnapshot = (project: Project): LayoutPresetSnapsh
 };
 
 /**
- * Read a snapshot's placements the way a hydrated project's are. Stored presets, applied presets, and drift
- * comparison share this, so a freshly applied preset always matches the snapshot it came from.
+ * Read a snapshot's placements the way a hydrated project's are. Stored presets, applied presets, and drift comparison
+ * share this, so a freshly applied preset always matches the snapshot it came from.
  */
 export const normalizeLayoutPresetSnapshot = (snapshot: LayoutPresetSnapshot): LayoutPresetSnapshot => {
   const { floatingWidgets, widgetRegions } = normalizeFloatingPlacement(
@@ -167,8 +167,8 @@ export const normalizeLayoutPresetSnapshot = (snapshot: LayoutPresetSnapshot): L
     snapshot.floatingWidgets,
     (instanceId) => Object.hasOwn(snapshot.widgetInstances, instanceId)
   );
-  // A window normalization dropped leaves an instance nothing places; applying the preset would not place it
-  // either, so the snapshot stops naming it.
+  // A window normalization dropped leaves an instance nothing places; applying the preset would not place it either, so
+  // the snapshot stops naming it.
   const orphanedIds = Object.keys(snapshot.floatingWidgets ?? {}).filter(
     (instanceId) =>
       !floatingWidgets?.[instanceId] &&

@@ -26,7 +26,6 @@ describe('isEditableHotkeyTarget', () => {
   });
 
   it('lets shortcuts through from a focused switch, checkbox, or button', () => {
-    // A workflow node's boolean switch is a hidden checkbox: Ctrl+Z from it must reach the editor's undo.
     expect(isEditableHotkeyTarget(mount('<label><input data-target type="checkbox" /></label>'))).toBe(false);
     expect(isEditableHotkeyTarget(mount('<input data-target type="radio" />'))).toBe(false);
     expect(isEditableHotkeyTarget(mount('<input data-target type="range" />'))).toBe(false);
@@ -60,14 +59,12 @@ describe('isNativeControlKeyPress', () => {
     expect(press('<div data-target role="slider" tabindex="0"></div>', { key: 'ArrowLeft' })).toBe(true);
   });
 
-  // The workflow editor binds bare Space to Add node; on a focused node toggle or button, Space must still press it.
   it('leaves the activating Space or Enter to a focused button, toggle, link or tab', () => {
     expect(press('<button data-target type="button">x</button>', { key: ' ' })).toBe(true);
     expect(press('<input data-target type="checkbox" />', { key: ' ' })).toBe(true);
     expect(press('<div data-target role="switch" tabindex="0"></div>', { key: ' ' })).toBe(true);
     expect(press('<a data-target href="#x">x</a>', { key: 'Enter' })).toBe(true);
     expect(press('<div data-target role="tab" tabindex="0"></div>', { key: 'Enter' })).toBe(true);
-    // A focused canvas or graph node is no such control, and a chord is never the control's.
     expect(press('<div data-target role="group" tabindex="0"></div>', { key: ' ' })).toBe(false);
     expect(press('<button data-target type="button">x</button>', { ctrlKey: true, key: 'Enter' })).toBe(false);
   });

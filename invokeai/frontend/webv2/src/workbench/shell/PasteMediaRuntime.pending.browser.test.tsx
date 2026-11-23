@@ -3,7 +3,6 @@ import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
 
-/** Holds the dialog's module back, as a slow connection does on the first paste. */
 const chunk = vi.hoisted(() => {
   let arrive = () => {};
   const arrived = new Promise<void>((resolve) => {
@@ -43,7 +42,6 @@ it('suspends shortcuts from the paste that opens the dialog, while its module is
     document.body.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData }))
   );
   expect(host.querySelector('[data-testid="paste"]')).toBeNull();
-  // Delete or Ctrl+Enter must not reach the gallery behind the dialog that is on its way.
   expect(isModalPresent()).toBe(true);
 
   await act(async () => {
@@ -51,6 +49,5 @@ it('suspends shortcuts from the paste that opens the dialog, while its module is
     await chunk.arrived;
   });
   await expect.poll(() => host.querySelector('[data-testid="paste"]')).not.toBeNull();
-  // The stand-in steps aside for the loaded dialog, which this test replaces with one that announces nothing.
   expect(isModalPresent()).toBe(false);
 });

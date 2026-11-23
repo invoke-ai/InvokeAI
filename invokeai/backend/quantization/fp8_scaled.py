@@ -20,7 +20,7 @@ that :class:`CustomLinear` can decide per forward what to do with it.
 from dataclasses import dataclass
 from logging import Logger
 from pathlib import Path
-from typing import Any, Iterable, Mapping
+from typing import Any, Callable, Iterable, Literal, Mapping
 
 import torch
 
@@ -97,6 +97,69 @@ def read_safetensors_metadata(path: Path, logger: Logger | None = None) -> dict[
                 f"Could not read safetensors metadata from {path.name} ({e}); per-layer quantization hints unavailable."
             )
         return None
+
+
+def _backend_for(header: Mapping[str, Any]) -> Literal["pread", "mmap"]:
+    weights = (".weight", TORCHAO_QDATA_SUFFIX)
+    return "pread" if any(k.endswith(weights) and v["dtype"].startswith("F8_") for k, v in header.items()) else "mmap"
+
+
+def safetensors_backend(path: Path | str) -> Literal["pread", "mmap"]:
+    """The ``backend`` to read ``path``'s tensors with, so that widening its float8 weights releases the file.
+
+    The default mmap backend maps the whole file and every tensor is a slice of that mapping. A loader that
+    widens float8 weights to bf16 replaces the float8 sources, but tensors already in the target dtype (norms,
+    biases) stay views because ``.to`` is a no-op for them, and those few views pin the entire file for the
+    model's lifetime, uncounted by the RAM cache. A float8 weight is the trigger because that is what gets
+    widened while its neighbours stay views: ``.weight``, or torchao's ``._weight_qdata``. A load that keeps its fp8
+    codes is read this way all the same: the codes and the dense layers the cast leaves alone would otherwise pin the
+    file just as well. With ``pread`` every tensor owns its storage.
+
+    Only those float8 weights trigger it. A file without one keeps the lazy mmap load, and so keeps pinning its file
+    through whatever dtype-matching tensors a loader leaves as views: that covers the empty ``scaled_fp8`` marker, a
+    file whose only float8 tensors are nvfp4 block scales (``.weight_scale``), and the modelopt nvfp4 FLUX.3 builds,
+    whose bf16 tensors (see ``relayout_modelopt_nvfp4_payloads``) stay views of the file.
+    """
+    from invokeai.backend.model_manager.model_on_disk import read_safetensors_header
+
+    header = read_safetensors_header(Path(path))
+    return _backend_for(header)
+
+
+def load_safetensors_checkpoint(
+    path: Path | str,
+    *,
+    select: Callable[[dict[str, str]], Mapping[str, str]] | None = None,
+    owned: bool = False,
+) -> dict[str, torch.Tensor]:
+    """Load a single-file checkpoint with the backend :func:`safetensors_backend` picks for it.
+
+    ``select`` names what is worth reading, from the header alone: it is called with ``{key: key}`` for every tensor
+    in the file and returns the part to read (a loader passes its own key rename and drop functions, which only look
+    at names; the values of what comes back name the file's keys). A tensor it leaves out is never read, which is what
+    a bundled VAE or vision tower costs under ``pread``: with mmap an unused tensor was never paged in. The result is
+    keyed by the file's own names, whatever ``select`` renamed.
+
+    ``owned`` reads with ``pread`` whatever the file stores, for a caller whose tensors stay views of the file even
+    though it holds no float8 weight: a bf16 tower, whose cast to bf16 returns the tensor itself.
+
+    The RAM cache's room for the read is not made here: the loader base class asks ``make_room`` for the file's size
+    (``get_size_fs``) before ``_load_model`` runs, and a read is never larger than the file.
+    """
+    from safetensors import safe_open
+
+    from invokeai.backend.model_manager.model_on_disk import read_safetensors_header
+
+    header = read_safetensors_header(Path(path))
+    names = {key: key for key in header}
+    if select is not None:
+        names = {key: key for key in select(names).values()}
+    absent = [key for key in names if key not in header]
+    if absent:
+        raise ValueError(f"{Path(path).name} has no tensor '{absent[0]}'.")
+    backend = "pread" if owned else _backend_for(header)
+    with safe_open(str(path), framework="pt", device="cpu", backend=backend) as f:
+        return {key: f.get_tensor(key) for key in names}
 
 
 def parse_quantization_metadata(metadata: Mapping[str, Any] | None) -> dict[str, dict[str, Any]]:
@@ -513,6 +576,89 @@ def _normalize_weight_scale(scale: torch.Tensor) -> torch.Tensor:
     return scale.flatten()
 
 
+TORCHAO_QDATA_SUFFIX = "._weight_qdata"
+TORCHAO_SCALE_SUFFIX = "._weight_scale"
+
+
+def find_torchao_fp8_problem(sd: Mapping[Any, Any]) -> str | None:
+    """Why ``sd`` holds torchao layers that cannot be translated, or None if it holds none or all are fine.
+
+    torchao's serialized ``Float8Tensor`` (unsloth's FP8 builds) stores each quantized Linear as
+    ``<layer>._weight_qdata`` (``float8_e4m3fn``, ``[out, in]``) plus ``<layer>._weight_scale`` (float32, one
+    per output row) in place of ``<layer>.weight``. Only that layout is accepted; per-tensor and block-wise
+    scales, int8 payloads (which add a ``_weight_zero_point``) and half-present pairs are named and refused
+    rather than guessed at. Reads only key names, dtypes and shapes, so it also works on meta tensors.
+    """
+    keys = {key for key in sd if isinstance(key, str)}
+    # Any other `<layer>._weight_<name>` (a zero point, `_weight_act_pre_scale`, ...) is state this decode does
+    # not apply, and a loader that ignores extras would then compute the layer wrongly without saying so.
+    extras = {
+        layer: name
+        for layer, sep, name in (key.rpartition("._weight_") for key in keys)
+        if sep and name not in ("qdata", "scale")
+    }
+    for key in sorted(keys):
+        if key.endswith(TORCHAO_SCALE_SUFFIX):
+            layer = key[: -len(TORCHAO_SCALE_SUFFIX)]
+            if layer + TORCHAO_QDATA_SUFFIX not in keys:
+                return f"'{layer}' has a torchao scale but no quantized weight"
+            continue
+        if not key.endswith(TORCHAO_QDATA_SUFFIX):
+            continue
+        layer = key[: -len(TORCHAO_QDATA_SUFFIX)]
+        qdata = sd[key]
+        if layer in extras:
+            if extras[layer] == "zero_point":
+                return f"'{layer}' carries a zero point (an integer torchao quantization)"
+            return f"'{layer}' carries torchao tensor '_weight_{extras[layer]}', which is not supported"
+        if qdata.dtype != FP8_DTYPE:
+            return f"'{layer}' is stored as {qdata.dtype}, not float8_e4m3fn"
+        if qdata.dim() != 2:
+            return f"'{layer}' has a {qdata.dim()}-D quantized weight, expected 2-D"
+        if f"{layer}.weight" in keys:
+            return f"'{layer}' has both a quantized and a plain weight"
+        scale = sd.get(layer + TORCHAO_SCALE_SUFFIX)
+        if scale is None:
+            return f"'{layer}' has a quantized weight but no torchao scale"
+        out = qdata.shape[0]
+        if scale.dtype != torch.float32:
+            return f"'{layer}' has a {scale.dtype} scale, expected float32"
+        if tuple(scale.shape) not in ((out, 1), (out,)):
+            return (
+                f"'{layer}' has a scale of shape {tuple(scale.shape)}; only one scale per output row "
+                f"({out} rows) is supported, not per-tensor or block-wise scales"
+            )
+    return None
+
+
+def translate_torchao_fp8_layers(sd: dict[Any, Any]) -> int:
+    """Rename torchao fp8 layers in place to the ComfyUI scaled-fp8 form; return how many there were.
+
+    ``<layer>._weight_qdata`` becomes ``<layer>.weight`` and ``<layer>._weight_scale`` becomes
+    ``<layer>.weight_scale``, so the rest of the scaled-fp8 pipeline applies. Tensors are renamed,
+    never copied.
+
+    The scale is per output row. A loader that renames keys after translating must carry the scale along
+    (:func:`detach_layer_sidechannel` / :func:`reattach_layer_sidechannel`), and anything that permutes a
+    weight's rows must permute the scale the same way. A state dict without torchao keys is left alone (returns 0).
+
+    Raises ``ValueError`` for a layout :func:`find_torchao_fp8_problem` names.
+    """
+    problem = find_torchao_fp8_problem(sd)
+    if problem is not None:
+        raise ValueError(f"Unsupported torchao fp8 checkpoint: {problem}.")
+    layers = [
+        key[: -len(TORCHAO_QDATA_SUFFIX)] for key in sd if isinstance(key, str) and key.endswith(TORCHAO_QDATA_SUFFIX)
+    ]
+    for layer in layers:
+        sd[f"{layer}.weight"] = sd.pop(layer + TORCHAO_QDATA_SUFFIX)
+        # torchao writes the per-row scale as `[out, 1]`. `_normalize_weight_scale` keeps a 2-D scale as
+        # block-wise, which `is_matmul_usable_scale` rejects, and the split would then silently fold the
+        # layer to bf16. Flat `[out]` is the per-output-channel form.
+        sd[f"{layer}.weight_scale"] = sd.pop(layer + TORCHAO_SCALE_SUFFIX).reshape(-1)
+    return len(layers)
+
+
 def reject_undecoded_mx_scale(path: str, scale: Any) -> None:
     """Refuse an MX exponent grid to anything that is about to multiply it as a number.
 
@@ -707,6 +853,29 @@ def _fold_scale(weight: torch.Tensor, scale: torch.Tensor, dtype: torch.dtype, p
             slab_scale = expanded[slab] if expanded.dim() else expanded
         out[slab] = weight[slab].float() * slab_scale
     return out
+
+
+def fold_transient_bytes(weight: Any, scale: Any) -> int:
+    """The most :func:`dequantize_fp8_scaled` holds beside its result while folding ``scale`` into ``weight``.
+
+    That is the float32 copy of the weight and the product, each over the whole weight or one slab of rows
+    (`_fold_scale`), plus, for a block-wise scale, its widened copy over the same rows and, in slabs, the row index
+    that picks each slab's scale rows. Exact in slabs; folded whole it is over by the result, which does not exist yet
+    while the multiply holds its copies. Reads shapes only, so a loader can reserve for it from a header's ``meta``
+    tensors before anything is read. ``scale`` is in the layout the fold receives, so a stored MXFP8 grid stands for
+    its decoded one. The result, the stored weight and the scale itself are the caller's to count.
+    """
+    numel = weight.numel()
+    rows = weight.shape[0] if weight.dim() else 1
+    block_wise = scale.numel() > 1 and scale.dim() > 1
+    index_bytes = 0
+    if numel > _FOLD_SLAB_ELEMENTS:
+        columns = numel // rows
+        slab_rows = min(rows, max(1, _FOLD_SLAB_ELEMENTS // columns))
+        numel = slab_rows * columns
+        if block_wise:
+            index_bytes = slab_rows * torch.int64.itemsize
+    return numel * torch.float32.itemsize * (3 if block_wise else 2) + index_bytes
 
 
 def attach_fp8_scales(

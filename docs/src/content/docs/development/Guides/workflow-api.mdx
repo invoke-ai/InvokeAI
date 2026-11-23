@@ -12,7 +12,7 @@ InvokeAI's HTTP API can be used programmatically from external clients, but one 
 
 This is a common source of confusion when a client can successfully read workflow records but cannot execute them.
 
-If you are using multi-user mode, include your `Authorization: Bearer <token>` header on these requests.
+Sign-in is on by default, so include an `Authorization: Bearer <token>` header on these requests. The [Multi-User API Guide](/configuration/multi-user-mode/api-guide/) shows how to get a token. The examples below leave it out.
 
 ## Minimal `enqueue_batch` Example
 

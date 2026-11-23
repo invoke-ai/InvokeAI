@@ -41,6 +41,7 @@ from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 # official paths. Ordered longest-first so the nested PEFT prefix is not left with a tail.
 _PEFT_PREFIXES_TO_STRIP = (
     "base_model.model.transformer.",
+    "base_model.model.",
     # Comfy packages some releases under this; diffusers' own rename table strips it too, so the
     # probe admits it and this keeps the two in step.
     "model.diffusion_model.",

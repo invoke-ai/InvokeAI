@@ -386,6 +386,7 @@
           "hash": "blake3:qwen3"
         },
         "clip_skip": 0,
+        "ref_images": [],
         "anima_inpaint_adapter": {
           "base": "anima",
           "cond_in_channels": 4,
@@ -880,6 +881,7 @@
           "hash": "blake3:qwen3"
         },
         "clip_skip": 0,
+        "ref_images": [],
         "strength": 0.6,
         "control_layers": [
           {
@@ -1516,6 +1518,7 @@
           "hash": "blake3:qwen3"
         },
         "clip_skip": 0,
+        "ref_images": [],
         "anima_inpaint_adapter": {
           "base": "anima",
           "cond_in_channels": 4,

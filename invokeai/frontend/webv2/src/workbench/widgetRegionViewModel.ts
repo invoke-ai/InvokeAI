@@ -124,8 +124,8 @@ export const createWidgetRegionViewModel = <Instance extends WidgetPlacementInst
     availableItems,
     placedItems,
     region,
-    // A floating slot is a pointer to the window, not a tab: it neither drags nor
-    // gives the strip a drop index, so it stays out of the sortable list.
+    // A floating slot is a pointer to the window, not a tab: it neither drags nor gives the strip a drop index, so it
+    // stays out of the sortable list.
     sortableInstanceIds: placedItems.filter((item) => !item.isFloating).map((item) => item.id),
   };
 };

@@ -11,10 +11,7 @@ import { useCallback, useRef, useState, type MouseEvent, type PointerEvent as Re
 
 import { capturePointer, releasePointer, trackPointerDown } from './loupeGestures';
 
-/**
- * Apply one imperative fraction-space transform to matching-size comparison panes. Pinch zooms/pans together; one
- * finger pans an already-zoomed pair.
- */
+/** One transform for both panes in pane-fraction space, so both show the same region at any resolution. */
 
 const MAX_ACTUAL_ZOOM = 8;
 const PIXELATED_ACTUAL_ZOOM = 2;
@@ -54,12 +51,19 @@ export interface CompareLoupePane {
 const clampFraction = (f: number, scale: number): number =>
   scale <= 1 ? (1 - scale) / 2 : Math.min(0, Math.max(1 - scale, f));
 
+/** The image a pane shows: its identity, and its width in its own pixels. */
+export interface CompareLoupeImage {
+  id: string;
+  naturalWidth: number;
+}
+
 export const useCompareLoupe = ({
   enabled,
-  naturalWidth,
+  images,
 }: {
   enabled: boolean;
-  naturalWidth: number;
+  /** Each pane's image, by pane index. */
+  images: readonly [CompareLoupeImage, CompareLoupeImage];
 }): { getPane: (index: 0 | 1) => CompareLoupePane | null; isZoomed: boolean } => {
   const transformRef = useRef<FractionTransform>({ fx: 0, fy: 0, scale: 1 });
   const panesRef = useRef<[PaneElements, PaneElements]>([
@@ -71,10 +75,36 @@ export const useCompareLoupe = ({
   /** Every pointer currently down on either pane, in client space, in arrival order. */
   const pointersRef = useRef(new Map<number, PanZoomPoint>());
   const pinchRef = useRef<PinchGesture | null>(null);
-  const naturalWidthRef = useRef(naturalWidth);
+  const imagesRef = useRef(images);
   // eslint-disable-next-line react/refs
-  naturalWidthRef.current = naturalWidth;
+  imagesRef.current = images;
+  /** The image ids the current transform was set on, by pane. */
+  const pairRef = useRef<readonly [string, string] | null>(null);
   const [isZoomed, setIsZoomed] = useState(false);
+
+  const writeStyles = useCallback(() => {
+    const { fx, fy, scale } = transformRef.current;
+    const isFit = scale === 1;
+
+    for (const [index, pane] of panesRef.current.entries()) {
+      const { frame, image } = pane;
+
+      if (!frame || !image) {
+        continue;
+      }
+
+      image.style.transform = isFit
+        ? ''
+        : `translate(${fx * frame.clientWidth}px, ${fy * frame.clientHeight}px) scale(${scale})`;
+      image.style.transformOrigin = '0 0';
+
+      const actualZoom = (scale * frame.clientWidth) / Math.max(1, imagesRef.current[index]?.naturalWidth ?? 1);
+
+      image.style.imageRendering = !isFit && actualZoom >= PIXELATED_ACTUAL_ZOOM ? 'pixelated' : '';
+    }
+
+    setIsZoomed(!isFit);
+  }, []);
 
   const apply = useCallback(() => {
     if (rafRef.current !== null) {
@@ -83,29 +113,19 @@ export const useCompareLoupe = ({
 
     rafRef.current = requestAnimationFrame(() => {
       rafRef.current = null;
-      const { fx, fy, scale } = transformRef.current;
-      const isFit = scale === 1;
-
-      for (const pane of panesRef.current) {
-        const { frame, image } = pane;
-
-        if (!frame || !image) {
-          continue;
-        }
-
-        image.style.transform = isFit
-          ? ''
-          : `translate(${fx * frame.clientWidth}px, ${fy * frame.clientHeight}px) scale(${scale})`;
-        image.style.transformOrigin = '0 0';
-
-        const actualZoom = (scale * frame.clientWidth) / Math.max(1, naturalWidthRef.current);
-
-        image.style.imageRendering = !isFit && actualZoom >= PIXELATED_ACTUAL_ZOOM ? 'pixelated' : '';
-      }
-
-      setIsZoomed(!isFit);
+      writeStyles();
     });
-  }, []);
+  }, [writeStyles]);
+
+  /** Writes the transform now, before paint, superseding a pending frame. */
+  const flush = useCallback(() => {
+    if (rafRef.current !== null) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
+
+    writeStyles();
+  }, [writeStyles]);
 
   const setTransform = useCallback(
     (next: FractionTransform) => {
@@ -120,14 +140,19 @@ export const useCompareLoupe = ({
     [apply]
   );
 
-  /** Never below fit, never past `MAX_ACTUAL_ZOOM` of the images' own pixels. */
+  /** Fit up to `MAX_ACTUAL_ZOOM` of the sharper image's pixels; the other pane pixelates first. */
   const constrainScale = useCallback((scale: number): number => {
-    const firstFrame = panesRef.current.find((pane) => pane.frame)?.frame ?? null;
-    const maxScale = firstFrame
-      ? Math.max(1, (MAX_ACTUAL_ZOOM * naturalWidthRef.current) / Math.max(1, firstFrame.clientWidth))
-      : MAX_ACTUAL_ZOOM;
+    let maxScale = 0;
 
-    return Math.max(1, Math.min(scale, maxScale));
+    for (const [index, { frame }] of panesRef.current.entries()) {
+      if (frame) {
+        const naturalWidth = imagesRef.current[index]?.naturalWidth ?? 1;
+
+        maxScale = Math.max(maxScale, (MAX_ACTUAL_ZOOM * naturalWidth) / Math.max(1, frame.clientWidth));
+      }
+    }
+
+    return Math.max(1, Math.min(scale, maxScale === 0 ? MAX_ACTUAL_ZOOM : maxScale));
   }, []);
 
   const zoomAroundFraction = useCallback(
@@ -169,8 +194,8 @@ export const useCompareLoupe = ({
     [zoomAroundFraction]
   );
 
-  // One stable set of callbacks per pane index; wheel listeners need manual
-  // attachment (`passive: false`) so ref callbacks with cleanup own them.
+  // One stable set of callbacks per pane index; wheel listeners need manual attachment (`passive: false`) so ref
+  // callbacks with cleanup own them.
   /** Choose the pane containing the pinch midpoint, independent of finger arrival order. */
   const getGesturePane = useCallback((center: PanZoomPoint, fallback: 0 | 1): 0 | 1 => {
     for (const index of [0, 1] as const) {
@@ -204,7 +229,8 @@ export const useCompareLoupe = ({
           zoomAroundFraction(
             (event.clientX - rect.left) / rect.width,
             (event.clientY - rect.top) / rect.height,
-            Math.max(1, naturalWidthRef.current / frame.clientWidth)
+            // One image pixel per screen pixel for the image double-clicked.
+            Math.max(1, imagesRef.current[index].naturalWidth / frame.clientWidth)
           );
         },
         onPointerDown: (event) => {
@@ -297,14 +323,33 @@ export const useCompareLoupe = ({
           ownerDocument.removeEventListener('pointercancel', handleDocumentPointerEnd);
         };
       },
+      // Panes key their image by id, so this runs, before paint, whenever a pane's image changes.
       imageRefCallback: (node) => {
         panesRef.current[index].image = node;
 
         if (node) {
-          apply();
+          reconcilePair();
+          flush();
         }
       },
     });
+    /** Keeps zoom for a pair sharing an image, zooming out to its lower limit; a new pair opens at fit. */
+    const reconcilePair = (): void => {
+      const [first, second] = imagesRef.current;
+      const previous = pairRef.current;
+
+      pairRef.current = [first.id, second.id];
+
+      if (!previous || (previous[0] === first.id && previous[1] === second.id)) {
+        return;
+      }
+
+      if (previous.includes(first.id) || previous.includes(second.id)) {
+        zoomAroundFraction(0.5, 0.5, transformRef.current.scale);
+      } else {
+        setTransform({ fx: 0, fy: 0, scale: 1 });
+      }
+    };
     /** Starts a pan from the given pointer's position, at the current transform. */
     const beginPan = (pointerId: number, from: PanZoomPoint): void => {
       panRef.current = {
@@ -316,10 +361,7 @@ export const useCompareLoupe = ({
       };
     };
 
-    /**
-     * Measure/capture both fingers in the midpoint pane, using fallback only outside both. Reject unmeasurable or
-     * coincident-pointer gestures.
-     */
+    /** Both fingers measured in the midpoint pane; unmeasurable or coincident gestures are rejected. */
     const beginPinch = (fallbackPane: 0 | 1, pointerIds: [number, number]): PinchGesture | null => {
       const first = pointersRef.current.get(pointerIds[0]);
       const second = pointersRef.current.get(pointerIds[1]);
@@ -413,9 +455,8 @@ export const useCompareLoupe = ({
         pinchRef.current = null;
         const remaining = [...pointers.keys()];
 
-        // Lifting one finger of a three-finger gesture re-pinches on what is
-        // left; lifting to a single finger hands the gesture over to a pan, so
-        // the images keep following that finger without a release and retouch.
+        // Lifting one finger of a three-finger gesture re-pinches on what is left; lifting to a single finger hands the
+        // gesture over to a pan, so the images keep following that finger without a release and retouch.
         if (remaining.length >= 2) {
           beginPinch(pinch.paneIndex, [remaining[0]!, remaining[1]!]);
           return;

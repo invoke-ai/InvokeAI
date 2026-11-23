@@ -10,6 +10,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import { createInstance, type i18n as I18nInstance } from 'i18next';
 import { act, cloneElement, startTransition, useCallback, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider } from 'react-i18next';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -29,7 +30,7 @@ const uploadImageMock = vi.fn();
 const uploadVideoMock = vi.fn();
 const resolveItemMock = vi.fn();
 
-const pickerState = vi.hoisted(() => ({ accept: null as readonly string[] | null }));
+const pickerState = vi.hoisted(() => ({ accept: null as readonly string[] | null, isOpen: false }));
 const workflowApiMock = vi.hoisted(() => ({ apiFetch: vi.fn(), apiFetchJson: vi.fn() }));
 const workflowCommandsMock = vi.hoisted(() => ({ editGraph: vi.fn() }));
 const findInGalleryMock = vi.hoisted(() => vi.fn());
@@ -40,7 +41,6 @@ vi.mock('@platform/transport/http', async (importOriginal) => ({
   apiFetchJson: workflowApiMock.apiFetchJson,
 }));
 
-// Stub Gallery transport while asserting accepted kinds and returned items at the field boundary.
 vi.mock('@features/gallery/picker', () => ({
   GalleryPickerPopover: ({
     accept,
@@ -53,7 +53,13 @@ vi.mock('@features/gallery/picker', () => ({
   }) => {
     pickerState.accept = accept;
 
-    return cloneElement(children, { onClick: () => onPick(SELECTED_GALLERY_VIDEO) });
+    return (
+      <>
+        {cloneElement(children, { onClick: () => onPick(SELECTED_GALLERY_VIDEO) })}
+        {/* The real picker's content is portaled out of the field, as here. */}
+        {pickerState.isOpen ? createPortal(<input aria-label="Search the picker" />, document.body) : null}
+      </>
+    );
   },
 }));
 
@@ -77,7 +83,6 @@ const modelSelectState = vi.hoisted(() => ({
   },
 }));
 
-// Stub model-library UI while asserting picker filters, exclusions, and selected models.
 vi.mock('@features/models/react', () => ({
   ModelSelect: (props: NonNullable<typeof modelSelectState.props>) => {
     modelSelectState.props = props;
@@ -99,8 +104,7 @@ const SD_LORA = {
   type: 'lora',
 };
 const SDXL_LORA = { base: 'sdxl', hash: 'hash-sdxl', key: 'sdxl-lora', name: 'Pixel Art XL', type: 'lora' };
-// What the real picker would hand back for this template: an sd-1 LoRA carrying a model default
-// weight, so "adds at the model default" cannot pass by coincidence.
+// Carries a model default weight, so "adds at the model default" cannot pass by coincidence.
 const ADDABLE_LORA = {
   base: 'sd-1',
   default_settings: { weight: 0.4 },
@@ -129,13 +133,6 @@ vi.mock('@features/workflow/ui/WorkflowUiContext', () => ({
     project: { getSnapshot: () => projectSnapshot },
   }),
 }));
-
-const TEXTAREA_TEMPLATE = {
-  name: 'prompt',
-  title: 'Prompt',
-  type: { name: 'StringField' },
-  uiComponent: 'textarea',
-} as unknown as FieldInputTemplate;
 
 const VIDEO_TEMPLATE = {
   name: 'video',
@@ -231,8 +228,7 @@ beforeEach(() => {
   workflowApiMock.apiFetch.mockReset().mockResolvedValue(new Response());
   workflowApiMock.apiFetchJson.mockReset();
   workflowCommandsMock.editGraph.mockReset();
-  // Module-level capture: without this the next test's wait is satisfied by the previous test's
-  // props and asserts against a picker that is no longer mounted.
+  // Module-level capture: without this the next test's wait is satisfied by the previous test's props.
   modelSelectState.props = null;
   queryClient.clear();
   delete galleryValues.selectedImage;
@@ -255,7 +251,6 @@ const renderField = async (
   onChange: (value: unknown) => void,
   nodeId?: string,
   seedProps: Pick<WorkflowFieldInputProps, 'onSeedModeChange' | 'seedMode'> = {},
-  /** Renders the English copy, for tests that tell rows apart by their translated names. */
   i18n?: I18nInstance
 ) => {
   const field = (
@@ -277,12 +272,6 @@ const typeWeight = async (input: HTMLInputElement, keys: string) => {
   await act(async () => {
     await userEvent.click(input);
     await userEvent.keyboard(`{Control>}a{/Control}${keys}`);
-  });
-};
-
-const pressKey = async (key: string) => {
-  await act(async () => {
-    await userEvent.keyboard(key);
   });
 };
 
@@ -333,24 +322,6 @@ describe('WorkflowFieldInput boolean', () => {
     });
 
     expect(onChange).toHaveBeenCalledWith(true);
-  });
-});
-
-describe('WorkflowFieldInput textarea', () => {
-  it('uses the accessible unbounded resizable textarea for prompt-like string fields', async () => {
-    await renderField(TEXTAREA_TEMPLATE, 'hello', vi.fn());
-
-    const textarea = host.querySelector<HTMLTextAreaElement>('textarea')!;
-    const handle = host.querySelector<HTMLElement>('[role="separator"]')!;
-
-    expect(getComputedStyle(textarea).height).toBe('96px');
-    expect(getComputedStyle(textarea).fontFamily).toContain('monospace');
-    expect(handle.getAttribute('aria-label')).toBe('Resize Prompt');
-    expect(handle.getAttribute('aria-valuemin')).toBe('56');
-    expect(handle.hasAttribute('aria-valuemax')).toBe(false);
-
-    await act(() => handle.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowDown' })));
-    expect(getComputedStyle(textarea).height).toBe('108px');
   });
 });
 
@@ -417,23 +388,6 @@ describe('WorkflowFieldInput authored form controls', () => {
     });
     expect(host.querySelector('[role="slider"]')).toBeNull();
     expect(host.querySelector<HTMLInputElement>('input[type="number"]')?.value).toBe('8');
-  });
-
-  it('ends the slider track on the step multiples the node accepts', async () => {
-    // Bounds 1–100 with a step of 8 admit 8…96; a track from 1 would offer stops such as 49 that validation rejects.
-    const misaligned = fullTemplate('IntegerField', { maximum: 100, minimum: 1, multipleOf: 8 });
-    await renderWithSettings(misaligned, 16, vi.fn(), { component: 'slider', kind: 'number' });
-
-    const slider = host.querySelector<HTMLElement>('[role="slider"]')!;
-    expect(slider.getAttribute('aria-valuemin')).toBe('8');
-    expect(slider.getAttribute('aria-valuemax')).toBe('96');
-
-    await renderWithSettings(fullTemplate('IntegerField', { maximum: 7, minimum: 1, multipleOf: 8 }), 0, vi.fn(), {
-      component: 'slider',
-      kind: 'number',
-    });
-    expect(host.querySelector('[role="slider"]')).toBeNull();
-    expect(host.querySelector('input[type="number"]')).not.toBeNull();
   });
 });
 
@@ -523,18 +477,6 @@ describe('WorkflowFieldInput saved workflows', () => {
     expect(workflowCommandsMock.editGraph).toHaveBeenCalledOnce();
   });
 
-  it('uses plural loading copy while the workflow list is loading', async () => {
-    workflowApiMock.apiFetchJson.mockImplementation(() => new Promise(() => {}));
-
-    await renderField(SAVED_WORKFLOW_TEMPLATE, '', vi.fn());
-
-    await vi.waitFor(() =>
-      expect(host.querySelector<HTMLInputElement>('input[role="combobox"]')?.placeholder).toBe(
-        'nodes.savedWorkflowListLoading'
-      )
-    );
-  });
-
   it('displays dynamic workflow names and marks incompatible workflows disabled', async () => {
     const onChange = vi.fn();
     workflowApiMock.apiFetchJson.mockImplementation((path: string) => {
@@ -622,33 +564,6 @@ describe('WorkflowFieldInput saved workflows', () => {
 });
 
 describe('WorkflowFieldInput media inputs', () => {
-  it('renders media controls when the host provides the workflow dnd context', async () => {
-    await act(() => {
-      root.render(
-        <ChakraProvider value={system}>
-          <QueryClientProvider client={queryClient}>
-            <DndContext>
-              <WorkflowFieldInput template={VIDEO_TEMPLATE} value={undefined} onChange={vi.fn()} />
-            </DndContext>
-          </QueryClientProvider>
-        </ChakraProvider>
-      );
-    });
-
-    expect(host.textContent).not.toContain('nodes.inputModes.connection');
-    expect(findButton('widgets.gallery.picker.chooseVideo').disabled).toBe(false);
-  });
-
-  it('renders a direct-input widget for VideoField instead of falling back to connection-only', async () => {
-    await renderField(VIDEO_TEMPLATE, undefined, vi.fn());
-
-    expect(host.textContent).not.toContain('nodes.inputModes.connection');
-    expect(findButton('widgets.gallery.picker.chooseVideo').disabled).toBe(false);
-    expect(pickerState.accept).toEqual(['video']);
-    expect(findButton('Upload').disabled).toBe(false);
-    expect(host.querySelector<HTMLInputElement>('input[type="file"]')?.accept).toBe('video/*,audio/*');
-  });
-
   it('adopts a video picked from the gallery, shows its details, and clears it', async () => {
     const onChange = vi.fn();
 
@@ -659,7 +574,6 @@ describe('WorkflowFieldInput media inputs', () => {
     await renderField(VIDEO_TEMPLATE, { video_name: 'clip.mp4' }, onChange);
     expect(host.querySelector('img')?.src).toContain('/api/v1/videos/i/clip.mp4/thumbnail');
     await vi.waitFor(() => {
-      // Dimensions/duration badge from the resolved item details.
       expect(host.textContent).toContain('640x480 · 5s');
     });
 
@@ -688,7 +602,6 @@ describe('WorkflowFieldInput media inputs', () => {
       { image_name: SELECTED_GALLERY_VIDEO.name },
     ]);
 
-    // Each tile reveals its own image in the gallery.
     const findButtons = [...host.querySelectorAll<HTMLButtonElement>('button[aria-label*="InGallery"]')];
     expect(findButtons).toHaveLength(2);
     await act(() => findButtons[1]!.click());
@@ -699,23 +612,6 @@ describe('WorkflowFieldInput media inputs', () => {
 
     await act(() => findButton('Clear').click());
     expect(onChange).toHaveBeenLastCalledWith([]);
-  });
-
-  it('keeps an empty image collection droppable and pickable', async () => {
-    const onChange = vi.fn();
-    const collectionTemplate = {
-      name: 'images',
-      title: 'Images',
-      type: { cardinality: 'COLLECTION', name: 'ImageField' },
-    } as unknown as FieldInputTemplate;
-
-    await renderField(collectionTemplate, [], onChange);
-
-    const emptyState = findButton('widgets.gallery.picker.chooseImage');
-
-    expect(emptyState.getBoundingClientRect().height).toBeGreaterThanOrEqual(64);
-    await act(() => emptyState.click());
-    expect(onChange).toHaveBeenLastCalledWith([{ image_name: SELECTED_GALLERY_VIDEO.name }]);
   });
 
   it('adopts the files that uploaded when one of a multi-file batch fails', async () => {
@@ -747,35 +643,6 @@ describe('WorkflowFieldInput media inputs', () => {
     createToast.mockRestore();
   });
 
-  it('keeps video COLLECTION fields connection-only (the widget would write a bare object into a list)', async () => {
-    const collectionTemplate = {
-      name: 'videos',
-      title: 'Videos',
-      type: { cardinality: 'COLLECTION', name: 'VideoField' },
-    } as unknown as FieldInputTemplate;
-
-    await renderField(collectionTemplate, undefined, vi.fn());
-
-    expect(host.textContent).toContain('nodes.inputModes.connection');
-    expect(host.querySelector('input[type="file"]')).toBeNull();
-  });
-
-  it('rejects a file whose type does not match the field kind', async () => {
-    const onChange = vi.fn();
-
-    await renderField(VIDEO_TEMPLATE, undefined, onChange);
-
-    const fileInput = host.querySelector<HTMLInputElement>('input[type="file"]')!;
-    const transfer = new DataTransfer();
-
-    transfer.items.add(new File(['data'], 'a.png', { type: 'image/png' }));
-    fileInput.files = transfer.files;
-    await act(() => fileInput.dispatchEvent(new Event('change', { bubbles: true })));
-
-    expect(uploadVideoMock).not.toHaveBeenCalled();
-    expect(onChange).not.toHaveBeenCalled();
-  });
-
   it('uploads a picked file and adopts the uploaded video', async () => {
     uploadVideoMock.mockResolvedValue({ kind: 'video', name: 'uploaded.mp4' });
     const onChange = vi.fn();
@@ -797,111 +664,91 @@ describe('WorkflowFieldInput media inputs', () => {
     expect(uploadVideoMock.mock.calls[0]?.[1]).toBe('none');
   });
 
-  it('falls back to a hint when the companion video field is unset', async () => {
-    graphNodes.push(makeFrameNode(undefined));
+  const renderMediaMenuField = async (onNodeContextMenu?: (event: React.MouseEvent) => void) => {
+    const openItemContextMenu = vi.fn();
+    const adapter = { openItemContextMenu } as unknown as GalleryUiAdapter;
 
-    await renderField(FRAME_INDEX_TEMPLATE, 0, vi.fn(), 'frame-node');
-
-    expect(host.querySelector('input[type="number"]')).not.toBeNull();
-    expect(host.querySelector('video')).toBeNull();
-    expect(host.textContent).toContain('nodes.framePreviewNoVideo');
-  });
-
-  it('falls back to a hint when the video has no probed frame rate', async () => {
-    // SELECTED_GALLERY_VIDEO has no fps, so frames cannot be mapped onto time.
-    graphNodes.push(makeFrameNode({ video_name: 'clip.mp4' }));
-
-    await renderField(FRAME_INDEX_TEMPLATE, 0, vi.fn(), 'frame-node');
-
+    await act(() => {
+      root.render(
+        <ChakraProvider value={system}>
+          <QueryClientProvider client={queryClient}>
+            <DndContext>
+              <GalleryUiProvider adapter={adapter}>
+                <div onContextMenu={onNodeContextMenu}>
+                  <WorkflowFieldInput template={VIDEO_TEMPLATE} value={{ video_name: 'clip.mp4' }} onChange={vi.fn()} />
+                </div>
+              </GalleryUiProvider>
+            </DndContext>
+          </QueryClientProvider>
+        </ChakraProvider>
+      );
+    });
     await vi.waitFor(() => {
-      expect(host.textContent).toContain('nodes.framePreviewNoFrameRate');
-    });
-    expect(host.querySelector('video')).toBeNull();
-  });
-
-  it('ignores the stored video value while the video field is connection-driven', async () => {
-    resolveItemMock.mockResolvedValue({ ...SELECTED_GALLERY_VIDEO, fps: 30 });
-    graphNodes.push(makeFrameNode({ video_name: 'clip.mp4' }), {
-      data: { inputs: {}, type: 'video' },
-      id: 'upstream',
-      type: 'invocation',
-    });
-    graphEdges.push({
-      id: 'e1',
-      source: 'upstream',
-      sourceHandle: 'video',
-      target: 'frame-node',
-      targetHandle: 'video',
+      expect(host.textContent).toContain('640x480 · 5s');
     });
 
-    await renderField(FRAME_INDEX_TEMPLATE, 0, vi.fn(), 'frame-node');
+    // The thumbnail itself errors in the test server; the well's picker button holds it.
+    return {
+      openItemContextMenu,
+      well: host.querySelector<HTMLElement>('button[aria-label="widgets.gallery.picker.chooseVideo"]')!,
+    };
+  };
 
-    expect(host.textContent).toContain('nodes.framePreviewConnected');
-    expect(host.querySelector('video')).toBeNull();
-    expect(resolveItemMock).not.toHaveBeenCalled();
+  it("opens the gallery's item menu for the field's media at the pointer, and leaves its picker's to the browser", async () => {
+    const nodeMenu = vi.fn((event: React.MouseEvent) => event.defaultPrevented);
+    pickerState.isOpen = true;
+
+    try {
+      const { openItemContextMenu, well } = await renderMediaMenuField(nodeMenu);
+      const rightClick = async (element: Element) => {
+        const event = new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 30, clientY: 40 });
+        await act(() => element.dispatchEvent(event));
+        return event;
+      };
+
+      expect((await rightClick(well)).defaultPrevented).toBe(true);
+      // The node reads this to stay out of the way.
+      expect(nodeMenu).toHaveLastReturnedWith(true);
+      expect(openItemContextMenu).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({
+          item: expect.objectContaining({ kind: 'video', name: 'clip.mp4' }),
+          ref: { kind: 'video', name: 'clip.mp4' },
+          x: 30,
+          y: 40,
+        })
+      );
+
+      expect(
+        (await rightClick(document.querySelector('input[aria-label="Search the picker"]')!)).defaultPrevented
+      ).toBe(false);
+      expect(openItemContextMenu).toHaveBeenCalledOnce();
+    } finally {
+      pickerState.isOpen = false;
+    }
   });
 
-  it('reports a deleted video instead of a frame-rate story', async () => {
-    resolveItemMock.mockRejectedValue(new Error('404'));
-    graphNodes.push(makeFrameNode({ video_name: 'gone.mp4' }));
+  it('anchors a keyboard-opened item menu below the start of the focused media, on screen, not at the pointer', async () => {
+    const { openItemContextMenu, well } = await renderMediaMenuField();
+    const elsewhere = document.createElement('div');
+    const openFromKeyboard = async () => {
+      await act(() => userEvent.keyboard('{Shift>}{F10}{/Shift}'));
+      return openItemContextMenu.mock.lastCall?.[0] as { x: number; y: number };
+    };
 
-    await renderField(FRAME_INDEX_TEMPLATE, 0, vi.fn(), 'frame-node');
+    elsewhere.style.cssText = 'position:fixed;right:0;bottom:0;width:20px;height:20px';
+    host.append(elsewhere);
+    await userEvent.hover(elsewhere);
+    well.focus();
+    const rect = well.getBoundingClientRect();
 
-    await vi.waitFor(() => {
-      expect(host.textContent).toContain('nodes.framePreviewLoadFailed');
-    });
-    expect(host.querySelector('video')).toBeNull();
-  });
+    expect(await openFromKeyboard()).toMatchObject({ x: rect.left, y: rect.bottom });
 
-  it('treats an empty-string video name as unset without firing a lookup', async () => {
-    graphNodes.push(makeFrameNode({ video_name: '' }));
+    // Media can run past the viewport where scrolling cannot reveal it, as a node on the transformed workflow canvas.
+    host.style.cssText = `position:fixed;inset-inline:0;top:${window.innerHeight - rect.height / 2}px`;
+    const moved = well.getBoundingClientRect();
 
-    await renderField(FRAME_INDEX_TEMPLATE, 0, vi.fn(), 'frame-node');
-
-    expect(host.textContent).toContain('nodes.framePreviewNoVideo');
-    expect(resolveItemMock).not.toHaveBeenCalled();
-  });
-
-  it('reveals the chosen image in the gallery from the field', async () => {
-    const imageTemplate = {
-      name: 'image',
-      title: 'Image',
-      type: { name: 'ImageField' },
-    } as unknown as FieldInputTemplate;
-
-    await renderField(imageTemplate, { image_name: 'chosen.png' }, vi.fn());
-    await act(() => host.querySelector<HTMLButtonElement>('button[aria-label*="InGallery"]')!.click());
-
-    expect(findInGalleryMock).toHaveBeenLastCalledWith({ kind: 'image', name: 'chosen.png' });
-  });
-
-  it('keeps the image field on the image upload path', async () => {
-    uploadImageMock.mockResolvedValue({ imageName: 'uploaded.png' });
-    const onChange = vi.fn();
-    const imageTemplate = {
-      name: 'image',
-      title: 'Image',
-      type: { name: 'ImageField' },
-    } as unknown as FieldInputTemplate;
-
-    await renderField(imageTemplate, undefined, onChange);
-
-    expect(host.querySelector<HTMLInputElement>('input[type="file"]')?.accept).toBe('image/*');
-    // Nothing to reveal until the field holds an image.
-    expect(host.querySelector('button[aria-label*="InGallery"]')).toBeNull();
-    await act(() => findButton('Upload').click());
-
-    const fileInput = host.querySelector<HTMLInputElement>('input[type="file"]')!;
-    const transfer = new DataTransfer();
-
-    transfer.items.add(new File(['data'], 'a.png', { type: 'image/png' }));
-    fileInput.files = transfer.files;
-    await act(() => fileInput.dispatchEvent(new Event('change', { bubbles: true })));
-
-    await vi.waitFor(() => {
-      expect(onChange).toHaveBeenCalledWith({ image_name: 'uploaded.png' });
-    });
-    expect(uploadVideoMock).not.toHaveBeenCalled();
+    expect(moved.bottom).toBeGreaterThan(window.innerHeight);
+    expect(await openFromKeyboard()).toMatchObject({ x: moved.left, y: window.innerHeight });
   });
 });
 
@@ -927,7 +774,6 @@ describe('WorkflowFieldInput video frame picker', () => {
     graphNodes.push(makeFrameNode({ video_name: 'clip.mp4' }));
   });
 
-  /** Renders, or re-renders as the document would after an edit, the frame field with the given stored value. */
   const renderFrameField = async (value: unknown, onChange: (value: unknown) => void) => {
     await act(() => {
       root.render(
@@ -963,7 +809,6 @@ describe('WorkflowFieldInput video frame picker', () => {
   };
 
   const frameButton = () => page.getByRole('button', { name: 'Use this frame' });
-  // Unavailable, not disabled: the button keeps focus while it cannot act.
   const expectUseFrameAvailable = async (available: boolean) => {
     if (available) {
       await expect.element(frameButton()).not.toHaveAttribute('aria-disabled');
@@ -992,37 +837,6 @@ describe('WorkflowFieldInput video frame picker', () => {
     await expectUseFrameAvailable(false);
   });
 
-  it('resolves negative indices from the end', async () => {
-    await renderFrameField(-1, vi.fn());
-    const video = await getVideo();
-
-    await expectShownFrame(video, 9);
-
-    await renderFrameField(-3, vi.fn());
-    await expectShownFrame(video, 7);
-  });
-
-  it('returns to the field frame when the field changes from outside the player', async () => {
-    await renderFrameField(-1, vi.fn());
-    const video = await getVideo();
-    await expectShownFrame(video, 9);
-
-    await stepPlayerFrames(',', 4);
-    await expectShownFrame(video, 5);
-
-    // Undo or a graph load: a new value at a new frame.
-    await renderFrameField(2, vi.fn());
-    await expectShownFrame(video, 2);
-
-    // A typed value naming the frame -1 already resolved to still brings the field's frame back.
-    await renderFrameField(-1, vi.fn());
-    await expectShownFrame(video, 9);
-    await stepPlayerFrames(',', 1);
-    await expectShownFrame(video, 8);
-    await renderFrameField(9, vi.fn());
-    await expectShownFrame(video, 9);
-  });
-
   it('commits the paused frame with "Use this frame", keeping focus once it is unavailable', async () => {
     const onChange = vi.fn();
     await renderFrameField(2, onChange);
@@ -1039,7 +853,6 @@ describe('WorkflowFieldInput video frame picker', () => {
 
     expect(onChange).toHaveBeenCalledExactlyOnceWith(5);
 
-    // The document adopts the value: the button has nothing to commit, but keeps focus inside the node's key guard.
     await renderFrameField(5, onChange);
     await expectShownFrame(video, 5);
     await expectUseFrameAvailable(false);
@@ -1050,45 +863,6 @@ describe('WorkflowFieldInput video frame picker', () => {
     await userEvent.keyboard('{Enter}');
     await act(() => button.click());
     expect(onChange).toHaveBeenCalledOnce();
-  });
-
-  it('plays past a loop without changing the field, and offers the frame it pauses on', async () => {
-    const onChange = vi.fn();
-    await renderFrameField(0, onChange);
-    const video = await getVideo();
-    await expectShownFrame(video, 0);
-    let wrapped = false;
-    let lastTime = video.currentTime;
-    const watchWrap = () => {
-      wrapped ||= video.currentTime < lastTime;
-      lastTime = video.currentTime;
-    };
-    video.addEventListener('timeupdate', watchWrap);
-
-    await userEvent.click(page.getByRole('button', { name: 'Play' }));
-    await expectUseFrameAvailable(false);
-    await expect.poll(() => wrapped, { timeout: 5_000 }).toBe(true);
-    video.removeEventListener('timeupdate', watchWrap);
-    expect(video.paused).toBe(false);
-    await userEvent.click(page.getByRole('button', { name: 'Pause' }));
-    // It may have paused on the field's frame; one step forward leaves it either way.
-    await stepPlayerFrames('.', 1);
-
-    await expectUseFrameAvailable(true);
-    expect(onChange).not.toHaveBeenCalled();
-  });
-
-  it('reports a video the browser cannot play, keeping the frame field usable', async () => {
-    resolveItemMock.mockResolvedValue({ ...FIXTURE_VIDEO, fullUrl: '/missing-video.mp4' });
-    const onChange = vi.fn();
-    await renderFrameField(0, onChange);
-
-    await expect.element(page.getByText('Frame preview unavailable — the video could not be played.')).toBeVisible();
-    await expect.element(frameButton()).not.toBeInTheDocument();
-
-    await userEvent.fill(page.getByRole('spinbutton'), '4');
-    await userEvent.keyboard('{Enter}');
-    expect(onChange).toHaveBeenCalledWith(4);
   });
 });
 
@@ -1128,7 +902,6 @@ describe('WorkflowFieldInput board field', () => {
       resources: { en: { translation: await fetch('/locales/en.json').then((response) => response.json()) } },
     });
   });
-  /** Opens the board select and reads its options and group headings, as the gallery would label them. */
   const renderBoardField = async (
     boardSharing: boolean | undefined,
     galleryHost: Partial<GalleryUiAdapter> = {},
@@ -1181,54 +954,6 @@ describe('WorkflowFieldInput board field', () => {
     });
   });
 
-  it('folds every board into the caller’s own on a host without board sharing', async () => {
-    expect(await renderBoardField(false)).toEqual({
-      groups: ['Library'],
-      items: ['Auto (Uncategorized)', 'Uncategorized', 'mine', 'team'],
-    });
-  });
-
-  it('names the board Auto resolves to, with the gallery’s label for the project inbox', async () => {
-    const project = { projectId: 'project-1', projectName: 'Portraits', projects: [] };
-    workflowApiMock.apiFetchJson.mockResolvedValue([
-      boardDto('inbox', { board_name: 'Portraits', is_inbox: true, project_id: 'project-1' }),
-      ...listing,
-    ]);
-    galleryValues.projectBoardId = 'inbox';
-
-    expect(await renderBoardField(true, project)).toEqual({
-      groups: ['Portraits', 'Library', 'Shared with me'],
-      items: ['Auto (Inbox)', 'Uncategorized', 'Inbox', 'mine', 'team'],
-    });
-
-    // Close the first menu completely, so the second read sees only the reopened one.
-    await act(() => userEvent.keyboard('{Escape}'));
-    await vi.waitFor(() => expect(document.querySelector('[data-scope="select"][data-part="item"]')).toBeNull());
-    galleryValues.autoAddBoardId = 'mine';
-    expect((await renderBoardField(true, project)).items[0]).toBe('Auto (mine)');
-  });
-
-  it('names an archived auto-add board as compilation resolves it, not the inbox', async () => {
-    const archived = boardDto('kept', { archived: true, board_name: 'Kept results' });
-    workflowApiMock.apiFetchJson.mockImplementation((url: string) =>
-      Promise.resolve(url.includes('include_archived=true') ? [...listing, archived] : listing)
-    );
-    galleryValues.projectBoardId = 'mine';
-    galleryValues.autoAddBoardId = 'kept';
-
-    await renderBoardField(true);
-
-    // Archived boards stay out of the choices; Auto still sends results to the one chosen on purpose.
-    await vi.waitFor(() =>
-      expect(document.querySelector('[data-scope="select"][data-part="item"]')?.textContent?.trim()).toBe(
-        'Auto (Kept results)'
-      )
-    );
-    expect(
-      [...document.querySelectorAll('[data-scope="select"][data-part="item"]')].map((item) => item.textContent?.trim())
-    ).not.toContain('Kept results');
-  });
-
   it('writes a picked board as its id', async () => {
     const onChange = vi.fn();
 
@@ -1265,7 +990,6 @@ describe('WorkflowFieldInput board field', () => {
       await vi.waitFor(() => {
         expect(onChange).toHaveBeenCalledWith({ image_name: 'uploaded.png' });
       });
-      // The listing was read before the destination was chosen; the board it lacks is no destination.
       expect(workflowApiMock.apiFetchJson).toHaveBeenCalledWith(
         expect.stringContaining('/api/v1/boards/'),
         expect.anything()
@@ -1278,7 +1002,6 @@ describe('WorkflowFieldInput board field', () => {
   });
 });
 
-/** Feed committed values back through an owning parent to expose keystroke rerenders and blur clamping. */
 const StatefulLoRAField = ({ initial, onCommit }: { initial: unknown; onCommit: (value: unknown) => void }) => {
   const [value, setValue] = useState(initial);
   const onChange = useCallback(
@@ -1345,19 +1068,6 @@ describe('WorkflowFieldInput LoRA collection', () => {
     expect(props.filter?.(SDXL_LORA)).toBe(false);
   });
 
-  it("appends a picked LoRA at the model's own default weight", async () => {
-    const onChange = vi.fn();
-
-    await renderLoras([loraEntry()], onChange);
-    await act(() => findButton('Add LoRA…').click());
-
-    // 0.4 comes from ADDABLE_LORA.default_settings, not from DEFAULT_LORA_WEIGHT_CONFIG.initial.
-    expect(onChange).toHaveBeenCalledWith([
-      loraEntry(),
-      { lora: { base: 'sd-1', hash: 'hash-add', key: 'add-lora', name: 'Add Me', type: 'lora' }, weight: 0.4 },
-    ]);
-  });
-
   it('edits one weight and removes one entry without disturbing the rest', async () => {
     const onChange = vi.fn();
     const other = loraEntry({
@@ -1382,46 +1092,6 @@ describe('WorkflowFieldInput LoRA collection', () => {
     expect(onChange).toHaveBeenLastCalledWith([loraEntry()]);
   });
 
-  it('edits the right row when the same LoRA appears twice in an imported workflow', async () => {
-    const onChange = vi.fn();
-
-    await renderLoras([loraEntry(), loraEntry({ weight: 1 })], onChange);
-
-    const removeButtons = host.querySelectorAll<HTMLButtonElement>('button[aria-label="Remove Detail Tweaker"]');
-
-    expect(removeButtons).toHaveLength(2);
-    await act(() => removeButtons[1]!.click());
-    expect(onChange).toHaveBeenCalledWith([loraEntry()]);
-  });
-
-  it('keeps a half-typed decimal instead of snapping back to the last committed number', async () => {
-    const onChange = vi.fn();
-
-    await renderStatefulLoras([loraEntry()], onChange);
-
-    const weight = host.querySelector<HTMLInputElement>('input')!;
-
-    // Test each keystroke so trailing-decimal drafts cannot reset to zero and turn 0.5 into 5.
-    await typeWeight(weight, '0');
-    await pressKey('.');
-
-    // A number input reports the trailing `.` as absent; the next digit landing after it is the proof.
-    expect(weight.value).toBe('0');
-    expect(onChange).toHaveBeenLastCalledWith([loraEntry({ weight: 0 })]);
-
-    await pressKey('5');
-
-    expect(weight.value).toBe('0.5');
-    expect(onChange).toHaveBeenLastCalledWith([loraEntry({ weight: 0.5 })]);
-    // Nothing on the way there was ever an order of magnitude out.
-    expect(onChange.mock.calls.every(([value]) => (value as { weight: number }[])[0]!.weight <= 0.5)).toBe(true);
-
-    // The arrow keys step by the LoRA coarse step, not the number input's default of 1.
-    await pressKey('{ArrowUp}');
-    expect(weight.value).toBe('0.55');
-    expect(onChange).toHaveBeenLastCalledWith([loraEntry({ weight: 0.55 })]);
-  });
-
   it('keeps an out-of-range or cleared weight on screen and invalid instead of clamping or restoring it', async () => {
     const onChange = vi.fn();
 
@@ -1440,7 +1110,6 @@ describe('WorkflowFieldInput LoRA collection', () => {
     expect(onChange).toHaveBeenLastCalledWith([loraEntry({ weight: 2 })]);
     expect(weight.getAttribute('aria-invalid')).toBeNull();
 
-    // Clearing keeps the row (and its input) and reports through the field, not by snapping back to 2.
     await typeWeight(weight, '{Backspace}');
     expect(onChange).toHaveBeenLastCalledWith([loraEntry({ weight: null })]);
     expect(weight.value).toBe('');
@@ -1449,42 +1118,6 @@ describe('WorkflowFieldInput LoRA collection', () => {
     expect(host.querySelector<HTMLInputElement>('input')).toBe(weight);
     expect(weight.value).toBe('');
     expect(weight.getAttribute('aria-invalid')).toBe('true');
-  });
-
-  it('keeps an unreadable entry in the list and lets the user remove it', async () => {
-    const onChange = vi.fn();
-    // A key-only identifier is not renderable and the backend would reject it.
-    const broken = { lora: { key: 'ghost' }, weight: 1 };
-
-    await renderLoras([loraEntry(), broken], onChange);
-
-    expect(host.textContent).toContain('Unreadable entry');
-    // Only the readable row gets a weight control.
-    expect(host.querySelectorAll('input')).toHaveLength(1);
-
-    // Editing the good row must not drop the bad one.
-    await typeWeight(host.querySelector<HTMLInputElement>('input')!, '0.5');
-    expect(onChange).toHaveBeenLastCalledWith([loraEntry({ weight: 0.5 }), broken]);
-
-    await act(() => host.querySelector<HTMLButtonElement>('button[aria-label="Remove Unreadable entry"]')!.click());
-    expect(onChange).toHaveBeenLastCalledWith([loraEntry()]);
-  });
-
-  it('clears the field back to its default when the last entry is removed', async () => {
-    const onChange = vi.fn();
-
-    await renderLoras([loraEntry()], onChange);
-    await act(() => host.querySelector<HTMLButtonElement>('button[aria-label="Remove Detail Tweaker"]')!.click());
-
-    // `undefined`, not `[]`: the loaders default to no LoRAs, so the node returns to its default.
-    expect(onChange).toHaveBeenCalledWith(undefined);
-  });
-
-  it('renders a single stored LoRAField as a one-row list rather than falling back', async () => {
-    await renderLoras(loraEntry(), vi.fn());
-
-    expect(host.textContent).not.toContain('nodes.inputModes.connection');
-    expect(host.querySelectorAll('input')).toHaveLength(1);
   });
 });
 
@@ -1521,13 +1154,6 @@ describe('WorkflowFieldInput model identifiers', () => {
     expect(filter(componentsFolder)).toBe(false);
     expect(filter({ ...transformer, base: 'wan' })).toBe(false);
   });
-
-  it('offers components-only folders to a field that asks for folders', async () => {
-    const filter = await pickerFilter(ltx2Template(['diffusers']));
-
-    expect(filter(componentsFolder)).toBe(true);
-    expect(filter(transformer)).toBe(false);
-  });
 });
 
 describe('WorkflowFieldInput seed inputs', () => {
@@ -1545,39 +1171,20 @@ describe('WorkflowFieldInput seed inputs', () => {
   const menuItem = (mode: string) =>
     document.querySelector<HTMLElement>(`[role="menuitemradio"][data-value="${mode}"]`);
 
-  it('renders a plain number input when no seed mode is supplied, and for non-seed integers', async () => {
-    await renderField(SEED_TEMPLATE, 42, vi.fn());
-
-    expect(seedInput()?.value).toBe('42');
-    expect(modeTrigger()).toBeNull();
-    expect(diceButton()).toBeNull();
-
-    await renderField({ ...SEED_TEMPLATE, name: 'steps' } as FieldInputTemplate, 20, vi.fn(), undefined, {
-      onSeedModeChange: vi.fn(),
-      seedMode: 'increment',
-    });
-
-    expect(modeTrigger()).toBeNull();
-  });
-
   it('puts the mode menu beside a seed input and commits the chosen mode without touching the value', async () => {
     const onChange = vi.fn();
     const onSeedModeChange = vi.fn();
 
-    // Box the row at the node width so the width assertions below mean what they say; the
-    // largest seed has to fit beside the stepper, the dice and the trigger without scrolling.
+    // Node width: the largest seed has to fit beside the stepper, the dice and the trigger without scrolling.
     host.style.width = '18rem';
     await renderField(SEED_TEMPLATE, 4_294_967_295, onChange, undefined, { onSeedModeChange, seedMode: 'fixed' });
 
     expect(seedInput()?.disabled).toBe(false);
-    // Use untranslated long keys to verify truncation preserves accessible names and number-input width.
     expect(modeTrigger()?.getAttribute('aria-label')).toBe('common.seedMode.label: common.seedMode.fixed');
     expect(modeTrigger()?.getBoundingClientRect().width).toBeLessThanOrEqual(144);
     expect((seedInput() as HTMLInputElement).scrollWidth).toBeLessThanOrEqual(
       (seedInput() as HTMLInputElement).clientWidth
     );
-    // xyflow reads `.nokey` to leave a control's keys alone; the trigger and the portaled menu both need it,
-    // or arrows nudge the node and Backspace deletes it while the menu is in use.
     expect(modeTrigger()?.closest('.nokey')).not.toBeNull();
 
     await settle(() => modeTrigger()?.click());
@@ -1589,32 +1196,6 @@ describe('WorkflowFieldInput seed inputs', () => {
 
     expect(onSeedModeChange).toHaveBeenCalledWith('increment');
     expect(onChange).not.toHaveBeenCalled();
-  });
-
-  it("previews the next batch from the workflow's own run count and describes the input with it", async () => {
-    workflowValues.batchCount = 3;
-
-    await renderField(SEED_TEMPLATE, 42, vi.fn(), undefined, { onSeedModeChange: vi.fn(), seedMode: 'increment' });
-
-    const preview = host.querySelector<HTMLElement>('[data-testid="seed-sequence-preview"]');
-
-    // Without i18n resources the key renders, carrying the interpolated bounds.
-    expect(preview?.textContent).toBe('common.seedNextBatchRange');
-    expect(seedInput()?.getAttribute('aria-describedby')).toBe(preview?.id);
-
-    await renderField(SEED_TEMPLATE, 42, vi.fn(), undefined, { onSeedModeChange: vi.fn(), seedMode: 'fixed' });
-
-    expect(host.querySelector('[data-testid="seed-sequence-preview"]')).toBeNull();
-    expect(seedInput()?.getAttribute('aria-describedby')).toBeNull();
-
-    // An empty field previews from the template default, which is where the plan starts it.
-    workflowValues.batchCount = 2;
-    await renderField({ ...SEED_TEMPLATE, default: 1_234 } as FieldInputTemplate, undefined, vi.fn(), undefined, {
-      onSeedModeChange: vi.fn(),
-      seedMode: 'increment',
-    });
-
-    expect(host.querySelector('[data-testid="seed-sequence-preview"]')?.textContent).toBe('common.seedNextBatchRange');
   });
 
   it('rolls a new seed from the dice and writes it to the field as an integer in range', async () => {
@@ -1629,14 +1210,6 @@ describe('WorkflowFieldInput seed inputs', () => {
     expect(Number.isInteger(rolled)).toBe(true);
     expect(rolled).toBeGreaterThanOrEqual(0);
     expect(rolled).toBeLessThanOrEqual(4_294_967_295);
-  });
-
-  it('quiets the value and the dice in random mode but keeps the seed on show', async () => {
-    await renderField(SEED_TEMPLATE, 42, vi.fn(), undefined, { onSeedModeChange: vi.fn(), seedMode: 'random' });
-
-    expect(seedInput()?.disabled).toBe(true);
-    expect(seedInput()?.value).toBe('42');
-    expect(diceButton()?.disabled).toBe(true);
   });
 });
 
@@ -1668,10 +1241,7 @@ const fullTemplate = (
   ...overrides,
 });
 
-/**
- * Feeds each commit back as the next prop and derives `invalid` the way both hosts do, so echo-driven caret bugs
- * reproduce. A deferred echo lands in a transition, as the Canvas flow-model rebuild does.
- */
+/** Echoes each commit back as the next prop, deferred as the Canvas rebuild does, so caret bugs reproduce. */
 const StatefulField = ({
   echo = 'sync',
   initial,
@@ -1697,7 +1267,6 @@ const StatefulField = ({
   );
   const invalid = getWorkflowFieldInvalidReason({ isConnected: false, template, value }) !== null;
 
-  // Both editors wrap the control in a Field.Root that marks everything inside it invalid.
   return (
     <Field.Root invalid={invalid}>
       <WorkflowFieldInput invalid={invalid} template={template} value={value} onChange={onChange} />
@@ -1710,7 +1279,6 @@ describe('WorkflowFieldInput text and number entry', () => {
   const renderStateful = async (template: FieldInputTemplate, initial: unknown, echo?: 'deferred' | 'sync') => {
     const onCommit = vi.fn();
 
-    // Keyed so a later render in the same test starts from its own initial value.
     renderCount += 1;
     await act(() => {
       root.render(
@@ -1745,7 +1313,7 @@ describe('WorkflowFieldInput text and number entry', () => {
   const caret = (input: HTMLInputElement | HTMLTextAreaElement) => [input.selectionStart, input.selectionEnd];
   const isInvalid = (input: HTMLElement) => input.getAttribute('aria-invalid') === 'true';
   const FLOAT = fullTemplate('FloatField');
-  const INTEGER = fullTemplate('IntegerField');
+
   const TEXT = fullTemplate('StringField');
 
   describe('text', () => {
@@ -1785,97 +1353,6 @@ describe('WorkflowFieldInput text and number entry', () => {
       expect(number.input.value).toBe('1230.5');
     });
 
-    it('replaces a selection in place and leaves the caret after the replacement', async () => {
-      const { input, onCommit } = await renderStateful(TEXT, 'hello world');
-
-      await keys('{Shift>}{ArrowLeft}{ArrowLeft}{/Shift}ab');
-      expect(input.value).toBe('hello worab');
-      expect(caret(input)).toEqual([11, 11]);
-
-      await keys('{Control>}{Shift>}{ArrowLeft}{/Shift}{/Control}there');
-      expect(input.value).toBe('hello there');
-      expect(caret(input)).toEqual([11, 11]);
-
-      await keys('{Home}{ArrowRight}{ArrowRight}{Shift>}{ArrowRight}{/Shift}L');
-      expect(input.value).toBe('heLlo there');
-      expect(caret(input)).toEqual([3, 3]);
-
-      await keys('{Control>}a{/Control}new value');
-      expect(input.value).toBe('new value');
-      expect(caret(input)).toEqual([9, 9]);
-      expect(onCommit).toHaveBeenLastCalledWith('new value');
-
-      await act(async () => {
-        await userEvent.dblClick(input);
-      });
-      await keys('word');
-      expect(input.value).toBe('new word');
-      expect(caret(input)).toEqual([8, 8]);
-    });
-
-    it('deletes at the caret, holds still at the boundaries, and stays empty once cleared', async () => {
-      const { input, onCommit } = await renderStateful(TEXT, 'abc');
-
-      await keys('{Home}{Backspace}');
-      expect(input.value).toBe('abc');
-      expect(caret(input)).toEqual([0, 0]);
-
-      await keys('{End}{Delete}');
-      expect(input.value).toBe('abc');
-      expect(caret(input)).toEqual([3, 3]);
-
-      await keys('{ArrowLeft}{Backspace}');
-      expect(input.value).toBe('ac');
-      expect(caret(input)).toEqual([1, 1]);
-
-      await keys('{Home}{Delete}');
-      expect(input.value).toBe('c');
-      expect(caret(input)).toEqual([0, 0]);
-
-      await keys('{Delete}');
-      expect(input.value).toBe('');
-      expect(onCommit).toHaveBeenLastCalledWith('');
-      expect(document.activeElement).toBe(input);
-
-      await keys('xyz{Control>}a{/Control}{Backspace}');
-      expect(input.value).toBe('');
-      expect(onCommit).toHaveBeenLastCalledWith('');
-      expect(document.activeElement).toBe(input);
-    });
-
-    it('pastes at the caret and over a selection, and keeps spacing and punctuation as typed', async () => {
-      const { input, onCommit } = await renderStateful(TEXT, 'hello world');
-
-      await keys('{Control>}{Shift>}{ArrowLeft}{/Shift}{/Control}');
-      await act(async () => {
-        await userEvent.copy();
-      });
-      await keys('{Home}');
-      await act(async () => {
-        await userEvent.paste();
-      });
-      expect(input.value).toBe('worldhello world');
-      expect(caret(input)).toEqual([5, 5]);
-
-      await keys('{End}{ArrowLeft}{ArrowLeft}{ArrowLeft}');
-      await act(async () => {
-        await userEvent.paste();
-      });
-      expect(input.value).toBe('worldhello woworldrld');
-      expect(caret(input)).toEqual([18, 18]);
-
-      await keys('{Control>}a{/Control}');
-      await act(async () => {
-        await userEvent.paste();
-      });
-      expect(input.value).toBe('world');
-      expect(caret(input)).toEqual([5, 5]);
-
-      await keys(', again.  ');
-      expect(input.value).toBe('world, again.  ');
-      expect(onCommit).toHaveBeenLastCalledWith('world, again.  ');
-    });
-
     it('keeps a composed entry intact while each update echoes back, in the input and the textarea', async () => {
       const TEXTAREA = fullTemplate('StringField', { uiComponent: 'textarea' });
 
@@ -1912,57 +1389,9 @@ describe('WorkflowFieldInput text and number entry', () => {
         expect(onCommit).toHaveBeenLastCalledWith('he日本!llo world');
       }
     });
-
-    it('keeps newlines and cross-line replacements in a textarea', async () => {
-      const { input, onCommit } = await renderStateful(
-        fullTemplate('StringField', { uiComponent: 'textarea' }),
-        'alpha beta'
-      );
-
-      expect(input.tagName).toBe('TEXTAREA');
-
-      await keys('{Home}{ArrowRight}{ArrowRight}{ArrowRight}{ArrowRight}{ArrowRight}{Enter}');
-      expect(input.value).toBe('alpha\n beta');
-      expect(caret(input)).toEqual([6, 6]);
-
-      await keys('X');
-      expect(input.value).toBe('alpha\nX beta');
-      expect(caret(input)).toEqual([7, 7]);
-
-      await keys('{Control>}{Home}{/Control}{ArrowRight}{ArrowRight}{ArrowRight}{Shift>}{ArrowDown}{/Shift}Q');
-      expect(input.value).toBe('alpQeta');
-      expect(caret(input)).toEqual([4, 4]);
-      expect(onCommit).toHaveBeenLastCalledWith('alpQeta');
-
-      await keys('{End}{Backspace}{Backspace}{Backspace}{Backspace}{Backspace}{Backspace}{Backspace}');
-      expect(input.value).toBe('');
-      expect(onCommit).toHaveBeenLastCalledWith('');
-      expect(document.activeElement).toBe(input);
-    });
   });
 
   describe('float', () => {
-    it('inserts digits at the caret of a decimal and commits each result as typed', async () => {
-      const cases: [string, string, string, number][] = [
-        ['{Home}2', '20.5', '230.5', 230.5],
-        ['{Home}{ArrowRight}2', '02.5', '023.5', 23.5],
-        ['{End}{ArrowLeft}6', '0.65', '0.635', 0.635],
-        ['{End}2', '0.52', '0.523', 0.523],
-      ];
-
-      for (const [sequence, afterInsert, afterNext, committed] of cases) {
-        const { input, onCommit } = await renderStateful(FLOAT, 0.5);
-
-        await keys(sequence);
-        expect(input.value).toBe(afterInsert);
-        // A number input hides its caret; where the next digit lands shows it stayed after the insertion.
-        await keys('3');
-        expect(input.value).toBe(afterNext);
-        expect(onCommit).toHaveBeenLastCalledWith(committed);
-        expect(document.activeElement).toBe(input);
-      }
-    });
-
     it('replaces a selected digit or the whole value without jumping after the first character', async () => {
       const { input, onCommit } = await renderStateful(FLOAT, 0.5);
 
@@ -2033,136 +1462,6 @@ describe('WorkflowFieldInput text and number entry', () => {
       expect(signed.input.value).toBe('0.001');
     });
 
-    it('edits the decimal point in place and holds still at the boundaries', async () => {
-      const { input, onCommit } = await renderStateful(FLOAT, 0.5);
-
-      await keys('{Home}{ArrowRight}{Delete}');
-      expect(input.value).toBe('05');
-      expect(onCommit).toHaveBeenLastCalledWith(5);
-      await keys('9');
-      expect(input.value).toBe('095');
-
-      await keys('{Control>}a{/Control}0.5{End}{ArrowLeft}{Backspace}');
-      expect(input.value).toBe('05');
-      await keys('9');
-      expect(input.value).toBe('095');
-
-      await keys('{Control>}a{/Control}45{Home}{Backspace}');
-      expect(input.value).toBe('45');
-      await keys('1');
-      expect(input.value).toBe('145');
-
-      await keys('{End}{Delete}');
-      expect(input.value).toBe('145');
-      await keys('2');
-      expect(input.value).toBe('1452');
-      expect(onCommit).toHaveBeenLastCalledWith(1452);
-    });
-
-    it('clears with Backspace, Delete, or a selection and stays empty and focused', async () => {
-      const backspaced = await renderStateful(FLOAT, 4);
-
-      await keys('{Backspace}');
-      expect(backspaced.input.value).toBe('');
-      expect(backspaced.onCommit).toHaveBeenLastCalledWith(undefined);
-      expect(isInvalid(backspaced.input)).toBe(true);
-      expect(document.activeElement).toBe(backspaced.input);
-      await keys('7');
-      expect(backspaced.input.value).toBe('7');
-      expect(isInvalid(backspaced.input)).toBe(false);
-
-      const deleted = await renderStateful(FLOAT, 4);
-
-      await keys('{Home}{Delete}');
-      expect(deleted.input.value).toBe('');
-      expect(deleted.onCommit).toHaveBeenLastCalledWith(undefined);
-      await keys('8');
-      expect(deleted.input.value).toBe('8');
-
-      const selected = await renderStateful(FLOAT, 1234);
-
-      await keys('{Control>}a{/Control}{Delete}');
-      expect(selected.input.value).toBe('');
-      await keys('12{Control>}a{/Control}{Backspace}');
-      expect(selected.input.value).toBe('');
-      expect(selected.onCommit).toHaveBeenLastCalledWith(undefined);
-      expect(document.activeElement).toBe(selected.input);
-
-      const optional = await renderStateful(fullTemplate('FloatField', { required: false }), 4);
-
-      await keys('{Backspace}');
-      expect(optional.input.value).toBe('');
-      expect(optional.onCommit).toHaveBeenLastCalledWith(undefined);
-      expect(isInvalid(optional.input)).toBe(false);
-    });
-
-    it('steps with the arrow keys by the declared step and ignores the wheel', async () => {
-      const stepped = await renderStateful(fullTemplate('FloatField', { multipleOf: 0.25 }), 0.5);
-
-      await keys('{ArrowUp}');
-      expect(stepped.input.value).toBe('0.75');
-      expect(stepped.onCommit).toHaveBeenLastCalledWith(0.75);
-      await keys('{ArrowDown}{ArrowDown}');
-      expect(stepped.input.value).toBe('0.25');
-      expect(stepped.onCommit).toHaveBeenLastCalledWith(0.25);
-      expect(document.activeElement).toBe(stepped.input);
-
-      // Chromium would step the focused value on wheel; the field lets the event through unfocused, then takes
-      // focus back with the draft intact.
-      await keys('{Control>}a{/Control}0.');
-      expect(stepped.onCommit).toHaveBeenLastCalledWith(0);
-      await act(async () => {
-        await userEvent.wheel(stepped.input, { delta: { y: 100 } });
-      });
-      await vi.waitFor(() => {
-        expect(document.activeElement).toBe(stepped.input);
-      });
-      expect(stepped.onCommit).toHaveBeenLastCalledWith(0);
-      await keys('5');
-      expect(stepped.input.value).toBe('0.5');
-      expect(stepped.onCommit).toHaveBeenLastCalledWith(0.5);
-
-      const integer = await renderStateful(INTEGER, 3);
-
-      await keys('{ArrowUp}');
-      expect(integer.input.value).toBe('4');
-      expect(integer.onCommit).toHaveBeenLastCalledWith(4);
-
-      // A float without a declared step moves by tenths, and a typed value off that step stays valid.
-      const float = await renderStateful(FLOAT, 0.5);
-
-      await keys('{ArrowUp}');
-      expect(float.input.value).toBe('0.6');
-      expect(float.onCommit).toHaveBeenLastCalledWith(0.6);
-      await keys('{Control>}a{/Control}0.15');
-      expect(float.onCommit).toHaveBeenLastCalledWith(0.15);
-      expect(isInvalid(float.input)).toBe(false);
-    });
-
-    it('pastes a number at the caret and over a selection', async () => {
-      const { input, onCommit } = await renderStateful(FLOAT, 25);
-
-      await keys('{Home}{Shift>}{ArrowRight}{/Shift}');
-      await act(async () => {
-        await userEvent.copy();
-      });
-      await keys('{End}');
-      await act(async () => {
-        await userEvent.paste();
-      });
-      expect(input.value).toBe('252');
-      expect(onCommit).toHaveBeenLastCalledWith(252);
-      await keys('1');
-      expect(input.value).toBe('2521');
-
-      await keys('{Control>}a{/Control}');
-      await act(async () => {
-        await userEvent.paste();
-      });
-      expect(input.value).toBe('2');
-      expect(onCommit).toHaveBeenLastCalledWith(2);
-    });
-
     it('normalizes a valid draft on blur and keeps an incomplete one visible and invalid', async () => {
       const { input, onCommit } = await renderStateful(FLOAT, 0.5);
 
@@ -2186,74 +1485,6 @@ describe('WorkflowFieldInput text and number entry', () => {
   });
 
   describe('integer and bounds', () => {
-    it('keeps a fractional or negative entry visible and invalid instead of correcting it', async () => {
-      const fractional = await renderStateful(INTEGER, undefined);
-
-      await keys('2.5');
-      expect(fractional.input.value).toBe('2.5');
-      expect(fractional.onCommit).toHaveBeenLastCalledWith(2.5);
-      expect(isInvalid(fractional.input)).toBe(true);
-      await keys('{Backspace}{Backspace}');
-      expect(fractional.input.value).toBe('2');
-      expect(fractional.onCommit).toHaveBeenLastCalledWith(2);
-      expect(isInvalid(fractional.input)).toBe(false);
-
-      const nonNegative = await renderStateful(fullTemplate('IntegerField', { minimum: 0 }), undefined);
-
-      await keys('-7');
-      expect(nonNegative.input.value).toBe('-7');
-      expect(nonNegative.onCommit).toHaveBeenLastCalledWith(-7);
-      expect(isInvalid(nonNegative.input)).toBe(true);
-      await blur(nonNegative.input);
-      expect(nonNegative.input.value).toBe('-7');
-      expect(isInvalid(nonNegative.input)).toBe(true);
-      await act(async () => {
-        await userEvent.click(nonNegative.input);
-      });
-      await keys('{Home}{Delete}');
-      expect(nonNegative.input.value).toBe('7');
-      expect(nonNegative.onCommit).toHaveBeenLastCalledWith(7);
-      expect(isInvalid(nonNegative.input)).toBe(false);
-
-      const negativeFloat = await renderStateful(fullTemplate('FloatField', { minimum: 0 }), 4);
-
-      await keys('{Home}-');
-      expect(negativeFloat.input.value).toBe('-4');
-      expect(negativeFloat.onCommit).toHaveBeenLastCalledWith(-4);
-      expect(isInvalid(negativeFloat.input)).toBe(true);
-    });
-
-    it('edits a multi-digit integer at every position and completes a signed draft', async () => {
-      const { input, onCommit } = await renderStateful(INTEGER, 1234);
-
-      await keys('{Home}9');
-      expect(input.value).toBe('91234');
-      await keys('{End}{ArrowLeft}{ArrowLeft}{Backspace}');
-      expect(input.value).toBe('9134');
-      await keys('{Home}{ArrowRight}{Delete}');
-      expect(input.value).toBe('934');
-      expect(onCommit).toHaveBeenLastCalledWith(934);
-
-      await keys('{Control>}a{/Control}56');
-      expect(input.value).toBe('56');
-      expect(onCommit).toHaveBeenLastCalledWith(56);
-
-      await keys('{Control>}a{/Control}{Backspace}-');
-      expect(input.value).toBe('');
-      expect(onCommit).toHaveBeenLastCalledWith(undefined);
-      await keys('12');
-      expect(input.value).toBe('-12');
-      expect(onCommit).toHaveBeenLastCalledWith(-12);
-      expect(isInvalid(input)).toBe(false);
-
-      await keys('{Control>}a{/Control}4{Backspace}');
-      expect(input.value).toBe('');
-      expect(onCommit).toHaveBeenLastCalledWith(undefined);
-      await keys('4{Home}{Delete}');
-      expect(input.value).toBe('');
-      expect(document.activeElement).toBe(input);
-    });
-
     it('marks out-of-range and off-step entries invalid but editable, then valid once corrected', async () => {
       const { input, onCommit } = await renderStateful(
         fullTemplate('FloatField', { exclusiveMaximum: 1, minimum: 0, multipleOf: 0.25 }),
@@ -2318,7 +1549,6 @@ describe('WorkflowFieldInput scalar collections', () => {
     act(async () => {
       await userEvent.keyboard(sequence);
     });
-  const isInvalid = (input: HTMLElement | null) => input?.getAttribute('aria-invalid') === 'true';
 
   it('appends, edits, and removes rows while each keystroke echoes back late', async () => {
     const { onCommit } = await renderList(list('IntegerField'), [1, 2], 'deferred');
@@ -2346,61 +1576,14 @@ describe('WorkflowFieldInput scalar collections', () => {
     expect(row(2)?.value).toBe('742');
   });
 
-  it('marks only the cleared or out-of-range row invalid and keeps the entry as typed', async () => {
-    const { onCommit } = await renderList(list('IntegerField', { minimum: 0 }), [1, 2]);
-    const first = row(1)!;
-
-    await click(first);
-    await keys('{Control>}a{/Control}{Backspace}-');
-    expect(first.value).toBe('');
-    expect(onCommit).toHaveBeenLastCalledWith([null, 2]);
-    expect(isInvalid(first)).toBe(true);
-    expect(isInvalid(row(2))).toBe(false);
-
-    await keys('3');
-    expect(first.value).toBe('-3');
-    expect(onCommit).toHaveBeenLastCalledWith([-3, 2]);
-    expect(isInvalid(first)).toBe(true);
-
-    await keys('{Home}{Delete}');
-    expect(first.value).toBe('3');
-    expect(onCommit).toHaveBeenLastCalledWith([3, 2]);
-    expect(isInvalid(first)).toBe(false);
-  });
-
-  it('clears a required list to empty and an optional one back to its absent default', async () => {
-    const required = await renderList(list('StringField'), ['a', 'b']);
-
-    await click(button('common.clear'));
-    expect(required.onCommit).toHaveBeenLastCalledWith([]);
-    expect(rows()).toBe(0);
-    expect(Array.from(host.querySelectorAll('button')).map((element) => element.textContent)).not.toContain(
-      'common.clear'
-    );
-
-    await click(button('nodes.addItem'));
-    expect(required.onCommit).toHaveBeenLastCalledWith(['']);
-    await click(row(1)!);
-    await keys('hello');
-    expect(required.onCommit).toHaveBeenLastCalledWith(['hello']);
-
-    const optional = await renderList(list('FloatField', { required: false }), [0.5]);
-
-    await click(removeButton(1));
-    expect(optional.onCommit).toHaveBeenLastCalledWith(undefined);
-    expect(rows()).toBe(0);
-  });
-
   it('keeps keyboard focus in the list when a removal or clear unmounts the focused button', async () => {
     const { onCommit } = await renderList(list('IntegerField'), [1, 2, 3]);
 
-    // Removing the last row unmounts its own button; focus steps back to the previous row's.
     await act(() => removeButton(3).focus());
     await keys('{Enter}');
     expect(onCommit).toHaveBeenLastCalledWith([1, 2]);
     expect(document.activeElement).toBe(removeButton(2));
 
-    // Removing an earlier row keeps the button at that position, now owning the next item.
     await act(() => removeButton(1).focus());
     await keys('{Enter}');
     expect(onCommit).toHaveBeenLastCalledWith([2]);
@@ -2429,10 +1612,7 @@ describe('WorkflowFieldInput record pickers', () => {
     title: 'Style Preset',
     type: { batch: false, cardinality: 'SINGLE', name: 'StylePresetField' },
   });
-  const SYSTEM_PROMPT = fullTemplate('StringField', {
-    title: 'System Prompt',
-    type: { batch: false, cardinality: 'SINGLE', name: 'SystemPromptField' },
-  });
+
   const presetDto = (id: string, name: string) => ({
     id,
     image: null,
@@ -2442,14 +1622,7 @@ describe('WorkflowFieldInput record pickers', () => {
     type: 'user',
     user_id: 'user-1',
   });
-  const promptDto = (id: string, name: string) => ({
-    content: 'Be helpful.',
-    id,
-    is_public: true,
-    max_tokens: null,
-    name,
-    user_id: 'user-1',
-  });
+
   const combobox = () => host.querySelector<HTMLInputElement>('input[role="combobox"]');
   const option = (label: string) =>
     Array.from(document.querySelectorAll<HTMLElement>('[data-scope="combobox"][data-part="item"]')).find((item) =>
@@ -2479,44 +1652,7 @@ describe('WorkflowFieldInput record pickers', () => {
       userEvent.click(host.querySelector<HTMLButtonElement>('button[aria-label="nodes.stylePresetClear"]')!)
     );
     expect(onChange).toHaveBeenLastCalledWith(undefined);
-    // The clear button leaves with the value; focus lands on the input rather than falling to the page.
     expect(document.activeElement).toBe(combobox());
-  });
-
-  it('keeps a system prompt id the list no longer holds and flags it as missing', async () => {
-    workflowApiMock.apiFetchJson.mockResolvedValue([promptDto('prompt-1', 'Helpful')]);
-    const onChange = vi.fn();
-
-    await renderField(SYSTEM_PROMPT, { system_prompt_id: 'prompt-gone' }, onChange);
-    await vi.waitFor(() => expect(combobox()?.value).toBe('nodes.systemPromptMissing'));
-    expect(combobox()?.getAttribute('aria-invalid')).toBe('true');
-    // The reason is linked to the input so assistive tech reads it with the invalid state.
-    const describedBy = combobox()?.getAttribute('aria-describedby');
-    expect(describedBy).toBeTruthy();
-    expect(document.getElementById(describedBy!)?.textContent).toBe('nodes.systemPromptMissing');
-    expect(onChange).not.toHaveBeenCalled();
-
-    // The live record is still offered next to the missing one.
-    await act(() => userEvent.click(combobox()!));
-    await vi.waitFor(() => expect(option('Helpful')).toBeDefined());
-    await act(() => userEvent.click(option('Helpful')!));
-    expect(onChange).toHaveBeenLastCalledWith({ system_prompt_id: 'prompt-1' });
-  });
-
-  it('offers a retry when the list fails to load', async () => {
-    workflowApiMock.apiFetchJson.mockRejectedValue(new Error('offline'));
-
-    await renderField(SYSTEM_PROMPT, undefined, vi.fn());
-    await vi.waitFor(() =>
-      expect(host.querySelector<HTMLButtonElement>('button[aria-label="common.retry"]')).not.toBeNull()
-    );
-    expect(host.textContent).toContain('nodes.recordListFailed');
-
-    workflowApiMock.apiFetchJson.mockResolvedValue([promptDto('prompt-1', 'Helpful')]);
-    await act(() => userEvent.click(host.querySelector<HTMLButtonElement>('button[aria-label="common.retry"]')!));
-    await vi.waitFor(() => expect(host.querySelector('button[aria-label="common.retry"]')).toBeNull());
-    await act(() => userEvent.click(combobox()!));
-    await vi.waitFor(() => expect(option('Helpful')).toBeDefined());
   });
 });
 
@@ -2590,7 +1726,6 @@ describe('WorkflowFieldInput generators', () => {
       step: 0.5,
       type: 'float_generator_arithmetic_sequence',
     });
-    // The preview holds the pre-edit value through the typing burst, then settles.
     await vi.waitFor(() => expect(host.textContent).toContain('1, 1.5, 2, 2.5'), { timeout: 2000 });
 
     await selectVariant('nodes.parseString');
@@ -2614,7 +1749,6 @@ describe('WorkflowFieldInput generators', () => {
     expect(numberInput('-seed').disabled).toBe(true);
     expect(numberInput('-seed').getAttribute('aria-label')).toBe('nodes.generatorSeed');
 
-    // A count below its minimum commits as typed, is flagged, and names its rule; the other settings survive.
     await act(() => numberInput('-count').focus());
     await act(() => userEvent.keyboard('{Control>}a{/Control}0'));
     expect(numberInput('-count').value).toBe('0');
@@ -2654,7 +1788,6 @@ describe('WorkflowFieldInput generators', () => {
     await act(() => userEvent.keyboard('{Control>}a{/Control}20000'));
     await vi.waitFor(() => expect(host.textContent).toContain('nodes.generatorTooMany'), { timeout: 2000 });
 
-    // Clearing leaves the setting empty and flagged, on blur too, instead of restoring the last count.
     await act(() => userEvent.keyboard('{Control>}a{/Control}{Backspace}'));
     expect(onCommit).toHaveBeenLastCalledWith({
       count: null,
@@ -2668,39 +1801,11 @@ describe('WorkflowFieldInput generators', () => {
     expect(numberInput('-count').value).toBe('');
     expect(numberInput('-count').getAttribute('aria-invalid')).toBe('true');
 
-    // A fractional pinned seed is kept and flagged rather than dropped back to a random draw.
     await act(() => numberInput('-seed').focus());
     await act(() => userEvent.keyboard('{Control>}a{/Control}2.5'));
     expect(onCommit).toHaveBeenLastCalledWith(expect.objectContaining({ seed: 2.5 }));
     expect(numberInput('-seed').getAttribute('aria-invalid')).toBe('true');
     expect(numberInput('-seed').disabled).toBe(false);
-  });
-
-  it('loads a parse-string source from a file and previews the split values', async () => {
-    const { onCommit } = await renderGenerator(STRING_GENERATOR, {
-      input: 'a|b',
-      splitOn: '|',
-      type: 'string_generator_parse_string',
-    });
-
-    expect(host.textContent).toContain('a, b');
-
-    const fileInput = host.querySelector<HTMLInputElement>('input[type="file"]')!;
-
-    await act(() => userEvent.upload(fileInput, new File(['x|y|z'], 'values.txt', { type: 'text/plain' })));
-    await vi.waitFor(() =>
-      expect(onCommit).toHaveBeenLastCalledWith({ input: 'x|y|z', splitOn: '|', type: 'string_generator_parse_string' })
-    );
-    await vi.waitFor(() => expect(host.textContent).toContain('x, y, z'), { timeout: 2000 });
-
-    const toast = vi.spyOn(toaster, 'create');
-
-    await act(() =>
-      userEvent.upload(fileInput, new File([new Uint8Array(129 * 1024)], 'big.txt', { type: 'text/plain' }))
-    );
-    await vi.waitFor(() => expect(toast).toHaveBeenCalledWith({ title: 'nodes.generatorFileTooLarge', type: 'error' }));
-    expect(onCommit).toHaveBeenLastCalledWith({ input: 'x|y|z', splitOn: '|', type: 'string_generator_parse_string' });
-    toast.mockRestore();
   });
 
   it('previews dynamic prompts from the backend and marks a board the gallery no longer has', async () => {

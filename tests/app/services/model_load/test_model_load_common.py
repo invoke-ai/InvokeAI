@@ -12,6 +12,9 @@ from types import SimpleNamespace
 import pytest
 
 from invokeai.app.services.model_load.model_load_common import load_settings_changed
+from invokeai.backend.model_manager.configs.roles import view_as
+from invokeai.backend.model_manager.taxonomy import ModelType, Qwen35VariantType
+from tests.fixtures.model_roles import text_llm_file
 
 
 def _config(*, fp8: bool | None = None, cpu_only: bool | None = None, **fields):
@@ -96,3 +99,14 @@ def test_path_made_absolute_by_the_loader_matches_its_stored_record(tmp_path: Pa
 
     assert load_settings_changed(loaded_from, stored, models_path=tmp_path) is False
     assert load_settings_changed(loaded_from, _config(path="sd-1/main/other.safetensors"), models_path=tmp_path)
+
+
+def test_a_role_view_differs_from_its_record_but_not_from_the_view_of_an_unchanged_record():
+    record = text_llm_file("llm")
+    view = view_as(record, ModelType.Qwen35Encoder)
+
+    assert load_settings_changed(view, record)
+    assert not load_settings_changed(view, view_as(record, ModelType.Qwen35Encoder))
+    assert load_settings_changed(
+        view, view_as(text_llm_file("llm", Qwen35VariantType.Qwen35_4B), ModelType.Qwen35Encoder)
+    )

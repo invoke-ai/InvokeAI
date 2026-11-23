@@ -43,8 +43,8 @@ import { useTranslation } from 'react-i18next';
 type EntryStatus = CustomNodeInstallLogEntry['status'];
 
 /**
- * Installs clone synchronously with no job id or progress, so a running install shows an indeterminate bar and
- * offers no pause or cancel; uninstalls are recorded settled.
+ * Installs clone synchronously with no job id or progress, so a running install shows an indeterminate bar and offers
+ * no pause or cancel; uninstalls are recorded settled.
  */
 const STATUS_PRESENTATION: Record<
   EntryStatus,

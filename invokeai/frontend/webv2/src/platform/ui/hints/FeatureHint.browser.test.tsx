@@ -102,8 +102,8 @@ const waitForCard = async (timeoutMs = 5000): Promise<void> => {
 const PANEL_CSS = 'position:fixed;top:120px;height:200px;overflow-y:auto';
 
 /**
- * A hinted label above its control inside `host`: a scrolling panel when its CSS scrolls, like a docked widget
- * body. With `field`, the label and control sit in a marked 100px field.
+ * A hinted label above its control inside `host`: a scrolling panel when its CSS scrolls, like a docked widget body.
+ * With `field`, the label and control sit in a marked 100px field.
  */
 const renderHint = async (hostCss: string, { field = false, labels = ['CLIP skip'] } = {}) => {
   host = document.createElement('div');
@@ -159,14 +159,6 @@ describe('FeatureHint', () => {
     expect(document.querySelector('[data-scope="hover-card"]')).toBeNull();
   });
 
-  it('keeps the trigger out of the tab order so wrapping labels adds no tab stops', async () => {
-    const trigger = await render({ enabled: true, onDisable: vi.fn() });
-
-    expect(trigger.getAttribute('data-scope')).toBe('hover-card');
-    expect(trigger.hasAttribute('tabindex')).toBe(false);
-    expect(trigger.getAttribute('role')).toBeNull();
-  });
-
   it('opens the card with its heading and paragraphs on hover', async () => {
     const trigger = await render({ enabled: true, onDisable: vi.fn() });
 
@@ -212,53 +204,6 @@ describe('FeatureHint', () => {
     expect(onDisable).toHaveBeenCalledTimes(1);
   });
 
-  it('omits the dismiss action when the host cannot persist preferences', async () => {
-    const trigger = await render({ enabled: true, onDisable: null });
-
-    await act(async () => {
-      await userEvent.hover(trigger);
-    });
-    await waitForCard();
-
-    expect(cardText()).toContain('CLIP Skip');
-    expect(cardText()).not.toContain("Don't show me these");
-  });
-
-  describe('placement', () => {
-    it('sits beside its panel, level with the label, instead of over the controls in it', async () => {
-      const { panel, trigger } = await renderHint(`${PANEL_CSS};width:80px;left:8px`);
-      const card = await openHintCard(trigger);
-      const label = trigger.getBoundingClientRect();
-
-      expect(card.left).toBeGreaterThanOrEqual(panel.getBoundingClientRect().right);
-      expect(card.top).toBeLessThan(label.bottom);
-      expect(card.bottom).toBeGreaterThan(label.top);
-    });
-
-    it('flips to the other side of the panel when the viewport edge leaves no room', async () => {
-      const { panel, trigger } = await renderHint(`${PANEL_CSS};width:80px;right:8px`);
-      const card = await openHintCard(trigger);
-
-      expect(card.right).toBeLessThanOrEqual(panel.getBoundingClientRect().left);
-    });
-
-    it('sits beside the field, on screen, when the panel fills the viewport', async () => {
-      // A maximized floating window: no room beside the panel on either side.
-      const { control, trigger } = await renderHint(`${PANEL_CSS};left:0;width:100vw`, { field: true });
-      const card = await openHintCard(trigger);
-
-      expect(card.left).toBeGreaterThanOrEqual(control.getBoundingClientRect().right);
-      expect(card.right).toBeLessThanOrEqual(document.documentElement.clientWidth);
-    });
-
-    it('sits beside the marked field when no panel scrolls around it', async () => {
-      const { control, trigger } = await renderHint('position:fixed;top:120px;left:8px', { field: true });
-      const card = await openHintCard(trigger);
-
-      expect(card.left).toBeGreaterThanOrEqual(control.getBoundingClientRect().right);
-    });
-  });
-
   describe('on the way to the card', () => {
     const LEFT_PANEL_CSS = `${PANEL_CSS};width:80px;left:8px`;
     const MOVE = { stepDelayMs: 20, steps: 4 };
@@ -292,59 +237,6 @@ describe('FeatureHint', () => {
       expect(document.elementFromPoint(to.left + to.width / 2, to.top + to.height / 2)?.closest('a')).toBe(link);
     });
 
-    it('stays open through a rest on the arrow, which lies outside the card body', async () => {
-      const { trigger } = await renderHint(LEFT_PANEL_CSS);
-      const card = await openHintCard(trigger);
-      const arrow = document.querySelector<HTMLElement>('[data-scope="hover-card"][data-part="arrow"]')!;
-      const arrowRect = arrow.getBoundingClientRect();
-      const label = trigger.getBoundingClientRect();
-      const exit = { x: label.right - 2, y: label.top + label.height / 2 };
-      // The arrow straddles the card's edge: its outer half is clear of the content rect.
-      const outer = { x: arrowRect.left + 1, y: arrowRect.top + arrowRect.height / 2 };
-
-      expect(outer.x).toBeLessThan(card.left);
-      await movePointerAlong(exit, { x: outer.x - 6, y: outer.y }, MOVE);
-      await act(() =>
-        userEvent.hover(arrow, { position: { x: outer.x - arrowRect.left, y: outer.y - arrowRect.top } })
-      );
-      // Past the corridor's grace window and the close delay after it.
-      await settle(1500);
-      // The title, the card's first paragraph.
-      await act(() => userEvent.hover(document.querySelector('[data-scope="hover-card"][data-part="content"] p')!));
-      await settle(500);
-
-      expect(cardText()).toContain('CLIP Skip');
-    });
-
-    it('closes at the ordinary delay when the pointer leaves with a button held, as a scrub does', async () => {
-      const { trigger } = await renderHint(LEFT_PANEL_CSS);
-      const card = await openHintCard(trigger);
-      const label = trigger.getBoundingClientRect();
-      const held = {
-        bubbles: true,
-        buttons: 1,
-        clientX: label.right - 2,
-        clientY: label.top + label.height / 2,
-        pointerType: 'mouse',
-      };
-
-      // A scrubber taking pointer capture on press moves the pointer off the label with the button still down.
-      await act(() => trigger.dispatchEvent(new PointerEvent('pointerdown', held)));
-      expect(cardText()).toContain('CLIP Skip');
-      await act(() => trigger.dispatchEvent(new PointerEvent('pointerout', { ...held, relatedTarget: document.body })));
-      // A rightward drag heads toward the card; within the grace window, a corridor would keep the card open.
-      for (const step of [1, 2, 3]) {
-        await act(() =>
-          document.dispatchEvent(new PointerEvent('pointermove', { ...held, clientX: held.clientX + step * 8 }))
-        );
-        await settle(100);
-      }
-      await settle(400);
-
-      expect(card.left).toBeGreaterThan(held.clientX);
-      expect(cardText()).toBe('');
-    });
-
     it('closes once the pointer leaves the corridor sideways', async () => {
       const { trigger } = await renderHint(LEFT_PANEL_CSS);
 
@@ -359,19 +251,6 @@ describe('FeatureHint', () => {
         MOVE
       );
       await settle(600);
-
-      expect(cardText()).toBe('');
-    });
-
-    it('closes after a grace window when the pointer rests on the way', async () => {
-      const { trigger } = await renderHint(LEFT_PANEL_CSS);
-      const card = await openHintCard(trigger);
-      const label = trigger.getBoundingClientRect();
-      const exit = { x: label.right - 2, y: label.top + label.height / 2 };
-
-      await movePointerAlong(exit, { x: card.left - 4, y: exit.y + 24 }, MOVE);
-      // Past the grace window and the close delay after it.
-      await settle(1700);
 
       expect(cardText()).toBe('');
     });

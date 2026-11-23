@@ -144,11 +144,17 @@ def test_the_official_names_the_2_0_map_misses_are_still_renamed() -> None:
     assert "proj_in" in renamed
 
 
-@pytest.mark.parametrize("prefix", ["", "diffusion_model.", "transformer.", "base_model.model.transformer."])
+@pytest.mark.parametrize(
+    "prefix",
+    ["", "diffusion_model.", "transformer.", "base_model.model.", "base_model.model.transformer."],
+)
 def test_the_peft_prefixes_seen_in_the_wild_all_strip(prefix: str) -> None:
     patch = lora_model_from_ltx2_state_dict(_published_state_dict(prefix=prefix))
+    bare = lora_model_from_ltx2_state_dict(_published_state_dict(prefix=""))
 
     assert len(patch.layers) == len(PUBLISHED_LAYER_PATHS)
+    # Stripped, not carried through: a left-over prefix would resolve onto no module.
+    assert patch.layers.keys() == bare.layers.keys()
 
 
 def test_an_unknown_layer_keeps_its_own_name_so_the_patcher_can_report_it() -> None:

@@ -1,4 +1,3 @@
-/** A variation axis exposed by a font file. */
 export interface FontAxis {
   tag: string;
   label: string;

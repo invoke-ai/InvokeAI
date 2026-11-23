@@ -39,7 +39,7 @@ const FALLBACK_COLOR = '#000000';
 const formatPx = (value: number): string => `${value}px`;
 
 /** Where Place on = Selected layer sends the next shape, given the selection. */
-type SelectedPlacement = 'none' | 'layer' | 'mask' | 'new-layer';
+type SelectedPlacement = 'none' | 'layer' | 'mask' | 'vector' | 'new-layer';
 
 const setShapeOptions = (engine: ToolFormProps['engine'], patch: Partial<ShapeToolOptions>): void => {
   engine.interaction.set('shapeOptions', { ...engine.interaction.get('shapeOptions'), ...patch });
@@ -55,6 +55,9 @@ const ShapeToolSettings = ({ engine }: ToolFormProps) => {
     if (!layer) {
       return 'none';
     }
+    if (layer.type === 'vector') {
+      return 'vector';
+    }
     if (layer.type === 'inpaint_mask' || layer.type === 'regional_guidance') {
       return 'mask';
     }
@@ -64,13 +67,17 @@ const ShapeToolSettings = ({ engine }: ToolFormProps) => {
     () =>
       SHAPE_KIND_ORDER.map((value) => ({
         icon: SHAPE_KIND_PRESENTATION[value].icon,
-        label: t(SHAPE_KIND_PRESENTATION[value].labelKey),
+        label: t(
+          placement === 'vector' && value === 'polygon'
+            ? 'widgets.canvas.toolOptions.vectorShapePolyline'
+            : SHAPE_KIND_PRESENTATION[value].labelKey
+        ),
         value,
       })),
-    [t]
+    [placement, t]
   );
   const onKindChange = useCallback((kind: ShapeToolKind) => setShapeOptions(engine, { kind }), [engine]);
-  const canPlaceSelected = placement === 'layer' || placement === 'mask';
+  const canPlaceSelected = placement === 'layer' || placement === 'mask' || placement === 'vector';
   const targetOptions = useMemo(
     () => [
       {
@@ -87,6 +94,8 @@ const ShapeToolSettings = ({ engine }: ToolFormProps) => {
     [engine]
   );
   const hintId = useId();
+  const polylineHintId = useId();
+  const showPolylineHint = placement === 'vector' && options.kind === 'polygon';
   const hintKey = !canPlaceSelected
     ? 'widgets.canvas.toolOptions.shapeTargetFallbackHint'
     : options.target === 'selected' && placement === 'mask'
@@ -95,6 +104,7 @@ const ShapeToolSettings = ({ engine }: ToolFormProps) => {
   return (
     <>
       <PropertySegmentedRow
+        describedBy={showPolylineHint ? polylineHintId : undefined}
         label={t('widgets.properties.rows.kind')}
         options={kindOptions}
         value={options.kind}
@@ -107,6 +117,11 @@ const ShapeToolSettings = ({ engine }: ToolFormProps) => {
         value={canPlaceSelected ? options.target : 'new'}
         onValueChange={onTargetChange}
       />
+      {showPolylineHint ? (
+        <Text color="fg.muted" fontSize="xs" id={polylineHintId}>
+          {t('widgets.canvas.toolOptions.vectorPolylineHint')}
+        </Text>
+      ) : null}
       {hintKey ? (
         <Text color="fg.muted" fontSize="xs" id={hintId}>
           {t(hintKey)}
@@ -296,10 +311,22 @@ const ShapeAppearanceControls = ({
   );
 };
 
+const useSelectedVectorName = () =>
+  useActiveProjectSelector((project) => {
+    const { document } = project.canvas;
+    const layer = getDocumentLayer(document, document.selectedLayerId);
+    return layer?.type === 'vector' ? layer.name : null;
+  });
+
+const ShapeAppearanceSettings = (props: ToolFormProps) => {
+  const name = useSelectedVectorName();
+  return name !== null ? null : <ShapeDefaultAppearanceSettings {...props} />;
+};
+
 export const shapeForm: ToolPropertyForm = {
   groups: [
     { body: ShapeToolSettings, id: 'shape', labelKey: 'widgets.properties.groups.shape' },
-    { body: ShapeDefaultAppearanceSettings, id: 'shape-appearance', labelKey: 'widgets.properties.groups.appearance' },
+    { body: ShapeAppearanceSettings, id: 'shape-appearance', labelKey: 'widgets.properties.groups.appearance' },
   ],
   id: 'shape',
   paintsLeaf: true,

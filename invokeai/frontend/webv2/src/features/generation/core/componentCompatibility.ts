@@ -1,6 +1,9 @@
+import type { ModelRole } from '@features/models';
+
+import { architectureAcceptsVae } from '@features/models/architectures';
+
 import type { ComponentModelConfig, GenerateModelConfig, VaeModelConfig } from './types';
 
-import { getArchitectureCapabilityRow } from './architectureCapabilities';
 import { isAnimaInpaintAdapterModel } from './canvas/controlValidation';
 
 export type GenerateComponentCandidate = {
@@ -13,7 +16,11 @@ export type GenerateComponentCandidate = {
   key?: string;
   /** VAE latent width. Only `wan` ships more than one, and its two are different decoders. */
   latent_channels?: number | null;
+  /** Other types the same files serve as; the backend always sends it. */
+  roles?: readonly ModelRole[];
   submodels?: Record<string, unknown> | null;
+  /** Text LLMs only: whether the model reads images. */
+  supports_images?: unknown;
   type: string;
   variant?: unknown;
 };
@@ -40,6 +47,44 @@ const hasSubmodels = (model: GenerateComponentCandidate, required: readonly stri
 
 export const isSelfContainedSDNQPipeline = (model: GenerateComponentCandidate): boolean =>
   hasSubmodels(model, SDNQ_PIPELINE_COMPONENTS);
+
+const WAN_SINGLE_FILE_FORMATS: readonly (string | undefined)[] = ['gguf_quantized', 'checkpoint'];
+
+/** Whether the Wan loader reads a low-noise expert beside `model`: a single-file A14B model, not TI2V-5B. */
+export const hasWanLowNoiseSlot = (model: GenerateModelConfig): boolean =>
+  model.type === 'main' &&
+  model.base === 'wan' &&
+  WAN_SINGLE_FILE_FORMATS.includes(model.format) &&
+  model.variant !== 'ti2v_5b';
+
+const isSameWanExpertTag = (first: unknown, second: unknown): boolean =>
+  (first === 'high' || first === 'low') && first === second;
+
+/** The probe's filename tag of a single-file Wan expert; `none` or absent when the name says nothing. */
+const getWanExpertTag = (model: object): unknown => (model as { expert?: unknown }).expert;
+
+/**
+ * What `wan_model_loader` accepts as the low-noise expert of `model`: another single-file Wan model of the same
+ * variant, never the main model itself, no Diffusers pipeline, and not tagged for the role `model` is tagged for.
+ */
+export const isWanLowNoiseExpertFor =
+  (model: GenerateModelConfig): GenerateComponentFilter =>
+  (candidate) =>
+    hasWanLowNoiseSlot(model) &&
+    candidate.type === 'main' &&
+    candidate.base === 'wan' &&
+    candidate.key !== (model as { key?: string }).key &&
+    WAN_SINGLE_FILE_FORMATS.includes(candidate.format) &&
+    (candidate.variant ?? null) === (model.variant ?? null) &&
+    !isSameWanExpertTag(getWanExpertTag(model), getWanExpertTag(candidate));
+
+/**
+ * Whether the Wan loader takes the VAE from a Diffusers `source` beside `model`: TI2V-5B decodes with the 48-channel
+ * VAE and the A14B variants with the 16-channel one, so both must be on the same side. The source may still supply just
+ * the text encoder beside a standalone VAE.
+ */
+export const doesWanSourceSupplyVae = (model: GenerateModelConfig, source: GenerateComponentCandidate): boolean =>
+  (model.variant === 'ti2v_5b') === (source.variant === 'ti2v_5b');
 
 export const isSelfContainedSDNQFlux1Pipeline = (model: GenerateComponentCandidate): boolean =>
   hasSubmodels(model, SDNQ_FLUX1_COMPONENTS);
@@ -74,23 +119,38 @@ export const isClipVariant =
   (model) =>
     model.type === 'clip_embed' && model.variant === variant;
 
+/** Whether the model is a `type`, as its primary type or through a role. */
+export const servesAsType = (model: GenerateComponentCandidate, type: string): boolean =>
+  model.type === type || (model.roles ?? []).some((role) => role.type === type);
+
+/** The variant the model has as a `type`: its own for the primary type, the role's for a role. */
+export const roleVariantOf = (model: GenerateComponentCandidate, type: string): unknown =>
+  model.type === type ? model.variant : (model.roles ?? []).find((role) => role.type === type)?.variant;
+
+export const servesAsVariant = (model: GenerateComponentCandidate, type: string, variant: unknown): boolean =>
+  roleVariantOf(model, type) === variant;
+
 export const isAnimaQwen3Encoder: GenerateComponentFilter = (model) =>
-  model.type === 'qwen3_encoder' && model.variant === 'qwen3_06b';
+  servesAsVariant(model, 'qwen3_encoder', 'qwen3_06b');
 
 /** Anima-3.8B's semantic connector was trained on the Qwen3.5 4B. */
 export const isAnimaQwen35Encoder: GenerateComponentFilter = (model) =>
-  model.type === 'qwen3_5_encoder' && model.variant === 'qwen3_5_4b';
+  servesAsVariant(model, 'qwen3_5_encoder', 'qwen3_5_4b');
 
 /** MOSS-Image conditions on the Qwen3.5 9B; the 4B's hidden size does not fit its text embedder. */
 export const isMossImageQwen35Encoder: GenerateComponentFilter = (model) =>
-  model.type === 'qwen3_5_encoder' && model.variant === 'qwen3_5_9b';
+  servesAsVariant(model, 'qwen3_5_encoder', 'qwen3_5_9b');
 
 /** Z-Image's caption embedder is 2560 wide, the Qwen3 4B hidden size; the 8B encoder's 4096 cannot feed it. */
 export const isZImageQwen3Encoder: GenerateComponentFilter = (model) =>
-  model.type === 'qwen3_encoder' && model.variant === 'qwen3_4b';
+  servesAsVariant(model, 'qwen3_encoder', 'qwen3_4b');
 
 /** The optional 4-channel ControlNet-LLLite adapter the canvas feeds during Anima inpainting and outpainting. */
 export const isAnimaInpaintAdapter: GenerateComponentFilter = (model) => isAnimaInpaintAdapterModel(model);
+
+/** The FLUX.3 prompt upsampler reads reference images, so a text-only LLM cannot serve it. */
+export const isVisionTextLlm: GenerateComponentFilter = (model) =>
+  model.type === 'text_llm' && model.supports_images === true;
 
 /** Ministral and Mistral encoders require distinct variants. */
 const MINISTRAL_3B_VARIANT = 'ministral3_3b';
@@ -108,13 +168,19 @@ export const isQwen3Vl4bEncoder: GenerateComponentFilter = (model) =>
 export const isQwen3Vl8bEncoder: GenerateComponentFilter = (model) =>
   model.type === 'qwen3_vl_encoder' && model.variant === 'qwen3_vl_8b';
 
-/** The mmproj file of a GGUF Qwen3-VL encoder; the loader accepts the 8B one only. */
+/** The mmproj file of a GGUF Qwen3-VL encoder; the loader accepts the tower of the encoder's own size only. */
 export const isQwen3Vl8bVisionTower: GenerateComponentFilter = (model) =>
   model.type === 'qwen3_vl_vision_tower' && model.variant === 'qwen3_vl_8b';
+
+export const isQwen3Vl4bVisionTower: GenerateComponentFilter = (model) =>
+  model.type === 'qwen3_vl_vision_tower' && model.variant === 'qwen3_vl_4b';
 
 /** A GGUF encoder keeps no vision tower (llama.cpp splits it into an mmproj file), so references need the tower model. */
 export const isGgufQwen3Vl8bEncoder: GenerateComponentFilter = (model) =>
   isQwen3Vl8bEncoder(model) && model.format === 'gguf_quantized';
+
+export const isGgufQwen3Vl4bEncoder: GenerateComponentFilter = (model) =>
+  isQwen3Vl4bEncoder(model) && model.format === 'gguf_quantized';
 
 /** Exclude only single-file unconditional branches (safetensors or GGUF); Diffusers bundles both branches. */
 export const isIdeogram4UnconditionalBranch: GenerateComponentFilter = (model) =>
@@ -132,11 +198,17 @@ export const isFlux2Qwen3EncoderForModel = (selectedModel: GenerateModelConfig):
     typeof selectedModel.variant === 'string' ? KLEIN_TO_QWEN3_VARIANT[selectedModel.variant] : null;
 
   return (model) => {
-    if (model.type !== 'qwen3_encoder' || model.variant === 'qwen3_06b') {
+    if (!servesAsType(model, 'qwen3_encoder')) {
       return false;
     }
 
-    return requiredVariant ? model.variant === requiredVariant : true;
+    const variant = roleVariantOf(model, 'qwen3_encoder');
+
+    if (variant === 'qwen3_06b') {
+      return false;
+    }
+
+    return requiredVariant ? variant === requiredVariant : true;
   };
 };
 
@@ -197,31 +269,9 @@ export const getCompatibleDiffusersComponentSource = <T extends GenerateComponen
 ): T | undefined =>
   source && isCompatibleDiffusersComponentSourceForModel(selectedModel, source) ? source : undefined;
 
-/** Backend rows own VAE compatibility; missing rows fail closed. */
-const acceptsVae = (base: string, model: GenerateComponentCandidate, variant?: unknown): boolean => {
-  if (model.type !== 'vae') {
-    return false;
-  }
-
-  // With the variant: Wan A14B and TI2V-5B decode with different VAEs, and only the variant row says so.
-  const row = getArchitectureCapabilityRow(base, variant);
-
-  if (!row) {
-    return false;
-  }
-
-  // A null `vae` block is the backend saying "its own base, no constraints" — what `accepts_vae`
-  // answers for an architecture that declares no facet. It is a declaration, not a missing one.
-  if (!row.vae) {
-    return model.base === base;
-  }
-
-  return row.vae.accepted.some(
-    (accepted) =>
-      accepted.base === model.base &&
-      (accepted.latent_channels === null || model.latent_channels === accepted.latent_channels)
-  );
-};
+/** Backend rows own VAE compatibility; missing rows fail closed. Related Models' VAE links ask the same question. */
+const acceptsVae = (base: string, model: GenerateComponentCandidate, variant?: unknown): boolean =>
+  model.type === 'vae' && architectureAcceptsVae({ base, variant }, model);
 
 export const isVaeAcceptedByBase =
   (base: string, variant?: unknown): GenerateComponentFilter =>

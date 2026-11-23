@@ -1,10 +1,13 @@
 import type { StarterModel } from '@features/models';
 import type { WorkflowModelRequirement } from '@features/workflow/core/modelRequirements';
 import type {
+  FieldInputTemplate,
   InvocationTemplate,
   InvocationTemplatesSnapshot,
   ProjectGraphState,
   ProjectWorkflowEntry,
+  WorkflowEdge,
+  WorkflowInvocationNode,
 } from '@features/workflow/core/types';
 import type * as libraryBrowseStoreModule from '@features/workflow/data/libraryBrowseStore';
 import type {
@@ -12,6 +15,7 @@ import type {
   WorkflowLibraryEntry,
   WorkflowLibraryEntryEnrichment,
 } from '@features/workflow/data/libraryBrowseStore';
+import type * as workflowQueriesModule from '@features/workflow/queries';
 import type {
   WorkflowGraphPreviewPort,
   WorkflowPreferences,
@@ -25,32 +29,43 @@ import { WorkflowGraphPreviewProvider, WorkflowUiProvider } from '@features/work
 import {
   openWorkflowLibraryAtProjectWorkflow,
   setWorkflowLibraryOpen,
+  setWorkflowLibrarySearch,
   setWorkflowLibraryTab,
   workflowUiStore,
 } from '@features/workflow/ui/workflowUiStore';
-import { buildInvocationNode, createProjectGraph, projectGraphReducer } from '@features/workflow/utility';
+import {
+  buildInvocationNode,
+  createProjectGraph,
+  projectGraphReducer,
+  serializeWorkflowJson,
+} from '@features/workflow/utility';
+import { auditAccessibility } from '@platform/browser/auditAccessibility.testing';
 import { settleAnimations } from '@platform/browser/settleAnimations.testing';
+import { resolvedValues } from '@platform/core/resolvedValues.testing';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import { act, StrictMode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import { page, userEvent } from 'vitest/browser';
-// Warm the mocked lazy module to avoid first-compile timing variability in preview wiring tests.
-import '@features/workflow/ui/graph-preview/GraphPreviewDialog';
 
 import { LibraryCopyChoiceHost } from './LibraryCopyChoiceDialog';
+import { loadGraphPreview } from './libraryPreviewSource';
 import { WorkflowLibraryDialog } from './WorkflowLibraryDialog';
 
-/** In the app the workbench derives this from its Gallery adapter; the library's thumbnail slot reads it. */
+/** Zag selects only the highlighted item, so a menu item takes a real pointer click, which hovers it first. */
+const selectMenuItem = async (item: HTMLElement | null | undefined) => {
+  expect(item, 'no such menu item').toBeTruthy();
+  await act(() => userEvent.click(item!));
+};
+
 const GALLERY_HOST: GalleryHost = {
-  galleryValues: {},
+  galleryValues: resolvedValues(),
   notifications: { add: vi.fn(), reportError: vi.fn() },
   projectName: '',
 };
 
-// Provide the fixture node's reactive template snapshot so preview compilation can run without backend schema
-// loading.
 const PREVIEW_NODE_TEMPLATE: InvocationTemplate = {
   category: 'test',
   classification: 'stable',
@@ -66,11 +81,67 @@ const PREVIEW_NODE_TEMPLATE: InvocationTemplate = {
   version: '1.0.0',
 };
 
+const previewField = (
+  name: string,
+  typeName: string,
+  overrides: Partial<FieldInputTemplate> = {}
+): FieldInputTemplate => ({
+  description: '',
+  exclusiveMaximum: null,
+  exclusiveMinimum: null,
+  fieldKind: 'input',
+  input: 'any',
+  maximum: null,
+  minimum: null,
+  multipleOf: null,
+  name,
+  options: null,
+  required: false,
+  title: name.replace(/^./, (letter) => letter.toUpperCase()).replaceAll('_', ' '),
+  type: { batch: false, cardinality: 'SINGLE', name: typeName },
+  uiChoiceLabels: null,
+  uiComponent: null,
+  uiHidden: false,
+  uiModelBase: null,
+  uiModelFormat: null,
+  uiModelType: null,
+  uiOrder: null,
+  ...overrides,
+});
+const previewTemplate = (type: string, title: string, inputs: FieldInputTemplate[]): InvocationTemplate => ({
+  ...PREVIEW_NODE_TEMPLATE,
+  inputs: Object.fromEntries(inputs.map((input) => [input.name, input])),
+  outputType: `${type}_output`,
+  title,
+  type,
+});
+
+const GRAPH_TEMPLATES: Record<string, InvocationTemplate> = {
+  collect: previewTemplate('collect', 'Collect', [previewField('item', 'AnyField')]),
+  denoise_latents: previewTemplate('denoise_latents', 'Denoise Latents', [
+    previewField('steps', 'IntegerField'),
+    previewField('cfg_scale', 'FloatField'),
+    previewField('positive', 'ConditioningField'),
+    previewField('unet', 'UNetField'),
+  ]),
+  l2i: previewTemplate('l2i', 'Latents to Image', [previewField('latents', 'LatentsField')]),
+  main_model_loader: previewTemplate('main_model_loader', 'Main Model', [
+    previewField('model', 'ModelIdentifierField', { required: true, uiModelBase: ['flux'], uiModelType: ['main'] }),
+  ]),
+  string: previewTemplate('string', 'String Primitive', [previewField('value', 'StringField')]),
+};
+
+const templatesState = vi.hoisted(() => ({ current: null as unknown as InvocationTemplatesSnapshot }));
 const TEMPLATES_SNAPSHOT: InvocationTemplatesSnapshot = {
   error: null,
   status: 'loaded',
-  templates: { integer: PREVIEW_NODE_TEMPLATE },
+  templates: { integer: PREVIEW_NODE_TEMPLATE, ...GRAPH_TEMPLATES },
 };
+
+beforeEach(() => {
+  templatesState.current = TEMPLATES_SNAPSHOT;
+  installs.active = new Set();
+});
 
 const identity = vi.hoisted(() => ({
   session: { multiuserEnabled: false, phase: 'ready', user: null } as {
@@ -82,7 +153,54 @@ const identity = vi.hoisted(() => ({
 
 vi.mock('@features/workflow/react', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  useInvocationTemplatesSnapshot: () => TEMPLATES_SNAPSHOT,
+  useInvocationTemplatesSnapshot: () => templatesState.current,
+}));
+
+const templateRecords = vi.hoisted(() => new Map<string, { name: string; revision: number }>());
+
+const libraryWrites = vi.hoisted(() => ({
+  cached: vi.fn((workflowId: string, _options: { expectedRevision: number }) =>
+    Promise.resolve({ id: workflowId, meta: { category: 'user' }, name: workflowId })
+  ),
+  create: vi.fn((_workflow: { name: string }, _signal?: AbortSignal) => Promise.resolve('wf-landscape-copy')),
+  delete: vi.fn((_workflowId: string, _signal?: AbortSignal) => Promise.resolve()),
+  record: vi.fn((workflowId: string, _signal?: AbortSignal) =>
+    Promise.resolve({ revision: 3, workflow: { id: workflowId, name: workflowId }, workflow_id: workflowId })
+  ),
+  update: vi.fn((_workflowId: string, _workflow: { name: string }, _options: { expectedRevision: number }) =>
+    Promise.resolve()
+  ),
+}));
+
+vi.mock('@features/workflow/queries', async (importOriginal) => {
+  const original = await importOriginal<typeof workflowQueriesModule>();
+
+  return {
+    ...original,
+    createLibraryWorkflow: libraryWrites.create,
+    deleteLibraryWorkflow: libraryWrites.delete,
+    getLibraryWorkflowCached: libraryWrites.cached,
+    getLibraryWorkflowRecord: libraryWrites.record,
+    invalidateWorkflowLibraryCache: vi.fn(),
+    updateLibraryWorkflow: libraryWrites.update,
+    savedWorkflowDetailQueryOptions: (workflowId: string) => ({
+      ...original.savedWorkflowDetailQueryOptions(workflowId),
+      queryFn: () => {
+        const record = templateRecords.get(workflowId);
+
+        return record
+          ? Promise.resolve(record as unknown as workflowQueriesModule.WorkflowRecordDTO)
+          : Promise.reject(new Error('not found'));
+      },
+    }),
+  };
+});
+
+const downloads = vi.hoisted(() => ({ downloadText: vi.fn((_text: string, _name: string, _type: string) => {}) }));
+
+vi.mock('@platform/browser/downloadBlob', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  downloadText: downloads.downloadText,
 }));
 
 vi.mock('@features/identity', async (importOriginal) => ({
@@ -90,45 +208,11 @@ vi.mock('@features/identity', async (importOriginal) => ({
   useAuthSession: () => identity.session,
 }));
 
-// Stub preview rendering while exposing compiled graph, hideInvoke, and close behavior owned by dialog wiring.
-vi.mock('@features/workflow/ui/graph-preview/GraphPreviewDialog', () => ({
-  GraphPreviewDialog: ({
-    graphId,
-    hideInvoke,
-    isOpen,
-    source,
-    sourceLabel,
-    onExitComplete,
-    onOpenChange,
-  }: {
-    graphId: string;
-    hideInvoke?: boolean;
-    isOpen: boolean;
-    source: { graph: { nodes: { id: string; type: string }[] } | null };
-    sourceLabel: string;
-    onExitComplete?: () => void;
-    onOpenChange: (isOpen: boolean) => void;
-  }) => (
-    <div
-      data-graph-id={graphId}
-      data-hide-invoke={String(hideInvoke)}
-      data-preview-dialog
-      data-preview-open={String(isOpen)}
-      data-source-label={sourceLabel}
-    >
-      {(source.graph?.nodes ?? []).map((node) => node.type).join(',')}
-      <button onClick={() => onOpenChange(false)}>Close preview</button>
-      {/* Stands in for Ark's presence machine: the real dialog reports the end
-          of its close transition, which is what releases the mount. */}
-      <button onClick={() => onExitComplete?.()}>Finish preview exit</button>
-    </div>
-  ),
-}));
-
-// Drive a real external browse store to retain subscription and selector behavior while spying on commands.
 const browse = vi.hoisted(() => ({
-  ensureWorkflowLibraryBrowseLoaded: vi.fn(() => Promise.resolve()),
-  // Assigned by the module factory below, which owns the store instance.
+  ensureWorkflowLibraryBrowseLoaded: vi.fn((_opening: Partial<WorkflowLibraryBrowseSnapshot['filter']>) =>
+    Promise.resolve()
+  ),
+  loadWorkflowLibraryPlaceTotals: vi.fn((_places: readonly string[]) => Promise.resolve()),
   getSnapshot: null as null | (() => WorkflowLibraryBrowseSnapshot),
   loadWorkflowLibraryRange: vi.fn((_start: number, _end: number) => Promise.resolve(true)),
   setSnapshot: null as null | ((snapshot: WorkflowLibraryBrowseSnapshot) => void),
@@ -136,28 +220,41 @@ const browse = vi.hoisted(() => ({
 }));
 
 vi.mock('@features/workflow/data/libraryBrowseStore', async (original) => {
-  const { selectWorkflowLibraryEntry } = await original<typeof libraryBrowseStoreModule>();
+  const {
+    getWorkflowLibraryOrder,
+    getWorkflowLibrarySortDefaultDirection,
+    selectWorkflowLibraryEntry,
+    WORKFLOW_LIBRARY_ENRICHMENT_DEMAND,
+    WORKFLOW_LIBRARY_METADATA_WINDOW,
+  } = await original<typeof libraryBrowseStoreModule>();
   const { createExternalStore } = await import('@platform/state/externalStore');
   const store = createExternalStore<WorkflowLibraryBrowseSnapshot>({
     entries: [],
     error: null,
-    filter: { category: 'user', search: '', sort: 'updated', tag: null },
+    filter: { direction: 'desc', place: 'user', search: '', sort: 'updated', tags: [] },
     page: 0,
     pages: 0,
     status: 'idle',
     tagCounts: [],
     total: 0,
-    userTotal: null,
+    placeTotals: {},
   });
 
   browse.getSnapshot = store.getSnapshot;
   browse.setSnapshot = store.setSnapshot;
 
   return {
+    getWorkflowLibraryOrder,
+    getWorkflowLibrarySortDefaultDirection,
+    holdWorkflowLibraryBrowse: () => () => {},
     selectWorkflowLibraryEntry,
+    WORKFLOW_LIBRARY_ENRICHMENT_DEMAND,
+    WORKFLOW_LIBRARY_METADATA_WINDOW,
     ensureWorkflowLibraryBrowseLoaded: browse.ensureWorkflowLibraryBrowseLoaded,
+    loadWorkflowLibraryPlaceTotals: browse.loadWorkflowLibraryPlaceTotals,
     getWorkflowLibraryBrowseSnapshot: store.getSnapshot,
     loadWorkflowLibraryRange: browse.loadWorkflowLibraryRange,
+    refreshWorkflowLibraryBrowse: vi.fn(() => Promise.resolve()),
     rememberWorkflowLibraryScroll: vi.fn(),
     setWorkflowLibraryVisibleDemand: vi.fn(),
     setWorkflowLibrarySelectedDemand: vi.fn(),
@@ -166,19 +263,25 @@ vi.mock('@features/workflow/data/libraryBrowseStore', async (original) => {
   };
 });
 
-// Test opener invocation and busy-state wiring here; load sequencing has separate coverage.
 const loader = vi.hoisted(() => ({
   open: vi.fn((_item: unknown, _mode: 'first-copy' | 'add-copy') => Promise.resolve()),
   phase: { current: 'idle' as 'applying' | 'fetching' | 'idle' },
+  replace: vi.fn((_item: unknown, _workflowId: string) => Promise.resolve()),
   resume: vi.fn((_workflowId: string) => {}),
 }));
 
 vi.mock('./useOpenLibraryWorkflow', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  useOpenLibraryWorkflow: () => ({ loadPhase: loader.phase.current, open: loader.open, resume: loader.resume }),
+  useOpenLibraryWorkflow: () => ({
+    loadPhase: loader.phase.current,
+    open: loader.open,
+    replace: loader.replace,
+    resume: loader.resume,
+  }),
 }));
 
-// Use fixed model-store data so missing-model badges test dialog wiring rather than live catalogs.
+const installs = vi.hoisted(() => ({ active: new Set<string>() }));
+
 const FLUX_STARTER: StarterModel = {
   base: 'flux',
   description: 'FLUX.1 dev',
@@ -192,36 +295,21 @@ vi.mock('@features/models', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   ensureModelsLoaded: vi.fn(() => Promise.resolve()),
   ensureStartersLoaded: vi.fn(),
-  useActiveInstallSources: () => new Set<string>(),
+  useActiveInstallSources: () => installs.active,
   useInstallActions: () => ({ install: vi.fn(), installMany: vi.fn(), pendingSources: new Set() }),
   useModelsSelector: (selector: (snapshot: unknown) => unknown) => selector({ models: [] }),
   useStartersSelector: (selector: (snapshot: unknown) => unknown) =>
     selector({ response: { starter_models: [FLUX_STARTER] } }),
 }));
 
-// Provide English/plural strings without booting the HTTP-backed i18n client.
 const TRANSLATIONS: Record<string, string> = {
-  'workflowLibrary.openProjectWorkflowHint': 'Makes it the active workflow',
-  'workflowLibrary.renameProjectWorkflowHint': 'Changes its name in this project; a linked template keeps its own',
-  'workflowLibrary.duplicateProjectWorkflowHint': 'A copy beside it in this project',
-  'workflowLibrary.saveToLibraryHint': 'Creates a new template from this workflow',
-  'workflowLibrary.updateTemplateHint': 'Writes this workflow over its library template',
-  'workflowLibrary.removeHint': 'Removes it from this project only',
-  'workflowLibrary.renameTemplateHint': "Changes the template's name in the library",
-  'workflowLibrary.duplicateHint': 'Saves a copy under Yours, original untouched',
-  'workflowLibrary.downloadJsonHint': 'For bug reports and sharing',
-  'workflowLibrary.forkIntoProjectHint': 'Copies it into a new project',
-  'workflowLibrary.deleteHint': 'Removes it from your library',
-
+  'common.cancel': 'Cancel',
   'common.close': 'Close',
   'workflowLibrary.activeWorkflow': 'Active',
-  'workflowLibrary.addAnotherCopy': 'Add another copy',
-  'workflowLibrary.addAnotherCopyHint': 'A second, independent copy in this project',
-  'workflowLibrary.chooseProjectCopy': 'Open which copy?',
-  'workflowLibrary.allTag': 'All',
   'workflowLibrary.applying': 'Applying workflow…',
-  'workflowLibrary.browse': 'Browse',
   'workflowLibrary.delete': 'Delete',
+  'workflowLibrary.deleteConfirmBody': 'Delete "{{name}}" from the workflow library? This cannot be undone.',
+  'workflowLibrary.deleteConfirmTitle': 'Delete workflow',
   'workflowLibrary.downloadJson': 'Download JSON',
   'workflowLibrary.duplicate': 'Duplicate',
   'workflowLibrary.duplicateName': '{{name}} copy',
@@ -237,15 +325,11 @@ const TRANSLATIONS: Record<string, string> = {
   'workflowLibrary.nodeCount_other': '{{count}} nodes',
   'workflowLibrary.notRunYet': 'Not run yet',
   'workflowLibrary.open': 'Open',
-  'workflowLibrary.openHint': 'Adds a copy to this project',
   'workflowLibrary.openWithEllipsis': 'Open…',
-  'workflowLibrary.previewGraph': 'Preview graph',
   'workflowLibrary.private': 'Private',
   'workflowLibrary.public': 'Public',
   'workflowLibrary.publicWorkflow': 'Public workflow',
   'workflowLibrary.visibilityUpdateFailed': 'Failed to update workflow visibility',
-  'workflowLibrary.projectWorkflowCount_one': '{{count}} workflow in this project',
-  'workflowLibrary.projectWorkflowCount_other': '{{count}} workflows in this project',
   'workflowLibrary.remove': 'Remove',
   'workflowLibrary.removeConfirmBody':
     'Remove "{{name}}" from this project? Its library template, if any, is not affected.',
@@ -267,18 +351,161 @@ const TRANSLATIONS: Record<string, string> = {
   'workflowLibrary.sourceBundled': 'From a bundled template (read-only)',
   'workflowLibrary.sourceNone': 'Not linked to a library template',
   'workflowLibrary.sourceRevision': 'Linked to library template at revision {{revision}}',
-  'workflowLibrary.shared': 'Shared',
-  'workflowLibrary.thisProject': 'This project',
   'workflowLibrary.thumbnailFit': 'Thumbnail display',
   'workflowLibrary.thumbnailFitContain': 'Fit',
   'workflowLibrary.thumbnailFitCover': 'Fill',
   'workflowLibrary.thisProjectHint':
     'Workflows saved with this project. Edits autosave here; the library changes only when you save to it.',
   'workflowLibrary.title': 'Workflows',
+  'workflowLibrary.cardSize': 'Card size',
+  'workflowLibrary.cardSizeLarge': 'Large cards',
+  'workflowLibrary.cardSizeSmall': 'Small cards',
+  'workflowLibrary.clearTags': 'Clear',
+  'workflowLibrary.emptyRecent': 'Nothing opened yet. Workflows you open from My library or Templates appear here.',
+  'workflowLibrary.emptyShared': 'Nothing shared yet. Public workflows on this server appear here.',
+  'workflowLibrary.emptyUser': 'No saved workflows yet. Use Save to library… in the editor to keep one here.',
+  'workflowLibrary.placeDefault': 'Templates',
+  'workflowLibrary.placeProject': 'In this project',
+  'workflowLibrary.placeRecent': 'Recent',
+  'workflowLibrary.placeShared': 'Shared with me',
+  'workflowLibrary.placeUser': 'My library',
+  'workflowLibrary.places': 'Places',
+  'workflowLibrary.resultCount_one': '{{count}} workflow',
+  'workflowLibrary.resultCount_other': '{{count}} workflows',
+  'workflowLibrary.resultCountWithTags_one': '{{count}} workflow · {{tags}}',
+  'workflowLibrary.resultCountWithTags_other': '{{count}} workflows · {{tags}}',
+  'workflowLibrary.sortAToZ': 'A to Z',
+  'workflowLibrary.sortControl': 'Sort: {{sort}}, {{direction}}',
+  'workflowLibrary.sortFirstToLast': 'First to last',
+  'workflowLibrary.sortLastRun': 'Last run',
+  'workflowLibrary.sortLastToFirst': 'Last to first',
+  'workflowLibrary.sortNewestFirst': 'Newest first',
+  'workflowLibrary.sortOldestFirst': 'Oldest first',
+  'workflowLibrary.sortProjectOrder': 'Project order',
+  'workflowLibrary.sortZToA': 'Z to A',
+  'workflowLibrary.tags': 'Tags',
+  'workflowLibrary.tagsAnyHint': 'Showing workflows with any checked tag',
+  'workflowLibrary.viewOptions': 'View options',
+  'workflowLibrary.layoutGroup': 'View',
+  'workflowLibrary.layoutGrid': 'Grid',
+  'workflowLibrary.layoutList': 'List',
   'workflowLibrary.untitled': 'Untitled Workflow',
   'workflowLibrary.updateTemplate': 'Update library template',
   'workflowLibrary.workflowName': 'Workflow name',
-  'workflowLibrary.yours': 'Yours',
+  'workflowLibrary.activeRanWhen': 'Active workflow · ran {{when}}',
+  'workflowLibrary.activeWorkflowLine': 'Active workflow',
+  'workflowLibrary.callable': 'Callable',
+  'workflowLibrary.factCreated': 'Created',
+  'workflowLibrary.factEdited': 'Edited',
+  'workflowLibrary.factInProject': 'In this project',
+  'workflowLibrary.factLastRun': 'Last run',
+  'workflowLibrary.factUpdated': 'Updated',
+  'workflowLibrary.inProject': 'In project',
+  'workflowLibrary.linkedTemplate': 'Linked template',
+  'workflowLibrary.modelsToInstall_one': '{{count}} model to install',
+  'workflowLibrary.modelsToInstall_other': '{{count}} models to install',
+  'workflowLibrary.nodePacksMissing_one': '{{count}} node pack missing',
+  'workflowLibrary.nodePacksMissing_other': '{{count}} node packs missing',
+  'workflowLibrary.openedWhen': 'Opened {{when}}',
+  'workflowLibrary.projectCopies_one': '{{count}} copy',
+  'workflowLibrary.projectCopies_other': '{{count}} copies',
+  'workflowLibrary.projectCopiesNone': 'None',
+  'workflowLibrary.projectCopyRevision_one': '{{count}} copy · revision {{revision}}',
+  'workflowLibrary.ranWhen': 'Ran {{when}}',
+  'workflowLibrary.readyToRun': 'Ready to run',
+  'workflowLibrary.templateNewer': 'Template is newer',
+  'workflowLibrary.templateRevision': 'Library template is at revision {{revision}}',
+  'workflowLibrary.updateFromTemplate': 'Update from template',
+  'workflowLibrary.updateFromTemplateBody': 'Replace "{{name}}" with the library template’s current version?',
+  'workflowLibrary.updateFromTemplateConfirm': 'Update',
+  'workflowLibrary.updatedFromTemplate': 'Updated from template',
+  'workflowLibrary.whenAtRevision': '{{when}} · revision {{revision}}',
+  'workflowLibrary.detailsAndRequirements': 'Details and requirements',
+  'workflowLibrary.hideDetails': 'Hide details',
+  'workflowLibrary.sortAndViewOptions': 'Sort and view options',
+  'workflowLibrary.sortDirectionGroup': 'Direction',
+  'workflowLibrary.missingNodePackNames_one': 'Missing node pack: {{packs}}',
+  'workflowLibrary.missingNodePackNames_other': 'Missing node packs: {{packs}}',
+  'workflowLibrary.sourceNamedRevision': 'Linked to {{name}}, revision {{revision}}',
+  'graphPreview.nodeSummary.denoise_one': '{{count}} step · cfg {{cfg}}',
+  'graphPreview.nodeSummary.denoise_other': '{{count}} steps · cfg {{cfg}}',
+  'workflowLibrary.preview.action': 'Preview',
+  'workflowLibrary.preview.actionHint': 'Preview',
+  'workflowLibrary.preview.atFirst': 'This is the first workflow here',
+  'workflowLibrary.preview.atLast': 'This is the last workflow here',
+  'workflowLibrary.preview.backTo': 'Back to {{place}}',
+  'workflowLibrary.preview.copyJson': 'Copy workflow JSON',
+  'workflowLibrary.preview.downloadJson': 'Download workflow JSON',
+  'workflowLibrary.preview.edgeLabel': '{{source}} to {{target}}',
+  'workflowLibrary.preview.exportMenu': 'Export',
+  'workflowLibrary.preview.find': 'Find a node',
+  'workflowLibrary.preview.findMatches_one': '{{count}} match',
+  'workflowLibrary.preview.findMatches_other': '{{count}} matches',
+  'workflowLibrary.preview.findNone': 'No matches',
+  'workflowLibrary.preview.fit': 'Fit',
+  'workflowLibrary.preview.from': 'From',
+  'workflowLibrary.preview.helpersFolded_one': '{{count}} helper folded',
+  'workflowLibrary.preview.helpersFolded_other': '{{count}} helpers folded',
+  'workflowLibrary.preview.legend': 'Markers',
+  'workflowLibrary.preview.loading': 'Loading workflow…',
+  'workflowLibrary.preview.minimap': 'Minimap',
+  'workflowLibrary.preview.needsModel': 'Needs a model',
+  'workflowLibrary.preview.needsModelInline': 'needs a model',
+  'workflowLibrary.preview.needsModelNote': "Needs a model that isn't installed",
+  'workflowLibrary.preview.next': 'Next workflow',
+  'workflowLibrary.preview.nodePackMissing': 'Node pack missing',
+  'workflowLibrary.preview.position': '{{position}} of {{total}}',
+  'workflowLibrary.preview.previous': 'Previous workflow',
+  'workflowLibrary.preview.region': 'Preview of {{name}}',
+  'workflowLibrary.preview.result': 'Result',
+  'workflowLibrary.preview.resultInline': 'result',
+  'workflowLibrary.preview.showAll': 'Show all {{count}}',
+  'workflowLibrary.preview.showingAll_other': 'Showing all {{count}} nodes, as drawn',
+  'workflowLibrary.preview.showingNodes_one': 'Showing {{shown}} of {{count}} node',
+  'workflowLibrary.preview.showingNodes_other': 'Showing {{shown}} of {{count}} nodes',
+  'workflowLibrary.preview.simplify': 'Simplify',
+  'workflowLibrary.preview.stepper': 'Step through workflows',
+  'workflowLibrary.preview.to': 'To',
+  'workflowLibrary.preview.unknownNode': "Unknown node type: its node pack isn't installed on this server.",
+  'workflowLibrary.preview.unknownNodeMarker': 'unknown node type',
+  'workflowLibrary.preview.unreadable': "This workflow can't be previewed: {{message}}",
+  'workflowLibrary.preview.youSetThis': 'You set this',
+  'workflowLibrary.preview.valueNumber': '{{value}}',
+  'workflowLibrary.preview.youSetThisInline': 'you set this',
+  'workflowLibrary.preview.zoomIn': 'Zoom in',
+  'workflowLibrary.preview.zoomOut': 'Zoom out',
+  'workflowLibrary.preview.zoomPercent': '{{percent}}%',
+  'workflowLibrary.preview.authorNotes': "Author's notes",
+  'workflowLibrary.preview.byAuthor': 'by {{author}}',
+  'workflowLibrary.preview.emptyValue': 'Empty',
+  'graphPreview.copyFailed': 'Failed to copy JSON',
+  'graphPreview.copyGraphJson': 'Copy graph JSON',
+  'graphPreview.invalidTitle': "This graph can't compile yet.",
+  'nodes.forLoopLinkageInvalid': 'Loop linkage must connect a For to its ForReturn',
+  'nodes.forLoopValidationFailed': 'For loop validation failed',
+  'workflowLibrary.preview.graph': 'Graph',
+  'workflowLibrary.preview.graphJson': 'Graph JSON',
+  'workflowLibrary.preview.nodes': 'Nodes',
+  'workflowLibrary.preview.inputCount_one': '{{count}} input',
+  'workflowLibrary.preview.inputCount_other': '{{count}} inputs',
+  'workflowLibrary.preview.inputs': 'Inputs',
+  'workflowLibrary.preview.kindLibrary': 'My library',
+  'workflowLibrary.preview.kindProject': 'In this project',
+  'workflowLibrary.preview.kindShared': 'Shared',
+  'workflowLibrary.preview.kindTemplate': 'Template',
+  'workflowLibrary.preview.modelNotInstalled': 'Model not installed',
+  'workflowLibrary.preview.modelToPick': 'Model to pick',
+  'workflowLibrary.preview.more': '+{{count}}',
+  'workflowLibrary.preview.noInputs': 'This workflow exposes no inputs. Its values are set on its nodes.',
+  'workflowLibrary.preview.pickAfterOpening': 'Pick one after opening',
+  'workflowLibrary.preview.previewNamed': 'Preview {{name}}',
+  'workflowLibrary.preview.readAllNotes': 'Read all notes',
+  'workflowLibrary.preview.seeAllInputs_other': 'See all {{count}} inputs',
+  'workflowLibrary.preview.showLessNotes': 'Show less',
+  'workflowLibrary.preview.showNode': '{{node}}: show in the graph',
+  'workflowLibrary.preview.version': 'v{{version}}',
+  'workflowLibrary.preview.youSet': 'You set',
+  'workflowLibrary.preview.positionUnknown': "Its place in these results isn't loaded",
 };
 
 const interpolate = (template: string, options?: Record<string, unknown>): string =>
@@ -291,7 +518,9 @@ const translate = (key: string, options?: Record<string, unknown>): string => {
   return interpolate(plural ?? TRANSLATIONS[key] ?? key, options);
 };
 
-vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: translate }) }));
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({ i18n: { language: 'en', resolvedLanguage: 'en' }, t: translate }),
+}));
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -341,7 +570,6 @@ const PORTRAIT = entry('wf-portrait', 'Portrait Studio', readyEnrichment(12, 'sd
 const NON_OWNER_SHARED = { ...PORTRAIT, item: { ...PORTRAIT.item, user_id: 'user-b' } };
 const OWNER_PRIVATE = { ...PORTRAIT, item: { ...PORTRAIT.item, is_public: false, user_id: 'user-a' } };
 const OWNER_PUBLIC = { ...PORTRAIT, item: { ...PORTRAIT.item, is_public: true, user_id: 'user-a' } };
-// One absent requirement with a matching starter should show one model to install.
 const LANDSCAPE = entry(
   'wf-landscape',
   'Landscape Pass',
@@ -363,14 +591,101 @@ const PREVIEW_FIXTURE = entry(
   readyEnrichment(1, null, NO_REQUIREMENTS, PREVIEW_DOCUMENT)
 );
 
+const graphNode = (
+  id: string,
+  type: string,
+  position: { x: number; y: number },
+  inputs: Record<string, unknown> = {},
+  fieldLabels: Record<string, string> = {}
+): WorkflowInvocationNode => ({
+  data: {
+    inputs: Object.fromEntries(
+      Object.entries(inputs).map(([name, value]) => [name, { label: fieldLabels[name] ?? '', name, value }])
+    ),
+    isIntermediate: true,
+    isOpen: true,
+    label: '',
+    nodePack: 'invokeai',
+    notes: '',
+    type,
+    useCache: true,
+    version: '1.0.0',
+  },
+  id,
+  position,
+  type: 'invocation',
+});
+const graphEdge = (source: string, target: string, sourceHandle: string, targetHandle: string): WorkflowEdge => ({
+  id: `${source}-${target}`,
+  source,
+  sourceHandle,
+  target,
+  targetHandle,
+  type: 'default',
+});
+const exposedField = (id: string, nodeId: string, fieldName: string) => ({
+  data: { fieldIdentifier: { fieldName, nodeId }, showDescription: false, showShuffle: false },
+  id,
+  parentId: 'root',
+  type: 'node-field' as const,
+});
+
+/** Simplified, the prompt folds into a pill on the denoiser and the collect hides: four of six nodes show. */
+const GRAPH_DOCUMENT: ProjectGraphState = {
+  ...createProjectGraph('graph-fixture', 'Graph Fixture'),
+  edges: [
+    graphEdge('prompt', 'collect', 'value', 'item'),
+    graphEdge('collect', 'denoise', 'collection', 'positive'),
+    graphEdge('model', 'denoise', 'unet', 'unet'),
+    graphEdge('denoise', 'decode', 'latents', 'latents'),
+    graphEdge('decode', 'refine', 'image', 'image'),
+  ],
+  author: 'Invoke',
+  form: {
+    elements: {
+      'field-model': exposedField('field-model', 'model', 'model'),
+      'field-prompt': exposedField('field-prompt', 'prompt', 'value'),
+      'field-steps': exposedField('field-steps', 'denoise', 'steps'),
+      'heading-model': { data: { content: 'Model' }, id: 'heading-model', parentId: 'root', type: 'heading' },
+      'heading-prompt': { data: { content: 'Prompting' }, id: 'heading-prompt', parentId: 'root', type: 'heading' },
+      root: {
+        data: {
+          children: ['heading-prompt', 'field-prompt', 'field-steps', 'heading-model', 'field-model'],
+          layout: 'column',
+        },
+        id: 'root',
+        type: 'container',
+      },
+    },
+    rootElementId: 'root',
+  },
+  notes: Array.from({ length: 12 }, (_, line) => `Note line ${line + 1}: keep the refine pass for portraits.`).join(
+    '\n'
+  ),
+  workflowVersion: '1.2.0',
+  nodes: [
+    graphNode(
+      'prompt',
+      'string',
+      { x: 0, y: 0 },
+      { value: 'a lighthouse at dusk, long exposure' },
+      { value: 'Prompt' }
+    ),
+    graphNode('collect', 'collect', { x: 320, y: 0 }),
+    graphNode('model', 'main_model_loader', { x: 0, y: 240 }),
+    graphNode('denoise', 'denoise_latents', { x: 640, y: 120 }, { cfg_scale: 3.5, steps: 30 }),
+    graphNode('decode', 'l2i', { x: 960, y: 120 }),
+    graphNode('refine', 'mask_refine', { x: 1280, y: 120 }),
+  ],
+};
+const GRAPH_ENTRY = entry('wf-graph', 'Graph Fixture', readyEnrichment(6, 'flux', NO_REQUIREMENTS, GRAPH_DOCUMENT));
+
 /** ~80 characters with no break opportunity the rail could exploit. */
-const LONG_NAME = 'Cinematic Portrait Restoration And Upscaling Pipeline With Refiner And Face Detail';
-const LONG_NAMED = entry('wf-long-name', LONG_NAME, readyEnrichment(3, 'sdxl'));
 
 const LOADED_SNAPSHOT: WorkflowLibraryBrowseSnapshot = {
   entries: [PORTRAIT, LANDSCAPE, SKETCH, UPSCALE],
   error: null,
-  filter: { category: 'user', search: '', sort: 'updated', tag: null },
+  filter: { direction: 'desc', place: 'user', search: '', sort: 'updated', tags: [] },
   page: 0,
   pages: 2,
   status: 'loaded',
@@ -379,7 +694,7 @@ const LOADED_SNAPSHOT: WorkflowLibraryBrowseSnapshot = {
     { count: 1, tag: 'upscale' },
   ],
   total: 24,
-  userTotal: 4,
+  placeTotals: { user: 4 },
 };
 
 const withSnapshot = (patch: Partial<WorkflowLibraryBrowseSnapshot>): WorkflowLibraryBrowseSnapshot => ({
@@ -410,7 +725,6 @@ const createMutablePort = <Snapshot,>(initialSnapshot: Snapshot) => {
 
 const PROJECT_ID = 'project-1';
 
-/** The project's own collection: an unlinked active workflow, a bundled copy, and a copy of a user template. */
 const ALPHA: ProjectWorkflowEntry = { document: { ...createProjectGraph('wf-alpha'), name: 'Alpha' } };
 const BUNDLED_COPY: ProjectWorkflowEntry = {
   document: { ...createProjectGraph('wf-bundled'), name: 'Bundled copy' },
@@ -450,8 +764,14 @@ const COMMANDS = {
   setWorkflowSource: vi.fn(),
   undo: vi.fn(),
 };
-/** Only the library's own preferences matter here; saving one republishes it, as the account store does. */
-const LIBRARY_PREFERENCES = { workflowLibrarySort: 'updated', workflowLibraryThumbnailFit: 'cover' } as const;
+const LIBRARY_PREFERENCES = {
+  themeId: 'classic',
+  workflowLibraryCardSize: 'small',
+  workflowLibraryLayout: 'grid',
+  workflowLibrarySort: 'updated',
+  workflowLibrarySortDirection: 'desc',
+  workflowLibraryThumbnailFit: 'cover',
+} as const;
 const preferences = createMutablePort<WorkflowPreferences>(LIBRARY_PREFERENCES as unknown as WorkflowPreferences);
 const setLibraryPreferences = vi.fn((patch: Partial<WorkflowPreferences>) =>
   preferences.setSnapshot({ ...preferences.port.getSnapshot(), ...patch })
@@ -466,8 +786,8 @@ const UI_ADAPTER = {
   project: project.port,
 } as unknown as WorkflowUiAdapter;
 const GRAPH_PREVIEW = { openDocumentInNewProject: vi.fn() } as unknown as WorkflowGraphPreviewPort;
+const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
-/** The library as the workflow dialog host mounts it: open while the UI store says so. */
 const StoreBoundLibraryDialog = () => {
   const isOpen = workflowUiStore.useSelector((snapshot) => snapshot.isLibraryOpen);
 
@@ -489,16 +809,18 @@ describe('WorkflowLibraryDialog', () => {
     await act(async () => {
       root.render(
         <StrictMode>
-          <ChakraProvider value={system}>
-            <WorkflowUiProvider adapter={UI_ADAPTER}>
-              <GalleryHostProvider host={GALLERY_HOST}>
-                <WorkflowGraphPreviewProvider adapter={GRAPH_PREVIEW}>
-                  <WorkflowLibraryDialog isOpen={isOpen} onOpenChange={onOpenChange} />
-                  <LibraryCopyChoiceHost />
-                </WorkflowGraphPreviewProvider>
-              </GalleryHostProvider>
-            </WorkflowUiProvider>
-          </ChakraProvider>
+          <QueryClientProvider client={queryClient}>
+            <ChakraProvider value={system}>
+              <WorkflowUiProvider adapter={UI_ADAPTER}>
+                <GalleryHostProvider host={GALLERY_HOST}>
+                  <WorkflowGraphPreviewProvider adapter={GRAPH_PREVIEW}>
+                    <WorkflowLibraryDialog isOpen={isOpen} onOpenChange={onOpenChange} />
+                    <LibraryCopyChoiceHost />
+                  </WorkflowGraphPreviewProvider>
+                </GalleryHostProvider>
+              </WorkflowUiProvider>
+            </ChakraProvider>
+          </QueryClientProvider>
         </StrictMode>
       );
       await settleFrame();
@@ -510,7 +832,6 @@ describe('WorkflowLibraryDialog', () => {
     await renderDialog();
   };
 
-  /** Drains the microtask + timer queue the store probe and debounce settle on. */
   const wait = (ms: number) =>
     act(async () => {
       await new Promise<void>((resolve) => {
@@ -518,12 +839,12 @@ describe('WorkflowLibraryDialog', () => {
       });
     });
 
-  /** Poll lazy preview resolution inside act to avoid timing-dependent waits and suspended-resource warnings. */
-  const waitForPreviewDialog = () =>
+  const stage = () => document.querySelector<HTMLElement>('[data-preview-stage]');
+  const waitForPreviewGraph = () =>
     act(async () => {
       await vi.waitFor(
         () => {
-          expect(document.querySelector('[data-preview-dialog]')).not.toBeNull();
+          expect(stage()?.querySelector('.react-flow__node')).not.toBeNull();
         },
         // Allow time for Vite's dynamic-import round trip even when the module is warm.
         { timeout: 2000 }
@@ -554,17 +875,25 @@ describe('WorkflowLibraryDialog', () => {
     await act(() => button?.click());
   };
 
-  const clickSegment = async (value: string) => {
-    const tab = document.querySelector<HTMLButtonElement>(`[role="tab"][id$="-tab-${value}"]`);
-    expect(tab).not.toBeNull();
+  const placeButton = (value: string) => document.querySelector<HTMLButtonElement>(`[data-library-place="${value}"]`);
+  const tagCheckbox = (tag: string) =>
+    document.querySelector<HTMLInputElement>(`[data-library-tag="${tag}"] input[type="checkbox"]`);
+  const clickTag = async (tag: string) => {
+    const label = document.querySelector<HTMLElement>(`[data-library-tag="${tag}"]`);
+    expect(label).not.toBeNull();
+
+    await act(() => userEvent.click(label!));
+  };
+  const clickPlace = async (value: string) => {
+    const place = placeButton(value);
+    expect(place).not.toBeNull();
 
     await act(async () => {
-      tab?.click();
+      place?.click();
       await settleFrame();
     });
   };
 
-  /** The dialog sizes itself to the window, so layout tests set it; the runner's own size returns afterwards. */
   const resizeViewport = async (width: number, height: number) => {
     const previous = { height: window.innerHeight, width: window.innerWidth };
 
@@ -573,6 +902,8 @@ describe('WorkflowLibraryDialog', () => {
   };
 
   const gridViewport = () => document.querySelector<HTMLElement>('[role="region"][aria-label="Workflows"]');
+  const isShown = (element: Element | null | undefined): element is HTMLElement =>
+    element instanceof HTMLElement && element.getClientRects().length > 0;
 
   const expectContained = (element: HTMLElement | Range, container: HTMLElement) => {
     const box = element.getBoundingClientRect();
@@ -586,21 +917,6 @@ describe('WorkflowLibraryDialog', () => {
     ).toBeLessThanOrEqual(bounds.bottom + 1);
   };
 
-  const expectWrappedRenameHint = async (menu: HTMLElement, dialog: HTMLElement) => {
-    await act(() => userEvent.keyboard('{Home}{ArrowDown}'));
-    const rename = menu.querySelector<HTMLElement>('[data-menu-item="rename"]')!;
-    await vi.waitFor(() => {
-      expect(menu.getAttribute('aria-activedescendant')).toBe(rename.id);
-      const hint = rename.querySelector('p')!;
-      expect(hint.textContent).toBe(TRANSLATIONS['workflowLibrary.renameProjectWorkflowHint']);
-      const text = document.createRange();
-      text.selectNodeContents(hint);
-      expect(text.getClientRects().length).toBeGreaterThan(1);
-      expectContained(text, menu);
-      expectContained(text, dialog);
-    });
-  };
-
   beforeEach(async () => {
     await resizeViewport(1280, 800);
     host = document.createElement('div');
@@ -609,19 +925,24 @@ describe('WorkflowLibraryDialog', () => {
     onOpenChange = vi.fn((_isOpen: boolean) => {});
     identity.session = { multiuserEnabled: false, phase: 'ready', user: null };
     browse.ensureWorkflowLibraryBrowseLoaded.mockClear();
+    browse.loadWorkflowLibraryPlaceTotals.mockClear();
     browse.setWorkflowLibraryBrowseFilter.mockClear();
     loader.open.mockClear();
+    loader.replace.mockClear();
     loader.resume.mockClear();
+    queryClient.clear();
+    templateRecords.clear();
     loader.phase.current = 'idle';
     for (const command of Object.values(COMMANDS)) {
       command.mockClear();
     }
+    for (const write of Object.values(libraryWrites)) {
+      write.mockClear();
+    }
     project.setSnapshot(projectSnapshot(PROJECT_WORKFLOWS));
     preferences.setSnapshot(LIBRARY_PREFERENCES as unknown as WorkflowPreferences);
     setLibraryPreferences.mockClear();
-    // The dialog's tab and selection live in the session store; start every test from the account's clean slate.
     accountLifecycle.invalidate();
-    // These are the template tabs' behaviours; the project view has its own suite below.
     setWorkflowLibraryTab('user');
   });
 
@@ -630,42 +951,52 @@ describe('WorkflowLibraryDialog', () => {
     host.remove();
   });
 
-  it('renders one card per entry with its name and enriched node count', async () => {
-    await openWith(LOADED_SNAPSHOT);
+  it('renders one card per entry with its base model, readiness and leading fact', async () => {
+    await openWith(withSnapshot({ entries: [...LOADED_SNAPSHOT.entries, PREVIEW_FIXTURE] }));
 
-    expect(cards()).toHaveLength(4);
+    expect(cards()).toHaveLength(5);
 
-    const text = document.body.textContent ?? '';
+    const portrait = card('wf-portrait')!;
+    expect(portrait.textContent).toContain('Portrait Studio');
+    expect(portrait.textContent).toContain('SDXL');
+    expect(portrait.textContent).toContain('In project');
+    expect(portrait.querySelector('[data-workflow-in-project]')).not.toBeNull();
+    expect(portrait.querySelector('[data-workflow-readiness]')?.getAttribute('data-workflow-readiness')).toBe('ready');
+    expect(document.querySelector('[data-workflow-detail]')?.textContent).toContain('12 nodes');
 
-    expect(text).toContain('Portrait Studio');
-    expect(text).toContain('12 nodes');
-    expect(text).toContain('SDXL');
-    expect(text).toContain('Landscape Pass');
-    expect(text).toContain('7 nodes');
-    expect(text).toContain('FLUX');
+    const landscape = card('wf-landscape')!;
+    expect(landscape.textContent).toContain('FLUX');
+    expect(landscape.textContent).toContain('1 model to install');
+    expect(landscape.querySelector('[data-workflow-readiness]')?.getAttribute('data-workflow-readiness')).toBe(
+      'models'
+    );
+    expect(landscape.querySelector('[data-workflow-in-project]')).toBeNull();
+
+    const ready = card('wf-preview-fixture')!;
+    expect(ready.textContent).toContain('1 node');
+    expect(ready.querySelector('[data-workflow-readiness]')?.getAttribute('data-workflow-readiness')).toBe('ready');
   });
 
-  it('shows a quiet placeholder while enrichment is pending and omits the badges when it failed', async () => {
-    await openWith(LOADED_SNAPSHOT);
+  it('marks a workflow whose node types the server lacks with the missing pack count, naming them in the rail', async () => {
+    const unknown = (type: string) =>
+      buildInvocationNode({ ...PREVIEW_NODE_TEMPLATE, nodePack: 'face-tools', title: type, type }, { x: 400, y: 0 });
+    const document_: ProjectGraphState = {
+      ...PREVIEW_DOCUMENT,
+      nodes: [...PREVIEW_DOCUMENT.nodes, unknown('face_mask'), unknown('face_crop')],
+    };
+    const custom = entry('wf-custom', 'Custom Nodes', readyEnrichment(3, null, NO_REQUIREMENTS, document_));
+    await openWith(withSnapshot({ entries: [custom, LANDSCAPE] }));
 
-    const pending = card('wf-sketch');
-    expect(pending?.textContent).toContain('Sketch To Render');
-    expect(pending?.textContent).not.toContain('nodes');
-    expect(pending?.querySelector('[data-enrichment-placeholder]')).not.toBeNull();
-
-    // A failed enrichment is a quiet omission, never an error-styled card.
-    const failed = card('wf-upscale');
-    expect(failed?.textContent).toContain('Upscale Chain');
-    expect(failed?.textContent).not.toContain('nodes');
-    expect(failed?.querySelector('[data-enrichment-placeholder]')).toBeNull();
-  });
-
-  it('renders the thumbnail when present and the not-run-yet placeholder when absent', async () => {
-    await openWith(LOADED_SNAPSHOT);
-
-    expect(card('wf-portrait')?.querySelector('img')).not.toBeNull();
-    expect(card('wf-landscape')?.querySelector('img')).toBeNull();
-    expect(card('wf-landscape')?.textContent).toContain('Not run yet');
+    const tile = card('wf-custom')!;
+    expect(tile.querySelector('[data-workflow-readiness]')?.getAttribute('data-workflow-readiness')).toBe('nodePacks');
+    expect(tile.textContent).toContain('1 node pack missing');
+    expect(tile.textContent).not.toContain('3 nodes');
+    expect(document.querySelector('[data-workflow-detail] [data-workflow-missing-node-packs]')?.textContent).toBe(
+      '1 node pack missing'
+    );
+    expect(document.querySelector('[data-workflow-detail] [data-workflow-missing-node-pack-names]')?.textContent).toBe(
+      'Missing node pack: face-tools'
+    );
   });
 
   it('kicks the first load when it opens and leaves the store alone while closed', async () => {
@@ -676,119 +1007,135 @@ describe('WorkflowLibraryDialog', () => {
 
     await renderDialog(true);
 
-    // Times are not asserted: StrictMode double-invokes mount effects, and the
-    // store's own single-flight is what makes that a no-op.
+    // Calls are not counted: StrictMode double-invokes mount effects; the store's single-flight makes that a no-op.
     expect(browse.ensureWorkflowLibraryBrowseLoaded).toHaveBeenCalled();
   });
 
-  it('opens in the account’s stored sort, offered on Yours only, and refetches in the order chosen', async () => {
+  const sortTrigger = () => document.querySelector<HTMLButtonElement>('[data-workflow-library-sort]');
+  const openSortMenu = async () => {
+    const trigger = sortTrigger()!;
+    await act(() => userEvent.click(trigger));
+    await vi.waitFor(() => expect(trigger.getAttribute('aria-expanded')).toBe('true'));
+    const menu = document.getElementById(trigger.getAttribute('aria-controls') ?? '')!;
+    return [...menu.querySelectorAll<HTMLElement>('[role="menuitemradio"]')];
+  };
+  const chooseSortItem = async (label: string) => {
+    const item = (await openSortMenu()).find((candidate) => candidate.textContent === label);
+    expect(item, label).not.toBeUndefined();
+    await act(() => userEvent.click(item!));
+  };
+
+  it('opens in the account’s stored order and refetches in the key chosen, starting in its natural direction', async () => {
     preferences.setSnapshot({
       ...LIBRARY_PREFERENCES,
       workflowLibrarySort: 'opened',
     } as unknown as WorkflowPreferences);
-    await openWith(LOADED_SNAPSHOT);
-    const sortTrigger = () => document.querySelector<HTMLElement>('[role="combobox"][aria-labelledby]');
-    const sortLabel = () => document.getElementById(sortTrigger()?.getAttribute('aria-labelledby') ?? '')?.textContent;
+    await openWith(withSnapshot({ filter: { ...LOADED_SNAPSHOT.filter, sort: 'opened' } }));
 
-    expect(browse.ensureWorkflowLibraryBrowseLoaded).toHaveBeenCalledWith('opened');
-    expect(sortLabel()).toBe('Sort by');
-    expect(sortTrigger()?.textContent).toContain('Last opened');
+    expect(browse.ensureWorkflowLibraryBrowseLoaded).toHaveBeenCalledWith({
+      direction: 'desc',
+      place: 'user',
+      search: '',
+      sort: 'opened',
+      tags: [],
+    });
+    expect(browse.loadWorkflowLibraryPlaceTotals).toHaveBeenCalledWith(['recent', 'default']);
+    expect(sortTrigger()?.textContent).toBe('Last opened');
+    expect(sortTrigger()?.getAttribute('aria-label')).toBe('Sort: Last opened, Newest first');
+    const items = await openSortMenu();
+    expect(items.map((item) => item.textContent)).toEqual([
+      'Last opened',
+      'Last updated',
+      'Last run',
+      'Date created',
+      'Name',
+      'Newest first',
+      'Oldest first',
+    ]);
+    await act(() => userEvent.click(items.find((item) => item.textContent === 'Name')!));
 
-    await act(() => userEvent.click(sortTrigger()!));
-    const nameOption = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find(
-      (option) => option.textContent === 'Name'
-    );
-    await act(() => userEvent.click(nameOption!));
-
-    expect(setLibraryPreferences).toHaveBeenCalledWith({ workflowLibrarySort: 'name' });
-    expect(browse.setWorkflowLibraryBrowseFilter).toHaveBeenCalledWith({ sort: 'name' });
-
-    // Bundled templates always list by name, and the project's own workflows have no library order.
-    await act(() => browse.setSnapshot?.(withSnapshot({ filter: { ...LOADED_SNAPSHOT.filter, category: 'default' } })));
-    expect(sortTrigger()).toBeNull();
-    await clickSegment('project');
-    expect(sortTrigger()).toBeNull();
+    expect(setLibraryPreferences).toHaveBeenCalledWith({
+      workflowLibrarySort: 'name',
+      workflowLibrarySortDirection: 'asc',
+    });
+    expect(browse.setWorkflowLibraryBrowseFilter).toHaveBeenCalledWith({ direction: 'asc', sort: 'name' });
   });
 
-  it('fills thumbnails by default and letterboxes them once Fit is chosen', async () => {
+  it('reverses My library’s order from the Sort menu and keeps the direction with the account', async () => {
     await openWith(LOADED_SNAPSHOT);
-    const thumbnail = () => card('wf-portrait')!.querySelector('img')!;
-    const fitOption = () =>
-      document.querySelector<HTMLInputElement>(
-        '[role="radiogroup"][aria-label="Thumbnail display"] input[value="contain"]'
-      );
 
-    expect(getComputedStyle(thumbnail()).objectFit).toBe('cover');
-    expect(fitOption()?.checked).toBe(false);
+    await chooseSortItem('Oldest first');
 
-    await act(() => userEvent.click(fitOption()!.closest('label')!));
-
-    expect(setLibraryPreferences).toHaveBeenCalledWith({ workflowLibraryThumbnailFit: 'contain' });
-    expect(fitOption()?.checked).toBe(true);
-    expect(getComputedStyle(thumbnail()).objectFit).toBe('contain');
+    expect(setLibraryPreferences).toHaveBeenCalledWith({ workflowLibrarySortDirection: 'asc' });
+    expect(browse.setWorkflowLibraryBrowseFilter).toHaveBeenCalledWith({ direction: 'asc' });
   });
 
   it('switches to the bundled defaults once when the account has no workflows of its own', async () => {
-    await openWith(withSnapshot({ userTotal: 0 }));
+    await openWith(withSnapshot({ placeTotals: { user: 0 } }));
     await wait(0);
 
-    expect(browse.setWorkflowLibraryBrowseFilter).toHaveBeenCalledWith({ category: 'default', tag: null });
-    // The segment follows the store's category, so the tab moves with it.
+    expect(browse.setWorkflowLibraryBrowseFilter).toHaveBeenCalledWith({ place: 'default', tags: [] });
     expect(workflowUiStore.getSnapshot().libraryTab).toBe('default');
+    expect(placeButton('default')?.getAttribute('aria-pressed')).toBe('true');
   });
 
-  it('keeps Shared selected when the owner has no workflows of their own', async () => {
-    identity.session = { multiuserEnabled: true, phase: 'ready', user: { user_id: 'user-a' } };
-    setWorkflowLibraryTab('shared');
-    await openWith(
-      withSnapshot({
-        filter: { category: 'user', isPublic: true, search: '', sort: 'updated', tag: null },
-        userTotal: 0,
-      })
-    );
-    await wait(0);
-
-    expect(browse.setWorkflowLibraryBrowseFilter).not.toHaveBeenCalled();
-    expect(workflowUiStore.getSnapshot().libraryTab).toBe('shared');
-  });
-
-  it('leaves the category alone when the account already has workflows', async () => {
+  it('clears the checked tags but keeps the search when the place changes', async () => {
     await openWith(LOADED_SNAPSHOT);
-    await wait(0);
-
-    expect(browse.setWorkflowLibraryBrowseFilter).not.toHaveBeenCalled();
-  });
-
-  it('resets the tag when the category segment changes', async () => {
-    await openWith(withSnapshot({ filter: { category: 'user', search: '', sort: 'updated', tag: 'portrait' } }));
-
-    await clickSegment('default');
-
-    // The store applies filter patches literally, so clearing the tag on a
-    // category switch is the dialog's job.
-    expect(browse.setWorkflowLibraryBrowseFilter).toHaveBeenCalledWith({ category: 'default', tag: null });
-  });
-
-  it('opens the Shared tab with the public user-workflow filter', async () => {
-    identity.session = { multiuserEnabled: true, phase: 'ready', user: { user_id: 'user-a' } };
-    await openWith(LOADED_SNAPSHOT);
-
-    await clickSegment('shared');
-
-    expect(workflowUiStore.getSnapshot().libraryTab).toBe('shared');
-    expect(document.querySelector('[role="tab"][id$="-tab-shared"]')?.getAttribute('aria-selected')).toBe('true');
-    expect(browse.setWorkflowLibraryBrowseFilter).toHaveBeenCalledWith({
-      category: 'user',
-      isPublic: true,
-      tag: null,
+    await clickTag('portrait');
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    onTestFinished(() => {
+      vi.useRealTimers();
     });
+    const input = document.querySelector<HTMLInputElement>('input[type="search"]')!;
+    const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+    await act(async () => {
+      setValue?.call(input, 'portrait');
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      await Promise.resolve();
+    });
+    browse.setWorkflowLibraryBrowseFilter.mockClear();
+
+    await act(() => placeButton('default')!.click());
+
+    expect(browse.setWorkflowLibraryBrowseFilter).toHaveBeenCalledWith({
+      direction: 'desc',
+      place: 'default',
+      search: 'portrait',
+      sort: 'updated',
+      tags: [],
+    });
+    expect(input.value).toBe('portrait');
+    await act(() => vi.advanceTimersByTimeAsync(1000));
+    vi.useRealTimers();
+    expect(browse.setWorkflowLibraryBrowseFilter).toHaveBeenCalledTimes(1);
+    expect(workflowUiStore.getSnapshot().libraryQuery.tags).toEqual([]);
   });
 
-  it('hides the Shared tab when multiuser mode is disabled', async () => {
+  it('shows place totals in the rail and opens Shared with the public filter', async () => {
+    identity.session = { multiuserEnabled: true, phase: 'ready', user: { user_id: 'user-a' } };
+    await openWith(withSnapshot({ placeTotals: { default: 25, recent: 3, shared: 9, user: 4 } }));
+
+    expect(
+      [...document.querySelectorAll<HTMLElement>('[data-library-place]')].map((place) => place.textContent)
+    ).toEqual(['In this project3', 'Recent3', 'My library4', 'Templates25', 'Shared with me9']);
+    expect(browse.loadWorkflowLibraryPlaceTotals).toHaveBeenCalledWith(['recent', 'default', 'shared']);
+
+    await clickPlace('shared');
+
+    expect(workflowUiStore.getSnapshot().libraryTab).toBe('shared');
+    expect(placeButton('shared')?.getAttribute('aria-pressed')).toBe('true');
+    expect(placeButton('user')?.getAttribute('aria-pressed')).toBe('false');
+    expect(browse.setWorkflowLibraryBrowseFilter).toHaveBeenCalledWith(expect.objectContaining({ place: 'shared' }));
+    expect(document.querySelector('section[aria-labelledby]')?.getAttribute('aria-labelledby')).toBe(
+      placeButton('shared')?.querySelector('[id]')?.id
+    );
+  });
+
+  it('hides Shared with me when multiuser mode is disabled', async () => {
     identity.session = { multiuserEnabled: false, phase: 'ready', user: null };
     await openWith(LOADED_SNAPSHOT);
 
-    expect(document.querySelector('[role="tab"][id$="-tab-shared"]')).toBeNull();
+    expect(placeButton('shared')).toBeNull();
   });
 
   it('hides template editing controls for another user’s Shared workflow', async () => {
@@ -797,7 +1144,7 @@ describe('WorkflowLibraryDialog', () => {
     await openWith(
       withSnapshot({
         entries: [NON_OWNER_SHARED],
-        filter: { category: 'user', isPublic: true, search: '', sort: 'updated', tag: null },
+        filter: { direction: 'desc', place: 'shared', search: '', sort: 'updated', tags: [] },
       })
     );
 
@@ -809,34 +1156,10 @@ describe('WorkflowLibraryDialog', () => {
     });
     await vi.waitFor(() => expect(document.querySelector('[role="menu"]')).not.toBeNull());
 
-    expect(document.querySelector('[data-menu-item="rename"]')).toBeNull();
-    expect(document.querySelector('[data-menu-item="delete"]')).toBeNull();
+    expect(document.querySelector('[role="menuitem"][data-value="rename"]')).toBeNull();
+    expect(document.querySelector('[role="menuitem"][data-value="delete"]')).toBeNull();
     expect(document.querySelector('[aria-label="workflowLibrary.thumbnailChoose"]')).toBeNull();
     expect(document.querySelector('[data-thumbnail-remove]')).toBeNull();
-  });
-
-  it('keeps an owner’s Shared workflow editable but hides its visibility switch', async () => {
-    identity.session = { multiuserEnabled: true, phase: 'ready', user: { user_id: 'user-a' } };
-    setWorkflowLibraryTab('shared');
-    await openWith(
-      withSnapshot({
-        entries: [{ ...PORTRAIT, item: { ...PORTRAIT.item, user_id: 'user-a' } }],
-        filter: { category: 'user', isPublic: true, search: '', sort: 'updated', tag: null },
-      })
-    );
-
-    const moreActions = document.querySelector<HTMLButtonElement>('[data-workflow-detail] [aria-label="More actions"]');
-    expect(moreActions).not.toBeNull();
-    await act(async () => {
-      moreActions?.click();
-      await settleFrame();
-    });
-    await vi.waitFor(() => expect(document.querySelector('[role="menu"]')).not.toBeNull());
-
-    expect(document.querySelector('[data-menu-item="rename"]')).not.toBeNull();
-    expect(document.querySelector('[data-menu-item="delete"]')).not.toBeNull();
-    expect(document.querySelector('[aria-label="workflowLibrary.thumbnailChoose"]')).not.toBeNull();
-    expect(document.querySelector('[data-workflow-detail] input[type="checkbox"]')).toBeNull();
   });
 
   it('shows the visibility state on saved user cards and offers the switch only to the owner in Yours', async () => {
@@ -845,11 +1168,13 @@ describe('WorkflowLibraryDialog', () => {
     await openWith(
       withSnapshot({
         entries: [OWNER_PRIVATE],
-        filter: { category: 'user', search: '', sort: 'updated', tag: null },
+        filter: { direction: 'desc', place: 'user', search: '', sort: 'updated', tags: [] },
       })
     );
 
-    expect(card('wf-portrait')?.textContent).toContain('Private');
+    expect(card('wf-portrait')?.textContent).not.toContain('Private');
+    expect(card('wf-portrait')?.querySelector('[data-workflow-visibility]')).toBeNull();
+    expect(document.querySelector('[data-workflow-detail] [data-workflow-visibility]')?.textContent).toBe('Private');
     const ownerSwitch = document.querySelector<HTMLInputElement>('[data-workflow-detail] input[type="checkbox"]');
     expect(ownerSwitch).not.toBeNull();
     expect(ownerSwitch?.checked).toBe(false);
@@ -860,7 +1185,7 @@ describe('WorkflowLibraryDialog', () => {
     await openWith(
       withSnapshot({
         entries: [{ ...OWNER_PRIVATE, item: { ...OWNER_PRIVATE.item, user_id: 'user-a' } }],
-        filter: { category: 'user', search: '', sort: 'updated', tag: null },
+        filter: { direction: 'desc', place: 'user', search: '', sort: 'updated', tags: [] },
       })
     );
 
@@ -871,59 +1196,96 @@ describe('WorkflowLibraryDialog', () => {
       await settleFrame();
     });
     await vi.waitFor(() => expect(document.querySelector('[role="menu"]')).not.toBeNull());
-    expect(document.querySelector('[data-menu-item="rename"]')).toBeNull();
-    expect(document.querySelector('[data-menu-item="delete"]')).toBeNull();
+    expect(document.querySelector('[role="menuitem"][data-value="rename"]')).toBeNull();
+    expect(document.querySelector('[role="menuitem"][data-value="delete"]')).toBeNull();
     expect(document.querySelector('[aria-label="workflowLibrary.thumbnailChoose"]')).toBeNull();
   });
 
-  it('shows public state on Shared cards without visibility controls', async () => {
-    identity.session = { multiuserEnabled: true, phase: 'ready', user: { user_id: 'user-a' } };
-    setWorkflowLibraryTab('shared');
-    await openWith(
-      withSnapshot({
-        entries: [OWNER_PUBLIC],
-        filter: { category: 'user', isPublic: true, search: '', sort: 'updated', tag: null },
-      })
-    );
+  it('keeps visibility out of single-user cards and rails, even for a public template', async () => {
+    identity.session = { multiuserEnabled: false, phase: 'ready', user: null };
+    await openWith(withSnapshot({ entries: [OWNER_PUBLIC] }));
 
-    expect(card('wf-portrait')?.textContent).toContain('Public');
+    expect(document.querySelector('[data-workflow-visibility]')).toBeNull();
     expect(document.querySelector('[data-workflow-detail] input[type="checkbox"]')).toBeNull();
+    expect(document.querySelector('[data-workflow-detail]')?.textContent).not.toContain('Visibility');
   });
 
-  it('keeps Yours template editing available in single-user mode', async () => {
-    identity.session = { multiuserEnabled: false, phase: 'ready', user: null };
-    setWorkflowLibraryTab('user');
-    await openWith(
-      withSnapshot({
-        entries: [PORTRAIT],
-        filter: { category: 'user', search: '', sort: 'updated', tag: null },
-      })
-    );
+  it('asks for any of the checked tags, names them in the result line, and clears them', async () => {
+    await openWith(LOADED_SNAPSHOT);
+    // StrictMode's remount of the browse session clears the listing's query once on mount.
+    browse.setWorkflowLibraryBrowseFilter.mockClear();
+    const results = () => document.querySelector('[data-workflow-library-results]')?.textContent;
 
-    const moreActions = document.querySelector<HTMLButtonElement>('[data-workflow-detail] [aria-label="More actions"]');
-    expect(moreActions).not.toBeNull();
+    expect(results()).toBe('24 workflows');
+    expect(document.body.textContent).toContain('Showing workflows with any checked tag');
+
+    await clickTag('portrait');
+    await clickTag('upscale');
+
+    expect(browse.setWorkflowLibraryBrowseFilter).toHaveBeenNthCalledWith(1, { tags: ['portrait'] });
+    expect(browse.setWorkflowLibraryBrowseFilter).toHaveBeenNthCalledWith(2, { tags: ['portrait', 'upscale'] });
+    expect(tagCheckbox('portrait')?.checked).toBe(true);
+    expect(results()).toBe('24 workflows · portrait or upscale');
+
+    await clickText('Clear');
+
+    expect(browse.setWorkflowLibraryBrowseFilter).toHaveBeenLastCalledWith({ tags: [] });
+    expect(tagCheckbox('portrait')?.checked).toBe(false);
+    expect(buttonWithText('Clear')).toBeUndefined();
+  });
+
+  it('clears the listing’s search and tags on close, so reopening on a library place loads unfiltered', async () => {
+    await act(() => browse.setSnapshot?.(LOADED_SNAPSHOT));
+    setWorkflowLibraryOpen(true);
     await act(async () => {
-      moreActions?.click();
+      root.render(
+        <StrictMode>
+          <QueryClientProvider client={queryClient}>
+            <ChakraProvider value={system}>
+              <WorkflowUiProvider adapter={UI_ADAPTER}>
+                <GalleryHostProvider host={GALLERY_HOST}>
+                  <WorkflowGraphPreviewProvider adapter={GRAPH_PREVIEW}>
+                    <StoreBoundLibraryDialog />
+                  </WorkflowGraphPreviewProvider>
+                </GalleryHostProvider>
+              </WorkflowUiProvider>
+            </ChakraProvider>
+          </QueryClientProvider>
+        </StrictMode>
+      );
       await settleFrame();
     });
-    await vi.waitFor(() => expect(document.querySelector('[role="menu"]')).not.toBeNull());
+    const search = () => document.querySelector<HTMLInputElement>('input[type="search"]');
+    const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+    await act(async () => {
+      setValue?.call(search(), 'photo');
+      search()!.dispatchEvent(new Event('input', { bubbles: true }));
+      await Promise.resolve();
+    });
+    await clickTag('portrait');
+    await expect.poll(() => browse.setWorkflowLibraryBrowseFilter.mock.calls).toContainEqual([{ search: 'photo' }]);
+    browse.setWorkflowLibraryBrowseFilter.mockClear();
 
-    expect(document.querySelector('[data-menu-item="rename"]')).not.toBeNull();
-    expect(document.querySelector('[data-menu-item="delete"]')).not.toBeNull();
-    expect(document.querySelector('[aria-label="workflowLibrary.thumbnailChoose"]')).not.toBeNull();
-    expect(document.querySelector('[data-workflow-detail] input[type="checkbox"]')).toBeNull();
-  });
+    await act(async () => {
+      document.querySelector<HTMLButtonElement>('button[aria-label="Close"]')!.click();
+      await settleFrame();
+    });
 
-  it('selects and clears a tag from the chip row', async () => {
-    await openWith(LOADED_SNAPSHOT);
+    expect(workflowUiStore.getSnapshot().isLibraryOpen).toBe(false);
+    expect(browse.setWorkflowLibraryBrowseFilter).toHaveBeenLastCalledWith({ search: '', tags: [] });
+    browse.ensureWorkflowLibraryBrowseLoaded.mockClear();
 
-    await clickText('portrait2');
+    await act(async () => {
+      setWorkflowLibraryOpen(true);
+      await settleFrame();
+    });
 
-    expect(browse.setWorkflowLibraryBrowseFilter).toHaveBeenCalledWith({ tag: 'portrait' });
-
-    await clickText('All');
-
-    expect(browse.setWorkflowLibraryBrowseFilter).toHaveBeenCalledWith({ tag: null });
+    expect(workflowUiStore.getSnapshot().libraryTab).toBe('user');
+    expect(browse.ensureWorkflowLibraryBrowseLoaded).toHaveBeenCalledWith(
+      expect.objectContaining({ place: 'user', search: '', tags: [] })
+    );
+    expect(search()?.value).toBe('');
+    expect(tagCheckbox('portrait')?.checked).toBe(false);
   });
 
   it('pushes the search term to the store once, after the debounce', async () => {
@@ -932,9 +1294,10 @@ describe('WorkflowLibraryDialog', () => {
     const input = document.querySelector<HTMLInputElement>('input[type="search"]');
     expect(input).not.toBeNull();
 
-    // React tracks the input's value through its own setter, so assigning
-    // `.value` directly would be swallowed as a no-op change.
+    // React tracks input values through its own setter; assigning `.value` directly would read as no change.
     const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+    // StrictMode's remount of the browse session clears the listing's query once on mount.
+    browse.setWorkflowLibraryBrowseFilter.mockClear();
 
     for (const value of ['p', 'ph', 'pho', 'phot', 'photo']) {
       await act(async () => {
@@ -946,7 +1309,7 @@ describe('WorkflowLibraryDialog', () => {
 
     expect(browse.setWorkflowLibraryBrowseFilter).not.toHaveBeenCalled();
 
-    await wait(400);
+    await expect.poll(() => browse.setWorkflowLibraryBrowseFilter.mock.calls).toEqual([[{ search: 'photo' }]]);
 
     expect(browse.setWorkflowLibraryBrowseFilter).toHaveBeenCalledTimes(1);
     expect(browse.setWorkflowLibraryBrowseFilter).toHaveBeenCalledWith({ search: 'photo' });
@@ -977,302 +1340,6 @@ describe('WorkflowLibraryDialog', () => {
     expect(card('large-0')).not.toBeNull();
   });
 
-  it('keeps measured rows separated after viewport resize, zoom and text reflow', async () => {
-    const entries = Array.from({ length: 90 }, (_, index) => ({
-      ...PORTRAIT,
-      item: { ...PORTRAIT.item, workflow_id: `reflow-${index}`, name: LONG_NAME },
-    }));
-    await openWith({ ...LOADED_SNAPSHOT, entries, total: 90, pages: 5 });
-    const rootStyle = document.documentElement.style;
-    const previousZoom = rootStyle.zoom;
-    const previousFontSize = rootStyle.fontSize;
-    onTestFinished(() => {
-      rootStyle.zoom = previousZoom;
-      rootStyle.fontSize = previousFontSize;
-    });
-
-    const expectRowGaps = async (zoom = 1, gap = 12) => {
-      await vi.waitFor(() => {
-        const rows = [...new Set(cards().map((element) => element.closest<HTMLElement>('[data-index]')!))].sort(
-          (a, b) => Number(a.dataset.index) - Number(b.dataset.index)
-        );
-        expect(rows.length).toBeGreaterThanOrEqual(3);
-        expect(cards().length).toBeLessThan(40);
-        for (let index = 1; index < rows.length; index += 1) {
-          const previous = rows[index - 1]!;
-          const current = rows[index]!;
-          const previousRect = previous.getBoundingClientRect();
-          const currentRect = current.getBoundingClientRect();
-          // Row padding owns the 12px gap; the row boxes themselves must meet without overlap.
-          expect(Math.abs((currentRect.top - previousRect.bottom) / zoom)).toBeLessThanOrEqual(1);
-          const cardBottom = Math.max(
-            ...[...previous.querySelectorAll<HTMLElement>('[data-workflow-card]')].map(
-              (element) => element.getBoundingClientRect().bottom
-            )
-          );
-          expect(Math.abs((currentRect.top - cardBottom) / zoom - gap)).toBeLessThanOrEqual(1);
-        }
-      });
-    };
-
-    await expectRowGaps();
-    await page.viewport(700, 800);
-    await expectRowGaps();
-    await page.viewport(1280, 800);
-    await expectRowGaps();
-    await act(() => {
-      rootStyle.zoom = '2';
-    });
-    await expectRowGaps(2);
-    await act(() => {
-      rootStyle.zoom = previousZoom;
-      rootStyle.fontSize = '20px';
-    });
-    // Text scaling also scales the rem-based gap.
-    await expectRowGaps(1, 15);
-    await act(() => {
-      const viewport = gridViewport()!;
-      viewport.scrollTop = 1000;
-      viewport.dispatchEvent(new Event('scroll'));
-    });
-    await page.viewport(900, 800);
-    await expectRowGaps(1, 15);
-  });
-
-  it.each(
-    (['library', 'project'] as const).flatMap((view) =>
-      [
-        [640, 400],
-        [512, 384],
-        [320, 400],
-        [1280, 320],
-        [700, 320],
-        [640, 320],
-        [512, 320],
-        [320, 320],
-      ].map(([width, height]) => ({ view, width: width!, height: height! }))
-    )
-  )(
-    'keeps the $view grid, selected metadata and actions usable at $width×$height layout viewport',
-    async ({ view, width: targetWidth, height: targetHeight }) => {
-      const description = `${'Required workflow metadata. '.repeat(200)}End of required metadata.`;
-      const entries = [
-        { ...PREVIEW_FIXTURE, item: { ...PREVIEW_FIXTURE.item, description } },
-        ...Array.from({ length: 1000 }, (_, index) => ({
-          ...PORTRAIT,
-          item: { ...PORTRAIT.item, workflow_id: `layout-${index}` },
-        })),
-      ];
-      project.setSnapshot(
-        projectSnapshot([
-          ...PROJECT_WORKFLOWS.map((entry) =>
-            entry === USER_COPY ? { ...entry, document: { ...entry.document, description } } : entry
-          ),
-          ...Array.from({ length: 1000 }, (_, index) => ({
-            ...USER_COPY,
-            document: { ...USER_COPY.document, id: `project-layout-${index}` },
-          })),
-        ])
-      );
-      await openWith(withSnapshot({ entries, total: entries.length, pages: 51 }));
-      if (view === 'project') {
-        await clickSegment('project');
-        await vi.waitFor(() => expect(card('wf-user')).not.toBeNull());
-        await act(() => card('wf-user')!.click());
-        expect(document.querySelector('[data-project-workflow-detail="wf-user"]')).not.toBeNull();
-      }
-
-      const dialog = document.querySelector<HTMLElement>('[data-scope="dialog"][data-part="content"]')!;
-      const detail = dialog.querySelector<HTMLElement>('[data-workflow-detail], [data-project-workflow-detail]')!;
-      const metadata = detail.querySelector<HTMLElement>('[role="region"]')!;
-      const grid = gridViewport()!;
-      const close = dialog.querySelector<HTMLButtonElement>('button[aria-label="Close"]')!;
-      const open = [...detail.querySelectorAll<HTMLButtonElement>('button')].find(
-        (button) => button.textContent === 'Open'
-      )!;
-      const preview = [...detail.querySelectorAll<HTMLButtonElement>('button')].find(
-        (button) => button.textContent === 'Preview graph'
-      )!;
-      const menu = detail.querySelector<HTMLButtonElement>('button[aria-label="More actions"]')!;
-
-      for (const [width, height] of [
-        [1280, 800],
-        [700, 800],
-        [targetWidth, targetHeight],
-      ] as const) {
-        // Real layout-viewport reduction, as at 200% browser zoom on a 1280×800 display. CSS zoom misses this.
-        await page.viewport(width, height);
-        expect(window.innerWidth).toBe(width);
-        expect(window.innerHeight).toBe(height);
-        await vi.waitFor(() => {
-          // Enough for readable metadata and a substantial part of a card, rather than merely nonzero boxes.
-          expect(metadata.clientHeight, 'selected metadata scroll viewport').toBeGreaterThanOrEqual(80);
-          expect(grid.clientHeight, 'workflow grid scroll viewport').toBeGreaterThanOrEqual(120);
-          expect(grid.clientHeight, 'finite virtual grid viewport').toBeLessThanOrEqual(640);
-          expect(detail.clientHeight, 'finite detail pane').toBeLessThanOrEqual(640);
-          if (width <= 512 || height === 320) {
-            expect(grid.clientHeight, 'flow grid has a finite viewport').toBe(256);
-            expect(detail.getBoundingClientRect().height, 'flow detail does not grow with metadata').toBe(320);
-          }
-          expect(dialog.scrollWidth).toBeLessThanOrEqual(dialog.clientWidth + 1);
-          expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(width);
-          expect(dialog.getBoundingClientRect().top).toBeGreaterThanOrEqual(0);
-          expect(dialog.getBoundingClientRect().bottom).toBeLessThanOrEqual(height);
-          if ((width >= 640 && height >= 400) || height >= 640) {
-            for (const action of [open, preview, menu, close]) {
-              expectContained(action, dialog);
-            }
-          }
-          for (const control of dialog.querySelectorAll<HTMLElement>(
-            'input[type="search"], [role="combobox"], [role="tab"], [aria-label="Thumbnail display"]'
-          )) {
-            expectContained(control, dialog);
-          }
-          if ((width === 700 && height >= 640) || width <= 512) {
-            expect(grid.getBoundingClientRect().bottom).toBeLessThanOrEqual(detail.getBoundingClientRect().top);
-          } else {
-            expect(grid.getBoundingClientRect().right).toBeLessThanOrEqual(detail.getBoundingClientRect().left);
-          }
-          expect(grid.scrollWidth).toBeLessThanOrEqual(grid.clientWidth + 1);
-          expect(cards().length).toBeGreaterThan(0);
-          expect(cards().length).toBeLessThan(40);
-          for (const element of cards()) {
-            const box = element.getBoundingClientRect();
-            const bounds = grid.getBoundingClientRect();
-            expect(box.left).toBeGreaterThanOrEqual(bounds.left);
-            expect(box.right).toBeLessThanOrEqual(bounds.right + 1);
-            expect(box.width).toBeGreaterThanOrEqual(180);
-            const row = element.closest<HTMLElement>('[data-index]')!;
-            expectContained(element, row);
-            const nextRow = row.nextElementSibling;
-            if (nextRow) {
-              expect(box.bottom).toBeLessThanOrEqual(nextRow.getBoundingClientRect().top);
-            }
-          }
-        });
-      }
-
-      const expectUnclipped = (element: HTMLElement) => {
-        expectContained(element, dialog);
-        for (let parent = element.parentElement; parent && parent !== dialog; parent = parent.parentElement) {
-          const style = getComputedStyle(parent);
-          if (/(auto|scroll|hidden|clip)/.test(style.overflowY)) {
-            expectContained(element, parent);
-          }
-        }
-      };
-      await act(() => cards()[0]!.focus());
-      const focusedCard = cards()[0]!.getBoundingClientRect();
-      const gridBounds = grid.getBoundingClientRect();
-      const modalBounds = dialog.getBoundingClientRect();
-      expect(
-        Math.min(focusedCard.bottom, gridBounds.bottom, modalBounds.bottom) -
-          Math.max(focusedCard.top, gridBounds.top, modalBounds.top)
-      ).toBeGreaterThanOrEqual(120);
-      await act(() => grid.focus());
-      await act(() => userEvent.keyboard('{PageDown}'));
-      await vi.waitFor(() => {
-        expect(grid.scrollTop).toBeGreaterThan(0);
-        expect(cards().length).toBeLessThan(40);
-        expect(grid.clientHeight).toBeLessThanOrEqual(640);
-      });
-      await act(() => metadata.focus());
-      expect(document.activeElement).toBe(metadata);
-      expectUnclipped(metadata);
-      await act(() => userEvent.keyboard('{End}'));
-      await vi.waitFor(() => {
-        expect(metadata.scrollTop).toBeGreaterThan(0);
-        const lastMetadata =
-          metadata.querySelector<HTMLElement>('[data-workflow-source]') ?? [...metadata.querySelectorAll('p')].at(-1)!;
-        const ending = document.createRange();
-        ending.selectNodeContents(lastMetadata);
-        const text = lastMetadata.firstChild!;
-        ending.setStart(text, Math.max(0, text.textContent!.length - 24));
-        expectContained(ending, metadata);
-        expectContained(ending, dialog);
-      });
-
-      // Native focus scrolling must bring each action into the modal's clipped viewport, including flow layouts.
-      const reached = new Set<Element>();
-      for (let index = 0; index < 40 && reached.size < 4; index += 1) {
-        await act(() => userEvent.keyboard('{Tab}'));
-        if ([open, preview, menu, close].includes(document.activeElement as HTMLButtonElement)) {
-          expectUnclipped(document.activeElement as HTMLElement);
-          reached.add(document.activeElement!);
-        }
-      }
-      expect(reached.size).toBe(4);
-      const toolbarTargets = [
-        dialog.querySelector<HTMLElement>('input[type="search"]'),
-        dialog.querySelector<HTMLElement>('[role="combobox"]'),
-        dialog.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]'),
-        [...dialog.querySelectorAll<HTMLButtonElement>('button')].find(
-          (button) => button.textContent === 'New workflow'
-        ),
-      ].filter((element): element is HTMLElement => Boolean(element));
-      const toolbarReached = new Set<Element>();
-      for (const key of ['{Shift>}{Tab}{/Shift}', '{Tab}']) {
-        await act(() => close.focus());
-        for (let index = 0; index < 30; index += 1) {
-          await act(() => userEvent.keyboard(key));
-          const focused = document.activeElement as HTMLElement;
-          if (focused.hasAttribute('data-workflow-card')) {
-            break;
-          }
-          if (toolbarTargets.includes(focused)) {
-            expectUnclipped(focused);
-            toolbarReached.add(focused);
-          }
-        }
-      }
-      expect(toolbarReached.size).toBe(toolbarTargets.length);
-      if (dialog.scrollHeight > dialog.clientHeight + 1) {
-        await act(() => close.focus());
-        await act(() => userEvent.keyboard('{End}'));
-        await vi.waitFor(() => {
-          expect(dialog.scrollTop).toBeGreaterThan(0);
-          expectUnclipped(preview);
-        });
-      }
-      // Focus first, as a keyboard user would, so offscreen controls scroll into view before activation.
-      await act(() => menu.focus());
-      expectUnclipped(menu);
-      await act(() => userEvent.keyboard('{Enter}'));
-      await vi.waitFor(() => expect(menu.getAttribute('aria-expanded')).toBe('true'));
-      const menuContent = document.querySelector<HTMLElement>('[role="menu"]')!;
-      // Open state precedes the entry slide's final geometry.
-      await act(() => settleAnimations(menuContent));
-      expectContained(menuContent, dialog);
-      if (view === 'project' && targetWidth === 320) {
-        await expectWrappedRenameHint(menuContent, dialog);
-      }
-      await act(() => userEvent.keyboard('{End}'));
-      const lastAction = [...menuContent.querySelectorAll<HTMLElement>('[role="menuitem"]')].at(-1)!;
-      await vi.waitFor(() => {
-        expect(menuContent.getAttribute('aria-activedescendant')).toBe(lastAction.id);
-        expectContained(lastAction, menuContent);
-        expectContained(lastAction, dialog);
-      });
-      await act(() => userEvent.keyboard('{Escape}'));
-      await act(() => preview.focus());
-      expectUnclipped(preview);
-      await act(() => userEvent.keyboard('{Enter}'));
-      await waitForPreviewDialog();
-      expect(document.querySelector('[data-preview-dialog]')).not.toBeNull();
-      // The preview renderer is stubbed; close it through its existing harness controls before using the rail.
-      await clickText('Close preview');
-      await clickText('Finish preview exit');
-      await act(() => open.focus());
-      expectUnclipped(open);
-      await act(() => userEvent.keyboard('{Enter}'));
-      expect(view === 'project' ? COMMANDS.selectWorkflow : loader.open).toHaveBeenCalled();
-      await act(() => close.focus());
-      expectUnclipped(close);
-      await act(() => userEvent.keyboard('{Enter}'));
-      expect(onOpenChange).toHaveBeenCalledWith(false);
-    }
-  );
-
   it('keeps keyboard focus mounted across virtual row boundaries', async () => {
     await resizeViewport(1280, 800);
     const entries = Array.from({ length: 90 }, (_, index) => ({
@@ -1294,44 +1361,6 @@ describe('WorkflowLibraryDialog', () => {
     expect(cards().length).toBeLessThan(40);
   });
 
-  it.each(['library', 'project'] as const)('keeps the %s card menu inside its dialog while resizing', async (view) => {
-    await resizeViewport(320, 320);
-    await openWith(LOADED_SNAPSHOT);
-    if (view === 'project') {
-      await clickSegment('project');
-    }
-    await vi.waitFor(() => expect(card(view === 'project' ? 'wf-alpha' : 'wf-landscape')).not.toBeNull());
-    const source = card(view === 'project' ? 'wf-alpha' : 'wf-landscape')!;
-    await act(() => source.focus());
-    // Keyboard context-menu events have no pointer coordinates.
-    await act(() => source.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true })));
-    await vi.waitFor(() =>
-      expect(document.querySelector('[data-workflow-context-menu][data-state="open"]')).not.toBeNull()
-    );
-    const menu = document.querySelector<HTMLElement>('[data-workflow-context-menu][data-state="open"]')!;
-    const dialog = document.querySelector<HTMLElement>('[data-scope="dialog"][data-part="content"]')!;
-    await act(() => settleAnimations(menu));
-    expectContained(menu, dialog);
-    if (view === 'project') {
-      await expectWrappedRenameHint(menu, dialog);
-    }
-    await act(() => userEvent.keyboard('{End}'));
-    const lastAction = [...menu.querySelectorAll<HTMLElement>('[role="menuitem"]')].at(-1)!;
-    await vi.waitFor(() => {
-      expect(menu.getAttribute('aria-activedescendant')).toBe(lastAction.id);
-      expectContained(lastAction, menu);
-      expectContained(lastAction, dialog);
-    });
-    await resizeViewport(700, 320);
-    await vi.waitFor(() => {
-      expect(menu.getAttribute('data-state')).toBe('open');
-      expectContained(menu, dialog);
-    });
-    await act(() => userEvent.keyboard('{Escape}'));
-    await vi.waitFor(() => expect(document.activeElement).toBe(source));
-    expect(document.querySelector('[data-workflow-context-menu][data-state="open"]')).toBeNull();
-  });
-
   it('auto-selects the first entry and moves the selection when it disappears', async () => {
     await openWith(LOADED_SNAPSHOT);
 
@@ -1347,22 +1376,24 @@ describe('WorkflowLibraryDialog', () => {
     expect(card('wf-sketch')?.getAttribute('aria-pressed')).toBe('true');
   });
 
-  it('opens a workflow on double click', async () => {
-    await openWith(LOADED_SNAPSHOT);
+  it('opens the selected workflow on double click while its metadata page is evicted', async () => {
+    preferences.setSnapshot({ ...preferences.port.getSnapshot(), workflowLibraryLayout: 'list' });
+    await openWith(withSnapshot({ entries: [PORTRAIT, LANDSCAPE], total: 24 }));
+    const primary = () => document.getElementById('workflow-library-card-wf-landscape')!;
+    await act(() => primary().click());
+    await act(() =>
+      browse.setSnapshot?.(
+        withSnapshot({
+          entries: [SKETCH],
+          selectedEntry: LANDSCAPE,
+          startIndex: 20,
+          total: 24,
+        })
+      )
+    );
+    await act(() => primary().dispatchEvent(new MouseEvent('dblclick', { bubbles: true })));
 
-    await act(() => {
-      card('wf-landscape')?.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
-    });
-
-    expect(loader.open).toHaveBeenCalledTimes(1);
-    expect(loader.open).toHaveBeenCalledWith(LANDSCAPE.item, 'first-copy');
-  });
-
-  it('dedupes entries that share a workflow id', async () => {
-    await openWith(withSnapshot({ entries: [PORTRAIT, LANDSCAPE, { ...PORTRAIT }] }));
-
-    expect(cards()).toHaveLength(2);
-    expect(document.querySelectorAll('[data-workflow-card="wf-portrait"]')).toHaveLength(1);
+    expect(loader.open).toHaveBeenCalledExactlyOnceWith(LANDSCAPE.item, 'first-copy');
   });
 
   it('keeps the loaded grid and reports a failed load-more inline', async () => {
@@ -1373,52 +1404,11 @@ describe('WorkflowLibraryDialog', () => {
     expect(document.body.textContent ?? '').not.toContain('No workflows match these filters.');
   });
 
-  it('shows the loading copy on the very first paint, before the store leaves idle', async () => {
-    // Initial idle state precedes loading and must not render as no matches.
-    await openWith({
-      entries: [],
-      error: null,
-      filter: { category: 'user', search: '', sort: 'updated', tag: null },
-      page: 0,
-      pages: 0,
-      status: 'idle',
-      tagCounts: [],
-      total: 0,
-      userTotal: null,
-    });
-
-    const text = document.body.textContent ?? '';
-
-    expect(text).toContain('Loading workflows…');
-    expect(text).not.toContain('No workflows match these filters.');
-  });
-
-  it('shows the empty state only when nothing loaded', async () => {
-    await openWith(withSnapshot({ entries: [], status: 'loaded', total: 0 }));
-
-    expect(cards()).toHaveLength(0);
-    expect(document.body.textContent ?? '').toContain('No workflows match these filters.');
-  });
-
-  it('shows the selected workflow in the rail and follows the selection', async () => {
-    await openWith(LOADED_SNAPSHOT);
-
-    const detail = () => document.querySelector<HTMLElement>('[data-workflow-detail]');
-
-    expect(detail()?.dataset.workflowDetail).toBe('wf-portrait');
-
-    await act(() => card('wf-landscape')?.click());
-
-    expect(detail()?.dataset.workflowDetail).toBe('wf-landscape');
-    expect(detail()?.textContent).toContain('Landscape Pass');
-  });
-
   it("opens a tile's actions from its own menu button, toggles it closed, and hands focus back to the button", async () => {
     await openWith(LOADED_SNAPSHOT);
 
     const button = document.querySelector<HTMLButtonElement>('[data-workflow-card-menu="wf-landscape"]');
     expect(button).not.toBeNull();
-    // A sibling of the card button, never nested inside it.
     expect(document.querySelector('[data-workflow-card="wf-landscape"]')?.tagName).toBe('BUTTON');
     expect(document.querySelector('[data-workflow-card="wf-landscape"]')?.contains(button)).toBe(false);
 
@@ -1427,10 +1417,11 @@ describe('WorkflowLibraryDialog', () => {
       await settleFrame();
     });
 
-    // The button selects its tile and opens the same actions the right-click offers, anchored to the button.
-    expect(document.querySelector<HTMLElement>('[data-workflow-detail]')?.dataset.workflowDetail).toBe('wf-landscape');
+    expect(document.querySelector<HTMLElement>('[data-workflow-detail]')?.dataset.workflowDetail).toBe('wf-portrait');
     const open = () =>
-      document.querySelector<HTMLElement>('[data-workflow-context-menu][data-state="open"] [data-menu-item="open"]');
+      document.querySelector<HTMLElement>(
+        '[data-workflow-context-menu][data-state="open"] [role="menuitem"][data-value="open"]'
+      );
     await vi.waitFor(() => expect(open()).not.toBeNull());
     await vi.waitFor(() => expect(document.activeElement?.closest('[role="menu"]')).not.toBeNull(), { timeout: 2000 });
 
@@ -1442,8 +1433,7 @@ describe('WorkflowLibraryDialog', () => {
     );
     expect(document.activeElement).toBe(button);
 
-    // A second press on the same button closes the menu instead of reopening it elsewhere. The press is a pointer
-    // sequence, since the pointerdown lands outside the menu and must be kept from dismissing it first.
+    // Pointer sequence: the pointerdown lands outside the menu and must not dismiss it before the click toggles it.
     await pressTileMenuButton(button);
     await vi.waitFor(() => expect(open()).not.toBeNull());
     expect(button?.getAttribute('aria-expanded')).toBe('true');
@@ -1454,360 +1444,849 @@ describe('WorkflowLibraryDialog', () => {
     expect(button?.getAttribute('aria-expanded')).toBe('false');
   });
 
-  it("moves the open menu to another tile's button and hands the expanded state over", async () => {
-    await openWith(LOADED_SNAPSHOT);
+  describe('a card menu acts on its own card, never moving the selection', () => {
+    const detail = () => document.querySelector<HTMLElement>('[data-workflow-detail]')?.dataset.workflowDetail;
+    const openMenu = () => document.querySelector<HTMLElement>('[data-workflow-context-menu][data-state="open"]');
+    const alertDialog = () => document.querySelector<HTMLElement>('[role="alertdialog"]');
+    const confirmIn = async (label: string) => {
+      const confirm = [...(alertDialog()?.querySelectorAll('button') ?? [])].find(
+        (candidate) => (candidate.textContent ?? '').trim() === label
+      );
+      expect(confirm).not.toBeUndefined();
+      await act(async () => {
+        confirm?.click();
+        await settleFrame();
+      });
+    };
 
-    const first = document.querySelector<HTMLButtonElement>('[data-workflow-card-menu="wf-landscape"]');
-    const second = document.querySelector<HTMLButtonElement>('[data-workflow-card-menu="wf-portrait"]');
-    expect(second).not.toBeNull();
+    const raise = async (path: 'right-click' | 'Shift+F10' | 'More button') => {
+      const source = card('wf-landscape')!;
+      if (path === 'More button') {
+        const more = document.querySelector<HTMLElement>('[data-workflow-card-menu="wf-landscape"]')!;
+        await pressTileMenuButton(more);
+        return more;
+      }
+      await act(() => source.focus());
+      await act(() =>
+        source.dispatchEvent(
+          // A keyboard-raised menu (Shift+F10, the Menu key) reports no pointer position.
+          path === 'Shift+F10'
+            ? new MouseEvent('contextmenu', { bubbles: true, cancelable: true })
+            : new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 120, clientY: 80 })
+        )
+      );
+      return source;
+    };
 
-    await pressTileMenuButton(first);
-    await vi.waitFor(() => expect(first?.getAttribute('aria-expanded')).toBe('true'));
+    it.each(['right-click', 'Shift+F10', 'More button'] as const)(
+      'opens from a %s on another card, keeping the rail, and renames that workflow',
+      async (path) => {
+        await openWith(LOADED_SNAPSHOT);
+        await act(() => card('wf-upscale')?.click());
+        expect(detail()).toBe('wf-upscale');
 
-    await pressTileMenuButton(second);
+        const trigger = await raise(path);
 
-    await vi.waitFor(() => expect(second?.getAttribute('aria-expanded')).toBe('true'));
-    expect(first?.getAttribute('aria-expanded')).toBe('false');
-    expect(document.querySelector<HTMLElement>('[data-workflow-detail]')?.dataset.workflowDetail).toBe('wf-portrait');
-    await vi.waitFor(() =>
-      expect(document.querySelector('[data-workflow-context-menu][data-state="open"]')).not.toBeNull()
+        await vi.waitFor(() => expect(openMenu()?.id).toBe('workflow-library-card-wf-landscape-actions'));
+        expect(trigger.getAttribute('aria-controls')).toBe(openMenu()?.id);
+        expect(trigger.getAttribute('aria-expanded')).toBe('true');
+        expect(detail()).toBe('wf-upscale');
+        expect(card('wf-upscale')?.getAttribute('aria-pressed')).toBe('true');
+        expect(card('wf-landscape')?.getAttribute('aria-pressed')).toBe('false');
+
+        await selectMenuItem(openMenu()?.querySelector<HTMLElement>('[role="menuitem"][data-value="rename"]'));
+        await act(settleFrame);
+        const input = await vi.waitFor(() => {
+          const element = document.querySelector<HTMLInputElement>('input[name="renameValue"]');
+          expect(element?.value).toBe('Landscape Pass');
+          return element!;
+        });
+        const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+        await act(async () => {
+          setValue?.call(input, 'Landscape, tuned');
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+          await Promise.resolve();
+        });
+        await act(async () => {
+          input.closest('form')?.querySelector<HTMLButtonElement>('button[type="submit"]')?.click();
+          await settleFrame();
+        });
+
+        expect(libraryWrites.update).toHaveBeenCalledExactlyOnceWith(
+          'wf-landscape',
+          expect.objectContaining({ name: 'Landscape, tuned' }),
+          expect.objectContaining({ expectedRevision: 3 })
+        );
+        expect(detail()).toBe('wf-upscale');
+      }
     );
-  });
 
-  it('hands focus to the template rail menu it opens', async () => {
-    await openWith(LOADED_SNAPSHOT);
-    await act(() => card('wf-landscape')?.click());
+    it('runs Open on the card it was raised for', async () => {
+      await openWith(LOADED_SNAPSHOT);
+      await raise('right-click');
 
-    const trigger = document.querySelector<HTMLElement>('[data-workflow-detail] [aria-label="More actions"]');
-    expect(trigger).not.toBeNull();
-    await act(async () => {
-      trigger?.click();
-      await settleFrame();
+      const open = () => openMenu()?.querySelector<HTMLElement>('[role="menuitem"][data-value="open"]');
+      await vi.waitFor(() => expect(open()).not.toBeUndefined());
+      await selectMenuItem(open());
+
+      expect(loader.open).toHaveBeenCalledWith(LANDSCAPE.item, 'first-copy');
+      expect(detail()).toBe('wf-portrait');
     });
 
-    await vi.waitFor(() => expect(document.activeElement?.closest('[role="menu"]')).not.toBeNull(), { timeout: 2000 });
-  });
+    it('deletes another card and keeps the selection; deleting the selected one clears it', async () => {
+      await openWith(LOADED_SNAPSHOT);
+      await act(() => card('wf-upscale')?.click());
+      await raise('right-click');
 
-  it('opens the rail actions for a card from a right-click and runs them', async () => {
-    await openWith(LOADED_SNAPSHOT);
+      await vi.waitFor(() =>
+        expect(openMenu()?.querySelector('[role="menuitem"][data-value="delete"]')).not.toBeNull()
+      );
+      await selectMenuItem(openMenu()?.querySelector<HTMLElement>('[role="menuitem"][data-value="delete"]'));
+      await act(settleFrame);
+      await vi.waitFor(() => expect(alertDialog()?.textContent).toContain('Landscape Pass'));
+      await confirmIn('Delete');
 
-    await act(() =>
-      card('wf-landscape')?.dispatchEvent(
-        new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 120, clientY: 80 })
-      )
-    );
+      expect(libraryWrites.delete).toHaveBeenCalledExactlyOnceWith('wf-landscape', expect.anything());
+      await act(() => browse.setSnapshot?.(withSnapshot({ entries: [PORTRAIT, SKETCH, UPSCALE], total: 23 })));
+      expect(card('wf-landscape')).toBeNull();
+      expect(detail()).toBe('wf-upscale');
 
-    // The right-click selects the card, so the rail (which owns the actions) shows it.
-    expect(document.querySelector<HTMLElement>('[data-workflow-detail]')?.dataset.workflowDetail).toBe('wf-landscape');
-
-    const open = () => document.querySelector<HTMLElement>('[data-workflow-context-menu] [data-menu-item="open"]');
-
-    await vi.waitFor(() => expect(open()).not.toBeNull());
-    await act(() => open()?.click());
-
-    expect(loader.open).toHaveBeenCalledWith(LANDSCAPE.item, 'first-copy');
-  });
-
-  // The question mounts while the menu that asked it is still closing; the menu's teardown must not dismiss it.
-  it('keeps the copy question a card menu raised for a template the project already holds', async () => {
-    await openWith(LOADED_SNAPSHOT);
-
-    await act(() =>
-      card('wf-portrait')?.dispatchEvent(
-        new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 120, clientY: 80 })
-      )
-    );
-
-    const open = () => document.querySelector<HTMLElement>('[data-workflow-context-menu] [data-menu-item="open"]');
-
-    await vi.waitFor(() => expect(open()).not.toBeNull());
-    await act(async () => {
-      open()?.click();
-      await settleFrame();
-      await settleFrame();
+      await act(() =>
+        card('wf-upscale')?.dispatchEvent(
+          new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 120, clientY: 80 })
+        )
+      );
+      await vi.waitFor(() =>
+        expect(openMenu()?.querySelector('[role="menuitem"][data-value="delete"]')).not.toBeNull()
+      );
+      await selectMenuItem(openMenu()?.querySelector<HTMLElement>('[role="menuitem"][data-value="delete"]'));
+      await act(settleFrame);
+      await vi.waitFor(() => expect(alertDialog()?.textContent).toContain('Upscale Chain'));
+      await confirmIn('Delete');
+      expect(libraryWrites.delete).toHaveBeenLastCalledWith('wf-upscale', expect.anything());
+      await act(() => browse.setSnapshot?.(withSnapshot({ entries: [PORTRAIT, SKETCH], total: 22 })));
+      expect(detail()).toBe('wf-portrait');
     });
 
-    await vi.waitFor(() => expect(document.querySelector('[data-workflow-context-menu]')).toBeNull());
-    expect(document.querySelector('[data-library-copy-choice]')).not.toBeNull();
-    expect(loader.open).not.toHaveBeenCalled();
-  });
+    it('keeps a confirmation opened from a menu on its own workflow when a refresh drops that card', async () => {
+      await openWith(LOADED_SNAPSHOT);
+      await raise('right-click');
+      await vi.waitFor(() =>
+        expect(openMenu()?.querySelector('[role="menuitem"][data-value="delete"]')).not.toBeNull()
+      );
+      await selectMenuItem(openMenu()?.querySelector<HTMLElement>('[role="menuitem"][data-value="delete"]'));
+      await act(settleFrame);
+      await vi.waitFor(() => expect(alertDialog()?.textContent).toContain('Landscape Pass'));
 
-  it('closes the card context menu on Escape and hands focus back to the card', async () => {
-    await openWith(LOADED_SNAPSHOT);
+      await act(() => browse.setSnapshot?.(withSnapshot({ entries: [PORTRAIT, SKETCH, UPSCALE], total: 23 })));
+      await settleAnimations();
+      expect(alertDialog()?.getAttribute('data-state')).toBe('open');
+      expect(alertDialog()?.textContent).toContain('Landscape Pass');
+      await confirmIn('Cancel');
+      await vi.waitFor(() => expect(alertDialog()).toBeNull());
 
-    // A keyboard-raised menu reports no pointer position.
-    await act(() =>
-      card('wf-landscape')?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }))
-    );
-
-    const menu = () => document.querySelector<HTMLElement>('[data-workflow-context-menu]');
-
-    // The positioner places the menu a frame after it mounts; anchored inside the card, not at the viewport corner.
-    await vi.waitFor(() =>
-      expect(menu()?.getBoundingClientRect().left ?? 0).toBeGreaterThan(
-        card('wf-landscape')!.getBoundingClientRect().left
-      )
-    );
-
-    await act(async () => {
-      await userEvent.keyboard('{Escape}');
+      await act(() =>
+        card('wf-upscale')?.dispatchEvent(
+          new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 120, clientY: 80 })
+        )
+      );
+      await vi.waitFor(() => expect(openMenu()?.id).toBe('workflow-library-card-wf-upscale-actions'));
+      await settleFrame();
+      expect(alertDialog()).toBeNull();
+      expect(libraryWrites.delete).not.toHaveBeenCalled();
     });
 
-    await vi.waitFor(() => expect(menu()).toBeNull());
-    await vi.waitFor(() => expect(document.activeElement).toBe(card('wf-landscape')));
+    it("offers Rename and Delete by the card's own access, not the selection's", async () => {
+      identity.session = { multiuserEnabled: true, phase: 'ready', user: { user_id: 'user-a' } };
+      const othersShared = { ...NON_OWNER_SHARED, item: { ...NON_OWNER_SHARED.item, workflow_id: 'wf-shared' } };
+      await openWith(withSnapshot({ entries: [OWNER_PRIVATE, othersShared] }));
+      const items = () =>
+        [...(openMenu()?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [])].map((item) => item.dataset.value);
+      const raiseOn = async (workflowId: string) => {
+        await act(() =>
+          card(workflowId)?.dispatchEvent(
+            new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 120, clientY: 80 })
+          )
+        );
+        await vi.waitFor(() => expect(openMenu()?.id).toBe(`workflow-library-card-${workflowId}-actions`));
+      };
+
+      expect(detail()).toBe('wf-portrait');
+      await raiseOn('wf-shared');
+      expect(items()).toEqual(['open', 'duplicate', 'fork-into-project', 'download-json']);
+      await act(() => userEvent.keyboard('{Escape}'));
+      await vi.waitFor(() => expect(openMenu()).toBeNull());
+
+      await act(() => card('wf-shared')?.click());
+      expect(detail()).toBe('wf-shared');
+      await raiseOn('wf-portrait');
+      expect(items()).toContain('rename');
+      expect(items()).toContain('delete');
+    });
+
+    it('duplicates the card it was raised for, once per press, and selects the copy', async () => {
+      let finishCopy!: (workflowId: string) => void;
+      libraryWrites.create.mockImplementationOnce(
+        () =>
+          new Promise<string>((resolve) => {
+            finishCopy = resolve;
+          })
+      );
+      await openWith(LOADED_SNAPSHOT);
+      const duplicateItem = () => openMenu()?.querySelector<HTMLElement>('[role="menuitem"][data-value="duplicate"]');
+      const raiseOn = async (workflowId: string) => {
+        await act(() =>
+          card(workflowId)?.dispatchEvent(
+            new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 120, clientY: 80 })
+          )
+        );
+        await vi.waitFor(() => expect(openMenu()?.id).toBe(`workflow-library-card-${workflowId}-actions`));
+      };
+
+      await raiseOn('wf-landscape');
+      await selectMenuItem(duplicateItem());
+      await act(settleFrame);
+      expect(libraryWrites.cached).toHaveBeenCalledExactlyOnceWith(
+        'wf-landscape',
+        expect.objectContaining({ expectedRevision: 1 })
+      );
+      await vi.waitFor(() => expect(libraryWrites.create).toHaveBeenCalledOnce());
+      expect(libraryWrites.create.mock.calls[0]![0].name).toBe('Landscape Pass copy');
+
+      await raiseOn('wf-landscape');
+      expect(duplicateItem()?.hasAttribute('data-disabled')).toBe(true);
+      await act(() => userEvent.keyboard('{Escape}'));
+      await vi.waitFor(() => expect(openMenu()).toBeNull());
+      await raiseOn('wf-sketch');
+      expect(duplicateItem()?.hasAttribute('data-disabled')).toBe(false);
+      await act(() => userEvent.keyboard('{Escape}'));
+      await vi.waitFor(() => expect(openMenu()).toBeNull());
+
+      await act(async () => {
+        finishCopy('wf-landscape-copy');
+        await settleFrame();
+      });
+      // Listed after the first entry, so only the selection, not the rail's first-entry fallback, shows the copy.
+      const copy = entry('wf-landscape-copy', 'Landscape Pass copy', readyEnrichment(7, 'flux'));
+      await act(() => browse.setSnapshot?.(withSnapshot({ entries: [PORTRAIT, LANDSCAPE, copy, SKETCH, UPSCALE] })));
+      expect(detail()).toBe('wf-landscape-copy');
+      expect(libraryWrites.create).toHaveBeenCalledOnce();
+    });
   });
 
   it('opens the selected workflow from the rail, the keyboard-reachable path', async () => {
     await openWith(LOADED_SNAPSHOT);
 
-    // Portrait needs nothing installed, but the project already holds a copy of it: Open asks what to do.
-    await clickText('Open…');
+    const railOpen = () => document.querySelector<HTMLButtonElement>('[data-workflow-detail-open]');
+
+    expect(railOpen()?.textContent).toBe('Open…');
+    await act(() => railOpen()?.click());
 
     expect(workflowUiStore.getSnapshot().libraryCopyChoice?.item.workflow_id).toBe(PORTRAIT.item.workflow_id);
     expect(loader.open).not.toHaveBeenCalled();
 
-    // Upscale has no copy yet (and nothing to install first), so Open adds one.
     await act(() => card('wf-upscale')?.click());
-    await clickText('Open');
+    expect(railOpen()?.textContent).toBe('Open');
+    await act(() => railOpen()?.click());
 
     expect(loader.open).toHaveBeenCalledWith(UPSCALE.item, 'first-copy');
   });
 
-  it('badges the cards with the models their workflows still need', async () => {
+  const quickAction = (workflowId: string, action: 'open' | 'preview') =>
+    card(workflowId)
+      ?.closest('[data-workflow-card-root]')
+      ?.querySelector<HTMLButtonElement>(`[data-card-action="${action}"]`) ?? null;
+
+  it('opens from the Open quick action without taking focus, asking first when the project holds a copy', async () => {
     await openWith(LOADED_SNAPSHOT);
 
-    expect(card('wf-landscape')?.textContent).toContain('Install 1 model');
-    expect(card('wf-portrait')?.textContent).not.toContain('Install');
+    await act(() => userEvent.hover(card('wf-portrait')!));
+    expect(quickAction('wf-portrait', 'open')?.textContent).toBe('Open…');
+    await act(() => userEvent.click(quickAction('wf-portrait', 'open')!));
+    expect(workflowUiStore.getSnapshot().libraryCopyChoice?.item.workflow_id).toBe('wf-portrait');
+    expect(loader.open).not.toHaveBeenCalled();
+    await vi.waitFor(() => expect(document.querySelector('[data-library-copy-choice]')).not.toBeNull());
+    await act(() => userEvent.keyboard('{Escape}'));
+    await vi.waitFor(() => expect(document.activeElement).toBe(card('wf-portrait')));
+
+    await act(() => userEvent.hover(card('wf-upscale')!));
+    expect(quickAction('wf-upscale', 'open')?.textContent).toBe('Open');
+    await act(() => userEvent.click(quickAction('wf-upscale', 'open')!));
+    expect(loader.open).toHaveBeenCalledWith(UPSCALE.item, 'first-copy');
+    expect(document.activeElement).toBe(card('wf-upscale'));
   });
 
-  it('records the workflow the rail asked to preview', async () => {
-    await openWith(LOADED_SNAPSHOT);
+  describe('preview mode', () => {
+    const stageButton = (label: string) =>
+      [...(stage()?.querySelectorAll<HTMLButtonElement>('button') ?? [])].find(
+        (button) => button.getAttribute('aria-label') === label || button.textContent === label
+      ) ?? null;
+    const previewNodes = () => [...(stage()?.querySelectorAll<HTMLElement>('.react-flow__node') ?? [])];
+    const previewNode = (id: string) =>
+      stage()?.querySelector<HTMLElement>(`.react-flow__node[data-id="${id}"]`) ?? null;
 
-    await clickText('Preview graph');
+    const nodeCard = () => stage()?.querySelector<HTMLElement>('[data-preview-node-card]') ?? null;
+    const stepper = () => [...document.querySelectorAll<HTMLElement>('[data-preview-stepper]')].find(isShown) ?? null;
+    const stepButton = (label: string) =>
+      stepper()?.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`) ?? null;
+    const positionText = () => stepper()?.querySelector('[data-preview-position]')?.textContent || null;
+    const railId = () => document.querySelector<HTMLElement>('[data-workflow-detail]')?.dataset.workflowDetail;
+    const railPreview = () => document.querySelector<HTMLButtonElement>('[data-workflow-preview-trigger]');
+    const collection = () => document.querySelector<HTMLElement>('[data-workflow-library-collection]');
+    const press = (key: string) => act(() => userEvent.keyboard(key));
+    const previewGraph = async (
+      snapshot: WorkflowLibraryBrowseSnapshot = withSnapshot({ entries: [GRAPH_ENTRY], total: 1 })
+    ) => {
+      await openWith(snapshot);
+      await act(() => card('wf-graph')?.click());
+      await clickText('Preview');
+      await waitForPreviewGraph();
+    };
 
-    // Task 8 mounts the preview dialog from this pending selection.
-    expect(document.querySelector('[data-pending-preview="wf-portrait"]')).not.toBeNull();
-  });
+    // The library preloads the graph chunk as it opens; a cold import can outlast `waitFor` under load.
+    beforeAll(() =>
+      Promise.all([loadGraphPreview(), import('@features/workflow/ui/graph-preview/WorkflowPreviewJson')])
+    );
 
-  it("mounts the lazy preview dialog with the entry's compiled graph and hides Invoke", async () => {
-    await openWith(withSnapshot({ entries: [PORTRAIT, PREVIEW_FIXTURE] }));
-
-    await act(() => card('wf-preview-fixture')?.click());
-    await clickText('Preview graph');
-    await waitForPreviewDialog();
-
-    const preview = document.querySelector('[data-preview-dialog]');
-    expect(preview).not.toBeNull();
-    expect(preview?.getAttribute('data-graph-id')).toBe('wf-preview-fixture');
-    expect(preview?.getAttribute('data-hide-invoke')).toBe('true');
-    expect(preview?.getAttribute('data-source-label')).toBe('Preview Fixture');
-    // The document's one `integer` node made it through compilation.
-    expect(preview?.textContent).toContain('integer');
-  });
-
-  it('commits the first preview in the click that opens it once the library has loaded the dialog', async () => {
-    await openWith(withSnapshot({ entries: [PORTRAIT, PREVIEW_FIXTURE] }));
-    await act(() => card('wf-preview-fixture')?.click());
-    await vi.dynamicImportSettled();
-
-    // A Suspense reveal here lets StrictMode replay the open dialog's effects after its focus trap started.
-    act(() => (buttonWithText('Preview graph') as HTMLButtonElement).click());
-
-    expect(document.querySelector('[data-preview-dialog]')?.getAttribute('data-preview-open')).toBe('true');
-  });
-
-  it('disables the Preview action for an entry whose enrichment is not ready', async () => {
-    await openWith(LOADED_SNAPSHOT);
-
-    await act(() => card('wf-sketch')?.click());
-
-    const button = buttonWithText('Preview graph') as HTMLButtonElement | undefined;
-    expect(button?.disabled).toBe(true);
-  });
-
-  it('keeps the preview mounted through its exit transition, then resets the pending preview', async () => {
-    await openWith(withSnapshot({ entries: [PORTRAIT, PREVIEW_FIXTURE] }));
-
-    await act(() => card('wf-preview-fixture')?.click());
-    await clickText('Preview graph');
-    await waitForPreviewDialog();
-
-    expect(document.querySelector('[data-preview-dialog]')?.getAttribute('data-preview-open')).toBe('true');
-
-    await clickText('Close preview');
-
-    // Keep the closing preview mounted until its exit animation finishes.
-    expect(document.querySelector('[data-preview-dialog]')?.getAttribute('data-preview-open')).toBe('false');
-    expect(document.querySelector('[data-pending-preview]')).not.toBeNull();
-
-    await clickText('Finish preview exit');
-
-    expect(document.querySelector('[data-preview-dialog]')).toBeNull();
-    expect(document.querySelector('[data-pending-preview]')).toBeNull();
-  });
-
-  it('keeps a re-opened preview mounted when the previous exit reports in late', async () => {
-    await openWith(withSnapshot({ entries: [PORTRAIT, PREVIEW_FIXTURE] }));
-
-    await act(() => card('wf-preview-fixture')?.click());
-    await clickText('Preview graph');
-    await waitForPreviewDialog();
-
-    await clickText('Close preview');
-    // Previewing again mid-transition re-opens the same dialog…
-    await clickText('Preview graph');
-
-    expect(document.querySelector('[data-preview-dialog]')?.getAttribute('data-preview-open')).toBe('true');
-
-    // …and the exit report from the *previous* close must not unmount it.
-    await clickText('Finish preview exit');
-
-    expect(document.querySelector('[data-preview-dialog]')?.getAttribute('data-preview-open')).toBe('true');
-  });
-
-  it('does not resurrect the preview after the library dialog closes and reopens', async () => {
-    await openWith(withSnapshot({ entries: [PORTRAIT, PREVIEW_FIXTURE] }));
-
-    await act(() => card('wf-preview-fixture')?.click());
-    await clickText('Preview graph');
-    await waitForPreviewDialog();
-
-    expect(document.querySelector('[data-preview-dialog]')).not.toBeNull();
-
-    // Use the dialog's real Close path, then reopen through controlled props to verify reset and mount cleanup.
-    const closeButton = document.querySelector<HTMLButtonElement>('button[aria-label="Close"]');
-    expect(closeButton).not.toBeNull();
-    // Settle deferred Dialog close transitions inside act.
-    await act(async () => {
-      closeButton?.click();
-      await settleFrame();
+    beforeEach(() => {
+      browse.loadWorkflowLibraryRange.mockClear();
+      downloads.downloadText.mockClear();
     });
 
-    await renderDialog(false);
-    expect(document.querySelector('[data-preview-dialog]')).toBeNull();
+    it('takes the places rail and the collection, keeps the detail rail, and opens no second dialog', async () => {
+      await openWith(withSnapshot({ entries: [PORTRAIT, GRAPH_ENTRY], total: 2 }));
+      await act(() => card('wf-graph')?.click());
+      await clickText('Preview');
 
-    await renderDialog(true);
-    expect(document.querySelector('[data-preview-dialog]')).toBeNull();
-  });
+      expect(stage()?.getAttribute('aria-label')).toBe('Preview of Graph Fixture');
+      expect(document.activeElement).toBe(stage());
+      expect(document.querySelectorAll('[data-scope="dialog"][data-part="content"]')).toHaveLength(1);
+      expect(getComputedStyle(collection()!).visibility).toBe('hidden');
+      expect(getComputedStyle(document.querySelector('[data-library-rail-slot]')!).visibility).toBe('hidden');
+      expect(railId()).toBe('wf-graph');
+      expect(isShown(document.querySelector('[data-workflow-detail-open]'))).toBe(true);
+      expect(isShown(railPreview())).toBe(false);
+      await waitForPreviewGraph();
+      expect(previewNodes()).toHaveLength(4);
+    });
 
-  it('sits the close control at the end of the tab row, not floating over the tag chips', async () => {
-    await resizeViewport(1280, 800);
-    await openWith(LOADED_SNAPSHOT);
+    it('has accessible library and preview surfaces', async () => {
+      const wasDark = document.documentElement.classList.contains('dark');
+      document.documentElement.classList.add('dark');
+      onTestFinished(() => {
+        document.documentElement.classList.toggle('dark', wasDark);
+      });
+      await openWith(withSnapshot({ entries: [PORTRAIT, GRAPH_ENTRY], total: 2 }));
+      const dialog = () => document.querySelector<HTMLElement>('[role="dialog"]')!;
+      expect(
+        await auditAccessibility(dialog(), { rules: { 'label-content-name-mismatch': { enabled: true } } })
+      ).toEqual([]);
+      await act(() => card('wf-graph')!.click());
+      await act(() => railPreview()!.click());
+      await waitForPreviewGraph();
+      expect(
+        await auditAccessibility(dialog(), { rules: { 'label-content-name-mismatch': { enabled: true } } })
+      ).toEqual([]);
+    });
 
-    const close = document.querySelector<HTMLButtonElement>('button[aria-label="Close"]');
-    const segments = document.querySelector<HTMLElement>('[role="tablist"][aria-label="Workflows"]');
-    const search = document.querySelector<HTMLElement>('input[type="search"]');
-    expect(close).not.toBeNull();
-    expect(segments).not.toBeNull();
-
-    // On the tab row's baseline rather than the dialog's absolute top corner…
-    const closeBox = close!.getBoundingClientRect();
-    const segmentBox = segments!.getBoundingClientRect();
-    const closeCenter = closeBox.top + closeBox.height / 2;
-
-    expect(closeCenter).toBeGreaterThanOrEqual(segmentBox.top);
-    expect(closeCenter).toBeLessThanOrEqual(segmentBox.bottom);
-    // …after the tabs, at the end of the row, with the search before them.
-    expect(closeBox.left).toBeGreaterThanOrEqual(segmentBox.right);
-    expect(search!.getBoundingClientRect().right).toBeLessThanOrEqual(segmentBox.left);
-  });
-
-  it.each([
-    ['user', false, 'This project'],
-    ['project', false, 'Yours'],
-    ['shared', true, 'Shared'],
-  ] as const)(
-    'keeps the %s header inside a 320px-wide dialog, with Close on the title row and every tab label whole',
-    async (tab, isMultiuser, targetTab) => {
-      identity.session = isMultiuser
-        ? { multiuserEnabled: true, phase: 'ready', user: { user_id: 'user-a' } }
-        : { multiuserEnabled: false, phase: 'ready', user: null };
-      await resizeViewport(320, 640);
+    it('selects cards with Space and previews from the named Preview button; Escape returns to the collection', async () => {
       await openWith(LOADED_SNAPSHOT);
-      if (tab === 'project') {
-        await clickSegment('project');
+      await act(() => card('wf-landscape')!.focus());
+      await press(' ');
+      expect(stage()).toBeNull();
+      expect(railId()).toBe('wf-landscape');
+      expect(railPreview()?.tabIndex).toBe(0);
+      await act(() => railPreview()!.focus());
+      await press(' ');
+
+      expect(stage()).not.toBeNull();
+      expect(railId()).toBe('wf-landscape');
+
+      await press('{Escape}');
+      expect(stage()).toBeNull();
+      expect(document.activeElement).toBe(railPreview());
+      expect(onOpenChange).not.toHaveBeenCalled();
+
+      await act(() => userEvent.hover(card('wf-portrait')!));
+      await act(() => userEvent.click(quickAction('wf-portrait', 'preview')!));
+      expect(stage()).not.toBeNull();
+      expect(railId()).toBe('wf-portrait');
+
+      await press('{Escape}');
+      expect(stage()).toBeNull();
+      await press('{Escape}');
+      expect(onOpenChange).toHaveBeenCalledWith(false);
+    });
+
+    it('returns to the collection as it left it: scroll position, selection and the control that opened it', async () => {
+      const entries = Array.from({ length: 40 }, (_, index) => ({
+        ...PORTRAIT,
+        item: { ...PORTRAIT.item, workflow_id: `scroll-${index}`, name: `Scroll ${index}` },
+      }));
+      await openWith(withSnapshot({ entries, total: entries.length }));
+      const viewport = gridViewport()!;
+      await act(async () => {
+        viewport.scrollTop = 600;
+        viewport.dispatchEvent(new Event('scroll'));
+        await settleFrame();
+      });
+      await act(() => card('scroll-12')!.click());
+      await act(() => userEvent.click(railPreview()!));
+
+      await act(() => stageButton('Back to My library')!.click());
+
+      expect(stage()).toBeNull();
+      expect(gridViewport()!.scrollTop).toBe(600);
+      expect(railId()).toBe('scroll-12');
+      expect(document.activeElement).toBe(railPreview());
+    });
+
+    it('steps through the results in order, selecting each, and stops at the ends', async () => {
+      await openWith(withSnapshot({ total: 4 }));
+      await clickText('Preview');
+
+      expect(railId()).toBe('wf-portrait');
+      expect(positionText()).toBe('1 of 4');
+      expect(stepButton('Previous workflow')?.getAttribute('aria-disabled')).toBe('true');
+
+      await act(() => userEvent.click(stepButton('Next workflow')!));
+      expect(railId()).toBe('wf-landscape');
+      expect(positionText()).toBe('2 of 4');
+      expect(document.activeElement).toBe(stepButton('Next workflow'));
+
+      await act(() => stepButton('Next workflow')!.focus());
+      await press('{ArrowDown}');
+      expect(railId()).toBe('wf-sketch');
+      expect(document.activeElement).toBe(stepButton('Next workflow'));
+      const rail = document.querySelector<HTMLElement>('[data-workflow-detail]')!;
+      expect(rail.contains(stepper())).toBe(true);
+      expect(stage()?.querySelector('[data-preview-stepper]')).toBeNull();
+      expect(stage()?.querySelector('[role="status"]')?.textContent).toBe('Loading workflow…');
+
+      await press('{ArrowDown}');
+      expect(railId()).toBe('wf-upscale');
+      expect(positionText()).toBe('4 of 4');
+      expect(stage()?.querySelector('[role="alert"]')?.textContent).toBe(
+        "This workflow can't be previewed: unreadable"
+      );
+      expect(stepButton('Next workflow')?.getAttribute('aria-disabled')).toBe('true');
+      await press('{ArrowDown}');
+      expect(railId()).toBe('wf-upscale');
+
+      await press('{ArrowUp}');
+      expect(railId()).toBe('wf-sketch');
+
+      await press('{Escape}');
+      expect(document.activeElement).toBe(card('wf-sketch'));
+    });
+
+    it.each(['selection', 'search', 'filter'] as const)('ignores a late step after a new %s intent', async (change) => {
+      await openWith(withSnapshot({ entries: [PORTRAIT, LANDSCAPE], total: 24 }));
+      await act(() => card('wf-landscape')!.click());
+      await clickText('Preview');
+      let arrive!: () => void;
+      browse.loadWorkflowLibraryRange.mockImplementationOnce(
+        () =>
+          new Promise<boolean>((resolve) => {
+            arrive = () => {
+              browse.setSnapshot?.({ ...browse.getSnapshot!(), entries: [PORTRAIT, LANDSCAPE, SKETCH], total: 24 });
+              resolve(true);
+            };
+          })
+      );
+      await act(() => stepButton('Next workflow')!.click());
+      await act(() => {
+        if (change === 'selection') {
+          card('wf-portrait')!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        } else if (change === 'search') {
+          setWorkflowLibrarySearch('cat');
+        } else {
+          browse.setSnapshot?.({
+            ...browse.getSnapshot!(),
+            filter: { ...browse.getSnapshot!().filter, search: 'cat' },
+          });
+        }
+      });
+      if (change === 'selection') {
+        expect(railId()).toBe('wf-portrait');
       }
+      await act(async () => {
+        arrive();
+        await settleFrame();
+      });
+
+      expect(railId()).toBe(change === 'selection' ? 'wf-portrait' : 'wf-landscape');
+    });
+
+    it('draws the saved document simplified, with editor titles and markers, and every node on Show all', async () => {
+      await previewGraph();
+
+      expect(previewNodes().map((node) => node.getAttribute('aria-label'))).toEqual([
+        'Main Model Model not installed you set this needs a model',
+        'Prompt Denoise Latents 30 steps · cfg 3.5 you set this',
+        'Latents to Image',
+        'mask_refine Node pack missing unknown node type result',
+      ]);
+      expect(previewNode('denoise')?.textContent).toBe('Prompt Denoise Latents 30 steps · cfg 3.5');
+      expect(previewNode('refine')?.textContent).toBe('mask_refine Node pack missing');
+      expect([...stage()!.querySelectorAll('[data-preview-legend] li')].map((item) => item.textContent)).toEqual([
+        'You set this',
+        'Needs a model',
+        'Result',
+      ]);
+      expect(stage()?.querySelector('[data-preview-node-count]')?.textContent).toBe(
+        'Showing 4 of 6 nodes · 2 helpers folded' + 'Show all 6'
+      );
+
+      await act(() => stageButton('Show all 6')!.click());
+      await vi.waitFor(() => expect(previewNodes()).toHaveLength(6));
+      expect(previewNode('prompt')?.getAttribute('aria-label')).toBe('String Primitive you set this');
+      expect(stage()?.querySelector('[data-preview-node-count]')?.textContent).toBe(
+        'Showing all 6 nodes, as drawn' + 'Simplify'
+      );
+
+      await act(() => stageButton('Simplify')!.click());
+      await vi.waitFor(() => expect(previewNodes()).toHaveLength(4));
+    });
+
+    it('exports the saved workflow document from its menu, in the editor’s own export shape', async () => {
+      await previewGraph();
+      const exportItem = (value: string) =>
+        document.querySelector<HTMLElement>(`[role="menuitem"][data-value="${value}"]`);
+      await act(() => userEvent.click(stageButton('Export')!));
+      await vi.waitFor(() => expect(exportItem('download-workflow-json')).not.toBeNull());
+      expect(exportItem('copy-workflow-json')).not.toBeNull();
+
+      await selectMenuItem(exportItem('download-workflow-json'));
+
+      expect(downloads.downloadText).toHaveBeenCalledWith(
+        JSON.stringify(serializeWorkflowJson(GRAPH_DOCUMENT), null, 2),
+        'Graph Fixture.json',
+        'application/json'
+      );
+    });
+
+    const tabs = () => [...(stage()?.querySelectorAll<HTMLElement>('[role="tab"]') ?? [])];
+    const selectTab = (name: string) =>
+      act(() => userEvent.click(tabs().find((tab) => tab.textContent?.startsWith(name))!));
+    const previewInputs = () => [...(stage()?.querySelectorAll<HTMLElement>('[data-preview-input]') ?? [])];
+    const inputRow = (label: string) =>
+      previewInputs().find((input) => input.querySelector('p')?.textContent === label) ?? null;
+
+    it('switches between Nodes, Inputs and Graph as tabs, keeping the choice until the library closes', async () => {
+      await previewGraph();
+
+      expect(tabs().map((tab) => [tab.textContent, tab.getAttribute('aria-selected')])).toEqual([
+        ['Nodes', 'true'],
+        ['Inputs 3', 'false'],
+        ['Graph', 'false'],
+      ]);
+      const panel = () => stage()!.querySelector<HTMLElement>('[role="tabpanel"]')!;
+      expect(panel().getAttribute('aria-labelledby')).toBe(tabs()[0]!.id);
+
+      await selectTab('Inputs');
+      expect(panel().getAttribute('aria-labelledby')).toBe(tabs()[1]!.id);
+      expect(previewInputs()).toHaveLength(3);
+      expect(stage()?.querySelector('[data-preview-find]')).toBeNull();
+
+      await press('{Escape}');
+      await clickText('Preview');
+      expect(tabs()[1]?.getAttribute('aria-selected')).toBe('true');
+      await act(async () => {
+        document.querySelector<HTMLButtonElement>('button[aria-label="Close"]')!.click();
+        await settleFrame();
+      });
+      await renderDialog(false);
+      await renderDialog(true);
+      await clickText('Preview');
+      expect(tabs()[0]?.getAttribute('aria-selected')).toBe('true');
+    });
+
+    it('shows in Graph the graph the workflow compiles to, or in words why it does not compile', async () => {
+      const json = () => stage()?.querySelector('[data-preview-json] code')?.textContent ?? null;
+
+      await previewGraph();
+      await selectTab('Graph');
+      await vi.waitFor(
+        async () => {
+          await act(settleFrame);
+          expect(json()).not.toBeNull();
+        },
+        { timeout: 5000 }
+      );
+
+      expect(Object.keys((JSON.parse(json()!) as { nodes: Record<string, unknown> }).nodes)).toEqual(
+        expect.arrayContaining(['denoise', 'decode'])
+      );
+
+      const broken = {
+        ...GRAPH_DOCUMENT,
+        edges: [...GRAPH_DOCUMENT.edges, graphEdge('decode', 'denoise', 'loop_linkage', 'latents')],
+      };
+      await act(() =>
+        browse.setSnapshot?.(
+          withSnapshot({
+            entries: [entry('wf-graph', 'Graph Fixture', readyEnrichment(6, 'flux', NO_REQUIREMENTS, broken))],
+            total: 1,
+          })
+        )
+      );
+      expect(json()).toBeNull();
+      expect(stage()?.querySelector('[role="tabpanel"] [role="alert"]')?.textContent).toBe(
+        "This graph can't compile yet. For loop validation failed: Loop linkage must connect a For to its ForReturn."
+      );
+      await selectTab('Nodes');
+      await waitForPreviewGraph();
+    });
+
+    it('shows the form read-only: saved values, a model to install, and the node each input sets', async () => {
+      await previewGraph();
+      await selectTab('Inputs');
+
+      expect([...stage()!.querySelectorAll('h3')].map((heading) => heading.textContent)).toEqual([
+        'Prompting',
+        'Model',
+      ]);
+      const value = (label: string) => inputRow(label)?.querySelector<HTMLElement>('[data-input-value]');
+      expect(value('Prompt')?.textContent).toBe('a lighthouse at dusk, long exposure');
+      expect(value('Prompt')?.hasAttribute('tabindex')).toBe(false);
+      expect(value('Steps')?.textContent).toBe('30');
+      expect(value('Model')?.dataset.inputValue).toBe('missing');
+      expect(value('Model')?.textContent).toBe('FLUX checkpoint · Not installed');
+      const warningProbe = document.createElement('span');
+      warningProbe.style.color = 'var(--chakra-colors-fg\\.warning)';
+      document.body.append(warningProbe);
+      const warningColor = getComputedStyle(warningProbe).color;
+      warningProbe.remove();
+      value('Model')!.style.color = 'rgb(1, 2, 3)';
+      expect(getComputedStyle(value('Model')!).borderColor).toBe(warningColor);
+      value('Model')!.style.removeProperty('color');
+
+      await act(() => userEvent.click(inputRow('Steps')!.querySelector('button')!));
+      await waitForPreviewGraph();
+      expect(tabs()[0]?.getAttribute('aria-selected')).toBe('true');
+      expect(nodeCard()?.dataset.previewNodeCard).toBe('denoise');
+      expect(document.activeElement).toBe(nodeCard());
+
+      await selectTab('Inputs');
+      await act(() => userEvent.click(inputRow('Prompt')!.querySelector('button')!));
+      await waitForPreviewGraph();
+      expect(nodeCard()?.dataset.previewNodeCard).toBe('prompt');
+      expect(previewNodes()).toHaveLength(6);
+    });
+
+    it('reopens on the collection and on Nodes after a close that bypasses the library’s own controls', async () => {
+      await act(() => browse.setSnapshot?.(LOADED_SNAPSHOT));
+      setWorkflowLibraryOpen(true);
+      const render = () =>
+        act(async () => {
+          root.render(
+            <StrictMode>
+              <QueryClientProvider client={queryClient}>
+                <ChakraProvider value={system}>
+                  <WorkflowUiProvider adapter={UI_ADAPTER}>
+                    <GalleryHostProvider host={GALLERY_HOST}>
+                      <WorkflowGraphPreviewProvider adapter={GRAPH_PREVIEW}>
+                        <StoreBoundLibraryDialog />
+                      </WorkflowGraphPreviewProvider>
+                    </GalleryHostProvider>
+                  </WorkflowUiProvider>
+                </ChakraProvider>
+              </QueryClientProvider>
+            </StrictMode>
+          );
+          await settleFrame();
+        });
+      await render();
+      await clickText('Preview');
+      await selectTab('Inputs');
+      expect(stage()).not.toBeNull();
+
+      await act(async () => {
+        setWorkflowLibraryOpen(false);
+        await settleFrame();
+      });
+      await act(async () => {
+        setWorkflowLibraryOpen(true);
+        await settleFrame();
+      });
+
+      expect(stage()).toBeNull();
+      expect(getComputedStyle(collection()!).visibility).toBe('visible');
+      await clickText('Preview');
+      expect(tabs()[0]?.getAttribute('aria-selected')).toBe('true');
+    });
+  });
+
+  const NARROW_WINDOWS = [[640, 400]] as const;
+
+  it.each(NARROW_WINDOWS)(
+    'shows the selection as a bottom sheet whose details open over the grid in a %i×%i window',
+    async (width, height) => {
+      const entries = [
+        PORTRAIT,
+        ...Array.from({ length: 40 }, (_, index) => ({
+          ...LANDSCAPE,
+          item: { ...LANDSCAPE.item, workflow_id: `sheet-${index}` },
+        })),
+      ];
+      await resizeViewport(width, height);
+      await openWith(withSnapshot({ entries, total: entries.length, pages: 1 }));
 
       const content = document.querySelector<HTMLElement>('[data-scope="dialog"][data-part="content"]')!;
-      const contentBox = content.getBoundingClientRect();
-      expect(content.scrollWidth).toBeLessThanOrEqual(content.clientWidth + 1);
-      const title = content.querySelector<HTMLElement>('[data-part="title"]')!;
-      const close = content.querySelector<HTMLButtonElement>('button[aria-label="Close"]')!;
-      const tabs = [...content.querySelectorAll<HTMLElement>('[role="tab"]')];
-      const find = (selector: string) => content.querySelector<HTMLElement>(selector);
-      // Search, sort and the tag strip belong to the template tabs; the project tab shows its hint instead.
-      const rowControls =
-        tab === 'user'
-          ? [
-              find('input[type="search"]'),
-              find('[role="combobox"][aria-labelledby]'),
-              // The tag strip, the header's only scroll region.
-              find('[role="region"]:not([role="tabpanel"] *)'),
-            ]
-          : [];
-      const header = [close, ...tabs, find('[aria-label="Thumbnail display"]'), ...rowControls];
-      expect(tabs.map((element) => element.textContent)).toEqual(
-        isMultiuser ? ['This project', 'Browse', 'Yours', 'Shared'] : ['This project', 'Browse', 'Yours']
-      );
-      expect(header).not.toContain(null);
-
-      for (const element of header as HTMLElement[]) {
-        const box = element.getBoundingClientRect();
-        expect(box.left, element.textContent ?? '').toBeGreaterThanOrEqual(contentBox.left);
-        expect(box.right, element.textContent ?? '').toBeLessThanOrEqual(contentBox.right);
-      }
-      for (const label of tabs.map((element) => element.firstElementChild as HTMLElement)) {
-        expect(label.scrollWidth, label.textContent ?? '').toBeLessThanOrEqual(label.clientWidth);
+      const sheet = content.querySelector<HTMLElement>('[data-workflow-detail="wf-portrait"]')!;
+      const summary = sheet.querySelector<HTMLElement>('[data-detail-sheet-summary]')!;
+      const details = sheet.querySelector<HTMLElement>('[data-detail-sheet-details]')!;
+      const toggle = summary.querySelector<HTMLButtonElement>('[data-detail-sheet-toggle]')!;
+      const more = summary.querySelector<HTMLButtonElement>('button[aria-label="More actions"]')!;
+      const grid = gridViewport()!;
+      const search = content.querySelector<HTMLElement>('[data-workflow-library-toolbar] input[type="search"]')!;
+      let centre = sheet.parentElement!;
+      while (!/(auto|scroll)/.test(getComputedStyle(centre).overflowY)) {
+        centre = centre.parentElement!;
       }
 
-      // Close shares the title's row, so it stays where a dialog's Close is expected.
-      const titleBox = title.getBoundingClientRect();
-      const closeCenter = close.getBoundingClientRect().top + close.getBoundingClientRect().height / 2;
-      expect(closeCenter).toBeGreaterThanOrEqual(titleBox.top);
-      expect(closeCenter).toBeLessThanOrEqual(titleBox.bottom);
+      expect(isShown(summary)).toBe(true);
+      expect(isShown(details)).toBe(false);
+      expectContained(summary, content);
+      expect(summary.getBoundingClientRect().left).toBeGreaterThanOrEqual(grid.getBoundingClientRect().left - 1);
+      expect(summary.getBoundingClientRect().bottom).toBeGreaterThan(grid.getBoundingClientRect().top);
+      expect(summary.textContent).toContain('Portrait Studio');
+      expect(summary.querySelector('[data-detail-sheet-open]')?.textContent).toBe('Open…');
+      expect(toggle.textContent).toBe('Details and requirements');
+      expect(toggle.getAttribute('aria-expanded')).toBe('false');
+      expect(toggle.getAttribute('aria-controls')).toBe(details.id);
 
-      // A real pointer click reaches the other tab on its own row.
-      const target = tabs.find((element) => element.textContent === targetTab)!;
-      await act(() => userEvent.click(target));
-      expect(target.getAttribute('aria-selected')).toBe('true');
+      await act(() => userEvent.click(more));
+      await vi.waitFor(() => expect(more.getAttribute('aria-expanded')).toBe('true'));
+      const actions = document.getElementById(more.getAttribute('aria-controls') ?? '')!;
+      expect(actions.querySelector('[role="menuitem"][data-value="duplicate"]')).not.toBeNull();
+      await act(() => userEvent.keyboard('{Escape}'));
+      await vi.waitFor(() => expect(document.activeElement).toBe(more));
+
+      await act(() => {
+        grid.scrollTop = 200;
+        grid.dispatchEvent(new Event('scroll'));
+      });
+      const scrollTop = grid.scrollTop;
+      expect(scrollTop).toBeGreaterThan(0);
+      // From the top of the column, as the library opens; the pointer would scroll the toggle into view first.
+      await act(() => {
+        centre.scrollTop = 0;
+        toggle.focus({ preventScroll: true });
+      });
+      const centreScrollTop = centre.scrollTop;
+
+      await act(() => userEvent.keyboard('{Enter}'));
+      expect(toggle.getAttribute('aria-expanded')).toBe('true');
+      expect(toggle.textContent).toBe('Hide details');
+      expect(isShown(details)).toBe(true);
+      const detailsBox = details.getBoundingClientRect();
+      const gridBox = grid.getBoundingClientRect();
+      expect(detailsBox.top).toBeLessThanOrEqual(gridBox.top + 1);
+      expect(detailsBox.left).toBeLessThanOrEqual(gridBox.left + 1);
+      expect(detailsBox.right).toBeGreaterThanOrEqual(gridBox.right - 1);
+      expect(getComputedStyle(grid).visibility).toBe('hidden');
+      expect(grid.scrollTop).toBe(scrollTop);
+      expect(details.contains(document.activeElement)).toBe(true);
+      if (height <= 400) {
+        expect(centre.scrollTop).toBeGreaterThan(centreScrollTop);
+      }
+      expect(getComputedStyle(summary.querySelector('p')!).whiteSpace).not.toBe('nowrap');
+      expect(
+        [...details.querySelectorAll('p')].some((text) => text.textContent === 'Portrait Studio' && isShown(text))
+      ).toBe(false);
+      expect([...details.querySelectorAll('img')].some(isShown)).toBe(false);
+      expect(details.querySelector('[data-requirement-status], [data-workflow-detail-facts]')).not.toBeNull();
+      expect(
+        [...details.querySelectorAll('button')].some((button) => button.textContent === 'Preview' && isShown(button))
+      ).toBe(true);
+
+      await act(() => userEvent.click(more));
+      await vi.waitFor(() => expect(more.getAttribute('aria-expanded')).toBe('true'));
+      await act(() => userEvent.keyboard('{Escape}'));
+      await vi.waitFor(() => expect(more.getAttribute('aria-expanded')).toBe('false'));
+      expect(toggle.getAttribute('aria-expanded')).toBe('true');
+
+      await act(() => details.focus());
+      await act(() => userEvent.keyboard('{Escape}'));
+      expect(toggle.getAttribute('aria-expanded')).toBe('false');
+      expect(document.activeElement).toBe(toggle);
+      expect(isShown(details)).toBe(false);
+      expect(getComputedStyle(grid).visibility).toBe('visible');
+      expect(grid.scrollTop).toBe(scrollTop);
+      expect(centre.scrollTop).toBe(centreScrollTop);
+      expectContained(search, content);
+      expect(onOpenChange).not.toHaveBeenCalledWith(false);
+
+      await act(() => userEvent.keyboard('{Escape}'));
+      expect(onOpenChange).toHaveBeenCalledWith(false);
     }
   );
 
-  it('wraps a long workflow name in full instead of scrolling the rail sideways', async () => {
-    await openWith(withSnapshot({ entries: [LONG_NAMED, PORTRAIT] }));
+  describe('list layout', () => {
+    const row = (workflowId: string) =>
+      document.getElementById(`workflow-library-card-${workflowId}`)?.closest<HTMLElement>('[data-list-row]') ?? null;
+    const primary = (workflowId: string) => row(workflowId)?.querySelector<HTMLElement>('[data-list-primary]') ?? null;
+    const rail = () => document.querySelector<HTMLElement>('[data-workflow-detail]')?.dataset.workflowDetail;
 
-    const detail = document.querySelector<HTMLElement>('[data-workflow-detail]');
-    const body = detail?.parentElement;
-    expect(detail?.dataset.workflowDetail).toBe('wf-long-name');
-    expect(body).not.toBeNull();
+    const openAsList = async (snapshot: WorkflowLibraryBrowseSnapshot) => {
+      preferences.setSnapshot({ ...preferences.port.getSnapshot(), workflowLibraryLayout: 'list' });
+      await openWith(snapshot);
+      await vi.waitFor(() => expect(row('wf-portrait')).not.toBeNull());
+    };
 
-    // 18rem rail plus its 1px borders. Anything wider is the rail growing to
-    // its content's min-content width.
-    expect(detail?.getBoundingClientRect().width).toBeLessThanOrEqual(18 * 16 + 2);
-    expect(body?.scrollWidth).toBeLessThanOrEqual((body?.clientWidth ?? 0) + 1);
+    it('starts as the grid, switches to rows from the view menu and keeps the choice with the account', async () => {
+      await openWith(LOADED_SNAPSHOT);
+      const item = (label: string) =>
+        [...document.querySelectorAll<HTMLElement>('[role="menuitemradio"]')].find(
+          (candidate) => candidate.textContent === label
+        );
 
-    // The rail's own (vertical) scroll area must not scroll horizontally: it
-    // renders no horizontal scrollbar, so overflow there just hides content.
-    const railViewport = detail?.querySelector<HTMLElement>(`[role="region"][aria-label="${LONG_NAME}"]`);
-    expect(railViewport).not.toBeNull();
-    expect(railViewport?.scrollWidth).toBeLessThanOrEqual((railViewport?.clientWidth ?? 0) + 1);
+      expect(cards()).toHaveLength(4);
+      expect(document.querySelector('[data-workflow-library-list]')).toBeNull();
+      await act(() => userEvent.click(document.querySelector<HTMLElement>('button[aria-label="View options"]')!));
+      await vi.waitFor(() => expect(item('List')).not.toBeUndefined());
+      expect(item('Grid')?.getAttribute('aria-checked')).toBe('true');
+      await act(() => userEvent.click(item('List')!));
 
-    // The detail rail must wrap the full workflow name without clipping.
-    const heading = [...(detail?.querySelectorAll('p') ?? [])].find((element) => element.textContent === LONG_NAME);
-    expect(heading, 'the full name should be rendered').not.toBeUndefined();
-    expect(heading?.scrollWidth).toBeLessThanOrEqual((heading?.clientWidth ?? 0) + 1);
-    // Wrapped, not squeezed onto one line.
-    expect(heading?.getBoundingClientRect().height ?? 0).toBeGreaterThan(20);
-  });
+      expect(setLibraryPreferences).toHaveBeenCalledWith({ workflowLibraryLayout: 'list' });
+      await vi.waitFor(() => expect(row('wf-portrait')).not.toBeNull());
+      expect(cards()).toHaveLength(0);
+      expect(row('wf-landscape')?.textContent).toContain('Landscape Pass');
+      expect(row('wf-landscape')?.textContent).toContain('1 model to install');
+      expect(
+        row('wf-landscape')?.querySelector('[data-workflow-readiness]')?.getAttribute('data-workflow-readiness')
+      ).toBe('models');
+      expect(row('wf-portrait')?.querySelector('[data-workflow-in-project]')).not.toBeNull();
+      expect(row('wf-sketch')?.querySelector('[data-enrichment-placeholder]')).not.toBeNull();
+      expect(
+        document
+          .querySelector('[data-workflow-library-list] [role="list"]')
+          ?.querySelector('[aria-setsize]')
+          ?.getAttribute('aria-setsize')
+      ).toBe('24');
+      expect(item('Small cards')).toBeUndefined();
+      expect(item('Fill')).toBeUndefined();
+    });
 
-  it('shows the busy overlay while a workflow is being applied', async () => {
-    loader.phase.current = 'applying';
+    it('selects on a press, opens on a double-click, and moves the selection with ArrowDown and Enter', async () => {
+      await openAsList(LOADED_SNAPSHOT);
 
-    await openWith(LOADED_SNAPSHOT);
+      await act(() => userEvent.click(primary('wf-landscape')!));
+      expect(rail()).toBe('wf-landscape');
+      expect(primary('wf-landscape')?.getAttribute('aria-current')).toBe('true');
 
-    const status = document.querySelector('[role="status"]');
-    expect(status?.textContent).toContain('Applying workflow…');
-    expect(document.querySelector('[aria-busy="true"]')).not.toBeNull();
+      await act(() => {
+        primary('wf-landscape')?.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+      });
+      expect(loader.open).toHaveBeenCalledWith(LANDSCAPE.item, 'first-copy');
+
+      await act(() => userEvent.keyboard('{ArrowDown}'));
+      expect(document.activeElement).toBe(primary('wf-sketch'));
+      await act(() => userEvent.keyboard('{Enter}'));
+      expect(rail()).toBe('wf-sketch');
+    });
   });
 });
 
@@ -1821,24 +2300,25 @@ describe('WorkflowLibraryDialog — This project', () => {
       setTimeout(resolve, 0);
     });
 
-  /** `storeBound` opens and closes the dialog through the UI store, as the workflow dialog host does. */
   const renderDialog = async ({ storeBound = false }: { storeBound?: boolean } = {}) => {
     await act(async () => {
       root.render(
         <StrictMode>
-          <ChakraProvider value={system}>
-            <WorkflowUiProvider adapter={UI_ADAPTER}>
-              <GalleryHostProvider host={GALLERY_HOST}>
-                <WorkflowGraphPreviewProvider adapter={GRAPH_PREVIEW}>
-                  {storeBound ? (
-                    <StoreBoundLibraryDialog />
-                  ) : (
-                    <WorkflowLibraryDialog isOpen onOpenChange={onOpenChange} />
-                  )}
-                </WorkflowGraphPreviewProvider>
-              </GalleryHostProvider>
-            </WorkflowUiProvider>
-          </ChakraProvider>
+          <QueryClientProvider client={queryClient}>
+            <ChakraProvider value={system}>
+              <WorkflowUiProvider adapter={UI_ADAPTER}>
+                <GalleryHostProvider host={GALLERY_HOST}>
+                  <WorkflowGraphPreviewProvider adapter={GRAPH_PREVIEW}>
+                    {storeBound ? (
+                      <StoreBoundLibraryDialog />
+                    ) : (
+                      <WorkflowLibraryDialog isOpen onOpenChange={onOpenChange} />
+                    )}
+                  </WorkflowGraphPreviewProvider>
+                </GalleryHostProvider>
+              </WorkflowUiProvider>
+            </ChakraProvider>
+          </QueryClientProvider>
         </StrictMode>
       );
       await settleFrame();
@@ -1867,10 +2347,9 @@ describe('WorkflowLibraryDialog — This project', () => {
     await click(card(workflowId));
   };
 
-  const menuItem = (value: string) => document.querySelector<HTMLElement>(`[data-menu-item="${value}"]`);
+  const menuItem = (value: string) => document.querySelector<HTMLElement>(`[role="menuitem"][data-value="${value}"]`);
   const railMenuTrigger = () => rail()?.querySelector<HTMLElement>('[aria-label="More actions"]');
-  // The trigger's data-state belongs to its tooltip; the menu's own state is aria-expanded. The menu opens on a
-  // later frame, so read it only once its items are in the document.
+  // The trigger's data-state belongs to its tooltip; aria-expanded is the menu's, and its items mount a frame later.
   const openRailMenu = async () => {
     const trigger = railMenuTrigger();
     expect(trigger).not.toBeNull();
@@ -1882,13 +2361,12 @@ describe('WorkflowLibraryDialog — This project', () => {
     await vi.waitFor(
       () => {
         expect(railMenuTrigger()?.getAttribute('aria-expanded')).toBe('true');
-        expect(document.querySelector('[data-menu-item]')).not.toBeNull();
+        expect(document.querySelector('[role="menuitem"]')).not.toBeNull();
       },
       { timeout: 2000 }
     );
   };
-  // Escape only reaches the menu once it holds focus, which lands a frame later; toggling the trigger closes it
-  // regardless. A closed menu keeps its items mounted, so aria-expanded is what says it has closed.
+  // Escape reaches the menu only once it holds focus a frame later; closed items stay mounted, so read aria-expanded.
   const closeRailMenu = async () => {
     if (railMenuTrigger()?.getAttribute('aria-expanded') === 'true') {
       await click(railMenuTrigger());
@@ -1898,7 +2376,7 @@ describe('WorkflowLibraryDialog — This project', () => {
   };
   const clickRailMenuItem = async (value: string) => {
     await openRailMenu();
-    await click(menuItem(value));
+    await selectMenuItem(menuItem(value));
   };
 
   beforeEach(() => {
@@ -1907,17 +2385,21 @@ describe('WorkflowLibraryDialog — This project', () => {
     root = createRoot(host);
     onOpenChange = vi.fn((_isOpen: boolean) => {});
     browse.ensureWorkflowLibraryBrowseLoaded.mockClear();
+    browse.loadWorkflowLibraryPlaceTotals.mockClear();
     browse.setWorkflowLibraryBrowseFilter.mockClear();
     loader.open.mockClear();
+    loader.replace.mockClear();
     loader.resume.mockClear();
+    queryClient.clear();
+    templateRecords.clear();
     loader.phase.current = 'idle';
     for (const command of Object.values(COMMANDS)) {
       command.mockClear();
     }
     project.setSnapshot(projectSnapshot(PROJECT_WORKFLOWS));
+    preferences.setSnapshot(LIBRARY_PREFERENCES as unknown as WorkflowPreferences);
     browse.setSnapshot?.(LOADED_SNAPSHOT);
     accountLifecycle.invalidate();
-    // The library opens on the project's own workflows, as it does from the workflow header.
     openWorkflowLibraryAtProjectWorkflow(PROJECT_ID, 'wf-alpha');
   });
 
@@ -1931,27 +2413,77 @@ describe('WorkflowLibraryDialog — This project', () => {
 
     expect(document.querySelector('[data-library-tab="project"]')).not.toBeNull();
     expect(cards().map((element) => element.dataset.workflowCard)).toEqual(['wf-alpha', 'wf-bundled', 'wf-user']);
-    expect(document.body.textContent).toContain('3 workflows in this project');
+    expect(document.querySelector('[data-workflow-library-results]')?.textContent).toBe('3 workflows');
 
     const badges = [...document.querySelectorAll<HTMLElement>('[data-workflow-card] [data-active-workflow]')];
     expect(badges).toHaveLength(1);
     expect(badges[0]?.closest<HTMLElement>('[data-workflow-card]')?.dataset.workflowCard).toBe('wf-alpha');
     expect(badges[0]?.textContent).toBe('Active');
 
-    // The project view is local; no library page is requested and no search is offered.
     expect(browse.ensureWorkflowLibraryBrowseLoaded).not.toHaveBeenCalled();
-    expect(document.querySelector('input[type="search"]')).toBeNull();
+    expect(browse.loadWorkflowLibraryPlaceTotals).toHaveBeenCalled();
+    expect(document.querySelector('[data-library-tag]')).toBeNull();
+    expect(document.querySelector('[data-workflow-library-rail]')?.textContent).toContain(
+      'Edits autosave here; the library changes only when you save to it.'
+    );
     expect(document.querySelector('[data-workflow-card] [data-workflow-visibility]')).toBeNull();
     expect(document.body.textContent).not.toContain('Public workflow');
+
+    const quickOpen = (workflowId: string) =>
+      card(workflowId)?.closest('[data-workflow-card-root]')?.querySelector('[data-card-action="open"]') ?? null;
+    await act(() => userEvent.hover(card('wf-alpha')!));
+    await act(() => userEvent.hover(card('wf-user')!));
+    expect(quickOpen('wf-alpha')).toBeNull();
+    expect(quickOpen('wf-user')).not.toBeNull();
   });
 
-  it('starts a fresh workflow from the header', async () => {
+  it('searches, filters by tag and orders the project’s workflows locally', async () => {
+    project.setSnapshot(
+      projectSnapshot([
+        { document: { ...ALPHA.document, tags: 'portrait' } },
+        { ...BUNDLED_COPY, document: { ...BUNDLED_COPY.document, tags: 'Portrait, upscale' } },
+        USER_COPY,
+      ])
+    );
     await renderDialog();
+    const ids = () => cards().map((element) => element.dataset.workflowCard);
+    const search = document.querySelector<HTMLInputElement>('input[type="search"]')!;
+    const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
 
-    await clickText('New workflow');
+    expect(
+      [...document.querySelectorAll<HTMLElement>('[data-library-tag]')].map((tag) => tag.dataset.libraryTag)
+    ).toEqual(['portrait', 'upscale']);
 
-    expect(COMMANDS.createWorkflow).toHaveBeenCalledTimes(1);
-    expect(onOpenChange).not.toHaveBeenCalled();
+    await act(async () => {
+      setValue?.call(search, 'copy');
+      search.dispatchEvent(new Event('input', { bubbles: true }));
+      await settleFrame();
+    });
+    expect(ids()).toEqual(['wf-bundled', 'wf-user']);
+    expect(document.querySelector('[data-workflow-library-results]')?.textContent).toBe('2 workflows');
+
+    await click(document.querySelector<HTMLElement>('[data-library-tag="portrait"]'));
+    expect(ids()).toEqual(['wf-bundled']);
+
+    await act(async () => {
+      setValue?.call(search, '');
+      search.dispatchEvent(new Event('input', { bubbles: true }));
+      await settleFrame();
+    });
+    expect(ids()).toEqual(['wf-alpha', 'wf-bundled']);
+
+    const sortButton = document.querySelector<HTMLButtonElement>('[data-workflow-library-sort]')!;
+    expect(sortButton.getAttribute('aria-label')).toBe('Sort: Project order, First to last');
+    await click(sortButton);
+    await vi.waitFor(() => expect(sortButton.getAttribute('aria-expanded')).toBe('true'));
+    await click(
+      [...document.querySelectorAll<HTMLElement>('[role="menuitemradio"]')].find(
+        (item) => item.textContent === 'Last to first'
+      )
+    );
+    expect(ids()).toEqual(['wf-bundled', 'wf-alpha']);
+    expect(workflowUiStore.getSnapshot().libraryProjectOrder).toEqual({ direction: 'desc', sort: 'order' });
+    expect(browse.setWorkflowLibraryBrowseFilter).not.toHaveBeenCalled();
   });
 
   it('opens a workflow from a double-click or the rail, then closes', async () => {
@@ -1965,66 +2497,62 @@ describe('WorkflowLibraryDialog — This project', () => {
     await selectCard('wf-bundled');
     expect(rail()?.dataset.projectWorkflowDetail).toBe('wf-bundled');
 
-    await clickText('Open');
+    await click([...(rail()?.querySelectorAll('button') ?? [])].find((button) => button.textContent === 'Open'));
 
     expect(COMMANDS.selectWorkflow).toHaveBeenLastCalledWith('wf-bundled');
     expect(onOpenChange).toHaveBeenCalledTimes(2);
   });
 
-  it("opens a project tile's actions from its menu button, including rename", async () => {
-    const previous = { height: window.innerHeight, width: window.innerWidth };
-    await page.viewport(1280, 800);
-    onTestFinished(() => page.viewport(previous.width, previous.height));
+  it("renames and removes another workflow from its card's menu, keeping the selected one", async () => {
     await renderDialog();
+    await selectCard('wf-bundled');
+    const contextMenu = () => document.querySelector<HTMLElement>('[data-workflow-context-menu][data-state="open"]');
+    const raiseOnUserCopy = async () => {
+      await act(() => userEvent.click(card('wf-user')!, { button: 'right' }));
+      await vi.waitFor(() => expect(contextMenu()?.id).toBe('workflow-library-card-wf-user-actions'));
+      expect(rail()?.dataset.projectWorkflowDetail).toBe('wf-bundled');
+    };
 
-    const button = await vi.waitFor(() => {
-      const element = document.querySelector<HTMLButtonElement>('[data-workflow-card-menu="wf-bundled"]');
-      expect(element).not.toBeNull();
+    await raiseOnUserCopy();
+    await selectMenuItem(contextMenu()?.querySelector<HTMLElement>('[role="menuitem"][data-value="rename"]'));
+    const input = await vi.waitFor(() => {
+      const element = document.querySelector<HTMLInputElement>('input[name="renameValue"]');
+      expect(element?.value).toBe('User copy');
       return element!;
     });
-    await act(() => userEvent.click(button));
+    const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+    await act(async () => {
+      setValue?.call(input, 'User copy, tuned');
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      await Promise.resolve();
+    });
+    await click(input.closest('form')?.querySelector<HTMLButtonElement>('button[type="submit"]'));
+    expect(COMMANDS.renameWorkflow).toHaveBeenCalledExactlyOnceWith('wf-user', 'User copy, tuned');
 
-    await vi.waitFor(() =>
-      expect(document.querySelector('[data-workflow-context-menu] [data-menu-item="rename"]')).not.toBeNull()
+    await vi.waitFor(() => expect(alertDialog()).toBeNull());
+    await raiseOnUserCopy();
+    await selectMenuItem(contextMenu()?.querySelector<HTMLElement>('[role="menuitem"][data-value="remove"]'));
+    expect(alertDialog()?.textContent).toContain('Remove "User copy" from this project?');
+    await click(
+      [...(alertDialog()?.querySelectorAll('button') ?? [])].find(
+        (candidate) => (candidate.textContent ?? '').trim() === 'Remove'
+      )
     );
+
+    expect(COMMANDS.removeWorkflow).toHaveBeenCalledExactlyOnceWith('wf-user');
+    expect(workflowUiStore.getSnapshot().librarySelection).toEqual({ projectId: PROJECT_ID, workflowId: 'wf-bundled' });
     expect(rail()?.dataset.projectWorkflowDetail).toBe('wf-bundled');
   });
 
-  it('hands focus to the rail menu it opens, so the pointer can move onto it without closing it', async () => {
-    await renderDialog();
-
-    await click(railMenuTrigger());
-
-    // Inside the dialog a menu that never took focus closes on the first pointer move onto it.
-    await vi.waitFor(() => expect(document.activeElement?.closest('[role="menu"]')).not.toBeNull(), { timeout: 2000 });
-  });
-
-  it('shows the active workflow in the rail with Open disabled, since it is already open', async () => {
+  it('shows the active workflow in the rail with Open disabled, saying why, since it is already open', async () => {
     await renderDialog();
 
     expect(rail()?.dataset.projectWorkflowDetail).toBe('wf-alpha');
-    expect((buttonWithText('Active') as HTMLButtonElement | undefined)?.disabled).toBe(true);
+    const open = rail()?.querySelector<HTMLButtonElement>('[data-project-workflow-open]');
+    expect(open?.textContent).toBe('Open');
+    expect(open?.disabled).toBe(true);
+    expect(document.getElementById(open?.getAttribute('aria-describedby') ?? '')?.textContent).toBe('Active workflow');
     expect(rail()?.querySelector('[data-workflow-source]')?.textContent).toBe('Not linked to a library template');
-  });
-
-  it('renames through the dialog', async () => {
-    await renderDialog();
-    await selectCard('wf-bundled');
-
-    await clickRailMenuItem('rename');
-
-    const input = document.querySelector<HTMLInputElement>('input[name="renameValue"]');
-    expect(input?.value).toBe('Bundled copy');
-
-    const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
-    await act(async () => {
-      setValue?.call(input, 'Bundled, tuned');
-      input?.dispatchEvent(new Event('input', { bubbles: true }));
-      await Promise.resolve();
-    });
-    await click(input?.closest('form')?.querySelector<HTMLButtonElement>('button[type="submit"]'));
-
-    expect(COMMANDS.renameWorkflow).toHaveBeenCalledWith('wf-bundled', 'Bundled, tuned');
   });
 
   it('duplicates beside the original under a copy name', async () => {
@@ -2034,7 +2562,6 @@ describe('WorkflowLibraryDialog — This project', () => {
     await clickRailMenuItem('duplicate');
 
     expect(COMMANDS.duplicateWorkflow).toHaveBeenCalledWith('wf-bundled', 'Bundled copy copy');
-    // The copy becomes the selection so the rail shows what was just made.
     expect(workflowUiStore.getSnapshot().librarySelection).toEqual({ projectId: PROJECT_ID, workflowId: 'wf-copy' });
   });
 
@@ -2054,6 +2581,7 @@ describe('WorkflowLibraryDialog — This project', () => {
     await click(confirm);
 
     expect(COMMANDS.removeWorkflow).toHaveBeenCalledWith('wf-bundled');
+    expect(workflowUiStore.getSnapshot().librarySelection).toBeNull();
   });
 
   it('offers a template update only for a source the account can write', async () => {
@@ -2074,8 +2602,40 @@ describe('WorkflowLibraryDialog — This project', () => {
     );
     expect(menuItem('update-template')).not.toBeNull();
 
-    await click(menuItem('update-template'));
+    await selectMenuItem(menuItem('update-template'));
 
+    expect(workflowUiStore.getSnapshot().publicationIntent).toEqual({ kind: 'update-source', workflowId: 'wf-user' });
+  });
+
+  it('says when the linked template is newer, and updates the copy from it after confirmation', async () => {
+    templateRecords.set('wf-portrait', { name: 'Portrait Studio', revision: 6 });
+    await renderDialog();
+    await selectCard('wf-user');
+
+    const linked = () => rail()?.querySelector<HTMLElement>('[data-linked-template="wf-portrait"]');
+    await vi.waitFor(() =>
+      expect(linked()?.querySelector('[data-template-newer]')?.textContent).toBe('Template is newer')
+    );
+    expect(linked()?.querySelector('[data-workflow-source]')?.textContent).toBe(
+      'Linked to Portrait Studio, revision 4'
+    );
+    expect(linked()?.querySelector('[data-template-revision]')?.textContent).toBe('Library template is at revision 6');
+    expect(rail()?.querySelector('[data-detail-sheet-summary]')?.textContent).toContain('Template is newer');
+
+    const linkedButton = (text: string) =>
+      [...(linked()?.querySelectorAll('button') ?? [])].find((button) => button.textContent === text);
+    await click(linkedButton('Update from template'));
+    expect(alertDialog()?.textContent).toContain('Replace "User copy"');
+    expect(loader.replace).not.toHaveBeenCalled();
+    await click(
+      [...(alertDialog()?.querySelectorAll('button') ?? [])].find((button) => button.textContent === 'Update')
+    );
+    expect(loader.replace).toHaveBeenCalledWith(
+      { name: 'Portrait Studio', revision: 6, workflow_id: 'wf-portrait' },
+      'wf-user'
+    );
+
+    await click(linkedButton('Update library template'));
     expect(workflowUiStore.getSnapshot().publicationIntent).toEqual({ kind: 'update-source', workflowId: 'wf-user' });
   });
 
@@ -2091,7 +2651,6 @@ describe('WorkflowLibraryDialog — This project', () => {
     await renderDialog({ storeBound: true });
     expect(rail()?.dataset.projectWorkflowDetail).toBe('wf-user');
 
-    // The library closes, another template's copy becomes the workflow being edited, and Library… opens it again.
     await act(async () => {
       setWorkflowLibraryOpen(false);
       project.setSnapshot(projectSnapshot(workflows, 'wf-landscape'));
@@ -2125,20 +2684,40 @@ describe('WorkflowLibraryDialog — This project', () => {
     expect(menuItem('save-to-library')).not.toBeNull();
   });
 
-  it('previews a project workflow from its own document', async () => {
+  it('draws a project workflow afresh when its document is replaced under the same id, dropping the open card', async () => {
+    const stage = () => document.querySelector<HTMLElement>('[data-preview-stage]');
+    const nodes = () => [...(stage()?.querySelectorAll<HTMLElement>('.react-flow__node') ?? [])];
     await renderDialog();
     await selectCard('wf-user');
-
-    await clickText('Preview graph');
+    await clickText('Preview');
     await act(async () => {
-      await vi.waitFor(() => expect(document.querySelector('[data-preview-dialog]')).not.toBeNull(), {
-        timeout: 2000,
-      });
+      await vi.waitFor(() => expect(nodes()).toHaveLength(1), { timeout: 2000 });
+    });
+    await act(() => userEvent.click(nodes()[0]!));
+    expect(stage()?.querySelector('[data-preview-node-card]')).not.toBeNull();
+
+    await act(async () => {
+      project.setSnapshot(
+        projectSnapshot(
+          PROJECT_WORKFLOWS.map((workflow) =>
+            workflow === USER_COPY
+              ? { ...USER_COPY, document: { ...GRAPH_DOCUMENT, id: 'wf-user', name: 'User copy' } }
+              : workflow
+          )
+        )
+      );
+      await settleFrame();
     });
 
-    const preview = document.querySelector('[data-preview-dialog]');
-    expect(preview?.getAttribute('data-graph-id')).toBe('wf-user');
-    expect(preview?.getAttribute('data-source-label')).toBe('User copy');
-    expect(preview?.textContent).toContain('integer');
+    await act(async () => {
+      await vi.waitFor(
+        () => expect(nodes().map((node) => node.dataset.id)).toEqual(['model', 'denoise', 'decode', 'refine']),
+        {
+          timeout: 2000,
+        }
+      );
+    });
+    expect(stage()?.querySelector('[data-preview-node-card]')).toBeNull();
+    expect(stage()?.querySelector('[data-preview-node-count]')?.textContent).toContain('Showing 4 of 6 nodes');
   });
 });

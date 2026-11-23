@@ -3,6 +3,7 @@ import type { PromptTemplateCatalog } from '@features/generation/ui/usePromptTem
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { PromptTemplatesButton } from '@features/generation/ui/promptFields/PromptTemplatesButton';
+import { setPendingPromptTemplateDraft } from '@features/generation/ui/promptTemplateDraftStore';
 import { Tooltip } from '@platform/ui/Tooltip';
 import { system } from '@theme/system';
 import i18next from 'i18next';
@@ -46,6 +47,11 @@ vi.mock('@features/generation/ui/GenerationUiContext', async (importOriginal) =>
     capabilities: { canManagePromptTemplates: false },
     notifications: { error: vi.fn(), info: vi.fn(), reportError: vi.fn() },
   }),
+}));
+
+vi.mock('@features/gallery/mediaSlot', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  GalleryMediaSlot: () => null,
 }));
 
 let host: HTMLDivElement | null = null;
@@ -180,6 +186,40 @@ describe('the prompt templates button', () => {
     expect(
       [...host!.querySelectorAll('span')].find((span) => span.textContent === 'widgets.generate.templatesButton')
     ).toBeUndefined();
+  });
+
+  it('leaves a template draft handed over from the gallery to the field that takes it', async () => {
+    host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+
+    await act(() => {
+      root?.render(
+        <I18nextProvider i18n={i18n}>
+          <ChakraProvider value={system}>
+            <div data-testid="upscale">
+              <PromptTemplatesButton
+                activeTemplate={null}
+                showSyntaxHighlighting={false}
+                takesPendingDraft={false}
+                onApply={vi.fn()}
+              />
+            </div>
+            <div data-testid="generate">
+              <PromptTemplatesButton activeTemplate={null} showSyntaxHighlighting={false} onApply={vi.fn()} />
+            </div>
+          </ChakraProvider>
+        </I18nextProvider>
+      );
+    });
+
+    await act(() => setPendingPromptTemplateDraft({ negativePrompt: '', positivePrompt: 'a lighthouse' }));
+
+    const triggerState = (testId: string) =>
+      host!.querySelector(`[data-testid="${testId}"] button`)?.getAttribute('aria-expanded');
+
+    expect(triggerState('upscale')).toBe('false');
+    expect(triggerState('generate')).toBe('true');
   });
 
   it('says nothing while the catalog is unread', async () => {

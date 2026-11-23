@@ -53,7 +53,7 @@ import struct
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeVar
 
 import torch
 
@@ -76,6 +76,8 @@ from invokeai.backend.quantization.int8_matmul import (
 from invokeai.backend.util.logging import InvokeAILogger
 
 logger = InvokeAILogger.get_logger(__name__)
+
+_T = TypeVar("_T")
 
 CONVROT_GROUP_SIZE = 256
 
@@ -833,17 +835,15 @@ def drop_unconsumed_quantization_sidecars(sd: dict[str, Any]) -> dict[str, Any]:
     return {k: v for k, v in sd.items() if not (isinstance(k, str) and k.endswith(_UNCONSUMED_SIDECAR_SUFFIXES))}
 
 
-def resolve_quantized_module_paths(
-    markers: dict[str, dict[str, Any]], key_map: dict[str, str]
-) -> dict[str, dict[str, Any]]:
-    """Re-key markers from the checkpoint's names to the built model's names.
+def resolve_quantized_module_paths(markers: dict[str, _T], key_map: dict[str, str]) -> dict[str, _T]:
+    """Re-key per-layer entries (int8 markers, scaled-fp8 layers) from the checkpoint's names to the built model's names.
 
     The markers are read in the checkpoint's key space, because that is the only place where a
     marker and its weight are reliably paired: the key conversions rename `.weight` (and, by
     substring, `.weight_scale`) but leave `.comfy_quant` behind on the old name. Following the
     weight's own rename is therefore the only mapping that cannot drift from the conversion.
     """
-    resolved: dict[str, dict[str, Any]] = {}
+    resolved: dict[str, _T] = {}
     for path, marker in markers.items():
         weight_key = key_map.get(f"{path}.weight", f"{path}.weight")
         resolved[weight_key[: -len(".weight")]] = marker
@@ -1165,6 +1165,7 @@ def install_int8_convrot_layers(
     reserve: Callable[[int], None],
     skip_patterns: Iterable[str] = (),
     extra_reserved_bytes: int = 0,
+    read: Callable[[str], torch.Tensor] | None = None,
 ) -> dict[str, dict[str, Any]]:
     """Take a marked int8 or int4 checkpoint from state dict to installed ``Int8ConvrotLinear`` and
     ``Int4ConvrotLinear`` modules.
@@ -1191,12 +1192,24 @@ def install_int8_convrot_layers(
 
     ``reserve`` is the cache's ``make_room``; ``extra_reserved_bytes`` is for a loader whose file
     also holds layers of another scheme -- Krea-2 and Z-Image add what their nvfp4 layers will cost,
-    so the one reservation covers the whole load. Returns the layers that stayed int8.
+    so the one reservation covers the whole load. ``read`` is for a loader that hands over the file's header as
+    ``meta`` tensors: steps 1 and 2 need only keys, shapes and dtypes, so each ``meta`` entry is read through it after
+    the reservation, and no payload lands on an unreserved cache. Returns the layers that stayed int8.
     """
     reject_foreign_quantization_scales(sd, quantized, architecture, model)
     reserve(
         predict_int8_cast_size(sd, dtype, quantized, model=model, skip_patterns=skip_patterns) + extra_reserved_bytes
     )
+    if read is not None:
+        # The reservation is each tensor at its width after the cast, so a dense tensor is cast as it arrives: reading
+        # an fp32 file's dense tensors first and casting them afterwards holds twice what was reserved, in anonymous
+        # memory. The marked layers' payloads stay as stored for the split to keep or decode. No local holds the payload:
+        # it would keep the stored tensor alive through the next read.
+        marked = _pinned_quantized_keys(quantized)
+        for key in [key for key, tensor in sd.items() if tensor.is_meta]:
+            sd[key] = read(key)
+            if key not in marked and is_castable_float(sd[key]):
+                sd[key] = sd[key].to(dtype)
     surviving = split_int8_convrot_layers(sd, quantized, dtype, model=model, skip_patterns=skip_patterns)
     cast_unquantized(sd, dtype, surviving)
     swap_in_int8_linears(model, sd, surviving)
