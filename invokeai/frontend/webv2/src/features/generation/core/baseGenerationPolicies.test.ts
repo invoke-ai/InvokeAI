@@ -628,6 +628,29 @@ describe('component policies', () => {
     );
   });
 
+  it('blocks FLUX Fill outside inpaint and outpaint, but not while a Canvas frame decides the mode', () => {
+    const model = createModel('flux', { variant: 'dev_fill' });
+    const settings = {
+      ...createSettings(model),
+      clipEmbedModel: clipEmbed,
+      t5EncoderModel: t5Encoder,
+      vae: fluxVae,
+    };
+    const reasons = (mode?: Parameters<typeof getGenerationValidationReasons>[2]) =>
+      getGenerationValidationReasons(model, settings, mode).filter((reason) => reason.startsWith('FLUX Fill'));
+
+    expect(reasons()).toHaveLength(1);
+    expect(reasons('img2img')).toHaveLength(1);
+    expect(reasons('inpaint')).toEqual([]);
+    expect(reasons('outpaint')).toEqual([]);
+    expect(getGenerateInvocationIssues({ ...settings, model }).map(({ message }) => message)).toEqual(reasons());
+    expect(
+      getGenerateInvocationIssues({ ...settings, model }, { canvasFrame: { height: 512, width: 512 } }).map(
+        ({ message }) => message
+      )
+    ).not.toContain(reasons()[0]);
+  });
+
   it('keeps concepts but clears incompatible selections when the selected model changes', () => {
     const model = createModel('sdxl');
     const settings = createSettings(createModel('sd-1'), {

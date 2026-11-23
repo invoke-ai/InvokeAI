@@ -11,7 +11,6 @@ import {
 } from '@features/generation/core/baseGenerationPolicies';
 import {
   describeExternalCanvasRefusal,
-  isExternalGenerationMode,
   isExternalTextOnlyCanvasModel,
 } from '@features/generation/core/externalProvider';
 import { buildExternalGraph, getFamilyGraphBuilder } from '@features/generation/core/graph';
@@ -55,9 +54,11 @@ import {
 import { type CanvasSize, resolveCanvasProcessingSize } from './canvasProcessingSize';
 import { isAnimaInpaintAdapterModel } from './controlValidation';
 
+const isFluxFill = (model: GenerateModelConfig): boolean => model.base === 'flux' && model.variant === 'dev_fill';
+
 /** SD-3, FLUX, FLUX.2, FLUX.3 and MOSS-Image start at 1 - strength^0.2; FLUX Fill at 0; others at 1 - strength. */
 const canvasDenoisingStart = (model: GenerateModelConfig, strength: number): number => {
-  if (model.base === 'flux' && model.variant === 'dev_fill') {
+  if (isFluxFill(model)) {
     return 0;
   }
   const usesOptimizedCurve =
@@ -170,8 +171,12 @@ const getCanvasValidationReasons = (input: CompileCanvasGraphInput, processingSi
       reasons.push('Canvas generation requires a composited source image.');
     }
 
-    // A provider edits at its own strength; only the local denoise reads this one.
-    if (model.type !== 'external_image_generator' && (!Number.isFinite(strength) || strength <= 0 || strength > 1)) {
+    // A provider edits at its own strength and FLUX Fill always denoises fully; only other local denoises read this.
+    if (
+      model.type !== 'external_image_generator' &&
+      !isFluxFill(model) &&
+      (!Number.isFinite(strength) || strength <= 0 || strength > 1)
+    ) {
       reasons.push('Canvas denoising strength must be greater than 0 and at most 1.');
     }
   }
@@ -512,6 +517,86 @@ const addAnimaInpaintAdapter = (
   }
 };
 
+/**
+ * Fades the regenerated area, restores the generated image and mask to the bbox, and composites the result over the
+ * canvas image. `mask` is black where the model generated; `maskSize` is the size it has.
+ */
+const addCanvasPasteBack = (
+  family: FamilyGraph,
+  args: {
+    bbox: CompileCanvasGraphInput['bbox'];
+    compositing: CanvasCompositingSettings;
+    destination: CompileCanvasGraphInput['destination'];
+    initialImageName: string;
+    mask: CanvasInpaintSources['mask'];
+    maskSize: CanvasSize;
+    processingSize: CanvasSize;
+  }
+): void => {
+  const { bbox, compositing, destination, initialImageName } = args;
+  const { graph } = family;
+
+  // The base decoder, until the composited output below takes over canvas_output from it.
+  const l2i = graph.nodes.canvas_output;
+  if (!l2i) {
+    throw new Error('Canvas generation could not find the base graph output.');
+  }
+
+  const expandMask = addNode(graph, {
+    fade_size_px: compositing.maskBlur,
+    id: 'expand_mask',
+    ...('node' in args.mask ? {} : { mask: args.mask }),
+    type: 'expand_mask_with_fade',
+  });
+  if ('node' in args.mask) {
+    addEdge(graph, args.mask.node, args.mask.field, expandMask, 'mask');
+  }
+
+  let generatedImageSource: BackendInvocationContract = l2i;
+  let outputMaskSource: BackendInvocationContract = expandMask;
+
+  if (!sizesMatch(bbox, args.processingSize)) {
+    generatedImageSource = addNode(graph, {
+      height: bbox.height,
+      id: 'canvas_resize_generated_to_bbox',
+      is_intermediate: true,
+      type: 'img_resize',
+      width: bbox.width,
+    });
+    addEdge(graph, l2i, 'image', generatedImageSource, 'image');
+  }
+  if (!sizesMatch(bbox, args.maskSize)) {
+    outputMaskSource = addNode(graph, {
+      height: bbox.height,
+      id: 'canvas_resize_output_mask_to_bbox',
+      is_intermediate: true,
+      type: 'img_resize',
+      width: bbox.width,
+    });
+    addEdge(graph, expandMask, 'image', outputMaskSource, 'image');
+  }
+
+  const { output } = replaceCanvasOutput(
+    graph,
+    'canvas_l2i',
+    compositing.outputOnlyMaskedRegions
+      ? {
+          invert_mask: true,
+          is_intermediate: destination === 'canvas',
+          type: 'apply_mask_to_image',
+          use_cache: false,
+        }
+      : {
+          is_intermediate: destination === 'canvas',
+          layer_base: { image_name: initialImageName },
+          type: 'invokeai_img_blend',
+          use_cache: false,
+        }
+  );
+  addEdge(graph, generatedImageSource, 'image', output, compositing.outputOnlyMaskedRegions ? 'image' : 'layer_upper');
+  addEdge(graph, outputMaskSource, 'image', output, 'mask');
+};
+
 /** Returns what the inpaint-conditioned adapters read. */
 const graftMaskTail = (
   family: FamilyGraph,
@@ -533,13 +618,6 @@ const graftMaskTail = (
 ): CanvasInpaintSources => {
   const { compositing, destination, initialImageName, latents, model, settings } = args;
   const { denoise, graph } = family;
-  const needsResize = !sizesMatch(args.bbox, args.processingSize);
-
-  // The base decoder, until the composited output below takes over canvas_output from it.
-  const l2i = graph.nodes.canvas_output;
-  if (!l2i) {
-    throw new Error('Canvas generation could not find the base graph output.');
-  }
 
   const gradientMask = addNode(graph, {
     coherence_mode: compositing.coherenceMode,
@@ -578,54 +656,15 @@ const graftMaskTail = (
     });
   }
 
-  const expandMask = addNode(graph, {
-    fade_size_px: compositing.maskBlur,
-    id: 'expand_mask',
-    type: 'expand_mask_with_fade',
+  addCanvasPasteBack(family, {
+    bbox: args.bbox,
+    compositing,
+    destination,
+    initialImageName,
+    mask: { field: 'expanded_mask_area', node: gradientMask },
+    maskSize: args.processingSize,
+    processingSize: args.processingSize,
   });
-  addEdge(graph, gradientMask, 'expanded_mask_area', expandMask, 'mask');
-
-  let generatedImageSource: BackendInvocationContract = l2i;
-  let outputMaskSource: BackendInvocationContract = expandMask;
-
-  if (needsResize) {
-    generatedImageSource = addNode(graph, {
-      height: args.bbox.height,
-      id: 'canvas_resize_generated_to_bbox',
-      is_intermediate: true,
-      type: 'img_resize',
-      width: args.bbox.width,
-    });
-    outputMaskSource = addNode(graph, {
-      height: args.bbox.height,
-      id: 'canvas_resize_output_mask_to_bbox',
-      is_intermediate: true,
-      type: 'img_resize',
-      width: args.bbox.width,
-    });
-    addEdge(graph, l2i, 'image', generatedImageSource, 'image');
-    addEdge(graph, expandMask, 'image', outputMaskSource, 'image');
-  }
-
-  const { output } = replaceCanvasOutput(
-    graph,
-    'canvas_l2i',
-    compositing.outputOnlyMaskedRegions
-      ? {
-          invert_mask: true,
-          is_intermediate: destination === 'canvas',
-          type: 'apply_mask_to_image',
-          use_cache: false,
-        }
-      : {
-          is_intermediate: destination === 'canvas',
-          layer_base: { image_name: initialImageName },
-          type: 'invokeai_img_blend',
-          use_cache: false,
-        }
-  );
-  addEdge(graph, generatedImageSource, 'image', output, compositing.outputOnlyMaskedRegions ? 'image' : 'layer_upper');
-  addEdge(graph, outputMaskSource, 'image', output, 'mask');
   return inpaint;
 };
 
@@ -656,6 +695,76 @@ const addNoiseBeforeEncode = (
     addEdge(graph, noiseMaskSourceNode, 'image', noise, 'mask');
   }
   return { edgeFrom: noise };
+};
+
+/** The outpaint mask: transparent image areas generate, combined with an explicit inpaint mask when present. */
+const addOutpaintMask = (
+  graph: BackendGraphContract,
+  initialImageName: string,
+  maskImageName: string | null | undefined
+): { node: BackendInvocationContract; field: string } => {
+  const alphaToMask = addNode(graph, {
+    id: 'image_alpha_to_mask',
+    image: { image_name: initialImageName },
+    type: 'tomask',
+  });
+
+  if (!maskImageName) {
+    return { field: 'image', node: alphaToMask };
+  }
+  const maskCombine = addNode(graph, {
+    id: 'mask_combine',
+    mask1: { image_name: maskImageName },
+    type: 'mask_combine',
+  });
+  addEdge(graph, alphaToMask, 'image', maskCombine, 'mask2');
+  return { field: 'image', node: maskCombine };
+};
+
+/**
+ * FLUX Fill is conditioned on the image and mask itself, so it takes no latents, noise or denoise mask; the backend
+ * resizes the fill inputs to the denoise size, and only the result is restored to the bbox.
+ */
+const graftFluxFill = (
+  family: FamilyGraph,
+  input: CompileCanvasGraphInput,
+  compositing: CanvasCompositingSettings,
+  processingSize: CanvasSize,
+  mode: 'inpaint' | 'outpaint'
+): CanvasInpaintSources => {
+  const { denoise, graph } = family;
+  const initialImageName = input.compositeImageName as string;
+
+  setCanvasDenoisingRange(denoise, input.model, input.settings, input.strength);
+
+  const mask: CanvasInpaintSources['mask'] =
+    mode === 'outpaint'
+      ? addOutpaintMask(graph, initialImageName, input.maskImageName)
+      : { image_name: input.maskImageName as string };
+  const maskTensor = addNode(graph, {
+    id: 'flux_fill_mask_tensor',
+    ...('node' in mask ? {} : { image: mask }),
+    type: 'image_mask_to_tensor',
+  });
+  if ('node' in mask) {
+    addEdge(graph, mask.node, mask.field, maskTensor, 'image');
+  }
+  const fill = addNode(graph, { id: 'flux_fill', image: { image_name: initialImageName }, type: 'flux_fill' });
+  addEdge(graph, maskTensor, 'mask', fill, 'mask');
+  addEdge(graph, fill, 'fill_cond', denoise, 'fill_conditioning');
+
+  addCanvasPasteBack(family, {
+    bbox: input.bbox,
+    compositing,
+    destination: input.destination,
+    initialImageName,
+    mask,
+    maskSize: input.bbox,
+    processingSize,
+  });
+
+  setMetadataMode(graph, mode, input.strength);
+  return { image: { image_name: initialImageName }, mask };
 };
 
 const graftInpaint = (
@@ -745,25 +854,7 @@ const graftOutpaint = (
     infill.image = { image_name: initialImageName };
   }
 
-  // Derive the mask from image alpha (transparent means generate), combining an explicit inpaint mask when present.
-  const alphaToMask = addNode(graph, {
-    id: 'image_alpha_to_mask',
-    image: { image_name: initialImageName },
-    type: 'tomask',
-  });
-
-  let gradientMaskEdge: { node: BackendInvocationContract; field: string };
-  if (input.maskImageName) {
-    const maskCombine = addNode(graph, {
-      id: 'mask_combine',
-      mask1: { image_name: input.maskImageName },
-      type: 'mask_combine',
-    });
-    addEdge(graph, alphaToMask, 'image', maskCombine, 'mask2');
-    gradientMaskEdge = { field: 'image', node: maskCombine };
-  } else {
-    gradientMaskEdge = { field: 'image', node: alphaToMask };
-  }
+  let gradientMaskEdge = addOutpaintMask(graph, initialImageName, input.maskImageName);
 
   if (needsResize) {
     const maskResize = addNode(graph, {
@@ -965,7 +1056,7 @@ export const compileCanvasGraph = (input: CompileCanvasGraphInput): CompiledCanv
 
   const validationReasons = [
     ...getCanvasValidationReasons(input, processingSize),
-    ...getGenerationValidationReasons(model, settings, isExternalGenerationMode(mode) ? mode : 'txt2img'),
+    ...getGenerationValidationReasons(model, settings, mode),
   ];
 
   if (validationReasons.length > 0) {
@@ -1022,10 +1113,12 @@ export const compileCanvasGraph = (input: CompileCanvasGraphInput): CompiledCanv
   let inpaint: CanvasInpaintSources | undefined;
   if (mode === 'img2img') {
     graftImageToImage(family, model, settings, compositeImageName as string, strength, bbox);
-  } else if (mode === 'inpaint') {
-    inpaint = graftInpaint(family, input, compositing, processingSize);
-  } else if (mode === 'outpaint') {
-    inpaint = graftOutpaint(family, input, compositing, processingSize);
+  } else if (mode === 'inpaint' || mode === 'outpaint') {
+    if (isFluxFill(model)) {
+      inpaint = graftFluxFill(family, input, compositing, processingSize, mode);
+    } else {
+      inpaint = (mode === 'inpaint' ? graftInpaint : graftOutpaint)(family, input, compositing, processingSize);
+    }
   }
 
   // Inpaint and outpaint also hand the control adapters what they regenerate.

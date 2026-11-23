@@ -1227,10 +1227,6 @@ const getBaseComponentSectionPolicy = (
             missingMessage: 'Generate needs a VAE for FLUX models.',
           },
         ]),
-        rules: (ctx) =>
-          ctx.model.type !== 'external_image_generator' && ctx.model.variant === 'dev_fill'
-            ? ['FLUX Fill models do not support text-to-image generation.']
-            : [],
       };
     case 'flux2': {
       const isDev = model.variant === 'dev';
@@ -3438,11 +3434,19 @@ const getComponentValidationIssues = (model: GenerateModelConfig, settings: Gene
   ];
 };
 
-/** `mode` is the external generation mode being compiled; local models are validated the same way for every mode. */
+/**
+ * What a validation answers for: the generation mode being compiled, or `canvasFrame` for Canvas readiness, where the
+ * mode is only known once the composite exists. Local models differ only for FLUX Fill, which edits an image.
+ */
+export type GenerationValidationMode = ExternalGenerationMode | 'outpaint' | 'canvasFrame';
+
+const FLUX_FILL_MODE_REASON =
+  'FLUX Fill models only inpaint and outpaint. Use them on the Canvas with an inpaint mask or a frame that extends past the image.';
+
 export const getGenerationValidationIssues = (
   model: GenerateModelConfig,
   settings: GenerateSettings,
-  mode: ExternalGenerationMode = 'txt2img'
+  mode: GenerationValidationMode = 'txt2img'
 ): GenerationIssue[] => {
   if (!hasArchitectureCapabilities()) {
     // Keep core independent of the load-state store; failures direct callers to retry.
@@ -3496,7 +3500,9 @@ export const getGenerationValidationIssues = (
   }
 
   if (model.type === 'external_image_generator') {
-    const modeReason = getExternalModeReason(model, mode);
+    // Canvas compiles reject outpainting themselves, and readiness asks providers by their own modes.
+    const providerMode: ExternalGenerationMode = mode === 'outpaint' || mode === 'canvasFrame' ? 'txt2img' : mode;
+    const modeReason = getExternalModeReason(model, providerMode);
 
     if (modeReason) {
       issues.push(createUntranslatedGenerationIssue(modeReason, MODEL_TARGET));
@@ -3513,7 +3519,7 @@ export const getGenerationValidationIssues = (
 
     // Every request emits one output, and the Canvas edit modes add the composite as one init image.
     if (isSeedreamBatchModel(model)) {
-      const totalImages = getExternalReferenceImages(settings, model).length + (mode === 'txt2img' ? 0 : 1) + 1;
+      const totalImages = getExternalReferenceImages(settings, model).length + (providerMode === 'txt2img' ? 0 : 1) + 1;
 
       if (totalImages > SEEDREAM_BATCH_MAX_TOTAL_IMAGES) {
         issues.push(
@@ -3541,6 +3547,10 @@ export const getGenerationValidationIssues = (
     );
   }
 
+  if (model.variant === 'dev_fill' && model.base === 'flux' && (mode === 'txt2img' || mode === 'img2img')) {
+    issues.push(createUntranslatedGenerationIssue(FLUX_FILL_MODE_REASON, MODEL_TARGET));
+  }
+
   issues.push(...getModelFamilyValidationIssues(model, settings));
   issues.push(
     ...getRefinerValidationReasons(model, settings).map((reason) =>
@@ -3555,7 +3565,7 @@ export const getGenerationValidationIssues = (
 export const getGenerationValidationReasons = (
   model: GenerateModelConfig,
   settings: GenerateSettings,
-  mode: ExternalGenerationMode = 'txt2img'
+  mode: GenerationValidationMode = 'txt2img'
 ): string[] => getGenerationValidationIssues(model, settings, mode).map(({ message }) => message);
 
 export const needsEmptyCanvasFrameForReferenceBudget = (
@@ -3592,7 +3602,13 @@ export const getGenerateInvocationIssues = (
       providerModes !== null && canvasFrame
         ? { ...values, ...resolveExternalCanvasRequestSize(model, canvasFrame) }
         : values,
-      providerModes !== null && !providerModes.includes('txt2img') ? 'img2img' : 'txt2img'
+      providerModes !== null
+        ? providerModes.includes('txt2img')
+          ? 'txt2img'
+          : 'img2img'
+        : canvasFrame
+          ? 'canvasFrame'
+          : 'txt2img'
     ),
     ...(models ? getGenerationModelAvailabilityIssues(model, values, models) : []),
   ];
