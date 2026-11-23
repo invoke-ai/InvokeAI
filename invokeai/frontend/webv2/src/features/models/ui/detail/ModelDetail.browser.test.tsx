@@ -114,7 +114,39 @@ describe('ModelDetail', () => {
 
     const links = [...host.querySelectorAll<HTMLAnchorElement>('a[target="_blank"]')];
     expect(links.map((link) => link.href)).toEqual([source, 'https://example.org/model']);
+    expect(links.map((link) => link.closest('dd')?.previousElementSibling?.textContent)).toEqual([
+      'models.sourceUrl',
+      'models.modelPage',
+    ]);
     expect(host.textContent).toContain(MAIN.source);
+  });
+
+  it('does not repeat the Hugging Face page the source already links to', async () => {
+    const page = 'https://huggingface.co/org/repo';
+    setModelsSnapshotForTests({
+      models: [{ ...MAIN, source: 'org/repo::model.safetensors', source_type: 'hf_repo_id', source_urls: [page] }],
+      status: 'loaded',
+    });
+    await renderDetail(MAIN.key);
+
+    expect([...host.querySelectorAll<HTMLAnchorElement>('a[target="_blank"]')].map((link) => link.href)).toEqual([
+      page,
+    ]);
+  });
+
+  it('shows unsafe source links as text instead of anchors', async () => {
+    setModelsSnapshotForTests({
+      models: [
+        { ...MAIN, source_url: 'javascript:alert(1)', source_urls: ['javascript:alert(2)', 'httpx://example.com'] },
+      ],
+      status: 'loaded',
+    });
+    await renderDetail(MAIN.key);
+
+    expect(host.querySelector('a[target="_blank"]')).toBeNull();
+    expect(host.textContent).toContain('javascript:alert(1)');
+    expect(host.textContent).toContain('javascript:alert(2)');
+    expect(host.textContent).toContain('httpx://example.com');
   });
 
   it('lists the roles a model also serves, and no row without any', async () => {
