@@ -2,8 +2,9 @@
 
 import os
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 from unittest.mock import MagicMock
+from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
@@ -11,8 +12,17 @@ from fastapi.testclient import TestClient
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api_app import app
 from invokeai.app.services.auth.token_service import set_jwt_secret
+from invokeai.app.services.fonts.fonts_common import FontScope
 from invokeai.app.services.invoker import Invoker
-from invokeai.app.services.users.users_common import UserCreateRequest
+from invokeai.app.services.shared.database.queries.fonts import UploadedFont
+from invokeai.app.services.style_preset_records.style_preset_records_common import (
+    PresetData,
+    PresetType,
+    StylePresetWithoutId,
+)
+from invokeai.app.services.style_preset_records.style_preset_records_default import StylePresetRecordsStorage
+from invokeai.app.services.users.users_common import SYSTEM_USER_ID, UserCreateRequest
+from invokeai.app.services.wildcard_records.wildcard_records_common import WildcardWithoutId
 
 
 @pytest.fixture(autouse=True, scope="module")
@@ -551,3 +561,91 @@ class TestMediaCookieBehindSubPathProxy:
         assert len(set_cookies) == 1
         assert 'invokeai_media_token=""' in set_cookies[0]
         assert f"Path={self.BASE_PATH}/api/v1" in set_cookies[0]
+
+
+def _add_project(invoker: Invoker, user_id: str) -> None:
+    invoker.services.project_records.create(user_id, "Project", {})
+
+
+def _add_wildcard(invoker: Invoker, user_id: str) -> None:
+    invoker.services.wildcard_records.create(WildcardWithoutId(name="colors", values=["red"]), user_id)
+
+
+def _add_template(invoker: Invoker, user_id: str, *, is_public: bool = False) -> None:
+    template = StylePresetWithoutId(
+        name="Template",
+        preset_data=PresetData(positive_prompt="a {prompt}", negative_prompt=""),
+        type=PresetType.User,
+        is_public=is_public,
+    )
+    StylePresetRecordsStorage(invoker.services.database).create(template, user_id)
+
+
+def _add_font(invoker: Invoker, owner_id: str | None) -> None:
+    font_id = f"font_{uuid4().hex}"
+    invoker.services.database.queries.fonts.insert_upload(
+        UploadedFont(
+            id=font_id,
+            owner_id=owner_id,
+            scope=FontScope.PRIVATE if owner_id else FontScope.SHARED,
+            filename="Font.ttf",
+            storage_path=f"{font_id}.ttf",
+            family="Font",
+            label="Font Regular",
+            style="normal",
+            weight=400,
+            content_hash="0" * 64,
+            byte_size=1,
+            axes=(),
+            instances=(),
+        )
+    )
+
+
+class TestSingleUserWorkStatus:
+    @pytest.fixture(autouse=True)
+    def _dependencies(self, monkeypatch: Any, mock_invoker: Invoker) -> None:
+        monkeypatch.setattr("invokeai.app.api.routers.auth.ApiDependencies", MockApiDependencies(mock_invoker))
+
+    @pytest.mark.parametrize(
+        "add_work",
+        [
+            _add_project,
+            _add_wildcard,
+            _add_template,
+            _add_font,
+        ],
+        ids=["project", "wildcard", "private_template", "private_font"],
+    )
+    def test_reported_during_setup_when_system_owns_private_work(
+        self, add_work: Callable[[Invoker, str], None], mock_invoker: Invoker, client: TestClient
+    ) -> None:
+        add_work(mock_invoker, SYSTEM_USER_ID)
+
+        status = client.get("/api/v1/auth/status").json()
+
+        assert status["setup_required"] is True
+        assert status["has_single_user_work"] is True
+
+    def test_not_reported_for_content_every_account_sees_or_another_account_owns(
+        self, mock_invoker: Invoker, client: TestClient
+    ) -> None:
+        # Bundled templates, a public template and a shared font upload stay visible after setup.
+        StylePresetRecordsStorage(mock_invoker.services.database).start(mock_invoker)
+        _add_template(mock_invoker, SYSTEM_USER_ID, is_public=True)
+        _add_font(mock_invoker, None)
+        _add_project(mock_invoker, setup_test_user(mock_invoker, "status-user@example.com"))
+
+        status = client.get("/api/v1/auth/status").json()
+
+        assert status["setup_required"] is True
+        assert status["has_single_user_work"] is False
+
+    def test_not_reported_once_an_administrator_exists(self, mock_invoker: Invoker, client: TestClient) -> None:
+        _add_project(mock_invoker, SYSTEM_USER_ID)
+        setup_test_admin(mock_invoker, "status-admin@example.com")
+
+        status = client.get("/api/v1/auth/status").json()
+
+        assert status["setup_required"] is False
+        assert status["has_single_user_work"] is False

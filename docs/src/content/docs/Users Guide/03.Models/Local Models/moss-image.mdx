@@ -130,8 +130,9 @@ Not supported, and refused at install with a message saying so: ComfyUI's scaled
 torchao exports other than the fp8 layout above (INT8 builds, per-tensor or block-wise fp8), files that mix torchao fp8
 with ComfyUI-quantized layers, nvfp4 and w4a8 builds, and the ComfyUI-GGUF `Q8_CR` and `Q4_CR` files. Install the bf16
 file, the fp8 or int8 build above, or a GGUF instead. To save VRAM with a bf16 file, turn on **FP8 Storage** in the
-model's **Default Settings**. FP8 Storage does nothing for a GGUF; for the fp8 build it only keeps the file's fp8 layers
-packed, and for the int8 build it applies only to the layers that are not already int8.
+model's **Default Settings**. FP8 Storage does nothing for a GGUF or the int8 build; the int8 build keeps the layers it
+did not quantize in bf16. The Model Manager can still show the toggle for the int8 build, because it is the same kind
+of file as the bf16 one. It has no effect there. For the fp8 build it only keeps the file's fp8 layers packed.
 
 The int8 build and the GGUFs save memory; they are not faster. In InvokeAI's measurements on an RTX 4090 they took
 3-15 % longer per image than bf16. Int8 and Q8_0 keep the scene of a bf16 image and shift its details.

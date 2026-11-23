@@ -85,8 +85,8 @@ def _raise_if_no_weight_shards(submodel_path: Path, submodel_label: str) -> None
     type=ModelType.Main,
     format=ModelFormat.Diffusers,
     fp8_storage=Unimplemented(
-        "the transformer keeps fp32 patch projections and output heads beside bf16 blocks, and the cast "
-        "derives one compute dtype from the first float parameter; that has to be checked here first"
+        "the transformer reads `context_embedder.weight.dtype` and the AdaLN `linear.weight.dtype` to cast "
+        "its inputs, so an fp8 weight would turn those inputs into fp8 before the cast hook widens it"
     ),
 )
 class MiniMaxH3DiffusersModel(ModelLoader):

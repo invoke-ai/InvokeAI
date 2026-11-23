@@ -303,7 +303,7 @@ curl -X POST "http://localhost:9090/api/v1/recall/video/default/image?image_name
 curl -X POST "http://localhost:9090/api/v1/recall/video/default/image?image_name=9d2a….png&append=true"
 ```
 
-In multi-user mode, add `-H "Authorization: Bearer <token>"`.
+Sign-in is on by default, so add `-H "Authorization: Bearer <token>"` to each request. See the [Multi-User API Guide](/configuration/multi-user-mode/api-guide/) for getting a token.
 
 ### Python
 

@@ -1,11 +1,13 @@
-import { ChakraProvider } from '@chakra-ui/react';
+import { ChakraProvider, Menu, Popover, Portal } from '@chakra-ui/react';
 import { system } from '@theme/system';
 import { CameraIcon } from 'lucide-react';
-import { Activity, act, useCallback, useRef, useState } from 'react';
+import { Activity, act, type ReactElement, useCallback, useRef, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
 import { userEvent } from 'vitest/browser';
 
+import { MenuContent } from './Menu';
+import { PopoverContent } from './Popover';
 import { Toolbar, ToolbarButton } from './Toolbar';
 import { ClippedTooltip, Tooltip } from './Tooltip';
 
@@ -219,4 +221,112 @@ it('shows a tip again only when hovered after its section was hidden mid-fade', 
   // The pointer left while the section was hidden; the next hover still opens the tip.
   await userEvent.hover(trigger);
   await expect.poll(() => shownTip()?.textContent).toBe('Open the other section');
+});
+
+const POPOVER_AT = { getAnchorRect: () => ({ height: 1, width: 1, x: 24, y: 24 }), placement: 'bottom-start' } as const;
+
+// Shared by the tooltip and the menu, as `useTooltipTriggerIds` does: Zag finds each trigger by its id.
+const FIELD_ID = 'media-field';
+const TIP_IDS = { trigger: FIELD_ID };
+const MENU_IDS = { contextTrigger: FIELD_ID };
+
+interface MediaFieldProps {
+  inPopover: boolean;
+  /** Tooltip around the menu's trigger is the `useTooltipTriggerIds` order; dialogs need the menu's outside. */
+  isMenuTriggerOutside: boolean;
+}
+
+/** A field that shows its name on hover and opens a context menu from the same element; the item's tip opens with it. */
+const MediaFieldWithMenu = ({ inPopover, isMenuTriggerOutside }: MediaFieldProps) => {
+  const [isNameShown, setIsNameShown] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const showName = useCallback(() => setIsNameShown(true), []);
+  const handleMenuOpenChange = useCallback((details: { open: boolean }) => setIsMenuOpen(details.open), []);
+  const button = (
+    <button type="button" onPointerEnter={showName}>
+      Media
+    </button>
+  );
+  const nameTip = (trigger: ReactElement) => (
+    <Tooltip content="Media name" ids={TIP_IDS} open={isNameShown} placement="bottom">
+      {trigger}
+    </Tooltip>
+  );
+  const field = (
+    <Menu.Root ids={MENU_IDS} open={isMenuOpen} onOpenChange={handleMenuOpenChange}>
+      {isMenuTriggerOutside ? (
+        <Menu.ContextTrigger asChild>{nameTip(button)}</Menu.ContextTrigger>
+      ) : (
+        nameTip(<Menu.ContextTrigger asChild>{button}</Menu.ContextTrigger>)
+      )}
+      <Portal>
+        <Menu.Positioner>
+          <MenuContent>
+            <Menu.Item value="unavailable">
+              <Tooltip content="Item reason" open={isMenuOpen} placement="bottom">
+                <span>Unavailable action</span>
+              </Tooltip>
+            </Menu.Item>
+            <Menu.Item value="second">Second action</Menu.Item>
+            <Menu.Item value="third">Third action</Menu.Item>
+          </MenuContent>
+        </Menu.Positioner>
+      </Portal>
+    </Menu.Root>
+  );
+
+  return inPopover ? (
+    <Popover.Root open positioning={POPOVER_AT}>
+      <Portal>
+        <Popover.Positioner>
+          <PopoverContent>
+            <div style={{ width: '120px' }}>{field}</div>
+            {/* Room under the field, so its tip lies over the popover. */}
+            <div style={{ height: '80px' }} />
+          </PopoverContent>
+        </Popover.Positioner>
+      </Portal>
+    </Popover.Root>
+  ) : (
+    <div style={{ left: '24px', position: 'absolute', top: '40px' }}>{field}</div>
+  );
+};
+
+/** What the browser paints on top at a tip's centre; tips let the pointer through, so the probe lets this one hit. */
+const paintedAtCentreOf = (text: string) => {
+  const tip = [...document.querySelectorAll<HTMLElement>('[role="tooltip"]')].find((each) => each.textContent === text);
+  if (!tip) {
+    return null;
+  }
+  tip.style.pointerEvents = 'auto';
+  const rect = tip.getBoundingClientRect();
+  return document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2);
+};
+
+it.each([
+  { where: 'on the page', inPopover: false, isMenuTriggerOutside: false },
+  { where: 'in a popover', inPopover: true, isMenuTriggerOutside: false },
+  { where: 'in a popover, inside its menu trigger', inPopover: true, isMenuTriggerOutside: true },
+])("paints a tip $where beneath its menu, and a menu item's tip above the menu", async (props) => {
+  host = document.createElement('div');
+  document.body.append(host);
+  root = createRoot(host);
+  await act(() =>
+    root?.render(
+      <ChakraProvider value={system}>
+        <MediaFieldWithMenu {...props} />
+      </ChakraProvider>
+    )
+  );
+  const field = document.getElementById(FIELD_ID)!;
+
+  await userEvent.hover(field);
+  await expect.poll(() => paintedAtCentreOf('Media name')?.textContent).toBe('Media name');
+
+  // Near the corner, so the menu opens over the tip below the field.
+  await userEvent.click(field, { button: 'right', position: { x: 4, y: 4 } });
+  const menu = () => document.querySelector('[data-scope="menu"][data-part="content"]');
+
+  await expect.poll(() => !!menu()?.contains(paintedAtCentreOf('Media name'))).toBe(true);
+  await expect.poll(() => paintedAtCentreOf('Item reason')?.textContent).toBe('Item reason');
 });

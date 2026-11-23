@@ -2,7 +2,11 @@ import type { GenerationModelCatalogItem as ModelConfig } from '@features/genera
 import type { GenerateModelConfig, GenerateSettings, LoraModelConfig } from '@features/generation/core/types';
 
 import { Flex, Icon, Stack, Text } from '@chakra-ui/react';
-import { getKrea2EditLoraState, isReferenceImageSupported } from '@features/generation/core/baseGenerationPolicies';
+import {
+  getKrea2EditLoraState,
+  isReferenceImageSupported,
+  needsEmptyCanvasFrameForReferenceBudget,
+} from '@features/generation/core/baseGenerationPolicies';
 import {
   type GenerateDraft,
   type GenerateSettingsUpdate,
@@ -55,7 +59,8 @@ export const GenerateGuidanceSection = ({
   const activeReferenceImages = referenceImagesSupported
     ? settings.referenceImages.filter((image) => image.isEnabled).length
     : 0;
-  const catalogStatus = useGenerationUi().models.status;
+  const ui = useGenerationUi();
+  const catalogStatus = ui.models.status;
   const activeConcepts = settings.loras.filter(
     (lora) =>
       lora.isEnabled && isCompatibleLora(lora, selectedModel) && isConceptInstalled(lora, loraModels, catalogStatus)
@@ -116,6 +121,12 @@ export const GenerateGuidanceSection = ({
           onCommit={onReferenceCommit}
           onCommitImmediate={onCommitImmediate}
         />
+        {ui.project.invocationSourceId === 'canvas' &&
+        needsEmptyCanvasFrameForReferenceBudget(selectedModel, settings) ? (
+          <Text color="fg.warning" fontSize="xs" role="status" textWrap="pretty">
+            {t('widgets.generate.canvasReferenceImageBudgetHint')}
+          </Text>
+        ) : null}
         {/* Not blocking: the run works, but without an edit LoRA it only copies the references. */}
         {getKrea2EditLoraState(selectedModel, settings) === 'noLora' ? (
           <Text color="fg.warning" fontSize="xs" role="status" textWrap="pretty">

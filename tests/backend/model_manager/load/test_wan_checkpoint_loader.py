@@ -18,6 +18,7 @@ import safetensors.torch
 import torch
 from safetensors.torch import save_file
 
+from invokeai.backend.model_manager.configs.main import Main_Checkpoint_Wan_Config, MainModelDefaultSettings
 from invokeai.backend.model_manager.load import load_default
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch_module_autocast import (
     apply_custom_layers_to_model,
@@ -30,6 +31,7 @@ from invokeai.backend.model_manager.load.model_loaders.wan import (
 from invokeai.backend.model_manager.taxonomy import SubModelType, WanVariantType
 from invokeai.backend.quantization.fp8_scaled import is_scale_metadata_key, set_full_precision_hints_respected
 from invokeai.backend.quantization.int8_convrot import Int8ConvrotLinear
+from tests.fixtures.loader_seams import assert_fp8_storage_declined, logged_info
 from tests.fixtures.quantized_payloads import (
     comfy_quant_marker,
     mxfp8_tensors,
@@ -113,10 +115,12 @@ def _load(
     variant: WanVariantType = WanVariantType.T2V_A14B,
     loader: WanCheckpointModel | None = None,
     dtype: torch.dtype = torch.bfloat16,
+    config=None,
 ):
-    config = MagicMock()
-    config.path = str(path)
-    config.variant = variant
+    if config is None:
+        config = MagicMock()
+        config.path = str(path)
+        config.variant = variant
 
     with (
         patch("invokeai.backend.model_manager.load.model_loaders.wan.TorchDevice.choose_torch_device"),
@@ -772,28 +776,39 @@ class TestInt8Convrot:
                 expected += tensor.numel() * torch.bfloat16.itemsize
         loader._ram_cache.make_room.assert_called_once_with(expected)
 
-    def test_fp8_storage_leaves_the_int8_buffers_alone(self, tmp_path: Path) -> None:
-        """The loader ends in the FP8 Storage pass for every path. It walks parameters and an ``Int8ConvrotLinear``
-        holds buffers, so the codes and their fp32 scales must come out untouched while the dense remainder is
-        cast."""
+    def test_fp8_storage_leaves_an_int8_build_as_loaded(self, tmp_path: Path) -> None:
+        """The loader ends in the FP8 Storage pass for every path. An int8 build is declined whole: the codes and
+        their fp32 scales stay, and so does a block Linear the checkpoint left dense -- every tensor equals the load
+        without FP8 Storage."""
         dense_layer = BLOCK_LAYERS[-1]
         quantized = BLOCK_LAYERS[:-1]
         _, sd = _int8_checkpoint(quantized)
         path = _write(tmp_path, sd)
-        loader = _make_loader()
-        loader._should_use_fp8 = lambda *_args: True
-        loader._torch_dtype = torch.bfloat16
-        loader._logger = MagicMock()
 
-        model = _load(path, loader=loader)
+        def load(fp8_storage: bool):
+            config = Main_Checkpoint_Wan_Config.model_construct(
+                path=str(path),
+                name="wan_int8",
+                variant=WanVariantType.T2V_A14B,
+                default_settings=MainModelDefaultSettings(fp8_storage=fp8_storage),
+            )
+            loader = _make_loader()
+            loader._torch_dtype = torch.bfloat16
+            loader._torch_device = torch.device("cpu")
+            loader._logger = MagicMock()
+            with patch.object(load_default, "_device_supports_fp8_storage", return_value=True):
+                return _load(path, loader=loader, config=config), loader
+
+        plain, _ = load(False)
+        model, loader = load(True)
 
         for name in quantized:
             layer = model.get_submodule(name)
             assert isinstance(layer, Int8ConvrotLinear), name
             assert layer.weight.dtype is torch.int8, name
             assert layer.weight_scale.dtype is torch.float32, name
-        # The pass really ran: a block Linear the checkpoint left dense is now stored as fp8.
-        assert model.get_submodule(dense_layer).weight.dtype is torch.float8_e4m3fn
+        assert model.get_submodule(dense_layer).weight.dtype is torch.bfloat16
+        assert_fp8_storage_declined(model, plain, logged_info(loader._logger), "wan_int8")
 
     def test_an_int8_weight_without_a_marker_is_refused(self, tmp_path: Path) -> None:
         """Cast as raw codes it would be a model of small integers that loads without complaint."""
