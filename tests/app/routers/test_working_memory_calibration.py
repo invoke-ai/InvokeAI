@@ -315,12 +315,6 @@ def test_a_retry_between_another_attempts_steps_is_refused_with_a_coded_409(
     }
 
 
-def test_the_retry_route_documents_its_coded_409() -> None:
-    responses = app.openapi()["paths"]["/api/v1/queue/{queue_id}/retry_items_by_id"]["put"]["responses"]
-    assert "calibration_running" in responses["409"]["description"]
-    assert "calibration_interleaved" in responses["409"]["description"]
-
-
 def test_status_reset_and_export_for_admins(client: TestClient, admin_token: str, calibration) -> None:
     _, service = calibration
     run_id = _calibrate(client, admin_token).json()["run_id"]

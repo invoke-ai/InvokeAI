@@ -2016,12 +2016,15 @@ def test_a_retry_refused_on_one_device_class_counts_nothing_on_another(
         assert [run.get("retries_in_flight", 0) for run in stored["runs"]] == [0] * len(stored["runs"])
 
 
+@pytest.mark.parametrize("b_starts", ["at the check", "at the commit"])
 def test_no_attempt_starts_between_a_retrys_check_and_its_commit(
-    tmp_path: Path, started, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, started, monkeypatch: pytest.MonkeyPatch, b_starts: str
 ) -> None:
     """A's one-step attempt failed, and nothing runs: its retry passes the check. Before the queue commits it, another
-    administrator starts B, whose check would find nothing running yet. The retry holds the attempts' lock through its
-    commit: B waits for it, then finds A's retry queued and is refused."""
+    administrator starts B, whose check would find nothing running yet: inside the check, or once it returned, as the
+    queue begins the commit (`admit`). The retry holds the attempts' lock from its check through its commit: B waits
+    for it, then finds A's retry queued and is refused. Were the lock given back after the check, B would start at the
+    commit and A's retry would commit after it, between B's steps."""
     service = started(tmp_path)
     queue = service._services.session_queue
     failed = _failed(service, "tab-a", steps=1)
@@ -2045,17 +2048,32 @@ def test_no_attempt_starts_between_a_retrys_check_and_its_commit(
             outcome.append(error)
 
     other = threading.Thread(target=start_b)
-    checked = service.retries_starting
 
-    def checked_then_b_starts(sources):
-        in_flight = checked(sources)
+    def b_starts_now() -> None:
         other.start()
         assert arrived.wait(10)
         # Time for B to pass the retry, were nothing to hold it.
         other.join(timeout=0.5)
-        return in_flight
 
-    monkeypatch.setattr(service, "retries_starting", checked_then_b_starts)
+    if b_starts == "at the check":
+        checked = service.retries_starting
+
+        def checked_then_b_starts(sources):
+            in_flight = checked(sources)
+            b_starts_now()
+            return in_flight
+
+        monkeypatch.setattr(service, "retries_starting", checked_then_b_starts)
+    else:
+        run = queue._queries.run
+
+        def b_starts_then_commit(work, *, read_only: bool = False):
+            # The retry's commit; B's own enqueue, once B started, runs a work of that name too.
+            if work.__name__ == "admit" and other.ident is None:
+                b_starts_now()
+            return run(work, read_only=read_only)
+
+        monkeypatch.setattr(queue._queries, "run", b_starts_then_commit)
     [retried] = queue.retry_items_by_id("default", failed.item_ids).retried_items
     other.join(timeout=10)
 
