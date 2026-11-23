@@ -229,7 +229,7 @@ def flux2_dora_patch_bytes(
                 except AttributeError:
                     continue  # The patcher skips an incomplete group.
                 if not all(isinstance(module, torch.nn.Linear) for module in modules):
-                    continue  # Binding owns the unsupported-quantization error.
+                    continue  # The patcher warns and skips unsupported fused groups.
 
                 dora = layer.layer
                 vector_bytes = dora.down.shape[1] * torch.float32.itemsize

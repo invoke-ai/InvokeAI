@@ -796,8 +796,8 @@ class Flux2DenoiseInvocation(BaseInvocation, WithMetadata):
             adapter = stack.enter_context(context.models.load(lora.lora).model_in_ram())
             assert isinstance(adapter, ModelPatchRaw)
             converted = convert_bfl_lora_patch_to_diffusers(adapter)
-            # Conversion can reuse cache-owned layers. Patching moves their tensors in place, so each
-            # application needs its own patch objects even when multiple requests pin the same record.
+            # Copy patch objects, including wrapper leaves, per application; their tensors remain shared
+            # until a patch's `to()` rebinds them. The cached objects must not be moved by patching.
             local = ModelPatchRaw({key: copy.copy(layer) for key, layer in converted.layers.items()})
             patches.append((local, lora.weight))
         return patches

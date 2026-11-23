@@ -224,8 +224,9 @@ preserve their normalization when Q, K and V are split, including when the fused
 
 Output-axis DoRA also works on supported FLUX.2 int8 checkpoints. For fused QKV
 input-axis DoRA, the shared norm currently requires ordinary floating-point Q/K/V weights (including native
-FP8 storage). Packed modules and GGUF or SDNQ tensor subclasses are rejected when applying that adapter;
-use a base with ordinary floating-point Q/K/V weights for this orientation.
+FP8 storage). For packed modules and GGUF or SDNQ tensor subclasses, the fused QKV group is skipped with a
+warning and the adapter's other supported layers still apply. Use ordinary floating-point Q/K/V weights
+to apply the fused input-axis group.
 
 ## PiD super-resolution decode
 

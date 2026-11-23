@@ -10,6 +10,10 @@ from invokeai.backend.util.fp8 import FP8_STORAGE_DTYPES
 _NORM_BLOCK_ELEMENTS = 1 << 20
 
 
+class UnsupportedFusedInputDoRABase(Exception):
+    """The fused norm cannot be bound to one of this group's base weights."""
+
+
 class FusedInputDoRALayer(BaseLayerPatch):
     """Unbound fused DoRA: loading knows the factors, but only application knows the Q/K/V bases.
 
@@ -26,6 +30,23 @@ class FusedInputDoRALayer(BaseLayerPatch):
         self, model: torch.nn.Module, base_dtypes: tuple[torch.dtype | None, ...] = (None, None, None)
     ) -> list[tuple[str, DoRALayer]]:
         modules = [model.get_submodule(key) for key in self.keys]
+        layer = self.layer
+        # Validate the adapter even when a quantized base will be skipped. These dimensions
+        # are available on both ordinary and buffer-backed quantized Linear modules.
+        if all(hasattr(module, "in_features") and hasattr(module, "out_features") for module in modules):
+            in_features = [module.in_features for module in modules]
+            out_features = [module.out_features for module in modules]
+            if (
+                layer.up.ndim != 2
+                or layer.down.ndim != 2
+                or len(set(in_features)) != 1
+                or len(set(out_features)) != 1
+                or layer.up.shape != (sum(out_features), layer.down.shape[0])
+                or layer.down.shape[1] != in_features[0]
+                or layer.dora_scale.numel() != in_features[0]
+                or (layer.bias is not None and layer.bias.numel() != sum(out_features))
+            ):
+                raise RuntimeError("Fused input-axis DoRA dimensions do not match its Q/K/V projections.")
         for module in modules:
             # Binding needs all three base weights before patching; packed modules and tensor subclasses
             # do not provide the ordinary floating-point weight slabs used by this norm pass.
@@ -35,12 +56,11 @@ class FusedInputDoRALayer(BaseLayerPatch):
                 or type(module.weight.data) is not torch.Tensor
                 or not module.weight.is_floating_point()
             ):
-                raise RuntimeError(
+                raise UnsupportedFusedInputDoRABase(
                     "Fused input-axis DoRA requires ordinary floating-point Q/K/V weights; "
                     "this base model quantization format is not supported for that operation."
                 )
 
-        layer = self.layer
         up_parts = layer.up.chunk(3, dim=0)
         norm_sq = torch.zeros(layer.down.shape[1], device=modules[0].weight.device, dtype=torch.float32)
         for module, up, base_dtype in zip(modules, up_parts, base_dtypes, strict=True):

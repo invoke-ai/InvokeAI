@@ -10,7 +10,7 @@ from transformers import CLIPTextModel
 from invokeai.backend.model_manager.load.model_cache.model_cache import MODEL_LOAD_LOCK
 from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch, sub_patches
 from invokeai.backend.patches.layers.flux_control_lora_layer import FluxControlLoRALayer
-from invokeai.backend.patches.layers.fused_input_dora_layer import FusedInputDoRALayer
+from invokeai.backend.patches.layers.fused_input_dora_layer import FusedInputDoRALayer, UnsupportedFusedInputDoRABase
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.patches.pad_with_zeros import pad_with_zeros
 from invokeai.backend.util import InvokeAILogger
@@ -190,7 +190,13 @@ class LayerPatcher:
                     else None
                     for key in layer.keys
                 )
-                for key, split_layer in layer.bind(model, base_dtypes):
+                try:
+                    bound = layer.bind(model, base_dtypes)
+                except UnsupportedFusedInputDoRABase as error:
+                    logger = InvokeAILogger.get_logger(LayerPatcher.__name__)
+                    logger.warning("Skipping fused input-axis DoRA group '%s': %s", layer_key, error)
+                    continue
+                for key, split_layer in bound:
                     layers[f"{prefix}{key}"] = split_layer
             else:
                 layers[layer_key] = layer

@@ -189,15 +189,14 @@ def test_converted_dora_on_packed_qkv_and_cleanup(packed: str, axis: str) -> Non
     force_sidecar = requires_sidecar_patching(model, ModelFormat.Checkpoint)
     assert force_sidecar
     if axis == "input":
-        with pytest.raises(RuntimeError, match="Fused input-axis DoRA requires ordinary floating-point Q/K/V weights"):
-            with LayerPatcher.apply_smart_model_patches(
-                model=model,
-                patches=[(patch, 0.7)],
-                prefix=FLUX_LORA_TRANSFORMER_PREFIX,
-                dtype=torch.float32,
-                force_sidecar_patching=force_sidecar,
-            ):
-                model(x)
+        with LayerPatcher.apply_smart_model_patches(
+            model=model,
+            patches=[(patch, 0.7)],
+            prefix=FLUX_LORA_TRANSFORMER_PREFIX,
+            dtype=torch.float32,
+            force_sidecar_patching=force_sidecar,
+        ):
+            torch.testing.assert_close(model(x), baseline, rtol=0, atol=0)
     else:
         # Both packed fixtures decode to ones. Build the full fused result independently of the split.
         base = torch.ones(384, 64)
