@@ -5,6 +5,7 @@ from typing import Any
 from unittest.mock import Mock
 
 import pytest
+import yaml
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
@@ -12,7 +13,12 @@ from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api.routers import app_info
 from invokeai.app.api_app import app
 from invokeai.app.services.auth.token_service import TokenData
-from invokeai.app.services.config.config_default import get_config, load_and_migrate_config, load_external_api_keys
+from invokeai.app.services.config.config_default import (
+    get_config,
+    load_and_migrate_config,
+    load_config_from_root,
+    load_external_api_keys,
+)
 from invokeai.app.services.external_generation.external_generation_common import ExternalProviderStatus
 from invokeai.app.services.image_files.image_subfolder_strategy import DateStrategy, create_subfolder_strategy
 from invokeai.app.services.invoker import Invoker
@@ -421,6 +427,35 @@ def test_update_runtime_config_persists_generation_devices(
     assert response.status_code == 200
     assert response.json()["config"]["generation_devices"] == "auto"
     assert get_config().generation_devices == "auto"
+
+
+@pytest.mark.parametrize("file_multiuser", [None, True, False])
+def test_saving_generation_settings_preserves_the_authentication_choice_in_yaml(
+    file_multiuser: bool | None,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    mock_invoker: Invoker,
+    client: TestClient,
+) -> None:
+    config_path = tmp_path / "invokeai.yaml"
+    settings: dict[str, str | bool] = {"schema_version": "4.0.3"}
+    if file_multiuser is not None:
+        settings["multiuser"] = file_multiuser
+    config_path.write_text(yaml.safe_dump(settings))
+    monkeypatch.setenv("INVOKEAI_MULTIUSER", "false")
+    runtime_config = load_config_from_root(tmp_path)
+    monkeypatch.setattr(mock_invoker.services, "configuration", runtime_config)
+    monkeypatch.setattr(app_info, "get_config", lambda: runtime_config)
+    monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", MockApiDependencies(mock_invoker))
+
+    response = client.patch("/api/v1/app/runtime_config", json={"max_queue_history": 12})
+
+    assert response.status_code == 200
+    assert response.json()["config"]["multiuser"] is False
+    file_choice = file_multiuser is not False
+    assert yaml.safe_load(config_path.read_text()) == {**settings, "multiuser": file_choice, "max_queue_history": 12}
+    monkeypatch.delenv("INVOKEAI_MULTIUSER")
+    assert load_config_from_root(tmp_path).multiuser is file_choice
 
 
 def test_update_runtime_config_rejects_invalid_generation_device(

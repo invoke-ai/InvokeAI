@@ -8,6 +8,7 @@ import type { ChangeEvent } from 'react';
 
 import { Box, Flex, HStack, Image, Stack, Text, Textarea } from '@chakra-ui/react';
 import { FindInGalleryThumbnailButton } from '@features/gallery/mediaSlot';
+import { useGalleryItemContextMenu } from '@features/gallery/react';
 import { galleryImageUrls } from '@features/gallery/utility';
 import { useInvocationTemplatesSelector } from '@features/workflow/react';
 import { workflowSelectionStore } from '@features/workflow/ui/editor/selectionStore';
@@ -144,9 +145,10 @@ const OutputImage = ({ imageName }: { imageName: string }) => {
   const { t } = useTranslation();
   const { findInGallery } = useWorkflowUi();
   const onFind = useCallback(() => findInGallery({ kind: 'image', name: imageName }), [findInGallery, imageName]);
+  const onContextMenu = useGalleryItemContextMenu({ kind: 'image', name: imageName });
 
   return (
-    <Box className="group" position="relative">
+    <Box className="group" position="relative" onContextMenu={onContextMenu}>
       <Image
         alt={t('widgets.workflow.outputImage')}
         bg="bg.muted"

@@ -16,6 +16,7 @@ vi.mock('@features/identity/session', async (importOriginal) => {
   const singleUser: SessionModule.AuthSession = {
     accountEpoch: 1,
     expiredUserId: null,
+    hasSingleUserWork: false,
     multiuserEnabled: false,
     phase: 'ready',
     sessionExpired: false,

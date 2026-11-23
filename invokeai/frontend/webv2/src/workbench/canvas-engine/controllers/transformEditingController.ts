@@ -1,6 +1,7 @@
 import type {
   BeginTransformResult,
   CanvasEditRefusal,
+  FlipLayerResult,
   StructuralCommitResult,
 } from '@workbench/canvas-engine/capabilities';
 import type { CanvasDocumentContractV3, CanvasLayerContract } from '@workbench/canvas-engine/contracts';
@@ -8,6 +9,7 @@ import type { TransformOptions, TransformSession } from '@workbench/canvas-engin
 import type { CanvasProjectMutation } from '@workbench/canvas-engine/mutationContracts';
 import type { LayerCacheEntry } from '@workbench/canvas-engine/render/layerCache';
 import type { RasterBackend, RasterSurface } from '@workbench/canvas-engine/render/raster';
+import type { FloatingSelection } from '@workbench/canvas-engine/selection/floatingSelection';
 import type { LayerTransform } from '@workbench/canvas-engine/transform/transformMath';
 import type { Rect, ToolId } from '@workbench/canvas-engine/types';
 
@@ -29,9 +31,9 @@ import {
   imageDataOf,
   type SpatialRunner,
 } from '@workbench/canvas-engine/render/exactAdjustments';
-import { hittableLayerSize } from '@workbench/canvas-engine/tools/moveHitTest';
+import { hittableLayerRect, hittableLayerSize } from '@workbench/canvas-engine/tools/moveHitTest';
 import { isTransformEligible } from '@workbench/canvas-engine/tools/transformTool';
-import { bakeMatrix } from '@workbench/canvas-engine/transform/transformMath';
+import { bakeMatrix, flipTransform } from '@workbench/canvas-engine/transform/transformMath';
 
 import type { CanvasMutationContext, EditPublishResult, EditStep } from './mutationContext';
 
@@ -74,6 +76,8 @@ export interface TransformEditingControllerOptions {
   readonly canEdit: () => boolean;
   readonly isGestureActive: () => boolean;
   readonly hasFloatingSelection: () => boolean;
+  readonly getFloatingSelection: () => FloatingSelection | null;
+  readonly setFloatingTransform: (transform: LayerTransform) => boolean;
   /** The tool the user is on: a Space, Alt or C hold only lends the surface to another tool. */
   readonly getUserToolId: () => ToolId;
   /** Selects `layerId`; selecting cancels a session on another layer. */
@@ -250,6 +254,49 @@ export class TransformEditingController {
       this.deps.pending.set(null);
       this.deps.reportRefusal('not-ready');
     }
+  }
+
+  flip(layerId: string, direction: 'horizontal' | 'vertical', label: string): FlipLayerResult {
+    const document = this.deps.getDocument();
+    const leaf = lookupDocumentLeaf(document, layerId);
+    if (this.disposed || !document) {
+      return { status: 'not-ready' };
+    }
+    if (!leaf) {
+      return { status: 'missing' };
+    }
+    if (leaf.effectiveLocked) {
+      return { status: 'locked' };
+    }
+    const session = this.deps.session.get();
+    if (!this.deps.canEdit() || (session?.layerId === layerId && (session.processing || this.processing))) {
+      return { status: 'busy' };
+    }
+    // The float is in its layer's local space, so it mirrors along the layer's axes.
+    const float = this.deps.getFloatingSelection();
+    if (float?.layerId === layerId) {
+      const flipped = flipTransform(float.transform, float.pixels.rect, direction);
+      // A drag would overwrite the flip, and a refused float transform reports itself.
+      const applied = !this.deps.isGestureActive() && this.deps.setFloatingTransform(flipped);
+      return { status: applied ? 'previewed' : 'busy' };
+    }
+    const rect = hittableLayerRect(leaf.layer, document);
+    if (!rect) {
+      return { status: 'empty' };
+    }
+    if (session?.layerId === layerId) {
+      this.update(flipTransform(session.transform, rect, direction));
+      return { status: 'previewed' };
+    }
+    return this.deps.commitStructural(
+      label,
+      {
+        id: layerId,
+        patch: { transform: flipTransform(leaf.layer.transform, rect, direction) },
+        type: 'updateCanvasLayer',
+      },
+      { id: layerId, patch: { transform: leaf.layer.transform }, type: 'updateCanvasLayer' }
+    );
   }
 
   update(transform: LayerTransform): void {

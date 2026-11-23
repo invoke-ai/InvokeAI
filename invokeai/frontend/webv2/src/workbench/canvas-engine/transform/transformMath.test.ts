@@ -9,10 +9,16 @@ import {
   applyScale,
   bakeMatrix,
   composeLayerTransforms,
+  flipTransform,
   IDENTITY_TRANSFORM,
+  layerPointToDocument,
   layerTransformMatrix,
   localHandlePoint,
   resizeCursorForHandle,
+  retransformAbout,
+  scaleAxis,
+  scaleForLength,
+  transformedSize,
   ROTATE_SNAP_RAD,
   TRANSFORM_ROTATE_NUB_PX,
   transformOverlayGeometry,
@@ -59,7 +65,7 @@ describe('off-origin content rect (content-sized layers)', () => {
       handle: 'se',
       pointerDoc: { x: 130, y: 100 },
       rect: offOrigin,
-      shift: false,
+      constrain: false,
       start: identity,
       startPointerDoc: { x: 70, y: 60 },
     });
@@ -121,7 +127,7 @@ describe('applyScale: about the opposite handle', () => {
       alt: false,
       handle: 'se',
       pointerDoc: { x: 150, y: 100 },
-      shift: false,
+      constrain: false,
       rect,
       start: identity,
       startPointerDoc: { x: 100, y: 100 },
@@ -140,7 +146,7 @@ describe('applyScale: modifiers', () => {
       alt: true,
       handle: 'se',
       pointerDoc: { x: 150, y: 150 },
-      shift: false,
+      constrain: false,
       rect,
       start: identity,
       startPointerDoc: { x: 100, y: 100 },
@@ -150,12 +156,12 @@ describe('applyScale: modifiers', () => {
     expect(close(centerAfter.y, centerBefore.y)).toBe(true);
   });
 
-  it('shift keeps a uniform aspect on a corner drag', () => {
+  it('keeps a uniform aspect on a constrained corner drag', () => {
     const next = applyScale({
       alt: false,
       handle: 'se',
       pointerDoc: { x: 200, y: 110 },
-      shift: true,
+      constrain: true,
       rect,
       start: identity,
       startPointerDoc: { x: 100, y: 100 },
@@ -171,13 +177,57 @@ describe('applyScale: flip and clamp', () => {
       alt: false,
       handle: 'e',
       pointerDoc: { x: -50, y: 50 },
-      shift: false,
+      constrain: false,
       rect,
       start: identity,
       startPointerDoc: { x: 100, y: 50 },
     });
     expect(next.scaleX).toBeLessThan(0);
     expect(Number.isNaN(next.scaleX)).toBe(false);
+  });
+});
+
+describe('numeric size about a reference point', () => {
+  it('lands the typed size on a rotated, flipped, off-origin layer and keeps the reference point in place', () => {
+    const box: TransformRect = { height: 40, width: 60, x: 25, y: -15 };
+    const start: LayerTransform = { rotation: 0.7, scaleX: -1.5, scaleY: 0.5, x: 12, y: 34 };
+    const anchor = localHandlePoint(box, 'ne');
+    const before = layerPointToDocument(start, anchor);
+
+    const scales = scaleAxis(start, 'x', scaleForLength(120, box.width, start.scaleX), true);
+    const next = retransformAbout(start, anchor, scales);
+
+    expect(transformedSize(next, box).width).toBeCloseTo(120, 9);
+    expect(transformedSize(next, box).height).toBeCloseTo(26 + 2 / 3, 9);
+    expect(next.scaleX).toBeLessThan(0);
+    expect(next.scaleY).toBeGreaterThan(0);
+    expect(next.rotation).toBe(start.rotation);
+    const after = layerPointToDocument(next, anchor);
+    expect(after.x).toBeCloseTo(before.x, 9);
+    expect(after.y).toBeCloseTo(before.y, 9);
+  });
+});
+
+describe('flipTransform', () => {
+  it('mirrors in place about the content centre, and twice restores the transform', () => {
+    const box: TransformRect = { height: 40, width: 60, x: 25, y: -15 };
+    const start: LayerTransform = { rotation: 0.7, scaleX: 1.5, scaleY: 0.5, x: 12, y: 34 };
+    const center = { x: 55, y: 5 };
+    for (const [direction, scaleX, scaleY] of [
+      ['horizontal', -1.5, 0.5],
+      ['vertical', 1.5, -0.5],
+    ] as const) {
+      const flipped = flipTransform(start, box, direction);
+      expect(flipped).toMatchObject({ rotation: -0.7, scaleX, scaleY });
+      const before = layerPointToDocument(start, center);
+      const after = layerPointToDocument(flipped, center);
+      expect(after.x).toBeCloseTo(before.x, 9);
+      expect(after.y).toBeCloseTo(before.y, 9);
+      const twice = flipTransform(flipped, box, direction);
+      for (const key of ['rotation', 'scaleX', 'scaleY', 'x', 'y'] as const) {
+        expect(twice[key]).toBeCloseTo(start[key], 9);
+      }
+    }
   });
 });
 
@@ -235,7 +285,7 @@ describe('applyScale: grid snapping', () => {
       grid,
       handle: 'se',
       pointerDoc,
-      shift: false,
+      constrain: false,
       rect,
       start: identity,
       startPointerDoc: { x: 100, y: 100 },

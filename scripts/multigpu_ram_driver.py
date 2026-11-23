@@ -16,9 +16,14 @@ This automates the two manual checks from the test plan:
 ------------------------------------------------------------------------------------------------
 Getting a batch file
 ------------------------------------------------------------------------------------------------
+Use a dedicated test instance with its own InvokeAI root. Bind the server to 127.0.0.1, or publish
+its Docker port only on 127.0.0.1. Close reverse-proxy, tunnel and other external routes to it.
+Then start that instance with INVOKEAI_MULTIUSER=false. This driver sends no sign-in token, and
+anyone who can reach the single-user server has administrator access.
+
 The script needs the exact body InvokeAI's UI sends to enqueue a generation. Easiest way to capture
 it:
-  1. Open InvokeAI in the browser with devtools -> Network open.
+  1. Open the test instance in the browser with devtools -> Network open.
   2. Click Invoke once.
   3. Find the POST to `.../queue/default/enqueue_batch`, copy its JSON request body, save to a file
      (e.g. batch.json). It looks like {"prepend": false, "batch": {"graph": {...}, "runs": 1}}.
@@ -199,7 +204,7 @@ def wait_drained(base: str, queue_id: str, timeout: float) -> None:
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--graph", required=True, help="Path to a captured enqueue_batch body (JSON).")
-    ap.add_argument("--url", default="http://127.0.0.1:9090", help="Server base URL.")
+    ap.add_argument("--url", default="http://127.0.0.1:9090", help="Loopback URL of the private test instance.")
     ap.add_argument("--queue-id", default="default")
     ap.add_argument("--pairs", type=int, default=2, help="Concurrent batches per round (>= #GPUs).")
     ap.add_argument("--rounds", type=int, default=1, help="Number of rounds (use 25+ for leak soak).")

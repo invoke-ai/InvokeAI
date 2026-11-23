@@ -23,11 +23,13 @@ import {
   executeCanvasToolCommand,
   isCanvasToolCommand,
   mergeSelectedLayerDown,
+  showCanvasRefusalNotice,
   type CanvasToolCommandContext,
   type HotkeyTableEntry,
 } from '@workbench/widgets/canvas/canvasToolCommands';
 import {
   commitPreparedEdit,
+  isFlipLayerRefusal,
   type LayerOperationRefusal,
   type PreparedCommitOutcome,
 } from '@workbench/widgets/canvas/useStructuralCommit';
@@ -35,6 +37,7 @@ import {
   deleteLayers,
   duplicateLayers,
   groupLayers,
+  prepareNewRasterLayer,
   ungroupLayers,
   type LayerCommandDeps,
 } from '@workbench/widgets/layers/layerCommands';
@@ -65,6 +68,8 @@ export const CANVAS_ONLY_HOTKEYS = [
   ['canvas.nudgeRightLarge', 'widgets.canvas.commands.nudgeRightLarge', ['shift+arrowright']],
   ['canvas.nudgeUpLarge', 'widgets.canvas.commands.nudgeUpLarge', ['shift+arrowup']],
   ['canvas.nudgeDownLarge', 'widgets.canvas.commands.nudgeDownLarge', ['shift+arrowdown']],
+  // Mod+Shift+N is reserved by browsers; creation stays unbound until customized.
+  ['canvas.newRasterLayer', 'widgets.canvas.commands.newRasterLayer', [], { ignoreRepeat: true }],
   ['canvas.duplicateLayer', 'widgets.canvas.commands.duplicateLayer', ['mod+j']],
   ['canvas.groupLayers', 'widgets.canvas.commands.groupLayers', ['mod+g']],
   ['canvas.ungroupLayers', 'widgets.canvas.commands.ungroupLayers', ['mod+shift+g']],
@@ -75,7 +80,14 @@ export const CANVAS_ONLY_HOTKEYS = [
   ['canvas.layerToBack', 'widgets.canvas.commands.layerToBack', ['mod+shift+[']],
   // No default key — assignable through the hotkeys settings; the canvas menu offers the same action.
   ['canvas.cropAllLayersToFrame', 'widgets.canvas.contextMenu.cropAllLayersToBbox', []],
+  ['canvas.flipHorizontal', 'widgets.transform.flipHorizontal', []],
+  ['canvas.flipVertical', 'widgets.transform.flipVertical', []],
 ] as const satisfies readonly HotkeyTableEntry[];
+
+const FLIP_LABEL_KEYS = {
+  horizontal: 'widgets.transform.flipHorizontal',
+  vertical: 'widgets.transform.flipVertical',
+} as const;
 
 /** Command id → document-space nudge delta (shift variants are ×10). */
 const NUDGE_DELTAS: Record<string, { dx: number; dy: number }> = {
@@ -237,8 +249,23 @@ export const executeCanvasHotkeyCommand = (commandId: string, ctx: CanvasHotkeyC
     ctx.copySelection(commandId === 'canvas.cutSelection');
   } else if (commandId === 'canvas.pasteImage') {
     ctx.pasteFromClipboard();
+  } else if (commandId === 'canvas.newRasterLayer') {
+    ctx.reportPreparedCommit(
+      commitPreparedEdit(engine, t('widgets.layers.actions.addRasterLayer'), prepareNewRasterLayer)
+    );
   } else if (commandId === 'canvas.cropAllLayersToFrame') {
     ctx.cropAllLayers();
+  } else if (commandId === 'canvas.flipHorizontal' || commandId === 'canvas.flipVertical') {
+    const direction = commandId === 'canvas.flipHorizontal' ? 'horizontal' : 'vertical';
+    const flipped =
+      selectedLayer && engine?.layers.flipLayer(selectedLayer.id, direction, t(FLIP_LABEL_KEYS[direction]));
+    if (selected && isGroupNode(selected.node)) {
+      showCanvasRefusalNotice('flip:group', t('widgets.transform.noSelection'), t('widgets.transform.groupSelected'));
+    } else if (flipped && isFlipLayerRefusal(flipped)) {
+      ctx.reportLayerOperation(flipped.status);
+    } else if (flipped && flipped.status !== 'previewed') {
+      ctx.reportStructuralCommit(flipped);
+    }
   } else if (commandId === 'canvas.toggleNonRasterLayers') {
     // Hide overlays without disabling generation content; showing restores individually hidden nodes too.
     const overlays = index.nodes.filter((entry) => isOverlayStack(entry.stack));
