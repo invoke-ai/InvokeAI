@@ -525,7 +525,7 @@ class QwenImageTextEncoderInvocation(BaseInvocation):
         # lock is held no longer than necessary - while a writer holds it, or waits for it, every VRAM move on every
         # worker stalls, and every reader delays every cold model construction:
         # 1. the offload is a VRAM move like any other (`load_state_dict(assign=True)` -> `register_parameter`), so it
-        #    takes the read lock, acquired *before* the cache lock `make_room_in_vram` takes, per the lock-ordering
+        #    takes the read lock inside `make_room_in_vram`, before its cache lock, per the lock-ordering
         #    contract;
         # 2. the checkpoint read takes no lock: it creates no parameters and touches no global state, and it is the
         #    slow part on anything but NVMe. It runs after the offload so the offload's RAM cannot evict its pages;
@@ -544,8 +544,7 @@ class QwenImageTextEncoderInvocation(BaseInvocation):
         try:
             # A CPU execution device has no VRAM to make room in (recent bitsandbytes can quantize on the CPU).
             if quantized_bytes > 0 and device.type != "cpu":
-                with MODEL_LOAD_LOCK.read_lock():
-                    vram_available = context.models.make_room_in_vram(quantized_bytes)
+                vram_available = context.models.make_room_in_vram(quantized_bytes)
                 if vram_available < quantized_bytes:
                     context.logger.warning(
                         f"Only {max(vram_available, 0) / MB:.0f} MB of VRAM could be made available on {device} for "
