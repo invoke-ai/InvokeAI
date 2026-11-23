@@ -600,6 +600,7 @@ qwen3_vl_vision_tower_8b = StarterModel(
 )
 
 qwen3_vl_vision_tower_4b = StarterModel(
+    source_urls=["https://huggingface.co/Qwen/Qwen3-VL-4B-Instruct-GGUF"],
     name="Qwen3-VL 4B Vision Tower",
     base=BaseModelType.Any,
     source=f"{_QWEN3_VL_4B_GGUF}/mmproj-Qwen3VL-4B-Instruct-F16.gguf",
