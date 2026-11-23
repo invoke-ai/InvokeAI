@@ -3,6 +3,7 @@ import type { MouseEvent, ReactNode } from 'react';
 
 import { Box, chakra, Menu, Portal } from '@chakra-ui/react';
 import { canCopyText, copyText } from '@platform/browser/clipboard';
+import { getContextMenuPoint } from '@platform/react/contextMenuPoint';
 import { MenuContent, MenuItem, useContextMenu } from '@platform/ui/Menu';
 import { Tooltip } from '@platform/ui/Tooltip';
 import { useTranslation } from 'react-i18next';
@@ -108,21 +109,9 @@ export const GenerateFieldContextMenu = ({
 
   const handleContextMenu = (event: MouseEvent<HTMLDivElement>) => {
     event.preventDefault();
-    // A keyboard-opened menu has no pointer position of its own: Chromium reports button -1 at wherever the mouse last
-    // was, other engines no pointer type or 0,0.
-    const native = event.nativeEvent as Partial<PointerEvent>;
-    const fromKeyboard =
-      event.button === -1 || native.pointerType === '' || (event.clientX === 0 && event.clientY === 0);
     const focused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    const rect = (
-      focused && event.currentTarget.contains(focused) ? focused : event.currentTarget
-    ).getBoundingClientRect();
 
-    open({
-      restoreFocus: focused ? () => focused.focus() : undefined,
-      x: fromKeyboard ? rect.left : event.clientX,
-      y: fromKeyboard ? rect.bottom : event.clientY,
-    });
+    open({ ...getContextMenuPoint(event), restoreFocus: focused ? () => focused.focus() : undefined });
   };
 
   return (

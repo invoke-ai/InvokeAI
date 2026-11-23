@@ -51,6 +51,7 @@ from invokeai.backend.quantization.fp8_scaled import (
     extract_comfy_quant_hints,
     extract_fp8_scaled_layers,
     full_precision_hints_respected,
+    load_safetensors_checkpoint,
     parse_quantization_metadata,
     read_safetensors_metadata,
     reject_quantized_side_channel,
@@ -375,7 +376,7 @@ class Ideogram4CheckpointModel(ModelLoader):
         target_device = TorchDevice.choose_torch_device()
         model_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
 
-        sd: dict[str, torch.Tensor] = load_file(model_path)
+        sd: dict[str, torch.Tensor] = load_safetensors_checkpoint(model_path)
 
         # Which of the two ComfyUI side channels this file carries is decided once, and int8 first:
         # an int8 layer ships a `.weight_scale` too, so probing for scales without ruling int8 out

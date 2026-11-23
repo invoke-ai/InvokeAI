@@ -12,14 +12,12 @@ This guide explains how to interact with InvokeAI's API in both single-user and 
 
 ### Single-User vs Multi-User Mode
 
-**Single-User Mode** (`multiuser: false` or option absent):
+**Single-User Mode** (`multiuser: false`; deprecated):
 
-- No authentication required
-- All API endpoints accessible without tokens
-- Direct API access like previous InvokeAI versions
-- All content visible in unified view
+- Project, generation and gallery requests use the internal `system` account without a token.
+- Keep the server accessible only on your computer, since anyone who can reach it has administrator privileges.
 
-**Multi-User Mode** (`multiuser: true`):
+**Multi-User Mode** (`multiuser: true` or option absent, the default):
 
 - JWT token authentication required
 - User-scoped access to resources
@@ -42,7 +40,7 @@ When multi-user mode is enabled, most API endpoints require authentication using
 </Steps>
 
 :::note[Single-User Mode]
-When running in single-user mode (`multiuser: false`), authentication endpoints are not available and authentication headers are not required.
+In single-user mode, `GET /api/v1/auth/status` reports `multiuser_enabled: false`. Login and initial setup return `403`.
 :::
 
 ### Login Endpoint
@@ -506,16 +504,14 @@ curl -X POST "http://localhost:9090/api/v1/boards/?board_name=My%20API%20Board" 
 
 ### Authentication Required
 
-All endpoints now require authentication except:
+In multi-user mode, clients can use the following endpoints without a token:
 
 - `GET /api/v1/auth/status` — Check whether multi-user setup is required
 - `POST /api/v1/auth/setup` — Initial admin setup
 - `POST /api/v1/auth/login` — User login
-- `GET /api/v1/images/i/{image_name}/full` — Full-resolution image file
-- `GET /api/v1/images/i/{image_name}/thumbnail` — Image thumbnail
 - `GET /api/v1/workflows/i/{workflow_id}/thumbnail` — Workflow thumbnail
 
-The image and thumbnail endpoints are intentionally unauthenticated because browsers load these resources via `<img src>` tags, which cannot send `Authorization` headers. Security relies on the fact that image and workflow IDs are UUIDs and therefore unguessable.
+Full images (`GET /api/v1/images/i/{image_name}/full`) and image thumbnails (`GET /api/v1/images/i/{image_name}/thumbnail`) require authentication and read access to the image. API clients can send their bearer token. Browsers can use the path-scoped HttpOnly media cookie set at login.
 
 ### User-Scoped Resources
 
@@ -650,7 +646,8 @@ Occurs when:
   "setup_required": true,
   "multiuser_enabled": true,
   "strict_password_checking": true,
-  "admin_email": "admin@example.com"
+  "admin_email": null,
+  "has_single_user_work": true
 }
 ```
 
@@ -660,15 +657,20 @@ Occurs when:
   "setup_required": false,
   "multiuser_enabled": true,
   "strict_password_checking": true,
-  "admin_email": null
+  "admin_email": null,
+  "has_single_user_work": false
 }
 ```
 
 :::note
-`admin_email` is only populated while `setup_required` is `true` (to help locate the pre-seeded
-administrator account during initial setup). Once an admin has been created — and whenever
-multiuser mode is disabled — it is returned as `null` to avoid leaking administrator identity on
-public deployments.
+`admin_email` is `null` in both cases. The server fills it in only while `setup_required` is `true`, and setup is
+required only while no active administrator exists, so there is no address to return. Once an administrator exists,
+and whenever multiuser mode is disabled, it stays `null` so a public server does not reveal an administrator's
+address.
+
+`has_single_user_work` is `true` only while `setup_required` is `true` and the internal `system` account owns a
+Workbench project, a wildcard, a private prompt template or a private uploaded font. The setup screen then shows the
+**Your earlier work is kept** notice.
 :::
 
 
@@ -1063,16 +1065,10 @@ boards = client.get_boards()
 
 InvokeAI supports both single-user and multi-user modes via the `multiuser` configuration option.
 
-**Configuration:**
+Multi-user mode is the default. For a deprecated single-user install accessible only from this computer, set the option explicitly in `invokeai.yaml`:
 
 ```yaml
-# invokeai.yaml
-
-# Single-user mode (no authentication)
-multiuser: false  # or omit the option entirely
-
-# Multi-user mode (authentication required)
-multiuser: true
+multiuser: false
 ```
 
 **Checking Mode Programmatically:**

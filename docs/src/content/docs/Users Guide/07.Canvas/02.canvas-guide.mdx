@@ -140,11 +140,11 @@ The frame is the final footprint of the generation on the canvas. With **Render 
 
 Choose **Transform** from a layer's menu, or press **Shift+T**, to scale and rotate the selected layer. The handles appear at once, even when the Transform tool is already active; if a brush stroke is still being saved, the tool switches straight away and the handles appear when the stroke is saved. Transform works on any enabled layer with content, inpaint masks and regional guidance included. Painted pixels (a paint layer, or a control layer you have painted on) are redrawn at their new size; every other layer, inpaint masks and regional guidance included, keeps its pixels and only its placement changes. A transformed mask's fill pattern and new brush strokes follow its scale and rotation, and **Invert mask** on a rotated mask inverts the generation frame's bounding box as the mask sees it; generation reads the mask through its transform, so results are unaffected.
 
-* Drag a corner or edge handle to scale. **Shift** scales proportionally and **Alt**, held before or during the drag, scales from the center.
+* Drag a corner or edge handle to scale. While the aspect lock beside **Size** is on (the default), every handle keeps the layer's proportions; **Shift** scales freely for that drag, or proportionally while the lock is off. **Alt**, held before or during the drag, scales from the center.
 * Drag just outside a corner to rotate. **Shift** rotates in 15° steps.
 * Drag inside to move.
 
-Press **Enter** or click **Apply** to finish, or **Escape** or **Cancel** to undo the transform. The **Transform** tab of the Layers panel sets the position, scale and rotation numerically. A negative scale flips the layer.
+Press **Enter** or click **Apply** to finish, or **Escape** or **Cancel** to undo the transform. The tool's options and the **Transform** tab of the Layers panel set the position, size and rotation numerically. **Size** is the layer's own width and height in canvas pixels; with the aspect lock on, changing one changes the other by the same factor. Besides a number of pixels, **W** and **H** take a change of the current value: type `50%` for half, `*2` to double or `/4` for a quarter (or type the operator first, then the number), and press **Enter**. **Escape** drops the change. The reference point button beside **Position** picks which point of the layer (a corner, an edge's middle or the center, the center by default) **X** and **Y** show and place, and which point stays put when you type a size or rotation. The **Flip horizontal** and **Flip vertical** buttons beside **Rotation** mirror the layer in place across its center, whatever the reference point; they are also in the layer's menu under **Flip** and in the command palette, for the selected layer. While you are moving selected pixels, flipping their layer flips those pixels instead, until you apply or cancel the move.
 
 To crop a layer to the generation frame, choose **Crop layer to frame** from its menu; a layer entirely outside the frame is left alone. **Fit to frame** scales a layer to fit inside the frame. To crop every layer at once, use **Crop all layers to frame** in the [canvas menu](#the-canvas-menu).
 
@@ -242,6 +242,8 @@ The canvas belongs to its project and is saved with it automatically. To keep a 
 These shortcuts work while the canvas has focus; then they take the key from a workbench shortcut that shares it, such as **T** and **G** for the side panels, as **Settings → Hotkeys** notes. On macOS, use **Cmd** in place of **Ctrl**. The canvas's shortcut hints show the gestures of the active tool.
 
 The tool keys, **Shift+T**, **[** and **]**, and **X** and **D** also work after you click in the Layers panel or its Color pane, so you can pick a layer or a color and switch tools without clicking back on the canvas. **Escape** and holding or tapping **C** work from the Layers panel too, but **Enter** applies a transform, text or filter only while the canvas has focus. None of these keys act while you type in a text field.
+
+To create a raster layer from the keyboard, assign a shortcut to **New raster layer** under **Settings → Keyboard shortcuts → Canvas**. It has no default binding, leaving browser-reserved shortcuts untouched. With the canvas focused, it adds and selects an empty raster layer using the same insertion and undo behavior as the Layers panel.
 
 | Shortcut | Action |
 |---|---|

@@ -9,7 +9,7 @@ import type {
 import type { AdjustedSurfaceStatus } from '@workbench/canvas-engine/render/spatialDisplay';
 import type { VectorShapePreview } from '@workbench/canvas-engine/render/vectorGuides';
 import type { SamInteractionState } from '@workbench/canvas-engine/samInteraction';
-import type { LayerTransform } from '@workbench/canvas-engine/transform/transformMath';
+import type { LayerTransform, TransformAnchor } from '@workbench/canvas-engine/transform/transformMath';
 import type { Rect, SelectionOp, ToolId, Vec2 } from '@workbench/canvas-engine/types';
 import type { VectorEditSession } from '@workbench/canvas-engine/vectorEditState';
 
@@ -232,6 +232,9 @@ export interface TransformOptions {
   smoothing: boolean;
   resampleMode: 'bilinear' | 'bicubic' | 'hamming' | 'lanczos';
   fitMode: 'contain' | 'cover' | 'fill';
+  aspectLinked: boolean;
+  /** Only the numeric fields use it; gestures keep their own pivots. */
+  referencePoint: TransformAnchor;
 }
 
 /** Spans gestures until Apply or Cancel; `startTransform` is the undo and cancel baseline. */
@@ -683,6 +686,8 @@ export const createEngineStores = (initialTool: ToolId = 'view'): EngineStores =
     smoothing: false,
     resampleMode: 'bicubic',
     fitMode: 'contain',
+    aspectLinked: true,
+    referencePoint: 'center',
   }),
   transformSession: createScalarStore<TransformSession | null>(null, transformSessionEqual),
   pendingTransformLayerId: createScalarStore<string | null>(null),

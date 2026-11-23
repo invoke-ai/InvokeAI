@@ -1,7 +1,7 @@
 /**
  * Transform sessions frame the selected eligible layer without retargeting and span multiple gestures/numeric edits.
- * Handles scale about opposite anchors (Alt center, Shift uniform); rotate zones use Shift 15-degree snap; interior
- * moves with axis lock.
+ * Handles scale about opposite anchors (Alt center; the aspect link, inverted by Shift, keeps proportions); rotate zones
+ * use Shift 15-degree snap; interior moves with axis lock.
  *
  * Layer origins/handles snap to the model grid; Alt bypasses move snapping but retains center-scale meaning.
  * Local-space floats never snap. Apply makes one parameter edit or paint bake. Pointercancel reverts only its drag;
@@ -172,11 +172,11 @@ export const createTransformTool = (): Tool => {
       case 'scale':
         return applyScale({
           alt: input.modifiers.alt,
+          constrain: ctx.stores.transformOptions.get().aspectLinked !== input.modifiers.shift,
           // No alt bypass on a scale handle — alt already means scale-about-center.
           grid: gridFor(false),
           handle: state.target.handle,
           pointerDoc: pointer,
-          shift: input.modifiers.shift,
           rect: state.rect,
           start: state.startTransform,
           startPointerDoc: state.startPointerDoc,

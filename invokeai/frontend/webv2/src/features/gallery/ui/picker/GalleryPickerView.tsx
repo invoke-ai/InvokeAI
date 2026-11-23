@@ -1,6 +1,6 @@
 import type { GalleryItem, GalleryItemKey } from '@features/gallery/core/items';
 import type { GallerySparseListing } from '@features/gallery/ui/useGalleryData';
-import type { KeyboardEvent, RefObject } from 'react';
+import type { KeyboardEvent, MouseEvent, RefObject } from 'react';
 
 import { Box, HStack, Icon, Stack, Text } from '@chakra-ui/react';
 import { getGalleryBoardLabel } from '@features/gallery/core/boardLabels';
@@ -12,12 +12,13 @@ import { GalleryAnnouncer, GalleryLoadNotice } from '@features/gallery/ui/Galler
 import { GallerySearchField } from '@features/gallery/ui/GallerySearchField';
 import { GallerySearchHelp } from '@features/gallery/ui/GallerySearchHelp';
 import { getGalleryProjectBoardId, getGallerySelectedBoardId } from '@features/gallery/ui/galleryStateView';
-import { useGalleryHost } from '@features/gallery/ui/GalleryUiContext';
+import { useGalleryHost, useGalleryItemContextMenu } from '@features/gallery/ui/GalleryUiContext';
 import { getGalleryUploadTargetLabel } from '@features/gallery/ui/GalleryUploadButton';
 import { GalleryViewSegmentTabs } from '@features/gallery/ui/GalleryViewTabs';
 import { useGalleryUploadAction } from '@features/gallery/ui/useGalleryUploadAction';
 import { useGalleryUploadInput } from '@features/gallery/ui/useGalleryUploadInput';
 import { isImeComposing } from '@platform/browser/imeComposition';
+import { isKeyboardContextMenu } from '@platform/react/contextMenuPoint';
 import { getApiErrorMessage } from '@platform/transport/http';
 import { Button, CloseButton, IconButton } from '@platform/ui/Button';
 import { LoadError } from '@platform/ui/LoadError';
@@ -42,7 +43,7 @@ import {
   type GalleryPickerSelection,
 } from './galleryPicker';
 import { GalleryPickerBoards, type GalleryPickerBoardGroup } from './GalleryPickerBoards';
-import { galleryPickerOptionId, GalleryPickerGrid } from './GalleryPickerGrid';
+import { galleryPickerOptionId, GalleryPickerGrid, getShownGalleryPickerOption } from './GalleryPickerGrid';
 import { useGalleryPickerScope, type GalleryPickerOpeningScope } from './useGalleryPickerScope';
 
 const BOARD_BUTTON_EXPANDED_PROPS = { bg: 'bg.hover' } as const;
@@ -306,8 +307,16 @@ export const GalleryPickerView = ({
     [focusSearch, selectBoard]
   );
 
+  // Whether the next `contextmenu` on the field follows a pointer press. Engines differ in how a key-opened one looks,
+  // but only a pointer-opened one (mouse, Ctrl-click, touch hold) comes after a `pointerdown`.
+  const searchPointerPressedRef = useRef(false);
   const handleSearchKeyDown = useCallback(
     (event: KeyboardEvent<HTMLInputElement>) => {
+      // Not a repeat: a modifier held through a right-click keeps repeating until the menu opens on release.
+      if (!event.repeat) {
+        searchPointerPressedRef.current = false;
+      }
+
       if (isImeComposing(event.nativeEvent)) {
         return;
       }
@@ -453,6 +462,31 @@ export const GalleryPickerView = ({
     ),
     [handleClearSearch, scope.pane, scope.searchTerm, t]
   );
+  // Focus stays in the field, so the context-menu key reaches it rather than the highlighted tile.
+  const getHighlightedTile = useCallback(
+    () => getShownGalleryPickerOption(listboxId, resolvedActiveIndex),
+    [listboxId, resolvedActiveIndex]
+  );
+  const openHighlightedItemMenu = useGalleryItemContextMenu(
+    showsGrid && !isStale ? (activeItem ?? null) : null,
+    getHighlightedTile
+  );
+  const handleSearchPointerDown = useCallback(() => {
+    searchPointerPressedRef.current = true;
+  }, []);
+  // A right-click on the field keeps the browser's menu (paste); anything else opens the highlighted item's.
+  const handleSearchContextMenu = useCallback(
+    (event: MouseEvent<HTMLInputElement>) => {
+      const fromPointer = searchPointerPressedRef.current && !isKeyboardContextMenu(event);
+
+      searchPointerPressedRef.current = false;
+
+      if (!fromPointer) {
+        openHighlightedItemMenu?.(event);
+      }
+    },
+    [openHighlightedItemMenu]
+  );
   const searchInputProps = useMemo(
     () =>
       scope.pane === 'boards'
@@ -464,9 +498,20 @@ export const GalleryPickerView = ({
                   ? galleryPickerOptionId(listboxId, resolvedActiveIndex)
                   : undefined,
               'aria-controls': listboxId,
+              onContextMenu: handleSearchContextMenu,
+              onPointerDown: handleSearchPointerDown,
             }
           : undefined,
-    [boardsId, isStale, listboxId, resolvedActiveIndex, scope.pane, showsGrid]
+    [
+      boardsId,
+      handleSearchContextMenu,
+      handleSearchPointerDown,
+      isStale,
+      listboxId,
+      resolvedActiveIndex,
+      scope.pane,
+      showsGrid,
+    ]
   );
   const searchLabel =
     scope.pane === 'boards'

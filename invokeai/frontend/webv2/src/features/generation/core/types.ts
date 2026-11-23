@@ -92,6 +92,8 @@ export type LoraModelConfig = ModelIdentifierConfig & {
   trigger_phrases?: string[] | null;
   default_settings?: {
     weight?: number | null;
+    weight_max?: number | null;
+    weight_min?: number | null;
   } | null;
   variant?: string | null;
 };
