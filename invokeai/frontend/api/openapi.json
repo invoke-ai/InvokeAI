@@ -25039,7 +25039,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -25122,6 +25131,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "config_path",
@@ -25203,7 +25213,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -25286,6 +25305,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "config_path",
@@ -25367,7 +25387,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -25442,6 +25471,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "format",
@@ -25523,7 +25553,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -25598,6 +25637,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "format",
@@ -25836,7 +25876,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -25905,6 +25954,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "format",
@@ -29446,7 +29496,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -29524,6 +29583,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "default_settings",
@@ -29605,7 +29665,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -29683,6 +29752,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "default_settings",
@@ -30059,7 +30129,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -30146,6 +30225,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "config_path",
@@ -30228,7 +30308,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -30303,6 +30392,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "config_path",
@@ -30383,7 +30473,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -30458,6 +30557,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "config_path",
@@ -30539,7 +30639,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -30621,6 +30730,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "config_path",
@@ -30703,7 +30813,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -30778,6 +30897,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "config_path",
@@ -30858,7 +30978,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -30933,6 +31062,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "config_path",
@@ -31013,7 +31143,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -31088,6 +31227,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "config_path",
@@ -31168,7 +31308,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -31243,6 +31392,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "config_path",
@@ -31324,7 +31474,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -31391,6 +31550,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "format",
@@ -31471,7 +31631,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -31538,6 +31707,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "format",
@@ -31618,7 +31788,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -31685,6 +31864,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "format",
@@ -31765,7 +31945,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -31832,6 +32021,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "format",
@@ -37215,7 +37405,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -37324,6 +37523,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "base",
@@ -38218,7 +38418,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -38271,6 +38480,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -47410,7 +47620,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -47475,6 +47694,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "base",
@@ -47555,7 +47775,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -47620,6 +47849,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "base",
@@ -47700,7 +47930,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -47777,6 +48016,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "config_path",
@@ -47858,7 +48098,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -47934,6 +48183,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "base",
@@ -50943,7 +51193,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -50996,6 +51255,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -51074,7 +51334,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -51127,6 +51396,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -51205,7 +51475,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -51258,6 +51537,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -51336,7 +51616,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -51389,6 +51678,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -51467,7 +51757,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -51520,6 +51819,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -51598,7 +51898,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -51655,6 +51964,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -51734,7 +52044,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -51791,6 +52110,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -51870,7 +52190,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -51927,6 +52256,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -70718,7 +71048,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -70771,6 +71110,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -73651,7 +73991,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -73720,6 +74069,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "format",
@@ -74249,7 +74599,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -74329,6 +74688,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -74409,7 +74769,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -74499,6 +74868,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -74581,7 +74951,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -74661,6 +75040,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -74742,7 +75122,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -74822,6 +75211,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -74903,7 +75293,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -74983,6 +75382,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -75064,7 +75464,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -75144,6 +75553,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -75224,7 +75634,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -75304,6 +75723,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -75384,7 +75804,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -75474,6 +75903,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -75556,7 +75986,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -75636,6 +76075,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -75716,7 +76156,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -75806,6 +76255,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -75888,7 +76338,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -75968,6 +76427,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -76049,7 +76509,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -76129,6 +76598,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -76210,7 +76680,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -76290,6 +76769,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -76370,7 +76850,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -76460,6 +76949,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -76542,7 +77032,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -76622,6 +77121,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -76703,7 +77203,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -76783,6 +77292,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -76864,7 +77374,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -76944,6 +77463,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -77025,7 +77545,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -77105,6 +77634,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -77186,7 +77716,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -77266,6 +77805,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -77347,7 +77887,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -77427,6 +77976,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -77508,7 +78058,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -77588,6 +78147,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -77669,7 +78229,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -77749,6 +78318,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -77830,7 +78400,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -77910,6 +78489,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -77990,7 +78570,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -78070,6 +78659,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -78150,7 +78740,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -78240,6 +78839,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -78322,7 +78922,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -78402,6 +79011,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -78482,7 +79092,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -78586,6 +79205,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -78669,7 +79289,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -78759,6 +79388,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -78841,7 +79471,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -78921,6 +79560,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -79001,7 +79641,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -79081,6 +79730,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -79851,7 +80501,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -79946,6 +80605,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -80029,7 +80689,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -80125,6 +80794,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -80208,7 +80878,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -80300,6 +80979,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -80382,7 +81062,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -80477,6 +81166,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -80560,7 +81250,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -80655,6 +81354,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -80738,7 +81438,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -80833,6 +81542,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -80916,7 +81626,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -81014,6 +81733,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -81097,7 +81817,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -81192,6 +81921,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -81275,7 +82005,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -81375,6 +82114,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -81459,7 +82199,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -81559,6 +82308,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -81643,7 +82393,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -81735,6 +82494,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -81817,7 +82577,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -81912,6 +82681,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -81995,7 +82765,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -82097,6 +82876,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -82180,7 +82960,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -82278,6 +83067,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -82361,7 +83151,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -82459,6 +83258,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -82542,7 +83342,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -82640,6 +83449,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -82723,7 +83533,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -82821,6 +83640,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -82904,7 +83724,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -83006,6 +83835,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -83090,7 +83920,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -83185,6 +84024,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -83268,7 +84108,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -83352,6 +84201,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -83433,7 +84283,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -83517,6 +84376,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -83599,7 +84459,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -83686,6 +84555,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -83769,7 +84639,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -83856,6 +84735,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -83939,7 +84819,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -84026,6 +84915,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -84109,7 +84999,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -84193,6 +85092,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -84275,7 +85175,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -84362,6 +85271,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -84445,7 +85355,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -84551,6 +85470,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -84637,7 +85557,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -84730,6 +85659,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -84814,7 +85744,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -84898,6 +85837,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -84980,7 +85920,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -85067,6 +86016,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -85150,7 +86100,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -85244,6 +86203,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -85327,7 +86287,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -85417,6 +86386,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -85500,7 +86470,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -85590,6 +86569,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -85673,7 +86653,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -85785,6 +86774,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -85868,7 +86858,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -85958,6 +86957,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -86041,7 +87041,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -86131,6 +87140,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -86214,7 +87224,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -86319,6 +87338,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -86404,7 +87424,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -86491,6 +87520,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -86574,7 +87604,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -86670,6 +87709,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -86753,7 +87793,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -86845,6 +87894,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -86927,7 +87977,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -87022,6 +88081,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -87105,7 +88165,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -87200,6 +88269,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -87283,7 +88353,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -87378,6 +88457,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -87461,7 +88541,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -87559,6 +88648,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -87642,7 +88732,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -87737,6 +88836,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -87820,7 +88920,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -87920,6 +89029,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -88004,7 +89114,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -88096,6 +89215,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -88178,7 +89298,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -88273,6 +89402,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -88356,7 +89486,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -88458,6 +89597,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -88541,7 +89681,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -88643,6 +89792,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -88726,7 +89876,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -88828,6 +89987,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -88912,7 +90072,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -89007,6 +90176,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -89090,7 +90260,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -89195,6 +90374,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -89279,7 +90459,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -89384,6 +90573,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -89468,7 +90658,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -89573,6 +90772,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -89657,7 +90857,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -89752,6 +90961,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -89835,7 +91045,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -89930,6 +91149,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -90013,7 +91233,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -90108,6 +91337,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -96486,7 +97716,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -96567,6 +97806,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "config_path",
@@ -96649,7 +97889,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -96718,6 +97967,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "base",
@@ -96799,7 +98049,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -96880,6 +98139,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "config_path",
@@ -100063,7 +101323,23 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page)"
+            "description": "User-editable URL for the model (e.g. download page or model page)"
+          },
+          "source_urls": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "name": {
             "anyOf": [
@@ -103721,7 +104997,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -103790,6 +105075,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "config_path",
@@ -103871,7 +105157,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -103940,6 +105235,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "config_path",
@@ -104021,7 +105317,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -104090,6 +105395,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "config_path",
@@ -104171,7 +105477,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -104240,6 +105555,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "config_path",
@@ -104321,7 +105637,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -104390,6 +105715,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "config_path",
@@ -106066,7 +107392,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -106147,6 +107482,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "config_path",
@@ -106259,7 +107595,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -106340,6 +107685,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "config_path",
@@ -106422,7 +107768,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -106503,6 +107858,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "config_path",
@@ -106585,7 +107941,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -106654,6 +108019,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "base",
@@ -106735,7 +108101,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -106816,6 +108191,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "config_path",
@@ -106898,7 +108274,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -106967,6 +108352,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "base",
@@ -107084,7 +108470,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -107165,6 +108560,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "config_path",
@@ -107247,7 +108643,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -107324,6 +108729,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "config_path",
@@ -107405,7 +108811,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -107486,6 +108901,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "config_path",
@@ -107568,7 +108984,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -107637,6 +109062,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "base",
@@ -107724,7 +109150,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -107805,6 +109240,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "config_path",
@@ -110575,7 +112011,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -110640,6 +112085,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "config_path",
@@ -110720,7 +112166,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -110773,6 +112228,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "base",
@@ -110852,7 +112308,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -110917,6 +112382,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "config_path",
@@ -116618,7 +118084,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -116687,6 +118162,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "format",
@@ -117034,7 +118510,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -117099,6 +118584,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "base",
@@ -117180,6 +118666,15 @@
           "source": {
             "type": "string",
             "title": "Source"
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, copied to installed configs."
           },
           "name": {
             "type": "string",
@@ -117396,6 +118891,15 @@
           "source": {
             "type": "string",
             "title": "Source"
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, copied to installed configs."
           },
           "name": {
             "type": "string",
@@ -119376,7 +120880,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -119443,6 +120956,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "format",
@@ -119523,7 +121037,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -119590,6 +121113,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "format",
@@ -119693,7 +121217,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -119758,6 +121291,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "base",
@@ -119838,7 +121372,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -119915,6 +121458,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "config_path",
@@ -119996,7 +121540,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -120073,6 +121626,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "config_path",
@@ -120154,7 +121708,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -120219,6 +121782,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "base",
@@ -120299,7 +121863,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -120364,6 +121937,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "base",
@@ -120467,7 +122041,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -120520,6 +122103,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -120598,7 +122182,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -120651,6 +122244,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -120729,7 +122323,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -120782,6 +122385,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -120860,7 +122464,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -120913,6 +122526,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -120991,7 +122605,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -121044,6 +122667,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -121122,7 +122746,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -121175,6 +122808,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "type",
@@ -121492,7 +123126,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -121575,6 +123218,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "config_path",
@@ -121657,7 +123301,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -121732,6 +123385,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "format",
@@ -122434,7 +124088,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -122516,6 +124179,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "config_path",
@@ -122597,7 +124261,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -122679,6 +124352,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "config_path",
@@ -122760,7 +124434,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -122842,6 +124525,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "config_path",
@@ -122923,7 +124607,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -123005,6 +124698,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "config_path",
@@ -123086,7 +124780,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -123168,6 +124871,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "config_path",
@@ -123249,7 +124953,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -123331,6 +125044,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "config_path",
@@ -123412,7 +125126,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -123494,6 +125217,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "config_path",
@@ -123575,7 +125299,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -123657,6 +125390,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "config_path",
@@ -124047,7 +125781,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -124100,6 +125843,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "base",
@@ -124683,7 +126427,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -124760,6 +126513,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "config_path",
@@ -124841,7 +126595,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -124918,6 +126681,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "config_path",
@@ -124998,7 +126762,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -125075,6 +126848,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "config_path",
@@ -125156,7 +126930,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -125233,6 +127016,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "config_path",
@@ -125314,7 +127098,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -125391,6 +127184,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "config_path",
@@ -125472,7 +127266,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -125549,6 +127352,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "config_path",
@@ -125629,7 +127433,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -125706,6 +127519,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "config_path",
@@ -125786,7 +127600,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -125863,6 +127686,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "config_path",
@@ -125943,7 +127767,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -126020,6 +127853,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "config_path",
@@ -126100,7 +127934,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -126183,6 +128026,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "config_path",
@@ -126265,7 +128109,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -126334,6 +128187,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "format",
@@ -126414,7 +128268,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -126483,6 +128346,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "format",
@@ -126564,7 +128428,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -126633,6 +128506,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "format",
@@ -126714,7 +128588,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -126783,6 +128666,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "format",
@@ -126863,7 +128747,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -126932,6 +128825,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "format",
@@ -127012,7 +128906,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -127081,6 +128984,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "format",
@@ -127161,7 +129065,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -127237,6 +129150,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "format",
@@ -130455,7 +132369,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -130532,6 +132455,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "config_path",
@@ -130613,7 +132537,16 @@
               }
             ],
             "title": "Source Url",
-            "description": "Optional URL for the model (e.g. download page or model page)."
+            "description": "User-editable URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model, set by starters and installs. Users edit source_url instead."
           },
           "cover_image": {
             "anyOf": [
@@ -130678,6 +132611,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "roles",
           "base",
