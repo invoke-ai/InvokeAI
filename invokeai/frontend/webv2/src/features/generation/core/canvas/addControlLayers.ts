@@ -148,6 +148,10 @@ const addKrea2ControlLora = (
   latents: FamilyLatentSpace | null,
   size: FamilyGraph['denoiseSize']
 ): void => {
+  // `krea2_denoise` turns a weight-0 Control LoRA off, so its encode would be wasted work.
+  if (layer.weight === 0) {
+    return;
+  }
   if (!latents) {
     throw new Error('A Krea-2 Control LoRA needs the graph VAE to encode its control image.');
   }

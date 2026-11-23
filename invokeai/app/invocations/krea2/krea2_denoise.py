@@ -585,10 +585,11 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata):
         # K/V-cache mode keeps the references out of the per-step sequence: they run once, alone, before the loop.
         cache_references = self.reference_kv_cache and reference_tokens is not None
         joint_references = None if cache_references else reference_tokens
+        if self.control_lora is not None:
+            self._validate_control_lora_model(context, self.control_lora)
         control_lora = self._active_control_lora()
         control_tokens = None
         if control_lora is not None:
-            self._validate_control_lora_model(context, control_lora)
             control_tokens = self._load_control_tokens(context, control_lora, inference_dtype, device)
 
         transformer_info = context.models.load(self.transformer.transformer)

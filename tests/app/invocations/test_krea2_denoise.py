@@ -2085,37 +2085,47 @@ def _with_control_lora_record(context, base: BaseModelType = BaseModelType.Krea2
 
 
 @pytest.mark.parametrize(
-    ("record", "shape", "message"),
+    ("record", "weight", "shape", "message"),
     [
         (
             (BaseModelType.Krea2, ModelType.ControlLoRa),
+            0.75,
             (1, KREA2_LATENT_CHANNELS, 1, 4, 4),
             r"at the generation width and height \(16x16\)",
         ),
         (
             (BaseModelType.Krea2, ModelType.ControlLoRa),
+            0.75,
             (1, 8, 2, 2),
             r"at the generation width and height \(16x16\)",
         ),
         (
             (BaseModelType.Flux, ModelType.ControlLoRa),
+            0.75,
+            (1, KREA2_LATENT_CHANNELS, 1, 2, 2),
+            "'Some Model' is a flux control_lora model, not a Krea-2 Control LoRA",
+        ),
+        (
+            (BaseModelType.Flux, ModelType.ControlLoRa),
+            0.0,
             (1, KREA2_LATENT_CHANNELS, 1, 2, 2),
             "'Some Model' is a flux control_lora model, not a Krea-2 Control LoRA",
         ),
         (
             (BaseModelType.Krea2, ModelType.LoRA),
+            0.75,
             (1, KREA2_LATENT_CHANNELS, 1, 2, 2),
             "'Some Model' is a krea-2 lora model, not a Krea-2 Control LoRA",
         ),
     ],
-    ids=["other-size", "other-channels", "flux-control-lora", "plain-krea2-lora"],
+    ids=["other-size", "other-channels", "flux-control-lora", "flux-control-lora-at-weight-zero", "plain-krea2-lora"],
 )
 def test_an_unusable_control_lora_is_refused_before_the_transformer_loads(
-    monkeypatch, tmp_path, record, shape, message
+    monkeypatch, tmp_path, record, weight, shape, message
 ) -> None:
     _patch_runtime(monkeypatch)
     invocation = _runtime_invocation(cfg_scale=1.0)
-    invocation.control_lora = _control_lora_field()
+    invocation.control_lora = _control_lora_field(weight=weight)
     context = _with_control_lora_record(_refusing_context(tmp_path), *record)
     tensors = context.tensors.load
     context.tensors.load = lambda name: torch.zeros(shape) if name == "control" else tensors(name)
@@ -2207,7 +2217,7 @@ def test_a_control_lora_at_weight_zero_is_ignored(monkeypatch, tmp_path) -> None
     transformer = _ImgInTransformer()
     invocation = _runtime_invocation(cfg_scale=4.0)
     invocation.control_lora = _control_lora_field(weight=0.0, latents_name="never-loaded")
-    context = _runtime_context(tmp_path, transformer)
+    context = _with_control_lora_record(_runtime_context(tmp_path, transformer))
     transformer_info = _TransformerInfo(transformer)
     loads: list[str] = []
 

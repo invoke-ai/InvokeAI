@@ -341,6 +341,14 @@ describe('addControlLayers — control_lora on krea-2', () => {
     ]);
     expect(Object.values(graph.nodes).some((n) => n.type === 'flux_control_lora_loader')).toBe(false);
   });
+
+  it('leaves a weight-0 Control LoRA out of the graph', () => {
+    const graph = krea2Graph();
+    addTo(graph, { base: 'krea-2', latents: null, layers: [{ ...krea2Layer, weight: 0 }] });
+
+    expect(Object.keys(graph.nodes)).toEqual(['denoise_latents', 'model_loader']);
+    expect(graph.edges).toEqual([]);
+  });
 });
 
 describe('addControlLayers — control_lora limits', () => {
