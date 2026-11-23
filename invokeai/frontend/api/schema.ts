@@ -7637,12 +7637,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -7736,12 +7736,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -7835,12 +7835,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -7931,12 +7931,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -8123,12 +8123,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -10070,12 +10070,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -10159,12 +10159,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -10404,12 +10404,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -10498,12 +10498,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -10597,12 +10597,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -10698,12 +10698,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -10794,12 +10794,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -10883,12 +10883,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -10972,12 +10972,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -11071,12 +11071,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -11160,12 +11160,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -11246,12 +11246,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -11332,12 +11332,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -11418,12 +11418,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -13996,12 +13996,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -14476,12 +14476,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -19197,12 +19197,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -19296,12 +19296,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -19387,12 +19387,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -19483,12 +19483,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -20274,12 +20274,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -20357,12 +20357,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -20440,12 +20440,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -20523,12 +20523,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -20606,12 +20606,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -20689,12 +20689,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -20774,12 +20774,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -20859,12 +20859,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -28243,12 +28243,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -29934,12 +29934,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -30264,12 +30264,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -30357,12 +30357,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -30453,12 +30453,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -30548,12 +30548,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -30643,12 +30643,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -30733,12 +30733,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -30823,12 +30823,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -30918,12 +30918,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -31009,12 +31009,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -31102,12 +31102,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -31196,12 +31196,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -31294,12 +31294,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -31384,12 +31384,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -31477,12 +31477,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -31576,12 +31576,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -31674,12 +31674,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -31767,12 +31767,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -31869,12 +31869,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -31971,12 +31971,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -32070,12 +32070,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -32164,12 +32164,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -32257,12 +32257,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -32347,12 +32347,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -32437,12 +32437,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -32534,12 +32534,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -32625,12 +32625,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -32726,12 +32726,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -32826,12 +32826,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -32917,12 +32917,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -33007,12 +33007,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -33422,12 +33422,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -33524,12 +33524,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -33628,12 +33628,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -33726,12 +33726,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -33825,12 +33825,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -33929,12 +33929,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -34037,12 +34037,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -34141,12 +34141,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -34246,12 +34246,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -34362,12 +34362,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -34472,12 +34472,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -34570,12 +34570,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -34675,12 +34675,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -34771,12 +34771,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -34868,12 +34868,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -34965,12 +34965,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -35062,12 +35062,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -35174,12 +35174,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -35280,12 +35280,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -35376,12 +35376,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -35471,12 +35471,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -35566,12 +35566,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -35662,12 +35662,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -35762,12 +35762,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -35863,12 +35863,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -35958,12 +35958,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -36067,12 +36067,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -36181,12 +36181,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -36286,12 +36286,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -36381,12 +36381,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -36477,12 +36477,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -36570,12 +36570,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -36664,12 +36664,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -36758,12 +36758,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -36858,12 +36858,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -36952,12 +36952,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -37053,12 +37053,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -37160,12 +37160,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -37261,12 +37261,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -37366,12 +37366,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -37464,12 +37464,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -37563,12 +37563,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -37662,12 +37662,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -37766,12 +37766,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -37870,12 +37870,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -37976,12 +37976,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -38085,12 +38085,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -38183,12 +38183,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -38282,12 +38282,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -38388,12 +38388,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -38491,12 +38491,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -38597,12 +38597,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -38696,12 +38696,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -38800,12 +38800,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -38903,12 +38903,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -39006,12 +39006,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -39105,12 +39105,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -39204,12 +39204,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -42377,12 +42377,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -42490,12 +42490,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -42586,12 +42586,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -43142,12 +43142,12 @@ export type components = {
             source_api_response?: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page)
+             * @description User-editable URL for the model (e.g. download page or model page)
              */
             source_url?: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls?: string[] | null;
             /**
@@ -44738,12 +44738,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -44831,12 +44831,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -44928,12 +44928,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -45021,12 +45021,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -45114,12 +45114,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -46223,12 +46223,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -46346,12 +46346,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -46444,12 +46444,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -46545,12 +46545,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -46638,12 +46638,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -46739,12 +46739,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -46858,12 +46858,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -46970,12 +46970,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -47078,12 +47078,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -47181,12 +47181,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -47291,12 +47291,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -48728,12 +48728,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -48834,12 +48834,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -48929,12 +48929,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -51852,12 +51852,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -52069,12 +52069,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -52155,7 +52155,7 @@ export type components = {
             source: string;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, copied to installed configs.
              */
             source_urls?: string[];
             /** Name */
@@ -52216,7 +52216,7 @@ export type components = {
             source: string;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, copied to installed configs.
              */
             source_urls?: string[];
             /** Name */
@@ -53264,12 +53264,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -53350,12 +53350,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -53451,12 +53451,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -53545,12 +53545,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -53645,12 +53645,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -53753,12 +53753,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -53845,12 +53845,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -53944,12 +53944,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -54027,12 +54027,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -54110,12 +54110,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -54193,12 +54193,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -54276,12 +54276,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -54359,12 +54359,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -54588,12 +54588,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -54691,12 +54691,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -55075,12 +55075,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -55173,12 +55173,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -55271,12 +55271,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -55369,12 +55369,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -55467,12 +55467,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -55565,12 +55565,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -55663,12 +55663,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -55764,12 +55764,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -56041,12 +56041,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -56411,12 +56411,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -56504,12 +56504,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -56600,12 +56600,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -56696,12 +56696,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -56792,12 +56792,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -56885,12 +56885,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -56978,12 +56978,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -57071,12 +57071,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -57164,12 +57164,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -57263,12 +57263,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -57362,12 +57362,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -57455,12 +57455,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -57548,12 +57548,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -57638,12 +57638,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -57728,12 +57728,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -57818,12 +57818,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -57911,12 +57911,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -59757,12 +59757,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**
@@ -59859,12 +59859,12 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
             /**
              * Source Urls
-             * @description Web pages about the model.
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
              */
             source_urls: string[];
             /**

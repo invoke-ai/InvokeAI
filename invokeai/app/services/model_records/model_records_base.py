@@ -86,9 +86,19 @@ class ModelRecordChanges(BaseModelExcludeNull):
     source: Optional[str] = Field(description="original source of the model", default=None)
     source_type: Optional[ModelSourceType] = Field(description="type of model source", default=None)
     source_api_response: Optional[str] = Field(description="metadata from remote source", default=None)
-    source_url: Optional[str] = Field(description="Optional URL for the model (e.g. download page)", default=None)
+    source_url: Optional[str] = Field(
+        description="User-editable URL for the model (e.g. download page or model page)", default=None
+    )
+    source_urls: Optional[list[SourceURL]] = Field(
+        default=None,
+        description="Web pages about the model, set by starters and installs. Users edit source_url instead.",
+    )
 
-    source_urls: Optional[list[SourceURL]] = Field(default=None, description="Web pages about the model.")
+    @field_validator("source_urls", mode="before")
+    @classmethod
+    def clear_source_urls_on_null(cls, v: Any) -> Any:
+        # The config field is a non-null list, so an explicit null clears it as [] does.
+        return [] if v is None else v
 
     @field_validator("source_url", mode="before")
     @classmethod

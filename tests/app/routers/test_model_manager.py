@@ -514,6 +514,21 @@ def test_update_model_record_answers_with_the_service_outcome(client: TestClient
     assert model_record_routes.store.get_model(key).name == "legacy"
 
 
+def test_update_model_record_sets_keeps_and_clears_source_links(client: TestClient, model_record_routes: Any) -> None:
+    key = "test_config_1"
+    links = ["https://example.com/model", "https://example.com/quantized"]
+
+    assert client.patch(f"/api/v2/models/i/{key}", json={"source_urls": links}).status_code == 200
+    kept = client.patch(f"/api/v2/models/i/{key}", json={"name": "renamed"})
+    assert kept.status_code == 200
+    assert kept.json()["source_urls"] == links
+
+    cleared = client.patch(f"/api/v2/models/i/{key}", json={"source_urls": None})
+    assert cleared.status_code == 200
+    assert cleared.json()["source_urls"] == []
+    assert model_record_routes.store.get_model(key).source_urls == []
+
+
 def test_reidentify_model_answers_with_the_service_outcome(
     client: TestClient, model_record_routes: Any, mm2_app_config: Any
 ) -> None:

@@ -101,10 +101,12 @@ class Config_Base(ABC, BaseModel):
     )
     source_url: str | None = Field(
         default=None,
-        description="Optional URL for the model (e.g. download page or model page).",
+        description="User-editable URL for the model (e.g. download page or model page).",
     )
-
-    source_urls: list[SourceURL] = Field(default_factory=list, description="Web pages about the model.")
+    source_urls: list[SourceURL] = Field(
+        default_factory=list,
+        description="Web pages about the model, set by starters and installs. Users edit source_url instead.",
+    )
 
     @field_validator("source_url", mode="before")
     @classmethod

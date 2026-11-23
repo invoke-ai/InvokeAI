@@ -26,7 +26,9 @@ from invokeai.backend.model_manager.taxonomy import (
 class StarterModelWithoutDependencies(BaseModel):
     description: str
     source: str
-    source_urls: list[SourceURL] = Field(default_factory=list, description="Web pages about the model.")
+    source_urls: list[SourceURL] = Field(
+        default_factory=list, description="Web pages about the model, copied to installed configs."
+    )
     name: str
     base: BaseModelType
     type: ModelType
