@@ -33,8 +33,6 @@ import {
 import { lazy, Suspense, useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import type { VectorPathMenuTarget } from './VectorPathContextMenu';
-
 import { useModelGridSize } from './bboxGrid';
 import { CanvasBottomOverlay } from './CanvasBottomOverlay';
 import { copyCanvasSelection, decodeImageBlob, readClipboardImage } from './canvasClipboard';
@@ -87,10 +85,7 @@ import { useStagingRecovery } from './useCanvasRecovery';
 import { useCreateFromBbox } from './useCreateFromBbox';
 import { useStagedResultGallerySave } from './useStagedResultGallerySave';
 import { reportLayerOperation, reportPreparedCommit, reportStructuralCommit } from './useStructuralCommit';
-
-const VectorPathContextMenu = lazy(() =>
-  import('./VectorPathContextMenu').then((module) => ({ default: module.VectorPathContextMenu }))
-);
+import { VectorPathContextMenu, type VectorPathMenuTarget } from './VectorPathContextMenu';
 
 const MissingFontsDialog = lazy(() =>
   import('./MissingFontsDialog').then((module) => ({ default: module.MissingFontsDialog }))
@@ -698,9 +693,7 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
           <>
             <ToolStrip engine={engine} />
             {vectorMenuTarget ? (
-              <Suspense fallback={null}>
-                <VectorPathContextMenu engine={engine} target={vectorMenuTarget} onClose={closeVectorMenu} />
-              </Suspense>
+              <VectorPathContextMenu engine={engine} target={vectorMenuTarget} onClose={closeVectorMenu} />
             ) : null}
             <CanvasFrameSizeReadout engine={engine} />
             <ControlLayerCanvasOverlay engine={engine} isFileDragActive={fileDrag !== null} />

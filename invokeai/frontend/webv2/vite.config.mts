@@ -190,9 +190,9 @@ const EDITOR_BOOT_SHARED_MODULES = [
 
 // Editor runtime the workbench store reaches; ungrouped, Rolldown splits it by importer set into extra boot requests.
 const WORKBENCH_RUNTIME_SHARED_MODULES = [
-  // Layer factories are shared with lazy vector creation; keep the adapter helper in the existing boot request.
+  // Layer factories and engine actions share the adapter helper; keep it in the existing boot request.
   '/workbench/controlAdapters.ts',
-  // The boot document model and lazy vector runtime share these already-eager primitives.
+  // The document model and engine actions share these boot primitives.
   '/workbench/canvas-engine/contracts.ts',
   '/workbench/canvas-engine/document-model/documentModel.ts',
   '/workbench/canvas-engine/document-model/postconditions.ts',

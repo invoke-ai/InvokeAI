@@ -25,11 +25,9 @@ Port `dispatch()` returns whether named project's canvas identity changed. User-
 
 Paint persistence clears dirty result only after intended layer accepts bitmap reference. Rejected update keeps dirty pixels for retry; layer or project deletion is terminal and discards obsolete persistence work. Rule applies equally to raster/control paint sources and paint-backed masks.
 
-## Vector runtime readiness
+## Vector runtime
 
-The engine loads `vectorRuntime.ts` on the first vector-layer creation, Spline tool request, or explicit `layers.vectorEdit.prepare()`. That runtime owns editing, vector Shape sessions, guide rendering, and Trace/Fill geometry. Raster tools and ordinary document bounds stay synchronous and do not import it. `interaction.vectorToolsStatus` reports idle/loading/ready/failed; pending requests share one load, failures report through the engine notification port and an explicit request can retry.
-
-`canvas-operations/useCanvasEngine.ts` prepares saved vector documents before exposing an interactive engine, and withholds the handle while loading. Layer creation waits for readiness and checks the original document and active engine lifetime before returning its descriptor; a tool request also checks that no later tool superseded it. Cooldown cancels pending user intents, while a completed module remains reusable until disposal. A load completing after disposal creates no runtime state. Vector Properties, path menus and Spline settings load on demand through React boundaries.
+`vectorRuntime.ts` is a static engine dependency. Its editing controller, vector Shape sessions, guide rendering and Trace/Fill geometry are initialized with the engine, so the first vector action is synchronous. `canvas-operations/useCanvasEngine.ts` exposes one stable engine for its registry lease; selecting Spline or creating a vector layer does not suspend the Canvas or its panels. Vector Properties, path menus and Spline settings are static dependencies of their owning widgets.
 
 ## Document contract and hierarchy
 
