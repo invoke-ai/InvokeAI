@@ -15,12 +15,14 @@ from unittest.mock import MagicMock
 import pytest
 import torch
 
-from invokeai.backend.model_manager.configs.main import Main_Checkpoint_Krea2_Config
+from invokeai.backend.model_manager.configs.main import Main_Checkpoint_Krea2_Config, MainModelDefaultSettings
+from invokeai.backend.model_manager.load import load_default
 from invokeai.backend.model_manager.load.model_loaders import krea2
 from invokeai.backend.model_manager.load.model_loaders.krea2 import Krea2CheckpointModel
 from invokeai.backend.model_manager.taxonomy import Krea2VariantType
 from invokeai.backend.quantization.int8_convrot import CONVROT_GROUP_SIZE, Int8ConvrotLinear
 from invokeai.backend.quantization.nvfp4 import NVFP4Linear
+from tests.fixtures.loader_seams import assert_fp8_storage_declined, logged_info
 from tests.fixtures.quantized_payloads import comfy_quant_marker, nvfp4_signed_tensors
 from tests.fixtures.safetensors_files import served_checkpoint
 
@@ -73,8 +75,7 @@ def _packed_bytes(rows: int, columns: int) -> int:
     return rows * columns // 2 + rows * (columns // 16) + 4
 
 
-@pytest.fixture(params=["dense", "int8"])
-def loaded(request, monkeypatch: pytest.MonkeyPatch, tmp_path) -> SimpleNamespace:
+def _load(monkeypatch: pytest.MonkeyPatch, tmp_path, neighbour: str, fp8_storage: bool = False) -> SimpleNamespace:
     """The loader run over a native nvfp4 file whose `blocks.0.attn.wk` neighbour is dense or int8 -- the two
     side-channel branches the nvfp4 layers have to pass through untouched."""
     import diffusers
@@ -98,7 +99,7 @@ def loaded(request, monkeypatch: pytest.MonkeyPatch, tmp_path) -> SimpleNamespac
     state_dict["tmlp.0.bias"] = torch.randn(128)
     state_dict["first.weight"] = torch.randn(4, 8)
     state_dict["first.bias"] = torch.randn(4)
-    if request.param == "dense":
+    if neighbour == "dense":
         state_dict["blocks.0.attn.wk.weight"] = torch.randn(128, CONVROT_GROUP_SIZE)
     else:
         state_dict["blocks.0.attn.wk.weight"] = torch.randint(-127, 128, (128, CONVROT_GROUP_SIZE), dtype=torch.int8)
@@ -111,7 +112,10 @@ def loaded(request, monkeypatch: pytest.MonkeyPatch, tmp_path) -> SimpleNamespac
     checkpoint_path = tmp_path / "krea2_turbo_nvfp4.safetensors"
     checkpoint_path.touch()
     config = Main_Checkpoint_Krea2_Config.model_construct(
-        path=str(checkpoint_path), variant=Krea2VariantType.Turbo, fp8_storage=None
+        path=str(checkpoint_path),
+        name="krea2_turbo_nvfp4",
+        variant=Krea2VariantType.Turbo,
+        default_settings=MainModelDefaultSettings(fp8_storage=fp8_storage),
     )
     loader = object.__new__(Krea2CheckpointModel)
     loader._ram_cache = SimpleNamespace(make_room=MagicMock())
@@ -119,7 +123,7 @@ def loaded(request, monkeypatch: pytest.MonkeyPatch, tmp_path) -> SimpleNamespac
     # Supplied because the loader reads it when it decides whether to keep fp8 weights packed:
     # a fixture built with `object.__new__` has to provide every attribute that path touches.
     loader._torch_device = torch.device("cpu")
-    loader._apply_fp8_layerwise_casting = lambda model, _config, _submodel: model
+    loader._torch_dtype = COMPUTE_DTYPE
 
     monkeypatch.setattr(diffusers, "Krea2Transformer2DModel", _TinyKrea2, raising=False)
     monkeypatch.setattr(
@@ -132,11 +136,19 @@ def loaded(request, monkeypatch: pytest.MonkeyPatch, tmp_path) -> SimpleNamespac
         lambda _path, _logger: {"_quantization_metadata": json.dumps({"layers": header_layers})},
     )
     monkeypatch.setattr(krea2, "should_keep_fp8_weights", lambda _device: False)
+    monkeypatch.setattr(load_default, "_device_supports_fp8_storage", lambda *_args: True)
     monkeypatch.setattr(krea2.TorchDevice, "choose_torch_device", lambda: torch.device("cpu"))
     monkeypatch.setattr(krea2.TorchDevice, "choose_bfloat16_safe_dtype", lambda _device: COMPUTE_DTYPE)
 
     model = loader._load_from_singlefile(config)
-    return SimpleNamespace(model=model, loader=loader, expected=expected, dense=dense, neighbour=request.param)
+    return SimpleNamespace(
+        model=model, loader=loader, expected=expected, dense=dense, neighbour=neighbour, config=config
+    )
+
+
+@pytest.fixture(params=["dense", "int8"])
+def loaded(request, monkeypatch: pytest.MonkeyPatch, tmp_path) -> SimpleNamespace:
+    return _load(monkeypatch, tmp_path, request.param)
 
 
 def test_header_named_nvfp4_layers_are_packed_under_their_diffusers_paths(loaded) -> None:
@@ -190,3 +202,40 @@ def test_one_reservation_counts_the_nvfp4_layers_as_they_are_held(loaded) -> Non
     call = loaded.loader._ram_cache.make_room.call_args
     assert call.args == (packed + decoded + dense + neighbour,)
     assert 0 < call.kwargs["host_bytes_needed"] < call.args[0]
+
+
+def test_fp8_storage_casts_the_dense_layers_of_an_nvfp4_build_and_leaves_its_nvfp4_buffers(
+    monkeypatch: pytest.MonkeyPatch, tmp_path
+) -> None:
+    """Turned on, FP8 Storage stores the layers the build ships in full precision in fp8. The nvfp4 layers are buffers,
+    so they stay as stored."""
+    plain = _load(monkeypatch, tmp_path, "dense")
+    stored = _load(monkeypatch, tmp_path, "dense", fp8_storage=True)
+
+    assert plain.model.img_in.weight.dtype is COMPUTE_DTYPE
+    assert stored.model.img_in.weight.dtype is torch.float8_e4m3fn
+    packed = 0
+    for name, module in stored.model.named_modules():
+        if isinstance(module, NVFP4Linear):
+            packed += 1
+            for key, buffer in module.state_dict().items():
+                reference = plain.model.get_submodule(name).state_dict()[key]
+                assert buffer.dtype is reference.dtype, (name, key)
+                assert torch.equal(buffer.float(), reference.float()), (name, key)
+    assert packed == len(PACKED)
+    assert any(
+        line.startswith("FP8 layerwise casting enabled for krea2_turbo_nvfp4")
+        for line in logged_info(stored.loader._logger)
+    )
+    assert not any("FP8 Storage skipped" in line for line in logged_info(stored.loader._logger))
+
+
+def test_fp8_storage_leaves_an_int8_neighbour_build_as_loaded(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+    """One int8 layer beside the nvfp4 ones makes FP8 Storage decline the build: the decoded time embedding, the dense
+    projection and the int8 neighbour keep what the build ships, with no float8 tensor, and every tensor equal to the
+    load without FP8 Storage."""
+    plain = _load(monkeypatch, tmp_path, "int8")
+    stored = _load(monkeypatch, tmp_path, "int8", fp8_storage=True)
+
+    assert stored.model.img_in.weight.dtype is COMPUTE_DTYPE
+    assert_fp8_storage_declined(stored.model, plain.model, logged_info(stored.loader._logger), "krea2_turbo_nvfp4")

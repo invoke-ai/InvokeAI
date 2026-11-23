@@ -238,8 +238,8 @@ class AnimaCheckpointModel(ModelLoader):
         # nothing stayed packed, the state dict was cast to a single `model_dtype` above, so the
         # layerwise cast has one unambiguous compute dtype to restore to; when something did stay
         # packed, the cast bails out on its own rather than upcast a scaled weight without applying
-        # its scale. AnimaTransformer is a plain nn.Module, so this takes the hook-based path in
-        # `_apply_fp8_to_nn_module`.
+        # its scale or cast the dense remainder of an int8 build. AnimaTransformer is a plain nn.Module, so this
+        # takes the hook-based path in `_apply_fp8_to_nn_module`.
         if fp8_layers:
             attached = attach_fp8_scales(model, fp8_layers)
             logger.info(

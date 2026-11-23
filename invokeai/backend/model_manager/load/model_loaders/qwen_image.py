@@ -330,8 +330,8 @@ class QwenImageCheckpointModel(ModelLoader):
         if int8_markers:
             sd = drop_unconsumed_quantization_sidecars(sd)
             fp8_layers = {}
-            # Nothing scaled to keep for fp8 storage; the outer `_apply_fp8_layerwise_casting` still casts the dense
-            # remainder when the model asks for fp8 storage.
+            # Nothing scaled to keep for fp8 storage; the int8 layers make the outer `_apply_fp8_layerwise_casting`
+            # decline the model, so the dense remainder stays as loaded.
             use_fp8_storage = False
             keep_fp8 = False
         else:

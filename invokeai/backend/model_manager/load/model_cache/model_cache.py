@@ -695,6 +695,8 @@ class ModelCache:
         self._last_activity_time: Optional[float] = None
         self._timeout_timer: Optional[threading.Timer] = None
         self._shutdown_event = threading.Event()
+        # Whether `_delete_cache_entry` has said once that a model left with page-locked weights.
+        self._pinned_eviction_logged = False
         self._deferred_work_queue: queue.SimpleQueue[object] = queue.SimpleQueue()
         self._deferred_work_thread: Optional[threading.Thread] = None
         self._deferred_work_finalizer: Optional[weakref.finalize] = None
@@ -961,9 +963,7 @@ class ModelCache:
         for cache_entry in list(self._cached_models.values()):
             cache_entry.is_stale = True
             if not (cache_entry.is_locked or cache_entry.first_use_holds > 0 or cache_entry.admission_in_flight):
-                self._delete_cache_entry(cache_entry)
-                if not cache_entry.detached:
-                    bytes_freed += cache_entry.cached_model.total_bytes()
+                bytes_freed += self._delete_cache_entry(cache_entry)
                 models_cleared += 1
 
         # A claimed admission or first-use wrapper can still be released after the normal worker
@@ -1745,8 +1745,7 @@ class ModelCache:
         for entry in list(self._cached_models.values()):
             if entry.is_stale and not entry.is_locked and not entry.in_first_use_window:
                 key = entry.key
-                bytes_freed += entry.cached_model.total_bytes()
-                self._delete_cache_entry(entry)
+                bytes_freed += self._delete_cache_entry(entry)
                 evicted += 1
                 _log_best_effort(
                     self._logger,
@@ -1822,8 +1821,7 @@ class ModelCache:
             cache_entry.awaiting_first_use = False
         if cache_entry.is_stale and not cache_entry.is_locked and not cache_entry.in_first_use_window:
             key = cache_entry.key
-            bytes_freed = cache_entry.cached_model.total_bytes()
-            self._delete_cache_entry(cache_entry)
+            bytes_freed = self._delete_cache_entry(cache_entry)
             self._notify_models_cleared(
                 models_cleared=1,
                 bytes_requested=0,
@@ -1977,7 +1975,14 @@ class ModelCache:
         return self._locks_held
 
     def _pin(self, cache_entry: CacheRecord) -> None:
-        """Lock `cache_entry` and count the lock in `locks_held`. Caller holds the lock."""
+        """Lock `cache_entry` and count the lock in `locks_held`. Caller holds the lock.
+
+        A model with a RAM copy first locks its weights' storages in the registry of page-locked memory, which may wait
+        for one that another thread is unregistering. That thread needs none of this cache's locks.
+        """
+        cached_model = cache_entry.cached_model
+        if isinstance(cached_model, CachedModelWithPartialLoad):
+            cached_model.begin_streaming_lock()
         cache_entry.lock()
         self._locks_held += 1
 
@@ -1985,17 +1990,21 @@ class ModelCache:
         """Release a lock `_pin` took. Caller holds the lock. The record refuses an unlock it has no lock for before
         either count changes, so a double unlock leaves `locks_held` right.
 
-        The last release, an unlock or a failed `lock`/`continue_lock` alike, returns weights a holder cast in place to
-        their counted dtypes (see `_restore_counted_dtypes`). A record that is detached or stale is skipped: it leaves
-        the cache, and a restore would only allocate on the device outside any reservation.
+        The last release, an unlock or a failed `lock`/`continue_lock` alike, marks the weights the model streamed as
+        idle: they stay page-locked, but another model may reclaim them (`PinnedStorageRegistry`). It also returns
+        weights a holder cast in place to their counted dtypes (see `_restore_counted_dtypes`), except on a record that
+        is detached or stale: it leaves the cache, and a restore would only allocate on the device outside any
+        reservation.
         """
         cache_entry.unlock()
         self._locks_held -= 1
-        if (
-            not cache_entry.is_locked
-            and not cache_entry.is_stale
-            and self._cached_models.get(cache_entry.key) is cache_entry
-        ):
+        if isinstance(cache_entry.cached_model, CachedModelWithPartialLoad):
+            cache_entry.cached_model.end_streaming_lock()
+        if cache_entry.is_locked:
+            return
+        if isinstance(cache_entry.cached_model, CachedModelWithPartialLoad):
+            cache_entry.cached_model.mark_streamed_weights_idle()
+        if not cache_entry.is_stale and self._cached_models.get(cache_entry.key) is cache_entry:
             self._restore_counted_dtypes(cache_entry)
 
     @synchronized
@@ -2174,8 +2183,7 @@ class ModelCache:
             and not cache_entry.admission_in_flight
             and self._cached_models.get(cache_entry.key) is cache_entry
         ):
-            bytes_freed = cache_entry.cached_model.total_bytes()
-            self._delete_cache_entry(cache_entry)
+            bytes_freed = self._delete_cache_entry(cache_entry)
             self._notify_models_cleared(
                 models_cleared=1,
                 bytes_requested=0,
@@ -2256,11 +2264,19 @@ class ModelCache:
             f"After unloading: {self._get_vram_state_str(model_cur_vram_bytes, model_total_bytes, vram_available)}"
         )
 
+        # A model that will run partially loaded with async weight streaming holds copies in flight on top of its
+        # resident weights and the working memory. Plan for them by loading that much less of it; a model that fits
+        # streams nothing and needs no reserve. Other models are already offloaded at this point (it did not fit).
+        streaming_reserve = 0
+        if model_vram_needed > vram_available + MB and isinstance(cache_entry.cached_model, CachedModelWithPartialLoad):
+            streaming_reserve = cache_entry.cached_model.weight_streaming_reserve_bytes()
+            vram_available -= streaming_reserve
+
         if vram_available < 0:
             # There is insufficient VRAM available. As a last resort, try to unload the model being locked from VRAM,
             # as it may still be loaded from a previous use.
             vram_bytes_freed_from_own_model = self._move_model_to_ram(cache_entry, -vram_available)
-            vram_available = self._get_vram_available(working_mem_bytes)
+            vram_available = self._get_vram_available(working_mem_bytes) - streaming_reserve
             self._logger.debug(
                 f"Unloaded {vram_bytes_freed_from_own_model / MB:.2f}MB from the model being locked ({cache_entry.key})."
             )
@@ -2293,7 +2309,7 @@ class ModelCache:
             # The reservation _get_vram_available actually applied: callers passing None (the
             # majority) get the configured default, and smaller values are clamped up to it —
             # printing the raw argument would report 0MB for the very number being diagnosed.
-            effective_working_mem = self._working_mem_reserve(working_mem_bytes)
+            effective_working_mem = self._working_mem_reserve(working_mem_bytes) + streaming_reserve
             self._logger.warning(
                 f"VRAM budget for '{cache_entry.key}' is short by {-vram_available / MB:.0f}MB even after "
                 f"offloading (working memory reservation: {effective_working_mem / MB:.0f}MB); the model will "
@@ -2324,7 +2340,7 @@ class ModelCache:
             return False
 
         model_cur_vram_bytes = cache_entry.cached_model.cur_vram_bytes()
-        vram_available = self._get_vram_available(working_mem_bytes)
+        vram_available = self._get_vram_available(working_mem_bytes) - streaming_reserve
         loaded_percent = model_cur_vram_bytes / model_total_bytes if model_total_bytes > 0 else 0
         # Use the model's actual compute_device for logging, not the cache's default
         model_device = cache_entry.cached_model.compute_device
@@ -2352,7 +2368,9 @@ class ModelCache:
         self._logger.debug(
             f"After loading: {self._get_vram_state_str(model_cur_vram_bytes, model_total_bytes, vram_available)}"
         )
-        self._release_allocator_blocks_for_reserve(working_mem_bytes)
+        self._release_allocator_blocks_for_reserve(
+            self._working_mem_reserve(working_mem_bytes) + streaming_reserve if streaming_reserve else working_mem_bytes
+        )
         return True
 
     def _working_mem_reserve(self, working_mem_bytes: Optional[int]) -> int:
@@ -2525,6 +2543,26 @@ class ModelCache:
             vram_bytes_to_free,
             keep_required_weights_in_vram=keep_required_weights_in_vram,
         )
+
+    @synchronized
+    def hold_model_residency(self, cache_entry: CacheRecord, max_resident_bytes: int) -> int:
+        """Trim a locked model that keeps running to at most ``max_resident_bytes`` of resident weights, counting what
+        it streams in: returns the bytes moved to RAM.
+
+        A model that streams from RAM (`async_weight_streaming`) holds up to `weight_streaming_reserve_bytes()` of
+        copies in flight on top of its resident weights, which the caller's limit has to leave room for, whether the
+        lock settled above the limit or already under it by the reserve its own load planned. The reserve is asked for
+        here, which also plans the streaming that follows (a lock that planned none registers nothing new). A model
+        that stays fully resident streams nothing.
+        """
+        cached_model = cache_entry.cached_model
+        resident = cached_model.cur_vram_bytes()
+        if isinstance(cached_model, CachedModelWithPartialLoad) and max_resident_bytes < cached_model.total_bytes():
+            resident += cached_model.weight_streaming_reserve_bytes()
+        excess = resident - max_resident_bytes
+        if excess <= 0:
+            return 0
+        return self._move_model_to_ram(cache_entry, excess, keep_required_weights_in_vram=True)
 
     def _get_vram_available(self, working_mem_bytes: Optional[int], honor_cap: bool = True) -> int:
         """Calculate the amount of additional VRAM available for the cache to use (takes into account the working
@@ -3071,11 +3109,10 @@ class ModelCache:
                 and cache_entry.first_use_holds == 0
                 and not cache_entry.admission_in_flight
             ):
-                ram_bytes_freed += cache_entry.cached_model.total_bytes()
                 self._logger.debug(
                     f"Dropping {model_key} from RAM cache to free {(cache_entry.cached_model.total_bytes() / MB):.2f}MB."
                 )
-                self._delete_cache_entry(cache_entry)
+                ram_bytes_freed += self._delete_cache_entry(cache_entry)
                 del cache_entry
                 models_cleared += 1
             else:
@@ -3185,8 +3222,7 @@ class ModelCache:
                     f"Dropping {cache_entry.key} from RAM cache on behalf of a peer device cache "
                     f"({(cache_entry.cached_model.total_bytes() / MB):.2f}MB)."
                 )
-                bytes_freed += cache_entry.cached_model.total_bytes()
-                self._delete_cache_entry(cache_entry)
+                bytes_freed += self._delete_cache_entry(cache_entry)
                 models_cleared += 1
             # Cumulative: a peer request can follow this cache's own make_room within one session.
             self._notify_models_cleared(
@@ -3272,8 +3308,7 @@ class ModelCache:
                         f"Dropping {cache_entry.key} from RAM cache to reconcile the shared RAM budget "
                         f"({(cache_entry.cached_model.total_bytes() / MB):.2f}MB)."
                     )
-                    bytes_freed += cache_entry.cached_model.total_bytes()
-                    self._delete_cache_entry(cache_entry)
+                    bytes_freed += self._delete_cache_entry(cache_entry)
                     models_cleared += 1
             finally:
                 self._lock.release()
@@ -3294,9 +3329,12 @@ class ModelCache:
                 return
             # Satisfied: loop back to retire the flag via the guarded clear above.
 
-    def _delete_cache_entry(self, cache_entry: CacheRecord) -> None:
+    def _delete_cache_entry(self, cache_entry: CacheRecord) -> int:
         """Delete cache_entry from the cache if it is the record currently held under its key.
-        No exception is thrown if it is absent (or the key is now held by a different record)."""
+        No exception is thrown if it is absent (or the key is now held by a different record).
+
+        Returns the model bytes released, or zero when the entry is absent, detached for a live handle, or otherwise a no-op.
+        """
         # Identity, not key membership: a record can be deleted while still locked (the VRAM-move
         # error paths) and the key re-admitted before the record's last unlock() runs the
         # stale-eviction path. A key-only check would pop the NEW record from the cache - detaching
@@ -3306,7 +3344,7 @@ class ModelCache:
         # which also keeps the release exactly-once for double-deletes (release_shared_weights is
         # itself idempotent, but the budget debit is not).
         if self._cached_models.get(cache_entry.key) is not cache_entry:
-            return
+            return 0
         if cache_entry.live_handles:
             cache_entry.detached = True
             self._detached_handle_records.append(cache_entry)
@@ -3324,7 +3362,7 @@ class ModelCache:
                     self._ensure_shutdown_deferred_worker()
                 self._cache_stack = [key for key in self._cache_stack if key != cache_entry.key]
                 del self._cached_models[cache_entry.key]
-                return
+                return 0
         # Armed or not: the weights may die during a later calibration window.
         probe.dropped(self, cache_entry)
         self._cache_stack = [key for key in self._cache_stack if key != cache_entry.key]
@@ -3338,6 +3376,20 @@ class ModelCache:
         # released via the store above). Captured before release_shared_weights() flips the flag.
         if self._ram_budget is not None and not uses_shared:
             self._ram_budget.remove_non_shared(total_bytes, cache=self)
+        # Last, after the bookkeeping above: it waits for the device. It does not raise, but a hang or
+        # an interrupt there must not leave the record half removed.
+        if isinstance(cache_entry.cached_model, CachedModelWithPartialLoad):
+            had_pins = cache_entry.cached_model.release_pinned_weights()
+            if had_pins and not self._pinned_eviction_logged and not self._shutdown_event.is_set():
+                # Its next load page-locks the weights again, which can cost more than streaming saves when it
+                # happens between the images of one generation (measured on Linux with an 8 GB RAM cache).
+                self._pinned_eviction_logged = True
+                self._logger.info(
+                    f"async_weight_streaming: {cache_entry.key} left the RAM cache with page-locked weights; loading "
+                    "it again locks them again. If that happens between images, raise max_cache_ram_gb so the models "
+                    "of one generation fit."
+                )
+        return total_bytes
 
     def _register_loaded_model_handle(self, cache_entry: CacheRecord, handle: Any) -> bool:
         if not _is_integrated_cuda(self._execution_device):
@@ -3438,9 +3490,10 @@ class ModelCache:
             if entry.is_locked or entry.first_use_holds > 0 or entry.admission_in_flight:
                 entry.is_stale = True
                 continue
-            bytes_freed += entry.cached_model.total_bytes()
-            self._delete_cache_entry(entry)
-            dropped.append(entry)
+            released = self._delete_cache_entry(entry)
+            bytes_freed += released
+            if self._cached_models.get(entry.key) is not entry:
+                dropped.append(entry)
 
         # Also forget this model's canonical shared CPU weights. A locked (stale-marked) entry keeps
         # its shared-store reference alive until unlock; without this, another device's rebuild of

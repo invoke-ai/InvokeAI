@@ -1126,6 +1126,41 @@ def test_integrated_cuda_shutdown_does_not_report_detached_weights_as_freed(mock
         cache.shutdown()
 
 
+def test_integrated_cuda_drop_model_does_not_report_detached_weights_as_freed(mock_logger: MagicMock):
+    budget = RamBudget(max_bytes=2**30, shared_store=None)
+    cache = _make_cuda_cache(mock_logger, keep_ram_copy=False, ram_budget=budget)
+    cleared: list[dict] = []
+    cache.on_cache_models_cleared(lambda **kwargs: cleared.append(kwargs))
+    try:
+        with _patch_integrated_cuda():
+            cache.put("m", DummyModule())
+            entry = _entry(cache, "m")
+            loaded = LoadedModelWithoutConfig(entry, cache)
+            loaded._end_first_use_window()
+            entry.awaiting_first_use = False
+            total_bytes = entry.cached_model.total_bytes()
+
+        assert cache.drop_model("m") == 1
+        assert entry.detached
+        assert cleared[-1]["bytes_freed"] == 0
+        assert budget.total_in_use() == total_bytes
+
+        released = threading.Event()
+        release = cache._release_detached_model_handle
+
+        def release_and_signal(cache_entry):
+            release(cache_entry)
+            released.set()
+
+        with patch.object(cache, "_release_detached_model_handle", side_effect=release_and_signal):
+            del loaded
+            gc.collect()
+            assert released.wait(timeout=10)
+        assert budget.total_in_use() == 0
+    finally:
+        cache.shutdown()
+
+
 def test_integrated_cuda_cpu_only_entry_keeps_budget_while_handle_lives(mock_logger: MagicMock):
     budget = RamBudget(max_bytes=2**30, shared_store=None)
     cache = _make_cuda_cache(mock_logger, keep_ram_copy=False, ram_budget=budget)

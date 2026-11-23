@@ -84,6 +84,7 @@ describe('getLayerContextMenuLayout', () => {
       {
         id: 'primary',
         items: [
+          'open-properties',
           'transform',
           'rename',
           'fit-to-bbox',
@@ -129,6 +130,7 @@ describe('getLayerContextMenuLayout', () => {
     expect(summarize(inpaint)[1]).toEqual({
       id: 'primary',
       items: [
+        'open-properties',
         'transform',
         'rename',
         'fit-to-bbox',
@@ -142,6 +144,7 @@ describe('getLayerContextMenuLayout', () => {
     expect(summarize(regional)[1]).toEqual({
       id: 'primary',
       items: [
+        'open-properties',
         'transform',
         'rename',
         'fit-to-bbox',
@@ -162,6 +165,7 @@ describe('getLayerContextMenuLayout', () => {
     expect(summarize(control)[1]).toEqual({
       id: 'primary',
       items: [
+        'open-properties',
         'transform',
         'rename',
         'fit-to-bbox',
