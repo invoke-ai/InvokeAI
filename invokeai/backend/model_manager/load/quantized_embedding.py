@@ -1,6 +1,11 @@
-"""Materialize indexed embedding weights within an absolute host RAM reservation."""
+"""Materialize indexed embedding weights within an absolute host RAM reservation.
 
-from collections.abc import Iterable
+``nn.Embedding`` indexes its weight directly, which neither GGML nor SDNQ serves in packed form.
+Gemma-2's encoder and Flux's T5/CLIP still materialize embeddings without a reservation; their
+load paths do not pass a cache here.
+"""
+
+from collections.abc import Iterable, Mapping
 from itertools import chain
 from typing import Any
 
@@ -13,27 +18,27 @@ from invokeai.backend.quantization.sdnq.sdnq_tensor import SDNQTensor
 
 
 def materialize_quantized_embedding(
-    embedding: torch.nn.Module, *, ram_cache: ModelCache, held_tensors: Iterable[torch.Tensor] = ()
+    embedding: torch.nn.Module, *, model: torch.nn.Module, state_dict: Mapping[str, torch.Tensor], ram_cache: ModelCache
 ) -> bool:
     """Replace ``embedding.weight`` with a dequantized ``Parameter``, reserving the room first.
 
     Does nothing and returns False when the weight is already a plain tensor, so a caller can run it
     unconditionally over a model whose quantization it does not know.
 
-    `held_tensors` must include the caller's live checkpoint values, model parameters and buffers.
-    The embedding itself is always counted. Shared backing storage is counted once, including the
-    checkpoint aliases retained by assign=True and weights the model did not consume. Passing an
-    iterator avoids building another state dict. With only an embedding alive, the default suffices.
+    The model parameters, buffers, checkpoint values and embedding are all counted. Shared backing
+    storage is counted once, including checkpoint aliases retained by assign=True and weights the
+    model did not consume. Meta tensors do not hold storage.
     """
     weight: Any = embedding.weight
     dequantize = getattr(weight, "get_dequantized_tensor", None)
     if dequantize is None:
         return False
 
-    held_bytes = _held_tensor_bytes(chain((weight,), held_tensors))
+    held_bytes = _held_tensor_bytes(chain((weight,), state_dict.values(), model.parameters(), model.buffers()))
     # `.shape` is logical on both wrappers; `Tensor.numel()` instead reports packed elements.
     output_bytes = weight.shape.numel() * weight.compute_dtype.itemsize
     if isinstance(weight, GGMLTensor):
+        # Some unquantized GGML decodes return a view; reserving an output is conservative there.
         ram_cache.make_room(held_bytes + output_bytes + ggml_unpack_temp_bytes(weight))
         result = unpack_ggml_tensor(weight)
     else:
@@ -51,7 +56,7 @@ def _held_tensor_bytes(tensors: Iterable[torch.Tensor]) -> int:
     total = 0
     for tensor in tensors:
         if isinstance(tensor, SDNQTensor):
-            payloads = (tensor.quantized_data, tensor._scale, tensor._zero_point, tensor._svd_up, tensor._svd_down)
+            payloads = tensor.storage_tensors()
         elif isinstance(tensor, GGMLTensor):
             payloads = (tensor.quantized_data,)
         else:

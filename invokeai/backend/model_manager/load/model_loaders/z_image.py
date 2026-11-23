@@ -1,6 +1,5 @@
 """Class for Z-Image model loading in InvokeAI."""
 
-from itertools import chain
 from pathlib import Path
 from typing import Any, Optional
 
@@ -384,7 +383,8 @@ class ZImageDiffusersModel(GenericDiffusersLoader):
         if materialize_quantized_embedding(
             model.model.embed_tokens,
             ram_cache=self._ram_cache,
-            held_tensors=chain(sd.values(), model.parameters(), model.buffers()),
+            model=model,
+            state_dict=sd,
         ):
             logger.info("Dequantized embed_tokens weight for embedding lookups")
 
@@ -1550,7 +1550,8 @@ class Qwen3EncoderGGUFLoader(ModelLoader):
         if materialize_quantized_embedding(
             model.model.embed_tokens,
             ram_cache=self._ram_cache,
-            held_tensors=chain(sd.values(), model.parameters(), model.buffers()),
+            model=model,
+            state_dict=sd,
         ):
             logger.info("Dequantized embed_tokens weight for embedding lookups")
 
@@ -1741,7 +1742,8 @@ class Qwen3EncoderSDNQLoader(ModelLoader):
         if materialize_quantized_embedding(
             model.model.embed_tokens,
             ram_cache=self._ram_cache,
-            held_tensors=chain(sd.values(), model.parameters(), model.buffers()),
+            model=model,
+            state_dict=sd,
         ):
             logger.info("Dequantized embed_tokens weight for embedding lookups")
 

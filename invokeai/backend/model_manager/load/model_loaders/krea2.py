@@ -2,7 +2,6 @@
 
 from abc import abstractmethod
 from collections.abc import Callable
-from itertools import chain
 from pathlib import Path
 from typing import Any, Generic, Optional, TypeVar
 
@@ -1382,7 +1381,8 @@ class Qwen3VLEncoderGGUFLoader(_Qwen3VLEncoderSingleFileLoader[Qwen3VLEncoder_GG
         materialize_quantized_embedding(
             model.language_model.embed_tokens,
             ram_cache=self._ram_cache,
-            held_tensors=chain(sd.values(), model.parameters(), model.buffers()),
+            model=model,
+            state_dict=sd,
         )
 
         _reject_incomplete_load(model, what="Qwen3-VL encoder GGUF")

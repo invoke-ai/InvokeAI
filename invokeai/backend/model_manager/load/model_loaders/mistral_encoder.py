@@ -21,7 +21,6 @@ tokenizer from ``black-forest-labs/FLUX.2-dev`` via HuggingFace.
 
 import re
 from collections.abc import Mapping
-from itertools import chain
 from pathlib import Path
 from typing import Any, NamedTuple, Optional
 
@@ -1432,7 +1431,8 @@ class MistralEncoderGGUFLoader(ModelLoader):
         materialize_quantized_embedding(
             model.embed_tokens,
             ram_cache=self._ram_cache,
-            held_tensors=chain(sd.values(), model.parameters(), model.buffers()),
+            model=model,
+            state_dict=sd,
         )
 
         _reinit_inv_freq(model, mistral_config, compute_dtype)

@@ -1,6 +1,5 @@
 """Embedding materialization must budget live storage and bound GGML decode temporaries."""
 
-from itertools import chain
 from unittest.mock import call, create_autospec
 
 import gguf
@@ -18,19 +17,14 @@ from tests.backend.quantization.gguf.test_loaders import _quantized_embedding
 _VOCAB, _HIDDEN = 64, 32
 
 
-@pytest.mark.parametrize(
-    "qtype",
-    [gguf.GGMLQuantizationType.Q8_0, gguf.GGMLQuantizationType.Q6_K, gguf.GGMLQuantizationType.IQ4_NL],
-    ids=lambda q: q.name,
-)
-@pytest.mark.parametrize("dtype", [torch.float32, torch.float16, torch.bfloat16])
-@pytest.mark.parametrize("rows_per_chunk", [1, 3])
-def test_ggml_embedding_decodes_bounded_rows_bit_exactly(monkeypatch, qtype, dtype, rows_per_chunk):
-    # A row wider than the element budget must still decode one complete row.
-    budget = 511 if rows_per_chunk == 1 else 3 * 512
+def test_ggml_embedding_decodes_bounded_rows_bit_exactly(monkeypatch):
+    qtype = gguf.GGMLQuantizationType.Q8_0
+    dtype = torch.float32
+    rows_per_chunk = 3
+    budget = rows_per_chunk * 512
     monkeypatch.setattr(loaders, "_UNPACK_CHUNK_ELEMENTS", budget)
     embedding = torch.nn.Embedding(37, 512, device="meta")
-    weight = _quantized_embedding(qtype)
+    weight = _quantized_embedding(qtype, rows=37, width=512)
     weight.compute_dtype = dtype
     embedding.weight = torch.nn.Parameter(weight, requires_grad=False)
     # Independent whole-tensor decode, before observing the production calls.
@@ -47,9 +41,9 @@ def test_ggml_embedding_decodes_bounded_rows_bit_exactly(monkeypatch, qtype, dty
 
     monkeypatch.setattr(GGMLTensor, "get_dequantized_tensor", recording)
 
-    assert materialize_quantized_embedding(embedding, ram_cache=cache) is True
+    assert materialize_quantized_embedding(embedding, ram_cache=cache, model=embedding, state_dict={}) is True
 
-    assert decoded == ([512] * 37 if rows_per_chunk == 1 else [3 * 512] * 12 + [512])
+    assert decoded == [3 * 512] * 12 + [512]
     assert torch.equal(embedding.weight.view(torch.uint8), expected.view(torch.uint8))
     assert embedding.weight.dtype == dtype
     assert embedding.weight.device == weight.quantized_data.device
@@ -81,6 +75,7 @@ def _q8_0_embedding() -> torch.nn.Embedding:
 
 
 def test_a_packed_weight_is_materialized_and_reserved_by_its_dequantized_size() -> None:
+    """The wrapper's logical shape sizes the output; numel() counts packed elements instead."""
     ram_cache = create_autospec(ModelCache, instance=True)
     embedding = _q8_0_embedding()
     # The packed element count is a different number from the logical one in either direction — Q8_0
@@ -89,7 +84,7 @@ def test_a_packed_weight_is_materialized_and_reserved_by_its_dequantized_size() 
     assert embedding.weight.quantized_data.numel() != _VOCAB * _HIDDEN
     weight_bytes = embedding.weight.quantized_data.nbytes
 
-    assert materialize_quantized_embedding(embedding, ram_cache=ram_cache) is True
+    assert materialize_quantized_embedding(embedding, ram_cache=ram_cache, model=embedding, state_dict={}) is True
 
     assert ram_cache.make_room.call_args_list == [call(weight_bytes + 7 * _VOCAB * _HIDDEN * torch.float32.itemsize)]
     assert not isinstance(embedding.weight, GGMLTensor)
@@ -106,13 +101,16 @@ def test_a_plain_weight_is_left_alone_and_reserves_nothing() -> None:
     embedding = torch.nn.Embedding(_VOCAB, _HIDDEN)
     weight_before = embedding.weight
 
-    assert materialize_quantized_embedding(embedding, ram_cache=ram_cache) is False
+    assert materialize_quantized_embedding(embedding, ram_cache=ram_cache, model=embedding, state_dict={}) is False
 
     assert ram_cache.make_room.call_args_list == []
     assert embedding.weight is weight_before
 
 
 def test_an_sdnq_weight_keeps_whole_tensor_decoding_and_reserves_its_payloads(monkeypatch) -> None:
+    """SDNQ and GGML share a duck-typed contract, not a base class. The helper needs SDNQ's public
+    compute_dtype to size the allocation even though other code mostly accesses it via hasattr.
+    """
     ram_cache = create_autospec(ModelCache, instance=True)
     embedding = torch.nn.Embedding(_VOCAB, _HIDDEN)
     embedding.weight = torch.nn.Parameter(
@@ -131,12 +129,13 @@ def test_an_sdnq_weight_keeps_whole_tensor_decoding_and_reserves_its_payloads(mo
     real_decode = SDNQTensor.get_dequantized_tensor
 
     def recording(tensor):
+        assert ram_cache.make_room.called
         decoded.append(tensor)
         return real_decode(tensor)
 
     monkeypatch.setattr(SDNQTensor, "get_dequantized_tensor", recording)
 
-    assert materialize_quantized_embedding(embedding, ram_cache=ram_cache) is True
+    assert materialize_quantized_embedding(embedding, ram_cache=ram_cache, model=embedding, state_dict={}) is True
 
     assert ram_cache.make_room.call_args_list == [call(weight.sdnq_storage_nbytes() + 6 * expected.nbytes)]
     assert len(decoded) == 1 and decoded[0] is weight
@@ -162,14 +161,13 @@ def test_checkpoint_and_model_aliases_count_their_backing_storage_once(shared):
         "tied.weight": embedding.weight.detach(),
         "unused": unused,
         "buffer_view": storage[8:16],
+        "meta": torch.empty(10000, device="meta"),
     }
     cache = create_autospec(ModelCache, instance=True)
     packed_bytes = embedding.weight.quantized_data.nbytes
     output_bytes = _VOCAB * _HIDDEN * torch.float32.itemsize
 
-    assert materialize_quantized_embedding(
-        embedding, ram_cache=cache, held_tensors=chain(checkpoint.values(), model.parameters(), model.buffers())
-    )
+    assert materialize_quantized_embedding(embedding, ram_cache=cache, model=model, state_dict=checkpoint)
 
     assert cache.make_room.call_args_list == [
         call((packed_bytes if shared else 2 * packed_bytes) + storage.nbytes + unused.nbytes + 7 * output_bytes)
@@ -195,9 +193,8 @@ def test_other_live_sdnq_weights_include_all_auxiliary_storage_once():
     packed_bytes = embedding.weight.quantized_data.nbytes
     held_bytes = other.quantized_data.nbytes + sum(t.nbytes for t in auxiliary)
 
-    assert materialize_quantized_embedding(
-        embedding, ram_cache=cache, held_tensors=chain((other, other.detach()), auxiliary)
-    )
+    checkpoint = {"other": other, "alias": other.detach(), **{f"aux_{i}": t for i, t in enumerate(auxiliary)}}
+    assert materialize_quantized_embedding(embedding, ram_cache=cache, model=embedding, state_dict=checkpoint)
 
     assert cache.make_room.call_args_list == [
         call(packed_bytes + held_bytes + 7 * _VOCAB * _HIDDEN * torch.float32.itemsize)
@@ -221,7 +218,7 @@ def test_unquantized_ggml_storage_still_materializes_in_the_compute_dtype(qtype)
     )
     cache = create_autospec(ModelCache, instance=True)
 
-    assert materialize_quantized_embedding(embedding, ram_cache=cache)
+    assert materialize_quantized_embedding(embedding, ram_cache=cache, model=embedding, state_dict={})
 
     assert torch.equal(embedding.weight, source.float())
     assert embedding.weight.dtype == torch.float32
@@ -248,7 +245,40 @@ def test_failed_materialization_preserves_the_original_weight(monkeypatch, failu
         cache.make_room.side_effect = RuntimeError("reservation failed")
 
     with pytest.raises(RuntimeError, match=f"{failure} failed"):
-        materialize_quantized_embedding(embedding, ram_cache=cache)
+        materialize_quantized_embedding(embedding, ram_cache=cache, model=embedding, state_dict={})
 
     assert embedding.weight is weight
     assert calls == ([] if failure == "reservation" else [3 * _HIDDEN] * 2)
+
+
+@pytest.mark.parametrize("failure", ["reservation", "decode"])
+def test_failed_sdnq_materialization_preserves_the_original_weight(monkeypatch, failure):
+    embedding = torch.nn.Embedding(_VOCAB, _HIDDEN)
+    embedding.weight = torch.nn.Parameter(
+        SDNQTensor(
+            data=torch.ones((_VOCAB, _HIDDEN), dtype=torch.int8),
+            quantization_type=SDNQQuantizationType.INT8_SYM,
+            tensor_shape=torch.Size((_VOCAB, _HIDDEN)),
+            compute_dtype=torch.float32,
+            scale=torch.ones(1),
+        ),
+        requires_grad=False,
+    )
+    weight = embedding.weight
+    cache = create_autospec(ModelCache, instance=True)
+    decoded = []
+
+    def fail_decode(tensor):
+        assert cache.make_room.called
+        decoded.append(tensor)
+        raise RuntimeError("decode failed")
+
+    monkeypatch.setattr(SDNQTensor, "get_dequantized_tensor", fail_decode)
+    if failure == "reservation":
+        cache.make_room.side_effect = RuntimeError("reservation failed")
+
+    with pytest.raises(RuntimeError, match=f"{failure} failed"):
+        materialize_quantized_embedding(embedding, ram_cache=cache, model=embedding, state_dict={})
+
+    assert embedding.weight is weight
+    assert decoded == ([] if failure == "reservation" else [weight])

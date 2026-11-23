@@ -421,6 +421,38 @@ def _quantized_embedding(qtype: gguf.GGMLQuantizationType, rows: int = 37, width
     )
 
 
+@pytest.mark.parametrize("rows_per_chunk", [1, 3])
+@pytest.mark.parametrize("dtype", [torch.float32, torch.float16, torch.bfloat16])
+@pytest.mark.parametrize(
+    "qtype",
+    [gguf.GGMLQuantizationType.Q8_0, gguf.GGMLQuantizationType.Q6_K, gguf.GGMLQuantizationType.IQ4_NL],
+    ids=lambda qtype: qtype.name,
+)
+def test_unpack_decodes_bounded_rows_bit_exactly(monkeypatch, qtype, dtype, rows_per_chunk):
+    # A row wider than the budget still decodes whole; 37 rows also gives a short final slice.
+    budget = 511 if rows_per_chunk == 1 else 3 * 512
+    monkeypatch.setattr(loaders, "_UNPACK_CHUNK_ELEMENTS", budget)
+    weight = _quantized_embedding(qtype)
+    weight.compute_dtype = dtype
+    expected = weight.get_dequantized_tensor()
+    decoded = []
+    real_decode = GGMLTensor.get_dequantized_tensor
+
+    def record_rows(tensor):
+        result = real_decode(tensor)
+        decoded.append(result.numel())
+        return result
+
+    monkeypatch.setattr(GGMLTensor, "get_dequantized_tensor", record_rows)
+    result = loaders.unpack_ggml_tensor(weight)
+
+    assert decoded == ([512] * 37 if rows_per_chunk == 1 else [3 * 512] * 12 + [512])
+    assert result.dtype == dtype
+    assert result.device == weight.quantized_data.device
+    # Compare bytes so NaNs, their payloads, and signed zeros must match exactly.
+    assert torch.equal(result.view(torch.uint8), expected.view(torch.uint8))
+
+
 @pytest.mark.parametrize(
     "qtype",
     [
