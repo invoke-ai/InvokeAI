@@ -17,9 +17,6 @@ import torch
 
 from invokeai.backend.model_manager.load.load_default import ModelLoader
 from invokeai.backend.model_manager.load.model_cache import model_cache as cache_module
-from invokeai.backend.model_manager.load.model_cache.cached_model.cached_model_with_partial_load import (
-    CachedModelWithPartialLoad,
-)
 from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
 from invokeai.backend.model_manager.load.model_cache.ram_budget import RamBudget
 from invokeai.backend.model_manager.load.model_cache.shared_cpu_weights import SharedCpuWeightsStore
@@ -221,7 +218,7 @@ class _FileLoader(ModelLoader):
 def adoption_pair(tmp_path):
     caches = []
 
-    def create(*, layout="dense", keep_copy=True, partial=False, cap=10**12):
+    def create(*, layout="dense", keep_copy=True, cap=10**12):
         path = tmp_path / "tiny.pt"
         torch.save(_AdmissionModel(layout).state_dict(), path)
         store = SharedCpuWeightsStore()
@@ -230,7 +227,7 @@ def adoption_pair(tmp_path):
             caches.append(
                 ModelCache(
                     execution_device_working_mem_gb=1,
-                    enable_partial_loading=partial,
+                    enable_partial_loading=False,
                     keep_ram_copy_of_weights=keep,
                     execution_device="cpu",
                     storage_device="cpu",
@@ -251,6 +248,42 @@ def adoption_pair(tmp_path):
     yield create
     for cache in caches:
         cache.shutdown()
+
+
+def test_adoption_keeps_peer_cached_and_avoids_reload(adoption_pair):
+    source, dest, config, store, budget = adoption_pair(cap=356)
+    first = source._ram_cache.get(config.key)
+    canonical = store.peek(config.key)
+    record, claim = dest._load_and_cache(config)
+    assert claim is not None
+    claim.release()
+    dest._ram_cache.lock(record, None)
+    dest._ram_cache.unlock(record)
+    first_again, claim = source._load_and_cache(config)
+    if claim is not None:
+        claim.release()
+    assert first_again is first
+    assert source.disk_loads == 1 and dest.disk_loads == 0
+    assert record.cached_model.get_cpu_state_dict() is canonical
+    assert store.refcount(config.key) == 2
+    assert budget.total_in_use() == 256
+
+
+def test_failed_clone_releases_pin_and_loads_from_disk(adoption_pair, monkeypatch):
+    source, dest, config, store, _ = adoption_pair()
+    canonical = store.peek(config.key)
+    assert canonical is not None
+
+    def fail_clone(self, memo):
+        raise RuntimeError("cannot copy shell")
+
+    monkeypatch.setattr(_AdmissionModel, "__deepcopy__", fail_clone, raising=False)
+    record, claim = dest._load_and_cache(config)
+    assert claim is not None
+    claim.release()
+    assert source.disk_loads == 1 and dest.disk_loads == 1
+    assert record.cached_model.get_cpu_state_dict() is canonical
+    assert store.refcount(config.key) == 2
 
 
 @pytest.mark.parametrize(
@@ -339,86 +372,3 @@ def test_matching_loader_pins_canonical_until_admission(adoption_pair, monkeypat
         assert record.cached_model.get_cpu_state_dict() is canonical
         assert store.get_shell(key) is shell
         assert store.refcount(key) == 1
-
-
-@pytest.mark.parametrize("partial", [False, True], ids=["full", "partial"])
-@pytest.mark.parametrize("when", ["before_reservation", "before_acquire", "after_acquire"])
-def test_loader_rejects_replaced_canonical(adoption_pair, monkeypatch, partial, when):
-    # Select the wrapper using only the device policy. Tensors and transfers remain on CPU.
-    if partial:
-        monkeypatch.setattr(cache_module, "device_has_dedicated_vram", lambda _: True)
-    source, dest, config, store, _ = adoption_pair(partial=partial)
-    key = config.key
-    if partial:
-        assert isinstance(source._ram_cache.get(key).cached_model, CachedModelWithPartialLoad)
-    canonical = store.peek(key)
-    assert canonical is not None
-    replacement = {name: tensor.clone() for name, tensor in canonical.items()}
-
-    def replace_entry():
-        assert store.invalidate(key) == 1
-        store.acquire(key, replacement)
-
-    if when == "before_reservation":
-        original_put = dest._ram_cache.put
-
-        def put_after_invalidation(*args, **kwargs):
-            replace_entry()
-            return original_put(*args, **kwargs)
-
-        def unexpected_reservation(size):
-            pytest.fail(f"Stale adoption tried to reserve {size} bytes")
-
-        monkeypatch.setattr(dest._ram_cache, "put", put_after_invalidation)
-        monkeypatch.setattr(dest._ram_cache, "_make_room_internal", unexpected_reservation)
-    else:
-        original_apply = cache_module.apply_custom_layers_to_model
-
-        def inject_replacement(model):
-            original_apply(model)
-            if when == "before_acquire":
-                replace_entry()
-            else:
-                original_assign = model.load_state_dict
-
-                def assign_then_replace(*args, **kwargs):
-                    result = original_assign(*args, **kwargs)
-                    replace_entry()
-                    return result
-
-                monkeypatch.setattr(model, "load_state_dict", assign_then_replace)
-
-        monkeypatch.setattr(cache_module, "apply_custom_layers_to_model", inject_replacement)
-    try:
-        with pytest.raises(RuntimeError, match="Shared CPU weights .* invalidated"):
-            dest._load_and_cache(config)
-        with pytest.raises(IndexError):
-            dest._ram_cache.get(key)
-        assert store.peek(key) is replacement
-        assert store.refcount(key) == 1
-        source._ram_cache.shutdown()
-        assert store.retired_bytes() == 0
-        assert store.refcount(key) == 1
-    finally:
-        store.release(key, replacement)
-
-
-@pytest.mark.parametrize("keep_copy", [False, True])
-def test_fallback_rejects_invalidation_after_source_eviction(adoption_pair, monkeypatch, keep_copy):
-    source, dest, config, store, budget = adoption_pair(layout="private", keep_copy=keep_copy, cap=288)
-    original_make_room = dest._ram_cache._make_room_internal
-
-    def invalidate_after_reservation(size):
-        assert size == 288
-        result = original_make_room(size)
-        with pytest.raises(IndexError):
-            source._ram_cache.get(config.key)
-        assert store.invalidate(config.key) == 0
-        return result
-
-    monkeypatch.setattr(dest._ram_cache, "_make_room_internal", invalidate_after_reservation)
-    with pytest.raises(RuntimeError, match="Shared CPU weights .* invalidated"):
-        dest._load_and_cache(config)
-    with pytest.raises(IndexError):
-        dest._ram_cache.get(config.key)
-    assert budget.total_in_use() == 0

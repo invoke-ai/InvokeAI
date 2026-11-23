@@ -4,10 +4,7 @@ from typing import Any
 import torch
 
 from invokeai.backend.model_manager.load.model_cache.counted_dtypes import return_to_counted_dtypes
-from invokeai.backend.model_manager.load.model_cache.shared_cpu_weights import (
-    SharedCpuWeightsAdoption,
-    SharedCpuWeightsStore,
-)
+from invokeai.backend.model_manager.load.model_cache.shared_cpu_weights import SharedCpuWeightsStore
 from invokeai.backend.model_manager.load.model_cache.tensor_aliases import StorageKey, analyze_state_dict, storage_key
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
 from invokeai.backend.quantization.sdnq.sdnq_tensor import SDNQTensor
@@ -30,8 +27,6 @@ class CachedModelOnlyFullLoad:
         keep_ram_copy: bool = False,
         shared_store: SharedCpuWeightsStore | None = None,
         cache_key: str | None = None,
-        *,
-        adoption: SharedCpuWeightsAdoption | None = None,
     ):
         """Initialize a CachedModelOnlyFullLoad.
         Args:
@@ -44,7 +39,6 @@ class CachedModelOnlyFullLoad:
             shared_store (SharedCpuWeightsStore | None): If provided (along with cache_key), share a single canonical
                 CPU copy of the weights across per-device caches instead of one copy per device.
             cache_key (str | None): The model cache key used to identify shared weights in `shared_store`.
-            adoption: Validate the canonical generation when acquiring a shared CPU copy.
         """
         # model is often a torch.nn.Module, but could be any model type. Throughout this class, we handle both cases.
         self._model = model
@@ -80,7 +74,7 @@ class CachedModelOnlyFullLoad:
             # SharedCpuWeightsStore). If another device already registered this key, re-point our
             # module at the shared tensors and drop our duplicate so the weights live once in RAM.
             if shared_store is not None and cache_key is not None:
-                canonical = shared_store.acquire(cache_key, cpu_state_dict, adoption=adoption)
+                canonical = shared_store.acquire(cache_key, cpu_state_dict)
                 self._cpu_state_dict = canonical  # Release this exact entry if construction fails.
                 self._shared_store = shared_store
                 self._shared_key = cache_key

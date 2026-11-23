@@ -27,7 +27,7 @@ from invokeai.backend.model_manager.load.model_cache.cached_model.cached_model_w
 from invokeai.backend.model_manager.load.model_cache.ram_budget import RamBudget
 from invokeai.backend.model_manager.load.model_cache.shared_cpu_weights import (
     SHARED_CPU_WEIGHTS,
-    SharedCpuWeightsAdoption,
+    SharedCpuWeightsPin,
     SharedCpuWeightsStore,
 )
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch_module_autocast import (
@@ -582,6 +582,9 @@ class ModelCache:
         """
         self._shared_cpu_weights = shared_cpu_weights
         self._ram_budget = ram_budget
+        self._budget_counts_store = (
+            ram_budget is not None and shared_cpu_weights is not None and ram_budget.counts_store(shared_cpu_weights)
+        )
         self._enable_partial_loading = enable_partial_loading
         self._keep_ram_copy_of_weights = keep_ram_copy_of_weights
         # Notices already emitted, keyed by (topic, device), so each is logged once rather than
@@ -682,6 +685,9 @@ class ModelCache:
         computed from their individual sizes (see ModelManagerService.build_model_manager).
         """
         self._ram_budget = ram_budget
+        self._budget_counts_store = self._shared_cpu_weights is not None and ram_budget.counts_store(
+            self._shared_cpu_weights
+        )
         ram_budget.register_cache(self)
 
     @property
@@ -908,7 +914,7 @@ class ModelCache:
         prefetch: bool = False,
         claim_admission: bool = False,
         *,
-        adoption: SharedCpuWeightsAdoption | None = None,
+        adoption: SharedCpuWeightsPin | None = None,
     ) -> Optional[FirstUseClaim]:
         """Add a model to the cache.
 
@@ -931,7 +937,7 @@ class ModelCache:
                 cannot outlive its load, so a load that is cancelled or errors before its
                 retrieval releases the admission by dying, instead of leaving a grace standing
                 that nothing can clear (see shutdown()).
-            adoption: The canonical generation that supplied the adopted model.
+            adoption: Source pin passed by the loader so a full reservation can release it early.
         """
         if key in self._cached_models:
             self._logger.debug(
@@ -1074,7 +1080,7 @@ class ModelCache:
             raise RuntimeError("Adoption requires a module and a shared CPU weights store.")
         reservation: AbstractContextManager[bool] = nullcontext(False)
         if store is not None and isinstance(model, torch.nn.Module):
-            check_match = keep_ram_copy and self._ram_budget is not None and self._ram_budget.counts_store(store)
+            check_match = keep_ram_copy and self._budget_counts_store
             if check_match or adoption is not None:
                 reservation = store.pin_for_admission(key, model if check_match else None, size, adoption)
 
@@ -1092,7 +1098,6 @@ class ModelCache:
                     keep_ram_copy=keep_ram_copy,
                     shared_store=store,
                     cache_key=key,
-                    adoption=adoption,
                 )
             else:
                 wrapped_model = CachedModelOnlyFullLoad(
@@ -1102,17 +1107,7 @@ class ModelCache:
                     keep_ram_copy=keep_ram_copy,
                     shared_store=store,
                     cache_key=key,
-                    adoption=adoption,
                 )
-            if adoption is not None:
-                assert store is not None
-                # Covers destinations without a shared state dict and invalidation during wrapper
-                # construction. Production settings changes take the same model load write lock.
-                try:
-                    store.validate_adoption(key, adoption)
-                except BaseException:
-                    wrapped_model.release_shared_weights()
-                    raise
 
         # awaiting_first_use protects an unclaimed new entry from the asynchronous eviction paths
         # (budget reconcile, peer-requested eviction) until the loader locks it - see CacheRecord.
@@ -3116,6 +3111,10 @@ class ModelCache:
         `is_stale` and evicted as soon as the last lock (or the window) releases - without that,
         a setting toggled during an in-flight generation would survive on the locked entry and quietly
         get reused by the next generation.
+
+        Callers must serialize this operation against loads and admissions in every device cache,
+        using MODEL_LOAD_LOCK.write_lock() if they may run concurrently. The per-cache lock alone
+        cannot provide that fence.
 
         Returns the number of entries immediately dropped (locked entries that are only marked
         stale do not count).

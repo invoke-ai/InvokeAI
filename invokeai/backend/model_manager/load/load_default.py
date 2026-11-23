@@ -23,7 +23,7 @@ from invokeai.backend.model_manager.load.model_cache.model_cache import (
     ModelCache,
     get_model_cache_key,
 )
-from invokeai.backend.model_manager.load.model_cache.shared_cpu_weights import SharedCpuWeightsAdoption
+from invokeai.backend.model_manager.load.model_cache.shared_cpu_weights import SharedCpuWeightsPin
 from invokeai.backend.model_manager.load.model_util import calc_model_size_by_fs
 from invokeai.backend.model_manager.load.optimizations import skip_torch_weight_init
 from invokeai.backend.model_manager.taxonomy import (
@@ -854,7 +854,7 @@ class ModelLoader(ModelLoaderBase):
         module.register_forward_pre_hook(pre_hook)
         module.register_forward_hook(post_hook, always_call=True)
 
-    def _try_adopt_shared_weights(self, cache_key: str, adoption: SharedCpuWeightsAdoption) -> torch.nn.Module | None:
+    def _try_adopt_shared_weights(self, cache_key: str, adoption: SharedCpuWeightsPin) -> torch.nn.Module | None:
         """Build this model by adopting another device's already-resident CPU weights, skipping the
         disk read entirely.
 

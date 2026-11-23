@@ -18,6 +18,9 @@ import torch
 from invokeai.backend.model_manager.load.load_base import LoadedModelWithoutConfig
 from invokeai.backend.model_manager.load.model_cache import model_cache as model_cache_module
 from invokeai.backend.model_manager.load.model_cache.cache_stats import CacheStats
+from invokeai.backend.model_manager.load.model_cache.cached_model.cached_model_with_partial_load import (
+    CachedModelWithPartialLoad,
+)
 from invokeai.backend.model_manager.load.model_cache.model_cache import (
     GB,
     MIN_RAM_CACHE_BYTES,
@@ -51,10 +54,10 @@ def _collect_only_this_tests_objects():
     gc.unfreeze()
 
 
-def _make_cache(store, budget, logger, keep_ram_copy=True) -> ModelCache:
+def _make_cache(store, budget, logger, keep_ram_copy=True, partial=False) -> ModelCache:
     return ModelCache(
         execution_device_working_mem_gb=1.0,
-        enable_partial_loading=False,
+        enable_partial_loading=partial,
         keep_ram_copy_of_weights=keep_ram_copy,
         execution_device="cpu",
         storage_device="cpu",
@@ -135,6 +138,55 @@ def test_matching_put_releases_pin_if_injection_fails_after_peer_eviction(mock_l
     finally:
         source.shutdown()
         dest.shutdown()
+
+
+@pytest.mark.parametrize("case", ["independent", "fresh_weights", "private_buffer"])
+def test_nonmatching_admission_reserves_full_size(mock_logger, case):
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=356, shared_store=store)
+    source = _make_cache(store, budget, mock_logger)
+    dest = _make_cache(store, budget, mock_logger)
+    try:
+        source.put("m", torch.nn.Linear(8, 8, bias=False))
+        _use_and_release(source, "m")
+        canonical = store.peek("m")
+        assert canonical is not None
+        model = torch.nn.Linear(8, 8, bias=False)
+        if case == "private_buffer":
+            model.load_state_dict(canonical, assign=True)
+            model.register_buffer("private", torch.ones(8), persistent=False)
+        dest.put("other" if case == "independent" else "m", model)
+        with pytest.raises(IndexError):
+            source.get("m")
+    finally:
+        source.shutdown()
+        dest.shutdown()
+    assert store.total_bytes_in_use() == 0
+
+
+def test_partial_loading_matching_admission_keeps_peer(mock_logger, monkeypatch):
+    # Exercise the partial wrapper without selecting an accelerator.
+    monkeypatch.setattr(model_cache_module, "device_has_dedicated_vram", lambda _: True)
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=356, shared_store=store)
+    source = _make_cache(store, budget, mock_logger, partial=True)
+    dest = _make_cache(store, budget, mock_logger, partial=True)
+    try:
+        source.put("m", torch.nn.Linear(8, 8, bias=False))
+        first = _use_and_release(source, "m")
+        canonical = store.peek("m")
+        assert canonical is not None
+        model = torch.nn.Linear(8, 8, bias=False)
+        model.load_state_dict(canonical, assign=True)
+        dest.put("m", model)
+        assert source.get("m") is first
+        assert isinstance(dest.get("m").cached_model, CachedModelWithPartialLoad)
+        assert store.refcount("m") == 2
+        assert budget.total_in_use() == 256
+    finally:
+        source.shutdown()
+        dest.shutdown()
+    assert budget.total_in_use() == 0
 
 
 def _collect_until(predicate, attempts: int = 5) -> bool:
