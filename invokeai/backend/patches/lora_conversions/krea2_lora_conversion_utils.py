@@ -291,9 +291,10 @@ def _get_lora_layer_values(
             "lora_down.weight": layer_dict["lora_A.weight"],
             "lora_up.weight": layer_dict["lora_B.weight"],
         }
-        for magnitude_key in ("dora_scale", "dora_magnitude"):
-            if magnitude_key in layer_dict:
-                values[magnitude_key] = layer_dict[magnitude_key]
+        # The magnitudes and the ``diff_b`` / ``diff`` deltas keep their names; ``_layer_from_values`` reads them.
+        for passthrough_key in ("dora_scale", "dora_magnitude", "diff_b", "diff"):
+            if passthrough_key in layer_dict:
+                values[passthrough_key] = layer_dict[passthrough_key]
         if "alpha" in layer_dict:
             values["alpha"] = layer_dict["alpha"]
         if alpha is not None:

@@ -275,6 +275,10 @@ Qwen-Image LoRAs, LoKR and LoHA files also load in ComfyUI's `diffusion_model.` 
 `lora_transformer_transformer_blocks_…` layouts, when they train the blocks' modulation or MLP layers; see the
 [family page](/users-guide/models/local-models/qwen-image/#lora).
 
+Krea-2 LoRAs also load in ComfyUI's `diffusion_model.` layout, including full (`diff`) layers and `diff_b` bias
+deltas, and in the fal trainer's PEFT layout (`base_model.model.` followed by the native module names); see the
+[family page](/users-guide/models/local-models/krea-2/#lora).
+
 Qwen-Image LoRAs also patch the Qwen2.5-VL encoder when the file has text-encoder layers; see the same page.
 
 A Krea-2 Control LoRA is one `.safetensors` file in the layout of

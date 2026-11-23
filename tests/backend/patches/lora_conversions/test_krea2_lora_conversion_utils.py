@@ -656,3 +656,45 @@ def test_fal_peft_keys_on_native_modules_match_the_diffusers_layout() -> None:
     model = lora_model_from_krea2_state_dict(state_dict)
 
     assert set(model.layers) == {f"{KREA2_LORA_TRANSFORMER_PREFIX}{diffusers}" for diffusers in modules.values()}
+
+
+@pytest.mark.parametrize(
+    ("module", "layer_key"),
+    [
+        ("diffusion_model.first", "img_in"),
+        ("transformer.transformer_blocks.0.attn.to_q", "transformer_blocks.0.attn.to_q"),
+        ("base_model.model.first", "img_in"),
+    ],
+)
+def test_peft_lora_with_diff_b_keeps_the_bias_delta(module: str, layer_key: str) -> None:
+    diff_b = torch.arange(4, dtype=torch.float32)
+    state_dict = {
+        f"{module}.lora_A.weight": torch.ones(2, 3),
+        f"{module}.lora_B.weight": torch.ones(4, 2),
+        f"{module}.alpha": torch.tensor(1.0),
+        f"{module}.diff_b": diff_b,
+    }
+
+    model = lora_model_from_krea2_state_dict(state_dict)
+
+    layer = model.layers[f"{KREA2_LORA_TRANSFORMER_PREFIX}{layer_key}"]
+    assert isinstance(layer, LoRALayer)
+    params = layer.get_parameters({"weight": torch.zeros(4, 3), "bias": torch.zeros(4)}, weight=0.5)
+    assert torch.allclose(params["weight"], torch.full((4, 3), 0.5))
+    assert torch.allclose(params["bias"], diff_b * 0.5)
+
+
+def test_peft_dora_with_diff_b_keeps_the_bias_delta() -> None:
+    diff_b = torch.arange(4, dtype=torch.float32)
+    state_dict = {
+        "diffusion_model.first.lora_A.weight": torch.ones(2, 3),
+        "diffusion_model.first.lora_B.weight": torch.ones(4, 2),
+        "diffusion_model.first.lora_magnitude_vector.weight": torch.ones(4),
+        "diffusion_model.first.diff_b": diff_b,
+    }
+
+    model = lora_model_from_krea2_state_dict(state_dict)
+
+    layer = model.layers[f"{KREA2_LORA_TRANSFORMER_PREFIX}img_in"]
+    assert isinstance(layer, DoRALayer)
+    assert layer.bias is not None and torch.equal(layer.bias, diff_b)
