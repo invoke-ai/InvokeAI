@@ -8,6 +8,7 @@ import torch
 from safetensors.torch import load_file
 
 from invokeai.app.services.config import InvokeAIAppConfig
+from invokeai.backend.krea2.control_lora import krea2_control_lora_from_state_dict
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.load.load_default import ModelLoader
 from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
@@ -116,6 +117,7 @@ def _count_factorized_layers_with_dora_magnitude(state_dict: dict[str, torch.Ten
 @ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.LoRA, format=ModelFormat.LyCORIS)
 @ModelLoaderRegistry.register(base=BaseModelType.Flux, type=ModelType.ControlLoRa, format=ModelFormat.LyCORIS)
 @ModelLoaderRegistry.register(base=BaseModelType.Flux, type=ModelType.ControlLoRa, format=ModelFormat.Diffusers)
+@ModelLoaderRegistry.register(base=BaseModelType.Krea2, type=ModelType.ControlLoRa, format=ModelFormat.LyCORIS)
 class LoRALoader(ModelLoader):
     """Class to load LoRA models."""
 
@@ -248,6 +250,8 @@ class LoRALoader(ModelLoader):
         elif self._model_base == BaseModelType.QwenImage21:
             # ComfyUI, diffusers/PEFT or Kohya keys; ComfyUI's fused gate_up is split for diffusers.
             model = lora_model_from_qwen_image_21_state_dict(state_dict=state_dict)
+        elif self._model_base == BaseModelType.Krea2 and config.type is ModelType.ControlLoRa:
+            model = krea2_control_lora_from_state_dict(state_dict)
         elif self._model_base == BaseModelType.Krea2:
             # Krea-2 LoRAs use diffusers PEFT format targeting the Krea2 transformer (and optionally
             # the Qwen3-VL text encoder). alpha=None → alpha=rank (common diffusers default).

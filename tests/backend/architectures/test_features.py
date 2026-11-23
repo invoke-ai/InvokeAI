@@ -69,7 +69,7 @@ def test_the_sd_family_grid_is_the_vae_compression() -> None:
     [
         ("controlnet", {"sd-1", "sdxl", "flux"}),
         ("t2i_adapter", {"sd-1", "sdxl"}),
-        ("control_lora", {"flux"}),
+        ("control_lora", {"flux", "krea-2"}),
         ("z_image_control", {"z-image"}),
         ("anima_lllite", {"anima"}),
         ("qwen_image_control", {"qwen-image"}),
