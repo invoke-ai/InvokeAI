@@ -14,7 +14,7 @@ from functools import partial
 from itertools import chain
 from pathlib import Path
 from types import SimpleNamespace
-from typing import TYPE_CHECKING, Any, Final, NamedTuple, Optional
+from typing import TYPE_CHECKING, Any, Final, Literal, NamedTuple, Optional
 
 import torch
 
@@ -141,17 +141,34 @@ finished, within seconds; a step that runs long (a large model's largest decode)
 observation, as the runner settles them, starts the wait. Past it the attempt is taken for abandoned: a client that
 went away. It no longer blocks another attempt, and it never feeds a fit, being short of steps."""
 
-_RUNNING_ELSEWHERE: Final = (
-    "Another calibration is still running on this GPU. Wait until it has finished, or stop it, then calibrate again."
-)
+_Busy = Literal["running", "between_steps"]
+"""Why another attempt holds the device class (`_attempt_blocks`): one of its runs is running, or it is open between
+its steps."""
 
-_BETWEEN_STEPS: Final = (
-    "Another calibration on this GPU is between its steps. Try again in a moment, or once it has finished."
-)
+_BUSY: Final[Mapping[_Busy, str]] = {
+    "running": "Another calibration is still running on this GPU. Wait until it has finished, or stop it, then "
+    "calibrate again.",
+    "between_steps": "Another calibration on this GPU is between its steps. Try again in a moment, or once it has "
+    "finished.",
+}
+"""The refusals of a new run of an attempt (`create_run`), by why another attempt holds the device class."""
+
+_RETRY_BUSY: Final[Mapping[_Busy, str]] = {
+    "running": "Another calibration is still running on this GPU, and this item would measure in the middle of it. "
+    "Retry it once that calibration has finished, or stop it.",
+    "between_steps": "Another calibration on this GPU is between its steps, and this item would measure in the middle "
+    "of it. Retry it once that calibration has finished.",
+}
+"""The refusals of a retry of calibration items (`retries_starting`), shown where the queue's retry failed."""
 
 _INTERLEAVED: Final = (
     "Another calibration ran on this GPU after this calibration started, so its measurements can no longer be "
     "combined. Calibrate again."
+)
+
+_RETRY_INTERLEAVED: Final = (
+    "Another calibration ran on this GPU after this item's calibration started, so a retry could no longer be "
+    "combined with that calibration's measurements. Calibrate the model again instead."
 )
 
 _ATTEMPTS_LOCK: Final = "calibration-attempts"
@@ -943,7 +960,7 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
                     raise CalibrationAttemptInterleavedError(_INTERLEAVED)
                 # The queue is read under the file's lock; the queue takes it only outside its transactions.
                 if (busy := self._attempt_blocks(file, key)) is not None:
-                    raise CalibrationAttemptBusyError(busy)
+                    raise CalibrationAttemptBusyError(_BUSY[busy])
                 # The attempt's earlier steps measured the models as they were then: the model calibrated, and every
                 # model their graphs named, hash included, which a graph compiled since names as it is now.
                 for known in file.runs:
@@ -978,7 +995,7 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
         self._run_files[run_id] = device_class.id
         return _Enqueue(batch, device_class.id, created=created, marks=created)
 
-    def _attempt_blocks(self, file: CalibrationStoreFile, key: Optional[AttemptKey]) -> Optional[str]:
+    def _attempt_blocks(self, file: CalibrationStoreFile, key: Optional[AttemptKey]) -> Optional[_Busy]:
         """Why another attempt than `key` holds the device class, or None: one of its runs is running (an item pending,
         in progress or waiting), or another owner's attempt is open. One attempt runs on a device class at a time: its
         runs measure the GPU back to back, each step on what the last one left, and another attempt's items in between
@@ -1013,7 +1030,7 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
         between_steps: list[list[CalibrationRun]] = []
         for other, runs in attempts.items():
             if any(run.run_id in running for run in runs):
-                return _RUNNING_ELSEWHERE
+                return "running"
             removed = notes.get(other)
             queued, planned = _queued_runs(runs, removed)
             if (
@@ -1031,9 +1048,9 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
         canceled, started = self._canceled_runs([run for runs in between_steps for run in runs])
         for runs in between_steps:
             if any(run.run_id in started for run in runs):
-                return _RUNNING_ELSEWHERE
+                return "running"
             if not any(run.run_id in canceled for run in runs):
-                return _BETWEEN_STEPS
+                return "between_steps"
         return None
 
     def _can_continue(self, runs: list[CalibrationRun]) -> bool:
@@ -1317,9 +1334,9 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
             keys = dict.fromkeys(_attempt_key(run) for run in file.runs if run.run_id in run_ids)
             for key in keys:
                 if key is not None and _cut_off(file, key):
-                    raise CalibrationAttemptInterleavedError(_INTERLEAVED)
+                    raise CalibrationAttemptInterleavedError(_RETRY_INTERLEAVED)
                 if (busy := self._attempt_blocks(file, key)) is not None:
-                    raise CalibrationAttemptBusyError(busy)
+                    raise CalibrationAttemptBusyError(_RETRY_BUSY[busy])
             return _count_retries(run_ids, file)
 
         try:

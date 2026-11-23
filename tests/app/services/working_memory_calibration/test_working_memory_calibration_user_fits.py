@@ -1933,8 +1933,8 @@ def test_a_retry_while_another_attempt_runs_is_refused_though_it_started_before_
         queue.retry_items_by_id("default", failed.item_ids)
 
     assert str(refused.value) == (
-        "Another calibration is still running on this GPU. Wait until it has finished, or stop it, then calibrate "
-        "again."
+        "Another calibration is still running on this GPU, and this item would measure in the middle of it. Retry it "
+        "once that calibration has finished, or stop it."
     )
     _unchanged_by_a_refused_retry(tmp_path, queue, before, failed, running)
 

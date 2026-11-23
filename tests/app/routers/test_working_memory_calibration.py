@@ -284,8 +284,8 @@ def test_a_retry_that_would_break_attempt_exclusivity_is_refused_with_a_coded_40
     assert response.status_code == 409, response.text
     assert response.json()["detail"] == {
         "code": "calibration_interleaved",
-        "message": "Another calibration ran on this GPU after this calibration started, so its measurements can no "
-        "longer be combined. Calibrate again.",
+        "message": "Another calibration ran on this GPU after this item's calibration started, so a retry could no "
+        "longer be combined with that calibration's measurements. Calibrate the model again instead.",
     }
     assert queue.get_queue_item_ids("default").item_ids == before
 
@@ -310,8 +310,8 @@ def test_a_retry_between_another_attempts_steps_is_refused_with_a_coded_409(
     assert response.status_code == 409, response.text
     assert response.json()["detail"] == {
         "code": "calibration_running",
-        "message": "Another calibration on this GPU is between its steps. Try again in a moment, or once it has "
-        "finished.",
+        "message": "Another calibration on this GPU is between its steps, and this item would measure in the middle "
+        "of it. Retry it once that calibration has finished.",
     }
 
 
