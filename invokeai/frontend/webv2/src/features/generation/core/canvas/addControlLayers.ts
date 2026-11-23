@@ -2,6 +2,7 @@
 
 import type { SupportedGenerateBase } from '@features/generation/core/baseGenerationPolicies';
 import type { BackendGraphContract, BackendInvocationContract } from '@features/generation/core/contracts';
+import type { FamilyGraph, FamilyLatentSpace } from '@features/generation/core/familyGraph';
 import type { ModelConfig } from '@features/models';
 
 import { addEdge, addNode } from '@features/generation/core/graphBuilder';
@@ -92,6 +93,9 @@ export interface AddControlLayersOptions {
    * condition on the inpainted region and take them, except an InstantX Qwen-Image union; the other kinds ignore them.
    */
   inpaint?: CanvasInpaintSources;
+  /** The family's latent space and denoise size; a Krea-2 Control LoRA encodes its control image with them. */
+  latents: FamilyLatentSpace | null;
+  denoiseSize: FamilyGraph['denoiseSize'];
 }
 
 /**
@@ -134,6 +138,42 @@ const addFunUnionControl = (
 };
 
 /**
+ * Krea-2's Control LoRA conditions on the control image's latents, encoded with the graph's VAE at exactly the denoise
+ * size (the denoise refuses any other), so the encode resizes the image to it.
+ */
+const addKrea2ControlLora = (
+  graph: BackendGraphContract,
+  denoise: BackendInvocationContract,
+  layer: ControlLayerGraphInput,
+  latents: FamilyLatentSpace | null,
+  size: FamilyGraph['denoiseSize']
+): void => {
+  // `krea2_denoise` turns a weight-0 Control LoRA off, so its encode would be wasted work.
+  if (layer.weight === 0) {
+    return;
+  }
+  if (!latents) {
+    throw new Error('A Krea-2 Control LoRA needs the graph VAE to encode its control image.');
+  }
+  const encode = addNode(graph, {
+    height: size.height,
+    id: `control_lora_i2l_${layer.id}`,
+    image: { image_name: layer.imageName },
+    type: latents.encodeType,
+    width: size.width,
+  });
+  addEdge(graph, latents.vae.node, latents.vae.field, encode, 'vae');
+  const node = addNode(graph, {
+    id: `control_lora_${layer.id}`,
+    lora: layer.model,
+    type: 'krea2_control_lora',
+    weight: layer.weight,
+  });
+  addEdge(graph, encode, 'latents', node, 'control_latents');
+  addEdge(graph, node, 'control_lora', denoise, 'control_lora');
+};
+
+/**
  * The one collector every Anima ControlNet-LLLite adapter joins. `anima_denoise.control_lllite` takes one field or a
  * list, and the denoiser applies each model once, so control layers and the canvas inpaint adapter share it.
  */
@@ -154,7 +194,7 @@ const controlNetNodeType = (base: string): string => (base === 'flux' ? 'flux_co
 
 /** Validate defensively through the shared policy before graph wiring. */
 export const addControlLayers = (graph: BackendGraphContract, options: AddControlLayersOptions): void => {
-  const { base, denoise, inpaint, layers, modelVariant } = options;
+  const { base, denoise, denoiseSize, inpaint, latents, layers, modelVariant } = options;
 
   let controlNetCollector: BackendInvocationContract | null = null;
   let t2iAdapterCollector: BackendInvocationContract | null = null;
@@ -217,6 +257,8 @@ export const addControlLayers = (graph: BackendGraphContract, options: AddContro
         weight: layer.weight,
       });
       addEdge(graph, node, 't2i_adapter', ensureT2iAdapterCollector(), 'item');
+    } else if (layer.kind === 'control_lora' && base === 'krea-2') {
+      addKrea2ControlLora(graph, denoise, layer, latents, denoiseSize);
     } else if (layer.kind === 'control_lora') {
       const node = addNode(graph, {
         id: `control_lora_${layer.id}`,
