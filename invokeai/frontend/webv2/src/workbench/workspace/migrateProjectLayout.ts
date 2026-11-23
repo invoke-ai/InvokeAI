@@ -34,6 +34,15 @@ export interface StoredProjectLayout {
   widgetRegions: Record<WidgetRegion, WidgetRegionState>;
   /** When the document was last saved, where known: an account adopts its most recently used project's arrangements. */
   storedAt?: string;
+  /** Saved beside the layout while the project was held (`Project.heldLegacyLayout`); migration does not read it. */
+  heldView?: HeldView;
+}
+
+/** What a held project showed: the workspace it was on, its views, and what it had still to tell. */
+export interface HeldView {
+  droppedArrangements?: readonly LayoutPresetId[];
+  views: WorkspaceViews;
+  workspaceId: LayoutPresetId;
 }
 
 export interface ProjectLayoutMigration {

@@ -31,10 +31,12 @@ export type ProjectDocumentV3 = Pick<
 
 /**
  * The layout a document stored before structure and view split. A project loaded from one writes it back unchanged
- * until the editor migrates it against the account, so a copy, import or export made meanwhile keeps it.
+ * until the editor migrates it against the account, so a copy, import or export made meanwhile keeps it. `heldView` is
+ * additive within it: what a held project shows, which a build before the split drops on save.
  */
 interface StoredLayoutFields {
   floatingWidgets: StoredProjectLayout['floatingWidgets'];
+  heldView: StoredProjectLayout['heldView'];
   layout: StoredProjectLayout['layout'];
   presetWorkingLayouts: StoredProjectLayout['presetWorkingLayouts'];
   widgetRegions: StoredProjectLayout['widgetRegions'];
@@ -42,7 +44,8 @@ interface StoredLayoutFields {
 
 /**
  * The layout fields a project's document holds: its workspace and views, or the stored layout it has not migrated or
- * holds until its account's adoption is saved (`heldLegacyLayout`), which a later load migrates the same way again.
+ * holds until its account's adoption is saved (`heldLegacyLayout`), which a later load migrates the same way again and
+ * then shows as it was held.
  */
 const toDocumentLayoutFields = ({
   droppedArrangements,
@@ -54,6 +57,7 @@ const toDocumentLayoutFields = ({
   ProjectDocumentV3,
   | 'droppedArrangements'
   | 'floatingWidgets'
+  | 'heldView'
   | 'layout'
   | 'presetWorkingLayouts'
   | 'views'
@@ -61,10 +65,14 @@ const toDocumentLayoutFields = ({
   | 'workspaceId'
 > => {
   const legacyLayout = unmigrated ?? heldLegacyLayout;
+  const heldView: StoredProjectLayout['heldView'] = unmigrated
+    ? unmigrated.heldView
+    : { ...(droppedArrangements ? { droppedArrangements: [...droppedArrangements] } : {}), views, workspaceId };
 
   return legacyLayout
     ? {
         ...(legacyLayout.floatingWidgets ? { floatingWidgets: legacyLayout.floatingWidgets } : {}),
+        ...(heldView ? { heldView } : {}),
         layout: legacyLayout.layout,
         ...(legacyLayout.presetWorkingLayouts ? { presetWorkingLayouts: legacyLayout.presetWorkingLayouts } : {}),
         widgetRegions: legacyLayout.widgetRegions,

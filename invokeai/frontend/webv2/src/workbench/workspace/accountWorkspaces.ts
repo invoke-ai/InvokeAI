@@ -69,6 +69,12 @@ export const readWorkspaceRecord = (account: AccountState, workspaceId: LayoutPr
         })(),
       };
 
+/** The account noting that the workspace model wrote the workspace's structure, so adoption leaves it alone. */
+const withWrittenStructure = (account: AccountState, workspaceId: LayoutPresetId): AccountState =>
+  account.writtenStructureIds?.includes(workspaceId)
+    ? account
+    : { ...account, writtenStructureIds: [...(account.writtenStructureIds ?? []), workspaceId] };
+
 export const isSameWorkspaceRecord = (left: WorkspaceRecord, right: WorkspaceRecord): boolean =>
   areJsonValuesStructurallyEqual(left, right);
 
@@ -82,23 +88,29 @@ export const writeWorkspaceRecord = (
   record: WorkspaceRecord
 ): AccountState => {
   if (record.kind === 'built-in') {
-    return {
-      ...account,
-      layoutPresetMetadataOverrides: withEntry(account.layoutPresetMetadataOverrides, workspaceId, record.metadata),
-      layoutPresetOverrides: withEntry(account.layoutPresetOverrides, workspaceId, record.structure),
-      layoutPresetRouteOverrides: withEntry(account.layoutPresetRouteOverrides, workspaceId, record.route),
-    };
+    return withWrittenStructure(
+      {
+        ...account,
+        layoutPresetMetadataOverrides: withEntry(account.layoutPresetMetadataOverrides, workspaceId, record.metadata),
+        layoutPresetOverrides: withEntry(account.layoutPresetOverrides, workspaceId, record.structure),
+        layoutPresetRouteOverrides: withEntry(account.layoutPresetRouteOverrides, workspaceId, record.route),
+      },
+      workspaceId
+    );
   }
 
   const { preset } = record;
 
   return preset && account.customLayoutPresets?.some((candidate) => candidate.id === workspaceId)
-    ? {
-        ...account,
-        customLayoutPresets: account.customLayoutPresets.map((candidate) =>
-          candidate.id === workspaceId ? preset : candidate
-        ),
-      }
+    ? withWrittenStructure(
+        {
+          ...account,
+          customLayoutPresets: account.customLayoutPresets.map((candidate) =>
+            candidate.id === workspaceId ? preset : candidate
+          ),
+        },
+        workspaceId
+      )
     : account;
 };
 
@@ -124,18 +136,24 @@ export const writeWorkspaceStructure = (
   if (isBuiltInLayoutPresetId(workspaceId)) {
     const isShipped = isSameStructure(getLayoutPreset(workspaceId).snapshot, snapshot);
 
-    return {
-      ...account,
-      layoutPresetOverrides: withEntry(account.layoutPresetOverrides, workspaceId, isShipped ? undefined : snapshot),
-    };
+    return withWrittenStructure(
+      {
+        ...account,
+        layoutPresetOverrides: withEntry(account.layoutPresetOverrides, workspaceId, isShipped ? undefined : snapshot),
+      },
+      workspaceId
+    );
   }
 
-  return {
-    ...account,
-    customLayoutPresets: (account.customLayoutPresets ?? []).map((preset) =>
-      preset.id === workspaceId ? { ...preset, snapshot } : preset
-    ),
-  };
+  return withWrittenStructure(
+    {
+      ...account,
+      customLayoutPresets: (account.customLayoutPresets ?? []).map((preset) =>
+        preset.id === workspaceId ? { ...preset, snapshot } : preset
+      ),
+    },
+    workspaceId
+  );
 };
 
 /**
@@ -245,9 +263,13 @@ export const isNewWorkspaceId = (account: AccountState, workspaceId: LayoutPrese
   !getOrderedLayoutPresets(account).some((preset) => preset.id === workspaceId);
 
 /** The account with a new custom workspace, last in the tab order and active. Nothing else changes. */
-export const createWorkspace = (account: AccountState, preset: LayoutPreset): AccountState => ({
-  ...account,
-  activeLayoutPresetId: preset.id,
-  customLayoutPresets: [...(account.customLayoutPresets ?? []), preset],
-  layoutPresetOrder: [...getOrderedLayoutPresets(account).map((candidate) => candidate.id), preset.id],
-});
+export const createWorkspace = (account: AccountState, preset: LayoutPreset): AccountState =>
+  withWrittenStructure(
+    {
+      ...account,
+      activeLayoutPresetId: preset.id,
+      customLayoutPresets: [...(account.customLayoutPresets ?? []), preset],
+      layoutPresetOrder: [...getOrderedLayoutPresets(account).map((candidate) => candidate.id), preset.id],
+    },
+    preset.id
+  );

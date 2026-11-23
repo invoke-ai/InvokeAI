@@ -1692,7 +1692,10 @@ describe('durable project persistence', () => {
 
     vi.mocked(api.saveSession).mockResolvedValue(undefined);
     const saved = await service.saveWorkbench(hydrated);
-    const released = workbenchReducer(hydrated, { type: 'releaseHeldLayouts' });
+    const released = workbenchReducer(hydrated, {
+      savedAccount: saved.snapshot.state.account,
+      type: 'releaseHeldLayouts',
+    });
 
     expect(saved.accountSaved).toBe(true);
     await service.saveWorkbench(released);

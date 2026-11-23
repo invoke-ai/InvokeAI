@@ -1,4 +1,5 @@
 import type {
+  BuiltInLayoutPresetId,
   CenterViewId,
   LayoutPresetSnapshot,
   LayoutPresetSnapshotLayout,
@@ -8,11 +9,13 @@ import type {
 import type { WidgetInstanceId } from '@workbench/widgetContracts';
 
 import { WIDGET_REGIONS } from '@workbench/layoutContracts';
+import { getLayoutPreset } from '@workbench/layoutPresets';
 import { cloneLayoutPresetWidgetRegions } from '@workbench/layoutPresetSnapshots';
 
 import type { WorkspaceStructure } from './structure';
 
-import { CENTER_VIEW_TYPE_IDS, normalizeStructure } from './structure';
+import { withoutWrittenMark } from './storedAccount';
+import { CENTER_VIEW_TYPE_IDS, isSameStructure, normalizeStructure } from './structure';
 
 /** Retired widget types; anything persisted about them drops on load. */
 export const RETIRED_WIDGET_TYPE_IDS: ReadonlySet<string> = new Set(['properties', 'transform', 'project']);
@@ -184,7 +187,8 @@ export const isStoredStructure = (value: unknown): value is LayoutPresetSnapshot
 };
 
 /** A stored structure as this build reads it: retired widgets stripped, then canonical (`normalizeStructure`). */
-export const readStoredStructure = (snapshot: LayoutPresetSnapshot): WorkspaceStructure => {
+export const readStoredStructure = (stored: LayoutPresetSnapshot): WorkspaceStructure => {
+  const snapshot = withoutWrittenMark(stored);
   const { widgetInstances, widgetRegions } = stripRetiredWidgets(
     cloneLayoutPresetWidgetRegions(snapshot.widgetRegions),
     snapshot.widgetInstances,
@@ -198,6 +202,19 @@ export const readStoredStructure = (snapshot: LayoutPresetSnapshot): WorkspaceSt
     ),
     widgetRegions,
   });
+};
+
+/**
+ * A built-in's stored override as this build reads it, or none when it reads as the built-in ships: kept, it would pin
+ * the built-in where later releases change it.
+ */
+export const readStoredOverride = (
+  workspaceId: BuiltInLayoutPresetId,
+  snapshot: LayoutPresetSnapshot
+): WorkspaceStructure | undefined => {
+  const structure = readStoredStructure(snapshot);
+
+  return isSameStructure(structure, getLayoutPreset(workspaceId).snapshot) ? undefined : structure;
 };
 
 /** A project's widget instances without those of retired types; the same record when it holds none. */

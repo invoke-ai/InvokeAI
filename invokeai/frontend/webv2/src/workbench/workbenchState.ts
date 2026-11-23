@@ -287,7 +287,13 @@ import {
   type LayoutSource,
 } from './workspace/projectLayout';
 import { resolveLayout } from './workspace/resolveLayout';
-import { isStoredStructure, readStoredStructure, withoutRetiredTypes } from './workspace/storedStructure';
+import { readWrittenStructureIds } from './workspace/storedAccount';
+import {
+  isStoredStructure,
+  readStoredOverride,
+  readStoredStructure,
+  withoutRetiredTypes,
+} from './workspace/storedStructure';
 import { getCustomizeSession, pruneCustomizeSessions } from './workspace/structureLock';
 import { captureLayout, getAddedInstanceId, reduceStructure } from './workspace/structureReducer';
 import {
@@ -345,7 +351,7 @@ type WorkbenchReducerAction =
   /** Drops the active project's view of the workspace: every front, size, panel and window as the workspace sets them. */
   | { type: 'resetWorkspaceView'; workspaceId: LayoutPresetId }
   /** The account that adopted is saved; projects migrated with it may now be written in the new shape. */
-  | { type: 'releaseHeldLayouts' }
+  | { type: 'releaseHeldLayouts'; savedAccount: AccountState }
   /** Locking: no project outside Customize keeps steps that would change structure on undo. */
   | { type: 'clearLayoutHistory' }
   /** Cancel: the account and the project's view are as before Customize. */
@@ -2041,6 +2047,7 @@ const assembleWorkbenchProject = (
   const {
     floatingWidgets: storedFloatingWidgets,
     graphHistory: _graphHistory,
+    heldView: storedHeldView,
     layout: storedLayout,
     droppedArrangements: storedDroppedArrangements,
     legacyLayout: carriedLegacyLayout,
@@ -2067,6 +2074,7 @@ const assembleWorkbenchProject = (
       : loadStoredProjectLayout(
           {
             floatingWidgets: storedFloatingWidgets,
+            heldView: storedHeldView,
             layout: storedLayout,
             presetWorkingLayouts: storedWorkingLayouts,
             widgetRegions: storedWidgetRegions,
@@ -2479,9 +2487,12 @@ const normalizeLayoutPresetOverrides = (overrides: unknown): LayoutPresetOverrid
     Object.entries(overrides as Record<string, unknown>).flatMap(([presetId, snapshot]) => {
       const resolvedPresetId = resolveLayoutPresetId(presetId);
 
-      return isBuiltInLayoutPresetId(resolvedPresetId) && isStoredStructure(snapshot)
-        ? [[resolvedPresetId, readStoredStructure(snapshot)]]
-        : [];
+      const structure =
+        isBuiltInLayoutPresetId(resolvedPresetId) && isStoredStructure(snapshot)
+          ? readStoredOverride(resolvedPresetId, snapshot)
+          : undefined;
+
+      return structure ? [[resolvedPresetId, structure]] : [];
     })
   );
 };
@@ -2508,19 +2519,41 @@ export const normalizeWorkbenchAccount = (value: unknown): WorkbenchState['accou
     layoutPresetRouteOverrides: normalizeLayoutPresetRouteOverrides(account?.layoutPresetRouteOverrides),
     // An account with nothing stored is new: it has no stored arrangements to adopt.
     ...(account === undefined || account.workspaceLayoutsAdopted === true ? { workspaceLayoutsAdopted: true } : {}),
+    ...(() => {
+      const written = readWrittenStructureIds(account as Record<string, unknown> | undefined)
+        .map(resolveLayoutPresetId)
+        .filter((id) => isBuiltInLayoutPresetId(id) || customLayoutPresets.some((preset) => preset.id === id));
+
+      return written.length > 0 ? { writtenStructureIds: [...new Set(written)] } : {};
+    })(),
   };
 };
 
-/** A project arriving after hydration, settled against the account: its stored layout migrates, never adopted. */
-const settleArriving = (state: WorkbenchState, project: Project, context: WorkbenchReducerContext): Project =>
-  withWorkspaceInstances(
-    state.account,
-    settleArrivingProject(state.account, project, {
-      // Migrated against an adoption not saved yet, it is held with the others until the account is saved.
-      hold: state.projects.some((candidate) => candidate.heldLegacyLayout !== undefined),
-      surfaces: context.availability,
-    })
-  );
+/**
+ * A project arriving after hydration, settled against the account (`settleArrivingProject`). When it adopts, the
+ * account changes under every open project, so each gets values for what its workspace now places.
+ */
+const settleArriving = (
+  state: WorkbenchState,
+  project: Project,
+  context: WorkbenchReducerContext
+): { project: Project; state: WorkbenchState } => {
+  const settled = settleArrivingProject(state.account, project, {
+    adoptionPending: state.layoutAdoptionPending === true,
+    surfaces: context.availability,
+  });
+  const next: WorkbenchState =
+    settled.account === state.account
+      ? state
+      : {
+          ...state,
+          account: settled.account,
+          layoutAdoptionPending: true,
+          projects: state.projects.map((candidate) => withWorkspaceInstances(settled.account, candidate)),
+        };
+
+  return { project: withWorkspaceInstances(settled.account, settled.project), state: next };
+};
 
 /** A settled project with values for every instance its workspace places. */
 const withWorkspaceInstances = (account: AccountState, project: Project): Project =>
@@ -2535,13 +2568,15 @@ const normalizeWorkbenchState = (state: WorkbenchState, context: WorkbenchReduce
   const activeProjectId = loaded.some((project) => project.id === state.activeProjectId)
     ? state.activeProjectId
     : loaded[0]!.id;
+  const { layoutAdoptionPending: _pending, ...rest } = state;
   const settled = settleHydratedProjects(normalizedAccount, loaded, activeProjectId, context.availability);
 
   return {
-    ...state,
+    ...rest,
     account: settled.account,
     activeProjectId,
     backendConnection: { status: 'connecting' },
+    ...(settled.adoptionPending ? { layoutAdoptionPending: true } : {}),
     notifications: [],
     projects: settled.projects.map((project) => withWorkspaceInstances(settled.account, project)),
   };
@@ -4173,9 +4208,13 @@ const reduceWorkbenchAction = (
         return { ...state, activeProjectId: action.project.id };
       }
 
-      const project = settleArriving(state, normalizeWorkbenchProject(action.project), context);
+      const settled = settleArriving(state, normalizeWorkbenchProject(action.project), context);
 
-      return { ...state, activeProjectId: project.id, projects: [...state.projects, project] };
+      return {
+        ...settled.state,
+        activeProjectId: settled.project.id,
+        projects: [...settled.state.projects, settled.project],
+      };
     }
     case 'renameProject': {
       const name = action.name.trim();
@@ -4362,9 +4401,14 @@ const reduceWorkbenchAction = (
       });
     }
     case 'releaseHeldLayouts': {
-      const projects = state.projects.map(releaseHeldLayout);
+      // Only a session write that carried the adoption saved it; one sent before the adoption did not.
+      if (!state.layoutAdoptionPending || action.savedAccount.workspaceLayoutsAdopted !== true) {
+        return state;
+      }
 
-      return projects.every((project, index) => project === state.projects[index]) ? state : { ...state, projects };
+      const { layoutAdoptionPending: _pending, ...released } = state;
+
+      return { ...released, projects: state.projects.map(releaseHeldLayout) };
     }
     case 'clearLayoutHistory': {
       const projects = state.projects.map((project) =>
@@ -5954,8 +5998,9 @@ const reduceWorkbenchAction = (
       };
     }
     case 'replaceProjectFromServer': {
-      const normalizedServerProject = settleArriving(state, normalizeWorkbenchProject(action.project), context);
-      const localProject = state.projects.find((project) => project.id === action.projectId);
+      const settled = settleArriving(state, normalizeWorkbenchProject(action.project), context);
+      const normalizedServerProject = settled.project;
+      const localProject = settled.state.projects.find((project) => project.id === action.projectId);
       const serverProject: Project = localProject
         ? {
             ...normalizedServerProject,
@@ -5968,10 +6013,10 @@ const reduceWorkbenchAction = (
           }
         : normalizedServerProject;
       return {
-        ...state,
+        ...settled.state,
         projects: localProject
-          ? state.projects.map((project) => (project.id === action.projectId ? serverProject : project))
-          : [...state.projects, serverProject],
+          ? settled.state.projects.map((project) => (project.id === action.projectId ? serverProject : project))
+          : [...settled.state.projects, serverProject],
       };
     }
     case 'retargetProject': {
@@ -5989,15 +6034,15 @@ const reduceWorkbenchAction = (
             action.boardId
           )
         : normalizeWorkbenchProject(action.project);
-      const project = settleArriving(state, retargeted, context);
       const targetAlreadyOpen = state.projects.some(
         (candidate) => candidate.id === action.targetProjectId && candidate.id !== action.projectId
       );
       if (targetAlreadyOpen) {
         return state;
       }
+      const { project, state: settledState } = settleArriving(state, retargeted, context);
       return {
-        ...state,
+        ...settledState,
         activeProjectId: state.activeProjectId === action.projectId ? project.id : state.activeProjectId,
         // The same project under its new id: already on screen, not arriving.
         enteredProjectIds: state.enteredProjectIds?.map((id) => (id === action.projectId ? project.id : id)),
@@ -6010,9 +6055,9 @@ const reduceWorkbenchAction = (
                   session,
                 ])
               ),
-        projects: state.projects.some((candidate) => candidate.id === action.projectId)
-          ? state.projects.map((candidate) => (candidate.id === action.projectId ? project : candidate))
-          : [...state.projects, project],
+        projects: settledState.projects.some((candidate) => candidate.id === action.projectId)
+          ? settledState.projects.map((candidate) => (candidate.id === action.projectId ? project : candidate))
+          : [...settledState.projects, project],
       };
     }
     case 'autosaveScheduled': {

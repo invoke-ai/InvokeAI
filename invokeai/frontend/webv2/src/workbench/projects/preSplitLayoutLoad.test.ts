@@ -1,6 +1,7 @@
 import type { AccountState, Project, WorkbenchState } from '@workbench/projectContracts';
 import type { WidgetInstanceContract } from '@workbench/widgetContracts';
 
+import { normalizeWorkbenchAccount } from '@workbench/workbenchState';
 import {
   createInitialWorkbenchState,
   getActiveProject,
@@ -14,11 +15,15 @@ import type { ProjectWithWorkspaceDTO } from './api';
 
 // Captured once from commit 7b783591bc, the last build before the split: a throwaway test there drove its reducer
 // (`workbenchState.testing`) through each scenario's gestures, serialized the active project with its
-// `serializeProjectDocumentV3`, and kept the layout fields, each instance's type and the account's workspaces.
+// `serializeProjectDocumentV3`, and kept the layout fields, each instance's type and the account's workspaces. The
+// "drafted after the upgrade" entries start from a session this build wrote (Compose customized, a custom workspace
+// made): that build hydrated it with no project it could open, so it made a draft; `account` is its session write's
+// account, and the documents are the draft as made and with Queue then moved to the left rail.
 import captured from './preSplitLayouts.fixtures.json';
 import { serializeProjectDocumentV3 } from './projectDocument';
 import { splitProjectDocument } from './projectHalves';
 import { deserializeProjectRecord } from './projectHydration';
+import { serializeSessionBlob } from './session';
 
 /** What the build before the split stored for one project, and the account beside it (`preSplitLayouts.fixtures`). */
 type Captured = (typeof captured)[keyof typeof captured];
@@ -191,5 +196,57 @@ describe('projects saved by the build before the split', () => {
 
     expect(regionsOf(other).left.instanceIds).toContain(minted);
     expect(getActiveProject(other).widgetInstances[minted]?.typeId).toBe('upscale');
+  });
+});
+
+describe('returning from the build before the split', () => {
+  const { account } = captured['drafted after the upgrade'];
+  const written = normalizeWorkbenchAccount(account);
+  const returnWith = (
+    key: 'drafted after the upgrade' | 'drafted after the upgrade, then rearranged',
+    stored: unknown = account
+  ) => upgrade([recordOf('draft', captured[key], '2026-06-01')], stored as Partial<AccountState>);
+
+  it('marks in the session each structure this build wrote, and none an older build saved', () => {
+    const edit = getWorkspaceStructure(written, 'edit');
+    const right = edit.widgetRegions.right;
+    const savedThere = {
+      ...edit,
+      widgetRegions: { ...edit.widgetRegions, right: { ...right, sizePx: right.sizePx + 1 } },
+    };
+    const state = upgrade([recordOf('p', captured['removed a widget'], '2026-01-01')], {
+      activeLayoutPresetId: 'compose',
+      layoutPresetOverrides: { edit: savedThere },
+    });
+    const stored = JSON.parse(serializeSessionBlob(state)) as { account: Record<string, unknown> };
+
+    expect(stored.account).not.toHaveProperty('writtenStructureIds');
+    expect(stored.account.layoutPresetOverrides).toHaveProperty('edit');
+    expect(normalizeWorkbenchAccount(stored.account).writtenStructureIds).toEqual(['compose']);
+  });
+
+  it('never adopts over a workspace this build wrote, though that build dropped the adoption mark', () => {
+    expect(account).not.toHaveProperty('workspaceLayoutsAdopted');
+    expect(returnWith('drafted after the upgrade').account.layoutPresetOverrides).toEqual(
+      written.layoutPresetOverrides
+    );
+
+    const rearranged = returnWith('drafted after the upgrade, then rearranged');
+
+    expect(getWorkspaceStructure(rearranged.account, 'compose').widgetRegions).toEqual(
+      getWorkspaceStructure(written, 'compose').widgetRegions
+    );
+    expect(rearranged.notifications).toMatchObject([{ titleKey: 'shell.workspace.arrangementDroppedTitle' }]);
+  });
+
+  it('still adopts over a workspace that build saved itself', () => {
+    const { workspaceStructure: _mark, ...layout } = account.layoutPresetOverrides.compose.layout;
+    const state = returnWith('drafted after the upgrade, then rearranged', {
+      ...account,
+      layoutPresetOverrides: { compose: { ...account.layoutPresetOverrides.compose, layout } },
+    });
+
+    expect(getWorkspaceStructure(state.account, 'compose').widgetRegions.left.instanceIds).toContain('queue');
+    expect(state.notifications).toEqual([]);
   });
 });

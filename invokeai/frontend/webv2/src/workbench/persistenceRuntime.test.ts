@@ -93,8 +93,8 @@ const createAggregate = (initialState = createInitialWorkbenchState()) => {
     },
     getPersistedRevision: () => revision,
     getState: () => state,
-    releaseHeldLayouts: () => {
-      events.push('releaseHeldLayouts');
+    releaseHeldLayouts: (savedAccount) => {
+      events.push(`releaseHeldLayouts:${savedAccount.activeLayoutPresetId}`);
     },
     hydrate: (nextState) => {
       state = structuredClone(nextState);
@@ -397,9 +397,12 @@ describe('Workbench persistence runtime', () => {
         hasPendingChanges: true,
         hasRetryablePendingChanges: true,
       })
-      .mockResolvedValueOnce(saveResult(aggregate.state));
+      .mockResolvedValueOnce(
+        saveResult({ ...aggregate.state, account: { ...aggregate.state.account, activeLayoutPresetId: 'saved' } })
+      );
     const clock = new FakeClock();
     const runtime = createWorkbenchPersistenceRuntime({ aggregate: aggregate.port, clock, persistence });
+    const releases = () => aggregate.events.filter((event) => event.startsWith('releaseHeldLayouts'));
 
     runtime.start();
     await flushPromises();
@@ -408,13 +411,14 @@ describe('Workbench persistence runtime', () => {
     await flushPromises();
 
     expect(persistence.saveWorkbench).toHaveBeenCalledOnce();
-    expect(aggregate.events).not.toContain('releaseHeldLayouts');
+    expect(releases()).toEqual([]);
 
     clock.runAll();
     await flushPromises();
 
     expect(persistence.saveWorkbench).toHaveBeenCalledTimes(2);
-    expect(aggregate.events.filter((event) => event === 'releaseHeldLayouts')).toHaveLength(1);
+    // With the account that save wrote, not the editor's latest: only that one tells whether it carried the adoption.
+    expect(releases()).toEqual(['releaseHeldLayouts:saved']);
   });
 
   it('ignores server outcomes once its account lifetime has ended', async () => {

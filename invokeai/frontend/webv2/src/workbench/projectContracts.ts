@@ -46,8 +46,9 @@ export interface Project {
    */
   legacyLayout?: StoredProjectLayout;
   /**
-   * The stored layout a project migrated during its account's adoption is written back with, unchanged, until the
-   * account that adopted is saved: a load that never saved it migrates and adopts again. Transient.
+   * The stored layout a project migrated while its account's adoption is unsaved is written back with, unchanged and
+   * beside what it shows (`heldView`), until a session write carrying the adoption is acknowledged: a load that never
+   * saved it migrates and adopts again. Transient.
    */
   heldLegacyLayout?: StoredProjectLayout;
   /** Workspaces whose own arrangement this project lost when its stored layout migrated: told once, then cleared. */
@@ -95,6 +96,11 @@ export interface WorkbenchState {
   enteredProjectIds?: readonly string[];
   /** Projects in Customize on their workspace. Transient: never persisted, synced across tabs or undone. */
   customizing?: CustomizeSessions;
+  /**
+   * This editor adopted (`workspaceLayoutsAdopted`) and no session write carrying it has been acknowledged yet: every
+   * project stored before the split that arrives meanwhile is held (`Project.heldLegacyLayout`). Transient.
+   */
+  layoutAdoptionPending?: true;
   /** Transient: never persisted, synced across tabs or undone. */
   canvasStagingFollow?: Readonly<
     Record<string, { readonly framedSlotIds: readonly string[]; readonly pinnedSlotId: string | null }>
@@ -203,8 +209,13 @@ export interface AccountState {
   layoutPresetOverrides?: LayoutPresetOverrides;
   layoutPresetRouteOverrides?: LayoutPresetRouteOverrides;
   /**
-   * Set once the account's workspaces took over the arrangements projects stored before structure and view split
-   * (the most recently used project's became its workspaces). A fresh account starts with it.
+   * Set once a project stored before structure and view split adopted (its arrangements became the account's
+   * workspaces). A fresh account starts with it; an account that has it never adopts again.
    */
   workspaceLayoutsAdopted?: true;
+  /**
+   * Workspaces whose structure the workspace model wrote, which adoption never replaces. In memory only: the session
+   * marks those structures instead (`workspace/storedAccount.ts`), which an older build's rewrite keeps.
+   */
+  writtenStructureIds?: readonly LayoutPresetId[];
 }

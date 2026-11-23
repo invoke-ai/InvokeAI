@@ -3,6 +3,8 @@ import type { AccountState, WorkbenchState } from '@workbench/projectContracts';
 import type { QueueRunJournal } from '@workbench/queue-integration/queueRunJournal';
 import type { WorkbenchPreferences } from '@workbench/settings/contracts';
 
+import { toStoredAccount } from '@workbench/workspace/storedAccount';
+
 import type { ProjectDraftKey, ProjectDraftStore } from './draftStore';
 
 import { getClientStateValue, setClientStateValue } from './api';
@@ -70,7 +72,7 @@ export const serializeSessionBlob = (
   draftEditorSessionIds?: Record<string, string>
 ): string =>
   JSON.stringify({
-    account: state.account,
+    account: toStoredAccount(state.account),
     activeProjectId: state.activeProjectId,
     ...(draftEditorSessionIds && Object.keys(draftEditorSessionIds).length > 0 ? { draftEditorSessionIds } : {}),
     ...(editorSessionId ? { editorSessionId } : {}),

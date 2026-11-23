@@ -82,12 +82,13 @@ export type { TestAction as WorkbenchAction, WorkbenchReducerContext };
  */
 export const asStoredBeforeSplit = (
   project: Project,
-  { floatingWidgets, layout, presetWorkingLayouts, storedAt, widgetRegions }: StoredProjectLayout
+  { floatingWidgets, heldView, layout, presetWorkingLayouts, storedAt, widgetRegions }: StoredProjectLayout
 ): Project => {
   const { legacyLayout: _legacy, views: _views, workspaceId: _workspaceId, ...rest } = project;
   const loaded = normalizeWorkbenchProject({
     ...rest,
     ...(floatingWidgets ? { floatingWidgets } : {}),
+    ...(heldView ? { heldView } : {}),
     layout,
     ...(presetWorkingLayouts ? { presetWorkingLayouts } : {}),
     widgetRegions,

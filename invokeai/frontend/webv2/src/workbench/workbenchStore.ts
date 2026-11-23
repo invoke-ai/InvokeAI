@@ -1,7 +1,7 @@
 import type { ProjectGraphState, ProjectWorkflowSource } from '@features/workflow/contracts';
 import type { ProjectGraphAction } from '@features/workflow/utility';
 import type { LayoutPresetId } from '@workbench/layoutContracts';
-import type { Project, WorkbenchState } from '@workbench/projectContracts';
+import type { AccountState, Project, WorkbenchState } from '@workbench/projectContracts';
 
 import {
   legacyGeneratedImageToGalleryItem,
@@ -677,8 +677,8 @@ const createPersistenceAdapter = (dispatch: WorkbenchDispatch, getState: () => W
     },
     getState,
     hydrate: command('hydrateWorkbench', (state: WorkbenchState) => ({ state })),
-    /** The account that adopted is saved: projects migrated with it stop writing their stored layout back. */
-    releaseHeldLayouts: command('releaseHeldLayouts'),
+    /** A session write was acknowledged: once it carried the adoption, held projects write the new shape. */
+    releaseHeldLayouts: command('releaseHeldLayouts', (savedAccount: AccountState) => ({ savedAccount })),
     replaceProjectFromServer: command('replaceProjectFromServer'),
     retargetProject: (payload: ActionPayload<'retargetProject'>): ProjectCommandResult => {
       const state = getState();

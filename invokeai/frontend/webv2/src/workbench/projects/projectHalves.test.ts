@@ -83,6 +83,7 @@ describe('splitting a project into content and workspace', () => {
     const stored = serializeProjectDocumentV3(
       asStoredBeforeSplit(project, {
         ...structuralLayouts['floated a widget'],
+        heldView: { views: { edit: { sizes: { left: 500 } } }, workspaceId: 'edit' },
         presetWorkingLayouts: [workingCopyOf('edit', { right: { sizePx: 401 } })],
       })
     );

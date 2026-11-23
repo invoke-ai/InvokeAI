@@ -895,7 +895,7 @@ describe('stored layouts from before the split', () => {
 
     expect(document(opened)).not.toHaveProperty('workspaceId');
 
-    const released = workbenchReducer(opened, { type: 'releaseHeldLayouts' });
+    const released = workbenchReducer(opened, { savedAccount: opened.account, type: 'releaseHeldLayouts' });
 
     expect(document(released)).toMatchObject({ workspaceId: 'compose' });
     expect(document(released)).not.toHaveProperty('layout');
@@ -912,6 +912,115 @@ describe('stored layouts from before the split', () => {
         })
       )
     ).toHaveProperty('workspaceId', 'compose');
+  });
+
+  it('adopts from the first stored project opened when none was open at hydration', () => {
+    const fresh = { ...createInitialWorkbenchState().projects[0]!, id: 'fresh' };
+    const hydrated = hydrate(sessionOf([fresh]));
+
+    expect(hydrated.account.workspaceLayoutsAdopted).toBeUndefined();
+
+    const opened = workbenchReducer(hydrated, {
+      project: storedProject('last-used', structuralLayouts['removed a widget'], '2026-03-01T00:00:00Z'),
+      type: 'openProject',
+    });
+
+    expect(opened.account.workspaceLayoutsAdopted).toBe(true);
+    expect(getWorkspaceStructure(opened.account, 'compose').widgetRegions.right.instanceIds).toEqual([
+      'gallery',
+      'queue',
+    ]);
+    expect(arrangementNotices(opened)).toEqual([]);
+
+    const another = workbenchReducer(opened, {
+      project: storedProject('older', structuralLayouts['moved a tab to another rail'], '2026-01-01T00:00:00Z'),
+      type: 'openProject',
+    });
+
+    expect(another.account).toBe(opened.account);
+    expect(arrangementNotices(another)).toMatchObject([{ projectId: 'older' }]);
+  });
+
+  it('adopts nothing for a workspace the adopting project placed as it ships', () => {
+    const { widgetRegions } = structuralLayouts['removed a widget'];
+    const saved = {
+      ...legacyAccount,
+      layoutPresetOverrides: { compose: { ...layoutPresets[0]!.snapshot, widgetRegions } },
+    };
+    const state = hydrate(sessionOf([storedProject('shipped', viewOnlyLayouts['fronted other tabs'])], saved));
+
+    expect(getWorkspaceStructure(state.account, 'compose').widgetRegions.right.instanceIds).toEqual([
+      'gallery',
+      'queue',
+    ]);
+    expect(arrangementNotices(state)).toEqual([]);
+  });
+
+  it('holds every arrival while the adoption is unsaved, whichever projects are still open', () => {
+    const document = (current: WorkbenchState, id: string) =>
+      serializeProjectDocumentV3(getProject(current, id)) as unknown as Record<string, unknown>;
+    const reload = (current: WorkbenchState, id: string): Project => {
+      const loaded = deserializeProjectDocument(document(current, id));
+
+      return loaded.status === 'loaded' ? loaded.project : expect.unreachable();
+    };
+    const fresh = { ...createInitialWorkbenchState().projects[0]!, id: 'fresh' };
+    const adopted = hydrate(
+      sessionOf([storedProject('a', structuralLayouts['removed a widget'], '2026-02-01T00:00:00Z'), fresh])
+    );
+    // The account write keeps failing; A, the adopting project, is closed and only its stored shape is on the server.
+    const storedA = reload(adopted, 'a');
+    const closed = workbenchReducer(adopted, { projectId: 'a', type: 'closeProject' });
+    const openedB = workbenchReducer(closed, {
+      project: storedProject('b', structuralLayouts['moved a tab to another rail']),
+      type: 'openProject',
+    });
+
+    expect(document(openedB, 'b')).not.toHaveProperty('workspaceId');
+    // A save sent before the adoption was made releases nothing.
+    expect(
+      workbenchReducer(openedB, { savedAccount: { activeLayoutPresetId: 'compose' }, type: 'releaseHeldLayouts' })
+    ).toBe(openedB);
+
+    // Reopened before the account is saved, A shows its own arrangement, which the account still carries.
+    const reopenedA = workbenchReducer(openedB, { project: storedA, type: 'openProject' });
+
+    expect(document(reopenedA, 'a')).not.toHaveProperty('workspaceId');
+    expect(arrangementNotices(reopenedA).map(({ projectId }) => projectId)).toEqual(['b']);
+    expect(getLayoutOf(reopenedA).widgetRegions.right.instanceIds).toEqual(['gallery', 'queue']);
+
+    const released = workbenchReducer(reopenedA, { savedAccount: reopenedA.account, type: 'releaseHeldLayouts' });
+
+    expect(document(released, 'b')).toHaveProperty('workspaceId', 'compose');
+    expect(document(released, 'a')).toHaveProperty('workspaceId', 'compose');
+
+    // Had the page reloaded instead, the account would still be unadopted and A, stored as it was, adopts again.
+    const readopted = workbenchReducer(hydrate(sessionOf([fresh])), { project: storedA, type: 'openProject' });
+
+    expect(readopted.account.layoutPresetOverrides).toEqual(adopted.account.layoutPresetOverrides);
+  });
+
+  it('keeps what a held project shows across a reload before the account is saved', () => {
+    const adopted = hydrate(
+      sessionOf([storedProject('held', structuralLayouts['removed a widget'], '2026-02-01T00:00:00Z')])
+    );
+    const resized = workbenchReducer(
+      workbenchReducer(adopted, { region: 'left', sizePx: 610, type: 'setRegionWidgetSize' }),
+      {
+        presetId: 'edit',
+        type: 'applyPreset',
+      }
+    );
+    const stored = serializeProjectDocumentV3(getActiveProject(resized)) as unknown as Record<string, unknown>;
+
+    expect(stored).not.toHaveProperty('workspaceId');
+
+    const loaded = deserializeProjectDocument(stored);
+    const reloaded = hydrate(sessionOf([loaded.status === 'loaded' ? loaded.project : expect.unreachable()]));
+
+    expect(getActiveProject(reloaded).workspaceId).toBe('edit');
+    expect(getActiveProject(reloaded).views.compose?.sizes?.left).toBe(610);
+    expect(reloaded.account.layoutPresetOverrides).toEqual(adopted.account.layoutPresetOverrides);
   });
 
   it('adopts the most recently stored project when the one opening has nothing stored', () => {
@@ -4064,7 +4173,6 @@ describe('workbench account and project settings', () => {
       layoutPresetOrder: ['compose', 'edit', 'video', 'automate'],
       layoutPresetOverrides: {},
       layoutPresetRouteOverrides: {},
-      workspaceLayoutsAdopted: true,
     });
   });
 
@@ -5721,5 +5829,27 @@ describe('loading stored layouts that dock retired widgets', () => {
 
     expect(storedPreset?.widgetRegions.left).toMatchObject(leftWithoutProject);
     expect(storedPreset?.widgetInstances).not.toHaveProperty('project');
+  });
+
+  it('forgets a built-in override that reads as the built-in ships once its retired widget is stripped', () => {
+    const shipped = layoutPresets[0]!.snapshot;
+    const account = normalizeWorkbenchAccount({
+      activeLayoutPresetId: shipped.layout.presetId,
+      layoutPresetOverrides: {
+        [shipped.layout.presetId]: {
+          ...shipped,
+          widgetInstances: { ...shipped.widgetInstances, properties: { id: 'properties', typeId: 'properties' } },
+          widgetRegions: {
+            ...shipped.widgetRegions,
+            right: {
+              ...shipped.widgetRegions.right,
+              instanceIds: [...shipped.widgetRegions.right.instanceIds, 'properties'],
+            },
+          },
+        },
+      },
+    });
+
+    expect(account.layoutPresetOverrides).toEqual({});
   });
 });
