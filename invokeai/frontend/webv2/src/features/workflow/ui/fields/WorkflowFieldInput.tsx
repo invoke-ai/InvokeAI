@@ -45,7 +45,11 @@ import {
   getCachedGalleryBoard,
   invalidateGallery,
 } from '@features/gallery/queries';
-import { useHostGalleryBoards, useOptionalGalleryHostProjectContext } from '@features/gallery/react';
+import {
+  useGalleryItemContextMenu,
+  useHostGalleryBoards,
+  useOptionalGalleryHostProjectContext,
+} from '@features/gallery/react';
 import { galleryImageUrls, galleryVideoUrls } from '@features/gallery/utility';
 import { DEFAULT_LORA_WEIGHT_CONFIG, sanitizeBatchCount, SCHEDULER_OPTIONS } from '@features/generation/settings';
 import { isInvocationNode } from '@features/workflow/contracts';
@@ -124,6 +128,7 @@ import {
   useState,
   useSyncExternalStore,
   type ChangeEvent,
+  type MouseEventHandler,
 } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -791,9 +796,17 @@ const ImageCollectionTile = ({
   const { findInGallery } = useWorkflowUi();
   const onRemoveClick = useCallback(() => onRemove(index), [index, onRemove]);
   const onFind = useCallback(() => findInGallery({ kind: 'image', name }), [findInGallery, name]);
+  const onContextMenu = useGalleryItemContextMenu({ kind: 'image', name });
 
   return (
-    <Box aspectRatio="1" bg="bg.subtle" className="group" position="relative" rounded="xs">
+    <Box
+      aspectRatio="1"
+      bg="bg.subtle"
+      className="group"
+      position="relative"
+      rounded="xs"
+      onContextMenu={onContextMenu}
+    >
       <Image
         alt=""
         h="full"
@@ -1064,6 +1077,8 @@ const MediaInput = ({ id, invalid, kind, onChange, value }: WorkflowFieldInputPr
     retry: false,
     staleTime: 60_000,
   });
+  const shownItem = mediaItem?.kind === kind && mediaItem.name === mediaName ? mediaItem : null;
+  const onContextMenu = useGalleryItemContextMenu(shownItem ?? (mediaName ? { kind, name: mediaName } : null));
   const badge =
     mediaItem && mediaItem.name === mediaName && mediaItem.width > 0
       ? `${mediaItem.width}x${mediaItem.height}${
@@ -1083,7 +1098,15 @@ const MediaInput = ({ id, invalid, kind, onChange, value }: WorkflowFieldInputPr
     <Box position="relative" w="full" {...invalidAriaProps}>
       <MediaDropMonitor dropId={dropId} kind={kind} onDrop={onMediaDrop} />
       {/* The whole preview area is the drop target. */}
-      <Box ref={setNodeRef} className="nodrag group" h="32" position="relative" rounded="sm" w="full">
+      <Box
+        ref={setNodeRef}
+        className="nodrag group"
+        h="32"
+        position="relative"
+        rounded="sm"
+        w="full"
+        onContextMenu={onContextMenu}
+      >
         <GalleryPickerPopover accept={pickerAccept} label={pickerLabel} onPick={onPick}>
           <chakra.button
             aria-label={mediaName ? pickerLabel : undefined}
@@ -1199,12 +1222,18 @@ const VideoFramePicker = lazy(() =>
 );
 
 /** The picker's box and button row while its player loads, so the node does not change size. */
-const VideoFramePickerFallback = ({ posterUrl }: { posterUrl: string }) => {
+const VideoFramePickerFallback = ({
+  onContextMenu,
+  posterUrl,
+}: {
+  onContextMenu: MouseEventHandler<HTMLElement> | undefined;
+  posterUrl: string;
+}) => {
   const { t } = useTranslation();
 
   return (
     <Flex direction="column" gap="1" w="full">
-      <Box bg="black" borderWidth="1px" h="32" overflow="hidden" rounded="sm" w="full">
+      <Box bg="black" borderWidth="1px" h="32" overflow="hidden" rounded="sm" w="full" onContextMenu={onContextMenu}>
         <Image alt="" h="full" objectFit="contain" src={posterUrl} w="full" />
       </Box>
       <Button alignSelf="flex-start" disabled size="sm" variant="outline">
@@ -1268,9 +1297,11 @@ const VideoFrameIndexInput = (props: WorkflowFieldInputProps) => {
       : Math.max(0, Math.min(frameCount - 1, numericValue < 0 ? frameCount + numericValue : numericValue));
 
   const posterUrl = video?.thumbnailUrl ?? null;
+  const onVideoContextMenu = useGalleryItemContextMenu(video);
   const pickerFallback = useMemo(
-    () => (posterUrl === null ? null : <VideoFramePickerFallback posterUrl={posterUrl} />),
-    [posterUrl]
+    () =>
+      posterUrl === null ? null : <VideoFramePickerFallback posterUrl={posterUrl} onContextMenu={onVideoContextMenu} />,
+    [onVideoContextMenu, posterUrl]
   );
 
   return (
@@ -1287,6 +1318,7 @@ const VideoFrameIndexInput = (props: WorkflowFieldInputProps) => {
             resolvedIndex={resolvedIndex}
             videoUrl={video.fullUrl}
             onChange={onChange}
+            onContextMenu={onVideoContextMenu}
           />
         </Suspense>
       ) : (

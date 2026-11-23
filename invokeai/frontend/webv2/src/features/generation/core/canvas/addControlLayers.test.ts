@@ -40,11 +40,20 @@ const layer = (overrides: Partial<ControlLayerGraphInput> = {}): ControlLayerGra
   ...overrides,
 });
 
-// Cast: TestGraph is structurally the BackendGraphContract shape addControlLayers needs.
-const addTo = (graph: TestGraph, options: Omit<AddControlLayersOptions, 'denoise'>) =>
-  addControlLayers(graph as never, { ...options, denoise: graph.nodes.denoise_latents });
+/** The options a case sets; the family facts only a Krea-2 Control LoRA reads default to a graph without a VAE. */
+type TestOptions = Omit<AddControlLayersOptions, 'denoise' | 'denoiseSize' | 'latents'> &
+  Partial<Pick<AddControlLayersOptions, 'denoiseSize' | 'latents'>>;
 
-const run = (options: Omit<AddControlLayersOptions, 'denoise'>) => {
+// Cast: TestGraph is structurally the BackendGraphContract shape addControlLayers needs.
+const addTo = (graph: TestGraph, options: TestOptions) =>
+  addControlLayers(graph as never, {
+    denoiseSize: { height: 1024, width: 1024 },
+    latents: null,
+    ...options,
+    denoise: graph.nodes.denoise_latents,
+  });
+
+const run = (options: TestOptions) => {
   const graph = baseGraph();
   addTo(graph, options);
   return graph;
@@ -78,6 +87,8 @@ describe('isControlKindSupportedForBase', () => {
     { base: 'flux2', kind: 'controlnet', outcome: 'unsupported' },
     { base: 'flux2', kind: 'qwen_image_control', outcome: 'unsupported' },
     { base: 'flux', kind: 'control_lora', outcome: 'supported' },
+    { base: 'krea-2', kind: 'control_lora', outcome: 'supported' },
+    { base: 'krea-2', kind: 'controlnet', outcome: 'unsupported' },
     { base: 'sd-1', kind: 'control_lora', outcome: 'unsupported' },
     { base: 'sdxl', kind: 'control_lora', outcome: 'unsupported' },
     { base: 'sd-2', kind: 'control_lora', outcome: 'unsupported' },
@@ -280,6 +291,63 @@ describe('addControlLayers — control_lora on flux', () => {
     expect(graph.nodes['control_net_collector']).toBeUndefined();
     expect(graph.nodes['t2i_adapter_collector']).toBeUndefined();
     expect(Object.values(graph.nodes).some((n) => n.type === 'collect')).toBe(false);
+  });
+});
+
+describe('addControlLayers — control_lora on krea-2', () => {
+  const krea2Graph = (): TestGraph => {
+    const graph = baseGraph();
+    graph.nodes.model_loader = { id: 'model_loader', type: 'krea2_model_loader' };
+    return graph;
+  };
+  const krea2Layer = layer({
+    id: 'K1',
+    imageName: 'depth.png',
+    kind: 'control_lora',
+    model: model('krea-2', 'control_lora'),
+    weight: 0.8,
+  });
+
+  it('encodes the control image at the denoise size with the graph VAE and feeds the Krea-2 Control LoRA node', () => {
+    const graph = krea2Graph();
+    addTo(graph, {
+      base: 'krea-2',
+      denoiseSize: { height: 1024, width: 768 },
+      latents: { encodeType: 'qwen_image_i2l', vae: { field: 'vae', node: graph.nodes.model_loader } },
+      layers: [krea2Layer],
+    });
+
+    expect(graph.nodes['control_lora_i2l_K1']).toMatchObject({
+      height: 1024,
+      image: { image_name: 'depth.png' },
+      type: 'qwen_image_i2l',
+      width: 768,
+    });
+    expect(graph.nodes['control_lora_i2l_K1']).not.toHaveProperty('reference');
+    expect(graph.nodes['control_lora_K1']).toMatchObject({
+      lora: krea2Layer.model,
+      type: 'krea2_control_lora',
+      weight: 0.8,
+    });
+    expect(graph.nodes['control_lora_K1']).not.toHaveProperty('image');
+    expect(edgesTo(graph, 'control_lora_i2l_K1', 'vae').map((e) => e.source)).toEqual([
+      { field: 'vae', node_id: 'model_loader' },
+    ]);
+    expect(edgesTo(graph, 'control_lora_K1', 'control_latents').map((e) => e.source)).toEqual([
+      { field: 'latents', node_id: 'control_lora_i2l_K1' },
+    ]);
+    expect(edgesTo(graph, 'denoise_latents', 'control_lora').map((e) => e.source)).toEqual([
+      { field: 'control_lora', node_id: 'control_lora_K1' },
+    ]);
+    expect(Object.values(graph.nodes).some((n) => n.type === 'flux_control_lora_loader')).toBe(false);
+  });
+
+  it('leaves a weight-0 Control LoRA out of the graph', () => {
+    const graph = krea2Graph();
+    addTo(graph, { base: 'krea-2', latents: null, layers: [{ ...krea2Layer, weight: 0 }] });
+
+    expect(Object.keys(graph.nodes)).toEqual(['denoise_latents', 'model_loader']);
+    expect(graph.edges).toEqual([]);
   });
 });
 

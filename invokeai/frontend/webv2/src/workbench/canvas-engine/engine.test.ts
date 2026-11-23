@@ -4413,6 +4413,31 @@ describe('nudgeSelectedLayer', () => {
   });
 });
 
+describe('flipLayer', () => {
+  it('commits one undoable flip, and inside the layer’s session flips only the preview', async () => {
+    const { store } = createReducerBackedStore(selectedImageDoc());
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      bitmapStore: createSpyBitmapStore(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: store.getState().projects[0]!.id,
+      store,
+    });
+    const transform = () => getDocumentLayer(engine.document.getDocument(), 'a')!.transform;
+
+    expect(engine.layers.flipLayer('a', 'horizontal', 'Flip horizontal')).toEqual({ status: 'committed' });
+    expect(transform()).toMatchObject({ scaleX: -1, scaleY: 1, x: 10, y: 0 });
+    await engine.history.undo();
+    expect(transform()).toEqual({ rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 });
+
+    engine.tools.setTool('transform');
+    expect(engine.layers.flipLayer('a', 'vertical', 'Flip vertical')).toEqual({ status: 'previewed' });
+    expect(engine.stores.transformSession.get()?.transform).toMatchObject({ scaleY: -1, y: 10 });
+    expect(transform()).toEqual({ rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 });
+    engine.lifecycle.dispose();
+  });
+});
+
 describe('move tool: drag through the pipeline', () => {
   it('commits one structural transform update and records an undoable entry', () => {
     const raf = createControllableRaf();

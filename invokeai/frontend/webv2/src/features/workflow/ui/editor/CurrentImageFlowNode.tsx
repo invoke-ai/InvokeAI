@@ -1,5 +1,4 @@
 import type {
-  GalleryImageItem,
   GalleryItem,
   GalleryItemRef,
   GalleryVideoItem,
@@ -18,6 +17,7 @@ import {
   toGalleryItemKey,
   toGalleryItemRef,
 } from '@features/gallery/contracts';
+import { useGalleryItemContextMenu } from '@features/gallery/react';
 import { getGalleryItemDragData, getGalleryItemDragId } from '@features/gallery/utility';
 import { getAuthSession, refreshProtectedMediaCookie } from '@features/identity';
 import {
@@ -39,6 +39,7 @@ import {
   getWorkflowNodeHeaderProps,
   getWorkflowNodeShellProps,
   useIsWorkflowImageExport,
+  WorkflowNodeHeaderButton,
 } from '@features/workflow/ui/nodeChrome';
 import { useProjectGraphCommands } from '@features/workflow/ui/useProjectGraphCommands';
 import {
@@ -55,7 +56,7 @@ import {
   progressImageToStreamingSource,
 } from '@platform/ui/streaming-image/streamingImageSource';
 import { Tooltip } from '@platform/ui/Tooltip';
-import { CopyIcon, GripHorizontalIcon } from 'lucide-react';
+import { CopyIcon, EllipsisVerticalIcon, GripHorizontalIcon } from 'lucide-react';
 import {
   lazy,
   memo,
@@ -185,7 +186,7 @@ export const resolveLiveProgressImage = ({
   slotProgressImage: Omit<LatestProgressImageSnapshot, 'target'> | null | undefined;
 }): Omit<LatestProgressImageSnapshot, 'target'> | null => {
   if (!activeTarget) {
-    return null;
+    return allowUntargetedFrame && progressImage && !progressImage.target ? progressImage : null;
   }
   const isActiveTargetFramed = framedTargets.some((candidate) => isSameProgressTarget(candidate, activeTarget));
   if (slotProgressImage && isActiveTargetFramed) {
@@ -388,23 +389,39 @@ const seekVideo = (video: HTMLVideoElement, seconds: number): void => {
   }
 };
 
-// Pointer drags only, as Preview's frame: no tab stop or button role so the canvas keeps its own keys.
-const DraggableCurrentImage = ({ children, image }: { children: ReactNode; image: GalleryImageItem | null }) => {
+/** The image under the node's frame, draggable wherever gallery images can be dropped. */
+const DraggableCurrentImage = ({
+  children,
+  itemRef,
+  onContextMenu,
+}: {
+  children: ReactNode;
+  itemRef: GalleryItemRef | null;
+  onContextMenu: ((event: MouseEvent<HTMLElement>) => void) | undefined;
+}) => {
   const disabledId = useId();
-  const dragData = useMemo(
-    () => (image ? getGalleryItemDragData([{ kind: 'image', name: image.name }]) : undefined),
-    [image]
-  );
+  const dragData = useMemo(() => (itemRef ? getGalleryItemDragData([itemRef]) : undefined), [itemRef]);
+  // Pointer drags only, as the Preview frame's: the image is no tab stop, so the canvas keeps its own keys. The header's
+  // button is the keyboard's way to the item menu.
   const { listeners, setNodeRef } = useDraggable({
     data: dragData,
-    disabled: !image,
-    id: image
-      ? getGalleryItemDragId({ kind: 'image', name: image.name }, 'workflow-current-image', disabledId)
+    disabled: !itemRef,
+    id: itemRef
+      ? getGalleryItemDragId(itemRef, 'workflow-current-image', disabledId)
       : `workflow-current-image:disabled:${disabledId}`,
   });
 
   return (
-    <Box ref={setNodeRef} className="nodrag" cursor={image ? 'grab' : undefined} h="full" w="full" {...listeners}>
+    // `nodrag`: the canvas leaves the pointer to the image drag rather than moving the node.
+    <Box
+      ref={setNodeRef}
+      className="nodrag"
+      cursor={itemRef ? 'grab' : undefined}
+      h="full"
+      w="full"
+      onContextMenu={onContextMenu}
+      {...listeners}
+    >
       {children}
     </Box>
   );
@@ -496,13 +513,21 @@ const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNo
     () =>
       resolveLiveProgressImage({
         activeTarget,
-        allowUntargetedFrame: projectQueueItemIds === null,
+        allowUntargetedFrame: projectQueueItemIds === null && isOriginInProject,
         followedTargets: projectFollowedTargets,
         framedTargets: projectFramedTargets,
         progressImage,
         slotProgressImage,
       }),
-    [activeTarget, progressImage, projectFollowedTargets, projectFramedTargets, projectQueueItemIds, slotProgressImage]
+    [
+      activeTarget,
+      isOriginInProject,
+      progressImage,
+      projectFollowedTargets,
+      projectFramedTargets,
+      projectQueueItemIds,
+      slotProgressImage,
+    ]
   );
   const activeBackendItemId = useMemo(
     () => resolveActiveBackendItemId(activeTarget, projectQueueItemsById),
@@ -745,7 +770,13 @@ const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNo
   );
 
   const title = node.data.label || t('widgets.workflow.addNodeDialog.currentImageTitle');
-  const draggableImage = !hasLiveFrame && displayedItem && isGalleryImageItem(displayedItem) ? displayedItem : null;
+  const shownMediaRef = useMemo<GalleryItemRef | null>(
+    () => (!hasLiveFrame && displayedItem ? toGalleryItemRef(displayedItem) : null),
+    [displayedItem, hasLiveFrame]
+  );
+  const draggableImageRef = shownMediaRef?.kind === 'image' ? shownMediaRef : null;
+  const openItemMenu = useGalleryItemContextMenu(shownMediaRef);
+  const imageActionsLabel = t('widgets.preview.imageActions');
   const fallbackImage = useMemo(
     () =>
       displayedItem && isGalleryImageItem(displayedItem)
@@ -769,6 +800,7 @@ const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNo
     height: displayHeight,
     width: displayWidth,
   });
+  const showItemMenuButton = Boolean(openItemMenu);
 
   return (
     <Box
@@ -782,7 +814,7 @@ const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNo
       w={`${displayWidth}px`}
       {...getWorkflowNodeShellProps({ selected })}
     >
-      <Flex {...getWorkflowNodeHeaderProps()} flexShrink={0} gap="1.5">
+      <Flex {...getWorkflowNodeHeaderProps({ endsWithButton: showItemMenuButton })} flexShrink={0} gap="1.5">
         <MiddleTruncate flex="1" fontWeight="600" minW="0" text={title} />
         <HStack className="nodrag nopan" flexShrink={0} gap="1" ms="auto">
           {isGenerating ? (
@@ -830,6 +862,16 @@ const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNo
               </Button>
             </Tooltip>
           ) : null}
+          {showItemMenuButton ? (
+            <WorkflowNodeHeaderButton
+              aria-haspopup="menu"
+              aria-label={imageActionsLabel}
+              content={imageActionsLabel}
+              onClick={openItemMenu}
+            >
+              <Icon as={EllipsisVerticalIcon} boxSize="3.5" />
+            </WorkflowNodeHeaderButton>
+          ) : null}
         </HStack>
       </Flex>
 
@@ -863,11 +905,12 @@ const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNo
             key={videoSurfaceKey}
             item={displayedItem}
             surfaceKey={videoSurfaceKey}
+            onContextMenu={openItemMenu}
             onCopyAvailabilityChange={handleVideoCopyAvailabilityChange}
             onVideoElementChange={handleVideoElementChange}
           />
         ) : (
-          <DraggableCurrentImage image={draggableImage}>
+          <DraggableCurrentImage itemRef={draggableImageRef} onContextMenu={openItemMenu}>
             <StreamingImageFrame fallbackImage={fallbackImage} fit="contain" h="full" liveImage={liveImage} w="full">
               <Flex align="center" color="fg.subtle" fontSize="xs" h="full" justify="center" px="4" textAlign="center">
                 {t('widgets.workflow.currentImageEmpty')}
@@ -956,11 +999,13 @@ const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNo
 
 const CurrentImageVideoSurface = ({
   item,
+  onContextMenu,
   onCopyAvailabilityChange,
   onVideoElementChange,
   surfaceKey,
 }: {
   item: GalleryVideoItem;
+  onContextMenu?: (event: MouseEvent<HTMLElement>) => void;
   onCopyAvailabilityChange: (surfaceKey: string, isAvailable: boolean) => void;
   onVideoElementChange: (element: HTMLVideoElement | null) => void;
   surfaceKey: string;
@@ -1077,7 +1122,14 @@ const CurrentImageVideoSurface = ({
   );
 
   return (
-    <Box bg="black" className="nodrag nopan nowheel" h="full" position="relative" w="full">
+    <Box
+      bg="black"
+      className="nodrag nopan nowheel"
+      h="full"
+      position="relative"
+      w="full"
+      onContextMenu={onContextMenu}
+    >
       <Suspense fallback={videoPosterFallback}>
         <PlayerComponent
           ref={setVideoElementRef}

@@ -155,6 +155,11 @@ class NVFP4Linear(DequantizingLinear):
     sidecar LoRA patches, and a partial load that leaves its buffers on the CPU streams them per forward.
     """
 
+    # FP8 Storage may cast the layers the build ships in full precision. On an RTX 4090 that barely moved the step-0
+    # transformer output against bf16 (Krea-2 Turbo 8.4% -> 8.9%, Z-Image Turbo 31.6% -> 31.8%) and did not change the
+    # image PSNR, and it saves 4-16% of the model.
+    leaves_dense_layers_to_fp8_storage = True
+
     def __init__(
         self,
         weight: torch.Tensor,

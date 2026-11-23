@@ -16,6 +16,7 @@ import { GenerateGuidanceSection } from './GenerateGuidanceSection';
 vi.mock('./GenerationUiContext', () => ({
   useGenerationUi: () => ({
     models: { status: 'loaded' },
+    project: { activeProjectId: 'project', invocationSourceId: 'generate', showPromptSyntaxHighlighting: false },
     sectionPreferences: { sectionsOpen: { guidance: true }, setSectionsOpen: vi.fn() },
   }),
 }));

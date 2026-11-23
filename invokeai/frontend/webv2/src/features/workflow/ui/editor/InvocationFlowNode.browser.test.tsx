@@ -12,6 +12,7 @@ import openapi from '@api/openapi.json';
 /* eslint-disable react-perf/jsx-no-new-object-as-prop, react-perf/jsx-no-new-array-as-prop -- each render mounts a fresh flow on purpose */
 import { Box, ChakraProvider } from '@chakra-ui/react';
 import { DndContext, type DragStartEvent } from '@dnd-kit/core';
+import { GalleryUiProvider, type GalleryUiAdapter } from '@features/gallery/react';
 import { galleryImageUrls } from '@features/gallery/utility';
 import { parseOpenApiToTemplates } from '@features/workflow/data/templates';
 import { flowThemeCss } from '@features/workflow/ui/graph-preview/flowTheme';
@@ -1469,8 +1470,11 @@ describe('InvocationFlowNode collapsed ports', () => {
 describe('CurrentImageFlowNode', () => {
   let host: HTMLDivElement;
   let root: Root;
+  const openItemContextMenu = vi.fn();
+  const galleryAdapter = { openItemContextMenu } as unknown as GalleryUiAdapter;
 
   beforeEach(() => {
+    openItemContextMenu.mockClear();
     host = document.createElement('div');
     host.style.cssText = 'width: 480px; height: 520px;';
     document.body.append(host);
@@ -1524,10 +1528,12 @@ describe('CurrentImageFlowNode', () => {
               { ...createAdapter(createExecutionPort().port), project: project.port } as unknown as WorkflowUiAdapter
             }
           >
-            {/* Stands in for the shell's drag context, where gallery items are dragged. */}
-            <DndContext onDragStart={onDragStart}>
-              <ReactFlow edges={[]} nodes={currentImageNodes} nodeTypes={nodeTypes} />
-            </DndContext>
+            <GalleryUiProvider adapter={galleryAdapter}>
+              {/* Stands in for the shell's drag context, where gallery items are dragged. */}
+              <DndContext onDragStart={onDragStart}>
+                <ReactFlow edges={[]} nodes={currentImageNodes} nodeTypes={nodeTypes} />
+              </DndContext>
+            </GalleryUiProvider>
           </WorkflowUiProvider>
         </ChakraProvider>
       )
@@ -1566,6 +1572,106 @@ describe('CurrentImageFlowNode', () => {
     expect(source).not.toBeNull();
     expect(source!.getAttribute('tabindex')).toBeNull();
     expect(source!.getAttribute('role')).toBeNull();
+  });
+
+  it("opens the shown image's menu from a header button the keyboard reaches, only while an image is shown", async () => {
+    const project = createGalleryProject({ recentImages: [recent] });
+    const menuButton = () => host.querySelector<HTMLButtonElement>('button[aria-label="Image actions"]');
+    await render(project);
+    await vi.waitFor(() => expect(shownImage()).toBe(recent.imageUrl));
+
+    const flowNode = host.querySelector<HTMLElement>('.react-flow__node')!;
+    // The flow keeps a node hidden, so unfocusable, until it has measured it.
+    await vi.waitFor(() => {
+      flowNode.focus();
+      expect(document.activeElement).toBe(flowNode);
+    });
+    await act(() => userEvent.keyboard('{Tab}'));
+    expect(document.activeElement).toBe(menuButton());
+    await act(() => userEvent.keyboard('{Enter}'));
+
+    const button = menuButton()!.getBoundingClientRect();
+    expect(openItemContextMenu).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ ref: { kind: 'image', name: 'recent.png' }, x: button.left, y: button.bottom })
+    );
+    expect(openItemContextMenu.mock.lastCall![0].returnFocus()).toBe(menuButton());
+
+    // A pointer press opens it below the button too, not at the pointer.
+    await act(() => userEvent.click(menuButton()!));
+    expect(openItemContextMenu.mock.lastCall![0]).toMatchObject({ x: button.left, y: button.bottom });
+
+    // Right-clicking the displayed image opens the shared media menu at the pointer.
+    openItemContextMenu.mockClear();
+    const imageEl = host.querySelector<HTMLImageElement>('.react-flow__node img')!;
+    await act(() => {
+      imageEl.dispatchEvent(
+        new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 64, clientY: 72 })
+      );
+    });
+    expect(openItemContextMenu).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ ref: { kind: 'image', name: 'recent.png' }, x: 64, y: 72 })
+    );
+
+    openItemContextMenu.mockClear();
+    exportMocks.progressImage = { dataUrl: outputImage(1, 1), height: 1, width: 1 };
+    await act(() => project.setGalleryValues({ recentImages: [chosen] }));
+    expect(host.textContent).toContain('Generating');
+    expect(menuButton()).toBeNull();
+    const liveImageEl = host.querySelector<HTMLImageElement>('.react-flow__node img')!;
+    await act(() => {
+      liveImageEl.dispatchEvent(
+        new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 64, clientY: 72 })
+      );
+    });
+    expect(openItemContextMenu).not.toHaveBeenCalled();
+
+    exportMocks.progressImage = null;
+    await act(() => project.setGalleryValues({}));
+    expect(menuButton()).toBeNull();
+  });
+
+  it("opens a selected video's media menu from both the header button and right-click", async () => {
+    await import('@platform/ui/video-player/VideoPlayer');
+    const selectedVideo = {
+      boardId: 'none',
+      category: 'general',
+      createdAt: '2026-11-23T00:00:00Z',
+      durationSeconds: 4,
+      fps: 24,
+      fullUrl: 'data:audio/wav;base64,UklGRiUAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQEAAACA',
+      height: 576,
+      isIntermediate: false,
+      kind: 'video' as const,
+      name: 'clip.mp4',
+      starred: false,
+      thumbnailUrl: 'data:image/png;base64,c2F2ZWQ=',
+      width: 1024,
+    };
+    const project = createGalleryProject({ selectedImage: selectedVideo });
+    const menuButton = () => host.querySelector<HTMLButtonElement>('button[aria-label="Image actions"]');
+    await render(project);
+
+    await vi.waitFor(
+      async () => {
+        await act(() => Promise.resolve());
+        expect(host.querySelector('video')).not.toBeNull();
+      },
+      { timeout: 10_000 }
+    );
+
+    await act(() => userEvent.click(menuButton()!));
+    expect(openItemContextMenu).toHaveBeenCalledWith(
+      expect.objectContaining({ ref: { kind: 'video', name: 'clip.mp4' } })
+    );
+
+    openItemContextMenu.mockClear();
+    const video = host.querySelector('video')!;
+    await act(() => {
+      video.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 80, clientY: 90 }));
+    });
+    expect(openItemContextMenu).toHaveBeenCalledWith(
+      expect.objectContaining({ ref: { kind: 'video', name: 'clip.mp4' }, x: 80, y: 90 })
+    );
   });
 
   it('does not render again for gallery changes that leave the shown image alone', async () => {

@@ -18,6 +18,8 @@ export interface TransformRect {
 
 export type TransformHandle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w';
 
+export type TransformAnchor = TransformHandle | 'center';
+
 export type TransformTarget =
   | { kind: 'scale'; handle: TransformHandle }
   | { kind: 'rotate'; handle: TransformHandle }
@@ -56,14 +58,14 @@ const OPPOSITE: Record<TransformHandle, TransformHandle> = {
   w: 'e',
 };
 
-const hasWest = (h: TransformHandle): boolean => h === 'nw' || h === 'w' || h === 'sw';
-const hasEast = (h: TransformHandle): boolean => h === 'ne' || h === 'e' || h === 'se';
-const hasNorth = (h: TransformHandle): boolean => h === 'nw' || h === 'n' || h === 'ne';
-const hasSouth = (h: TransformHandle): boolean => h === 'sw' || h === 's' || h === 'se';
+const hasWest = (h: TransformAnchor): boolean => h === 'nw' || h === 'w' || h === 'sw';
+const hasEast = (h: TransformAnchor): boolean => h === 'ne' || h === 'e' || h === 'se';
+const hasNorth = (h: TransformAnchor): boolean => h === 'nw' || h === 'n' || h === 'ne';
+const hasSouth = (h: TransformAnchor): boolean => h === 'sw' || h === 's' || h === 'se';
 
 export const isCornerHandle = (h: TransformHandle): boolean => h.length === 2;
 
-export const localHandlePoint = (rect: TransformRect, handle: TransformHandle): Vec2 => ({
+export const localHandlePoint = (rect: TransformRect, handle: TransformAnchor): Vec2 => ({
   x: rect.x + (hasWest(handle) ? 0 : hasEast(handle) ? rect.width : rect.width / 2),
   y: rect.y + (hasNorth(handle) ? 0 : hasSouth(handle) ? rect.height : rect.height / 2),
 });
@@ -85,6 +87,44 @@ const rotationMat = (rad: number): { a: number; b: number; c: number; d: number 
 const applyLinear = (m: { a: number; b: number; c: number; d: number }, v: Vec2): Vec2 => ({
   x: m.a * v.x + m.c * v.y,
   y: m.b * v.x + m.d * v.y,
+});
+
+type LinearTransform = Pick<LayerTransform, 'rotation' | 'scaleX' | 'scaleY'>;
+
+/** The translation that puts `local` at `doc`: T = doc − R·(sx·local.x, sy·local.y). */
+export const moveLocalPointTo = (linear: LinearTransform, local: Vec2, doc: Vec2): LayerTransform => {
+  const rs = applyLinear(rotationMat(linear.rotation), { x: linear.scaleX * local.x, y: linear.scaleY * local.y });
+  return { rotation: linear.rotation, scaleX: linear.scaleX, scaleY: linear.scaleY, x: doc.x - rs.x, y: doc.y - rs.y };
+};
+
+export const layerPointToDocument = (transform: LayerTransform, local: Vec2): Vec2 =>
+  applyToPoint(layerTransformMatrix(transform), local);
+
+export const retransformAbout = (start: LayerTransform, local: Vec2, next: Partial<LinearTransform>): LayerTransform =>
+  moveLocalPointTo({ ...start, ...next }, local, layerPointToDocument(start, local));
+
+/** Mirrors in document space about the content centre, so the angle negates and one local axis flips. */
+export const flipTransform = (
+  transform: LayerTransform,
+  rect: TransformRect,
+  direction: 'horizontal' | 'vertical'
+): LayerTransform => {
+  const center = localCenter(rect);
+  return moveLocalPointTo(
+    {
+      rotation: -transform.rotation,
+      scaleX: direction === 'horizontal' ? -transform.scaleX : transform.scaleX,
+      scaleY: direction === 'vertical' ? -transform.scaleY : transform.scaleY,
+    },
+    center,
+    layerPointToDocument(transform, center)
+  );
+};
+
+/** The layer's own box in document pixels (not its rotated bounds). */
+export const transformedSize = (transform: LayerTransform, rect: TransformRect): { width: number; height: number } => ({
+  height: rect.height * Math.abs(transform.scaleY),
+  width: rect.width * Math.abs(transform.scaleX),
 });
 
 /** A handle's outward normal in LOCAL space (y-down, matching document/screen). */
@@ -212,6 +252,21 @@ const clampScale = (s: number): number => {
   return Math.abs(s) < MIN_ABS_SCALE ? sign * MIN_ABS_SCALE : s;
 };
 
+export const scaleForLength = (length: number, rectLength: number, current: number): number =>
+  (current < 0 ? -1 : 1) * Math.max(MIN_ABS_SCALE, length / rectLength);
+
+export const scaleAxis = (
+  start: LayerTransform,
+  axis: 'x' | 'y',
+  scale: number,
+  linked: boolean
+): Pick<LayerTransform, 'scaleX' | 'scaleY'> => {
+  const next = clampScale(scale);
+  const [own, other] = axis === 'x' ? [start.scaleX, start.scaleY] : [start.scaleY, start.scaleX];
+  const linkedOther = linked ? clampScale(other * Math.abs(next / own)) : other;
+  return axis === 'x' ? { scaleX: next, scaleY: linkedOther } : { scaleX: linkedOther, scaleY: next };
+};
+
 export const constrainMoveDelta = (delta: Vec2, shift: boolean): Vec2 => {
   if (!shift) {
     return delta;
@@ -230,14 +285,14 @@ export interface ScaleParams {
   handle: TransformHandle;
   startPointerDoc: Vec2;
   pointerDoc: Vec2;
-  shift: boolean;
+  constrain: boolean;
   alt: boolean;
   grid?: number;
 }
 
-/** Edges affect one axis, Shift corners keep aspect; flips allowed down to the minimum absolute scale. */
+/** Free edges affect one axis; flips allowed down to the minimum absolute scale. */
 export const applyScale = (p: ScaleParams): LayerTransform => {
-  const { alt, handle, rect, shift, start } = p;
+  const { alt, constrain, handle, rect, start } = p;
   const m = layerTransformMatrix(start);
   const handleLocal = localHandlePoint(rect, handle);
   const anchorLocal = alt ? localCenter(rect) : localHandlePoint(rect, OPPOSITE[handle]);
@@ -262,26 +317,25 @@ export const applyScale = (p: ScaleParams): LayerTransform => {
   let sx = dlx !== 0 ? vx / dlx : start.scaleX;
   let sy = dly !== 0 ? vy / dly : start.scaleY;
 
-  if (shift && isCornerHandle(handle)) {
+  if (constrain) {
     const fx = start.scaleX !== 0 ? sx / start.scaleX : 1;
     const fy = start.scaleY !== 0 ? sy / start.scaleY : 1;
-    const f = Math.abs(fx) >= Math.abs(fy) ? fx : fy;
-    sx = start.scaleX * f;
-    sy = start.scaleY * f;
+    if (isCornerHandle(handle)) {
+      const f = Math.abs(fx) >= Math.abs(fy) ? fx : fy;
+      sx = start.scaleX * f;
+      sy = start.scaleY * f;
+    } else if (dlx !== 0) {
+      sy = start.scaleY * Math.abs(fx);
+    } else {
+      sx = start.scaleX * Math.abs(fy);
+    }
   }
 
-  sx = clampScale(sx);
-  sy = clampScale(sy);
-
-  // Keep the anchor fixed: T = anchorDoc − R·(sx·anchorLocal.x, sy·anchorLocal.y).
-  const rs = applyLinear(rotationMat(start.rotation), { x: sx * anchorLocal.x, y: sy * anchorLocal.y });
-  return {
-    rotation: start.rotation,
-    scaleX: sx,
-    scaleY: sy,
-    x: anchorDoc.x - rs.x,
-    y: anchorDoc.y - rs.y,
-  };
+  return moveLocalPointTo(
+    { rotation: start.rotation, scaleX: clampScale(sx), scaleY: clampScale(sy) },
+    anchorLocal,
+    anchorDoc
+  );
 };
 
 export const snapRotation = (rad: number): number => Math.round(rad / ROTATE_SNAP_RAD) * ROTATE_SNAP_RAD;
@@ -305,18 +359,7 @@ export const applyRotate = (p: RotateParams): LayerTransform => {
   if (p.shift) {
     rotation = snapRotation(rotation);
   }
-  // Keep the center fixed: T = center − R(rotation)·(sx·cx, sy·cy).
-  const rs = applyLinear(rotationMat(rotation), {
-    x: start.scaleX * centerLocal.x,
-    y: start.scaleY * centerLocal.y,
-  });
-  return {
-    rotation,
-    scaleX: start.scaleX,
-    scaleY: start.scaleY,
-    x: center.x - rs.x,
-    y: center.y - rs.y,
-  };
+  return moveLocalPointTo({ rotation, scaleX: start.scaleX, scaleY: start.scaleY }, centerLocal, center);
 };
 
 export const bakeMatrix = (transform: LayerTransform): Mat2d => layerTransformMatrix(transform);

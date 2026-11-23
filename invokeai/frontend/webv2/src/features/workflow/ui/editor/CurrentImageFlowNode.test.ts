@@ -362,12 +362,24 @@ describe('resolveLiveProgressImage', () => {
         slotProgressImage: null,
       })
     ).toBeNull();
+    // Untargeted global frames without an activeTarget are rejected when queueItems are known (allowUntargetedFrame: false),
+    // and only accepted in the legacy/test fallback mode without queueItems.
     expect(
       resolveLiveProgressImage({
-        activeTarget: projectATarget,
+        activeTarget: null,
+        allowUntargetedFrame: false,
+        followedTargets: [],
+        framedTargets: [],
+        progressImage: slotFrame,
+        slotProgressImage: null,
+      })
+    ).toBeNull();
+    expect(
+      resolveLiveProgressImage({
+        activeTarget: null,
         allowUntargetedFrame: true,
-        followedTargets: [projectATarget],
-        framedTargets: [projectATarget],
+        followedTargets: [],
+        framedTargets: [],
         progressImage: slotFrame,
         slotProgressImage: null,
       })
@@ -474,6 +486,7 @@ describe('CurrentImageFlowNode locale keys', () => {
       'widgets.preview.copyCurrentFrameUnsupported',
       'widgets.preview.copyCurrentFrameWriteFailed',
       'widgets.preview.dragVideo',
+      'widgets.preview.imageActions',
       'widgets.preview.videoFailed',
       'widgets.preview.videoRetry',
       'widgets.workflow.addNodeDialog.currentImageTitle',
