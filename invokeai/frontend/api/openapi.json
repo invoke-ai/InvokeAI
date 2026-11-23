@@ -42662,7 +42662,7 @@
         "tags": ["lora", "model", "flux"],
         "title": "Control LoRA - FLUX",
         "type": "object",
-        "version": "1.1.1",
+        "version": "1.1.2",
         "output": {
           "$ref": "#/components/schemas/FluxControlLoRALoaderOutput"
         }
