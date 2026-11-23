@@ -830,6 +830,9 @@ def test_download_from_a_server_that_stalls_mid_body_errors_instead_of_hanging(
 ) -> None:
     """A server that sends part of the body and then goes silent must not hold the worker forever."""
     monkeypatch.setattr(download_default, "DOWNLOAD_TIMEOUT", (2, 0.5))
+    # Talk to the local server directly: an ambient proxy would fail the request for an unrelated reason.
+    monkeypatch.setenv("NO_PROXY", "*")
+    monkeypatch.setenv("no_proxy", "*")
     release = Event()
     listener = socket.create_server(("127.0.0.1", 0))
     port = listener.getsockname()[1]
@@ -849,7 +852,7 @@ def test_download_from_a_server_that_stalls_mid_body_errors_instead_of_hanging(
         job = queue.download(source=AnyHttpUrl(f"http://127.0.0.1:{port}/model.safetensors"), dest=tmp_path)
         queue.wait_for_job(job, timeout=5)
         assert job.status == DownloadJobStatus.ERROR
-        assert "ConnectionError" in (job.error_type or "")
+        assert "Read timed out" in (job.error_type or "")
     finally:
         release.set()
         queue.stop()
