@@ -1,4 +1,5 @@
 /** Public, storage-independent contracts owned by Generation. */
+import type { ModelRole } from '@features/models';
 
 export type ResultDestination = 'canvas' | 'gallery';
 
@@ -92,7 +93,10 @@ export interface GenerationModelCatalogItem {
   type: string;
   format?: string;
   variant?: string | null;
+  roles?: readonly ModelRole[];
   hash?: string;
+  /** Registered, but its files are gone: listed in the library, never loadable. */
+  is_missing?: boolean;
   submodel_type?: string;
   trigger_phrases?: string[] | null;
   default_settings?: {
@@ -105,6 +109,7 @@ export interface GenerationModelCatalogItem {
     height?: number | null;
     vae?: string | null;
     vae_precision?: string | null;
+    components?: Record<string, string> | null;
     weight?: number | null;
   } | null;
   [key: string]: unknown;

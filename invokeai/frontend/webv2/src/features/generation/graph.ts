@@ -2,6 +2,7 @@
 export {
   addLoraCollectionLoader,
   addTransformerLoraCollectionLoader,
+  addWanLoraLoaders,
   buildImageToImagePipeline,
   compileGenerateGraph,
   FLUX_REDUX_INFLUENCE,
@@ -15,7 +16,9 @@ export {
   createId,
   getActiveCompatibleLoras,
   getLoadedLoras,
+  hasDistinctWanLowNoiseWeight,
   toGraphContract,
+  toMetadataLora,
   toModelIdentifier,
 } from './core/graphBuilder';
 export { detectCanvasMode } from './core/canvas/canvasMode';

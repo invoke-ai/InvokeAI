@@ -330,6 +330,32 @@ describe('resolveWorkflowModelRequirements', () => {
     expect(resolved).toMatchObject({ matchedModelName: 'Some SDXL Checkpoint', status: 'installed' });
   });
 
+  it('resolves a slot requirement through a role of an installed model, not by type alone', () => {
+    const requirement: WorkflowModelRequirement = {
+      base: null,
+      kind: 'slot',
+      label: 'Qwen3.5 Encoder',
+      modelType: 'qwen3_5_encoder',
+    };
+    const roleServing: InstalledModelSummary = {
+      base: 'any',
+      hash: 'h',
+      key: 'llm',
+      name: 'Qwen3.5 9B VLM',
+      roles: [{ type: 'qwen3_5_encoder' }],
+      type: 'text_llm',
+    };
+    const resolve = (installedModels: InstalledModelSummary[]) =>
+      resolveWorkflowModelRequirements([requirement], {
+        activeInstallSources: new Set(),
+        installedModels,
+        starterModels: [],
+      })[0];
+
+    expect(resolve([roleServing])).toMatchObject({ matchedModelName: 'Qwen3.5 9B VLM', status: 'installed' });
+    expect(resolve([{ ...roleServing, roles: [] }])).toMatchObject({ status: 'unresolvable' });
+  });
+
   it('matches a starter catalog entry via previous_names, case-insensitively', () => {
     const requirement: WorkflowModelRequirement = {
       identifier: { base: 'sdxl', key: 'missing-key', name: 'old name', type: 'main' },

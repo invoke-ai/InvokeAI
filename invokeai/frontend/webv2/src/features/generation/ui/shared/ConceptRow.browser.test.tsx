@@ -214,6 +214,13 @@ describe('ConceptRow', () => {
     expect(onRemove).toHaveBeenCalledWith('lora-1');
   });
 
+  it("spans the weight track over the concept's saved slider bounds", async () => {
+    const row = await render(makeLora({ default_settings: { weight: 0, weight_max: 3, weight_min: -2 } }));
+    const slider = row.querySelector<HTMLElement>('[role="slider"]')!;
+
+    expect([slider.getAttribute('aria-valuemin'), slider.getAttribute('aria-valuemax')]).toEqual(['-2', '3']);
+  });
+
   it('offers model, weight, toggle, and removal actions from the row context menu', async () => {
     const onUpdate = vi.fn();
     const onRemove = vi.fn();
@@ -360,5 +367,65 @@ describe('ConceptRow', () => {
     await act(() => userEvent.click(remove!));
 
     await expect.poll(() => document.activeElement?.textContent).toBe('Add concept');
+  });
+
+  it.each(['high', 'low', 'both'] as const)(
+    'shows the Wan expert target badge for %s and omits it when untargeted',
+    async (target) => {
+      const targeted = await render({ ...makeLora({ base: 'wan' }), target });
+      expect(targeted.textContent).toContain(`widgets.generate.wanLoraTargets.${target}`);
+
+      const untargeted = await render(makeLora({ base: 'wan' }));
+      expect(untargeted.textContent).not.toContain('widgets.generate.wanLoraTargets');
+    }
+  );
+
+  it('renders independent high-noise and low-noise weight scrubbers when lowNoiseWeight is set', async () => {
+    const onUpdate = vi.fn();
+    const row = await render(
+      { ...makeLora({ base: 'wan' }), lowNoiseWeight: 0.4, target: 'both', weight: 0.8 },
+      { onUpdate }
+    );
+    const sliders = row.querySelectorAll<HTMLElement>('[role="slider"]');
+
+    expect(sliders).toHaveLength(2);
+    expect(row.textContent).toContain('widgets.generate.highNoiseWeight');
+    expect(row.textContent).toContain('widgets.generate.lowNoiseWeight');
+
+    sliders[0]!.focus();
+    await act(() => userEvent.keyboard('{ArrowRight}'));
+    await act(() => flushWorkbenchDrafts());
+    expect(onUpdate).toHaveBeenLastCalledWith('lora-1', { weight: 0.85 });
+
+    sliders[1]!.focus();
+    await act(() => userEvent.keyboard('{ArrowLeft}'));
+    await act(() => flushWorkbenchDrafts());
+    expect(onUpdate).toHaveBeenLastCalledWith('lora-1', { lowNoiseWeight: 0.35 });
+  });
+
+  it('offers Use single weight and Clear expert target actions in the row context menu', async () => {
+    const onUpdate = vi.fn();
+    const row = await render(
+      { ...makeLora({ base: 'wan' }), lowNoiseWeight: 0.4, target: 'both', weight: 0.8 },
+      { onUpdate }
+    );
+    const openMenu = async () => {
+      await act(() => userEvent.click(row.querySelector<HTMLElement>('[data-list-primary]')!, { button: 'right' }));
+      await expect.poll(() => document.querySelector('[role="menu"]')).not.toBeNull();
+    };
+    const choose = async (label: string) => {
+      const item = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find(
+        (candidate) => candidate.textContent === label
+      );
+      await act(() => userEvent.click(item!));
+    };
+
+    await openMenu();
+    await choose('widgets.generate.conceptMenu.useSingleWeight');
+    expect(onUpdate).toHaveBeenLastCalledWith('lora-1', { lowNoiseWeight: null });
+
+    await openMenu();
+    await choose('widgets.generate.conceptMenu.clearExpertTarget');
+    expect(onUpdate).toHaveBeenLastCalledWith('lora-1', { lowNoiseWeight: null, target: null });
   });
 });

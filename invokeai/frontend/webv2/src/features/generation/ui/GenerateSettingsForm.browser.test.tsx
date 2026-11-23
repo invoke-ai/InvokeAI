@@ -5,11 +5,11 @@ import type { ComponentType } from 'react';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { DndContext } from '@dnd-kit/core';
-import { architectureCapabilitiesFixture } from '@features/generation/core/architectureCapabilities.testing';
 import { getDefaultGenerateSettings } from '@features/generation/core/baseGenerationPolicies';
-import { ensureArchitectureCapabilitiesLoaded } from '@features/generation/data/architectureCapabilitiesStore';
 import { wildcardsQueryOptions } from '@features/generation/data/wildcards';
 import { flushGenerateDrafts } from '@features/generation/react';
+import { ensureArchitectureCapabilitiesLoaded } from '@features/models/architecturesStore';
+import { architectureCapabilitiesFixture } from '@features/models/core/architectureCapabilities.testing';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { createExternalStoreCore, type ExternalStoreCore } from '@platform/state/externalStoreCore';
 import { closingFrames, recordDialogExit } from '@platform/ui/dialogExit.testing';
@@ -27,7 +27,7 @@ vi.mock('react-i18next', () => {
   return { useTranslation: () => ({ i18n: { resolvedLanguage: 'en' }, t }) };
 });
 
-vi.mock('@features/generation/data/architectureCapabilitiesApi', () => ({
+vi.mock('@features/models/data/architectureCapabilitiesApi', () => ({
   getArchitectureCapabilities: () => Promise.resolve(architectureCapabilitiesFixture),
 }));
 
@@ -124,7 +124,13 @@ const MainModelPicker = ({
       data-component-value={value ?? ''}
     >
       {stableGroups.models.catalog
-        .filter((model) => modelTypes.includes(model.type) && (filter?.(model) ?? true))
+        .filter(
+          (model) =>
+            [model.type, ...((model.roles as { type: string }[] | undefined) ?? []).map((role) => role.type)].some(
+              (type) => modelTypes.includes(type)
+            ) &&
+            (filter?.(model) ?? true)
+        )
         .map((model) => (
           <button key={model.key} data-component-pick={model.key} type="button" onClick={() => onChange(model)}>
             {model.name}
@@ -300,6 +306,58 @@ afterEach(async () => {
   root = null;
   commits.clear();
   accountLifecycle.invalidate();
+});
+
+describe('Canvas hosted-provider preflight', () => {
+  it('shows a conditional Canvas budget hint without a blocking issue', async () => {
+    const model = {
+      ...MODEL,
+      base: 'external',
+      type: 'external_image_generator',
+      key: 'seedream',
+      name: 'Seedream',
+      provider_id: 'seedream',
+      provider_model_id: 'seedream-4-5-251128',
+      capabilities: { modes: ['txt2img', 'img2img'], supports_reference_images: true, max_reference_images: 14 },
+    } as unknown as GenerationModelCatalogItem;
+    stableGroups.models.catalog = [model];
+    await settle(() =>
+      storedValues().patchSnapshot({
+        ...getDefaultGenerateSettings(model as never),
+        modelKey: model.key,
+        referenceImages: Array.from({ length: 14 }, (_, i) => ({
+          id: `ref-${i}`,
+          isEnabled: true,
+          config: {
+            type: 'external_reference_image',
+            image: {
+              imageName: `ref-${i}.png`,
+              width: 512,
+              height: 512,
+              original: { image: { image_name: `ref-${i}.png`, width: 512, height: 512 } },
+            },
+          },
+        })),
+      })
+    );
+    const adapter = buildAdapter();
+    adapter.project = { ...adapter.project, invocationSourceId: 'canvas' };
+    await renderAdapter(adapter);
+    const hint = 'widgets.generate.canvasReferenceImageBudgetHint';
+    const issue = 'Seedream supports at most 15 images total (reference + init + output), got 16.';
+    expect(host!.textContent).toContain(hint);
+    expect(host!.textContent).not.toContain(issue);
+    await renderAdapter(buildAdapter());
+    expect(host!.textContent).not.toContain(hint);
+    await renderAdapter(adapter);
+    await settle(() => {
+      const references = storedValues().getSnapshot().referenceImages as { isEnabled: boolean }[];
+      storedValues().patchSnapshot({
+        referenceImages: references.map((ref, i) => (i === 0 ? { ...ref, isEnabled: false } : ref)),
+      });
+    });
+    expect(host!.textContent).not.toContain(hint);
+  });
 });
 
 describe('GenerateSettingsForm Anima inpaint adapter', () => {

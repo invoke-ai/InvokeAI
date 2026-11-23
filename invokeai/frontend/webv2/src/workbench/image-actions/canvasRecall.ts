@@ -1,5 +1,6 @@
 import type { GalleryImage } from '@features/gallery';
 import type { GenerateModelConfig, ComponentModelConfig } from '@features/generation/contracts';
+import type { ResolvedValues } from '@platform/core/resolvedValues';
 import type { CanvasDocumentContractV3, CanvasLayerContract, CanvasNodeContract } from '@workbench/canvas-engine/api';
 import type { Project } from '@workbench/projectContracts';
 import type { WorkbenchCommands } from '@workbench/workbenchStore';
@@ -75,7 +76,8 @@ const readCanvasSettings = (metadata: Record<string, unknown>): Record<string, u
   const settings = record && isRecord(record.settings) ? record.settings : null;
   if (settings && isRecord(settings.compositing)) {
     const raw = settings.compositing;
-    const normalized = readCanvasCompositingSettings(raw);
+    // Resolved when recorded.
+    const normalized = readCanvasCompositingSettings(raw as ResolvedValues);
     for (const key of Object.values(CANVAS_COMPOSITING_KEYS)) {
       const value = raw[key],
         canonical = normalized[key];

@@ -15,13 +15,13 @@ import type { ReactNode } from 'react';
 import { ChakraProvider } from '@chakra-ui/react';
 import { DndContext } from '@dnd-kit/core';
 import { PositivePromptField } from '@features/generation/components';
+import { promptTemplatesQueryOptions } from '@features/generation/queries';
+import { GenerationUiProvider } from '@features/generation/ui/GenerationUiContext';
 import {
   resetArchitectureCapabilities,
   setArchitectureCapabilities,
-} from '@features/generation/core/architectureCapabilities';
-import { architectureCapabilitiesFixture } from '@features/generation/core/architectureCapabilities.testing';
-import { promptTemplatesQueryOptions } from '@features/generation/queries';
-import { GenerationUiProvider } from '@features/generation/ui/GenerationUiContext';
+} from '@features/models/core/architectureCapabilities';
+import { architectureCapabilitiesFixture } from '@features/models/core/architectureCapabilities.testing';
 import { createDefaultUpscaleWidgetValues } from '@features/upscale';
 import { UpscaleWidgetView } from '@features/upscale/ui/UpscaleWidgetView';
 import { accountLifecycle } from '@platform/state/accountLifecycle';

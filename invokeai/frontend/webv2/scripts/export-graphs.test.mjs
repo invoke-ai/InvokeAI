@@ -9,7 +9,7 @@ import { promisify } from 'node:util';
 
 const PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const CLI = resolve(PACKAGE_ROOT, 'scripts/export-graphs.mjs');
-const CAPABILITIES = resolve(PACKAGE_ROOT, 'src/features/generation/core/__fixtures__/architectureCapabilities.json');
+const CAPABILITIES = resolve(PACKAGE_ROOT, 'src/features/models/core/__fixtures__/architectureCapabilities.json');
 
 const runCli = async (context, requestText) => {
   const directory = await mkdtemp(resolve(tmpdir(), 'invokeai-graphs-export-'));

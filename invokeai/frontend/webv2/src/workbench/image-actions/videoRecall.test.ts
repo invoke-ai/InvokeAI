@@ -822,3 +822,119 @@ describe('legacy H3 duration recall', () => {
     expect(result?.values).toMatchObject({ numFrames: expectedFrames, fps: 24 });
   });
 });
+
+describe('H3 draft size recall', () => {
+  it.each([
+    [864, 480, '16:9', '480p'],
+    [960, 544, '16:9', '544p'],
+    [544, 960, '9:16', '544p'],
+    [480, 480, '1:1', '480p'],
+  ] as const)('recalls %sx%s as %s %s', (width, height, aspectRatioId, targetResolution) => {
+    expect(getVideoSizeRecalls(h3Model(), width, height)).toContainEqual({ aspectRatioId, targetResolution });
+  });
+});
+
+describe('equivalent H3 media-sized presets', () => {
+  const model = h3Model();
+  const frame = { width: 1000, height: 700, image_name: 'legacy-frame.png' };
+
+  it.each(['768 highres', '768 lowres', '544p'] as const)(
+    'recalls the original 768x544 canvas from %s without increasing its size',
+    (targetResolution) => {
+      const values = { ...createDefaultVideoWidgetValues([model]), firstFrameImage: frame, targetResolution };
+      const result = buildVideoRecallSettings({
+        currentValues: values,
+        kind: 'all',
+        metadata: {
+          generation_mode: 'minimax_h3_i2v',
+          width: 768,
+          height: 544,
+          first_frame_image: { image_name: frame.image_name },
+        },
+        models: [model],
+      });
+      expect(result).not.toBeNull();
+      const settled = settleMediaSizedRecall({ ...result!, values: { ...result!.values, firstFrameImage: frame } });
+      expect(settled.values.targetResolution).toBe(targetResolution === '544p' ? '544p' : '768 lowres');
+      expect(getVideoDimensions(model, settled.values)).toMatchObject({ width: 768, height: 544 });
+      const sizeOnly = resolveVideoSizeRecall(values, 768, 544);
+      expect(sizeOnly).toEqual({
+        outcome: 'fits',
+        sizeRecall: { targetResolution: targetResolution === '544p' ? '544p' : '768 lowres' },
+      });
+    }
+  );
+});
+
+describe('Wan LoRA expert target recall', () => {
+  const highLora = { ...LIGHTNING_HIGH, key: 'wan-expert-high' };
+  const lowLora = { ...LIGHTNING_LOW, key: 'wan-expert-low' };
+  const dualLora = { base: 'wan', key: 'wan-expert-dual', name: 'Wan Dual', type: 'lora', variant: 'a14b' };
+  const currentValues = createDefaultVideoWidgetValues([WAN_T2V]);
+
+  it('restores target and low_noise_weight without altering untargeted LoRA records', () => {
+    const result = buildVideoRecallSettings({
+      currentValues,
+      kind: 'all',
+      metadata: wanMetadata({
+        loras: [
+          { model: { key: highLora.key }, target: 'high', weight: 0.9 },
+          { model: { key: lowLora.key }, target: 'low', weight: 0.5 },
+          { low_noise_weight: 0.3, model: { key: dualLora.key }, target: 'both', weight: 0.8 },
+          { model: { key: LIGHTNING_HIGH.key }, weight: 1 },
+        ],
+      }),
+      models: [WAN_T2V, highLora, lowLora, dualLora, LIGHTNING_HIGH],
+    });
+
+    expect(result?.values.loras).toEqual([
+      { isEnabled: true, model: highLora, target: 'high', weight: 0.9 },
+      { isEnabled: true, model: lowLora, target: 'low', weight: 0.5 },
+      { isEnabled: true, lowNoiseWeight: 0.3, model: dualLora, target: 'both', weight: 0.8 },
+      { isEnabled: true, model: LIGHTNING_HIGH, weight: 1 },
+    ]);
+  });
+
+  it('folds legacy dual high/low entries for the same LoRA into one both entry', () => {
+    const result = buildVideoRecallSettings({
+      currentValues,
+      kind: 'all',
+      metadata: wanMetadata({
+        loras: [
+          { model: { key: dualLora.key }, target: 'low', weight: 0.4 },
+          { model: { key: dualLora.key }, target: 'high', weight: 0.85 },
+        ],
+      }),
+      models: [WAN_T2V, dualLora],
+    });
+
+    expect(result?.values.loras).toEqual([
+      { isEnabled: true, lowNoiseWeight: 0.4, model: dualLora, target: 'both', weight: 0.85 },
+    ]);
+  });
+
+  it('deduplicates non-opposing duplicate entries for the same LoRA key', () => {
+    const sameTarget = buildVideoRecallSettings({
+      currentValues,
+      kind: 'all',
+      metadata: wanMetadata({
+        loras: [
+          { model: { key: highLora.key }, target: 'high', weight: 0.9 },
+          { model: { key: highLora.key }, target: 'high', weight: 0.5 },
+          { model: { key: dualLora.key }, target: 'high', weight: 0.8 },
+          { model: { key: dualLora.key }, target: 'low', weight: 0.4 },
+          { model: { key: dualLora.key }, target: 'low', weight: 0.2 },
+          { model: { key: LIGHTNING_HIGH.key }, weight: 1 },
+          { model: { key: LIGHTNING_HIGH.key }, weight: 0.6 },
+        ],
+      }),
+      models: [WAN_T2V, highLora, dualLora, LIGHTNING_HIGH],
+    });
+
+    expect(sameTarget?.values.loras).toEqual([
+      { isEnabled: true, model: highLora, target: 'high', weight: 0.9 },
+      { isEnabled: true, lowNoiseWeight: 0.4, model: dualLora, target: 'both', weight: 0.8 },
+      { isEnabled: true, model: LIGHTNING_HIGH, weight: 1 },
+    ]);
+  });
+});

@@ -1,8 +1,8 @@
 import type { BackendGraphContract, BackendInvocationContract } from '@features/generation/contracts';
 
-import { architectureCapabilitiesFixture } from '@features/generation/core/architectureCapabilities.testing';
 import { generateGraphCases, satisfiedSettingsFor } from '@features/generation/core/graphCoverage.testing';
-import { withArchitectureCapabilities } from '@features/generation/graphExport';
+import { withArchitectureCapabilities } from '@features/models/architectures';
+import { architectureCapabilitiesFixture } from '@features/models/core/architectureCapabilities.testing';
 import { describe, expect, it } from 'vitest';
 
 import { exportGraphs, GraphExportRequestError, type GraphExportCaseResult } from './graphExport';
@@ -138,6 +138,27 @@ describe('graph export', () => {
     });
   });
 
+  it('takes the default component the way Generate does: not while its files are missing', () => {
+    const zImage = { ...sdxlCase('z-image'), model_key: 'z-image-gguf' };
+    const withDefault = (flagged: boolean, missingFirst = false) => {
+      const models = MODELS.map((entry) =>
+        entry.key === 'z-image-gguf'
+          ? { ...entry, default_settings: { components: { qwen3_encoder: 'qwen3-4b-gguf' } } }
+          : entry.key === 'qwen3-4b-gguf'
+            ? { ...entry, ...(flagged ? { is_missing: true } : {}) }
+            : entry
+      );
+      const missing = models.find((entry) => entry.key === 'qwen3-4b-gguf')!;
+
+      return missingFirst ? [missing, ...models.filter((entry) => entry !== missing)] : models;
+    };
+
+    expect(exportOne(zImage, withDefault(false)).components.qwen3EncoderModel).toBe('qwen3-4b-gguf');
+    // Whichever comes first in the catalog, the required-slot fallback skips the missing encoder too.
+    expect(exportOne(zImage, withDefault(true)).components.qwen3EncoderModel).toBe('qwen3-4b');
+    expect(exportOne(zImage, withDefault(true, true)).components.qwen3EncoderModel).toBe('qwen3-4b');
+  });
+
   it('fills required components from the installed models and keeps explicit picks', () => {
     const zImage = { ...sdxlCase('z-image'), model_key: 'z-image-gguf' };
 
@@ -147,6 +168,51 @@ describe('graph export', () => {
       qwen3EncoderModel: 'qwen3-4b-gguf',
       vae: 'flux-vae',
     });
+  });
+
+  it('rejects a Vision Tower beside a safetensors encoder whatever order the picks are listed in', () => {
+    // The model's default components set a GGUF encoder and its tower; the case asks for a safetensors encoder.
+    const krea2Models = [
+      ...MODELS,
+      model('k2-gguf', 'krea-2', 'main', {
+        default_settings: { components: { qwen3_vl_encoder: 'k2-encoder-gguf', qwen3_vl_vision_tower: 'k2-mmproj' } },
+        format: 'gguf_quantized',
+        variant: 'krea2_base',
+      }),
+      model('k2-encoder-gguf', 'any', 'qwen3_vl_encoder', { format: 'gguf_quantized', variant: 'qwen3_vl_4b' }),
+      model('k2-encoder-st', 'any', 'qwen3_vl_encoder', { format: 'checkpoint', variant: 'qwen3_vl_4b' }),
+      model('k2-mmproj', 'any', 'qwen3_vl_vision_tower', { format: 'gguf_quantized', variant: 'qwen3_vl_4b' }),
+      model('k2-vae', 'qwen-image', 'vae', { format: 'checkpoint' }),
+    ];
+    const exportWith = (components: Record<string, string>) =>
+      exportGraphs(request([sdxlCase('k2', { components, model_key: 'k2-gguf' })], krea2Models)).cases[0];
+    const encoderFirst = { qwen3VLEncoderModel: 'k2-encoder-st', qwen3VLVisionTowerModel: 'k2-mmproj', vae: 'k2-vae' };
+    const towerFirst = { qwen3VLVisionTowerModel: 'k2-mmproj', qwen3VLEncoderModel: 'k2-encoder-st', vae: 'k2-vae' };
+
+    expect(errorOf(exportWith(encoderFirst))).toMatch(/Unknown component slot .{1,4}qwen3VLVisionTowerModel/);
+    expect(errorOf(exportWith(towerFirst))).toMatch(/Unknown component slot .{1,4}qwen3VLVisionTowerModel/);
+  });
+
+  it('drops an inherited Vision Tower whose slot an encoder override closes', () => {
+    const krea2Models = [
+      ...MODELS,
+      model('k2-gguf', 'krea-2', 'main', {
+        default_settings: { components: { qwen3_vl_encoder: 'k2-encoder-gguf', qwen3_vl_vision_tower: 'k2-mmproj' } },
+        format: 'gguf_quantized',
+        variant: 'krea2_base',
+      }),
+      model('k2-encoder-gguf', 'any', 'qwen3_vl_encoder', { format: 'gguf_quantized', variant: 'qwen3_vl_4b' }),
+      model('k2-encoder-st', 'any', 'qwen3_vl_encoder', { format: 'checkpoint', variant: 'qwen3_vl_4b' }),
+      model('k2-mmproj', 'any', 'qwen3_vl_vision_tower', { format: 'gguf_quantized', variant: 'qwen3_vl_4b' }),
+      model('k2-vae', 'qwen-image', 'vae', { format: 'checkpoint' }),
+    ];
+    const { batch, components } = exportOne(
+      sdxlCase('k2', { components: { qwen3VLEncoderModel: 'k2-encoder-st', vae: 'k2-vae' }, model_key: 'k2-gguf' }),
+      krea2Models
+    );
+
+    expect(components).toEqual({ qwen3VLEncoderModel: 'k2-encoder-st', vae: 'k2-vae' });
+    expect(batch.graph.nodes.model_loader?.qwen3_vl_vision_tower_model).toBeUndefined();
   });
 
   it.each(generateGraphCases)('compiles $label from exactly the components it needs', ({ base, shape }) => {
@@ -191,6 +257,22 @@ describe('graph export', () => {
     expect(errors['unknown-lora']).toMatch(/^loras\[0\]: "missing-lora" .* Choices: sdxl-lora\.$/);
     expect(errors['unknown-control']).toMatch(/^control\[0\]: "sdxl-lora" cannot drive .* Choices: sdxl-canny\.$/);
     expect(response.cases.find((result) => result.id === 'ok')).toHaveProperty('batch');
+  });
+
+  it('refuses a case that names a model whose files are gone like one that is not installed', () => {
+    const models = MODELS.map((entry) =>
+      entry.key === 'sdxl' || entry.key === 'sdxl-lora' ? { ...entry, is_missing: true } : entry
+    );
+    const [mainGone] = exportGraphs(request([sdxlCase('main-gone')], models)).cases;
+    const [loraGone] = exportGraphs(
+      request(
+        [sdxlCase('lora-gone', { loras: [{ key: 'sdxl-lora', weight: 1 }] })],
+        MODELS.map((entry) => (entry.key === 'sdxl-lora' ? { ...entry, is_missing: true } : entry))
+      )
+    ).cases;
+
+    expect(errorOf(mainGone!)).toBe('model_key "sdxl" is not a selectable main model. Choices: z-image-gguf.');
+    expect(errorOf(loraGone!)).toContain('"sdxl-lora" is not an installed LoRA');
   });
 
   it('exports identical requests identically, with stable node ids', () => {

@@ -1,15 +1,15 @@
 import type { GenerateLora, VaeModelConfig } from '@features/generation/contracts';
 import type { ModelConfig } from '@features/models';
 
+import { getSchedulerOptions } from '@features/generation/settings';
 import {
   resetArchitectureCapabilities,
   setArchitectureCapabilities,
-} from '@features/generation/core/architectureCapabilities';
+} from '@features/models/core/architectureCapabilities';
 import {
   architectureCapabilitiesFixture,
   seedArchitectureCapabilities,
-} from '@features/generation/core/architectureCapabilities.testing';
-import { getSchedulerOptions } from '@features/generation/settings';
+} from '@features/models/core/architectureCapabilities.testing';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -98,6 +98,20 @@ describe('upscale settings', () => {
     expect(normalizeUpscaleWidgetValues({ mistralEncoderModel: mistral, qwenVlEncoderModel: mistral })).toMatchObject({
       mistralEncoderModel: { key: 'm' },
       qwenVlEncoderModel: null,
+    });
+  });
+
+  it('keeps a saved Text LLM that serves as the encoder through a role, and drops one without the role', () => {
+    const textLlm = {
+      ...model('llm', 'text_llm', 'any'),
+      roles: [{ type: 'qwen3_encoder', variant: 'qwen3_4b' }],
+    };
+
+    expect(normalizeUpscaleWidgetValues({ qwen3EncoderModel: textLlm })).toMatchObject({
+      qwen3EncoderModel: { key: 'llm', type: 'text_llm' },
+    });
+    expect(normalizeUpscaleWidgetValues({ qwen3EncoderModel: { ...textLlm, roles: [] } })).toMatchObject({
+      qwen3EncoderModel: null,
     });
   });
 
@@ -233,6 +247,23 @@ const QWEN3_4B = withVariant(model('qwen3-4b', 'qwen3_encoder', 'any'), 'qwen3_4
 const QWEN3_8B = withVariant(model('qwen3-8b', 'qwen3_encoder', 'any'), 'qwen3_8b');
 const QWEN3_06B = withVariant(model('qwen3-06b', 'qwen3_encoder', 'any'), 'qwen3_06b');
 describe('text encoder and VAE components', () => {
+  it('offers a Qwen3 4B Text LLM to Z-Image upscale through its role and refuses an 8B one', () => {
+    const roleLlm = (variant: string): ModelConfig =>
+      ({ ...model(`llm-${variant}`, 'text_llm', 'any'), roles: [{ type: 'qwen3_encoder', variant }] }) as ModelConfig;
+    const values = (llm: ModelConfig) => ({
+      ...createDefaultUpscaleWidgetValues([
+        model('spandrel', 'spandrel_image_to_image', 'any'),
+        model('z', 'main', 'z-image'),
+        model('flux-vae', 'vae', 'flux'),
+        llm,
+      ]),
+      inputImage: { height: 64, image_name: 'in.png', width: 64 },
+    });
+
+    expect(values(roleLlm('qwen3_4b')).qwen3EncoderModel?.key).toBe('llm-qwen3_4b');
+    expect(values(roleLlm('qwen3_8b')).qwen3EncoderModel).toBeNull();
+  });
+
   const ready = (models: ModelConfig[]) => ({
     ...createDefaultUpscaleWidgetValues(models),
     inputImage: { height: 64, image_name: 'in.png', width: 64 },

@@ -21,6 +21,7 @@ import type {
   QwenImageEncoderQuantization,
   VaeModelConfig,
   VaePrecision,
+  WanLoraTarget,
 } from './types';
 
 import { sanitizeBatchCount } from './batch';
@@ -282,9 +283,23 @@ const getRefinerModelOrNull = (value: unknown): MainModelConfig | null =>
 
 const isVaePrecision = (value: unknown): value is VaePrecision => value === 'fp16' || value === 'fp32';
 
-/** Backend defaults from `Ideogram4DenoiseInvocation` / `Krea2*Invocation`. */
-export const IDEOGRAM4_SAMPLER_PRESETS: Ideogram4SamplerPreset[] = ['V4_QUALITY_48', 'V4_DEFAULT_20', 'V4_TURBO_12'];
+/** Mirror `invokeai/backend/ideogram4/sampler_configs.py`. Guidance describes the main phase before the polish tail. */
+export const IDEOGRAM4_SAMPLER_PRESETS: Record<Ideogram4SamplerPreset, { guidanceScale: number; steps: number }> = {
+  V4_QUALITY_48: { guidanceScale: 7, steps: 48 },
+  V4_DEFAULT_20: { guidanceScale: 7, steps: 20 },
+  V4_TURBO_12: { guidanceScale: 7, steps: 12 },
+};
 export const DEFAULT_IDEOGRAM4_SAMPLER_PRESET: Ideogram4SamplerPreset = 'V4_QUALITY_48';
+
+export const getEffectiveIdeogram4Sampling = (
+  settings: Pick<GenerateSettings, 'ideogram4SamplerPreset' | 'ideogram4GuidanceScale' | 'ideogram4Steps'>
+) => {
+  const preset = IDEOGRAM4_SAMPLER_PRESETS[settings.ideogram4SamplerPreset];
+  return {
+    guidanceScale: settings.ideogram4GuidanceScale ?? preset.guidanceScale,
+    steps: settings.ideogram4Steps ?? preset.steps,
+  };
+};
 /** Ideogram guidance_scale bounds live on the numeric anyOf branch, outside the shared capability-table slider. */
 export const IDEOGRAM4_GUIDANCE_MIN = 1;
 export const IDEOGRAM4_GUIDANCE_MAX = 20;
@@ -342,7 +357,7 @@ export const normalizeMossImageSkipLayers = (value: unknown): number[] | null =>
   Array.isArray(value) && value.every((entry) => Number.isInteger(entry)) ? toUniqueAscending(value) : null;
 
 export const isIdeogram4SamplerPreset = (value: unknown): value is Ideogram4SamplerPreset =>
-  IDEOGRAM4_SAMPLER_PRESETS.includes(value as Ideogram4SamplerPreset);
+  typeof value === 'string' && Object.hasOwn(IDEOGRAM4_SAMPLER_PRESETS, value);
 
 export const isFluxDypePreset = (value: unknown): value is FluxDypePreset =>
   FLUX_DYPE_PRESETS.includes(value as FluxDypePreset);
@@ -369,25 +384,70 @@ export {
   KREA2_REBALANCE_WEIGHT_COUNT,
 };
 
-const isGenerateLora = (value: unknown): value is GenerateLora =>
-  isRecord(value) &&
-  isLoraModelConfig(value.model) &&
-  hasFiniteNumber(value, 'weight') &&
-  typeof value.isEnabled === 'boolean';
+export const isWanLoraTarget = (value: unknown): value is WanLoraTarget =>
+  value === 'high' || value === 'low' || value === 'both';
+
+export const isGenerateLora = (value: unknown): value is GenerateLora => {
+  if (
+    !isRecord(value) ||
+    !isLoraModelConfig(value.model) ||
+    !hasFiniteNumber(value, 'weight') ||
+    typeof value.isEnabled !== 'boolean'
+  ) {
+    return false;
+  }
+
+  if (value.target !== undefined && !isWanLoraTarget(value.target)) {
+    return false;
+  }
+
+  if (value.lowNoiseWeight !== undefined && (value.target !== 'both' || !hasFiniteNumber(value, 'lowNoiseWeight'))) {
+    return false;
+  }
+
+  return true;
+};
+
+export const normalizeGenerateLora = (value: unknown): GenerateLora | null => {
+  if (
+    !isRecord(value) ||
+    !isLoraModelConfig(value.model) ||
+    !hasFiniteNumber(value, 'weight') ||
+    typeof value.isEnabled !== 'boolean'
+  ) {
+    return null;
+  }
+
+  const target = isWanLoraTarget(value.target) ? value.target : undefined;
+  const lowNoiseWeight =
+    target === 'both' && hasFiniteNumber(value, 'lowNoiseWeight') ? (value.lowNoiseWeight as number) : undefined;
+
+  return {
+    isEnabled: value.isEnabled,
+    model: value.model,
+    weight: value.weight as number,
+    ...(target !== undefined ? { target } : {}),
+    ...(lowNoiseWeight !== undefined ? { lowNoiseWeight } : {}),
+  };
+};
 
 export const DEFAULT_REFERENCE_IMAGE_LIMIT = 5;
 
-const REFERENCE_IMAGE_CONFIG_TYPES = new Set([
-  'external_reference_image',
-  'flux2_reference_image',
-  'flux_kontext_reference_image',
-  'flux_redux',
-  'ip_adapter',
-  'krea2_edit_reference_image',
-  'krea2_reference_image',
-  'qwen_image_reference_image',
-  'qwen_image_2_1_reference_image',
-]);
+// Keyed by kind, so a new kind fails to compile until the reader below handles it.
+const REFERENCE_IMAGE_CONFIG_TYPES: Record<GenerateReferenceImageConfig['type'], true> = {
+  external_reference_image: true,
+  flux2_reference_image: true,
+  flux_kontext_reference_image: true,
+  flux_redux: true,
+  ip_adapter: true,
+  krea2_edit_reference_image: true,
+  krea2_reference_image: true,
+  qwen_image_reference_image: true,
+  qwen_image_2_1_reference_image: true,
+};
+
+const isReferenceImageConfigType = (value: unknown): value is GenerateReferenceImageConfig['type'] =>
+  typeof value === 'string' && Object.hasOwn(REFERENCE_IMAGE_CONFIG_TYPES, value);
 
 const isClipVisionModel = (value: unknown): value is 'ViT-H' | 'ViT-G' | 'ViT-L' =>
   value === 'ViT-H' || value === 'ViT-G' || value === 'ViT-L';
@@ -408,7 +468,7 @@ const normalizeReferenceImageAsset = (value: unknown): GenerateReferenceImageAss
   value === null ? null : normalizeCroppableImage(value);
 
 const normalizeReferenceImageConfig = (value: unknown): GenerateReferenceImageConfig | null => {
-  if (!isRecord(value) || typeof value.type !== 'string' || !REFERENCE_IMAGE_CONFIG_TYPES.has(value.type)) {
+  if (!isRecord(value) || !isReferenceImageConfigType(value.type)) {
     return null;
   }
 
@@ -462,8 +522,6 @@ const normalizeReferenceImageConfig = (value: unknown): GenerateReferenceImageCo
         weight: hasFiniteNumber(value, 'weight') ? (value.weight as number) : 1,
       };
   }
-
-  return null;
 };
 
 /** Long enough for a descriptive label, short enough to stay one line in metadata and recall notices. */
@@ -598,6 +656,12 @@ export const getDefaultLoraWeight = (model: LoraModelConfig): number => {
     ? weight
     : DEFAULT_LORA_WEIGHT_CONFIG.initial;
 };
+
+/** The weight slider's track; an unset bound falls back like the backend's effective-range validator. */
+export const getLoraWeightSliderRange = (model: LoraModelConfig): { max: number; min: number } => ({
+  max: model.default_settings?.weight_max ?? DEFAULT_LORA_WEIGHT_CONFIG.sliderMax,
+  min: model.default_settings?.weight_min ?? DEFAULT_LORA_WEIGHT_CONFIG.sliderMin,
+});
 
 const areModelSnapshotsEqual = (a: unknown, b: unknown): boolean => {
   if (a === b) {
@@ -992,7 +1056,7 @@ export const normalizeGenerateSettings = (values: unknown): GenerateSettings | n
       : getClampedNumber(values, 'hiDiffusionT2Ratio', 0, MAX_HIDIFFUSION_RATIO, 0),
     ...normalizeDynamicPromptsSettings(values),
     height,
-    loras: Array.isArray(values.loras) ? values.loras.filter(isGenerateLora) : [],
+    loras: Array.isArray(values.loras) ? values.loras.flatMap((entry) => normalizeGenerateLora(entry) ?? []) : [],
     modelKey: values.modelKey as string,
     negativePromptEnabled: typeof values.negativePromptEnabled === 'boolean' ? values.negativePromptEnabled : true,
     negativePrompt: values.negativePrompt as string,

@@ -5,8 +5,8 @@ import type { InvocationTemplatesSnapshot } from '@features/workflow/react';
 import type { GraphContract } from '@workbench/graphContracts';
 import type { TFunction } from 'i18next';
 
-import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
 import { getDefaultGenerateSettings } from '@features/generation/settings';
+import { seedArchitectureCapabilities } from '@features/models/core/architectureCapabilities.testing';
 import { createGraphBearingSurface } from '@workbench/graphSurfaces';
 import { getActiveProjectGraph } from '@workbench/projectWorkflows';
 import { BUILT_IN_PROJECT_SETTINGS } from '@workbench/settings/projectSettings';

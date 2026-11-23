@@ -1,18 +1,20 @@
 /* oxlint-disable react-perf/jsx-no-new-object-as-prop, react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop */
 import type { GalleryItem } from '@features/gallery/core/items';
 import type { GalleryBoard } from '@features/gallery/core/types';
-import type { GalleryUiAdapter } from '@features/gallery/react';
+import type { GalleryItemContextMenuRequest, GalleryUiAdapter } from '@features/gallery/react';
 import type { GalleryHost } from '@features/gallery/ui/GalleryUiContext';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { legacyGeneratedImageToGalleryItem } from '@features/gallery/core/items';
 import { GalleryUiProvider } from '@features/gallery/react';
 import { GalleryHostProvider } from '@features/gallery/ui/GalleryUiContext';
+import { resolvedValues } from '@platform/core/resolvedValues.testing';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import { act, useCallback, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { userEvent } from 'vitest/browser';
 
 import { getGalleryPickerSelectionAfterPick, type GalleryPickerSelection } from './galleryPicker';
 import { GalleryPickerPopover } from './GalleryPickerPopover';
@@ -134,11 +136,13 @@ let queryClient: QueryClient | null = null;
 const galleryCommands = { selectBoard: vi.fn(), selectItem: vi.fn(), setView: vi.fn() };
 const openGallery = vi.fn(() => true);
 const notifications = { add: vi.fn(), reportError: vi.fn() };
+const openItemContextMenu = vi.fn();
 
 const adapter = {
   gallery: galleryCommands,
   galleryValues: { galleryView: 'images', selectedBoardId: 'dogs', selectedImage: dogItems[1] },
   notifications,
+  openItemContextMenu,
   projectName: 'Project',
   widgets: { openGallery, patchGalleryValues: vi.fn() },
 } as unknown as GalleryUiAdapter;
@@ -163,7 +167,7 @@ const MultiAddHost = ({ initialSelection }: { initialSelection: GalleryPickerSel
 const OPEN_DIALOG = '[role="dialog"][data-state="open"]';
 
 /** A host without a workbench (the Launchpad): no Gallery widget scope to seed from or reveal. */
-const launchpadHost: GalleryHost = { galleryValues: {}, notifications, projectName: '' };
+const launchpadHost: GalleryHost = { galleryValues: resolvedValues(), notifications, projectName: '' };
 
 const renderPicker = async (picker?: React.ReactElement, { withoutWorkbench = false } = {}) => {
   const content = picker ?? (
@@ -421,6 +425,52 @@ describe('GalleryPickerPopover', () => {
     expect(document.querySelector(OPEN_DIALOG)).toBeNull();
     expect(onPick).not.toHaveBeenCalled();
     await vi.waitFor(() => expect(document.activeElement).toBe(trigger));
+  });
+
+  it("opens the highlighted item's menu from the keyboard in the search field, and leaves a right-click to the browser", async () => {
+    const { dialog } = await openPicker();
+    const input = getSearchInput(dialog);
+
+    await vi.waitFor(() => expect(document.activeElement).toBe(input));
+    await pressKey(input, 'ArrowLeft');
+    await vi.waitFor(() => expect(getActiveOption(dialog)).toBe(getOption(dialog, 'image:a.png')));
+    await act(() => userEvent.keyboard('{Shift>}{F10}{/Shift}'));
+
+    const expectHighlightedItemMenu = () => {
+      const request = openItemContextMenu.mock.lastCall?.[0] as GalleryItemContextMenuRequest;
+      const tile = getOption(dialog, 'image:a.png').getBoundingClientRect();
+
+      expect(request).toMatchObject({ item: dogItems[0], ref: { kind: 'image', name: 'a.png' } });
+      expect(request.x).toBeGreaterThanOrEqual(tile.left);
+      expect(request.x).toBeLessThanOrEqual(tile.right);
+      expect(request.y).toBeGreaterThanOrEqual(tile.top);
+      expect(request.y).toBeLessThanOrEqual(tile.bottom);
+      expect(request.returnFocus?.()).toBe(input);
+    };
+
+    expectHighlightedItemMenu();
+
+    await act(() => userEvent.click(input, { button: 'right' }));
+    expect(openItemContextMenu).toHaveBeenCalledOnce();
+
+    // A key-opened menu in an engine that reports it like a right-click: the key press came after the pointer's.
+    const field = input.getBoundingClientRect();
+
+    await act(() => userEvent.click(input));
+    await pressKey(input, 'F10');
+    await act(() =>
+      input.dispatchEvent(
+        new MouseEvent('contextmenu', {
+          bubbles: true,
+          button: 2,
+          cancelable: true,
+          clientX: field.left + field.width / 2,
+          clientY: field.top + field.height / 2,
+        })
+      )
+    );
+    expect(openItemContextMenu).toHaveBeenCalledTimes(2);
+    expectHighlightedItemMenu();
   });
 
   it('dims tiles the slot cannot take and ignores clicks on them', async () => {

@@ -1,10 +1,13 @@
-import type { ArchitectureCapabilitiesSnapshot } from '@features/generation/runtime';
+import type { ArchitectureCapabilitiesSnapshot } from '@features/models/architecturesStore';
 import type { CanvasControlLayerContract } from '@workbench/canvas-engine/api';
 import type { WorkbenchPreferences } from '@workbench/settings/contracts';
 
 import { Box, Icon, Spinner, VisuallyHidden } from '@chakra-ui/react';
-import { getArchitectureCapabilitiesSnapshot, subscribeArchitectureCapabilities } from '@features/generation/runtime';
 import { useModelsSelector } from '@features/models';
+import {
+  getArchitectureCapabilitiesSnapshot,
+  subscribeArchitectureCapabilities,
+} from '@features/models/architecturesStore';
 import { useExternalStoreSelector } from '@platform/state/selectors';
 import { Tooltip } from '@platform/ui/Tooltip';
 import {

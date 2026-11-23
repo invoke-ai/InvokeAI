@@ -10,6 +10,7 @@ import { ChakraProvider } from '@chakra-ui/react';
 import { GalleryHostProvider } from '@features/gallery/picker';
 import { WorkflowGraphPreviewProvider, WorkflowUiProvider } from '@features/workflow/ui/WorkflowUiContext';
 import { createProjectGraph, serializeWorkflowJson } from '@features/workflow/utility';
+import { resolvedValues } from '@platform/core/resolvedValues.testing';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { system } from '@theme/system';
 import { act, StrictMode, type ComponentProps, type ReactNode } from 'react';
@@ -99,7 +100,7 @@ vi.mock('@features/workflow/queries', async (importOriginal) => ({
 }));
 
 const GALLERY_HOST: GalleryHost = {
-  galleryValues: {},
+  galleryValues: resolvedValues(),
   notifications: { add: vi.fn(), reportError: vi.fn() },
   projectName: '',
 };

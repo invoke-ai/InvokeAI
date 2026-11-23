@@ -4,9 +4,9 @@ import type { GenerationUiAdapter } from '@features/generation/ui/GenerationUiCo
 import type * as MenuModule from '@platform/ui/Menu';
 
 import { ChakraProvider } from '@chakra-ui/react';
-import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
 import { getDefaultGenerateSettings } from '@features/generation/core/baseGenerationPolicies';
 import { GenerationUiProvider } from '@features/generation/ui/GenerationUiContext';
+import { seedArchitectureCapabilities } from '@features/models/core/architectureCapabilities.testing';
 import { createExternalStoreCore } from '@platform/state/externalStoreCore';
 import { system } from '@theme/system';
 import { createInstance } from 'i18next';
@@ -73,7 +73,10 @@ const turbo: MainModelConfig = {
   type: 'main',
 };
 
-const render = async (model: MainModelConfig) => {
+const render = async (
+  model: MainModelConfig,
+  { catalog = [model], settings = {} }: { catalog?: readonly unknown[]; settings?: Record<string, unknown> } = {}
+) => {
   const values = createExternalStoreCore<Record<string, unknown>>({
     ...getDefaultGenerateSettings(model),
     aspectRatioId: 'Free',
@@ -84,12 +87,13 @@ const render = async (model: MainModelConfig) => {
     positivePrompt: 'a lighthouse',
     steps: 30,
     width: 1216,
+    ...settings,
   });
   const patchGenerateSettings = vi.fn((patch: Record<string, unknown>) => values.patchSnapshot(patch));
   const undoable = vi.fn();
   const adapter = {
     generateValues: values,
-    models: { catalog: [model], getBaseLabel: () => 'SDXL' },
+    models: { catalog, getBaseLabel: () => 'SDXL' },
     notifications: { error: vi.fn(), info: vi.fn(), reportError: vi.fn(), undoable },
     presets: { includePrompts: true, presets: [], remove: vi.fn(), rename: vi.fn(), save: vi.fn() },
     project: { activeProjectId: 'project-1' },
@@ -258,7 +262,7 @@ describe('GenerateHeaderActions', () => {
       .element(item('Apply model defaults'))
       .toHaveAccessibleDescription(
         'Steps 30 → 8. Left as is, not set for this model: Size, CFG, Scheduler, and VAE precision. ' +
-          "The model's VAE is not installed or does not fit it, so your VAE stays."
+          'VAE is missing, not installed or does not fit this model, so no default is applied for it.'
       );
   });
 
@@ -271,7 +275,7 @@ describe('GenerateHeaderActions', () => {
       .element(item('Apply model defaults'))
       .toHaveAccessibleDescription(
         'Left as is, not set for this model: Size, Steps, CFG, Scheduler, and VAE precision ' +
-          'VAE only sets only a VAE, which is not installed or does not fit it, so your VAE stays.'
+          'VAE only sets only VAE, which is missing, not installed or does not fit it, so nothing is applied.'
       );
   });
 
@@ -284,9 +288,35 @@ describe('GenerateHeaderActions', () => {
       .element(item('Apply model defaults'))
       .toHaveAccessibleDescription(
         'Left as is, not set for this model: Size, CFG, Scheduler, and VAE precision ' +
-          "Already using Steps only's defaults, except its VAE, which is not installed or does not fit it, so your " +
-          'VAE stays.'
+          "Already using Steps only's defaults, except VAE, which is missing, not installed or does not fit it."
       );
+  });
+
+  it('keeps a working encoder when the saved default encoder is registered but its file is missing', async () => {
+    const t5 = (key: string, name: string) => ({ base: 'any', key, name, type: 't5_encoder' });
+    const saved = { ...t5('saved-t5', 'Moved T5'), is_missing: true };
+    const working = t5('working-t5', 'Working T5');
+    const flux: MainModelConfig = {
+      base: 'flux',
+      default_settings: { components: { t5_encoder: saved.key } },
+      format: 'checkpoint',
+      key: 'flux',
+      name: 'FLUX',
+      type: 'main',
+    };
+    const { patchGenerateSettings } = await render(flux, {
+      catalog: [flux, saved, working],
+      settings: { t5EncoderModel: working },
+    });
+
+    await openMenu();
+    await expect.element(item('Apply model defaults')).toHaveAttribute('aria-disabled', 'true');
+    await expect
+      .element(item('Apply model defaults'))
+      .toHaveAccessibleDescription(expect.stringContaining('T5 Encoder'));
+    await act(() => (item('Apply model defaults').element() as HTMLElement).click());
+
+    expect(patchGenerateSettings).not.toHaveBeenCalled();
   });
 
   it('offers no apply, saying why, for a model with no defaults of its own', async () => {

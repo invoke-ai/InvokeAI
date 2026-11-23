@@ -66,7 +66,7 @@ const FIXTURE_VIDEO = readFileSync(resolve(import.meta.dirname, 'mock-assets/fix
 const FIXTURE_VIDEO_POSTER = readFileSync(resolve(import.meta.dirname, 'mock-assets/fixture-video.webp'));
 const ARCHITECTURE_CAPABILITIES = JSON.parse(
   readFileSync(
-    resolve(import.meta.dirname, '../src/features/generation/core/__fixtures__/architectureCapabilities.json'),
+    resolve(import.meta.dirname, '../src/features/models/core/__fixtures__/architectureCapabilities.json'),
     'utf8'
   )
 );
@@ -1451,6 +1451,7 @@ export const startMockBackend = async (port, { clock = Date.now, profile = 'empt
       if (method === 'GET' && path === '/api/v1/auth/status') {
         return json(200, {
           admin_email: null,
+          has_single_user_work: false,
           multiuser_enabled: isMultiuserCaller(faults),
           setup_required: false,
           strict_password_checking: false,

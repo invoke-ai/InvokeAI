@@ -1,4 +1,4 @@
-import fixture from '@features/generation/core/__fixtures__/architectureCapabilities.json';
+import fixture from '@features/models/core/__fixtures__/architectureCapabilities.json';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const api = vi.hoisted(() => ({ getArchitectureCapabilities: vi.fn() }));
@@ -16,13 +16,13 @@ describe('architecture capabilities store', () => {
   it('fills the core registry rather than the snapshot', async () => {
     api.getArchitectureCapabilities.mockResolvedValue(rows);
     const store = await import('./architectureCapabilitiesStore');
-    const registry = await import('@features/generation/core/architectureCapabilities');
+    const registry = await import('@features/models/core/architectureCapabilities');
 
     expect(registry.hasArchitectureCapabilities()).toBe(false);
     await store.refreshArchitectureCapabilities();
 
     expect(store.getArchitectureCapabilitiesSnapshot()).toEqual({ error: null, revision: 1, status: 'loaded' });
-    expect(registry.getArchitectureGenerationConfig('sd-1')?.defaults.steps).toBe(30);
+    expect(registry.getArchitectureCapabilityRow('sd-1')?.defaults?.steps).toBe(30);
   });
 
   it('dedupes concurrent refreshes', async () => {
@@ -39,7 +39,7 @@ describe('architecture capabilities store', () => {
   it('reports a failure and leaves the registry empty', async () => {
     api.getArchitectureCapabilities.mockRejectedValue(new Error('outage'));
     const store = await import('./architectureCapabilitiesStore');
-    const registry = await import('@features/generation/core/architectureCapabilities');
+    const registry = await import('@features/models/core/architectureCapabilities');
 
     await store.refreshArchitectureCapabilities();
 
@@ -67,7 +67,7 @@ describe('architecture capabilities store', () => {
     api.getArchitectureCapabilities.mockResolvedValue(rows);
     const lifecycle = await import('@platform/state/accountLifecycle');
     const store = await import('./architectureCapabilitiesStore');
-    const registry = await import('@features/generation/core/architectureCapabilities');
+    const registry = await import('@features/models/core/architectureCapabilities');
 
     await store.refreshArchitectureCapabilities();
     expect(registry.hasArchitectureCapabilities()).toBe(true);
@@ -81,7 +81,7 @@ describe('architecture capabilities store', () => {
   it('publishes the registry rather than its own request state', async () => {
     api.getArchitectureCapabilities.mockResolvedValue(rows);
     const store = await import('./architectureCapabilitiesStore');
-    const registry = await import('@features/generation/core/architectureCapabilities');
+    const registry = await import('@features/models/core/architectureCapabilities');
     const seen: number[] = [];
     const unsubscribe = store.subscribeArchitectureCapabilities(() =>
       seen.push(store.getArchitectureCapabilitiesSnapshot().revision)
@@ -101,7 +101,7 @@ describe('architecture capabilities store', () => {
     api.getArchitectureCapabilities.mockResolvedValue(rows);
     const lifecycle = await import('@platform/state/accountLifecycle');
     const store = await import('./architectureCapabilitiesStore');
-    const registry = await import('@features/generation/core/architectureCapabilities');
+    const registry = await import('@features/models/core/architectureCapabilities');
 
     store.ensureArchitectureCapabilitiesLoaded();
     await store.refreshArchitectureCapabilities();

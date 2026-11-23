@@ -20,6 +20,7 @@ import type {
 } from './types';
 
 import {
+  addReferenceImages,
   GENERATE_COMPONENT_VALUE_KEYS,
   getComponentSectionPolicy,
   getDefaultGenerateSettings,
@@ -29,7 +30,6 @@ import {
   isLoraSupported,
   isReferenceImageSupported,
   SUPPORTED_GENERATE_BASES,
-  withAddedReferenceImages,
 } from './baseGenerationPolicies';
 import { getIsPidSupportedBase } from './pid';
 import { clampDimension, deriveAspectRatioId } from './settings';
@@ -351,7 +351,7 @@ const withRecallTuning = (
     ideogram4GuidanceScale: 5,
     ideogram4Mu: 1,
     ideogram4SamplerPreset: 'V4_TURBO_12',
-    ideogram4Steps: 30,
+    ideogram4Steps: 31,
     krea2RebalanceEnabled: true,
     krea2RebalanceMultiplier: 3,
     krea2RebalanceWeights: '1.0,1.0,1.0,1.0,1.0,1.0,1.0,2.0,4.0,1.0,3.0,1.0',
@@ -396,14 +396,16 @@ const recallReferenceImagesFor = (model: MainModelConfig, settings: GenerateSett
     ];
   }
 
-  return isReferenceImageSupported(model, settings)
-    ? withAddedReferenceImages(
-        model,
-        [{ base: model.base, key: `${model.base}-ip-adapter`, name: `${model.base} IP Adapter`, type: 'ip_adapter' }],
-        [],
-        [{ id: 'reference', image: RECALL_REFERENCE_IMAGE }]
-      )
-    : [];
+  return addReferenceImages({
+    additions: [{ id: 'reference', image: RECALL_REFERENCE_IMAGE }],
+    components: settings,
+    mode: 'strict',
+    model,
+    models: [
+      { base: model.base, key: `${model.base}-ip-adapter`, name: `${model.base} IP Adapter`, type: 'ip_adapter' },
+    ],
+    referenceImages: [],
+  }).referenceImages;
 };
 
 /** Everything filled and tuned; the size is off default and not square (Z-Image PiD is native, others fit). */

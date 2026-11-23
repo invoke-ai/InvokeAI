@@ -45,6 +45,7 @@ import {
   isMossImageQwen35Encoder,
   isQwen3Vl4bEncoder,
   isVisionTextLlm,
+  hasWanLowNoiseSlot,
   isSelfContainedSDNQFlux1Pipeline,
   isVaeCompatibleWithGenerateModel,
   isZImageQwen3Encoder,
@@ -63,6 +64,7 @@ import {
   addOutputPostprocessors,
   createId,
   getActiveCompatibleLoras,
+  hasDistinctWanLowNoiseWeight,
   toModelIdentifier,
   toGraphContract,
 } from './graphBuilder';
@@ -72,6 +74,7 @@ import { getCompelPromptNodeType } from './prompt/compel';
 import { getEffectiveReferenceImage, getEnabledReferenceImages } from './referenceImage';
 import { getActiveRefiner, getBaseDenoisingRange } from './sdxlRefiner';
 import { addSDXLRefinerStage, getRefinerMetadata } from './sdxlRefinerGraph';
+import { getEffectiveIdeogram4Sampling } from './settings';
 
 const getCompatibleComponentSource = (
   settings: Pick<GenerateSettings, 'componentSourceModel'>,
@@ -324,6 +327,60 @@ export const addTransformerLoraCollectionLoader = (
   }
 
   return loader;
+};
+
+/**
+ * Use `wan_lora_collection_loader` for ordinary untargeted LoRA sets; when any active LoRA carries a recalled Wan
+ * expert target or differing low-noise weight, chain `wan_lora_loader` nodes to preserve exact per-expert targeting.
+ */
+export const addWanLoraLoaders = (
+  graph: BackendGraphContract,
+  loras: GenerateLora[],
+  modelLoader: BackendInvocationContract,
+  model: Pick<MainModelConfig, 'variant'> | null | undefined
+): BackendInvocationContract => {
+  if (loras.every((lora) => lora.target === undefined && lora.lowNoiseWeight === undefined)) {
+    return addTransformerLoraCollectionLoader(graph, loras, 'wan_lora_collection_loader', modelLoader, ['transformer']);
+  }
+
+  let source = modelLoader;
+
+  for (const lora of loras) {
+    const loraModel = toModelIdentifier(lora.model);
+
+    if (hasDistinctWanLowNoiseWeight(lora, model)) {
+      const highLoader = addNode(graph, {
+        id: createId('wan_lora_loader'),
+        lora: loraModel,
+        target: 'high',
+        type: 'wan_lora_loader',
+        weight: lora.weight,
+      });
+      addEdge(graph, source, 'transformer', highLoader, 'transformer');
+
+      const lowLoader = addNode(graph, {
+        id: createId('wan_lora_loader'),
+        lora: loraModel,
+        target: 'low',
+        type: 'wan_lora_loader',
+        weight: lora.lowNoiseWeight,
+      });
+      addEdge(graph, highLoader, 'transformer', lowLoader, 'transformer');
+      source = lowLoader;
+    } else {
+      const loader = addNode(graph, {
+        id: createId('wan_lora_loader'),
+        lora: loraModel,
+        target: lora.target ?? 'auto',
+        type: 'wan_lora_loader',
+        weight: lora.weight,
+      });
+      addEdge(graph, source, 'transformer', loader, 'transformer');
+      source = loader;
+    }
+  }
+
+  return source;
 };
 
 type GenerateGraphBuilder = (
@@ -2285,7 +2342,10 @@ const buildIdeogram4Graph = (
   addEdge(graph, posCond, 'conditioning', denoise, 'positive_conditioning');
   addEdge(graph, seed, 'value', denoise, 'seed');
   addEdge(graph, denoise, 'latents', output, 'latents');
+  const sampling = getEffectiveIdeogram4Sampling(settings);
   const metadata = addMetadata(graph, output, settings, model, 'ideogram4_txt2img', projectSettings, {
+    cfg_scale: sampling.guidanceScale,
+    steps: sampling.steps,
     ideogram4_color_palette: settings.ideogram4ColorPalette,
     ideogram4_guidance_scale: settings.ideogram4GuidanceScale ?? null,
     ideogram4_mu: settings.ideogram4Mu ?? null,
@@ -2317,6 +2377,8 @@ const buildWanGraph = (
   const sourceModel = getDiffusersSource(settings, model);
   const vaeModel = getCompatibleVae(settings, model);
   const wanT5EncoderModel = settings.wanT5EncoderModel;
+  // The loader reads the second expert only for a single-file A14B model, so a stale pick never reaches the graph.
+  const lowNoiseModel = hasWanLowNoiseSlot(model) ? settings.wanLowNoiseModel : null;
 
   if (!sourceModel && (!vaeModel || !wanT5EncoderModel)) {
     throw new Error('Wan models require a VAE and Wan T5 Encoder, or a Diffusers component source.');
@@ -2330,14 +2392,12 @@ const buildWanGraph = (
     id: 'model_loader',
     model,
     // The second A14B expert. Omitted, the high-noise expert covers the whole schedule.
-    transformer_low_noise_model: settings.wanLowNoiseModel ?? undefined,
+    transformer_low_noise_model: lowNoiseModel ?? undefined,
     type: 'wan_model_loader',
     vae_model: vaeModel ?? undefined,
     wan_t5_encoder_model: wanT5EncoderModel ?? undefined,
   });
-  const loraSource = activeLoras.length
-    ? addTransformerLoraCollectionLoader(graph, activeLoras, 'wan_lora_collection_loader', modelLoader, ['transformer'])
-    : modelLoader;
+  const loraSource = activeLoras.length ? addWanLoraLoaders(graph, activeLoras, modelLoader, model) : modelLoader;
   const posCond = addNode(graph, { id: 'pos_cond', type: 'wan_text_encoder' });
   const negCond = addNode(graph, { id: 'neg_cond', type: 'wan_text_encoder' });
   const denoise = addNode(graph, {
@@ -2370,7 +2430,7 @@ const buildWanGraph = (
     wan_component_source: sourceModel,
     wan_guidance_scale_low_noise: settings.wanGuidanceScaleLowNoise ?? null,
     wan_t5_encoder_model: wanT5EncoderModel ?? undefined,
-    wan_transformer_low_noise: settings.wanLowNoiseModel ?? undefined,
+    wan_transformer_low_noise: lowNoiseModel ?? undefined,
   });
 
   return {

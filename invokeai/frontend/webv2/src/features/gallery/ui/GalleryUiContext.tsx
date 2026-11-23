@@ -9,10 +9,21 @@ import type {
   GalleryView,
 } from '@features/gallery/core/types';
 import type { QueueProgressSession } from '@features/queue/contracts';
+import type { ResolvedValues } from '@platform/core/resolvedValues';
 
 import { asSingleAccountBoards } from '@features/gallery/core/boardAccess';
+import { getContextMenuPoint, getContextMenuPointBelow } from '@platform/react/contextMenuPoint';
 import { createKeyedTransientStore, type KeyedTransientStore } from '@platform/state/externalStore';
-import { createContext, use, useMemo, useState, type ComponentType, type ReactNode } from 'react';
+import {
+  createContext,
+  use,
+  useCallback,
+  useMemo,
+  useState,
+  type ComponentType,
+  type MouseEvent,
+  type ReactNode,
+} from 'react';
 
 export interface GalleryItemActions {
   /**
@@ -54,6 +65,16 @@ export interface GalleryItemContextMenuTarget {
   items: GalleryItem[];
   listingBoardId?: string;
   /** Resolved on close: the menu that had focus is gone by then. */
+  returnFocus?: () => HTMLElement | null;
+  x: number;
+  y: number;
+}
+
+export interface GalleryItemContextMenuRequest {
+  /** What the surface already holds; the menu fetches the item without it. */
+  item?: GalleryItem;
+  ref: GalleryItemRef;
+  /** Resolved on close. */
   returnFocus?: () => HTMLElement | null;
   x: number;
   y: number;
@@ -119,16 +140,21 @@ export interface GalleryUiAdapter {
   /** The server has more than one account. */
   boardSharing?: boolean;
   gallery: GalleryCommandsPort;
-  galleryValues: Record<string, unknown>;
+  galleryValues: ResolvedValues;
   generateValues: Record<string, unknown>;
   /** The host narrows the server's check with its projects' own scans; rejects when the check cannot run. */
   getBoardMediaUsage(boardId: string, signal: AbortSignal): Promise<GalleryMediaUsageReport>;
   /** Null once the project is closed. */
-  getProjectGalleryValues?(projectId: string): Record<string, unknown> | null;
+  getProjectGalleryValues?(projectId: string): ResolvedValues | null;
   /** The host may explain where new results still go. */
   noteBoardBrowsed?(boardId: string): void;
   getItemLabel(item: GalleryItemRef): Promise<string | null>;
   notifications: GalleryNotificationsPort;
+  /**
+   * The item menu for media shown outside the Gallery widget; a newer request replaces a pending or open one. Stable:
+   * media surfaces read it alone, so adapter rebuilds do not re-render them.
+   */
+  openItemContextMenu(request: GalleryItemContextMenuRequest): void;
   projectId: string;
   projectName: string;
   /** The open project need not be among them. */
@@ -152,6 +178,7 @@ export interface GalleryUiAdapter {
 }
 
 const GalleryUiContext = createContext<GalleryUiAdapter | null>(null);
+const GalleryItemContextMenuContext = createContext<GalleryUiAdapter['openItemContextMenu'] | undefined>(undefined);
 const GalleryItemActionsContext = createContext<GalleryItemActions | null>(null);
 
 export const GalleryItemActionsProvider = ({
@@ -185,7 +212,9 @@ export const GalleryUiProvider = ({ adapter, children }: { adapter: GalleryUiAda
 
   return (
     <GalleryUiContext value={adapter}>
-      <GalleryLayoutStoreContext value={layoutStore}>{children}</GalleryLayoutStoreContext>
+      <GalleryItemContextMenuContext value={adapter.openItemContextMenu}>
+        <GalleryLayoutStoreContext value={layoutStore}>{children}</GalleryLayoutStoreContext>
+      </GalleryItemContextMenuContext>
     </GalleryUiContext>
   );
 };
@@ -225,7 +254,7 @@ export const useHostGalleryBoards = (boards: readonly GalleryBoard[] | undefined
 
 /** A host without a workbench (the Launchpad) supplies one with GalleryHostProvider. */
 export interface GalleryHost {
-  galleryValues: Record<string, unknown>;
+  galleryValues: ResolvedValues;
   notifications: GalleryNotificationsPort;
   projectId?: string;
   projectName: string;
@@ -282,4 +311,67 @@ export const useGalleryHost = (): GalleryHost => {
   }
 
   return resolved;
+};
+
+const getFocusedElement = (): HTMLElement | null => {
+  const { activeElement } = document;
+
+  return activeElement instanceof HTMLElement && activeElement !== document.body ? activeElement : null;
+};
+
+const isGalleryItem = (media: GalleryItem | GalleryItemRef): media is GalleryItem => 'fullUrl' in media;
+
+/**
+ * The item menu for gallery media: an `onContextMenu` handler for an element showing it (right-click or the context-menu
+ * key), or an `onClick` handler for a button that opens it, below the button. Pass the item itself when the surface has
+ * it, so the menu opens without a fetch. Undefined without media or outside the workbench (a `GalleryHostProvider`
+ * host), where the browser's own menu stays.
+ *
+ * `anchor` opens the menu below what it returns, or else below the handler's element, whatever the event's position:
+ * for an element that only highlights the media (a field driving `aria-activedescendant`).
+ */
+export const useGalleryItemContextMenu = (
+  media: GalleryItem | GalleryItemRef | null,
+  anchor?: () => Element | null
+): ((event: MouseEvent<HTMLElement>) => void) | undefined => {
+  const host = use(GalleryHostContext);
+  const open = use(GalleryItemContextMenuContext);
+  const item = media && isGalleryItem(media) ? media : undefined;
+  const kind = media?.kind;
+  const name = media?.name;
+  const handleContextMenu = useCallback(
+    (event: MouseEvent<HTMLElement>) => {
+      const { currentTarget, target } = event;
+
+      // Handled already by media nested inside this one. React also bubbles events up from portals: a popover opened
+      // from the media (its picker) keeps its own menus.
+      if (
+        !open ||
+        kind === undefined ||
+        name === undefined ||
+        event.defaultPrevented ||
+        !(target instanceof Node && currentTarget.contains(target))
+      ) {
+        return;
+      }
+
+      // Not stopped: owners around the media (a workflow node) read `defaultPrevented`, and window listeners (a touch
+      // hold disarming its drag) must still hear the event.
+      event.preventDefault();
+      // A pressed button is the opener even where a click does not focus it.
+      const isPress = event.type !== 'contextmenu';
+      const opener = isPress ? currentTarget : getFocusedElement();
+      const below = anchor ? (anchor() ?? currentTarget) : isPress ? currentTarget : null;
+
+      open({
+        ...(below ? getContextMenuPointBelow(below) : getContextMenuPoint(event)),
+        item,
+        ref: { kind, name },
+        returnFocus: () => (opener?.isConnected ? opener : null),
+      });
+    },
+    [anchor, item, kind, name, open]
+  );
+
+  return host || !open || kind === undefined || name === undefined ? undefined : handleContextMenu;
 };

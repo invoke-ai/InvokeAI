@@ -4,7 +4,7 @@ import {
   DEFAULT_DYNAMIC_PROMPTS_SETTINGS,
   DEFAULT_NEGATIVE_PROMPT_HEIGHT_PX,
   DEFAULT_POSITIVE_PROMPT_HEIGHT_PX,
-  isLoraModelConfig,
+  isGenerateLora,
   isMainModelConfig,
   isModelIdentifierConfig,
   isVaeModelConfig,
@@ -13,6 +13,7 @@ import {
   MIN_NEGATIVE_PROMPT_HEIGHT_PX,
   MIN_POSITIVE_PROMPT_HEIGHT_PX,
   normalizeDynamicPromptsSettings,
+  normalizeGenerateLora,
   sanitizeBatchCount,
 } from '@features/generation/settings';
 import { isSeedMode } from '@platform/core/seed';
@@ -64,7 +65,12 @@ export const isVideoAspectRatioId = (value: unknown): value is VideoAspectRatioI
   typeof value === 'string' && (VIDEO_ASPECT_RATIO_IDS as readonly string[]).includes(value);
 
 export const WAN_TARGET_RESOLUTIONS: readonly WanTargetResolution[] = ['480p', '720p', '1080p'];
-export const MINIMAX_H3_TARGET_RESOLUTIONS: readonly MiniMaxH3TargetResolution[] = ['768 highres', '768 lowres'];
+export const MINIMAX_H3_TARGET_RESOLUTIONS: readonly MiniMaxH3TargetResolution[] = [
+  '768 highres',
+  '768 lowres',
+  '480p',
+  '544p',
+];
 export const LTX2_TARGET_RESOLUTIONS: readonly Ltx2TargetResolution[] = ['512p', '704p', '768p', '1024p', '1536p'];
 
 export const isVideoTargetResolution = (value: unknown): value is VideoTargetResolution =>
@@ -237,11 +243,7 @@ const sanitizeVideoReferences = (value: unknown, sourceVideoName?: string): Vide
   return result;
 };
 
-const isVideoLora = (value: unknown): value is GenerateLora =>
-  isRecord(value) &&
-  isLoraModelConfig(value.model) &&
-  hasFiniteNumber(value, 'weight') &&
-  typeof value.isEnabled === 'boolean';
+const isVideoLora = isGenerateLora;
 
 const getStringArray = (value: unknown): string[] =>
   Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === 'string') : [];
@@ -327,7 +329,7 @@ export const normalizeVideoSettings = (values: unknown): VideoSettings | null =>
     (!firstFrameImage || !isConditioningClipExcludingFrames(values.conditioningClip))
       ? values.conditioningClip
       : null;
-  const loras = Array.isArray(values.loras) ? values.loras.filter(isVideoLora) : [];
+  const loras = Array.isArray(values.loras) ? values.loras.flatMap((entry) => normalizeGenerateLora(entry) ?? []) : [];
   const acceleratorLoraKeys = getStringArray(values.acceleratorLoraKeys);
   // Clear acceleration when any required accelerator LoRA disappears instead of claiming an inactive fast path.
   const acceleratorEnabled =

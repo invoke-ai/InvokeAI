@@ -1,8 +1,15 @@
+import {
+  resetArchitectureCapabilities,
+  setArchitectureCapabilities,
+} from '@features/models/core/architectureCapabilities';
+import {
+  architectureCapabilitiesFixture,
+  seedArchitectureCapabilities,
+} from '@features/models/core/architectureCapabilities.testing';
+
 import type { GenerationIssue } from './generationIssues';
 import type { GenerateModelConfig, GenerateReferenceImage, GenerateSettings, MainModelConfig } from './types';
 
-import { resetArchitectureCapabilities, setArchitectureCapabilities } from './architectureCapabilities';
-import { architectureCapabilitiesFixture, seedArchitectureCapabilities } from './architectureCapabilities.testing';
 import {
   getDefaultGenerateSettings,
   getGenerationModelAvailabilityIssues,

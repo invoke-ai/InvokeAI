@@ -1,5 +1,6 @@
 import type { GalleryImage } from '@features/gallery';
 import type {
+  ComponentModelConfig,
   GenerateModelConfig,
   GenerateReferenceImage,
   GenerateWidgetValues,
@@ -16,11 +17,13 @@ import {
   getCompatibleReferenceImages,
   getDefaultGenerateSettings,
   getEffectiveReferenceImage,
-  hasArchitectureCapabilities,
+  getModelDefaultFills,
   isSupportedGenerateModel,
   isVaeModelConfig,
   normalizeGenerateWidgetValues,
+  pickFallbackGenerateModel,
 } from '@features/generation/settings';
+import { hasArchitectureCapabilities } from '@features/models/architectures';
 import {
   getInvocationTemplatesSnapshot,
   refreshInvocationTemplates,
@@ -257,9 +260,14 @@ export const getMissingGenerateValuesMessage = (t: TFunction): string =>
 
 export const getCurrentGenerateValues = ({
   generateValues,
+  models,
   supportedModels,
+  fillDefaults = true,
 }: {
+  /** False for a recall that reads the image first: its model, not the fallback's, decides the defaults. */
+  fillDefaults?: boolean;
   generateValues: Record<string, unknown>;
+  models: readonly ComponentModelConfig[];
   supportedModels: GenerateModelConfig[];
 }) => {
   const normalizedValues = normalizeGenerateWidgetValues(generateValues);
@@ -274,16 +282,23 @@ export const getCurrentGenerateValues = ({
   }
 
   const fallbackModelKey = typeof generateValues.modelKey === 'string' ? generateValues.modelKey : null;
-  const fallbackModel = supportedModels.find((model) => model.key === fallbackModelKey) ?? supportedModels[0];
+  const fallbackModel =
+    supportedModels.find((model) => model.key === fallbackModelKey) ?? pickFallbackGenerateModel(supportedModels);
 
-  return fallbackModel
-    ? ({
-        ...getDefaultGenerateSettings(fallbackModel),
-        ...generateValues,
-        model: fallbackModel,
-        modelKey: fallbackModel.key,
-      } as GenerateWidgetValues)
-    : null;
+  if (!fallbackModel) {
+    return null;
+  }
+
+  const initial = {
+    ...getDefaultGenerateSettings(fallbackModel),
+    ...generateValues,
+    model: fallbackModel,
+    modelKey: fallbackModel.key,
+  } as GenerateWidgetValues;
+
+  // The model's default components and VAE fill in as they do when Generate itself picks the first model: once the
+  // values persist with a model, nothing fills them again.
+  return fillDefaults ? { ...initial, ...getModelDefaultFills(fallbackModel, initial, models) } : initial;
 };
 
 let canvasRecallHolder: { owner: AccountScope } | null = null;
@@ -358,7 +373,16 @@ export const executeImageRecall = async ({
       return false;
     }
 
-    const readGenerateValues = () => getCurrentGenerateValues({ generateValues: getGenerateValues(), supportedModels });
+    // A recall of the model reads the image before any default fills a slot, or it would take the default for a pick
+    // the image never made.
+    const recallsModel = kind === 'all' || kind === 'remix';
+    const readGenerateValues = () =>
+      getCurrentGenerateValues({
+        fillDefaults: !recallsModel,
+        generateValues: getGenerateValues(),
+        models,
+        supportedModels,
+      });
     const missingValuesNotice = () =>
       commands.notifications.add({
         kind: 'info',
@@ -490,6 +514,23 @@ export const executeImageRecall = async ({
         title: t('widgets.gallery.itemActions.recall.nothingRecalled'),
       });
       return false;
+    }
+
+    // An image that names no model leaves the fallback model of a fresh project, which takes its defaults after all,
+    // but not for a slot recall set from the image (a pick, or an explicit empty one): those are held, and the
+    // defaults resolve beside them, so a slot that hangs on a cleared one is not filled either. A pick recall rejected
+    // leaves its slot to the default.
+    if (recallsModel && !result.fields.includes('model') && !normalizeGenerateWidgetValues(getGenerateValues())) {
+      // A recorded pick whose files are gone stays as recalled, like the main model, LoRAs and adapters of the image,
+      // but does not hold its slot: a working default takes its place.
+      const held = [...result.appliedComponents, ...(result.fields.includes('vae') ? (['vae'] as const) : [])].filter(
+        (setting) => !result.values[setting]?.is_missing
+      );
+
+      result.values = {
+        ...result.values,
+        ...getModelDefaultFills(result.values.model, result.values, models, { held }),
+      };
     }
 
     if (result.fields.includes('referenceImages') && result.values.referenceImages.length > 0) {

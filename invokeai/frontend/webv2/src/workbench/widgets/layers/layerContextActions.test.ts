@@ -5,7 +5,7 @@ import type {
   CanvasRasterLayerContractV2,
 } from '@workbench/canvas-engine/contracts';
 
-import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
+import { seedArchitectureCapabilities } from '@features/models/core/architectureCapabilities.testing';
 import { createControlLayer, createVectorLayer } from '@workbench/canvas-engine/api';
 import { groupContract, stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { describe, expect, it, vi } from 'vitest';
@@ -108,6 +108,7 @@ const makeEffects = (): LayerContextActionEffects => ({
   duplicate: vi.fn(),
   extractMaskedArea: vi.fn(() => Promise.resolve()),
   fitToBbox: vi.fn(),
+  flip: vi.fn(),
   group: vi.fn(),
   mergeDown: vi.fn(() => Promise.resolve()),
   mergeMasks: vi.fn(() => Promise.resolve()),
@@ -271,9 +272,12 @@ describe('getLayerContextActions', () => {
       'duplicate',
       'group',
       'remove-from-group',
+      'open-properties',
       'rename',
       'transform',
       'fit-to-bbox',
+      'flip-horizontal',
+      'flip-vertical',
       'add-brightness-contrast',
       'add-exposure',
       'add-levels',
@@ -522,6 +526,21 @@ describe('getLayerContextActions', () => {
     expect(idsFor(upper, [upper, createInpaintMaskLayer('Mask', 'mask-below')])).toEqual(
       expect.not.arrayContaining(operations)
     );
+  });
+});
+
+describe('open-properties', () => {
+  it('offers Layer properties on every layer type and opens the Properties pane through its effect', () => {
+    for (const type of ['raster', 'control', 'inpaint_mask', 'regional_guidance'] as const) {
+      const action = byId(getLayerContextActions(makeState(makeLayer(type))), 'open-properties');
+      expect(action.isDisabled, type).toBe(false);
+    }
+    expect(getEnglishTranslation('widgets.layers.actions.properties')).toBe('Layer properties');
+
+    const effects = makeEffects();
+    getLayerContextActionDefinition('open-properties').handler(makeRuntimeContext(rasterLayer, { effects }));
+
+    expect(Object.values(effects).filter((effect) => effect.mock.calls.length > 0)).toEqual([effects.openProperties]);
   });
 });
 

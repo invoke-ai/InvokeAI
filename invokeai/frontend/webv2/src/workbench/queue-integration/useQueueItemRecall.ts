@@ -2,9 +2,13 @@ import type { QueueGenerationMeta } from '@features/queue/contracts';
 import type { ImageRecallKind } from '@workbench/image-actions';
 
 import { createGenerateFormValuesSelector } from '@features/generation/react';
-import { getArchitectureCapabilitiesSnapshot, subscribeArchitectureCapabilities } from '@features/generation/runtime';
-import { hasArchitectureCapabilities, isSupportedGenerateModel } from '@features/generation/settings';
+import { isSupportedGenerateModel } from '@features/generation/settings';
 import { ensureModelsLoaded, useModelsSelector } from '@features/models';
+import { hasArchitectureCapabilities } from '@features/models/architectures';
+import {
+  getArchitectureCapabilitiesSnapshot,
+  subscribeArchitectureCapabilities,
+} from '@features/models/architecturesStore';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { useExternalStoreSelector } from '@platform/state/selectors';
 import { EMPTY_IMAGE_RECALL_CAPABILITIES, getCurrentGenerateValues } from '@workbench/image-actions';
@@ -61,10 +65,10 @@ export const useQueueItemRecall = (
       () =>
         getQueueRecallTargetState({
           hasCapabilityTable: hasArchitectureCapabilities(),
-          hasCurrentValues: getCurrentGenerateValues({ generateValues, supportedModels }) !== null,
+          hasCurrentValues: getCurrentGenerateValues({ generateValues, models, supportedModels }) !== null,
           isCatalogSettled,
         }),
-      [generateValues, isCatalogSettled, supportedModels]
+      [generateValues, isCatalogSettled, models, supportedModels]
     )
   );
   const source = getQueueRecallSource(snapshot?.sourceId ?? null, isNonGenerateRun);

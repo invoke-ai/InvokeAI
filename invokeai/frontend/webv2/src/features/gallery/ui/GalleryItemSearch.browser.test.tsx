@@ -7,6 +7,7 @@ import type { GalleryUiAdapter } from '@features/gallery/react';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { GalleryUiProvider } from '@features/gallery/react';
+import { resolvedValues } from '@platform/core/resolvedValues.testing';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import { act, useMemo, useState, type ReactNode } from 'react';
@@ -70,7 +71,7 @@ const adapter: GalleryUiAdapter = {
     toggleItemSelection: noop,
     updateSettings: noop,
   },
-  galleryValues: {},
+  galleryValues: resolvedValues(),
   generateValues: {},
   getItemLabel: () => Promise.resolve(null),
   liveFollowEnabled: false,
@@ -79,6 +80,7 @@ const adapter: GalleryUiAdapter = {
   followedProgressSessionId: null,
   followProgressSession: noop,
   notifications: { add: notificationsAdd, reportError: noop },
+  openItemContextMenu: noop,
   projectId: 'project-1',
   projectName: 'Project',
   projects: [],

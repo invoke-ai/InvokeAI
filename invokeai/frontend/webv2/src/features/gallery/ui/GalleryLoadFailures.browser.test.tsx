@@ -6,6 +6,7 @@ import type { QueueProgressSession } from '@features/queue/contracts';
 import { Box, ChakraProvider } from '@chakra-ui/react';
 import { DndContext } from '@dnd-kit/core';
 import { GalleryItemActionsProvider, GalleryUiProvider, type GalleryUiAdapter } from '@features/gallery/react';
+import { resolvedValues } from '@platform/core/resolvedValues.testing';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
@@ -170,11 +171,12 @@ const Harness = ({
         toggleItemSelection: noop,
         updateSettings: (settings: Record<string, unknown>) => patch(settings),
       },
-      galleryValues,
+      galleryValues: resolvedValues(galleryValues),
       generateValues: {},
       getItemLabel: () => Promise.resolve(null),
       liveFollowEnabled: false,
       notifications: { add: noop, reportError: noop },
+      openItemContextMenu: noop,
       pinnedProgressSessionId: null,
       progressSessions,
       projectId: 'project-1',

@@ -5,14 +5,14 @@ import type { GenerateModelConfig, GenerateReferenceImage } from '@features/gene
 import { ChakraProvider } from '@chakra-ui/react';
 import { DndContext, MouseSensor, pointerWithin, useDraggable, useSensor, useSensors } from '@dnd-kit/core';
 import { getGalleryItemDragData } from '@features/gallery/utility';
-import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
 import {
   getDefaultGenerateSettings,
   getGenerateInvocationIssues,
-  getMaxReferenceImages,
+  getReferenceImageRoom,
 } from '@features/generation/core/baseGenerationPolicies';
 import { type GenerationUiAdapter, GenerationUiProvider } from '@features/generation/ui/GenerationUiContext';
 import { GenerateIssuesProvider } from '@features/generation/ui/shared/GenerateIssues';
+import { seedArchitectureCapabilities } from '@features/models/core/architectureCapabilities.testing';
 import { dragWithMouse } from '@platform/browser/mouseDrag.testing';
 import { system } from '@theme/system';
 import i18next from 'i18next';
@@ -49,7 +49,7 @@ await i18n.use(initReactI18next).init({
 seedArchitectureCapabilities();
 
 const SDXL: GenerateModelConfig = { base: 'sdxl', format: 'diffusers', key: 'sdxl', name: 'SDXL', type: 'main' };
-const max = () => getMaxReferenceImages(SDXL);
+const max = () => getReferenceImageRoom(SDXL, {}, []).limit;
 const NO_MODELS: [] = [];
 const NO_VISION_COMPONENTS = {};
 const reference = (id: string): GenerateReferenceImage => ({

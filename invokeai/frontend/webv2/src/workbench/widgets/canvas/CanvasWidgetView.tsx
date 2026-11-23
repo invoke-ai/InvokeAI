@@ -1,4 +1,5 @@
-import type { WidgetViewProps } from '@workbench/widgetContracts';
+import type { WidgetRuntimeApi, WidgetViewProps } from '@workbench/widgetContracts';
+import type { TFunction } from 'i18next';
 import type { KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent } from 'react';
 
 import { Box } from '@chakra-ui/react';
@@ -64,6 +65,7 @@ import { CanvasSurface } from './CanvasSurface';
 import { CanvasSurfaceContextLayout } from './CanvasSurfaceContextLayout';
 import {
   CANVAS_COMPANION_HOTKEYS,
+  type HotkeyTableEntry,
   reportMergeDownRefusal,
   reportTransformRefusal,
   showCanvasRefusalNotice,
@@ -106,6 +108,50 @@ const CanvasShortcutHintRegistration = ({
 }) => {
   const [source] = useState(() => createCanvasShortcutHintSource(engine, projectId, instanceId));
   useRegisterShortcutHintSource(source);
+  return null;
+};
+
+// Reset only the registration lease when its APIs or translator change, leaving Canvas state mounted.
+let hotkeyRegistrationKeys: WeakMap<object, number> | null = null;
+let nextHotkeyRegistrationKey = 0;
+const hotkeyRegistrationKey = (identity: object): number => {
+  hotkeyRegistrationKeys ??= new WeakMap();
+  let key = hotkeyRegistrationKeys.get(identity);
+  if (key === undefined) {
+    key = ++nextHotkeyRegistrationKey;
+    hotkeyRegistrationKeys.set(identity, key);
+  }
+  return key;
+};
+
+const CanvasHotkeyRegistration = ({
+  commands,
+  hotkeys,
+  execute,
+  t,
+}: Pick<WidgetRuntimeApi, 'commands' | 'hotkeys'> & { execute: (commandId: string) => void; t: TFunction }) => {
+  const executeCommand = useEffectEvent(execute);
+  // useMountEffect is the repository's mount/unmount effect boundary.
+  /* eslint-disable react-hooks/rules-of-hooks */
+  useMountEffect(() => {
+    const entries: readonly HotkeyTableEntry[] = [...CANVAS_COMPANION_HOTKEYS, ...CANVAS_ONLY_HOTKEYS];
+    const disposers = entries.flatMap(([id, titleKey, defaultKeys, options]) => {
+      const title = t(titleKey);
+      return [
+        commands.register({ handler: () => executeCommand(id), id, title }),
+        hotkeys.register({
+          allowInEditable: false,
+          commandId: id,
+          defaultKeys: [...defaultKeys],
+          id,
+          title,
+          ...options,
+        }),
+      ];
+    });
+    return () => disposers.forEach((dispose) => dispose());
+  });
+  /* eslint-enable react-hooks/rules-of-hooks */
   return null;
 };
 
@@ -344,26 +390,29 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
   );
 
   /** The engine produces selected pixels; widget code owns system clipboard writes and optional cutting. */
-  const copySelection = useEffectEvent((cut: boolean) => {
-    const mountedEngine = engine;
-    if (!mountedEngine) {
-      return;
-    }
-    void (async () => {
-      try {
-        await copyCanvasSelection(mountedEngine.selection, cut, copyImage);
-      } catch (error) {
-        notifications.add({
-          kind: 'error',
-          message: error instanceof ClipboardUnavailableError ? t('common.copyUnavailable') : undefined,
-          title: t('widgets.canvas.clipboard.copyFailed'),
-        });
+  const copySelection = useCallback(
+    (cut: boolean) => {
+      const mountedEngine = engine;
+      if (!mountedEngine) {
+        return;
       }
-    })();
-  });
+      void (async () => {
+        try {
+          await copyCanvasSelection(mountedEngine.selection, cut, copyImage);
+        } catch (error) {
+          notifications.add({
+            kind: 'error',
+            message: error instanceof ClipboardUnavailableError ? t('common.copyUnavailable') : undefined,
+            title: t('widgets.canvas.clipboard.copyFailed'),
+          });
+        }
+      })();
+    },
+    [engine, notifications, t]
+  );
 
   /** Pastes an image off the system clipboard as a new layer over the bbox. */
-  const pasteFromClipboard = useEffectEvent(() => {
+  const pasteFromClipboard = useCallback(() => {
     const mountedEngine = engine;
     if (!mountedEngine) {
       return;
@@ -394,7 +443,7 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
         reportLayerOperation(result.status, notify.error, t);
       }
     })();
-  });
+  }, [engine, notifications, notify.error, t]);
 
   useDndMonitor({ onDragEnd: handleCanvasImageDrop });
 
@@ -515,53 +564,52 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
     return () => engine?.previews.setStagedPreview(null);
   }, [engine]);
 
-  const executeCanvasHotkey = useEffectEvent((commandId: string) => {
-    const selectedLayerIds = readLayerPanelState(projectId, document.selectedLayerId).selectedIds;
-    executeCanvasHotkeyCommand(commandId, {
+  const executeCanvasHotkey = useCallback(
+    (commandId: string) => {
+      const selectedLayerIds = readLayerPanelState(projectId, document.selectedLayerId).selectedIds;
+      executeCanvasHotkeyCommand(commandId, {
+        copySelection,
+        cropAllLayers: () => {
+          if (engine) {
+            void cropAllLayersToFrame(engine.layers, notify, t);
+          }
+        },
+        dispatch: canvasDispatch,
+        document,
+        engine,
+        hasMultipleStagingSlots,
+        layerCommands: { engine, reportError: notify.error, t },
+        pasteFromClipboard,
+        reportLayerOperation: (refusal) => reportLayerOperation(refusal, notify.error, t),
+        reportMergeDownRefusal: (refusal) => reportMergeDownRefusal(document, refusal, showCanvasRefusalNotice, t),
+        reportTransformRefusal: (refusal, layerId) =>
+          reportTransformRefusal(
+            refusal,
+            { id: layerId, name: getDocumentNode(document, layerId)?.name ?? '' },
+            { error: notify.error, notice: showCanvasRefusalNotice },
+            t
+          ),
+        reportPreparedCommit: (outcome) => reportPreparedCommit(outcome, notify.error, t),
+        reportStructuralCommit: (result) => reportStructuralCommit(result, notify.error, t),
+        resetActiveColors: colorCommands.resetPair,
+        selectedLayerIds,
+        swapActiveColors: colorCommands.swapPair,
+        t,
+      });
+    },
+    [
+      canvasDispatch,
+      colorCommands,
       copySelection,
-      cropAllLayers: () => {
-        if (engine) {
-          void cropAllLayersToFrame(engine.layers, notify, t);
-        }
-      },
-      dispatch: canvasDispatch,
       document,
       engine,
       hasMultipleStagingSlots,
-      layerCommands: { engine, reportError: notify.error, t },
+      notify,
       pasteFromClipboard,
-      reportLayerOperation: (refusal) => reportLayerOperation(refusal, notify.error, t),
-      reportMergeDownRefusal: (refusal) => reportMergeDownRefusal(document, refusal, showCanvasRefusalNotice, t),
-      reportTransformRefusal: (refusal, layerId) =>
-        reportTransformRefusal(
-          refusal,
-          { id: layerId, name: getDocumentNode(document, layerId)?.name ?? '' },
-          { error: notify.error, notice: showCanvasRefusalNotice },
-          t
-        ),
-      reportPreparedCommit: (outcome) => reportPreparedCommit(outcome, notify.error, t),
-      reportStructuralCommit: (result) => reportStructuralCommit(result, notify.error, t),
-      resetActiveColors: colorCommands.resetPair,
-      selectedLayerIds,
-      swapActiveColors: colorCommands.swapPair,
+      projectId,
       t,
-    });
-  });
-
-  useEffect(() => {
-    // Exclude editable targets so tool letters and size brackets do not intercept typing.
-    const disposers = [...CANVAS_COMPANION_HOTKEYS, ...CANVAS_ONLY_HOTKEYS].flatMap(([id, titleKey, defaultKeys]) => {
-      const title = t(titleKey);
-      return [
-        runtime.commands.register({ handler: () => executeCanvasHotkey(id), id, title }),
-        runtime.hotkeys.register({ allowInEditable: false, commandId: id, defaultKeys: [...defaultKeys], id, title }),
-      ];
-    });
-
-    return () => {
-      disposers.forEach((dispose) => dispose());
-    };
-  }, [runtime.commands, runtime.hotkeys, t]);
+    ]
+  );
 
   const layerContextMenuTarget = useMemo(
     () =>
@@ -609,6 +657,13 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
       w="full"
       {...fileDragHandlers}
     >
+      <CanvasHotkeyRegistration
+        key={[runtime.commands, runtime.hotkeys, t].map(hotkeyRegistrationKey).join(':')}
+        commands={runtime.commands}
+        hotkeys={runtime.hotkeys}
+        execute={executeCanvasHotkey}
+        t={t}
+      />
       {engine ? (
         <CanvasShortcutHintRegistration
           key={`${projectId}:${instance.id}`}

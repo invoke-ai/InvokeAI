@@ -38,9 +38,12 @@ import {
   patchGalleryItemCaches,
 } from '@features/gallery/queries';
 import { setPendingPromptTemplateDraft } from '@features/generation/react';
-import { getArchitectureCapabilitiesSnapshot, subscribeArchitectureCapabilities } from '@features/generation/runtime';
-import { getMaxReferenceImages, isVaeModelConfig, isSupportedGenerateModel } from '@features/generation/settings';
+import { getReferenceImageRoom, isVaeModelConfig, isSupportedGenerateModel } from '@features/generation/settings';
 import { ensureModelsLoaded, useModelsSelector } from '@features/models';
+import {
+  getArchitectureCapabilitiesSnapshot,
+  subscribeArchitectureCapabilities,
+} from '@features/models/architecturesStore';
 import { submitUtilityGraph, type UtilityGraphSubmission, UtilityQueueError } from '@features/queue/utility';
 import { copyImage } from '@platform/browser/clipboard';
 import { downloadBlob } from '@platform/browser/downloadBlob';
@@ -260,15 +263,15 @@ export const useImageActions = ({
     subscribeArchitectureCapabilities,
     getArchitectureCapabilitiesSnapshot,
     useCallback(() => {
-      const values = getCurrentGenerateValues({ generateValues, supportedModels });
+      const values = getCurrentGenerateValues({ generateValues, models, supportedModels });
 
       return {
         canUseAsReferenceImage: Boolean(
-          values && values.referenceImages.length < getMaxReferenceImages(values.model, values)
+          values && getReferenceImageRoom(values.model, values, values.referenceImages).free > 0
         ),
         currentGenerateValues: values,
       };
-    }, [generateValues, supportedModels])
+    }, [generateValues, models, supportedModels])
   );
 
   const selectVideoPlacementRoom = useMemo(
@@ -316,7 +319,7 @@ export const useImageActions = ({
     const getLatestWidgetValues = (widgetId: 'gallery' | 'generate' | 'video') => {
       const project = getLatestProject();
 
-      return project ? getResolvedProjectWidgetValues(project, widgetId, queries.getSnapshot().scopedDefaults) : {};
+      return getResolvedProjectWidgetValues(project, widgetId, queries.getSnapshot().scopedDefaults);
     };
     const getLatestGenerateValues = () => getLatestWidgetValues('generate');
     const getLatestVideoValues = () => getLatestWidgetValues('video');

@@ -58,6 +58,7 @@ from invokeai.app.services.model_install.model_install_common import (
     URLModelSource,
 )
 from invokeai.app.services.model_records import DuplicateModelException, ModelRecordServiceBase, UnknownModelException
+from invokeai.app.services.model_records.missing_models import find_missing_models
 from invokeai.app.services.model_records.model_records_base import ModelRecordChanges
 from invokeai.app.util.no_replace import rename_noreplace
 from invokeai.app.util.path_safety import is_plain_filename
@@ -91,7 +92,6 @@ from invokeai.backend.model_manager.metadata.metadata_base import (
 from invokeai.backend.model_manager.search import ModelSearch
 from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
-    ModelFormat,
     ModelRepoVariant,
     ModelSourceType,
     ModelType,
@@ -1950,13 +1950,7 @@ class ModelInstallService(ModelInstallServiceBase):
     # --------------------------------------------------------------------------------------------
     def _scan_for_missing_models(self) -> list[AnyModelConfig]:
         """Scan the models directory for missing models and return a list of them."""
-        missing_models: list[AnyModelConfig] = []
-        for model_config in self.record_store.all_models():
-            if model_config.base == BaseModelType.External or model_config.format == ModelFormat.ExternalApi:
-                continue
-            if not (self.app_config.models_path / model_config.path).resolve().exists():
-                missing_models.append(model_config)
-        return missing_models
+        return find_missing_models(self.record_store.all_models(), self.app_config.models_path)
 
     def _register_orphaned_models(self) -> None:
         """Scan the invoke-managed models directory for orphaned models and registers them.

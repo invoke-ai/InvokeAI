@@ -8,10 +8,10 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { page } from 'vitest/browser';
+import { page, userEvent } from 'vitest/browser';
 
 import { HotkeysSettingsSection } from './HotkeysSettingsSection';
-import { DEFAULT_PREFERENCES, patchWorkbenchPreferences } from './store';
+import { DEFAULT_PREFERENCES, getWorkbenchPreferences, patchWorkbenchPreferences } from './store';
 
 vi.mock('@workbench/projects/api', async (importOriginal) => ({
   ...(await importOriginal<typeof projectsApi>()),
@@ -63,6 +63,26 @@ afterEach(async () => {
 });
 
 describe('HotkeysSettingsSection conflicts', () => {
+  it('rejects the stock Shift+N collision and saves an available New Raster Layer shortcut', async () => {
+    await render();
+    await act(() => search().fill('new raster layer'));
+    await expect.element(page.getByText('New Raster Layer', { exact: true })).toBeVisible();
+    await act(() => page.getByRole('button', { name: i18n.t('hotkeys.addHotkey'), exact: true }).click());
+    await act(() => userEvent.keyboard('{Shift>}n{/Shift}'));
+    await expect.element(conflictText('Fit Frame To Layers')).toBeVisible();
+    const save = page.getByRole('button', { name: i18n.t('hotkeys.saveEdit'), exact: true });
+    await expect.element(save).toBeDisabled();
+    expect(getWorkbenchPreferences().customHotkeys['canvas.newRasterLayer']).toBeUndefined();
+
+    await act(() => page.getByRole('button', { name: i18n.t('hotkeys.cancelEdit'), exact: true }).click());
+    await act(() => page.getByRole('button', { name: i18n.t('hotkeys.addHotkey'), exact: true }).click());
+    await act(() => userEvent.keyboard('{Alt>}{Shift>}n{/Shift}{/Alt}'));
+    await expect.element(page.getByText(/^Conflicts with /)).not.toBeInTheDocument();
+    await expect.element(save).toBeEnabled();
+    await act(() => save.click());
+    expect(getWorkbenchPreferences().customHotkeys['canvas.newRasterLayer']).toEqual(['shift+alt+n']);
+  });
+
   // Recall Seed answers in Preview and Gallery. A Gallery binding on its key meets it through the second of those
   // widget types; a Canvas binding on the same key meets neither.
   it('flags a binding that shares its key with a multi-widget shortcut on any of that shortcut’s widgets', async () => {

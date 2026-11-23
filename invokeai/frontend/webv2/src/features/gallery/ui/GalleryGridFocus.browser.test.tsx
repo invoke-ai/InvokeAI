@@ -12,6 +12,7 @@ import { toGalleryItemKey, toGalleryItemRef } from '@features/gallery/core/items
 import { getGalleryDeletionSuccessor } from '@features/gallery/core/selection';
 import { getGallerySettings, type GallerySettings } from '@features/gallery/core/settings';
 import { GalleryUiProvider, type GalleryUiAdapter } from '@features/gallery/react';
+import { resolvedValues } from '@platform/core/resolvedValues.testing';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
@@ -170,7 +171,7 @@ const createGallery = (items: GalleryItem[], selected: GalleryItem | null): Gall
   semanticImageQuery: null,
   semanticSearchText: null,
   // The harness shows three columns.
-  settings: getGallerySettings({ paginationMode: 'paginated' }),
+  settings: getGallerySettings(resolvedValues({ paginationMode: 'paginated' })),
   starredOnly: false,
 });
 

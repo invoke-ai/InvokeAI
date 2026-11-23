@@ -1,6 +1,6 @@
 import type { GenerationModelCatalogItem, MainModelConfig } from '@features/generation/contracts';
 
-import { architectureCapabilitiesFixture } from '@features/generation/core/architectureCapabilities.testing';
+import { architectureCapabilitiesFixture } from '@features/models/core/architectureCapabilities.testing';
 import { LTX2_DEFAULT_NEGATIVE_PROMPT, LTX2_EXTEND_CONTEXT_FRAMES } from '@features/video/core/dimensions';
 import { describe, expect, it } from 'vitest';
 
@@ -494,7 +494,7 @@ describe('getVideoModelSelectionResult', () => {
     const from = settingsFor(wan, {
       ...lightningOn,
       loras: [...lightningOn.loras, { isEnabled: true, model: lora('Style LoRA') as never, weight: 0.5 }],
-      targetResolution: '480p',
+      targetResolution: '720p',
       vae: { base: 'wan', key: 'wan-vae', name: 'Wan VAE', type: 'vae' },
       wanT5EncoderModel: { base: 'any', key: 'umt5', name: 'UMT5-XXL', type: 'wan_t5_encoder' },
     });
