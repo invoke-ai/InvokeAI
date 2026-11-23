@@ -348,6 +348,8 @@ def test_service_drop_waits_for_cross_cache_adoption(harness, monkeypatch):
         shared_cpu_weights=weights,
     )
     service._ram_caches = {"source": source, "cpu": dest}
+    # Unmatched host devices must also load into the destination, not the warmed source.
+    service._default_ram_cache = dest
     cloning, resume, waiting = threading.Event(), threading.Event(), threading.Event()
     original_adopt = _RecordingLoader._try_adopt_shared_weights
     original_wait = MODEL_LOAD_LOCK._cond.wait
