@@ -4,9 +4,10 @@ from pathlib import Path
 from typing import Any, Optional
 
 import pytest
-from sqlalchemy import update
+from sqlalchemy import select, update
 
 from invokeai.app.services.shared.database.database import Database
+from invokeai.app.services.shared.database.dialect import fold_case
 from invokeai.app.services.shared.database.queries import workflows as workflow_queries
 from invokeai.app.services.shared.database.schema.workflows import workflow_library
 from invokeai.app.services.shared.pagination import SQLiteDirection
@@ -77,6 +78,36 @@ def test_a_search_looks_in_the_name_description_and_tags_ignoring_case(
 
     assert _names(workflow_records, query="fix") == ["Faces", "Hires FIX", "Tagged"]
     assert _names(workflow_records, query="  FIX ") == ["Faces", "Hires FIX", "Tagged"]
+
+
+def test_a_search_and_a_tag_filter_ignore_the_case_of_letters_beyond_ascii(
+    workflow_records: WorkflowRecordsStorage,
+) -> None:
+    workflow_records.create(_workflow("Åland trip", tags="ÅLAND, Kitchen"), user_id=USER)
+    workflow_records.create(_workflow("ÅNGSTRÖM", tags="KITCHEN"), user_id=USER)
+    workflow_records.create(_workflow("Aland", tags="aland"), user_id=USER)
+
+    assert _names(workflow_records, query="åland") == ["Åland trip"]
+    assert _names(workflow_records, query="ÅNGSTRÖM") == ["ÅNGSTRÖM"]
+    assert _names(workflow_records, tags=["åland"]) == ["Åland trip"]
+    assert _names(workflow_records, tags=["KITCHEN"]) == ["Åland trip", "ÅNGSTRÖM"]
+    assert workflow_records.counts_by_tag(["åland", "kitchen"], categories=[WorkflowCategory.User]) == {
+        "åland": 1,
+        "kitchen": 2,
+    }
+
+
+def test_a_search_text_of_many_letters_with_capitals_matches_like_a_short_one(
+    workflow_records: WorkflowRecordsStorage,
+) -> None:
+    # More capitals than a statement has replacement slots: it is built for the call alone.
+    letters = "абвгдежзийклмнопрстуфхцчшщъыьэюяё"
+    workflow_records.create(_workflow(f"{letters.upper()} flow", tags=letters.upper()), user_id=USER)
+    workflow_records.create(_workflow("Other"), user_id=USER)
+
+    assert _names(workflow_records, query=letters) == [f"{letters.upper()} flow"]
+    assert _names(workflow_records, tags=[letters]) == [f"{letters.upper()} flow"]
+    assert workflow_records.counts_by_tag([letters], categories=[WorkflowCategory.User]) == {letters: 1}
 
 
 def test_search_texts_and_tags_match_wildcard_characters_only_as_themselves(
@@ -164,6 +195,62 @@ def test_names_sort_ignoring_case(workflow_records: WorkflowRecordsStorage, dire
 
     expected = ["alpha", "Bravo", "charlie", "Delta"]
     assert [item.name for item in listed] == (expected if direction == SQLiteDirection.Ascending else expected[::-1])
+
+
+@pytest.mark.parametrize("direction", [SQLiteDirection.Ascending, SQLiteDirection.Descending])
+def test_names_sort_ignoring_the_case_of_letters_beyond_ascii(
+    workflow_records: WorkflowRecordsStorage, direction: SQLiteDirection
+) -> None:
+    ids = {
+        name: workflow_records.create(_workflow(name), user_id=USER).workflow_id
+        for name in ("zebra", "Åland", "Ångström", "åland")
+    }
+
+    listed = workflow_records.get_many(WorkflowRecordOrderBy.Name, direction, [WorkflowCategory.User]).items
+
+    # By their folded names (`å` is after `z`): `Åland` and `åland` are equal, so their ids order them.
+    equal_names = sorted([ids["Åland"], ids["åland"]])
+    expected = [ids["zebra"], *equal_names, ids["Ångström"]]
+    assert [item.workflow_id for item in listed] == (
+        expected if direction == SQLiteDirection.Ascending else expected[::-1]
+    )
+
+
+def test_the_name_key_of_every_workflow_is_the_folded_name_after_each_write(
+    database: Database, workflow_records: WorkflowRecordsStorage
+) -> None:
+    def key_matches_name() -> None:
+        with database.begin(write=False) as conn:
+            rows = conn.execute(select(workflow_library.c.name, workflow_library.c.name_key)).all()
+        # The bundled workflows (stored when the service started) and the ones below.
+        assert rows and all(key == fold_case(name) for name, key in rows)
+
+    key_matches_name()
+    created = workflow_records.create(_workflow("ÅLAND Trip"), user_id=USER)
+    key_matches_name()
+    workflow_records.update(created.workflow.model_copy(update={"name": "Ångström"}))
+    key_matches_name()
+    workflow_records.update_is_public(created.workflow_id, True, user_id=USER)
+    key_matches_name()
+    # A bundled workflow whose stored copy differs from the shipped one is written again by the sync.
+    with database.begin(write=False) as conn:
+        bundled_id = conn.execute(
+            select(workflow_library.c.workflow_id).where(workflow_library.c.category == "default").limit(1)
+        ).scalar_one()
+    stale = workflow_records.get(bundled_id).workflow.model_copy(update={"notes": "stale", "name": "STALE Ångström"})
+    with database.begin(write=True) as conn:
+        conn.execute(
+            update(workflow_library)
+            .where(workflow_library.c.workflow_id == bundled_id)
+            .values(workflow=stale.model_dump_json(), name_key="stale")
+        )
+    workflow_records._sync_default_workflows()
+    key_matches_name()
+    with database.begin(write=False) as conn:
+        key = conn.execute(
+            select(workflow_library.c.name_key).where(workflow_library.c.workflow_id == created.workflow_id)
+        ).scalar_one()
+    assert key == "ångström"
 
 
 @pytest.mark.parametrize("direction", [SQLiteDirection.Ascending, SQLiteDirection.Descending])

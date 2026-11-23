@@ -81,6 +81,13 @@ def test_keys_with_a_prefix_list_most_recently_written_first_ignoring_case(
     assert store.get_keys_by_prefix(SYSTEM_USER_ID, "snap:") == ["SNAP:upper", "snap:new", "snap:old"]
 
 
+def test_a_prefix_ignores_the_case_of_letters_beyond_ascii(store: ClientStatePersistence) -> None:
+    for key in ("Åland:one", "åland:two", "ÅLAND:three", "Aland:four", "xÅland:five"):
+        store.set_by_key(SYSTEM_USER_ID, key, "{}")
+
+    assert sorted(store.get_keys_by_prefix(SYSTEM_USER_ID, "ÅLAND:")) == ["ÅLAND:three", "Åland:one", "åland:two"]
+
+
 def test_like_wildcards_in_a_prefix_match_only_themselves(store: ClientStatePersistence) -> None:
     for key in ("a%b", "axb", "a_c", "ayc", "a\\d", "aed"):
         store.set_by_key(SYSTEM_USER_ID, key, "{}")

@@ -493,8 +493,13 @@ class TestSearch:
 class TestSearchBeyondAscii:
     def test_a_search_ignores_the_case_of_letters_beyond_ascii(self, store: ImageRecordStorage) -> None:
         _save(store, "apples.png", metadata='{"prompt": "frische äpfel"}')
+        _save(store, "capitals.png", metadata='{"prompt": "FRISCHE ÄPFEL aus Åland"}')
+        _save(store, "angstrom.png", metadata='{"prompt": "ÅLAND"}')
+        _save(store, "plain.png", metadata='{"prompt": "frische apfel, Aland"}')
 
-        assert store.get_image_names(search_term="ÄPFEL").image_names == ["apples.png"]
+        assert sorted(store.get_image_names(search_term="ÄPFEL").image_names) == ["apples.png", "capitals.png"]
+        assert sorted(store.get_image_names(search_term="åland").image_names) == ["angstrom.png", "capitals.png"]
+        assert store.get_many(limit=10, search_term="Åland").total == 2
 
 
 class TestOwnershipFilteringOmittedBoard:

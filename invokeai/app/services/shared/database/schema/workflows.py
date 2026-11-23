@@ -29,6 +29,11 @@ workflow_library = table(
     Column("is_public", Boolean(), nullable=False, server_default=default(False)),
     Column("last_run_at", Timestamp()),
     Column("revision", BigInt(), nullable=False, server_default=default(1)),
+    # `fold_case(name)`, which the names sort by: every writer of `workflow` sets it with the name the document holds
+    # (`queries/workflows.py`), since a generated column cannot fold case alike on every backend. Nullable only
+    # because the migration that added it could not make a column NOT NULL on SQLite. Last, where a
+    # migration adds it.
+    Column("name_key", LongText()),
 )
 
 Index("idx_workflow_library_category", workflow_library.c.category, **LONG_TEXT_INDEX_PREFIX)

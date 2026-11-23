@@ -36,6 +36,8 @@ from invokeai.app.services.shared.database.dialect import (
     fixed_limit,
     insert_ignore,
     like_contains,
+    like_parameters,
+    like_slots,
 )
 from invokeai.app.services.shared.database.queries.base import IN_CHUNK, QueryModule, day_after, mapped, read, write
 from invokeai.app.services.shared.database.queries.board_access import listed_board
@@ -141,7 +143,8 @@ class _Shape(NamedTuple):
     board: str
     # Whether the listing is limited to what one account may see; else everything, as for an administrator.
     scoped: bool
-    search: bool
+    # The replacement slots of the search pattern (`LikePattern.slots`); None without a search.
+    search: Optional[int]
     created_from: bool
     created_to: bool
 
@@ -165,7 +168,7 @@ def _shape(
         intermediate=is_intermediate is not None,
         board=board,
         scoped=user_id is not None and not is_admin,
-        search=bool(search_term),
+        search=like_contains(search_term).slots if search_term else None,
         created_from=created_from is not None,
         created_to=created_to is not None,
     )
@@ -181,12 +184,12 @@ def _parameters(
     created_to: Optional[str],
     user_id: Optional[str],
 ) -> dict[str, Any]:
+    pattern = like_contains(search_term) if search_term else None
     return {
         "image_origin": image_origin.value if image_origin is not None else None,
         "is_intermediate": is_intermediate,
         "board_id": board_id,
-        # Lowered here, as the legacy storage did: SQLite's LIKE folds the case of ASCII letters only.
-        "pattern": like_contains(search_term.lower()) if search_term else None,
+        **like_parameters("pattern", pattern, like_slots(pattern)),
         "created_from": created_from,
         "created_before": day_after(created_to) if created_to is not None else None,
         "user_id": user_id,
@@ -228,9 +231,13 @@ def _conditions(shape: _Shape, joined: bool) -> list[ColumnElement[bool]]:
     elif shape.scoped:
         conditions.append(own)
 
-    if shape.search:
-        pattern: ColumnElement[str] = bindparam("pattern")
-        conditions.append(or_(CaseInsensitiveLike(_I.metadata, pattern), CaseInsensitiveLike(_I.created_at, pattern)))
+    if shape.search is not None:
+        conditions.append(
+            or_(
+                CaseInsensitiveLike(_I.metadata, "pattern", shape.search),
+                CaseInsensitiveLike(_I.created_at, "pattern", shape.search),
+            )
+        )
     if shape.created_from:
         conditions.append(_I.created_at >= bindparam("created_from"))
     if shape.created_to:
