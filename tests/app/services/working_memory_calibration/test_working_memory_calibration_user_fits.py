@@ -1861,6 +1861,60 @@ def test_a_retry_of_a_run_without_an_attempt_between_another_attempts_steps_is_r
     )
 
 
+@pytest.mark.parametrize("first", ["the script's retry", "the attempt's retry"])
+def test_a_script_retry_between_a_failed_last_step_and_its_retry(tmp_path: Path, started, first: str) -> None:
+    """A script's run failed; then A ran, its first step measured the line and its last step ran out of memory. A is
+    complete, so not open: the script's run may be retried, and its retry measures the GPU after A's steps. A's last
+    step's retry would then measure after it: refused, and A feeds only what it measured before. Retried first, A's
+    step runs while the script's retry is refused; once it finished, the script's run may be retried."""
+    service = started(tmp_path)
+    queue = service._services.session_queue
+    script = _failed(service, None)
+    largest = _failed_largest_step(service, "tab-a")
+
+    if first == "the script's retry":
+        [script_retry] = queue.retry_items_by_id("default", script.item_ids).retried_items
+        before = queue.get_queue_item_ids("default").item_ids
+        with pytest.raises(CalibrationAttemptInterleavedError) as refused:
+            queue.retry_items_by_id("default", largest.item_ids)
+        assert refused.value.code == "calibration_interleaved"
+        _unchanged_by_a_refused_retry(tmp_path, queue, before, largest)
+        _settle_as_the_runner(service, script.run_id, [script_retry.item_id], "completed")
+    else:
+        [step_retry] = queue.retry_items_by_id("default", largest.item_ids).retried_items
+        before = queue.get_queue_item_ids("default").item_ids
+        with pytest.raises(CalibrationAttemptBusyError):
+            queue.retry_items_by_id("default", script.item_ids)
+        _unchanged_by_a_refused_retry(tmp_path, queue, before, script)
+        _settle_as_the_runner(service, largest.run_id, [step_retry.item_id], "failed")
+        assert len(queue.retry_items_by_id("default", script.item_ids).retried_items) == 1
+    service.refresh_user_fits()
+
+    assert _estimate() == _user_bytes(1024)
+    assert {run.held_back for run in service.get_model_summary("model-a").runs if run.run_id != script.run_id} == {None}
+
+
+def test_a_script_retry_past_an_idle_attempts_grace_refuses_its_next_step(
+    tmp_path: Path, started, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A's client went away after its first step. Past `ATTEMPT_IDLE_GRACE` a script's run may be retried; A's next
+    step, posted after all, would measure after the retry: refused, as after a script's new run, and A never feeds."""
+    service = started(tmp_path)
+    queue = service._services.session_queue
+    script = _failed(service, None)
+    first = _step(service, "tab-a")
+    service.record_windows(first.run_id, _on_the_line(first.run_id))
+    _idle(monkeypatch)
+
+    assert len(queue.retry_items_by_id("default", script.item_ids).retried_items) == 1
+    assert "retried_at" in _stored_run(tmp_path, script.run_id)
+    with pytest.raises(CalibrationAttemptInterleavedError):
+        _step(service, "tab-a")
+    service.refresh_user_fits()
+    runs = {run.run_id: run.held_back for run in service.get_model_summary("model-a").runs}
+    assert runs[first.run_id] == "aborted_attempt"
+
+
 def test_a_retry_while_another_attempt_runs_is_refused_though_it_started_before_on_the_clock(
     tmp_path: Path, started, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -2078,6 +2132,34 @@ def test_an_attempt_whose_steps_another_calibration_ran_between_never_feeds(
         strict=True,
     ):
         run["created_at"] = (start + datetime.timedelta(seconds=offset)).isoformat()
+    path.write_text(json.dumps(stored))
+
+    reread = started(tmp_path)
+    reread.refresh_user_fits()
+
+    assert _estimate() == _shipped()
+    held = {run.run_id: run.held_back for run in reread.get_model_summary("model-a").runs}
+    assert held[first.run_id] == "aborted_attempt"
+
+
+def test_an_attempt_a_script_was_retried_between_the_steps_of_never_feeds(
+    tmp_path: Path, started, mock_invoker: Invoker
+) -> None:
+    """A store that holds such an attempt all the same: the script's run was created before A, and its retry began
+    between A's two steps (`retried_at`). Complete, every step finished, and still aborted."""
+    service = started(tmp_path)
+    script = _failed(service, None)
+    first, second = _step(service, "tab-a"), _step(service, "tab-a")
+    service.record_windows(first.run_id, _on_the_line(first.run_id))
+    service.stop(mock_invoker)
+    path = next((tmp_path / "working_memory").glob("*.json"))
+    stored = json.loads(path.read_bytes())
+    start = datetime.datetime(2026, 10, 27, 12, tzinfo=datetime.timezone.utc)
+    offsets = {script.run_id: 0, first.run_id: 10, second.run_id: 20}
+    for run in stored["runs"]:
+        run["created_at"] = (start + datetime.timedelta(seconds=offsets[run["run_id"]])).isoformat()
+        if run["run_id"] == script.run_id:
+            run["retried_at"] = (start + datetime.timedelta(seconds=15)).isoformat()
     path.write_text(json.dumps(stored))
 
     reread = started(tmp_path)

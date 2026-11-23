@@ -371,11 +371,15 @@ def _lineage_outcomes(
 
 
 def _count_retries(run_ids: frozenset[str], file: CalibrationStoreFile) -> tuple[bool, frozenset[str]]:
-    """A store change: count one more retry in flight on each run of `run_ids` the file holds. Returns those."""
+    """A store change: count one more retry in flight on each run of `run_ids` the file holds, and note on each of
+    them without an attempt that a retry of it began now (`retried_at`, `_started_at`). Returns those."""
     counted = frozenset(run.run_id for run in file.runs if run.run_id in run_ids)
+    now = _now()
     for run in file.runs:
         if run.run_id in counted:
             run.retries_in_flight += 1
+            if run.attempt_id is None:
+                run.retried_at = now
     return bool(counted), counted
 
 
@@ -409,19 +413,33 @@ def _last_activity(runs: Iterable[CalibrationRun]) -> datetime.datetime:
     )
 
 
+def _started_at(run: CalibrationRun) -> datetime.datetime:
+    """When the run last began to measure the GPU on its own account: its creation, or for a run without an attempt
+    the latest retry of its items that began since (`retried_at`). A retry of an attempt's run needs no such note: it
+    is refused once another run began after the attempt's first (`_cut_off`), and an attempt begun after it is cut
+    off by its own first run."""
+    return max(run.created_at, run.retried_at) if run.retried_at is not None else run.created_at
+
+
 def _cut_off(file: CalibrationStoreFile, key: AttemptKey) -> bool:
-    """Whether another run (another attempt's, or one without an attempt: a script, the family E2E tool) was created
-    on the device class after the first run of attempt `key`: a later step of it would measure the GPU after that run,
-    so none is accepted (`CalibrationAttemptInterleavedError`)."""
+    """Whether another run (another attempt's, or one without an attempt: a script, the family E2E tool) began on the
+    device class after the first run of attempt `key`, created or, without an attempt, retried (`_started_at`): a
+    later step of it, or a retry of one of its steps, would measure the GPU after that run, so none is accepted
+    (`CalibrationAttemptInterleavedError`)."""
     own = [run.created_at for run in file.runs if _attempt_key(run) == key]
-    return bool(own) and any(_attempt_key(run) != key and run.created_at > min(own) for run in file.runs)
+    return bool(own) and any(_attempt_key(run) != key and _started_at(run) > min(own) for run in file.runs)
 
 
 def _interleaved_attempts(file: CalibrationStoreFile) -> set[AttemptKey]:
-    """The attempts another run was created between the first and the last run of: their later steps measured the GPU
-    after that run, not after their own earlier steps. The calibrate route refuses such a step
-    (`CalibrationAttemptInterleavedError`), so only a store written otherwise holds one."""
-    created = sorted(run.created_at for run in file.runs)
+    """The attempts another run was created, or retried without an attempt (`retried_at`), between the first and the
+    last run of: their later steps measured the GPU after that run, not after their own earlier steps. The calibrate
+    route refuses such a step (`CalibrationAttemptInterleavedError`), so only a store written otherwise holds one."""
+    created = sorted(
+        chain(
+            (run.created_at for run in file.runs),
+            (run.retried_at for run in file.runs if run.attempt_id is None and run.retried_at is not None),
+        )
+    )
     spans: dict[AttemptKey, list[datetime.datetime]] = {}
     for run in file.runs:
         if (key := _attempt_key(run)) is not None:
@@ -967,8 +985,8 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
         would measure neither.
 
         `key` None judges a retry of a run without an attempt (a script's, the family E2E tool's): every attempt counts
-        then, its owner's too, since a retry creates no run that would cut the open attempt off (`_cut_off`) as that
-        run's creation did.
+        then, its owner's too. The retry would measure between the open attempt's steps and cut it off (`retried_at`,
+        `_cut_off`), where its owner's client means to go on with it.
 
         Open: between its steps, short of `attempt_steps` runs (those resets removed included), not aborted (no item
         of it canceled or failed for a changed model, no reset that stopped it, no other run since its first), its
@@ -1273,6 +1291,12 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
         (`CalibrationAttemptBusyError`, `_attempt_blocks`), which also refuses the retry of a run without an attempt
         between another attempt's steps. A count left over in `retries_in_flight` refuses nothing: it would refuse for
         good. The queue calls this under `retry_admission`.
+
+        A run without an attempt notes that a retry of it began (`retried_at`), as it is counted: the retry measures
+        the GPU after every attempt begun before it, so it cuts those off as a run created now would (`_cut_off`), and
+        a later step or retry of theirs is refused. An attempt whose last step failed is not open, and its own retry
+        is the only thing that would go on with it: without the note, a script's retry admitted first, then that
+        retry, would let the attempt feed a window measured after the script's.
 
         A retry inherits its source's origin, which names the run: a recreated or restored database that gave a
         recorded id to an unrelated item cannot make that item's retry the run's, and a bulk retry of generations
