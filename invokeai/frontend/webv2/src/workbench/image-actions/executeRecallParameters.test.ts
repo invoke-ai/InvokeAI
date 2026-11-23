@@ -165,6 +165,7 @@ describe('executeRecallParameters', () => {
     const initialised = () =>
       getCurrentGenerateValues({
         generateValues: { modelKey: sdxl.key },
+        models: [sdxl as unknown as GenerateModelConfig],
         supportedModels: [sdxl as unknown as GenerateModelConfig],
       }) as unknown as Record<string, unknown> & { height: number; width: number };
 

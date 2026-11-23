@@ -1,12 +1,15 @@
-"""Krea-2 LoRA prefix constants and kohya key-reconstruction helpers.
+"""Krea-2 LoRA prefix constants, kohya key-reconstruction helpers and the Control LoRA detector.
 
 The prefixes namespace LoRA patch keys when applying them to Krea-2 models.
 
-The kohya/LyCORIS reconstruction helpers live here rather than in ``krea2_lora_conversion_utils`` so that
-``model_manager.configs.lora`` can identify a flattened Krea-2 LoRA without importing the converter: the
-converter pulls in the patch layers, which import ``model_manager.load``, closing an import cycle back into
-``model_manager.configs``. Same reason ``anima_lora_constants`` exists.
+The kohya/LyCORIS reconstruction helpers and the Control LoRA detector live here rather than in
+``krea2_lora_conversion_utils`` so that ``model_manager.configs.lora`` can identify those files without importing
+the converter: the converter pulls in the patch layers, which import ``model_manager.load``, closing an import cycle
+back into ``model_manager.configs``. Same reason ``anima_lora_constants`` exists.
 """
+
+import re
+from typing import Any
 
 from invokeai.backend.patches.lora_conversions.kohya_key_utils import (
     INDEX_PLACEHOLDER,
@@ -109,3 +112,36 @@ def is_kohya_krea2_lora_key(key: str | int) -> bool:
     """
     split = split_kohya_krea2_key(key)
     return split is not None and unflatten_kohya_krea2_module_path(split[0]) is not None
+
+
+# --- Krea-2 Control LoRA (https://github.com/Tanmaypatil123/Krea-2-controlnet) ---------------------------------
+# Native module names, block LoRAs as ``<module>.A`` (down) / ``<module>.B`` (up), and the input projection
+# ``first`` widened to take ``[noisy latent tokens | control latent tokens]``: twice the packed latent width.
+KREA2_CONTROL_LORA_INPUT_WIDTH = 2 * 64
+KREA2_HIDDEN_SIZE = 6144
+KREA2_CONTROL_LORA_PROJECTION_KEYS = ("first.weight", "first.bias")
+_KREA2_CONTROL_LORA_BLOCK_KEY = re.compile(
+    r"blocks\.[0-9]+\.(?:"
+    + "|".join(re.escape(f"{group}.{leaf}") for group, leaves in _NATIVE_KREA2_BLOCK_SUBTREE.items() for leaf in leaves)
+    + r")\.[AB]"
+)
+
+
+def is_krea2_control_lora_state_dict(state_dict: dict[str | int, Any]) -> bool:
+    """True only for a ``[6144, 128]`` ``first`` projection plus complete A/B pairs on block Linears, nothing else."""
+    weight = state_dict.get("first.weight")
+    bias = state_dict.get("first.bias")
+    if weight is None or bias is None:
+        return False
+    if tuple(weight.shape) != (KREA2_HIDDEN_SIZE, KREA2_CONTROL_LORA_INPUT_WIDTH) or tuple(bias.shape) != (
+        KREA2_HIDDEN_SIZE,
+    ):
+        return False
+    modules: dict[str, set[str]] = {}
+    for key in state_dict:
+        if key in KREA2_CONTROL_LORA_PROJECTION_KEYS:
+            continue
+        if not isinstance(key, str) or _KREA2_CONTROL_LORA_BLOCK_KEY.fullmatch(key) is None:
+            return False
+        modules.setdefault(key[:-2], set()).add(key[-1])
+    return bool(modules) and all(halves == {"A", "B"} for halves in modules.values())

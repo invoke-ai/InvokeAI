@@ -15,6 +15,7 @@ import {
 const session = (overrides: Partial<AuthSession> = {}): AuthSession => ({
   accountEpoch: 1,
   expiredUserId: null,
+  hasSingleUserWork: false,
   multiuserEnabled: true,
   phase: 'ready',
   sessionExpired: false,

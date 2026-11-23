@@ -22,6 +22,7 @@ from invokeai.backend.model_manager.load.model_loaders.krea2 import (
 )
 from invokeai.backend.model_manager.taxonomy import Krea2VariantType, Qwen3VLVariantType, SubModelType
 from invokeai.backend.quantization.int8_convrot import Int4ConvrotLinear, Int8ConvrotLinear
+from tests.fixtures.safetensors_files import record_reads, served_checkpoint
 
 
 class _TinyVisionTowerHost(torch.nn.Module):
@@ -48,7 +49,6 @@ class _TinyKrea2Transformer(torch.nn.Module):
 
 def test_single_file_loader_constructs_and_materializes_model(monkeypatch, tmp_path) -> None:
     import diffusers
-    import safetensors.torch
 
     checkpoint_path = tmp_path / "krea2.safetensors"
     checkpoint_path.touch()
@@ -66,7 +66,10 @@ def test_single_file_loader_constructs_and_materializes_model(monkeypatch, tmp_p
     loader._apply_fp8_layerwise_casting = lambda model, _config, _submodel: model
 
     monkeypatch.setattr(diffusers, "Krea2Transformer2DModel", _TinyKrea2Transformer, raising=False)
-    monkeypatch.setattr(safetensors.torch, "load_file", lambda _path: {"weight": torch.ones(2, 2)})
+    monkeypatch.setattr(
+        "invokeai.backend.model_manager.load.model_loaders.krea2.load_safetensors_checkpoint",
+        served_checkpoint({"weight": torch.ones(2, 2)}),
+    )
     monkeypatch.setattr(
         "invokeai.backend.model_manager.load.model_loaders.krea2.TorchDevice.choose_torch_device",
         lambda: torch.device("cpu"),
@@ -95,7 +98,6 @@ def test_single_file_loader_decodes_an_int8_convrot_checkpoint(monkeypatch, tmp_
     import json
 
     import diffusers
-    import safetensors.torch
 
     from invokeai.backend.quantization.int8_convrot import CONVROT_GROUP_SIZE, build_regular_hadamard
 
@@ -135,7 +137,10 @@ def test_single_file_loader_decodes_an_int8_convrot_checkpoint(monkeypatch, tmp_
     loader._apply_fp8_layerwise_casting = lambda model, _config, _submodel: model
 
     monkeypatch.setattr(diffusers, "Krea2Transformer2DModel", _TinyInt8Krea2Transformer, raising=False)
-    monkeypatch.setattr(safetensors.torch, "load_file", lambda _path: state_dict)
+    monkeypatch.setattr(
+        "invokeai.backend.model_manager.load.model_loaders.krea2.load_safetensors_checkpoint",
+        served_checkpoint(state_dict),
+    )
     monkeypatch.setattr(
         "invokeai.backend.model_manager.load.model_loaders.krea2.TorchDevice.choose_torch_device",
         lambda: torch.device("cpu"),
@@ -180,7 +185,6 @@ def test_single_file_loader_keeps_a_mixed_int4_build_named_only_in_its_header_pa
     import json
 
     import diffusers
-    import safetensors.torch
 
     from invokeai.backend.quantization.int8_convrot import CONVROT_GROUP_SIZE
     from tests.fixtures.quantized_payloads import (
@@ -224,7 +228,10 @@ def test_single_file_loader_keeps_a_mixed_int4_build_named_only_in_its_header_pa
     loader._apply_fp8_layerwise_casting = lambda model, _config, _submodel: model
 
     monkeypatch.setattr(diffusers, "Krea2Transformer2DModel", _TinyMixedKrea2Transformer, raising=False)
-    monkeypatch.setattr(safetensors.torch, "load_file", lambda _path: state_dict)
+    monkeypatch.setattr(
+        "invokeai.backend.model_manager.load.model_loaders.krea2.load_safetensors_checkpoint",
+        served_checkpoint(state_dict),
+    )
     monkeypatch.setattr(
         "invokeai.backend.model_manager.load.model_loaders.krea2.read_safetensors_metadata", lambda *_args: header
     )
@@ -562,7 +569,6 @@ def test_an_int8_weight_without_a_marker_is_refused(monkeypatch, tmp_path) -> No
     import json
 
     import diffusers
-    import safetensors.torch
 
     class _TinyInt8Krea2Transformer(torch.nn.Module):
         def __init__(self, **_kwargs) -> None:
@@ -589,7 +595,10 @@ def test_an_int8_weight_without_a_marker_is_refused(monkeypatch, tmp_path) -> No
     loader._logger = MagicMock()
 
     monkeypatch.setattr(diffusers, "Krea2Transformer2DModel", _TinyInt8Krea2Transformer, raising=False)
-    monkeypatch.setattr(safetensors.torch, "load_file", lambda _path: state_dict)
+    monkeypatch.setattr(
+        "invokeai.backend.model_manager.load.model_loaders.krea2.load_safetensors_checkpoint",
+        served_checkpoint(state_dict),
+    )
     monkeypatch.setattr(
         "invokeai.backend.model_manager.load.model_loaders.krea2.TorchDevice.choose_torch_device",
         lambda: torch.device("cpu"),
@@ -627,9 +636,10 @@ def _int8_marker_blob(**overrides) -> torch.Tensor:
     return torch.frombuffer(bytearray(json.dumps(marker).encode("utf-8")), dtype=torch.uint8).clone()
 
 
-def _int8_transformer_driver(monkeypatch, tmp_path, model_class, state_dict):
+def _int8_transformer_driver(monkeypatch, tmp_path, model_class, state_dict, *, written: bool = False):
+    """The loader over ``state_dict``, served in place of the file read, or with ``written`` over a real file."""
     import diffusers
-    import safetensors.torch
+    from safetensors import torch as safetensors_torch
 
     checkpoint_path = tmp_path / "krea2_int8_convrot.safetensors"
     checkpoint_path.touch()
@@ -639,10 +649,17 @@ def _int8_transformer_driver(monkeypatch, tmp_path, model_class, state_dict):
     loader = object.__new__(Krea2CheckpointModel)
     loader._ram_cache = SimpleNamespace(make_room=MagicMock())
     loader._logger = MagicMock()
+    loader._torch_device = torch.device("cpu")
     loader._apply_fp8_layerwise_casting = lambda model, _config, _submodel: model
 
     monkeypatch.setattr(diffusers, "Krea2Transformer2DModel", model_class, raising=False)
-    monkeypatch.setattr(safetensors.torch, "load_file", lambda _path: state_dict)
+    if written:
+        safetensors_torch.save_file(state_dict, str(checkpoint_path))
+    else:
+        monkeypatch.setattr(
+            "invokeai.backend.model_manager.load.model_loaders.krea2.load_safetensors_checkpoint",
+            served_checkpoint(state_dict),
+        )
     monkeypatch.setattr(
         "invokeai.backend.model_manager.load.model_loaders.krea2.TorchDevice.choose_torch_device",
         lambda: torch.device("cpu"),
@@ -913,7 +930,6 @@ class _TinyNativeKrea2(torch.nn.Module):
 
 def _native_fp8_driver(monkeypatch, tmp_path, state_dict, observe: tuple[str, ...] = ()):
     import diffusers
-    import safetensors.torch
 
     from invokeai.backend.model_manager.load.model_loaders import krea2
     from tests.fixtures.loader_seams import Seam, prepare
@@ -923,7 +939,7 @@ def _native_fp8_driver(monkeypatch, tmp_path, state_dict, observe: tuple[str, ..
     config = Main_Checkpoint_Krea2_Config.model_construct(
         path=str(checkpoint), variant=Krea2VariantType.Turbo, fp8_storage=None
     )
-    seam = Seam(loader=Krea2CheckpointModel, module=krea2, load_file_host=safetensors.torch, patches_device=True)
+    seam = Seam(loader=Krea2CheckpointModel, module=krea2, patches_device=True)
     run = prepare(
         seam,
         monkeypatch,
@@ -1075,3 +1091,26 @@ def test_an_nvfp4_layer_missing_its_global_scale_is_refused_before_the_cache_is_
         run.load(config)
 
     assert run.reserved == []
+
+
+@pytest.mark.parametrize("prefix", ["", "model.diffusion_model."], ids=["bare", "comfyui-prefixed"])
+def test_the_final_layers_the_conversion_discards_are_never_read(monkeypatch, tmp_path, prefix: str) -> None:
+    """`last.up` and `last.down` of a native checkpoint have no module in the diffusers model. Read through ``pread``
+    they would cost their size in process memory only to be dropped."""
+    from invokeai.backend.model_manager.configs.main import KREA2_DISCARDED_NATIVE_FINAL_LAYERS
+
+    class _TinyKrea2(torch.nn.Module):
+        def __init__(self, **_kwargs) -> None:
+            super().__init__()
+            self.proj = torch.nn.Linear(4, 4, bias=False)
+
+    state_dict = {f"{prefix}proj.weight": torch.ones(4, 4)}
+    for layer in KREA2_DISCARDED_NATIVE_FINAL_LAYERS:
+        state_dict[f"{prefix}{layer}.weight"] = torch.ones(8, 8).to(torch.float8_e4m3fn)
+        state_dict[f"{prefix}{layer}.weight_scale"] = torch.tensor(1.0)
+    loader, config = _int8_transformer_driver(monkeypatch, tmp_path, _TinyKrea2, state_dict, written=True)
+    log = record_reads(monkeypatch)
+
+    loader._load_from_singlefile(config)
+
+    assert set(log.tensors) == {f"{prefix}proj.weight"}

@@ -37,6 +37,8 @@ register(
         # Either one training-free style reference (shared-KV attention, no adapter model) or up to
         # three edit references for ai-toolkit edit LoRAs; `krea2_denoise` refuses more than three.
         max_reference_images=3,
+        # A Control LoRA with its own node, `krea2_control_lora`: the model type is FLUX's, the node is not.
+        control_kinds=frozenset({"control_lora"}),
         supports_regional_guidance=True,
         regional_negative=True,
     ),
