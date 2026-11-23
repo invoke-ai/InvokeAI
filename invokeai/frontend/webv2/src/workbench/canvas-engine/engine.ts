@@ -168,6 +168,7 @@ import { createColorSampler } from '@workbench/canvas-engine/render/colorSample'
 import {
   compositeDocument,
   createCheckerboardTile,
+  shouldSmoothAtZoom,
   type CompositeOptions,
 } from '@workbench/canvas-engine/render/compositor';
 import { createFontLoader, domFontLoadApi } from '@workbench/canvas-engine/render/fontLoader';
@@ -506,7 +507,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     maskPatterns: {
       screen: () => {
         const dpr = viewport.getDpr();
-        return { dpr, view: viewport.viewMatrix(dpr) };
+        return { dpr, smoothing: shouldSmoothAtZoom(viewport.getZoom()), view: viewport.viewMatrix(dpr) };
       },
       tile: getMaskPatternTile,
     },
@@ -1595,7 +1596,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       const point = viewport.screenToDocument(screenPoint);
       colorLoupeSampler ??= createColorSampler(backend);
       const size = colorLoupePixels(viewport.getZoom());
-      const area = colorLoupeSampler.sampleArea(doc, layerCache, point, size, colorSampleProviders);
+      const area = colorLoupeSampler.sampleArea(doc, layerCache, point, size, colorSampleProviders, screenPoint);
       return area ? { checker: getCheckerboardTile(), color: area.center, pixels: area.pixels, point } : null;
     },
     getOverlayCursor: () => overlayCursor,

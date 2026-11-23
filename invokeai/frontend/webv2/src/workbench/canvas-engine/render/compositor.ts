@@ -9,14 +9,14 @@ import type {
 import type { CanvasDiagnostics } from '@workbench/canvas-engine/diagnostics';
 import type { SemanticLeaf } from '@workbench/canvas-engine/document-model/semanticLeaf';
 import type { OverlayStackKind } from '@workbench/canvas-engine/document/layerStacks';
-import type { FrameDamage, Mat2d, Rect, Vec2 } from '@workbench/canvas-engine/types';
+import type { FrameDamage, Mat2d, Rect } from '@workbench/canvas-engine/types';
 
 import { compileDocumentLeaves, lookupDocumentLeaf } from '@workbench/canvas-engine/document-model/documentModel';
 import {
   ALL_OVERLAY_STACKS_SHOWN,
   planScreenComposition,
 } from '@workbench/canvas-engine/document-model/screenComposition';
-import { fromTRS, multiply } from '@workbench/canvas-engine/math/mat2d';
+import { fromTRS, invert, multiply } from '@workbench/canvas-engine/math/mat2d';
 import { intersect, isEmpty, roundOut, transformBounds, union } from '@workbench/canvas-engine/math/rect';
 
 import type { DerivedSurfaceCache } from './derivedSurfaceCache';
@@ -69,11 +69,17 @@ export interface CompositeOptions {
   skipLayerId?: string | null;
   /** Null means direct solid fill; without a provider only solid fills render. */
   maskPatternTile?: ((style: string, color: string) => RasterSurface | null) | null;
-  /**
-   * The viewport supplies its backing scale and owns the scratch used to stencil screen-space patterns. `origin` is the
-   * viewport device pixel at target pixel (0, 0), for an off-screen target such as a color sample; the viewport omits it.
-   */
-  screenMask?: { dpr: number; origin?: Vec2; getScratch: (width: number, height: number) => RasterSurface };
+  /** The viewport supplies its backing scale and owns the scratch used to stencil screen-space patterns. */
+  screenMask?: {
+    dpr: number;
+    getScratch: (width: number, height: number) => RasterSurface;
+    /**
+     * For a target other than the viewport, such as a color sample: the viewport's document-to-device `view` and
+     * smoothing, and `fromTarget`, which places target pixels on viewport device pixels. Patterned masks then stencil
+     * exactly as the viewport draws them and land on the target nearest-neighbor.
+     */
+    device?: { view: Mat2d; smoothing: boolean; fromTarget: Mat2d };
+  };
   /** Display-only: pixel-consuming composites must omit them, or the tint becomes generated content. */
   regionOverlays?: boolean;
   /** Layer-local output bounds, drawn through the layer transform. */
@@ -447,14 +453,24 @@ export const compositeDocument = (
   opts.diagnostics?.increment('compositeFrames');
   const repaint = damage.kind === 'rect' ? damage.rect : targetRect;
   let usedMaskScratch = false;
+  const device = opts.screenMask?.device;
+  // Target matrices become viewport device matrices through the document; an off-screen target maps back afterwards.
+  const targetToDocument = device ? invert(view) : null;
+  const targetToDevice = device && targetToDocument ? multiply(device.view, targetToDocument) : null;
+  const deviceToTarget = device ? invert(device.fromTarget) : null;
   const drawMaskFill: DrawMaskFill = (layerId, fill, coverage, matrix, kind) => {
     const { surface, rect, version } = coverage;
     const tile = opts.maskPatternTile?.(fill.style, fill.color) ?? null;
     if (tile && opts.screenMask) {
       const { dpr, getScratch } = opts.screenMask;
-      const bounds = roundOut(transformBounds(matrix, rect));
-      const area = intersect(bounds, repaint);
-      if (!area || isEmpty(area) || ![area.x, area.y, area.width, area.height].every(Number.isFinite)) {
+      const targetArea = intersect(roundOut(transformBounds(matrix, rect)), repaint);
+      if (!targetArea || isEmpty(targetArea) || (device && (!targetToDevice || !deviceToTarget))) {
+        return;
+      }
+      const deviceMatrix = targetToDevice ? multiply(targetToDevice, matrix) : matrix;
+      // Rounding out in device space keeps every target pixel of `targetArea` fully inside the stencil.
+      const area = device ? roundOut(transformBounds(device.fromTarget, targetArea)) : targetArea;
+      if (isEmpty(area) || ![area.x, area.y, area.width, area.height].every(Number.isFinite)) {
         return;
       }
       const scratch = getScratch(area.width, area.height);
@@ -468,22 +484,27 @@ export const compositeDocument = (
       stencil.rect(0, 0, area.width, area.height);
       stencil.clip();
       stencil.globalCompositeOperation = 'source-over';
-      stencil.imageSmoothingEnabled = ctx.imageSmoothingEnabled;
-      setTransformFromMat(stencil, { ...matrix, e: matrix.e - area.x, f: matrix.f - area.y });
+      stencil.imageSmoothingEnabled = device?.smoothing ?? ctx.imageSmoothingEnabled;
+      setTransformFromMat(stencil, { ...deviceMatrix, e: deviceMatrix.e - area.x, f: deviceMatrix.f - area.y });
       stencil.drawImage(surface.canvas, rect.x, rect.y);
 
       // Fill in viewport CSS coordinates so damage and layer transforms cannot shift the pattern.
       stencil.imageSmoothingEnabled = true;
-      const deviceX = area.x + (opts.screenMask.origin?.x ?? 0);
-      const deviceY = area.y + (opts.screenMask.origin?.y ?? 0);
-      stencil.setTransform(dpr, 0, 0, dpr, -deviceX, -deviceY);
+      stencil.setTransform(dpr, 0, 0, dpr, -area.x, -area.y);
       stencil.globalCompositeOperation = 'source-in';
       stencil.fillStyle = stencil.createPattern(tile.canvas, 'repeat') ?? fill.color;
-      stencil.fillRect(deviceX / dpr, deviceY / dpr, area.width / dpr, area.height / dpr);
+      stencil.fillRect(area.x / dpr, area.y / dpr, area.width / dpr, area.height / dpr);
       stencil.restore();
 
       ctx.save();
       identityTransform(ctx);
+      if (deviceToTarget) {
+        ctx.beginPath();
+        ctx.rect(targetArea.x, targetArea.y, targetArea.width, targetArea.height);
+        ctx.clip();
+        setTransformFromMat(ctx, deviceToTarget);
+        ctx.imageSmoothingEnabled = false;
+      }
       ctx.drawImage(scratch.canvas, 0, 0, area.width, area.height, area.x, area.y, area.width, area.height);
       ctx.restore();
       return;

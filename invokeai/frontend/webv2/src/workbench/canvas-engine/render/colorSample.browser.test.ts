@@ -6,7 +6,6 @@ import type {
 import type { Mat2d } from '@workbench/canvas-engine/types';
 
 import { stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
-import { applyToPoint, invert } from '@workbench/canvas-engine/math/mat2d';
 import { createDomRasterBackend } from '@workbench/canvas-engine/render/raster';
 import { describe, expect, it } from 'vitest';
 
@@ -80,13 +79,15 @@ describe('color sampling with real browser rasterization', () => {
     expect(pixel(2, 0)).toEqual([0, 0, 0, 0]);
   });
 
-  it.each([
-    { dpr: 1, pan: { x: 0, y: 0 }, zoom: 1 },
-    { dpr: 1, pan: { x: 7, y: -3 }, zoom: 1 },
-    { dpr: 2, pan: { x: 5.25, y: 2.5 }, zoom: 1.5 },
-    { dpr: 1, pan: { x: -11, y: 4 }, zoom: 3 },
-    { dpr: 1, pan: { x: 3, y: 1 }, zoom: 0.5 },
-  ])('picks the hatch line or gap the viewport shows at zoom $zoom, DPR $dpr', ({ dpr, pan, zoom }) => {
+  type MaskStyle = CanvasInpaintMaskLayerContract['mask']['fill']['style'];
+
+  /** A coral patterned mask over blue, drawn as the viewport would; `paintMask` paints its coverage. */
+  const hatchScene = (
+    style: MaskStyle,
+    { dpr, pan, zoom }: { dpr: number; pan: { x: number; y: number }; zoom: number },
+    paintMask: (ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D) => void = (ctx) =>
+      ctx.fillRect(0, 0, 128, 128)
+  ) => {
     const backend = createDomRasterBackend();
     const caches = createLayerCacheStore(backend);
     const blue = caches.getOrCreate('blue', 128, 128);
@@ -95,14 +96,14 @@ describe('color sampling with real browser rasterization', () => {
     caches.publishPixels('blue');
     const coverage = caches.getOrCreate('mask', 128, 128);
     coverage.surface.ctx.fillStyle = '#000000';
-    coverage.surface.ctx.fillRect(0, 0, 128, 128);
+    paintMask(coverage.surface.ctx);
     caches.publishPixels('mask');
     const mask: CanvasInpaintMaskLayerContract = {
       blendMode: 'normal',
       id: 'mask',
       isEnabled: true,
       isLocked: false,
-      mask: { bitmap: null, fill: { color: '#e07575', style: 'diagonal' } },
+      mask: { bitmap: null, fill: { color: '#e07575', style } },
       name: 'Mask',
       opacity: 1,
       transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
@@ -113,29 +114,97 @@ describe('color sampling with real browser rasterization', () => {
       height: 128,
       stacks: stacksFrom([mask, { ...layer(0), id: 'blue' }]),
     };
-    const tile = createMaskPatternTile(backend, 'diagonal', '#e07575')!;
+    const tile = createMaskPatternTile(backend, style, '#e07575')!;
     const view: Mat2d = { a: zoom * dpr, b: 0, c: 0, d: zoom * dpr, e: pan.x * dpr, f: pan.y * dpr };
+    const smoothing = shouldSmoothAtZoom(zoom);
     const screen = backend.createSurface(96, 96);
     compositeDocument(screen, doc, caches, view, {
       backend,
-      imageSmoothing: shouldSmoothAtZoom(zoom),
+      imageSmoothing: smoothing,
       maskPatternTile: () => tile,
       screenMask: { dpr, getScratch: (width, height) => backend.createSurface(width, height) },
     });
+    const providers = { maskPatterns: { screen: () => ({ dpr, smoothing, view }), tile: () => tile } };
     const sampler = createColorSampler(backend);
-    const providers = { maskPatterns: { screen: () => ({ dpr, view }), tile: () => tile } };
-    const toDocument = invert(view)!;
+    // The viewport's own screen-to-document conversion, whose round trip can miss the device pixel.
+    const toDocument = (cssPoint: { x: number; y: number }) => ({
+      x: (cssPoint.x - pan.x) / zoom,
+      y: (cssPoint.y - pan.y) / zoom,
+    });
+    const pick = (cssPoint: { x: number; y: number }) =>
+      sampler.sample(doc, caches, toDocument(cssPoint), providers, cssPoint);
+    const shown = (x: number, y: number) => [...screen.ctx.getImageData(x, y, 1, 1).data];
+    return { caches, doc, pick, providers, sampler, shown, toDocument };
+  };
 
-    const seen = new Set<string>();
-    for (let y = 24; y < 36; y += 1) {
-      for (let x = 24; x < 36; x += 1) {
-        const [r, g, b] = screen.ctx.getImageData(x, y, 1, 1).data;
-        const docPoint = applyToPoint(toDocument, { x: x + 0.25, y: y + 0.75 });
-        const sample = sampler.sample(doc, caches, docPoint, providers);
-        expect([sample?.r, sample?.g, sample?.b], `device pixel ${x},${y}`).toEqual([r, g, b]);
-        seen.add(r === 0 && g === 0 && b === 255 ? 'gap' : 'line');
+  it.each<{ dpr: number; pan: { x: number; y: number }; zoom: number; style?: MaskStyle }>([
+    { dpr: 1, pan: { x: 0, y: 0 }, zoom: 1 },
+    { dpr: 1, pan: { x: 7, y: -3 }, zoom: 1 },
+    { dpr: 2, pan: { x: 5.25, y: 2.5 }, zoom: 1.5 },
+    { dpr: 1, pan: { x: -11, y: 4 }, zoom: 3 },
+    { dpr: 1, pan: { x: 3, y: 1 }, zoom: 0.5 },
+    { dpr: 1, pan: { x: 0, y: 0 }, zoom: 0.7, style: 'vertical' },
+  ])(
+    'picks the hatch line or gap the viewport shows at zoom $zoom, DPR $dpr',
+    ({ style = 'diagonal', ...viewport }) => {
+      const { pick, shown } = hatchScene(style, viewport);
+      const seen = new Set<string>();
+      for (let y = 24; y < 36; y += 1) {
+        for (let x = 24; x < 36; x += 1) {
+          const [r, g, b] = shown(x, y);
+          // Integer pointer coordinates sit on device pixel edges, where a document round trip can land on a neighbor.
+          for (const offset of [0, 0.25, 0.75]) {
+            const sample = pick({ x: (x + offset) / viewport.dpr, y: (y + offset) / viewport.dpr });
+            expect([sample?.r, sample?.g, sample?.b], `device pixel ${x},${y} + ${offset}`).toEqual([r, g, b]);
+          }
+          seen.add(r === 0 && g === 0 && b === 255 ? 'gap' : 'line');
+        }
+      }
+      expect([...seen].sort()).toEqual(['gap', 'line']);
+    }
+  );
+
+  it('picks one color across a screen pixel that blends a thin hatched stroke at 50% zoom', () => {
+    const { pick, shown } = hatchScene('horizontal', { dpr: 1, pan: { x: 0, y: 0 }, zoom: 0.5 }, (ctx) =>
+      ctx.fillRect(40, 0, 1, 128)
+    );
+    let blended = 0;
+    for (let y = 0; y < 48; y += 1) {
+      const [r, g, b] = shown(20, y);
+      if (r !== 0 || g !== 0 || b !== 255) {
+        blended += 1;
+        expect(r).toBeLessThan(0xe0);
+      }
+      for (const x of [20.1, 20.9]) {
+        const sample = pick({ x, y: y + 0.5 });
+        expect([sample?.r, sample?.g, sample?.b], `screen ${x},${y}`).toEqual([r, g, b]);
       }
     }
-    expect([...seen].sort()).toEqual(['gap', 'line']);
+    expect(blended).toBeGreaterThan(0);
+  });
+
+  it('fills each loupe cell with the screen pixel where its document pixel is drawn at 4x zoom', () => {
+    const zoom = 4;
+    const { caches, doc, providers, sampler, shown, toDocument } = hatchScene(
+      'diagonal',
+      { dpr: 1, pan: { x: -40, y: -40 }, zoom },
+      (ctx) => ctx.fillRect(10, 10, 14, 14)
+    );
+    const pointer = { x: 41.3, y: 42.6 };
+    const size = 7;
+    const half = (size - 1) / 2;
+    const area = sampler.sampleArea(doc, caches, toDocument(pointer), size, providers, pointer)!;
+
+    const seen = new Set<string>();
+    for (let row = 0; row < size; row += 1) {
+      for (let column = 0; column < size; column += 1) {
+        const x = Math.floor(pointer.x) + (column - half) * zoom;
+        const y = Math.floor(pointer.y) + (row - half) * zoom;
+        const expected = shown(x, y);
+        expect([...area.pixels.ctx.getImageData(column, row, 1, 1).data], `cell ${column},${row}`).toEqual(expected);
+        seen.add(expected.join());
+      }
+    }
+    expect(seen.size).toBeGreaterThan(1);
   });
 });

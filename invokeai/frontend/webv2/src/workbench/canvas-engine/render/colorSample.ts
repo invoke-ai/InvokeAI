@@ -7,7 +7,7 @@
 import type { CanvasDocumentContractV3 } from '@workbench/canvas-engine/contracts';
 import type { Mat2d, Vec2 } from '@workbench/canvas-engine/types';
 
-import { applyToPoint } from '@workbench/canvas-engine/math/mat2d';
+import { applyToPoint, invert } from '@workbench/canvas-engine/math/mat2d';
 
 import type { LayerCacheStore } from './layerCache';
 import type { RasterBackend, RasterSurface } from './raster';
@@ -25,8 +25,8 @@ export interface RgbaSample {
 /** The viewport's patterned-mask drawing; the hatch is laid out in screen space, so samples need its phase. */
 export interface ColorSampleMaskPatterns {
   readonly tile: NonNullable<CompositeOptions['maskPatternTile']>;
-  /** The viewport's current backing scale and document-to-device matrix. */
-  readonly screen: () => { dpr: number; view: Mat2d };
+  /** The viewport's current backing scale, document-to-device matrix and smoothing. */
+  readonly screen: () => { dpr: number; view: Mat2d; smoothing: boolean };
 }
 
 export type ColorSampleProviders = Pick<CompositeOptions, 'adjustedSurface' | 'derivedSurfaces' | 'groupSurface'> & {
@@ -47,13 +47,15 @@ export interface ColorSampler {
   /**
    * Floors document coordinates to a pixel; transformed content remains pickable outside document dimensions. Returns
    * null for zero-alpha coverage. Repeating a pixel of an unchanged document and cache revision reuses the previous
-   * result.
+   * result. With `maskPatterns`, `screenPoint` (viewport CSS pixels) picks the device pixel instead, and patterned
+   * masks read as the viewport draws them there.
    */
   sample(
     doc: CanvasDocumentContractV3,
     layers: LayerCacheStore,
     docPoint: Vec2,
-    providers?: ColorSampleProviders
+    providers?: ColorSampleProviders,
+    screenPoint?: Vec2
   ): RgbaSample | null;
   /** The pixels around `docPoint` (odd `size`), with the same coverage rules and reuse as {@link sample}. */
   sampleArea(
@@ -61,7 +63,8 @@ export interface ColorSampler {
     layers: LayerCacheStore,
     docPoint: Vec2,
     size: number,
-    providers?: ColorSampleProviders
+    providers?: ColorSampleProviders,
+    screenPoint?: Vec2
   ): ColorSampleArea | null;
 }
 
@@ -70,15 +73,53 @@ const sampleAt = (data: Uint8ClampedArray, offset: number): RgbaSample | null =>
   return alpha === 0 ? null : { a: alpha, b: data[offset + 2] ?? 0, g: data[offset + 1] ?? 0, r: data[offset] ?? 0 };
 };
 
-/** Where the viewport's hatch lands on a sample scratch. */
-interface HatchPlacement {
+/** How a sample scratch lines up with the viewport's device pixels. */
+interface DevicePlacement {
   dpr: number;
-  /** The viewport device pixel at scratch pixel (0, 0). */
-  origin: Vec2;
+  view: Mat2d;
+  smoothing: boolean;
+  /** Places the scratch's center pixel center on the center of the device pixel under the pointer. */
+  fromTarget: Mat2d;
+  /** That device pixel's center in document space. */
+  docPoint: Vec2;
 }
 
-const sameHatch = (a: HatchPlacement | null, b: HatchPlacement | null): boolean =>
-  a === b || (!!a && !!b && a.dpr === b.dpr && a.origin.x === b.origin.x && a.origin.y === b.origin.y);
+/**
+ * The device pixel comes from the pointer's own screen position: a round trip through document space can land on its
+ * neighbor. Scratch neighbors step one document pixel, so a loupe cell shows the screen where that pixel is drawn.
+ */
+const placeOnDevice = (
+  { dpr, smoothing, view }: ReturnType<ColorSampleMaskPatterns['screen']>,
+  screenPoint: Vec2,
+  half: number
+): DevicePlacement | null => {
+  const toDocument = invert(view);
+  if (!toDocument) {
+    return null;
+  }
+  const pixel = { x: Math.floor(screenPoint.x * dpr) + 0.5, y: Math.floor(screenPoint.y * dpr) + 0.5 };
+  const linear = { ...view, e: 0, f: 0 };
+  const center = applyToPoint(linear, { x: half + 0.5, y: half + 0.5 });
+  return {
+    docPoint: applyToPoint(toDocument, pixel),
+    dpr,
+    fromTarget: { ...linear, e: pixel.x - center.x, f: pixel.y - center.y },
+    smoothing,
+    view,
+  };
+};
+
+const sameMatrix = (a: Mat2d, b: Mat2d): boolean =>
+  a.a === b.a && a.b === b.b && a.c === b.c && a.d === b.d && a.e === b.e && a.f === b.f;
+
+const samePlacement = (a: DevicePlacement | null, b: DevicePlacement | null): boolean =>
+  a === b ||
+  (!!a &&
+    !!b &&
+    a.dpr === b.dpr &&
+    a.smoothing === b.smoothing &&
+    sameMatrix(a.view, b.view) &&
+    sameMatrix(a.fromTarget, b.fromTarget));
 
 /** A sampler that keeps its scratch, draw plan and last sample across a picking gesture. */
 export const createColorSampler = (backend: RasterBackend): ColorSampler => {
@@ -99,7 +140,7 @@ export const createColorSampler = (backend: RasterBackend): ColorSampler => {
     providers: ColorSampleProviders;
     px: number;
     py: number;
-    hatch: HatchPlacement | null;
+    placement: DevicePlacement | null;
     area: ColorSampleArea;
   }
   const lastBySize = new Map<number, Last>();
@@ -110,24 +151,22 @@ export const createColorSampler = (backend: RasterBackend): ColorSampler => {
     layers: LayerCacheStore,
     docPoint: Vec2,
     size: number,
-    providers: ColorSampleProviders
+    providers: ColorSampleProviders,
+    screenPoint: Vec2 | undefined
   ): ColorSampleArea | null => {
-    const px = Math.floor(docPoint.x);
-    const py = Math.floor(docPoint.y);
+    const half = (size - 1) / 2;
+    const { maskPatterns, ...compositeProviders } = providers;
+    const placement =
+      maskPatterns && screenPoint && Number.isFinite(screenPoint.x) && Number.isFinite(screenPoint.y)
+        ? placeOnDevice(maskPatterns.screen(), screenPoint, half)
+        : null;
+    const point = placement?.docPoint ?? docPoint;
+    const px = Math.floor(point.x);
+    const py = Math.floor(point.y);
     if (!Number.isFinite(px) || !Number.isFinite(py)) {
       return null;
     }
-    const half = (size - 1) / 2;
     const view: Mat2d = { a: 1, b: 0, c: 0, d: 1, e: half - px, f: half - py };
-    const { maskPatterns, ...compositeProviders } = providers;
-    const screen = maskPatterns?.screen();
-    const device = screen && applyToPoint(screen.view, docPoint);
-    // The sampled pixel reads the hatch at the device pixel under the pointer, matching the viewport exactly;
-    // neighbors follow at device rather than document spacing.
-    const hatch: HatchPlacement | null =
-      screen && device
-        ? { dpr: screen.dpr, origin: { x: Math.floor(device.x) - half, y: Math.floor(device.y) - half } }
-        : null;
     const revision = layers.revision();
     const last = lastBySize.get(size);
     if (
@@ -137,7 +176,7 @@ export const createColorSampler = (backend: RasterBackend): ColorSampler => {
       last.providers === providers &&
       last.px === px &&
       last.py === py &&
-      sameHatch(last.hatch, hatch)
+      samePlacement(last.placement, placement)
     ) {
       return last.area;
     }
@@ -153,20 +192,27 @@ export const createColorSampler = (backend: RasterBackend): ColorSampler => {
       backend,
       ...compositeProviders,
       ...(maskPatterns &&
-        hatch && { maskPatternTile: maskPatterns.tile, screenMask: { ...hatch, getScratch: getStencil } }),
+        placement && {
+          maskPatternTile: maskPatterns.tile,
+          screenMask: {
+            device: { fromTarget: placement.fromTarget, smoothing: placement.smoothing, view: placement.view },
+            dpr: placement.dpr,
+            getScratch: getStencil,
+          },
+        }),
       preparation,
     });
 
     const { data } = scratch.ctx.getImageData(half, half, 1, 1);
     const area: ColorSampleArea = { center: sampleAt(data, 0), pixels: scratch };
-    lastBySize.set(size, { area, doc, layers, providers, px, py, revision, hatch });
+    lastBySize.set(size, { area, doc, layers, providers, px, py, revision, placement });
     return area;
   };
 
   return {
-    sample: (doc, layers, docPoint, providers = RAW_PIXELS) =>
-      composite(doc, layers, docPoint, 1, providers)?.center ?? null,
-    sampleArea: (doc, layers, docPoint, size, providers = RAW_PIXELS) =>
-      composite(doc, layers, docPoint, Math.max(1, Math.floor(size / 2) * 2 + 1), providers),
+    sample: (doc, layers, docPoint, providers = RAW_PIXELS, screenPoint) =>
+      composite(doc, layers, docPoint, 1, providers, screenPoint)?.center ?? null,
+    sampleArea: (doc, layers, docPoint, size, providers = RAW_PIXELS, screenPoint) =>
+      composite(doc, layers, docPoint, Math.max(1, Math.floor(size / 2) * 2 + 1), providers, screenPoint),
   };
 };
