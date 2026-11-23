@@ -137,6 +137,37 @@ def test_the_flux2_flat_layout_records_its_variant_from_lokr_widths() -> None:
     assert variant is Flux2VariantType.Klein9B
 
 
+@pytest.mark.parametrize(
+    ("module", "family_module"),
+    [
+        ("transformer_blocks_0_ff_linear_in", None),
+        ("transformer_blocks_0_attn_to_q", "transformer_blocks_0_ff_context_linear_out"),
+    ],
+)
+def test_the_flux2_variant_is_read_from_any_hidden_sized_projection(module: str, family_module: str | None) -> None:
+    """A Klein 9B file that trains only some of the hidden-sized modules still records its variant.
+
+    The fused single-block names the layout above carries are not always present: a file trained on the double
+    blocks' `to_q`/`to_k`/`to_v` and feed-forward recorded no variant and was then offered for Klein 4B, where
+    every layer misses. `ff_context.linear_out` only brings the family in the second case: it takes the MLP width,
+    so it settles nothing by itself.
+    """
+    keys = {
+        f"lycoris_{module}.alpha": ([], "BF16"),
+        f"lycoris_{module}.lokr_w1": ([16, 16], "BF16"),
+        f"lycoris_{module}.lokr_w2": ([256, 256], "BF16"),
+    }
+    if family_module is not None:
+        keys |= {
+            f"lycoris_{family_module}.alpha": ([], "BF16"),
+            f"lycoris_{family_module}.lokr_w1": ([16, 16], "BF16"),
+            f"lycoris_{family_module}.lokr_w2": ([256, 768], "BF16"),
+        }
+    mod, overrides = _mod(_state_dict(keys), f"flux2-{module}")
+
+    assert LoRA_LyCORIS_Flux2_Config.from_model_on_disk(mod, overrides).variant is Flux2VariantType.Klein9B
+
+
 _SD1_SD2_SHAPES = {
     "sd15-attention": sd15_lycoris_flat_lokr_format.state_dict_keys,
     "sd15-attention-and-ff": sd15_lycoris_flat_lokr_format.attention_and_ff_state_dict_keys,

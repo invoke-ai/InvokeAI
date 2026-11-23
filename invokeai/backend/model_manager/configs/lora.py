@@ -241,9 +241,21 @@ _BFL_LYCORIS_ATTN_IN_SUFFIXES = tuple(f".img_attn.proj{suffix}" for suffix in _L
 _BFL_LYCORIS_MLP_OUT_SUFFIXES = tuple(f".img_mlp.0{suffix}" for suffix in _LYCORIS_OUT_DIM_SUFFIXES)
 
 # FLUX.2 modules whose input dimension is the transformer's hidden size: every block shares that width, whatever
-# variant it belongs to, so any one of them settles the variant. The feed-forward layers carry their own width
-# instead, which is why they are not listed.
-_FLUX2_HIDDEN_SIZE_MODULE_TAILS = ("attn.to_add_out", "attn.to_qkv_mlp_proj")
+# variant it belongs to, so any one of them settles the variant on its own. The feed-forward outputs take the MLP
+# width instead, which is why they are left out.
+_FLUX2_HIDDEN_SIZE_MODULE_TAILS = (
+    "attn.to_q",
+    "attn.to_k",
+    "attn.to_v",
+    "attn.to_out.0",
+    "attn.add_q_proj",
+    "attn.add_k_proj",
+    "attn.add_v_proj",
+    "attn.to_add_out",
+    "attn.to_qkv_mlp_proj",
+    "ff.linear_in",
+    "ff_context.linear_in",
+)
 
 
 def _lokr_operand_dim(
@@ -772,8 +784,13 @@ def _get_flux2_lora_variant(state_dict: dict[str | int, Any]) -> Flux2VariantTyp
             if module is None or not module.endswith(_FLUX2_HIDDEN_SIZE_MODULE_TAILS):
                 continue
             in_dim = _lycoris_in_dim(state_dict, key.rsplit(".", 1)[0])
-            if in_dim is not None:
-                return _variant_from_hidden_size(in_dim)
+            if in_dim is None:
+                continue
+            # A tail whose input is not the hidden size (the single block's `to_out` takes the fused attention and
+            # MLP width) is no evidence either way, so the loop keeps looking rather than settling on it.
+            variant = _variant_from_hidden_size(in_dim)
+            if variant is not None:
+                return variant
 
     # Layers outside the blocks: their hidden-sized axis.
     for layer, axis, width in _kohya_non_block_widths(state_dict):

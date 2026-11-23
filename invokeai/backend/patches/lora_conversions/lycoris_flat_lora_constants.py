@@ -205,9 +205,8 @@ SDXL_UNET_MODULE_TEMPLATES = (
         for tail in _SDXL_ATTENTION_TAILS
     )
     + tuple(f"mid_block.attentions.{{j}}.transformer_blocks.{{k}}.{tail}" for tail in _SDXL_ATTENTION_TAILS)
-    # `proj_in`/`proj_out` sit on the attention block itself, outside the transformer stack, and SDXL's
-    # `AttnProcessor2_0` holds both as Linears. LyCORIS's fuller presets train them, so a file with one has to
-    # resolve it rather than stay unknown.
+    # `proj_in`/`proj_out` sit on the `Transformer2DModel` itself, outside the transformer stack, and are Linears
+    # there. LyCORIS's fuller presets train them, so a file with one has to resolve it rather than stay unknown.
     + tuple(
         f"{stage}_blocks.{{i}}.attentions.{{j}}.{tail}" for stage in ("down", "up") for tail in ("proj_in", "proj_out")
     )
