@@ -4644,7 +4644,7 @@
         "outputOnlyMaskedRegions": "Output only generated regions",
         "ruleOfThirds": "Rule of thirds",
         "scrollInput": "Scroll input",
-        "scrollInputDescription": "Auto-detect zooms with a mouse wheel, and pans and pinch-zooms with a trackpad. Choose a device if yours is misread.",
+        "scrollInputDescription": "Auto-detect zooms with a mouse wheel, and pans and pinch-zooms with a trackpad. Once a trackpad has been used in this browser, a smooth-scrolling mouse wheel pans too; choose Mouse wheel if yours does.",
         "scrollInputOptions": {
           "auto": "Auto-detect",
           "mouse": "Mouse wheel",
