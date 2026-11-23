@@ -127,6 +127,7 @@ const ROUTE_SHARED_MODULES = [
   '/workbench/projects/projectFileErrors.ts',
   '/workbench/projects/projectFileToasts.ts',
   '/workbench/projects/session.ts',
+  '/workbench/workspace/storedAccount.ts',
   '/workbench/projects/useProjectFileActions.ts',
   '/workbench/settings/SettingsDialogHost.tsx',
   '/workbench/settings/launchpad.tsx',

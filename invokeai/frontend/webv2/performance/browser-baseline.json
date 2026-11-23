@@ -777,7 +777,8 @@
       "source:src/workbench/settings/store.ts",
       "source:src/workbench/shell/useWhatsNew.ts",
       "source:src/workbench/shell/whatsNewStore.ts",
-      "source:src/workbench/widgetState.ts"
+      "source:src/workbench/widgetState.ts",
+      "source:src/workbench/workspace/storedAccount.ts"
     ],
     "editor-minimal-static": [
       "package:@ark-ui/react",
@@ -1961,6 +1962,8 @@
       "source:src/workbench/workspace/registryAvailability.ts",
       "source:src/workbench/workspace/resolveLayout.ts",
       "source:src/workbench/workspace/resolveOpen.ts",
+      "source:src/workbench/workspace/storedAccount.ts",
+      "source:src/workbench/workspace/storedLayoutDigest.ts",
       "source:src/workbench/workspace/storedStructure.ts",
       "source:src/workbench/workspace/structure.ts",
       "source:src/workbench/workspace/structureLock.ts",
@@ -3332,6 +3335,8 @@
       "source:src/workbench/workspace/registryAvailability.ts",
       "source:src/workbench/workspace/resolveLayout.ts",
       "source:src/workbench/workspace/resolveOpen.ts",
+      "source:src/workbench/workspace/storedAccount.ts",
+      "source:src/workbench/workspace/storedLayoutDigest.ts",
       "source:src/workbench/workspace/storedStructure.ts",
       "source:src/workbench/workspace/structure.ts",
       "source:src/workbench/workspace/structureLock.ts",
@@ -4603,6 +4608,8 @@
       "source:src/workbench/workspace/registryAvailability.ts",
       "source:src/workbench/workspace/resolveLayout.ts",
       "source:src/workbench/workspace/resolveOpen.ts",
+      "source:src/workbench/workspace/storedAccount.ts",
+      "source:src/workbench/workspace/storedLayoutDigest.ts",
       "source:src/workbench/workspace/storedStructure.ts",
       "source:src/workbench/workspace/structure.ts",
       "source:src/workbench/workspace/structureLock.ts",
