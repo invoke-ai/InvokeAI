@@ -11,11 +11,6 @@ import fuzzysort from 'fuzzysort';
 
 import { getPaletteContributionKey } from './contributionKey';
 
-/**
- * Normalize sources to PaletteEntry; rank fuzzily within fixed sections so command/settings placement remains
- * stable.
- */
-
 export interface PaletteStageOption {
   id: string;
   label: string;
@@ -58,6 +53,8 @@ export interface PaletteEntry {
   isPersistentRecent: boolean;
   /** Enter pushes this value-picker stage instead of running the entry. */
   stage?: PaletteStage;
+  /** Running opens a page outside the app (a new browser tab); the row shows an external-link cue. */
+  opensExternally?: boolean;
   /** mod+Enter alternative, advertised in the footer while highlighted. */
   secondary?: { label: string; run: () => unknown };
   run: () => unknown;
@@ -89,11 +86,7 @@ export interface PaletteSearchProvider {
   /** Immutable snapshot of every host value that can affect search results. */
   contextKey: string;
   label: string;
-  /**
-   * Provider filters by created-at date range. Date-less providers are
-   * skipped entirely for pure-date queries (empty text + range), where they
-   * could only return broad unfiltered results.
-   */
+  /** Provider filters by created-at date range. */
   supportsCreatedAtRange?: boolean;
   /** Searches only once the user scopes into it; root mode offers just its scope row. For costly searches. */
   scopedOnly?: boolean;
@@ -106,9 +99,11 @@ export type PaletteRow =
   | { kind: 'provider-error'; id: string; providerKey: string; label: string; retry: () => void }
   | { kind: 'scope'; id: string; providerKey: string; label: string };
 
+export type NavigablePaletteRow = Exclude<PaletteRow, { kind: 'label' }>;
+
 export interface ActivePaletteRow {
   index: number;
-  row: Exclude<PaletteRow, { kind: 'label' }>;
+  row: NavigablePaletteRow;
 }
 
 export const getNavigablePaletteRows = (rows: readonly PaletteRow[]): ActivePaletteRow[] =>
@@ -170,8 +165,8 @@ const groupRank = (group: string): number => {
 /** Omit navigation, caret nudges, and the palette toggle from searchable rows. */
 const PALETTE_HIDDEN_COMMANDS = new Set([
   'app.openCommandPalette',
-  // Both palettes already ship `buildOpenSettingsEntry` under this id, and it
-  // carries search keywords and an empty-state slot the catalog entry lacks.
+  // Both palettes already ship `buildOpenSettingsEntry` under this id, and it carries search keywords and an
+  // empty-state slot the catalog entry lacks.
   'app.openSettings',
   'app.promptWeightDown',
   'app.promptWeightUp',
@@ -204,6 +199,8 @@ const PALETTE_HIDDEN_COMMANDS = new Set([
   'gallery.moveFocusRight',
   'gallery.moveFocusUp',
   'gallery.toggleFocusedInSelection',
+  // Acts on the focused queue row, which the palette has taken focus from.
+  'queue.recallAll',
   'viewer.nextItem',
   'viewer.previousItem',
 ]);
@@ -227,6 +224,7 @@ const APP_COMMAND_GROUPS: Record<string, string> = {
   'app.selectQueueTab': 'Navigation',
   'app.selectUpscalingTab': 'Navigation',
   'app.selectWorkflowsTab': 'Navigation',
+  'app.switchWorkflowView': 'Workflows',
   'app.toggleLeftPanel': 'Layout',
   'app.togglePanels': 'Layout',
   'app.togglePreview': 'Layout',
@@ -265,11 +263,7 @@ export const getEntryKeys = (
   return keys[0] ? formatHotkey(keys[0]) : undefined;
 };
 
-/**
- * The catalog commands that open one widget. The palette offers each widget once, as a widget entry (see
- * `buildWidgetEntries`) that keeps the command's id and key; the Workflow editor's command stays a command, since it
- * opens the editor in the center rather than the widget wherever it is.
- */
+/** The catalog commands that open one widget. */
 export const WIDGET_OPEN_COMMANDS: Readonly<Record<string, string>> = {
   'app.selectCanvasTab': 'canvas',
   'app.selectGenerateTab': 'generate',
@@ -291,10 +285,7 @@ export const buildCatalogCommandEntries = ({
   customHotkeys: CustomHotkeys;
   execute: (commandId: string) => unknown;
   formatHotkey: (key: string) => string[];
-  /**
-   * Whether a command has a handler now. The catalog mirrors widget keys a widget registers only in some states
-   * (Preview's item arrows and zoom); an entry with nothing to run is left out.
-   */
+  /** Whether a command has a handler now. */
   isHandled?: (commandId: string) => boolean;
   presentWidgetTypeIds: ReadonlySet<string>;
   t: TFunction;
@@ -338,10 +329,7 @@ export const buildCatalogCommandEntries = ({
       };
     });
 
-/**
- * One entry per widget the layout can show, so a widget removed from every rail is never lost: running it brings the
- * widget forward where the layout has it, else opens it.
- */
+/** One entry per widget the layout can show, so a widget removed from every rail is never lost. */
 export const buildWidgetEntries = ({
   catalog,
   customHotkeys,
@@ -591,10 +579,7 @@ const buildEmptyStateRows = (
   return [...rows, ...toGroupedRows(launcher)];
 };
 
-/**
- * Empty queries show recents/navigation. Otherwise rank title/keywords/down-weighted subtitle within fixed
- * sections, breaking ties by recency then title.
- */
+/** Empty queries show recents/navigation. */
 export const searchPaletteRows = (
   entries: readonly PaletteEntry[],
   query: string,
@@ -609,8 +594,7 @@ export const searchPaletteRows = (
   const trimmed = query.trim();
 
   if (trimmed.length === 0) {
-    // Stage mode lists every option before the user types; the root palette
-    // shows the curated launcher instead.
+    // Stage mode lists every option before the user types; the root palette shows the curated launcher instead.
     if (showAllOnEmpty) {
       const all = new Map<string, RankedEntry[]>();
 
@@ -689,11 +673,7 @@ export interface ProviderResultSection {
   retry: () => void;
 }
 
-/**
- * Entity sections render below local sections as each provider resolves.
- * Empty non-fetching sections drop silently in root mode; `cap` bounds root
- * mode to a teaser (depth lives behind the scope), null means uncapped.
- */
+/** Entity sections render below local sections as each provider resolves. */
 export const buildProviderSectionRows = (
   sections: readonly ProviderResultSection[],
   cap: number | null = PROVIDER_ROOT_RESULT_CAP,
@@ -758,8 +738,8 @@ export const buildScopeRows = (
   }
 
   return [
-    // Distinct id: the scope-command *group* label ("label:Search in") can
-    // render in the same list when a query fuzzy-matches those commands.
+    // Distinct id: the scope-command *group* label ("label:Search in") can render in the same list when a query
+    // fuzzy-matches those commands.
     { id: 'label:scope-rows', kind: 'label', label: t?.('commandPalette.search.in') ?? SEARCH_SCOPE_GROUP },
     ...providers.map<PaletteRow>((provider) => ({
       id: getPaletteContributionKey('scope', provider.providerKey),

@@ -12,6 +12,7 @@ import torch
 
 from invokeai.app.services.config import get_config
 from invokeai.backend.util.devices import (
+    EmptyCacheOutcome,
     TorchDevice,
     choose_precision,
     choose_torch_device,
@@ -1107,9 +1108,9 @@ def test_a_forced_empty_cache_runs_past_a_busy_peer_and_its_wrapper(monkeypatch)
     monkeypatch.setattr(torch.backends.mps, "is_available", lambda: False)
     monkeypatch.setattr(TorchDevice, "_another_generation_device_busy", classmethod(lambda cls: True))
 
-    assert TorchDevice.empty_cache() is False
+    assert TorchDevice.empty_cache() is EmptyCacheOutcome.DEFERRED
     assert calls == []
-    assert TorchDevice.empty_cache(force=True) is True
+    assert TorchDevice.empty_cache(force=True) is EmptyCacheOutcome.RAN
     assert calls == ["torch"]
 
 
@@ -1142,3 +1143,81 @@ def test_naming_the_igpu_beside_a_radeon_on_windows_rocm_is_refused():
 )
 def test_an_explicit_device_is_kept_unless_it_is_that_igpu(integrated_map, requested, platform, hip):
     assert _explicit_cuda_devices(integrated_map, requested, platform, hip) == [torch.device(requested[0])]
+
+
+# ===== choose_krea2_transformer_dtype ============
+
+
+@pytest.mark.parametrize("precision", ["auto", "float16", "bfloat16"])
+def test_choose_krea2_transformer_dtype_runs_gguf_on_mps_in_float32(monkeypatch, precision):
+    monkeypatch.setattr(get_config(), "precision", precision)
+    assert TorchDevice.choose_krea2_transformer_dtype(is_gguf=True, device=torch.device("mps")) is torch.float32
+
+
+@pytest.mark.parametrize(("is_gguf", "device_type"), [(False, "mps"), (True, "cpu"), (True, "cuda"), (False, "cuda")])
+@pytest.mark.parametrize("precision", ["auto", "float16", "float32"])
+def test_choose_krea2_transformer_dtype_otherwise_ignores_precision(monkeypatch, is_gguf, device_type, precision):
+    """The loader and denoise both ask this; precision must not split them (Krea-2 text encoding ignores it too)."""
+    monkeypatch.setattr(get_config(), "precision", precision)
+    device = torch.device(device_type)
+    with patch.object(TorchDevice, "choose_bfloat16_safe_dtype", return_value=torch.bfloat16) as mock_safe:
+        assert TorchDevice.choose_krea2_transformer_dtype(is_gguf=is_gguf, device=device) is torch.bfloat16
+    mock_safe.assert_called_once_with(device)
+
+
+class _CountingObserver:
+    def __init__(self) -> None:
+        self.calls: list[str] = []
+
+    def before_empty_cache(self) -> None:
+        self.calls.append("before")
+
+    def after_empty_cache(self, released: bool) -> None:
+        self.calls.append(f"after:{released}")
+
+
+@pytest.fixture
+def refusing_backend(monkeypatch):
+    """A CUDA backend whose release raises, and the observer that sees every release attempt."""
+    from invokeai.backend.util import devices as devices_module
+
+    class Backend:
+        calls = 0
+
+        def refuse(self) -> None:
+            self.calls += 1
+            raise torch.OutOfMemoryError("CUDA out of memory while releasing\nsecond line of detail")
+
+    backend = Backend()
+    backend.observer = _CountingObserver()
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(torch.cuda, "empty_cache", backend.refuse)
+    monkeypatch.setattr(torch.backends.mps, "is_available", lambda: False)
+    monkeypatch.setattr(devices_module, "_xpu_is_available", lambda: False)
+    monkeypatch.setattr(devices_module, "EMPTY_CACHE_OBSERVERS", [backend.observer])
+    TorchDevice._empty_cache_deferred.clear()
+    return backend
+
+
+def test_empty_cache_the_backend_refuses_is_reported_as_refused(refusing_backend, caplog):
+    """An ordinary release is advisory: a device context that cannot return its cached blocks (or runs out of
+    memory doing so) must not fail the eviction, offload or Empty Cache request that asked for it."""
+    with caplog.at_level("WARNING"):
+        outcome = TorchDevice.empty_cache()
+
+    assert outcome is EmptyCacheOutcome.REFUSED
+    assert refusing_backend.calls == 1
+    assert refusing_backend.observer.calls == ["before", "after:False"]
+    assert not TorchDevice._empty_cache_deferred.is_set()
+    assert "CUDA out of memory while releasing" in caplog.text
+    assert "second line of detail" not in caplog.text
+
+
+def test_forced_empty_cache_the_backend_refuses_raises(refusing_backend):
+    """A forced caller cannot proceed as if the release ran (a short reserve hangs on Windows, a probe window would
+    record a baseline that still counts the blocks), so the refusal reaches it."""
+    with pytest.raises(torch.OutOfMemoryError, match="while releasing"):
+        TorchDevice.empty_cache(force=True)
+
+    assert refusing_backend.calls == 1
+    assert refusing_backend.observer.calls == ["before", "after:False"]

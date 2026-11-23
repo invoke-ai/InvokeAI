@@ -18,7 +18,7 @@ from invokeai.app.services.client_state_persistence.client_state_persistence_def
 )
 from invokeai.app.services.image_records.image_records_default import ImageRecordStorage
 from invokeai.app.services.intermediates import intermediates_records_default
-from invokeai.app.services.intermediates.intermediates_common import BROWSER_HOLD_TTL_SECONDS
+from invokeai.app.services.intermediates.intermediates_common import BROWSER_HOLD_TTL_SECONDS, ActiveQueueMediaUse
 from invokeai.app.services.intermediates.intermediates_records_default import (
     IntermediatesRecords,
     ReferenceOwner,
@@ -714,3 +714,26 @@ def test_a_hold_stays_active_while_its_finished_session_belongs_to_an_active_roo
         conn.execute(update(session_queue).where(session_queue.c.item_id == child).values(status="completed"))
 
     assert records.summarize(None)[("alice", None)]["image"].counts.active == 1
+
+
+def test_active_uses_name_each_items_account_and_follow_session_rewrites(
+    database: Database, records: IntermediatesRecords
+) -> None:
+    first = _queue_item(database, "s-1", session='{"a": {"image_name": "a.png"}, "b": {"video_name": "v.mp4"}}')
+    second = _queue_item(database, "s-2", status="in_progress", session='{"a": {"image_name": "other.png"}}')
+    _queue_item(database, "s-3", status="completed", session='{"a": {"image_name": "a.png"}}')
+    _queue_item(database, "s-4", session='{"a": {"image_name": "unasked.png"}}')
+    with database.begin(write=True) as conn:
+        conn.execute(update(session_queue).where(session_queue.c.item_id == second).values(user_id="bob"))
+    asked = MediaReferences(images={"a.png", "other.png"}, videos={"v.mp4"})
+
+    mine = ActiveQueueMediaUse("system", frozenset({"a.png"}), frozenset({"v.mp4"}))
+    bobs = ActiveQueueMediaUse("bob", frozenset({"other.png"}), frozenset())
+    assert sorted(records.get_active_uses(asked), key=repr) == sorted([mine, bobs], key=repr)
+
+    # A session rewritten while its item stays active is scanned again.
+    with database.begin(write=True) as conn:
+        conn.execute(
+            update(session_queue).where(session_queue.c.item_id == first).values(session="{}", session_revision=1)
+        )
+    assert records.get_active_uses(asked) == [bobs]

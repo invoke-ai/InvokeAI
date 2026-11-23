@@ -6,6 +6,7 @@ import type { QueueProgressSession } from '@features/queue/contracts';
 import { Box, ChakraProvider } from '@chakra-ui/react';
 import { DndContext } from '@dnd-kit/core';
 import { GalleryItemActionsProvider, GalleryUiProvider, type GalleryUiAdapter } from '@features/gallery/react';
+import { resolvedValues } from '@platform/core/resolvedValues.testing';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
@@ -25,7 +26,6 @@ interface ListRequest {
   starred?: boolean;
 }
 
-/** The stubbed transport: each request is answered by whatever the test scripts for it. */
 const transport = vi.hoisted(() => ({
   listBoards: vi.fn<() => Promise<GalleryBoard[]>>(),
   listItems: vi.fn<(request: ListRequest) => Promise<GalleryItemsPage>>(),
@@ -99,7 +99,7 @@ const thumbnailRouteCommands = commands as typeof commands & {
 };
 const fail = (): Promise<never> => Promise.reject(new Error('Service Unavailable'));
 
-/** A just-generated image on another board, the kind the old fallback showed in place of a failed listing. */
+/** The kind of item the old fallback showed in place of a failed listing. */
 const OTHER_BOARD_RECENT: GeneratedImageContract = {
   boardId: 'cats',
   height: 8,
@@ -129,7 +129,6 @@ const ItemActionsProvider = ({ children }: { children: ReactNode }) => (
   <GalleryItemActionsProvider actions={itemActions}>{children}</GalleryItemActionsProvider>
 );
 
-/** The workbench side: Gallery commands patch the values the widget reads back, as the real store does. */
 const Harness = ({
   initialValues,
   progressSessions,
@@ -148,6 +147,7 @@ const Harness = ({
       ImageContextMenu: () => null,
       antialiasProgressImages: false,
       exportProject: noop,
+      getBoardMediaUsage: vi.fn(),
       followProgressSession: noop,
       followedProgressSessionId: null,
       gallery: {
@@ -171,11 +171,12 @@ const Harness = ({
         toggleItemSelection: noop,
         updateSettings: (settings: Record<string, unknown>) => patch(settings),
       },
-      galleryValues,
+      galleryValues: resolvedValues(galleryValues),
       generateValues: {},
       getItemLabel: () => Promise.resolve(null),
       liveFollowEnabled: false,
       notifications: { add: noop, reportError: noop },
+      openItemContextMenu: noop,
       pinnedProgressSessionId: null,
       progressSessions,
       projectId: 'project-1',
@@ -247,10 +248,9 @@ const findButton = (name: string) => host?.querySelector<HTMLButtonElement>(`but
 const waitFor = (assertion: () => void) => vi.waitFor(assertion, { timeout: 5_000 });
 const announcer = () => host?.querySelector('[role="status"][aria-live="polite"][aria-atomic="true"]') ?? null;
 const gridViewport = () => listing()?.closest<HTMLElement>('[data-part="viewport"]') ?? null;
-/** The compact chip's text; the drag context adds hidden instructions of its own to the host. */
+/** The drag context adds hidden instructions of its own to the host. */
 const chipText = () => host?.querySelector('p')?.textContent ?? null;
 const offsetsRequested = () => transport.listItems.mock.calls.map(([request]) => request.offset);
-/** Lets frames, effects and any request they would start run their course. */
 const settleFrames = async (frames = 8) => {
   for (let frame = 0; frame < frames; frame += 1) {
     await act(
@@ -261,17 +261,12 @@ const settleFrames = async (frames = 8) => {
     );
   }
 };
-/** Each a minute older than the last, so the grid shows them in this order, page after page. */
 const dogs = (count: number, from = 0) =>
   Array.from({ length: count }, (_, index) => ({
     ...image(`dog-${String(from + index).padStart(3, '0')}.png`, 'dogs'),
     createdAt: new Date(Date.UTC(2026, 8, 30) - (from + index) * 60_000).toISOString(),
   }));
 
-/**
- * Scrolls the grid to its end, which requests the next page; once that has failed, settles at the new end and
- * measures the failure notice against the viewport and the loaded tiles.
- */
 const scrollToLoadMoreFailure = async () => {
   await waitFor(() => expect(gridViewport()).not.toBeNull());
   const viewport = gridViewport()!;
@@ -283,7 +278,7 @@ const scrollToLoadMoreFailure = async () => {
   await act(scrollToEnd);
   await waitFor(() => expect(findButton('Retry loading more items')).not.toBeNull());
   await act(scrollToEnd);
-  // Outlast the virtualizer's 150ms scrolling state, as a user reading the notice would.
+  // Outlast the virtualizer's 150ms scrolling state.
   await act(
     () =>
       new Promise<void>((resolve) => {
@@ -297,7 +292,6 @@ const scrollToLoadMoreFailure = async () => {
   const tiles = [...listing()!.querySelectorAll<HTMLElement>('[role="listitem"]')].filter((tile) =>
     tile.querySelector('button[aria-pressed]')
   );
-  // The last loaded item; sparse slots can remain between this row and a later page.
   const lastTile = tiles.reduce((last, tile) =>
     tile.getBoundingClientRect().bottom > last.getBoundingClientRect().bottom - 1 ? tile : last
   );
@@ -352,7 +346,6 @@ describe('Gallery listing failures', () => {
     expect(alertText()).toContain('Service Unavailable');
     expect(host?.textContent).not.toContain('Drop media here or click to upload');
     expect(host?.textContent).not.toContain('No items match');
-    // The board list is independent of the listing and still loads.
     expect(host?.textContent).toContain('Cats');
 
     const retry = findButton('Retry loading items');
@@ -365,12 +358,10 @@ describe('Gallery listing failures', () => {
     expect(
       listing()?.querySelector('button[aria-label="Select b.png for preview"]')?.getAttribute('aria-current')
     ).toBe('true');
-    // Focus went to the grid that replaced the Retry, not the document body.
     await waitFor(() => expect(host?.contains(document.activeElement)).toBe(true));
   });
 
   it('reloads every thumbnail a long image move refused, once, probing one image per interval meanwhile', async () => {
-    // The real guard answers every image read with 409 while the files move; nothing tells this tab when it ends.
     const moving = Array.from({ length: 6 }, (_, index) => ({
       ...image(`moving-${String(index)}.png`, 'dogs', 10 - index),
       thumbnailUrl: `/api/v1/images/i/moving-${String(index)}.png/thumbnail`,
@@ -384,8 +375,7 @@ describe('Gallery listing failures', () => {
       const log = await thumbnailRouteCommands.getThumbnailRequests();
       return log.urls.filter((_, index) => log.types[index] === 'image');
     };
-    // The probe's reads are answered in the page, so they settle within the fake clock's steps; the tiles' own
-    // image reads go to the network route.
+    // The probe's reads are answered in the page so they settle within the fake clock's steps.
     let isMoving = true;
     const browserFetch = globalThis.fetch;
     const probes = vi.spyOn(globalThis, 'fetch').mockImplementation((input, init) =>
@@ -402,11 +392,9 @@ describe('Gallery listing failures', () => {
     const probedPaths = () => probes.mock.calls.map(([input]) => pathOf(String(input)));
     await thumbnailRouteCommands.startThumbnailRoute(paths, { failures: 1_000_000, status: 409 });
     transport.listItems.mockImplementation(() => page(moving));
-    // Real time keeps flowing for Query and the image loads; the test jumps the clock through the move.
     vi.useFakeTimers({ shouldAdvanceTime: true, toFake: ['setTimeout', 'clearTimeout'] });
 
     try {
-      // StrictMode rehearses each tile's unmount; recovery must survive it as it does in the app.
       await renderGallery({}, 'center', NO_SESSIONS, { strict: true });
       await waitFor(() => expect(thumbnailNames()).toHaveLength(6));
       const thumbnails = moving.map((item) => host!.querySelector<HTMLImageElement>(`img[alt="${item.name}"]`)!);
@@ -414,8 +402,7 @@ describe('Gallery listing failures', () => {
       expect(thumbnails.every((thumbnail) => thumbnail.naturalWidth === 0)).toBe(true);
       expect(countByPath(await imageRequests())).toEqual(eachPath(1));
 
-      // Through six minutes of move the probe keeps asking about one image for the whole grid every 15 to 30 s,
-      // never one per tile.
+      // Six minutes of move at one probe every 15 to 30 s.
       for (let interval = 1; interval <= 12; interval += 1) {
         const before = probes.mock.calls.length;
         await act(() => vi.advanceTimersByTimeAsync(30_000));
@@ -426,7 +413,6 @@ describe('Gallery listing failures', () => {
       expect(await imageRequests()).toHaveLength(6);
       expect(thumbnails.every((thumbnail) => thumbnail.naturalWidth === 0)).toBe(true);
 
-      // The move ends: the next probe sees an image served and every failed tile reloads by itself.
       isMoving = false;
       await thumbnailRouteCommands.endThumbnailRouteFailures();
       await act(() => vi.advanceTimersByTimeAsync(30_000));
@@ -436,7 +422,6 @@ describe('Gallery listing failures', () => {
         )
         .toEqual(moving.map(() => 64));
 
-      // Each tile asked twice in all: the refused read and one reload. Nothing asks again afterwards.
       const probeCount = probes.mock.calls.length;
       await act(() => vi.advanceTimersByTimeAsync(5 * 60_000));
       expect(countByPath(await imageRequests())).toEqual(eachPath(2));
@@ -479,7 +464,6 @@ describe('Gallery listing failures', () => {
   });
 
   it('keeps loaded pages when the next page fails, offers Retry there, and substitutes no recents', async () => {
-    // Sparse rows retain absolute positions; scroll to the next page and verify its local recovery control.
     transport.listItems.mockImplementation(({ offset }) => (offset === 0 ? page(DOG_ITEMS, 61) : fail()));
     await renderGallery({ recentImages: [OTHER_BOARD_RECENT] });
 
@@ -493,7 +477,6 @@ describe('Gallery listing failures', () => {
     expect(host?.textContent).not.toContain('recent-elsewhere.png');
     expect(alertText()).toBeNull();
 
-    // The failed page waits for Retry: the end of the grid stays in view, yet nothing asks for it again.
     const failedCalls = transport.listItems.mock.calls.length;
 
     await settleFrames();
@@ -506,7 +489,6 @@ describe('Gallery listing failures', () => {
 
     await waitFor(() => expect(thumbnailNames()).toHaveLength(4));
     expect(host?.textContent).not.toContain('Could not load more items.');
-    // Retry fetched only the failed page, not the whole listing again.
     expect(transport.listItems.mock.calls.slice(failedCalls).map(([request]) => request.offset)).toEqual([60]);
   });
 
@@ -603,7 +585,6 @@ describe('Gallery listing failures', () => {
     await renderGallery();
     await waitFor(() => expect(thumbnailNames()).toHaveLength(3));
 
-    // The live region exists, empty, before anything fails, so the failure is a change inside it.
     const liveRegion = announcer();
 
     expect(liveRegion?.textContent).toBe('');
@@ -616,7 +597,6 @@ describe('Gallery listing failures', () => {
     expect(alertText()).toBeNull();
     expect(announcer()).toBe(liveRegion);
     expect(liveRegion?.textContent).toBe('Could not refresh. Showing earlier results.');
-    // Announced once, through the persistent region only.
     expect(
       [...(host?.querySelectorAll('[role="status"], [role="alert"], [aria-live]') ?? [])].filter((region) =>
         region.textContent?.includes('Could not refresh.')
@@ -638,7 +618,6 @@ describe('Gallery listing failures', () => {
 
     const failedPageRequests = offsetsRequested().filter((offset) => offset === 60).length;
 
-    // An invalidation, as after a generation, refetches the loaded page successfully.
     await act(() => queryClient!.invalidateQueries({ queryKey: ['gallery', 'items', 'list'] }));
     await waitFor(() => expect(offsetsRequested().filter((offset) => offset === 0)).toHaveLength(2));
     await settleFrames();
@@ -659,13 +638,10 @@ describe('Gallery listing failures', () => {
 
     expect(notice.inViewport).toBe(true);
     expect(notice.overlappingTiles).toBe(0);
-    // The last of the 60 loaded tiles sits directly above it.
     expect(notice.lastTileName).toBe('Select dog-059.png for preview');
     expect(notice.rect.top).toBeGreaterThanOrEqual(notice.lastTileBottom);
-    // The listing's box spans its rows, so whatever follows it in flow cannot land among them.
     expect(listing()!.getBoundingClientRect().bottom).toBeGreaterThanOrEqual(notice.lastTileBottom);
 
-    // Keyboard users reach Retry from the last tile.
     const lastTile = listing()!.querySelector<HTMLElement>('button[aria-label="Select dog-059.png for preview"]')!;
 
     lastTile.focus({ preventScroll: true });
@@ -677,7 +653,6 @@ describe('Gallery listing failures', () => {
     await waitFor(() => expect(findButton('Retry loading more items')).toBeNull());
     await settleFrames(2);
 
-    // The next page's first tiles take the notice's place, where the user is looking.
     const viewportRect = viewport.getBoundingClientRect();
     const tileInPlace = [...listing()!.querySelectorAll<HTMLElement>('[role="listitem"]')].find((tile) => {
       const tileRect = tile.getBoundingClientRect();
@@ -737,7 +712,6 @@ describe('Gallery listing failures', () => {
           deliverNextPage = () => resolve({ items: dogs(60, offset), total: 61 });
         })
     );
-    // A real click, which focuses the button as a user's would; it keeps focus while the retry runs.
     await userEvent.click(retry);
     expect(document.activeElement).toBe(retry);
     expect(retry.getAttribute('aria-busy')).toBe('true');
@@ -755,7 +729,6 @@ describe('Gallery listing failures', () => {
     expect(focused.matches('[role="listitem"] button[aria-pressed]')).toBe(true);
     expect(focusedRect.bottom).toBeGreaterThan(viewportRect.top);
     expect(focusedRect.top).toBeLessThan(viewportRect.bottom);
-    // Beside the row that was retried, not back at the top of the board.
     expect(focused.getAttribute('aria-label')).not.toBe('Select dog-000.png for preview');
   });
 });

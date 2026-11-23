@@ -1,7 +1,7 @@
 import math
 from contextlib import ExitStack
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable, ClassVar, Iterator, Optional, TypeAlias
+from typing import TYPE_CHECKING, Any, Callable, ClassVar, Iterator, Optional, TypeAlias
 
 import torch
 import torchvision.transforms as tv_transforms
@@ -19,12 +19,17 @@ from invokeai.app.invocations.fields import (
     Input,
     InputField,
     LatentsField,
+    MetadataField,
     QwenImageConditioningField,
-    WithBoard,
     WithMetadata,
 )
+from invokeai.app.invocations.metadata import (
+    LatentsMetaOutput,
+    build_denoise_metadata,
+    serialize_adapter_metadata,
+    serialize_lora_metadata,
+)
 from invokeai.app.invocations.model import TransformerField, VAEField
-from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.invocations.qwen_image.qwen_image_control import QwenImageControlField
 from invokeai.app.invocations.vae.qwen_image_image_to_latents import QwenImageImageToLatentsInvocation
 from invokeai.app.services.shared.invocation_context import InvocationContext
@@ -79,10 +84,10 @@ ControlNet run beside it."""
     title="Denoise - Qwen Image",
     tags=["image", "qwen_image"],
     category="image",
-    version="1.1.1",
+    version="1.2.0",
     classification=Classification.Prototype,
 )
-class QwenImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
+class QwenImageDenoiseInvocation(BaseInvocation, WithMetadata):
     """Run the denoising process with a Qwen Image model."""
 
     # If latents is provided, this means we are doing image-to-image.
@@ -133,13 +138,46 @@ class QwenImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         input=Input.Connection,
     )
 
+    def _build_metadata(self) -> MetadataField:
+        updates: dict[str, Any] = {
+            "generation_mode": (
+                "qwen_image_inpaint"
+                if getattr(self, "denoise_mask", None) is not None
+                else ("qwen_image_img2img" if getattr(self, "latents", None) is not None else "qwen_image_txt2img")
+            ),
+            "width": self.width,
+            "height": self.height,
+            "steps": self.steps,
+            "cfg_scale": self.cfg_scale,
+            "denoising_start": self.denoising_start,
+            "denoising_end": self.denoising_end,
+            "seed": self.seed,
+            "model": self.transformer.transformer,
+            "qwen_image_shift": self.shift if self.shift is not None else "auto",
+        }
+        if self.vae is not None:
+            updates["vae"] = self.vae.vae
+            updates["qwen_image_vae"] = self.vae.vae
+
+        updates["loras"] = serialize_lora_metadata(getattr(self.transformer, "loras", None))
+        updates["controlnets"] = serialize_adapter_metadata(self.control)
+
+        return build_denoise_metadata(getattr(self, "metadata", None), updates)
+
     @torch.no_grad()
-    def invoke(self, context: InvocationContext) -> LatentsOutput:
+    def invoke(self, context: InvocationContext) -> LatentsMetaOutput:
         latents = self._run_diffusion(context)
         latents = latents.detach().to("cpu")
 
         name = context.tensors.save(tensor=latents)
-        return LatentsOutput.build(latents_name=name, latents=latents, seed=None)
+        return LatentsMetaOutput.build(
+            latents_name=name,
+            latents=latents,
+            seed=None,
+            metadata=self._build_metadata(),
+            width=self.width,
+            height=self.height,
+        )
 
     @staticmethod
     def _schedule(
@@ -476,22 +514,12 @@ class QwenImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         step_callback = self._build_step_callback(context)
 
-        step_callback(
-            PipelineIntermediateState(
-                step=0,
-                order=1,
-                total_steps=total_steps,
-                timestep=int(timesteps_sched[0].item()) if len(timesteps_sched) > 0 else 0,
-                latents=self._unpack_latents(latents, latent_height, latent_width),
-            ),
-        )
-
         noisy_seq_len = latents.shape[1]
         model_input_seq_len = noisy_seq_len + (ref_latents_packed.shape[1] if ref_latents_packed is not None else 0)
 
         transformer_config = context.models.get_config(self.transformer.transformer)
         # The forward's activations, which the cache keeps free by offloading as much of the transformer as that
-        # takes, plus the per-forward dequantization transient of an nvfp4 or GGUF build, alive alongside them and
+        # takes, plus the per-forward dequantization transient of an nvfp4, int8 or GGUF build, alive alongside them and
         # invisible to the estimate. All read from the unlocked model, before the lock; the transient is zero for a
         # dense build.
         text_seq_len = max(
@@ -551,6 +579,16 @@ class QwenImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                             transformer, locked_control, control_context, scale=self.control.control_context_scale
                         )
                     )
+            # Inside the lock: a Tiny AutoEncoder preview loads its TAE only if it fits next to the locked model.
+            step_callback(
+                PipelineIntermediateState(
+                    step=0,
+                    order=1,
+                    total_steps=total_steps,
+                    timestep=int(timesteps_sched[0].item()) if len(timesteps_sched) > 0 else 0,
+                    latents=self._unpack_latents(latents, latent_height, latent_width),
+                ),
+            )
             # Quantized weights (packed nvfp4 Linears, GGUF, SDNQ) cannot take a direct patch, so their LoRAs ride as
             # sidecars. Asked of the loaded module tree: a `checkpoint` build may hold packed Linears.
             model_is_quantized = requires_sidecar_patching(transformer, transformer_config.format)

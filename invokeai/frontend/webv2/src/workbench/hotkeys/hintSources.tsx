@@ -40,8 +40,8 @@ export const createShortcutHintSources = () => {
       focusListeners.forEach((listener) => listener());
     }
   };
-  // Leaving for the body (a background click, blur()) fires focusout without a focusin; the element that will own
-  // focus is only known once the focus update settles, while focus moving to another element reports it via focusin.
+  // Leaving for the body (a background click, blur()) fires focusout without a focusin; the element that will own focus
+  // is only known once the focus update settles, while focus moving to another element reports it via focusin.
   const settleFocus = (event: FocusEvent) => {
     if (!event.relatedTarget) {
       queueMicrotask(() => updateFocus(event));

@@ -1,7 +1,7 @@
 import type { SettingDefinition, SettingsContribution, SettingsText } from '@platform/ui/settings/contracts';
 
 import { intermediatesSettingsContribution } from '@features/intermediates/settingsContribution';
-import { WORKBENCH_LANGUAGE_OPTIONS } from '@platform/i18n/languages';
+import { getWorkbenchLanguageAvailability, WORKBENCH_LANGUAGE_OPTIONS } from '@platform/i18n/languages';
 
 const text =
   (key: string, fallback?: string): SettingsText =>
@@ -42,7 +42,16 @@ export const appearanceSettings = section('appearance', 'Appearance', [
     label: text('language.label', 'Language'),
     kind: 'select',
     scope: 'preference',
-    options: WORKBENCH_LANGUAGE_OPTIONS,
+    description: text('language.description'),
+    options: WORKBENCH_LANGUAGE_OPTIONS.map((option): { value: string; label: SettingsText } => ({
+      value: option.value,
+      label: (t) => {
+        const availability = getWorkbenchLanguageAvailability(option.value);
+        return availability === 'available'
+          ? option.label
+          : t(`settings.catalog.language.${availability}`, { label: option.label });
+      },
+    })),
   },
   preference('reduceMotion', 'Reduce motion', 'animation'),
   preference('highContrast', 'High contrast', 'accessibility a11y readability'),
@@ -75,7 +84,7 @@ export const behaviorSettings = section('behavior', 'Behavior', [
       { value: 'recentProject', label: text('options.recentProject', 'Most recent project') },
     ],
   },
-  preference('autoSwitchInvocationRoute', 'Invoke follows what you edit', 'route source destination'),
+  preference('autoSwitchInvocationRoute', "Auto-switch Invoke to what you're editing", 'route source destination'),
   preference('enableInformationalPopovers', 'Enable informational popovers', 'help tooltips'),
   preference('enableModelDescriptions', 'Show descriptions in model pickers', 'models dropdowns'),
   preference('notifyOnEnqueue', 'Notify when queued', 'notifications queue'),
@@ -91,41 +100,48 @@ export const galleryPreferenceSettings = section('gallery', 'Gallery', [
 export const previewPreferenceSettings = section('preview', 'Preview', [
   preference('antialiasProgressImages', 'Antialias progress images'),
 ]);
-export const workflowSettings = section('workflow', 'Workflow', [
-  {
-    id: 'workflowEdgeStyle',
-    label: text('workflowEdgeStyle.label', 'Connection style'),
-    description: text('workflowEdgeStyle.description'),
-    kind: 'select',
-    scope: 'preference',
-    options: [
-      { value: 'curved', label: text('options.curved', 'Curved') },
-      { value: 'square', label: text('options.square', 'Square') },
-    ],
-  },
-  preference(
-    'workflowEdgesBehindNodes',
-    'Keep highlighted connections behind nodes',
-    'workflow edges wires links z-order'
-  ),
-  preference('workflowSnapToGrid', 'Always snap to grid', 'workflow nodes'),
-  preference('workflowGroupNodesByCategory', 'Group node search by category', 'workflow nodes add search categories'),
-  preference('workflowShowMinimap', 'Show minimap'),
-  preference('workflowValidateConnections', 'Validate connections', 'workflow edges'),
-]);
-export const queueSettings = section('queue', 'Queue', [
-  {
-    id: 'queueJobsScope',
-    label: text('queueJobsScope.label', 'Show jobs from'),
-    description: text('queueJobsScope.description'),
-    kind: 'select',
-    scope: 'preference',
-    options: [
-      { value: 'active-project', label: text('options.activeProject', 'Active project') },
-      { value: 'all', label: text('options.all', 'All projects') },
-    ],
-  },
-]);
+export const workflowSettings: SettingsContribution = {
+  ...section('workflow', 'Workflow', [
+    {
+      id: 'workflowEdgeStyle',
+      label: text('workflowEdgeStyle.label', 'Connection style'),
+      description: text('workflowEdgeStyle.description'),
+      kind: 'select',
+      scope: 'preference',
+      options: [
+        { value: 'curved', label: text('options.curved', 'Curved') },
+        { value: 'square', label: text('options.square', 'Square') },
+      ],
+    },
+    preference(
+      'workflowEdgesBehindNodes',
+      'Keep highlighted connections behind nodes',
+      'workflow edges wires links z-order'
+    ),
+    preference('workflowSnapToGrid', 'Always snap to grid', 'workflow nodes'),
+    preference('workflowGroupNodesByCategory', 'Group node search by category', 'workflow nodes add search categories'),
+    preference('workflowShowMinimap', 'Show minimap'),
+    preference('workflowValidateConnections', 'Validate connections', 'workflow edges'),
+  ]),
+  // What people change while arranging a graph; the rest stay in the dialog.
+  quick: ['workflowSnapToGrid', 'workflowShowMinimap', 'workflowEdgeStyle'],
+};
+export const queueSettings: SettingsContribution = {
+  ...section('queue', 'Queue', [
+    {
+      id: 'queueJobsScope',
+      label: text('queueJobsScope.label', 'Show jobs from'),
+      description: text('queueJobsScope.description'),
+      kind: 'select',
+      scope: 'preference',
+      options: [
+        { value: 'active-project', label: text('options.activeProject', 'Active project') },
+        { value: 'all', label: text('options.all', 'All projects') },
+      ],
+    },
+  ]),
+  quick: ['queueJobsScope'],
+};
 export const imageMapVocabularySettings = section('imageMap', 'Image Map', [
   custom('imageMapVocabulary', 'Vocabulary', 'server'),
 ]);

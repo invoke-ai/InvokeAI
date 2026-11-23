@@ -9,16 +9,7 @@ import type {
 
 export type QueueHistoryItemStatus = 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
 
-/**
- * Why a run failed, for failures the queue runtime words itself, so the notice can show translated text. The English
- * `error` stays alongside as diagnostic detail; server and validation text is shown as the notice's reason.
- * - `invalid-submission`: the queued request is missing or malformed, so it was never sent.
- * - `not-accepted`: the server queue took none of the run's items.
- * - `project-not-saved`: the run's project cannot be saved, so it was not sent.
- * - `removed`: the run's backend items vanished from the server queue.
- * - `server-error`: enqueue kept failing with a server error until the runtime gave up.
- * - `unexplained`: the backend failed the run without a reason.
- */
+/** Failures the runtime words itself, so the notice can be translated; `error` keeps the English detail. */
 export type QueueRunErrorCode =
   | 'invalid-submission'
   | 'not-accepted'
@@ -34,19 +25,30 @@ export interface QueueSubmissionSnapshot {
   graph: QueueGraphSnapshot;
   /** Gallery board captured at enqueue time; null means uncategorized. */
   galleryBoardId: string | null;
-  /** Workflow outputs omit intermediate node images. */
   filterIntermediateResults: boolean;
   resultNodeIds?: readonly string[];
   presentation: QueueSubmissionPresentation;
-  /** Set by Invoke Front: the backend runs the batch ahead of the user's other pending work. */
   prepend?: boolean;
   submittedAt: string;
+}
+
+/** The latest failed attempt to submit a run the backend has not accepted yet; cleared once the backend accepts it. */
+export interface QueueSubmissionRetry {
+  /** `server-error`: 5xx but 502-504, spends the budget; `unavailable`: 408/429/502-504; `unreachable`: no answer. */
+  reason: 'error' | 'server-error' | 'unavailable' | 'unreachable';
+  /** Consecutive failed submissions so far, whatever their reason; at least 1. Paces the next attempt. */
+  failureCount: number;
+  serverErrorCount: number;
+  /** Epoch ms of the first of those consecutive server errors; null when serverErrorCount is 0. */
+  serverErrorSince: number | null;
+  status: number | null;
+  message: string;
+  failedAt: number;
 }
 
 export interface QueueItem {
   id: string;
   status: QueueHistoryItemStatus;
-  /** Whether this run can still exist in durable browser recovery storage. */
   localRecoveryState?: 'durable' | 'local-only' | 'uncertain';
   cancellationPending?: boolean;
   cancellable: boolean;
@@ -58,6 +60,7 @@ export interface QueueItem {
   retriedBackendItemIds?: number[];
   backendBatchId?: string;
   error?: string;
+  submissionRetry?: QueueSubmissionRetry;
   resultImages?: QueueResultImage[];
   /** Videos already routed to the Gallery; a repeat routing pass must not reselect them. */
   resultVideoNames?: string[];

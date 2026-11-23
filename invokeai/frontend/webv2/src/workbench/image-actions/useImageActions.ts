@@ -1,3 +1,4 @@
+import type { GalleryMediaUsageReport } from '@features/gallery/mediaUsage';
 import type { GalleryItemActionContext, GalleryItemActions } from '@features/gallery/react';
 import type { VaeModelConfig } from '@features/generation/contracts';
 import type { ModelConfig } from '@features/models';
@@ -5,6 +6,7 @@ import type { VideoConditioningRole } from '@features/video';
 import type { WorkbenchSnapshot } from '@workbench/workbenchStore';
 
 import {
+  GALLERY_REQUEST_MAX_NAMES,
   galleryItemOrganization,
   galleryItems,
   galleryTransfers,
@@ -36,9 +38,12 @@ import {
   patchGalleryItemCaches,
 } from '@features/gallery/queries';
 import { setPendingPromptTemplateDraft } from '@features/generation/react';
-import { getArchitectureCapabilitiesSnapshot, subscribeArchitectureCapabilities } from '@features/generation/runtime';
-import { getMaxReferenceImages, isVaeModelConfig, isSupportedGenerateModel } from '@features/generation/settings';
+import { getReferenceImageRoom, isVaeModelConfig, isSupportedGenerateModel } from '@features/generation/settings';
 import { ensureModelsLoaded, useModelsSelector } from '@features/models';
+import {
+  getArchitectureCapabilitiesSnapshot,
+  subscribeArchitectureCapabilities,
+} from '@features/models/architecturesStore';
 import { submitUtilityGraph, type UtilityGraphSubmission, UtilityQueueError } from '@features/queue/utility';
 import { copyImage } from '@platform/browser/clipboard';
 import { downloadBlob } from '@platform/browser/downloadBlob';
@@ -48,10 +53,12 @@ import {
   assertAccountScopeCurrent,
   captureAccountScope,
   isAccountScopeCurrent,
+  type AccountScope,
 } from '@platform/state/accountLifecycle';
 import { useExternalStoreSelector } from '@platform/state/selectors';
 import { getApiErrorMessage } from '@platform/transport/http';
 import { socketHub } from '@platform/transport/socketHub';
+import { toaster } from '@platform/ui/toaster';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   createCanvasFromImages,
@@ -62,6 +69,7 @@ import {
   sendGalleryImageAsControl,
   type GalleryCanvasImportDestination,
 } from '@workbench/canvas-operations/api';
+import { getProjectSyncSnapshot } from '@workbench/projects/syncStore';
 import { useWorkbenchPreferenceSelector } from '@workbench/settings/store';
 import { useNotify } from '@workbench/useNotify';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
@@ -71,6 +79,7 @@ import { useWorkbenchCommands, useWorkbenchQueries, useWorkbenchSelector } from 
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import type { MediaUsageHost } from './mediaUsageReport';
 import type { RequestDeletionConfirmation } from './useDeletionConfirmation';
 import type { VideoRecallKind } from './videoRecall';
 
@@ -100,64 +109,90 @@ import {
   type ImageRecallCapabilities,
   type ImageRecallKind,
 } from './imageRecall';
-import { collectMediaUsage } from './mediaUsage';
 import { buildPbrMapsGraph } from './pbrMapsGraph';
 
-/**
- * Share backend image mutations across surfaces; patch Gallery caches optimistically and invalidate affected
- * server state.
- */
 export interface ImageActions extends GalleryItemActions {
-  /** Whether the generate widget's current model can accept another reference image. */
   canUseAsReferenceImage: boolean;
-  /** Whether the video widget's current model takes reference videos and has room for another. */
   canUseAsReferenceVideo: boolean;
-  /** Whether the video widget's current model takes a conditioning clip in each role. */
   canUseAsConditioningClip: Record<VideoConditioningRole, boolean>;
   copyImage: (image: GalleryImage) => Promise<void>;
-  /** Opens a new project whose canvas holds these images as raster layers. */
   createCanvasFromImages: (images: readonly GalleryImage[]) => Promise<void>;
   deleteImages: (imageNames: string[]) => Promise<void>;
-  /** Derives recall availability from already-fetched metadata and the current generate/model state. */
   deriveImageRecallCapabilities: (
     image: GalleryImage,
     metadata: GalleryImageMetadata | null
   ) => ImageRecallCapabilities;
   downloadImage: (image: GalleryImage) => Promise<void>;
   downloadImages: (imageNames: string[]) => Promise<void>;
-  /** Queues normal, roughness and displacement maps of the image into the project's auto-add board. */
   generatePbrMaps: (image: GalleryImage) => Promise<void>;
-  /** Opens the image's embedded workflow or generation graph in the workflow editor. */
   loadImageWorkflow: (image: GalleryImage) => Promise<void>;
-  /** Opens the video's embedded workflow or generation graph in the workflow editor. */
   loadVideoWorkflow: (item: GalleryVideoItem) => Promise<void>;
   moveImagesToBoard: (imageNames: string[], boardId: string) => Promise<void>;
   openImageInPreview: (image: GalleryImage) => void;
   recallImageData: (image: GalleryImage, kind: ImageRecallKind) => Promise<void>;
-  /** Applies a gallery video's recorded parameters to the Video panel. */
   recallVideoData: (item: GalleryVideoItem, kind: VideoRecallKind) => Promise<void>;
-  /** Sets a gallery video as the Video panel's Initial Video, as that field would. */
   sendToInitialVideo: (item: GalleryVideoItem) => void;
-  /** Opens the generate widget's template editor prefilled from this image's prompts. */
   savePromptAsTemplate: (image: GalleryImage) => Promise<void>;
   selectForCompare: (image: GalleryImage) => void;
   sendToCanvas: (images: readonly GalleryImage[], destination: GalleryCanvasImportDestination) => Promise<void>;
-  /** Fills the selected control layer when it has no image yet, else adds a control layer; shows its Properties. */
+  /** Fills the selected control layer when it has no image yet, else adds a control layer. */
   sendImageAsControl: (image: GalleryImage) => Promise<void>;
   setImagesStarred: (imageNames: string[], starred: boolean) => Promise<void>;
   useAsReferenceImage: (image: GalleryImage) => void;
   useAsReferenceVideo: (item: GalleryVideoItem) => void;
-  /** Sets a gallery video as the Video panel's conditioning clip in `role`, clearing the media it excludes. */
+  /** Clears the media the clip excludes. */
   useAsConditioningClip: (item: GalleryVideoItem, role: VideoConditioningRole) => void;
 }
 
 const EMPTY_WIDGET_VALUES: Record<string, unknown> = {};
+/** Per stage (server, then closed projects), before asking instead: the user is waiting on a click. */
+const UNCONFIRMED_DELETION_CHECK_TIMEOUT_MS = 3_000;
+const PENDING_CHECK_NOTICE_DELAY_MS = 400;
 
-/**
- * Selected as booleans so Video panel edits re-render action consumers only when an answer flips (the workbench
- * selector compares shallowly). The cache skips re-normalizing video values that have not changed since the last
- * store update.
- */
+/** Items being checked, asked about or deleted, per account, shared by every deleting surface. */
+const deletionsInFlight = new WeakMap<AccountScope, Set<GalleryItemKey>>();
+
+const claimDeletion = (items: readonly GalleryItemRef[]): (() => void) | null => {
+  const owner = captureAccountScope();
+  const claimed = deletionsInFlight.get(owner) ?? new Set<GalleryItemKey>();
+  const keys = items.map(toGalleryItemKey);
+
+  if (keys.some((key) => claimed.has(key))) {
+    return null;
+  }
+
+  deletionsInFlight.set(owner, claimed);
+  keys.forEach((key) => claimed.add(key));
+
+  return () => keys.forEach((key) => claimed.delete(key));
+};
+
+/** One notice for all concurrent silent-deletion checks, dismissed only when the last one ends. */
+const PENDING_CHECK_NOTICE_ID = 'gallery-deletion-usage-check';
+let pendingChecks = 0;
+
+/** The release is safe to call more than once. */
+const holdPendingCheckNotice = (title: string): (() => void) => {
+  pendingChecks += 1;
+  const timer = setTimeout(() => {
+    toaster.create({ duration: Number.POSITIVE_INFINITY, id: PENDING_CHECK_NOTICE_ID, title, type: 'loading' });
+  }, PENDING_CHECK_NOTICE_DELAY_MS);
+  let released = false;
+
+  return () => {
+    if (released) {
+      return;
+    }
+    released = true;
+    clearTimeout(timer);
+    pendingChecks -= 1;
+    if (pendingChecks === 0) {
+      toaster.dismiss(PENDING_CHECK_NOTICE_ID);
+    }
+  };
+};
+
+/** Booleans so Video panel edits re-render consumers only when an answer flips (the selector compares shallowly). */
 const createVideoPlacementRoomSelector = (models: readonly ModelConfig[], projectId: string | undefined) => {
   let lastValues: Record<string, unknown> | null = null;
   let lastResult: VideoPlacementRoom = { conditioningAudio: false, conditioningVideo: false, referenceVideo: false };
@@ -177,7 +212,6 @@ const createVideoPlacementRoomSelector = (models: readonly ModelConfig[], projec
   };
 };
 
-// The server's own words for a refusal (an item on someone else's board, say), not its JSON body.
 const toErrorMessage = (error: unknown): string =>
   getApiErrorMessage(error, error instanceof Error ? error.message : String(error));
 
@@ -209,7 +243,6 @@ export const useImageActions = ({
   generateValues: Record<string, unknown>;
   getItemActionContext?: () => GalleryItemActionContext | null;
   projectId?: string;
-  /** Called after a successful deletion so the host can select a neighboring image. */
   onImagesDeleted?: (imageNames: string[]) => void;
   requestDeletionConfirmation: RequestDeletionConfirmation;
 }): ImageActions => {
@@ -225,19 +258,20 @@ export const useImageActions = ({
   const models = useModelsSelector((snapshot) => snapshot.models);
   const supportedModels = useMemo(() => models.filter(isSupportedGenerateModel), [models]);
   const vaeModels = useMemo(() => models.filter(isVaeModelConfig).map((model) => model as VaeModelConfig), [models]);
-  // Both read architecture policy, so they are read inside the capability store's selector: memoised
-  // on the project alone they would keep the answer given before the table arrived.
+  // Read inside the selector: memoised on the project alone they would keep the answer from before policy arrived.
   const { canUseAsReferenceImage, currentGenerateValues } = useExternalStoreSelector(
     subscribeArchitectureCapabilities,
     getArchitectureCapabilitiesSnapshot,
     useCallback(() => {
-      const values = getCurrentGenerateValues({ generateValues, supportedModels });
+      const values = getCurrentGenerateValues({ generateValues, models, supportedModels });
 
       return {
-        canUseAsReferenceImage: Boolean(values && values.referenceImages.length < getMaxReferenceImages(values.model)),
+        canUseAsReferenceImage: Boolean(
+          values && getReferenceImageRoom(values.model, values, values.referenceImages).free > 0
+        ),
         currentGenerateValues: values,
       };
-    }, [generateValues, supportedModels])
+    }, [generateValues, models, supportedModels])
   );
 
   const selectVideoPlacementRoom = useMemo(
@@ -256,7 +290,6 @@ export const useImageActions = ({
     void ensureModelsLoaded();
   });
 
-  // Selection-independent, so callers can hand it to every thumbnail without re-rendering them per selection.
   const selectForCompare = useCallback(
     (image: GalleryImage) => gallery.setCompareImage(image, projectId),
     [gallery, projectId]
@@ -274,7 +307,6 @@ export const useImageActions = ({
     const getBoardName = (boardId: string) => {
       const board = boards.find((board) => board.id === boardId);
 
-      // Uncategorized has no entry of its own in every host's list; another board missing from it is not Uncategorized.
       return board
         ? getGalleryBoardLabel(board, t)
         : t(boardId === 'none' ? 'widgets.gallery.uncategorized' : 'widgets.gallery.unknownBoard');
@@ -287,13 +319,11 @@ export const useImageActions = ({
     const getLatestWidgetValues = (widgetId: 'gallery' | 'generate' | 'video') => {
       const project = getLatestProject();
 
-      // Read as the widget does: auto-add follows the Gallery's resolved `followSelectedBoard`.
-      return project ? getResolvedProjectWidgetValues(project, widgetId, queries.getSnapshot().scopedDefaults) : {};
+      return getResolvedProjectWidgetValues(project, widgetId, queries.getSnapshot().scopedDefaults);
     };
     const getLatestGenerateValues = () => getLatestWidgetValues('generate');
     const getLatestVideoValues = () => getLatestWidgetValues('video');
-    // The persisted selection, primary and members, as one comparable key: a host's action context only sees
-    // loaded items, so it cannot tell a cleared selection from one moved to an item it has not loaded.
+    // A host sees only loaded items, so it cannot tell a cleared selection from one moved to an unloaded item.
     const getPersistedGallerySelectionKey = (): string => {
       const values = getLatestWidgetValues('gallery');
 
@@ -302,12 +332,11 @@ export const useImageActions = ({
         getPersistedSelectedGalleryItemKeys(values),
       ]);
     };
-    // Snapshot deletion-sensitive widget values across all projects; cache rollback cannot restore them. Diff
-    // before/after values for conflict-safe restoration.
+    // Cache rollback cannot restore deletion-sensitive widget values, so snapshot them across all projects.
     const applyGalleryItemRemoval = (itemKeys: GalleryItemKey[]): GalleryWidgetKeySnapshotEntry[] => {
       const before = captureGalleryWidgetKeyValues(queries.getSnapshot().projects);
 
-      gallery.removeItems(itemKeys);
+      gallery.removeItems(itemKeys, { keepComparisonForSuccessor: true, projectId });
 
       return diffGalleryWidgetKeyValues(before, queries.getSnapshot().projects);
     };
@@ -315,8 +344,7 @@ export const useImageActions = ({
       const patches = selectRestorableGalleryWidgetPatches(entries, queries.getSnapshot().projects);
 
       for (const patch of patches) {
-        // Restore exact prior values as a CAS-guarded system patch; widget patches are not undoable, and
-        // user-origin patches would auto-route.
+        // CAS-guarded system patch: widget patches are not undoable, and user-origin patches would auto-route.
         commands.widgets.patchValues(patch.widgetId, patch.values, patch.projectId, 'system');
       }
     };
@@ -364,12 +392,10 @@ export const useImageActions = ({
       action: 'delete' | 'move' | 'star' | 'unstar';
       applyConfirmed: (result: GalleryItemMutationResult, signal: AbortSignal) => Promise<void> | void;
       boardId?: string;
-      /** How to revert a change that fully succeeded, offered as Undo; null when there is nothing it could revert. */
       getUndo?: (succeeded: readonly GalleryItemRef[]) => (() => void) | null;
       mutate: (signal: AbortSignal) => Promise<GalleryItemMutationResult>;
       requested: GalleryItemRef[];
-      /** Undo the optimistic apply. Runs once, only when the account scope that requested
-       *  it is still current, before the (likely also-failing) trailing invalidation. */
+      /** Runs once, only while the requesting account scope is current, before the trailing invalidation. */
       rollback?: () => void;
     }): Promise<void> => {
       const owner = captureAccountScope();
@@ -383,7 +409,6 @@ export const useImageActions = ({
         await applyConfirmed(result, owner.signal);
       } catch (caught: unknown) {
         error = caught;
-        // Roll back total failures immediately; an offline mutation often means invalidation also fails.
         if (isAccountScopeCurrent(owner)) {
           rollback?.();
         }
@@ -417,8 +442,7 @@ export const useImageActions = ({
       );
     };
     const deleteItemsConfirmed = (items: GalleryItemRef[]): Promise<void> => {
-      // Capture successor context before optimistic removal. Any rejected items restore the widget snapshot; the
-      // confirmed removals then apply again.
+      // Capture successor context before optimistic removal.
       const deletionContext = getItemActionContext?.() ?? null;
       let orderedRefs: GalleryItemRef[] | null = null;
       const isDeletionContextCurrent = (): boolean => {
@@ -428,9 +452,7 @@ export const useImageActions = ({
 
         const current = getItemActionContext();
 
-        // The optimistic removal below clears the deleted primary from the host's selection, so the selection is
-        // still this deletion's while the store holds what that removal (or restoring rejected items) left;
-        // anything selected since, loaded by the host or not, makes the successor stale.
+        // Anything selected since this deletion's optimistic removal, loaded or not, makes the successor stale.
         return Boolean(
           current &&
           current.filterIdentity === deletionContext.filterIdentity &&
@@ -442,8 +464,7 @@ export const useImageActions = ({
         kind: 'delete',
         result: { failed: [], succeeded: items },
       });
-      // Guard cache rollback shared by partial/total failures so an exception after partial restoration cannot
-      // roll it back twice.
+      // Shared by partial and total failures so cache rollback cannot run twice.
       let cachesRolledBack = false;
       const rollbackCachesOnce = () => {
         if (cachesRolledBack) {
@@ -453,7 +474,7 @@ export const useImageActions = ({
         cachesRolledBack = true;
         rollbackCaches();
       };
-      // Once backend-confirmed deletion starts applying, later callback failures must not restore deleted items.
+      // Once confirmed deletion starts applying, later callback failures must not restore deleted items.
       let confirmedApplied = false;
       const galleryWidgetSnapshot = applyGalleryItemRemoval(items.map(toGalleryItemKey));
       let selectionAfterRemoval = getPersistedGallerySelectionKey();
@@ -461,11 +482,9 @@ export const useImageActions = ({
       return runItemMutation({
         action: 'delete',
         applyConfirmed: async (result, signal) => {
-          // A rejected request reports its items as failed rather than throwing. Those items remain, so restore what
-          // the optimistic removal cleared; confirmed removals are applied again below.
+          // Rejected items remain, so restore what the optimistic removal cleared; confirmed removals reapply below.
           if (result.failed.length > 0) {
-            // Restoring changes the persisted selection the successor fence compares against: adopt it only when
-            // the selection was still this deletion's, so a choice made meanwhile still wins.
+            // Adopt the restored selection only when it was still this deletion's, so a choice made meanwhile wins.
             const wasCurrent = isDeletionContextCurrent();
 
             rollbackCachesOnce();
@@ -510,22 +529,22 @@ export const useImageActions = ({
           }
 
           confirmedApplied = true;
-          // Without a rollback the optimistic patch already lowered every page's total; only pages refetched since
-          // still count the deleted items.
+          // Without a rollback the optimistic patch already lowered page totals; only pages refetched since count them.
           patchGalleryItemCaches(
             queryClient,
             { kind: 'delete', result },
             { totals: cachesRolledBack ? 'listing' : 'holder' }
           );
-          gallery.removeItems(result.succeeded.map(toGalleryItemKey));
+          gallery.removeItems(result.succeeded.map(toGalleryItemKey), {
+            keepComparisonForSuccessor: successor !== null,
+            projectId,
+          });
           if (successor) {
             const failedKeys = new Set(result.failed.map(toGalleryItemKey));
             const retainedFailedKeys = items
               .filter((item) => failedKeys.has(toGalleryItemKey(item)))
               .map(toGalleryItemKey);
-            // The successor was chosen from the host's own list, so it is
-            // stamped the way the host would stamp it — in the window it
-            // came from, not the grid's.
+            // Stamp the successor in the window it came from, as the host would, not the grid's.
             const selectionPage = deletionContext?.getItemSelectionPage?.(successor);
 
             if (retainedFailedKeys.length > 0) {
@@ -570,23 +589,76 @@ export const useImageActions = ({
         },
       });
     };
-    const deleteItems: ImageActions['deleteItems'] = (items, options) => {
-      const project = projectId ? queries.getProject(projectId) : queries.getSnapshot().activeProject;
-      const usage = project ? collectMediaUsage(project, items) : [];
+    const deleteItems: ImageActions['deleteItems'] = async (items, options) => {
+      // Drop a repeated Delete for claimed items: running it again would delete twice and report a refused failure.
+      const release = claimDeletion(items);
 
-      // The opt-out covers deleting one item the user is looking at. A batch, an item off screen and media the
-      // project still uses always ask: the dialog names what goes, and authored work would point at nothing.
+      if (!release) {
+        return;
+      }
+
+      const usageHost: MediaUsageHost = {
+        getLoadedProjects: () => queries.getSnapshot().projects,
+        getSyncBase: (targetProjectId) => getProjectSyncSnapshot().projects[targetProjectId],
+        openProjectId: projectId ?? queries.getSnapshot().activeProject.id,
+      };
+      const request = { kind: 'items', refs: items } as const;
+      const checkUsage = (signal: AbortSignal) =>
+        import('./mediaUsageReport').then(({ resolveMediaUsage }) => resolveMediaUsage(request, usageHost, { signal }));
+      // Only one visible item may skip confirmation: a batch or off-screen delete always names what goes.
       const canSkipFutureConfirmations = items.length === 1 && options?.targetsOffScreen !== true;
+      const confirm = (usage?: GalleryMediaUsageReport) =>
+        requestDeletionConfirmation(items, () => deleteItemsConfirmed(items), {
+          canSkipFutureConfirmations,
+          checkUsage,
+          returnFocus: options?.returnFocus,
+          usage,
+        });
 
-      return confirmImageDeletion || usage.length > 0 || !canSkipFutureConfirmations
-        ? requestDeletionConfirmation(items, () => deleteItemsConfirmed(items), {
-            canSkipFutureConfirmations,
-            returnFocus: options?.returnFocus,
-            usage,
-          })
-        : deleteItemsConfirmed(items);
+      try {
+        if (confirmImageDeletion || !canSkipFutureConfirmations) {
+          return await confirm();
+        }
+
+        // Without routine confirmation one visible item goes silently only once the check finds it unused in time.
+        const owner = captureAccountScope();
+        const releaseNotice = holdPendingCheckNotice(t('widgets.gallery.deleteInUse.checking'));
+        let usage: GalleryMediaUsageReport | undefined;
+        let isUnused = false;
+        let checkFailed = false;
+
+        try {
+          const [{ isUsedInLoadedProjects, resolveMediaUsage }, { isGalleryMediaUnused }] = await Promise.all([
+            import('./mediaUsageReport'),
+            import('@features/gallery/mediaUsage'),
+          ]);
+          const report = await resolveMediaUsage(request, usageHost, {
+            projectReadsTimeoutMs: UNCONFIRMED_DELETION_CHECK_TIMEOUT_MS,
+            serverTimeoutMs: UNCONFIRMED_DELETION_CHECK_TIMEOUT_MS,
+          });
+
+          if (!isGalleryMediaUnused(report)) {
+            usage = report;
+          } else {
+            // The answer can be seconds old: a use added in this tab since still asks.
+            isUnused = !isUsedInLoadedProjects(items, usageHost);
+          }
+        } catch {
+          checkFailed = true;
+        } finally {
+          releaseNotice();
+        }
+
+        if (checkFailed) {
+          // The resolver rejects only on an account change; the deletion belonged to the previous account.
+          return isAccountScopeCurrent(owner) ? await confirm() : undefined;
+        }
+
+        return isUnused ? await deleteItemsConfirmed(items) : await confirm(usage);
+      } finally {
+        release();
+      }
     };
-    /** Groups refs by a known prior value; refs whose prior value is unknown are left out. */
     const groupByPrior = <Value>(
       refs: readonly GalleryItemRef[],
       getPrior: (key: GalleryItemKey) => Value | undefined
@@ -611,7 +683,7 @@ export const useImageActions = ({
 
       return groups;
     };
-    // Known boards and star flags from cache and store, preferring cache; invalidation reconciles conflicts.
+    // Prefer cache over store; invalidation reconciles conflicts.
     const readKnownBoardIds = (refs: readonly GalleryItemRef[]): Map<GalleryItemKey, string> => {
       const boardIds = new Map<GalleryItemKey, string>(
         [...collectGalleryStoreKnownItemFields(queries.getSnapshot().projects, refs)].map(([key, fields]) => [
@@ -640,11 +712,7 @@ export const useImageActions = ({
 
       return starred;
     };
-    /**
-     * Undo for a move or star: each item back to its own prior value. The toast outlives later actions, so at undo
-     * time only items still holding this action's value are reverted; a later move or star of the same item wins.
-     * Items whose prior value was not known stay as the action left them. Anything not restored is reported.
-     */
+    /** Undo reverts only items still holding this action's value, so a later move or star wins. */
     const getGalleryItemUndo = <Value>({
       getCurrent,
       painted,
@@ -658,7 +726,6 @@ export const useImageActions = ({
       revert: (refs: GalleryItemRef[], prior: Value) => void;
       succeeded: readonly GalleryItemRef[];
     }): (() => void) | null => {
-      // An item already holding the painted value has nothing to undo.
       const changed = succeeded.filter((ref) => previous.get(toGalleryItemKey(ref)) !== painted);
       const groups = groupByPrior(changed, (key) => previous.get(key));
 
@@ -694,9 +761,7 @@ export const useImageActions = ({
         }
       };
     };
-    // Undo is the same mutation back, reported without an Undo of its own.
     const moveItemsToBoard = (items: GalleryItemRef[], boardId: string, offerUndo = true): Promise<void> => {
-      // On partial move failure, restore then reapply confirmed items.
       const previousBoardIds = readKnownBoardIds(items);
 
       const rollbackCaches = patchGalleryItemCaches(queryClient, {
@@ -704,7 +769,6 @@ export const useImageActions = ({
         kind: 'move',
         result: { failed: [], succeeded: items },
       });
-      // Partial and total failure paths share rollback; guard against applying it twice.
       let cachesRolledBack = false;
       const rollbackCachesOnce = () => {
         if (cachesRolledBack) {
@@ -714,8 +778,7 @@ export const useImageActions = ({
         cachesRolledBack = true;
         rollbackCaches();
       };
-      // Restore store boards only while they still match this move's optimistic board; group by prior board to
-      // preserve concurrent moves.
+      // Restore only boards still at this move's optimistic value, grouped by prior board, so concurrent moves survive.
       const restorePreviousBoardIds = () => {
         const currentStoreBoardIds = collectGalleryStoreKnownItemFields(queries.getSnapshot().projects, items);
         const safeKeys = new Set(
@@ -791,8 +854,7 @@ export const useImageActions = ({
       gallery.patchItems(keys, { starred });
     };
     const setItemsStarred = (items: GalleryItemRef[], starred: boolean, offerUndo = true): Promise<void> => {
-      // Cache star changes move items between listing partitions and need snapshot/CAS rollback. Store restoration
-      // uses each actual prior flag, never blanket inversion.
+      // Star changes move items between listing partitions; restore each actual prior flag, never a blanket inversion.
       const previousStarred = readKnownStarred(items);
 
       let rollbackCaches: (() => void) | null = patchGalleryItemCaches(queryClient, {
@@ -809,8 +871,6 @@ export const useImageActions = ({
 
       return runItemMutation({
         action: starred ? 'star' : 'unstar',
-        // Rejected refs must reappear where they were, so restore the
-        // snapshot and re-apply only the confirmed ones.
         applyConfirmed: (result) => {
           if (result.failed.length === 0) {
             return;
@@ -836,8 +896,7 @@ export const useImageActions = ({
             : null,
         mutate: (signal) => galleryItemOrganization.setStarred(items, starred, signal),
         requested: items,
-        // Restore known prior flags only where this action's painted value remains; cache rollback restores its
-        // own snapshot.
+        // Restore prior flags only where this action's painted value remains.
         rollback: () => {
           rollbackCachesOnce();
 
@@ -896,25 +955,38 @@ export const useImageActions = ({
       const loadedByKey = new Map(loadedItems.map((item) => [toGalleryItemKey(item), item]));
       const imageNames = items.filter((item) => item.kind === 'image').map((item) => item.name);
       const videoRefs = items.filter((item) => item.kind === 'video');
+      const archiveCount = Math.ceil(imageNames.length / GALLERY_REQUEST_MAX_NAMES);
       let failedCount = 0;
+      let savedFileCount = 0;
       let succeededCount = 0;
 
-      if (imageNames.length > 0) {
+      if (archiveCount > 1) {
+        notifications.add({
+          kind: 'info',
+          message: t('widgets.gallery.itemActions.download.preparingArchives', { count: archiveCount }),
+          title: t('widgets.gallery.preparingDownload'),
+        });
+      }
+
+      for (let offset = 0; offset < imageNames.length; offset += GALLERY_REQUEST_MAX_NAMES) {
+        const archiveNames = imageNames.slice(offset, offset + GALLERY_REQUEST_MAX_NAMES);
+
         try {
           const { blob, fileName } = await galleryTransfers.downloadArchive({
-            imageNames,
+            imageNames: archiveNames,
             signal: owner.signal,
           });
 
           assertAccountScopeCurrent(owner);
           downloadBlob(blob, fileName);
-          succeededCount += imageNames.length;
+          savedFileCount += 1;
+          succeededCount += archiveNames.length;
         } catch {
           if (!isAccountScopeCurrent(owner)) {
             return;
           }
 
-          failedCount += imageNames.length;
+          failedCount += archiveNames.length;
         }
       }
 
@@ -932,6 +1004,7 @@ export const useImageActions = ({
 
           assertAccountScopeCurrent(owner);
           downloadBlob(blob, item.name);
+          savedFileCount += 1;
           succeededCount += 1;
         } catch {
           if (!isAccountScopeCurrent(owner)) {
@@ -954,9 +1027,9 @@ export const useImageActions = ({
         );
       } else {
         recordSuccess(
-          t('widgets.gallery.itemActions.download.success', {
-            count: succeededCount,
-          })
+          archiveCount > 1
+            ? t('widgets.gallery.itemActions.download.successArchives', { count: savedFileCount })
+            : t('widgets.gallery.itemActions.download.success', { count: succeededCount })
         );
       }
     };
@@ -965,7 +1038,6 @@ export const useImageActions = ({
       metadata: GalleryImageMetadata | null
     ): ImageRecallCapabilities => {
       if (!currentGenerateValues) {
-        // Loading an embedded workflow does not go through the Generate panel.
         return { ...EMPTY_IMAGE_RECALL_CAPABILITIES, workflow: image.hasWorkflow === true };
       }
 
@@ -1060,7 +1132,7 @@ export const useImageActions = ({
           assertAccountScopeCurrent(owner);
           const boardId = getGalleryAutoAddBoardId(galleryValues, (id) => canAddToCachedGalleryBoard(id, queryClient));
 
-          // Ahead of queued generations, as the legacy action was; the account signal ends the watch, not the item.
+          // Ahead of queued generations, as the legacy action was; the account signal ends the watch.
           submission = await submitUtilityGraph({
             graph: buildPbrMapsGraph({ boardId, imageName: image.imageName }),
             hub: socketHub,
@@ -1075,8 +1147,7 @@ export const useImageActions = ({
           return;
         }
 
-        // Handle settlement before anything else can throw, so an aborted watch never rejects unobserved. The
-        // utility item is not project work, so the queue runtime does not refresh the gallery for it.
+        // Attach settlement before anything can throw, so an aborted watch never rejects unobserved.
         void submission.settled.then(
           () => {
             if (!isAccountScopeCurrent(owner)) {
@@ -1101,8 +1172,7 @@ export const useImageActions = ({
               });
               return;
             }
-            // The item is gone without a terminal event: cleared while pending, or pruned after completing while
-            // the socket was down. Either way the gallery may hold its maps.
+            // Gone without a terminal event (cleared or pruned while offline), so the gallery may hold its maps.
             if (error instanceof UtilityQueueError && error.reason === 'removed') {
               void invalidateGallery(queryClient, owner);
               notifications.add({
@@ -1160,7 +1230,6 @@ export const useImageActions = ({
           t,
         });
 
-        // The value patch auto-routes invocation; the caller reveals the widget.
         if (isAccountScopeCurrent(owner) && didRecall && (!projectId || queries.isActiveProject(projectId))) {
           openWorkbenchWidget('video', { preferredRegions: ['left'] });
         }
@@ -1203,6 +1272,13 @@ export const useImageActions = ({
         const owner = captureAccountScope();
         const didRecall = await executeImageRecall({
           commands,
+          canvasTarget: projectId
+            ? {
+                commands,
+                projectId,
+                getProject: () => (queries.isActiveProject(projectId) ? (getLatestProject() ?? null) : null),
+              }
+            : undefined,
           getGenerateValues: getLatestGenerateValues,
           image,
           isCanvasFrame: getLatestProject()?.invocation.sourceId === 'canvas',
@@ -1319,7 +1395,7 @@ export const useImageActions = ({
           notifications.add({ kind: notice.kind, title: t(notice.titleKey, notice.options ?? {}) });
 
           if ((result.status === 'filled' || result.status === 'created') && queries.isActiveProject(targetProjectId)) {
-            // The menu that asked has no trigger to hand focus back to, so the Canvas takes it, as for any import.
+            // No trigger to return focus to, so the Canvas takes it.
             openWorkbenchWidget('canvas', { preferredRegions: ['center'], requireCenterView: true });
             revealLayerProperties(result.layerId);
           }
@@ -1370,7 +1446,7 @@ export const useImageActions = ({
       useAsReferenceVideo: (item) => {
         const placement = appendReferenceVideo({ models, video: item, videoValues: getLatestVideoValues() });
 
-        // The menu offers this only when there is room; a race can still fill the last slot first.
+        // A race can still fill the last slot first.
         if (placement.status !== 'appended') {
           notifications.add({
             kind: 'info',
@@ -1390,7 +1466,7 @@ export const useImageActions = ({
       useAsConditioningClip: (item, role) => {
         const placement = placeConditioningClip({ models, role, video: item, videoValues: getLatestVideoValues() });
 
-        // The menu offers this only when the model takes the clip; the panel's model can still change first.
+        // The panel's model can still change first.
         if (placement.status !== 'placed') {
           notifications.add({
             kind: 'info',

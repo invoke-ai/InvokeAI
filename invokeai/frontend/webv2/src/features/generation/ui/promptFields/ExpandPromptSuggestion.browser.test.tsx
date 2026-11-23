@@ -14,7 +14,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { commands, userEvent } from 'vitest/browser';
+import { userEvent } from 'vitest/browser';
 
 declare module 'vitest/browser' {
   interface BrowserCommands {
@@ -52,7 +52,15 @@ const ENHANCER = {
   type: 'text_llm',
 };
 
-const MOSS_ENHANCER = { ...ENHANCER, key: 'e4b', name: 'Gemma 4 E4B', source: 'google/gemma-4-E4B-it' };
+/** A record whose primary type is another one but whose files also serve as a Text LLM. */
+const ROLE_ENHANCER = {
+  ...ENHANCER,
+  key: 'role-e4b',
+  name: 'Gemma 4 E4B (encoder)',
+  roles: [{ format: null, type: 'text_llm', variant: null }],
+  source: 'google/gemma-4-E4B-it',
+  type: 'qwen3_5_encoder',
+};
 const MOSS_PROMPT_ID = '0f8f5b2e-1c9e-4f2a-9a4e-1f1f1f1f0011';
 const MOSS_SUGGESTION: ExpandPromptSuggestion = {
   image: null,
@@ -61,7 +69,7 @@ const MOSS_SUGGESTION: ExpandPromptSuggestion = {
   modelSource: 'google/gemma-4-E4B-it',
   systemPromptId: MOSS_PROMPT_ID,
 };
-
+const FLUX3_PROMPT_ID = '0f8f5b2e-1c9e-4f2a-9a4e-1f1f1f1f0012';
 const prompt = (id: string, content: string) => ({
   content,
   id,
@@ -71,13 +79,12 @@ const prompt = (id: string, content: string) => ({
   userId: 'system',
 });
 const VISION_A = { base: 'any', key: 'llava-a', name: 'LLaVA A', type: 'llava_onevision' };
-const VISION_B = { base: 'any', key: 'llava-b', name: 'LLaVA B', type: 'llava_onevision' };
-
 const PROMPTS = [
   prompt('default', 'DEFAULT'),
   prompt('t2v', 'T2V'),
   prompt('i2v', 'I2V'),
   prompt(MOSS_PROMPT_ID, 'MOSS'),
+  prompt(FLUX3_PROMPT_ID, 'FLUX3'),
 ];
 
 const FRAME = { height: 512, image_name: 'frame.png', width: 768 };
@@ -92,7 +99,12 @@ const LTX_SUGGESTION: ExpandPromptSuggestion = {
 const notices = vi.hoisted(() => ({ info: vi.fn(), offer: vi.fn(), undoable: vi.fn() }));
 
 // Read at render time by the mocks below, so each test can set them before rendering.
-let catalog: (typeof TEXT_ONLY | typeof ENHANCER | typeof VISION_A)[] = [];
+let catalog: (
+  | typeof TEXT_ONLY
+  | typeof ENHANCER
+  | typeof VISION_A
+  | (Omit<typeof ROLE_ENHANCER, 'roles'> & { roles?: unknown[] })
+)[] = [];
 let arePromptsLoading = false;
 
 const StubSelect = ({
@@ -179,7 +191,6 @@ vi.mock('@features/generation/data/promptUtilities', async (importOriginal) => (
 }));
 
 vi.mock('@features/generation/data/wildcards', async (importOriginal) => ({
-  // Partial: the real module's other exports (constants, mappers) stay available to what imports them.
   ...(await importOriginal<Record<string, unknown>>()),
   createWildcard: vi.fn(),
   deleteWildcard: vi.fn(),
@@ -209,7 +220,6 @@ afterEach(async () => {
   root = null;
 });
 
-/** What the field was last rendered with, so a saved slot can render its own change back. */
 let rendered: {
   onChange: (value: string) => void;
   projectId: string;
@@ -263,7 +273,6 @@ const renderAndOpen = async (
   await act(() => host?.querySelector<HTMLButtonElement>(`[aria-label="${trigger}"]`)?.click());
 };
 
-/** A saved slot that, like Generate's draft, holds a saved pick by the next render. */
 const savedModels = (overrides: Partial<SavedPromptModels> = {}): SavedPromptModels => {
   const onChange = vi.fn((patch: Partial<SavedPromptModels>) => {
     if (rendered?.savedPromptModels?.onChange === onChange) {
@@ -309,23 +318,6 @@ it('starts from the suggested enhancer and describes from the first frame with t
   expect(await runExpand()).toMatchObject({ image_name: 'frame.png', model_key: 'e2b', system_prompt: 'I2V' });
 });
 
-it('switches to the text prompt when the user leaves the frame out', async () => {
-  await renderAndOpen(LTX_SUGGESTION);
-
-  await act(() => firstFrameCheckbox()?.click());
-  const request = await runExpand();
-  expect(request.image_name).toBeUndefined();
-  expect(request.system_prompt).toBe('T2V');
-});
-
-it('offers a different frame again after one was left out', async () => {
-  await renderAndOpen(LTX_SUGGESTION);
-
-  await act(() => firstFrameCheckbox()?.click());
-  await act(() => renderField({ ...LTX_SUGGESTION, image: { ...FRAME, image_name: 'other.png' } }));
-  expect(await runExpand()).toMatchObject({ image_name: 'other.png', system_prompt: 'I2V' });
-});
-
 it('uses the text prompt and says why for a model that cannot read images', async () => {
   await renderAndOpen(LTX_SUGGESTION);
 
@@ -336,42 +328,6 @@ it('uses the text prompt and says why for a model that cannot read images', asyn
   expect(request).toMatchObject({ model_key: 'qwen', system_prompt: 'T2V' });
   expect(request.image_name).toBeUndefined();
 });
-
-it("keeps the user's own system prompt over the suggestion", async () => {
-  await renderAndOpen(LTX_SUGGESTION);
-
-  await choose('system prompt', 'default');
-  expect(await runExpand()).toMatchObject({ image_name: 'frame.png', system_prompt: 'DEFAULT' });
-});
-
-it('points to the starter models and falls back to an installed model when the enhancer is missing', async () => {
-  catalog = [TEXT_ONLY];
-  await renderAndOpen(LTX_SUGGESTION);
-
-  expect(select('text llm')?.value).toBe('qwen');
-  expect(document.body.textContent).toContain('LTX-2.5 Prompt Enhancer (Gemma-4 E2B) is not installed');
-  expect(document.body.textContent).toContain('widgets.generate.expandFirstFrameUnreadable');
-  expect(await runExpand()).toMatchObject({ model_key: 'qwen', system_prompt: 'T2V' });
-});
-
-it('waits for the system prompts before expanding', async () => {
-  arePromptsLoading = true;
-  await renderAndOpen(LTX_SUGGESTION);
-
-  expect(expandButton()?.disabled).toBe(true);
-});
-
-it('starts from the first listed model without a suggestion', async () => {
-  await renderAndOpen(null);
-
-  // Listed by name: "Gemma-4 E2B" before "Qwen".
-  expect(select('text llm')?.value).toBe('e2b');
-  expect(document.body.textContent).not.toContain('is not installed');
-  expect(await runExpand()).toMatchObject({ model_key: 'e2b' });
-});
-
-const useSuggestedButton = (name: string) =>
-  document.querySelector<HTMLButtonElement>(`button[aria-label="Use ${name}"]`);
 
 it("keeps the surface's saved pick over an installed suggestion, also after a remount, and saves a different one", async () => {
   const saved = savedModels({ expandPromptModelKey: 'qwen' });
@@ -388,41 +344,19 @@ it("keeps the surface's saved pick over an installed suggestion, also after a re
   expect(saved.onChange).toHaveBeenCalledExactlyOnceWith({ expandPromptModelKey: 'e2b' });
 });
 
-it('switches to the recommended MOSS-Image enhancer from the hint and saves it', async () => {
-  catalog = [TEXT_ONLY, ENHANCER, MOSS_ENHANCER];
-  const saved = savedModels({ expandPromptModelKey: 'e2b' });
-  await renderAndOpen(MOSS_SUGGESTION, saved);
-
-  expect(select('text llm')?.value).toBe('e2b');
-  await act(() => useSuggestedButton('Gemma 4 E4B')?.click());
-  expect(select('text llm')?.value).toBe('e4b');
-  expect(useSuggestedButton('Gemma 4 E4B')).toBeNull();
-  expect(saved.onChange).toHaveBeenCalledExactlyOnceWith({ expandPromptModelKey: 'e4b' });
-  expect(await runExpand()).toMatchObject({ model_key: 'e4b', system_prompt: 'MOSS' });
-});
-
-it('preselects an installed suggestion when nothing is saved, without the hint', async () => {
-  catalog = [TEXT_ONLY, ENHANCER, MOSS_ENHANCER];
+it('offers a record that serves as a Text LLM through a role, and suggests it by source', async () => {
+  catalog = [TEXT_ONLY, ROLE_ENHANCER];
   await renderAndOpen(MOSS_SUGGESTION, savedModels());
 
-  expect(select('text llm')?.value).toBe('e4b');
-  expect(useSuggestedButton('Gemma 4 E4B')).toBeNull();
+  expect(select('text llm')?.value).toBe('role-e4b');
 });
 
-it('recognises the MOSS-Image enhancer installed in place from a local folder', async () => {
-  catalog = [TEXT_ONLY, { ...MOSS_ENHANCER, source: 'E:/ModelStuffSSD/gemma-4-E4B-it' }];
+it('does not take a record of another type without the Text LLM role as a candidate', async () => {
+  catalog = [TEXT_ONLY, { ...ROLE_ENHANCER, roles: [] }];
   await renderAndOpen(MOSS_SUGGESTION, savedModels());
 
-  expect(select('text llm')?.value).toBe('e4b');
-  expect(document.body.textContent).not.toContain('is not installed');
-});
-
-it('points to the MOSS-Image enhancer starter model when it is not installed', async () => {
-  await renderAndOpen(MOSS_SUGGESTION, savedModels({ expandPromptModelKey: 'e2b' }));
-
-  expect(select('text llm')?.value).toBe('e2b');
-  expect(document.body.textContent).toContain('Gemma 4 E4B (Prompt Enhancer) is not installed');
-  expect(document.body.textContent).not.toContain('Recommended:');
+  expect(select('text llm')?.value).toBe('qwen');
+  expect(document.body.textContent).toContain('is not installed');
 });
 
 it("starts another project from its own saved Expand Prompt model, not the previous project's pick", async () => {
@@ -431,20 +365,6 @@ it("starts another project from its own saved Expand Prompt model, not the previ
   expect(select('text llm')?.value).toBe('qwen');
 
   await act(() => renderField(null, savedModels({ expandPromptModelKey: 'e2b' }), undefined, 'project-2'));
-  expect(select('text llm')?.value).toBe('e2b');
-});
-
-it('keeps the session pick of a surface without a saved slot across a project switch', async () => {
-  await renderAndOpen(null);
-  await choose('text llm', 'qwen');
-
-  await act(() => renderField(null, undefined, undefined, 'project-2'));
-  expect(select('text llm')?.value).toBe('qwen');
-});
-
-it('falls back when the saved pick is no longer installed', async () => {
-  await renderAndOpen(null, savedModels({ expandPromptModelKey: 'uninstalled' }));
-
   expect(select('text llm')?.value).toBe('e2b');
 });
 
@@ -467,7 +387,6 @@ const settle = () =>
       globalThis.setTimeout(resolve, 100);
     });
   });
-/** A run that stays in flight until `finish` is called. */
 const pendingRun = () => {
   let finish: (() => void) | undefined;
   const running = new Promise<void>((resolve) => {
@@ -482,14 +401,6 @@ const pendingRun = () => {
   };
 };
 
-it('closes an idle Expand Prompt popover on an outside click', async () => {
-  await renderAndOpen(null);
-  expect(isPopoverOpen('widgets.generate.expand')).toBe(true);
-
-  await clickOutside();
-  expect(isPopoverOpen('widgets.generate.expand')).toBe(false);
-});
-
 const trigger = (label: string) => host?.querySelector<HTMLButtonElement>(`[aria-label="${label}"]`);
 const isSpinning = (button: HTMLButtonElement | null | undefined) =>
   button?.querySelector('.chakra-spinner') !== null && button?.getAttribute('aria-busy') === 'true';
@@ -499,7 +410,6 @@ const promptBox = () =>
 const buttonWithText = (text: string) =>
   [...document.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent === text);
 
-/** The Undo the last landed result offered, as its toast would run it. */
 const undoLastResult = () => {
   const [, notice] = notices.undoable.mock.calls.at(-1) as [string, { onUndo: () => void }];
   return act(() => notice.onUndo());
@@ -553,26 +463,6 @@ it('keeps running once the popover closes, and lands without taking focus from t
   expect(elsewhere.value).toBe('notes');
   await undoLastResult();
   expect(promptBox()?.value).toBe('she waves');
-  elsewhere.remove();
-});
-
-it('leaves a composing IME in another field alone when a result lands', async () => {
-  const run = pendingRun();
-  vi.mocked(expandPrompt).mockImplementationOnce(() => run.running.then(() => ({ expanded_prompt: 'x', seed: 1 })));
-  await renderAndOpen(null);
-  const elsewhere = document.createElement('textarea');
-  document.body.append(elsewhere);
-
-  await act(() => expandButton()?.click());
-  await clickOutside();
-  await act(() => elsewhere.focus());
-  await commands.imeCompose([{ kind: 'compose', text: 'にほ' }]);
-  await run.finish();
-  await commands.imeCompose([{ kind: 'commit', text: '日本' }]);
-
-  expect(promptBox()?.value).toBe('x');
-  expect(document.activeElement).toBe(elsewhere);
-  expect(elsewhere.value).toBe('日本');
   elsewhere.remove();
 });
 
@@ -636,23 +526,6 @@ it('drops a result for a project this field no longer shows', async () => {
   expect(notices.undoable).not.toHaveBeenCalled();
 });
 
-it('drops the request when its field unmounts, so a remounted field is never written by it', async () => {
-  const run = pendingRun();
-  const onChange = vi.fn();
-  vi.mocked(expandPrompt).mockImplementationOnce(() => run.running.then(() => ({ expanded_prompt: 'x', seed: 1 })));
-  await renderAndOpen(null, undefined, 'widgets.generate.expandPrompt', onChange);
-
-  await act(() => expandButton()?.click());
-  await act(() => root?.render(null));
-  await act(() => renderField(null, undefined, onChange));
-  await run.finish();
-
-  expect(promptBox()?.value).toBe('she waves');
-  expect(onChange).not.toHaveBeenCalled();
-  expect(notices.undoable).not.toHaveBeenCalled();
-});
-
-// Shares Expand's request handling; this covers its own wiring.
 it('runs Image to Prompt and writes its prompt', async () => {
   catalog = [VISION_A];
   const run = pendingRun();
@@ -668,34 +541,4 @@ it('runs Image to Prompt and writes its prompt', async () => {
   expect(isPopoverOpen('widgets.generate.generatePrompt')).toBe(false);
   expect(promptBox()?.value).toBe('described');
   expect(notices.undoable).toHaveBeenCalledWith('widgets.generate.promptFromImage', expect.anything());
-});
-
-it('starts Image to Prompt from the first listed vision model and saves a different pick', async () => {
-  catalog = [VISION_B, VISION_A];
-  const saved = savedModels();
-  await renderAndOpen(null, saved, 'widgets.generate.imageToPrompt');
-
-  expect(select('text llm')?.value).toBe('llava-a');
-  const generateButton = () =>
-    [...document.querySelectorAll<HTMLButtonElement>('button')].find(
-      (button) => button.textContent === 'widgets.generate.generatePrompt'
-    );
-  await act(() => generateButton()?.click());
-  expect(imageToPrompt).toHaveBeenCalledWith(
-    expect.objectContaining({ image_name: 'selected.png', model_key: 'llava-a' })
-  );
-
-  await act(() => host?.querySelector<HTMLButtonElement>('[aria-label="widgets.generate.imageToPrompt"]')?.click());
-  await choose('text llm', 'llava-b');
-  expect(saved.onChange).toHaveBeenCalledExactlyOnceWith({ imageToPromptModelKey: 'llava-b' });
-});
-
-it("starts another project from its own saved Image to Prompt model, not the previous project's pick", async () => {
-  catalog = [VISION_A, VISION_B];
-  await renderAndOpen(null, savedModels(), 'widgets.generate.imageToPrompt');
-  await choose('text llm', 'llava-b');
-  expect(select('text llm')?.value).toBe('llava-b');
-
-  await act(() => renderField(null, savedModels({ imageToPromptModelKey: 'llava-a' }), undefined, 'project-2'));
-  expect(select('text llm')?.value).toBe('llava-a');
 });

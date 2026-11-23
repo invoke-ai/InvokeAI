@@ -79,4 +79,4 @@ class ExtensionsManager:
         finally:
             with torch.no_grad():
                 for param_key, weight in original_weights.get_changed_weights():
-                    unet.get_parameter(param_key).copy_(weight)
+                    unet.get_parameter(param_key).data.copy_(weight)

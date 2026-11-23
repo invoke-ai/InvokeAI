@@ -7,6 +7,7 @@ from typing import ClassVar
 
 import pytest
 import torch
+import torch.nn.functional as F
 from diffusers.schedulers.scheduling_flow_match_euler_discrete import FlowMatchEulerDiscreteScheduler
 
 from invokeai.app.invocations.fields import (
@@ -16,6 +17,7 @@ from invokeai.app.invocations.fields import (
     LatentsField,
     TensorField,
 )
+from invokeai.app.invocations.krea2.krea2_control_lora import Krea2ControlLoRAField
 from invokeai.app.invocations.krea2.krea2_denoise import (
     KREA2_LATENT_CHANNELS,
     Krea2DenoiseInvocation,
@@ -23,14 +25,18 @@ from invokeai.app.invocations.krea2.krea2_denoise import (
 )
 from invokeai.app.invocations.model import LoRAField, ModelIdentifierField, TransformerField
 from invokeai.backend.krea2 import denoise_working_memory as _ESTIMATOR_MODULE
+from invokeai.backend.krea2.control_lora import Krea2ControlLoRAPatch
 from invokeai.backend.krea2.sampling_utils import build_sigmas, pack_latents, unpack_latents
 from invokeai.backend.krea2.style_reference import Krea2StyleReferenceMode, capture_style_reference
 from invokeai.backend.model_manager.taxonomy import BaseModelType, Krea2VariantType, ModelFormat, ModelType
+from invokeai.backend.patches.layers.full_layer import FullLayer
+from invokeai.backend.patches.lora_conversions.krea2_lora_constants import KREA2_LORA_TRANSFORMER_PREFIX
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.quantization.dequantizing_linear import peak_dequant_transient_bytes
 from invokeai.backend.quantization.int8_convrot import Int8ConvrotLinear
 from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import RectifiedFlowInpaintExtension
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData, Krea2ConditioningInfo
+from invokeai.backend.util.devices import TorchDevice
 
 
 @pytest.mark.parametrize(("denoising_start", "denoising_end"), [(0.75, 0.25), (0.5, 0.5)])
@@ -430,7 +436,13 @@ def _runtime_invocation(
     )
 
 
-def _runtime_context(tmp_path, transformer: _Transformer, *, negative_text_seq_len: int = 2):
+def _runtime_context(
+    tmp_path,
+    transformer: _Transformer,
+    *,
+    negative_text_seq_len: int = 2,
+    model_format: ModelFormat = ModelFormat.Checkpoint,
+):
     conditionings = {
         "positive": ConditioningFieldData(conditionings=[Krea2ConditioningInfo(prompt_embeds=torch.ones(1, 2, 12, 8))]),
         "negative": ConditioningFieldData(
@@ -449,7 +461,7 @@ def _runtime_context(tmp_path, transformer: _Transformer, *, negative_text_seq_l
         "style-ref": torch.zeros(1, KREA2_LATENT_CHANNELS, 1, 2, 2),
         "style-ref-wrong-size": torch.zeros(1, KREA2_LATENT_CHANNELS, 1, 4, 4),
     }
-    config = SimpleNamespace(format=ModelFormat.Checkpoint, variant=Krea2VariantType.Turbo)
+    config = SimpleNamespace(format=model_format, variant=Krea2VariantType.Turbo)
     return SimpleNamespace(
         models=SimpleNamespace(
             load=lambda _identifier: _TransformerInfo(transformer),
@@ -578,6 +590,70 @@ def test_run_diffusion_keeps_fp32_sampler_state_with_bf16_model_input(
         assert inpaint_merge_output_dtypes == [torch.float32] * active_steps
 
 
+@pytest.mark.parametrize(
+    ("model_format", "expected_dtype"),
+    [(ModelFormat.GGUFQuantized, torch.float32), (ModelFormat.Checkpoint, torch.bfloat16)],
+)
+def test_run_diffusion_on_mps_feeds_transformer_and_loras_in_the_loader_dtype(
+    monkeypatch, tmp_path, model_format: ModelFormat, expected_dtype: torch.dtype
+) -> None:
+    """Latents, conditioning, timesteps and LoRA sidecar weights must match the dtype the transformer loaded in.
+
+    A GGUF transformer on MPS runs in float32 (every GGUF Linear casts its input to the compute dtype),
+    so bfloat16 LoRA weights, or bfloat16 inputs reaching a bias-free Linear, fail a matmul dtype check.
+    """
+    _patch_runtime(monkeypatch)
+    monkeypatch.setattr(
+        "invokeai.app.invocations.krea2.krea2_denoise.TorchDevice.choose_bfloat16_safe_dtype",
+        lambda _device: torch.bfloat16,
+    )
+    # The real policy, asked about MPS, while the run itself stays on the CPU.
+    choose_dtype = TorchDevice.choose_krea2_transformer_dtype
+    monkeypatch.setattr(
+        "invokeai.app.invocations.krea2.krea2_denoise.TorchDevice.choose_krea2_transformer_dtype",
+        lambda is_gguf, device: choose_dtype(is_gguf=is_gguf, device=torch.device("mps")),
+    )
+    patch_dtypes: list[torch.dtype] = []
+
+    def _record_patches(**kwargs):
+        patch_dtypes.append(kwargs["dtype"])
+        return nullcontext()
+
+    monkeypatch.setattr(
+        "invokeai.app.invocations.krea2.krea2_denoise.LayerPatcher.apply_smart_model_patches", _record_patches
+    )
+    import invokeai.app.invocations.krea2.krea2_denoise as denoise_module
+
+    estimate = denoise_module.estimate_krea2_denoise_working_memory
+    estimate_dtypes: list[torch.dtype] = []
+
+    def _record_estimate(*args, **kwargs):
+        estimate_dtypes.append(kwargs["dtype"])
+        return estimate(*args, **kwargs)
+
+    monkeypatch.setattr(denoise_module, "estimate_krea2_denoise_working_memory", _record_estimate)
+
+    class _DtypeRecordingTransformer(_Transformer):
+        def __init__(self) -> None:
+            super().__init__()
+            self.input_dtypes: set[tuple[torch.dtype, ...]] = set()
+
+        def __call__(self, *, hidden_states, encoder_hidden_states, timestep, **kwargs):
+            self.input_dtypes.add((hidden_states.dtype, encoder_hidden_states.dtype, timestep.dtype))
+            return super().__call__(
+                hidden_states=hidden_states, encoder_hidden_states=encoder_hidden_states, timestep=timestep, **kwargs
+            )
+
+    transformer = _DtypeRecordingTransformer()
+    _runtime_invocation(cfg_scale=1.0)._run_diffusion(
+        _runtime_context(tmp_path, transformer, model_format=model_format)
+    )
+
+    assert patch_dtypes == [expected_dtype]
+    assert estimate_dtypes == [expected_dtype]
+    assert transformer.input_dtypes == {(expected_dtype, expected_dtype, expected_dtype)}
+
+
 def test_run_diffusion_applies_mixed_cfg_only_at_enabled_steps(monkeypatch, tmp_path) -> None:
     _patch_runtime(monkeypatch)
     transformer = _Transformer()
@@ -586,6 +662,27 @@ def test_run_diffusion_applies_mixed_cfg_only_at_enabled_steps(monkeypatch, tmp_
 
     assert latents.shape == (1, KREA2_LATENT_CHANNELS, 1, 2, 2)
     assert transformer.conditioning_values == [1.0, 0.0, 1.0]
+
+
+def test_every_preview_is_sent_while_the_transformer_is_locked(monkeypatch, tmp_path) -> None:
+    """A Tiny AutoEncoder preview places its TAE next to the locked model; before the lock there is none to fit."""
+    _patch_runtime(monkeypatch)
+    transformer = _Transformer()
+    context = _runtime_context(tmp_path, transformer)
+    events: list[str] = []
+
+    @contextmanager
+    def locked(**_kwargs):
+        events.append("lock")
+        yield ({}, transformer)
+        events.append("unlock")
+
+    context.models.load = lambda _identifier: SimpleNamespace(model=transformer, model_on_device=locked)
+    context.util.sd_step_callback = lambda *_args: events.append("preview")
+
+    _runtime_invocation(cfg_scale=1.0)._run_diffusion(context)
+
+    assert events == ["lock", "preview", "preview", "preview", "unlock"]
 
 
 def test_run_diffusion_treats_an_empty_negative_collection_as_absent(monkeypatch, tmp_path) -> None:
@@ -648,6 +745,39 @@ def test_run_diffusion_sizes_regional_masks_per_pass_when_cfg_lengths_differ(mon
         transformer.regional_attention_masks, transformer.combined_sequence_lengths, strict=True
     ):
         assert mask.shape == (sequence_length, sequence_length)
+
+
+def test_run_diffusion_keeps_the_global_negative_image_wide_beside_negative_regions(monkeypatch, tmp_path) -> None:
+    _patch_runtime(monkeypatch)
+    transformer = _Transformer()
+
+    def with_left_half(name: str) -> list[Krea2ConditioningField]:
+        return [
+            Krea2ConditioningField(conditioning_name=name),
+            Krea2ConditioningField(conditioning_name=name, mask=TensorField(tensor_name="left-half")),
+        ]
+
+    invocation = _runtime_invocation(cfg_scale=2.0, negative_conditioning=with_left_half("negative"))
+    invocation.positive_conditioning = with_left_half("positive")
+    # A 2x2 token grid, so the left-half region leaves a background beside it.
+    invocation.width = invocation.height = 32
+    context = _runtime_context(tmp_path, transformer)
+    left_half = torch.zeros(1, 32, 32)
+    left_half[..., :16] = 1
+    load_tensor = context.tensors.load
+    context.tensors = SimpleNamespace(load=lambda name: left_half if name == "left-half" else load_tensor(name))
+
+    invocation._run_diffusion(context)
+
+    positive_mask, negative_mask = transformer.regional_attention_masks[:2]
+    # Sequence: [global text (2), regional text (2), image tokens (4)].
+    global_text, image = slice(0, 2), slice(4, 8)
+    background = torch.tensor([False, True, False, True])
+    assert torch.equal(positive_mask[global_text, image], background.expand(2, 4))
+    assert torch.equal(positive_mask[image, global_text], background[:, None].expand(4, 2))
+    assert negative_mask[global_text, image].all() and negative_mask[image, global_text].all()
+    for mask in (positive_mask, negative_mask):
+        assert torch.equal(mask[2:4, image], (~background).expand(2, 4))
 
 
 def test_run_diffusion_releases_regional_mask_when_transformer_raises(monkeypatch, tmp_path) -> None:
@@ -1932,3 +2062,173 @@ def test_the_reference_kv_cache_reserves_its_cache_instead_of_per_step_tokens(mo
     # the smallest square that holds it.
     step, references = 2 + 1, _REFERENCE_TOKENS
     assert asked_seq_lens == [step, math.ceil(math.sqrt(max(step * (step + references), references**2)))]
+
+
+def _control_lora_field(weight: float = 0.75, latents_name: str = "control") -> Krea2ControlLoRAField:
+    return Krea2ControlLoRAField(
+        lora=ModelIdentifierField(
+            key="control", hash="control", name="control", base=BaseModelType.Krea2, type=ModelType.ControlLoRa
+        ),
+        weight=weight,
+        control_latents=LatentsField(latents_name=latents_name),
+    )
+
+
+def _with_control_lora_record(context, base: BaseModelType = BaseModelType.Krea2, type=ModelType.ControlLoRa):
+    """`context` with the record of the `control` model, as `_runtime_context` answers only for the transformer."""
+    transformer_config = context.models.get_config
+    record = SimpleNamespace(name="Some Model", base=base, type=type)
+    context.models.get_config = (
+        lambda identifier: record if identifier.key == "control" else transformer_config(identifier)
+    )
+    return context
+
+
+@pytest.mark.parametrize(
+    ("record", "weight", "shape", "message"),
+    [
+        (
+            (BaseModelType.Krea2, ModelType.ControlLoRa),
+            0.75,
+            (1, KREA2_LATENT_CHANNELS, 1, 4, 4),
+            r"at the generation width and height \(16x16\)",
+        ),
+        (
+            (BaseModelType.Krea2, ModelType.ControlLoRa),
+            0.75,
+            (1, 8, 2, 2),
+            r"at the generation width and height \(16x16\)",
+        ),
+        (
+            (BaseModelType.Flux, ModelType.ControlLoRa),
+            0.75,
+            (1, KREA2_LATENT_CHANNELS, 1, 2, 2),
+            "'Some Model' is a flux control_lora model, not a Krea-2 Control LoRA",
+        ),
+        (
+            (BaseModelType.Flux, ModelType.ControlLoRa),
+            0.0,
+            (1, KREA2_LATENT_CHANNELS, 1, 2, 2),
+            "'Some Model' is a flux control_lora model, not a Krea-2 Control LoRA",
+        ),
+        (
+            (BaseModelType.Krea2, ModelType.LoRA),
+            0.75,
+            (1, KREA2_LATENT_CHANNELS, 1, 2, 2),
+            "'Some Model' is a krea-2 lora model, not a Krea-2 Control LoRA",
+        ),
+    ],
+    ids=["other-size", "other-channels", "flux-control-lora", "flux-control-lora-at-weight-zero", "plain-krea2-lora"],
+)
+def test_an_unusable_control_lora_is_refused_before_the_transformer_loads(
+    monkeypatch, tmp_path, record, weight, shape, message
+) -> None:
+    _patch_runtime(monkeypatch)
+    invocation = _runtime_invocation(cfg_scale=1.0)
+    invocation.control_lora = _control_lora_field(weight=weight)
+    context = _with_control_lora_record(_refusing_context(tmp_path), *record)
+    tensors = context.tensors.load
+    context.tensors.load = lambda name: torch.zeros(shape) if name == "control" else tensors(name)
+
+    with pytest.raises(ValueError, match=message):
+        invocation._run_diffusion(context)
+
+
+class _ImgInTransformer(_Transformer):
+    """Runs a real `img_in` on every pass and records whether something replaced its projection."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.img_in = torch.nn.Linear(KREA2_LATENT_CHANNELS * 4, 4)
+        self.reprojected: list[bool] = []
+        self.projections: list[tuple[torch.Tensor, torch.Tensor]] = []
+
+    def __call__(self, *, hidden_states, **kwargs):
+        stock = F.linear(hidden_states, self.img_in.weight, self.img_in.bias)
+        projected = self.img_in(hidden_states)
+        self.reprojected.append(not torch.allclose(projected, stock))
+        self.projections.append((hidden_states, projected))
+        return super().__call__(hidden_states=hidden_states, **kwargs)
+
+
+@torch.no_grad()
+def test_a_control_lora_projects_both_cfg_passes_with_other_loras_img_in_layers(monkeypatch, tmp_path) -> None:
+    _patch_runtime(monkeypatch)
+    transformer = _ImgInTransformer()
+    control_weight, control_bias = torch.randn(4, 128), torch.randn(4)
+    control_info = _LoRAInfo()
+    control_info.model = Krea2ControlLoRAPatch(
+        layers={}, input_projection_weight=control_weight, input_projection_bias=control_bias
+    )
+    img_in_delta, img_in_bias_delta = torch.randn(4, 64), torch.randn(4)
+    regular_info = _LoRAInfo()
+    regular_info.model = ModelPatchRaw(
+        layers={f"{KREA2_LORA_TRANSFORMER_PREFIX}img_in": FullLayer(img_in_delta, img_in_bias_delta)}
+    )
+    applied: list[tuple[object, float]] = []
+
+    @contextmanager
+    def patcher(*, patches, **_kwargs):
+        applied.extend((patch, weight) for patch, weight, _in_ram in patches)
+        yield
+
+    monkeypatch.setattr("invokeai.app.invocations.krea2.krea2_denoise.LayerPatcher.apply_smart_model_patches", patcher)
+    invocation = _runtime_invocation(cfg_scale=4.0)
+    invocation.transformer = TransformerField(
+        transformer=_model_identifier(),
+        loras=[
+            LoRAField(
+                lora=ModelIdentifierField(
+                    key="regular", hash="regular", name="regular", base=BaseModelType.Krea2, type=ModelType.LoRA
+                ),
+                weight=0.5,
+            )
+        ],
+    )
+    invocation.style_reference = _style_reference_field()
+    invocation.control_lora = _control_lora_field(weight=0.75)
+    context = _with_control_lora_record(_runtime_context(tmp_path, transformer))
+    tensors = context.tensors.load
+    context.tensors.load = (
+        lambda name: torch.ones(1, KREA2_LATENT_CHANNELS, 1, 2, 2) if name == "control" else tensors(name)
+    )
+    transformer_info = _TransformerInfo(transformer)
+    loras = {"control": control_info, "regular": regular_info}
+    context.models.load = lambda identifier: loras.get(identifier.key, transformer_info)
+
+    invocation._run_diffusion(context)
+
+    assert applied == [(regular_info.model, 0.5), (control_info.model, 0.75)]
+    assert transformer_info.working_memory.features["lora_count"] == 2
+    # Per step: the style capture pass, then the conditional and unconditional target passes.
+    assert transformer.reprojected == [False, True, True] * 2
+    # The regular LoRA's img_in layer, at its own weight, adds to the projection's latent half.
+    latents, projected = transformer.projections[1]
+    expected_weight = torch.cat([control_weight[:, :64] + 0.5 * img_in_delta, control_weight[:, 64:]], dim=1)
+    expected_bias = control_bias + 0.5 * img_in_bias_delta
+    torch.testing.assert_close(
+        projected, F.linear(torch.cat([latents, torch.ones_like(latents)], dim=-1), expected_weight, expected_bias)
+    )
+    assert not transformer.img_in._forward_hooks
+
+
+def test_a_control_lora_at_weight_zero_is_ignored(monkeypatch, tmp_path) -> None:
+    _patch_runtime(monkeypatch)
+    transformer = _ImgInTransformer()
+    invocation = _runtime_invocation(cfg_scale=4.0)
+    invocation.control_lora = _control_lora_field(weight=0.0, latents_name="never-loaded")
+    context = _with_control_lora_record(_runtime_context(tmp_path, transformer))
+    transformer_info = _TransformerInfo(transformer)
+    loads: list[str] = []
+
+    def load(identifier):
+        loads.append(identifier.key)
+        return transformer_info
+
+    context.models.load = load
+
+    invocation._run_diffusion(context)
+
+    assert "control" not in loads
+    assert transformer_info.working_memory.features["lora_count"] == 0
+    assert transformer.reprojected == [False, False] * 2

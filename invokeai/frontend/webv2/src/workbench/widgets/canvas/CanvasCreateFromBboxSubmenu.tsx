@@ -15,10 +15,7 @@ const CREATE_FROM_BBOX_ITEMS: readonly { destination: CreateFromBboxDestination;
   { destination: 'raster', labelKey: 'widgets.canvas.contextMenu.newRasterLayer' },
 ];
 
-/**
- * What a frame snapshot can become, in the order every host lists them: the canvas context menu's Create from frame
- * submenu and the header's Frame menu.
- */
+/** What a frame snapshot can become, in the order every host lists them. */
 export const CreateFromBboxMenuItems = ({
   disabled,
   onCreate,

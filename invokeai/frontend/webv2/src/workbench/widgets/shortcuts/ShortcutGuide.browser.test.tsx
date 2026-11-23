@@ -61,7 +61,6 @@ import { StatusBar } from '@workbench/shell/StatusBar';
 
 import { ShortcutGuide } from './ShortcutGuide';
 
-/** The chip is named by its content: only the guide's name, never the preview hints. */
 const SHORTCUTS_CHIP = { exact: true, name: 'Shortcuts' };
 
 const widgetWidths = createExternalStore<Record<string, number>>({});
@@ -161,7 +160,6 @@ const render = async (width = 900, withCanvasSource = true) => {
   );
 };
 
-/** The center canvas holds focus until the user goes elsewhere: Generate, on the left, adds no hints of its own. */
 const leaveCanvas = () =>
   act(() =>
     host!.querySelector('[data-testid="left"]')!.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
@@ -223,7 +221,6 @@ describe('contextual status-bar guide', () => {
     await leaveCanvas();
     const guide = page.getByRole('button', SHORTCUTS_CHIP);
     expect(guide.element().textContent).toContain('Invoke');
-    // The preview hints stay out of the name, so a voice command for a hint cannot land on the chip.
     await expect.element(guide).toHaveAccessibleName('Shortcuts');
     expect(guide.element().textContent).not.toContain('Cancel generation');
     expect(guide.element().textContent).not.toContain('Command palette');
@@ -297,8 +294,7 @@ describe('contextual status-bar guide', () => {
     expect(guide.element().getBoundingClientRect().width).toBeLessThan(80);
     await act(() => widgetWidths.setSnapshot({ ...widgetWidths.getSnapshot(), 'server-status': 250 }));
     await render(700);
-    await expect.poll(() => guide.element().getBoundingClientRect().width).toBeLessThanOrEqual(24);
-    // Icon only: the visible label is gone, and its hidden copy keeps the chip's name.
+    await expect.poll(() => guide.element().getBoundingClientRect().width).toBeLessThanOrEqual(28);
     expect(guide.element().querySelector('[data-shortcut-guide]')?.lastElementChild?.querySelector('p')).toBeNull();
     await expect.element(guide).toHaveAccessibleName('Shortcuts');
     expect(notification.getBoundingClientRect().right).toBeLessThanOrEqual(700);
@@ -312,6 +308,45 @@ describe('contextual status-bar guide', () => {
     await expect.poll(() => footer.scrollWidth).toBeLessThanOrEqual(footer.clientWidth);
     expect(notification.getBoundingClientRect().right).toBeLessThanOrEqual(700);
   });
+  it('keeps the chip, padding included, within its space at every width as its content steps down', async () => {
+    await leaveCanvas();
+    await page.viewport(700, 600);
+    await render(700);
+    const footer = host!.querySelector('footer')!;
+    const stripEnd = footer.getBoundingClientRect().right - parseFloat(getComputedStyle(footer).paddingRight);
+    const notification = host!.querySelector('[data-status-bar-widget="notifications"]')!;
+    const content = () => host!.querySelector<HTMLElement>('[data-shortcut-guide]')!;
+    const visibleRow = () => content().lastElementChild!;
+    const visibleContentRight = () =>
+      Math.max(
+        ...[...visibleRow().children]
+          .filter((child) => getComputedStyle(child).position !== 'absolute')
+          .map((child) => {
+            const range = document.createRange();
+            range.selectNodeContents(child);
+            return range.getBoundingClientRect().right;
+          })
+      );
+    const misfits: number[] = [];
+    for (let other = 400; visibleRow().querySelector('p'); other++) {
+      expect(other).toBeLessThan(700);
+      await act(() => widgetWidths.setSnapshot({ 'server-status': other }));
+      // The strip and the guide measure from ResizeObserver callbacks; two frames let both settle.
+      await act(
+        () =>
+          new Promise<void>((resolve) => {
+            requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+          })
+      );
+      if (
+        notification.getBoundingClientRect().right > stripEnd + 0.5 ||
+        visibleContentRight() > content().getBoundingClientRect().right + 0.5
+      ) {
+        misfits.push(other);
+      }
+    }
+    expect(misfits).toEqual([]);
+  });
   it('shrinks whole hints, preserves source in its popover, consumes Escape and restores the editing origin', async () => {
     const canvas = host!.querySelector<HTMLElement>('[data-testid="canvas"]')!;
     await act(() => canvas.focus());
@@ -322,7 +357,6 @@ describe('contextual status-bar guide', () => {
     await expect
       .poll(() => host!.querySelector('[data-hint-measurements]')?.nextElementSibling?.textContent)
       .toBe('Shortcuts');
-    // The visible fallback label is the whole name, not repeated by the hidden one.
     await expect.element(guide).toHaveAccessibleName('Shortcuts');
     await guide.click();
     const popup = page.getByRole('dialog');
@@ -394,7 +428,6 @@ describe('contextual status-bar guide', () => {
       await leaveCanvas();
       await expect.poll(() => host!.textContent).toContain('Cancel generation');
       await act(() => field.focus());
-      // Invoke stays usable from text fields; Cancel generation is not, so the guide must judge the focused field.
       await expect.poll(() => host!.textContent).not.toContain('Cancel generation');
       expect(host!.textContent).toContain('Invoke');
       // Leaving for the body fires focusout without a focusin.

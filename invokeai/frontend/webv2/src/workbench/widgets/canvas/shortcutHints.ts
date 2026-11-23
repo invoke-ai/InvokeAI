@@ -2,6 +2,7 @@ import type { CanvasEngine, CanvasInteractionState, ToolId } from '@workbench/ca
 import type { ShortcutHint, ShortcutHintSnapshot, ShortcutHintSource } from '@workbench/hotkeys/hintSources';
 
 import { getCanvasOperations } from '@workbench/canvas-operations/api';
+import { MOD_KEY_LABEL } from '@workbench/hotkeys/keys';
 
 const gesture = (label: string, parts: readonly string[] = [], pointerKey?: string): ShortcutHint => ({
   labelKey: `workbench.shortcuts.actions.${label}`,
@@ -73,14 +74,12 @@ export const getCanvasShortcutHints = ({
       gesture('subtractSelection', ['alt'])
     );
   } else if (tool === 'shape') {
+    const isBox = shapeKind !== 'polygon' && shapeKind !== 'freehand';
     hints.push(
-      ...(shapeKind === 'polygon'
-        ? POLYGON_HINTS
-        : [
-            gesture('draw', [], 'drag'),
-            ...(shapeKind === 'freehand' ? [] : [gesture('constrain', ['shift'], 'drag')]),
-            CANCEL,
-          ])
+      ...(shapeKind === 'polygon' ? POLYGON_HINTS : [gesture('draw', [], 'drag'), CANCEL]),
+      ...(isBox ? [gesture('constrain', ['shift'], 'drag'), gesture('drawFromCenter', ['alt'], 'drag')] : []),
+      // The platform's mod key cuts out: ⌘ on macOS, Ctrl elsewhere.
+      gesture('cutOutShape', [MOD_KEY_LABEL])
     );
   } else if (tool === 'bbox') {
     hints.push(

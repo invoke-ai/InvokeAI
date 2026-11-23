@@ -42,8 +42,8 @@ const HydratedSessionController = ({ search }: { search: WorkbenchSearch }) => {
 
     if (projectIds.includes(requestedProjectId)) {
       commands.projects.switchTo(requestedProjectId);
-      // The link is a one-time open request. Keeping it would override later
-      // project selections (including a new project) on reload.
+      // The link is a one-time open request. Keeping it would override later project selections (including a new
+      // project) on reload.
       void navigate({ replace: true, search: {}, to: '/app' });
       return;
     }

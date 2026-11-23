@@ -16,12 +16,12 @@ import torch.nn as nn
 
 from invokeai.backend.ideogram4.quantized_loading import (
     FP8_TEXT_ENCODER_CONFIG_FLAG,
-    Fp8Linear,
     is_fp8_state_dict,
     load_fp8_state_dict,
     quantize_weight_to_fp8,
     swap_linears_to_fp8,
 )
+from invokeai.backend.quantization.fp8_rowwise import Fp8Linear
 
 
 class _TinyEncoder(nn.Module):

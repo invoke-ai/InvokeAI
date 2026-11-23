@@ -23,7 +23,12 @@ export {
   imageIndexAvailabilityOptions,
 } from './data/queries';
 export { abortGalleryLocatorRequests, createGalleryLocatorRequest } from './core/selection';
-export { canAddToCachedGalleryBoard, ensureGalleryBoardDestinations, getCachedGalleryBoard } from './data/queryCache';
+export {
+  canAddToCachedGalleryBoard,
+  ensureGalleryBoardDestinations,
+  getCachedGalleryBoard,
+  getGalleryBoardDestinationIds,
+} from './data/queryCache';
 export type {
   CanonicalGalleryItemsFilter,
   GalleryBoardsQuery,
@@ -49,4 +54,5 @@ export {
 } from './data/queryCache';
 export type { GalleryItemCachePatch } from './data/queryCache';
 export { createGalleryRealtimeRuntime } from './data/realtimeRuntime';
+export { resolveGalleryUploadBoardId } from './data/uploadDestination';
 export { galleryBoardExists } from './data/backend';

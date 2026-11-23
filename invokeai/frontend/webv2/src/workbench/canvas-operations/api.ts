@@ -12,6 +12,8 @@ export type {
 } from './contracts';
 export {
   importGalleryImagesToCanvas,
+  commitCanvasRecall,
+  prepareLegacyCanvasMetadata,
   type GalleryCanvasImportDestination,
   type ImportGalleryImagesResult,
 } from './importGalleryImages';
@@ -29,11 +31,9 @@ export {
   getControlIntentNotice,
   getControlSourceSnapshot,
   getControlUploadNotice,
-  resolveControlFileDrop,
   sendGalleryImageAsControl,
   subscribeControlSourceSnapshot,
   uploadControlImageFile,
-  type ControlFileDropResolution,
   type ControlSourceNotice,
   type ControlSourceOrigin,
   type ControlSourceSnapshot,
@@ -57,10 +57,15 @@ export type {
   SamSessionErrorCode,
   SamSessionSnapshot,
 } from './operationTypes';
+export { getCanvasEngine, isBlankCanvasDocument } from './engineRegistry';
 export { getCanvasOperations } from './operationAccess';
 export { IDLE_CONTROL_DETECTION_STATUS } from './controlDetectionStatusStore';
-export { getCanvasEngine, isBlankCanvasDocument } from './engineRegistry';
-export { resolveCanvasSaveBoardId, saveCanvasToGallery, type CanvasGallerySaveRegion } from './saveCanvasToGallery';
+export {
+  recordCanvasMetadata,
+  resolveCanvasSaveBoardId,
+  saveCanvasToGallery,
+  type CanvasGallerySaveRegion,
+} from './saveCanvasToGallery';
 export {
   retryStagedResultBoard,
   saveStagedResultToGallery,
@@ -92,3 +97,4 @@ export {
 } from './filterGraphs';
 export { readLastUsedFilterType, recordLastUsedFilterType } from './filterPreferences';
 export { buildSamGraph, documentToExportLocalSamInput, isSamDocumentInputValid, isSamInputValid } from './samGraph';
+export { isSamRunError } from './selectObjectSession';

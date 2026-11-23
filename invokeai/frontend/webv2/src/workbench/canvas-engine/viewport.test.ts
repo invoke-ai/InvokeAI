@@ -37,7 +37,6 @@ describe('createViewport', () => {
     const docUnderAnchorBefore = vp.screenToDocument(anchor);
     vp.zoomAtPoint(3, anchor);
     expect(vp.getZoom()).toBe(3);
-    // The document point under the anchor must project back to the same screen anchor.
     closeTo(vp.documentToScreen(docUnderAnchorBefore), anchor);
   });
 
@@ -53,7 +52,6 @@ describe('createViewport', () => {
     }
 
     expect(zooms[0]).toBe(1);
-    // Leaving 100%, zoom continues from where the wheel would have been: 87% after two notches.
     expect(zooms[1]).toBeCloseTo(0.87 * Math.exp(0.3), 9);
     expect(zooms[2]).toBeCloseTo(0.87 * Math.exp(0.45), 9);
     closeTo(vp.documentToScreen(docUnderAnchor), anchor);
@@ -61,11 +59,9 @@ describe('createViewport', () => {
 
   it('wheelZoom starts afresh after any other zoom change, even one to the same zoom', () => {
     const vp = createViewport({ pan: { x: 0, y: 0 }, zoom: 1 });
-    // Resting on 100% with the intended zoom at about 101.8%, just inside the tolerance.
     vp.wheelZoom(-12, { x: 0, y: 0 });
     expect(vp.getZoom()).toBe(1);
 
-    // Fit lands on exactly 100%. Had the remembered intended zoom survived it, this small step would leave 100%.
     vp.fitToView({ height: 100, width: 100, x: 0, y: 0 }, { height: 200, width: 200 }, 50);
     vp.wheelZoom(-2, { x: 0, y: 0 });
 
@@ -76,11 +72,9 @@ describe('createViewport', () => {
     const now = vi.spyOn(performance, 'now').mockReturnValue(1_000);
     try {
       const vp = createViewport({ pan: { x: 0, y: 0 }, zoom: 1 });
-      // Resting on 100% with the intended zoom at about 101.8%, just inside the tolerance.
       vp.wheelZoom(-12, { x: 0, y: 0 });
       expect(vp.getZoom()).toBe(1);
 
-      // A pause ends the gesture: this small step starts from 100% and stays on it, where it would otherwise leave.
       now.mockReturnValue(1_400);
       vp.wheelZoom(-2, { x: 0, y: 0 });
 
@@ -99,7 +93,6 @@ describe('createViewport', () => {
   });
 
   it('wheelZoom crosses a preset instead of parking on it', () => {
-    // A step from 0.99 must pass through 1x without preset snapping.
     const vp = createViewport({ pan: { x: 0, y: 0 }, zoom: 0.99 });
 
     vp.wheelZoom(-100, { x: 0, y: 0 });
@@ -126,7 +119,6 @@ describe('createViewport', () => {
 
     // avail = 400 - 2*50 = 300; zoom = min(300/200, 300/100) = 1.5
     expect(vp.getZoom()).toBeCloseTo(1.5, 6);
-    // Document center maps to viewport center.
     const docCenter: Vec2 = { x: 100, y: 50 };
     closeTo(vp.documentToScreen(docCenter), { x: 200, y: 200 });
   });
@@ -161,7 +153,6 @@ describe('createViewport', () => {
     expect(vp.getDpr()).toBe(2);
     expect(vp.getViewportSize()).toEqual({ height: 600, width: 800 });
     expect(listener).toHaveBeenCalledTimes(1);
-    // Identical call does not re-notify.
     vp.setViewportSize(800, 600, 3);
     expect(listener).toHaveBeenCalledTimes(1);
   });

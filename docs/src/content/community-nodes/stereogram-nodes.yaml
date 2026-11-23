@@ -1,0 +1,14 @@
+title: Stereogram Nodes
+author: simonfuhrmann
+repo: https://github.com/simonfuhrmann/invokeai-stereo
+summary: Create cross-view or parallel-view stereograms.
+description: >-
+  Stereograms are 2D images that reveal a 3D scene when viewed properly.
+categories: [video-3d]
+links:
+  - label: Viewing tutorials on r/CrossView
+    url: https://www.reddit.com/r/CrossView/
+thumbnail: ./stereogram-nodes.webp
+images:
+  - src: https://raw.githubusercontent.com/simonfuhrmann/invokeai-stereo/refs/heads/main/docs/example_promo_03.jpg
+    alt: An example stereogram workflow and its cross-view output

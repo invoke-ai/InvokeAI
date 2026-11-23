@@ -38,8 +38,8 @@ describe('useModifierHeld', () => {
     expect(read()).toBe('free');
   });
 
-  // A release the page never hears (another window took the keys, a listener ate it) is corrected by the next
-  // pointer event, which carries the live modifier state.
+  // A release the page never hears (another window took the keys, a listener ate it) is corrected by the next pointer
+  // event, which carries the live modifier state.
   it('resyncs from a pointer event when the release was missed', async () => {
     const read = await renderProbe();
 

@@ -47,7 +47,7 @@ describe(`layers panel budgets over ${NODE_COUNT} nodes`, () => {
     expect(Object.values(expanded).reduce((total, stack) => total + stack.rows.length, 0)).toBe(NODE_COUNT);
     expect(getDocumentModelDiagnostics().nodesCompiled).toBe(NODE_COUNT);
     const flat = flattenPanelRows(expanded, [], () => false);
-    expect(flat.filter((row) => row.kind === 'header')).toHaveLength(4);
+    expect(flat.filter((row) => row.kind === 'header')).toHaveLength(5);
     expect(flat.filter((row) => row.kind === 'node')).toHaveLength(NODE_COUNT);
   });
 
@@ -56,7 +56,6 @@ describe(`layers panel budgets over ${NODE_COUNT} nodes`, () => {
     const groups = groupIds(document);
     const expanded = new Set(groups);
     const before = buildLayerStackRows(document.stacks, expanded);
-    // Selection lives beside the document, so nothing here can change.
     const again = buildLayerStackRows(document.stacks, expanded);
     for (const stack of Object.keys(before) as (keyof typeof before)[]) {
       before[stack].rows.forEach((row, position) => expect(again[stack].rows[position]).toBe(row));

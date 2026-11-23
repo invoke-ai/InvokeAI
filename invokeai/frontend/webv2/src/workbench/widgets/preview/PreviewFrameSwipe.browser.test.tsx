@@ -21,8 +21,21 @@ void i18n.use(initReactI18next).init({
   fallbackLng: 'en',
   initAsync: false,
   lng: 'en',
-  resources: { en: { translation: { widgets: { preview: { dragVideo: 'Drag video' } } } } },
+  resources: {
+    en: {
+      translation: {
+        common: { videoPlayer: { playbackSpeedValue: 'Playback speed: {{rate}}', rate: '{{rate}}×' } },
+        widgets: { preview: { dragVideo: 'Drag video' } },
+      },
+    },
+  },
 });
+
+// Preview loads the player with its first video; loading it up front keeps a slow first transform out of these tests'
+// timing. PreviewFrameLazyPlayer covers the lazy path itself.
+await import('@platform/ui/video-player/VideoPlayer');
+
+const FIXTURE_VIDEO_URL = '/scripts/mock-assets/fixture-video.mp4';
 
 // The production hold, so a slow runner cannot arm a drag between a touch and its first quick move.
 const HOLD_DELAY_MS = 400;
@@ -45,7 +58,7 @@ const makeItem = (name: string, kind: 'image' | 'video' = 'image'): GalleryItem 
     width: 128,
   };
 
-  return kind === 'image' ? { ...base, kind } : { ...base, durationSeconds: 1, kind };
+  return kind === 'image' ? { ...base, kind } : { ...base, durationSeconds: 1, fullUrl: FIXTURE_VIDEO_URL, kind };
 };
 
 let host: HTMLDivElement | null = null;
@@ -88,7 +101,6 @@ const touch = (
   target.dispatchEvent(event);
 };
 
-/** Horizontal touch path: down at the first x, a move per later x, then up, each `stepMs` apart on the gesture clock. */
 const swipe = async (
   target: HTMLElement,
   xs: number[],
@@ -119,10 +131,6 @@ const DropMonitor = ({ onDrop }: { onDrop: (overId: string | number | null) => v
   return null;
 };
 
-/**
- * A three-item carousel whose navigation moves a real selection, so a committed swipe re-renders the frame with the
- * next source the way Preview does.
- */
 const renderCarousel = async ({
   items = [makeItem('red'), makeItem('green'), makeItem('blue')],
   navigateResult = true,
@@ -130,9 +138,7 @@ const renderCarousel = async ({
   start = 1,
 }: {
   items?: GalleryItem[];
-  /** `pending` never settles, like a page fetch that hangs. */
   navigateResult?: boolean | 'pending';
-  /** Overrides the next neighbor derived from `items`. */
   next?: PreviewNeighbor;
   start?: number;
 } = {}) => {
@@ -224,8 +230,17 @@ const renderCarousel = async ({
 
   const media = () => host!.querySelector<HTMLElement>('img[alt]:not([alt=""]), video')!;
 
+  await vi.waitFor(async () => {
+    await act(async () => {});
+    expect(media()).not.toBeNull();
+  });
+
   return {
-    content: () => media().parentElement!,
+    content: () => {
+      const element = media();
+
+      return (element.tagName === 'VIDEO' ? element.closest('[role="group"]')! : element).parentElement!;
+    },
     media,
     neighbors: () => [...host!.querySelectorAll<HTMLElement>('[data-swipe-neighbor]')],
     onDrop,
@@ -262,7 +277,6 @@ describe('PreviewFrame touch swipe', () => {
     await interact(() => touch('pointermove', document, 170, 140, base + 16));
     await interact(() => touch('pointermove', document, 130, 140, base + 32));
 
-    // Mid-gesture the image and its neighbors follow the finger.
     expect(offsetOf(carousel.content())).toBe(-70);
     expect(carousel.neighbors().map(offsetOf)).toEqual([-70, -70]);
 
@@ -271,16 +285,12 @@ describe('PreviewFrame touch swipe', () => {
     observer.disconnect();
 
     expect(carousel.onNavigate).toHaveBeenCalledExactlyOnceWith(1);
-    // The parked offset never reaches a painted frame of the new image: it and both neighbors are back at rest.
     expect(offsetsAtSwap.length).toBeGreaterThan(0);
     expect(offsetsAtSwap.every((offset) => ['', 'none'].includes(offset))).toBe(true);
-    // The new image is a new element: a reused one would keep painting the old picture until the new one loaded.
     expect(carousel.media()).not.toBe(image);
     expect(isAtRest(carousel.content())).toBe(true);
     expect(carousel.neighbors()).toHaveLength(2);
     expect(carousel.neighbors().every(isAtRest)).toBe(true);
-    // Once a neighbor's full image loads, its thumbnail underlay is gone, leaving exactly what the frame will show
-    // (blue is the last image, so only the previous panel has one).
     await vi.waitFor(() =>
       expect(carousel.neighbors().map((neighbor) => neighbor.querySelectorAll('img').length)).toEqual([1, 0])
     );
@@ -311,7 +321,6 @@ describe('PreviewFrame touch swipe', () => {
     await interact(() => touch('pointermove', document, 150, 140, base + 16));
     await interact(() => touch('pointermove', document, 50, 140, base + 32));
 
-    // 200px of finger travel with nothing to reveal moves the image well under a third of the stage.
     expect(offsetOf(carousel.content())).toBeLessThan(0);
     expect(offsetOf(carousel.content())).toBeGreaterThan(-STAGE_WIDTH * 0.3);
 
@@ -340,7 +349,6 @@ describe('PreviewFrame touch swipe', () => {
 
     expect(next.querySelector('.chakra-spinner')).not.toBeNull();
     await vi.waitFor(() => expect(offsetOf(carousel.content())).toBe(-STAGE_WIDTH));
-    // The park is bounded even while the fetch is still in flight.
     await vi.waitFor(() => expect(isAtRest(carousel.content())).toBe(true), { timeout: 3000 });
 
     expect(carousel.onNavigate).toHaveBeenCalledOnce();
@@ -351,13 +359,11 @@ describe('PreviewFrame touch swipe', () => {
     const carousel = await renderCarousel();
     const base = performance.now();
 
-    // Drag past the commit threshold, then flick back: the release cancels and the image starts home.
     await interact(() => touch('pointerdown', carousel.media(), 250, 140, base), 0);
     await interact(() => touch('pointermove', document, 40, 140, base + 150), 0);
     await interact(() => touch('pointermove', document, 80, 140, base + 166), 0);
     await interact(() => touch('pointerup', document, 80, 140, base + 182), 0);
 
-    // Catch it on the way and lift without moving.
     await interact(() => touch('pointerdown', carousel.media(), 150, 140, base + 200), 0);
     await interact(() => touch('pointerup', document, 150, 140, base + 260));
     await vi.waitFor(() => expect(isAtRest(carousel.content())).toBe(true));
@@ -368,13 +374,11 @@ describe('PreviewFrame touch swipe', () => {
   it('leaves a held touch to drag-and-drop, including one that catches a returning image', async () => {
     const carousel = await renderCarousel();
 
-    // Moving before the hold elapses is a swipe, never a drag.
     await swipe(carousel.media(), [200, 170, 140]);
     await vi.waitFor(() => expect(carousel.media().getAttribute('alt')).toBe('blue'));
 
     expect(carousel.onDrop).not.toHaveBeenCalled();
 
-    // A short drag starts the image home; a touch that catches it and holds arms the drag, which then wins.
     const image = carousel.media();
     const base = performance.now();
 
@@ -382,7 +386,6 @@ describe('PreviewFrame touch swipe', () => {
     await interact(() => touch('pointerdown', image, 150, 140, base + 1000), HOLD_DELAY_MS + 100);
     await interact(() => touch('pointermove', document, 250, 120, base + 2000));
     await interact(() => touch('pointermove', document, 480, 100, base + 2016));
-    // The armed drag sent the caught image home; the drag's own moves never move the track.
     await vi.waitFor(() => expect(isAtRest(carousel.content())).toBe(true));
     await interact(() => touch('pointermove', document, 482, 100, base + 2032));
 
@@ -464,25 +467,25 @@ describe('PreviewFrame touch swipe', () => {
     const y = video.getBoundingClientRect().top + 20;
     const base = performance.now();
 
-    // Nothing native is left to claim one-finger travel on the stage.
     expect(getComputedStyle(carousel.content().parentElement!).touchAction).toBe('none');
 
     await interact(() => touch('pointerdown', video, 200, y, base), 0);
     await interact(() => touch('pointermove', document, 170, y, base + 16), 0);
     await interact(() => touch('pointermove', document, 140, y, base + 32), 0);
-    // The cancel arrives well after the last move; the flick it interrupted still counts.
     await interact(() => touch('pointercancel', document, 140, y, base + 400), 0);
     await vi.waitFor(() => expect(carousel.media().getAttribute('alt')).toBe('blue'));
 
     expect(carousel.onNavigate).toHaveBeenCalledExactlyOnceWith(1);
   });
 
-  it('swipes a video from its picture but leaves the native control bar alone', async () => {
+  it("swipes a video from its picture but leaves the player's control bar alone", async () => {
     const carousel = await renderCarousel({ items: [makeItem('red'), makeItem('clip', 'video'), makeItem('blue')] });
     const video = carousel.media();
     const rect = video.getBoundingClientRect();
+    const bar = host!.querySelector<HTMLElement>('[data-video-player-controls]')!;
+    const barRect = bar.getBoundingClientRect();
 
-    await swipe(video, [200, 170, 140], { y: rect.bottom - 10 });
+    await swipe(bar, [200, 170, 140], { y: barRect.top + barRect.height / 2 });
     await interact(() => {}, 400);
 
     expect(carousel.onNavigate).not.toHaveBeenCalled();
@@ -491,5 +494,28 @@ describe('PreviewFrame touch swipe', () => {
     await vi.waitFor(() => expect(carousel.media().getAttribute('alt')).toBe('blue'));
 
     expect(carousel.onNavigate).toHaveBeenCalledExactlyOnceWith(1);
+  });
+
+  it("leaves a touch drag inside the player's portalled speed menu alone", async () => {
+    const clip = { ...makeItem('clip', 'video'), height: 180, width: 320 };
+    const carousel = await renderCarousel({ items: [makeItem('red'), clip, makeItem('blue')] });
+    const trigger = host!.querySelector<HTMLButtonElement>('[aria-label="Playback speed: 1×"]')!;
+
+    await vi.waitFor(() => expect(trigger.disabled).toBe(false), { timeout: 5000 });
+    await interact(() => trigger.click(), 200);
+    const option = [...document.querySelectorAll<HTMLElement>('[role="menuitemradio"]')].find(
+      (item) => item.textContent === '2×'
+    )!;
+    const optionRect = option.getBoundingClientRect();
+
+    expect(host!.contains(option)).toBe(false);
+
+    await swipe(option, [optionRect.left + 60, optionRect.left + 30, optionRect.left], {
+      y: optionRect.top + optionRect.height / 2,
+    });
+    await interact(() => {}, 400);
+
+    expect(carousel.onNavigate).not.toHaveBeenCalled();
+    expect(carousel.content().style.translate).toBe('');
   });
 });

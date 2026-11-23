@@ -8,6 +8,11 @@ import { WorkflowFieldInput } from '@features/workflow/ui/fields/WorkflowFieldIn
 import { useProjectGraphCommands } from '@features/workflow/ui/useProjectGraphCommands';
 import { useWorkflowProjectSelector } from '@features/workflow/ui/WorkflowUiContext';
 import {
+  areHiDiffusionRatiosAutomatic,
+  getHiDiffusionRatioOrderIssue,
+  getHiDiffusionRatioTemplate,
+  isHiDiffusionNode,
+  isHiDiffusionRatioField,
   applyNodeFieldFormSettings,
   cloneWorkflowFieldDefault,
   getEffectiveWorkflowFieldDescription,
@@ -69,20 +74,33 @@ export const NodeFieldControl = ({
   const projectId = useWorkflowProjectSelector((project) => project.id);
   const { effectiveTemplate, fieldName, formSettings, instance, invocationNode, nodeContext, nodeId, template } =
     useNodeFieldBinding(element, projectGraph);
-  // The form stays mounted across a workflow switch; a value that arrives later (an upload) must still land in
-  // the workflow this control rendered.
+  // The form stays mounted across a workflow switch; a value that arrives later (an upload) must still land in the
+  // workflow this control rendered.
   const target = useMemo(() => ({ projectId, workflowId: projectGraph.id }), [projectId, projectGraph.id]);
   // Seed focused label drafts from displayed text, including template fallback.
   const [draftLabel, setDraftLabel] = useState<string | null>(null);
 
-  const isConnected = getResolvedWorkflowEdges(projectGraph.nodes, projectGraph.edges).some(
-    (edge) => edge.target === nodeId && edge.targetHandle === fieldName
-  );
+  const resolvedEdges = getResolvedWorkflowEdges(projectGraph.nodes, projectGraph.edges);
+  const isConnected = resolvedEdges.some((edge) => edge.target === nodeId && edge.targetHandle === fieldName);
   const label = instance?.label || template?.title || '';
   const description = getEffectiveWorkflowFieldDescription(instance, template);
-  const invalidReason = effectiveTemplate
-    ? getWorkflowFieldInvalidReason({ isConnected, template: effectiveTemplate, value: instance?.value })
-    : null;
+  const connectedFields = new Set(
+    resolvedEdges.filter((edge) => edge.target === nodeId).map((edge) => edge.targetHandle)
+  );
+  const ratiosDisabled =
+    !!invocationNode &&
+    isHiDiffusionNode(invocationNode.data.type) &&
+    isHiDiffusionRatioField(fieldName) &&
+    areHiDiffusionRatiosAutomatic(invocationNode);
+  const ratioIssue =
+    invocationNode && isHiDiffusionRatioField(fieldName)
+      ? getHiDiffusionRatioOrderIssue(invocationNode, connectedFields)
+      : null;
+  const invalidReason =
+    ratioIssue ??
+    (effectiveTemplate
+      ? getWorkflowFieldInvalidReason({ isConnected, template: effectiveTemplate, value: instance?.value })
+      : null);
   const isInvalid = invalidReason !== null;
   const canReset =
     !!template &&
@@ -158,8 +176,9 @@ export const NodeFieldControl = ({
   return (
     <Field.Root invalid={isInvalid} minW="0" w="full">
       <Stack gap="1" minW="0" w="full">
+        {/* The label row is always as tall as the reset button, so the input below never moves when it appears. */}
         {isLabelEditable ? (
-          <HStack gap="1" minW="0" w="full">
+          <HStack gap="1" minH="6" minW="0" w="full">
             <Input
               aria-label={t('nodes.fieldLabel')}
               color={isInvalid ? 'fg.error' : 'fg.muted'}
@@ -178,7 +197,7 @@ export const NodeFieldControl = ({
             {resetButton}
           </HStack>
         ) : (
-          <HStack gap="1" minW="0" w="full">
+          <HStack gap="1" minH="6" minW="0" w="full">
             <Tooltip content={`${nodeContext} → ${template.title}`}>
               <Stack color={isInvalid ? 'fg.error' : undefined} flex="1" gap="0" minW="0">
                 <FieldLabel>{label}</FieldLabel>
@@ -187,11 +206,6 @@ export const NodeFieldControl = ({
             {resetButton}
           </HStack>
         )}
-        {element.data.showDescription && description ? (
-          <LinkifiedText color="fg.subtle" fontSize="xs" whiteSpace="pre-wrap">
-            {description}
-          </LinkifiedText>
-        ) : null}
         {isConnected ? (
           <Text color="fg.subtle" fontSize="xs">
             {t('nodes.providedByConnection')}
@@ -200,13 +214,18 @@ export const NodeFieldControl = ({
           <HStack alignItems="start" gap="1" minW="0" w="full">
             <Box flex="1" minW="0">
               <WorkflowFieldInput
+                disabled={ratiosDisabled}
                 formSettings={formSettings}
                 id={valueInputId}
                 invalid={isInvalid}
                 nodeId={nodeId}
                 seedMode={getWorkflowFieldSeedMode(instance)}
-                template={effectiveTemplate}
-                value={instance?.value}
+                template={getHiDiffusionRatioTemplate(invocationNode, effectiveTemplate, connectedFields)}
+                value={
+                  isHiDiffusionNode(invocationNode.data.type) && isHiDiffusionRatioField(fieldName)
+                    ? (instance?.value ?? 0)
+                    : instance?.value
+                }
                 workflowId={projectGraph.id}
                 onChange={onValueChange}
                 onSeedModeChange={onSeedModeChange}
@@ -227,6 +246,12 @@ export const NodeFieldControl = ({
             ) : null}
           </HStack>
         )}
+        {/* Below the control, as `Field` places helper text: side-by-side fields keep their inputs level. */}
+        {element.data.showDescription && description ? (
+          <LinkifiedText color="fg.subtle" fontSize="xs" whiteSpace="pre-wrap">
+            {description}
+          </LinkifiedText>
+        ) : null}
         {invalidReason ? <Field.ErrorText fontSize="xs">{invalidReason}</Field.ErrorText> : null}
       </Stack>
     </Field.Root>

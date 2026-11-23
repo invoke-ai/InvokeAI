@@ -20,7 +20,6 @@ import { hasNotificationUndo } from './undoRegistry';
 
 const workbench = vi.hoisted(() => ({ store: null as ReturnType<typeof createWorkbenchStore> | null }));
 
-// `useNotify` records into whichever workbench it finds; here, a real store without the provider's persistence.
 vi.mock('@workbench/WorkbenchContext', async (importOriginal) => ({
   ...(await importOriginal<typeof WorkbenchContextModule>()),
   useOptionalWorkbenchCommands: () => workbench.store?.commands ?? null,
@@ -28,7 +27,6 @@ vi.mock('@workbench/WorkbenchContext', async (importOriginal) => ({
 
 const { useNotify } = await import('@workbench/useNotify');
 
-// The app's own instance and catalog: the no-editor fallback reads `i18next.t` directly.
 await i18next.use(initReactI18next).init({
   initAsync: false,
   lng: 'en',
@@ -43,7 +41,6 @@ let stop: (() => void) | null = null;
 const probe: { notify: Notify | null } = { notify: null };
 const focusMoves: string[] = [];
 
-/** `useNotify` is stable for a given workbench, so publishing it once at mount is enough. */
 const NotifyProbe = () => {
   const notify = useNotify();
 
@@ -74,7 +71,6 @@ const start = (store: ReturnType<typeof createWorkbenchStore>) =>
     subscribe: store.subscribe,
   });
 
-/** Mounts the toaster and a `useNotify` caller, inside an editor unless `store` is null. */
 const render = async (store: ReturnType<typeof createWorkbenchStore> | null) => {
   workbench.store = store;
   stop = store ? start(store) : null;
@@ -150,7 +146,6 @@ describe('notification toasts in the editor', () => {
     expect(project.widgetInstances[project.widgetRegions.right.activeInstanceId]?.typeId).toBe('queue');
     expect(focusMoves).toEqual(['right:queue']);
     await expect.poll(() => isGone('No image selected')).toBe(true);
-    // The record keeps both descriptors as data, so the center could still offer them.
     expect(structuredClone(recordedNotifications()[0]?.actions)).toEqual([
       { kind: 'open-widget', widgetId: 'queue' },
       { kind: 'open-widget', widgetId: 'not-installed' },
@@ -188,7 +183,6 @@ describe('notification toasts in the editor', () => {
     const [recorded] = recordedNotifications();
     const undoAction = recorded?.actions?.[0];
 
-    // Plain data: cloning would throw on a function.
     expect(structuredClone(recorded)).toEqual(recorded);
     expect(undoAction?.kind).toBe('undo');
     expect(buttonLabels(toast)).toEqual(['Undo']);
@@ -249,7 +243,6 @@ describe('notification toasts in the editor', () => {
     const durationOf = (title: string) => toaster.getVisibleToasts().find((toast) => toast.title === title)?.duration;
 
     expect(durationOf('Invocation failed')).toBe(Number.POSITIVE_INFINITY);
-    // Left to the toaster's per-type default.
     expect(durationOf('Saved')).toBeUndefined();
   });
 

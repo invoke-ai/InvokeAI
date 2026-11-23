@@ -9,14 +9,14 @@ import {
   getDocumentLeaves,
   isAdjustmentRefusal,
 } from '@workbench/canvas-engine/api';
-import { useCanvasEngineRead } from '@workbench/widgets/canvas/engineStoreHooks';
+import { useCanvasEngineRead, usePsdExportStatus } from '@workbench/widgets/canvas/engineStoreHooks';
 import {
   describeAdjustmentRefusal,
   describeNamedRefusal,
   usePreparedCommit,
 } from '@workbench/widgets/canvas/useStructuralCommit';
 import { useActiveProjectName } from '@workbench/WorkbenchContext';
-import { EyeIcon, EyeOffIcon, FileDownIcon, LayersIcon, PlusIcon } from 'lucide-react';
+import { EyeIcon, EyeOffIcon, FileDownIcon, LayersIcon, PlusIcon, XIcon } from 'lucide-react';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -40,6 +40,7 @@ export interface LayerStackAction {
   readonly label: string;
   readonly icon: LucideIcon;
   readonly disabled: boolean;
+  readonly status?: string;
   run(): void;
 }
 
@@ -74,16 +75,26 @@ export const useLayerStackActions = (
       canMergeVisibleRasters(engine.document.model()?.compileLeaves() ?? [], engine.exports.hasExportableLayerContent)
   );
   const canExport = !!engine && exportable;
+  const exportStatus = usePsdExportStatus(engine);
+  const exporting = exportStatus !== 'idle';
 
   return useMemo(() => {
     const actions: Record<StackActionId, LayerStackAction> = {
+      cancelExportPsd: {
+        disabled: exportStatus === 'downloading' || exportStatus === 'cancelling',
+        icon: XIcon,
+        id: 'cancelExportPsd',
+        label: t('widgets.layers.groupActions.cancelExportPsd'),
+        run: () => engine?.exports.cancelPsdExport(),
+      },
       exportPsd: {
-        disabled: editingLocked || !canExport,
+        disabled: editingLocked || !canExport || exporting,
         icon: FileDownIcon,
         id: 'exportPsd',
         label: t('widgets.layers.groupActions.exportPsd'),
+        status: exporting ? t(`widgets.layers.groupActions.psdExportStatus.${exportStatus}`) : undefined,
         run: () => {
-          if (!engine) {
+          if (!engine || exporting) {
             return;
           }
           void engine.exports
@@ -102,7 +113,9 @@ export const useLayerStackActions = (
                 toaster.create({ title: t(notice.key, notice.options), type: 'warning' });
               }
             })
-            .catch(() => toaster.create({ title: t('widgets.layers.groupActions.exportFailed'), type: 'error' }));
+            .catch(() => {
+              toaster.create({ title: t('widgets.layers.groupActions.exportFailed'), type: 'error' });
+            });
         },
       },
       mergeVisible: {
@@ -175,7 +188,9 @@ export const useLayerStackActions = (
         },
       },
     };
-    return getStackActions(stack).map((id) => actions[id]);
+    return getStackActions(stack).flatMap((id) =>
+      id === 'exportPsd' && exporting ? [actions[id], actions.cancelExportPsd] : [actions[id]]
+    );
   }, [
     addLayer,
     allVisible,
@@ -185,6 +200,8 @@ export const useLayerStackActions = (
     commitPrepared,
     editingLocked,
     engine,
+    exporting,
+    exportStatus,
     nodes,
     projectName,
     stack,

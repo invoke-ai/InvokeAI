@@ -12,14 +12,14 @@ import { AuthFormAlert, AuthScreen } from './AuthScreen';
 import { PasswordInput } from './PasswordInput';
 
 /**
- * Where an expired session was, as the router's `returnTo` search value: an in-app path, never another origin and
- * never the auth screens themselves.
+ * Where an expired session was, as the router's `returnTo` search value: an in-app path, never another origin and never
+ * the auth screens themselves.
  */
 export const readLoginReturnPath = (value: unknown): string | undefined =>
   typeof value === 'string' &&
   value.startsWith('/') &&
-  // `//host`, `/\host` and a slash followed by whitespace or a control character all read as another origin to some
-  // URL parsers; refuse them whatever history the router uses.
+  // `//host`, `/\host` and a slash followed by whitespace or a control character all read as another origin to some URL
+  // parsers; refuse them whatever history the router uses.
   !/^\/[\\/\s\p{Cc}]/u.test(value) &&
   !value.startsWith('/login') &&
   !value.startsWith('/setup')
@@ -27,8 +27,8 @@ export const readLoginReturnPath = (value: unknown): string | undefined =>
     : undefined;
 
 /**
- * Sign-in screen, shown only when the backend runs in multi-user mode. After an expired session, signing back in as
- * the same account returns to where it was; any other account starts at Home.
+ * Sign-in screen, shown only when the backend runs in multi-user mode. After an expired session, signing back in as the
+ * same account returns to where it was; any other account starts at Home.
  */
 export const LoginScreen = () => {
   const { t } = useTranslation();
@@ -44,8 +44,8 @@ export const LoginScreen = () => {
         try {
           await loginWithCredentials(values.email, values.password, values.rememberMe);
         } catch (error) {
-          // A newer identity transition supersedes this submit; stale completion must neither navigate nor report
-          // an error.
+          // A newer identity transition supersedes this submit; stale completion must neither navigate nor report an
+          // error.
           if (isLoginAttemptSupersededError(error)) {
             return;
           }

@@ -1,7 +1,8 @@
+import cv2
 import numpy as np
 import pytest
 
-from invokeai.backend.tiles.utils import TBLR, paste
+from invokeai.backend.tiles.utils import TBLR, paste, seam_blend
 
 
 def test_paste_no_mask_success():
@@ -99,3 +100,57 @@ def test_paste_mask_does_not_match_src_image():
 
     with pytest.raises(ValueError):
         paste(dst_image=dst_image, src_image=src_image, box=box, mask=mask)
+
+
+@pytest.mark.parametrize("x_seam", [True, False])
+def test_seam_blend_places_seam_in_low_energy_region(x_seam: bool):
+    """Test that the seam follows the region where the two images agree, rather than a column offset from it."""
+    blend_amount = 8
+    rng = np.random.default_rng(0)
+    ia1 = np.zeros((8, 64, 3))
+    # ia2 is noise everywhere except for a band where it matches ia1, so the lowest-energy seam lies in that band.
+    ia2 = rng.uniform(0, 255, (8, 64, 1)).repeat(3, axis=2)
+    ia2[:, 36:52] = 0.0
+    if x_seam:
+        ia1 = ia1.transpose(1, 0, 2)
+        ia2 = ia2.transpose(1, 0, 2)
+
+    blended = seam_blend(ia1, ia2, blend_amount, x_seam=x_seam)
+
+    if x_seam:
+        blended = blended.transpose(1, 0, 2)
+        ia1 = ia1.transpose(1, 0, 2)
+        ia2 = ia2.transpose(1, 0, 2)
+
+    # Outside the band (plus half the blur on either side), each image must be passed through untouched.
+    half_blend = blend_amount // 2
+    np.testing.assert_array_equal(blended[:, : 36 - half_blend], ia1[:, : 36 - half_blend])
+    np.testing.assert_array_equal(blended[:, 52 + half_blend :], ia2[:, 52 + half_blend :])
+
+
+@pytest.mark.parametrize("x_seam", [True, False])
+def test_seam_blend_can_start_seam_at_last_column_before_gutter(x_seam: bool):
+    """Test that the last column outside the gutter is searched when it holds the unique lowest-energy seam."""
+    blend_amount = 8
+    last_column = 64 - blend_amount // 2 - 1
+    rng = np.random.default_rng(0)
+    ia1 = np.zeros((8, 64, 3))
+    # The images match only around the last column, so it is the only column with zero energy.
+    ia2 = rng.uniform(0, 255, (8, 64, 1)).repeat(3, axis=2)
+    ia2[:, last_column - 1 : last_column + 2] = 0.0
+
+    expected_mask = np.zeros((8, 64))
+    expected_mask[:, :last_column] = 1.0
+    expected_mask = cv2.blur(expected_mask, (blend_amount, blend_amount))[..., np.newaxis]
+    expected = ia1 * expected_mask + ia2 * (1.0 - expected_mask)
+
+    if x_seam:
+        ia1 = ia1.transpose(1, 0, 2)
+        ia2 = ia2.transpose(1, 0, 2)
+
+    blended = seam_blend(ia1, ia2, blend_amount, x_seam=x_seam)
+
+    if x_seam:
+        blended = blended.transpose(1, 0, 2)
+
+    np.testing.assert_allclose(blended, expected)

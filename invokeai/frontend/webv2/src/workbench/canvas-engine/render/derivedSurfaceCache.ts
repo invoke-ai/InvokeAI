@@ -86,9 +86,8 @@ export const createDerivedSurfaceCache = (
 
     diagnostics?.increment('derivedCacheMisses');
     const canReuse = existing?.source === request.source;
-    // Only a reusable surface built with the SAME parameters can be refreshed in
-    // part; different parameters mean every pixel is wrong, not just the changed
-    // ones.
+    // Only a reusable surface built with the SAME parameters can be refreshed in part; different parameters mean every
+    // pixel is wrong, not just the changed ones.
     const reusableFromVersion = canReuse && existing.paramsKey === request.paramsKey ? existing.sourceVersion : null;
     const surface = request.create(canReuse ? existing.surface : null, reusableFromVersion);
     const bytes = surfaceBytes(surface);

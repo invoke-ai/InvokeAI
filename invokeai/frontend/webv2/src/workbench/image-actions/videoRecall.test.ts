@@ -1,28 +1,26 @@
 import type { GenerationModelCatalogItem, MainModelConfig } from '@features/generation/contracts';
-import type { TFunction } from 'i18next';
 
 import {
   compileVideoGraph,
   createDefaultVideoWidgetValues,
+  getAcceleratorToggleResult,
   getDefaultVideoSettings,
-  type VideoSettings,
+  getVideoDimensions,
+  syncVideoWidgetValuesWithModels,
+  type VideoWidgetValues,
 } from '@features/video';
-import { getVideoPromptPolicy } from '@features/video/core/videoPolicies';
-import i18n from 'i18next';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
+import { recordOf } from './recallContract.testing';
 import {
   buildVideoRecallSettings,
   deriveAcceleratorRecallState,
-  EMPTY_VIDEO_RECALL_CAPABILITIES,
   getVideoRecallCapabilities,
-  getVideoRecallMessage,
-  getVideoSizeRecall,
+  getVideoSizeRecalls,
   parseVideoRecallRecord,
+  resolveVideoSizeRecall,
+  settleMediaSizedRecall,
 } from './videoRecall';
-
-const isVideoGenerationMetadata = (metadata: unknown): boolean =>
-  parseVideoRecallRecord(metadata)?.isVideoGeneration ?? false;
 
 const wanModel = (variant: string, format = 'diffusers', key = `wan-${variant}-${format}`): MainModelConfig => ({
   base: 'wan',
@@ -70,70 +68,25 @@ const wanMetadata = (extra: Record<string, unknown> = {}): Record<string, unknow
   ...extra,
 });
 
-describe('parseVideoRecallRecord', () => {
-  it('marks only the video generation modes as video generation', () => {
-    expect(isVideoGenerationMetadata(wanMetadata())).toBe(true);
-    expect(isVideoGenerationMetadata({ generation_mode: 'minimax_h3_flf2v' })).toBe(true);
-    // Image metadata — including Wan still-image modes — is not video metadata.
-    expect(isVideoGenerationMetadata({ generation_mode: 'wan_txt2img' })).toBe(false);
-    expect(isVideoGenerationMetadata({ generation_mode: 'sdxl_txt2img' })).toBe(false);
-    expect(isVideoGenerationMetadata({})).toBe(false);
-    expect(isVideoGenerationMetadata(null)).toBe(false);
-  });
-});
-
 describe('getVideoRecallCapabilities', () => {
-  it('is empty for non-video metadata', () => {
-    expect(getVideoRecallCapabilities({ generation_mode: 'sdxl_txt2img', seed: 5 })).toEqual(
-      EMPTY_VIDEO_RECALL_CAPABILITIES
-    );
-  });
-
   it('derives per-verb availability from what the metadata contains', () => {
-    expect(getVideoRecallCapabilities(wanMetadata())).toEqual({ all: true, prompts: true, remix: true, seed: true });
+    expect(getVideoRecallCapabilities(wanMetadata())).toEqual({
+      all: true,
+      prompts: true,
+      remix: true,
+      seed: true,
+      size: true,
+    });
     expect(getVideoRecallCapabilities({ generation_mode: 'wan_t2v', seed: 7 })).toEqual({
       all: true,
       prompts: false,
       remix: false,
       seed: true,
+      size: false,
     });
-  });
-
-  // Each record names one thing recall writes; the verbs it offers must be the ones that do something.
-  it.each([
-    ['fps', WAN_T2V, { fps: 16, generation_mode: 'wan_t2v' }, ['fps']],
-    ['size', WAN_T2V, { generation_mode: 'wan_t2v', height: 720, width: 1280 }, ['size']],
-    ['a switched-off negative prompt', WAN_T2V, { generation_mode: 'wan_t2v', negative_prompt: null }, ['prompts']],
-    [
-      'references',
-      h3Model(),
-      { generation_mode: 'minimax_h3_ref2v', minimax_h3_references: [{ image_name: 'ref.png', kind: 'image' }] },
-      ['media'],
-    ],
-    [
-      'a conditioning clip',
-      ltx2Model('ltx2_dev'),
-      {
-        generation_mode: 'ltx2_a2v',
-        ltx2_conditioning_role: 'audio',
-        ltx2_conditioning_video: { video_name: 'song.mp4' },
-      },
-      ['media'],
-    ],
-  ])('offers what recall applies for a record naming only %s', (_, model, metadata, fields) => {
-    const capabilities = getVideoRecallCapabilities(metadata);
-    const recall = (kind: 'prompts' | 'remix') =>
-      buildVideoRecallSettings({
-        currentValues: createDefaultVideoWidgetValues([model]),
-        kind,
-        metadata,
-        models: [model],
-      });
-
-    expect(capabilities.remix).toBe(true);
-    expect(capabilities.all).toBe(true);
-    expect(recall('remix')?.fields).toEqual(fields);
-    expect(capabilities.prompts).toBe(recall('prompts') !== null);
+    // A dimension alone, or a non-positive one, is no size to recall.
+    expect(getVideoRecallCapabilities({ generation_mode: 'wan_t2v', width: 1280 }).size).toBe(false);
+    expect(getVideoRecallCapabilities({ generation_mode: 'wan_t2v', height: 720, width: 0 }).size).toBe(false);
   });
 });
 
@@ -152,48 +105,14 @@ describe('parseVideoRecallRecord media', () => {
       sourceVideoName: 'clip.mp4',
     });
   });
-
-  it('keeps user keyframes when no source video was recorded', () => {
-    expect(
-      parseVideoRecallRecord({ first_frame_image: { image_name: 'first.png' }, generation_mode: 'wan_i2v' })?.media
-    ).toEqual({ firstFrameName: 'first.png', lastFrameName: null, sourceVideoName: null });
-  });
 });
 
-describe('getVideoRecallMessage', () => {
-  const englishCatalog = Object.values(
-    import.meta.glob('../../../public/locales/en.json', { eager: true, import: 'default' })
-  )[0] as Record<string, unknown>;
-  const instance = i18n.createInstance();
-  const t = ((key: string, values?: Record<string, unknown>) => instance.t(key, values)) as TFunction;
-
-  beforeAll(async () => {
-    await instance.init({
-      initAsync: false,
-      interpolation: { escapeValue: false },
-      lng: 'en',
-      resources: { en: { translation: englishCatalog } },
-    });
-  });
-
-  it('names the applied fields as one locale-joined list', () => {
-    expect(getVideoRecallMessage(['model', 'cfg', 'media'], t)).toBe('Applied model, CFG, and conditioning media.');
-    expect(getVideoRecallMessage(['seed'], t)).toBe('Applied seed.');
-  });
-});
-
-describe('getVideoSizeRecall', () => {
+describe('getVideoSizeRecalls', () => {
   it('inverts a preset-derived canvas exactly', () => {
-    expect(getVideoSizeRecall(WAN_T2V, 1280, 720)).toEqual({ aspectRatioId: '16:9', targetResolution: '720p' });
-    expect(getVideoSizeRecall(h3Model(), 1344, 768)).toEqual({
-      aspectRatioId: '16:9',
-      targetResolution: '768 highres',
-    });
-  });
-
-  it('rejects sizes that came from conditioning media rather than a preset', () => {
-    // 1920x1080-shaped media at some odd snap no preset reproduces.
-    expect(getVideoSizeRecall(WAN_T2V, 848, 464)).toBeNull();
+    expect(getVideoSizeRecalls(WAN_T2V, 1280, 720)).toEqual([{ aspectRatioId: '16:9', targetResolution: '720p' }]);
+    expect(getVideoSizeRecalls(h3Model(), 1344, 768)).toEqual([
+      { aspectRatioId: '16:9', targetResolution: '768 highres' },
+    ]);
   });
 });
 
@@ -210,79 +129,143 @@ describe('deriveAcceleratorRecallState', () => {
       acceleratorLoraKeys: [LIGHTNING_HIGH.key, LIGHTNING_LOW.key],
     });
   });
-
-  it('reads the step count off the recalled LoRAs, not off what the panel is running', () => {
-    // A panel already running an 8-step Turbo LoRA must not shift the step
-    // count a 6-step one is checked against.
-    const turbo = { base: 'minimax-h3', key: 'turbo', name: 'MiniMax H3 Turbo LoRA', type: 'lora' as const };
-    const lightx2v = {
-      base: 'minimax-h3',
-      key: 'lightx2v',
-      name: 'MiniMax H3 LightX2V Turbo LoRA',
-      type: 'lora' as const,
-    };
-    const model = h3Model();
-    const running = {
-      ...createDefaultVideoWidgetValues([model, lightx2v as never]),
-      acceleratorEnabled: true,
-      acceleratorLoraKeys: [lightx2v.key],
-      loras: [{ isEnabled: true, model: lightx2v as never, weight: 1 }],
-      steps: 8,
-    };
-    const recalled = [{ isEnabled: true, model: turbo as never, weight: 1 }];
-
-    expect(deriveAcceleratorRecallState(model, recalled, 6, running)).toEqual({
-      acceleratorEnabled: true,
-      acceleratorLoraKeys: [turbo.key],
-    });
-  });
-
-  it('stays off at non-accelerator steps or with a partial pair', () => {
-    expect(deriveAcceleratorRecallState(WAN_T2V, pairEntries, 40, settings)).toEqual({
-      acceleratorEnabled: false,
-      acceleratorLoraKeys: [],
-    });
-    expect(deriveAcceleratorRecallState(WAN_T2V, [pairEntries[0]!], 4, settings)).toEqual({
-      acceleratorEnabled: false,
-      acceleratorLoraKeys: [],
-    });
-  });
 });
 
 describe('buildVideoRecallSettings', () => {
   const catalog = [WAN_T2V, WAN_I2V, h3Model(), LIGHTNING_HIGH, LIGHTNING_LOW];
   const currentValues = { ...createDefaultVideoWidgetValues([h3Model()]) };
 
-  it('recalls prompts into the video widget values, leaving everything else alone', () => {
-    const result = buildVideoRecallSettings({
-      currentValues,
-      kind: 'prompts',
-      metadata: wanMetadata(),
-      models: catalog,
-    });
+  it('recalls only the size for the size verb, fitted to the panel model', () => {
+    const wanValues = createDefaultVideoWidgetValues([WAN_T2V]);
+    const metadata = wanMetadata({ height: 1280, model: { key: h3Model().key }, width: 720 });
+    const result = buildVideoRecallSettings({ currentValues: wanValues, kind: 'size', metadata, models: catalog });
 
-    expect(result?.fields).toEqual(['prompts']);
-    expect(result?.values).toEqual({
-      ...currentValues,
-      negativePrompt: 'blurry',
-      negativePromptEnabled: true,
-      positivePrompt: 'a red fox running',
+    expect(result?.fields).toEqual(['size']);
+    // The recorded model, prompts and seed stay out; only the preset pair changes.
+    expect(result?.values).toEqual({ ...wanValues, aspectRatioId: '9:16', targetResolution: '720p' });
+  });
+
+  describe('a size recall with media in the panel', () => {
+    const image = (width: number, height: number) => ({ height, image_name: 'held.png', width });
+    const recallSize = (values: VideoWidgetValues, width: number, height: number) =>
+      buildVideoRecallSettings({
+        currentValues: values,
+        kind: 'size',
+        metadata: wanMetadata({ height, width }),
+        models: catalog,
+      });
+    const wanValues = createDefaultVideoWidgetValues([WAN_T2V]);
+
+    it('writes nothing when the media would keep the frame from reaching the recorded size', () => {
+      const values = { ...wanValues, firstFrameImage: image(1280, 720) };
+
+      expect(recallSize(values, 720, 1280)).toBeNull();
+      expect(resolveVideoSizeRecall(values, 720, 1280)).toMatchObject({
+        effective: { height: 720, width: 1280 },
+        outcome: 'media-conflict',
+      });
     });
   });
 
-  it('recalls only the seed for the seed verb', () => {
-    const result = buildVideoRecallSettings({ currentValues, kind: 'seed', metadata: wanMetadata(), models: catalog });
+  describe('a size recall that would change whether the panel can run', () => {
+    const ltx2 = ltx2Model('ltx2_dev');
+    const ltx2Values = createDefaultVideoWidgetValues([ltx2]);
+    const audioClip = {
+      clip: { duration: 4, fps: 24, height: 1024, video_name: 'song.mp4', width: 1792 },
+      role: 'audio',
+    };
+    const metadata = wanMetadata({ height: 1024, width: 1792 });
+    const recall = (values: VideoWidgetValues) =>
+      buildVideoRecallSettings({ currentValues: values, kind: 'size', metadata, models: [ltx2] });
 
-    expect(result?.fields).toEqual(['seed']);
-    expect(result?.values).toMatchObject({ seed: 1234, seedMode: 'fixed' });
+    it('writes nothing when a two-stage preset would be refused alongside the conditioning clip', () => {
+      const values = {
+        ...ltx2Values,
+        conditioningClip: audioClip,
+        targetResolution: '720p',
+      } as unknown as VideoWidgetValues;
+
+      expect(recall(values)).toBeNull();
+      expect(resolveVideoSizeRecall(values, 1792, 1024)).toEqual({
+        outcome: 'invalid',
+        reason: expect.stringContaining('does not run a two-stage target resolution'),
+      });
+    });
   });
 
-  it('remix recalls everything except the seed', () => {
-    const result = buildVideoRecallSettings({ currentValues, kind: 'remix', metadata: wanMetadata(), models: catalog });
+  describe('a canvas the recorded media sized, settled against them once hydrated', () => {
+    const recallFirstFrame = (
+      currentValues: VideoWidgetValues,
+      record: Record<string, unknown>,
+      hydratedFrame: VideoWidgetValues['firstFrameImage']
+    ) => {
+      const result = buildVideoRecallSettings({ currentValues, kind: 'all', metadata: record, models: catalog })!;
 
-    expect(result?.fields).not.toContain('seed');
-    expect(result?.values.seedMode).toBe(currentValues.seedMode);
-    expect(result?.fields).toEqual(expect.arrayContaining(['model', 'frames', 'steps', 'cfg', 'size']));
+      // The pure recall restores no resolution for it: the recorded canvas lost the media's exact ratio to snapping.
+      expect(result.fields).not.toContain('size');
+
+      return settleMediaSizedRecall({ ...result, values: { ...result.values, firstFrameImage: hydratedFrame } });
+    };
+    const h3Values = { ...createDefaultVideoWidgetValues([h3Model()]), targetResolution: '768 lowres' as const };
+    // 1800x1000 at 768 highres: 1382.4x768 is over the area cap, scaled by 0.986 to 1363.1x757.3, snapped to 1376x768.
+    // Fed back, 1376x768 would give 1344x768; at 768 lowres the frame gives 768x416.
+    const h3Record = {
+      first_frame_image: { image_name: 'first.png' },
+      generation_mode: 'minimax_h3_i2v',
+      height: 768,
+      model: { key: h3Model().key },
+      width: 1376,
+    };
+    const wanValues = createDefaultVideoWidgetValues([WAN_I2V]);
+    // 1000x700 at 1080p: 1542.9x1080, snapped to 1536x1088. Fed back, 1536x1088 would give 1520x1088; 720p and 480p
+    // give the frame 1024x720 and 688x480.
+    const wanRecord = wanMetadata({
+      first_frame_image: { image_name: 'first.png' },
+      generation_mode: 'wan_i2v',
+      height: 1088,
+      model: { key: WAN_I2V.key },
+      width: 1536,
+    });
+    const frame = (width: number, height: number) => ({ height, image_name: 'first.png', width });
+
+    it.each([
+      ['an area-capped H3 canvas', h3Values, h3Record, frame(1800, 1000), '768 highres'],
+      ['a Wan 1080p canvas snapped off its short side', wanValues, wanRecord, frame(1000, 700), '1080p'],
+    ] as const)(
+      'restores the target resolution of %s from the hydrated media, leaving the aspect ratio to them',
+      (_, currentValues, record, hydratedFrame, targetResolution) => {
+        const settled = recallFirstFrame(currentValues, record, hydratedFrame);
+
+        expect(settled.values).toMatchObject({ aspectRatioId: currentValues.aspectRatioId, targetResolution });
+        expect(settled.fields).toContain('size');
+      }
+    );
+  });
+
+  describe('a size more than one preset reproduces', () => {
+    const h3 = h3Model();
+    const h3Values = createDefaultVideoWidgetValues([h3]);
+    const withFrame = (width: number, height: number): VideoWidgetValues => ({
+      ...h3Values,
+      firstFrameImage: { height, image_name: 'held.png', width },
+    });
+
+    it('takes the preset that fits the held frame, not just the first match', () => {
+      const values = withFrame(1003, 1024);
+      const lowres = { aspectRatioId: '1:1', targetResolution: '768 lowres' };
+
+      expect(resolveVideoSizeRecall(values, 768, 768)).toEqual({ outcome: 'fits', sizeRecall: lowres });
+
+      const result = buildVideoRecallSettings({
+        currentValues: values,
+        kind: 'size',
+        metadata: wanMetadata({ height: 768, width: 768 }),
+        models: [h3],
+      });
+
+      expect(result?.values).toEqual({ ...values, ...lowres });
+      expect(getVideoDimensions(h3, result!.values)).toMatchObject({ height: 768, width: 768 });
+    });
   });
 
   it('resolves the model by key and snaps cross-family constraints before applying values', () => {
@@ -328,75 +311,9 @@ describe('buildVideoRecallSettings', () => {
     expect(result?.values).toMatchObject({ acceleratorEnabled: true });
   });
 
-  it('clears existing LoRAs when the video ran without any', () => {
-    const withLora = {
-      ...currentValues,
-      loras: [{ isEnabled: true, model: LIGHTNING_HIGH as never, weight: 1 }],
-    };
-    const result = buildVideoRecallSettings({
-      currentValues: withLora,
-      kind: 'all',
-      metadata: wanMetadata(),
-      models: catalog,
-    });
-
-    expect(result?.fields).toContain('loras');
-    expect(result?.values.loras).toEqual([]);
-    expect(result?.values.acceleratorEnabled).toBe(false);
-  });
-
-  it('reports recallable media names but leaves hydration to the executor', () => {
-    const metadata = wanMetadata({
-      first_frame_image: { image_name: 'first.png' },
-      generation_mode: 'wan_i2v',
-      model: { key: WAN_I2V.key },
-    });
-    const result = buildVideoRecallSettings({ currentValues, kind: 'all', metadata, models: catalog });
-
-    expect(result?.fields).toContain('media');
-    expect(result?.mediaNames).toEqual({
-      conditioningClip: null,
-      firstFrameName: 'first.png',
-      lastFrameName: null,
-      references: [],
-      sourceVideoName: null,
-      sourceVideoTrim: null,
-    });
-    expect(result?.values.firstFrameImage).toBeNull();
-  });
-
-  it('recalls the recorded Wan fps and carries the source-clip trim bounds for the executor', () => {
-    const withFps = buildVideoRecallSettings({
-      currentValues,
-      kind: 'all',
-      metadata: wanMetadata({ fps: 24 }),
-      models: catalog,
-    });
-
-    expect(withFps?.fields).toContain('fps');
-    expect(withFps?.values.fps).toBe(24);
-
-    const extend = buildVideoRecallSettings({
-      currentValues,
-      kind: 'all',
-      metadata: wanMetadata({
-        generation_mode: 'wan_extend_video',
-        model: { key: WAN_I2V.key },
-        source_video: { video_name: 'clip.mp4' },
-        source_video_end_frame: 50,
-        source_video_start_frame: 10,
-      }),
-      models: catalog,
-    });
-
-    expect(extend?.mediaNames.sourceVideoName).toBe('clip.mp4');
-    expect(extend?.mediaNames.sourceVideoTrim).toEqual({ endFrame: 50, startFrame: 10 });
-  });
-
   it('restores reuse-primary semantics when the low-noise CFG key is absent', () => {
     const withLow = { ...createDefaultVideoWidgetValues([WAN_T2V]), cfgScaleLowNoise: 2 };
-    // wan_t2v metadata without guidance_scale_low_noise: the run reused the
-    // primary CFG, so the recalled state must too.
+    // wan_t2v metadata without guidance_scale_low_noise: the run reused the primary CFG, so the recall must too.
     const result = buildVideoRecallSettings({
       currentValues: withLow,
       kind: 'all',
@@ -424,70 +341,6 @@ describe('buildVideoRecallSettings', () => {
     });
 
     expect(belowFloor?.values.cfgScaleLowNoise).toBeNull();
-  });
-
-  it('clears held conditioning media when the recorded run had none — mode is part of the recall', () => {
-    const withFrame = {
-      ...createDefaultVideoWidgetValues([WAN_I2V]),
-      firstFrameImage: { height: 720, image_name: 'held.png', width: 1280 },
-    };
-    const result = buildVideoRecallSettings({
-      currentValues: withFrame,
-      kind: 'all',
-      metadata: wanMetadata(),
-      models: catalog,
-    });
-
-    expect(result?.fields).toContain('media');
-    expect(result?.values.firstFrameImage).toBeNull();
-    expect(result?.values.sourceVideo).toBeNull();
-  });
-
-  it('does not flip the negative toggle on for an empty recorded negative', () => {
-    const empty = buildVideoRecallSettings({
-      currentValues,
-      kind: 'prompts',
-      metadata: wanMetadata({ negative_prompt: '' }),
-      models: catalog,
-    });
-
-    expect(empty?.values).toEqual({ ...currentValues, positivePrompt: 'a red fox running' });
-
-    const explicitNull = buildVideoRecallSettings({
-      currentValues,
-      kind: 'prompts',
-      metadata: wanMetadata({ negative_prompt: null }),
-      models: catalog,
-    });
-
-    expect(explicitNull?.values).toMatchObject({ negativePrompt: '', negativePromptEnabled: false });
-  });
-
-  it('clears current LoRAs when the recorded ones are no longer installed', () => {
-    const withLora = {
-      ...currentValues,
-      loras: [{ isEnabled: true, model: LIGHTNING_HIGH as never, weight: 1 }],
-    };
-    const result = buildVideoRecallSettings({
-      currentValues: withLora,
-      kind: 'all',
-      metadata: wanMetadata({ loras: [{ model: { key: 'uninstalled' }, weight: 1 }] }),
-      models: [WAN_T2V, LIGHTNING_HIGH],
-    });
-
-    expect(result?.values.loras).toEqual([]);
-    expect(result?.fields).toContain('loras');
-  });
-
-  it('returns null for non-video metadata', () => {
-    expect(
-      buildVideoRecallSettings({
-        currentValues,
-        kind: 'all',
-        metadata: { generation_mode: 'sdxl_txt2img', seed: 3 },
-        models: catalog,
-      })
-    ).toBeNull();
   });
 });
 
@@ -530,88 +383,6 @@ describe('buildVideoRecallSettings — partial records from the external recall 
     expect(result?.fields).toEqual(['prompts', 'steps']);
     expect(result?.values).toEqual({ ...holding, positivePrompt: 'a heron', steps: 30 });
   });
-
-  it('replaces the LoRA set only when the request names one, an empty list included', () => {
-    const cleared = buildVideoRecallSettings({
-      currentValues: holding,
-      kind: 'all',
-      metadata: { loras: [] },
-      models: catalog,
-      partial: true,
-      requireGenerationMode: false,
-    });
-
-    expect(cleared?.fields).toEqual(['loras']);
-    expect(cleared?.values.loras).toEqual([]);
-  });
-
-  it('names a media slot without clearing the others; hydration displaces only its rivals', () => {
-    const result = buildVideoRecallSettings({
-      currentValues: holding,
-      kind: 'all',
-      metadata: { last_frame_image: { image_name: 'last.png' } },
-      models: catalog,
-      partial: true,
-      requireGenerationMode: false,
-    });
-
-    expect(result?.mediaNames).toMatchObject({ firstFrameName: null, lastFrameName: 'last.png' });
-    expect(result?.values.firstFrameImage).toEqual(holding.firstFrameImage);
-  });
-
-  it('clears the references for an explicitly empty list, and only then', () => {
-    const panel = {
-      ...createDefaultVideoWidgetValues([h3Model()]),
-      references: [
-        { detail: 'max' as const, image: { height: 512, image_name: 'ref.png', width: 512 }, kind: 'image' as const },
-      ],
-    };
-    const build = (metadata: Record<string, unknown>) =>
-      buildVideoRecallSettings({
-        currentValues: panel,
-        kind: 'all',
-        metadata,
-        models: catalog,
-        partial: true,
-        requireGenerationMode: false,
-      });
-
-    expect(build({ minimax_h3_references: [] })).toMatchObject({ fields: ['media'], values: { references: [] } });
-    expect(build({ positive_prompt: 'p' })?.values.references).toEqual(panel.references);
-  });
-
-  it('keeps the panel hybrid base and may set its start block', () => {
-    const fl2vaBase: MainModelConfig = { ...h3Model('h3-fl2va-base'), format: 'checkpoint' };
-    const panel = {
-      ...createDefaultVideoWidgetValues([h3Model()]),
-      h3HybridBaseModel: fl2vaBase,
-      h3HybridStartBlock: 25,
-    };
-    const result = buildVideoRecallSettings({
-      currentValues: panel,
-      kind: 'all',
-      metadata: { minimax_h3_hybrid_start_block: 30 },
-      models: [...catalog, fl2vaBase],
-      partial: true,
-      requireGenerationMode: false,
-    });
-
-    expect(result?.values.h3HybridBaseModel).toBe(fl2vaBase);
-    expect(result?.values.h3HybridStartBlock).toBe(30);
-  });
-
-  it('reads an explicit null negative prompt as turning it off', () => {
-    const result = buildVideoRecallSettings({
-      currentValues: { ...holding, negativePrompt: 'blurry', negativePromptEnabled: true },
-      kind: 'all',
-      metadata: { negative_prompt: null },
-      models: catalog,
-      partial: true,
-      requireGenerationMode: false,
-    });
-
-    expect(result?.values).toMatchObject({ negativePrompt: '', negativePromptEnabled: false });
-  });
 });
 
 describe('buildVideoRecallSettings — leaving the accelerator', () => {
@@ -644,14 +415,6 @@ describe('buildVideoRecallSettings — leaving the accelerator', () => {
     });
     expect(defaults.steps).not.toBe(4);
   });
-
-  it('keeps the sampling values the record names', () => {
-    expect(recall({ loras: [], steps: 12 }, true)?.values).toMatchObject({
-      acceleratorEnabled: false,
-      cfgScale: defaults.cfgScale,
-      steps: 12,
-    });
-  });
 });
 
 describe('ref2va reference recall', () => {
@@ -674,10 +437,6 @@ describe('ref2va reference recall', () => {
     ...extra,
   });
 
-  it('recognizes the ref2v generation mode as video metadata', () => {
-    expect(isVideoGenerationMetadata({ generation_mode: 'minimax_h3_ref2v' })).toBe(true);
-  });
-
   it('reports the ordered references, tolerantly skipping malformed entries', () => {
     const result = buildVideoRecallSettings({
       currentValues,
@@ -694,21 +453,6 @@ describe('ref2va reference recall', () => {
     // References replace the frame/source slots.
     expect(result?.mediaNames.firstFrameName).toBeNull();
     expect(result?.values.references).toEqual([]);
-  });
-
-  it("clears the panel's held media so the executor re-hydrates references on a clean slate", () => {
-    const holding = {
-      ...currentValues,
-      firstFrameImage: { height: 4, image_name: 'held.png', width: 4 },
-    };
-    const result = buildVideoRecallSettings({
-      currentValues: holding,
-      kind: 'all',
-      metadata: h3RefMetadata(),
-      models: catalog,
-    });
-
-    expect(result?.values.firstFrameImage).toBeNull();
   });
 });
 
@@ -755,209 +499,31 @@ describe('model-position recall shapes', () => {
     expect(result?.values).toMatchObject({ acceleratorEnabled: true, acceleratorLoraKeys: [ref2vTurbo.key] });
   });
 
-  it('recalls the hybrid quality base together with its start block, never the block alone', () => {
-    const fl2vaBase: MainModelConfig = {
-      base: 'minimax-h3',
-      format: 'checkpoint',
-      key: 'h3-fl2va-ckpt',
-      name: 'MiniMax H3 FL2VA Transformer (int8, pruned)',
-      type: 'main',
-      variant: 'fl2va',
+  it('preserves an explicitly matching Ref2VA hybrid through partial recall and catalog sync', () => {
+    const hybrid = { ...checkpoint, key: 'quality-base', variant: 'fl2va' };
+    const models = [...catalog, hybrid];
+    const holding: VideoWidgetValues = {
+      ...currentValues,
+      model: checkpoint,
+      modelKey: checkpoint.key,
+      h3TaskOverride: 'ref2va',
+      h3HybridBaseModel: hybrid,
+      h3HybridStartBlock: 30,
     };
-    const metadata = {
-      generation_mode: 'minimax_h3_ref2v',
-      minimax_h3_component_source: { key: install.key },
-      minimax_h3_hybrid_base_model: { key: fl2vaBase.key },
-      minimax_h3_hybrid_start_block: 30,
-      minimax_h3_references: [{ detail: 'max', image_name: 'ref.png', kind: 'image' }],
-      model: { key: checkpoint.key },
-      num_frames: 124,
-    };
-    const result = buildVideoRecallSettings({ currentValues, kind: 'all', metadata, models: [...catalog, fl2vaBase] });
-
-    expect(result?.fields).toContain('components');
-    expect(result?.values.model?.key).toBe(checkpoint.key);
-    expect(result?.values.h3HybridBaseModel?.key).toBe(fl2vaBase.key);
-    expect(result?.values.h3HybridStartBlock).toBe(30);
-
-    // With the base uninstalled, the block stays at the panel's value: a start block only
-    // means something for the base it was recorded with.
-    const gone = buildVideoRecallSettings({ currentValues, kind: 'all', metadata, models: catalog });
-
-    expect(gone?.values.h3HybridBaseModel).toBeNull();
-    expect(gone?.values.h3HybridStartBlock).toBe(currentValues.h3HybridStartBlock);
-
-    // An uninstalled recorded hybrid base must not reuse the panel's base or receive its recorded blocks.
-    const otherBase: MainModelConfig = { ...fl2vaBase, key: 'h3-fl2va-other', name: 'Another FL2VA' };
-    const holding = { ...currentValues, h3HybridBaseModel: otherBase, h3HybridStartBlock: 12 };
-    const onto = buildVideoRecallSettings({
+    const result = buildVideoRecallSettings({
       currentValues: holding,
-      kind: 'all',
-      metadata,
-      models: [...catalog, otherBase],
+      kind: 'seed',
+      metadata: { generation_mode: 'minimax_h3_ref2v', seed: 123 },
+      models,
     });
-
-    expect(onto?.fields).toContain('components');
-    expect(onto?.values.h3HybridBaseModel).toBeNull();
-    expect(onto?.values.h3HybridStartBlock).toBe(12);
-  });
-
-  it.each(['all', 'remix'] as const)(
-    'clears the hybrid quality base on a %s recall of a run recorded without it',
-    (kind) => {
-      const fl2vaBase: MainModelConfig = {
-        base: 'minimax-h3',
-        format: 'checkpoint',
-        key: 'h3-fl2va-ckpt',
-        name: 'MiniMax H3 FL2VA Transformer (int8, pruned)',
-        type: 'main',
-        variant: 'fl2va',
-      };
-      // No component source recorded either, so the cleared base is the only component change.
-      const metadata = {
-        generation_mode: 'minimax_h3_ref2v',
-        minimax_h3_references: [{ detail: 'max', image_name: 'ref.png', kind: 'image' }],
-        model: { key: checkpoint.key },
-        num_frames: 124,
-      };
-      const holding = { ...currentValues, h3HybridBaseModel: fl2vaBase, h3HybridStartBlock: 12 };
-      const result = buildVideoRecallSettings({
-        currentValues: holding,
-        kind,
-        metadata,
-        models: [...catalog, fl2vaBase],
-      });
-
-      expect(result?.fields).toContain('components');
-      expect(result?.values.model?.key).toBe(checkpoint.key);
-      expect(result?.values.h3HybridBaseModel).toBeNull();
-      // The block is hidden without a base and only means something with one; it is left alone.
-      expect(result?.values.h3HybridStartBlock).toBe(12);
-
-      // A panel without a base has nothing to clear, and the toast must not claim a component change.
-      const bare = buildVideoRecallSettings({ currentValues, kind, metadata, models: [...catalog, fl2vaBase] });
-
-      expect(bare?.values.h3HybridBaseModel).toBeNull();
-      expect(bare?.fields).not.toContain('components');
-
-      // Report a hybrid base cleared by the model transition as cleared by recall.
-      const toFl2va = buildVideoRecallSettings({
-        currentValues: holding,
-        kind,
-        metadata: {
-          ...metadata,
-          generation_mode: 'minimax_h3_t2v',
-          minimax_h3_references: undefined,
-          model: { key: fl2vaBase.key },
-        },
-        models: [...catalog, fl2vaBase],
-      });
-
-      expect(toFl2va?.values.model?.key).toBe(fl2vaBase.key);
-      expect(toFl2va?.values.h3HybridBaseModel).toBeNull();
-      expect(toFl2va?.fields).toContain('components');
-
-      // A seed recall never reaches the components: the held base survives it.
-      const seedOnly = buildVideoRecallSettings({
-        currentValues: holding,
-        kind: 'seed',
-        metadata: { ...metadata, seed: 7 },
-        models: [...catalog, fl2vaBase],
-      });
-
-      expect(seedOnly?.fields).toEqual(['seed']);
-      expect(seedOnly?.values.h3HybridBaseModel).toEqual(fl2vaBase);
-    }
-  );
-
-  it('recalls the recorded component source for a checkpoint-main recording', () => {
-    const result = buildVideoRecallSettings({
-      currentValues,
-      kind: 'all',
-      metadata: {
-        generation_mode: 'minimax_h3_ref2v',
-        minimax_h3_component_source: { key: install.key },
-        minimax_h3_references: [{ detail: 'max', image_name: 'ref.png', kind: 'image' }],
-        model: { key: checkpoint.key },
-        num_frames: 124,
-      },
-      models: catalog,
+    expect(result).not.toBeNull();
+    const synced = syncVideoWidgetValuesWithModels(result!.values, models);
+    expect(synced).toMatchObject({
+      seed: 123,
+      h3TaskOverride: 'ref2va',
+      h3HybridBaseModel: hybrid,
+      h3HybridStartBlock: 30,
     });
-
-    expect(result?.fields).toContain('model');
-    expect(result?.values.model?.key).toBe(checkpoint.key);
-    expect(result?.values.componentSourceModel?.key).toBe(install.key);
-  });
-  it('promotes the recorded transformer even when the recorded install itself is gone', () => {
-    // Promote the recorded transformer even when the missing install falls back to the panel's checkpoint.
-    const panelCheckpoint: MainModelConfig = {
-      base: 'minimax-h3',
-      format: 'checkpoint',
-      key: 'h3-fl2va-ckpt',
-      name: 'MiniMax H3 FL2VA Transformer (int8)',
-      type: 'main',
-      variant: 'fl2va',
-    };
-    const result = buildVideoRecallSettings({
-      currentValues: { ...currentValues, model: panelCheckpoint, modelKey: panelCheckpoint.key },
-      kind: 'all',
-      metadata: {
-        generation_mode: 'minimax_h3_ref2v',
-        minimax_h3_references: [{ detail: 'max', image_name: 'ref.png', kind: 'image' }],
-        minimax_h3_transformer_model: { key: checkpoint.key },
-        model: { key: 'h3-install-gone' },
-        num_frames: 124,
-      },
-      models: [panelCheckpoint, checkpoint],
-    });
-
-    expect(result?.values.model?.key).toBe(checkpoint.key);
-    expect(result?.fields).toContain('model');
-    expect(result?.values.h3TransformerModel).toBeNull();
-    expect(result?.mediaNames.references).toHaveLength(1);
-  });
-
-  it('drops a corrupt transformer-override recording that names a non-main', () => {
-    const result = buildVideoRecallSettings({
-      currentValues,
-      kind: 'all',
-      metadata: {
-        generation_mode: 'minimax_h3_ref2v',
-        minimax_h3_references: [{ detail: 'max', image_name: 'ref.png', kind: 'image' }],
-        minimax_h3_transformer_model: { key: ref2vTurbo.key },
-        model: { key: install.key },
-        num_frames: 124,
-      },
-      models: catalog,
-    });
-
-    expect(result?.values.model?.key).toBe(install.key);
-    expect(result?.values.h3TransformerModel).toBeNull();
-  });
-
-  it('reports the source video alongside the references for a reference-extend recording', () => {
-    const result = buildVideoRecallSettings({
-      currentValues,
-      kind: 'all',
-      metadata: {
-        generation_mode: 'minimax_h3_ref2v',
-        minimax_h3_component_source: { key: install.key },
-        minimax_h3_references: [
-          { conditioning: 'video_audio', end_frame: 400, kind: 'video', start_frame: 260, video_name: 'long.mp4' },
-        ],
-        model: { key: checkpoint.key },
-        num_frames: 124,
-        source_video: { video_name: 'long.mp4' },
-        source_video_end_frame: 400,
-        source_video_start_frame: 10,
-      },
-      models: catalog,
-    });
-
-    expect(result?.fields).toContain('media');
-    expect(result?.mediaNames.references).toHaveLength(1);
-    expect(result?.mediaNames.sourceVideoName).toBe('long.mp4');
-    expect(result?.mediaNames.sourceVideoTrim).toEqual({ endFrame: 400, startFrame: 10 });
   });
 });
 
@@ -982,21 +548,6 @@ describe('portable records (metadata_version 1.0.0)', () => {
 
     expect(canonical?.values.cfgScaleLowNoise).toBe(3.5);
     expect(legacy?.values.cfgScaleLowNoise).toBe(3.5);
-  });
-
-  it('resolves a model recorded on another install by hash when its key is unknown here', () => {
-    const hashed = { ...WAN_T2V, hash: 'blake3:abc' };
-    const result = buildVideoRecallSettings({
-      currentValues,
-      kind: 'all',
-      metadata: wanMetadata({
-        model: { base: 'wan', hash: 'blake3:abc', key: 'foreign-key', name: 'Other name', type: 'main' },
-      }),
-      models: [hashed, h3Model()],
-    });
-
-    expect(result?.fields).toContain('model');
-    expect(result?.values.model?.key).toBe(WAN_T2V.key);
   });
 
   it('falls back to name, base and type when neither key nor hash matches', () => {
@@ -1056,19 +607,6 @@ describe('portable records (metadata_version 1.0.0)', () => {
     expect(aliased?.values.wanLowNoiseModel).toEqual(lowExpert);
   });
 
-  it('takes the first installed model when a portable identifier matches several', () => {
-    const twin = { ...WAN_T2V, key: 'wan-twin' };
-    const result = buildVideoRecallSettings({
-      currentValues,
-      kind: 'all',
-      metadata: wanMetadata({ model: { base: 'wan', key: 'foreign-key', name: WAN_T2V.name, type: 'main' } }),
-      models: [WAN_T2V, twin, h3Model()],
-    });
-
-    expect(result?.fields).toContain('model');
-    expect(result?.values.model?.key).toBe(WAN_T2V.key);
-  });
-
   it('reads a pre-identifier model record, which may omit the type', () => {
     const result = buildVideoRecallSettings({
       currentValues,
@@ -1078,27 +616,6 @@ describe('portable records (metadata_version 1.0.0)', () => {
     });
 
     expect(result?.values.model?.key).toBe(WAN_T2V.key);
-  });
-
-  it('fills a component slot only with a model of the type it holds', () => {
-    const vae = { base: 'wan', key: 'wan-vae', name: 'Wan 2.1 VAE', type: 'vae' };
-    const result = buildVideoRecallSettings({
-      currentValues: { ...createDefaultVideoWidgetValues([WAN_T2V]), vae: null },
-      kind: 'all',
-      // A typeless record whose name and base match the main model first.
-      metadata: wanMetadata({ vae: { base: 'wan', name: WAN_T2V.name } }),
-      models: [WAN_T2V, vae],
-    });
-
-    expect(result?.values.vae).toBeNull();
-    expect(result?.fields).not.toContain('components');
-  });
-
-  it('does not advertise a recall for a model reference nothing can resolve', () => {
-    expect(getVideoRecallCapabilities({ generation_mode: 'wan_t2v', model: { name: 'only a name' } })).toEqual(
-      EMPTY_VIDEO_RECALL_CAPABILITIES
-    );
-    expect(getVideoRecallCapabilities({ generation_mode: 'wan_t2v', model: { hash: 'blake3:x' } }).remix).toBe(true);
   });
 });
 
@@ -1146,8 +663,8 @@ describe('LTX-2 recall', () => {
   const currentValues = createDefaultVideoWidgetValues([WAN_T2V]);
 
   it('turns auto duration off when it restores a length, so the recalled clip runs at that length', () => {
-    // Same model, head installed and selected: model selection keeps both, so only recall's own rule
-    // can turn auto duration off. Left on, the recalled 121 frames would be a ceiling, not the length.
+    // Same model, head installed and selected: model selection keeps both, so only recall's own rule can turn auto
+    // duration off. Left on, the recalled 121 frames would be a ceiling, not the length.
     const head: GenerationModelCatalogItem = {
       base: 'ltx-2',
       key: 'duration-head',
@@ -1165,110 +682,9 @@ describe('LTX-2 recall', () => {
     expect(result?.values).toMatchObject({ autoDuration: false, ltx2DurationHeadModel: head, numFrames: 121 });
   });
 
-  it('recalls the context length a continuation was made with', () => {
-    // Not recoverable from anything else in the record: the output length folds the source, the
-    // generated half and the crossfade together, so without this a recall silently reinstates the
-    // default 17 and reproduces a different run.
-    const result = buildVideoRecallSettings({
-      currentValues: createDefaultVideoWidgetValues([LTX2_DEV]),
-      kind: 'all',
-      metadata: ltx2Metadata({ ltx2_context_frames: 49 }),
-      models: catalog,
-    });
-
-    expect(result?.values).toMatchObject({ ltx2ExtendContextFrames: 49 });
-    expect(result?.fields).toEqual(expect.arrayContaining(['extendContext']));
-  });
-
-  it('snaps a recalled context off the grid and ignores one on a non-LTX-2 clip', () => {
-    const offGrid = buildVideoRecallSettings({
-      currentValues: createDefaultVideoWidgetValues([LTX2_DEV]),
-      kind: 'all',
-      metadata: ltx2Metadata({ ltx2_context_frames: 30 }),
-      models: catalog,
-    });
-    // A Wan clip carrying the key (hand-edited metadata) must not write an LTX-2-only setting.
-    const wrongFamily = buildVideoRecallSettings({
-      currentValues: createDefaultVideoWidgetValues([WAN_T2V]),
-      kind: 'all',
-      metadata: { ...wanMetadata(), ltx2_context_frames: 49 },
-      models: [WAN_T2V, LIGHTNING_HIGH, LIGHTNING_LOW],
-    });
-
-    expect(offGrid?.values).toMatchObject({ ltx2ExtendContextFrames: 25 });
-    expect(wrongFamily?.fields).not.toContain('extendContext');
-  });
-
-  it('recalls an ordinary clip into a panel that currently has the accelerator on', () => {
-    // The accelerator hides Steps and every guidance scale, and the policy that decides what recall
-    // may write is derived from the panel's CURRENT state. Asked as-is it reports those controls
-    // invisible and drops all of them, leaving the accelerator's 8 / 1 / 1 / 1 / 0 on screen as the
-    // recalled clip's values -- numbers that clip never used, with nothing saying they were dropped.
-    const accelerated = {
-      ...createDefaultVideoWidgetValues([LTX2_DEV]),
-      acceleratorEnabled: true,
-      acceleratorLoraKeys: ['ltx2-distilled'],
-      audioCfgScale: 1,
-      cfgScale: 1,
-      modalityScale: 1,
-      steps: 8,
-      stgScale: 0,
-    };
-    const result = buildVideoRecallSettings({
-      currentValues: accelerated,
-      kind: 'all',
-      metadata: ltx2Metadata(),
-      models: catalog,
-    });
-
-    expect(result?.values).toMatchObject({
-      audioCfgScale: 7,
-      cfgScale: 3,
-      modalityScale: 3,
-      steps: 30,
-      stgScale: 1,
-    });
-    expect(result?.fields).toEqual(expect.arrayContaining(['steps', 'cfg']));
-  });
-
-  it('writes no control a partial recall leaves hidden behind the panel accelerator', () => {
-    const accelerated = {
-      ...createDefaultVideoWidgetValues([LTX2_DEV]),
-      acceleratorEnabled: true,
-      acceleratorLoraKeys: ['ltx2-distilled'],
-      cfgScale: 1,
-      steps: 8,
-    };
-    const result = buildVideoRecallSettings({
-      currentValues: accelerated,
-      kind: 'all',
-      metadata: { positive_prompt: 'p', steps: 30, cfg_scale: 4 },
-      models: catalog,
-      partial: true,
-      requireGenerationMode: false,
-    });
-
-    expect(result?.fields).toEqual(['prompts']);
-    expect(result?.values).toMatchObject({ acceleratorEnabled: true, cfgScale: 1, steps: 8 });
-  });
-
-  it('treats both LTX-2 modes as recallable video metadata', () => {
-    // The mode id is the gate for every Recall button; a string the set does not know silently
-    // hides them all, with nothing failing.
-    for (const mode of ['ltx2_t2v', 'ltx2_i2v']) {
-      expect(isVideoGenerationMetadata({ generation_mode: mode, seed: 1 })).toBe(true);
-      expect(getVideoRecallCapabilities(ltx2Metadata({ generation_mode: mode }))).toEqual({
-        all: true,
-        prompts: true,
-        remix: true,
-        seed: true,
-      });
-    }
-  });
-
   it('recalls a two-stage run as the preset that produces its canvas', () => {
-    // A two-stage run records its final canvas, and no single-stage preset resolves to it -- so the
-    // preset comes back from the size alone, without the metadata having to name the stage count.
+    // A two-stage run records its final canvas, and no single-stage preset resolves to it -- so the preset comes back
+    // from the size alone, without the metadata having to name the stage count.
     const result = buildVideoRecallSettings({
       currentValues,
       kind: 'all',
@@ -1285,248 +701,240 @@ describe('LTX-2 recall', () => {
     expect(result?.values.targetResolution).toBe('1024p');
     expect(result?.values.aspectRatioId).toBe('16:9');
   });
+});
 
-  it('reproduces a dev clip that ran without a negative prompt, from a distilled panel', () => {
-    // Switching to dev seeds the release's list into a panel that carries none -- which is right
-    // when the user picks the model, and wrong here: the clip recorded an empty negative prompt and
-    // a recall has to re-run what was generated, not what the panel would default to.
-    const onDistilled = createDefaultVideoWidgetValues([LTX2_DISTILLED]);
-
-    const result = buildVideoRecallSettings({
-      currentValues: onDistilled,
-      kind: 'all',
-      metadata: ltx2Metadata({ negative_prompt: '' }),
-      models: catalog,
-    });
-
-    expect(result?.values.model).toMatchObject({ key: LTX2_DEV.key });
-    expect(result?.values.cfgScale).toBe(3);
-    expect(result?.values.negativePrompt).toBe('');
-  });
-
-  it('restores the model, both component slots and every guidance scale', () => {
-    const result = buildVideoRecallSettings({ currentValues, kind: 'all', metadata: ltx2Metadata(), models: catalog });
-
-    expect(result?.values.model).toMatchObject({ key: LTX2_DEV.key });
-    expect(result?.values.componentSourceModel).toMatchObject({ key: LTX2_COMPONENTS.key });
-    expect(result?.values.ltx2TextEncoderModel).toMatchObject({ key: LTX2_ENCODER.key });
-    expect(result?.values).toMatchObject({
-      audioCfgScale: 7,
-      cfgScale: 3,
-      fps: 24,
-      modalityScale: 3,
-      numFrames: 121,
-      seed: 99,
-      steps: 30,
-      stgScale: 1,
-    });
-    expect(result?.fields).toEqual(expect.arrayContaining(['model', 'components', 'cfg', 'frames', 'steps']));
-  });
-
-  it('recalls the size back onto the preset that produced it', () => {
-    const result = buildVideoRecallSettings({ currentValues, kind: 'all', metadata: ltx2Metadata(), models: catalog });
-
-    expect(result?.values.targetResolution).toBe('704p');
-    expect(result?.values.aspectRatioId).toBe('16:9');
-  });
-
-  it('does not put a step count on a checkpoint whose schedule is fixed', () => {
-    // The distilled schedule ignores whatever reaches it, so a recalled 30 would leave a disabled
-    // control showing a number the run will not use — and re-record it on the next generation.
-    const result = buildVideoRecallSettings({
-      currentValues,
-      kind: 'all',
-      metadata: ltx2Metadata({ model: LTX2_DISTILLED, steps: 30 }),
-      models: catalog,
-    });
-
-    expect(result?.values.model).toMatchObject({ key: LTX2_DISTILLED.key });
-    expect(result?.values.steps).toBe(8);
-    expect(result?.fields).not.toContain('steps');
-  });
-
-  it('reproduces a run made with the negative prompt switched off', () => {
-    // Whether the negative prompt is on changes the LTX-2 graph — it decides whether an
-    // unconditional pass runs at all — and nothing records that bit directly. What is recorded is
-    // the guidance the run actually used, which is the same thing: both scales at 1 mean no
-    // unconditional pass, so recalling them rebuilds the same graph even with the prompt back on.
-    const result = buildVideoRecallSettings({
-      currentValues,
-      kind: 'all',
-      metadata: ltx2Metadata({ cfg_scale: 1, ltx2_audio_cfg_scale: 1 }),
-      models: catalog,
-    });
-
-    expect(result?.values.cfgScale).toBe(1);
-    expect(result?.values.audioCfgScale).toBe(1);
-    expect(getVideoPromptPolicy(result!.values.model!, result!.values).negativeUsedInGraph).toBe(false);
-  });
-
-  it('drops the per-modality scales when recalled onto a family without them', () => {
-    const result = buildVideoRecallSettings({
-      currentValues,
-      kind: 'all',
-      metadata: { ...ltx2Metadata(), model: WAN_T2V, generation_mode: 'wan_t2v' },
-      models: catalog,
-    });
-
-    expect(result?.values.audioCfgScale).toBeNull();
-    expect(result?.values.stgScale).toBeNull();
-    expect(result?.values.modalityScale).toBeNull();
+it('reads the legacy Wan VAE slot', () => {
+  const vae = { key: 'legacy-vae', base: 'wan', name: 'Wan VAE', type: 'vae' };
+  expect(parseVideoRecallRecord({ generation_mode: 'wan_t2v', wan_vae_model: vae })?.components).toContainEqual({
+    modelType: 'vae',
+    valuesKey: 'vae',
+    ref: { key: vae.key, base: vae.base, name: vae.name, type: vae.type, hash: null },
   });
 });
 
-/**
- * The record a compiled graph stores: the metadata node's literal fields plus the values its edges carry, which the
- * queue fills from the batch (prompts and seed) when it runs.
- */
-const recordedMetadata = (settings: VideoSettings, model: MainModelConfig): Record<string, unknown> => {
-  const compiled = compileVideoGraph(settings, model);
-  const { backendGraph } = compiled;
-  const batch: Record<string, unknown> = {
-    [compiled.negativePromptNodeId]: settings.negativePrompt,
-    [compiled.positivePromptNodeId]: settings.positivePrompt,
-    [compiled.seedNodeId]: settings.seed,
-  };
-  const record: Record<string, unknown> = { ...backendGraph.nodes.core_metadata };
-
-  for (const edge of backendGraph.edges) {
-    if (edge.destination.node_id === 'core_metadata') {
-      expect(batch, `metadata field ${edge.destination.field} comes from the batch`).toHaveProperty(
-        edge.source.node_id
-      );
-      record[edge.destination.field] = batch[edge.source.node_id];
-    }
-  }
-
-  return record;
-};
-
-describe('recall of what the video graphs record', () => {
-  it('Wan: restores prompts with the wired negative, seed, sampling, fps and size', () => {
-    const model = wanModel('t2v_a14b');
-    const settings: VideoSettings = {
-      ...getDefaultVideoSettings(model),
-      aspectRatioId: '16:9',
-      cfgScale: 4,
-      fps: 24,
-      negativePrompt: 'blurry, low quality',
-      negativePromptEnabled: true,
-      numFrames: 81,
-      positivePrompt: 'a red fox in the snow',
-      seed: 4242,
-      steps: 20,
-      targetResolution: '720p',
-    };
-    const metadata = recordedMetadata(settings, model);
+describe('H3 overridden task recall', () => {
+  it.each(['fl2va', 'ref2va'] as const)('round-trips a %s override with its Turbo through graph metadata', (task) => {
+    const model = { ...h3Model('hybrid'), format: 'checkpoint', variant: task === 'ref2va' ? 'fl2va' : 'ref2va' };
+    const component = h3Model('components');
+    const flTurbo = lora('MiniMax H3 Turbo LoRA', 'minimax-h3', null);
+    const refTurbo = lora('MiniMax H3 Ref2V Turbo LoRA', 'minimax-h3', null);
+    const catalog = [model, component, flTurbo, refTurbo];
+    const references = [
+      { kind: 'image' as const, detail: 'match' as const, image: { image_name: 'ref.png', width: 512, height: 512 } },
+    ];
+    const settings = getAcceleratorToggleResult(
+      {
+        ...getDefaultVideoSettings(model, catalog),
+        h3TaskOverride: task,
+        references: task === 'ref2va' ? references : [],
+      },
+      model,
+      catalog,
+      true
+    ).settings;
+    const selectedTurbo = task === 'ref2va' ? refTurbo : flTurbo;
+    expect(settings.acceleratorLoraKeys).toEqual([selectedTurbo.key]);
+    const graph = compileVideoGraph(settings, model).backendGraph;
+    expect(graph.nodes.model_loader).toMatchObject({ task_variant_override: task });
+    const metadata = recordOf(compileVideoGraph(settings, model), settings);
     const result = buildVideoRecallSettings({
-      currentValues: createDefaultVideoWidgetValues([model]),
+      currentValues: createDefaultVideoWidgetValues(catalog),
       kind: 'all',
       metadata,
-      models: [model],
+      models: catalog,
+    })!;
+    expect(result.values.h3TaskOverride).toBe(task);
+    expect(result.values.model).toBe(model);
+    expect(result.values.acceleratorEnabled).toBe(true);
+    expect(result.values.acceleratorLoraKeys).toEqual([selectedTurbo.key]);
+    // Hydration supplies the media returned separately by recall.
+    const restored = syncVideoWidgetValuesWithModels({ ...result.values, references: settings.references }, catalog);
+    expect(compileVideoGraph(restored, restored.model!).backendGraph.nodes.model_loader).toMatchObject({
+      task_variant_override: task,
     });
-
-    expect(getVideoRecallCapabilities(metadata)).toEqual({ all: true, prompts: true, remix: true, seed: true });
-    expect(result?.fields).toEqual(['prompts', 'seed', 'model', 'frames', 'steps', 'cfg', 'fps', 'size']);
-    expect(result?.values).toMatchObject({
-      aspectRatioId: '16:9',
-      cfgScale: 4,
-      fps: 24,
-      negativePrompt: 'blurry, low quality',
-      negativePromptEnabled: true,
-      numFrames: 81,
-      positivePrompt: 'a red fox in the snow',
-      seed: 4242,
-      steps: 20,
-      targetResolution: '720p',
-    });
+    expect(restored.steps).toBe(settings.steps);
   });
 
-  it('MiniMax H3: restores the ordered references with their trim and conditioning', () => {
-    const componentSource = h3Model();
-    const model: MainModelConfig = {
-      base: 'minimax-h3',
-      format: 'checkpoint',
-      key: 'h3-ref2va-ckpt',
-      name: 'MiniMax H3 Ref2VA Transformer',
-      type: 'main',
-      variant: 'ref2va',
-    };
-    const settings: VideoSettings = {
-      ...getDefaultVideoSettings(model),
-      componentSourceModel: componentSource,
-      positivePrompt: 'a dancer',
-      references: [
-        {
-          clip: { endFrame: 47, fps: 24, height: 480, numFrames: 48, startFrame: 2, video_name: 'ref.mp4', width: 832 },
-          conditioning: 'video_audio',
-          kind: 'video',
-        },
-        { detail: 'match', image: { height: 512, image_name: 'ref.png', width: 512 }, kind: 'image' },
-      ],
-      seed: 77,
-    };
-    const metadata = recordedMetadata(settings, model);
+  it('restores the effective task from generation_mode for the same checkpoint', () => {
+    const model = { ...h3Model('hybrid'), format: 'checkpoint', variant: 'fl2va' };
+    const values = createDefaultVideoWidgetValues([model]);
     const result = buildVideoRecallSettings({
-      currentValues: createDefaultVideoWidgetValues([componentSource]),
+      currentValues: values,
       kind: 'all',
-      metadata,
-      models: [componentSource, model],
+      metadata: {
+        generation_mode: 'minimax_h3_ref2v',
+        model: { base: 'minimax-h3', key: model.key, name: model.name, type: 'main' },
+      },
+      models: [model],
+    });
+    expect(result?.values.h3TaskOverride).toBe('ref2va');
+    expect(result?.values.model).toBe(model);
+    expect(model.variant).toBe('fl2va');
+  });
+
+  it('does not apply the recorded task to an unrelated model when the recorded model is unavailable', () => {
+    const current = { ...h3Model('current'), format: 'checkpoint', variant: 'fl2va' };
+    const values = createDefaultVideoWidgetValues([current]);
+    const result = buildVideoRecallSettings({
+      currentValues: values,
+      kind: 'all',
+      metadata: {
+        generation_mode: 'minimax_h3_ref2v',
+        positive_prompt: 'test scene',
+        model: { base: 'minimax-h3', key: 'uninstalled', name: 'Missing model', type: 'main' },
+      },
+      models: [current],
+    });
+    expect(result?.values.h3TaskOverride).toBeUndefined();
+    expect(result?.values.model?.variant).toBe('fl2va');
+  });
+});
+
+describe('legacy H3 duration recall', () => {
+  const model = h3Model();
+  const currentValues = { ...createDefaultVideoWidgetValues([model]), numFrames: 175 };
+  const metadata = (duration: unknown, extra: Record<string, unknown> = {}) => ({
+    generation_mode: 'minimax_h3_t2v',
+    model: { key: model.key },
+    minimax_h3_duration_seconds: duration,
+    ...extra,
+  });
+
+  it.each([
+    [5, 124],
+    [6, 141],
+    [7, 175],
+    [8, 192],
+    [9, 209],
+    [10, 243],
+    [11, 260],
+    [12, 294],
+    [13, 311],
+    [14, 345],
+  ])('restores the emitted frame count for the legacy %is duration', (duration, expectedFrames) => {
+    const result = buildVideoRecallSettings({
+      currentValues,
+      kind: 'all',
+      metadata: metadata(duration),
+      models: [model],
+    });
+    expect(result?.fields).toContain('frames');
+    expect(result?.values).toMatchObject({ numFrames: expectedFrames, fps: 24 });
+  });
+});
+
+describe('H3 draft size recall', () => {
+  it.each([
+    [864, 480, '16:9', '480p'],
+    [960, 544, '16:9', '544p'],
+    [544, 960, '9:16', '544p'],
+    [480, 480, '1:1', '480p'],
+  ] as const)('recalls %sx%s as %s %s', (width, height, aspectRatioId, targetResolution) => {
+    expect(getVideoSizeRecalls(h3Model(), width, height)).toContainEqual({ aspectRatioId, targetResolution });
+  });
+});
+
+describe('equivalent H3 media-sized presets', () => {
+  const model = h3Model();
+  const frame = { width: 1000, height: 700, image_name: 'legacy-frame.png' };
+
+  it.each(['768 highres', '768 lowres', '544p'] as const)(
+    'recalls the original 768x544 canvas from %s without increasing its size',
+    (targetResolution) => {
+      const values = { ...createDefaultVideoWidgetValues([model]), firstFrameImage: frame, targetResolution };
+      const result = buildVideoRecallSettings({
+        currentValues: values,
+        kind: 'all',
+        metadata: {
+          generation_mode: 'minimax_h3_i2v',
+          width: 768,
+          height: 544,
+          first_frame_image: { image_name: frame.image_name },
+        },
+        models: [model],
+      });
+      expect(result).not.toBeNull();
+      const settled = settleMediaSizedRecall({ ...result!, values: { ...result!.values, firstFrameImage: frame } });
+      expect(settled.values.targetResolution).toBe(targetResolution === '544p' ? '544p' : '768 lowres');
+      expect(getVideoDimensions(model, settled.values)).toMatchObject({ width: 768, height: 544 });
+      const sizeOnly = resolveVideoSizeRecall(values, 768, 544);
+      expect(sizeOnly).toEqual({
+        outcome: 'fits',
+        sizeRecall: { targetResolution: targetResolution === '544p' ? '544p' : '768 lowres' },
+      });
+    }
+  );
+});
+
+describe('Wan LoRA expert target recall', () => {
+  const highLora = { ...LIGHTNING_HIGH, key: 'wan-expert-high' };
+  const lowLora = { ...LIGHTNING_LOW, key: 'wan-expert-low' };
+  const dualLora = { base: 'wan', key: 'wan-expert-dual', name: 'Wan Dual', type: 'lora', variant: 'a14b' };
+  const currentValues = createDefaultVideoWidgetValues([WAN_T2V]);
+
+  it('restores target and low_noise_weight without altering untargeted LoRA records', () => {
+    const result = buildVideoRecallSettings({
+      currentValues,
+      kind: 'all',
+      metadata: wanMetadata({
+        loras: [
+          { model: { key: highLora.key }, target: 'high', weight: 0.9 },
+          { model: { key: lowLora.key }, target: 'low', weight: 0.5 },
+          { low_noise_weight: 0.3, model: { key: dualLora.key }, target: 'both', weight: 0.8 },
+          { model: { key: LIGHTNING_HIGH.key }, weight: 1 },
+        ],
+      }),
+      models: [WAN_T2V, highLora, lowLora, dualLora, LIGHTNING_HIGH],
     });
 
-    expect(getVideoRecallCapabilities(metadata)).toEqual({ all: true, prompts: true, remix: true, seed: true });
-    expect(result?.fields).toEqual(expect.arrayContaining(['prompts', 'seed', 'model', 'components', 'media']));
-    expect(result?.values).toMatchObject({
-      componentSourceModel: componentSource,
-      model,
-      positivePrompt: 'a dancer',
-      seed: 77,
-    });
-    expect(result?.mediaNames.references).toEqual([
-      { conditioning: 'video_audio', kind: 'video', name: 'ref.mp4', trim: { endFrame: 47, startFrame: 2 } },
-      { detail: 'match', kind: 'image', name: 'ref.png' },
+    expect(result?.values.loras).toEqual([
+      { isEnabled: true, model: highLora, target: 'high', weight: 0.9 },
+      { isEnabled: true, model: lowLora, target: 'low', weight: 0.5 },
+      { isEnabled: true, lowNoiseWeight: 0.3, model: dualLora, target: 'both', weight: 0.8 },
+      { isEnabled: true, model: LIGHTNING_HIGH, weight: 1 },
     ]);
   });
 
-  it('LTX-2 audio-to-video: restores the soundtrack in its role, the components and the fps', () => {
-    const model = ltx2Model('ltx2_dev');
-    const encoder: GenerationModelCatalogItem = {
-      base: 'ltx-2',
-      key: 'gemma4',
-      name: 'LTX-2.5 Text Encoder',
-      type: 'gemma4_encoder',
-    };
-    const componentSource = ltx2Model('ltx2_dev', 'diffusers', 'ltx2-components');
-    const settings: VideoSettings = {
-      ...getDefaultVideoSettings(model),
-      componentSourceModel: componentSource,
-      conditioningClip: {
-        clip: { fps: 24, height: 704, numFrames: 96, video_name: 'song.mp4', width: 1248 },
-        fpsKnown: true,
-        role: 'audio',
-      },
-      fps: 25,
-      ltx2TextEncoderModel: encoder,
-      positivePrompt: 'a singer on stage',
-      seed: 99,
-    };
-    const metadata = recordedMetadata(settings, model);
+  it('folds legacy dual high/low entries for the same LoRA into one both entry', () => {
     const result = buildVideoRecallSettings({
-      currentValues: createDefaultVideoWidgetValues([model]),
+      currentValues,
       kind: 'all',
-      metadata,
-      models: [model, componentSource, encoder],
+      metadata: wanMetadata({
+        loras: [
+          { model: { key: dualLora.key }, target: 'low', weight: 0.4 },
+          { model: { key: dualLora.key }, target: 'high', weight: 0.85 },
+        ],
+      }),
+      models: [WAN_T2V, dualLora],
     });
 
-    expect(getVideoRecallCapabilities(metadata)).toEqual({ all: true, prompts: true, remix: true, seed: true });
-    expect(result?.fields).toEqual(expect.arrayContaining(['prompts', 'seed', 'model', 'fps', 'components', 'media']));
-    expect(result?.values).toMatchObject({
-      componentSourceModel: componentSource,
-      fps: 25,
-      ltx2TextEncoderModel: encoder,
-      positivePrompt: 'a singer on stage',
-      seed: 99,
+    expect(result?.values.loras).toEqual([
+      { isEnabled: true, lowNoiseWeight: 0.4, model: dualLora, target: 'both', weight: 0.85 },
+    ]);
+  });
+
+  it('deduplicates non-opposing duplicate entries for the same LoRA key', () => {
+    const sameTarget = buildVideoRecallSettings({
+      currentValues,
+      kind: 'all',
+      metadata: wanMetadata({
+        loras: [
+          { model: { key: highLora.key }, target: 'high', weight: 0.9 },
+          { model: { key: highLora.key }, target: 'high', weight: 0.5 },
+          { model: { key: dualLora.key }, target: 'high', weight: 0.8 },
+          { model: { key: dualLora.key }, target: 'low', weight: 0.4 },
+          { model: { key: dualLora.key }, target: 'low', weight: 0.2 },
+          { model: { key: LIGHTNING_HIGH.key }, weight: 1 },
+          { model: { key: LIGHTNING_HIGH.key }, weight: 0.6 },
+        ],
+      }),
+      models: [WAN_T2V, highLora, dualLora, LIGHTNING_HIGH],
     });
-    expect(result?.mediaNames.conditioningClip).toEqual({ name: 'song.mp4', role: 'audio' });
+
+    expect(sameTarget?.values.loras).toEqual([
+      { isEnabled: true, model: highLora, target: 'high', weight: 0.9 },
+      { isEnabled: true, lowNoiseWeight: 0.4, model: dualLora, target: 'both', weight: 0.8 },
+      { isEnabled: true, model: LIGHTNING_HIGH, weight: 1 },
+    ]);
   });
 });

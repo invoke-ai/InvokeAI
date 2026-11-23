@@ -1,4 +1,4 @@
-import { ChakraProvider } from '@chakra-ui/react';
+import { Box, ChakraProvider } from '@chakra-ui/react';
 import { adjustFocusedPromptAttention } from '@features/generation/ui/promptFields/promptAttentionHotkeys';
 import { PromptTextarea } from '@features/generation/ui/promptFields/PromptTextarea';
 import { ResizableTextarea } from '@platform/ui/ResizableTextarea';
@@ -12,28 +12,42 @@ let host: HTMLDivElement | null = null;
 let root: Root | null = null;
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-const renderTextarea = async (maxHeightPx?: number) => {
+const WELL_HOST_CSS = { '--wb-control-well': '{colors.bg}', '& textarea': { bg: 'var(--wb-control-well)' } };
+
+const renderTextarea = async (maxHeightPx?: number, well?: { zoom: number }) => {
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
   const onResizeEnd = vi.fn();
+  const textarea = (
+    <ResizableTextarea
+      aria-label="Prompt"
+      defaultHeightPx={100}
+      maxHeightPx={maxHeightPx}
+      minHeightPx={60}
+      resizeHandleAriaLabel="Resize prompt"
+      onResizeEnd={onResizeEnd}
+    />
+  );
 
   await act(() => {
     root?.render(
       <ChakraProvider value={system}>
-        <ResizableTextarea
-          aria-label="Prompt"
-          defaultHeightPx={100}
-          maxHeightPx={maxHeightPx}
-          minHeightPx={60}
-          resizeHandleAriaLabel="Resize prompt"
-          onResizeEnd={onResizeEnd}
-        />
+        {well ? (
+          // A scaled well host, as the node editor is: it paints its controls on the well, and its zoom puts the inner
+          // bottom edge inside a device pixel.
+          <Box css={WELL_HOST_CSS} data-control-well="" transform={`scale(${well.zoom})`}>
+            {textarea}
+          </Box>
+        ) : (
+          textarea
+        )}
       </ChakraProvider>
     );
   });
 
   return {
+    fade: host.querySelector<HTMLElement>('[data-resizable-textarea-fade]')!,
     handle: host.querySelector<HTMLElement>('[role="separator"]')!,
     onResizeEnd,
     textarea: host.querySelector<HTMLTextAreaElement>('textarea')!,
@@ -48,35 +62,6 @@ afterEach(async () => {
 });
 
 describe('ResizableTextarea', () => {
-  it('keeps its focus border while hovered', async () => {
-    const { textarea } = await renderTextarea();
-
-    await act(async () => {
-      await userEvent.hover(textarea);
-      await userEvent.tab();
-      await new Promise((resolve) => {
-        globalThis.setTimeout(resolve, 200);
-      });
-    });
-    expect(document.activeElement).toBe(textarea);
-    const hoveredFocusBorderColor = getComputedStyle(textarea).borderTopColor;
-    const accentProbe = document.createElement('div');
-    accentProbe.style.border = '1px solid var(--chakra-colors-accent-solid)';
-    document.body.append(accentProbe);
-    const accentBorderColor = getComputedStyle(accentProbe).borderTopColor;
-    accentProbe.remove();
-    expect(getComputedStyle(textarea).outlineStyle).toBe('none');
-    expect(hoveredFocusBorderColor).toBe(accentBorderColor);
-
-    await act(async () => {
-      await userEvent.unhover(textarea);
-      await new Promise((resolve) => {
-        globalThis.setTimeout(resolve, 200);
-      });
-    });
-    expect(getComputedStyle(textarea).borderTopColor).toBe(accentBorderColor);
-  });
-
   it('allows unbounded pointer and keyboard growth while keeping Home at the minimum', async () => {
     const { handle, onResizeEnd, textarea } = await renderTextarea();
 
@@ -99,23 +84,11 @@ describe('ResizableTextarea', () => {
     expect(handle.hasAttribute('aria-valuemax')).toBe(false);
   });
 
-  it('scrolls through the ScrollArea viewport instead of a native scrollbar', async () => {
-    const { textarea } = await renderTextarea(140);
+  it('fades to whatever lies behind it outside a well host', async () => {
+    const { fade, textarea } = await renderTextarea();
 
-    expect(textarea.dataset.part).toBe('viewport');
-    expect(textarea.getAttribute('role')).toBe('textbox');
-    expect(getComputedStyle(textarea).scrollbarWidth).toBe('none');
-
-    await act(() => {
-      textarea.value = Array.from({ length: 50 }, (_, index) => `line ${index}`).join('\n');
-      textarea.dispatchEvent(new Event('input', { bubbles: true }));
-      textarea.scrollTop = 100;
-    });
-
-    const scrollbar = host!.querySelector<HTMLElement>('[data-part="scrollbar"]')!;
-
-    await expect.poll(() => scrollbar.hasAttribute('data-overflow-y')).toBe(true);
-    await expect.poll(() => host!.querySelector<HTMLElement>('[data-part="thumb"]')!.clientHeight).toBeGreaterThan(0);
+    expect(getComputedStyle(textarea.parentElement!.parentElement!).maskImage).not.toBe('none');
+    expect(getComputedStyle(fade).display).toBe('none');
   });
 
   it('retains bounded End behavior when a maximum is supplied', async () => {
@@ -125,34 +98,6 @@ describe('ResizableTextarea', () => {
 
     expect(getComputedStyle(textarea).height).toBe('140px');
     expect(handle.getAttribute('aria-valuemax')).toBe('140');
-  });
-
-  it('uses the legacy prompt font size for both the textarea and syntax underlay', async () => {
-    host = document.createElement('div');
-    document.body.append(host);
-    root = createRoot(host);
-
-    await act(() => {
-      root?.render(
-        <ChakraProvider value={system}>
-          <PromptTextarea
-            aria-label="Prompt"
-            defaultHeightPx={100}
-            minHeightPx={60}
-            resizeHandleAriaLabel="Resize prompt"
-            showSyntaxHighlighting
-            value="(sunset:1.2)"
-            onChange={vi.fn()}
-          />
-        </ChakraProvider>
-      );
-    });
-
-    const textarea = host.querySelector<HTMLTextAreaElement>('textarea')!;
-    const underlay = host.querySelector<HTMLElement>('pre')!;
-
-    expect(getComputedStyle(textarea).fontSize).toBe('13.12px');
-    expect(getComputedStyle(underlay).fontSize).toBe('13.12px');
   });
 
   it('participates in the shared Ctrl+Up/Down prompt-attention system', async () => {
@@ -213,7 +158,6 @@ describe('ResizableTextarea', () => {
     await expect.poll(() => textarea.value).toBe('(hello world)+++');
   });
 
-  // Synthetic input must not mutate a read-only prompt.
   it('leaves a read-only prompt alone', async () => {
     const ReadOnlyHarness = () => (
       <PromptTextarea

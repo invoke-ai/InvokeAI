@@ -11,7 +11,7 @@ Paths relative to the webv2 package. `pnpm test:performance:architecture` runs t
 
 The routine browser gate visits each fixture twice in fresh browser contexts. Both observations run the complete journey, required/inactive-widget checks, and semantic-ready waits. Resource budgets use the maximum of each metric; fixture counts and script source owners must agree between observations. Successful routine runs do not record traces or report timing statistics. On failure, the gate attempts one diagnostic trace for the failing fixture and retains the original failure.
 
-`pnpm test:performance:browser:profile` runs the full sampling plan from `performance/architecture-fixtures.json`: one warmup, one unscored trace, and five scored observations per fixture. Use it after the performance build for timing investigation and traces of every route. Baseline updates always use this plan, as does the routine command when the checked-in timing policy enables enforcement. Full profiles report timing medians and variance; routine reports identify `mode: resources` and omit those fields. Resource reference files contain only resource measurements and work with either mode.
+`pnpm test:performance:browser:profile` runs the full sampling plan from `performance/architecture-fixtures.json`: one warmup, one unscored trace, and five scored observations per fixture. Use it after the performance build for timing investigation and traces of every route. Baseline updates always use this plan. Full profiles report timing medians and variance; routine reports identify `mode: resources` and omit those fields. Resource reference files contain only resource measurements and work with either mode.
 
 ## Byte budgets
 
@@ -23,7 +23,7 @@ Baseline byte budgets record measurements only. Each byte ceiling is the lower o
 
 Reference modes:
 
-- PRs into `main` and merge groups targeting `main`: CI restores `main`'s own measurements from the Actions cache (`WEBV2_PERF_REFERENCE_DIR`). Logs and reports name the restored reference.
+- PRs into `main` and merge groups targeting `main`: CI restores measurements of the exact base commit's inputs from the Actions cache (`WEBV2_PERF_REFERENCE_DIR`). Main records them on every push whose performance job produced both reference files. The cache key hashes the base's Git tree and blob IDs for this package, `invokeai/version/invokeai_version.py`, `.nvmrc`, the install action and `frontend-tests.yml`: a content hash, so commits that change none of them share one entry, and a change to any of them gets a new one. No prefix fallback exists. On a miss CI checks out that pinned base separately, installs its dependencies and Node version, builds once, and records both build and browser resources; a pull request keeps them for its next push onto the same base. Base budget failures still permit recording, but missing, malformed, incompatible, or incomplete measurements stop the job. Both reference files must measure that base's inputs; older cached or candidate measurements cannot substitute. Logs and reports name the key and the exact base SHA. Candidate completion gates retain their normal strict checks.
 - Local runs, pushes to `main`, stacked PRs without a reference: compare against committed measurements directly.
 - Every mode pins source-owner sets exactly: a module entering a route's initial graph fails at zero bytes.
 - Request counts have no allowance; cap is the lower of reference and committed counts.
@@ -31,7 +31,8 @@ Reference modes:
 
 ## Running
 
-- CI splits `check:release` between `lint:code` in the checks job and `check:release:tests` in the tests job. Architecture tests run in the complete unit suite; inventories are generated once and the performance build serves all subsequent browser journeys.
+- On a shared development machine, the [bounded local verification profile](../VERIFICATION.md#bounded-local-verification) caps Vitest workers while preserving the release chain. It does not relax the exclusive performance-run requirement below.
+- CI runs `lint:code` in the checks workflow and splits `check:release:tests` into parallel jobs of the tests workflow: unit tests and fixtures, the Chromium browser suite in two Vitest shards, the performance gates with the exact-base reference, and the production-build journeys (`pnpm test:journeys`). The performance and journey jobs each build; locally the performance build serves every later journey. Architecture tests run in the complete unit suite. The `frontend-webv2-tests` job is the required check and fails unless every other job succeeded.
 - `check:release` stops at the first failing gate; later gates did not run. In CI logs the failure sits at the tail, after passing test summaries.
 - Browser gate binds ports 4176 and 4177 (`INVOKEAI_PERFORMANCE_PORT`, `INVOKEAI_PERFORMANCE_BACKEND_PORT`). One performance gate per machine, nothing else building or testing.
 - One failing sample on a busy machine can be noise, "did not request required widgets" included. Rerun once on a quiet machine. Fails again: regression.
@@ -76,3 +77,97 @@ Failures name an owner and a remediation ticket: structural work that would reti
 | `seal-canvas-engine-seam`        | Importers of `@workbench/canvas-engine/contracts`                             |
 | `finish-queue-ownership`         | Importers of `@features/queue`                                                |
 | `define-gallery-feature`         | Importers of `./GalleryWidgetView`                                            |
+
+## Render validity and sustained interaction evidence
+
+Nominal browser journeys distinguish implementation mount marks from usable content. Visible images must finish
+`decode()`; the representative Canvas journey also waits for fixture pixels on the Canvas surface and a painted
+layer thumbnail. Mock full images are deterministic PNGs matching their DTO dimensions; thumbnails preserve aspect
+ratio within 256 pixels, without upscaling. Their encoding differs from the backend's WEBP thumbnails. Generation
+is capped at 4096 pixels per dimension and the shared dimension cache at 32 entries. Fixture tests verify PNG CRCs,
+inflated scanlines and dimensions, including a 4096-square image. Corrupt bytes are used only in negative tests.
+
+The shared journey diagnostics reject uncaught errors, console errors, HTTP failures and failed requests. Only the
+mock's `/ws/socket.io/?…transport=polling` 404 is expected. Canceled Queue status polls are normal owner teardown;
+HTTP failures for that endpoint still fail. Lifecycle/fault journeys declare their other expected failures locally.
+Browser reports keep API media requests and decoded dimensions separate from static-resource byte accounting.
+Failures retain diagnostics, screenshots and the existing diagnostic traces under `artifacts/architecture-performance`.
+
+Both routine resource observations and full profiles run a bounded Gallery quick-settings workload after startup and return-switch measurements on the
+representative Compose fixture: one warmup and six open/change/close cycles per routine observation or scored profile sample. Every cycle arms the pinned Chakra presence owner’s native `exitcomplete` event before closing, waits at most five seconds for it, then polls React removal for at most 250 ms before reporting actual retained counts. Persistent DOM is still rejected by the zero-retention bound. Animation-finished promises alone do not establish presence completion.
+Retained popover count must be zero; the runner fails immediately on a retained portal instead of waiting it away.
+Routine resource observations also run this bounded correctness phase, independently of report-only timing.
+DOM nodes, Canvas elements and request counts are diagnostic observations, not universal lifetime bounds. The
+report includes every cycle, interaction min/median/p95/max and observed long-task distributions. Long tasks cover
+the interaction phase, including its warmup, and interaction latency includes automation overhead; neither is an INP measurement. Failure
+artifacts preserve the workload context. The workload is intentionally hard-coded to Gallery quick settings; other owners need their own journey before extending coverage.
+
+Sustained reports name the runner, engine version, platform, workload and sample policy. Timing distributions are report-only; portal retirement is enforced.
+No gate compares timings, so `browser-baseline.json` must keep `timingPolicy.enforce` false.
+
+## Browser lifecycle smoke
+
+`pnpm test:browser:smoke` creates a fresh production build, then uses the existing project-file preview/backend lifecycle.
+`check:release` runs `test:browser:smoke:browser` after its shared performance build, so completion builds once; CI's journey job builds once for all three journeys.
+Use the raw `:browser` command only when the build is known current. Install engines using the locked package:
+`pnpm exec playwright install --with-deps chromium firefox webkit`. Ports default to 4180/4181; override
+`INVOKEAI_PROJECT_FILE_PORT` and `INVOKEAI_PROJECT_FILE_BACKEND_PORT` for an isolated focused run.
+
+The required localhost capabilities are IndexedDB and Web Locks. Each engine holds the initial fixture migration PUT before server dispatch and checks
+that this save staged the old document, then makes a new held prompt edit and leaves for a neutral same-origin
+document immediately. Before any editor can reconcile it, the suite checks where the edit is held and that the server
+lacks it; reopening must recover it. Chromium must hold it in the committed journal alone, with the staged draft and
+held PUT bodies still old, so its run proves journal-only recovery. In Firefox and WebKit, once unload cancels the held
+PUT, the queued `pagehide` save can continue: it stages the edit, retires its journal entry and may send it. Their runs
+prove only that the edit was durably held in the journal or the staged draft, was staged if sent, and survived the
+reload. Journal-only recovery is also covered by the scenarios in `src/workbench/projects/unloadJournal.scenarios.ts`,
+run on Chromium IndexedDB by `unloadJournal.scenarios.browser.test.ts`; that a save sends nothing until its draft
+write finishes is covered in `src/workbench/projects/durableSyncedPersistence.test.ts`. Each engine also verifies actual Canvas and layer-thumbnail fixture pixels, rejects an opaque
+checker-only thumbnail and empty Canvas, holds native animation-end delivery to prove retirement waits for the owner’s exit event, defers actual owner DOM removal by 100 ms to exercise the bounded React-removal grace, and injects retained portal DOM into the real sustained-workload collector.
+Engines must give duplicated tabs separate live editor sessions, release a closed tab's session lock, preserve edits
+across route re-entry after Launchpad owner/media readiness (all mounted cover images finish decoding), advance keyboard focus, and disable copy controls with an explanation when clipboard is
+unavailable. This is targeted current-engine coverage, with no minimum-version support promise. Missing engines or
+required capabilities fail the command and are reported, rather than skipped. Every engine is attempted, even after
+another fails. Reports, failure screenshots and traces live in `artifacts/browser-smoke` and CI uploads them.
+
+A new held prompt is made immediately before history navigation. History return records the real `pageshow.persisted` result and, where exposed, `notRestoredReasons`. A reload is
+reported as such; it does not establish BFCache restoration. Playwright WebKit is not actual Safari verification,
+and says nothing about every Apple platform. The documented Chromium unload guarantee remains scoped to Chromium;
+other engine results are evidence for the tested engine/build/platform only, not a broader durability guarantee.
+
+The smoke context blocks service workers so its same-origin idle HTML document and fault probes cannot be bypassed
+by the PWA navigation cache. This suite exercises real IndexedDB and Web Locks; service-worker cache behavior is
+outside its coverage. The noncanceling unload checkpoint runs before `pagehide` because WebKit can discard an
+IndexedDB journal transaction started in `pagehide`, even after explicit commit. A `beforeunload` listener can reduce
+Firefox BFCache eligibility; restoring from the cache is reported only when the engine actually does so.
+
+Document-navigation cancellation expectations are shared by smoke and release journeys. They apply only inside an
+explicitly owned navigation through DOMContentLoaded, on the same origin's `/api/` requests or mock Socket.IO polling.
+All engines may cancel old-document reads and writes; WebKit may instead emit its exact native Fetch/XMLHttpRequest
+access-control-denial message. A canceled mutation is teardown evidence, never evidence of a successful save: the
+held-edit scenario separately checks where the edit was durably held and that reopening recovers it. HTTP 4xx/5xx responses, non-abort failures, cross-origin
+requests, asset failures, live-document mutations and unrelated runtime/console errors remain critical. Queue reader
+cancellations during route re-entry are limited to its actual read interface: status, current, next and item IDs (GET),
+then bounded item hydration (`items_by_ids`, read-only POST). Queue status GET cancellation is also recognized at the
+shared observer because that owner's polling read retires during ordinary in-document switches. Only the concrete project-switch actions in
+`measureProjectSwitch` retire already pending same-origin `GET /api/v1/gallery/items/` request identities: Query cancels the
+old project's listing when its last observer leaves, including after HTTP 200 while the body is pending. These snapshots
+cover the switch to a temporary project and return to the original project; requests started during either action,
+setup/autosave reads, live-page aborts, other endpoints/methods and
+HTTP failures (including a later aborted error body) remain critical. The fault probes
+use independent strict diagnostics and separately assert that request and runtime failures reached the validator.
+
+Image readiness bounds native decoding within the same readiness timeout and retries a legitimately changed image
+source. An explicit owner selector includes every cover, even below the fold. It requires visible decoded images by default, or representative fixture pixels from both Canvas
+owners in Canvas mode. Empty fixtures explicitly opt out of image requirements after their owner semantic-ready
+assertion. An early capturing image-error listener remembers failed images even when an owner's `onError` removes
+them. The smoke proves both corrupt-visible and corrupt-removed image failures, independently of console errors.
+
+Accessibility runner failures retain nested aggregate diagnostics in `artifacts/accessibility/failure.txt`; the
+settings journey also captures its failing page as text and a screenshot before the browser context closes.
+
+## Workflow-library scaling fixture
+
+The mock backend accepts `POST /__workflow-library` with JSON `{"scenario":"large"}`. This opt-in workload replaces library records with 1,000 user workflows, each containing 40 integer nodes; normal route fixtures and resource budgets are unchanged. Scenarios `empty`, `failed-page`, `slow-detail`, and `changed-revision` respectively empty the library, fail page 2 once (retry succeeds), delay detail reads by 300 ms, and advance each record's revision on its first detail read. `POST /__reset` restores ordinary fixtures. `GET /__workflow-requests` records list/detail requests since seeding.
+
+For a comparison, seed the same scenario on base and candidate with identical viewport, zoom, browser and hardware. Open Yours, select a detail, traverse the library in both directions, switch search/tag views repeatedly, and return. Count `[data-workflow-card]` elements and workflow detail/list GETs at each position. Record long tasks and force-GC retained heap with the same browser profiling procedure on both builds; heap and wall time are observations, not deterministic counts. Run the normal timing profile only against its corresponding fresh performance build, with exclusive use of the machine. Owner resource observations and unit-fixture reads are not substitutes for this browser comparison.

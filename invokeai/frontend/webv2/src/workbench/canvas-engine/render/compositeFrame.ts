@@ -2,11 +2,11 @@ import type { CanvasDocumentContractV3, CanvasLayerContract } from '@workbench/c
 import type {
   PreviewStateController,
   SamPreviewState,
-  StagedPreviewState,
 } from '@workbench/canvas-engine/controllers/previewStateController';
 import type { RasterController } from '@workbench/canvas-engine/controllers/rasterController';
 import type { CanvasDiagnostics } from '@workbench/canvas-engine/diagnostics';
 import type { SemanticLeaf } from '@workbench/canvas-engine/document-model/semanticLeaf';
+import type { OverlayStackKind } from '@workbench/canvas-engine/document/layerStacks';
 import type { EngineStores } from '@workbench/canvas-engine/engineStores';
 import type { DerivedSurfaceCache } from '@workbench/canvas-engine/render/derivedSurfaceCache';
 import type { LayerCacheEntry, LayerCacheStore } from '@workbench/canvas-engine/render/layerCache';
@@ -14,10 +14,13 @@ import type { RasterBackend, RasterSurface } from '@workbench/canvas-engine/rend
 import type { FrameDamage, Mat2d, Rect } from '@workbench/canvas-engine/types';
 import type { Viewport } from '@workbench/canvas-engine/viewport';
 
+import { lookupDocumentLeaf } from '@workbench/canvas-engine/document-model/documentModel';
+import { isLeafDrawableForScreen } from '@workbench/canvas-engine/document-model/screenComposition';
 import { getDocumentIndex } from '@workbench/canvas-engine/document/documentIndex';
 import { isLayerContributing } from '@workbench/canvas-engine/document/layerEligibility';
 import { isOverlayStack } from '@workbench/canvas-engine/document/layerStacks';
 import { getSourceContentRect, isRenderableLayer, renderableSourceOf } from '@workbench/canvas-engine/document/sources';
+import { intersect } from '@workbench/canvas-engine/math/rect';
 import {
   compositeDocument,
   reusePreparation,
@@ -49,28 +52,50 @@ export interface CreateCompositeFrameDeps {
   readonly getControlView: () => CompositeOptions['controlView'];
   /** Starts (or joins) the rasterization of a layer whose cache is stale. */
   readonly rasterizeLayer: (layer: CanvasLayerContract, doc: CanvasDocumentContractV3) => void;
+  /**
+   * Whether a pointer gesture, transform session or floating selection in progress edits a control layer, a mask or a
+   * region. Those stacks then draw above a shown preview, so the user never edits blind, and the regenerate tint draws
+   * again with its raster layer, under the preview. The frame after the edit ends hides them again.
+   */
+  readonly isEditingStagingHiddenStack: () => boolean;
 }
 
 /**
- * While a staged or progress preview shows, masks and regions stop tinting the screen, so the result reads as it
- * would be accepted; control layers stay.
+ * While a staged or progress preview shows, or the user toggled the staged result off to compare, the screen draws
+ * raster layers only: control layers, masks and regions stop covering and tinting it, so the result reads as it would
+ * be accepted and the canvas under it reads the same way. Generation still reads every stack.
  */
-const STAGING_OVERLAY_STACKS = { control: true, inpaint_mask: false, regional_guidance: false } as const;
+const STAGING_OVERLAY_STACKS: Readonly<Record<OverlayStackKind, boolean>> = {
+  control: false,
+  vector: true,
+  inpaint_mask: false,
+  regional_guidance: false,
+};
 
-/** Whether the selection sits in a stack the staging view hides: the user is editing a mask or a region. */
-export const isEditingStagingHiddenStack = (doc: CanvasDocumentContractV3): boolean => {
-  const stack = doc.selectedLayerId ? getDocumentIndex(doc).byId.get(doc.selectedLayerId)?.stack : undefined;
+/**
+ * Whether `nodeId` sits in a stack the staging view hides: a control layer, a mask or a region, or a group in those
+ * stacks. An edit of it shows those stacks again ({@link CreateCompositeFrameDeps.isEditingStagingHiddenStack}).
+ */
+export const isInStagingHiddenStack = (doc: CanvasDocumentContractV3, nodeId: string | null): boolean => {
+  const stack = nodeId ? getDocumentIndex(doc).byId.get(nodeId)?.stack : undefined;
   return stack !== undefined && isOverlayStack(stack) && !STAGING_OVERLAY_STACKS[stack];
 };
 
 /**
- * Whether the screen hides masks, regions and the regenerate tint for a shown preview. Selecting a mask or a region
- * shows them again, drawn above the preview, so what the user edits is never painted blind.
+ * The selected control layer, mask or region a shown preview hides, when the screen would draw it with the stack shown.
+ * A gesture on it reveals the stack (and a brush refuses a layer whose pixels are not loaded yet), so the frame keeps
+ * it resident while hidden and on screen. A selected group needs nothing up front: brush and shapes paint a new layer,
+ * move drags whatever caches exist.
  */
-export const hidesOverlayStacksForStaging = (
-  doc: CanvasDocumentContractV3,
-  stagedPreview: StagedPreviewState | null
-): boolean => stagedPreview !== null && !isEditingStagingHiddenStack(doc);
+const stagingHiddenSelectedLeaf = (doc: CanvasDocumentContractV3): SemanticLeaf | null => {
+  const leaf = doc.selectedLayerId ? lookupDocumentLeaf(doc, doc.selectedLayerId) : null;
+  return leaf &&
+    isOverlayStack(leaf.stack) &&
+    !STAGING_OVERLAY_STACKS[leaf.stack] &&
+    isLeafDrawableForScreen(leaf, false)
+    ? leaf
+    : null;
+};
 
 export interface CompositeFrame {
   /** Composites the document onto the screen surface and enforces the surface budget. */
@@ -107,8 +132,8 @@ export const createCompositeFrame = (deps: CreateCompositeFrameDeps): CompositeF
   const { derivedSurfaceCache, diagnostics, layerCache, previews, raster, stores, transformOverrides, viewport } = deps;
 
   /**
-   * Create missing caches and rasterize stale ones, but never resize existing entries here: unflushed paint may
-   * exceed persisted bounds. Rasterization owns bounds changes.
+   * Create missing caches and rasterize stale ones, but never resize existing entries here: unflushed paint may exceed
+   * persisted bounds. Rasterization owns bounds changes.
    */
   const ensureLayerCaches = (
     doc: CanvasDocumentContractV3,
@@ -116,16 +141,19 @@ export const createCompositeFrame = (deps: CreateCompositeFrameDeps): CompositeF
     activeFrameLayerIds: ReadonlySet<string>
   ): void => {
     for (const { layer } of frame.leaves) {
-      if (!activeFrameLayerIds.has(layer.id) || !isLayerContributing(layer) || !renderableSourceOf(layer)) {
-        continue;
+      if (activeFrameLayerIds.has(layer.id)) {
+        ensureLayerCache(doc, layer);
       }
-      if (!isRenderableLayer(layer)) {
-        continue;
-      }
-      const entry = layerCache.getOrCreateRect(layer.id, getSourceContentRect(layer, doc));
-      if (entry.stale) {
-        deps.rasterizeLayer(layer, doc);
-      }
+    }
+  };
+
+  const ensureLayerCache = (doc: CanvasDocumentContractV3, layer: CanvasLayerContract): void => {
+    if (!isLayerContributing(layer) || !renderableSourceOf(layer) || !isRenderableLayer(layer)) {
+      return;
+    }
+    const entry = layerCache.getOrCreateRect(layer.id, getSourceContentRect(layer, doc));
+    if (entry.stale) {
+      deps.rasterizeLayer(layer, doc);
     }
   };
 
@@ -145,8 +173,8 @@ export const createCompositeFrame = (deps: CreateCompositeFrameDeps): CompositeF
     };
   };
 
-  // The frame description is reused until the document, isolation or override contents change; each leaf's
-  // bounds until its contract, placement, live cache extent or the document size does.
+  // The frame description is reused until the document, isolation or override contents change; each leaf's bounds until
+  // its contract, placement, live cache extent or the document size does.
   let preparation: CompositePreparation | null = null;
   // A bounded or empty repaint reads only part of the working set; the usage window stays open from the last full
   // repaint so artifacts it skipped are not evicted as unused.
@@ -212,21 +240,38 @@ export const createCompositeFrame = (deps: CreateCompositeFrameDeps): CompositeF
       const stagedPreview = previews.getStaged();
       const isolatedGuard = samPreview?.isolated ? samPreview.guard : null;
       const overrides = !isolatedGuard && transformOverrides.size > 0 ? transformOverrides : null;
-      const staging = hidesOverlayStacksForStaging(doc, stagedPreview);
+      // A shown or toggled-off preview hides every overlay stack and the regenerate tint, unless one is being edited.
+      const staging = previews.hidesStagingOverlays() && !deps.isEditingStagingHiddenStack();
       const showOverlayStacks = staging ? STAGING_OVERLAY_STACKS : undefined;
       const frame = describeFrame(doc, isolatedGuard?.layerId ?? null, overrides, showOverlayStacks);
       // Snapshot filter previews only when active, avoiding an empty map allocation every frame.
       const layerPreviews = !isolatedGuard && previews.filterCount() > 0 ? previews.filterSnapshot() : null;
+      const visibleRect = visibleDocumentRect(screen);
       const activeFrameLayerIds = calculateActiveFrameLayerIds({
         document: doc,
         preparation: frame,
-        viewport: visibleDocumentRect(screen),
+        viewport: visibleRect,
       });
       // A previewed layer draws through its cache entry even when only the preview is on screen.
       for (const layerId of layerPreviews?.keys() ?? []) {
         activeFrameLayerIds.add(layerId);
       }
       ensureLayerCaches(doc, frame, activeFrameLayerIds);
+      // The selected overlay leaf stays loaded and unevicted while hidden, ready for a gesture to reveal and edit,
+      // under the same on-screen rule as the leaves the frame draws. No transform override moves a hidden leaf.
+      const hiddenSelected = staging && !isolatedGuard ? stagingHiddenSelectedLeaf(doc) : null;
+      const hiddenBounds = hiddenSelected
+        ? committedLeafBounds(
+            hiddenSelected,
+            hiddenSelected.worldTransform,
+            doc,
+            layerCache.peek(hiddenSelected.id)?.rect
+          )
+        : null;
+      if (hiddenSelected && hiddenBounds && intersect(hiddenBounds, visibleRect)) {
+        activeFrameLayerIds.add(hiddenSelected.id);
+        ensureLayerCache(doc, hiddenSelected.layer);
+      }
       const frameDamage = isolatedGuard ? FULL_DAMAGE : (damage ?? FULL_DAMAGE);
       const usage = raster.beginFrame();
       if (frameDamage.kind === 'full' || !fullFrameUsage) {
@@ -243,7 +288,6 @@ export const createCompositeFrame = (deps: CreateCompositeFrameDeps): CompositeF
         controlView: isolatedGuard ? null : deps.getControlView(),
         derivedSurfaces: derivedSurfaceCache,
         diagnostics,
-        // Pixels in flight, drawn directly above the layer they were cut from.
         floatingSelection: isolatedGuard ? null : (floatFrame?.composite ?? null),
         imageSmoothing: shouldSmoothAtZoom(viewport.getZoom()),
         isolationLayerId: isolatedGuard?.layerId ?? null,
@@ -267,7 +311,6 @@ export const createCompositeFrame = (deps: CreateCompositeFrameDeps): CompositeF
                 surface: stagedPreview.surface,
               }
             : null,
-        // Skip the edited text layer because its portal renders live content.
         skipLayerId: stores.textEditSession.get()?.layerId ?? null,
         transformOverrides: overrides,
       });

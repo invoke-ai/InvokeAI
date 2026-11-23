@@ -624,17 +624,21 @@ class _EmptyCacheObserver:
                         # moved or freed before it have voided the window (`offloading`, `dropped`).
                         window.fold(window.counters.read(), ends_segment=False)
                     elif not own_boundary:
-                        window.fold(window.counters.read())
+                        window.fold(window.counters.read(), ends_segment=False)
                         window.pending_reset = True
         except Exception:
             _all_failed("follow a release")
 
-    def after_empty_cache(self) -> None:
+    def after_empty_cache(self, released: bool) -> None:
+        # The boundary is only real once the backend released: a refused release (see `TorchDevice.empty_cache`) left
+        # the segment, and its peaks, running.
         try:
             with _state_lock:
                 for window in _open_windows:
                     if window.pending_reset and window.counters is not None:
-                        window.counters.reset_peaks()
+                        if released:
+                            window.segments += 1
+                            window.counters.reset_peaks()
                         window.pending_reset = False
         except Exception:
             _all_failed("follow a release")

@@ -4,7 +4,12 @@ export {
   type ImageContextMenuTarget,
   type ImageContextMenuVariant,
 } from './ImageContextMenu';
-export { GALLERY_CANVAS_IMPORT_DESTINATIONS, ImageContinueGroup, ImageUseGroups } from './ImageItemMenuGroups';
+export {
+  GALLERY_CANVAS_IMPORT_DESTINATIONS,
+  ImageContinueGroup,
+  ImageUseGroups,
+  VideoUseGroups,
+} from './ImageItemMenuGroups';
 export { useImageRecallCapabilities } from './useImageRecallCapabilities';
 export {
   buildImageRecallSettings,
@@ -15,11 +20,12 @@ export {
   type ImageRecallKind,
   type ImageRecallResult,
 } from './imageRecall';
-export { executeImageRecall, getCurrentGenerateValues } from './executeImageRecall';
+export { claimCanvasRecall, executeImageRecall, getCurrentGenerateValues } from './executeImageRecall';
 export { readRecordedModelRef } from './recordedModel';
 export {
   appendReferenceVideo,
   applyVideoRecallMetadata,
+  executeVideoRecall,
   getCurrentVideoValues,
   placeConditioningClip,
   placeInitialVideo,

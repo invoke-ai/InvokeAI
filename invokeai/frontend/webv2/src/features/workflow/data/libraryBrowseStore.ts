@@ -15,13 +15,20 @@ import {
 import { createExternalStore } from '@platform/state/externalStore';
 import { shallowEqual } from '@platform/state/selectorCore';
 import { createTrailingSingleFlight } from '@platform/state/singleFlight';
-import { getApiErrorMessage } from '@platform/transport/http';
+import { ApiError, getApiErrorMessage } from '@platform/transport/http';
 
-import type { WorkflowLibraryCategory, WorkflowLibraryListItem, WorkflowLibraryPage } from './api';
+import type { ListWorkflowsParams, WorkflowLibraryCategory, WorkflowLibraryListItem, WorkflowLibraryPage } from './api';
 
-import { getAllWorkflowTags, getWorkflowTagCounts, listLibraryWorkflows, onLibraryWorkflowOpened } from './api';
+import {
+  getAllWorkflowTags,
+  getWorkflowTagCounts,
+  listLibraryWorkflows,
+  onLibraryWorkflowOpened,
+  onLibraryWorkflowRun,
+} from './api';
 import {
   getLibraryWorkflowCached,
+  getLibraryWorkflowRecordCached,
   onWorkflowLibraryCacheInvalidated,
   WorkflowLibraryChangedDuringReadError,
 } from './libraryCache';
@@ -29,25 +36,51 @@ import { getInvocationTemplatesSnapshot, refreshInvocationTemplates } from './te
 
 const libraryLogger = createLogger({ area: 'library', namespace: 'workflows' });
 
-/**
- * Filter and paginate server-side; asynchronously enrich cached payloads per row so node/model details cannot
- * block the grid.
- */
+/** Server-side filter and pagination; per-row enrichment of cached payloads never blocks the grid. */
 
 export type { WorkflowTagCount } from '@features/workflow/core/libraryTags';
 
-/** What the library's own templates are ordered by; bundled templates always list by name. */
-export type WorkflowLibrarySort = 'updated' | 'opened' | 'created' | 'name';
+/** Recent holds the owned and bundled templates the account has opened. */
+export type WorkflowLibraryPlace = 'user' | 'default' | 'shared' | 'recent';
+
+export type WorkflowLibrarySort = 'updated' | 'opened' | 'created' | 'name' | 'lastRun';
+
+export type WorkflowLibrarySortDirection = 'asc' | 'desc';
 
 export interface WorkflowLibraryBrowseFilter {
-  category: WorkflowLibraryCategory;
-  /** Public user workflows form a distinct view; absent keeps user listings owner scoped. */
-  isPublic?: boolean;
-  tag: string | null;
+  place: WorkflowLibraryPlace;
+  /** Any-of: a workflow carrying one of these tags matches. Kept sorted and unique, so equal selections share a view. */
+  tags: readonly string[];
   search: string;
-  /** Applies to the user category only; see `getListOrder`. */
   sort: WorkflowLibrarySort;
+  direction: WorkflowLibrarySortDirection;
 }
+
+export const getWorkflowLibrarySortDefaultDirection = (sort: WorkflowLibrarySort): WorkflowLibrarySortDirection =>
+  sort === 'name' ? 'asc' : 'desc';
+
+/**
+ * Recent lists most recently opened first. Bundled templates list by name (the server rewrites their timestamps at
+ * every start) and take the filter's direction only when its key is name.
+ */
+export const getWorkflowLibraryOrder = ({
+  direction,
+  place,
+  sort,
+}: Pick<WorkflowLibraryBrowseFilter, 'direction' | 'place' | 'sort'>): {
+  direction: WorkflowLibrarySortDirection;
+  sort: WorkflowLibrarySort;
+} => {
+  if (place === 'recent') {
+    return { direction: 'desc', sort: 'opened' };
+  }
+
+  if (place === 'default') {
+    return { direction: sort === 'name' ? direction : 'asc', sort: 'name' };
+  }
+
+  return { direction, sort };
+};
 
 export type WorkflowLibraryEntryEnrichment =
   | { status: 'pending' }
@@ -56,53 +89,95 @@ export type WorkflowLibraryEntryEnrichment =
 
 export interface WorkflowLibraryEntry {
   item: WorkflowLibraryListItem;
-  /** Parsed once from `item.tags` so cards never re-split the raw string. */
   tags: readonly string[];
   enrichment: WorkflowLibraryEntryEnrichment;
 }
 
+/** A server item position and the fraction of its row above the grid viewport. */
+export interface WorkflowLibraryScrollAnchor {
+  index: number;
+  fraction: number;
+}
+
 export interface WorkflowLibraryBrowseSnapshot {
   filter: WorkflowLibraryBrowseFilter;
-  status: 'idle' | 'loading' | 'loadingMore' | 'loaded' | 'error';
-  /** Accumulated pages for the current filter, in server order. */
+  status: 'idle' | 'loading' | 'loaded' | 'error';
+  startIndex?: number;
+  scrollAnchor?: WorkflowLibraryScrollAnchor | null;
+  selectedEntry?: WorkflowLibraryEntry | null;
   entries: readonly WorkflowLibraryEntry[];
   /** Last loaded page (0-based, mirroring the API). */
   page: number;
   pages: number;
   total: number;
-  /** Chip counts for the current category and visibility filter. */
+  /** Tag counts for the current place, independent of the search and the checked tags. */
   tagCounts: readonly WorkflowTagCount[];
-  /** Total user-category workflows, for the one-time Browse/Yours auto-switch. */
-  userTotal: number | null;
+  /** Unfiltered totals per place, for the rail and the empty-account switch to Templates; absent until known. */
+  placeTotals: Readonly<Partial<Record<WorkflowLibraryPlace, number>>>;
   error: string | null;
 }
 
 const PER_PAGE = 20;
+/** The most consecutive metadata positions the current view keeps resident (see README). */
+export const WORKFLOW_LIBRARY_METADATA_WINDOW = PER_PAGE * 3;
+export const WORKFLOW_LIBRARY_ENRICHMENT_DEMAND = 48;
 const ENRICHMENT_CONCURRENCY = 4;
 
 const PENDING_ENRICHMENT: WorkflowLibraryEntryEnrichment = { status: 'pending' };
 const EMPTY_ENTRIES: readonly WorkflowLibraryEntry[] = [];
 const EMPTY_TAG_COUNTS: readonly WorkflowTagCount[] = [];
-const INITIAL_FILTER: WorkflowLibraryBrowseFilter = { category: 'user', search: '', sort: 'updated', tag: null };
+const EMPTY_TAGS: readonly string[] = [];
+const EMPTY_PLACE_TOTALS: WorkflowLibraryBrowseSnapshot['placeTotals'] = {};
+const INITIAL_FILTER: WorkflowLibraryBrowseFilter = {
+  direction: 'desc',
+  place: 'user',
+  search: '',
+  sort: 'opened',
+  tags: EMPTY_TAGS,
+};
 
-const ORDER_BY: Record<WorkflowLibrarySort, 'created_at' | 'name' | 'opened_at' | 'updated_at'> = {
+type ListOrderBy = NonNullable<ListWorkflowsParams['orderBy']>;
+
+const ORDER_BY: Record<WorkflowLibrarySort, ListOrderBy> = {
   created: 'created_at',
+  lastRun: 'last_run_at',
   name: 'name',
   opened: 'opened_at',
   updated: 'updated_at',
 };
 
-/**
- * The list order a filter asks the server for. Bundled templates always list by name: the server rewrites their
- * timestamps at every start, so their dates order nothing. Dates list newest first; names A to Z.
- */
-const getListOrder = ({
-  category,
-  sort,
-}: WorkflowLibraryBrowseFilter): { direction: 'ASC' | 'DESC'; orderBy: (typeof ORDER_BY)[WorkflowLibrarySort] } => {
-  const effective = category === 'default' ? 'name' : sort;
+const getListOrder = (filter: WorkflowLibraryBrowseFilter): { direction: 'ASC' | 'DESC'; orderBy: ListOrderBy } => {
+  const { direction, sort } = getWorkflowLibraryOrder(filter);
 
-  return { direction: effective === 'name' ? 'ASC' : 'DESC', orderBy: ORDER_BY[effective] };
+  return { direction: direction === 'asc' ? 'ASC' : 'DESC', orderBy: ORDER_BY[sort] };
+};
+
+/** Shared is every account's public templates; My library and Recent stay owner scoped. */
+const PLACE_SCOPES: Record<
+  WorkflowLibraryPlace,
+  { categories: readonly WorkflowLibraryCategory[]; hasBeenOpened?: true; isPublic?: true }
+> = {
+  default: { categories: ['default'] },
+  recent: { categories: ['user', 'default'], hasBeenOpened: true },
+  shared: { categories: ['user'], isPublic: true },
+  user: { categories: ['user'] },
+};
+
+const getListScope = (place: WorkflowLibraryPlace) => {
+  const { categories, ...flags } = PLACE_SCOPES[place];
+
+  return categories.length === 1 ? { category: categories[0]!, ...flags } : { categories: [...categories], ...flags };
+};
+
+/** Sorted and unique; the previous array when the selection is unchanged, so an equal patch is a no-op. */
+const normalizeTags = (tags: readonly string[], previous: readonly string[]): readonly string[] => {
+  const next = [...new Set(tags)].sort();
+
+  if (next.length === 0) {
+    return EMPTY_TAGS;
+  }
+
+  return next.length === previous.length && next.every((tag, index) => tag === previous[index]) ? previous : next;
 };
 
 const INITIAL_SNAPSHOT: WorkflowLibraryBrowseSnapshot = {
@@ -112,22 +187,26 @@ const INITIAL_SNAPSHOT: WorkflowLibraryBrowseSnapshot = {
   page: 0,
   pages: 0,
   status: 'idle',
+  placeTotals: EMPTY_PLACE_TOTALS,
   tagCounts: EMPTY_TAG_COUNTS,
   total: 0,
-  userTotal: null,
 };
 
 const store = createExternalStore<WorkflowLibraryBrowseSnapshot>(INITIAL_SNAPSHOT);
 
-// #region View cache
+const withPlaceTotal = (filter: WorkflowLibraryBrowseFilter, total: number) =>
+  filter.search === '' && filter.tags.length === 0 && store.getSnapshot().placeTotals[filter.place] !== total
+    ? { placeTotals: { ...store.getSnapshot().placeTotals, [filter.place]: total } }
+    : {};
 
 /**
- * Views already browsed (Browse, Yours, Shared, a tag or search), kept so switching back shows them at once with their
- * enrichment instead of refetching and re-reading every row. A view older than `VIEW_FRESH_MS` is revalidated in the
- * background and merged in place; library mutations drop the other views.
+ * Views already browsed, so switching back shows their metadata at once. One older than `VIEW_FRESH_MS` revalidates
+ * in the background; library mutations drop the other views.
  */
 interface CachedBrowseView {
   entries: readonly WorkflowLibraryEntry[];
+  startIndex: number;
+  scrollAnchor: WorkflowLibraryScrollAnchor | null;
   fetchedAt: number;
   orderBy: ReturnType<typeof getListOrder>['orderBy'];
   page: number;
@@ -139,15 +218,13 @@ interface CachedBrowseView {
 const VIEW_CACHE_LIMIT = 8;
 const VIEW_FRESH_MS = 30_000;
 const viewCache = new Map<string, CachedBrowseView>();
-/** When the current view's pages last arrived from the server. */
 let currentViewFetchedAt = 0;
 
 const getFilterKey = (filter: WorkflowLibraryBrowseFilter): string =>
   JSON.stringify([
-    filter.category,
-    filter.isPublic,
+    filter.place,
     filter.search,
-    filter.tag,
+    filter.tags,
     getListOrder(filter).orderBy,
     getListOrder(filter).direction,
   ]);
@@ -164,7 +241,11 @@ const rememberCurrentView = (): void => {
 
   viewCache.delete(key);
   viewCache.set(key, {
-    entries,
+    entries: entries.map((entry) =>
+      entry.enrichment.status === 'pending' ? entry : { ...entry, enrichment: PENDING_ENRICHMENT }
+    ),
+    startIndex: store.getSnapshot().startIndex ?? 0,
+    scrollAnchor: store.getSnapshot().scrollAnchor ?? null,
     fetchedAt: currentViewFetchedAt,
     orderBy: getListOrder(filter).orderBy,
     page,
@@ -173,7 +254,6 @@ const rememberCurrentView = (): void => {
     total,
   });
 
-  // Maps iterate in insertion order, so the first key is the least recently left view.
   while (viewCache.size > VIEW_CACHE_LIMIT) {
     const oldest = viewCache.keys().next().value;
 
@@ -184,23 +264,18 @@ const rememberCurrentView = (): void => {
   }
 };
 
-// #endregion
-
 const initialLoadFlight = createTrailingSingleFlight();
 const refreshFlight = createTrailingSingleFlight();
+let initialLoadGeneration = -1;
+let refreshGeneration = -1;
 
-/**
- * Fences page responses by generation, not request order. A filter change, an account change, or a revalidation of
- * the current view starts a new generation, so a page requested before it cannot publish over what it read.
- */
+/** Fences page responses by generation, not request order; a filter, account or revalidation change starts one. */
 let listGeneration = 0;
-/** The generation of the revalidation reading the current view's pages; infinite scroll waits for it. */
-let revalidatingGeneration: number | null = null;
+/** Only metadata published in this list generation can satisfy overlapping range reads. */
+let metadataGeneration = -1;
 
 const isListCurrent = (generation: number, owner: AccountScope): boolean =>
   generation === listGeneration && isAccountScopeCurrent(owner);
-
-// #region Entries
 
 const toEntry = (item: WorkflowLibraryListItem): WorkflowLibraryEntry => ({
   enrichment: PENDING_ENRICHMENT,
@@ -222,7 +297,6 @@ const mergeEntries = (
   });
 };
 
-/** Re-arms rows whose enrichment failed so an explicit revalidation retries them. */
 const retryFailedEnrichment = (entries: readonly WorkflowLibraryEntry[]): readonly WorkflowLibraryEntry[] =>
   entries.some((entry) => entry.enrichment.status === 'error')
     ? entries.map((entry) =>
@@ -230,34 +304,28 @@ const retryFailedEnrichment = (entries: readonly WorkflowLibraryEntry[]): readon
       )
     : entries;
 
-const publishPage = (result: WorkflowLibraryPage, mode: 'append' | 'replace'): void => {
-  const previous = store.getSnapshot().entries;
-  const merged = mergeEntries(previous, result.items);
-
-  if (mode === 'replace') {
-    currentViewFetchedAt = Date.now();
-  }
-
+const publishPage = (result: WorkflowLibraryPage): void => {
+  currentViewFetchedAt = Date.now();
+  metadataGeneration = listGeneration;
   store.patchSnapshot({
-    entries: mode === 'append' ? [...previous, ...merged] : merged,
+    entries: mergeEntries(store.getSnapshot().entries, result.items),
+    startIndex: result.page * PER_PAGE,
     error: null,
     page: result.page,
     pages: result.pages,
     status: 'loaded',
     total: result.total,
+    ...withPlaceTotal(store.getSnapshot().filter, result.total),
   });
-
   pumpEnrichment();
 };
 
-/**
- * Share one template-load attempt for enrichment and remember failure to prevent fetch storms; explicit
- * refresh/filter/account changes rearm it.
- */
+/** One shared template load; a failure sticks until a refresh, filter or account change, preventing fetch storms. */
 let templatesFlight: Promise<void> | null = null;
 let hasTemplateLoadFailed = false;
 
 const loadTemplates = async (): Promise<InvocationTemplates> => {
+  const owner = captureAccountScope();
   const snapshot = getInvocationTemplatesSnapshot();
 
   if (snapshot.status === 'loaded') {
@@ -268,10 +336,16 @@ const loadTemplates = async (): Promise<InvocationTemplates> => {
     throw new Error('Node definitions are unavailable.');
   }
 
-  templatesFlight ??= refreshInvocationTemplates().finally(() => {
-    templatesFlight = null;
-  });
+  if (!templatesFlight) {
+    const flight = refreshInvocationTemplates().finally(() => {
+      if (templatesFlight === flight) {
+        templatesFlight = null;
+      }
+    });
+    templatesFlight = flight;
+  }
   await templatesFlight;
+  owner.signal.throwIfAborted();
 
   const settled = getInvocationTemplatesSnapshot();
 
@@ -284,140 +358,363 @@ const loadTemplates = async (): Promise<InvocationTemplates> => {
   return settled.templates;
 };
 
-const enrichmentQueue: string[] = [];
-const queuedWorkflowIds = new Set<string>();
-let activeEnrichmentWorkers = 0;
+// Demand belongs to mounted UI leases; selected detail is independent of the metadata window.
+let visibleDemand: readonly string[] = [];
+let selectedDemand: string | null = null;
+let selectedValidation: number | null = null;
+let selectedController: AbortController | null = null;
+const activeReads = new Map<string, AbortController>();
+
+export const selectWorkflowLibraryEntry = (
+  snapshot: Pick<WorkflowLibraryBrowseSnapshot, 'entries' | 'selectedEntry'>,
+  workflowId: string | null
+): WorkflowLibraryEntry | undefined => {
+  const selected = snapshot.selectedEntry?.item.workflow_id === workflowId ? snapshot.selectedEntry : undefined;
+  const resident = snapshot.entries.find((entry) => entry.item.workflow_id === workflowId);
+  // Independent list and selected reads can complete in either order; neither may lower the revision floor.
+  return selected && (!resident || selected.item.revision >= resident.item.revision) ? selected : resident;
+};
 
 const findEntry = (workflowId: string): WorkflowLibraryEntry | undefined =>
-  store.getSnapshot().entries.find((entry) => entry.item.workflow_id === workflowId);
+  selectWorkflowLibraryEntry(store.getSnapshot(), workflowId);
 
-/** Publishes one entry's enrichment, reusing every other entry object as-is. */
-const applyEnrichment = (workflowId: string, enrichment: WorkflowLibraryEntryEnrichment, owner: AccountScope): void => {
-  if (!isAccountScopeCurrent(owner)) {
-    return;
+const demandedIds = (): Set<string> =>
+  new Set([...(selectedDemand ? [selectedDemand] : []), ...visibleDemand.slice(0, WORKFLOW_LIBRARY_ENRICHMENT_DEMAND)]);
+
+/**
+ * Drops undemanded documents, and gives a pending list copy of the selected workflow the selected copy's enrichment at
+ * the same revision, so a card never stays pending beside a rail that shows that revision.
+ */
+const trimDocuments = (): void => {
+  const demand = demandedIds();
+  const snapshot = store.getSnapshot();
+  const selectedEntry = selectedDemand ? (findEntry(selectedDemand) ?? null) : null;
+  const inherited = selectedEntry?.enrichment.status === 'pending' ? null : selectedEntry;
+  const entries = snapshot.entries.map((entry) => {
+    if (
+      inherited &&
+      entry !== inherited &&
+      entry.enrichment.status === 'pending' &&
+      entry.item.workflow_id === inherited.item.workflow_id &&
+      entry.item.revision === inherited.item.revision
+    ) {
+      return { ...entry, enrichment: inherited.enrichment };
+    }
+
+    return !demand.has(entry.item.workflow_id) && entry.enrichment.status !== 'pending'
+      ? { ...entry, enrichment: PENDING_ENRICHMENT }
+      : entry;
+  });
+  if (selectedEntry !== snapshot.selectedEntry || entries.some((entry, index) => entry !== snapshot.entries[index])) {
+    store.patchSnapshot({ entries, selectedEntry });
   }
-
-  const { entries } = store.getSnapshot();
-  const index = entries.findIndex((entry) => entry.item.workflow_id === workflowId);
-  const existing = entries[index];
-
-  // The row was filtered or paged away while its payload was in flight.
-  if (!existing) {
-    return;
+  for (const [id, controller] of activeReads) {
+    if (!demand.has(id)) {
+      controller.abort();
+    }
   }
-
-  const next = entries.slice();
-
-  next[index] = { ...existing, enrichment };
-  store.patchSnapshot({ entries: next });
 };
 
-const enrichEntry = async (
-  { revision, workflow_id: workflowId }: WorkflowLibraryListItem,
-  owner: AccountScope
-): Promise<void> => {
-  try {
-    const templates = await loadTemplates();
-    const raw = await getLibraryWorkflowCached(workflowId, { expectedRevision: revision, signal: owner.signal });
-    const { document } = parseWorkflowJson(raw);
-
-    applyEnrichment(
-      workflowId,
-      {
-        document,
-        nodeCount: document.nodes.length,
-        requirements: extractWorkflowModelRequirements(document, templates),
-        status: 'ready',
-      },
-      owner
-    );
-  } catch (error) {
-    // The library, not this row, kept changing mid-read: the row stays pending and is read again. This recurs only
-    // while invalidations keep landing.
-    if (error instanceof WorkflowLibraryChangedDuringReadError) {
-      if (isAccountScopeCurrent(owner)) {
+const pumpEnrichment = (): void => {
+  trimDocuments();
+  if (
+    selectedDemand &&
+    findEntry(selectedDemand)?.enrichment.status === 'pending' &&
+    !activeReads.has(selectedDemand) &&
+    activeReads.size >= ENRICHMENT_CONCURRENCY
+  ) {
+    const obsolete = [...activeReads].reverse().find(([id]) => id !== selectedDemand);
+    obsolete?.[1].abort();
+  }
+  for (const workflowId of demandedIds()) {
+    if (activeReads.size + (selectedValidation !== null ? 1 : 0) >= ENRICHMENT_CONCURRENCY) {
+      break;
+    }
+    const entry = findEntry(workflowId);
+    if (
+      !entry ||
+      (workflowId === selectedDemand && selectedValidation !== null) ||
+      entry.enrichment.status !== 'pending' ||
+      activeReads.has(workflowId)
+    ) {
+      continue;
+    }
+    const controller = new AbortController();
+    const owner = captureAccountScope();
+    const generation = listGeneration;
+    activeReads.set(workflowId, controller);
+    const signal = AbortSignal.any([owner.signal, controller.signal]);
+    const publish = (enrichment: WorkflowLibraryEntryEnrichment) => {
+      if (
+        signal.aborted ||
+        !isListCurrent(generation, owner) ||
+        !demandedIds().has(workflowId) ||
+        findEntry(workflowId)?.item.revision !== entry.item.revision
+      ) {
+        return;
+      }
+      const snapshot = store.getSnapshot();
+      store.patchSnapshot({
+        entries: snapshot.entries.map((candidate) =>
+          candidate.item.workflow_id === workflowId && candidate.item.revision === entry.item.revision
+            ? { ...candidate, enrichment }
+            : candidate
+        ),
+        selectedEntry: selectedDemand === workflowId ? { ...entry, enrichment } : snapshot.selectedEntry,
+      });
+    };
+    void (async () => {
+      try {
+        const templates = await loadTemplates();
+        signal.throwIfAborted();
+        const raw = await getLibraryWorkflowCached(workflowId, { expectedRevision: entry.item.revision, signal });
+        signal.throwIfAborted();
+        const { document } = parseWorkflowJson(raw);
+        publish({
+          document,
+          nodeCount: document.nodes.length,
+          requirements: extractWorkflowModelRequirements(document, templates),
+          status: 'ready',
+        });
+      } catch (error) {
+        if (!signal.aborted && !(error instanceof WorkflowLibraryChangedDuringReadError)) {
+          publish({ message: getApiErrorMessage(error, 'Failed to read this workflow.'), status: 'error' });
+        }
+      } finally {
+        if (activeReads.get(workflowId) === controller) {
+          activeReads.delete(workflowId);
+        }
         pumpEnrichment();
       }
-      return;
-    }
-
-    // One unreadable workflow marks its own card and never fails the pool.
-    libraryLogger.warn({
-      context: { workflowId },
-      error,
-      message: 'Failed to read a library workflow',
-      name: 'workflows.library-read-failed',
-    });
-    applyEnrichment(
-      workflowId,
-      { message: getApiErrorMessage(error, 'Failed to read this workflow.'), status: 'error' },
-      owner
-    );
+    })();
   }
 };
 
-const runEnrichmentWorker = async (): Promise<void> => {
-  try {
-    for (let workflowId = enrichmentQueue.shift(); workflowId !== undefined; workflowId = enrichmentQueue.shift()) {
-      queuedWorkflowIds.delete(workflowId);
+export const setWorkflowLibraryVisibleDemand = (ids: readonly string[]): void => {
+  visibleDemand = ids.slice(0, WORKFLOW_LIBRARY_ENRICHMENT_DEMAND);
+  pumpEnrichment();
+};
 
-      const entry = findEntry(workflowId);
+export const setWorkflowLibrarySelectedDemand = (id: string | null): void => {
+  if (selectedDemand !== id) {
+    selectedValidation = null;
+    selectedController?.abort();
+    selectedController = null;
+  }
+  selectedDemand = id;
+  pumpEnrichment();
+};
 
-      // Each item captures the scope it starts under, so a worker that outlives
-      // an account switch drops its result instead of writing it.
-      if (entry) {
-        await enrichEntry(entry.item, captureAccountScope());
+export const rememberWorkflowLibraryScroll = (
+  filter: WorkflowLibraryBrowseFilter,
+  scrollAnchor: WorkflowLibraryScrollAnchor
+): void => {
+  const snapshot = store.getSnapshot();
+  // A leaving grid may still report measurements during the new view's commit.
+  if (
+    snapshot.filter === filter &&
+    (snapshot.scrollAnchor?.index !== scrollAnchor.index || snapshot.scrollAnchor.fraction !== scrollAnchor.fraction)
+  ) {
+    store.patchSnapshot({ scrollAnchor });
+  }
+};
+
+let windowRequest = 0;
+let rangeController: AbortController | null = null;
+/** Share bounded metadata reads, but resolve readiness for each caller's requested positions. */
+export const loadWorkflowLibraryRange = async (start: number, end: number, force = false): Promise<boolean> => {
+  const generation = listGeneration;
+  const owner = captureAccountScope();
+  const loading = loadWorkflowLibraryWindow(start, end, force);
+  const request = windowRequest;
+  const loaded = await loading;
+  const snapshot = store.getSnapshot();
+  const residentStart = snapshot.startIndex ?? 0;
+  const residentEnd = residentStart + snapshot.entries.length;
+  return (
+    loaded &&
+    isListCurrent(generation, owner) &&
+    request === windowRequest &&
+    start >= residentStart &&
+    start < residentEnd &&
+    Math.min(end, snapshot.total - 1) < residentEnd
+  );
+};
+
+/** Retain at most 60 consecutive positions. Partial edge pages are transient fetch buffers only. */
+const loadWorkflowLibraryWindow = (start: number, end: number, force: boolean): Promise<boolean> => {
+  const snapshot = store.getSnapshot();
+  if (snapshot.status === 'idle' || snapshot.status === 'loading' || snapshot.pages === 0) {
+    return Promise.resolve(false);
+  }
+  const residentStart = snapshot.startIndex ?? 0;
+  const requestedEnd = Math.min(end, snapshot.total - 1);
+  const flightCoversDemand =
+    rangeFlightWindow !== null &&
+    start >= rangeFlightWindow.start &&
+    start < rangeFlightWindow.end &&
+    requestedEnd < rangeFlightWindow.end;
+  // A viewport update inside Retry's window must not replace its forced revalidation with reused pages.
+  if (!force && rangeFlightWindow?.force && flightCoversDemand) {
+    return rangeFlight!;
+  }
+  const fetchedAt = currentViewFetchedAt;
+  const canReuse =
+    !force && metadataGeneration === listGeneration && fetchedAt !== 0 && Date.now() - fetchedAt <= VIEW_FRESH_MS;
+  if (
+    canReuse &&
+    start >= residentStart &&
+    start < residentStart + snapshot.entries.length &&
+    requestedEnd < residentStart + snapshot.entries.length
+  ) {
+    if (rangeFlightWindow && !flightCoversDemand) {
+      rangeController?.abort();
+      windowRequest += 1;
+      rangeFlightWindow = null;
+      rangeFlight = null;
+    }
+    return Promise.resolve(true);
+  }
+  // Most viewports fit aligned pages. A tall viewport can cross four pages while still needing only 60 positions.
+  const alignedStart = Math.max(0, Math.min(Math.floor(start / PER_PAGE), snapshot.pages - 3)) * PER_PAGE;
+  const windowStart = end < alignedStart + WORKFLOW_LIBRARY_METADATA_WINDOW ? alignedStart : Math.max(0, start);
+  const windowEnd = Math.min(snapshot.total, windowStart + WORKFLOW_LIBRARY_METADATA_WINDOW);
+  const first = Math.floor(windowStart / PER_PAGE);
+  const last = Math.max(first, Math.ceil(windowEnd / PER_PAGE) - 1);
+  const key = `${listGeneration}:${windowStart}:${windowEnd}:${force}`;
+  if (rangeFlightWindow?.key === key && (canReuse || !rangeFlightWindow.reusesMetadata)) {
+    return rangeFlight!;
+  }
+  const flightWindow = { key, start: windowStart, end: windowEnd, force, reusesMetadata: false };
+  rangeFlightWindow = flightWindow;
+  rangeController?.abort();
+  const controller = new AbortController();
+  rangeController = controller;
+  const request = ++windowRequest;
+  const generation = listGeneration;
+  const owner = captureAccountScope();
+  const flight = (async (): Promise<boolean> => {
+    try {
+      const reusedPages = new Set<number>();
+      let results = await Promise.all(
+        Array.from({ length: last - first + 1 }, (_, index) => {
+          const page = first + index;
+          const offset = page * PER_PAGE - residentStart;
+          const size = Math.min(PER_PAGE, snapshot.total - page * PER_PAGE);
+          // Reuse complete positions only: a clipped edge page must be read again before extending it.
+          if (canReuse && offset >= 0 && offset + size <= snapshot.entries.length) {
+            reusedPages.add(page);
+            flightWindow.reusesMetadata = true;
+            return Promise.resolve({
+              page,
+              pages: snapshot.pages,
+              total: snapshot.total,
+              items: snapshot.entries.slice(offset, offset + size).map((entry) => entry.item),
+            });
+          }
+          return fetchPage(snapshot.filter, page, owner, controller.signal);
+        })
+      );
+      if (!isListCurrent(generation, owner) || request !== windowRequest || controller.signal.aborted) {
+        return false;
+      }
+      // A changed total is evidence that offsets shifted; reread reused positions before combining them.
+      if (reusedPages.size && results.some((page) => page.total !== snapshot.total || page.pages !== snapshot.pages)) {
+        flightWindow.reusesMetadata = false;
+        results = await Promise.all(
+          results.map((page) =>
+            reusedPages.has(page.page) ? fetchPage(snapshot.filter, page.page, owner, controller.signal) : page
+          )
+        );
+        reusedPages.clear();
+      }
+      let publishedStart = windowStart;
+      if (results[0] && windowStart >= results[0].total) {
+        results = [await fetchPage(snapshot.filter, Math.max(0, results[0].pages - 1), owner, controller.signal)];
+        publishedStart = (results[0]?.page ?? 0) * PER_PAGE;
+      }
+      if (!isListCurrent(generation, owner) || request !== windowRequest || controller.signal.aborted) {
+        return false;
+      }
+      // A fetched page owns totals; reused pages describe the previous response, not a later server mutation.
+      const result =
+        results.find((page) => page.total !== snapshot.total || page.pages !== snapshot.pages) ?? results[0];
+      if (!result) {
+        return false;
+      }
+      const items = results.flatMap((page) => page.items).slice(publishedStart - (results[0]?.page ?? 0) * PER_PAGE);
+      metadataGeneration = generation;
+      // A partial read cannot renew the age of positions it did not read, even if the flight crossed expiry.
+      currentViewFetchedAt = reusedPages.size ? fetchedAt : Date.now();
+      store.patchSnapshot({
+        entries: mergeEntries(
+          store.getSnapshot().entries,
+          items.slice(0, Math.min(WORKFLOW_LIBRARY_METADATA_WINDOW, Math.max(0, result.total - publishedStart)))
+        ),
+        startIndex: publishedStart,
+        page: Math.min(last, Math.max(0, result.pages - 1)),
+        pages: result.pages,
+        total: result.total,
+        error: null,
+        status: 'loaded',
+      });
+      if (!isListCurrent(generation, owner) || request !== windowRequest || controller.signal.aborted) {
+        return false;
+      }
+      pumpEnrichment();
+      return true;
+    } catch (error) {
+      if (!controller.signal.aborted && isListCurrent(generation, owner) && request === windowRequest) {
+        store.patchSnapshot({ error: getApiErrorMessage(error, 'Failed to load workflows.') });
+      }
+      return false;
+    } finally {
+      if (request === windowRequest) {
+        rangeFlightWindow = null;
+        rangeFlight = null;
       }
     }
-  } finally {
-    activeEnrichmentWorkers -= 1;
-  }
+  })();
+  rangeFlight = flight;
+  return flight;
 };
-
-/** Queues every still-pending entry and tops the worker pool back up. */
-const pumpEnrichment = (): void => {
-  for (const entry of store.getSnapshot().entries) {
-    const workflowId = entry.item.workflow_id;
-
-    if (entry.enrichment.status === 'pending' && !queuedWorkflowIds.has(workflowId)) {
-      queuedWorkflowIds.add(workflowId);
-      enrichmentQueue.push(workflowId);
-    }
-  }
-
-  while (activeEnrichmentWorkers < ENRICHMENT_CONCURRENCY && enrichmentQueue.length > 0) {
-    activeEnrichmentWorkers += 1;
-    void runEnrichmentWorker();
-  }
-};
+let rangeFlight: Promise<boolean> | null = null;
+let rangeFlightWindow: {
+  key: string;
+  start: number;
+  end: number;
+  force: boolean;
+  reusesMetadata: boolean;
+} | null = null;
 
 const fetchPage = (
   filter: WorkflowLibraryBrowseFilter,
   page: number,
-  owner: AccountScope
+  owner: AccountScope,
+  signal?: AbortSignal
 ): Promise<WorkflowLibraryPage> =>
   listLibraryWorkflows({
     ...getListOrder(filter),
-    category: filter.category,
-    ...(filter.isPublic === undefined ? {} : { isPublic: filter.isPublic }),
+    ...getListScope(filter.place),
     page,
     perPage: PER_PAGE,
     query: filter.search || undefined,
-    signal: owner.signal,
-    tags: filter.tag ? [filter.tag] : undefined,
+    signal: signal ? AbortSignal.any([signal, owner.signal]) : owner.signal,
+    tags: filter.tags.length > 0 ? [...filter.tags] : undefined,
   });
 
 const loadFirstPage = async (filter: WorkflowLibraryBrowseFilter, owner: AccountScope): Promise<void> => {
   const generation = listGeneration;
+  const request = windowRequest;
 
   try {
     const result = await fetchPage(filter, 0, owner);
 
-    if (isListCurrent(generation, owner)) {
-      publishPage(result, 'replace');
+    if (isListCurrent(generation, owner) && request === windowRequest) {
+      publishPage(result);
     }
   } catch (error) {
-    if (isListCurrent(generation, owner)) {
+    if (isListCurrent(generation, owner) && request === windowRequest) {
       libraryLogger.warn({
         error,
         message: 'Failed to load workflows',
@@ -428,44 +725,26 @@ const loadFirstPage = async (filter: WorkflowLibraryBrowseFilter, owner: Account
   }
 };
 
-const loadMorePages = async (filter: WorkflowLibraryBrowseFilter, page: number, owner: AccountScope): Promise<void> => {
-  const generation = listGeneration;
-
+/** Tag counts are best-effort: a failed count leaves the previous tags in place. */
+const loadTagCounts = async (place: WorkflowLibraryPlace, owner: AccountScope): Promise<void> => {
   try {
-    const result = await fetchPage(filter, page, owner);
-
-    if (isListCurrent(generation, owner)) {
-      publishPage(result, 'append');
-    }
-  } catch (error) {
-    if (isListCurrent(generation, owner)) {
-      libraryLogger.warn({
-        error,
-        message: 'Failed to load more workflows',
-        name: 'workflows.library-load-failed',
-      });
-      store.patchSnapshot({ error: getApiErrorMessage(error, 'Failed to load more workflows.'), status: 'error' });
-    }
-  }
-};
-
-/** Tag chips are best-effort: a failed count leaves the previous chips in place. */
-const loadTagCounts = async (
-  category: WorkflowLibraryCategory,
-  isPublic: boolean | undefined,
-  owner: AccountScope
-): Promise<void> => {
-  try {
+    const { categories: placeCategories, hasBeenOpened, isPublic } = PLACE_SCOPES[place];
+    const categories = [...placeCategories];
     const publicFilter = isPublic === undefined ? {} : { isPublic };
-    const tags = await getAllWorkflowTags({ categories: [category], ...publicFilter, signal: owner.signal });
+    const tags = await getAllWorkflowTags({ categories, ...publicFilter, signal: owner.signal });
+    // The tag list has no recency filter; Recent's counts drop the tags none of its workflows carry.
     const counts =
       tags.length > 0
-        ? await getWorkflowTagCounts({ categories: [category], ...publicFilter, signal: owner.signal, tags })
+        ? await getWorkflowTagCounts({
+            categories,
+            ...publicFilter,
+            ...(hasBeenOpened ? { hasBeenOpened } : {}),
+            signal: owner.signal,
+            tags,
+          })
         : {};
 
-    // A category or visibility switch mid-flight owns the chips now.
-    const filter = store.getSnapshot().filter;
-    if (!isAccountScopeCurrent(owner) || filter.category !== category || filter.isPublic !== isPublic) {
+    if (!isAccountScopeCurrent(owner) || store.getSnapshot().filter.place !== place) {
       return;
     }
 
@@ -473,55 +752,97 @@ const loadTagCounts = async (
 
     store.patchSnapshot({ tagCounts: tagCounts.length > 0 ? tagCounts : EMPTY_TAG_COUNTS });
   } catch {
-    // Chips are decoration around the grid; the list request owns the error state.
+    // Tag counts are decoration around the grid; the list request owns the error state.
   }
 };
 
-/** Probe one user workflow to decide whether fresh accounts should open bundled defaults. */
-const probeUserTotal = async (owner: AccountScope): Promise<void> => {
-  if (store.getSnapshot().userTotal !== null) {
-    return;
+let placeTotalsGeneration = 0;
+const placeTotalFlights = new Map<WorkflowLibraryPlace, Promise<void>>();
+
+const probePlaceTotal = (place: WorkflowLibraryPlace): Promise<void> => {
+  const inflight = placeTotalFlights.get(place);
+
+  if (inflight) {
+    return inflight;
   }
 
-  try {
-    const result = await listLibraryWorkflows({ category: 'user', page: 0, perPage: 1, signal: owner.signal });
+  const owner = captureAccountScope();
+  const generation = placeTotalsGeneration;
+  const flight: Promise<void> = listLibraryWorkflows({
+    ...getListScope(place),
+    page: 0,
+    perPage: 1,
+    signal: owner.signal,
+  })
+    .then(
+      (result) => {
+        if (isAccountScopeCurrent(owner) && generation === placeTotalsGeneration) {
+          store.patchSnapshot({ placeTotals: { ...store.getSnapshot().placeTotals, [place]: result.total } });
+        }
+      },
+      () => {
+        // A failed probe leaves the previous total in place, or unknown until the first successful probe.
+      }
+    )
+    .finally(() => {
+      if (placeTotalFlights.get(place) === flight) {
+        placeTotalFlights.delete(place);
+      }
+    });
 
-    if (isAccountScopeCurrent(owner)) {
-      store.patchSnapshot({ userTotal: result.total });
-    }
-  } catch {
-    // Leaves `userTotal` null: the dialog simply keeps the category it opened on.
-  }
+  placeTotalFlights.set(place, flight);
+  return flight;
 };
 
-/**
- * Applies a filter patch. A view browsed before comes back from the cache at once (revalidated in the background once
- * stale); a new one resets the accumulated pages and fetches page 0.
- */
+/** One-row probes for the rail's totals; callers leave out the place whose first page is loading anyway. */
+export const loadWorkflowLibraryPlaceTotals = (places: readonly WorkflowLibraryPlace[]): Promise<void> =>
+  Promise.all(places.map(probePlaceTotal)).then(() => undefined);
+
+/** A view browsed before comes back from the cache at once, revalidated once stale; a new one starts from page 0. */
 export const setWorkflowLibraryBrowseFilter = (patch: Partial<WorkflowLibraryBrowseFilter>): void => {
   const snapshot = store.getSnapshot();
-  const filter = { ...snapshot.filter, ...patch };
+  const filter = {
+    ...snapshot.filter,
+    ...patch,
+    tags: patch.tags ? normalizeTags(patch.tags, snapshot.filter.tags) : snapshot.filter.tags,
+  };
 
   if (shallowEqual(filter, snapshot.filter)) {
     return;
   }
 
   const owner = captureAccountScope();
-  const isCategoryChanged = filter.category !== snapshot.filter.category;
-  const isTagScopeChanged = isCategoryChanged || filter.isPublic !== snapshot.filter.isPublic;
+  const isTagScopeChanged = filter.place !== snapshot.filter.place;
 
   rememberCurrentView();
+  rangeController?.abort();
+  rangeFlightWindow = null;
+  windowRequest += 1;
 
   // Everything already in flight was requested for the previous filter.
   listGeneration += 1;
+  visibleDemand = [];
+  selectedDemand = null;
+  selectedValidation = null;
+  selectedController?.abort();
+  selectedController = null;
+  for (const controller of activeReads.values()) {
+    controller.abort();
+  }
   hasTemplateLoadFailed = false;
 
   const cached = viewCache.get(getFilterKey(filter));
 
   if (cached) {
+    const isStale = Date.now() - cached.fetchedAt > VIEW_FRESH_MS;
     currentViewFetchedAt = cached.fetchedAt;
+    // Revalidation may queue behind another filter; stale positions cannot satisfy overlapping demand.
+    metadataGeneration = isStale ? -1 : listGeneration;
     store.patchSnapshot({
       entries: cached.entries,
+      startIndex: cached.startIndex,
+      scrollAnchor: cached.scrollAnchor,
+      selectedEntry: null,
       error: null,
       filter,
       page: cached.page,
@@ -529,10 +850,11 @@ export const setWorkflowLibraryBrowseFilter = (patch: Partial<WorkflowLibraryBro
       status: 'loaded',
       tagCounts: cached.tagCounts,
       total: cached.total,
+      ...withPlaceTotal(filter, cached.total),
     });
     pumpEnrichment();
 
-    if (Date.now() - cached.fetchedAt > VIEW_FRESH_MS) {
+    if (isStale) {
       void refreshWorkflowLibraryBrowse();
     }
     return;
@@ -540,6 +862,9 @@ export const setWorkflowLibraryBrowseFilter = (patch: Partial<WorkflowLibraryBro
 
   store.patchSnapshot({
     entries: EMPTY_ENTRIES,
+    startIndex: 0,
+    scrollAnchor: null,
+    selectedEntry: null,
     error: null,
     filter,
     page: 0,
@@ -552,65 +877,108 @@ export const setWorkflowLibraryBrowseFilter = (patch: Partial<WorkflowLibraryBro
   void loadFirstPage(filter, owner);
 
   if (isTagScopeChanged) {
-    void loadTagCounts(filter.category, filter.isPublic, owner);
+    void loadTagCounts(filter.place, owner);
   }
 };
 
-/**
- * Appends the next page; a no-op while a page is in flight or on the last page. During a revalidation the request
- * waits for it and then reads the next page of the revalidated list, because offsets may have shifted.
- */
-export const loadNextWorkflowLibraryPage = (): void => {
-  const { filter, page, pages, status } = store.getSnapshot();
+/** Applies the opening filter over the current one; the first open loads page 0 and tag counts in that filter. */
+export const ensureWorkflowLibraryBrowseLoaded = (opening: Partial<WorkflowLibraryBrowseFilter>): Promise<void> => {
+  const snapshot = store.getSnapshot();
 
-  if (status !== 'loaded' || page + 1 >= pages) {
-    return;
-  }
+  if (snapshot.status !== 'idle' && snapshot.status !== 'error') {
+    setWorkflowLibraryBrowseFilter(opening);
 
-  store.patchSnapshot({ status: 'loadingMore' });
-
-  if (revalidatingGeneration !== listGeneration) {
-    void loadMorePages(filter, page + 1, captureAccountScope());
-  }
-};
-
-/**
- * First open: page 0, the category's tag counts, and the user-total probe, in the account's stored sort so the first
- * request already comes back in order. A later open with another sort switches to it as a filter change.
- */
-export const ensureWorkflowLibraryBrowseLoaded = (sort: WorkflowLibrarySort): Promise<void> => {
-  const { status } = store.getSnapshot();
-
-  if (status !== 'idle' && status !== 'error') {
-    setWorkflowLibraryBrowseFilter({ sort });
+    // A view outdated while nobody looked (see `onOrderTouched`) revalidates as the library opens on it again.
+    if (store.getSnapshot().filter === snapshot.filter && currentViewFetchedAt === 0) {
+      return (
+        (initialLoadGeneration === listGeneration ? initialLoadFlight.inflight() : null) ??
+        (refreshGeneration === listGeneration ? refreshFlight.inflight() : null) ??
+        refreshWorkflowLibraryBrowse()
+      );
+    }
 
     return initialLoadFlight.inflight() ?? Promise.resolve();
   }
 
   return initialLoadFlight.run(async () => {
+    initialLoadGeneration = listGeneration;
     const owner = captureAccountScope();
-    const filter = { ...store.getSnapshot().filter, sort };
-
-    store.patchSnapshot({ filter });
+    const current = store.getSnapshot().filter;
+    const filter = {
+      ...current,
+      ...opening,
+      tags: opening.tags ? normalizeTags(opening.tags, current.tags) : current.tags,
+    };
 
     hasTemplateLoadFailed = false;
-    store.patchSnapshot({ error: null, status: 'loading' });
+    store.patchSnapshot({ error: null, filter, status: 'loading' });
 
-    await Promise.all([
-      loadFirstPage(filter, owner),
-      loadTagCounts(filter.category, filter.isPublic, owner),
-      probeUserTotal(owner),
-    ]);
+    await Promise.all([loadFirstPage(filter, owner), loadTagCounts(filter.place, owner)]);
   });
 };
 
-/**
- * Revalidates every page the user has scrolled through, plus the tag counts. It supersedes a page still in flight and
- * reads that page itself; a scroll during it waits and then appends from the revalidated list.
- */
+const revalidateSelected = async (generation: number, owner: AccountScope): Promise<void> => {
+  const entry = store.getSnapshot().selectedEntry;
+  if (!entry || entry.item.workflow_id !== selectedDemand) {
+    return;
+  }
+  const id = entry.item.workflow_id;
+  selectedController?.abort();
+  const controller = new AbortController();
+  selectedController = controller;
+  selectedValidation = generation;
+  const current = () => !controller.signal.aborted && isListCurrent(generation, owner) && selectedDemand === id;
+  try {
+    const record = await getLibraryWorkflowRecordCached(id, { signal: controller.signal });
+    if (!current() || record.revision < (findEntry(id)?.item.revision ?? entry.item.revision)) {
+      return;
+    }
+    const item: WorkflowLibraryListItem = {
+      ...entry.item,
+      workflow_id: record.workflow_id,
+      name: record.name,
+      revision: record.revision,
+      user_id: record.user_id,
+      is_public: record.is_public,
+      created_at: record.created_at,
+      updated_at: record.updated_at,
+      opened_at: record.opened_at,
+      last_run_at: record.last_run_at,
+      thumbnail_url: record.thumbnail_url,
+      call_saved_workflow_compatibility: record.call_saved_workflow_compatibility,
+      description: typeof record.workflow.description === 'string' ? record.workflow.description : '',
+      tags: typeof record.workflow.tags === 'string' ? record.workflow.tags : '',
+    };
+    store.patchSnapshot({ selectedEntry: toEntry(item) });
+  } catch (error) {
+    if (!current()) {
+      return;
+    }
+    if (error instanceof ApiError && (error.status === 403 || error.status === 404)) {
+      selectedDemand = null;
+      store.patchSnapshot({ selectedEntry: null });
+    } else {
+      store.patchSnapshot({
+        selectedEntry: {
+          ...(findEntry(id) ?? entry),
+          enrichment: { status: 'error', message: getApiErrorMessage(error, 'Failed to read this workflow.') },
+        },
+      });
+    }
+  } finally {
+    if (selectedController === controller) {
+      selectedController = null;
+    }
+    if (selectedValidation === generation) {
+      selectedValidation = null;
+    }
+  }
+};
+
+/** Revalidate resident positions and tag counts. A later range owns the window and fences this list publication. */
 export const refreshWorkflowLibraryBrowse = (): Promise<void> =>
   refreshFlight.run(async () => {
-    const { filter, page, status } = store.getSnapshot();
+    const { filter, status } = store.getSnapshot();
 
     if (status === 'idle') {
       return;
@@ -619,46 +987,66 @@ export const refreshWorkflowLibraryBrowse = (): Promise<void> =>
     const owner = captureAccountScope();
 
     listGeneration += 1;
+    for (const controller of activeReads.values()) {
+      controller.abort();
+    }
+    activeReads.clear();
+    rangeController?.abort();
+    rangeFlightWindow = null;
+    const request = ++windowRequest;
 
     const generation = listGeneration;
-    const lastPage = status === 'loadingMore' ? page + 1 : page;
-
-    revalidatingGeneration = generation;
+    refreshGeneration = generation;
+    const firstPage = Math.floor((store.getSnapshot().startIndex ?? 0) / PER_PAGE);
+    const residentStart = store.getSnapshot().startIndex ?? 0;
+    const residentEnd = residentStart + store.getSnapshot().entries.length;
+    const lastPage = Math.max(firstPage, Math.ceil(residentEnd / PER_PAGE) - 1);
 
     // An explicit revalidation is also the retry path for a failed enrichment.
     hasTemplateLoadFailed = false;
 
+    const selectedRead = revalidateSelected(generation, owner);
     try {
-      const results = await Promise.all(
-        Array.from({ length: lastPage + 1 }, (_unused, index) => fetchPage(filter, index, owner))
+      let results = await Promise.all(
+        Array.from({ length: lastPage - firstPage + 1 }, (_unused, index) =>
+          fetchPage(filter, firstPage + index, owner)
+        )
       );
+      let publishedStart = residentStart;
+      if (results[0] && residentStart >= results[0].total) {
+        results = [await fetchPage(filter, Math.max(0, results[0].pages - 1), owner)];
+        publishedStart = (results[0]?.page ?? 0) * PER_PAGE;
+      }
       const last = results[results.length - 1];
 
-      if (last && isListCurrent(generation, owner)) {
+      if (last && isListCurrent(generation, owner) && request === windowRequest) {
         const items = results.flatMap((result) => result.items);
-        // A scroll that arrived during this read; one already in flight when it began is part of `lastPage`.
-        const isScrollWaiting = status !== 'loadingMore' && store.getSnapshot().status === 'loadingMore';
-
         currentViewFetchedAt = Date.now();
-        revalidatingGeneration = null;
+        metadataGeneration = generation;
         store.patchSnapshot({
-          entries: mergeEntries(retryFailedEnrichment(store.getSnapshot().entries), items),
+          startIndex: publishedStart,
+          entries: mergeEntries(
+            retryFailedEnrichment(store.getSnapshot().entries),
+            items.slice(
+              publishedStart - (results[0]?.page ?? 0) * PER_PAGE,
+              publishedStart -
+                (results[0]?.page ?? 0) * PER_PAGE +
+                Math.min(WORKFLOW_LIBRARY_METADATA_WINDOW, Math.max(0, last.total - publishedStart))
+            )
+          ),
           error: null,
           // Deletions can shrink the library below the page the user was on.
           page: Math.min(lastPage, Math.max(0, last.pages - 1)),
           pages: last.pages,
           status: 'loaded',
           total: last.total,
+          ...withPlaceTotal(filter, last.total),
         });
+        await selectedRead;
         pumpEnrichment();
-
-        if (isScrollWaiting) {
-          loadNextWorkflowLibraryPage();
-        }
       }
     } catch (error) {
-      if (isListCurrent(generation, owner)) {
-        revalidatingGeneration = null;
+      if (isListCurrent(generation, owner) && request === windowRequest) {
         libraryLogger.warn({
           error,
           message: 'Failed to refresh workflows',
@@ -668,14 +1056,31 @@ export const refreshWorkflowLibraryBrowse = (): Promise<void> =>
       }
     }
 
-    await loadTagCounts(filter.category, filter.isPublic, owner);
+    await selectedRead;
+    pumpEnrichment();
+    await loadTagCounts(filter.place, owner);
   });
 
 export const getWorkflowLibraryBrowseSnapshot = (): WorkflowLibraryBrowseSnapshot => store.getSnapshot();
 
-export const useWorkflowLibraryBrowseSelector = store.useSelector;
+export const getWorkflowLibraryBrowseRetention = () => {
+  const snapshot = store.getSnapshot();
+  const entries = [
+    ...snapshot.entries,
+    ...[...viewCache.values()].flatMap((view) => view.entries),
+    ...(snapshot.selectedEntry ? [snapshot.selectedEntry] : []),
+  ];
+  return {
+    activeReads: activeReads.size + (selectedValidation !== null ? 1 : 0),
+    cachedViews: viewCache.size,
+    metadataEntries: entries.length,
+    parsedDocuments: new Set(
+      entries.filter((entry) => entry.enrichment.status === 'ready').map((entry) => entry.enrichment)
+    ).size,
+  };
+};
 
-// #endregion
+export const useWorkflowLibraryBrowseSelector = store.useSelector;
 
 /** Coalesce library changes into one current-view refresh because they can shift ordering. */
 let isRefreshScheduled = false;
@@ -683,6 +1088,13 @@ let isRefreshScheduled = false;
 /** Marks the current view outdated, so leaving it before the refresh lands does not cache it, and refreshes it. */
 const scheduleCurrentViewRefresh = (): void => {
   currentViewFetchedAt = 0;
+  // Fence existing list publications now, even when another filter holds the refresh flight.
+  const controller = rangeController;
+  rangeController = null;
+  rangeFlightWindow = null;
+  rangeFlight = null;
+  windowRequest += 1;
+  controller?.abort();
 
   if (isRefreshScheduled || store.getSnapshot().status === 'idle') {
     return;
@@ -700,32 +1112,99 @@ const scheduleCurrentViewRefresh = (): void => {
 };
 
 onWorkflowLibraryCacheInvalidated(() => {
+  const { filter, placeTotals } = store.getSnapshot();
+  const places = [
+    ...new Set([...(Object.keys(placeTotals) as WorkflowLibraryPlace[]), ...placeTotalFlights.keys()]),
+  ].filter((place) => place !== filter.place || filter.search !== '' || filter.tags.length > 0);
+  placeTotalsGeneration += 1;
+  placeTotalFlights.clear();
+  metadataGeneration = -1;
+  currentViewFetchedAt = 0;
   // A mutation can change any view; the current one refreshes, the others fetch afresh when revisited.
   viewCache.clear();
+  for (const controller of activeReads.values()) {
+    controller.abort();
+  }
+  activeReads.clear();
+  selectedController?.abort();
+  selectedValidation = store.getSnapshot().selectedEntry ? listGeneration + 1 : null;
   scheduleCurrentViewRefresh();
+  store.patchSnapshot({
+    entries: store.getSnapshot().entries.map((entry) => ({ ...entry, enrichment: PENDING_ENRICHMENT })),
+    selectedEntry: store.getSnapshot().selectedEntry
+      ? { ...store.getSnapshot().selectedEntry!, enrichment: PENDING_ENRICHMENT }
+      : null,
+  });
+  const generation = placeTotalsGeneration;
+  queueMicrotask(() => {
+    // Account cleanup invalidates the record cache before clearing this store.
+    if (browseHolds > 0 && placeTotalsGeneration === generation) {
+      void loadWorkflowLibraryPlaceTotals(places);
+    }
+  });
 });
 
-// Opening a workflow moves it to the top of every view ordered by last opened. The server may record the open after
-// the dialog is open again, so the current view refreshes now; hidden ones are dropped and fetched when revisited.
-onLibraryWorkflowOpened(() => {
+let browseHolds = 0;
+
+/** Holds the listing until the returned release runs; counted, so a remount's release and re-hold leave it held. */
+export const holdWorkflowLibraryBrowse = (): (() => void) => {
+  let isReleased = false;
+  browseHolds += 1;
+
+  return () => {
+    if (!isReleased) {
+      isReleased = true;
+      browseHolds -= 1;
+    }
+  };
+};
+
+/**
+ * Opening or running a workflow reorders every view by last opened or last run. Hidden ones are dropped; the current
+ * one refreshes while the library is held, otherwise it is marked outdated and the next opening revalidates it.
+ */
+const onOrderTouched = (orderBy: ListOrderBy) => (): void => {
   for (const [key, view] of viewCache) {
-    if (view.orderBy === 'opened_at') {
+    if (view.orderBy === orderBy) {
       viewCache.delete(key);
     }
   }
 
-  if (getListOrder(store.getSnapshot().filter).orderBy === 'opened_at') {
-    scheduleCurrentViewRefresh();
+  if (getListOrder(store.getSnapshot().filter).orderBy !== orderBy) {
+    return;
   }
-});
+
+  if (browseHolds > 0) {
+    scheduleCurrentViewRefresh();
+  } else {
+    listGeneration += 1;
+    currentViewFetchedAt = 0;
+    metadataGeneration = -1;
+  }
+};
+
+onLibraryWorkflowOpened(onOrderTouched('opened_at'));
+onLibraryWorkflowRun(onOrderTouched('last_run_at'));
 
 registerAccountOwnedResource({
   clear: () => {
     listGeneration += 1;
-    revalidatingGeneration = null;
-    enrichmentQueue.length = 0;
-    queuedWorkflowIds.clear();
+    metadataGeneration = -1;
+    visibleDemand = [];
+    selectedDemand = null;
+    selectedValidation = null;
+    selectedController?.abort();
+    selectedController = null;
+    for (const controller of activeReads.values()) {
+      controller.abort();
+    }
+    rangeFlightWindow = null;
+    rangeController?.abort();
+    rangeController = null;
+    windowRequest += 1;
     templatesFlight = null;
+    placeTotalsGeneration += 1;
+    placeTotalFlights.clear();
     hasTemplateLoadFailed = false;
     isRefreshScheduled = false;
     viewCache.clear();

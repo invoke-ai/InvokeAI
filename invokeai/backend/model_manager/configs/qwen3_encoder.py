@@ -15,6 +15,7 @@ from invokeai.backend.model_manager.configs.identification_utils import (
 )
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType, Qwen3VariantType
+from invokeai.backend.model_manager.util.llamacpp_keys import is_llamacpp_decoder_state_dict
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
 from invokeai.backend.quantization.sdnq.detection import (
     folder_has_sdnq_marker,
@@ -108,7 +109,7 @@ def _folder_tensor_names(mod: ModelOnDisk) -> set[str]:
     return names
 
 
-def _folder_is_sdnq_quantized(mod: ModelOnDisk) -> bool:
+def folder_is_sdnq_quantized(mod: ModelOnDisk) -> bool:
     """True if the Qwen3 encoder folder at `mod.path` holds SDNQ-quantized weights.
 
     `Qwen3Encoder_Qwen3Encoder_Config` and `Qwen3Encoder_SDNQ_Folder_Config` must be mutually
@@ -208,6 +209,18 @@ def _has_qwen3_5_layers(tensor_names: Iterable[str | int]) -> bool:
     return any(isinstance(key, str) and (".linear_attn." in key or ".ssm_" in key) for key in tensor_names)
 
 
+_QWEN3_HIDDEN_SIZES = {
+    1024: Qwen3VariantType.Qwen3_06B,
+    2560: Qwen3VariantType.Qwen3_4B,
+    4096: Qwen3VariantType.Qwen3_8B,
+}
+
+
+def qwen3_variant_from_hidden_size(hidden_size: Any) -> Optional[Qwen3VariantType]:
+    """The Qwen3 variant of a hidden size, or None for a size no Qwen3 encoder comes in."""
+    return _QWEN3_HIDDEN_SIZES.get(hidden_size) if isinstance(hidden_size, int) else None
+
+
 def _get_qwen3_variant_from_state_dict(state_dict: dict[str | int, Any]) -> Optional[Qwen3VariantType]:
     """Determine Qwen3 variant (0.6B, 4B, or 8B) from state dict based on hidden_size.
 
@@ -219,11 +232,6 @@ def _get_qwen3_variant_from_state_dict(state_dict: dict[str | int, Any]) -> Opti
     For GGUF format, the key is 'token_embd.weight'.
     For PyTorch format, the key is 'model.embed_tokens.weight'.
     """
-    # Hidden size thresholds
-    QWEN3_06B_HIDDEN_SIZE = 1024
-    QWEN3_4B_HIDDEN_SIZE = 2560
-    QWEN3_8B_HIDDEN_SIZE = 4096
-
     # Try to find embed_tokens weight
     embed_key = None
     for key in state_dict.keys():
@@ -254,16 +262,9 @@ def _get_qwen3_variant_from_state_dict(state_dict: dict[str | int, Any]) -> Opti
     else:
         return None
 
-    # Determine variant based on hidden_size. Unknown sizes mean this is NOT a
-    # recognized Qwen3 variant (could be another causal LM in GGUF format such as
+    # Unknown sizes mean this is NOT a recognized Qwen3 variant (could be another causal LM in GGUF format such as
     # Mistral or Llama, which use identical llama.cpp key naming).
-    if hidden_size == QWEN3_06B_HIDDEN_SIZE:
-        return Qwen3VariantType.Qwen3_06B
-    elif hidden_size == QWEN3_4B_HIDDEN_SIZE:
-        return Qwen3VariantType.Qwen3_4B
-    elif hidden_size == QWEN3_8B_HIDDEN_SIZE:
-        return Qwen3VariantType.Qwen3_8B
-    return None
+    return qwen3_variant_from_hidden_size(hidden_size)
 
 
 class Qwen3Encoder_Checkpoint_Config(Checkpoint_Config_Base, Config_Base):
@@ -395,6 +396,7 @@ class Qwen3Encoder_Qwen3Encoder_Config(Config_Base):
             # root next to config.json, this is a complete causal LM (TextLLM), not a Qwen3 encoder subfolder.
             tokenizer_files = ("tokenizer.json", "tokenizer.model", "tokenizer_config.json")
             if any((mod.path / f).exists() for f in tokenizer_files):
+                # Such a folder installs as a Text LLM that also serves as a Qwen3 encoder (see text_llm.py).
                 raise NotAMatchError(
                     "directory looks like a complete causal LM (config.json and tokenizer files at root), "
                     "not a standalone Qwen3 encoder"
@@ -424,16 +426,12 @@ class Qwen3Encoder_Qwen3Encoder_Config(Config_Base):
     def _reject_if_sdnq_quantized(cls, mod: ModelOnDisk) -> None:
         # Shared with Qwen3Encoder_SDNQ_Folder_Config so the two configs cannot both reject (or both
         # accept) the same folder.
-        if _folder_is_sdnq_quantized(mod):
+        if folder_is_sdnq_quantized(mod):
             raise NotAMatchError("folder is SDNQ-quantized; use Qwen3Encoder_SDNQ_Folder_Config")
 
     @classmethod
     def _get_variant_from_config(cls, config_path) -> Qwen3VariantType:
         """Get variant from config.json based on hidden_size, or raise NotAMatch if unknown."""
-        QWEN3_06B_HIDDEN_SIZE = 1024
-        QWEN3_4B_HIDDEN_SIZE = 2560
-        QWEN3_8B_HIDDEN_SIZE = 4096
-
         try:
             with open(config_path, "r", encoding="utf-8") as f:
                 config = json.load(f)
@@ -441,13 +439,15 @@ class Qwen3Encoder_Qwen3Encoder_Config(Config_Base):
             raise NotAMatchError(f"unable to read Qwen3 config.json: {e}") from e
 
         hidden_size = config.get("hidden_size")
-        if hidden_size == QWEN3_8B_HIDDEN_SIZE:
-            return Qwen3VariantType.Qwen3_8B
-        elif hidden_size == QWEN3_4B_HIDDEN_SIZE:
-            return Qwen3VariantType.Qwen3_4B
-        elif hidden_size == QWEN3_06B_HIDDEN_SIZE:
-            return Qwen3VariantType.Qwen3_06B
-        raise NotAMatchError(f"hidden_size {hidden_size} does not match a known Qwen3 variant")
+        variant = qwen3_variant_from_hidden_size(hidden_size)
+        if variant is None:
+            raise NotAMatchError(f"hidden_size {hidden_size} does not match a known Qwen3 variant")
+        return variant
+
+
+# The llama.cpp architecture `Qwen3EncoderGGUFLoader` builds a `Qwen3ForCausalLM` for. Exact on purpose: the MoE
+# Qwen3 reports "qwen3moe" and has a different module tree.
+_QWEN3_GGUF_ARCHITECTURES = frozenset({"qwen3"})
 
 
 class Qwen3Encoder_GGUF_Config(Checkpoint_Config_Base, Config_Base):
@@ -513,25 +513,34 @@ class Qwen3Encoder_GGUF_Config(Checkpoint_Config_Base, Config_Base):
         # Reject Qwen3.5: same width as Qwen3 at 4B, a different architecture (`Qwen35Encoder_*`).
         if _has_qwen3_5_layers(state_dict):
             raise NotAMatchError("state dict has Qwen3.5 linear-attention layers; this is a Qwen3.5 encoder, not Qwen3")
-        # Reject Qwen3-VL language towers. The visual-tower check above cannot see them: llama.cpp
-        # keeps the visual tower in a separate ``mmproj-*.gguf``, so a Qwen3-VL GGUF is structurally
-        # identical to a text-only Qwen3 of the same width (both 36 layers at hidden 2560 for the
-        # 4B). Only the architecture metadata separates them, and without this the file installs as
-        # a Z-Image encoder and never reaches Krea-2.
-        cls._reject_qwen3_vl_architecture(mod)
+        cls._reject_unsupported_architecture(mod, state_dict)
 
     @classmethod
-    def _reject_qwen3_vl_architecture(cls, mod: ModelOnDisk) -> None:
+    def _reject_unsupported_architecture(cls, mod: ModelOnDisk, state_dict: dict[str | int, Any]) -> None:
+        """Accept a llama.cpp file only when its architecture metadata says it is the Qwen3 the loader builds.
+
+        llama.cpp names tensors by role, not by architecture, so the key and width checks above cannot tell a
+        Qwen3 from any other decoder of the same width: without this, a 4096-wide Llama or Mistral would pass as
+        Qwen3 8B. A Qwen-VL language tower has no visual tower to probe for either (llama.cpp keeps that in a
+        separate ``mmproj-*.gguf``), so it matches a text-only Qwen3 in full. Only the metadata separates them.
+        """
         # `mod.metadata()` caches a GGUF's scalar fields across the whole identification sweep and
         # yields {} for anything it cannot read, so a non-GGUF simply finds no architecture here and
         # is left to `_validate_looks_like_gguf_quantized`.
         architecture = mod.metadata().get("general.architecture")
-        # Broader than the Qwen3-VL config's exact match on purpose: rejecting a variant we cannot
-        # build (e.g. "qwen3vlmoe") is correct here, whereas accepting one there would not be.
+        # Checked first for its reason, which names the encoder type the file belongs to. Broader than the Qwen3-VL
+        # config's exact match on purpose: rejecting a variant we cannot build (e.g. "qwen3vlmoe") is correct here,
+        # whereas accepting one there would not be.
         if architecture is not None and architecture.startswith("qwen3vl"):
             raise NotAMatchError(
                 f"GGUF architecture is {architecture!r}: this is a Qwen3-VL encoder (Krea-2 / Ideogram 4), "
                 "not a text-only Qwen3 encoder"
+            )
+        # Only for llama.cpp-named files: theirs are the keys that say nothing about the architecture.
+        if is_llamacpp_decoder_state_dict(state_dict) and architecture not in _QWEN3_GGUF_ARCHITECTURES:
+            raise NotAMatchError(
+                f"GGUF architecture is {architecture!r}; the Qwen3 encoder loader builds only "
+                f"{sorted(_QWEN3_GGUF_ARCHITECTURES)}"
             )
 
     @classmethod
@@ -629,7 +638,7 @@ class Qwen3Encoder_SDNQ_Folder_Config(Config_Base):
         # Shared with the rejection guard in Qwen3Encoder_Qwen3Encoder_Config: exactly one of the two
         # configs claims a given folder. A corrupt or foreign quantization_config.json falls through
         # to the key check there instead of aborting this probe with a JSONDecodeError.
-        if not _folder_is_sdnq_quantized(mod):
+        if not folder_is_sdnq_quantized(mod):
             raise NotAMatchError("directory does not look like an SDNQ-quantized Qwen3 encoder")
 
         # A root config.json next to tokenizer files is a complete causal LM (TextLLM), not a Qwen3

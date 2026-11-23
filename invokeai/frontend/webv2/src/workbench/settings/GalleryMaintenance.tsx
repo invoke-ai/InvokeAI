@@ -82,14 +82,12 @@ export const GalleryMaintenance = () => {
   const resourceId = useId();
   const requestSequence = useRef(0);
   const executing = useRef(false);
-  const isMounted = useRef(true);
   const [operation, setOperation] = useState<GalleryMaintenanceOperation | null>(null);
   const [preview, setPreview] = useState<PreviewState>({ kind: 'idle' });
   const [isExecuting, setIsExecuting] = useState(false);
   const [latest, setLatest] = useState<LatestOutcome | null>(null);
 
   useMountEffect(() => {
-    isMounted.current = true;
     const unregister = registerAccountOwnedResource({
       clear: () => {
         requestSequence.current += 1;
@@ -99,11 +97,8 @@ export const GalleryMaintenance = () => {
       },
       name: `gallery-maintenance:${resourceId}`,
     });
-    return () => {
-      isMounted.current = false;
-      requestSequence.current += 1;
-      unregister();
-    };
+    // Activity pauses the view registration; the account-owned request still settles retained state.
+    return unregister;
   });
 
   const startPreview = useCallback(
@@ -204,11 +199,11 @@ export const GalleryMaintenance = () => {
           refreshError = refreshErrors.join('\n');
         }
       }
-      if (isMounted.current && isAccountScopeCurrent(owner)) {
+      if (isAccountScopeCurrent(owner)) {
         setLatest({ kind: 'result', owner, value, refreshError });
       }
     } catch (error) {
-      if (isMounted.current && isAccountScopeCurrent(owner)) {
+      if (isAccountScopeCurrent(owner)) {
         setLatest({
           kind: 'error',
           owner,
@@ -219,9 +214,7 @@ export const GalleryMaintenance = () => {
       }
     } finally {
       executing.current = false;
-      if (isMounted.current) {
-        setIsExecuting(false);
-      }
+      setIsExecuting(false);
     }
   }, [operation, preview, queryClient, t]);
 

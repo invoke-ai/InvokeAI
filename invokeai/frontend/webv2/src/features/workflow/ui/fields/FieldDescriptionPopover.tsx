@@ -14,12 +14,15 @@ export const FieldDescriptionPopover = ({
   description,
   fieldName,
   nodeId,
+  size = 'sm',
   templateDescription,
 }: {
   /** The current override, if any. */
   description: string | undefined;
   fieldName: string;
   nodeId: string;
+  /** Node rows use `xs` to sit in their 20px label line; the form builder's card header uses `sm` like its other actions. */
+  size?: 'sm' | 'xs';
   templateDescription: string;
 }) => {
   const { t } = useTranslation();
@@ -45,7 +48,7 @@ export const FieldDescriptionPopover = ({
             aria-label={editLabel}
             className="nodrag"
             color={description ? 'accent.solid' : 'fg.subtle'}
-            size="sm"
+            size={size}
             variant="ghost"
           >
             <Icon as={FileTextIcon} boxSize="3" />

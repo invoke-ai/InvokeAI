@@ -1,6 +1,11 @@
+import { getGalleryBoardDestinationIds } from '@features/gallery/queries';
+import { getGenerationDevicesSnapshot, resolveRandDeviceMetadata } from '@features/queue/devices';
+import { getInvocationTemplatesSnapshot } from '@features/workflow/react';
 import { registerAccountOwnedResource } from '@platform/state/accountLifecycle';
 import { createExternalStoreCore } from '@platform/state/externalStoreCore';
 import { useExternalStoreSelector } from '@platform/state/selectors';
+
+import type { InvocationRuntimeInputs, InvocationSourceId } from './invocationContracts';
 
 interface InvocationPreparationSnapshot {
   leases: ReadonlyMap<string, number>;
@@ -16,9 +21,9 @@ const store = createExternalStoreCore<InvocationPreparationSnapshot>({ leases: E
 let nextLeaseToken = 1;
 
 /**
- * Single-flights a project's submission: acquire before the first await (lazy Canvas chunk, prompt expansion,
- * workflow generators) so a repeated invoke cannot submit the same captured settings twice. Canvas preparation
- * separately guards its own entry points.
+ * Single-flights a project's submission: acquire before the first await (lazy Canvas chunk, prompt expansion, workflow
+ * generators) so a repeated invoke cannot submit the same captured settings twice. Canvas preparation separately guards
+ * its own entry points.
  */
 export const beginInvocationPreparation = (projectId: string): InvocationPreparationLease | null => {
   const { leases } = store.getSnapshot();
@@ -54,4 +59,12 @@ export const useIsInvocationPreparing = (projectId: string): boolean =>
 registerAccountOwnedResource({
   clear: () => store.setSnapshot({ leases: EMPTY_LEASES }),
   name: 'invocation-preparation',
+});
+
+/** Capture after async prerequisites; the template owner replaces snapshots, so its published value is safe to share. */
+export const captureInvocationRuntimeInputs = (sourceId: InvocationSourceId): InvocationRuntimeInputs => ({
+  noiseDevice: resolveRandDeviceMetadata(false, getGenerationDevicesSnapshot().options),
+  templates:
+    sourceId === 'workflow' ? getInvocationTemplatesSnapshot() : { error: null, status: 'idle', templates: {} },
+  boardDestinationIds: getGalleryBoardDestinationIds(),
 });

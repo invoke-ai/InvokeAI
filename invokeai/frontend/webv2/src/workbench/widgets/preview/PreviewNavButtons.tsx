@@ -12,10 +12,7 @@ import type { PreviewSwipeNavigation } from './usePreviewSwipe';
 /** Marks the arrows so the stage can reveal them on hover or focus within it. */
 export const PREVIEW_NAV_ATTRIBUTE = 'data-preview-nav';
 
-/**
- * The stage shows its arrows while the pointer is over it or focus is within it. Hidden arrows take no pointer events,
- * so a click at the stage edge still reaches the image. The fade is opacity alone, and none under reduced motion.
- */
+/** Arrows show on hover or focus within; hidden ones take no pointer events, so edge clicks reach the image. */
 export const PREVIEW_NAV_STAGE_CSS = {
   [`& [${PREVIEW_NAV_ATTRIBUTE}]`]: {
     opacity: 0,
@@ -34,10 +31,7 @@ export const PREVIEW_NAV_STAGE_CSS = {
 /** Keeps the Preview's focus where it is, so the arrow keys still step after a click. */
 const keepFocus = (event: MouseEvent) => event.preventDefault();
 
-/**
- * Previous and next over the stage: a pointer path to the same steps the arrow keys take. A side with nothing to step
- * to has no button. Out of the tab order, since the keys already reach both steps.
- */
+/** Pointer path to the arrow-key steps; out of the tab order since the keys already reach them. */
 export const PreviewNavButtons = ({
   isVideo,
   navigation,
@@ -104,8 +98,9 @@ const NavButton = ({
     insetInlineEnd={side === 'end' ? '2' : undefined}
     insetInlineStart={side === 'start' ? '2' : undefined}
     position="absolute"
-    // A video's controls run along the bottom of the stage; center over what is left above them.
-    top={isVideo ? 'calc(50% - 1.5rem)' : '50%'}
+    // A video's control bar (about 4.5rem) overlays the bottom of its frame, which is centered in the stage; center
+    // over the picture above the bar, so a short frame's scrubber never sits under an arrow.
+    top={isVideo ? 'calc(50% - 2.25rem)' : '50%'}
     transform="translateY(-50%)"
     zIndex="1"
   >

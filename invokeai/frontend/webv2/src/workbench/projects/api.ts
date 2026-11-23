@@ -1,8 +1,15 @@
 import type { AccountScope } from '@platform/state/accountLifecycle';
 
 import { queryClient } from '@platform/query/client';
-import { assertAccountScopeCurrent } from '@platform/state/accountLifecycle';
-import { ApiError, apiFetch, apiFetchJson, sleep } from '@platform/transport/http';
+import { assertAccountScopeCurrent, captureAccountScope } from '@platform/state/accountLifecycle';
+import {
+  ApiError,
+  apiFetch,
+  apiFetchJson,
+  RequestDeadlineError,
+  sleep,
+  withRequestDeadline,
+} from '@platform/transport/http';
 import {
   DEFAULT_PROJECT_CANVAS_SCHEMA_VERSION,
   MAX_SUPPORTED_CANVAS_SCHEMA_VERSION,
@@ -15,6 +22,9 @@ import { PROJECT_SPLIT_DOCUMENT_SCHEMA_VERSION } from './documentSchemaVersion';
 const PROJECTS_BASE = '/api/v1/projects';
 const PROJECT_WRITE_MAX_ATTEMPTS = 9;
 const PROJECT_WRITE_RETRY_WINDOW_MS = 125_000;
+// The server permits 120 seconds to receive a project body; allow another 30 for processing and the response.
+const PROJECT_REQUEST_TIMEOUT_MS = 150_000;
+const CLIENT_STATE_READ_TIMEOUT_MS = 30_000;
 // The path's queue segment is ignored by the backend (kept for compatibility).
 const CLIENT_STATE_BASE = '/api/v1/client_state/default';
 
@@ -28,9 +38,7 @@ export interface ProjectSummaryDTO {
   /** The oldest project document schema a client must read; 3 for a project saved whole, 4 once split. */
   minimum_document_schema_version: number;
   created_at: string;
-  /** When the project content was last saved. */
   updated_at: string;
-  /** When the caller last saved their workspace in the project; null before they have. */
   workspace_updated_at: string | null;
 }
 
@@ -40,16 +48,11 @@ export interface ProjectWorkspaceDTO {
   updated_at: string;
 }
 
-/** What a write answers: the project content (from document schema 4; the whole document before it). */
 export interface ProjectRecordDTO extends ProjectSummaryDTO {
   data: Record<string, unknown>;
 }
 
-/**
- * What a read answers: the content and the caller's workspace beside it, null until their first save. A create or an
- * update answers the same shape, with the workspace it stored beside the content, or null when the request carried
- * none.
- */
+/** A read, create or update answer: the workspace beside the content, null when there is none. */
 export interface ProjectWithWorkspaceDTO extends ProjectRecordDTO {
   workspace: ProjectWorkspaceDTO | null;
 }
@@ -64,10 +67,7 @@ export interface ProjectCreateRequest {
   minimum_canvas_schema_version?: number;
   /** 4 when `data` is project content, which every save of a split project is; omitted for a document saved whole. */
   minimum_document_schema_version?: number;
-  /**
-   * The caller's first workspace in the project, stored in the same transaction as the content: the project never
-   * exists without it. Only beside split content (a document floor of 4); the server refuses it beside a whole one.
-   */
+  /** Stored in the same transaction as the content; only beside split content (document floor 4). */
   workspace?: Record<string, unknown>;
 }
 
@@ -90,7 +90,6 @@ export interface ProjectBoardSnapshotBoardDTO {
 }
 
 export interface ProjectBoardSnapshotDTO {
-  /** The inbox first, then the project's other boards in creation order. */
   boards: ProjectBoardSnapshotBoardDTO[];
 }
 
@@ -102,28 +101,74 @@ export interface ProjectUpdateRequest {
   minimum_canvas_schema_version?: number;
   /** 4 when `data` is project content, which splits a project saved whole; omission preserves the stored floor. */
   minimum_document_schema_version?: number;
-  /**
-   * The caller's workspace, stored in the same transaction as the content: how a project the server holds whole is
-   * split without a moment in which it holds the content alone. A workspace revision mismatch refuses the content too.
-   */
+  /** Same transaction as the content, so a whole project splits atomically; a revision mismatch refuses both. */
   workspace?: ProjectWorkspaceSaveRequest | null;
 }
 
 export interface ProjectWorkspaceSaveRequest {
   data: Record<string, unknown>;
-  /** The workspace revision this save replaces, or null for the caller's first workspace in the project. */
   expected_revision: number | null;
 }
 
 export const listProjects = (signal?: AbortSignal): Promise<ProjectSummaryDTO[]> =>
-  apiFetchJson<ProjectSummaryDTO[]>(`${PROJECTS_BASE}/`, { signal });
+  withRequestDeadline(
+    (signal) => apiFetchJson<ProjectSummaryDTO[]>(`${PROJECTS_BASE}/`, { signal }),
+    PROJECT_REQUEST_TIMEOUT_MS,
+    signal
+  );
+
+const getProjectPath = (projectId: string): string =>
+  `${PROJECTS_BASE}/${encodeURIComponent(projectId)}?max_canvas_schema_version=${MAX_SUPPORTED_CANVAS_SCHEMA_VERSION}` +
+  `&max_document_schema_version=${PROJECT_SPLIT_DOCUMENT_SCHEMA_VERSION}`;
 
 export const getProject = (projectId: string, signal?: AbortSignal): Promise<ProjectWithWorkspaceDTO> =>
-  apiFetchJson<ProjectWithWorkspaceDTO>(
-    `${PROJECTS_BASE}/${encodeURIComponent(projectId)}?max_canvas_schema_version=${MAX_SUPPORTED_CANVAS_SCHEMA_VERSION}` +
-      `&max_document_schema_version=${PROJECT_SPLIT_DOCUMENT_SCHEMA_VERSION}`,
-    { signal }
+  withRequestDeadline(
+    (signal) => apiFetchJson<ProjectWithWorkspaceDTO>(getProjectPath(projectId), { signal }),
+    PROJECT_REQUEST_TIMEOUT_MS,
+    signal
   );
+
+/**
+ * Null without parsing past `maxBytes` decoded. `Content-Length` counts compressed bytes, so the body is streamed and
+ * counted rather than trusted.
+ */
+export const getProjectWithinSize = async (
+  projectId: string,
+  maxBytes: number,
+  signal?: AbortSignal
+): Promise<ProjectWithWorkspaceDTO | null> => {
+  const response = await apiFetch(getProjectPath(projectId), { signal });
+  const declared = Number(response.headers.get('Content-Length'));
+
+  if (Number.isFinite(declared) && declared > maxBytes) {
+    await response.body?.cancel();
+    return null;
+  }
+
+  const decoder = new TextDecoder();
+  let text = '';
+  let size = 0;
+
+  if (response.body) {
+    const reader = response.body.getReader();
+
+    for (;;) {
+      const { done, value } = await reader.read();
+
+      if (done) {
+        break;
+      }
+      size += value.byteLength;
+      if (size > maxBytes) {
+        await reader.cancel();
+        return null;
+      }
+      text += decoder.decode(value, { stream: true });
+    }
+  }
+
+  return JSON.parse(text + decoder.decode()) as ProjectWithWorkspaceDTO;
+};
 
 const isProjectWriteBusyError = (error: unknown): error is ApiError => {
   if (!(error instanceof ApiError) || error.status !== 429) {
@@ -160,14 +205,19 @@ const createProjectWriteRetryBudget = (): ProjectWriteRetryBudget => ({
 });
 
 const requestProjectWrite = async <T>(
-  request: () => Promise<T>,
+  request: (signal: AbortSignal) => Promise<T>,
   signal: AbortSignal | undefined,
   budget: ProjectWriteRetryBudget = createProjectWriteRetryBudget()
 ): Promise<T> => {
+  const requestSignal = AbortSignal.any([captureAccountScope().signal, ...(signal ? [signal] : [])]);
   while (budget.attempts < PROJECT_WRITE_MAX_ATTEMPTS) {
     budget.attempts += 1;
     try {
-      return await request();
+      requestSignal.throwIfAborted();
+      if (Date.now() >= budget.deadline) {
+        throw new RequestDeadlineError();
+      }
+      return await withRequestDeadline(request, PROJECT_REQUEST_TIMEOUT_MS, requestSignal);
     } catch (error) {
       if (!isProjectWriteBusyError(error) || budget.attempts >= PROJECT_WRITE_MAX_ATTEMPTS) {
         throw error;
@@ -183,7 +233,7 @@ const requestProjectWrite = async <T>(
       if (delayMs > remainingMs) {
         throw error;
       }
-      await sleep(delayMs, signal);
+      await sleep(delayMs, requestSignal);
     }
   }
 
@@ -219,7 +269,7 @@ const createProjectFromBody = (
   budget: ProjectWriteRetryBudget
 ): Promise<ProjectWithWorkspaceDTO> =>
   requestProjectWrite(
-    () =>
+    (signal) =>
       apiFetchJson<ProjectWithWorkspaceDTO>(`${PROJECTS_BASE}/`, {
         body,
         method: 'POST',
@@ -244,7 +294,7 @@ export const updateProject = (
   });
 
   return requestProjectWrite(
-    () =>
+    (signal) =>
       apiFetchJson<ProjectWithWorkspaceDTO>(`${PROJECTS_BASE}/${encodeURIComponent(projectId)}`, {
         body,
         method: 'PUT',
@@ -255,11 +305,7 @@ export const updateProject = (
   );
 };
 
-/**
- * Saves the caller's workspace in a project; its revision is its own, apart from the content's. Declares the schemas
- * this build reads, as every project write does: a project whose canvas floor is above them is refused, not written
- * beside a canvas this build could not have loaded.
- */
+/** Declares the schemas this build reads: a project whose canvas floor is above them is refused. */
 export const saveProjectWorkspace = (
   projectId: string,
   request: ProjectWorkspaceSaveRequest,
@@ -272,7 +318,7 @@ export const saveProjectWorkspace = (
   });
 
   return requestProjectWrite(
-    () =>
+    (signal) =>
       apiFetchJson<ProjectWorkspaceDTO>(`${PROJECTS_BASE}/${encodeURIComponent(projectId)}/workspace`, {
         body,
         method: 'PUT',
@@ -283,7 +329,6 @@ export const saveProjectWorkspace = (
   );
 };
 
-/** What becomes of a deleted project's boards other than its inbox, which always goes with the project. */
 export type DeleteProjectBoards = 'delete' | 'release';
 
 /** Media is never deleted: released boards keep theirs in the Library, deleted boards' returns to Uncategorized. */
@@ -292,18 +337,33 @@ export const deleteProject = async (
   signal?: AbortSignal,
   boards: DeleteProjectBoards = 'release'
 ): Promise<void> => {
+  signal ??= captureAccountScope().signal;
   const query = boards === 'release' ? '' : '?boards=delete';
 
-  await apiFetch(`${PROJECTS_BASE}/${encodeURIComponent(projectId)}${query}`, { method: 'DELETE', signal });
+  try {
+    await withRequestDeadline(
+      (signal) => apiFetch(`${PROJECTS_BASE}/${encodeURIComponent(projectId)}${query}`, { method: 'DELETE', signal }),
+      PROJECT_REQUEST_TIMEOUT_MS,
+      signal
+    );
+  } catch (error) {
+    if (!(error instanceof RequestDeadlineError)) {
+      throw error;
+    }
+    // Deletion is idempotent: a settled repeat returns 204 even when the first request already removed the project.
+    await withRequestDeadline(
+      (signal) => apiFetch(`${PROJECTS_BASE}/${encodeURIComponent(projectId)}${query}`, { method: 'DELETE', signal }),
+      PROJECT_REQUEST_TIMEOUT_MS,
+      signal
+    );
+  }
 };
 
-/** Every board of the project with its visible media; excludes intermediate/other categories. */
 export const getProjectBoardSnapshot = (projectId: string, signal?: AbortSignal): Promise<ProjectBoardSnapshotDTO> =>
   apiFetchJson<ProjectBoardSnapshotDTO>(`${PROJECTS_BASE}/${encodeURIComponent(projectId)}/board-snapshot`, {
     signal,
   });
 
-/** A save was based on a stale revision — another tab or device saved first. */
 export const isProjectConflictError = (error: unknown): boolean => error instanceof ApiError && error.status === 409;
 
 export const isProjectNotFoundError = (error: unknown): boolean => error instanceof ApiError && error.status === 404;
@@ -313,7 +373,6 @@ export interface ProjectCanvasSchemaCompatibilityRefusal {
   maxCanvasSchemaVersion: number;
 }
 
-/** Parse the stable compatibility detail returned with a schema precondition failure. */
 export const getProjectCanvasSchemaCompatibilityRefusal = (
   error: unknown
 ): ProjectCanvasSchemaCompatibilityRefusal | null => {
@@ -353,7 +412,6 @@ export interface ProjectDocumentSchemaRefusal {
   maxDocumentSchemaVersion: number;
 }
 
-/** The server refused a project whose document schema this build predates: a newer Invoke split it further. */
 export const getProjectDocumentSchemaRefusal = (error: unknown): ProjectDocumentSchemaRefusal | null => {
   if (!(error instanceof ApiError) || error.status !== 412) {
     return null;
@@ -373,7 +431,6 @@ export const getProjectDocumentSchemaRefusal = (error: unknown): ProjectDocument
   }
 };
 
-/** The server refused to expose or replace a project written with a newer canvas schema. */
 export const isProjectCanvasSchemaUnsupportedError = (error: unknown): boolean =>
   getProjectCanvasSchemaCompatibilityRefusal(error) !== null;
 
@@ -428,11 +485,8 @@ export class ProjectCreateAbsentError extends Error {
 }
 
 /**
- * Settle ambiguous creates with a second POST: SQLite serializes writers, while GET 404 can race the initial
- * commit. A 201 succeeds; after 409, GET distinguishes an existing project from a board conflict or an id another
- * account holds. Other deterministic rejections prove absence. When the retry settles nothing either, a GET that finds
- * this create's project still proves it committed. Transport failure remains unknown and must never authorize deletion.
- * A read that settles the create carries the workspace the committed attempt stored, as the create's own answer would.
+ * Settle ambiguous creates with a second POST (GET 404 can race the initial commit). Transport failure stays unknown
+ * and must never authorize deletion.
  */
 const settleProjectCreate = async (
   request: ProjectCreateRequest,
@@ -442,10 +496,6 @@ const settleProjectCreate = async (
   const body = serializeCreateProjectRequest(request);
   const writeBudget = createProjectWriteRetryBudget();
 
-  /**
-   * The settled 409 makes this lookup decisive: an existing project committed; 404 means a board conflict, or an id
-   * another account holds.
-   */
   const settleConflict = async (conflict: unknown): Promise<ProjectWithWorkspaceDTO> => {
     if (projectId === undefined) {
       throw conflict;
@@ -466,7 +516,7 @@ const settleProjectCreate = async (
     }
   };
 
-  /** No answer settled the create; only finding its project does. A 404 here may predate the commit, so proves nothing. */
+  /** A 404 here may predate the commit, so proves nothing. */
   const settleUnanswered = async (unanswered: unknown, id: string): Promise<ProjectWithWorkspaceDTO> => {
     let record: ProjectWithWorkspaceDTO | null = null;
 
@@ -529,27 +579,28 @@ export const createProjectSettled = async (
   return record;
 };
 
-/**
- * Mark the account's board lists stale after a change the board endpoints do not announce. Loaded lazily to keep the
- * gallery data layer off the launchpad's startup graph.
- */
+/** Loaded lazily to keep the gallery data layer off the launchpad's startup graph. */
 export const invalidateBoardLists = (owner: AccountScope): void => {
   void import('@features/gallery/queries').then(({ galleryKeys }) =>
     queryClient.invalidateQueries({ queryKey: galleryKeys.boardsForAccount(owner) })
   );
 };
 
-/** A response arrived and refused the create outright, so nothing was written. */
 const isRefusal = (error: unknown): boolean => error instanceof ApiError && error.status >= 400 && error.status < 500;
 
-/** No response, or one that says nothing about whether the write happened. */
 const isIndeterminate = (error: unknown): boolean => !(error instanceof ApiError) || error.status >= 500;
 
 export const getClientStateValue = (key: string, signal?: AbortSignal): Promise<string | null> =>
-  apiFetchJson<string | null>(`${CLIENT_STATE_BASE}/get_by_key?key=${encodeURIComponent(key)}`, { signal });
+  withRequestDeadline(
+    (signal) =>
+      apiFetchJson<string | null>(`${CLIENT_STATE_BASE}/get_by_key?key=${encodeURIComponent(key)}`, { signal }),
+    CLIENT_STATE_READ_TIMEOUT_MS,
+    signal
+  );
 
 /** The endpoint takes a JSON-encoded string body, hence the stringify of a string. */
 export const setClientStateValue = async (key: string, value: string, signal?: AbortSignal): Promise<void> => {
+  // Must settle before callers release ordering queues; a timeout cannot fence a late commit.
   await apiFetchJson<string>(`${CLIENT_STATE_BASE}/set_by_key?key=${encodeURIComponent(key)}`, {
     body: JSON.stringify(value),
     method: 'POST',

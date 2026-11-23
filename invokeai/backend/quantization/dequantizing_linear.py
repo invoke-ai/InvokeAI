@@ -1,15 +1,18 @@
 """Linears that keep their weight quantized in buffers and materialize it on every forward.
 
-Two schemes store their Linears this way, ``int8_convrot`` and ``nvfp4``; GGUF keeps a plain Linear but
-packs its weight in a ``GGMLTensor`` and dequantizes it per forward just the same. The code around them
-needs the same two answers about any of these: whether a LoRA has to ride along as a sidecar, and how
-much memory one forward needs on top of the model's resident size. Both are asked of the loaded module
-tree and live here, so callers ask once for every scheme: a module-level scheme answers by subclassing,
-GGUF -- whose quantization lives on the weight, not the module -- is delegated to.
+Three schemes store their Linears this way, ``int8_convrot``, ``nvfp4`` and Ideogram 4's row-wise fp8
+(``fp8_rowwise``); GGUF keeps a plain Linear but packs its weight in a ``GGMLTensor`` and dequantizes it
+per forward just the same. The code around them
+needs the same three answers about any of these: whether a LoRA has to ride along as a sidecar, how
+much memory one forward needs on top of the model's resident size, and whether FP8 Storage may cast the
+build's other, full-precision layers (`leaves_dense_layers_to_fp8_storage`). The first two are asked of the
+loaded module tree and live here, so callers ask once for every scheme: a module-level scheme answers by
+subclassing, GGUF -- whose quantization lives on the weight, not the module -- is delegated to.
 """
 
 import abc
-from typing import Any
+import sys
+from typing import Any, ClassVar
 
 import torch
 import torch.nn.functional as F
@@ -32,6 +35,11 @@ class DequantizingLinear(torch.nn.Module, abc.ABC):
     Both methods are abstract so that a scheme missing one fails where its modules are built, at load,
     rather than in the denoise node that sizes its working memory from them.
     """
+
+    #: Whether FP8 Storage may cast the other, full-precision layers of a build holding this scheme. By default it
+    #: declines the whole build: those layers keep the precision the build chose. A scheme opts in only where
+    #: measurement showed that casting them costs nothing material.
+    leaves_dense_layers_to_fp8_storage: ClassVar[bool] = False
 
     in_features: int
     out_features: int
@@ -63,7 +71,24 @@ def requires_sidecar_patching(model: Any, model_format: ModelFormat) -> bool:
     """
     if model_format in (ModelFormat.GGUFQuantized, ModelFormat.SDNQQuantized):
         return True
-    return any(isinstance(module, DequantizingLinear) for module in model.modules())
+    # bitsandbytes Linears (Ideogram 4's nf4 pair is a Diffusers folder) pack their weight into a uint8
+    # parameter, which a direct patch reports as a shape mismatch and skips, layer by layer. Their classes
+    # are only looked up, never imported: bitsandbytes is optional, and a model holding such modules has
+    # imported them already.
+    quantized_types = (DequantizingLinear, *_loaded_bnb_linear_types())
+    return any(isinstance(module, quantized_types) for module in model.modules())
+
+
+def _loaded_bnb_linear_types() -> tuple[type, ...]:
+    found: list[type] = []
+    for module_name, class_name in (
+        ("invokeai.backend.quantization.bnb_nf4", "InvokeLinearNF4"),
+        ("invokeai.backend.quantization.bnb_llm_int8", "InvokeLinear8bitLt"),
+    ):
+        module = sys.modules.get(module_name)
+        if module is not None:
+            found.append(getattr(module, class_name))
+    return tuple(found)
 
 
 def peak_dequant_transient_bytes(model: torch.nn.Module, compute_dtype: torch.dtype) -> int:

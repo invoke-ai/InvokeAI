@@ -1,6 +1,7 @@
 import inspect
 import os
 from contextlib import ExitStack, nullcontext
+from dataclasses import dataclass
 from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
 
 import torch
@@ -15,7 +16,7 @@ from diffusers.schedulers.scheduling_dpmsolver_singlestep import DPMSolverSingle
 from diffusers.schedulers.scheduling_tcd import TCDScheduler
 from diffusers.schedulers.scheduling_utils import SchedulerMixin as Scheduler
 from PIL import Image
-from pydantic import field_validator
+from pydantic import field_validator, model_validator
 from torchvision.transforms.functional import resize as tv_resize
 from transformers import CLIPVisionModelWithProjection
 
@@ -28,10 +29,18 @@ from invokeai.app.invocations.fields import (
     Input,
     InputField,
     LatentsField,
+    MetadataField,
     UIType,
+    WithMetadata,
+)
+from invokeai.app.invocations.metadata import (
+    LatentsMetaOutput,
+    build_denoise_metadata,
+    serialize_adapter_metadata,
+    serialize_ip_adapter_ref_images,
+    serialize_lora_metadata,
 )
 from invokeai.app.invocations.model import ModelIdentifierField, UNetField
-from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.invocations.sd.controlnet import ControlField
 from invokeai.app.invocations.sd.ip_adapter import IPAdapterField
 from invokeai.app.invocations.sd.t2i_adapter import T2IAdapterField
@@ -86,6 +95,16 @@ from invokeai.backend.util.sage_attention import sage_attention_scope
 from invokeai.backend.util.silence_warnings import SilenceWarnings
 
 
+@dataclass(frozen=True)
+class SchedulerInitialization:
+    timesteps: torch.Tensor
+    init_timestep: torch.Tensor
+    scheduler_step_kwargs: Dict[str, Any]
+    # Indices use scheduler timestep entries, including second-order substeps, like the denoising loops.
+    full_timestep_count: int
+    start_step_index: int
+
+
 def get_scheduler(
     context: InvocationContext,
     scheduler_info: ModelIdentifierField,
@@ -135,9 +154,9 @@ def get_scheduler(
     title="Denoise - SD1.5, SDXL",
     tags=["latents", "denoise", "txt2img", "t2i", "t2l", "img2img", "i2i", "l2l"],
     category="latents",
-    version="1.6.0",
+    version="1.9.0",
 )
-class DenoiseLatentsInvocation(BaseInvocation):
+class DenoiseLatentsInvocation(BaseInvocation, WithMetadata):
     """Denoises noisy latents to decodable images"""
 
     positive_conditioning: Union[ConditioningField, list[ConditioningField]] = InputField(
@@ -211,6 +230,12 @@ class DenoiseLatentsInvocation(BaseInvocation):
         description=FieldDescriptions.hidiffusion_window_attn,
         title="HiDiffusion: Window Attention",
     )
+    hidiffusion_auto_ratios: bool = InputField(
+        default=False,
+        input=Input.Direct,
+        description=FieldDescriptions.hidiffusion_auto_ratios,
+        title="HiDiffusion: Automatic Ratios",
+    )
     hidiffusion_t1_ratio: float = InputField(
         default=0.4,
         ge=0,
@@ -219,7 +244,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
         title="HiDiffusion: T1 Ratio",
     )
     hidiffusion_t2_ratio: float = InputField(
-        default=0.0,
+        default=0,
         ge=0,
         le=1,
         description=FieldDescriptions.hidiffusion_t2_ratio,
@@ -249,6 +274,27 @@ class DenoiseLatentsInvocation(BaseInvocation):
             if v < 1:
                 raise ValueError("cfg_scale must be greater than 1")
         return v
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_legacy_hidiffusion_ratios(cls, values):
+        if not isinstance(values, dict):
+            return values
+        values = dict(values)
+        for name in ("hidiffusion_t1_ratio", "hidiffusion_t2_ratio"):
+            if name in values and values[name] is None:
+                values[name] = 0
+        return values
+
+    def validate_hidiffusion_ratio_order(self):
+        if (
+            self.hidiffusion
+            and self.hidiffusion_raunet
+            and not self.hidiffusion_auto_ratios
+            and self.hidiffusion_t2_ratio > self.hidiffusion_t1_ratio
+        ):
+            raise ValueError("HiDiffusion T2 ratio must be less than or equal to the T1 ratio")
+        return self
 
     @staticmethod
     def _get_text_embeddings_and_masks(
@@ -781,7 +827,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
         denoising_start: float,
         denoising_end: float,
         seed: int,
-    ) -> Tuple[torch.Tensor, torch.Tensor, Dict[str, Any]]:
+    ) -> SchedulerInitialization:
         assert isinstance(scheduler, ConfigMixin)
         if scheduler.config.get("cpu_only", False):
             scheduler.set_timesteps(steps, device="cpu")
@@ -789,6 +835,8 @@ class DenoiseLatentsInvocation(BaseInvocation):
         else:
             scheduler.set_timesteps(steps, device=device)
             timesteps = scheduler.timesteps
+
+        full_timestep_count = len(timesteps)
 
         # skip greater order timesteps
         _timesteps = timesteps[:: scheduler.order]
@@ -828,7 +876,13 @@ class DenoiseLatentsInvocation(BaseInvocation):
         if isinstance(scheduler, TCDScheduler):
             scheduler_step_kwargs.update({"eta": 1.0})
 
-        return timesteps, init_timestep, scheduler_step_kwargs
+        return SchedulerInitialization(
+            timesteps=timesteps,
+            init_timestep=init_timestep,
+            scheduler_step_kwargs=scheduler_step_kwargs,
+            full_timestep_count=full_timestep_count,
+            start_step_index=min(t_start_idx, full_timestep_count),
+        )
 
     def prep_inpaint_mask(
         self, context: InvocationContext, latents: torch.Tensor
@@ -886,7 +940,55 @@ class DenoiseLatentsInvocation(BaseInvocation):
 
         return seed, noise, latents
 
-    def invoke(self, context: InvocationContext) -> LatentsOutput:
+    def _build_metadata(self, width: int, height: int, context: Optional[InvocationContext] = None) -> MetadataField:
+        suffix = (
+            "inpaint"
+            if getattr(self, "denoise_mask", None) is not None
+            else ("img2img" if getattr(self, "latents", None) is not None else "txt2img")
+        )
+        prefix = "sdxl_" if getattr(self.unet.unet, "base", None) == BaseModelType.StableDiffusionXL else ""
+        updates: dict[str, Any] = {
+            "generation_mode": f"{prefix}{suffix}",
+            "width": width,
+            "height": height,
+            "cfg_scale": self.cfg_scale,
+            "steps": self.steps,
+            "scheduler": self.scheduler,
+            "denoising_start": self.denoising_start,
+            "denoising_end": self.denoising_end,
+            "cfg_rescale_multiplier": self.cfg_rescale_multiplier,
+            "model": self.unet.unet,
+            "seamless_x": "x" in (getattr(self.unet, "seamless_axes", []) or []),
+            "seamless_y": "y" in (getattr(self.unet, "seamless_axes", []) or []),
+            "hidiffusion": self.hidiffusion,
+            "hidiffusion_raunet": self.hidiffusion_raunet,
+            "hidiffusion_window_attn": self.hidiffusion_window_attn,
+            "hidiffusion_auto_ratios": self.hidiffusion_auto_ratios,
+            "hidiffusion_t1_ratio": None if self.hidiffusion_auto_ratios else self.hidiffusion_t1_ratio,
+            "hidiffusion_t2_ratio": None if self.hidiffusion_auto_ratios else self.hidiffusion_t2_ratio,
+        }
+        if getattr(self.unet, "freeu_config", None) is not None:
+            updates["freeu_s1"] = self.unet.freeu_config.s1
+            updates["freeu_s2"] = self.unet.freeu_config.s2
+            updates["freeu_b1"] = self.unet.freeu_config.b1
+            updates["freeu_b2"] = self.unet.freeu_config.b2
+
+        updates["loras"] = serialize_lora_metadata(getattr(self.unet, "loras", None))
+        updates["controlnets"] = serialize_adapter_metadata(self.control)
+        updates["ref_images"] = serialize_ip_adapter_ref_images(
+            getattr(self, "ip_adapter", None), context=context, default_width=width, default_height=height
+        )
+        updates["t2iAdapters"] = serialize_adapter_metadata(getattr(self, "t2i_adapter", None))
+
+        if self.noise and self.noise.seed is not None:
+            updates["seed"] = self.noise.seed
+        elif self.latents and self.latents.seed is not None:
+            updates["seed"] = self.latents.seed
+
+        return build_denoise_metadata(getattr(self, "metadata", None), updates)
+
+    def invoke(self, context: InvocationContext) -> LatentsMetaOutput:
+        self.validate_hidiffusion_ratio_order()
         if os.environ.get("USE_MODULAR_DENOISE", False):
             return self._new_invoke(context)
         else:
@@ -894,7 +996,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
 
     @torch.no_grad()
     @SilenceWarnings()  # This quenches the NSFW nag from diffusers.
-    def _new_invoke(self, context: InvocationContext) -> LatentsOutput:
+    def _new_invoke(self, context: InvocationContext) -> LatentsMetaOutput:
         ext_manager = ExtensionsManager(is_canceled=context.util.is_canceled)
 
         device = TorchDevice.choose_torch_device()
@@ -929,7 +1031,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
             unet_config=unet_config,
         )
 
-        timesteps, init_timestep, scheduler_step_kwargs = self.init_scheduler(
+        scheduler_init = self.init_scheduler(
             scheduler,
             seed=seed,
             device=device,
@@ -937,6 +1039,9 @@ class DenoiseLatentsInvocation(BaseInvocation):
             denoising_start=self.denoising_start,
             denoising_end=self.denoising_end,
         )
+        timesteps = scheduler_init.timesteps
+        init_timestep = scheduler_init.init_timestep
+        scheduler_step_kwargs = scheduler_init.scheduler_step_kwargs
 
         ### preview
         def step_callback(state: PipelineIntermediateState) -> None:
@@ -950,10 +1055,14 @@ class DenoiseLatentsInvocation(BaseInvocation):
                     apply_raunet=self.hidiffusion_raunet,
                     apply_window_attn=self.hidiffusion_window_attn,
                     has_controlnet=bool(self.control),
+                    has_t2i_adapter=bool(self.t2i_adapter),
                     is_controlnet_text_to_image=bool(self.control) and self.latents is None,
-                    t1_ratio=self.hidiffusion_t1_ratio,
-                    t2_ratio=self.hidiffusion_t2_ratio,
+                    t1_ratio=None if self.hidiffusion_auto_ratios else self.hidiffusion_t1_ratio,
+                    t2_ratio=None if self.hidiffusion_auto_ratios else self.hidiffusion_t2_ratio,
                     generator=torch.Generator(device="cpu").manual_seed(seed),
+                    is_inpainting_task=self.denoise_mask is not None,
+                    full_timestep_count=scheduler_init.full_timestep_count,
+                    start_step_index=scheduler_init.start_step_index,
                 )
             )
 
@@ -1056,11 +1165,20 @@ class DenoiseLatentsInvocation(BaseInvocation):
         TorchDevice.empty_cache()
 
         name = context.tensors.save(tensor=result_latents)
-        return LatentsOutput.build(latents_name=name, latents=result_latents, seed=None)
+        width = result_latents.shape[-1] * LATENT_SCALE_FACTOR
+        height = result_latents.shape[-2] * LATENT_SCALE_FACTOR
+        return LatentsMetaOutput.build(
+            latents_name=name,
+            latents=result_latents,
+            seed=None,
+            metadata=self._build_metadata(width, height, context),
+            width=width,
+            height=height,
+        )
 
     @torch.no_grad()
     @SilenceWarnings()  # This quenches the NSFW nag from diffusers.
-    def _old_invoke(self, context: InvocationContext) -> LatentsOutput:
+    def _old_invoke(self, context: InvocationContext) -> LatentsMetaOutput:
         device = TorchDevice.choose_torch_device()
         seed, noise, latents = self.prepare_noise_and_latents(context, self.noise, self.latents)
 
@@ -1178,7 +1296,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 dtype=unet_dtype,
             )
 
-            timesteps, init_timestep, scheduler_step_kwargs = self.init_scheduler(
+            scheduler_init = self.init_scheduler(
                 scheduler,
                 device=device,
                 steps=self.steps,
@@ -1186,6 +1304,9 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 denoising_end=self.denoising_end,
                 seed=seed,
             )
+            timesteps = scheduler_init.timesteps
+            init_timestep = scheduler_init.init_timestep
+            scheduler_step_kwargs = scheduler_init.scheduler_step_kwargs
             pipeline._num_timesteps = timesteps.shape[0]
 
             with (
@@ -1195,10 +1316,14 @@ class DenoiseLatentsInvocation(BaseInvocation):
                     apply_raunet=self.hidiffusion_raunet,
                     apply_window_attn=self.hidiffusion_window_attn,
                     has_controlnet=bool(controlnet_data),
+                    has_t2i_adapter=bool(t2i_adapter_data),
                     is_controlnet_text_to_image=bool(controlnet_data) and self.latents is None,
-                    t1_ratio=self.hidiffusion_t1_ratio,
-                    t2_ratio=self.hidiffusion_t2_ratio,
+                    t1_ratio=None if self.hidiffusion_auto_ratios else self.hidiffusion_t1_ratio,
+                    t2_ratio=None if self.hidiffusion_auto_ratios else self.hidiffusion_t2_ratio,
                     generator=torch.Generator(device="cpu").manual_seed(seed),
+                    is_inpainting_task=self.denoise_mask is not None,
+                    full_timestep_count=scheduler_init.full_timestep_count,
+                    start_step_index=scheduler_init.start_step_index,
                 )
                 if self.hidiffusion
                 else nullcontext()
@@ -1229,4 +1354,13 @@ class DenoiseLatentsInvocation(BaseInvocation):
         TorchDevice.empty_cache()
 
         name = context.tensors.save(tensor=result_latents)
-        return LatentsOutput.build(latents_name=name, latents=result_latents, seed=None)
+        width = result_latents.shape[-1] * LATENT_SCALE_FACTOR
+        height = result_latents.shape[-2] * LATENT_SCALE_FACTOR
+        return LatentsMetaOutput.build(
+            latents_name=name,
+            latents=result_latents,
+            seed=None,
+            metadata=self._build_metadata(width, height, context),
+            width=width,
+            height=height,
+        )

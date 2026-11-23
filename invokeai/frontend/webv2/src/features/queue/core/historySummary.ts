@@ -106,8 +106,7 @@ export const getQueueSummary = (items: QueueItem[], progress: QueueItemProgress 
 
   current = Math.min(current, total);
 
-  // `current` is the one-based ordinal of the active image, so that image
-  // remains in the countdown until it completes.
+  // `current` is the one-based ordinal of the active image, so that image remains in the countdown until it completes.
   return { current, remaining: Math.max(0, total - current + 1), runningQueueItemId: runningItem.id, total };
 };
 

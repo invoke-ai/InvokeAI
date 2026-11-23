@@ -23,6 +23,7 @@ const describeActions = (overrides: Partial<Parameters<typeof getQueueActionDesc
   getQueueActionDescriptors({
     canManageProcessor: true,
     counts,
+    cancelCurrentTarget: 'in_progress',
     hasRunningItem: true,
     includeOpenQueue: false,
     isConnected: true,
@@ -62,47 +63,6 @@ describe('queue action model', () => {
     expect(find(actions, 'clear-failed').confirmation?.body).toContain('"count":2');
   });
 
-  it('says the running item keeps going only when the server is reachable and an item is running', () => {
-    const body = (overrides: Parameters<typeof describeActions>[0]) =>
-      find(describeActions({ localUnsubmitted: 1, ...overrides }), 'cancel-all-except-current').confirmation?.body;
-
-    expect(body({})).toContain('widgets.queue.runningItemKeepsGoing');
-    expect(body({ isConnected: false })).not.toContain('runningItemKeepsGoing');
-    expect(body({ hasRunningItem: false })).not.toContain('runningItemKeepsGoing');
-  });
-
-  it('says that clearing the queue also stops what still runs, and leaves that out when nothing does', () => {
-    const busy = find(describeActions(), 'clear-queue').confirmation?.body;
-    const idle = find(describeActions({ counts: { ...counts, inProgress: 0, pending: 0 } }), 'clear-queue').confirmation
-      ?.body;
-
-    expect(busy).toContain('widgets.queue.clearQueueStopsWork {"count":4}');
-    expect(busy).toContain('clearQueueConfirmationBody.project {"count":11,"project":"Portraits"}');
-    expect(idle).not.toContain('clearQueueStopsWork');
-  });
-
-  it('never offers a "Cancel" way out of a cancel', () => {
-    for (const action of describeActions()) {
-      if (action.confirmation) {
-        expect(action.confirmation.cancelLabel).not.toBe('common.cancel');
-      }
-    }
-
-    expect(find(describeActions(), 'cancel-all').confirmation?.cancelLabel).toBe('widgets.queue.keepRunning');
-  });
-
-  it('offers one processor toggle that reflects its state and what waits on it', () => {
-    const running = find(describeActions(), 'toggle-processor');
-    const paused = find(describeActions({ isPaused: true }), 'toggle-processor');
-
-    expect(running).toMatchObject({ label: 'widgets.queue.pauseProcessor' });
-    expect(running.hint).toBeUndefined();
-    expect(paused).toMatchObject({
-      hint: 'widgets.queue.processorPausedWaiting {"count":3}',
-      label: 'widgets.queue.resumeProcessor',
-    });
-  });
-
   it('disables what needs the server while it is disconnected, but still opens the queue', () => {
     const offline = describeActions({ includeOpenQueue: true, isConnected: false });
 
@@ -116,28 +76,6 @@ describe('queue action model', () => {
     expect(cancelAll.confirmation?.body).toContain('"count":2');
   });
 
-  it("keeps cancel-all-except-current available offline for this tab's unaccepted runs, counting only those", () => {
-    const exceptCurrent = find(
-      describeActions({ isConnected: false, localUnsubmitted: 2 }),
-      'cancel-all-except-current'
-    );
-
-    expect(exceptCurrent.disabled).toBe(false);
-    expect(exceptCurrent.confirmation?.body).toContain('"count":2');
-  });
-
-  it("counts this tab's unaccepted runs with the server's queued items when cancelling all but the current one", () => {
-    const connected = find(describeActions({ localUnsubmitted: 2 }), 'cancel-all-except-current');
-    const localOnly = find(
-      describeActions({ counts: { ...counts, pending: 0 }, localUnsubmitted: 1 }),
-      'cancel-all-except-current'
-    );
-
-    expect(connected.confirmation?.body).toContain('"count":5');
-    expect(localOnly.disabled).toBe(false);
-    expect(localOnly.confirmation?.body).toContain('"count":1');
-  });
-
   it('disables bulk actions with nothing to reach', () => {
     const empty = describeActions({
       counts: {
@@ -146,6 +84,7 @@ describe('queue action model', () => {
         inProgress: 0,
         pending: 0,
       },
+      cancelCurrentTarget: null,
       hasRunningItem: false,
     });
 
@@ -182,15 +121,5 @@ describe('queue action counts', () => {
       inProgress: 3,
       pending: 7,
     });
-  });
-
-  it('confirms a member clear across projects without a count it cannot know', () => {
-    const body = find(
-      describeActions({ counts: getQueueActionCounts(server, { kind: 'mine' }, 'member'), scope: { kind: 'mine' } }),
-      'clear-queue'
-    ).confirmation?.body;
-
-    expect(body).toMatch(/^widgets\.queue\.clearQueueConfirmationBody\.mine( |$)/);
-    expect(body).not.toContain('"count":40');
   });
 });

@@ -14,10 +14,10 @@ import { Tooltip } from './Tooltip';
 
 interface UnavailableProps {
   /**
-   * Why the control cannot act now (say, no clipboard on a plain-HTTP origin). It stays visible and focusable, reads
-   * as disabled (`aria-disabled`, described by the reason), lets no activation through (a submit button does not
-   * submit), and shows the reason in its tooltip. The reason wins over `disabled`, which would hide it. Native
-   * `disabled` alone stays for states the user can change, where there is nothing to explain.
+   * Why the control cannot act now (say, no clipboard on a plain-HTTP origin). It stays visible and focusable, reads as
+   * disabled (`aria-disabled`, described by the reason), lets no activation through (a submit button does not submit),
+   * and shows the reason in its tooltip. The reason wins over `disabled`, which would hide it. Native `disabled` alone
+   * stays for states the user can change, where there is nothing to explain.
    */
   unavailableReason?: string;
 }
@@ -118,7 +118,8 @@ export const IconButton = ({
     () =>
       unavailableReason ? (
         <Stack gap="0">
-          {tooltip ? <Text>{tooltip}</Text> : null}
+          {/* A div, not a paragraph: a caller's tooltip may be a layout (a label beside its keycaps). */}
+          {tooltip ? <Text as="div">{tooltip}</Text> : null}
           <Text color={tooltip ? 'fg.muted' : undefined}>{unavailableReason}</Text>
         </Stack>
       ) : (
@@ -147,7 +148,6 @@ export const IconButton = ({
   );
 };
 
-/** Dismissal chrome is muted. */
 export const CloseButton = (props: CloseButtonProps) => <ChakraCloseButton color="fg.muted" {...props} />;
 
 export interface ToggleIconButtonProps extends Omit<

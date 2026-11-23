@@ -1,9 +1,6 @@
 import type { GalleryItemKey } from '@features/gallery';
 
-/**
- * Publish ephemeral tokenized trim-loop intents after selecting media and raising Preview. Expire stale requests
- * to prevent unexpected delayed audio; the player reports running state and stop control under the same token.
- */
+/** Tokenized trim-playback intents; stale ones expire to prevent unexpected delayed audio. */
 
 export interface VideoSpanPlaybackRequest {
   endSeconds: number;
@@ -13,7 +10,6 @@ export interface VideoSpanPlaybackRequest {
   token: number;
 }
 
-/** How long a published span request stays honourable. */
 export const VIDEO_SPAN_PLAYBACK_TTL_MS = 15_000;
 
 let currentRequest: VideoSpanPlaybackRequest | null = null;
@@ -42,7 +38,6 @@ export const requestVideoSpanPlayback = (span: {
 
 export const getVideoSpanPlaybackRequest = (): VideoSpanPlaybackRequest | null => currentRequest;
 
-/** True while `requestedAt` is recent enough to act on. */
 export const isVideoSpanPlaybackFresh = (requestedAt: number): boolean =>
   Date.now() - requestedAt <= VIDEO_SPAN_PLAYBACK_TTL_MS;
 
@@ -64,10 +59,7 @@ export const subscribeVideoSpanPlaybackRequests = (listener: () => void): (() =>
   };
 };
 
-/**
- * Report actual element playback for the current loop, null before use, after leaving its span, or while hidden.
- * Pausing keeps the loop armed for native resume.
- */
+/** Actual element playback of the current span, null when unused, left or hidden; pausing keeps it armed. */
 export interface VideoSpanPlaybackState {
   isPlaying: boolean;
   pause: () => void;
@@ -84,7 +76,7 @@ const notifyStateListeners = (): void => {
   }
 };
 
-/** The player's report. Replaces whatever stood before: one loop is on screen at a time. */
+/** The player's report. Replaces whatever stood before: one span is on screen at a time. */
 export const publishVideoSpanPlaybackState = (state: VideoSpanPlaybackState): void => {
   if (
     currentState !== null &&
@@ -99,7 +91,7 @@ export const publishVideoSpanPlaybackState = (state: VideoSpanPlaybackState): vo
   notifyStateListeners();
 };
 
-/** Retires `token`'s state. A report from a newer loop is left alone. */
+/** Retires `token`'s state. A report from a newer span is left alone. */
 export const clearVideoSpanPlaybackState = (token: number): void => {
   if (currentState?.token !== token) {
     return;

@@ -5,9 +5,8 @@ export interface SingleFlight<T> {
 
 export interface TrailingSingleFlight {
   /**
-   * Runs task now, or joins the in-flight run and queues exactly one trailing
-   * rerun. Callers that join resolve when the run they joined settles; the
-   * rerun keeps the result fresh but is not awaited by them.
+   * Runs task now, or joins the in-flight run and queues exactly one trailing rerun. Callers that join resolve when the
+   * run they joined settles; the rerun keeps the result fresh but is not awaited by them.
    */
   run(task: () => Promise<void>): Promise<void>;
   /** The in-flight promise, if any (for ensure* fast paths). */

@@ -1,9 +1,10 @@
+import type { ReferenceVisionComponents } from '@features/generation/core/baseGenerationPolicies';
 import type { GenerateModelConfig, GenerateReferenceImage } from '@features/generation/core/types';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { DndContext } from '@dnd-kit/core';
-import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
 import { type GenerationUiAdapter, GenerationUiProvider } from '@features/generation/ui/GenerationUiContext';
+import { seedArchitectureCapabilities } from '@features/models/core/architectureCapabilities.testing';
 import { system } from '@theme/system';
 import i18next from 'i18next';
 import { act } from 'react';
@@ -13,9 +14,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { GenerateReferenceImagesContent } from './GenerateReferenceImagesSection';
 
-/** A model that only lacks the right format explains why the reference section is gone; other models stay silent. */
 const i18n = i18next.createInstance();
-// The shipped copy, so a change to the hint's wording or placeholders fails here.
 await i18n.use(initReactI18next).init({
   fallbackLng: 'en',
   lng: 'en',
@@ -36,8 +35,12 @@ const QWEN21_GGUF: GenerateModelConfig = {
   name: 'Qwen-Image-2.1 Q4',
   type: 'main',
 };
+const QWEN21_CHECKPOINT: GenerateModelConfig = { ...QWEN21_GGUF, format: 'checkpoint', key: 'qwen21-int8' };
+const ENCODER_8B = { base: 'any', key: 'enc', name: 'Qwen3-VL 8B', type: 'qwen3_vl_encoder', variant: 'qwen3_vl_8b' };
 const NO_MODELS: [] = [];
-const COGVIEW4: GenerateModelConfig = { base: 'cogview4', key: 'cogview4', name: 'CogView4', type: 'main' };
+const HINT =
+  'Reference images need a Qwen3-VL 8B encoder with a vision tower. Select one under Components, or use a Diffusers Qwen-Image-2.1 model.';
+const GGUF_HINT = "Reference images need this encoder's Vision Tower (the mmproj file). Select it under Components.";
 const QWEN21_REFERENCE: GenerateReferenceImage = {
   config: {
     image: { original: { image: { height: 512, image_name: 'edit.png', width: 512 } } },
@@ -53,7 +56,11 @@ const section = (): HTMLElement | null | undefined => host?.querySelector('[data
 let root: Root | null = null;
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-const render = async (selectedModel: GenerateModelConfig, referenceImages: GenerateReferenceImage[] = []) => {
+const render = async (
+  selectedModel: GenerateModelConfig,
+  referenceImages: GenerateReferenceImage[] = [],
+  visionComponents: ReferenceVisionComponents = {}
+) => {
   await act(() =>
     root?.render(
       <I18nextProvider i18n={i18n}>
@@ -63,6 +70,7 @@ const render = async (selectedModel: GenerateModelConfig, referenceImages: Gener
               <div data-testid="section">
                 <GenerateReferenceImagesContent
                   models={NO_MODELS}
+                  visionComponents={visionComponents}
                   referenceImages={referenceImages}
                   selectedModel={selectedModel}
                   onCommit={vi.fn()}
@@ -90,24 +98,24 @@ afterEach(async () => {
   root = null;
 });
 
-describe('reference image format hint', () => {
-  it('names the Diffusers format where a GGUF Qwen-Image-2.1 model would show references', async () => {
+describe('reference image vision tower hint', () => {
+  it('names the encoders that read references where a GGUF Qwen-Image-2.1 model would show them', async () => {
     await render(QWEN21_GGUF);
 
-    expect(section()?.textContent).toBe('Reference images need a Diffusers Qwen-Image-2.1 model.');
+    expect(section()?.textContent).toBe(HINT);
     expect(section()?.querySelector('button')).toBeNull();
   });
 
-  it('keeps the format hint next to the clear action for references the model cannot read', async () => {
+  it('keeps the hint next to the clear action for references the model cannot read', async () => {
     await render(QWEN21_GGUF, [QWEN21_REFERENCE]);
 
-    expect(section()?.textContent).toContain('Reference images need a Diffusers Qwen-Image-2.1 model.');
+    expect(section()?.textContent).toContain(HINT);
     expect(section()?.querySelector('button')?.textContent).toBe('Remove all');
   });
 
-  it('renders nothing for a model whose base takes no references in any format', async () => {
-    await render(COGVIEW4);
+  it('asks for the Vision Tower when the selected encoder is GGUF', async () => {
+    await render(QWEN21_CHECKPOINT, [], { qwen3VLEncoderModel: { ...ENCODER_8B, format: 'gguf_quantized' } });
 
-    expect(section()?.textContent).toBe('');
+    expect(section()?.textContent).toBe(GGUF_HINT);
   });
 });

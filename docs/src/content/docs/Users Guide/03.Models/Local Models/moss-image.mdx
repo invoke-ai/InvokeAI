@@ -1,7 +1,7 @@
 ---
 title: MOSS-Image
 description: Generate and edit images with OpenMOSS's MOSS-Image Base and SFT, from the Diffusers pipelines or a single-file transformer, including JSON layout prompts, layouts from canvas regions and a prompt enhancer.
-lastUpdated: 2026-10-28
+lastUpdated: 2026-11-14
 sidebar:
   order: 8
 ---
@@ -58,6 +58,16 @@ starter models.
 | MOSS-Image Base  | `OpenMOSS-Team/MOSS-Image-Base` (~27 GB) | nothing, everything is bundled |
 | MOSS-Image SFT   | `OpenMOSS-Team/MOSS-Image-SFT` (~27 GB)  | nothing, everything is bundled |
 
+The single-file builds are individual starter models. They hold only the transformer, so each also installs the
+**FLUX.2 VAE** and the **Qwen3.5 9B Encoder (int8)**:
+
+| Starter | Source | Size |
+| ------- | ------ | ---- |
+| MOSS-Image Base / SFT (single file) | Comfy-Org bf16 safetensors | ~10.2 GB each |
+| MOSS-Image Base / SFT (int8) | Comfy-Org `int8_convrot` safetensors | ~5.4 GB each |
+| MOSS-Image Base / SFT (GGUF Q4_K_M) | unsloth | ~3.2 GB each |
+| MOSS-Image Base / SFT (GGUF Q8_0) | unsloth | ~5.5 GB each |
+
 :::note[Installing both]
 Each pipeline brings its own copy of the 17 GB text encoder and the VAE, so installing Base and SFT downloads
 and stores the same encoder twice.
@@ -67,7 +77,7 @@ MOSS-Image needs three components:
 
 | Component                 | Diffusers install | Single-file install  |
 | ------------------------- | ----------------- | -------------------- |
-| Transformer               | bundled           | the `.safetensors` file, such as the ComfyUI export `moss-image-dit.safetensors` |
+| Transformer               | bundled           | a `.safetensors` or `.gguf` file, such as the ComfyUI export `moss-image-dit.safetensors` (see [Transformer formats](#transformer-formats)) |
 | Text encoder (Qwen3.5 9B) | bundled           | installed separately |
 | VAE (FLUX.2)              | bundled           | installed separately |
 
@@ -75,18 +85,57 @@ When a single-file MOSS-Image model is selected, the **Components** section next
 
 - **Qwen3.5 Encoder**: a single-file Qwen3.5 9B encoder, such as the ComfyUI export
   `moss-image-qwen35.safetensors`. A file that carries the vision tower as well loads; the vision tower stays
-  on disk. The shards of a sharded export, such as the files in the pipeline's `text_encoder/` folder, do not
+  on disk. The files in Comfy-Org's MOSS-Image repository (`text_encoders/`, bf16 and `int8_convrot`) serve as this encoder
+  however they were installed: from their URL, from a repository id or from a local copy. A whole Qwen3.5 9B file with its vision tower and LM head is
+  filed as a [Text LLM](/users-guide/models/model-format-support/#text-llms) that also serves as the encoder, so it
+  appears in this picker. A model's roles are recorded when it is installed or re-identified. The shards of a sharded export, such as the files in the pipeline's `text_encoder/` folder, do not
   work on their own: the first shard is refused at install with a message saying so, and the others install as
   unknown models. The shards in `transformer/` install as unknown models too. Install the whole Diffusers
   folder or a merged single file instead. Anima-3.8B uses the Qwen3.5 4B, which installs under the same encoder type. The two are
-  not interchangeable, so the picker lists only 9B encoders.
+  not interchangeable, so the picker lists only 9B encoders. ComfyUI's int8 build of the encoder works as well:
+  install it with the **Qwen3.5 9B Encoder (int8)** starter model, which files it as a Qwen3.5 Encoder that also
+  serves as a Text LLM, or from its Comfy-Org URL. The FLUX.3 prompt upsampler is a fine-tune of Qwen3.5 9B and appears
+  in this picker too, but MOSS-Image was trained on the stock encoder: use Comfy-Org's MOSS-Image encoder file. On an RTX 4090 it
+  renders the same scene as the bf16 encoder with shifted details, and the file is about half the size. The w4a8
+  build is refused at install.
 - **VAE**: a FLUX.2 VAE. MOSS-Image ships the FLUX.2 VAE with a smaller decoder (the ComfyUI export
   `moss-image-vae.safetensors`); it installs under the FLUX.2 base. Any other FLUX.2 VAE works too, for
   example the **FLUX.2 VAE** starter model.
 
-Quantized MOSS-Image transformers (fp8, int8, nvfp4, MXFP8 and GGUF) are not supported yet and are
-refused at install with a message saying so. Install the bf16 file, and to save VRAM turn on **FP8
-Storage** in the model's **Default Settings**.
+### Transformer formats
+
+A single-file transformer comes in these forms; the model type, not the file name, decides how it loads.
+
+| Form | Examples | Notes |
+| ---- | -------- | ----- |
+| bf16 safetensors | `moss-image-dit.safetensors`, Comfy-Org's `moss_image_base_bf16.safetensors` | Either key layout (see below). |
+| int8 convrot safetensors | Comfy-Org's `moss_image_base_int8_convrot.safetensors` | `int8_tensorwise` with convrot. The attention, output and feed-forward projections stay int8 in memory and are dequantized for each step. |
+| fp8 safetensors | unsloth's `MOSS-Image-Base-FP8.safetensors` and `MOSS-Image-SFT-FP8.safetensors` | torchao fp8 with one scale per output row. On a GPU with fp8 support, the attention, output and feed-forward projections stay fp8 in memory when FP8 Storage is on (the default for these files) or [`fp8_compute`](/configuration/optimization/fp8-compute/) is on. They are then dequantized for each step, or, with `fp8_compute` on a GPU with fp8 hardware, multiplied directly in fp8. Otherwise they are widened to the compute dtype when the model loads. |
+| GGUF | `unsloth/MOSS-Image-Base-GGUF`, `leejet/MOSS-Image-SFT-GGUF` | The K-quants and `Q8_0` and the other llama.cpp types. The packed weights are dequantized for each step. |
+
+The community files come in two key layouts, and both install and load:
+
+- **Split**: each block has separate `proj.q`, `proj.k` and `proj.v` weights, as in OpenMOSS's Diffusers folder and
+  unsloth's GGUFs.
+- **Fused**: each block has one `proj.qkv` weight, as in Comfy-Org's single files and leejet's GGUFs. InvokeAI
+  splits it into its three parts when the model loads. A GGUF's packed rows are cut without being dequantized.
+
+A few layers stay in the compute dtype in every form, because the model reads their weight dtype to pick the
+dtype of the activations it passes on: the first layer of the image and time embeddings, the modulation and output
+layers, the text projection and the `q` projection of every block. For a quantized file this means they are
+dequantized when the model loads. The 42 `q` projections alone occupy about 0.74 GiB dense (bf16), so a Q4 GGUF takes
+more memory than its file size suggests.
+
+Not supported, and refused at install with a message saying so: ComfyUI's scaled fp8 and unscaled fp8 transformers,
+torchao exports other than the fp8 layout above (INT8 builds, per-tensor or block-wise fp8), files that mix torchao fp8
+with ComfyUI-quantized layers, nvfp4 and w4a8 builds, and the ComfyUI-GGUF `Q8_CR` and `Q4_CR` files. Install the bf16
+file, the fp8 or int8 build above, or a GGUF instead. To save VRAM with a bf16 file, turn on **FP8 Storage** in the
+model's **Default Settings**. FP8 Storage does nothing for a GGUF or the int8 build; the int8 build keeps the layers it
+did not quantize in bf16. The Model Manager can still show the toggle for the int8 build, because it is the same kind
+of file as the bf16 one. It has no effect there. For the fp8 build it only keeps the file's fp8 layers packed.
+
+The int8 build and the GGUFs save memory; they are not faster. In InvokeAI's measurements on an RTX 4090 they took
+3-15 % longer per image than bf16. Int8 and Q8_0 keep the scene of a bf16 image and shift its details.
 
 ## Generation settings
 
@@ -255,10 +304,37 @@ Small language models of about 1.5 to 1.7B parameters, such as **Qwen2.5 1.5B In
 models, are not recommended for this system prompt: they write layouts for nearly every request, and their
 drafts are often invalid.
 
+## LoRA
+
+MOSS-Image LoRAs install like any other and appear under **Concepts** in the Generate panel. They work on Base and
+SFT, and on GGUF, int8 and FP8 Storage builds; on GGUF and int8 transformers and with FP8 Storage the LoRA runs beside the
+weights instead of being merged into them.
+
+- These layouts load: ai-toolkit and ComfyUI files (`diffusion_model.` keys), kohya/LyCORIS files (`lora_unet_`
+  keys), diffusers/PEFT files (`transformer.` keys, also as a Diffusers folder with
+  `pytorch_lora_weights.safetensors`) and DiffSynth-Studio files (keys without a prefix).
+- A LoRA may store the attention projections fused (ComfyUI and ai-toolkit `proj.qkv`) or split into q, k and v.
+  InvokeAI places a fused `qkv` onto the transformer's separate q, k and v layers exactly.
+- LoRA, DoRA, LoKr, LoHa and full-weight layers are recognized.
+- LoRAs change the transformer only. These files are refused at install, with the reason shown: LoRAs that change
+  norm weights or biases (`.diff` on norms, `.diff_b`, `w_norm`), other adapter kinds such as OFT, control files that
+  widen the patch embedder (such as Comfy-Org's MOSS-Image color/depth control LoRA), LoRAs with text-encoder layers,
+  and raw PEFT adapters (`base_model.model.` keys), whose alpha is stored in a separate `adapter_config.json` that
+  InvokeAI does not read.
+- These are not recognized and install as an unknown model: SimpleTuner LyCORIS files with `lycoris_` key names, and
+  MOSS-Image edit LoRAs whose keys end in `lora_A`/`lora_B` without `.weight`, such as Comfy-Org's official
+  MOSS-Image edit LoRA.
+- Edit, character-reference and "ControlNet" LoRAs in the layouts above install and run, but they condition on
+  reference images, which MOSS-Image does not take in InvokeAI yet, so they do not do what they are made for.
+- For turbo and distillation LoRAs, use the steps and CFG Scale on their model card. DMD repositories that also ship
+  `time_embedding.safetensors` and `dataspace.safetensors` need those files and their own sampler, which InvokeAI does
+  not load, so the LoRA alone is only a partial speed-up.
+- An older version of InvokeAI registered MOSS-Image LoRAs as Z-Image LoRAs or as unknown models. Select one in the
+  Model Manager and use **Re-identify model**.
+
 ## Limitations
 
-- LoRA is not supported.
-- Quantized transformers are refused at install (see [Installing](#installing)).
+- ComfyUI scaled and unscaled fp8, other torchao layouts, torchao fp8 mixed with ComfyUI-quantized layers, nvfp4, w4a8 and ComfyUI-GGUF `Q8_CR`/`Q4_CR` transformers are refused at install (see [Installing](#installing)).
 - ControlNet, reference images and seamless tiling are not available.
 - Regional guidance places boxes in a layout; it has no regional negative prompts or regional reference images.
 - MOSS-Image is not offered in the [Upscale panel](/users-guide/image-generation/upscale/).
@@ -270,6 +346,7 @@ drafts are often invalid.
 | **Main Model - MOSS-Image**       | Loads the transformer, and the Qwen3.5 9B encoder and VAE from the pipeline or from the standalone models selected |
 | **Layout Prompt - MOSS-Image**    | Builds the prompt the model encodes from a prompt, the image size and a list of regions, each with a type, a caption, visible text for text regions, and a pixel box `[x1, y1, x2, y2]` from the image's top-left. Compiles a layout draft at the given size. Every MOSS-Image graph from the Generate tab and the Canvas uses it; its regions input has no editor widget |
 | **Prompt - MOSS-Image**           | Encodes a prompt with the Qwen3.5 9B encoder                               |
+| **Apply LoRA - MOSS-Image** / **Apply LoRA Collection - MOSS-Image** | Apply one LoRA, or a collection of them, to the transformer |
 | **Denoise - MOSS-Image**          | Runs sampling; accepts image-to-image latents and an inpainting mask, and takes the skip layers as **Uncond Skip Layers** |
 | **Image to Latents - FLUX2**      | VAE encode, for image-to-image and inpainting                              |
 | **Latents to Image - FLUX2**      | VAE decode                                                                 |

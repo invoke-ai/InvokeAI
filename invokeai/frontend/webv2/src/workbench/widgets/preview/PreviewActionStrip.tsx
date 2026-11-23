@@ -4,10 +4,16 @@ import type { ImageActions, ImageContextMenuVariant } from '@workbench/image-act
 import { Icon, HStack, Menu, Portal } from '@chakra-ui/react';
 import { galleryImageItemToGalleryImage, isGalleryImageItem, toGalleryItemRef } from '@features/gallery/contracts';
 import { canCopyImage } from '@platform/browser/clipboard';
-import { Button, IconButton } from '@platform/ui/Button';
+import { Button, IconButton, ToggleIconButton } from '@platform/ui/Button';
 import { MenuContent } from '@platform/ui/Menu';
 import { Tooltip, useTooltipTriggerIds } from '@platform/ui/Tooltip';
-import { ImageContinueGroup, ImageUseGroups, useImageRecallCapabilities } from '@workbench/image-actions';
+import { releaseFocusOnRemoval } from '@workbench/focusRegions';
+import {
+  ImageContinueGroup,
+  ImageUseGroups,
+  useImageRecallCapabilities,
+  VideoUseGroups,
+} from '@workbench/image-actions';
 import {
   ChevronDownIcon,
   CopyIcon,
@@ -18,7 +24,7 @@ import {
   StarIcon,
   type LucideIcon,
 } from 'lucide-react';
-import { useCallback, useMemo, useState, type ComponentProps, type MouseEvent } from 'react';
+import { useCallback, useMemo, useState, type ComponentProps, type MouseEvent, type Ref } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { PreviewDensity } from './previewDensity';
@@ -29,24 +35,25 @@ const STAR_LABEL_KEYS = {
   video: { off: 'widgets.preview.starVideo', on: 'widgets.preview.unstarVideo' },
 } as const;
 
-/**
- * The selection's actions in the Preview header. An image gets Edit (every way to continue working with it) and Use
- * (it as an input, or its settings), so ⋮ keeps only housekeeping: labelled at full density, icon-only at compact,
- * where compare moves into ⋮ too. Minimal density keeps star and the full ⋮ alone; videos have neither menu and keep
- * the full ⋮ at every density.
- */
+/** Header actions: Edit and Use for an image, Use for a video; ⋮ keeps housekeeping by density. */
 export const PreviewActionStrip = ({
   actions,
   density,
+  getRegion,
   isVideoFrameCopyAvailable = false,
   item,
+  onCancelCompare,
   onCopyCurrentFrame,
   onOpenMenu,
 }: {
   actions: ImageActions;
   density: PreviewDensity;
+  /** Preview's focusable region, which takes focus from the ⋮ when a later render removes it. */
+  getRegion?: () => HTMLElement | null;
   isVideoFrameCopyAvailable?: boolean;
   item: GalleryItem;
+  /** Set only while Select for compare waits for a second image, which shows it pressed; switches it off. */
+  onCancelCompare?: () => void;
   onCopyCurrentFrame?: () => void;
   /** Opens the view's image context menu at viewport coordinates, leaving out what the strip already offers. */
   onOpenMenu: ((x: number, y: number, variant: ImageContextMenuVariant) => void) | null;
@@ -57,9 +64,19 @@ export const PreviewActionStrip = ({
     () => void actions.setItemsStarred([toGalleryItemRef(item)], !item.starred),
     [actions, item]
   );
-  const selectForCompare = useCallback(() => image && actions.selectForCompare(image), [actions, image]);
+  const isCompareArmed = onCancelCompare !== undefined;
+  const toggleCompare = useCallback(
+    (checked: boolean) => {
+      if (!checked) {
+        onCancelCompare?.();
+      } else if (image) {
+        actions.selectForCompare(image);
+      }
+    },
+    [actions, image, onCancelCompare]
+  );
   const copyCurrentFrame = useCallback(() => onCopyCurrentFrame?.(), [onCopyCurrentFrame]);
-  const hasItemMenus = density !== 'minimal' && image !== null;
+  const hasItemMenus = density !== 'minimal';
   const openMenu = useCallback(
     (event: MouseEvent<HTMLButtonElement>) => {
       const rect = event.currentTarget.getBoundingClientRect();
@@ -76,15 +93,25 @@ export const PreviewActionStrip = ({
       </IconButton>
     </Tooltip>
   );
+  // Focus comes back to the ⋮ when its menu closes, and the strip goes with the selection.
+  const menuButtonRef = useCallback(
+    (node: HTMLButtonElement | null) => (node && getRegion ? releaseFocusOnRemoval(node, getRegion) : undefined),
+    [getRegion]
+  );
   const menuButton = onOpenMenu ? (
-    <StripIconButton icon={EllipsisVerticalIcon} label={t('widgets.preview.imageActions')} onClick={openMenu} />
+    <StripIconButton
+      ref={menuButtonRef}
+      icon={EllipsisVerticalIcon}
+      label={t('widgets.preview.imageActions')}
+      onClick={openMenu}
+    />
   ) : null;
 
-  if (density === 'compact' && image) {
+  if (density === 'compact') {
     return (
       <HStack flexShrink={0} gap="0.5">
-        <EditMenu actions={actions} image={image} isIconOnly />
-        <UseMenu actions={actions} image={image} isIconOnly />
+        {image ? <EditMenu actions={actions} image={image} isIconOnly /> : null}
+        <UseMenu actions={actions} isIconOnly item={item} />
         {starButton}
         {menuButton}
       </HStack>
@@ -102,13 +129,21 @@ export const PreviewActionStrip = ({
 
   return (
     <HStack flexShrink={0} gap="0.5">
-      {/* Lead with the labelled next steps; omit them for videos, matching context-menu eligibility. */}
+      {/* Lead with the labelled next steps; videos have no Edit or compare, matching context-menu eligibility. */}
+      {image ? <EditMenu actions={actions} image={image} /> : null}
+      <UseMenu actions={actions} item={item} />
       {image ? (
-        <>
-          <EditMenu actions={actions} image={image} />
-          <UseMenu actions={actions} image={image} />
-          <StripIconButton icon={ImagesIcon} label={t('widgets.preview.selectForCompare')} onClick={selectForCompare} />
-        </>
+        // A fixed name with the state in aria-pressed, as the routing lock is: pressed, it waits for a second image.
+        <ToggleIconButton
+          bg={isCompareArmed ? 'accent.subtle' : undefined}
+          checked={isCompareArmed}
+          color={isCompareArmed ? 'accent.fg' : 'fg.muted'}
+          icon={ImagesIcon}
+          label={t('widgets.preview.selectForCompare')}
+          tooltip={isCompareArmed ? t('widgets.preview.compareArmedTooltip') : undefined}
+          variant="ghost"
+          onCheckedChange={toggleCompare}
+        />
       ) : null}
       {starButton}
       {item.kind === 'video' && onCopyCurrentFrame ? (
@@ -126,15 +161,12 @@ export const PreviewActionStrip = ({
   );
 };
 
-/**
- * The image an open menu acts on, held from the moment it opens, as the ⋮ menu holds its target: a result that
- * Auto-switch brings in meanwhile must not take over the items, nor reload what they offer.
- */
-const useImageHeldWhileOpen = (image: GalleryImage) => {
-  const [heldImage, setHeldImage] = useState<GalleryImage | null>(null);
-  const handleOpenChange = useCallback(({ open }: { open: boolean }) => setHeldImage(open ? image : null), [image]);
+/** Held from opening, so a result Auto-switch brings in cannot take over or reload the items. */
+const useHeldWhileOpen = <T,>(item: T) => {
+  const [heldItem, setHeldItem] = useState<T | null>(null);
+  const handleOpenChange = useCallback(({ open }: { open: boolean }) => setHeldItem(open ? item : null), [item]);
 
-  return { handleOpenChange, menuImage: heldImage ?? image };
+  return { handleOpenChange, menuItem: heldItem ?? item };
 };
 
 interface ItemMenuProps {
@@ -179,7 +211,7 @@ const EditMenu = ({ actions, image, isIconOnly = false }: ItemMenuProps) => {
   const { t } = useTranslation();
   const label = t('widgets.preview.editThisImage');
   const ids = useTooltipTriggerIds();
-  const { handleOpenChange, menuImage } = useImageHeldWhileOpen(image);
+  const { handleOpenChange, menuItem: menuImage } = useHeldWhileOpen(image);
   const images = useMemo(() => [menuImage], [menuImage]);
 
   return (
@@ -205,12 +237,19 @@ const EditMenu = ({ actions, image, isIconOnly = false }: ItemMenuProps) => {
   );
 };
 
-/** What to take from the image: it as an input, or its recorded settings, with the viewer keys that do the same. */
-const UseMenu = ({ actions, image, isIconOnly = false }: ItemMenuProps) => {
+/** The item as an input, or its recorded settings. */
+const UseMenu = ({
+  actions,
+  isIconOnly = false,
+  item,
+}: Omit<ItemMenuProps, 'image'> & {
+  item: GalleryItem;
+}) => {
   const { t } = useTranslation();
   const ids = useTooltipTriggerIds();
-  const label = t('widgets.preview.useInGenerate');
-  const { handleOpenChange, menuImage } = useImageHeldWhileOpen(image);
+  const { handleOpenChange, menuItem } = useHeldWhileOpen(item);
+  // Named for the held item, so an open menu keeps its name when Auto-switch brings in the other kind.
+  const label = t(menuItem.kind === 'video' ? 'widgets.preview.useThisVideo' : 'widgets.preview.useInGenerate');
 
   return (
     <Menu.Root ids={ids} lazyMount positioning={MENU_POSITIONING} unmountOnExit onOpenChange={handleOpenChange}>
@@ -227,7 +266,11 @@ const UseMenu = ({ actions, image, isIconOnly = false }: ItemMenuProps) => {
       <Portal>
         <Menu.Positioner>
           <MenuContent minW="16rem">
-            <UseMenuItems actions={actions} image={menuImage} />
+            {isGalleryImageItem(menuItem) ? (
+              <UseMenuItems actions={actions} image={galleryImageItemToGalleryImage(menuItem)} />
+            ) : (
+              <VideoUseGroups actions={actions} item={menuItem} presentation="guided" />
+            )}
           </MenuContent>
         </Menu.Positioner>
       </Portal>
@@ -254,16 +297,19 @@ const StripIconButton = ({
   disabled,
   icon,
   label,
+  ref,
   unavailableReason,
   onClick,
 }: {
   disabled?: boolean;
   icon: LucideIcon;
   label: string;
+  ref?: Ref<HTMLButtonElement>;
   unavailableReason?: string;
   onClick: (event: MouseEvent<HTMLButtonElement>) => void;
 }) => (
   <IconButton
+    ref={ref}
     aria-label={label}
     color="fg.muted"
     disabled={disabled}

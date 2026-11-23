@@ -10,14 +10,19 @@ export const formatDuration = (startedAt?: string | null, completedAt?: string |
     return null;
   }
 
-  if (seconds < 60) {
-    return `${seconds.toFixed(2)}s`;
+  const fixed = seconds.toFixed(2);
+
+  // Compare the rounded label, not the raw value: 59.996s would print "60.00s".
+  if (Number(fixed) < 60) {
+    return `${fixed}s`;
   }
 
-  const minutes = Math.floor(seconds / 60);
+  // Round to whole seconds before splitting units, so 119.6s reads "2m 0s", not "1m 60s".
+  const total = Math.round(seconds);
+  const minutes = Math.floor(total / 60);
 
   if (minutes < 60) {
-    return `${minutes}m ${Math.round(seconds % 60)}s`;
+    return `${minutes}m ${total % 60}s`;
   }
 
   const hours = Math.floor(minutes / 60);

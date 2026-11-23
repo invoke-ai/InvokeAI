@@ -112,7 +112,6 @@ export const parseMaxTokensInput = (raw: string): ParsedMaxTokens => {
     return null;
   }
 
-  // Accept decimal integers only.
   if (!/^\d+$/.test(trimmed)) {
     return 'invalid';
   }

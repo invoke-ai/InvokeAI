@@ -5,6 +5,7 @@ import type { KeyboardEvent, MouseEvent } from 'react';
 import { Box, HStack, Icon, Text, VisuallyHidden } from '@chakra-ui/react';
 import { IconButton, Tooltip } from '@platform/ui';
 import { FeatureHint, FeatureHintExclusion } from '@platform/ui/hints/FeatureHint';
+import { rowFocusRing } from '@theme/recipes';
 import { ChevronDownIcon } from 'lucide-react';
 import { memo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -12,15 +13,15 @@ import { useTranslation } from 'react-i18next';
 import type { LayerRowCommands } from './layerRowCommands';
 
 import { anchorFromPoint } from './layerRowCommands';
+import { LAYER_PANEL_CONTROL_GAP, LAYER_PANEL_END_INSET } from './LayerRowSurface';
 import { useLayerStackActions, type LayerStackActionsEngine } from './useLayerStackActions';
-
-const HEADER_FOCUS = { outline: '2px solid', outlineColor: 'accent.solid', outlineOffset: '-2px' };
 
 const STACK_HINTS: Record<LayerStackKind, FeatureHintId> = {
   control: 'layerStackControl',
   inpaint_mask: 'layerStackInpaintMask',
   raster: 'layerStackRaster',
   regional_guidance: 'layerStackRegionalGuidance',
+  vector: 'layerStackVector',
 };
 
 interface LayerStackHeaderProps {
@@ -31,7 +32,6 @@ interface LayerStackHeaderProps {
   engine: LayerStackActionsEngine | null;
   focused: boolean;
   leafCount: number;
-  /** The header's tree key, the id the tree addresses it by. */
   rowKey: string;
   posInSet: number;
   setSize: number;
@@ -42,10 +42,7 @@ interface LayerStackHeaderProps {
 
 const stopPropagation = (event: { stopPropagation: () => void }): void => event.stopPropagation();
 
-/**
- * Stack headers own the roving tree stop; pointer-only action buttons remain keyboard-accessible through Shift+F10
- * menus.
- */
+/** Headers own the roving tree stop; pointer-only buttons are reachable through Shift+F10 menus. */
 const LayerStackHeaderComponent = ({
   collapsed,
   commands,
@@ -62,6 +59,7 @@ const LayerStackHeaderComponent = ({
 }: LayerStackHeaderProps) => {
   const { t } = useTranslation();
   const actions = useLayerStackActions(stack, document, engine, editingLocked);
+  const exportStatus = actions.find((action) => action.status)?.status;
   const handleToggle = useCallback(
     (event: { stopPropagation: () => void }) => {
       event.stopPropagation();
@@ -95,8 +93,8 @@ const LayerStackHeaderComponent = ({
   const hintId = STACK_HINTS[stack];
   const descriptionId = `layer-stack-hint-${stack}`;
   return (
-    // Attach hints to tree-item focus/hover with persistent described-by text; exclude action buttons with their
-    // own tooltips.
+    // Attach hints to tree-item focus/hover with persistent described-by text; exclude action buttons with their own
+    // tooltips.
     <FeatureHint hint={hintId}>
       <Box
         ref={element}
@@ -113,14 +111,14 @@ const LayerStackHeaderComponent = ({
         role={pinned ? undefined : 'treeitem'}
         rounded="sm"
         tabIndex={pinned ? undefined : focused ? 0 : -1}
-        _focusVisible={HEADER_FOCUS}
+        _focusVisible={rowFocusRing}
         onClick={handleClick}
         onContextMenu={handleContextMenu}
         onFocus={pinned ? undefined : handleFocus}
         onKeyDown={pinned ? undefined : handleKeyDown}
       >
         {pinned ? null : <VisuallyHidden id={descriptionId}>{t(`hints.${hintId}.paragraphs.0`)}</VisuallyHidden>}
-        <HStack gap="1" h="full" pe="1.5" ps="0">
+        <HStack gap="1" h="full" pe={LAYER_PANEL_END_INSET} ps="0">
           <IconButton
             aria-label={t(collapsed ? 'widgets.layers.groupActions.expand' : 'widgets.layers.groupActions.collapse')}
             color="fg.muted"
@@ -150,7 +148,12 @@ const LayerStackHeaderComponent = ({
             {t(`widgets.layers.groups.${stack}`)} ({leafCount})
           </Text>
           <FeatureHintExclusion>
-            <HStack gap="0.5" onClick={stopPropagation} onMouseDown={keepFocus}>
+            <HStack gap={LAYER_PANEL_CONTROL_GAP} onClick={stopPropagation} onMouseDown={keepFocus}>
+              {exportStatus && (
+                <Text role="status" color="fg.muted" fontSize="xs" maxW="7rem" truncate>
+                  {exportStatus}
+                </Text>
+              )}
               {actions.map((action) => (
                 <Tooltip key={action.id} content={action.label}>
                   <IconButton

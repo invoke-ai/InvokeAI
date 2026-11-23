@@ -22,7 +22,12 @@ import {
 } from './batch';
 import { CALL_SAVED_WORKFLOW_DYNAMIC_FIELD_PREFIX } from './callSavedWorkflow';
 import { createWorkflowId, nodeAcceptsExtraInputs } from './document';
-import { getWorkflowFieldInvalidReason, isDirectInputField, isWorkflowCollectionItemValid } from './fields';
+import {
+  getHiDiffusionRatioOrderIssue,
+  getWorkflowFieldInvalidReason,
+  isDirectInputField,
+  isWorkflowCollectionItemValid,
+} from './fields';
 import {
   createForLoopValidationReason,
   ForLoopGraphValidationError,
@@ -34,10 +39,7 @@ import { createWorkflowIssue, type WorkflowIssueReason, type WorkflowReadinessRe
 import { isInvocationNode } from './types';
 import { hasAnyCycle } from './validation';
 
-/**
- * Compile documents to immutable queue GraphContract with connector resolution. Batch and generator nodes never
- * reach the backend graph: the batch planner turns them into queue batch groups instead.
- */
+/** Batch and generator nodes never reach the backend graph; the batch planner turns them into batch groups. */
 
 export const isExecutableInvocationType = (type: string): boolean =>
   !isWorkflowBatchNodeType(type) && !isWorkflowGeneratorNodeType(type);
@@ -61,16 +63,11 @@ const getNodeInputTemplates = (
 ): FieldInputTemplate[] => Object.values({ ...template.inputs, ...node.data.dynamicInputTemplates });
 
 export interface CompileProjectGraphOptions {
-  /**
-   * The board Auto (and an unset board field) resolves to; `none` or null leaves the node unboarded, which the
-   * backend saves as Uncategorized.
-   */
+  /** `none` or null leaves the node unboarded, which the backend saves as Uncategorized. */
   autoBoardId?: string | null;
   /**
-   * Whether results may land on a board a field names explicitly: a board the caller may add to now. A board the
-   * predicate refuses (deleted, archived away, or someone else's the caller can only view since choosing it) resolves
-   * like Auto, so the run lands somewhere rather than failing on its board after generating. Absent, every explicit
-   * board is taken as given.
+   * A board the predicate refuses (deleted, archived, or now view-only) resolves like Auto, so the run lands somewhere
+   * rather than failing after generating. Absent, every explicit board is taken as given.
    */
   isBoardDestination?: (boardId: string) => boolean;
 }
@@ -112,11 +109,9 @@ export interface ProjectGraphReadiness {
 export interface ProjectGraphReadinessOptions {
   /** Required connection inputs supplied by an ephemeral caller after document compilation. */
   externallySatisfiedInputs?: ReadonlySet<string>;
-  /** Runs the submission would make; with batch nodes the product must fit the queue. */
   batchCount?: number;
 }
 
-/** The reason a batch of `sessions` sessions cannot be queued, or null while it fits. */
 export const getWorkflowBatchCapReason = (sessions: number): WorkflowIssueReason | null =>
   sessions > WORKFLOW_BATCH_MAX_ITEMS
     ? createWorkflowIssue('batchCap', { max: WORKFLOW_BATCH_MAX_ITEMS, sessions })
@@ -144,9 +139,18 @@ export const getProjectGraphReadiness = (
   }
 
   const reasons: WorkflowReadinessReason[] = [];
-  const connectedInputs = new Set(
-    canonicalEdges.map((edge) => `${edge.destination.node_id}:${edge.destination.field}`)
-  );
+  const connectedInputs = new Set<string>();
+  const connectedFieldsByNode = new Map<string, Set<string>>();
+  for (const edge of canonicalEdges) {
+    const { node_id, field } = edge.destination;
+    connectedInputs.add(`${node_id}:${field}`);
+    let fields = connectedFieldsByNode.get(node_id);
+    if (!fields) {
+      fields = new Set();
+      connectedFieldsByNode.set(node_id, fields);
+    }
+    fields.add(field);
+  }
 
   for (const node of invocationNodes) {
     const template = templates[node.data.type];
@@ -158,6 +162,16 @@ export const getProjectGraphReadiness = (
     }
 
     const nodeName = getNodeDisplayName(node, templates);
+    const ratioIssue = getHiDiffusionRatioOrderIssue(node, connectedFieldsByNode.get(node.id) ?? new Set());
+    if (ratioIssue) {
+      reasons.push(
+        createWorkflowIssue(
+          'invalidInput',
+          { field: ratioIssue, node: nodeName },
+          { nodeId: node.id, fieldName: 'hidiffusion_t2_ratio' }
+        )
+      );
+    }
     const onField = (fieldName: string) => ({ fieldName, nodeId: node.id });
 
     // The batch planner judges a batch node's own list (size, connections); the field rules would only repeat it.
@@ -299,7 +313,6 @@ const toGraphInputValue = (
   return options.preserveBoardSentinel || (resolved !== 'auto' && resolved !== 'none') ? resolved : undefined;
 };
 
-/** Compiles the document into a `GraphContract` carrying the executable backend graph. */
 export const compileProjectGraph = (
   document: ProjectGraphState,
   templates: InvocationTemplates,
@@ -399,8 +412,7 @@ export const compileProjectGraph = (
       type: edge.type,
     });
 
-    // A connected input always wins over a stale direct value; sending both
-    // would let pydantic reject the node on the ignored direct value.
+    // A connected input wins over a stale direct value; sending both lets pydantic reject the node.
     const targetNode = backendGraph.nodes[edge.destination.node_id];
 
     if (targetNode) {
@@ -443,16 +455,12 @@ export const compileProjectGraph = (
   };
 };
 
-/**
- * Seed modes require a template-declared scalar seed with the full range. Keep seed arithmetic here so shared
- * field utilities remain lightweight.
- */
+/** Seed modes need a template-declared scalar seed with the full range. */
 export const isSeedInputField = (template: FieldInputTemplate): boolean =>
   template.name === 'seed' &&
   template.type.name === 'IntegerField' &&
   template.type.cardinality === 'SINGLE' &&
-  // The modes walk and wrap over 0…SEED_MAX in steps of one, so the template has to
-  // accept every value on that walk; a tighter range or step keeps its plain control.
+  // The modes walk 0…SEED_MAX in steps of one, so a tighter range or step keeps its plain control.
   template.maximum === SEED_MAX &&
   ((template.minimum ?? null) === null || (template.minimum ?? 0) <= 0) &&
   (template.exclusiveMinimum ?? null) === null &&
@@ -463,7 +471,6 @@ export const isSeedInputField = (template: FieldInputTemplate): boolean =>
 export const getWorkflowFieldSeedMode = (instance: Pick<WorkflowFieldInstance, 'seedMode'> | undefined): SeedMode =>
   isSeedMode(instance?.seedMode) ? instance.seedMode : 'fixed';
 
-/** One seed input that varies between runs: the seed the first run uses and the direction of the rest. */
 export interface WorkflowSeedAssignment {
   fieldName: string;
   nodeId: string;
@@ -478,10 +485,7 @@ export interface WorkflowSeedPlan {
   seedAdvances: WorkflowSeedFieldAdvance[];
 }
 
-/**
- * Choose seed starts once per submission and expand runs deterministically at send time. Random preserves the
- * entered seed; stepping reports the next authored value.
- */
+/** Seed starts are chosen once per submission; random preserves the entered seed, stepping reports the next one. */
 export const planWorkflowSeeds = (
   document: ProjectGraphState,
   templates: InvocationTemplates,
@@ -551,7 +555,6 @@ export const planWorkflowSeeds = (
   return { seedAdvances, seeds };
 };
 
-/** Writes each planned first seed into the compiled graph, so a single run needs no batch data. */
 export const applyWorkflowSeeds = (
   graph: CompiledWorkflowGraph,
   seeds: readonly WorkflowSeedAssignment[]
@@ -573,11 +576,9 @@ export const applyWorkflowSeeds = (
 };
 
 export interface WorkflowSubmissionPlan extends WorkflowSeedPlan {
-  /** Runs the submission produces. */
   batchCount: number;
   /** Batch-node groups, in the backend's product-of-zips shape; empty without batch nodes. */
   batchData: WorkflowBatchDatum[][];
-  /** Sessions one run produces through batch nodes. */
   batchSize: number;
   graph: CompiledWorkflowGraph;
 }
@@ -590,10 +591,7 @@ export interface WorkflowSubmissionPlanOptions extends CompileProjectGraphOption
   random?: () => number;
 }
 
-/**
- * Compiles the document with every planned first seed in place and reports the seeds that vary. Returns null when
- * the batch plan is not ready: an unresolved generator, a batch reason, or more sessions than the queue accepts.
- */
+/** Null when the batch plan is not ready: an unresolved generator, a batch reason, or too many sessions. */
 export const planWorkflowSubmission = (
   document: ProjectGraphState,
   templates: InvocationTemplates,

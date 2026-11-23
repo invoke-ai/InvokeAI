@@ -9,19 +9,20 @@ from typing import TYPE_CHECKING
 import torch
 from PIL import Image
 
-from invokeai.app.util.step_callback import render_linear_preview
+from invokeai.app.util.step_callback import preview_frame, render_linear_preview
 from invokeai.backend.architectures import LatentSpace, resolve_latent_space
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
-from invokeai.backend.model_manager.configs.tiny_autoencoder import is_tiny_autoencoder_supported
+from invokeai.backend.model_manager.configs.tiny_autoencoder import named_tiny_autoencoder_space
 from invokeai.backend.model_manager.load.load_base import LoadedModel
 from invokeai.backend.model_manager.load.model_cache.model_cache import MODEL_LOAD_LOCK
+from invokeai.backend.model_manager.starter_models import STARTER_MODELS, StarterModel
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
+from invokeai.backend.tiny_autoencoder.decoder import TinyAutoencoderDecoder
 from invokeai.backend.tiny_autoencoder.preview import (
     decode_preview,
     decode_working_memory_bytes,
     select_tiny_autoencoder,
 )
-from invokeai.backend.tiny_autoencoder.taesd import TaesdDecoder
 from invokeai.backend.util.devices import TorchDevice
 
 if TYPE_CHECKING:
@@ -49,6 +50,22 @@ RENDER_COST_INTERVAL_FACTOR = 20
 RENDER_COST_SMOOTHING = 0.5
 
 
+def tiny_autoencoder_starters(space: LatentSpace) -> list[StarterModel]:
+    """The starter models that install a TAE for `space`, read from the catalog by the TAE each one installs."""
+    starters = []
+    for starter in STARTER_MODELS:
+        if starter.type is not ModelType.TinyAutoencoder:
+            continue
+        if named_tiny_autoencoder_space(starter.base, starter.source) is space:
+            starters.append(starter)
+    return starters
+
+
+def _normalized(device: torch.device | None) -> torch.device | None:
+    """`device` with its index, so `cuda` and `cuda:0` compare equal."""
+    return None if device is None else TorchDevice.normalize(device)
+
+
 def _first_report(key: Hashable) -> bool:
     with _reported_lock:
         first = key not in _reported
@@ -58,7 +75,7 @@ def _first_report(key: Hashable) -> bool:
 
 @dataclass(frozen=True)
 class _HeldDecoder:
-    decoder: TaesdDecoder
+    decoder: TinyAutoencoderDecoder
     device: torch.device
 
 
@@ -89,7 +106,10 @@ class TinyAutoencoderPreviews:
         self._tae_frames = 0
         self._render_cost_s: float | None = None
         self._decoded_on: torch.device | None = None  # where this frame's TAE decode ran; None if linear
+        self._sample_on: torch.device | None = None  # where this frame's latents lived
+        self._first_frame_overhead_s = 0.0  # lookup, load, lock and queued-step wait of a first CPU TAE frame
         self._last_tae_device: torch.device | None = None
+        self._last_sample_device: torch.device | None = None  # where the latents of the last TAE frame lived
 
     @property
     def min_frame_interval_s(self) -> float | None:
@@ -103,22 +123,36 @@ class TinyAutoencoderPreviews:
     def measure_frame(self) -> Iterator[None]:
         """Time one emitted frame, from its render through its encode, into the render-cost estimate.
 
-        The TAE's device is synchronized first, so denoise work still queued on it is not counted as the
-        frame's. After that, wall time is the frame's whole cost: the decode copies its image to the CPU,
-        which waits for the decode. The first TAE frame is not counted, because it also looks the TAE up,
-        loads and locks it.
+        The TAE's device and the one the latents live on are synchronized first, so denoise work still queued
+        on either is not counted as the frame's: a CPU TAE's decode would otherwise wait for the GPU step that
+        produced its latents when it copies them over. After that, wall time is the frame's whole cost: the
+        decode copies its image to the CPU, which waits for the decode.
+
+        The first TAE frame also looks the TAE up, loads and locks it, so on a GPU it is not counted: cuDNN's
+        first-call algorithm selection can make it unrepresentative too, and a GPU frame costs about 25 ms anyway.
+        A CPU decode has no cold-start outlier, and its frames cost 0.3 s and more: leaving the first one uncounted
+        would let the second go out unpaced. It is counted without the lookup, load, lock and the wait for the
+        queued step (`_first_frame_overhead_s`). The final frame is always rendered, and it is one frame.
         """
         if self._last_tae_device is not None:
             TorchDevice.synchronize(self._last_tae_device)
+        if self._last_sample_device is not None and _normalized(self._last_sample_device) != _normalized(
+            self._last_tae_device
+        ):
+            TorchDevice.synchronize(self._last_sample_device)
         self._decoded_on = None
+        self._first_frame_overhead_s = 0.0
         start = monotonic()
         yield
         cost = monotonic() - start
         if self._decoded_on is None or self._disabled:
             return
         self._last_tae_device = self._decoded_on
+        self._last_sample_device = self._sample_on
         self._tae_frames += 1
         if self._tae_frames == 1:
+            if self._decoded_on.type == "cpu":
+                self._render_cost_s = cost - self._first_frame_overhead_s
             return
         if self._render_cost_s is None:
             self._render_cost_s = cost
@@ -126,13 +160,19 @@ class TinyAutoencoderPreviews:
             self._render_cost_s += RENDER_COST_SMOOTHING * (cost - self._render_cost_s)
 
     def render(self, base_model: BaseModelType, sample: torch.Tensor) -> tuple[Image.Image, tuple[int, int]]:
-        space = resolve_latent_space(base_model, sample)
+        space = resolve_latent_space(base_model, preview_frame(sample))
         if not self._disabled:
             try:
+                started = monotonic()
                 held = self._decoder_for(base_model, space, sample)
                 if held is not None:
+                    if held.device.type == "cpu" and self._tae_frames == 0:
+                        # The decode's copy of the latents would wait for the queued step; wait here, outside the cost.
+                        TorchDevice.synchronize(sample.device)
+                        self._first_frame_overhead_s = monotonic() - started
                     image = decode_preview(held.decoder, sample, device=held.device)
                     self._decoded_on = held.device
+                    self._sample_on = sample.device
                     size = (sample.shape[-1] * space.spatial_compression, sample.shape[-2] * space.spatial_compression)
                     return image, size
             except Exception as error:
@@ -155,6 +195,7 @@ class TinyAutoencoderPreviews:
     def _disable(self) -> None:
         self._disabled = True
         self._last_tae_device = None
+        self._last_sample_device = None
         self._decoders.clear()
         self._locks.close()
 
@@ -186,10 +227,10 @@ class TinyAutoencoderPreviews:
             return None
 
         decoder = loaded.model  # the very module the lock moves and yields
-        if not isinstance(decoder, TaesdDecoder):
-            raise TypeError(f"expected a TaesdDecoder, the loader returned {type(decoder).__name__}")
+        if not isinstance(decoder, TinyAutoencoderDecoder):
+            raise TypeError(f"expected a TinyAutoencoderDecoder, the loader returned {type(decoder).__name__}")
         # Reserved once, with the lock: a denoise keeps its size, so every later frame decodes the same.
-        working_mem_bytes = decode_working_memory_bytes(decoder, sample)
+        working_mem_bytes = decode_working_memory_bytes(decoder, sample, loaded.compute_device)
         if not self._fits_in_vram(loaded, working_mem_bytes):
             self._report_not_resident(config)
             return None
@@ -230,10 +271,12 @@ class TinyAutoencoderPreviews:
         return available >= missing
 
     def _report_missing(self, base_model: BaseModelType, space: LatentSpace) -> None:
-        if is_tiny_autoencoder_supported(space):
+        starters = tiny_autoencoder_starters(space)
+        if starters:
+            install = " or ".join(f"the {s.name} starter model (listed under {s.base.value})" for s in starters)
             message = (
                 f"No installed Tiny AutoEncoder decodes {base_model.value} latents; using linear previews. "
-                "Install the matching Tiny AutoEncoder starter model."
+                f"Install {install}."
             )
         else:
             message = f"{base_model.value} has no Tiny AutoEncoder; using linear previews."
@@ -252,7 +295,8 @@ class TinyAutoencoderPreviews:
             ("not resident", config.key),
             logging.INFO,
             f"Tiny AutoEncoder '{config.name}' does not fit in VRAM next to the running model; "
-            "using linear previews for this invocation.",
+            'using linear previews for this invocation. Enable "Decode previews on CPU" for it in the model manager '
+            "to decode previews on the CPU instead.",
         )
 
     def _log_once(self, key: Hashable, level: int, message: str, exc_info: bool | None = None) -> None:

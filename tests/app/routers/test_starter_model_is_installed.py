@@ -18,6 +18,7 @@ from invokeai.backend.model_manager.starter_models.common import (
 )
 from invokeai.backend.model_manager.starter_models.types import StarterModel
 from invokeai.backend.model_manager.taxonomy import Qwen3VariantType
+from tests.fixtures.model_roles import text_llm_qwen3_folder
 
 FP4_ENCODER_STARTERS = [
     (z_image_qwen3_encoder_fp4, Qwen3VariantType.Qwen3_4B, Qwen3VariantType.Qwen3_8B),
@@ -43,3 +44,32 @@ def test_an_fp4_encoder_starter_is_satisfied_by_an_installed_encoder_of_its_size
 ) -> None:
     assert get_is_installed(starter, [_installed_encoder(size)])
     assert not get_is_installed(starter, [_installed_encoder(other_size)])
+
+
+@pytest.mark.parametrize(
+    ("starter", "size", "other_size"), FP4_ENCODER_STARTERS, ids=["z_image_4b", "klein_4b", "klein_8b"]
+)
+def test_a_qwen3_folder_installed_as_a_text_llm_satisfies_the_encoder_starter_of_its_size_only(
+    starter: StarterModel, size: Qwen3VariantType, other_size: Qwen3VariantType
+) -> None:
+    assert get_is_installed(starter, [text_llm_qwen3_folder("llm", size)])
+    assert not get_is_installed(starter, [text_llm_qwen3_folder("llm", other_size)])
+    assert not get_is_installed(starter, [text_llm_qwen3_folder("llm", None)])
+
+
+def test_a_renamed_install_from_a_superseded_source_still_counts_as_installed() -> None:
+    from invokeai.app.api.routers.model_manager import get_is_installed as is_installed
+    from invokeai.backend.model_manager.configs.main import Main_Checkpoint_Flux3_Config
+    from invokeai.backend.model_manager.starter_models.flux3 import flux3_klein_single_file
+
+    old_source = flux3_klein_single_file.previous_sources[0]
+    assert old_source != flux3_klein_single_file.source
+    renamed = Main_Checkpoint_Flux3_Config.model_construct(
+        key="installed",
+        name="my klein",
+        source=old_source,
+        base=flux3_klein_single_file.base,
+        type=flux3_klein_single_file.type,
+    )
+    assert is_installed(flux3_klein_single_file, [renamed])
+    assert not is_installed(flux3_klein_single_file, [renamed.model_copy(update={"source": "D:/other.safetensors"})])

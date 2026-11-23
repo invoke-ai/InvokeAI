@@ -1,4 +1,7 @@
-import type { QueueUiAdapter } from './QueueUiContext';
+import { createMenuPartLoader } from '@platform/ui/Menu';
+
+import type { QueueLocalRun, QueueUiAdapter } from './QueueUiContext';
+import type { QueueWidgetRuntime } from './QueueWidgetView';
 
 const noLoadingModel = { getLabel: (): string | null => null, subscribe: () => () => undefined };
 
@@ -12,15 +15,33 @@ export const createTestQueueUiAdapter = (overrides: Partial<QueueUiAdapter> = {}
   canManageItem: () => true,
   canManageProcessor: true,
   canViewItemDetails: () => true,
-  cancelLocalUnsubmittedRuns: () => undefined,
+  cancelLocalRun: () => undefined,
+  cancelLocalRuns: () => undefined,
   isConnected: true,
   isProjectOpen: () => true,
+  itemRecallMenuGroup: createMenuPartLoader(() => Promise.resolve(() => null)),
   loadingModel: noLoadingModel,
-  localUnsubmittedRuns: { activeProject: 0, allProjects: 0 },
+  localRuns: [],
   notify: { error: () => undefined, info: () => undefined, success: () => undefined },
   openQueue: () => undefined,
   preloadItemActions: () => undefined,
   queueJobsScope: 'all',
+  recallAllFromItem: () => undefined,
   viewer: 'single',
   ...overrides,
+});
+
+/** A run this tab queued long ago in `project-1` and is still submitting, with no failure yet. */
+export const createTestLocalRun = (overrides: Partial<QueueLocalRun> = {}): QueueLocalRun => ({
+  id: 'run-1',
+  label: 'A castle at dusk',
+  projectId: 'project-1',
+  retry: null,
+  submittedAt: 0,
+  ...overrides,
+});
+
+/** A widget runtime that takes registrations and runs nothing. */
+export const createTestQueueWidgetRuntime = (): QueueWidgetRuntime => ({
+  commands: { register: () => () => undefined },
 });

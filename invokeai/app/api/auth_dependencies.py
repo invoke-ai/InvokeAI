@@ -157,7 +157,7 @@ def get_current_user_or_default(
 
     This dependency is useful for endpoints that should work in both single-user and multiuser modes.
 
-    When multiuser mode is disabled (default), this always returns a system user with admin privileges,
+    When multiuser mode is disabled, this always returns a system user with admin privileges,
     allowing unrestricted access to all operations.
 
     When multiuser mode is enabled, authentication is required and this function validates the token,
@@ -247,7 +247,7 @@ def require_admin_or_default(
 
     This dependency is useful for admin-only endpoints that should work in both single-user and multiuser modes.
 
-    When multiuser mode is disabled (default), this always returns a system user with admin privileges.
+    When multiuser mode is disabled, this always returns a system user with admin privileges.
     When multiuser mode is enabled, this validates that the authenticated user has admin privileges.
 
     Args:

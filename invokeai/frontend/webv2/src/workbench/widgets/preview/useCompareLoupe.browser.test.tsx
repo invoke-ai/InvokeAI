@@ -18,7 +18,13 @@ const interact = (action: () => void): Promise<void> =>
   });
 
 const Harness = () => {
-  const loupe = useCompareLoupe({ enabled: true, naturalWidth: 200 });
+  const loupe = useCompareLoupe({
+    enabled: true,
+    images: [
+      { id: 'pane-0', naturalWidth: 200 },
+      { id: 'pane-1', naturalWidth: 200 },
+    ],
+  });
 
   return ([0, 1] as const).map((index) => {
     const pane = loupe.getPane(index)!;
@@ -145,10 +151,9 @@ describe('useCompareLoupe', () => {
       touch('pointerdown', 1, 50, { isPrimary: true });
       touch('pointerdown', 2, 150);
     });
-    // Capture moving between the panes — which is what arming a pinch whose
-    // fingers are on different images does — fires `lostpointercapture` on the
-    // pane that held it. Treating that as the finger going up would kill the
-    // gesture before its first move.
+    // Capture moving between the panes — which is what arming a pinch whose fingers are on different images does —
+    // fires `lostpointercapture` on the pane that held it. Treating that as the finger going up would kill the gesture
+    // before its first move.
     await interact(() => touch('lostpointercapture', 1, 50));
     await interact(() => {
       touch('pointermove', 1, 0);
@@ -175,7 +180,6 @@ describe('useCompareLoupe', () => {
     expect(images[0]?.style.transform).toBe('translate(-200px, -150px) scale(3)');
 
     await interact(() => touch('pointerup', 2, 250));
-    // Track the remaining finger through pan and release outside both panes.
     await interact(() => touch('pointermove', 1, -30));
     expect(images[0]?.style.transform).toBe('translate(-180px, -150px) scale(3)');
 

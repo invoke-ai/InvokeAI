@@ -95,8 +95,8 @@ Model Manager's **Default Settings**:
 The **Advanced** section of the Generate panel adds these controls for SDXL:
 
 - **VAE** and **VAE Precision** — see [VAE](#vae).
-- **Color Compensation** — adjusts the input image to reduce color shifts during inpainting and
-  image-to-image. This control is available only for SDXL.
+- **Color Compensation** — adjusts the input image to reduce color shifts during inpainting,
+  outpainting, and image-to-image. This control is available only for SDXL.
 - **Seamless Tiling** — generates images that tile without visible seams, on the X axis, Y axis or both.
 - **HiDiffusion** — improves structure at higher resolutions (it is most noticeable at 1536px and
   above). See [HiDiffusion](/users-guide/image-generation/advanced-topics/hidiffusion/).
@@ -146,9 +146,9 @@ SDXL supports up to **five reference images**, using IP-Adapter models:
 - **Standard Reference (IP Adapter ViT-H)**
 - **Precise Reference (IP Adapter Plus ViT-H)** — references the image with higher precision.
 
-Each reference image has a **Mode** — **Style**, **Composition** or **Both** — and a **Weight**. Under
-**Advanced**, you can set the range of steps the reference is active for and, in Style mode, choose a
-**Style variant** (Standard, Strong or Precise).
+Each reference image has a **Weight** on its row and, in its settings (the chevron beside **Weight**), a
+**Mode** — **Style**, **Composition** or **Both** — the range of steps the reference is active for and, in
+Style mode, a **Style variant** (Standard, Strong or Precise).
 
 The starter IP-Adapters carry their own image encoder. The **CLIP Vision** selector next to the model
 matters only for IP-Adapters installed from a single checkpoint file; if the chosen encoder is not

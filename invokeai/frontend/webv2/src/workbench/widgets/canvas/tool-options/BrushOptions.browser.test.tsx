@@ -48,7 +48,6 @@ describe('paint percent control', () => {
       (slider.element() as HTMLElement).focus();
       await userEvent.keyboard('{ArrowRight}{ArrowRight}');
     });
-    // Tool options are not history: each step reaches the store, not just the settled value.
     expect(setValue.mock.calls).toEqual([[0.51], [0.52]]);
     await expect.element(slider).toHaveAttribute('aria-valuetext', '52%');
 
@@ -69,7 +68,6 @@ describe('paint size control', () => {
     root = null;
   });
 
-  /** Owns the size like the tool store does, so each key steps from what the previous one produced. */
   const renderSize = async (initial: number, setSize = vi.fn(), controlled = true) => {
     const Harness = () => {
       const [size, setHarnessSize] = useState(initial);
@@ -110,11 +108,11 @@ describe('paint size control', () => {
     });
   };
 
-  /** Where the thumb sits along the track, 0–1 (the track is inset 10px from the frame). */
+  /** Where the thumb sits along the track, 0–1 (the track is inset 6px from the frame). */
   const thumbFraction = () => {
     const frame = container!.querySelector<HTMLElement>('[data-scope="scrubber"]')!.getBoundingClientRect();
     const thumb = container!.querySelector<HTMLElement>('[data-part="thumb"]')!.getBoundingClientRect();
-    return (thumb.left + thumb.width / 2 - frame.left - 10) / (frame.width - 20);
+    return (thumb.left + thumb.width / 2 - frame.left - 6) / (frame.width - 12);
   };
 
   it('announces the actual size, including sub-pixel sizes', async () => {

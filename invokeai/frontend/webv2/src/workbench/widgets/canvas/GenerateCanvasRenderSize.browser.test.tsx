@@ -3,13 +3,13 @@ import type { CanvasRenderSize } from '@features/generation/react';
 import type { ReactNode } from 'react';
 
 import { ChakraProvider } from '@chakra-ui/react';
+import { getDefaultGenerateSettings } from '@features/generation/core/baseGenerationPolicies';
+import { GenerateDimensionFields } from '@features/generation/ui/GenerateDimensionFields';
 import {
   resetArchitectureCapabilities,
   setArchitectureCapabilities,
-} from '@features/generation/core/architectureCapabilities';
-import { architectureCapabilitiesFixture } from '@features/generation/core/architectureCapabilities.testing';
-import { getDefaultGenerateSettings } from '@features/generation/core/baseGenerationPolicies';
-import { GenerateDimensionFields } from '@features/generation/ui/GenerateDimensionFields';
+} from '@features/models/core/architectureCapabilities';
+import { architectureCapabilitiesFixture } from '@features/models/core/architectureCapabilities.testing';
 import { createExternalStoreCore } from '@platform/state/externalStoreCore';
 import { useExternalStoreSelector } from '@platform/state/selectors';
 import { applyThemeToRoot } from '@theme/applyTheme';
@@ -26,7 +26,6 @@ interface HarnessProject {
   values: Record<string, Record<string, unknown>>;
 }
 
-// The active project as a store, so persisted canvas values re-render their readers as the Workbench would.
 const harness = vi.hoisted(() => ({
   invocationSourceId: 'canvas',
   project: null as unknown as {
@@ -63,9 +62,17 @@ vi.mock('@features/generation/ui/GenerationUiContext', async (importOriginal) =>
   useGenerationQueueInsights: (select: (insights: unknown) => unknown) =>
     select({ secondsPerRun: null, seedHistory: [] }),
   useGenerationUi: () => ({
+    aspectRatioPresets: {
+      isFull: false,
+      presets: [],
+      remove: () => undefined,
+      save: () => null,
+      update: () => undefined,
+    },
     CanvasRenderSize: harness.slot,
+    models: { getBaseLabel: (base: string) => base },
     project: { invocationSourceId: harness.invocationSourceId },
-    sectionPreferences: { sectionsOpen: { dimensions: true }, setSectionOpen: () => undefined },
+    sectionPreferences: { sectionsOpen: { dimensions: true }, setSectionsOpen: () => undefined },
   }),
 }));
 
@@ -120,7 +127,6 @@ const mount = async (children: ReactNode) => {
   });
 };
 
-/** The Size section as the Generate form renders it, over a frame of `frame`. */
 const renderSizeSection = async (project: HarnessProject) => {
   harness.project = createExternalStoreCore(project);
   const { height, width } = project.canvas.document.bbox;
@@ -142,7 +148,6 @@ const renderSizeSection = async (project: HarnessProject) => {
 };
 
 const canvasValues = () => harness.project.getSnapshot().values.canvas;
-/** The section header's size badge. */
 const badgeText = () =>
   [...(host?.querySelectorAll('span') ?? [])].find(
     (element) => element.childElementCount === 0 && /^\d+×\d+/.test(element.textContent ?? '')
@@ -152,7 +157,6 @@ const statusText = () =>
 const resetSizeButton = () => page.getByRole('button', { name: 'Reset size' });
 const renderAt = () => page.getByRole('combobox', { name: 'Render at' });
 
-/** The dashed ghost in the size preview, in preview pixels. */
 const ghostSize = () => {
   const ghost = [...(host?.querySelectorAll<HTMLElement>('div') ?? [])].find(
     (element) => getComputedStyle(element).borderStyle === 'dashed'
@@ -203,8 +207,6 @@ describe('GenerateCanvasRenderSize', () => {
     // Before the table the fallback grid is 8, and 720 sits on it.
     expect(reported).toEqual({ height: 720, width: 1280 });
 
-    // TI2V-5B requires grid 32 rather than its base's 16; preserve variant and capability updates so shown and
-    // compiled sizes agree.
     await act(() => {
       setArchitectureCapabilities(architectureCapabilitiesFixture);
     });
@@ -215,7 +217,6 @@ describe('GenerateCanvasRenderSize', () => {
     expect(height).not.toBe(720);
   });
 
-  /** Mount the slot alone over `project`, showing it `frame`, and return what it reports. */
   const reportFor = async (project: HarnessProject, frame: { height: number; width: number }) => {
     harness.project = createExternalStoreCore(project);
     const reported: { size: CanvasRenderSize['size'] } = { size: null };
@@ -243,8 +244,8 @@ describe('GenerateCanvasRenderSize', () => {
 
   it('resolves a committed frame from the exact bbox, as the graph compiler does', async () => {
     setArchitectureCapabilities(architectureCapabilitiesFixture);
-    // The bbox is off SDXL's grid; the Size section shows it snapped to 832x1216, an SDXL training size that Auto
-    // would keep. The exact 830x1216 is not one, so Auto grows it toward 1024x1024's area.
+    // The bbox is off SDXL's grid; the Size section shows it snapped to 832x1216, an SDXL training size that Auto would
+    // keep. The exact 830x1216 is not one, so Auto grows it toward 1024x1024's area.
     const project = createProject({ frame: { height: 1216, width: 832 }, model: SDXL_MODEL });
     project.canvas.document.bbox.width = 830;
     const reported = await reportFor(project, { height: 1216, width: 832 });
@@ -259,23 +260,23 @@ describe('Size section in canvas mode', () => {
   });
 
   it('describes the render size and follows a change of mode', async () => {
-    // SD 1.5 is optimal at 512x512, so Auto grows this frame.
     await renderSizeSection(createProject({ frame: { height: 384, width: 384 }, model: SD1_MODEL }));
 
-    await expect.element(renderAt()).toHaveTextContent('Optimal for model');
-    // People who knew the setting by its legacy name find it in the select's description, tooltip open or not.
+    await expect
+      .element(renderAt().element().querySelector<HTMLElement>('[data-part="value-text"]'))
+      .toHaveTextContent('Optimal for model');
     await expect.element(renderAt()).toHaveAccessibleDescription(/^Scale before processing/);
     expect(badgeText()).toBe('384×384 → 512×512');
     expect(statusText()).toMatch(/^512×512 · 0\.26 MP/);
     // The stage fits the larger render size: 88px of preview spans 512px.
     expect(ghostSize()).toEqual([88, 88]);
 
-    // The visible label is a pointer target for the select.
-    await userEvent.click(page.elementLocator(host?.querySelector('label[aria-hidden]') as HTMLElement));
-    await expect.element(renderAt()).toHaveFocus();
-    await expect.element(renderAt()).toHaveAttribute('aria-expanded', 'false');
-
-    await chooseRenderAt('Frame size');
+    const label = document.getElementById(renderAt().element().getAttribute('aria-labelledby')!)!;
+    expect(renderAt().element().contains(label)).toBe(true);
+    expect(label.textContent).toBe('Render at');
+    await userEvent.click(page.elementLocator(label));
+    await expect.element(renderAt()).toHaveAttribute('aria-expanded', 'true');
+    await userEvent.click(page.getByRole('option', { name: 'Frame size' }));
 
     expect(canvasValues().scaleMethod).toBe('none');
     expect(badgeText()).toBe('384×384');
@@ -288,7 +289,6 @@ describe('Size section in canvas mode', () => {
 
     await chooseRenderAt('Custom');
 
-    // Custom starts from the size the frame rendered at.
     const width = page.getByRole('spinbutton', { name: 'Render width' });
     const height = page.getByRole('spinbutton', { name: 'Render height' });
     await expect.element(width).toHaveValue('512');
@@ -296,7 +296,6 @@ describe('Size section in canvas mode', () => {
     expect(canvasValues()).toMatchObject({ scaleMethod: 'manual', scaledHeight: 512, scaledWidth: 512 });
 
     await userEvent.fill(width, '1023');
-    // Typed digits land as typed until the edit is committed.
     expect(canvasValues().scaledWidth).toBe(1023);
     await userEvent.keyboard('{Enter}');
 
@@ -361,7 +360,6 @@ describe('Size section in canvas mode', () => {
     expect(badgeText()).toBe('384×384');
     expect(statusText()).toMatch(/^0\.15 MP/);
     await expect.element(resetSizeButton()).toBeInTheDocument();
-    // The ghost is the recommended 512x512, not the canvas's custom render size.
     expect(ghostSize()).toEqual([88, 88]);
   });
 });

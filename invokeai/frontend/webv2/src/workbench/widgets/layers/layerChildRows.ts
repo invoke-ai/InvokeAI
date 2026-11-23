@@ -13,10 +13,7 @@ import { layerChildRowKey } from '@workbench/layerPanelState';
 
 export { layerChildRowKey };
 
-/**
- * Project modifier rows from existing layer config without expanding the document node union; edits use the same
- * patch-config seam as Properties.
- */
+/** Modifier rows projected from layer config; edits use Properties' patch-config seam. */
 
 export type LayerChildRowKind =
   | 'reference-image'
@@ -37,7 +34,6 @@ export type LayerChildRowKind =
 
 type AdjustmentChildKind = Extract<LayerChildRowKind, `adjustment-${string}`>;
 
-/** The row kind projecting an adjustment entry of `type`. */
 export const adjustmentChildKind = (type: CanvasAdjustmentEntry['type']): AdjustmentChildKind =>
   ADJUSTMENT_KIND_OF[type];
 
@@ -386,11 +382,7 @@ const insertAt = <T extends { id: string }>(items: readonly T[], item: T, before
   return index < 0 ? [...items, item] : [...items.slice(0, index), item, ...items.slice(index)];
 };
 
-/**
- * An adjustment entry's landing: a reorder within its owner, or ONE atomic batch removing it from its owner and
- * inserting it into another raster layer or group. The document model still refuses locked and overlay-stack
- * owners when the command is prepared.
- */
+/** A reorder within the owner, or one atomic remove-and-insert into another raster layer or group. */
 const adjustmentDropCommand = (
   document: CanvasDocumentContractV3,
   child: Pick<ProjectedChildRow, 'layerId' | 'itemId'>,
@@ -438,13 +430,7 @@ const adjustmentDropCommand = (
   };
 };
 
-/**
- * The document command a child-row drag resolves to, or `null` when it is a
- * no-op or the landing is invalid. Adjustment entries and reference images
- * reorder within their layer, or move to another layer that holds their kind
- * (raster layers and raster groups; regional layers) as ONE atomic cross-layer
- * edit.
- */
+/** The command a child-row drag resolves to, or `null` for a no-op or invalid landing. */
 export const layerChildDropCommand = (
   document: CanvasDocumentContractV3,
   child: Pick<ProjectedChildRow, 'kind' | 'layerId' | 'itemId'>,
@@ -485,8 +471,8 @@ export const layerChildDropCommand = (
   if (destination?.type !== 'regional_guidance') {
     return null;
   }
-  // A duplicated layer can carry the same item id (cloneSubtree re-mints only
-  // node ids); landing there would alias two rows onto one key. Refuse.
+  // A duplicated layer can carry the same item id (cloneSubtree re-mints only node ids); landing there would alias two
+  // rows onto one key. Refuse.
   if (destination.referenceImages.some((candidate) => candidate.id === child.itemId)) {
     return null;
   }
@@ -528,7 +514,7 @@ export const layerChildMoveTargets = (
   document: CanvasDocumentContractV3,
   child: Pick<ProjectedChildRow, 'kind' | 'layerId' | 'itemId' | 'stack'>
 ): LayerChildMoveTarget[] =>
-  preorder(document.stacks[child.stack]).flatMap((node) => {
+  preorder(document.stacks[child.stack] ?? []).flatMap((node) => {
     if (node.id === child.layerId) {
       return [];
     }

@@ -8,36 +8,33 @@ First things first:
 
 ## Quickstart
 
-No `docker compose`, no persistence, single command, using the official images:
+Choose the command for your GPU. New installations store accounts, images and models in the `invokeai-data` Docker volume. For an existing installation, replace `invokeai-data` with the volume name or absolute host directory that holds your InvokeAI data.
+If your data lives inside the old container, [recover it before replacing the container](https://v7.invoke.ai/configuration/docker/#recover-data-before-replacing-a-container).
 
 **CUDA (NVIDIA GPU):**
 
 ```bash
-docker run --runtime=nvidia --gpus=all --publish 9090:9090 ghcr.io/invoke-ai/invokeai
+docker run --runtime=nvidia --gpus=all --volume invokeai-data:/invokeai \
+  --publish 127.0.0.1:9090:9090 ghcr.io/invoke-ai/invokeai
 ```
 
 **ROCm (AMD GPU):**
 
 ```bash
-docker run --device /dev/kfd --device /dev/dri --publish 9090:9090 ghcr.io/invoke-ai/invokeai:main-rocm
+docker run --device /dev/kfd --device /dev/dri \
+  --env RENDER_GROUP_ID=$(getent group render | cut -d: -f3) \
+  --volume invokeai-data:/invokeai --publish 127.0.0.1:9090:9090 ghcr.io/invoke-ai/invokeai:main-rocm
 ```
 
-Open `http://localhost:9090` in your browser once the container finishes booting, install some models, and generate away!
+`RENDER_GROUP_ID` must match the host's `render` group. Without it, Invoke can't access the GPU.
 
-### Data persistence
-
-To persist your generated images and downloaded models outside of the container, add a `--volume/-v` flag to the above command, e.g.:
-
-```bash
-docker run --volume /some/local/path:/invokeai {...etc...}
-```
-
-`/some/local/path/invokeai` will contain all your data.
-It can *usually* be reused between different installs of Invoke. Tread with caution and read the release notes!
+Open `http://localhost:9090` on the Docker host and create the administrator account before giving other people access. Anyone who can reach a fresh installation can claim this account. If Docker runs on a remote host, run `ssh -N -L 127.0.0.1:9090:127.0.0.1:9090 user@docker-host` from your computer with your SSH login and host, then open the same URL locally.
 
 ## Customize the container
 
-The included `run.sh` script is a convenience wrapper around `docker compose`. It can be helpful for passing additional build arguments to `docker compose`. Alternatively, the familiar `docker compose` commands work just as well.
+The included `run.sh` script passes build arguments to `docker compose` and checks the data mount before replacing a ROCm container. If you use Compose directly for a ROCm upgrade, [check the old container's data mount](https://v7.invoke.ai/configuration/docker/#recover-data-before-replacing-a-container) before running `up`, `down` or `rm`. Older containers may hold the only copy of your data in their writable layer.
+
+For a new installation:
 
 ```bash
 cd docker
@@ -46,7 +43,11 @@ cp .env.sample .env
 ./run.sh
 ```
 
-It will take a few minutes to build the image the first time. Once the application starts up, open `http://localhost:9090` in your browser to invoke!
+Compose publishes the port on the Docker host's loopback address by default. Once the image builds and Invoke starts, open `http://localhost:9090` on the host or through the SSH tunnel above to create the administrator.
+
+To share the installation after setup, keep multi-user mode enabled. Set `HOST_INVOKEAI_IP` in `.env` to the host's LAN IP and run `./run.sh` again with the same data directory. For `docker run`, recreate the container with the volume containing your administrator and replace `127.0.0.1` in the port mapping with the host's LAN IP. If you use a reverse proxy, enable its route to Invoke only after setup.
+
+**Updating an existing Compose setup:** Compose publishes the port on `127.0.0.1` unless `HOST_INVOKEAI_IP` is set, so after you update, other devices can no longer connect. Create the administrator on the host first. Then set `HOST_INVOKEAI_IP` in `.env` to the host's LAN IP, or `0.0.0.0` for every interface, and run `./run.sh` again.
 
 >[!TIP]
 >When using the `run.sh` script, the container will continue running after Ctrl+C. To shut it down, use the `docker compose down` command.

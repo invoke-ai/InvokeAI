@@ -77,7 +77,7 @@ export const IntermediatesManager = ({
   const deleteReasonId = useId();
   useMountEffect(() => {
     consumeIntermediatesFocus(focus);
-    return () => window.clearTimeout(searchTimerRef.current);
+    // The input owns this bounded debounce; Activity hide must not discard its pending query.
   });
   const [ownerFilter, setOwnerFilter] = useState<string | null>(() =>
     focus?.ownerId && canClearOthersIntermediates ? focus.ownerId : currentUserId
@@ -87,7 +87,7 @@ export const IntermediatesManager = ({
   const searchRef = useRef<HTMLInputElement | null>(null);
   const operationRegionRef = useRef<HTMLDivElement | null>(null);
   const operation = useFollowedOperation({ fallbackFocusRef: searchRef });
-  // Operations live in server memory; after a restart the server no longer knows this one, and asking again cannot help.
+  // Operations live in server memory: after a restart the server no longer knows this one; asking again cannot help.
   const isLookupGone =
     operation.query.isError && operation.query.error instanceof ApiError && operation.query.error.status === 404;
   const lookupError = !operation.query.isError

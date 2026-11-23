@@ -12,7 +12,7 @@ LoRA iteration) live in ``wan_denoise`` and are imported here.
 """
 
 from contextlib import ExitStack
-from typing import Callable, Iterable, Optional
+from typing import Any, Callable, Iterable, Optional
 
 import torch
 from tqdm import tqdm
@@ -22,11 +22,18 @@ from invokeai.app.invocations.fields import (
     FieldDescriptions,
     Input,
     InputField,
+    LatentsField,
+    MetadataField,
     WanConditioningField,
     WanRefImageConditioningField,
+    WithMetadata,
+)
+from invokeai.app.invocations.metadata import (
+    LatentsMetaOutput,
+    build_denoise_metadata,
+    serialize_wan_lora_metadata,
 )
 from invokeai.app.invocations.model import WanTransformerField
-from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.invocations.wan.wan_denoise import (
     WAN_MAX_RESIDENT_TRANSFORMER_BYTES,
     WanDenoiseInvocation,
@@ -37,7 +44,7 @@ from invokeai.app.invocations.wan.wan_denoise import (
     _validate_spatial_dimensions,
 )
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, WanVariantType
+from invokeai.backend.model_manager.taxonomy import BaseModelType, WanVariantType
 from invokeai.backend.patches.layer_patcher import PatchSpec
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import WanConditioningInfo
@@ -51,16 +58,31 @@ from invokeai.backend.wan.sampling_utils import (
     num_latent_frames_for,
 )
 
+# Latent frames the step preview carries: the middle frame and the one before it. A Tiny AutoEncoder
+# decodes the window and keeps its last frame, which then has the frame before it as temporal memory;
+# the middle frame decoded alone is no better than the linear preview (RTX 4090, PSNR against the VAE
+# on the callback latents: Wan 16 ch 20.3 -> 34.9 dB, Wan 48 ch 19.3 -> 27.5 dB). The linear preview
+# reads only the last frame of the window, so it is unchanged.
+#
+# The window doubles the decode's memory, against a single latent (RTX 4090, fp16, `decode_preview`):
+#   taew2_1 (capped at 512):  832x480 599 vs 302 MiB, 11.8 vs 7.1 ms;  1280x720 599 vs 302 MiB, 9.9 vs 6.4 ms;
+#                             1024x1024 1064 vs 536 MiB, 17.2 vs 10.4 ms
+#   taew2_2 (capped at 1024): 832x480 407 vs 205 MiB, 12.6 vs 11.7 ms; 1280x720 599 vs 302 MiB, 15.6 vs 15.1 ms;
+#                             1024x1024 1064 vs 536 MiB, 31.9 vs 23.5 ms
+# A Wan video step takes seconds, and the ~1 GB transient fits the denoise's working-memory reserve, so the
+# decoders' preview caps stay as they are.
+PREVIEW_LATENT_WINDOW = 2
+
 
 @invocation(
     "wan_video_denoise",
     title="Denoise Video - Wan 2.2",
     tags=["video", "wan"],
     category="latents",
-    version="1.0.0",
+    version="1.1.0",
     classification=Classification.Prototype,
 )
-class WanVideoDenoiseInvocation(BaseInvocation):
+class WanVideoDenoiseInvocation(BaseInvocation, WithMetadata):
     """Run the Wan 2.2 denoising loop on a multi-frame latent tensor.
 
     The output is a 5D ``[1, C, T_lat, H/8, W/8]`` latent tensor ready for
@@ -137,8 +159,31 @@ class WanVideoDenoiseInvocation(BaseInvocation):
     steps: int = InputField(default=40, gt=0, description="Number of denoising steps.")
     seed: int = InputField(default=0, description="Randomness seed for reproducibility.")
 
+    def _build_metadata(self) -> MetadataField:
+        updates: dict[str, Any] = {
+            "generation_mode": "wan_i2v" if getattr(self, "ref_image", None) is not None else "wan_t2v",
+            "width": self.width,
+            "height": self.height,
+            "num_frames": self.num_frames,
+            "steps": self.steps,
+            "cfg_scale": self.guidance_scale,
+            "seed": self.seed,
+            "model": self.transformer.transformer,
+        }
+        if self.guidance_scale_low_noise is not None and self.guidance_scale_low_noise >= 1.0:
+            updates["wan_guidance_scale_low_noise"] = self.guidance_scale_low_noise
+        if getattr(self.transformer, "transformer_low_noise", None) is not None:
+            updates["wan_transformer_low_noise"] = self.transformer.transformer_low_noise
+
+        updates["loras"] = serialize_wan_lora_metadata(
+            getattr(self.transformer, "loras", None),
+            getattr(self.transformer, "loras_low_noise", None),
+        )
+
+        return build_denoise_metadata(getattr(self, "metadata", None), updates)
+
     @torch.no_grad()
-    def invoke(self, context: InvocationContext) -> LatentsOutput:
+    def invoke(self, context: InvocationContext) -> LatentsMetaOutput:
         latents = self._run_diffusion(context)
         # Keep the 5D shape (B, C, T, H, W) — wan_latents_to_video expects it.
         latents = latents.detach().to("cpu")
@@ -146,12 +191,11 @@ class WanVideoDenoiseInvocation(BaseInvocation):
         # LatentsOutput.build uses latents.size()[3] / [2] for width / height.
         # For 5D the spatial dims are at indices 4 / 3 instead of 3 / 2, so we
         # call the constructor directly with the actual H/W from the inputs.
-        from invokeai.app.invocations.fields import LatentsField
-
-        return LatentsOutput(
+        return LatentsMetaOutput(
             latents=LatentsField(latents_name=name, seed=self.seed),
             width=self.width,
             height=self.height,
+            metadata=self._build_metadata(),
         )
 
     def _run_diffusion(self, context: InvocationContext) -> torch.Tensor:
@@ -271,10 +315,10 @@ class WanVideoDenoiseInvocation(BaseInvocation):
             first_frame_mask[:, :, 0] = 0
 
         step_callback = self._build_step_callback(context)
+        mid = t_lat // 2
 
         high_model = self.transformer.transformer
         low_model = self.transformer.transformer_low_noise
-        low_config = context.models.get_config(low_model) if low_model is not None else None
         num_train_timesteps = int(scheduler.config.num_train_timesteps)
         boundary_timestep = self.transformer.boundary_ratio * num_train_timesteps if low_model is not None else None
 
@@ -282,9 +326,6 @@ class WanVideoDenoiseInvocation(BaseInvocation):
         # wan_denoise: an empty low list means "no LoRAs on the low expert".
         high_loras = self.transformer.loras
         low_loras = self.transformer.loras_low_noise
-        high_config = context.models.get_config(high_model)
-        high_is_quantized = high_config.format == ModelFormat.GGUFQuantized
-        low_is_quantized = low_config.format == ModelFormat.GGUFQuantized if low_config is not None else False
 
         def high_lora_factory() -> Iterable[PatchSpec]:
             return proxy._lora_iterator(context, high_loras)
@@ -304,8 +345,6 @@ class WanVideoDenoiseInvocation(BaseInvocation):
                 inference_dtype=inference_dtype,
                 high_lora_factory=high_lora_factory if high_loras else None,
                 low_lora_factory=low_lora_factory if low_loras else None,
-                high_is_quantized=high_is_quantized,
-                low_is_quantized=low_is_quantized,
                 working_mem_bytes=working_mem_bytes,
                 max_resident_model_bytes=(
                     WAN_MAX_RESIDENT_TRANSFORMER_BYTES if working_mem_bytes is not None else None
@@ -325,6 +364,8 @@ class WanVideoDenoiseInvocation(BaseInvocation):
                     active_label = _ExpertSwapper.HIGH
                     active_cfg = self.guidance_scale
 
+                # The previous expert must be unreferenced by the time `get` loads the next one.
+                transformer = None
                 transformer = swapper.get(active_label)
 
                 latent_model_input = latents.to(dtype=inference_dtype)
@@ -378,8 +419,8 @@ class WanVideoDenoiseInvocation(BaseInvocation):
                         order=1,
                         total_steps=total_steps,
                         timestep=int(t.item()),
-                        # Preview shows the middle frame for video.
-                        latents=latents[:, :, t_lat // 2],
+                        # Preview shows the middle frame for video, after a context window before it.
+                        latents=latents[:, :, max(0, mid - PREVIEW_LATENT_WINDOW + 1) : mid + 1],
                     )
                 )
 

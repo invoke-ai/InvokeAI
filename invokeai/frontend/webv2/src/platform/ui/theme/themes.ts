@@ -3,30 +3,18 @@ export type WorkbenchThemeId = 'classic' | 'light' | 'osakaJade' | 'mono' | 'ult
 /** Keep the ramp absolute: 50 lightest, 950 darkest, matching Chakra gray. */
 export type NeutralStep = 50 | 100 | 200 | 300 | 400 | 500 | 600 | 700 | 800 | 900 | 950;
 
-/**
- * Themes supply a neutral ramp and hue seeds; inset/fill/grid/control stay explicit because their elevation order
- * varies by theme.
- */
+/** Inset, fill, grid and control stay explicit because their elevation order varies by theme. */
 export interface ThemeColors {
-  /** Neutral ramp, lightest (`50`) → darkest (`950`). Source of all bg/fg/border. */
   neutral: Record<NeutralStep, string>;
   /** Invoke identity (lime). Two seeds; the palette's other steps derive in `system.ts`. */
   brand: { solid: string; contrast: string };
-  /** Selection / focus (blue). */
   accent: { solid: string; contrast: string };
-  /** Destructive / error intent. */
   danger: string;
-  /** Positive / success intent. */
   success: string;
-  /** Caution / warning intent. */
   warning: string;
-  /** Recessed work-area floor framed by the chrome (`bg.inset`). Off-ramp. */
   inset: string;
-  /** Subtle neutral fill for hovered/ghost controls (`gray.subtle`). Off-ramp. */
   fill: string;
-  /** Dot-grid decoration drawn on inset surfaces (`fg.grid`). Off-ramp. */
   grid: string;
-  /** Control / chip fill inside panels (`bg.emphasized`). Off-ramp. */
   control: string;
 }
 
@@ -34,35 +22,38 @@ export interface ThemeDefinition {
   id: WorkbenchThemeId;
   label: string;
   description: string;
-  /** Native color-scheme hint for form controls, scrollbars, and `<select>` popups. */
   colorScheme: 'dark' | 'light';
   colors: ThemeColors;
+  /** 0–100 lean from foreground toward accent: near-grey surfaces want a trace, strongly tinted ones more. */
+  interactionTint: number;
 }
 
+// A near-neutral cool grey: enough blue to sit with the accent, not enough to read as a blue interface.
 const classic: ThemeColors = {
   neutral: {
-    50: 'oklch(96% 0.006 264.5)',
-    100: 'oklch(91.5% 0.009 264.5)',
-    200: 'oklch(82.5% 0.014 264.5)',
-    300: 'oklch(73.5% 0.019 264.4)',
-    400: 'oklch(57.5% 0.026 264.3)',
-    500: 'oklch(44% 0.024 264.3)',
-    600: 'oklch(39% 0.022 264.3)',
-    700: 'oklch(34% 0.02 264.3)',
-    800: 'oklch(28.8% 0.018 264.3)',
-    900: 'oklch(23.8% 0.016 264.35)',
-    950: 'oklch(18.8% 0.014 264.4)',
+    50: 'oklch(96% 0.004 264)',
+    100: 'oklch(91.5% 0.005 264)',
+    200: 'oklch(82.5% 0.008 264)',
+    300: 'oklch(73.5% 0.011 264)',
+    400: 'oklch(57.5% 0.015 264)',
+    500: 'oklch(42% 0.014 264)',
+    600: 'oklch(36.5% 0.013 264)',
+    700: 'oklch(31.5% 0.012 264)',
+    800: 'oklch(26.3% 0.011 264)',
+    900: 'oklch(21.3% 0.009 264)',
+    950: 'oklch(16.5% 0.008 264)',
   },
-  brand: { solid: 'oklch(92.041% 0.2103 116.59)', contrast: 'oklch(18.8% 0.014 264.4)' },
-  accent: { solid: 'oklch(77.738% 0.1 231.76)', contrast: 'oklch(18.8% 0.014 264.4)' },
-  danger: 'oklch(70.61% 0.0841 19.38)',
-  success: 'oklch(79.8% 0.1132 141.63)',
-  warning: 'oklch(76.62% 0.0612 62.9)',
-  inset: 'oklch(18.8% 0.014 264.4)',
+  brand: { solid: 'oklch(92.041% 0.2103 116.59)', contrast: 'oklch(16.5% 0.008 264)' },
+  accent: { solid: 'oklch(77.738% 0.1 231.76)', contrast: 'oklch(16.5% 0.008 264)' },
+  // Status hues carry more colour than the greyer surfaces they sit on, at one shared lightness band.
+  danger: 'oklch(71% 0.125 22)',
+  success: 'oklch(79% 0.125 150)',
+  warning: 'oklch(80% 0.115 78)',
+  inset: 'oklch(16.5% 0.008 264)',
   // Keep fill visibly above control surfaces so ghost hovers do not disappear.
-  fill: 'oklch(36% 0.021 264.3)',
-  grid: 'oklch(38.5% 0.022 264.3)',
-  control: 'oklch(34% 0.02 264.3)',
+  fill: 'oklch(33.5% 0.012 264)',
+  grid: 'oklch(36% 0.013 264)',
+  control: 'oklch(31.5% 0.012 264)',
 };
 
 const light: ThemeColors = {
@@ -200,6 +191,7 @@ export const THEMES: ThemeDefinition[] = [
     description: 'The legacy blue-on-graphite workbench.',
     colorScheme: 'dark',
     colors: classic,
+    interactionTint: 15,
   },
   {
     id: 'light',
@@ -207,6 +199,7 @@ export const THEMES: ThemeDefinition[] = [
     description: 'Bright, high-contrast surfaces for daylight work.',
     colorScheme: 'light',
     colors: light,
+    interactionTint: 55,
   },
   {
     id: 'ultradark',
@@ -214,6 +207,7 @@ export const THEMES: ThemeDefinition[] = [
     description: 'Pure-black OLED surfaces for low-light rooms.',
     colorScheme: 'dark',
     colors: ultradark,
+    interactionTint: 55,
   },
   {
     id: 'mono',
@@ -221,6 +215,7 @@ export const THEMES: ThemeDefinition[] = [
     description: 'Neutral grayscale with no color cast.',
     colorScheme: 'dark',
     colors: mono,
+    interactionTint: 55,
   },
   {
     id: 'osakaJade',
@@ -228,6 +223,7 @@ export const THEMES: ThemeDefinition[] = [
     description: 'Deep jade stone with a cool green accent.',
     colorScheme: 'dark',
     colors: osakaJade,
+    interactionTint: 55,
   },
   {
     id: 'catppuccinMocha',
@@ -235,6 +231,7 @@ export const THEMES: ThemeDefinition[] = [
     description: 'Soothing pastel accents on deep violet-gray surfaces.',
     colorScheme: 'dark',
     colors: catppuccinMocha,
+    interactionTint: 55,
   },
 ];
 
@@ -244,7 +241,6 @@ if (!defaultTheme) {
   throw new Error('At least one workbench theme must be defined.');
 }
 
-/** The default theme. Its ramp/seeds are emitted as the semantic-token `base` value. */
 export const DEFAULT_THEME = defaultTheme;
 
 export const DEFAULT_THEME_ID: WorkbenchThemeId = DEFAULT_THEME.id;
@@ -265,7 +261,6 @@ const LEGACY_THEME_IDS: Record<string, WorkbenchThemeId> = {
   forest: 'osakaJade',
 };
 
-/** A stored theme preference → a current theme id, or `null` for junk. */
 export const resolveWorkbenchThemeId = (value: unknown): WorkbenchThemeId | null => {
   if (isWorkbenchThemeId(value)) {
     return value;
@@ -274,7 +269,6 @@ export const resolveWorkbenchThemeId = (value: unknown): WorkbenchThemeId | null
   return typeof value === 'string' ? (LEGACY_THEME_IDS[value] ?? null) : null;
 };
 
-/** The default panel surface of a theme (lightest end in light mode, near-darkest in dark). */
 const surfaceOf = (theme: ThemeDefinition): string =>
   theme.colorScheme === 'light' ? theme.colors.neutral[50] : theme.colors.neutral[900];
 

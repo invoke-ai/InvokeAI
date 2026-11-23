@@ -1,0 +1,7 @@
+title: Flux Ideal Size
+author: JPPhoto
+repo: https://github.com/JPPhoto/flux-ideal-size
+summary: The ideal size for the first stage of a FLUX generation.
+description: >-
+  Generating at the right size helps limit duplication and odd subject placement.
+categories: [sizing]

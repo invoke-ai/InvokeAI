@@ -3,14 +3,17 @@ from typing import (
     Self,
 )
 
-import torch
 from pydantic import Field
 from typing_extensions import Any
 
-from invokeai.backend.model_manager.configs.base import Checkpoint_Config_Base, Config_Base, Diffusers_Config_Base
+from invokeai.backend.model_manager.configs.base import (
+    Checkpoint_Config_Base,
+    Config_Base,
+    Diffusers_Config_Base,
+    ModelRole,
+)
 from invokeai.backend.model_manager.configs.gemma4_encoder import is_ltx2_gemma4_encoder_folder
 from invokeai.backend.model_manager.configs.identification_utils import (
-    InvalidMatchError,
     NotAMatchError,
     common_config_paths,
     get_class_name_from_config_dict_or_raise,
@@ -19,15 +22,22 @@ from invokeai.backend.model_manager.configs.identification_utils import (
     raise_if_not_dir,
     raise_if_not_file,
 )
-from invokeai.backend.model_manager.configs.qwen3_5_encoder import is_qwen3_5_vision_language_lm
+from invokeai.backend.model_manager.configs.qwen3_5_encoder import (
+    get_qwen3_5_variant,
+    is_text_llm_qwen3_5_file,
+    raise_for_unsupported_qwen3_5_quantization,
+)
+from invokeai.backend.model_manager.configs.qwen3_encoder import (
+    folder_is_sdnq_quantized,
+    qwen3_variant_from_hidden_size,
+)
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
     ModelFormat,
     ModelType,
 )
-from invokeai.backend.quantization.fp8_scaled import FP8_WEIGHT_DTYPES, WEIGHT_SCALE_SUFFIXES, is_scale_metadata_key
-from invokeai.backend.quantization.int8_convrot import INT8_TENSORWISE_FORMAT, read_comfy_quant_markers
+from invokeai.backend.qwen3_5.qwen3_5_vl import QWEN3_5_VL_LANGUAGE_MODEL_PREFIX
 
 # Gemma-2-2b's hidden size. Only this size is handled by the dedicated PiD Gemma2 encoder config; larger
 # Gemma 2 variants (9B=3584, 27B=4608) are rejected there and must stay classifiable as a generic TextLLM.
@@ -48,14 +58,21 @@ _SUPPORTS_IMAGES_DESCRIPTION = (
     "Whether the model has a vision tower and processor, so Expand Prompt can condition on an image"
 )
 
-# ComfyUI's w4a8 build of the FLUX.3 prompt upsampler (`asym_w4a8_int8`): packed 4-bit codes beside a codebook and
-# per-channel and per-group scales, which no loader here decodes.
-_W4A8_SUFFIXES = (".weight_codebook", ".weight_s_channel", ".weight_s_rel")
 
-# mxfp8's per-block scale: one E8M0 exponent per 32 weights, stored as bytes or as the float8 exponent type.
-_MXFP8_SCALE_DTYPES = tuple(
-    dtype for dtype in (torch.uint8, getattr(torch, "float8_e8m0fnu", None)) if dtype is not None
-)
+def _qwen3_encoder_roles(mod: ModelOnDisk, config_dict: dict[str, Any], class_name: str) -> list[ModelRole]:
+    """The Qwen3 encoder role of a complete Qwen3 causal-LM folder.
+
+    `Qwen3EncoderLoader` reads the standalone layout: config.json at the folder root, unquantized. Qwen2, Qwen-VL and
+    quantized folders, and sizes no Qwen3 encoder comes in, serve no such role.
+    """
+    if class_name != "Qwen3ForCausalLM" or not (mod.path / "config.json").is_file():
+        return []
+    if "quantization_config" in config_dict or folder_is_sdnq_quantized(mod):
+        return []
+    variant = qwen3_variant_from_hidden_size(config_dict.get("hidden_size"))
+    if variant is None:
+        return []
+    return [ModelRole(type=ModelType.Qwen3Encoder, format=ModelFormat.Qwen3Encoder, variant=variant)]
 
 
 class TextLLM_Diffusers_Config(Diffusers_Config_Base, Config_Base):
@@ -118,7 +135,9 @@ class TextLLM_Diffusers_Config(Diffusers_Config_Base, Config_Base):
             and "vision_config" in config_dict
             and any((mod.path / f).exists() for f in _PROCESSOR_CONFIG_FILES)
         )
-        return cls(**override_fields, supports_images=supports_images)
+        return cls(
+            **override_fields, supports_images=supports_images, roles=_qwen3_encoder_roles(mod, config_dict, class_name)
+        )
 
 
 class TextLLM_Checkpoint_Config(Checkpoint_Config_Base, Config_Base):
@@ -127,8 +146,8 @@ class TextLLM_Checkpoint_Config(Checkpoint_Config_Base, Config_Base):
     The layout is transformers' own `Qwen3_5ForConditionalGeneration` state dict, as ComfyUI exports the FLUX.3
     prompt upsampler (bf16, or `int8_tensorwise` with a multi-token-prediction head the loader drops). The file
     carries weights only; the loader supplies config, tokenizer and processor from the vendored Qwen3.5 assets,
-    which exist for the 9B. Its LM head sets it apart from the Qwen3.5 text-encoder exports, which have none and
-    are `Qwen35Encoder_Checkpoint_Config`'s.
+    which exist for the 9B. The same file is Comfy-Org's MOSS-Image text encoder, so it also serves as a Qwen3.5
+    encoder (role).
     """
 
     type: Literal[ModelType.TextLLM] = Field(default=ModelType.TextLLM)
@@ -147,57 +166,11 @@ class TextLLM_Checkpoint_Config(Checkpoint_Config_Base, Config_Base):
         raise_for_override_fields(cls, override_fields)
 
         state_dict = mod.load_state_dict()
-        if not is_qwen3_5_vision_language_lm(state_dict):
+        if not is_text_llm_qwen3_5_file(mod.path, state_dict):
             raise NotAMatchError(
                 "state dict is not a whole Qwen3.5 vision-language model (model.language_model.*, model.visual.*, "
                 "lm_head) of a size with a vendored config"
             )
-        _raise_for_unsupported_quantization(mod, state_dict)
-        return cls(**override_fields)
-
-
-def _raise_for_unsupported_quantization(mod: ModelOnDisk, state_dict: dict[str | int, Any]) -> None:
-    """Refuse every quantized build but ComfyUI's int8_tensorwise: with bf16, all the loader can build.
-
-    `InvalidMatchError`: the file is this model, so the installer shows the reason instead of registering a model
-    nothing loads. An int8 layer counts when its weight is int8 and its marker -- read from the file, since
-    identification sees dtypes and shapes but no bytes -- says int8_tensorwise; any other scale or marker is a scheme
-    the loader refuses.
-    """
-    keys = [key for key in state_dict if isinstance(key, str)]
-    int8_layers = {
-        key.removesuffix(".weight")
-        for key in keys
-        if key.endswith(".weight") and getattr(state_dict[key], "dtype", None) is torch.int8
-    }
-    scheme = _foreign_quantization(state_dict, keys, int8_layers)
-    if scheme is None and int8_layers:
-        markers = read_comfy_quant_markers(mod.path)
-        unmarked = sorted(
-            layer for layer in int8_layers if markers.get(layer, {}).get("format") != INT8_TENSORWISE_FORMAT
-        )
-        if unmarked:
-            scheme = f"int8 without an {INT8_TENSORWISE_FORMAT} marker (e.g. '{unmarked[0]}')"
-    if scheme is not None:
-        raise InvalidMatchError(
-            f"{mod.path.name} is quantized as {scheme}, which InvokeAI cannot load for this model. "
-            "Install the bf16 or int8_convrot build instead."
-        )
-
-
-def _foreign_quantization(state_dict: dict[str | int, Any], keys: list[str], int8_layers: set[str]) -> str | None:
-    """Name a quantization side channel that belongs to no int8 layer, or None if there is none."""
-    if any(key.endswith(_W4A8_SUFFIXES) for key in keys):
-        return "ComfyUI's w4a8 (asym_w4a8_int8)"
-    if any(key.endswith(".weight_scale_2") for key in keys):
-        return "nvfp4"
-    for key in keys:
-        layer = key.rsplit(".", 1)[0]
-        if not is_scale_metadata_key(key) or layer in int8_layers:
-            continue
-        if key.endswith(WEIGHT_SCALE_SUFFIXES) and getattr(state_dict.get(f"{layer}.weight"), "dtype", None) in (
-            FP8_WEIGHT_DTYPES
-        ):
-            return "mxfp8" if getattr(state_dict[key], "dtype", None) in _MXFP8_SCALE_DTYPES else "scaled fp8"
-        return "scaled fp8" if key == "scaled_fp8" else f"an unsupported scheme (it carries '{key}')"
-    return None
+        raise_for_unsupported_qwen3_5_quantization(mod, state_dict)
+        variant = get_qwen3_5_variant(state_dict, QWEN3_5_VL_LANGUAGE_MODEL_PREFIX)
+        return cls(**override_fields, roles=[ModelRole(type=ModelType.Qwen35Encoder, variant=variant)])

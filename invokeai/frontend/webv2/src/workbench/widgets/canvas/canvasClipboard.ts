@@ -1,19 +1,11 @@
-/**
- * Bridge clipboard images and engine Blob/ImageData on the widget side; inject dependencies for tests without real
- * clipboard/canvas access.
- */
+import type { CanvasSelectionCapability } from '@workbench/canvas-engine/api';
 
 import { type ClipboardAccess, ClipboardUnavailableError, readClipboardItems } from '@platform/browser/clipboard';
 
 /** MIME types accepted from the clipboard, best first. */
 const IMAGE_TYPES = ['image/png', 'image/webp', 'image/jpeg'] as const;
 
-/**
- * The first image on the clipboard, or `null` when it holds none or cannot be read (permission refused, document not
- * focused): a paste that finds nothing is an ordinary outcome. Rejects with `ClipboardUnavailableError` when the
- * browser has no clipboard API (plain HTTP), so paste can say why, and with the item's own error when an image it
- * lists cannot be retrieved.
- */
+/** The first clipboard image, or null when none is readable; rejects `ClipboardUnavailableError` without the API. */
 export const readClipboardImage = async (deps: ClipboardAccess = {}): Promise<Blob | null> => {
   let items: readonly ClipboardItem[];
   try {
@@ -73,5 +65,24 @@ export const decodeImageBlob = async (blob: Blob, deps: DecodeImageBlobDeps = {}
     return ctx.getImageData(0, 0, bitmap.width, bitmap.height);
   } finally {
     bitmap.close?.();
+  }
+};
+
+/** Copies the selection; a cut checks the removal can run first, so a refused cut writes nothing. */
+export const copyCanvasSelection = async (
+  selection: Pick<CanvasSelectionCapability, 'admitSelectionErase' | 'eraseSelection' | 'exportSelectionBlob'>,
+  cut: boolean,
+  write: (blob: Blob) => Promise<void>
+): Promise<void> => {
+  if (cut && !selection.admitSelectionErase()) {
+    return;
+  }
+  const blob = await selection.exportSelectionBlob();
+  if (!blob) {
+    return;
+  }
+  await write(blob);
+  if (cut) {
+    selection.eraseSelection();
   }
 };

@@ -32,7 +32,7 @@ import { requestQueueAction } from './queueActionRequests';
 import { clearQueueConfirmation, requestQueueConfirmation } from './queueConfirmationStore';
 import { QueueDataRuntime } from './QueueDataRuntime';
 import { getQueueAction, useQueueActions, type QueueActionId } from './queueMenuActions';
-import { createTestQueueUiAdapter } from './queueUiAdapter.testing';
+import { createTestLocalRun, createTestQueueUiAdapter } from './queueUiAdapter.testing';
 import { QueueUiProvider, type QueueUiAdapter } from './QueueUiContext';
 
 let host: HTMLDivElement | null = null;
@@ -86,6 +86,12 @@ it('animates a queue confirmation out with its text instead of unmounting it on 
   }
   await expect.poll(() => document.querySelector('[role="alertdialog"]')).toBeNull();
 });
+
+/** `count` unaccepted runs in each project. */
+const localRuns = (counts: Record<string, number>) =>
+  Object.entries(counts).flatMap(([projectId, count]) =>
+    Array.from({ length: count }, (_, index) => createTestLocalRun({ id: `${projectId}-run-${index}`, projectId }))
+  );
 
 describe('a bulk cancel from a shortcut or menu', () => {
   const notify = { error: vi.fn(), info: vi.fn(), success: vi.fn() };
@@ -181,17 +187,17 @@ describe('a bulk cancel from a shortcut or menu', () => {
   });
 
   it("stops this tab's runs the backend never got while offline, and sends nothing to it", async () => {
-    const cancelLocalUnsubmittedRuns = vi.fn();
+    const cancelLocalRuns = vi.fn();
     const dialog = await renderWithQueue({
-      cancelLocalUnsubmittedRuns,
+      cancelLocalRuns,
       isConnected: false,
-      localUnsubmittedRuns: { activeProject: 2, allProjects: 5 },
+      localRuns: localRuns({ 'project-1': 2, 'project-2': 3 }),
     });
 
     expect(dialog.textContent).toContain('"count":2');
     await act(() => userEvent.click(buttonIn(dialog, 'widgets.queue.cancelAllItems')));
 
-    await vi.waitFor(() => expect(cancelLocalUnsubmittedRuns).toHaveBeenCalledWith('project-1'));
+    await vi.waitFor(() => expect(cancelLocalRuns).toHaveBeenCalledWith('project-1'));
     expect(commands.cancelScopedItems).not.toHaveBeenCalled();
   });
 
@@ -209,22 +215,22 @@ describe('a bulk cancel from a shortcut or menu', () => {
 
   describe('cancel-all-except-current, from its menu item', () => {
     it("stops this tab's runs the backend never got while offline, and sends nothing to it", async () => {
-      const cancelLocalUnsubmittedRuns = vi.fn();
+      const cancelLocalRuns = vi.fn();
       const dialog = await renderWithQueue(
-        { cancelLocalUnsubmittedRuns, isConnected: false, localUnsubmittedRuns: { activeProject: 2, allProjects: 5 } },
+        { cancelLocalRuns, isConnected: false, localRuns: localRuns({ 'project-1': 2, 'project-2': 3 }) },
         'cancel-all-except-current'
       );
 
       await act(() => userEvent.click(buttonIn(dialog, 'widgets.queue.cancelAllExceptCurrent')));
 
-      await vi.waitFor(() => expect(cancelLocalUnsubmittedRuns).toHaveBeenCalledWith('project-1'));
+      await vi.waitFor(() => expect(cancelLocalRuns).toHaveBeenCalledWith('project-1'));
       expect(commands.cancelScopedItems).not.toHaveBeenCalled();
     });
 
     it('stops only local runs while connected when the server has nothing queued', async () => {
-      const cancelLocalUnsubmittedRuns = vi.fn();
+      const cancelLocalRuns = vi.fn();
       const dialog = await renderWithQueue(
-        { cancelLocalUnsubmittedRuns, localUnsubmittedRuns: { activeProject: 1, allProjects: 1 } },
+        { cancelLocalRuns, localRuns: localRuns({ 'project-1': 1 }) },
         'cancel-all-except-current',
         0
       );
@@ -232,14 +238,14 @@ describe('a bulk cancel from a shortcut or menu', () => {
       await act(() => userEvent.click(buttonIn(dialog, 'widgets.queue.cancelAllExceptCurrent')));
 
       await vi.waitFor(() => expect(notify.success).toHaveBeenCalled());
-      expect(cancelLocalUnsubmittedRuns).toHaveBeenCalledWith('project-1');
+      expect(cancelLocalRuns).toHaveBeenCalledWith('project-1');
       expect(commands.cancelScopedItems).not.toHaveBeenCalled();
     });
 
     it("stops this tab's unaccepted runs and the server's queued items, keeping the running one", async () => {
-      const cancelLocalUnsubmittedRuns = vi.fn();
+      const cancelLocalRuns = vi.fn();
       const dialog = await renderWithQueue(
-        { cancelLocalUnsubmittedRuns, localUnsubmittedRuns: { activeProject: 1, allProjects: 1 } },
+        { cancelLocalRuns, localRuns: localRuns({ 'project-1': 1 }) },
         'cancel-all-except-current'
       );
 
@@ -247,7 +253,7 @@ describe('a bulk cancel from a shortcut or menu', () => {
       await act(() => userEvent.click(buttonIn(dialog, 'widgets.queue.cancelAllExceptCurrent')));
 
       await vi.waitFor(() => expect(commands.cancelScopedItems).toHaveBeenCalledOnce());
-      expect(cancelLocalUnsubmittedRuns).toHaveBeenCalledWith('project-1');
+      expect(cancelLocalRuns).toHaveBeenCalledWith('project-1');
       expect(commands.cancelScopedItems).toHaveBeenCalledWith(expect.anything(), { keepCurrent: true });
       await vi.waitFor(() =>
         expect(notify.success).toHaveBeenCalledWith(expect.any(String), expect.stringContaining('"count":3'))

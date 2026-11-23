@@ -62,24 +62,32 @@ from invokeai.backend.model_manager.configs.ip_adapter import (
 from invokeai.backend.model_manager.configs.llava_onevision import LlavaOnevision_Diffusers_Config
 from invokeai.backend.model_manager.configs.lora import (
     ControlLoRA_LyCORIS_FLUX_Config,
+    ControlLoRA_LyCORIS_Krea2_Config,
     LoRA_Diffusers_Flux2_Config,
     LoRA_Diffusers_Flux3_Config,
     LoRA_Diffusers_FLUX_Config,
+    LoRA_Diffusers_Ideogram4_Config,
+    LoRA_Diffusers_MossImage_Config,
     LoRA_Diffusers_SD1_Config,
     LoRA_Diffusers_SD2_Config,
+    LoRA_Diffusers_SD3_Config,
     LoRA_Diffusers_SDXL_Config,
     LoRA_Diffusers_ZImage_Config,
     LoRA_LyCORIS_Anima_Config,
+    LoRA_LyCORIS_ErnieImage_Config,
     LoRA_LyCORIS_Flux2_Config,
     LoRA_LyCORIS_Flux3_Config,
     LoRA_LyCORIS_FLUX_Config,
+    LoRA_LyCORIS_Ideogram4_Config,
     LoRA_LyCORIS_Krea2_Config,
     LoRA_LyCORIS_LTX2_Config,
     LoRA_LyCORIS_MiniMaxH3_Config,
+    LoRA_LyCORIS_MossImage_Config,
     LoRA_LyCORIS_QwenImage21_Config,
     LoRA_LyCORIS_QwenImage_Config,
     LoRA_LyCORIS_SD1_Config,
     LoRA_LyCORIS_SD2_Config,
+    LoRA_LyCORIS_SD3_Config,
     LoRA_LyCORIS_SDXL_Config,
     LoRA_LyCORIS_Wan_Config,
     LoRA_LyCORIS_ZImage_Config,
@@ -135,8 +143,10 @@ from invokeai.backend.model_manager.configs.main import (
     Main_GGUF_Ideogram4_Config,
     Main_GGUF_Krea2_Config,
     Main_GGUF_LTX2_Config,
+    Main_GGUF_MossImage_Config,
     Main_GGUF_QwenImage21_Config,
     Main_GGUF_QwenImage_Config,
+    Main_GGUF_SD3_Config,
     Main_GGUF_Wan_Config,
     Main_GGUF_ZImage_Config,
     Main_SDNQ_Diffusers_Flux2_Config,
@@ -171,10 +181,12 @@ from invokeai.backend.model_manager.configs.qwen3_vl_encoder import (
     Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config,
     Qwen3VLEncoder_GGUF_Config,
     Qwen3VLEncoder_Qwen3VLEncoder_Config,
+    Qwen3VLVisionTower_GGUF_Config,
 )
 from invokeai.backend.model_manager.configs.qwen_vl_encoder import (
     QwenVLEncoder_Checkpoint_Config,
     QwenVLEncoder_Diffusers_Config,
+    QwenVLEncoder_GGUF_Config,
 )
 from invokeai.backend.model_manager.configs.siglip import SigLIP_Diffusers_Config
 from invokeai.backend.model_manager.configs.spandrel import Spandrel_Checkpoint_Config
@@ -201,10 +213,12 @@ from invokeai.backend.model_manager.configs.textual_inversion import (
 from invokeai.backend.model_manager.configs.tiny_autoencoder import (
     TinyAutoencoder_Checkpoint_Flux2_Config,
     TinyAutoencoder_Checkpoint_FLUX_Config,
+    TinyAutoencoder_Checkpoint_LTX2_Config,
     TinyAutoencoder_Checkpoint_QwenImage21_Config,
     TinyAutoencoder_Checkpoint_SD1_Config,
     TinyAutoencoder_Checkpoint_SD3_Config,
     TinyAutoencoder_Checkpoint_SDXL_Config,
+    TinyAutoencoder_Checkpoint_Wan_Config,
 )
 from invokeai.backend.model_manager.configs.unknown import Unknown_Config
 from invokeai.backend.model_manager.configs.vae import (
@@ -226,7 +240,10 @@ from invokeai.backend.model_manager.configs.vae import (
     VAE_Diffusers_SDXL_Config,
     VAE_Diffusers_Wan_Config,
 )
-from invokeai.backend.model_manager.configs.wan_t5_encoder import WanT5Encoder_WanT5Encoder_Config
+from invokeai.backend.model_manager.configs.wan_t5_encoder import (
+    WanT5Encoder_GGUF_Config,
+    WanT5Encoder_WanT5Encoder_Config,
+)
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk, read_safetensors_header
 from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
@@ -261,6 +278,12 @@ def _denoiser_stores_float8_weights(mod: ModelOnDisk) -> bool:
     let the layerwise cast re-encode the result as *unscaled* fp8, which on `flux-2-klein-4b-fp8` flushed 3.4% of the
     weights to zero for the byte count the file already had. The loaders now keep such a file in its own scaled form
     instead, so switching the setting on is lossless and worth doing by default.
+
+    A float8 tensor named as a scale (`<layer>.weight_scale`) is not evidence: nvfp4 stores its block scales in
+    F8_E4M3 beside a packed U8 weight, and they are not fp8 weights. For such a build FP8 Storage would store only the
+    layers the file ships in full precision, a lossy trade rather than the lossless keep a scaled-fp8 file gets, so
+    it is left to the user instead of switched on. An nvfp4 file that also stores scaled fp8 weights (Qwen-Image's
+    nvfp4 build) still counts.
     """
     if mod.path.is_file():
         candidates = [mod.path]
@@ -282,7 +305,9 @@ def _denoiser_stores_float8_weights(mod: ModelOnDisk) -> bool:
             continue
         denoiser = {key: info for key, info in header.items() if not key.startswith(_BUNDLED_COMPONENT_KEY_PREFIXES)}
         stores_float8 = stores_float8 or any(
-            isinstance(info, dict) and info.get("dtype") in _FP8_SAFETENSORS_DTYPES for info in denoiser.values()
+            isinstance(info, dict) and info.get("dtype") in _FP8_SAFETENSORS_DTYPES
+            for key, info in denoiser.items()
+            if not key.endswith("_scale")
         )
     return stores_float8
 
@@ -484,7 +509,9 @@ AnyModelConfig = Annotated[
         Annotated[Main_GGUF_Ideogram4_Config, Main_GGUF_Ideogram4_Config.get_tag()],
         Annotated[Main_GGUF_ErnieImage_Config, Main_GGUF_ErnieImage_Config.get_tag()],
         Annotated[Main_GGUF_LTX2_Config, Main_GGUF_LTX2_Config.get_tag()],
+        Annotated[Main_GGUF_MossImage_Config, Main_GGUF_MossImage_Config.get_tag()],
         Annotated[Main_GGUF_Anima_Config, Main_GGUF_Anima_Config.get_tag()],
+        Annotated[Main_GGUF_SD3_Config, Main_GGUF_SD3_Config.get_tag()],
         # IMPORTANT: FLUX.2 must be listed BEFORE FLUX.1 here. An ambiguous SDNQ transformer
         # checkpoint (prefixed FLUX.2 keys) can look like a FLUX.1 main model, so FLUX.2 must get
         # first refusal. Main_SDNQ_FLUX_Config additionally rejects FLUX.2 state dicts to keep the
@@ -532,6 +559,8 @@ AnyModelConfig = Annotated[
         Annotated[
             TinyAutoencoder_Checkpoint_QwenImage21_Config, TinyAutoencoder_Checkpoint_QwenImage21_Config.get_tag()
         ],
+        Annotated[TinyAutoencoder_Checkpoint_Wan_Config, TinyAutoencoder_Checkpoint_Wan_Config.get_tag()],
+        Annotated[TinyAutoencoder_Checkpoint_LTX2_Config, TinyAutoencoder_Checkpoint_LTX2_Config.get_tag()],
         # ControlNet - checkpoint format
         Annotated[ControlNet_Checkpoint_SD1_Config, ControlNet_Checkpoint_SD1_Config.get_tag()],
         Annotated[ControlNet_Checkpoint_SD2_Config, ControlNet_Checkpoint_SD2_Config.get_tag()],
@@ -567,6 +596,22 @@ AnyModelConfig = Annotated[
         # ``test_minimax_h3_lora_probe_independence.py``).
         Annotated[LoRA_LyCORIS_LTX2_Config, LoRA_LyCORIS_LTX2_Config.get_tag()],
         Annotated[LoRA_LyCORIS_MiniMaxH3_Config, LoRA_LyCORIS_MiniMaxH3_Config.get_tag()],
+        # MOSS-Image keys on its blocks' `proj.q`..`ffn_down` and its embedder and modulation modules, which no other
+        # supported transformer has; Z-Image's probe, whose block prefixes admit its files, rejects them, so the two are
+        # mutually exclusive regardless of order (locked in by `test_moss_image_lora_probe_independence.py`).
+        Annotated[LoRA_LyCORIS_MossImage_Config, LoRA_LyCORIS_MossImage_Config.get_tag()],
+        # ERNIE-Image keys on its `self_attention` / `mlp` block names and top-level modules, which Z-Image's probe now
+        # rejects, so the two are mutually exclusive regardless of order (locked in by
+        # `test_ernie_image_lora_probe_independence.py`).
+        Annotated[LoRA_LyCORIS_ErnieImage_Config, LoRA_LyCORIS_ErnieImage_Config.get_tag()],
+        # Ideogram 4 shares Z-Image's block names; it needs a patched weight at an Ideogram 4 width, which
+        # Z-Image's probe now rejects, so the two are mutually exclusive regardless of order (locked in by
+        # `test_ideogram4_lora_probe_independence.py`).
+        Annotated[LoRA_LyCORIS_Ideogram4_Config, LoRA_LyCORIS_Ideogram4_Config.get_tag()],
+        # SD 3 shares Qwen-Image's diffusers attention names; it is told apart by its width (1536 / 2432 against
+        # 3072), which Qwen-Image's probe now checks too, so the two are mutually exclusive regardless of order
+        # (locked in by `test_sd3_lora_probe_independence.py`).
+        Annotated[LoRA_LyCORIS_SD3_Config, LoRA_LyCORIS_SD3_Config.get_tag()],
         # Wan and Anima both target ``blocks.X`` shapes; their LoRA probes are
         # mutually exclusive — Wan rejects Anima's ``_proj``/``mlp``/
         # ``adaln_modulation`` markers, Anima requires at least one of those
@@ -584,12 +629,16 @@ AnyModelConfig = Annotated[
         Annotated[LoRA_Diffusers_SD1_Config, LoRA_Diffusers_SD1_Config.get_tag()],
         Annotated[LoRA_Diffusers_SD2_Config, LoRA_Diffusers_SD2_Config.get_tag()],
         Annotated[LoRA_Diffusers_SDXL_Config, LoRA_Diffusers_SDXL_Config.get_tag()],
+        Annotated[LoRA_Diffusers_SD3_Config, LoRA_Diffusers_SD3_Config.get_tag()],
         Annotated[LoRA_Diffusers_Flux2_Config, LoRA_Diffusers_Flux2_Config.get_tag()],
         Annotated[LoRA_Diffusers_FLUX_Config, LoRA_Diffusers_FLUX_Config.get_tag()],
         Annotated[LoRA_Diffusers_Flux3_Config, LoRA_Diffusers_Flux3_Config.get_tag()],
+        Annotated[LoRA_Diffusers_MossImage_Config, LoRA_Diffusers_MossImage_Config.get_tag()],
+        Annotated[LoRA_Diffusers_Ideogram4_Config, LoRA_Diffusers_Ideogram4_Config.get_tag()],
         Annotated[LoRA_Diffusers_ZImage_Config, LoRA_Diffusers_ZImage_Config.get_tag()],
         # ControlLoRA - diffusers format
         Annotated[ControlLoRA_LyCORIS_FLUX_Config, ControlLoRA_LyCORIS_FLUX_Config.get_tag()],
+        Annotated[ControlLoRA_LyCORIS_Krea2_Config, ControlLoRA_LyCORIS_Krea2_Config.get_tag()],
         # T5 Encoder - all formats
         Annotated[T5Encoder_T5Encoder_Config, T5Encoder_T5Encoder_Config.get_tag()],
         Annotated[T5Encoder_BnBLLMint8_Config, T5Encoder_BnBLLMint8_Config.get_tag()],
@@ -612,6 +661,7 @@ AnyModelConfig = Annotated[
         # satisfies the text-only Qwen3 GGUF heuristic in full.
         Annotated[Qwen3VLEncoder_GGUF_Config, Qwen3VLEncoder_GGUF_Config.get_tag()],
         Annotated[Qwen3VLEncoder_Qwen3VLEncoder_Config, Qwen3VLEncoder_Qwen3VLEncoder_Config.get_tag()],
+        Annotated[Qwen3VLVisionTower_GGUF_Config, Qwen3VLVisionTower_GGUF_Config.get_tag()],
         Annotated[Qwen35Encoder_Checkpoint_Config, Qwen35Encoder_Checkpoint_Config.get_tag()],
         # Qwen3 Encoder
         Annotated[Qwen3Encoder_Qwen3Encoder_Config, Qwen3Encoder_Qwen3Encoder_Config.get_tag()],
@@ -631,8 +681,11 @@ AnyModelConfig = Annotated[
         # Qwen VL Encoder (Qwen2.5-VL multimodal encoder for Qwen Image)
         Annotated[QwenVLEncoder_Diffusers_Config, QwenVLEncoder_Diffusers_Config.get_tag()],
         Annotated[QwenVLEncoder_Checkpoint_Config, QwenVLEncoder_Checkpoint_Config.get_tag()],
+        # Text only: llama.cpp keeps the vision tower in a separate mmproj file, which this config refuses.
+        Annotated[QwenVLEncoder_GGUF_Config, QwenVLEncoder_GGUF_Config.get_tag()],
         # Wan T5 Encoder (UMT5-XXL for Wan 2.2)
         Annotated[WanT5Encoder_WanT5Encoder_Config, WanT5Encoder_WanT5Encoder_Config.get_tag()],
+        Annotated[WanT5Encoder_GGUF_Config, WanT5Encoder_GGUF_Config.get_tag()],
         # TI - file format
         Annotated[TI_File_SD1_Config, TI_File_SD1_Config.get_tag()],
         Annotated[TI_File_SD2_Config, TI_File_SD2_Config.get_tag()],
@@ -771,6 +824,33 @@ class ModelConfigFactory:
                 f"{mod.path.name} is a ComfyUI-GGUF convrot ({kinds}) file, which this model type cannot load "
                 "yet. Use a GGML-quantized (Q8_0, Q4_K, ...) or safetensors build instead."
             )
+
+    @staticmethod
+    def _gguf_file_refusal(mod: ModelOnDisk) -> InvalidMatchError | None:
+        """The reason a `.gguf` file cannot be installed whatever model it holds, or None.
+
+        Two files no loader reads: a part of a llama.cpp multi-part GGUF (gguf-py writes every key,
+        `general.architecture` included, into part 1 only and gives every part `split.*` keys), and a file whose
+        header cannot be parsed. Neither has an architecture key to match on, so without this they would
+        register as Unknown models, and part 1 would pass any family check that looks at metadata alone.
+        """
+        if mod.path.suffix != ".gguf" or not mod.path.is_file():
+            return None
+        if (error := mod.metadata_read_error()) is not None:
+            return InvalidMatchError(
+                f"{mod.path.name} could not be read as a GGUF file ({error}). If the file is incomplete or corrupt, "
+                "download it again."
+            )
+        metadata = mod.metadata()
+        count = metadata.get("split.count")
+        if isinstance(count, int) and count > 1:
+            part = metadata.get("split.no")
+            which = f"part {part + 1} of {count}" if isinstance(part, int) else f"one of {count} parts"
+            return InvalidMatchError(
+                f"{mod.path.name} is {which} of a multi-part GGUF, which cannot be loaded. Join the parts into "
+                "one file with llama.cpp's `llama-gguf-split --merge`, then install the joined file."
+            )
+        return None
 
     @staticmethod
     def from_dict(fields: dict[str, Any]) -> AnyModelConfig:
@@ -963,6 +1043,10 @@ class ModelConfigFactory:
         # Perform basic sanity checks before attempting any config matching
         # This rejects obviously non-model paths early, saving time
         ModelConfigFactory._validate_path_looks_like_model(mod.path)
+
+        # A property of the file, not of any model family: no candidate runs on a file nothing can load.
+        if refusal := ModelConfigFactory._gguf_file_refusal(mod):
+            return ModelClassificationResult(config=None, details={"gguf_file": refusal})
 
         # We will always need these fields to build any model config.
         fields = ModelConfigFactory.build_common_fields(mod, override_fields)

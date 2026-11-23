@@ -368,7 +368,7 @@ describe('createWidgetRuntime', () => {
     disposeTwo();
   });
 
-  it('scopes palette, search, and toolbar registrations to the widget source', () => {
+  it('scopes palette and search registrations to the widget source', () => {
     const { widgets } = createDispatch();
     const extensions = createExtensionRegistry();
     const runtime = createWidgetRuntime({
@@ -384,11 +384,9 @@ describe('createWidgetRuntime', () => {
 
     runtime.palette.register({ commandId: 'test-widget.palette-command', title: 'Palette entry' });
     runtime.search.registerProvider({ id: 'test-widget.search', label: 'Search', search: () => [] });
-    runtime.toolbars.register({ id: 'test-widget.toolbar', items: [], location: 'status.left' });
 
     const expectedSource = expect.objectContaining({ instanceId: 'alpha', typeId: 'test-widget' });
     expect(extensions.stores.palette.list()).toEqual([expect.objectContaining({ source: expectedSource })]);
     expect(extensions.stores.search.list()).toEqual([expect.objectContaining({ source: expectedSource })]);
-    expect(extensions.stores.toolbars.list()).toEqual([expect.objectContaining({ source: expectedSource })]);
   });
 });

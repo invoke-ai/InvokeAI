@@ -1,4 +1,4 @@
-import type { HTMLAttributes, PointerEvent, ReactElement, ReactNode } from 'react';
+import type { HTMLAttributes, PointerEvent, ReactElement, ReactNode, SyntheticEvent } from 'react';
 
 import {
   HoverCard,
@@ -33,7 +33,6 @@ type HintPositioning = NonNullable<HoverCard.RootProps['positioning']>;
 
 /** Long enough that hints stay out of the way while a user works a panel. */
 const OPEN_DELAY = 600;
-/** Forgives a brief slip off the label or card; the grace corridor covers the trip from label to card. */
 const CLOSE_DELAY = 300;
 /** How long the corridor waits for progress toward the card; resting on the way, or on the field's control, ends it. */
 const CORRIDOR_GRACE_MS = 1000;
@@ -48,7 +47,6 @@ const HintCard = ({ hint, onDisable }: { hint: FeatureHintId; onDisable: (() => 
   const heading = t(`hints.${hint}.heading`);
   const paragraphs = readParagraphs(t(`hints.${hint}.paragraphs`, { returnObjects: true }));
 
-  // Padding belongs to the `hoverCard` content recipe, not here.
   return (
     <Stack gap="1.5">
       <Stack gap="1">
@@ -68,7 +66,7 @@ const HintCard = ({ hint, onDisable }: { hint: FeatureHintId; onDisable: (() => 
           <Separator />
           <HStack gap="2" minH="4">
             {onDisable && (
-              <Button color="fg.subtle" fontSize="xs" h="auto" px="1" size="sm" variant="plain" onClick={onDisable}>
+              <Button size="xs" variant="outline" onClick={onDisable}>
                 {t('common.dontShowMeThese')}
               </Button>
             )}
@@ -86,11 +84,27 @@ const HintCard = ({ hint, onDisable }: { hint: FeatureHintId; onDisable: (() => 
   );
 };
 
+const stopPropagation = (event: SyntheticEvent) => event.stopPropagation();
+
+/**
+ * The card portals out but stays inside its label in the React tree; stop its events bubbling into the label's
+ * ancestors (Select, ScrubberField, app hotkeys). Release events pass so document-tracked drags still end.
+ */
+const CARD_EVENT_BOUNDARY = {
+  onBlur: stopPropagation,
+  onClick: stopPropagation,
+  onContextMenu: stopPropagation,
+  onDoubleClick: stopPropagation,
+  onFocus: stopPropagation,
+  onKeyDown: stopPropagation,
+  onMouseDown: stopPropagation,
+  onPointerDown: stopPropagation,
+} satisfies HTMLAttributes<HTMLElement>;
+
 type ExclusionHandlers = Pick<HTMLAttributes<HTMLElement>, 'onPointerEnter' | 'onPointerLeave'>;
 
 const ExclusionContext = createContext<ExclusionHandlers | null>(null);
 
-/** Hands the trigger's own pointer handlers, swapped, to any exclusion inside the trigger. */
 const ExclusionProvider = ({ children }: { children: ReactNode }) => {
   const { onPointerEnter, onPointerLeave } = useHoverCardContext().getTriggerProps();
   const handlers = useMemo<ExclusionHandlers | null>(
@@ -101,10 +115,7 @@ const ExclusionProvider = ({ children }: { children: ReactNode }) => {
   return <ExclusionContext.Provider value={handlers}>{children}</ExclusionContext.Provider>;
 };
 
-/**
- * Suppress pointer hints over nested tooltip controls by treating entry/exit as trigger leave/enter; keyboard
- * focus is unaffected.
- */
+/** Pointer only: entering counts as a trigger leave; keyboard focus is unaffected. */
 export const FeatureHintExclusion = ({ children }: { children: ReactElement<HTMLAttributes<HTMLElement>> }) => {
   const handlers = useContext(ExclusionContext);
   return handlers ? cloneElement(children, mergeProps(handlers, children.props)) : children;
@@ -112,10 +123,6 @@ export const FeatureHintExclusion = ({ children }: { children: ReactElement<HTML
 
 type Point = { x: number; y: number };
 
-/**
- * What one hint's hover-card callbacks share outside render: the card element, the panel found once per opening,
- * and the grace corridor in progress.
- */
 const createHintSession = () => {
   let card: HTMLElement | null = null;
   let panel: { panel: HTMLElement | null; trigger: Element } | null = null;
@@ -142,11 +149,7 @@ const createHintSession = () => {
     setCard: (element: HTMLElement | null) => {
       card = element;
     },
-    /**
-     * Leaving the label toward an open card keeps it open while the pointer travels the corridor to it, as long as it
-     * gets closer within each `CORRIDOR_GRACE_MS`. Leaving the corridor, another hint's label, a scroll, or the pointer leaving the
-     * page calls `close`, as leaving the label would have. Returns false when no corridor applies.
-     */
+    /** Keeps the card open while the pointer nears it within each `CORRIDOR_GRACE_MS`; false without a corridor. */
     startCorridor: (exit: Point, trigger: HTMLElement, close: () => void): boolean => {
       cancelCorridor();
 
@@ -160,7 +163,6 @@ const createHintSession = () => {
       const openCard = card;
       const session = new AbortController();
       const listen = { capture: true, signal: session.signal };
-      // Anything but steady travel to the card gives the card back to the ordinary close delay.
       const giveUp = () => {
         session.abort();
         close();
@@ -178,13 +180,11 @@ const createHintSession = () => {
       document.addEventListener(
         'pointermove',
         ({ clientX: x, clientY: y, target }) => {
-          // Over the card, or closed some other way: the hover card owns what happens next.
           if (!openCard.isConnected || isOverCard(x, y, target)) {
             session.abort();
           } else if (!isInCorridor({ x, y })) {
             giveUp();
           } else if (distanceToCard(x) < closest) {
-            // Progress toward the card renews the grace window; resting or wandering lets it run out.
             closest = distanceToCard(x);
             globalThis.clearTimeout(graceTimer);
             graceTimer = globalThis.setTimeout(giveUp, CORRIDOR_GRACE_MS);
@@ -217,11 +217,7 @@ const createHintSession = () => {
 
 type HintCorridor = Pick<ReturnType<typeof createHintSession>, 'cancelCorridor' | 'startCorridor'>;
 
-/**
- * The label as the card's trigger. The card opens beside the panel, out of reach of the close delay, so the trigger
- * hands an open card's pointer leave to the session's grace corridor. Escape and blur still close it through the
- * hover card.
- */
+/** The card opens out of reach of the close delay, so an open card's pointer leave goes to the grace corridor. */
 const HintTrigger = ({ cancelCorridor, children, startCorridor }: HintCorridor & { children: ReactElement }) => {
   const hoverCard = useHoverCardContext();
   const triggerProps = hoverCard.getTriggerProps();
@@ -256,14 +252,10 @@ const HintTrigger = ({ cancelCorridor, children, startCorridor }: HintCorridor &
 
 export interface FeatureHintProps {
   hint: FeatureHintId;
-  /** Becomes the hover target verbatim — it gains data attributes, not a wrapper. */
   children: ReactElement;
 }
 
-/**
- * Attach to the child without button roles/tabindex so labels retain semantics; disabled hints return the child
- * untouched.
- */
+/** No button roles or tabindex, so labels keep their semantics. */
 export const FeatureHint = ({ children, hint }: FeatureHintProps) => {
   const { enabled, onDisable } = useFeatureHints();
   const [{ cancelCorridor, getAnchorRect, resetPanel, setCard, startCorridor }] = useState(createHintSession);
@@ -276,8 +268,7 @@ export const FeatureHint = ({ children, hint }: FeatureHintProps) => {
     }),
     [getAnchorRect, hint]
   );
-  // The panel around a label can change between openings, never during one. A press outside the card closes it
-  // through the hover card's dismissal, which ends any corridor with it.
+  // The panel around a label can change between openings, never during one.
   const handleOpenChange = useCallback(
     ({ open }: { open: boolean }) => {
       if (open) {
@@ -311,7 +302,7 @@ export const FeatureHint = ({ children, hint }: FeatureHintProps) => {
       </ExclusionProvider>
       <Portal>
         <HoverCard.Positioner>
-          <HoverCard.Content ref={setCard}>
+          <HoverCard.Content ref={setCard} {...CARD_EVENT_BOUNDARY}>
             <HoverCard.Arrow>
               <HoverCard.ArrowTip />
             </HoverCard.Arrow>

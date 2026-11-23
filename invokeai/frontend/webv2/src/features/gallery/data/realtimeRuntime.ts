@@ -19,10 +19,10 @@ interface QueueItemStatusChangedPayload {
 /**
  * External-client reveal contract. A batch enqueued with `POST /api/v1/queue/default/enqueue_batch` and
  * `batch.destination` set to this value, by the signed-in user (any user on a single-user server) and with an origin
- * that does not start with `webv2:`, asks for the last saved image of each completed item to be revealed, best
- * effort, in that user's open Gallery. Every other destination, `gallery` included (legacy web sends it on every
- * workflow and upscale run), only refreshes the Gallery. When the reveal happens, what it changes, and its limits
- * (workflow-call children among them) are documented in the Gallery README.
+ * that does not start with `webv2:`, asks for the last saved image of each completed item to be revealed, best effort,
+ * in that user's open Gallery. Every other destination, `gallery` included (legacy web sends it on every workflow and
+ * upscale run), only refreshes the Gallery. When the reveal happens, what it changes, and its limits (workflow-call
+ * children among them) are documented in the Gallery README.
  */
 const REVEAL_DESTINATION = 'gallery:reveal';
 
@@ -32,9 +32,8 @@ export interface GalleryRealtimeRuntime {
 }
 
 /**
- * Refresh external uploads, the session user's completions enqueued by other clients, and reconnects at least
- * minIntervalMs apart. Coalesce pending events and guarantee a trailing pass without repeatedly cancelling page
- * fetches.
+ * Refresh uploads, all of the session user's completions, and reconnects at least minIntervalMs apart. Hidden tabs
+ * retain one pending pass until visible. The Query invalidation owner serializes slow refetches.
  */
 export const createGalleryRealtimeRuntime = ({
   backend,
@@ -42,17 +41,21 @@ export const createGalleryRealtimeRuntime = ({
   getSessionUserId,
   invalidate,
   isClientQueueItemOrigin,
+  isVisible = () => true,
   minIntervalMs = 1000,
   onRevealRequest,
+  onVisibilityChange,
 }: {
   backend: GalleryRealtimeBackend;
   coalesceMs?: number;
   /** Null when events cannot be attributed to a user (single-user servers tag every event `system`). */
   getSessionUserId: () => string | null;
   invalidate: () => void | Promise<void>;
-  /** True for origins of items this client enqueues; Queue refreshes for those in the tab that tracks them. */
+  /** Frontend origins refresh only; they never request external reveal. */
   isClientQueueItemOrigin: (origin: string | null) => boolean;
+  isVisible?: () => boolean;
   minIntervalMs?: number;
+  onVisibilityChange?: (listener: () => void) => () => void;
   /** Receives the backend item id of each of those completions whose batch asked to be revealed. */
   onRevealRequest?: (queueItemId: number) => void;
 }): GalleryRealtimeRuntime => {
@@ -61,46 +64,54 @@ export const createGalleryRealtimeRuntime = ({
   let invalidationTimer: ReturnType<typeof setTimeout> | null = null;
   let lastInvalidatedAt = Number.NEGATIVE_INFINITY;
   let isStarted = false;
+  let invalidationPending = false;
   const isActive = (): boolean => isStarted && isAccountScopeCurrent(owner);
 
   const scheduleInvalidation = (): void => {
-    if (!isActive() || invalidationTimer !== null) {
+    if (!isActive() || !invalidationPending || !isVisible() || invalidationTimer !== null) {
       return;
     }
 
-    // Use monotonic time so wall-clock corrections cannot extend the pending timer and delay all subsequent
-    // events.
+    // Use monotonic time so wall-clock corrections cannot extend the pending timer and delay all subsequent events.
     const delay = Math.max(coalesceMs, lastInvalidatedAt + minIntervalMs - performance.now());
 
     invalidationTimer = setTimeout(() => {
       invalidationTimer = null;
 
-      if (isActive()) {
+      if (isActive() && isVisible()) {
+        invalidationPending = false;
         lastInvalidatedAt = performance.now();
         void invalidate();
       }
     }, delay);
   };
 
+  const requestInvalidation = (): void => {
+    if (isActive()) {
+      invalidationPending = true;
+      scheduleInvalidation();
+    }
+  };
+
+  const handleVisibilityChange = (): void => {
+    if (!isVisible() && invalidationTimer !== null) {
+      clearTimeout(invalidationTimer);
+      invalidationTimer = null;
+    }
+    scheduleInvalidation();
+  };
+
   const handleQueueItemStatusChanged = (event: QueueItemStatusChangedPayload): void => {
-    // Admins also receive other users' full events and everyone else's arrive redacted, so only the session user's
-    // completions can add to this gallery. Items this client enqueued are left to Queue, which refreshes only in the
-    // tab tracking the item: another tab or device of the same user is not refreshed for them. Known limitation,
-    // left intentionally: refreshing here too would double-refresh the enqueuing tab.
+    // Admins receive other users' events too. All own-account completions refresh here, including other tabs.
     const sessionUserId = getSessionUserId();
 
-    if (
-      !isActive() ||
-      event.status !== 'completed' ||
-      isClientQueueItemOrigin(event.origin) ||
-      (sessionUserId !== null && event.user_id !== sessionUserId)
-    ) {
+    if (!isActive() || event.status !== 'completed' || (sessionUserId !== null && event.user_id !== sessionUserId)) {
       return;
     }
 
-    scheduleInvalidation();
+    requestInvalidation();
 
-    if (event.destination === REVEAL_DESTINATION) {
+    if (!isClientQueueItemOrigin(event.origin) && event.destination === REVEAL_DESTINATION) {
       onRevealRequest?.(event.item_id);
     }
   };
@@ -117,8 +128,8 @@ export const createGalleryRealtimeRuntime = ({
     let previousStatus: BackendConnectionStatus | null = null;
 
     detachers.push(
-      backend.on('image_uploaded', scheduleInvalidation),
-      backend.on('video_uploaded', scheduleInvalidation),
+      backend.on('image_uploaded', requestInvalidation),
+      backend.on('video_uploaded', requestInvalidation),
       backend.on('queue_item_status_changed', handleQueueItemStatusChanged),
       backend.onConnectionChange((status) => {
         const isReconnect = previousStatus === 'disconnected' && status === 'connected';
@@ -126,14 +137,18 @@ export const createGalleryRealtimeRuntime = ({
         previousStatus = status;
 
         if (isReconnect) {
-          scheduleInvalidation();
+          requestInvalidation();
         }
       })
     );
+    if (onVisibilityChange) {
+      detachers.push(onVisibilityChange(handleVisibilityChange));
+    }
   };
 
   const dispose = (): void => {
     isStarted = false;
+    invalidationPending = false;
 
     for (const detach of detachers.splice(0)) {
       detach();

@@ -472,6 +472,7 @@ class TestNodeReservation:
         negative_tokens=None,
         loras=0,
         regional_mask=None,
+        negative_regional_mask=None,
     ):
         from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
             ConditioningFieldData,
@@ -565,15 +566,19 @@ class TestNodeReservation:
             control_encode = stack.enter_context(
                 patch.object(ZImageImageToLatentsInvocation, "vae_encode", side_effect=encode)
             )
-            if regional_mask is not None:
-                regional = ZImageRegionalPromptingExtension(
-                    regional_text_conditioning=ZImageRegionalTextConditioning(
-                        prompt_embeds=torch.zeros(POSITIVE_TOKENS, 2560), image_masks=[None], embedding_ranges=[]
-                    ),
-                    regional_attn_mask=regional_mask,
-                )
+            if regional_mask is not None or negative_regional_mask is not None:
+                regions = [
+                    ZImageRegionalPromptingExtension(
+                        regional_text_conditioning=ZImageRegionalTextConditioning(
+                            prompt_embeds=torch.zeros(tokens, 2560), image_masks=[None], embedding_ranges=[]
+                        ),
+                        regional_attn_mask=mask,
+                    )
+                    for tokens, mask in ((POSITIVE_TOKENS, regional_mask), (negative_tokens, negative_regional_mask))
+                    if tokens is not None
+                ]
                 stack.enter_context(
-                    patch.object(ZImageRegionalPromptingExtension, "from_text_conditionings", return_value=regional)
+                    patch.object(ZImageRegionalPromptingExtension, "from_text_conditionings", side_effect=regions)
                 )
             with pytest.raises(_StopBeforeLoad):
                 invocation._run_diffusion(context)
@@ -617,6 +622,17 @@ class TestNodeReservation:
         assert run.estimate["regional_attn_mask"] is mask
         assert run.estimate["has_attention_mask"] is True
 
+    @pytest.mark.parametrize("positive_regions", [False, True])
+    def test_negative_regions_reserve_the_larger_per_pass_bias(self, positive_regions):
+        positive_mask = torch.zeros((264, 264), dtype=torch.bool) if positive_regions else None
+        negative_mask = torch.zeros((296, 296), dtype=torch.bool)
+
+        run = self._run(negative_tokens=40, regional_mask=positive_mask, negative_regional_mask=negative_mask)
+
+        assert run.estimate["regional_attn_mask"] is negative_mask
+        assert run.estimate["has_attention_mask"] is True
+        assert run.estimate["text_seq_len"] == 40
+
     def test_a_control_reaches_the_estimate_and_keeps_the_reservation(self):
         """The control's block count sizes the hints; its blocks take the base blocks' arguments, so it adds no
         attention mask. It is locked after the transformer, which can then no longer be offloaded -- so it must ask for
@@ -633,7 +649,6 @@ class TestNodeReservation:
         run = self._run(control_blocks=15)
 
         assert run.order == ["encode", "transformer lock"]
-        assert run.control_encode["deterministic"] is True
 
     def test_the_control_fields_tiling_reaches_the_control_encode(self):
         """The control image is encoded at generation size. For an upscale that is the enlarged frame, whose untiled

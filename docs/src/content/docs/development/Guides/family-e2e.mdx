@@ -1,6 +1,6 @@
 ---
 title: Family E2E Runs
-lastUpdated: 2026-10-29
+lastUpdated: 2026-11-20
 ---
 
 `scripts/family_e2e` runs model families end to end through the HTTP API of a server it launches itself. Per case and size it records the image, the run time, the time per denoise step and the VRAM the server process used, measured at driver level. The report compares them with an explicitly accepted reference and with the previous run of the same profile.
@@ -10,13 +10,14 @@ It is a developer tool. It runs on Windows with NVIDIA and AMD (ROCm) GPUs, wher
 ## How a run works
 
 1. **Scratch root.** The template root's `invokeai.yaml` and a snapshot of its SQLite database go to `<data_dir>/scratch-roots/<run_id>-default/`. The template's database files (with a WAL left by an unclean stop) are copied, and the copy is backed up through InvokeAI's database layer, so the WAL's contents are included and the template's files are only read.
+   - The runner uses the API without signing in, so the template must run single-user. Use a template whose data you can expose to local processes, and set `multiuser: false` in its `invokeai.yaml`. The runner refuses a template with `multiuser: true` before copying its database, even when the manifest sets `INVOKEAI_MULTIUSER: "false"` under `server.env`. That override works only for a template whose `invokeai.yaml` has no `multiuser` line. Starting the template root's own server on the current version adds `multiuser: true` to such a file, even with `INVOKEAI_MULTIUSER=false` set, and from then on the runner refuses the template.
    - The tool refuses while the database file is open in any process (Windows only), or while anything listens on the template's configured port. Either means its server is still running.
    - It also refuses while a model install is unfinished (see [Shared paths](#shared-paths)).
    - Stores whose files the database owns start empty in the scratch root: outputs, uploaded fonts, style preset images, workflow thumbnails and profiles. The scratch server reconciles them with its own database; at the template it would, for example, delete uploaded fonts its database does not list.
    - Every other path setting points back at the template root as an absolute path, so models, custom nodes and memory settings are the template's own.
    - The tool overrides a few settings: a free port on `127.0.0.1`, a plain-format log file in the run directory, the image index off, and the queue cleared at startup. SSL and `base_url` are dropped. On Linux the server sees only the selected GPU, as `cuda:0`, so a `device` of `cuda:N` becomes `cuda:0` and a `generation_devices` list with a CUDA device becomes `auto`.
-   - `INVOKEAI_*` variables of the calling environment are not passed on. Put settings the server needs into the manifest's `server.env`.
-2. **Server.** The tool checks that `server.python` imports `invokeai` from `server.code_dir`. It then starts `<python> <code_dir>/scripts/invokeai-web.py --root <scratch root>` and reads the actual port from the server log. Multiuser mode is refused.
+   - `INVOKEAI_*` variables of the calling environment are not passed on. Put settings the server needs into the manifest's `server.env`. The runner reserves the host, port, database URL and database-owned storage paths so a manifest cannot redirect the scratch server to a network listener or live store.
+2. **Server.** The tool checks that `server.python` imports `invokeai` from `server.code_dir`. It then starts `<python> <code_dir>/scripts/invokeai-web.py --root <scratch root>` and reads the actual port from the server log. The server always runs single-user: a template that would run in multiuser mode is refused in step 1.
    - On Windows the server runs in a job object of the runner, so it dies with the runner however the runner ends. On Linux it runs in a session of its own. `stop`, an interrupt or a plain kill (SIGTERM) of the runner ends it; a runner killed with SIGKILL leaves it running. The runner writes the launched process into `heartbeat.json` before it waits for the server to start, so `stop` and `resume` also find a server whose runner was killed during the startup. While it holds more than 1 GiB on that GPU, `start` and `resume` name it as foreign load and refuse; `stop RUN` ends it. Otherwise the resumed runner stops it first, before it replaces `heartbeat.json`, which names the server for `stop`, or touches the scratch root and a calibration store in it. If it cannot stop the server, the runner refuses and leaves the scratch root with its store and the server's entries in `heartbeat.json` as they are; `runner.log` names the pid and the run shows as failed.
 3. **Graphs.** The real webv2 graph builders produce each case's batch through `pnpm graphs:export`, run in the tool checkout. Run `pnpm install` in `invokeai/frontend/webv2` there first.
    - The runner disables the invocation cache on every node and saves the batch as `graphs/<case_key>.json`.
@@ -56,7 +57,7 @@ A YAML file per machine, operating system and GPU, kept with the data rather tha
 | `profile` | Names runs and references. |
 | `data_dir` | The data directory above. |
 | `gpu` | Substring of the adapter name that matches exactly one adapter, e.g. `RTX 4090` or `9060`. `Radeon` alone also matches an AMD integrated GPU. On Linux it can also be an NVML UUID (`GPU-…`, listed by `nvidia-smi -L` and by the error for a name that matches several cards), which tells identical cards apart. A GPU NVML cannot query is left out with a warning. |
-| `server.template_root` | The root whose settings and database are copied. The scratch server shares its other paths; see [Shared paths](#shared-paths). |
+| `server.template_root` | The root whose settings and database are copied. Set `multiuser: false` in its `invokeai.yaml`; see [How a run works](#how-a-run-works). The scratch server shares its other paths; see [Shared paths](#shared-paths). |
 | `server.python` | The interpreter that runs the server. |
 | `server.code_dir` | The checkout the server runs. Defaults to the tool's checkout. |
 | `server.env` | Extra server environment, e.g. `HIP_VISIBLE_DEVICES`. On Linux the runner sets `CUDA_VISIBLE_DEVICES` to the selected GPU's UUID itself, so the server sees exactly that card, as `cuda:0`, and neither spreads its workers over the others nor borrows an idle one. A `CUDA_VISIBLE_DEVICES` here with any other value than that UUID is refused. The scratch root's `device: cuda:N` becomes `cuda:0` and a `generation_devices` list with a CUDA device becomes `auto` (see [How a run works](#how-a-run-works)). On Windows pin the server to the manifest's `gpu` here when the machine has several. Either way the first completed step fails the run when the server holds no memory on the selected card. |
@@ -87,6 +88,16 @@ A runner registers before it does anything else: it writes its process into `hea
 On Windows the background runner breaks away from the caller's job object, so a terminal or an agent harness that kills its job's processes does not end a long run. Where breakaway is refused, the runner is created through WMI. It then starts with the user's default environment instead of the caller's.
 
 A resumed run skips every step that already has a final record and keeps the measures of the earlier sessions. Its new server starts with a cold model cache, so each case size with measures left first repeats its last warm-up, once. The manifest, the graphs, and the server's commit and dirty flag must not have changed since the run started; further edits to an already dirty checkout cannot be detected.
+
+## Comparing a branch with its base
+
+Use this to test a pull request that changes what a model computes or how it loads.
+
+1. Run the base commit and `accept` it as the reference. Its bundle then reports `BASELINE`.
+2. Run the branch, with `expect: changed` on the cases the pull request is meant to change.
+3. Put the `summary.md` table in the pull request description and attach the `bundle` zip.
+
+Until such a comparison exists, treat time differences under about 10 % between sessions as noise.
 
 ## Working-memory calibration
 

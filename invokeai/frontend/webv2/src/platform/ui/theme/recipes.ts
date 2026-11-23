@@ -20,10 +20,7 @@ const CONTROL_BASIS: Record<ControlSize, string> = {
   '3xl': '3xl',
 };
 
-/**
- * Builds every control size from the stock steps, so same-named sizes align across control recipes. A recipe without
- * the basis step (select has no stock 3xl) takes its xl.
- */
+/** A recipe without the basis step (select has no stock 3xl) takes its xl. */
 const controlSizes = <T>(
   stock: Record<string, T> | undefined,
   build: (styles: T | undefined, height: string, size: ControlSize) => T,
@@ -32,6 +29,40 @@ const controlSizes = <T>(
   Object.fromEntries(
     CONTROL_SIZES.map((size) => [size, build(stock?.[basis[size]] ?? stock?.xl, `{sizes.control.${size}}`, size)])
   );
+
+/**
+ * The arrow box's transparent border (corner radius plus margin) keeps the tip off the content's rounded corners.
+ * A zero-size arrow gets no border, so the panel stays where its placement puts it.
+ */
+const arrowClearOfCorners = (visibleSize: string) => ({
+  '--arrow-visible-size': visibleSize,
+  '--arrow-clearance': 'min(calc({radii.md} + 2px), calc(var(--arrow-visible-size) * 1000))',
+  '--arrow-size': 'calc(var(--arrow-visible-size) + 2 * var(--arrow-clearance))',
+  borderColor: 'transparent',
+  borderStyle: 'solid',
+  borderWidth: 'var(--arrow-clearance)',
+  pointerEvents: 'none',
+});
+
+/** Zag's offset lands on the padding edge; moving out by the 1px border centres it on the outer edge. */
+const arrowInsideContent = {
+  zIndex: '-1',
+  '[data-placement^=bottom] > &': { translate: '0 -1px' },
+  '[data-placement^=top] > &': { translate: '0 1px' },
+  '[data-placement^=right] > &': { translate: '-1px 0' },
+  '[data-placement^=left] > &': { translate: '1px 0' },
+};
+
+/**
+ * Clipped to the outer half plus a ~3px band over the content edge, which absorbs fractional-DPR snapping (125%).
+ * The clip also bounds hit testing, so the visible tip counts as part of the surface.
+ */
+const arrowTipOutsideContent = {
+  borderLeftWidth: 'min(1px, var(--arrow-visible-size))',
+  borderTopWidth: 'min(1px, var(--arrow-visible-size))',
+  clipPath: 'polygon(0 0, calc(100% + 4.5px) 0, 0 calc(100% + 4.5px))',
+  pointerEvents: 'auto',
+};
 
 /** Extend the tooltip recipe; replacing it drops arrow size/background variables. */
 export const tooltipSlotRecipe = defineSlotRecipe({
@@ -46,6 +77,8 @@ export const tooltipSlotRecipe = defineSlotRecipe({
       borderWidth: '1px',
       boxShadow: 'lg',
       color: 'fg',
+      // Page tips sit beneath overlays, dialog backdrops (modal - 1) and toasts; Tooltip raises tips inside overlays.
+      zIndex: 'calc({zIndex.modal} - 2)',
       // Chakra's `fast` scale-fade drags on an annotation this small.
       _open: { ...chakraSlotRecipes.tooltip.base?.content?._open, animationDuration: 'faster' },
       _closed: { ...chakraSlotRecipes.tooltip.base?.content?._closed, animationDuration: 'faster' },
@@ -56,11 +89,11 @@ export const tooltipSlotRecipe = defineSlotRecipe({
     },
     positioner: {
       ...chakraSlotRecipes.tooltip.base?.positioner,
-      // Zag translates the positioner by `--x`/`--y`, which it sets inline a frame after opening. Unset, they leave it
-      // at the page's origin, where a tooltip closed within that frame (focus, then a click that disables the trigger)
-      // would fade out. Default off-screen, as Zag does for a positioner with no placement.
+      // Zag sets these a frame after opening; off-screen by default so an early close never fades at the origin.
       '--x': '0px',
       '--y': '-100vh',
+      // Zag lets the pointer through the content but not the positioner, which would take a neighbour's click.
+      pointerEvents: 'none',
     },
   },
 });
@@ -73,21 +106,28 @@ export const hoverCardSlotRecipe = defineSlotRecipe({
     content: {
       ...chakraSlotRecipes.hoverCard.base?.content,
       '--hovercard-bg': 'colors.bg.muted',
+      // The arrow stacks below the content's children, within the content.
+      isolation: 'isolate',
       borderColor: 'border.emphasized',
       borderWidth: '1px',
       boxShadow: 'lg',
       color: 'fg',
       maxWidth: '18rem',
     },
+    arrow: {
+      ...chakraSlotRecipes.hoverCard.base?.arrow,
+      ...arrowClearOfCorners('{sizes.3}'),
+      ...arrowInsideContent,
+    },
     arrowTip: {
       ...chakraSlotRecipes.hoverCard.base?.arrowTip,
       borderColor: 'border.emphasized',
+      ...arrowTipOutsideContent,
     },
   },
   defaultVariants: { size: 'xs' },
 });
 
-/** Extend the popover recipe to preserve arrow size/background variables. */
 export const popoverSlotRecipe = defineSlotRecipe({
   ...chakraSlotRecipes.popover,
   base: {
@@ -95,6 +135,7 @@ export const popoverSlotRecipe = defineSlotRecipe({
     content: {
       ...chakraSlotRecipes.popover.base?.content,
       '--popover-bg': 'colors.bg.muted',
+      isolation: 'isolate',
       borderColor: 'border.emphasized',
       borderWidth: '1px',
       boxShadow: 'lg',
@@ -102,25 +143,27 @@ export const popoverSlotRecipe = defineSlotRecipe({
       _open: { animationStyle: 'slide-fade-in', animationDuration: 'faster' },
       _closed: { animationStyle: 'slide-fade-out', animationDuration: 'faster' },
     },
+    arrow: {
+      ...chakraSlotRecipes.popover.base?.arrow,
+      ...arrowClearOfCorners('{sizes.3}'),
+      ...arrowInsideContent,
+    },
     arrowTip: {
       ...chakraSlotRecipes.popover.base?.arrowTip,
       borderColor: 'border.emphasized',
+      ...arrowTipOutsideContent,
     },
   },
 });
 
-/**
- * Keep white status text at AA: Chakra dims descriptions to 80%, and its green/orange 600 fills are too light
- * for white at any opacity, so success and warning use the 700 step.
- */
+/** White status text stays AA: success and warning use 700 fills, since Chakra's green/orange 600 are too light. */
 export const toastSlotRecipe = defineSlotRecipe({
   ...chakraSlotRecipes.toast,
   base: {
     ...chakraSlotRecipes.toast.base,
     root: {
       ...chakraSlotRecipes.toast.base?.root,
-      // Chakra's `*.contrast` text is black on these fills in dark color modes; the 700 steps need white. Its
-      // lightening trigger hover drops white text below AA on red, so status toasts darken on hover instead.
+      // The 700 steps need white text in dark modes, and Chakra's lightening hover fails AA on red, so hover darkens.
       '&[data-type=error]': {
         ...chakraSlotRecipes.toast.base?.root?.['&[data-type=error]'],
         '--toast-trigger-bg': '{black/20}',
@@ -248,7 +291,6 @@ export const buttonRecipe = defineRecipe({
   },
   variants: {
     ...chakraRecipes.button.variants,
-    // Heights come from the shared scale, so a button aligns with same-sized inputs, selects, and segment tabs.
     size: controlSizes<SystemStyleObject>(
       chakraRecipes.button.variants?.size,
       (styles, height, size) => ({ ...styles, h: height, minW: height, ...BUTTON_SIZE_TWEAKS[size] }),
@@ -267,7 +309,6 @@ export const buttonRecipe = defineRecipe({
         _hover: { bg: 'colorPalette.hoverTint/10' },
         _expanded: { bg: 'colorPalette.hoverTint/10' },
       },
-      // Give plain buttons the same visible hover fill as ghost buttons.
       plain: {
         ...chakraRecipes.button.variants?.variant?.plain,
         _hover: { bg: 'colorPalette.hoverTint/10' },
@@ -283,10 +324,7 @@ export const buttonRecipe = defineRecipe({
   } as unknown as typeof chakraRecipes.button.variants,
 });
 
-/**
- * Stock segment groups skip xl; the larger steps take the renamed stock 2xl and 3xl. Every step subtracts the root
- * border and inset from the shared control height, so groups align with same-sized buttons.
- */
+/** Each step subtracts the root border and inset from the shared control height. */
 const SEGMENT_BASIS: Record<ControlSize, string> = { ...CONTROL_BASIS, xl: 'lg', '2xl': '2xl' };
 
 const SEGMENT_SIZE_TWEAKS: Partial<Record<ControlSize, SystemStyleObject>> = {
@@ -309,7 +347,6 @@ export const segmentGroupSlotRecipe = defineSlotRecipe({
       ...chakraSlotRecipes.segmentGroup.base?.root,
       // Concentric with the root: the 5px control radius less the 1px border and 2px inset.
       '--segment-radius': 'radii.xs',
-      // Gap between the root border and the items; size variants subtract it from item heights.
       '--segment-inset': 'spacing.0.5',
       '--segment-gap': 'spacing.0.5',
       '--segment-indicator-shadow': 'none',
@@ -324,8 +361,7 @@ export const segmentGroupSlotRecipe = defineSlotRecipe({
     item: {
       ...chakraSlotRecipes.segmentGroup.base?.item,
       color: 'fg.muted',
-      // Use positive z-order; axe can treat negative indicators as beneath the page and measure the wrong
-      // contrast.
+      // Use positive z-order; axe can treat negative indicators as beneath the page and measure the wrong contrast.
       zIndex: 1,
       fontWeight: '500',
       transitionDuration: 'faster',
@@ -338,7 +374,6 @@ export const segmentGroupSlotRecipe = defineSlotRecipe({
         transitionDuration: 'faster',
         transitionProperty: 'opacity',
       },
-      // Centre the divider in the gap before the item.
       _horizontal: {
         _before: {
           insetInlineStart: 'calc(var(--segment-gap) / -2 - 0.5px)',
@@ -356,7 +391,6 @@ export const segmentGroupSlotRecipe = defineSlotRecipe({
           height: '1px',
         },
       },
-      // A hovered item's fill replaces its neighbouring dividers, as the checked item's does.
       [`${SEGMENT_HOVERED}, ${SEGMENT_HOVERED} + &`]: { _before: { opacity: '0' } },
       _checked: { color: 'fg' },
       _hover: {
@@ -369,7 +403,6 @@ export const segmentGroupSlotRecipe = defineSlotRecipe({
     },
     indicator: {
       ...chakraSlotRecipes.segmentGroup.base?.indicator,
-      // Bind Zag's inline transition variable to the motion-aware duration token.
       '--transition-duration': '{durations.fast}',
       bg: SEGMENT_SELECTED_BG,
       shadow: 'none',
@@ -378,8 +411,6 @@ export const segmentGroupSlotRecipe = defineSlotRecipe({
   },
   variants: {
     ...chakraSlotRecipes.segmentGroup.variants,
-    // Subtract the root border and inset from same-size button heights so segment controls align with neighboring
-    // buttons.
     size: controlSizes<SlotStyles>(
       chakraSlotRecipes.segmentGroup.variants?.size,
       (styles, height, size) => ({
@@ -428,7 +459,6 @@ export const formControlInteraction = {
 
 const formControlOpen = { borderColor: 'accent.solid' };
 
-/** Use focus-within for composite fields such as InputShell. */
 export const inputShellInteraction = {
   ...formControlInteraction,
   _focusWithin: formControlFocused,
@@ -515,6 +545,17 @@ export const numberInputSlotRecipe = defineSlotRecipe({
   } as unknown as typeof chakraSlotRecipes.numberInput.variants,
   base: {
     ...chakraSlotRecipes.numberInput.base,
+    // The steppers fill the root inside the field's border. The stock height follows the size's `--input-height`,
+    // so steppers would stand taller than a field sized apart from its root's size. The root keeps to its content,
+    // so a stretching flex or grid parent cannot make it taller than the field.
+    root: {
+      ...chakraSlotRecipes.numberInput.base?.root,
+      height: 'fit-content',
+    },
+    control: {
+      ...chakraSlotRecipes.numberInput.base?.control,
+      height: 'calc(100% - 2px)',
+    },
     input: {
       ...chakraSlotRecipes.numberInput.base?.input,
       ...formControlInteraction,
@@ -533,7 +574,6 @@ export const dropdownContent = {
 
 export const dropdownItem = {
   borderRadius: 'l2',
-  // Use data-danger for destructive menu items.
   '&[data-danger]': {
     color: 'fg.error',
     _highlighted: { bg: 'bg.error' },
@@ -558,6 +598,10 @@ export const dropdownGroupLabel = {
   textTransform: 'uppercase',
 };
 
+/** A context menu anchors to a point, so its arrow has no visible size until Zag reports the anchor's size. */
+const MENU_ARROW_SIZE =
+  'min({sizes.3}, max(0px, calc((min(var(--reference-width, 2px), var(--reference-height, 2px)) - 1px) * 1000)))';
+
 export const menuSlotRecipe = defineSlotRecipe({
   ...chakraSlotRecipes.menu,
   base: {
@@ -566,9 +610,27 @@ export const menuSlotRecipe = defineSlotRecipe({
       ...chakraSlotRecipes.menu.base?.content,
       ...dropdownContent,
     },
+    arrow: {
+      ...chakraSlotRecipes.menu.base?.arrow,
+      ...arrowClearOfCorners(MENU_ARROW_SIZE),
+      // Beside the content, the arrow is outside the scope of its `--menu-bg`.
+      '--arrow-background': `colors.${dropdownContent.bg}`,
+      // MenuContent mirrors the content's state and placement onto the arrow, so it slides and fades with the content.
+      _open: chakraSlotRecipes.menu.base?.content?._open,
+      // Held at its last frame: it ends with the content's exit, which unmounts both.
+      _closed: { ...chakraSlotRecipes.menu.base?.content?._closed, animationFillMode: 'forwards' },
+      '[hidden] + &': { display: 'none' },
+    },
+    arrowTip: {
+      ...chakraSlotRecipes.menu.base?.arrowTip,
+      borderColor: dropdownContent.borderColor,
+      ...arrowTipOutsideContent,
+    },
     item: {
       ...chakraSlotRecipes.menu.base?.item,
       ...dropdownItem,
+      // Item icons sit back from the label; danger items and deeper glyphs keep their own color.
+      '&:not([data-danger]) > svg': { color: 'fg.subtle' },
     },
     itemGroupLabel: {
       ...chakraSlotRecipes.menu.base?.itemGroupLabel,
@@ -583,8 +645,7 @@ export const menuSlotRecipe = defineSlotRecipe({
 
 export const selectSlotRecipe = defineSlotRecipe({
   ...chakraSlotRecipes.select,
-  // Override outline _expanded at variant level; base styles lose to it. Preserve Chakra's variant-map inference
-  // in the cast.
+  // Override outline _expanded at variant level, where base styles lose to it.
   variants: {
     ...chakraSlotRecipes.select.variants,
     size: controlSizes<SlotStyles>(chakraSlotRecipes.select.variants?.size, (styles, height) => ({
@@ -680,10 +741,7 @@ export const comboboxSlotRecipe = defineSlotRecipe({
   },
 });
 
-/**
- * Dialogs stack from the modal token, below the popover token menus and popovers use. zag copies a menu's z-index to its
- * positioner once, before the layer index lands, so a menu opened in a second, stacked dialog sat under that dialog.
- */
+/** Dialogs stack below menus: zag copies a menu's z-index to its positioner before the layer index lands. */
 const DIALOG_LAYER = { '--dialog-z-index': 'zIndex.modal' } as const;
 
 export const dialogSlotRecipe = defineSlotRecipe({
@@ -741,30 +799,19 @@ export const dialogSlotRecipe = defineSlotRecipe({
   },
 });
 
-/** Check each scrollbar's own overflow axis; Chakra's combined guard leaves phantom thumbs on the other axis. */
 export const scrollAreaSlotRecipe = defineSlotRecipe({
   ...chakraSlotRecipes.scrollArea,
   base: {
     ...chakraSlotRecipes.scrollArea.base,
     scrollbar: {
       ...chakraSlotRecipes.scrollArea.base?.scrollbar,
-      '&[data-orientation="vertical"]:not([data-overflow-y])': { display: 'none' },
-      '&[data-orientation="horizontal"]:not([data-overflow-x])': { display: 'none' },
       // Above sticky content (z-index 1) so opaque pinned headers never cover the thumb.
       zIndex: 2,
     },
   },
 });
 
-/**
- * Extend the control's hit area past its box with an invisible outset; the root is a label, so a press there toggles
- * the input. 6px gives the smallest (sm, 12px) control a 24px target and stays under the 8px minimum spacing between
- * neighbouring controls, so it never reaches a neighbour's box. Insets resolve from the padding box, so the outset
- * also clears the control's 1px border.
- *
- * Ark marks the control hovered while any part of the root is, so the label and the outset show the hover too. The
- * hover is defined for the `solid` variant only, the default every checkbox uses.
- */
+/** A 6px invisible outset gives the 12px control a 24px target without reaching a neighbour 8px away. */
 export const checkboxSlotRecipe = defineSlotRecipe({
   ...chakraSlotRecipes.checkbox,
   base: {
@@ -785,8 +832,7 @@ export const checkboxSlotRecipe = defineSlotRecipe({
         control: {
           ...chakraSlotRecipes.checkbox.variants?.variant?.solid?.control,
           _hover: {
-            // Halfway to the foreground is stronger than the rest border in every theme, high contrast included,
-            // where the rest border already matches the muted foreground. An invalid control keeps its error border.
+            // Halfway to the foreground beats the rest border in every theme, high contrast included.
             '&[data-state=unchecked]:not([data-invalid])': {
               borderColor: 'color-mix(in oklab, {colors.border.emphasized}, {colors.fg})',
             },
@@ -815,8 +861,7 @@ export const sliderSlotRecipe = defineSlotRecipe({
   variants: {
     ...chakraSlotRecipes.slider.variants,
     size: {
-      // Fine pointers use smaller thumbs. Update marker center with thumb size and zero marker inset because Zag
-      // already applies half-thumb offsets.
+      // Zag already applies half-thumb offsets, so the marker inset is zero.
       xl: {
         root: {
           ...chakraSlotRecipes.slider.variants?.size?.xl?.root,
@@ -870,7 +915,6 @@ export const progressCircleSlotRecipe = defineSlotRecipe({
   },
 });
 
-// Extending the stock recipe preserves the CSS variables that size thumbs and swatches.
 export const colorPickerSlotRecipe = defineSlotRecipe({
   ...chakraSlotRecipes.colorPicker,
   base: {
@@ -937,10 +981,29 @@ export const colorPickerSlotRecipe = defineSlotRecipe({
   },
 });
 
-/**
- * Use a linear sweep to avoid endpoint pauses; system.ts disables skeleton motion and gradients under reduced
- * motion.
- */
+/** The emphasized border stays readable on row hover fills; each size is 2px shorter than stock to fit a text line. */
+const KBD_HEIGHTS: Record<string, string> = { '4.5': '16px', '5': '18px', '6': '22px' };
+
+export const kbdRecipe = defineRecipe({
+  ...chakraRecipes.kbd,
+  variants: {
+    ...chakraRecipes.kbd.variants,
+    variant: {
+      ...chakraRecipes.kbd.variants?.variant,
+      raised: { ...chakraRecipes.kbd.variants?.variant?.raised, borderColor: 'border.emphasized' },
+      outline: { ...chakraRecipes.kbd.variants?.variant?.outline, borderColor: 'border.emphasized' },
+    },
+    // Keyed by stock height, as the size names are already rebased onto the workbench scale.
+    size: Object.fromEntries(
+      Object.entries(chakraRecipes.kbd.variants?.size ?? {}).map(([name, styles]) => [
+        name,
+        { ...styles, height: KBD_HEIGHTS[String((styles as { height?: unknown }).height)] ?? styles.height },
+      ])
+    ),
+  } as unknown as typeof chakraRecipes.kbd.variants,
+});
+
+/** A linear sweep avoids endpoint pauses; system.ts disables skeleton motion and gradients under reduced motion. */
 export const skeletonRecipe = defineRecipe({
   ...chakraRecipes.skeleton,
   variants: {
@@ -989,7 +1052,8 @@ export const panelRecipe = defineRecipe({
   defaultVariants: { tone: 'surface', density: 'none' },
 });
 
-const rowFocusRing = {
+/** Inset so neighbouring rows never clip it; exported for row-like surfaces such as tree items. */
+export const rowFocusRing = {
   outline: '2px solid',
   outlineColor: 'accent.solid',
   outlineOffset: '-2px',
@@ -998,7 +1062,6 @@ const rowFocusRing = {
 /** Hover, extended to a row whose context menu is open so the row it acts on stays marked. */
 const ROW_POINTED = '&:is(:hover, [data-hover], [data-menu-open]):not(:disabled, [data-disabled], [data-static])';
 
-/** One row surface for every list-like control; `Row` and `ListItem` both build on it. */
 const rowSurface = {
   borderRadius: 'sm',
   textAlign: 'start',
@@ -1041,10 +1104,7 @@ export const rowRecipe = defineRecipe({
   defaultVariants: { active: 'none' },
 });
 
-/**
- * A list row: an optional checkbox beside one primary button, never inside it. The ring wraps the whole row when
- * the button has focus; the accent tone recolors muted text so it stays legible on the solid fill.
- */
+/** The checkbox sits beside the primary button, never inside it; accent recolors muted text for the solid fill. */
 export const listItemSlotRecipe = defineSlotRecipe({
   slots: [
     'root',
@@ -1064,11 +1124,12 @@ export const listItemSlotRecipe = defineSlotRecipe({
       ...rowSurface,
       alignItems: 'stretch',
       display: 'flex',
-      // Lets `detail` take its own line under the row.
       flexWrap: 'wrap',
       minW: 0,
       position: 'relative',
       '&:has([data-list-primary]:focus-visible)': rowFocusRing,
+      // A disabled row stays focusable, so its content dims instead of the root: the focus ring keeps full strength.
+      _disabled: { cursor: 'not-allowed', '& > *': { opacity: 0.5 } },
       // Rows of a page being replaced stay readable; only the pointer says the list is working.
       '&[data-busy]': { cursor: 'progress' },
     },
@@ -1130,7 +1191,6 @@ export const listItemSlotRecipe = defineSlotRecipe({
       fontSize: 'xs',
       gap: '1.5',
     },
-    // Controls beside the primary button, never inside it.
     actions: {
       alignItems: 'center',
       display: 'flex',
@@ -1138,7 +1198,6 @@ export const listItemSlotRecipe = defineSlotRecipe({
       gap: '0.5',
       pe: '1',
     },
-    // Row-owned content on its own line, inset to the primary button's text.
     detail: {
       flexBasis: '100%',
       minW: 0,
@@ -1169,7 +1228,6 @@ export const listItemSlotRecipe = defineSlotRecipe({
         root: { minH: '13' },
         primary: { gap: '2.5', px: '2', py: '1.5' },
       },
-      // Comfortable's media one step tighter, for rows whose detail line already adds height.
       snug: {
         root: { minH: '12' },
         primary: { gap: '2.5', px: '1.5', py: '1.5' },
@@ -1180,7 +1238,6 @@ export const listItemSlotRecipe = defineSlotRecipe({
   defaultVariants: { active: 'none', density: 'regular' },
 });
 
-/** Section labels inside lists; the count sits beside the label in a quieter tone. */
 export const listSectionHeaderSlotRecipe = defineSlotRecipe({
   slots: ['root', 'label', 'count'],
   base: {
@@ -1213,12 +1270,30 @@ export const listSectionHeaderSlotRecipe = defineSlotRecipe({
       lineHeight: 'shorter',
     },
   },
+  variants: {
+    placement: {
+      list: {},
+      bar: { root: { alignItems: 'center', pb: '0' } },
+    },
+  },
+  defaultVariants: { placement: 'list' },
 });
+
+/** Trimmed to cap height so flex centring aligns letters with the icon; without `text-box` the full line box stays. */
+export const chipLabelStyles = {
+  '@supports (text-box: trim-both cap alphabetic)': {
+    paddingBlock: '0.3em',
+    textBox: 'trim-both cap alphabetic',
+  },
+} as const;
 
 export const chipRecipe = defineRecipe({
   base: {
     alignItems: 'center',
-    borderRadius: 'sm',
+    // Fill the host row, so a progress hairline keeps to its bottom edge however tall the trimmed label is.
+    alignSelf: 'stretch',
+    // The status bar's hover and active fill radius, which the progress hairline is clipped to.
+    borderRadius: 'control',
     display: 'inline-flex',
     flexShrink: '0',
     fontSize: 'xs',
@@ -1227,6 +1302,7 @@ export const chipRecipe = defineRecipe({
     px: '2',
     py: '0.5',
     whiteSpace: 'nowrap',
+    '& > p': chipLabelStyles,
   },
   variants: {
     tone: {
@@ -1314,7 +1390,6 @@ export const themeCardRecipe = defineSlotRecipe({
   defaultVariants: { selected: false },
 });
 
-/** Separate variable-height metadata rows with centered dividers; keep padding aligned with the row gap. */
 export const dataListSlotRecipe = defineSlotRecipe({
   ...chakraSlotRecipes.dataList,
   base: {
@@ -1357,14 +1432,10 @@ const resizeCapsuleStates = {
   '&:hover::after, &[data-dragging]::after': { borderColor: 'fg.subtle' },
   '&:focus-visible::after': { outline: '2px solid {colors.accent.solid}', outlineOffset: '1px' },
   '&[data-collapse-armed]::after': { opacity: 0 },
-  // A region outline runs along the hidden line and behind the capsule, which takes its colour.
   '[data-line-hidden] > &::after': { borderColor: 'accent.solid' },
 } as const;
 
-/**
- * Every resize affordance: a hairline divider with a capsule grip at its middle. The hit strip covers the line and
- * extends toward the end side, away from the scrollbar of the pane before it.
- */
+/** The hit strip extends toward the end side, away from the previous pane's scrollbar. */
 export const resizeHandleSlotRecipe = defineSlotRecipe({
   slots: ['root', 'handle'],
   base: {
@@ -1373,8 +1444,7 @@ export const resizeHandleSlotRecipe = defineSlotRecipe({
       position: 'relative',
       // Above region outlines (zIndex 4) so the capsule masks an outline passing through it.
       zIndex: 5,
-      // The line is a border, not a 1px background: at fractional display scales a background can round to two
-      // device pixels while every other border draws one. A pseudo-element keeps the hit strip's offsets unshifted.
+      // A border, not a 1px background: backgrounds can round to two device pixels at fractional scales.
       _before: { borderColor: 'border.subtle', content: '""', inset: '0', position: 'absolute' },
       '&[data-line-hidden]::before, &:has([data-collapse-armed])::before': { borderColor: 'transparent' },
     },
@@ -1410,7 +1480,6 @@ export const resizeHandleSlotRecipe = defineSlotRecipe({
           ...resizeCapsuleStates,
         },
       },
-      // The grip bent into an L along the window's bottom-right corner.
       corner: {
         root: {},
         handle: {

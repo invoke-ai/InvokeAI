@@ -4,12 +4,12 @@ import type { Project } from '@workbench/projectContracts';
 import type * as settingsStoreModule from '@workbench/settings/store';
 import type { ReactNode } from 'react';
 
+import { getDefaultGenerateSettings } from '@features/generation/settings';
 import {
   resetArchitectureCapabilities,
   setArchitectureCapabilities,
-} from '@features/generation/core/architectureCapabilities';
-import { architectureCapabilitiesFixture } from '@features/generation/core/architectureCapabilities.testing';
-import { getDefaultGenerateSettings } from '@features/generation/settings';
+} from '@features/models/core/architectureCapabilities';
+import { architectureCapabilitiesFixture } from '@features/models/core/architectureCapabilities.testing';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -17,7 +17,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 const harness = vi.hoisted(() => ({
   project: null as unknown,
   submit: vi.fn((_args: Record<string, unknown>) => Promise.resolve()),
-  // Stands in for the backend: one prompt per `|` alternative when expansion is on and the prompt has braces.
   useDynamicPrompts: vi.fn((prompt: string, config: { enabled: boolean } | null) => {
     const isDynamic = config?.enabled === true && prompt.includes('{');
 
@@ -32,8 +31,6 @@ const harness = vi.hoisted(() => ({
   }),
 }));
 
-// A controllable stand-in for the node-template store, so a test can decide which of the two stores
-// the route depends on finishes loading last.
 const templates = vi.hoisted(() => {
   type Snapshot = { error: string | null; status: string; templates: Record<string, unknown> };
   const loading: Snapshot = { error: null, status: 'loading', templates: {} };
@@ -58,7 +55,6 @@ const templates = vi.hoisted(() => {
   };
 });
 
-// A controllable stand-in for the account preferences, so a test can change the remembered control-model picks.
 const preferences = vi.hoisted(() => {
   const listeners = new Set<() => void>();
   let controlModelMemory: Record<string, string> = {};
@@ -84,8 +80,8 @@ const preferences = vi.hoisted(() => {
 vi.mock('@features/generation/react', () => ({ useDynamicPrompts: harness.useDynamicPrompts }));
 vi.mock('@features/models', () => ({
   ensureModelsLoaded: () => Promise.resolve(),
-  // One snapshot object, as the real store hands out. A fresh `models` array per render would change
-  // an input React Compiler memoises the route on, and re-resolve it by accident.
+  // One snapshot object, as the real store hands out. A fresh `models` array per render would change an input React
+  // Compiler memoises the route on, and re-resolve it by accident.
   useModelsSelector: (selector: (snapshot: unknown) => unknown) => selector(modelsSnapshot),
 }));
 vi.mock('@features/workflow/react', async (importOriginal) => ({
@@ -102,7 +98,10 @@ vi.mock('@workbench/settings/store', async (importOriginal) => {
   };
 });
 vi.mock('@workbench/activeInvocationSubmission', () => ({ submitActiveInvocation: harness.submit }));
-vi.mock('@workbench/invocationPreparation', () => ({ useIsInvocationPreparing: () => false }));
+vi.mock('@workbench/invocationPreparation', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useIsInvocationPreparing: () => false,
+}));
 vi.mock('@workbench/WorkbenchContext', () => ({
   useActiveProjectSelector: (selector: (project: Project) => unknown) => selector(harness.project as Project),
   useWorkbenchCommands: () => ({}),
@@ -128,8 +127,6 @@ const activeProject = (state: ReturnType<typeof createInitialWorkbenchState>): P
   state.projects.find((candidate) => candidate.id === state.activeProjectId)!;
 
 const buildGenerateProject = (): Project => {
-  // The table is needed to derive a *valid* saved project; the point of the test is what happens
-  // when the app is restarted and that project is reopened before the table comes back.
   setArchitectureCapabilities(architectureCapabilitiesFixture);
   const values: GenerateWidgetValues = {
     ...getDefaultGenerateSettings(sdxlModel),
@@ -147,12 +144,18 @@ const buildGenerateProject = (): Project => {
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
 
-const Probe = (): ReactNode => {
-  const state = useInvocationState();
+const Probe = ({ sourceId }: { sourceId?: 'video' }): ReactNode => {
+  const state = useInvocationState({ sourceId });
 
   return (
     <>
-      <span data-batch-count={state.batchCount} data-prompt-count={state.promptExpansion.count} data-testid="reasons">
+      <span
+        data-batch-count={state.batchCount}
+        data-destination={state.invocation.destination}
+        data-issue-targets={state.issues.map((issue) => issue.target.kind).join(' ')}
+        data-prompt-count={state.promptExpansion.count}
+        data-testid="reasons"
+      >
         {state.issues.map((issue) => issue.message).join(' | ')}
       </span>
       <span data-testid="issue-layers">
@@ -168,13 +171,13 @@ const Probe = (): ReactNode => {
   );
 };
 
-const renderProbe = async (project: Project) => {
+const renderProbe = async (project: Project, sourceId?: 'video') => {
   harness.project = project;
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
   await act(() => {
-    root?.render(<Probe />);
+    root?.render(<Probe sourceId={sourceId} />);
   });
 };
 
@@ -194,10 +197,8 @@ describe('useInvocationState and the architecture capability table', () => {
   it('stops blocking Invoke as soon as a retried load succeeds', async () => {
     await renderProbe(buildGenerateProject());
 
-    // Worded from the locale, which this probe leaves untranslated.
     expect(blockingReasons()).toBe('widgets.generate.issues.capabilitiesUnavailable');
 
-    // Capability arrival alone must recompute the route after retry succeeds.
     await act(() => {
       setArchitectureCapabilities(architectureCapabilitiesFixture);
     });
@@ -208,7 +209,6 @@ describe('useInvocationState and the architecture capability table', () => {
 
 describe('useInvocationState and the workflow node templates', () => {
   it('re-resolves a workflow route when the templates finish loading after the capability table', async () => {
-    // Template arrival must recompute the route even when the capability snapshot is unchanged.
     setArchitectureCapabilities(architectureCapabilitiesFixture);
     await renderProbe(
       activeProject(
@@ -275,7 +275,6 @@ describe('useInvocationState and the remembered control-model picks', () => {
     });
 
     expect(blockingReasons()).toContain('widgets.layers.control.invalidLayer');
-    // The control layer's issue names the layer, so Invoke can show it; the others name none.
     const layers = host!.querySelector('[data-testid="issue-layers"]')!.textContent!.split(' | ');
     expect(layers.filter((layerId) => layerId !== '-')).toEqual(['depth-layer']);
     expect(blockingReasons().split(' | ')[layers.indexOf('depth-layer')]).toContain(
@@ -291,6 +290,17 @@ describe('useInvocationState and the remembered control-model picks', () => {
 });
 
 describe('useInvocationState and Video dynamic prompts', () => {
+  it('fixes the Video dialog route to Gallery without offering a global destination fix', async () => {
+    const project = buildGenerateProject();
+    project.invocation = { sourceId: 'generate', sourceLocked: true, destination: 'canvas', destinationLocked: true };
+    await renderProbe(project, 'video');
+    expect(host?.querySelector('[data-testid="reasons"]')?.getAttribute('data-destination')).toBe('gallery');
+    expect(host?.querySelector('[data-testid="reasons"]')?.getAttribute('data-issue-targets')).not.toContain(
+      'destination'
+    );
+    expect(project.invocation.destination).toBe('canvas');
+  });
+
   const renderVideo = async (videoValues: Record<string, unknown>) => {
     setArchitectureCapabilities(architectureCapabilitiesFixture);
     let state = workbenchReducer(createInitialWorkbenchState(), {
@@ -320,7 +330,6 @@ describe('useInvocationState and Video dynamic prompts', () => {
   });
 
   it('counts a Video prompt saved before Video expanded prompts as typed', async () => {
-    // The prompt height marks a panel saved before; one without dynamic prompts settings runs its prompt as typed.
     expect(
       await renderVideo({
         dynamicPromptsEnabled: undefined,
@@ -328,5 +337,37 @@ describe('useInvocationState and Video dynamic prompts', () => {
         positivePromptHeightPx: 96,
       })
     ).toBe('1');
+  });
+});
+
+describe('useInvocationState and Upscale dynamic prompts', () => {
+  const renderUpscale = async (upscaleValues: Record<string, unknown>) => {
+    let state = workbenchReducer(createInitialWorkbenchState(), {
+      sourceId: 'upscale',
+      type: 'patchProjectPromptDraft',
+      values: {
+        positivePrompt: 'a {cat|dog|bird}',
+        promptTemplate: { id: 'film', name: 'Film', negativePrompt: '', positivePrompt: '{prompt}, {grain|haze}' },
+      },
+    });
+    state = workbenchReducer(state, { type: 'patchWidgetValues', values: upscaleValues, widgetId: 'upscale' });
+    state = workbenchReducer(state, { sourceId: 'upscale', type: 'setInvocationSource' });
+    harness.useDynamicPrompts.mockClear();
+    await renderProbe(activeProject(state));
+
+    return host?.querySelector('[data-testid="reasons"]')?.getAttribute('data-prompt-count');
+  };
+
+  it('counts the expansion of the prompt Refine shares with Generate, inside its template', async () => {
+    expect(await renderUpscale({ mode: 'refine' })).toBe('4');
+    expect(harness.useDynamicPrompts).toHaveBeenLastCalledWith(
+      'a {cat|dog|bird}, {grain|haze}',
+      expect.objectContaining({ enabled: true })
+    );
+  });
+
+  it('counts one prompt for Model only, which reads none', async () => {
+    expect(await renderUpscale({ mode: 'model-only' })).toBe('1');
+    expect(harness.useDynamicPrompts).toHaveBeenLastCalledWith(expect.any(String), null);
   });
 });

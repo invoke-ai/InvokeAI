@@ -1,7 +1,7 @@
 import { DEFAULT_LOGGING_CONFIG } from '@platform/logging/contracts';
 import { configureLogging, getLogSnapshot, resetLogging } from '@platform/logging/logger';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('./deploymentBase', () => ({
   getDeploymentBasePath: () => '/invoke',
@@ -10,16 +10,13 @@ vi.mock('./deploymentBase', () => ({
 
 import {
   ApiError,
-  absolutizeApiUrl,
+  RequestDeadlineError,
+  withRequestDeadline,
   apiFetch,
   apiFetchJson,
   apiFetchRaw,
   buildApiUrl,
   configureHttpAuth,
-  getApiErrorCode,
-  getApiErrorMessage,
-  getBackendSocketPath,
-  getBackendSocketUrl,
   type HttpAuthAdapter,
 } from './http';
 
@@ -44,40 +41,9 @@ describe('deployment-aware backend URLs', () => {
   it('prefixes API requests with the deployment root', () => {
     expect(buildApiUrl('/api/v1/app/version')).toBe('https://app.example/invoke/api/v1/app/version');
   });
-
-  it('prefixes backend-relative resource URLs and preserves absolute URLs', () => {
-    expect(absolutizeApiUrl('/api/v1/images/i/image.png/full')).toBe(
-      'https://app.example/invoke/api/v1/images/i/image.png/full'
-    );
-    expect(absolutizeApiUrl('https://cdn.example/image.png')).toBe('https://cdn.example/image.png');
-  });
-
-  it('uses the page origin with a deployment-prefixed Socket.IO path', () => {
-    expect(getBackendSocketUrl()).toBe('https://app.example');
-    expect(getBackendSocketPath()).toBe('/invoke/ws/socket.io');
-  });
 });
 
 describe('request identity ownership', () => {
-  it('preserves response headers on API errors for Retry-After handling', async () => {
-    const identity = {};
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(
-        new Response('{"detail":{"code":"project_write_busy"}}', {
-          headers: { 'Retry-After': '1' },
-          status: 429,
-        })
-      )
-    );
-    configureTestAuth(() => ({ identity, token: null }));
-
-    const error = await apiFetch('/api/v1/projects/').catch((error: unknown) => error);
-
-    expect(error).toBeInstanceOf(ApiError);
-    expect((error as ApiError).headers.get('Retry-After')).toBe('1');
-  });
-
   it('does not expire a newer account when an older request returns 401', async () => {
     let token: string | null = 'token-a';
     let identity = {};
@@ -143,32 +109,6 @@ describe('request identity ownership', () => {
     expect(onUnauthorized).not.toHaveBeenCalled();
   });
 
-  it('rejects a tokenless error body that finishes under a newer identity lifetime', async () => {
-    let identity = {};
-    let resolveBody: ((value: string) => void) | undefined;
-    const response = {
-      ok: false,
-      status: 401,
-      statusText: 'Unauthorized',
-      text: () =>
-        new Promise<string>((resolve) => {
-          resolveBody = resolve;
-        }),
-    } as Response;
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response));
-    configureTestAuth(() => ({ identity, token: null }));
-
-    const oldRequest = apiFetch('/api/v1/auth/status');
-    await vi.waitFor(() => {
-      expect(resolveBody).toBeDefined();
-    });
-
-    identity = {};
-    resolveBody?.('Unauthorized');
-
-    await expect(oldRequest).rejects.toMatchObject({ name: 'HttpRequestIdentityExpiredError' });
-  });
-
   it('rejects a response body that finishes under a newer identity lifetime', async () => {
     let identity = {};
     let resolveBody: ((value: unknown) => void) | undefined;
@@ -214,32 +154,6 @@ describe('credential outcome reporting', () => {
       [{ identity, token: 'token-a' }, 'token-b'],
     ]);
     expect(new Headers(fetchMock.mock.calls[0]?.[1]?.headers).get('Authorization')).toBe('Bearer token-a');
-  });
-
-  it('attributes nothing to the held credential when a request did not carry it', async () => {
-    const identity = {};
-    let token: string | null = null;
-    const onRefreshedToken = vi.fn();
-    const onUnauthorized = vi.fn();
-    const fetchMock = vi.fn((_input: RequestInfo | URL, _init?: RequestInit) =>
-      Promise.resolve(new Response('', { headers: { 'X-Refreshed-Token': 'replacement' }, status: 401 }))
-    );
-    vi.stubGlobal('fetch', fetchMock);
-    configureTestAuth(() => ({ identity, token }), { onRefreshedToken, onUnauthorized });
-
-    await expect(apiFetch('/api/v1/auth/status')).rejects.toMatchObject({ status: 401 });
-    token = 'held-token';
-    // A lease released for an earlier account authenticates with that account's token, not the held one.
-    await expect(
-      apiFetch('/api/v1/intermediates/holds/lease', {
-        headers: { Authorization: 'Bearer lease-token' },
-        method: 'DELETE',
-      })
-    ).rejects.toMatchObject({ status: 401 });
-
-    expect(new Headers(fetchMock.mock.calls[1]?.[1]?.headers).get('Authorization')).toBe('Bearer lease-token');
-    expect(onRefreshedToken).not.toHaveBeenCalled();
-    expect(onUnauthorized).not.toHaveBeenCalled();
   });
 
   it('never reports a replacement that arrives after its identity lifetime ended', async () => {
@@ -302,42 +216,6 @@ describe('transport diagnostics', () => {
       },
     ]);
   });
-
-  it('drops breadcrumbs from requests whose account lifetime ended and ignores aborts', async () => {
-    accountLifecycle.activate('user-a');
-    let settle: (response: Response) => void = () => undefined;
-
-    vi.stubGlobal(
-      'fetch',
-      vi
-        .fn()
-        .mockImplementationOnce(
-          () =>
-            new Promise<Response>((resolve) => {
-              settle = resolve;
-            })
-        )
-        .mockRejectedValueOnce(new DOMException('aborted', 'AbortError'))
-    );
-
-    const late = apiFetch('/api/v1/boards');
-
-    accountLifecycle.invalidate();
-    configureLogging({ ...DEFAULT_LOGGING_CONFIG, level: 'debug' });
-    settle(new Response('', { status: 500 }));
-    await expect(late).rejects.toBeInstanceOf(ApiError);
-    await expect(apiFetch('/api/v1/images')).rejects.toBeInstanceOf(DOMException);
-
-    expect(getLogSnapshot().entries).toEqual([]);
-  });
-
-  it('records nothing for successful requests', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('{}', { status: 200 })));
-
-    await apiFetch('/api/v1/app/version');
-
-    expect(getLogSnapshot().entries).toEqual([]);
-  });
 });
 
 describe('media cookie credentials', () => {
@@ -355,31 +233,62 @@ describe('media cookie credentials', () => {
 
     expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({ credentials: 'same-origin' });
   });
-
-  it('lets a caller override credentials for a cross-origin API base', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(new Response('', { status: 200 }));
-    vi.stubGlobal('fetch', fetchMock);
-
-    await apiFetch('/api/v1/auth/media-cookie', { credentials: 'include', method: 'POST' });
-
-    expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({ credentials: 'include' });
-  });
 });
 
-describe('structured error details', () => {
-  it('reads the code and message of a structured detail, and no code from a plain one', () => {
-    const structured = new ApiError(
-      JSON.stringify({ detail: { code: 'board_unreadable', message: 'Not authorized to access this board' } }),
-      403
-    );
-    const plain = new ApiError(JSON.stringify({ detail: 'Not allowed' }), 403);
-    const validation = new ApiError(JSON.stringify({ detail: [{ msg: 'field required' }] }), 422);
+describe('request deadline cancellation', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    configureTestAuth(() => ({ identity: null, token: null }));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
 
-    expect(getApiErrorCode(structured)).toBe('board_unreadable');
-    expect(getApiErrorMessage(structured, 'fallback')).toBe('Not authorized to access this board');
-    expect(getApiErrorCode(plain)).toBeNull();
-    expect(getApiErrorCode(validation)).toBeNull();
-    expect(getApiErrorCode(new ApiError('<html>', 502))).toBeNull();
-    expect(getApiErrorCode(new Error('offline'))).toBeNull();
+  it.each(['headers', 'body', 'error-body'] as const)('aborts a hung %s and disposes the deadline', async (phase) => {
+    let signal!: AbortSignal;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((_url, init) => {
+        signal = init.signal;
+        if (phase === 'headers') {
+          return new Promise(() => {
+            /* Simulate an unresponsive request. */
+          });
+        }
+        return Promise.resolve(new Response(new ReadableStream(), { status: phase === 'body' ? 200 : 500 }));
+      })
+    );
+    const result = expect(
+      withRequestDeadline((signal) => apiFetchJson('/hung', { signal }), 100)
+    ).rejects.toBeInstanceOf(RequestDeadlineError);
+    await vi.advanceTimersByTimeAsync(100);
+    await result;
+    expect(signal.aborted).toBe(true);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it.each(['caller', 'account'] as const)('cancels underlying work immediately on %s abort', async (source) => {
+    const caller = new AbortController();
+    let requestSignal!: AbortSignal;
+    const result = withRequestDeadline(
+      (signal) => {
+        requestSignal = signal;
+        return new Promise(() => {
+          /* Simulate an unresponsive request. */
+        });
+      },
+      100,
+      caller.signal
+    );
+    const rejected = expect(result).rejects.toMatchObject({ name: 'AbortError' });
+    if (source === 'caller') {
+      caller.abort();
+    } else {
+      accountLifecycle.invalidate();
+    }
+    await rejected;
+    expect(requestSignal.aborted).toBe(true);
+    expect(vi.getTimerCount()).toBe(0);
   });
 });

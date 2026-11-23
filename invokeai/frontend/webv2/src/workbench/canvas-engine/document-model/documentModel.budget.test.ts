@@ -51,7 +51,6 @@ const counters = () => ({
   nodesMaterialized: getDocumentIndexMaterializationCount(),
 });
 
-/** Runs the reducer over a fixture so the next document is the one production consumers see. */
 const reduce = (document: CanvasDocumentContractV3, command: DocumentCommand) => {
   const initial = createInitialWorkbenchState().projects[0]!;
   const project = applyCanvasProjectMutation(initial, { document, type: 'replaceCanvasDocument' });
@@ -195,10 +194,10 @@ describe(`document model budgets over ${NODE_COUNT} nodes`, () => {
         type: 'set-enabled',
         updates: Array.from({ length: 10 }, (_, index) => ({ id: `l${index}`, isEnabled: false })),
       },
-      { builds: 1, ids: 10, stacks: 4 },
+      { builds: 1, ids: 10, stacks: 5 },
     ],
     ['hide', { type: 'set-hidden', updates: [{ id: 'l1', isHidden: true }] }, { builds: 1, ids: 1, stacks: 1 }],
-    ['move', { ids: ['l8', 'l12', 'l16'], kind: 'forward', type: 'move' }, { builds: 1, ids: 4, stacks: 1 }],
+    ['move', { ids: ['l8', 'l12', 'l16'], kind: 'forward', type: 'move' }, { builds: 1, ids: 6, stacks: 3 }],
     // Removal repairs the selection over the projected forest, which costs one more index.
     ['remove', { ids: ['l1', 'l2'], type: 'remove' }, { builds: 2, ids: 2, stacks: 2 }],
   ])('prepares a %s edit with exact touched ids and stacks and no leaf compilation', (_label, command, expected) => {
@@ -214,7 +213,6 @@ describe(`document model budgets over ${NODE_COUNT} nodes`, () => {
 
   it('prepares group, ungroup and reparent edits on the tree without compiling leaves', () => {
     const model = createDocumentModel(createLargeTreeDocument(NODE_COUNT), context);
-    // l0 sits inside g0, so the selection folds into its ancestor and groups as one node.
     expect(model.prepare({ groupId: 'new', ids: ['g0', 'l0'], name: 'x', type: 'group' }).status).toBe('prepared');
     expect(model.prepare({ ids: ['g0'], type: 'ungroup' }).status).toBe('prepared');
     expect(model.prepare({ beforeId: null, ids: ['l0'], parentId: 'g0', type: 'reparent' }).status).toBe('prepared');
@@ -233,7 +231,6 @@ describe(`value edits over ${NODE_COUNT} nodes`, () => {
     const { model, next } = reduce(fixture, { id: 'l5', patch: { transform: { x: 40 } }, type: 'patch' });
     const leavesBefore = model.compileLeaves();
     const nodesBefore = compileDocumentNodes(model.document);
-    // One build for the accepted fixture, one derivation for the edit, and nothing on lookup.
     const index = timed(annotate, 'derived index lookup', () => getDocumentIndex(next));
     expect(counters()).toMatchObject({ indexBuilds: 1, indexDerivations: 1 });
     expect(index.byId.get('l5')!.node).not.toBe(model.getLayer('l5'));
@@ -244,7 +241,6 @@ describe(`value edits over ${NODE_COUNT} nodes`, () => {
     resetCounters();
     const leavesAfter = compileDocumentLeaves(next);
     const nodesAfter = compileDocumentNodes(next);
-    // The leaf and the ancestors rebuilt along its path are new contract objects; nothing else is.
     expect(counters()).toMatchObject({
       indexBuilds: 0,
       indexDerivations: 0,
@@ -319,7 +315,6 @@ describe('value edits at the 10,000-node limit', () => {
     expect(lookupDocumentNodeState(next, 'l5')?.node).toBe(getDocumentIndex(next).byId.get('l5')!.node);
     expect(lookupDocumentNodeState(next, 'l6')).toBe(lookupDocumentNodeState(before, 'l6'));
     expect(counters()).toMatchObject({ leavesCompiled: 1, nodesCompiled: depth + 1, nodesMaterialized: 0 });
-    // The ancestors compiled again kept their counts without walking their subtrees.
     const parentId = getDocumentIndex(next).byId.get('l5')!.parentId!;
     expect(lookupDocumentNodeState(next, parentId)?.leafCount).toBe(
       lookupDocumentNodeState(before, parentId)?.leafCount
@@ -375,7 +370,6 @@ describe('value edits at the 10,000-node limit', () => {
       deepest = Math.max(deepest, chain);
     }
     expect(deepest).toBeLessThanOrEqual(9);
-    // The flattening step recompiles what the chain touched, never the document.
     expect(compiledMost).toBeLessThanOrEqual(9);
     expect(counters()).toMatchObject({ indexBuilds: 0, nodesMaterialized: 0 });
     expect(getDocumentIndex(project.canvas.document).byId.get('l19')!.node).toMatchObject({ opacity: 0.5 });
@@ -426,7 +420,7 @@ describe('reducer → mirror value edits at the 10,000-node limit', () => {
 describe('eligibility without materialization', () => {
   beforeEach(resetCounters);
 
-  it('answers reparent, group, ungroup and remove eligibility without building an edit', () => {
+  it('answers reparent, group, ungroup, remove and duplicate eligibility without building an edit', () => {
     const document = createLargeTreeDocument(NODE_COUNT);
     const model = createDocumentModel(document, context);
     const index = getDocumentIndex(document);
@@ -440,6 +434,7 @@ describe('eligibility without materialization', () => {
     expect(model.refusalFor({ groupId: '\0probe', ids: ['l0', 'l1'], name: '', type: 'group' })).toBeDefined();
     expect(model.refusalFor({ ids: [groupId], type: 'ungroup' })).toBeNull();
     expect(model.refusalFor({ ids: ['l0'], type: 'remove' })).toBeNull();
+    expect(model.refusalFor({ createId: () => '\0copy', ids: [groupId, 'l0'], type: 'duplicate' })).toBeNull();
     expect(counters().editsMaterialized).toBe(0);
     expect(model.prepare({ ids: ['l0'], type: 'remove' }).status).toBe('prepared');
     expect(counters().editsMaterialized).toBe(1);

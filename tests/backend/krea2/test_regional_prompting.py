@@ -69,6 +69,25 @@ def test_restricted_attention_mask_matches_flux_style_region_semantics() -> None
     assert bool(mask.any(dim=1).all())
 
 
+def test_unmasked_conditioning_covers_the_whole_image_only_in_negative_mode() -> None:
+    # Sequence: [global text, regional text, region image token, background image token].
+    conditionings = [_conditioning(1, 1.0), _conditioning(1, 2.0, torch.tensor([[[1.0, 0.0]]]))]
+    positive = Krea2RegionalPromptingExtension.from_text_conditionings(conditionings, image_seq_len=2)
+    negative = Krea2RegionalPromptingExtension.from_text_conditionings(
+        conditionings, image_seq_len=2, unmasked_covers_whole_image=True
+    )
+    positive_mask = positive.get_attention_mask()
+    negative_mask = negative.get_attention_mask()
+    assert positive_mask is not None and negative_mask is not None
+
+    assert positive_mask[0, 2:].tolist() == [False, True]
+    assert positive_mask[2:, 0].tolist() == [False, True]
+    assert negative_mask[0, 2:].tolist() == [True, True]
+    assert negative_mask[2:, 0].tolist() == [True, True]
+    # Regional text and image/image isolation are the same in both modes.
+    assert torch.equal(positive_mask[1:, 1:], negative_mask[1:, 1:])
+
+
 def test_fully_covered_disjoint_regions_cannot_attend_across_regions() -> None:
     left_mask = torch.tensor([[[1.0, 0.0]]])
     right_mask = torch.tensor([[[0.0, 1.0]]])

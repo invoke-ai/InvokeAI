@@ -1,0 +1,9 @@
+title: Negative Image
+author: VeyDlin
+repo: https://github.com/VeyDlin/negative-image-node
+summary: Invert an image into its negative, for visual effects and mask inversion.
+categories: [image-effects, masks]
+thumbnail: ./negative-image.webp
+images:
+  - src: https://raw.githubusercontent.com/VeyDlin/negative-image-node/master/.readme/node.png
+    alt: The Negative Image node

@@ -127,6 +127,29 @@ flux_dev_int8 = StarterModel(
     dependencies=[t5_8b_quantized_encoder, flux_vae, clip_l_encoder],
 )
 
+# Kijai's plain e4m3fn casts: the weights are stored in fp8 without per-tensor scales.
+flux_schnell_fp8 = StarterModel(
+    name="FLUX.1 schnell (fp8)",
+    base=BaseModelType.Flux,
+    source="https://huggingface.co/Kijai/flux-fp8/resolve/2ef6f85f9f4b94634f995ba0bfa84fd3ab865c1d/"
+    "flux1-schnell-fp8-e4m3fn.safetensors",
+    description="FLUX schnell transformer in Kijai's fp8 (e4m3fn) cast, about half the size of the bfloat16 "
+    "transformer. FP8 Storage is switched on when it is installed. ~11.9GB; total size with dependencies: ~22GB",
+    type=ModelType.Main,
+    dependencies=[t5_base_encoder, flux_vae, clip_l_encoder],
+)
+
+flux_dev_fp8 = StarterModel(
+    name="FLUX.1 dev (fp8)",
+    base=BaseModelType.Flux,
+    source="https://huggingface.co/Kijai/flux-fp8/resolve/2ef6f85f9f4b94634f995ba0bfa84fd3ab865c1d/"
+    "flux1-dev-fp8-e4m3fn.safetensors",
+    description="FLUX dev transformer in Kijai's fp8 (e4m3fn) cast, about half the size of the bfloat16 "
+    "transformer. FP8 Storage is switched on when it is installed. ~11.9GB; total size with dependencies: ~22GB",
+    type=ModelType.Main,
+    dependencies=[t5_base_encoder, flux_vae, clip_l_encoder],
+)
+
 flux_dev = StarterModel(
     name="FLUX.1 dev",
     base=BaseModelType.Flux,
@@ -162,6 +185,18 @@ flux_kontext_quantized = StarterModel(
     description="FLUX.1 Kontext dev quantized (q4_k_m). Total size with dependencies: ~12GB",
     type=ModelType.Main,
     dependencies=[t5_8b_quantized_encoder, flux_vae, clip_l_encoder],
+)
+
+flux_kontext_fp8 = StarterModel(
+    name="FLUX.1 Kontext dev (fp8)",
+    base=BaseModelType.Flux,
+    source="https://huggingface.co/Comfy-Org/flux1-kontext-dev_ComfyUI/resolve/795e390e4a1200720e40af3780d5d8b96bc13ae3/"
+    "split_files/diffusion_models/flux1-dev-kontext_fp8_scaled.safetensors",
+    description="FLUX.1 Kontext dev transformer in Comfy-Org's scaled fp8 build, about half the size of the "
+    "bfloat16 transformer. FP8 Storage is switched on when it is installed. ~11.9GB; total size with "
+    "dependencies: ~22GB",
+    type=ModelType.Main,
+    dependencies=[t5_base_encoder, flux_vae, clip_l_encoder],
 )
 
 flux_krea = StarterModel(

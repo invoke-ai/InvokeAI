@@ -1,12 +1,11 @@
 /**
- * Transform sessions frame the selected eligible layer without retargeting and span multiple gestures/numeric
- * edits. Handles scale about opposite anchors (Alt center, Shift uniform); rotate zones use Shift 15-degree snap;
- * interior moves with axis lock.
+ * Transform sessions frame the selected eligible layer without retargeting and span multiple gestures/numeric edits.
+ * Handles scale about opposite anchors (Alt center; the aspect link, inverted by Shift, keeps proportions); rotate zones
+ * use Shift 15-degree snap; interior moves with axis lock.
  *
  * Layer origins/handles snap to the model grid; Alt bypasses move snapping but retains center-scale meaning.
- * Local-space floats never snap. Apply makes one parameter edit or paint bake. Pointercancel reverts only its
- * drag; Escape/real switches cancel the session. Temporary switches preserve edits, and deletion always tears them
- * down.
+ * Local-space floats never snap. Apply makes one parameter edit or paint bake. Pointercancel reverts only its drag;
+ * Escape/real switches cancel the session. Temporary switches preserve edits, and deletion always tears them down.
  */
 
 import type { CanvasDocumentContractV3, CanvasLayerContract } from '@workbench/canvas-engine/contracts';
@@ -38,7 +37,6 @@ export const TRANSFORM_DRAG_THRESHOLD_PX = 3;
 
 interface GestureState {
   target: TransformTarget;
-  /** Whether this drag moves the layer session or a floating selection. */
   kind: 'layer' | 'float';
   /** The subject transform captured at gesture start (revert target for cancel). */
   startTransform: LayerTransform;
@@ -49,7 +47,6 @@ interface GestureState {
   rect: TransformRect;
   /** Converts a document-space pointer into the subject's space. */
   fromDocument: (point: Vec2) => Vec2;
-  /** The cursor held for the duration of this gesture. */
   cursor: string;
   moved: boolean;
 }
@@ -63,8 +60,8 @@ const cursorForTarget = (transform: LayerTransform, target: TransformTarget): st
 };
 
 /**
- * Layer gestures use document space; floats use layer-local space. Convert pointers through to/fromDocument so
- * bounds, transforms and gesture math share one coordinate system.
+ * Layer gestures use document space; floats use layer-local space. Convert pointers through to/fromDocument so bounds,
+ * transforms and gesture math share one coordinate system.
  */
 interface TransformSubject {
   readonly kind: 'layer' | 'float';
@@ -73,8 +70,8 @@ interface TransformSubject {
   toDocument(point: Vec2): Vec2;
   fromDocument(point: Vec2): Vec2;
   /**
-   * Rotation the subject's own space adds on top of `transform.rotation`, so a
-   * resize cursor points the right way for a float on a rotated layer.
+   * Rotation the subject's own space adds on top of `transform.rotation`, so a resize cursor points the right way for a
+   * float on a rotated layer.
    */
   readonly spaceRotation: number;
 }
@@ -82,21 +79,15 @@ interface TransformSubject {
 const identityPoint = (point: Vec2): Vec2 => point;
 
 /**
- * Whether a transform session may open on `layer`: an editable, non-empty leaf that is not a mask. `liveRect` also
- * counts pixels the live cache holds but persistence has not acknowledged yet.
+ * Whether a transform session may open on `layer`: an editable, non-empty leaf. `liveRect` also counts pixels the live
+ * cache holds but persistence has not acknowledged yet.
  */
 export const isTransformEligible = (
   layer: CanvasLayerContract,
   doc: CanvasDocumentContractV3,
   liveRect?: Rect
-): boolean =>
-  // Masks lack an applyTransform bake path, so reject sessions that would preview but fail to apply.
-  isLeafEditable(lookupDocumentLeaf(doc, layer.id)) &&
-  layer.type !== 'inpaint_mask' &&
-  layer.type !== 'regional_guidance' &&
-  hittableLayerRect(layer, doc, liveRect) !== null;
+): boolean => isLeafEditable(lookupDocumentLeaf(doc, layer.id)) && hittableLayerRect(layer, doc, liveRect) !== null;
 
-/** Creates a fresh transform tool with its own session/gesture state. */
 export const createTransformTool = (): Tool => {
   let gesture: GestureState | null = null;
   // The cursor for the target under the pointer while idle (session but no drag).
@@ -172,8 +163,8 @@ export const createTransformTool = (): Tool => {
       x: pointer.x - state.startPointerDoc.x,
       y: pointer.y - state.startPointerDoc.y,
     };
-    // A float works in its layer's LOCAL space, so a document-space grid would
-    // skew it on a rotated/scaled layer — only layer gestures snap.
+    // A float works in its layer's LOCAL space, so a document-space grid would skew it on a rotated/scaled layer — only
+    // layer gestures snap.
     const gridFor = (bypass: boolean): number => (state.kind === 'layer' ? positionGrid(ctx, bypass) : 0);
     switch (state.target.kind) {
       case 'move':
@@ -181,11 +172,11 @@ export const createTransformTool = (): Tool => {
       case 'scale':
         return applyScale({
           alt: input.modifiers.alt,
+          constrain: ctx.stores.transformOptions.get().aspectLinked !== input.modifiers.shift,
           // No alt bypass on a scale handle — alt already means scale-about-center.
           grid: gridFor(false),
           handle: state.target.handle,
           pointerDoc: pointer,
-          shift: input.modifiers.shift,
           rect: state.rect,
           start: state.startTransform,
           startPointerDoc: state.startPointerDoc,
@@ -217,8 +208,8 @@ export const createTransformTool = (): Tool => {
     usesAltKey: true,
     onActivate: (ctx, opts) => {
       if (opts?.temporary) {
-        // Temporary reactivation preserves existing edits and does not reopen from committed transforms. If
-        // deletion cancelled the session mid-hold, leave it closed.
+        // Temporary reactivation preserves existing edits and does not reopen from committed transforms. If deletion
+        // cancelled the session mid-hold, leave it closed.
         return;
       }
       // A live float already owns the session; do not open a layer session over it.
@@ -236,21 +227,19 @@ export const createTransformTool = (): Tool => {
     onDeactivate: (ctx, opts) => {
       hoverCursor = null;
       if (opts?.temporary) {
-        // Temporary switches occur only between gestures and clear hover state while preserving session/preview.
-        // Real switches cancel.
+        // Temporary switches (only between gestures) clear hover but keep session/preview; real switches cancel.
         endGesture();
         return;
       }
-      // A real tool switch mid-session cancels it (drops the preview, no dispatch).
-      // A float is NOT cancelled here — the engine banks it on a real switch, so
-      // the pixels land rather than snapping back.
+      // A real tool switch mid-session cancels it (drops the preview, no dispatch). A float is NOT cancelled here — the
+      // engine banks it on a real switch, so the pixels land rather than snapping back.
       endGesture();
       ctx.cancelTransform?.();
     },
     onKeyCommand: (ctx, command) => {
       if (gesture) {
         // Ignore apply/cancel during captured drags to avoid tearing down the still-active pointer session.
-        return;
+        return false;
       }
       if (ctx.getFloatingSelection?.()) {
         if (command === 'apply') {
@@ -258,17 +247,18 @@ export const createTransformTool = (): Tool => {
         } else {
           ctx.cancelFloatingSelection?.();
         }
-        return;
+        return true;
       }
+      const open = ctx.stores.transformSession.get() !== null;
       if (command === 'apply') {
         ctx.applyTransform?.();
-      } else {
+      } else if (open) {
         ctx.cancelTransform?.();
       }
+      return open;
     },
     onPointerCancel: (ctx) => {
-      // Revert just this drag (keep the session / the float); Escape's own
-      // session-level cancel is separate.
+      // Revert just this drag (keep the session / the float); Escape's own session-level cancel is separate.
       if (gesture) {
         if (gesture.kind === 'float') {
           if (ctx.getFloatingSelection?.()) {

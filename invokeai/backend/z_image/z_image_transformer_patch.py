@@ -8,9 +8,11 @@ import torch
 
 def create_regional_forward(
     original_forward: Callable,
-    regional_attn_mask: torch.Tensor,
+    regional_attn_mask: torch.Tensor | None,
     img_seq_len: int,
-    positive_cap_feats: torch.Tensor,
+    positive_cap_feats: torch.Tensor | None,
+    negative_regional_attn_mask: torch.Tensor | None = None,
+    negative_cap_feats: torch.Tensor | None = None,
 ) -> Callable:
     """Create a modified forward function that uses a regional attention mask.
 
@@ -29,13 +31,10 @@ def create_regional_forward(
         regional_attn_mask: Boolean attention mask of shape (seq_len, seq_len) where
                            seq_len = img_seq_len + txt_seq_len, ordered [img, txt].
         img_seq_len: Number of (unpadded) image tokens in the sequence.
-        positive_cap_feats: The exact caption-embedding tensor the regional mask was
-            built for (the conditioned/positive pass). The regional mask is applied only
-            to forward calls whose ``cap_feats`` is this same object; the negative/CFG
-            pass supplies a different tensor and is left to run with the plain padding
-            mask. Identity is used instead of a token-length heuristic so the positive
-            and negative passes can never be confused even when their padded lengths
-            coincide.
+        positive_cap_feats: The caption tensor paired with ``regional_attn_mask``.
+        negative_regional_attn_mask: The negative pass's independent regional mask, if any.
+        negative_cap_feats: The caption tensor paired with ``negative_regional_attn_mask``.
+            Tensor identity selects each pass's mask, even when their token lengths coincide.
 
     Returns:
         A modified forward function with regional attention support.
@@ -59,12 +58,16 @@ def create_regional_forward(
 
         device = x[0].device
 
-        # Identify which caption inputs belong to the conditioned (positive) pass the regional
-        # mask was built for. Capture this before patchify_and_embed reassigns ``cap_feats``.
-        # The negative/CFG pass supplies a different tensor, so object identity distinguishes the
-        # passes regardless of token length (avoids the positive mask leaking into the uncond
-        # prediction when prompt lengths happen to pad to the same multiple).
-        is_positive_pass = [ci is positive_cap_feats for ci in cap_feats]
+        # Select before patchify_and_embed replaces the caption tensors. Token lengths cannot
+        # distinguish the CFG passes, and either pass may be the only one with regions.
+        regional_masks = [
+            regional_attn_mask
+            if caption is positive_cap_feats
+            else negative_regional_attn_mask
+            if caption is negative_cap_feats
+            else None
+            for caption in cap_feats
+        ]
 
         # Single adaLN embedding for all tokens (basic mode).
         adaln_input = self.t_embedder(t * self.t_scale).type_as(x[0])
@@ -128,27 +131,10 @@ def create_regional_forward(
         # We therefore scatter the four regional sub-blocks (img-img, img-txt, txt-img, txt-txt)
         # into their padding-aware positions instead of assuming a contiguous top-left block.
         #
-        # The patched forward also runs for the negative/CFG pass (a different prompt). The
-        # regional mask was built for the positive prompt only, so we apply it only to the
-        # conditioned items and fall back to the plain padding mask otherwise.
-        regional = regional_attn_mask.to(device=device, dtype=torch.bool)
-        txt_seq_len = regional.shape[0] - img_seq_len
+        use_regional = any(mask is not None for mask in regional_masks)
 
-        # Decide per item whether the regional mask applies, using only cheap scalar checks, so
-        # that on passes that never match (e.g. every negative/CFG pass) we avoid materializing
-        # the (bsz, 1, S, S) float mask at all.
-        applied_regional = [
-            is_positive_pass[i]
-            and txt_seq_len > 0
-            and img_seq_len <= x_seqlens[i]
-            and x_seqlens[i] + cap_seqlens[i] <= unified_seqlen
-            for i in range(bsz)
-        ]
-
-        # Main transformer layers: alternate regional mask (even) with plain padding mask (odd).
-        # If no item matched the positive pass, skip regional injection entirely.
-        use_regional = any(applied_regional)
-
+        # Rebuilt on every forward rather than cached per CFG pass: caching both passes' (S, S) biases keeps them
+        # resident (hundreds of MB at 2048 px), while the rebuild costs only a few milliseconds per forward.
         float_mask = None
         if use_regional:
             # Build a per-item additive float mask. Start from the plain padding mask (0 where a
@@ -170,9 +156,11 @@ def create_regional_forward(
                     .clone()
                 )
 
-            for i in range(bsz):
-                if not applied_regional[i]:
+            for i, regional in enumerate(regional_masks):
+                if regional is None:
                     continue
+                regional = regional.to(device=device, dtype=torch.bool)
+                txt_seq_len = regional.shape[0] - img_seq_len
                 x_len = x_seqlens[i]
 
                 ii, it = slice(0, img_seq_len), slice(img_seq_len, img_seq_len + txt_seq_len)
@@ -208,34 +196,47 @@ def patch_transformer_for_regional_prompting(
     regional_attn_mask: Optional[torch.Tensor],
     img_seq_len: int,
     positive_cap_feats: Optional[torch.Tensor] = None,
+    negative_regional_attn_mask: Optional[torch.Tensor] = None,
+    negative_cap_feats: Optional[torch.Tensor] = None,
 ):
     """Context manager to temporarily patch the transformer for regional prompting.
 
     Args:
         transformer: The ZImageTransformer2DModel instance.
         regional_attn_mask: Regional attention mask of shape (seq_len, seq_len).
-                           If None, the transformer is not patched.
+                           If both regional masks are None, the transformer is not patched.
         img_seq_len: Number of image tokens.
         positive_cap_feats: The caption-embedding tensor the regional mask was built for.
             Required when ``regional_attn_mask`` is provided; the mask is applied only to
             forward calls whose ``cap_feats`` is this exact object (the conditioned pass).
+        negative_regional_attn_mask: The negative pass's regional mask.
+        negative_cap_feats: The corresponding negative caption tensor; required for a negative mask.
 
     Yields:
         The (possibly patched) transformer.
     """
-    if regional_attn_mask is None:
+    if regional_attn_mask is None and negative_regional_attn_mask is None:
         # No regional prompting, use original forward
         yield transformer
         return
 
-    if positive_cap_feats is None:
+    if regional_attn_mask is not None and positive_cap_feats is None:
         raise ValueError("positive_cap_feats is required when regional_attn_mask is provided")
+    if negative_regional_attn_mask is not None and negative_cap_feats is None:
+        raise ValueError("negative_cap_feats is required when negative_regional_attn_mask is provided")
 
     # Store original forward
     original_forward = transformer.forward
 
     # Create and bind the regional forward
-    regional_fwd = create_regional_forward(original_forward, regional_attn_mask, img_seq_len, positive_cap_feats)
+    regional_fwd = create_regional_forward(
+        original_forward,
+        regional_attn_mask,
+        img_seq_len,
+        positive_cap_feats,
+        negative_regional_attn_mask,
+        negative_cap_feats,
+    )
     transformer.forward = lambda *args, **kwargs: regional_fwd(transformer, *args, **kwargs)
 
     try:

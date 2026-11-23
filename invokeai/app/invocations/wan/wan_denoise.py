@@ -38,21 +38,28 @@ from invokeai.app.invocations.fields import (
     Input,
     InputField,
     LatentsField,
+    MetadataField,
     WanConditioningField,
     WanRefImageConditioningField,
+    WithMetadata,
+)
+from invokeai.app.invocations.metadata import (
+    LatentsMetaOutput,
+    build_denoise_metadata,
+    serialize_wan_lora_metadata,
 )
 from invokeai.app.invocations.model import LoRAField, WanTransformerField
-from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, WanVariantType
+from invokeai.backend.model_manager.taxonomy import BaseModelType, WanVariantType
 from invokeai.backend.patches.layer_patcher import LayerPatcher, PatchSpec
 from invokeai.backend.patches.lora_conversions.wan_lora_constants import WAN_LORA_TRANSFORMER_PREFIX
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
-from invokeai.backend.quantization.dequantizing_linear import peak_dequant_transient_bytes
+from invokeai.backend.quantization.dequantizing_linear import peak_dequant_transient_bytes, requires_sidecar_patching
 from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import RectifiedFlowInpaintExtension
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import WanConditioningInfo
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.fp8 import peak_fp8_cast_transient_bytes
 from invokeai.backend.util.sage_attention import sage_attention_scope
 from invokeai.backend.wan.memory_optimization import wan_memory_optimization
 from invokeai.backend.wan.sampling_utils import get_spatial_scale_factor, make_noise
@@ -189,8 +196,6 @@ class _ExpertSwapper:
         inference_dtype: torch.dtype,
         high_lora_factory: LoRAIteratorFactory | None = None,
         low_lora_factory: LoRAIteratorFactory | None = None,
-        high_is_quantized: bool = False,
-        low_is_quantized: bool = False,
         working_mem_bytes: int | None = None,
         max_resident_model_bytes: int | None = None,
     ) -> None:
@@ -200,8 +205,6 @@ class _ExpertSwapper:
         self._inference_dtype = inference_dtype
         self._high_lora_factory = high_lora_factory
         self._low_lora_factory = low_lora_factory
-        self._high_is_quantized = high_is_quantized
-        self._low_is_quantized = low_is_quantized
         self._working_mem_bytes = working_mem_bytes
         self._max_resident_model_bytes = max_resident_model_bytes
         self._active_label: str | None = None
@@ -245,6 +248,9 @@ class _ExpertSwapper:
                 outgoing_info.unload_from_vram(outgoing_bytes)
             except Exception:
                 pass
+        # The handle reaches the cache record and the model: while it is alive the outgoing expert's
+        # tensors cannot be freed, and both experts would be resident through the load below.
+        outgoing_info = None
 
         # Hand the PyTorch allocator a clean slate before partial_load_to_vram measures
         # free space — the freed blocks stay pinned in the caching allocator until
@@ -257,10 +263,12 @@ class _ExpertSwapper:
         info = self._context.models.load(model_id)
         supports_partial_loading = getattr(info, "supports_partial_loading", None)
         if self._working_mem_bytes is None or supports_partial_loading is False:
-            # No estimate to add it to, so a GGUF expert's per-forward dequantization transient is passed
-            # alone; the cache floors it at `device_working_mem_gb`, so zero asks for the default.
+            # No estimate to add it to, so a quantized expert's per-forward dequantization transient (module-level
+            # schemes and GGUF, then the float8 widening of FP8 Storage and kept scaled fp8) is passed alone;
+            # the cache floors it at `device_working_mem_gb`, so zero asks for the default.
             device_ctx = info.model_on_device(
                 working_mem_bytes=peak_dequant_transient_bytes(info.model, self._inference_dtype)
+                + peak_fp8_cast_transient_bytes(info.model, self._inference_dtype)
             )
         else:
             device_ctx = info.model_on_device(working_mem_bytes=self._working_mem_bytes)
@@ -270,7 +278,7 @@ class _ExpertSwapper:
         # likely the LoRA patcher), the surrounding ExitStack will eventually call
         # ``swapper.close() -> _release()`` to clean up, and ``_release`` needs to
         # see the device context to exit it. Without this early stash the expert's
-        # weights stay GPU-resident (8-9 GB for GGUF experts) until the cache's LRU
+        # weights stay GPU-resident (8-9 GB for quantized experts) until the cache's LRU
         # finally evicts them, masquerading as a memory leak.
         self._active_label = label
         self._active_info = info
@@ -286,15 +294,13 @@ class _ExpertSwapper:
                     )
                     self._warned_partial_loading_unavailable = True
             else:
-                vram_bytes_to_free = max(0, info.resident_weight_bytes - self._max_resident_model_bytes)
-                if vram_bytes_to_free > 0:
-                    info.unload_from_vram(vram_bytes_to_free, keep_required_weights_in_vram=True)
+                if info.hold_resident_bytes(self._max_resident_model_bytes) > 0:
                     TorchDevice.empty_cache()
 
-        # Apply LoRA patches for this expert. GGUF transformers need sidecar
-        # patching since direct patching of GGMLTensors isn't supported.
+        # Apply LoRA patches for this expert. Quantized transformers (GGUF, or an int8 checkpoint whose Linears
+        # hold buffers instead of parameters) need sidecar patching since direct patching cannot write into
+        # their weights. Decided on the loaded module tree, per expert: a pair may mix a quantized and a dense one.
         lora_factory = self._high_lora_factory if label == self.HIGH else self._low_lora_factory
-        is_quantized = self._high_is_quantized if label == self.HIGH else self._low_is_quantized
         lora_ctx: Any | None = None
         if lora_factory is not None:
             lora_ctx = LayerPatcher.apply_smart_model_patches(
@@ -303,7 +309,7 @@ class _ExpertSwapper:
                 prefix=WAN_LORA_TRANSFORMER_PREFIX,
                 dtype=self._inference_dtype,
                 cached_weights=cached_weights,
-                force_sidecar_patching=is_quantized,
+                force_sidecar_patching=requires_sidecar_patching(model, info.config.format),
             )
             lora_ctx.__enter__()
 
@@ -340,10 +346,10 @@ class _ExpertSwapper:
     title="Denoise - Wan 2.2",
     tags=["image", "wan"],
     category="image",
-    version="1.0.0",
+    version="1.1.0",
     classification=Classification.Prototype,
 )
-class WanDenoiseInvocation(BaseInvocation):
+class WanDenoiseInvocation(BaseInvocation, WithMetadata):
     """Run the denoising process with a Wan 2.2 model.
 
     Drives the flow-matching schedule the model ships with (UniPC with flow
@@ -414,12 +420,49 @@ class WanDenoiseInvocation(BaseInvocation):
     steps: int = InputField(default=40, gt=0, description="Number of denoising steps.")
     seed: int = InputField(default=0, description="Randomness seed for reproducibility.")
 
+    def _build_metadata(self) -> MetadataField:
+        updates: dict[str, Any] = {
+            "generation_mode": (
+                "wan_inpaint"
+                if getattr(self, "denoise_mask", None) is not None
+                else ("wan_img2img" if getattr(self, "latents", None) is not None else "wan_txt2img")
+            ),
+            "width": self.width,
+            "height": self.height,
+            "steps": self.steps,
+            "cfg_scale": self.guidance_scale,
+            "guidance": self.guidance_scale,
+            "denoising_start": self.denoising_start,
+            "denoising_end": self.denoising_end,
+            "add_noise": self.add_noise,
+            "seed": self.seed,
+            "model": self.transformer.transformer,
+        }
+        if self.guidance_scale_low_noise is not None and self.guidance_scale_low_noise >= 1.0:
+            updates["wan_guidance_scale_low_noise"] = self.guidance_scale_low_noise
+        if getattr(self.transformer, "transformer_low_noise", None) is not None:
+            updates["wan_transformer_low_noise"] = self.transformer.transformer_low_noise
+
+        updates["loras"] = serialize_wan_lora_metadata(
+            getattr(self.transformer, "loras", None),
+            getattr(self.transformer, "loras_low_noise", None),
+        )
+
+        return build_denoise_metadata(getattr(self, "metadata", None), updates)
+
     @torch.no_grad()
-    def invoke(self, context: InvocationContext) -> LatentsOutput:
+    def invoke(self, context: InvocationContext) -> LatentsMetaOutput:
         latents = self._run_diffusion(context)
         latents = latents.detach().to("cpu")
         name = context.tensors.save(tensor=latents)
-        return LatentsOutput.build(latents_name=name, latents=latents, seed=None)
+        return LatentsMetaOutput.build(
+            latents_name=name,
+            latents=latents,
+            seed=None,
+            metadata=self._build_metadata(),
+            width=self.width,
+            height=self.height,
+        )
 
     def _run_diffusion(self, context: InvocationContext) -> torch.Tensor:
         if self.denoising_start >= self.denoising_end:
@@ -608,7 +651,6 @@ class WanDenoiseInvocation(BaseInvocation):
         # ``get_config`` doesn't touch the weights cache.
         high_model = self.transformer.transformer
         low_model = self.transformer.transformer_low_noise
-        low_config = context.models.get_config(low_model) if low_model is not None else None
         # FlowMatchEulerDiscreteScheduler stores num_train_timesteps in its config
         # (default 1000). Diffusers' WanPipeline computes:
         #   boundary_timestep = boundary_ratio * num_train_timesteps
@@ -622,13 +664,9 @@ class WanDenoiseInvocation(BaseInvocation):
         # "no LoRAs on the low expert" — reusing the primary list here would
         # silently apply high-expert-only LoRAs (e.g. Lightning high-noise
         # distills) to the wrong expert.
-        # Quantized (GGUF) experts force sidecar patching so GGMLTensor weights
-        # aren't touched directly.
+        # Quantized experts (GGUF, int8) get sidecar patching; the swapper decides per expert once loaded.
         high_loras = self.transformer.loras
         low_loras = self.transformer.loras_low_noise
-        high_config = context.models.get_config(high_model)
-        high_is_quantized = high_config.format == ModelFormat.GGUFQuantized
-        low_is_quantized = low_config.format == ModelFormat.GGUFQuantized if low_config is not None else False
 
         def high_lora_factory() -> Iterable[PatchSpec]:
             return self._lora_iterator(context, high_loras)
@@ -651,8 +689,6 @@ class WanDenoiseInvocation(BaseInvocation):
                 inference_dtype=inference_dtype,
                 high_lora_factory=high_lora_factory if high_loras else None,
                 low_lora_factory=low_lora_factory if low_loras else None,
-                high_is_quantized=high_is_quantized,
-                low_is_quantized=low_is_quantized,
                 working_mem_bytes=working_mem_bytes,
                 max_resident_model_bytes=(
                     WAN_MAX_RESIDENT_TRANSFORMER_BYTES if working_mem_bytes is not None else None
@@ -676,6 +712,8 @@ class WanDenoiseInvocation(BaseInvocation):
                     active_label = _ExpertSwapper.HIGH
                     active_cfg = self.guidance_scale
 
+                # The previous expert must be unreferenced by the time `get` loads the next one.
+                transformer = None
                 transformer = swapper.get(active_label)
 
                 # Cast latents to the transformer's dtype only for the forward

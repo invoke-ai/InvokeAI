@@ -204,7 +204,6 @@ describe('createModelsProvider', () => {
     expect(entries.map((entry) => entry.title)).toEqual(['supported-sdxl', 'external-provider']);
 
     entries[0]?.run();
-    // The widget opens after the switch, so a switch waiting for confirmation finds its model card.
     expect(selectModel).toHaveBeenCalledWith(supported, models);
     expect(order).toEqual(['select', 'open']);
 

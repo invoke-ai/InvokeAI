@@ -45,8 +45,12 @@ import {
   buildVideoRecallSettings,
   getVideoRecallMessage,
   getVideoRecallTitle,
+  parseVideoRecallRecord,
+  resolveVideoSizeRecall,
+  settleMediaSizedRecall,
   type VideoRecallKind,
   type VideoRecallMediaNames,
+  type VideoSizeRecallFit,
 } from './videoRecall';
 
 const toErrorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error));
@@ -63,10 +67,9 @@ export const getCurrentVideoValues = ({
   return syncVideoWidgetValuesWithModels(normalized, models);
 };
 
-/** There is no bulk video read; this bounds the per-video reads one recall keeps in flight. */
+/** There is no bulk video read. */
 const VIDEO_RESOLVE_CONCURRENCY = 4;
 
-/** The gallery's current records of the media a recall names, by name; a medium the gallery no longer has is absent. */
 interface ResolvedVideoRecallMedia {
   images: ReadonlyMap<string, GalleryImage>;
   videos: ReadonlyMap<string, GalleryVideoItem>;
@@ -74,12 +77,7 @@ interface ResolvedVideoRecallMedia {
 
 const NO_RESOLVED_MEDIA: ResolvedVideoRecallMedia = { images: new Map(), videos: new Map() };
 
-/**
- * Read every named medium once: the images in one bulk read, the videos a few at a time. A 404 means the medium was
- * deleted and a 403 that it sits on a board the caller can no longer read: either way it is gone for this caller, and
- * the recall goes on without it, as the bulk image read drops images it cannot return. Any other failure rejects, so
- * the recall reports it rather than applying with media silently missing.
- */
+/** A 404 or 403 means the medium is gone for this caller and the recall goes on; any other failure rejects. */
 const resolveVideoRecallMedia = async (
   names: VideoRecallMediaNames,
   signal: AbortSignal
@@ -124,15 +122,11 @@ const resolveVideoRecallMedia = async (
 
   return {
     images: new Map(images.map((image) => [image.imageName, image])),
-    // An aborted read leaves holes; the caller's account check fences it.
     videos: new Map(videos.flatMap((entry) => (entry ? [entry] : []))),
   };
 };
 
-/**
- * A partial recall names media on top of the panel's own. One the effective model cannot use would still displace
- * the held media it conflicts with before the reconcile below dropped it, so it is dropped up front instead.
- */
+/** A partial recall's unusable medium would still displace held media before reconcile, so drop it up front. */
 const pruneUnusablePartialMedia = ({
   mediaNames: names,
   values,
@@ -187,6 +181,27 @@ const reportVideoRecallError = (
   return false;
 };
 
+const getSizeRecallFailureMessage = (
+  fit: VideoSizeRecallFit,
+  size: { height: number; width: number },
+  t: TFunction
+): string => {
+  switch (fit.outcome) {
+    case 'invalid':
+      return fit.reason;
+    case 'media-conflict':
+      return t('widgets.gallery.itemActions.recall.videoSizeMediaConflict', {
+        ...size,
+        effectiveHeight: fit.effective.height,
+        effectiveWidth: fit.effective.width,
+      });
+    case 'media-unresolvable':
+      return t('widgets.gallery.itemActions.recall.videoSizeMediaUnresolvable', size);
+    default:
+      return t('widgets.gallery.itemActions.recall.videoSizeUnavailable', size);
+  }
+};
+
 export const executeVideoRecall = async ({
   commands,
   getVideoValues,
@@ -203,7 +218,6 @@ export const executeVideoRecall = async ({
   item: GalleryVideoItem;
   kind: VideoRecallKind;
   models: ModelConfig[];
-  /** Caller-captured identity lifetime; direct synchronous callers may omit it. */
   owner?: AccountScope;
   projectId?: string;
   queryClient: QueryClient;
@@ -215,6 +229,16 @@ export const executeVideoRecall = async ({
     return false;
   }
 
+  // Values sync against the catalog: an empty one would drop the panel's model, LoRAs and components on commit.
+  if (models.length === 0 && kind !== 'prompts') {
+    commands.notifications.add({
+      kind: 'info',
+      message: t('widgets.gallery.itemActions.recall.modelsUnavailableForVideoRecall'),
+      title: t('widgets.gallery.itemActions.recall.cannotRecallVideo'),
+    });
+    return false;
+  }
+
   let metadata: unknown;
 
   try {
@@ -223,12 +247,31 @@ export const executeVideoRecall = async ({
     return reportVideoRecallError(commands, owner, error, projectId);
   }
 
+  // A recorded size the panel cannot take is not missing metadata: say which size and why.
+  const record = kind === 'size' ? parseVideoRecallRecord(metadata) : null;
+  const size =
+    record?.isVideoGeneration && record.width && record.height ? { height: record.height, width: record.width } : null;
+  const emptyNotice = size
+    ? {
+        message: getSizeRecallFailureMessage(
+          resolveVideoSizeRecall(
+            getCurrentVideoValues({ models, videoValues: getVideoValues() }),
+            size.width,
+            size.height
+          ),
+          size,
+          t
+        ),
+        title: t('widgets.gallery.itemActions.recall.nothingRecalledVideoSize'),
+      }
+    : {
+        message: t('widgets.gallery.itemActions.recall.videoMetadataUnsupported'),
+        title: t('widgets.gallery.itemActions.recall.nothingRecalledVideo'),
+      };
+
   return applyVideoRecallMetadata({
     commands,
-    emptyNotice: {
-      message: t('widgets.gallery.itemActions.recall.videoMetadataUnsupported'),
-      title: t('widgets.gallery.itemActions.recall.nothingRecalledVideo'),
-    },
+    emptyNotice,
     getVideoValues,
     kind,
     metadata,
@@ -239,11 +282,7 @@ export const executeVideoRecall = async ({
   });
 };
 
-/**
- * Apply a video metadata record — read from a gallery video, or sent by the external recall API — to the Video
- * panel: build the values, hydrate the media it names from the gallery, drop media the resulting model cannot use,
- * and commit. Resolves whether anything was applied.
- */
+/** From a gallery video or the external recall API. */
 export const applyVideoRecallMetadata = async ({
   commands,
   emptyNotice,
@@ -258,17 +297,14 @@ export const applyVideoRecallMetadata = async ({
   t,
 }: {
   commands: Pick<WorkbenchCommands, 'notifications' | 'widgets'>;
-  /** Shown when nothing in the record applies. */
   emptyNotice: VideoRecallNotice;
   getVideoValues: () => Record<string, unknown>;
   kind: VideoRecallKind;
   metadata: unknown;
   models: readonly ModelConfig[];
   owner: AccountScope;
-  /** See `buildVideoRecallSettings`. */
   partial?: boolean;
   projectId?: string;
-  /** See `buildVideoRecallSettings`. */
   requireGenerationMode?: boolean;
   t: TFunction;
 }): Promise<boolean> => {
@@ -290,17 +326,15 @@ export const applyVideoRecallMetadata = async ({
       }
       return { currentValues, result };
     };
-    // A first build only decides what to read: the media the recall would apply, judged against the model it would
-    // settle on, so a recall that ends early or drops a medium never reads it.
+    // A first build only decides what to read, so a recall that ends early or drops a medium never reads it.
     const planned = build(getVideoValues()).result;
     const resolved = planned?.fields.includes('media')
       ? await resolveVideoRecallMedia(planned.mediaNames, owner.signal)
       : NO_RESOLVED_MEDIA;
 
     assertAccountScopeCurrent(owner);
-    // Snapshot the panel AFTER every read, and yield nothing until the commit: an edit made while the metadata or
-    // its media loaded must survive into the base the recall applies on top of. A medium this build names that the
-    // first did not (the panel's model changed meanwhile) was not read, and is left out like a deleted one.
+    // Snapshot the panel after every read: an edit made while media loaded must survive. A medium only this build names
+    // was not read and is left out like a deleted one.
     const { currentValues, result } = build(getVideoValues());
 
     if (!result) {
@@ -308,9 +342,8 @@ export const applyVideoRecallMetadata = async ({
       return false;
     }
 
-    // Hydrate media names from the gallery's records (dimensions/probe data) and drop deleted media.
     if (result.fields.includes('media')) {
-      // A full recall that cleared held media changed the panel even if nothing named below hydrates.
+      // A full recall that cleared held media changed the panel even if nothing hydrates.
       const clearedMedia = (
         ['conditioningClip', 'firstFrameImage', 'lastFrameImage', 'references', 'sourceVideo'] as const
       ).some((slot) => result.values[slot] !== currentValues[slot]);
@@ -319,8 +352,7 @@ export const applyVideoRecallMetadata = async ({
       const firstFrame = firstFrameName ? resolved.images.get(firstFrameName) : undefined;
       const lastFrame = lastFrameName ? resolved.images.get(lastFrameName) : undefined;
 
-      // Through the panel's own frame patch: a partial recall can land a frame beside a clip the panel holds for its
-      // picture, which the frame displaces exactly as setting it by hand would.
+      // Through the panel's own frame patch, so a frame displaces a held clip exactly as setting it by hand would.
       if (firstFrame) {
         result.values = {
           ...result.values,
@@ -348,10 +380,8 @@ export const applyVideoRecallMetadata = async ({
 
       const clipItem = conditioningClip ? resolved.videos.get(conditioningClip.name) : undefined;
 
-      // A clip that is gone leaves the rest of the recall to apply.
       if (conditioningClip && clipItem) {
-        // The recorded role, not the one a fresh drop would default to: the run held that
-        // modality clean, and the other role is a different generation entirely.
+        // The recorded role, not a fresh drop's default: the other role is a different generation entirely.
         result.values = {
           ...result.values,
           conditioningClip: {
@@ -364,7 +394,7 @@ export const applyVideoRecallMetadata = async ({
             }),
             role: conditioningClip.role,
           },
-          // A soundtrack keeps the frames hydrated above: they anchored the picture made for it.
+          // A soundtrack keeps its frames: they anchored the picture made for it.
           ...(isConditioningClipExcludingFrames(conditioningClip)
             ? { firstFrameImage: null, lastFrameImage: null }
             : {}),
@@ -376,7 +406,6 @@ export const applyVideoRecallMetadata = async ({
 
       const sourceItem = sourceVideoName ? resolved.videos.get(sourceVideoName) : undefined;
 
-      // A source clip that is gone leaves the rest of the recall to apply.
       if (sourceItem) {
         const rebuiltClip = createVideoSourceClip({
           durationSeconds: sourceItem.durationSeconds,
@@ -385,7 +414,7 @@ export const applyVideoRecallMetadata = async ({
           name: sourceItem.name,
           width: sourceItem.width,
         });
-        // Restore recorded trim against the fresh estimate; default trim would select different frames.
+        // Default trim would select different frames.
         const trim = rebuiltClip.numFrames >= 2 ? result.mediaNames.sourceVideoTrim : null;
         const startFrame = trim
           ? Math.min(Math.max(trim.startFrame, 0), rebuiltClip.numFrames - 2)
@@ -403,7 +432,6 @@ export const applyVideoRecallMetadata = async ({
       }
 
       if (result.mediaNames.references.length > 0) {
-        // Hydrate references in recorded order, dropping deleted media without reordering survivors.
         const references: VideoReferenceItem[] = [];
 
         for (const recorded of result.mediaNames.references) {
@@ -422,7 +450,6 @@ export const applyVideoRecallMetadata = async ({
 
           const item = resolved.videos.get(recorded.name);
 
-          // The reference video is gone; the rest of the recall still applies.
           if (!item) {
             continue;
           }
@@ -433,13 +460,10 @@ export const applyVideoRecallMetadata = async ({
             name: item.name,
             width: item.width,
           });
-          // Restore the recorded trim, clamped to the fresh frame-count estimate.
           const startFrame = recorded.trim ? Math.min(Math.max(recorded.trim.startFrame, 0), clip.numFrames - 1) : 0;
           const endFrame = recorded.trim
             ? Math.min(Math.max(recorded.trim.endFrame, startFrame), clip.numFrames - 1)
             : clip.numFrames - 1;
-          // Any valid recorded conditioning wins; otherwise use add-path defaults, including soundtrack
-          // conditioning for wrapped audio.
           const conditioning = isVideoReferenceConditioning(recorded.conditioning)
             ? recorded.conditioning
             : getDefaultReferenceConditioning(item.mediaOrigin);
@@ -453,9 +477,7 @@ export const applyVideoRecallMetadata = async ({
             firstFrameImage: null,
             lastFrameImage: null,
             references,
-            // A source video recorded alongside references is reference-extend
-            // state (hydrated above) — keep it; clear only a leftover. A partial
-            // recall keeps the panel's own, subject to the mode check below.
+            // A source video recorded alongside references is reference-extend state; clear only a leftover.
             sourceVideo: result.mediaNames.sourceVideoName || partial ? result.values.sourceVideo : null,
           };
           recalledMedia = true;
@@ -466,8 +488,7 @@ export const applyVideoRecallMetadata = async ({
         result.fields = result.fields.filter((field) => field !== 'media');
       }
 
-      // Reconcile hydrated media with the effective model's modes; deleted frames or unavailable models must not
-      // leave an ungeneratable panel.
+      // Deleted frames or unavailable models must not leave an ungeneratable panel.
       const effectiveModel = result.values.model;
 
       if (effectiveModel) {
@@ -475,9 +496,7 @@ export const applyVideoRecallMetadata = async ({
         const modes = policy.modes;
         const referenceExtend = Boolean(policy.references?.extend);
 
-        // A partial recall can replace the references or the initial video alone, which on a reference-extend panel
-        // would orphan the clip's continuity reference or leave it pointing at the previous clip. Relink it the way
-        // the panel's Initial Video field does, dropping the clip when no reference slot is left for it.
+        // A partial recall could orphan a reference-extend clip's continuity reference; relink it like Initial Video.
         if (partial && referenceExtend && result.values.sourceVideo) {
           const linked = getInitialVideoPatch({
             maxVideos: policy.references?.maxVideos ?? 0,
@@ -494,12 +513,10 @@ export const applyVideoRecallMetadata = async ({
         let references = result.values.references;
 
         if (references.length > 0 && !modes.includes('reference')) {
-          // The recalled transformer (or the panel's surviving one) has no reference mode.
           references = [];
         }
         if (references.length > 0) {
-          // References replace the frame slots; the source video survives only
-          // on a reference-extend panel (the new clip is appended to it).
+          // The source video survives only on a reference-extend panel.
           firstFrameImage = null;
           lastFrameImage = null;
           if (!referenceExtend) {
@@ -533,13 +550,14 @@ export const applyVideoRecallMetadata = async ({
       }
     }
 
+    ({ fields: result.fields, values: result.values } = settleMediaSizedRecall(result));
+
     if (result.fields.length === 0) {
       commands.notifications.add({ kind: 'info', ...emptyNotice });
       return false;
     }
 
-    // Commit only prompt keys: resnapshotted values may contain an unrelated model-family transition and would
-    // widen the lost-update window for concurrent media recall.
+    // Resnapshotted values may hold an unrelated model-family transition and would widen the lost-update window.
     if (result.fields.every((field) => field === 'prompts')) {
       commands.widgets.patchValues(
         'video',
@@ -564,10 +582,8 @@ export const applyVideoRecallMetadata = async ({
   }
 };
 
-// Placing a gallery video in the Video panel. Kept in this module rather than a file of its own: the gallery's actions
-// load it on every editor route, and a new module there is a new entry in the routes' pinned source-owner sets.
+// Kept in this module: a new module on every editor route is a new entry in the routes' pinned source-owner sets.
 
-/** What placing a video needs to know about it; gallery items and the external recall event both carry it. */
 export interface PlaceableVideo {
   durationSeconds: number;
   fps?: number;
@@ -581,12 +597,12 @@ export type InitialVideoPlacement =
   | {
       patch: Partial<VideoWidgetValues>;
       status: 'placed';
-      /** Whether the panel's model can generate from an initial video; the slot is filled either way. */
+      /** The slot is filled either way. */
       usable: boolean;
     }
   | { status: 'full' };
 
-/** Set the video as the Video panel's Initial Video, exactly as the panel's own Initial Video field would. */
+/** Exactly as the panel's own Initial Video field would. */
 export const placeInitialVideo = ({
   models,
   video,
@@ -629,7 +645,7 @@ const getReferenceVideoRoom = (
     : 'full';
 };
 
-/** Append the video to the Video panel's references with the defaults the References field gives a new video. */
+/** With the defaults the References field gives a new video. */
 export const appendReferenceVideo = ({
   models,
   video,
@@ -659,21 +675,14 @@ export const appendReferenceVideo = ({
 
 export type VideoImagePlacement =
   | {
-      /** Whether placing the image cleared media it can't be used with: a conditioning clip or an initial video. */
       displaced: boolean;
       patch: Partial<VideoWidgetValues>;
       slot: 'firstFrame' | 'lastFrame' | 'reference';
       status: 'placed';
     }
-  /** `full`: an append found every image slot the model takes already in use. */
   | { status: 'full' | 'unsupported' };
 
-/**
- * Place a gallery image where the Video panel's model takes images. A model with reference images gets it as one:
- * it replaces the reference images (reference videos stay), or with `append` joins them. A frame model gets it as
- * the first frame, clearing the last, as if the frames were a two-image list; with `append` it fills the first free
- * frame slot, and an initial video holds the first. The panel's model is never switched to make the image fit.
- */
+/** Reference models get it as a reference image, frame models as the first frame; the panel's model never switches. */
 export const placeVideoImage = ({
   append,
   image,
@@ -717,9 +726,7 @@ export const placeVideoImage = ({
     return { status: 'unsupported' };
   }
 
-  // Through the panel's own frame patch: a first frame displaces the initial video, and either frame displaces a
-  // clip that holds the picture, while a soundtrack stays to be anchored by it. The stored clip, not the normalized
-  // one, which hides a picture-role clip behind a first frame; only a visible clip is reported as displaced.
+  // The stored clip, not the normalized one, which hides a picture-role clip behind a first frame.
   const storedClip = isVideoConditioningClip(videoValues.conditioningClip) ? videoValues.conditioningClip : null;
   const clipDisplaced = isConditioningClipExcludingFrames(values.conditioningClip);
 
@@ -738,7 +745,7 @@ export const placeVideoImage = ({
   if (!values.firstFrameImage && !values.sourceVideo) {
     return {
       displaced: clipDisplaced,
-      // The visible last frame stays; one hidden behind stale references is cleared rather than resurfaced.
+      // A last frame hidden behind stale references is cleared rather than resurfaced.
       patch: {
         ...getFrameImagePatch('firstFrameImage', image, storedClip),
         lastFrameImage: values.lastFrameImage,
@@ -760,7 +767,6 @@ export const placeVideoImage = ({
   return { status: 'full' };
 };
 
-/** The generation mode a conditioning clip in each role asks of the model. */
 const CONDITIONING_ROLE_MODE = {
   audio: 'audio-to-video',
   video: 'video-to-audio',
@@ -768,23 +774,17 @@ const CONDITIONING_ROLE_MODE = {
 
 export type ConditioningClipPlacement =
   | {
-      /** Whether the clip cleared other conditioning media: the initial video, references, or frames for its picture. */
       displaced: boolean;
       patch: Partial<VideoWidgetValues>;
       status: 'placed';
     }
-  /** `no-picture`: a wrapped audio upload has only a placeholder picture, so it can only lend its soundtrack. */
+  /** A wrapped audio upload has only a placeholder picture, so it can only lend its soundtrack. */
   | { status: 'no-picture' | 'unsupported' };
 
 const canConditionInRole = (policy: VideoModelPolicy | null, role: VideoConditioningRole): boolean =>
   Boolean(policy?.modes.includes(CONDITIONING_ROLE_MODE[role]));
 
-/**
- * Set the video as the Video panel's conditioning clip in `role`. The panel's own field refuses a clip while
- * conflicting conditioning media is set; this explicit action clears that media instead, as Extend in Video displaces
- * a first frame, and reports it. Frames conflict only with the picture role. Unlike the Initial Video, a clip the panel's model cannot use is declined: it would clear
- * the other media for nothing.
- */
+/** Unlike the panel's field, clears conflicting media instead of refusing; declines a clip the model cannot use. */
 export const placeConditioningClip = ({
   models,
   role,
@@ -819,7 +819,6 @@ export const placeConditioningClip = ({
   };
 };
 
-/** Which gallery-video placements the Video panel's model can take right now. */
 export interface VideoPlacementRoom {
   conditioningAudio: boolean;
   conditioningVideo: boolean;

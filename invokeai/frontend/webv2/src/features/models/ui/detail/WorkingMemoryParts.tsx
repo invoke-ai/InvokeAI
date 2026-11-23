@@ -156,7 +156,6 @@ const LineStateHelp = ({ line }: { line: WorkingMemoryLine }) => {
 
 const HINT_POSITIONING = { placement: 'top' } as const;
 
-/** A column header with an info button after its label. */
 const HintedColumnHeader = ({ hint, label }: { hint: string; label: string }) => {
   const { t } = useTranslation();
   const name = t('models.workingMemory.aboutColumn', { column: label });
@@ -231,8 +230,8 @@ const useNotCountedLabel = () => {
 };
 
 /**
- * One estimator line: its state, the models whose measurements it pools (named when another model is among them,
- * this model first), the range the user line was fitted on, and every measured size.
+ * One estimator line: its state, the models whose measurements it pools (named when another model is among them, this
+ * model first), the range the user line was fitted on, and every measured size.
  */
 export const LineMeasurements = ({ line, modelKey }: { line: WorkingMemoryLine; modelKey: string }) => {
   const { t } = useTranslation();

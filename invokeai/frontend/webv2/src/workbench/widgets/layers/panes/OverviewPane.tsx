@@ -18,12 +18,24 @@ const CHECKERBOARD_CSS = {
   backgroundSize: '12px 12px',
 };
 
+/** Fixed dark/light/dark 1px border bands, not theme tokens, so the outline reads over any pixels at any DPR. */
+const VIEW_RECT_DARK = '#000000';
+const VIEW_RECT_LIGHT = '#ffffff';
+/** Smallest drawn outline: the three bands on each side plus a 2px hollow, so a tiny viewport still reads as a box. */
+const VIEW_RECT_MIN_PX = 8;
+const VIEW_RECT_INNER_CSS = {
+  _before: {
+    borderColor: VIEW_RECT_DARK,
+    borderWidth: '1px',
+    content: '""',
+    inset: '0',
+    position: 'absolute',
+  },
+};
+
 const VIEW_RECT_TRANSITION = `left ${VIEW_RECT_INTERVAL_MS}ms linear, top ${VIEW_RECT_INTERVAL_MS}ms linear, width ${VIEW_RECT_INTERVAL_MS}ms linear, height ${VIEW_RECT_INTERVAL_MS}ms linear`;
 
-/**
- * Show a fitted composite with viewport outline; click/drag centers, wheel zooms, and arrows pan. Throttle
- * painting and update the outline imperatively.
- */
+/** Fitted composite with viewport outline; painting is throttled and the outline updated imperatively. */
 export const OverviewPane = () => {
   const { t } = useTranslation();
   const engine = useCanvasEngine();
@@ -94,13 +106,17 @@ const ConnectedOverview = ({ engine }: { engine: CanvasEngineHandle }) => {
         const top = (topLeft.y - current.y) * current.scale;
         const width = (bottomRight.x - topLeft.x) * current.scale;
         const height = (bottomRight.y - topLeft.y) * current.scale;
+        const drawnWidth = Math.max(VIEW_RECT_MIN_PX, Math.min(width, widthPx * 2));
+        const drawnHeight = Math.max(VIEW_RECT_MIN_PX, Math.min(height, heightPx * 2));
+        // A box grown to the minimum stays centred on the viewport.
+        const drawnLeft = left - Math.max(0, drawnWidth - width) / 2;
+        const drawnTop = top - Math.max(0, drawnHeight - height) / 2;
         outline.style.visibility = 'visible';
-        outline.style.left = `${Math.max(-widthPx, Math.min(left, widthPx))}px`;
-        outline.style.top = `${Math.max(-heightPx, Math.min(top, heightPx))}px`;
-        outline.style.width = `${Math.max(4, Math.min(width, widthPx * 2))}px`;
-        outline.style.height = `${Math.max(4, Math.min(height, heightPx * 2))}px`;
+        outline.style.left = `${Math.max(-widthPx, Math.min(drawnLeft, widthPx))}px`;
+        outline.style.top = `${Math.max(-heightPx, Math.min(drawnTop, heightPx))}px`;
+        outline.style.width = `${drawnWidth}px`;
+        outline.style.height = `${drawnHeight}px`;
       };
-      // Throttle DOM outline updates and let CSS interpolate between them.
       const outlineThrottle = { last: 0, timer: null as ReturnType<typeof setTimeout> | null };
       const updateOutline = () => {
         if (outlineThrottle.timer !== null) {
@@ -119,8 +135,7 @@ const ConnectedOverview = ({ engine }: { engine: CanvasEngineHandle }) => {
         }, VIEW_RECT_INTERVAL_MS - elapsed);
       };
 
-      // Only a real composite consumes throttle budget, so the pre-measure clearing draw never defers the first
-      // paint. The outline follows every draw at once, so it never disagrees with the bitmap.
+      // Only a real composite consumes throttle budget, so the pre-measure clearing draw never defers the first paint.
       const drawComposite = (): boolean => {
         const rect = maxSizePx < 16 ? null : engine.previews.drawDocumentOverview(canvas, maxSizePx);
         if (!rect) {
@@ -287,14 +302,21 @@ const ConnectedOverview = ({ engine }: { engine: CanvasEngineHandle }) => {
         <chakra.canvas ref={canvasRef} display="block" touchAction="none" />
         <Box
           ref={viewRectRef}
-          borderColor="accent.solid"
-          borderWidth="1.5px"
+          borderColor={VIEW_RECT_DARK}
+          borderWidth="1px"
           pointerEvents="none"
           position="absolute"
-          rounded="xs"
           transition={VIEW_RECT_TRANSITION}
           visibility="hidden"
-        />
+        >
+          <Box
+            borderColor={VIEW_RECT_LIGHT}
+            borderWidth="1px"
+            css={VIEW_RECT_INNER_CSS}
+            inset="0"
+            position="absolute"
+          />
+        </Box>
       </chakra.button>
     </Flex>
   );

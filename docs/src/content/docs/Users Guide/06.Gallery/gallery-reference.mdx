@@ -22,7 +22,7 @@ Hover over a board and click its **⋮** button, or right-click it, to open its 
 
 <Image src={boardMenu} alt="The board menu with Save new results here, Download board, Rename board, Archive board and Delete board." width={420} />
 
-* **Save new results here** — makes this the board that receives new results, marked with a crosshair-style icon in the board list, whichever board you are viewing; it also turns off **Follow the selected board**. On that board, the item is **Stop saving new results here**, which sends results back to the project's Inbox. Not offered for the Inbox itself, date boards, archived boards or boards you can only view. See [Choosing where new media goes](/users-guide/gallery/introduction/#choosing-where-new-media-goes).
+* **Save new results here** — makes this the board that receives new results, marked in the board list with the same icon as **Saving to**, whichever board you are viewing; it also turns off **Follow the selected board**. On that board, the item is **Stop saving new results here**, which sends results back to the project's Inbox. Not offered for the Inbox itself, date boards, archived boards or boards you can only view. See [Choosing where new media goes](/users-guide/gallery/introduction/#choosing-where-new-media-goes).
 * **Download Board** — downloads the board (see [below](#downloading-a-board)).
 * **Rename board** — opens a dialog to change the name.
 * **Access** — on a multi-user installation, who else can open the board: **Restricted**, **Everyone can view** or **Everyone can contribute**. Only the board's owner and administrators see it. See [Image Boards](/configuration/multi-user-mode/user-guide/#image-boards).
@@ -51,13 +51,13 @@ Choose **Delete board** from the board's menu. The confirmation dialog says what
 <Image src={deleteBoard} alt="The Delete board dialog with the media it holds, the Also permanently delete its items checkbox, and Cancel and Delete board buttons." width={500} />
 
 * **Delete board** — removes the board and moves everything on it to **Uncategorized**. This is the default.
-* **Also permanently delete its items** — tick it to delete the board's images and videos with it; the button then says how many, such as **Delete board and 99 items**. For a board with 50 items or more, you also type the board's name to confirm.
+* **Also permanently delete its items** — tick it to delete the board's images and videos with it; the button then says how many, such as **Delete board and 99 items**. For a board with 50 items or more, you also type the board's name to confirm; once the check has answered, only the items that will actually be deleted count toward that. Ticking it also checks what still uses the board's media and lists it, as [deleting media](/users-guide/gallery/introduction/#deleting-media) does.
 
 A deleted board cannot be restored, and deleted media cannot be undone. While media is being deleted, a notice says so; when it finishes, another says what was moved or deleted, and how much could not be deleted, if any.
 
 Queued or running jobs that were sending results to the deleted board send them to **Uncategorized** instead. A project's Inbox cannot be deleted from the Gallery; delete the project instead, which also asks what to do with the project's other boards.
 
-On a multi-user installation, only a board's owner or an administrator can delete it. When an owner deletes a shared board with its media, only their own media is deleted and other people's items move to Uncategorized; an administrator's deletion removes everything. If some files cannot be removed, those items are kept in Uncategorized and a warning says how many.
+On a multi-user installation, only a board's owner or an administrator can delete it. When an owner deletes a shared board with its media, only their own media is deleted and other people's items move to Uncategorized; once the check of what uses the media has answered, the dialog names only the owner's items, such as **Also permanently delete your 2 items** and **Delete board and your 2 items**, and when none of the media is theirs it says that all of it moves to Uncategorized. An administrator's deletion removes everything. If some files cannot be removed, those items are kept in Uncategorized and a warning says how many.
 
 ## The media menu
 
@@ -71,12 +71,12 @@ For an image, the menu offers:
 * **Load workflow** — open the workflow that made the image. Unavailable for images without one.
 * **Continue working** — **Edit on Canvas** adds the image to the open project's canvas as an image layer and opens Canvas; **Upscale** sends it to the Upscale panel or upscales it at once; **Send to Video** uses it as the first frame in the Video panel; **Add to Canvas as…** adds it as a layer of the kind you choose; **New project from image** starts a new project whose canvas holds the image, sized to fit it.
 * **Use image as** — **Use as reference image**, **Use as control** and **Use as prompt template**. Its **Reuse from image** submenu restores the settings that made the image: **Remix image**, **All settings**, **Use prompt**, **Use seed**, **Use size** and **Use CLIP skip**; see [Resetting to defaults](/users-guide/image-generation/generate-panel/#resetting-to-defaults). Settings an image does not record are unavailable.
-* **Select for compare** — compare the image with the selected one; **Alt**-click (**Option**-click on macOS) on a thumbnail does the same.
+* **Select for compare** — compare the image with the selected one; **Alt**-click (**Option**-click on macOS) on a thumbnail does the same. On the selected image itself, it waits for the next image you select, and reads **Cancel compare** until then.
 * **Generate PBR maps** — queue normal, roughness and displacement maps of the image. They are saved to the board new results go to, or to the project's Inbox if you can't add to that board (Uncategorized when there is neither), and a notice reports when they are ready. The first run downloads the PBR models.
 * **Find in Gallery** — select the image in its own board and scroll the grid to it, clearing a search or filter that would hide it.
 * **Move to board** and **Delete image**.
 
-A video's menu has the equivalent actions for video, including **Extend in Video**, **Use as reference video** and **Use as conditioning clip**. With several items selected, the menu offers the actions that apply to all of them, such as **Star selection**, **Download selection**, **Move to board** and **Delete selection**; for several images it also leads with **Add to Canvas as…** and **New project from images**.
+A video's menu has the equivalent actions for video, including **Extend in Video**, **Use as reference video** and **Use as conditioning clip**. With several items selected, the menu offers the actions that apply to all of them, such as **Star selection**, **Download selection**, **Move to board** and **Delete selection**; for several images it also leads with **Add to Canvas as…** and **New project from images**. **Download selection** saves the selected images as a `.zip` file and each video on its own; a selection of more than 1,000 images downloads as several `.zip` files of up to 1,000 images each, and a notice says how many are coming. Your browser may ask you to allow several downloads from the site.
 
 Every image generated by InvokeAI also stores its generation metadata inside the file, so the prompt and settings travel with it when you download it.
 

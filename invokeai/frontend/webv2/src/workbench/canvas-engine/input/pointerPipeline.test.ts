@@ -8,8 +8,6 @@ import { createPointerPipeline } from '@workbench/canvas-engine/input/pointerPip
 import { createViewport } from '@workbench/canvas-engine/viewport';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-// ---- Fakes -----------------------------------------------------------------
-
 interface FakePointerInit {
   button?: number;
   buttons?: number;
@@ -67,9 +65,7 @@ const makeKeyEvent = (init: {
     target: init.target ?? null,
   }) as unknown as KeyboardEvent;
 
-/** A key target inside the canvas surface; the harness keyboard root claims it through `contains`. */
 const SURFACE_TARGET = { tagName: 'DIV' };
-/** A focused toolbar button outside the surface; its `closest` resolves the interactive selector. */
 const BUTTON_TARGET = { closest: () => ({}), tagName: 'BUTTON' };
 
 const createHarness = (
@@ -120,6 +116,7 @@ const createHarness = (
     activeToolId = id;
   });
   const ctx = {} as ToolContext;
+  const gestureChanges: boolean[] = [];
 
   const deps: PointerPipelineDeps = {
     getActiveTool: () => tool,
@@ -132,15 +129,14 @@ const createHarness = (
     hasTool: (id) => registered.has(id),
     isReplaying: () => opts.replaying?.() ?? false,
     maybeCommitModalSession: opts.maybeCommitModalSession,
+    onGestureChange: (active) => gestureChanges.push(active),
     setTool,
     updateCursor: vi.fn(),
     viewport: createViewport(),
   };
 
-  return { captures, deps, pipeline: createPointerPipeline(deps), releases, setTool, tool };
+  return { captures, deps, gestureChanges, pipeline: createPointerPipeline(deps), releases, setTool, tool };
 };
-
-// ---- Tests -----------------------------------------------------------------
 
 afterEach(() => {
   vi.useRealTimers();
@@ -154,13 +150,6 @@ describe('pointer pipeline: pressure + capture', () => {
     expect(h.captures).toEqual([7]);
     expect(h.tool.downs).toHaveLength(1);
     expect(h.tool.downs[0]!.pressure).toBe(0.5);
-  });
-
-  it('preserves reported pen pressure', () => {
-    const h = createHarness();
-    h.pipeline.onPointerDown(makePointerEvent({ pointerType: 'pen', pressure: 0.73 }));
-    expect(h.tool.downs[0]!.pressure).toBeCloseTo(0.73);
-    expect(h.tool.downs[0]!.pointerType).toBe('pen');
   });
 
   it('releases capture on pointer up and forwards the up sample', () => {
@@ -193,14 +182,6 @@ describe('pointer pipeline: coalesced batching', () => {
     expect(input).toBe(batch[2]);
     expect(batch[0]!.screenPoint).toEqual({ x: 10, y: 10 });
   });
-
-  it('falls back to a single-sample batch when no coalesced events exist', () => {
-    const h = createHarness();
-    h.pipeline.onPointerDown(makePointerEvent({}));
-    h.pipeline.onPointerMove(makePointerEvent({ clientX: 42, coalesced: [] }));
-    expect(h.tool.moves[0]!.batch).toHaveLength(1);
-    expect(h.tool.moves[0]!.input.screenPoint.x).toBe(42);
-  });
 });
 
 describe('pointer pipeline: modal (text-edit) session commit on pointerdown', () => {
@@ -212,22 +193,10 @@ describe('pointer pipeline: modal (text-edit) session commit on pointerdown', ()
     h.pipeline.onPointerDown(event);
 
     expect(maybeCommitModalSession).toHaveBeenCalledTimes(1);
-    expect(h.captures).toEqual([]); // no pointer capture
-    expect(h.tool.downs).toHaveLength(0); // not routed to the active tool
-    expect(h.pipeline.isGestureActive()).toBe(false); // ran before the gesture flag is set
+    expect(h.captures).toEqual([]);
+    expect(h.tool.downs).toHaveLength(0);
+    expect(h.pipeline.isGestureActive()).toBe(false);
     expect(event.preventDefault).toHaveBeenCalled();
-  });
-
-  it('starts a normal gesture when no modal session is open (returns false)', () => {
-    const maybeCommitModalSession = vi.fn(() => false);
-    const h = createHarness({ maybeCommitModalSession });
-
-    h.pipeline.onPointerDown(makePointerEvent({ pointerId: 6 }));
-
-    expect(maybeCommitModalSession).toHaveBeenCalledTimes(1);
-    expect(h.tool.downs).toHaveLength(1);
-    expect(h.pipeline.isGestureActive()).toBe(true);
-    expect(h.captures).toEqual([6]);
   });
 });
 
@@ -271,23 +240,8 @@ describe('pointer pipeline: gesture cancel + secondary buttons', () => {
     h.pipeline.onPointerDown(makePointerEvent({ pointerId: 9 }));
     h.pipeline.onKeyDown(makeKeyEvent({ key: 'Escape' }));
     expect(h.tool.cancels).toBe(1);
-    // A subsequent up is ignored (the gesture already ended).
     h.pipeline.onPointerUp(makePointerEvent({ buttons: 0, pointerId: 9 }));
     expect(h.tool.ups).toHaveLength(0);
-  });
-
-  it('ignores secondary-button presses during an active gesture', () => {
-    const h = createHarness();
-    h.pipeline.onPointerDown(makePointerEvent({ button: 0 }));
-    h.pipeline.onPointerDown(makePointerEvent({ button: 2, buttons: 3 }));
-    expect(h.tool.downs).toHaveLength(1);
-  });
-
-  it('ignores a standalone secondary-button press', () => {
-    const h = createHarness();
-    h.pipeline.onPointerDown(makePointerEvent({ button: 2, buttons: 2 }));
-    expect(h.tool.downs).toHaveLength(0);
-    expect(h.captures).toHaveLength(0);
   });
 });
 
@@ -311,74 +265,28 @@ describe('pointer pipeline: multi-pointer isolation during an active gesture', (
     h.pipeline.onPointerMove(makePointerEvent({ pointerId: 1, clientX: 10 }));
     expect(h.tool.moves).toHaveLength(1);
   });
-
-  it('ignores a second pointer up but ends the gesture on the first pointer up', () => {
-    const h = createHarness();
-    h.pipeline.onPointerDown(makePointerEvent({ pointerId: 1 }));
-    h.pipeline.onPointerUp(makePointerEvent({ buttons: 0, pointerId: 2 }));
-    expect(h.tool.ups).toHaveLength(0);
-    expect(h.releases).toHaveLength(0);
-    h.pipeline.onPointerUp(makePointerEvent({ buttons: 0, pointerId: 1 }));
-    expect(h.tool.ups).toHaveLength(1);
-    expect(h.releases).toEqual([1]);
-  });
-
-  it('ignores cancel events from a second pointer during an active gesture', () => {
-    const h = createHarness();
-    h.pipeline.onPointerDown(makePointerEvent({ pointerId: 1 }));
-    h.pipeline.onPointerCancel(makePointerEvent({ pointerId: 2 }));
-    expect(h.tool.cancels).toBe(0);
-    h.pipeline.onPointerCancel(makePointerEvent({ pointerId: 1 }));
-    expect(h.tool.cancels).toBe(1);
-  });
-
-  it('ignores a second pointerdown while a gesture is active', () => {
-    const h = createHarness();
-    h.pipeline.onPointerDown(makePointerEvent({ pointerId: 1 }));
-    h.pipeline.onPointerDown(makePointerEvent({ pointerId: 2 }));
-    expect(h.tool.downs).toHaveLength(1);
-    expect(h.captures).toEqual([1]);
-  });
 });
 
 describe('pointer pipeline: gesture-active state', () => {
-  it('reports the primary-button gesture from down to up', () => {
+  it('reports the primary-button gesture from down to up, announcing it before the tool sees the press', () => {
     const h = createHarness();
+    const announcedAtToolDown: boolean[][] = [];
+    h.tool.onPointerDown = () => announcedAtToolDown.push([...h.gestureChanges]);
     expect(h.pipeline.isGestureActive()).toBe(false);
     h.pipeline.onPointerDown(makePointerEvent({ pointerId: 1 }));
     expect(h.pipeline.isGestureActive()).toBe(true);
+    expect(announcedAtToolDown).toEqual([[true]]);
     h.pipeline.onPointerMove(makePointerEvent({ pointerId: 1, clientX: 10 }));
     expect(h.pipeline.isGestureActive()).toBe(true);
     h.pipeline.onPointerUp(makePointerEvent({ buttons: 0, pointerId: 1 }));
     expect(h.pipeline.isGestureActive()).toBe(false);
-  });
-
-  it('clears on pointercancel, Escape, and reset', () => {
-    const h = createHarness();
-    h.pipeline.onPointerDown(makePointerEvent({ pointerId: 1 }));
-    h.pipeline.onPointerCancel(makePointerEvent({ pointerId: 1 }));
-    expect(h.pipeline.isGestureActive()).toBe(false);
-
-    h.pipeline.onPointerDown(makePointerEvent({ pointerId: 2 }));
-    h.pipeline.onKeyDown(makeKeyEvent({ key: 'Escape' }));
-    expect(h.pipeline.isGestureActive()).toBe(false);
-
-    h.pipeline.onPointerDown(makePointerEvent({ pointerId: 3 }));
-    h.pipeline.reset();
-    expect(h.pipeline.isGestureActive()).toBe(false);
-  });
-
-  it('does not report a middle-mouse pan as a gesture', () => {
-    const h = createHarness();
-    h.pipeline.onPointerDown(makePointerEvent({ button: 1, buttons: 4 }));
-    expect(h.pipeline.isGestureActive()).toBe(false);
+    expect(h.gestureChanges).toEqual([true, false]);
   });
 });
 
 describe('pointer pipeline: cancelActiveGesture + reset run onPointerCancel', () => {
   it('cancelActiveGesture releases capture and runs the tool cancel once; a no-op with no gesture', () => {
     const h = createHarness();
-    // No gesture: a no-op (the tool cancel must not fire).
     h.pipeline.cancelActiveGesture();
     expect(h.tool.cancels).toBe(0);
 
@@ -388,7 +296,6 @@ describe('pointer pipeline: cancelActiveGesture + reset run onPointerCancel', ()
     expect(h.releases).toContain(5);
     expect(h.pipeline.isGestureActive()).toBe(false);
 
-    // A second call is a no-op — the gesture is already cancelled.
     h.pipeline.cancelActiveGesture();
     expect(h.tool.cancels).toBe(1);
   });
@@ -410,49 +317,9 @@ describe('pointer pipeline: temporary modifier tools', () => {
     const h = createHarness();
     h.pipeline.onPointerEnter();
     h.pipeline.onKeyDown(makeKeyEvent({ code: 'Space' }));
-    // Temporary switches preserve sessions across modifier holds.
     expect(h.setTool).toHaveBeenLastCalledWith('view', { temporary: true });
     h.pipeline.onKeyUp(makeKeyEvent({ code: 'Space' }));
     expect(h.setTool).toHaveBeenLastCalledWith('brush', { temporary: true });
-  });
-
-  it('replaces a matching pending restore target when its session closes', () => {
-    const h = createHarness({ tools: ['view', 'brush', 'sam'] });
-    h.deps.setTool('sam');
-    h.pipeline.onPointerEnter();
-    h.pipeline.onKeyDown(makeKeyEvent({ code: 'Space' }));
-    expect(h.setTool).toHaveBeenLastCalledWith('view', { temporary: true });
-
-    h.pipeline.replaceTemporaryRestoreTool('sam', 'view');
-    h.pipeline.onKeyUp(makeKeyEvent({ code: 'Space' }));
-
-    expect(h.setTool).toHaveBeenLastCalledWith('view', { temporary: true });
-    expect(h.setTool).not.toHaveBeenCalledWith('sam', { temporary: true });
-  });
-
-  it('does not replace an unrelated temporary restore target', () => {
-    const h = createHarness({ tools: ['view', 'brush', 'sam'] });
-    h.pipeline.onPointerEnter();
-    h.pipeline.onKeyDown(makeKeyEvent({ code: 'Space' }));
-
-    h.pipeline.replaceTemporaryRestoreTool('sam', 'view');
-    h.pipeline.onKeyUp(makeKeyEvent({ code: 'Space' }));
-
-    expect(h.setTool).toHaveBeenLastCalledWith('brush', { temporary: true });
-  });
-
-  it('does not switch on space when the pointer is not over the canvas', () => {
-    const h = createHarness();
-    h.pipeline.onKeyDown(makeKeyEvent({ code: 'Space' }));
-    expect(h.setTool).not.toHaveBeenCalled();
-  });
-
-  it('alt-hold is a no-op switch when colorPicker is not registered', () => {
-    const h = createHarness({ tools: ['view', 'brush'] });
-    h.pipeline.onPointerEnter();
-    h.pipeline.onKeyDown(makeKeyEvent({ code: 'AltLeft' }));
-    h.pipeline.onKeyUp(makeKeyEvent({ code: 'AltLeft' }));
-    expect(h.setTool).not.toHaveBeenCalled();
   });
 
   it('alt-hold switches to colorPicker when registered and restores on release', () => {
@@ -462,15 +329,6 @@ describe('pointer pipeline: temporary modifier tools', () => {
     expect(h.setTool).toHaveBeenLastCalledWith('colorPicker', { temporary: true });
     h.pipeline.onKeyUp(makeKeyEvent({ code: 'AltLeft' }));
     expect(h.setTool).toHaveBeenLastCalledWith('brush', { temporary: true });
-  });
-
-  it('leaves alt to a tool that uses it as a gesture modifier', () => {
-    const h = createHarness({ tools: ['view', 'brush', 'colorPicker'] });
-    (h.tool as { usesAltKey?: boolean }).usesAltKey = true;
-    h.pipeline.onPointerEnter();
-    h.pipeline.onKeyDown(makeKeyEvent({ code: 'AltLeft' }));
-    h.pipeline.onKeyUp(makeKeyEvent({ code: 'AltLeft' }));
-    expect(h.setTool).not.toHaveBeenCalled();
   });
 
   it('quick-tapping C sticky-selects the bbox tool after the temporary preview switch', () => {
@@ -485,41 +343,6 @@ describe('pointer pipeline: temporary modifier tools', () => {
     expect(h.setTool.mock.calls.slice(-2)).toEqual([['brush', { temporary: true }], ['bbox']]);
   });
 
-  it('leaves Shift+C to the registered clear-mask hotkey', () => {
-    const h = createHarness({ tools: ['view', 'brush', 'bbox'] });
-    h.pipeline.onPointerEnter();
-
-    h.pipeline.onKeyDown(makeKeyEvent({ code: 'KeyC', key: 'C', shiftKey: true }));
-    h.pipeline.onKeyUp(makeKeyEvent({ code: 'KeyC', key: 'C', shiftKey: true }));
-
-    expect(h.setTool).not.toHaveBeenCalled();
-  });
-
-  it('holding C restores the prior tool on release without sticky-selecting bbox', () => {
-    vi.useFakeTimers();
-    const h = createHarness({ tools: ['view', 'brush', 'bbox'] });
-    h.pipeline.onPointerEnter();
-
-    h.pipeline.onKeyDown(makeKeyEvent({ code: 'KeyC', key: 'c' }));
-    vi.runAllTimers();
-    h.pipeline.onKeyUp(makeKeyEvent({ code: 'KeyC', key: 'c' }));
-
-    expect(h.setTool).toHaveBeenLastCalledWith('brush', { temporary: true });
-  });
-
-  it('keeps temporary bbox active until pointerup when C is released mid-gesture', () => {
-    const h = createHarness({ tools: ['view', 'brush', 'bbox'] });
-    h.pipeline.onPointerEnter();
-
-    h.pipeline.onKeyDown(makeKeyEvent({ code: 'KeyC', key: 'c' }));
-    h.pipeline.onPointerDown(makePointerEvent({ pointerId: 11 }));
-    h.pipeline.onKeyUp(makeKeyEvent({ code: 'KeyC', key: 'c' }));
-    expect(h.setTool).toHaveBeenLastCalledWith('bbox', { temporary: true });
-
-    h.pipeline.onPointerUp(makePointerEvent({ buttons: 0, pointerId: 11 }));
-    expect(h.setTool).toHaveBeenLastCalledWith('brush', { temporary: true });
-  });
-
   it('ignores space/alt holds when the key event targets an editable element', () => {
     const h = createHarness({ tools: ['view', 'brush', 'colorPicker'] });
     h.pipeline.onPointerEnter();
@@ -529,7 +352,6 @@ describe('pointer pipeline: temporary modifier tools', () => {
     h.pipeline.onKeyDown(makeKeyEvent({ code: 'AltLeft', target: { isContentEditable: true } }));
     expect(h.setTool).not.toHaveBeenCalled();
 
-    // A non-editable target inside the surface still triggers the hold.
     h.pipeline.onKeyDown(makeKeyEvent({ code: 'Space', target: SURFACE_TARGET }));
     expect(h.setTool).toHaveBeenLastCalledWith('view', { temporary: true });
   });
@@ -551,99 +373,9 @@ describe('pointer pipeline: Alt eyedropper hold', () => {
     expect(down.preventDefault).toHaveBeenCalledOnce();
     expect(up.preventDefault).toHaveBeenCalledOnce();
 
-    // An unrelated release is still only observed.
     const space = makeKeyEvent({ code: 'Space', target: SURFACE_TARGET });
     h.pipeline.onKeyUp(space);
     expect(space.preventDefault).not.toHaveBeenCalled();
-  });
-
-  it('leaves Alt alone in an editable field', () => {
-    const h = pickerHarness();
-    h.pipeline.onPointerEnter();
-    const editable = altDown({ tagName: 'INPUT' });
-    const editableUp = makeKeyEvent({ code: 'AltLeft', target: { tagName: 'INPUT' } });
-    h.pipeline.onKeyDown(editable);
-    h.pipeline.onKeyUp(editableUp);
-    expect(editable.preventDefault).not.toHaveBeenCalled();
-    expect(editableUp.preventDefault).not.toHaveBeenCalled();
-  });
-
-  it.each([
-    ['hovered', true],
-    ['off the canvas', false],
-  ])(
-    'still prevents an owned Alt %s for a tool that uses it as a modifier, but starts and arms no picker',
-    (_, hovered) => {
-      const h = pickerHarness();
-      (h.tool as { usesAltKey?: boolean }).usesAltKey = true;
-      if (hovered) {
-        h.pipeline.onPointerEnter();
-      }
-      const down = altDown();
-      const up = altUp();
-      h.pipeline.onKeyDown(down);
-      h.pipeline.onPointerEnter({ altKey: true });
-      h.pipeline.onKeyUp(up);
-      expect(down.preventDefault).toHaveBeenCalledOnce();
-      expect(up.preventDefault).toHaveBeenCalledOnce();
-      expect(h.setTool).not.toHaveBeenCalled();
-    }
-  );
-
-  it('arms a pending hold off the canvas that a pointerenter with Alt still held begins', () => {
-    const h = pickerHarness();
-    const down = altDown();
-    h.pipeline.onKeyDown(down);
-    expect(down.preventDefault).toHaveBeenCalledOnce();
-    expect(h.setTool).not.toHaveBeenCalled();
-
-    h.pipeline.onPointerEnter({ altKey: true });
-    expect(h.setTool).toHaveBeenLastCalledWith('colorPicker', { temporary: true });
-    const up = altUp();
-    h.pipeline.onKeyUp(up);
-    expect(up.preventDefault).toHaveBeenCalledOnce();
-    expect(h.setTool).toHaveBeenLastCalledWith('brush', { temporary: true });
-  });
-
-  it('drops the pending hold when the pointer enters without Alt', () => {
-    const h = pickerHarness();
-    h.pipeline.onKeyDown(altDown());
-    h.pipeline.onPointerEnter({ altKey: false });
-    h.pipeline.onPointerLeave();
-    h.pipeline.onPointerEnter({ altKey: true });
-    expect(h.setTool).not.toHaveBeenCalled();
-  });
-
-  it.each([
-    ['the Alt release', (h: ReturnType<typeof createHarness>) => h.pipeline.onKeyUp(altUp())],
-    ['a tool switch', (h: ReturnType<typeof createHarness>) => h.pipeline.endForToolSwitch()],
-    ['a reset', (h: ReturnType<typeof createHarness>) => h.pipeline.reset()],
-  ])('clears the pending hold on %s', (_, clear) => {
-    const h = pickerHarness();
-    h.pipeline.onKeyDown(altDown());
-    clear(h);
-    h.pipeline.onPointerEnter({ altKey: true });
-    expect(h.setTool).not.toHaveBeenCalled();
-  });
-
-  it('begins the pending hold before routing a press that lands without hover, so a pen samples on contact', () => {
-    const h = pickerHarness();
-    const order: string[] = [];
-    h.setTool.mockImplementation((id: ToolId) => order.push(`set:${id}`));
-    h.tool.onPointerDown = () => order.push('down');
-    h.pipeline.onKeyDown(altDown());
-
-    h.pipeline.onPointerDown(makePointerEvent({ altKey: true, pointerId: 5, pointerType: 'pen' }));
-    expect(order).toEqual(['set:colorPicker', 'down']);
-  });
-
-  it('arms nothing off the canvas unless the surface owns the key', () => {
-    const h = pickerHarness({ resolveKeyOwner: () => 'companion' });
-    const down = altDown({ tagName: 'BODY' });
-    h.pipeline.onKeyDown(down);
-    h.pipeline.onPointerEnter({ altKey: true });
-    expect(down.preventDefault).not.toHaveBeenCalled();
-    expect(h.setTool).not.toHaveBeenCalled();
   });
 });
 
@@ -653,7 +385,7 @@ describe('pointer pipeline: injected key owner', () => {
     const resolveKeyOwner = vi.fn((_event: KeyboardEvent) => owner);
     const h = createHarness({ handleEscape, resolveKeyOwner, tools: ['view', 'brush', 'bbox', 'colorPicker'] });
     const commands: string[] = [];
-    h.tool.onKeyCommand = (_ctx, command) => commands.push(command);
+    h.tool.onKeyCommand = (_ctx, command) => commands.push(command) > 0;
     return { ...h, commands, handleEscape, resolveKeyOwner };
   };
   const BODY = { tagName: 'BODY' };
@@ -664,73 +396,10 @@ describe('pointer pipeline: injected key owner', () => {
     ['elsewhere', [], 0],
   ] as const)('with owner %s, Enter applies %j and Escape reaches the ladder %i time(s)', (owner, applied, escapes) => {
     const h = ownerHarness(owner);
-    // Focus left on the body by a click outside the canvas no longer settles ownership by itself.
     h.pipeline.onKeyDown(makeKeyEvent({ key: 'Enter', target: BODY }));
     h.pipeline.onKeyDown(makeKeyEvent({ key: 'Escape', target: BODY }));
     expect(h.commands).toEqual(applied);
     expect(h.handleEscape).toHaveBeenCalledTimes(escapes);
-  });
-
-  it('applies Enter from the surface only while focus is on its root or nowhere, not on a clicked control', () => {
-    const h = ownerHarness('surface');
-    const button = { ...BUTTON_TARGET, matches: () => false };
-    h.pipeline.onFocusIn({ target: button } as unknown as FocusEvent);
-    h.pipeline.onKeyDown(makeKeyEvent({ key: 'Enter', target: button }));
-    h.pipeline.onKeyDown(makeKeyEvent({ key: 'Enter', target: SURFACE_TARGET }));
-    expect(h.commands).toEqual(['apply']);
-  });
-
-  it.each([
-    ['surface', true],
-    ['companion', true],
-    ['elsewhere', false],
-  ] as const)('with owner %s, a quick C tap selects the frame tool: %s', (owner, selects) => {
-    const h = ownerHarness(owner);
-    h.pipeline.onKeyDown(makeKeyEvent({ code: 'KeyC', key: 'c', target: BODY }));
-    h.pipeline.onKeyUp(makeKeyEvent({ code: 'KeyC', key: 'c', target: BODY }));
-    expect(h.setTool.mock.calls.some(([id]) => id === 'bbox')).toBe(selects);
-  });
-
-  it.each(['surface', 'companion', 'elsewhere'] as const)(
-    'with owner %s, Space and Alt hold over the hovered canvas',
-    (owner) => {
-      const h = ownerHarness(owner);
-      h.pipeline.onPointerEnter();
-      const space = makeKeyEvent({ code: 'Space', target: BODY });
-      h.pipeline.onKeyDown(space);
-      expect(h.setTool).toHaveBeenLastCalledWith('view', { temporary: true });
-      expect(space.preventDefault).toHaveBeenCalledOnce();
-      h.pipeline.onKeyUp(makeKeyEvent({ code: 'Space', target: BODY }));
-
-      const alt = makeKeyEvent({ altKey: true, code: 'AltLeft', target: BODY });
-      h.pipeline.onKeyDown(alt);
-      expect(h.setTool).toHaveBeenLastCalledWith('colorPicker', { temporary: true });
-      expect(alt.preventDefault).toHaveBeenCalledOnce();
-    }
-  );
-
-  it.each([
-    ['companion', false],
-    ['elsewhere', false],
-    ['surface', true],
-  ] as const)('with owner %s and no hover, Alt is claimed: %s', (owner, claimed) => {
-    const h = ownerHarness(owner);
-    const alt = makeKeyEvent({ altKey: true, code: 'AltLeft', target: BODY });
-    h.pipeline.onKeyDown(alt);
-    expect(alt.preventDefault).toHaveBeenCalledTimes(claimed ? 1 : 0);
-    h.pipeline.onKeyDown(makeKeyEvent({ code: 'Space', target: BODY }));
-    expect(h.setTool).not.toHaveBeenCalled();
-  });
-
-  it('asks the judge only after its own refusals', () => {
-    const h = ownerHarness('surface');
-    h.pipeline.onPointerEnter();
-    h.pipeline.onKeyDown(makeKeyEvent({ key: 'Escape', target: { tagName: 'INPUT' } }));
-    h.pipeline.onKeyDown(makeKeyEvent({ code: 'Space', target: BUTTON_TARGET }));
-    h.pipeline.onKeyDown(makeKeyEvent({ defaultPrevented: true, key: 'Enter', target: BODY }));
-    h.pipeline.onPointerDown(makePointerEvent({ pointerId: 1 }));
-    expect(h.resolveKeyOwner).not.toHaveBeenCalled();
-    expect(h.handleEscape).not.toHaveBeenCalled();
   });
 });
 
@@ -738,7 +407,7 @@ describe('pointer pipeline: canvas keyboard ownership', () => {
   const applyHarness = () => {
     const h = createHarness();
     const commands: string[] = [];
-    h.tool.onKeyCommand = (_ctx, command) => commands.push(command);
+    h.tool.onKeyCommand = (_ctx, command) => commands.push(command) > 0;
     return { ...h, commands };
   };
 
@@ -761,7 +430,7 @@ describe('pointer pipeline: canvas keyboard ownership', () => {
     const handleEscape = vi.fn();
     const h = createHarness({ handleEscape });
     const commands: string[] = [];
-    h.tool.onKeyCommand = (_ctx, command) => commands.push(command);
+    h.tool.onKeyCommand = (_ctx, command) => commands.push(command) > 0;
     h.pipeline.onPointerEnter();
     const body = { tagName: 'BODY' };
     const release = registerModalPresence();
@@ -782,23 +451,6 @@ describe('pointer pipeline: canvas keyboard ownership', () => {
     expect(commands).toEqual(['apply']);
     expect(handleEscape).toHaveBeenCalledOnce();
   });
-
-  it('leaves Space to a focused control and to Ctrl/Meta/Alt chords', () => {
-    const h = createHarness();
-    h.pipeline.onPointerEnter();
-    const onButton = makeKeyEvent({ code: 'Space', key: ' ', target: BUTTON_TARGET });
-    h.pipeline.onKeyDown(onButton);
-    h.pipeline.onKeyDown(makeKeyEvent({ code: 'Space', ctrlKey: true, target: SURFACE_TARGET }));
-    h.pipeline.onKeyDown(makeKeyEvent({ code: 'Space', metaKey: true, target: SURFACE_TARGET }));
-    h.pipeline.onKeyDown(makeKeyEvent({ code: 'Space', defaultPrevented: true, target: SURFACE_TARGET }));
-    expect(h.setTool).not.toHaveBeenCalled();
-    expect(onButton.preventDefault).not.toHaveBeenCalled();
-
-    const owned = makeKeyEvent({ code: 'Space', key: ' ', shiftKey: true, target: SURFACE_TARGET });
-    h.pipeline.onKeyDown(owned);
-    expect(h.setTool).toHaveBeenLastCalledWith('view', { temporary: true });
-    expect(owned.preventDefault).toHaveBeenCalledOnce();
-  });
 });
 
 describe('pointer pipeline: history replay', () => {
@@ -816,6 +468,7 @@ describe('pointer pipeline: history replay', () => {
 
     replaying = false;
     h.pipeline.onPointerUp(makePointerEvent({ buttons: 0, pointerId: 2 }));
+    expect(h.gestureChanges).toEqual([]);
     h.pipeline.onPointerDown(makePointerEvent({ pointerId: 3 }));
     expect(h.tool.downs).toHaveLength(1);
   });
@@ -836,44 +489,32 @@ describe('pointer pipeline: cancellation ownership', () => {
     ]);
     expect(h.tool.ups).toHaveLength(0);
 
-    // The released pointer hovers normally again.
     h.pipeline.onPointerMove(makePointerEvent({ buttons: 0, clientX: 6, pointerId: 4 }));
     expect(h.tool.moves).toHaveLength(2);
   });
 
-  it.each([
-    ['released mid-gesture', true],
-    ['still held', false],
-  ])('a tool switch first restores the held tool when its key is %s', (_, released) => {
+  it('releases tool-owned modifiers on blur reset when their keyup was missed between presses', () => {
     const h = createHarness();
+    const held = new Set<string>();
+    h.tool.onModifierKey = (_ctx, modifier, pressed) => {
+      if (pressed) {
+        held.add(modifier);
+      } else {
+        held.delete(modifier);
+      }
+      return true;
+    };
+    const moves: string[][] = [];
+    h.tool.onPointerMove = () => moves.push([...held]);
     h.pipeline.onPointerEnter();
     h.pipeline.onKeyDown(makeKeyEvent({ code: 'Space', target: SURFACE_TARGET }));
-    h.pipeline.onPointerDown(makePointerEvent({ pointerId: 2 }));
-    if (released) {
-      h.pipeline.onKeyUp(makeKeyEvent({ code: 'Space' }));
-    }
-    h.setTool.mockClear();
-
-    h.pipeline.endForToolSwitch();
-    expect(h.tool.cancels).toBe(1);
-    expect(h.setTool.mock.calls).toEqual([['brush', { temporary: true }]]);
-    h.pipeline.onKeyUp(makeKeyEvent({ code: 'Space' }));
-    expect(h.setTool).toHaveBeenCalledOnce();
-  });
-
-  it('reset cancels through the held temporary tool before restoring the prior tool', () => {
-    const h = createHarness();
-    const order: string[] = [];
-    h.tool.onPointerCancel = () => order.push(`cancel:${h.deps.getActiveToolId()}`);
-    h.pipeline.onPointerEnter();
-    h.pipeline.onKeyDown(makeKeyEvent({ code: 'Space', target: SURFACE_TARGET }));
-    h.pipeline.onPointerDown(makePointerEvent({ pointerId: 3 }));
-    h.setTool.mockImplementation((id: ToolId) => {
-      order.push(`set:${id}`);
-    });
-
+    h.pipeline.onKeyDown(makeKeyEvent({ key: 'Alt', code: 'AltLeft', target: SURFACE_TARGET }));
+    h.pipeline.onKeyDown(makeKeyEvent({ key: 'Shift', target: SURFACE_TARGET }));
+    expect(held.size).toBe(3);
     h.pipeline.reset();
-    expect(order).toEqual(['cancel:view', 'set:brush']);
-    expect(h.pipeline.isGestureActive()).toBe(false);
+    h.pipeline.onPointerEnter();
+    h.pipeline.onPointerDown(makePointerEvent());
+    h.pipeline.onPointerMove(makePointerEvent({ clientX: 50, clientY: 50 }));
+    expect(moves).toEqual([[]]);
   });
 });

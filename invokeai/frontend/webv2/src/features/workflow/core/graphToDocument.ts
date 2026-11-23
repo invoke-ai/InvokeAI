@@ -10,6 +10,7 @@ import {
   migrateMiniMaxH3NumFramesValue,
   nodeAcceptsExtraInputs,
 } from './document';
+import { isHiDiffusionNode, normalizeHiDiffusionInputs } from './fields';
 import { getLayeredPositions } from './graphLayout';
 import { isInvocationNode } from './types';
 
@@ -32,7 +33,6 @@ export interface PreviewGraphDocumentResult {
   skippedNodeTypes: string[];
 }
 
-/** Converts a read-only preview graph into an editable project graph document. */
 export const previewGraphToDocument = (
   graph: PreviewGraphLike,
   templates: InvocationTemplates
@@ -97,6 +97,13 @@ export const previewGraphToDocument = (
       }
     }
 
+    if (isHiDiffusionNode(node.data.type) && template.inputs.hidiffusion_auto_ratios) {
+      normalizeHiDiffusionInputs(
+        node.data.inputs,
+        Object.fromEntries(Object.entries(graphNode.inputs).map(([name, value]) => [name, { name, value }])),
+        new Set(graph.edges.filter((edge) => edge.targetNodeId === graphNode.id).map((edge) => edge.targetField))
+      );
+    }
     nodes.push(node);
   }
 
@@ -128,8 +135,8 @@ export const previewGraphToDocument = (
     });
   }
 
-  // Clear literal values on connected inputs after wiring, so a stale direct
-  // value can't shadow the edge during compilation.
+  // Clear literal values on connected inputs after wiring, so a stale direct value can't shadow the edge during
+  // compilation.
   for (const edge of edges) {
     const targetNode = nodes.find((node) => node.id === edge.target);
     const instance =
@@ -180,8 +187,8 @@ export const storedGraphToDocument = (raw: unknown, templates: InvocationTemplat
     templates
   );
 
-  // Graphs carry no source versions. Recognize legacy values before labeling the recalled nodes current.
-  // Preview conversion has already cleared connected input literals, so they cannot be mistaken for old lists.
+  // Graphs carry no source versions. Recognize legacy values before labeling the recalled nodes current. Preview
+  // conversion has already cleared connected input literals, so they cannot be mistaken for old lists.
   for (const node of result.document.nodes) {
     if (!isInvocationNode(node)) {
       continue;

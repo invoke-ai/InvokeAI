@@ -45,6 +45,45 @@ describe('models store loading', () => {
     expect(api.listModels).toHaveBeenCalledTimes(2);
   });
 
+  it('reads the library fresh with file availability, and lists every model present when detection fails', async () => {
+    const a = { base: 'sdxl', key: 'a', name: 'A', type: 'main' };
+    const b = { base: 'sdxl', key: 'b', name: 'B', type: 'main' };
+    const { listModelsWithAvailability } = await import('./modelsStore');
+
+    api.listModels.mockResolvedValueOnce([a, b]);
+    api.listMissingModels.mockResolvedValueOnce([b]);
+    await expect(listModelsWithAvailability()).resolves.toEqual([a, { ...b, is_missing: true }]);
+
+    api.listModels.mockResolvedValueOnce([a, b]);
+    api.listMissingModels.mockRejectedValueOnce(new Error('down'));
+    await expect(listModelsWithAvailability()).resolves.toEqual([a, b]);
+  });
+
+  it('flags a registered model whose files are gone on its catalog entry', async () => {
+    const a = { base: 'sdxl', key: 'a', name: 'A', type: 'main' };
+    const b = { base: 'sdxl', key: 'b', name: 'B', type: 'main' };
+    api.listModels.mockResolvedValueOnce([a, b]);
+    api.listMissingModels.mockResolvedValueOnce([b]);
+    const store = await import('./modelsStore');
+
+    await store.refreshModels();
+
+    expect(store.getModelsSnapshot().models).toEqual([a, { ...b, is_missing: true }]);
+    expect(store.getModelsSnapshot().modelsByKey.get('b')).toMatchObject({ is_missing: true });
+  });
+
+  it('keeps a missing model flagged when a server response replaces its record', async () => {
+    const b = { base: 'sdxl', key: 'b', name: 'B', type: 'main' };
+    api.listModels.mockResolvedValueOnce([b]);
+    api.listMissingModels.mockResolvedValueOnce([b]);
+    const store = await import('./modelsStore');
+
+    await store.refreshModels();
+    store.replaceModelInStore({ ...b, name: 'Renamed' } as ModelConfig);
+
+    expect(store.getModelsSnapshot().modelsByKey.get('b')).toMatchObject({ is_missing: true, name: 'Renamed' });
+  });
+
   it('keeps the by-key index in lockstep with every models write', async () => {
     api.listModels.mockResolvedValueOnce([
       { base: 'sdxl', key: 'a', name: 'A', type: 'main' },
@@ -61,6 +100,99 @@ describe('models store loading', () => {
     store.removeModelsFromStore(['b']);
     expect(store.getModelsSnapshot().modelsByKey.has('b')).toBe(false);
     expect(store.getModelsSnapshot().models.map((model) => model.key)).toEqual(['a']);
+  });
+
+  it.each(['replace', 'patch', 'delete', 'cover'] as const)(
+    'fences an older list after a confirmed %s and reads unrelated changes on the trailing pass',
+    async (mutation) => {
+      const original = { key: 'a', name: 'Before', cover_image: null } as ModelConfig;
+      let finishOld!: (models: ModelConfig[]) => void;
+      let finishFresh!: (models: ModelConfig[]) => void;
+      api.listModels
+        .mockReturnValueOnce(
+          new Promise((resolve) => {
+            finishOld = resolve;
+          })
+        )
+        .mockReturnValueOnce(
+          new Promise((resolve) => {
+            finishFresh = resolve;
+          })
+        );
+      const store = await import('./modelsStore');
+      store.setModelsSnapshotForTests({ models: [original], status: 'loaded' });
+      const refresh = store.refreshModels();
+      if (mutation === 'replace') {
+        store.replaceModelInStore({ ...original, name: 'After' });
+      }
+      if (mutation === 'patch') {
+        store.patchModelInStore('a', { name: 'After' });
+      }
+      if (mutation === 'delete') {
+        store.removeModelsFromStore(['a']);
+      }
+      if (mutation === 'cover') {
+        store.markCoverImageChanged('a', true);
+      }
+      const confirmed = store.getModelsSnapshot().models;
+      finishOld([original]);
+      await refresh;
+      expect(store.getModelsSnapshot().models).toEqual(confirmed);
+      expect(api.listModels).toHaveBeenCalledTimes(2);
+      finishFresh([...confirmed, { key: 'b', name: 'Unrelated' } as ModelConfig]);
+      await store.ensureModelsLoaded();
+      expect(store.getModelsSnapshot().modelsByKey.get('b')?.name).toBe('Unrelated');
+    }
+  );
+
+  it('discards an obsolete list error after a mutation and still reads the authoritative trailing result', async () => {
+    const original = { key: 'a', name: 'Before' } as ModelConfig;
+    let rejectOld!: (error: Error) => void;
+    let finishFresh!: (models: ModelConfig[]) => void;
+    api.listModels
+      .mockReturnValueOnce(
+        new Promise((_resolve, reject) => {
+          rejectOld = reject;
+        })
+      )
+      .mockReturnValueOnce(
+        new Promise((resolve) => {
+          finishFresh = resolve;
+        })
+      );
+    const store = await import('./modelsStore');
+    store.setModelsSnapshotForTests({ models: [original], status: 'loaded' });
+    const refresh = store.refreshModels();
+    store.replaceModelInStore({ ...original, name: 'Confirmed' });
+    rejectOld(new Error('Obsolete failure'));
+    await refresh;
+    expect(store.getModelsSnapshot()).toMatchObject({ error: null, status: 'loaded' });
+    expect(store.getModelsSnapshot().modelsByKey.get('a')?.name).toBe('Confirmed');
+    expect(api.listModels).toHaveBeenCalledTimes(2);
+    finishFresh([{ ...original, name: 'Confirmed' }, { key: 'b', name: 'Unrelated' } as ModelConfig]);
+    await store.ensureModelsLoaded();
+    expect(store.getModelsSnapshot().modelsByKey.get('b')?.name).toBe('Unrelated');
+  });
+
+  it('accepts authoritative data after an optimistic change rolls back', async () => {
+    const model = { key: 'a', name: 'Before', cpu_only: null } as ModelConfig;
+    let finishOld!: (models: ModelConfig[]) => void;
+    api.listModels
+      .mockReturnValueOnce(
+        new Promise((resolve) => {
+          finishOld = resolve;
+        })
+      )
+      .mockResolvedValueOnce([{ ...model, name: 'Server rename' }]);
+    const store = await import('./modelsStore');
+    store.setModelsSnapshotForTests({ models: [model], status: 'loaded' });
+    const refresh = store.refreshModels();
+    store.patchModelInStore('a', { cpu_only: true });
+    store.patchModelInStore('a', { cpu_only: null });
+    finishOld([model]);
+    await refresh;
+    await store.ensureModelsLoaded();
+    expect(store.getModelsSnapshot().modelsByKey.get('a')).toMatchObject({ name: 'Server rename', cpu_only: null });
   });
 
   it('unwraps FastAPI detail bodies into the snapshot error', async () => {
@@ -103,7 +235,6 @@ describe('models store loading', () => {
           resolveB = resolve;
         })
       )
-      // The join during user B's flight queues a trailing rerun.
       .mockResolvedValueOnce([modelB]);
     const userARefresh = modelsStore.refreshModels();
 
@@ -120,7 +251,6 @@ describe('models store loading', () => {
 
     expect(modelsStore.getModelsSnapshot().models.map((model) => model.key)).toEqual(['model-b']);
 
-    // The mid-flight join re-fetches once more after the shared flight settles.
     await new Promise((resolve) => {
       setTimeout(resolve, 0);
     });

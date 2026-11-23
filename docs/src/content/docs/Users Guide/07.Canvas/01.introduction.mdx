@@ -1,7 +1,7 @@
 ---
 title: Crafting images with the Canvas
 description: An introduction to the Canvas — layers and masks, sending generations to the Canvas, inpainting, outpainting, regional prompts, control layers, drawing and adding gallery images.
-lastUpdated: 2026-10-31
+lastUpdated: 2026-11-18
 ---
 
 import { Image } from 'astro:assets';
@@ -18,7 +18,7 @@ The **Canvas** is where you build and refine an image in layers. You can paint, 
 
 The Canvas lives in the **Edit** layout (**Alt+2**): the Canvas is in the center, the **Generate** panel on the left supplies the model, prompt and settings, and the **Layers** panel on the right lists the canvas's layers and their settings.
 
-<Image src={editLayout} alt="The Edit layout: the Generate panel on the left, the Canvas with a mountain landscape in the center, and the Layers panel with its color picker, layer list and Properties on the right." />
+<Image src={editLayout} alt="The Edit layout: the Generate panel on the left, the Canvas with a glowing jellyfish over a city at dusk in the center, its inpaint masks and regional guidance areas visible, and the Layers panel with its color picker, layer list and Properties on the right." />
 
 This page introduces the main ideas and tasks. The [Canvas guide](/users-guide/canvas/canvas-guide/) and the [Layers panel guide](/users-guide/canvas/layers-panel/) describe every tool, menu and setting.
 
@@ -39,11 +39,11 @@ The Layers panel groups layers by type, in the stacks **Inpaint Masks**, **Regio
 
 <Image src={addLayerMenu} alt="The Add layer menu with Inpaint mask, Regional guidance, Regional reference image, Control layer, Raster layer and New group." width={500} />
 
-Each layer row has a dot on the left that switches the layer on or off for generation. Masks, regional guidance and control layers also have an eye button, which only hides them from view: a hidden mask still affects generation. **Shift+H** hides all of them at once so you can see the image underneath.
+Each raster layer row has an eye button on the right: a hidden raster layer is off the canvas and takes no part in generation. Mask, regional guidance and control layer rows have a dot before the eye as well. The dot decides whether the layer takes part in generation, and the eye only gets the layer out of view while it still affects generation. **Shift+H** does that for all of them at once so you can see the image underneath.
 
 ### Settings live in the Properties pane
 
-Each layer's settings, such as a regional prompt or a control layer's model, are in the **Properties** tab at the bottom of the Layers panel. Select the layer and click **Properties**: the heading at the top of the tab confirms which layer you are editing, for example *Layer: Regional Guidance 1*. The settings are in its **Layer** section. The Layer section comes after the settings of the active tool, so **you may need to scroll the Properties pane down to see it**. Dragging the divider above the Properties pane upward, or collapsing the color picker, gives it more room.
+Each layer's settings, such as a regional prompt or a control layer's model, are in the **Properties** tab at the bottom of the Layers panel. Select the layer and click **Properties**: the heading at the top of the tab confirms which layer you are editing, for example *Layer: Regional Guidance 1*. The settings are in its **Layer** section. The Layer section comes after the settings of the active tool, so **you may need to scroll the Properties pane down to see it**. Right-clicking the layer and choosing **Layer properties** opens the tab and scrolls to that section for you. Dragging the divider above the Properties pane upward, or collapsing the color picker, gives it more room.
 
 ### The generation frame
 
@@ -78,7 +78,7 @@ Inpainting regenerates part of an image and leaves the rest untouched: remove an
 
 1. **Add an inpaint mask**, or select the empty one a new canvas starts with, in the **Inpaint Masks** stack. (A new canvas opens with nothing selected and the Brush active, so a stroke there paints a new raster layer.)
 
-2. **Paint the mask.** Choose the **Brush** (**B**) and paint over the area to regenerate, or draw it with the **Shape** tool (**R**). The mask shows as a tinted overlay. The **Eraser** (**E**) removes mask, and **[** and **]** change the brush size.
+2. **Paint the mask.** Choose the **Brush** (**B**) and paint over the area to regenerate, or draw it with the **Shape** tool (**U**). The mask shows as a tinted overlay. The **Eraser** (**E**) removes mask, and **[** and **]** change the brush size.
 
 3. **Describe the result** in the Generate panel's prompt: describe the whole picture as it should look, or just what should appear in the masked area.
 
@@ -120,7 +120,7 @@ Regional guidance gives one area of the image its own prompt. For example, keep 
 
 2. **Paint the region** with the **Brush**, or draw it with the **Shape** tool. It shows as a tinted overlay.
 
-3. **Enter the region's prompt.** With the layer selected, open **Properties** and scroll down to its **Layer** section. Type in **Positive prompt**, and optionally **Negative prompt**. The prompt is saved when you click away from the field.
+3. **Enter the region's prompt.** Right-click the layer and choose **Layer properties**: the **Properties** tab opens at its **Layer** section. Type in **Positive prompt**. To keep something out of the region as well, click **+ Negative prompt…** and type in **Negative prompt**. Each prompt is saved when you click away from its field.
 
 4. **Press Invoke.** The main prompt still describes the whole image; the regional prompt applies inside the region.
 
@@ -128,7 +128,7 @@ Regional guidance gives one area of the image its own prompt. For example, keep 
 
 To guide a region with an image instead of, or as well as, words, choose **Add reference image** from the regional guidance layer's right-click menu, or add a **Regional reference image** layer from the **+** menu. The reference appears as a row under the layer; select that row to choose its image, model and weight in Properties.
 
-Regional guidance works with SD 1.5, SDXL, FLUX.1, FLUX.2, FLUX.3, Krea-2, Z-Image, Anima, MOSS-Image and Ideogram 4. [FLUX.3](/users-guide/models/local-models/flux-3/#layout-boxes-from-regional-guidance), MOSS-Image and Ideogram 4 place each region as a box in a JSON prompt instead of masking its prompt. MOSS-Image offers a **Region type** (Object by default, Character or Text); see [MOSS-Image](/users-guide/models/local-models/moss-image/#layout-with-canvas-regions) and [Ideogram 4](/users-guide/models/local-models/ideogram4/#prompting-ideogram-4). Regional negative prompts are available for SD 1.5 and SDXL, and regional reference images for SD 1.5, SDXL (IP-Adapter) and FLUX.1 (FLUX Redux). With other models, regional layers are skipped, and the layer's Properties say so. For a reference image that applies to the whole picture, use **Add reference image** in the Generate panel instead.
+Regional guidance works with SD 1.5, SDXL, FLUX.1, FLUX.2, FLUX.3, Krea-2, Z-Image, Anima, MOSS-Image and Ideogram 4. [FLUX.3](/users-guide/models/local-models/flux-3/#layout-boxes-from-regional-guidance), MOSS-Image and Ideogram 4 place each region as a box in a JSON prompt instead of masking its prompt. MOSS-Image offers a **Region type** (Object by default, Character or Text); see [MOSS-Image](/users-guide/models/local-models/moss-image/#layout-with-canvas-regions) and [Ideogram 4](/users-guide/models/local-models/ideogram4/#prompting-ideogram-4). Regional negative prompts and auto-negative are available for SD 1.5, SDXL, Krea-2, Z-Image and Anima. For Krea-2, Z-Image and Anima, they take effect only at CFG Scale above 1. Regional reference images are available for SD 1.5, SDXL (IP-Adapter) and FLUX.1 (FLUX Redux). With other models, regional layers are skipped, and the layer's Properties say so. For a reference image that applies to the whole picture, use **Add reference image** in the Generate panel instead.
 
 ## Control layers
 
@@ -143,7 +143,7 @@ A control layer shapes the composition with a guide image: the edges of a sketch
    * Right-click an image in the Gallery and choose **Use as Control**. It fills the selected control layer if that layer has no image yet, and otherwise adds a new control layer.
    * Right-click a raster layer and choose **Use as control layer**, which copies its pixels to a new control layer.
    * Drag an image from the Gallery onto the canvas and drop it on **Add as control layer**. As with **Use as Control**, it fills the selected control layer if that layer is still empty.
-   * Select an empty control layer and drop an image file from your computer onto the canvas, where the layer shows *Drop an image here*. The file is uploaded into that layer.
+   * Drag an image file from your computer onto the canvas and drop it on **Add as control layer**. It is uploaded to the Gallery first, then fills the selected control layer if that layer is still empty, as a Gallery image does.
 
 2. **Choose the Type**: **Pose**, **Depth**, **Edges**, **Soft edges**, **Line art**, **Sketch**, **Color** or **Tile**. Next to each type, the menu says how many installed models are made for it, *via Union* when only a Union model covers it, or *Not installed*.
 
@@ -159,7 +159,7 @@ Once a map has been detected, a switch above the canvas shows the layer as its *
 
 An empty control layer, or one with neither a type nor a model, only shows a warning and contributes nothing; Invoke stays available. A control layer with an image blocks Invoke if no model can be chosen for it, or if its map is out of date. **Invoke** then shows the number of issues, for example *Invoke · 1 issue*; click it to list them, and choose **Show layer** to select the layer that needs attention.
 
-Control layers work with SD 1.5, SDXL, FLUX.1, FLUX.2 [dev], Qwen Image, Z-Image and Anima, and need a control model for the same family, installed from the Model Manager's starter models. If no model fits, the **Model** row says so, with a link to the Model Manager when you can manage models.
+Control layers work with SD 1.5, SDXL, FLUX.1, FLUX.2 [dev], Qwen Image, Krea-2, Z-Image and Anima, and need a control model for the same family, installed from the Model Manager's starter models. On Krea-2 the control model is a [Control LoRA](/users-guide/models/local-models/krea-2/#control-lora), installed from its Hugging Face file rather than the starter models. If no model fits, the **Model** row says so, with a link to the Model Manager when you can manage models.
 
 ## Drawing on a raster layer
 
@@ -173,9 +173,10 @@ The tool strip also has shape, gradient and text tools, which are described in t
 
 ## Adding a gallery image to a layer
 
-There are three ways to bring an existing image onto the canvas:
+There are four ways to bring an existing image onto the canvas:
 
 * **Drag it from the Gallery.** With the Gallery and the Canvas both on screen (for example, the Compose layout with its center view switched to Canvas), drag an image onto the canvas. Drop zones appear: **Add as raster layer**, **Add as control layer**, **Add as regional reference image**, **Add as inpaint mask** and **Add as resized control layer**, which scales the image to the model's optimal size.
+* **Drag it from your computer.** Drag one or more image files (PNG, JPEG or WebP) from your file manager or the desktop onto the canvas. The same drop zones appear. The files are uploaded to the Gallery, to the board new results go to, and then added as the zone says. Other kinds of files are refused with a notice. While an operation such as a filter is running, the canvas says it is busy and takes no drop, and until an upload finishes, another drop is refused. An image dragged from a web page often arrives as a link rather than a file; save it first, then drag the file.
 * **Use the image's menu.** Right-click an image in the Gallery or Preview, or open **Edit** in the Preview's header. **Edit on Canvas** adds it as an image layer and opens Canvas; **Add to Canvas as…** lets you choose the kind of layer. **New project from image** instead starts a new project whose canvas holds the image, sized to fit it; the current project is left as it is.
 * **Paste it.** Copy an image, click the canvas and press **Ctrl+V** (**Cmd+V** on macOS). It is added as a new raster layer at the generation frame.
 

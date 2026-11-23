@@ -123,6 +123,30 @@ class TestASingleFile:
         assert _identified_base(path) is BaseModelType.StableDiffusion1
         assert _identified_base(path, base=BaseModelType.StableDiffusion2) is BaseModelType.StableDiffusion2
 
+    @pytest.mark.parametrize(
+        ("file_name", "encoder_conv_in", "decoder_conv_in"),
+        [
+            ("ltx-2.5-22b_video_vae_bf16.safetensors", (8, 3, 3, 3, 3), (8, 128, 3, 3, 3)),
+            ("ltx-2.5-22b_audio_vae_bf16.safetensors", (8, 2, 3, 3), (8, 8, 3, 3)),
+        ],
+    )
+    def test_a_vae_without_a_decoder_conv_in_weight_is_not_filed_under_any_base(
+        self,
+        tmp_path: Path,
+        file_name: str,
+        encoder_conv_in: tuple[int, ...],
+        decoder_conv_in: tuple[int, ...],
+    ) -> None:
+        path = tmp_path / file_name
+        save_file(
+            {
+                "encoder.conv_in.conv.weight": torch.zeros(encoder_conv_in),
+                "decoder.conv_in.conv.weight": torch.zeros(decoder_conv_in),
+            },
+            path,
+        )
+        assert _identified_base(path) is None
+
 
 class TestAFolder:
     @pytest.mark.parametrize("override", [None, FLUX, SD3])

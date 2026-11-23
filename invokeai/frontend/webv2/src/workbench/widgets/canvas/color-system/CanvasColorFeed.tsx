@@ -21,22 +21,14 @@ import {
   prepareMaskTintEdit,
 } from './useMaskTintEditor';
 
-/**
- * What one eyedropper pick writes, fixed at its first sample so a selection change mid-pick cannot retarget it.
- * Gradient stops have no armed state, so a pick on the Gradient tool writes the pair. A live text session is no
- * target: its editor holds focus and keeps Alt, and leaving it commits the session.
- */
+/** One pick's target, fixed at its first sample so a mid-pick selection change cannot retarget it. */
 type PickTarget =
   | { kind: 'mask-tint'; layerId: string }
   | { kind: 'shape'; layerId: string; field: 'fill' | 'stroke' }
   | { kind: 'text-layer'; layerId: string }
   | { kind: 'pair'; target: ActiveColorTarget; before: string };
 
-/**
- * Precedence: the armed mask tint while its mask is still selected; a selected shape (the foreground target writes
- * its fill, the background its stroke) when it has that slot; a selected text layer; otherwise the pair. A shape's
- * off slot is no target, as in its own options, where the toggle alone turns a slot on.
- */
+/** Precedence: armed mask tint, selected shape slot that is on, selected text layer, then the pair. */
 const resolvePickTarget = (engine: CanvasEngineHandle, canvasValues: Record<string, unknown>): PickTarget => {
   const model = engine.document.model();
   const document = model?.document ?? null;
@@ -60,10 +52,7 @@ const resolvePickTarget = (engine: CanvasEngineHandle, canvasValues: Record<stri
   return { before: readActiveColorPair(canvasValues)[pairTarget], kind: 'pair', target: pairTarget };
 };
 
-/**
- * Isolate frequent color-pair updates in this null adapter. Mirror the pair into brush color, captured at stroke
- * start, and route eyedropper picks to the armed color target.
- */
+/** Isolates frequent pair updates; mirrors the pair into brush color and routes picks to the armed target. */
 export const CanvasColorFeed = ({ engine }: { engine: CanvasEngineHandle | null }) => {
   const colorPair = useActiveColorPair();
 
@@ -86,8 +75,8 @@ export const CanvasColorFeed = ({ engine }: { engine: CanvasEngineHandle | null 
     engine.interaction.set('colorPair', { background: colorPair.background, foreground: colorPair.foreground });
   }, [engine, colorPair.background, colorPair.foreground]);
 
-  // Keyed by engine identity, so each engine instance (a project's engine recreated after disposal included) mounts
-  // its own routing and registers its router exactly once.
+  // Keyed by engine identity, so each engine instance (a project's engine recreated after disposal included) mounts its
+  // own routing and registers its router exactly once.
   return engine ? <ColorSampleRouting key={engineKey(engine)} engine={engine} /> : null;
 };
 
@@ -190,7 +179,6 @@ const ColorSampleRouting = ({ engine }: { engine: CanvasEngineHandle }) => {
     pickRef.current = null;
   });
 
-  // The parent keys this component by engine, so the router registers once per engine instance.
   // The linter cannot see useMountEffect as an effect, so it rejects calling the effect events from it.
   /* eslint-disable react-hooks/rules-of-hooks -- useMountEffect is the repository's explicit useEffect wrapper */
   useMountEffect(() => {

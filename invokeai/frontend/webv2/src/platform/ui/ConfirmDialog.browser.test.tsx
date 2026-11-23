@@ -1,10 +1,10 @@
 import { ChakraProvider, Text } from '@chakra-ui/react';
 import { system } from '@theme/system';
 import { createInstance } from 'i18next';
-import { act, useCallback, useState, type ReactNode } from 'react';
+import { act, Activity, useCallback, useState, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { initReactI18next } from 'react-i18next';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { userEvent } from 'vitest/browser';
 
 import { ConfirmDialog } from './ConfirmDialog';
@@ -84,6 +84,63 @@ describe('ConfirmDialog', () => {
     expect(confirmCalls).toBe(1);
   });
 
+  it('reconciles a confirmation closed while its Activity is hidden', async () => {
+    let finish!: () => void;
+    const pending = new Promise<void>((resolve) => {
+      finish = resolve;
+    });
+    const confirm = vi.fn(() => pending);
+    const Host = () => {
+      const [open, setOpen] = useState(false);
+      const show = useCallback(() => setOpen(true), []);
+      const close = useCallback(() => setOpen(false), []);
+      return (
+        <>
+          <button type="button" onClick={show}>
+            Open confirmation
+          </button>
+          <output>{open ? 'open' : 'closed'}</output>
+          <ConfirmDialog
+            body="This operation keeps running while hidden."
+            confirmLabel="Proceed"
+            isOpen={open}
+            title="Confirm operation"
+            onClose={close}
+            onConfirm={confirm}
+          />
+        </>
+      );
+    };
+    host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    const render = (mode: 'visible' | 'hidden') =>
+      act(() =>
+        root!.render(
+          <ChakraProvider value={system}>
+            <Activity mode={mode}>
+              <Host />
+            </Activity>
+          </ChakraProvider>
+        )
+      );
+    await render('visible');
+    await act(() => userEvent.click(host!.querySelector<HTMLButtonElement>('button')!));
+    const proceed = [...document.querySelectorAll<HTMLButtonElement>('[role="alertdialog"] button')].find(
+      (button) => button.textContent === 'Proceed'
+    )!;
+    await act(() => userEvent.click(proceed));
+    await render('hidden');
+    await act(async () => {
+      finish();
+      await pending;
+    });
+    await render('visible');
+    expect(host.querySelector('output')?.textContent).toBe('closed');
+    await expect.poll(() => document.querySelector('[role="alertdialog"][data-state="open"]')).toBeNull();
+    expect(confirm).toHaveBeenCalledOnce();
+  });
+
   it('keeps the text it showed while it animates out after its host clears the subject', async () => {
     // The usual host shape: the subject drives the copy and is cleared the moment the dialog closes.
     const Host = () => {
@@ -150,7 +207,8 @@ describe('ConfirmDialog', () => {
           color: style.color,
           fontSize: style.fontSize,
           fontWeight: style.fontWeight,
-          // Layout height: the content is still scaling in from 0.95 when it reports open, which the rect would include.
+          // Layout height: the content is still scaling in from 0.95 when it reports open, which the rect would
+          // include.
           height: paragraph.offsetHeight,
           letterSpacing: style.letterSpacing,
           lineHeight: style.lineHeight,

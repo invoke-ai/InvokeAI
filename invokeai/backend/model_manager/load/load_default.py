@@ -29,6 +29,7 @@ from invokeai.backend.model_manager.taxonomy import (
     AnyModel,
     SubModelType,
 )
+from invokeai.backend.quantization.dequantizing_linear import DequantizingLinear
 from invokeai.backend.quantization.fp8_scaled import count_fp8_weights, should_keep_fp8_weights
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.fp8 import FP8_COMPUTE_DTYPE_ATTR, FP8_STORAGE_DTYPES, set_fp8_compute_dtype
@@ -231,6 +232,15 @@ def _is_quantized_param(param: torch.nn.Parameter) -> bool:
     return not param.data.is_floating_point() or type(param.data) is not torch.Tensor
 
 
+def _declared_patterns(model: torch.nn.Module, attr: str) -> tuple[str, ...]:
+    """The string entries of a class attribute that lists module-name patterns, tolerating odd declarations."""
+    declared = getattr(model, attr, None) or ()
+    # Diffusers stores these as lists of strings, but a subclass could set a bare string.
+    if isinstance(declared, str):
+        declared = (declared,)
+    return tuple(p for p in declared if isinstance(p, str))
+
+
 def _model_declared_skip_patterns(model: torch.nn.Module) -> tuple[str, ...]:
     """The precision-sensitive modules a model declares for itself, as skip patterns.
 
@@ -251,11 +261,7 @@ def _model_declared_skip_patterns(model: torch.nn.Module) -> tuple[str, ...]:
     """
     patterns: list[str] = []
     for attr in ("_skip_layerwise_casting_patterns", "_keep_in_fp32_modules"):
-        declared = getattr(model, attr, None) or ()
-        # Diffusers stores these as lists of strings, but a subclass could set a bare string.
-        if isinstance(declared, str):
-            declared = (declared,)
-        patterns.extend(p for p in declared if isinstance(p, str) and p not in patterns)
+        patterns.extend(p for p in _declared_patterns(model, attr) if p not in patterns)
     return tuple(patterns)
 
 
@@ -357,7 +363,8 @@ class ModelLoader(ModelLoaderBase):
 
         Device caches share one canonical CPU copy per key, which a second device adopts instead of rerunning the
         loader. A loader whose stored format depends on the device (float8 where supported, the dtype it computes in)
-        returns the format here, so only devices that build the same weights share a copy. Empty by default.
+        returns the format here, so only devices that build the same weights share a copy. Empty by default. Appended after
+        the role suffix (`:as_<type>`, see `_load_and_cache`).
         """
         return ""
 
@@ -376,6 +383,10 @@ class ModelLoader(ModelLoaderBase):
         """
         stats_name = ":".join([config.base, config.type, config.name, (submodel_type or "")])
         cache_key = get_model_cache_key(config.key, submodel_type)
+        if getattr(config, "role_of", None) is not None:
+            # A role view loads the record's files through another config class and loader, so it is its own entry.
+            # The "<key>:" prefix stays, so dropping or offloading the record still covers it.
+            cache_key = f"{cache_key}:as_{config.type.value}"
         variant = self._cache_key_variant(config, submodel_type)
         if variant:
             cache_key = f"{cache_key}:{variant}"
@@ -625,6 +636,21 @@ class ModelLoader(ModelLoaderBase):
                 )
                 return model
 
+        # A quantized build leaves its timestep, input/output, modulation and text layers dense, at the precision the
+        # build chose. For int8 an unscaled e4m3 cast flushes small weights there to zero (94.8% of MOSS-Image int8's
+        # `time_embedding.2`) and moved Krea-2 int8's step-0 output error from 1.9% to 2.8%, for a saving of 0-7% of
+        # the model, so a scheme keeps its build as shipped unless it sets `leaves_dense_layers_to_fp8_storage`. After
+        # the fp8 check so that a model holding fp8 weights gets the single "already fp8" notice.
+        if isinstance(model, torch.nn.Module) and any(
+            isinstance(module, DequantizingLinear) and not module.leaves_dense_layers_to_fp8_storage
+            for module in model.modules()
+        ):
+            self._logger.info(
+                f"FP8 Storage skipped for {config.name} - this quantized build keeps its quantized layers as "
+                "stored and its other layers in the precision the build chose."
+            )
+            return model
+
         storage_dtype = torch.float8_e4m3fn
         compute_dtype = self._torch_dtype
 
@@ -638,10 +664,22 @@ class ModelLoader(ModelLoaderBase):
         # widen every other layer to `uint8` and `get_model_compute_dtype` would hand `uint8` to the
         # denoise loop — finite garbage, nothing logged. A float8 leading param is skipped for the
         # same reason `set_fp8_compute_dtype` rejects one: it is storage, not arithmetic.
+        #
+        # Parameters of `_keep_in_fp32_modules` are skipped too, by the same name rule as diffusers'
+        # `get_parameter_dtype`: they stay float32 on purpose and say nothing about the dtype the
+        # other layers compute in (Wan's `scale_shift_table` is registered first and would make
+        # every fp8 weight widen to float32).
         if isinstance(model, torch.nn.Module):
+            keep_fp32 = _declared_patterns(model, "_keep_in_fp32_modules")
+            float_params = [
+                (name, p)
+                for name, p in model.named_parameters()
+                if p.is_floating_point() and p.dtype not in FP8_STORAGE_DTYPES
+            ]
+            # When every float is kept in float32 there is nothing else to read; like diffusers, take the first.
             compute_dtype = next(
-                (p.dtype for p in model.parameters() if p.is_floating_point() and p.dtype not in FP8_STORAGE_DTYPES),
-                compute_dtype,
+                (p.dtype for name, p in float_params if not any(m in name for m in keep_fp32)),
+                float_params[0][1].dtype if float_params else compute_dtype,
             )
 
         # We use our own hook-based path for every nn.Module — including diffusers ModelMixin —

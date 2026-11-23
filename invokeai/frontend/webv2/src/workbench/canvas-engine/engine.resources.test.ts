@@ -18,12 +18,12 @@ import type * as RasterControllerModule from './controllers/rasterController';
 import type { RasterController } from './controllers/rasterController';
 
 import { createCanvasEngine } from './engine';
+import * as psdExport from './export/psdExport';
 
 const NO_GROUP_CONTENT: GroupSurfaceContent = { excludeIds: new Set(), float: null, previews: null };
 
 const owners = vi.hoisted(() => ({ raster: null as RasterController | null }));
 
-// Captures the engine's real raster owner; its behavior is unchanged.
 vi.mock('./controllers/rasterController', async (importOriginal) => {
   const actual = await importOriginal<typeof RasterControllerModule>();
   class CapturedRasterController extends actual.RasterController {
@@ -211,6 +211,111 @@ describe('engine raster resource lifecycle', () => {
     engine.lifecycle.dispose();
   });
 
+  it('publishes PSD progress and cancels a single active export through the public API, then retries', async () => {
+    const { engine, raster } = createEngine();
+    const statuses: string[] = [];
+    const unsubscribe = engine.interaction.subscribe('psdExportStatus', () =>
+      statuses.push(engine.interaction.get('psdExportStatus'))
+    );
+    const download = vi.fn();
+    let entered!: () => void;
+    const serializing = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    let first = true;
+    const execute = psdExport.executePsdExport;
+    const execution = vi.spyOn(psdExport, 'executePsdExport').mockImplementation((plan, name, deps) =>
+      execute(plan, name, {
+        ...deps,
+        download,
+        writePsd: () => {
+          if (!first) {
+            return Promise.resolve(new ArrayBuffer(8));
+          }
+          first = false;
+          entered();
+          return new Promise((_resolve, reject) => {
+            deps.signal?.addEventListener('abort', () => reject(new DOMException('Cancelled', 'AbortError')), {
+              once: true,
+            });
+          });
+        },
+      })
+    );
+    try {
+      const pending = engine.exports.exportRasterLayersToPsd('first');
+      expect(engine.interaction.get('psdExportStatus')).toBe('preparing');
+      await serializing;
+      expect(engine.interaction.get('psdExportStatus')).toBe('serializing');
+      await expect(engine.exports.exportRasterLayersToPsd('duplicate')).resolves.toBe('busy');
+      engine.exports.cancelPsdExport();
+      expect(engine.interaction.get('psdExportStatus')).toBe('cancelling');
+      await expect(pending).resolves.toBe('aborted');
+      expect(raster.memory.snapshot()).toMatchObject({ detachedBytes: 0, reservedBytes: 0 });
+      expect(download).not.toHaveBeenCalled();
+      await expect(engine.exports.exportRasterLayersToPsd('retry')).resolves.toBe('exported');
+      expect(download).toHaveBeenCalledOnce();
+      expect(statuses).toEqual([
+        'preparing',
+        'serializing',
+        'cancelling',
+        'idle',
+        'preparing',
+        'serializing',
+        'downloading',
+        'idle',
+      ]);
+    } finally {
+      unsubscribe();
+      execution.mockRestore();
+      engine.lifecycle.dispose();
+    }
+  });
+
+  it('releases PSD raster bytes before download and preserves the successful handoff across cooldown', async () => {
+    const { engine, raster } = createEngine();
+    let finishDownload!: () => void;
+    let downloadStarted!: () => void;
+    const downloading = new Promise<void>((resolve) => {
+      downloadStarted = resolve;
+    });
+    const download = new Promise<void>((resolve) => {
+      finishDownload = resolve;
+    });
+    const execute = psdExport.executePsdExport;
+    const execution = vi.spyOn(psdExport, 'executePsdExport').mockImplementation((plan, fileName, deps) =>
+      execute(plan, fileName, {
+        ...deps,
+        writePsd: () => Promise.resolve(new ArrayBuffer(8)),
+        download: () => {
+          downloadStarted();
+          return download;
+        },
+      })
+    );
+    const pending = engine.exports.exportRasterLayersToPsd('pending.psd');
+    try {
+      await downloading;
+      const reserved = raster.memory.snapshot().reservedBytes;
+      expect(reserved).toBe(0);
+      expect(raster.memory.snapshot().detachedBytes).toBe(0);
+
+      await expect(engine.lifecycle.beginCooldown()).resolves.toBe('cooled');
+      expect(raster.memory.snapshot().reservedBytes).toBe(reserved);
+      engine.lifecycle.activate();
+      expect(raster.memory.snapshot().reservedBytes).toBe(reserved);
+
+      finishDownload();
+      await expect(pending).resolves.toBe('exported');
+      expect(raster.memory.snapshot()).toMatchObject({ reservedBytes: 0, detachedBytes: 0 });
+    } finally {
+      finishDownload();
+      await pending;
+      execution.mockRestore();
+      engine.lifecycle.dispose();
+    }
+  });
+
   it('releases every resource category deterministically on disposal', async () => {
     const { engine, raster } = createEngine();
     const bitmap = { close: vi.fn(), height: 10, width: 10 } as unknown as ImageBitmap;
@@ -317,10 +422,8 @@ describe('engine raster composite export', () => {
 
     await expect(exportRect()).resolves.toMatchObject({ status: 'ok' });
 
-    // The output and the sampled layer-local scratch, never a layer-sized adjusted copy outside the reservation.
     expect(allocated).toEqual([[EXPORT_RECT.width, EXPORT_RECT.height], SAMPLED_SIZE]);
     const [sampledWidth, sampledHeight] = SAMPLED_SIZE;
-    // Output surface, plus the scratch surface and its ImageData readback.
     expect(reserved[0]).toBeGreaterThanOrEqual(
       (EXPORT_RECT.width * EXPORT_RECT.height + sampledWidth * sampledHeight * 2) * 4
     );
