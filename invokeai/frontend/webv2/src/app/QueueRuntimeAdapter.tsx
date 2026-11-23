@@ -3,7 +3,11 @@ import { invalidateGallery, invalidateGalleryBoardDestinations } from '@features
 import { getAuthSession } from '@features/identity';
 import { modelLoadActivitySink } from '@features/models';
 import { nodeExecutionStore } from '@features/nodes';
-import { createProductionQueueRuntime, createProductionQueueReceiptAcknowledgements } from '@features/queue';
+import {
+  createProductionQueueRuntime,
+  createProductionQueueReceiptAcknowledgements,
+  subscribeRemoteModelTransferToasts,
+} from '@features/queue';
 import { ensureInvocationTemplatesLoaded } from '@features/workflow/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import {
@@ -11,6 +15,8 @@ import {
   captureAccountScope,
   isAccountScopeCurrent,
 } from '@platform/state/accountLifecycle';
+import { socketHub } from '@platform/transport/socketHub';
+import { toaster } from '@platform/ui/toaster';
 import { useQueryClient } from '@tanstack/react-query';
 import { getOpenProject, getProjectSyncSnapshot } from '@workbench/projects/syncStore';
 import {
@@ -34,6 +40,7 @@ export const QueueRuntimeAdapter = () => {
     // Changing users remounts the workbench route, so the session read here stays the runtime's viewer.
     const session = getAuthSession();
     const viewerUserId = session.multiuserEnabled ? (session.user?.user_id ?? null) : null;
+    const disposeTransferToasts = subscribeRemoteModelTransferToasts(socketHub, toaster);
     let isDisposed = false;
     let journal: QueueRunJournal | undefined;
     let recallCache: QueueRecallCache | undefined;
@@ -181,6 +188,7 @@ export const QueueRuntimeAdapter = () => {
 
     return () => {
       isDisposed = true;
+      disposeTransferToasts();
       receiptAcknowledgements?.dispose();
       if (runtime) {
         void runtime.dispose().finally(() => {

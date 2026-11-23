@@ -325,6 +325,22 @@ class SessionQueue(SessionQueueBase):
         self.__invoker.services.events.emit_batch_enqueued(admitted, user_id=user_id)
         return admitted
 
+    def _park_remote_only_before_local_claim(self, queue_item: SessionQueueItem) -> bool:
+        """Leave Remote Only jobs to the remote pool without occupying a Local GPU.
+
+        Enqueue-time remote dispatch and native dequeue run concurrently. A Local worker
+        must park an eligible Remote Only row *before* trying to claim it; the guarded
+        database transition safely loses if another lane already took the item.
+        """
+        from invokeai.app.invocations.remote_worker.worker_pool import _settings_for_queue_item
+
+        settings = _settings_for_queue_item(queue_item)
+        if settings is None or settings.mode != "Remote Only":
+            return False
+
+        self.transition_queue_item_if_status(queue_item.item_id, "waiting", ("pending",), queue_item=queue_item)
+        return True
+
     def dequeue(self, device: Optional[str] = None) -> Optional[SessionQueueItem]:
         config = self.__invoker.services.configuration
         use_round_robin = config.multiuser and config.session_queue_mode == "round_robin"
@@ -348,7 +364,15 @@ class SessionQueue(SessionQueueBase):
             queue_item, readable = self._hydrate_queue_item(raw_queue_item, quarantine=True)
             if not readable:
                 continue
+            # Do not let a native GPU claim Remote Only work, even if the
+            # asynchronous remote pool has not parked the item yet.
+            if self._park_remote_only_before_local_claim(queue_item):
+                continue
+            original_item_id = queue_item.item_id
             queue_item = self._apply_device_affinity(queue_item, resident_model_keys)
+            # Device affinity can select a different pending queue item.
+            if queue_item.item_id != original_item_id and self._park_remote_only_before_local_claim(queue_item):
+                continue
             claimed = self._queries.session_queue.claim(queue_item.item_id, device)
             if claimed is None:
                 continue
@@ -489,6 +513,37 @@ class SessionQueue(SessionQueueBase):
         self, queue_id: str, origin_prefix: Optional[str] = None, owner_id: Optional[str] = None
     ) -> Optional[SessionQueueItem]:
         return self._get_queue_item_by_status_for_api(queue_id, "pending", origin_prefix, owner_id)
+
+    def get_root_queue_item_ids(
+        self, queue_id: str, user_id: str, statuses: tuple[QUEUE_ITEM_STATUS, ...]
+    ) -> list[int]:
+        return self._queries.session_queue.root_ids_by_status(queue_id, user_id, statuses)
+
+    def transition_queue_item_if_status(
+        self,
+        item_id: int,
+        status: QUEUE_ITEM_STATUS,
+        expected_statuses: tuple[QUEUE_ITEM_STATUS, ...],
+        device: Optional[str] = None,
+        queue_item: Optional[SessionQueueItem] = None,
+    ) -> Optional[SessionQueueItem]:
+        """Claim, park or requeue only if the actual database status is one we expect.
+
+        Uses the same transactional compare-and-swap pattern as local dequeue. The
+        status event is emitted only by the successful transition.
+        """
+        if queue_item is not None and queue_item.item_id != item_id:
+            raise ValueError(f"Queue item {queue_item.item_id} does not match requested item {item_id}")
+        changed = self._queries.session_queue.guarded_transition(item_id, status, expected_statuses, device=device)
+        if changed is None:
+            return None
+        if queue_item is None:
+            queue_item = self.get_queue_item(item_id)
+        else:
+            for field_name, value in changed.items():
+                setattr(queue_item, field_name, value)
+        self._emit_status_changed(queue_item)
+        return queue_item
 
     def _set_queue_item_status(
         self,
