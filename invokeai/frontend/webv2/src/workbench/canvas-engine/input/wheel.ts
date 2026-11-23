@@ -1,7 +1,8 @@
 /**
  * Mouse wheel: plain wheel zooms around the cursor, resting on snap points; ctrl+wheel sizes brush/eraser and is
  * otherwise swallowed. Trackpad: plain wheel pans on both axes for every tool; ctrl+wheel, how browsers deliver a
- * pinch, zooms continuously around the cursor. `scrollInput` picks one, or `auto` judges each event (`wheelDevice.ts`).
+ * pinch, zooms continuously around the cursor. `scrollInput` picks one, or `auto` judges each event (`wheelDevice.ts`);
+ * a two-axis event or a pinch proves a trackpad.
  */
 
 import type { ScalarStore, ScrollInput } from '@workbench/canvas-engine/engineStores';
@@ -24,7 +25,7 @@ export interface WheelHandlerDeps {
   /** Inverts ctrl+wheel brush sizing (default false: wheel-up grows); a user preference read fresh per event. */
   getInvertBrushSizeScroll(): boolean;
   getScrollInput(): ScrollInput;
-  /** The physical Control key; a pinch's ctrl+wheel arrives with it `up`. */
+  /** The physical Control key; a pinch's ctrl+wheel arrives with it `up` or, right after window focus, `unknown`. */
   getControlKeyState(): ControlKeyState;
   /** Set on trackpad proof; gates `auto` routing of smooth scrolling. */
   trackpadDetected: Pick<ScalarStore<boolean>, 'get' | 'set'>;
@@ -64,7 +65,7 @@ export const createWheelInput = (deps: WheelHandlerDeps): WheelInputHandlers => 
     return { x: event.clientX - (rect?.left ?? 0), y: event.clientY - (rect?.top ?? 0) };
   };
 
-  const routesAsTrackpad = (sample: WheelSample, pinch: boolean): boolean => {
+  const routesAsTrackpad = (sample: WheelSample): boolean => {
     const scrollInput = deps.getScrollInput();
     if (scrollInput !== 'auto') {
       return scrollInput === 'trackpad';
@@ -76,7 +77,7 @@ export const createWheelInput = (deps: WheelHandlerDeps): WheelInputHandlers => 
     if (sample.kind === 'notched') {
       return false;
     }
-    if (sample.twoAxis || pinch) {
+    if (sample.twoAxis || sample.pinch) {
       deps.trackpadDetected.set(true);
     }
     // Until a trackpad shows itself, smooth scrolling may be a high-resolution mouse wheel, which zooms.
@@ -100,11 +101,10 @@ export const createWheelInput = (deps: WheelHandlerDeps): WheelInputHandlers => 
     },
     onWheel: (event) => {
       event.preventDefault();
-      const pinch = event.ctrlKey && deps.getControlKeyState() === 'up';
-      const sample = classify(event, deps.viewport.getViewportSize(), pinch);
+      const sample = classify(event, deps.viewport.getViewportSize(), deps.getControlKeyState());
       const anchor = screenAnchor(event);
 
-      if (routesAsTrackpad(sample, pinch)) {
+      if (routesAsTrackpad(sample)) {
         if (event.ctrlKey) {
           deps.viewport.zoomAtPoint(deps.viewport.getZoom() * pinchZoomFactor(sample.deltaY), anchor);
         } else {

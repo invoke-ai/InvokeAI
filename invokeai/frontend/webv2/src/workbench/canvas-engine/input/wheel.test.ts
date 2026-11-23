@@ -156,13 +156,23 @@ describe('wheel input: auto', () => {
     expect(h.viewport.getState().pan).toEqual({ x: -2, y: -6 });
   });
 
-  it('detects a pinch, ctrl+wheel with Control known up, and zooms by it instead of sizing the brush', () => {
-    const h = createHarness({ controlKey: 'up' });
-    // Chromium stamps each pinch step as one whole wheel tick.
+  it.each(['up', 'unknown'] as const)(
+    'detects a pinch, a whole-tick ctrl+wheel step with Control %s, and zooms by it instead of sizing the brush',
+    (controlKey) => {
+      const h = createHarness({ controlKey });
+      // Chromium stamps each pinch step as one whole wheel tick.
+      h.wheel(-10, { ctrlKey: true, wheelDeltaY: 120 });
+      expect(h.detected.value).toBe(true);
+      expect(h.stepActiveBrushSize).not.toHaveBeenCalled();
+      expect(h.viewport.getZoom()).toBeCloseTo(Math.exp(0.1), 10);
+    }
+  );
+
+  it('sizes the brush on a whole-tick ctrl+wheel step while Control is held', () => {
+    const h = createHarness({ controlKey: 'down' });
     h.wheel(-10, { ctrlKey: true, wheelDeltaY: 120 });
-    expect(h.detected.value).toBe(true);
-    expect(h.stepActiveBrushSize).not.toHaveBeenCalled();
-    expect(h.viewport.getZoom()).toBeCloseTo(Math.exp(0.1), 10);
+    expect(h.stepActiveBrushSize).toHaveBeenCalledWith(1);
+    expect(h.detected.value).toBe(false);
   });
 
   it('zooms by a pinch whose first step is large, which Chromium also stamps as a whole tick', () => {
@@ -175,7 +185,8 @@ describe('wheel input: auto', () => {
   it('sizes the brush on a ctrl+notch that arrives with Control up, as Sticky Keys sends it', () => {
     const h = createHarness({ controlKey: 'up' });
     h.notch(-1, { ctrlKey: true });
-    expect(h.stepActiveBrushSize).toHaveBeenCalledWith(1);
+    h.wheel(-3, { ctrlKey: true, deltaMode: 1 });
+    expect(h.stepActiveBrushSize.mock.calls).toEqual([[1], [1]]);
     expect(h.detected.value).toBe(false);
   });
 
