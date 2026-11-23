@@ -471,7 +471,7 @@ describe('locked workspaces', () => {
     expect(store.getSnapshot().account.layoutPresetOrder).toEqual(['compose', 'custom-1', 'edit', 'video', 'automate']);
   });
 
-  it('offers Customize and Reset view in the active tab’s menu, and nothing that deletes', async () => {
+  it('offers Customize, Reset view and Manage workspaces in the active tab’s menu, and no Delete', async () => {
     const menuItems = () =>
       Array.from(document.querySelectorAll<HTMLElement>('[role="menuitem"]')).map((item) => item.dataset.value);
     const menuItem = (value: string) => document.querySelector<HTMLElement>(`[role="menuitem"][data-value="${value}"]`);
@@ -484,7 +484,7 @@ describe('locked workspaces', () => {
 
     await act(() => userEvent.click(presetTab('compose')!, { button: 'right' }));
     await expect.poll(() => menuItem('customize'), POLL).not.toBeNull();
-    expect(menuItems()).toEqual(['customize', 'reset-view']);
+    expect(menuItems()).toEqual(['customize', 'reset-view', 'manage-presets']);
 
     await act(() => userEvent.click(menuItem('reset-view')!));
 

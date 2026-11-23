@@ -171,6 +171,27 @@ describe('Customize session', () => {
     expect(getLayoutOf(undone).widgetRegions).toEqual(getLayoutOf(before).widgetRegions);
   });
 
+  it('steps the route auto-routing set with the arrangement: Undo and Redo, Cancel, and undoing Done', () => {
+    const routeOf = (state: ReturnType<typeof onCompose>) => getActiveProject(state).invocation.sourceId;
+    const customizing = workbenchReducer(onCompose(), { type: 'beginCustomize' });
+    const added = workbenchReducer(customizing, { region: 'left', type: 'openRegionWidget', widgetId: 'video' });
+    const undone = workbenchReducer(added, { type: 'undoProjectChange' });
+
+    expect(routeOf(customizing)).toBe('generate');
+    expect(routeOf(added)).toBe('video');
+    expect(getLayoutOf(undone).widgetRegions.left.instanceIds).not.toContain('video');
+    expect(routeOf(undone)).toBe('generate');
+    expect(routeOf(workbenchReducer(undone, { type: 'redoProjectChange' }))).toBe('video');
+
+    // Cancel is as it was on entry, a route picked by hand meanwhile included.
+    const picked = workbenchReducer(added, { sourceId: 'upscale', type: 'setInvocationSource' });
+    expect(routeOf(workbenchReducer(picked, { type: 'cancelCustomize' }))).toBe('generate');
+
+    const done = workbenchReducer(added, finish);
+    expect(routeOf(done)).toBe('video');
+    expect(routeOf(workbenchReducer(done, { type: 'undoProjectChange' }))).toBe('generate');
+  });
+
   it('resets to default as a draft edit: undoable, removing the overrides at Done and none at Cancel', () => {
     const customized = workbenchReducer(
       workbenchReducer(
@@ -281,13 +302,20 @@ describe('Customize session', () => {
     expect(getActiveProject(done).workspaceId).toBe('review');
   });
 
-  it('ends when its workspace is deleted', () => {
+  it('ends when its workspace is deleted, saying so only when that discards changes', () => {
     const custom = addCustomWorkspace(onCompose(), { id: 'mine', label: 'Mine' });
     const customizing = workbenchReducer(custom, { type: 'beginCustomize' });
     const deleted = workbenchReducer(customizing, { presetId: 'mine', type: 'deleteLayoutPreset' });
+    const endedNotices = (state: typeof custom) =>
+      state.notifications.filter(({ titleKey }) => titleKey === 'shell.workspace.customizeEndedTitle');
 
     expect(customizing.customizing).toMatchObject({ [custom.activeProjectId]: { draft: {}, presetId: 'mine' } });
     expect(deleted.customizing).toEqual({});
+    expect(endedNotices(deleted)).toEqual([]);
+
+    const edited = workbenchReducer(customizing, { region: 'left', sizePx: 600, type: 'setRegionWidgetSize' });
+    const [notice] = endedNotices(workbenchReducer(edited, { presetId: 'mine', type: 'deleteLayoutPreset' }));
+    expect(notice?.messageListValues).toEqual({ workspace: [{ text: 'Mine' }] });
 
     // A new workspace drafted from it goes too, leaving no view of the draft.
     const drafting = workbenchReducer(workbenchReducer(custom, { newWorkspace: copy, type: 'beginCustomize' }), {
@@ -300,5 +328,8 @@ describe('Customize session', () => {
     expect(getActiveProject(drafting).views).toHaveProperty('review');
     expect(draftDeleted.customizing).toEqual({});
     expect(getActiveProject(draftDeleted).views).not.toHaveProperty('review');
+    expect(endedNotices(draftDeleted).map(({ messageListValues }) => messageListValues)).toEqual([
+      { workspace: [{ text: 'Compose copy' }] },
+    ]);
   });
 });

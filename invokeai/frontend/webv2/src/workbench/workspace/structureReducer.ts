@@ -24,6 +24,7 @@ import type { SurfaceAvailability, WorkspaceView } from './view';
 
 import { clampRegionSize, normalizeStructure, PANEL_OPEN_KEYS, SIDE_REGIONS } from './structure';
 import { isSharedWithCenter } from './view';
+import { isPlacedInstance } from './workspaceDerivations';
 
 export type StructureAction =
   /**
@@ -444,7 +445,7 @@ const countCenterViews = (placement: CenterPlacement, availability: Availability
 
     return (
       instanceId !== without &&
-      placement.guests?.[instanceId] === undefined &&
+      isPlacedInstance(placement, instanceId) &&
       typeId !== undefined &&
       availability.getPresentation(typeId, 'center') === 'view'
     );

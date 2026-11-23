@@ -1,21 +1,28 @@
 import { useWorkbenchFocus } from '@workbench/focusRegions';
 import { useWorkbenchCommands, useWorkbenchQueries } from '@workbench/WorkbenchContext';
 import { useWorkbenchWidgetRegistry } from '@workbench/WorkbenchWidgetRegistryContext';
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 
-import type { OpenInWorkspace } from './workspaceNavigation';
+import type { OpenInWorkspace, WorkspaceNavigationPorts } from './workspaceNavigation';
 
 import { openInWorkspace } from './workspaceNavigation';
 
-/** `openInWorkspace` bound to this editor's store, widget registry and focus, for controls the user acts on. */
-export const useWorkspaceOpen = (): OpenInWorkspace => {
+/** This editor's store, widget registry and focus, as workspace navigation reads them. */
+export const useWorkspaceNavigationPorts = (): WorkspaceNavigationPorts => {
   const commands = useWorkbenchCommands();
   const queries = useWorkbenchQueries();
   const focus = useWorkbenchFocus();
   const { getWidgetsForRegion } = useWorkbenchWidgetRegistry();
 
-  return useCallback<OpenInWorkspace>(
-    (intents, options) => openInWorkspace({ commands, focus, getWidgetsForRegion, queries }, intents, options),
+  return useMemo(
+    () => ({ commands, focus, getWidgetsForRegion, queries }),
     [commands, focus, getWidgetsForRegion, queries]
   );
+};
+
+/** `openInWorkspace` bound to this editor, for controls the user acts on. */
+export const useWorkspaceOpen = (): OpenInWorkspace => {
+  const ports = useWorkspaceNavigationPorts();
+
+  return useCallback<OpenInWorkspace>((intents, options) => openInWorkspace(ports, intents, options), [ports]);
 };

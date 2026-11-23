@@ -1,3 +1,4 @@
+import type { InvocationRoute } from '@workbench/invocationContracts';
 import type { LayoutPresetId, LayoutPresetRoute } from '@workbench/layoutContracts';
 
 import { builtInLayoutPresetDescriptors } from '@workbench/layoutPresets';
@@ -41,17 +42,25 @@ export interface CustomizeSession {
   entryStructure: WorkspaceStructure;
   /** The project's view of the workspace when Customize began: Cancel puts it back. */
   entryView: WorkspaceView | undefined;
+  /** The project's Invoke route when Customize began: Cancel puts it back, and undoing Done does. */
+  entryInvocation: InvocationRoute;
   /** Every step the session made (structure, view, name, icon, route, reset), for its Undo and Redo. */
   history: { past: readonly CustomizeHistoryEntry[]; future: readonly CustomizeHistoryEntry[] };
   /** The workspace the project is on. */
   presetId: LayoutPresetId;
 }
 
+/** What a Customize step changes beside its draft: the project's view of the workspace and the route it ran. */
+export interface CustomizeProjectSide {
+  /** Structural gestures auto-route, so a step's route goes back and forth with its arrangement. */
+  invocation: InvocationRoute;
+  view: WorkspaceView | undefined;
+}
+
 /** A state of the session to step back or forward to. */
-export interface CustomizeHistoryEntry {
+export interface CustomizeHistoryEntry extends CustomizeProjectSide {
   draft: CustomizeDraft;
   structure: WorkspaceStructure;
-  view: WorkspaceView | undefined;
   resetPending?: true;
   mergeKey?: string;
   mergedAt: string;

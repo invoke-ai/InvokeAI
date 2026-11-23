@@ -75,6 +75,8 @@ export interface WorkflowWidgetCommands {
    */
   open(options: { surface?: 'stage' | 'panel'; widgetId: string }): void;
   patchValues(widgetId: string, values: Record<string, unknown>): void;
+  /** Shows the workflow's form in this workspace, as a guest window where it places none; never its graph. */
+  showForm(): void;
 }
 
 export interface WorkflowNodeExecutionState {

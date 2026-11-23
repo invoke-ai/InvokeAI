@@ -1,3 +1,5 @@
+import type { WorkbenchState } from '@workbench/projectContracts';
+
 import { getWidgetsForRegion } from '@workbench/widgetRegistry';
 import { createInitialWorkbenchState, withArrangement, workbenchReducer } from '@workbench/workbenchState.testing';
 import { createWorkbenchStore } from '@workbench/workbenchStore';
@@ -11,13 +13,18 @@ import {
   keepGuestInWorkspace,
   openInWorkspace,
   runWorkspaceCommand,
+  showWorkflowForm,
   toggleCenterPreview,
 } from './workspaceNavigation';
 
-const createNavigation = ({ presetId = 'compose', warm = true }: { presetId?: string; warm?: boolean } = {}) => {
+const createNavigation = ({
+  arrange = (state) => state,
+  presetId = 'compose',
+  warm = true,
+}: { arrange?: (state: WorkbenchState) => WorkbenchState; presetId?: string; warm?: boolean } = {}) => {
   const pendingLoads: (() => void)[] = [];
   const store = createWorkbenchStore(
-    workbenchReducer(createInitialWorkbenchState(), { presetId, type: 'applyPreset' }),
+    workbenchReducer(arrange(createInitialWorkbenchState()), { presetId, type: 'applyPreset' }),
     {
       isLoaded: () => warm,
       loadLayoutWidgets: () =>
@@ -254,6 +261,59 @@ describe('guests', () => {
     keepGuestInWorkspace(ports, guestId, { canEditStructure: true });
     expect(store.getSnapshot().customizing?.[project().id]).toBeUndefined();
     expect(getWorkspaceStructure(store.getSnapshot().account, 'compose').floatingWidgets?.[guestId]).toBeDefined();
+    expect(layout().guests).toEqual({});
+  });
+
+  it('Keep in workspace places the fallback stage of a center with nothing available, like any other guest', () => {
+    const { layout, ports, project, store } = createNavigation({
+      arrange: (state) => withArrangement(state, 'edit', { center: ['retired:center'] }),
+      presetId: 'edit',
+    });
+    const centerOf = () => getWorkspaceStructure(store.getSnapshot().account, 'edit').widgetRegions.center.instanceIds;
+    const stage = layout().widgetRegions.center.activeInstanceId;
+    expect(layout().guests).toEqual({ [stage]: 'center' });
+
+    keepGuestInWorkspace(ports, stage, { canEditStructure: false });
+    expect(store.getSnapshot().customizing?.[project().id]?.structure.widgetRegions.center.instanceIds).toEqual([
+      'retired:center',
+      stage,
+    ]);
+    expect(layout().guests).toEqual({});
+    expect(layout().widgetRegions.center.activeInstanceId).toBe(stage);
+
+    store.commands.layout.cancelCustomize();
+    expect(centerOf()).toEqual(['retired:center']);
+    expect(layout().guests).toEqual({ [stage]: 'center' });
+
+    keepGuestInWorkspace(ports, stage, { canEditStructure: true });
+    expect(centerOf()).toEqual(['retired:center', stage]);
+    expect(layout().guests).toEqual({});
+  });
+});
+
+describe('showWorkflowForm', () => {
+  it('shows the form as a guest window where the only workflow is the graph in the status bar panel', () => {
+    const { layout, ports } = createNavigation({
+      arrange: (state) => withArrangement(state, 'edit', { bottom: ['workflow'] }),
+      presetId: 'edit',
+    });
+
+    showWorkflowForm(ports);
+
+    const [guestId, surface] = Object.entries(layout().guests)[0] ?? [];
+    expect(surface).toBe('window');
+    expect(layout().widgetInstances[guestId!]?.typeId).toBe('workflow');
+  });
+
+  it('fronts the form the left rail places, behind another tab', () => {
+    const { layout, ports } = createNavigation({
+      arrange: (state) => withArrangement(state, 'edit', { left: ['generate', 'workflow'] }),
+      presetId: 'edit',
+    });
+
+    showWorkflowForm(ports);
+
+    expect(layout().widgetRegions.left.activeInstanceId).toBe('workflow');
     expect(layout().guests).toEqual({});
   });
 });

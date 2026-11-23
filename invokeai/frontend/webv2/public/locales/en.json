@@ -2801,6 +2801,8 @@
     "workspace": {
       "backToStage": "Back to {{stage}}",
       "customize": "Customize",
+      "customizeEndedMessage": "This project left the workspace it was customizing, so the unsaved changes to {{workspace}} were discarded.",
+      "customizeEndedTitle": "Customize ended",
       "customizeWorkspace": "Customize workspace",
       "customizing": "Customize {{name}}",
       "keepRearranging": "Keep rearranging",

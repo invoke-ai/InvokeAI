@@ -9,6 +9,7 @@ import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 interface CenterAreaTestProject {
+  guests: Record<string, 'center' | 'window'>;
   id: string;
   invocation: { sourceId: string };
   layout: { presetId: string };
@@ -49,6 +50,7 @@ const centerAreaMocks = vi.hoisted(() => {
   };
 
   const project: CenterAreaTestProject = {
+    guests: {},
     id: 'test-project',
     invocation: { sourceId: 'generate' },
     layout: { presetId: 'compose' },

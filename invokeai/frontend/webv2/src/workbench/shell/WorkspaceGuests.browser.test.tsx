@@ -13,11 +13,13 @@ import { system } from '@theme/system';
 import { createExtensionRegistry } from '@workbench/extensions/extensionRegistry';
 import { FocusRegionProvider } from '@workbench/focusRegions';
 import { createTestFocusController } from '@workbench/focusRegions.testing';
+import { patchWorkbenchPreferences } from '@workbench/settings/store';
 import { FloatingWidgetWindow } from '@workbench/widget-frame/FloatingWidgetWindow';
 import { WidgetRendererById } from '@workbench/widget-frame/WidgetRenderer';
 import { createInitialWorkbenchState, withArrangement } from '@workbench/workbenchState.testing';
 import { createWorkbenchStore } from '@workbench/workbenchStore';
 import { WorkbenchWidgetRegistryProvider } from '@workbench/WorkbenchWidgetRegistryContext';
+import { getWorkspaceStructure } from '@workbench/workspace/accountWorkspaces';
 import { openInWorkspace } from '@workbench/workspace/workspaceNavigation';
 import { createInstance } from 'i18next';
 import { CircleIcon } from 'lucide-react';
@@ -51,6 +53,12 @@ vi.mock('@workbench/WorkbenchContext', async (importOriginal) => ({
     useExternalStoreSelector(runtime.store.subscribe, runtime.store.getSnapshot, (s) => select(s.activeProject), equal),
   useWorkbenchSelector: <T,>(select: (snapshot: WorkbenchSnapshot) => T, equal?: (a: T, b: T) => boolean) =>
     useExternalStoreSelector(runtime.store.subscribe, runtime.store.getSnapshot, select, equal),
+  // The lock reads Customize through this; without it the harness would never see a session.
+  useOptionalWorkbenchSelector: <T,>(
+    select: (snapshot: WorkbenchSnapshot) => T,
+    _fallback: T,
+    equal?: (a: T, b: T) => boolean
+  ) => useExternalStoreSelector(runtime.store.subscribe, runtime.store.getSnapshot, select, equal),
 }));
 vi.mock('@workbench/widgetRegistry', async (importOriginal) => ({
   ...(await importOriginal<typeof WidgetRegistry>()),
@@ -187,28 +195,59 @@ describe('workspace guests and needs in real frames', () => {
     await expect.poll(() => host.querySelector('[data-unmet-need]')).toBeNull();
   });
 
-  it('opens what no workspace places as a guest window that keeps, closes and forgets, but never docks', async () => {
-    const ports = await render();
+  it.each([
+    ['locked', false],
+    ['rearranging without Customize', true],
+  ])(
+    'opens what no workspace places as a guest window that keeps, closes and forgets, but never docks, %s',
+    async (_state, rearrangeWithoutCustomize) => {
+      void patchWorkbenchPreferences({ rearrangeWithoutCustomize });
+      const ports = await render();
+      const hasDock = () =>
+        [...host.querySelectorAll('button')].some((b) => b.getAttribute('aria-label')?.startsWith('Dock'));
 
-    await act(() => openInWorkspace(ports, { typeId: 'notes' }));
-    await expect.poll(() => button('Keep Notes in workspace')).toBeDefined();
-    expect([...host.querySelectorAll('button')].some((b) => b.getAttribute('aria-label')?.startsWith('Dock'))).toBe(
-      false
+      await act(() => openInWorkspace(ports, { typeId: 'notes' }));
+      await expect.poll(() => button('Keep Notes in workspace')).toBeDefined();
+      expect(hasDock()).toBe(false);
+
+      await userEvent.click(button('Close Notes window')!);
+      expect(layout().guests).toEqual({});
+      expect(project().views.edit?.guests).toBeUndefined();
+      await expect.poll(() => host.querySelector('[data-floating-window]')).toBeNull();
+
+      await act(() => openInWorkspace(ports, { typeId: 'notes' }));
+      await expect.poll(() => button('Keep Notes in workspace')).toBeDefined();
+      await userEvent.click(button('Keep Notes in workspace')!);
+
+      const session = runtime.store.getSnapshot().customizing?.[project().id];
+      const kept = rearrangeWithoutCustomize
+        ? getWorkspaceStructure(runtime.store.getSnapshot().account, 'edit')
+        : session?.structure;
+      expect(session === undefined).toBe(rearrangeWithoutCustomize);
+      expect(Object.values(kept?.floatingWidgets ?? {})).toHaveLength(1);
+      expect(layout().guests).toEqual({});
+      await expect.poll(() => button('Keep Notes in workspace')).toBeUndefined();
+      // Placed now, and structure is editable either way, so the same window docks.
+      await expect.poll(hasDock).toBe(true);
+    }
+  );
+
+  it('offers Keep, and no Close, for the fallback stage a center with nothing available shows', async () => {
+    runtime.store = createWorkbenchStore(
+      withArrangement(createInitialWorkbenchState(), 'edit', { center: ['retired:center'], right: ['layers'] })
     );
+    await act(() => runtime.store.commands.layout.applyPreset('edit'));
+    await render();
+    await expect.poll(() => host.textContent).toContain('preview body');
 
-    await userEvent.click(button('Close Notes window')!);
+    await userEvent.click(button('Center view: Preview')!);
+    await expect.poll(() => document.querySelector('[data-value="keep-guest"]')).not.toBeNull();
+    expect(document.querySelector('[data-value="close-guest"]')).toBeNull();
+    await userEvent.click(document.querySelector<HTMLElement>('[data-value="keep-guest"]')!);
+
+    const draft = runtime.store.getSnapshot().customizing?.[project().id]?.structure;
+    expect(draft?.widgetRegions.center.instanceIds).toEqual(['retired:center', 'preview']);
     expect(layout().guests).toEqual({});
-    expect(project().views.edit?.guests).toBeUndefined();
-    await expect.poll(() => host.querySelector('[data-floating-window]')).toBeNull();
-
-    await act(() => openInWorkspace(ports, { typeId: 'notes' }));
-    await expect.poll(() => button('Keep Notes in workspace')).toBeDefined();
-    await userEvent.click(button('Keep Notes in workspace')!);
-
-    const session = runtime.store.getSnapshot().customizing?.[project().id];
-    expect(Object.values(session?.structure.floatingWidgets ?? {})).toHaveLength(1);
-    expect(layout().guests).toEqual({});
-    await expect.poll(() => button('Keep Notes in workspace')).toBeUndefined();
   });
 
   it('shows a center guest Away, with Back to the stage and Keep in its view menu', async () => {

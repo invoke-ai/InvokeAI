@@ -13,7 +13,7 @@ import { enterWorkspace } from './entry';
 import { registryAvailability } from './layoutFixtures.testing';
 import { resolveLayout } from './resolveLayout';
 import { normalizeStructure } from './structure';
-import { frontRegion, setRegionCollapsed } from './view';
+import { frontRegion, setRegionCollapsed, showGuest } from './view';
 
 const sources = { getNaturalDestination, getSourceId: getAvailableSourceIdForWidgetTypeId };
 const enter = (
@@ -136,5 +136,32 @@ describe('enterWorkspace', () => {
     const invocation = route({ destination: 'canvas', sourceId: 'canvas' });
 
     expect(enter({ snapshot: structure }, undefined, invocation)).toEqual({ invocation, view: undefined });
+  });
+
+  it('takes no job from a guest: a stage-less workspace showing Canvas as a guest keeps the route', () => {
+    const structure = normalizeStructure({
+      layout: {
+        centerViewId: 'canvas',
+        panels: { isBottomOpen: false, isLeftOpen: false, isRightOpen: true },
+        presetId: 'review',
+      },
+      widgetInstances: { gallery: { id: 'gallery', typeId: 'gallery' } },
+      widgetRegions: {
+        bottom: { activeInstanceId: '', instanceIds: [], isCollapsed: true, sizePx: 96 },
+        center: { activeInstanceId: '', instanceIds: [], isCollapsed: false, sizePx: 0 },
+        left: { activeInstanceId: '', instanceIds: [], isCollapsed: true, sizePx: 360 },
+        right: { activeInstanceId: 'gallery', instanceIds: ['gallery'], isCollapsed: false, sizePx: 360 },
+      },
+    });
+    const view = showGuest(
+      undefined,
+      structure,
+      'canvas',
+      { surface: 'center', typeId: 'canvas' },
+      { heightPx: 400, widthPx: 600, x: 0, y: 0 }
+    );
+    expect(resolveLayout(structure, view, registryAvailability).guests).toEqual({ canvas: 'center' });
+
+    expect(enter({ snapshot: structure }, view)).toEqual({ invocation: route(), view });
   });
 });

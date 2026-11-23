@@ -391,6 +391,30 @@ export const toggleCenterPreview = (ports: WorkspaceNavigationPorts): boolean =>
 };
 
 /**
+ * Shows the workflow's form within this workspace: the left rail's, else a window of it, else a guest window. Never the
+ * graph, which the resolver answers a panel ask with while it sits in the status bar's panel.
+ */
+export const showWorkflowForm = (ports: WorkspaceNavigationPorts): void => {
+  const { activeLayout: layout, activeProject: project } = ports.queries.getSnapshot();
+  const isWorkflow = (instanceId: WidgetInstanceId) => layout.widgetInstances[instanceId]?.typeId === 'workflow';
+  const formId = layout.widgetRegions.left.instanceIds.find(isWorkflow);
+  // A window shows the surface of the region it returns to: the form for the left rail.
+  const formWindow = Object.entries(layout.floatingWidgets ?? {}).find(
+    ([instanceId, window]) => isWorkflow(instanceId) && window.returnRegion === 'left'
+  )?.[0];
+
+  if (formId) {
+    ports.commands.widgets.front({ instanceId: formId, projectId: project.id, region: 'left' });
+    ports.focus?.focusRegion('left', undefined, formId);
+  } else if (formWindow) {
+    ports.commands.widgets.revealFloating(formWindow);
+    ports.focus?.focusFloating(formWindow);
+  } else {
+    openGuest(ports, 'workflow', 'window');
+  }
+};
+
+/**
  * Per project: the control its session's end returns focus to, and what in its bar takes focus once: the bar, or the
  * name field of a new workspace's draft.
  */

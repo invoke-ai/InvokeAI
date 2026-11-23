@@ -58,6 +58,15 @@ export const getWorkspaceHomeFronts = (
   right: getRegionFront(placement.widgetRegions.right),
 });
 
+/**
+ * Whether the arrangement places the instance: a resolved layout's guests, the center's fallback stage included, show
+ * there without being the workspace's, so they place nothing, run no job and rank no workspace.
+ */
+export const isPlacedInstance = (
+  placement: Pick<WorkspacePlacement, 'guests'>,
+  instanceId: WidgetInstanceId
+): boolean => placement.guests?.[instanceId] === undefined;
+
 /** Sources the arrangement docks in any region. */
 export const getPlacedSources = (
   placement: WorkspacePlacement,
@@ -66,7 +75,7 @@ export const getPlacedSources = (
   const sourceIds = new Set<InvocationSourceId>();
 
   for (const region of Object.values(placement.widgetRegions)) {
-    for (const instanceId of region.instanceIds) {
+    for (const instanceId of region.instanceIds.filter((id) => isPlacedInstance(placement, id))) {
       const typeId = placement.widgetInstances[instanceId]?.typeId;
       const sourceId = typeId ? getSourceId(typeId) : null;
 

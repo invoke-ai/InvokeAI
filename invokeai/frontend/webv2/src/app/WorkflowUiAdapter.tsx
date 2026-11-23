@@ -24,7 +24,8 @@ import {
 import { useNotify } from '@workbench/useNotify';
 import { getProjectWidgetValues, getResolvedProjectWidgetValues } from '@workbench/widgetState';
 import { useWorkbenchCommands, useWorkbenchInternalStore, useWorkbenchQueries } from '@workbench/WorkbenchContext';
-import { useWorkspaceOpen } from '@workbench/workspace/useWorkspaceOpen';
+import { useWorkspaceNavigationPorts, useWorkspaceOpen } from '@workbench/workspace/useWorkspaceOpen';
+import { showWorkflowForm } from '@workbench/workspace/workspaceNavigation';
 import { useMemo } from 'react';
 
 import { WorkflowCommandShortcut } from './WorkflowCommandShortcut';
@@ -135,6 +136,7 @@ export const WorkflowUiAdapterProvider = ({ children }: { children: ReactNode })
   const commands = useWorkbenchCommands();
   const queries = useWorkbenchQueries();
   const notify = useNotify();
+  const navigation = useWorkspaceNavigationPorts();
   const open = useWorkspaceOpen();
 
   useMountEffect(() => {
@@ -246,12 +248,14 @@ export const WorkflowUiAdapterProvider = ({ children }: { children: ReactNode })
         // Workflow opens widgets from its buttons, so the one opened takes focus.
         open: ({ surface, widgetId }) => void open({ surface, typeId: widgetId }),
         patchValues: (widgetId, values) => commands.widgets.patchValues(widgetId, values),
+        showForm: () => showWorkflowForm(navigation),
       },
     }),
     [
       capabilities,
       commands,
       findInGallery,
+      navigation,
       notify.error,
       notify.info,
       notify.success,

@@ -61,6 +61,7 @@ const keepAliveMocks = vi.hoisted(() => {
     rightInstanceId?: string;
   }) => ({
     floatingWidgets: [],
+    guests: {},
     id: projectId,
     invocation: { sourceId: 'generate' },
     layout: { presetId: 'edit' },

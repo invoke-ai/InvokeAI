@@ -6,8 +6,13 @@ import { getLayoutPreset, isBuiltInLayoutPresetId } from '@workbench/layoutPrese
 import { resolveSavedLayoutPreset } from '@workbench/layoutPresetSnapshots';
 
 import type { WorkspaceStructure } from './structure';
-import type { CustomizeDraft, CustomizeHistoryEntry, CustomizeSession, NewWorkspaceDraft } from './structureLock';
-import type { WorkspaceView } from './view';
+import type {
+  CustomizeDraft,
+  CustomizeHistoryEntry,
+  CustomizeProjectSide,
+  CustomizeSession,
+  NewWorkspaceDraft,
+} from './structureLock';
 
 import {
   createWorkspace,
@@ -43,19 +48,21 @@ const toNewWorkspaceDraft = ({ defaultRoute, iconId, label }: NewWorkspaceDraft)
 
 /** A session on `structure`, the account's for an existing workspace or a new workspace's starting copy. */
 export const beginCustomizeSession = ({
-  entryView,
+  entry,
   newWorkspace,
   presetId,
   structure,
 }: {
-  entryView: WorkspaceView | undefined;
+  /** The project's view and route as Customize begins. */
+  entry: CustomizeProjectSide;
   newWorkspace?: NewWorkspaceDraft;
   presetId: LayoutPresetId;
   structure: WorkspaceStructure;
 }): CustomizeSession => ({
   draft: newWorkspace ? toNewWorkspaceDraft(newWorkspace) : {},
+  entryInvocation: entry.invocation,
   entryStructure: structure,
-  entryView,
+  entryView: entry.view,
   history: { future: [], past: [] },
   ...(newWorkspace ? { newWorkspaceId: newWorkspace.id } : {}),
   presetId,
@@ -108,31 +115,33 @@ export const saveCustomizeSessionAsNew = (
 
 const toHistoryEntry = (
   session: CustomizeSession,
-  view: WorkspaceView | undefined
+  { invocation, view }: CustomizeProjectSide
 ): Omit<CustomizeHistoryEntry, 'mergedAt' | 'mergeKey'> => ({
   draft: session.draft,
+  invocation,
   ...(session.resetPending ? { resetPending: true as const } : {}),
   structure: session.structure,
   view,
 });
 
-/** Whether a step changed the session's draft, its metadata, the reset or the view it is seen through. */
+/** Whether a step changed the session's draft, its metadata, the reset, the view it is seen through or the route. */
 export const isCustomizeStep = (
   before: CustomizeSession,
   after: CustomizeSession,
-  viewBefore: WorkspaceView | undefined,
-  viewAfter: WorkspaceView | undefined
+  sideBefore: CustomizeProjectSide,
+  sideAfter: CustomizeProjectSide
 ): boolean =>
   after.structure !== before.structure ||
   after.draft !== before.draft ||
   after.resetPending !== before.resetPending ||
-  viewAfter !== viewBefore;
+  sideAfter.view !== sideBefore.view ||
+  sideAfter.invocation !== sideBefore.invocation;
 
 /** Records the state before a step; a step with the previous one's merge key, within the window, folds into it. */
 export const pushCustomizeHistory = (
   session: CustomizeSession,
   before: CustomizeSession,
-  viewBefore: WorkspaceView | undefined,
+  sideBefore: CustomizeProjectSide,
   mergeKey: string | undefined,
   timestamp: string
 ): CustomizeSession => {
@@ -154,19 +163,19 @@ export const pushCustomizeHistory = (
       future: [],
       past: [
         ...past,
-        { ...toHistoryEntry(before, viewBefore), ...(mergeKey ? { mergeKey } : {}), mergedAt: timestamp },
+        { ...toHistoryEntry(before, sideBefore), ...(mergeKey ? { mergeKey } : {}), mergedAt: timestamp },
       ].slice(-LAYOUT_HISTORY_LIMIT),
     },
   };
 };
 
-/** Undo or Redo inside Customize: the draft and the view it is seen through step together. Null at either end. */
+/** Undo or Redo inside Customize: the draft, the view it is seen through and the route step together. Null at either end. */
 export const stepCustomizeHistory = (
   session: CustomizeSession,
-  view: WorkspaceView | undefined,
+  side: CustomizeProjectSide,
   direction: 'undo' | 'redo',
   timestamp: string
-): { session: CustomizeSession; view: WorkspaceView | undefined } | null => {
+): ({ session: CustomizeSession } & CustomizeProjectSide) | null => {
   const { future, past } = session.history;
   const entry = direction === 'undo' ? past.at(-1) : future[0];
 
@@ -174,7 +183,7 @@ export const stepCustomizeHistory = (
     return null;
   }
 
-  const current: CustomizeHistoryEntry = { ...toHistoryEntry(session, view), mergedAt: timestamp };
+  const current: CustomizeHistoryEntry = { ...toHistoryEntry(session, side), mergedAt: timestamp };
   const { resetPending: _resetPending, ...rest } = session;
 
   return {
@@ -188,6 +197,7 @@ export const stepCustomizeHistory = (
           : { future: future.slice(1), past: [...past, current].slice(-LAYOUT_HISTORY_LIMIT) },
       structure: entry.structure,
     },
+    invocation: entry.invocation,
     view: entry.view,
   };
 };

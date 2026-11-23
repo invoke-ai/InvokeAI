@@ -13,6 +13,7 @@ import { page } from 'vitest/browser';
 
 const workbench = vi.hoisted(() => ({
   galleryValues: {} as Record<string, unknown>,
+  projectId: 'project-a',
   patchValues: vi.fn(),
   updateGallerySettings: vi.fn(),
 }));
@@ -25,6 +26,7 @@ vi.mock('@workbench/image-map/api', async (importOriginal) => ({
 }));
 
 vi.mock('@workbench/WorkbenchContext', () => ({
+  useActiveProjectId: () => workbench.projectId,
   useWidgetValuesSelector: (widgetId: string, select: (values: Record<string, unknown>) => unknown) =>
     select(widgetId === 'gallery' ? workbench.galleryValues : {}),
   useWorkbenchCommands: () => ({
@@ -212,6 +214,7 @@ const buttonLabels = (): string[] =>
 beforeEach(() => {
   vi.clearAllMocks();
   workbench.galleryValues = {};
+  workbench.projectId = 'project-a';
   registered.commands = [];
   registered.hotkeys = [];
   models.activeSources.set([]);
@@ -519,8 +522,28 @@ describe('Image Map cluster selection chip', () => {
     expect(document.activeElement).toBe(host!.querySelector('[data-image-map-surface]'));
   });
 
-  it('moves the Esc binding to the new project when the runtime changes without a remount', async () => {
+  it('binds Esc only while a cluster is selected, so with none it reaches Back to stage', async () => {
+    const escBound = () =>
+      registered.hotkeys.filter((entry) => entry.defaultKeys.includes('esc') && !entry.disposed).length;
+
     await renderMap(null);
+    expect(escBound()).toBe(0);
+
+    selectCluster('sunset beach');
+    await renderMap(null);
+    expect(escBound()).toBe(1);
+    registered.commands.find((entry) => !entry.disposed)!.handler();
+    expect(workbench.patchValues).toHaveBeenCalledWith('gallery', CLEARED);
+
+    workbench.galleryValues = {};
+    await renderMap(null);
+    expect(escBound()).toBe(0);
+  });
+
+  it('moves the Esc binding to the new project when the project changes without a remount', async () => {
+    selectCluster('sunset beach');
+    await renderMap(null);
+    workbench.projectId = 'project-b';
     await renderMap(null, makeViewProps('project-b'));
 
     const escBindings = registered.hotkeys.filter((entry) => entry.defaultKeys.includes('esc'));

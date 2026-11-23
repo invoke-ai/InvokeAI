@@ -5,6 +5,8 @@ import type { OpenIntent } from './openIntent';
 import type { GuestSurface } from './view';
 import type { WorkspacePlacement } from './workspaceDerivations';
 
+import { isPlacedInstance } from './workspaceDerivations';
+
 /**
  * How a widget type shows in a region, or null where it cannot. A `chip` is always on screen and opens nothing: a
  * status-bar tooltip or popover, or a center toolbar item.
@@ -73,7 +75,7 @@ const listPlacements = (
 ): Placement[] => {
   const isType = (instanceId: WidgetInstanceId) =>
     placement.widgetInstances[instanceId]?.typeId === intent.typeId &&
-    (guests === 'include' || placement.guests?.[instanceId] === undefined);
+    (guests === 'include' || isPlacedInstance(placement, instanceId));
   const placements: Placement[] =
     intent.surface === 'stage'
       ? []
@@ -164,7 +166,7 @@ const rankWorkspace = (
 /** Whether the arrangement places a type at all, its guests aside. */
 const placesType = (placement: WorkspacePlacement, typeId: WidgetTypeId): boolean => {
   const isType = (instanceId: WidgetInstanceId) =>
-    placement.widgetInstances[instanceId]?.typeId === typeId && placement.guests?.[instanceId] === undefined;
+    placement.widgetInstances[instanceId]?.typeId === typeId && isPlacedInstance(placement, instanceId);
 
   return (
     Object.keys(placement.floatingWidgets ?? {}).some(isType) ||

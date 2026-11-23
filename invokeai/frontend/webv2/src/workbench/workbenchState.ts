@@ -286,7 +286,7 @@ import {
   getProjectWorkspace,
   type LayoutSource,
 } from './workspace/projectLayout';
-import { resolveLayout } from './workspace/resolveLayout';
+import { getShownGuest, resolveLayout } from './workspace/resolveLayout';
 import { readWrittenStructureIds } from './workspace/storedAccount';
 import {
   isStoredStructure,
@@ -4060,12 +4060,13 @@ const recordLayoutSteps = (
     const beforeSession = getCustomizeSession(previous.customizing, before);
 
     if (session && beforeSession) {
-      const beforeView = getProjectView(previous, before);
+      const sideBefore = { invocation: before.invocation, view: getProjectView(previous, before) };
+      const sideAfter = { invocation: project.invocation, view: getProjectView(next, project) };
 
-      if (isCustomizeStep(beforeSession, session, beforeView, getProjectView(next, project))) {
+      if (isCustomizeStep(beforeSession, session, sideBefore, sideAfter)) {
         customizing = {
           ...customizing,
-          [project.id]: pushCustomizeHistory(session, beforeSession, beforeView, step.mergeKey, now()),
+          [project.id]: pushCustomizeHistory(session, beforeSession, sideBefore, step.mergeKey, now()),
         };
       }
 
@@ -4101,6 +4102,9 @@ const recordLayoutSteps = (
   return didChange || customizing !== next.customizing ? { ...next, customizing, projects } : next;
 };
 
+const CUSTOMIZE_ENDED_TITLE_KEY = 'shell.workspace.customizeEndedTitle';
+const CUSTOMIZE_ENDED_MESSAGE_KEY = 'shell.workspace.customizeEndedMessage';
+
 /** Customize ends with its workspace: when the project closes or leaves it, or the workspace is deleted. */
 const reconcileCustomizeSessions = (previous: WorkbenchState, next: WorkbenchState): WorkbenchState => {
   if (
@@ -4129,11 +4133,43 @@ const reconcileCustomizeSessions = (previous: WorkbenchState, next: WorkbenchSta
     return views === project.views ? project : { ...project, views };
   });
 
-  return {
+  const ended: WorkbenchState = {
     ...next,
     customizing,
     projects: projects.every((project, index) => project === next.projects[index]) ? next.projects : projects,
   };
+
+  // A session with something to lose that ends while its project stays open says so, rather than vanish.
+  return Object.entries(next.customizing).reduce<WorkbenchState>((announced, [projectId, session]) => {
+    if (
+      customizing?.[projectId] ||
+      !next.projects.some(({ id }) => id === projectId) ||
+      (session.newWorkspaceId === undefined && session.history.past.length === 0)
+    ) {
+      return announced;
+    }
+
+    const saved = resolveSavedLayoutPreset(previous.account, session.presetId);
+    const shown =
+      session.newWorkspaceId !== undefined
+        ? { text: session.draft.label ?? saved.label }
+        : saved.labelKey === undefined
+          ? { text: saved.label }
+          : { key: saved.labelKey, text: saved.label };
+
+    return addNotification(
+      announced,
+      createNotification({
+        kind: 'info',
+        message: `This project left the workspace it was customizing, so the unsaved changes to ${shown.text} were discarded.`,
+        messageKey: CUSTOMIZE_ENDED_MESSAGE_KEY,
+        messageListValues: { workspace: [shown] },
+        projectId,
+        title: 'Customize ended',
+        titleKey: CUSTOMIZE_ENDED_TITLE_KEY,
+      })
+    );
+  }, ended);
 };
 
 /**
@@ -4338,7 +4374,7 @@ const reduceWorkbenchAction = (
         customizing: {
           ...state.customizing,
           [activeProject.id]: beginCustomizeSession({
-            entryView,
+            entry: { invocation: activeProject.invocation, view: entryView },
             ...(newWorkspace ? { newWorkspace } : {}),
             presetId: activeProject.workspaceId,
             structure,
@@ -4428,10 +4464,12 @@ const reduceWorkbenchAction = (
       const { [activeProject.id]: _ended, ...customizing } = state.customizing ?? {};
       const views = withView(activeProject.views, activeProject.workspaceId, session.entryView);
 
+      // As it was on entry, the route included, even one changed by hand meanwhile.
       return replaceProject(
         { ...state, customizing },
         withoutLayoutHistory({
           ...activeProject,
+          invocation: session.entryInvocation,
           views: session.newWorkspaceId === undefined ? views : withView(views, session.newWorkspaceId, undefined),
         })
       );
@@ -4469,7 +4507,11 @@ const reduceWorkbenchAction = (
       // Done on an existing workspace is one step back to before Customize, while nothing has changed it since.
       const workspace =
         session.newWorkspaceId === undefined ? toUndoWorkspace(state.account, account, workspaceId) : undefined;
-      const beforeCustomize = { ...finished, views: withView(views, workspaceId, session.entryView) };
+      const beforeCustomize = {
+        ...finished,
+        invocation: session.entryInvocation,
+        views: withView(views, workspaceId, session.entryView),
+      };
 
       return replaceProject(
         { ...state, account, customizing },
@@ -4790,17 +4832,23 @@ const reduceWorkbenchAction = (
     }
     case 'closeGuest': {
       return updateActiveProject(state, (project) => {
+        const layout = getLayout(state, project, context);
+
+        if (!getShownGuest(layout, action.instanceId, context.availability)?.canClose) {
+          return project;
+        }
+
         const closed = updateProjectView(state, project, (view) => removeGuest(view, action.instanceId));
 
-        return closed === project
-          ? project
-          : rememberLayoutWindows(closed, getLayout(state, project, context), getLayout(state, closed, context));
+        return closed === project ? project : rememberLayoutWindows(closed, layout, getLayout(state, closed, context));
       });
     }
     case 'keepGuest': {
       const project = state.projects.find((candidate) => candidate.id === state.activeProjectId);
-      const guest = project && getProjectView(state, project)?.guests?.[action.instanceId];
-      const window = project && getLayout(state, project, context).floatingWidgets?.[action.instanceId];
+      const layout = project && getLayout(state, project, context);
+      // The resolved layout's guests include the center's fallback stage, which no view records.
+      const guest = layout && getShownGuest(layout, action.instanceId, context.availability);
+      const window = layout?.floatingWidgets?.[action.instanceId];
 
       if (!project || !guest) {
         return state;
@@ -5967,12 +6015,21 @@ const reduceWorkbenchAction = (
         return state;
       }
       if (session) {
-        const stepped = stepCustomizeHistory(session, getProjectView(state, project), direction, now());
+        const stepped = stepCustomizeHistory(
+          session,
+          { invocation: project.invocation, view: getProjectView(state, project) },
+          direction,
+          now()
+        );
 
         return stepped
           ? replaceProject(
               { ...state, customizing: { ...state.customizing, [project.id]: stepped.session } },
-              { ...project, views: withView(project.views, getProjectViewId(state, project), stepped.view) }
+              {
+                ...project,
+                invocation: stepped.invocation,
+                views: withView(project.views, getProjectViewId(state, project), stepped.view),
+              }
             )
           : state;
       }

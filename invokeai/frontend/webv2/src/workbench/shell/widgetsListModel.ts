@@ -10,6 +10,7 @@ import type { LayoutAvailability } from '@workbench/workspace/resolveLayout';
 
 import { canRenderWidgetInRegion, DEFAULT_ADD_REGIONS, isStatusChipWidget } from '@workbench/widgetPlacementCommands';
 import { takesLastCenterView } from '@workbench/workspace/structureReducer';
+import { isPlacedInstance } from '@workbench/workspace/workspaceDerivations';
 
 /** Where a widget is, as the Widgets list says it: a docked region, a floating window, or nowhere in this layout. */
 export type WidgetsListPlacement = { kind: 'docked'; region: WidgetRegion } | { kind: 'floating' } | { kind: 'hidden' };
@@ -75,7 +76,7 @@ export const getWidgetsListRows = ({
     getPlacementRank(left) - getPlacementRank(right) ||
     (left.instanceId ?? '').localeCompare(right.instanceId ?? '');
   // A guest shows here but is not placed: its type is listed as one this workspace lacks.
-  const instances = Object.values(project.widgetInstances).filter(({ id }) => project.guests?.[id] === undefined);
+  const instances = Object.values(project.widgetInstances).filter(({ id }) => isPlacedInstance(project, id));
   const placed = instances.flatMap((instance): WidgetsListRow[] => {
     const widget = widgets.find((candidate) => candidate.manifest.id === instance.typeId);
     const region = project.floatingPlacements?.[instance.id] ? undefined : findRegion(project, instance.id);

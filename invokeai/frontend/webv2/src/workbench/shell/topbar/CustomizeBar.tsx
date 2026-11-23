@@ -38,7 +38,6 @@ import {
   PencilRulerIcon,
   Redo2Icon,
   RotateCcwIcon,
-  Settings2Icon,
   Undo2Icon,
   WaypointsIcon,
 } from 'lucide-react';
@@ -48,7 +47,6 @@ import { useTranslation } from 'react-i18next';
 import { getInitialLayoutPresetIconId, resolveLayoutPresetRoute } from './layoutPresetDialogModel';
 import { LayoutPresetIconPicker } from './LayoutPresetIconPicker';
 import { resolveLayoutPresetIcon } from './layoutPresetIcons';
-import { openLayoutPresetManager } from './layoutPresetManagerStore';
 import { LayoutPresetRouteFields } from './LayoutPresetRouteFields';
 import { HIDE_BELOW_PRESET_LABEL_WIDTH } from './topbarBreakpoints';
 
@@ -304,16 +302,6 @@ export const CustomizeBar = ({ session }: { session: CustomizeSession }) => {
               <Icon as={CopyPlusIcon} boxSize="3.5" />
             </IconButton>
           )}
-          <IconButton
-            aria-label={t('topbar.presets.manage')}
-            size="sm"
-            tooltip={t('topbar.presets.manage')}
-            variant="ghost"
-            data-manage-workspaces=""
-            onClick={openLayoutPresetManager}
-          >
-            <Icon as={Settings2Icon} boxSize="3.5" />
-          </IconButton>
         </HStack>
         {hiddenEdges.start ? (
           <OverflowCue edge="start" label={t('common.scrollToStart')} onScrollTo={scrollTo} />

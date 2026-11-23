@@ -12,7 +12,7 @@ import { WIDGET_REGIONS } from '@workbench/layoutContracts';
 
 import type { RegionPresentation } from './resolveOpen';
 import type { SideRegion, WorkspaceStructure } from './structure';
-import type { GuestSurface, WorkspaceView } from './view';
+import type { GuestSurface, WorkspaceGuest, WorkspaceView } from './view';
 
 import { clampRegionSize, getRegionDefaults, PANEL_OPEN_KEYS, SIDE_REGIONS } from './structure';
 import { getGuestWindowRegion, getViewedWindow, getWindowView, isGuestSuperseded, showsOnceWithCenter } from './view';
@@ -47,6 +47,35 @@ export interface ResolvedLayout {
 }
 
 const NO_GUESTS: Readonly<Record<WidgetInstanceId, GuestSurface>> = {};
+
+/** A guest `layout` shows, the fallback stage included: what Keep in workspace places, and whether Close is offered. */
+export interface ShownGuest extends WorkspaceGuest {
+  /** A center guest closes only while the center has a view of its own to show instead. */
+  canClose: boolean;
+}
+
+export const getShownGuest = (
+  layout: Pick<ResolvedLayout, 'guests' | 'widgetInstances' | 'widgetRegions'>,
+  instanceId: WidgetInstanceId,
+  availability: Pick<LayoutAvailability, 'getPresentation'>
+): ShownGuest | undefined => {
+  const surface = layout.guests[instanceId];
+  const typeId = layout.widgetInstances[instanceId]?.typeId;
+
+  if (surface === undefined || typeId === undefined) {
+    return undefined;
+  }
+
+  const canClose =
+    surface === 'window' ||
+    layout.widgetRegions.center.instanceIds.some((id) => {
+      const other = layout.widgetInstances[id]?.typeId;
+
+      return id !== instanceId && other !== undefined && availability.getPresentation(other, 'center') === 'view';
+    });
+
+  return { canClose, surface, typeId };
+};
 
 const areListsEqual = (left: readonly string[] | undefined, right: readonly string[] | undefined): boolean =>
   left === right ||

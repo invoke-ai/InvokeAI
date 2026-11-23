@@ -39,9 +39,9 @@ import { CUSTOMIZE_WORKSPACE_COMMAND_ID, RESET_WORKSPACE_VIEW_COMMAND_ID } from 
 import {
   goBackToPreviousWorkspace,
   goBackToStage,
-  openGuest,
   openInWorkspace,
   runWorkspaceCommand,
+  showWorkflowForm,
   startCustomizing,
   toggleCenterPreview,
   type OpenInWorkspace,
@@ -297,13 +297,11 @@ export const useRegisterFirstPartyCommands = () => {
     const target = getFocusTarget();
     const graphRegions = ['center', 'bottom'] as const;
     const isWorkflow = (instanceId: string) => layout.widgetInstances[instanceId]?.typeId === 'workflow';
-    // A window shows the surface of the region it returns to: the form for the left rail.
-    const isWindow = (showsForm: boolean) => (instanceId: string) =>
-      isWorkflow(instanceId) && (layout.floatingWidgets?.[instanceId]?.returnRegion === 'left') === showsForm;
-    const windows = Object.keys(layout.floatingWidgets ?? {});
-    const placedIn = (region: 'center' | 'bottom' | 'left') =>
-      layout.widgetRegions[region].instanceIds.find(isWorkflow);
-    const visibleWorkflow = (region: 'center' | 'bottom' | 'left') => {
+    // A window shows the surface of the region it returns to: the graph for any but the left rail.
+    const isGraphWindow = (instanceId: string) =>
+      isWorkflow(instanceId) && layout.floatingWidgets?.[instanceId]?.returnRegion !== 'left';
+    const placedIn = (region: 'center' | 'bottom') => layout.widgetRegions[region].instanceIds.find(isWorkflow);
+    const visibleWorkflow = (region: 'center' | 'bottom') => {
       const { activeInstanceId, instanceIds, isCollapsed } = layout.widgetRegions[region];
 
       return (region === 'center' || !isCollapsed) &&
@@ -314,9 +312,9 @@ export const useRegisterFirstPartyCommands = () => {
     };
     const fromGraph =
       target?.kind === 'floating'
-        ? isWindow(false)(target.instanceId)
+        ? isGraphWindow(target.instanceId)
         : (target?.region === 'center' || target?.region === 'bottom') && visibleWorkflow(target.region) !== null;
-    const showPlaced = (region: 'center' | 'bottom' | 'left', instanceId: string) => {
+    const showPlaced = (region: 'center' | 'bottom', instanceId: string) => {
       // The center selects rather than fronts, so a form sharing the graph's instance stays in view beside it.
       if (region === 'center') {
         widgets.select({ projectId: project.id, region, widgetId: instanceId });
@@ -325,35 +323,22 @@ export const useRegisterFirstPartyCommands = () => {
       }
       focus.focusRegion(region, undefined, instanceId);
     };
-    const showWindow = (instanceId: string) => {
-      widgets.revealFloating(instanceId);
-      focus.focusFloating(instanceId);
-    };
 
     if (fromGraph) {
-      const formId = placedIn('left');
-      const formWindow = windows.find(isWindow(true));
-
-      if (formId) {
-        showPlaced('left', formId);
-      } else if (formWindow) {
-        showWindow(formWindow);
-      } else {
-        // The resolver would answer with the graph itself when it sits in the status bar's panel; the form is a rail's.
-        openGuest(navigation, 'workflow', 'window');
-      }
+      showWorkflowForm(navigation);
       return;
     }
 
     const graphRegion =
       graphRegions.find((region) => visibleWorkflow(region) !== null) ??
       graphRegions.find((region) => placedIn(region) !== undefined);
-    const graphWindow = windows.find(isWindow(false));
+    const graphWindow = Object.keys(layout.floatingWidgets ?? {}).find(isGraphWindow);
 
     if (graphRegion) {
       showPlaced(graphRegion, visibleWorkflow(graphRegion) ?? placedIn(graphRegion)!);
     } else if (graphWindow) {
-      showWindow(graphWindow);
+      widgets.revealFloating(graphWindow);
+      focus.focusFloating(graphWindow);
     } else {
       open({ surface: 'stage', typeId: 'workflow' }, { mode: 'stay' });
     }

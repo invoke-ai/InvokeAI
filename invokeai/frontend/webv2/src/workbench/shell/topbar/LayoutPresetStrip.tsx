@@ -719,15 +719,12 @@ const PresetMenu = ({
               ) : null}
             </MenuHeadingGroup>
 
-            {canEditStructure ? (
-              <>
-                <Menu.Separator />
-                <Menu.Item value="manage-presets" onClick={manage}>
-                  <Icon as={SettingsIcon} boxSize="3.5" />
-                  <Menu.ItemText>{t('topbar.presets.manage')}</Menu.ItemText>
-                </Menu.Item>
-              </>
-            ) : null}
+            {/* Like Customize, an explicit way into editing workspaces, so the lock does not hide it. */}
+            <Menu.Separator />
+            <Menu.Item value="manage-presets" onClick={manage}>
+              <Icon as={SettingsIcon} boxSize="3.5" />
+              <Menu.ItemText>{t('topbar.presets.manage')}</Menu.ItemText>
+            </Menu.Item>
           </MenuContent>
         </Menu.Positioner>
       </Portal>

@@ -28,6 +28,7 @@ import {
   useWorkbenchQueries,
   useWorkbenchSelector,
 } from '@workbench/WorkbenchContext';
+import { getShownGuest, type ShownGuest } from '@workbench/workspace/resolveLayout';
 import { takesLastCenterView } from '@workbench/workspace/structureReducer';
 import { useCanEditStructure } from '@workbench/workspace/useStructureLock';
 import { getActiveAwayStage, goBackToStage, keepGuestInWorkspace } from '@workbench/workspace/workspaceNavigation';
@@ -80,6 +81,9 @@ const getEndIslandMaxWidth = (startControlsWidth: string) =>
   `calc(100% - ${getChromeIslandMinWidth(startControlsWidth)} - {spacing.2})`;
 const END_ISLAND_MAX_WIDTH = getEndIslandMaxWidth(VIEW_MENU_MIN_WIDTH);
 const END_ISLAND_MAX_WIDTH_AWAY = getEndIslandMaxWidth(`(${VIEW_MENU_MIN_WIDTH} + ${BACK_COMPACT_WIDTH} + 2px)`);
+
+const areShownGuestsEqual = (left: ShownGuest | undefined, right: ShownGuest | undefined) =>
+  left?.canClose === right?.canClose && left?.surface === right?.surface && left?.typeId === right?.typeId;
 
 export const CenterArea = () => {
   const { t } = useTranslation();
@@ -181,11 +185,15 @@ export const CenterArea = () => {
     : true;
 
   const canEditStructure = useCanEditStructure();
-  // A guest is not the workspace's: it can be kept, and closed while the center has a view of its own to show.
-  const isGuest = activeItem !== undefined && placementProject.guests?.[activeItem.id] !== undefined;
   const activeId = activeItem?.id;
   const activeTypeId = activeItem?.typeId;
-  const canCloseGuest = isGuest && centerViewItems.some((item) => item.id !== activeId);
+  // A guest is not the workspace's, the fallback stage included: it can be kept, and sometimes closed.
+  const activeGuest = useActiveLayoutSelector(
+    (layout) => (activeId === undefined ? undefined : getShownGuest(layout, activeId, queries.getAvailability())),
+    areShownGuestsEqual
+  );
+  const isGuest = activeGuest !== undefined;
+  const canCloseGuest = activeGuest?.canClose === true;
   const keepGuest = useCallback(() => {
     if (activeId !== undefined) {
       keepGuestInWorkspace({ commands, queries }, activeId, { canEditStructure });
