@@ -46,37 +46,25 @@ export const assertMockBackendProfileName = (value) => {
   return value;
 };
 
-/**
- * Cover board-only/shared references, visible/excluded categories, and external references. Reassign existing
- * images without changing the pinned image count.
- */
+/** Reassigns existing images without changing the pinned image count. */
 export const PROJECT_FILE_BOARD = Object.freeze({
   /** Generated, on the board, and drawn by the canvas: the overlap case. */
   referencedImage: 'fixture-image-0002.png',
-  /** Generated, on the board, referenced by nothing. Travels only because the archive enumerates the board. */
   unreferencedImage: 'fixture-image-0005.png',
-  /** An upload, filed under the `user` asset category. */
   userAsset: 'fixture-image-0006.png',
-  /** A control-layer asset, so the restore has more than one category to preserve. */
   maskAsset: 'fixture-image-0007.png',
-  /** Already starred in the base composition, so starring survives without perturbing any ordering. */
   starredImage: 'fixture-image-0012.png',
   /** The canvas's private category. On the board, and it must never travel as board membership. */
   canvasOwnedImage: 'fixture-image-0008.png',
-  /** Hidden from every gallery view, and from the snapshot with it. */
   intermediateImage: 'fixture-image-0009.png',
-  /** A visible video on the board, which is a separate namespace and a separate copy path. */
   video: 'fixture-video-project.mp4',
   /** Drawn by the canvas but owned by no project: reused on import, never copied. */
   externalImages: Object.freeze(['fixture-image-0001.png', 'fixture-image-0003.png', 'fixture-image-0004.png']),
-  /** On the project's other board, so an archive carries more than the inbox. */
   memberImages: Object.freeze(['fixture-image-0013.png', 'fixture-image-0014.png']),
 });
 
-/** The journey project's board other than its inbox; see `createBoards`. */
 export const PROJECT_FILE_MEMBER_BOARD = Object.freeze({ id: 'fixture-member-board-02', name: 'Site plan refs' });
 
-/** Category and visibility overrides that put the board composition above onto the project's board. */
 const PROJECT_BOARD_IMAGES = new Map([
   [PROJECT_FILE_BOARD.referencedImage, { image_category: 'general' }],
   [PROJECT_FILE_BOARD.unreferencedImage, { image_category: 'general' }],
@@ -116,11 +104,7 @@ const createImages = (count) =>
     };
   });
 
-/**
- * Wan text-to-video metadata in the shape the video graph builders record (`core_metadata`), so Preview Details
- * parses rows and the media menu offers recall. The mock catalog serves no Wan main, so the model is a plausible
- * identifier that recall reports as not installed.
- */
+/** The mock catalog serves no Wan main, so recall reports the model as not installed. */
 const wanT2vMetadata = (positivePrompt, seed) => ({
   cfg_scale: 5,
   fps: 16,
@@ -238,7 +222,6 @@ const createVideos = () => [
     workflow: null,
   },
   {
-    // Include board-owned video to exercise its separate copy/upload routes.
     board_id: 'fixture-project-board-02',
     created_at: timestampAt(5),
     duration: 1,
@@ -337,14 +320,12 @@ const buildBoard = (boardId, boardName, images, videos, createdAt, projectId = n
     created_at: createdAt,
     image_count: boardImages.filter((image) => image.image_category === 'general').length,
     owner_username: null,
-    // Membership, as the backend stores it: an inbox belongs to its project, a Library board to none.
     project_id: projectId,
     user_id: FIXTURE_USER_ID,
     video_count: boardVideos.length,
   };
 };
 
-/** The project ids `createProjects` assigns, so boards can belong to them without the documents in hand. */
 export const fixtureProjectId = (index) => `fixture-project-${ordinal(index, 3)}`;
 
 const createBoards = (images, videos, projectCount) => [
@@ -367,7 +348,6 @@ const createBoards = (images, videos, projectCount) => [
       fixtureProjectId(index)
     )
   ),
-  // The first two projects also hold ordinary boards, so a project section has more than its inbox to show.
   ...range(Math.min(projectCount, 2), (index) =>
     buildBoard(
       `fixture-member-board-${ordinal(index, 2)}`,
@@ -420,17 +400,12 @@ const createQueueItems = (count) =>
 
 const MODEL_BASES = ['sd-1', 'sdxl', 'flux', 'flux2', 'qwen-image'];
 const MODEL_TYPES = ['main', 'lora', 'controlnet', 'vae', 'embedding'];
-// Main models cycle through their own bases so Generate sees SDXL mains and refiners, not only SD 1.5.
 const MAIN_MODEL_BASES = ['sd-1', 'sdxl', 'sdxl-refiner'];
 
 /** The source of the hosted record the mock starter catalog also lists, so the Model Manager shows it read-only. */
 export const CATALOG_MANAGED_EXTERNAL_SOURCE = 'external://gemini/gemini-2.5-flash-image';
 
-/**
- * Hosted-provider records with the capability shapes the Generate panel, Canvas, and Model Manager read: a named
- * resolution table (Gemini), fixed sizes per ratio with an edit mode (OpenAI), provider toggles (Seedream), and a
- * record the starter catalog manages. No shipped provider accepts a mask, so none advertises inpaint.
- */
+/** No shipped provider accepts a mask, so none advertises inpaint. */
 const EXTERNAL_MODEL_FIXTURES = [
   {
     base: 'external',
@@ -500,8 +475,7 @@ const EXTERNAL_MODEL_FIXTURES = [
     name: 'Fixture GPT Image',
     path: 'external://openai/fixture-gpt-image',
     provider_id: 'openai',
-    // A GPT Image model id, so Generate offers OpenAI's quality, background, and input-fidelity options; the
-    // fixture source keeps the record out of the starter catalog and editable in the Model Manager.
+    // A GPT Image id, so Generate offers OpenAI's quality, background and input-fidelity options.
     provider_model_id: 'gpt-image-1',
     source: 'external://openai/fixture-gpt-image',
     source_type: 'external',
@@ -564,7 +538,7 @@ const EXTERNAL_MODEL_FIXTURES = [
 /** The last slots of the model library hold the hosted-provider records so the profile counts stay as declared. */
 const createModels = (count) => [
   ...createLocalModels(Math.max(0, count - EXTERNAL_MODEL_FIXTURES.length)),
-  ...EXTERNAL_MODEL_FIXTURES.slice(0, count).map((model) => structuredClone(model)),
+  ...EXTERNAL_MODEL_FIXTURES.slice(0, count).map((model) => ({ roles: [], ...structuredClone(model) })),
 ];
 
 const createLocalModels = (count) =>
@@ -576,8 +550,7 @@ const createLocalModels = (count) =>
         ? MAIN_MODEL_BASES[Math.floor(index / MODEL_TYPES.length) % MAIN_MODEL_BASES.length]
         : MODEL_BASES[index % MODEL_BASES.length];
 
-    // Like the backend, a config serializes only the fields it stores: `cpu_only` on VAEs, `trigger_phrases` on main
-    // and LoRA models.
+    // Like the backend, a config serializes only the fields it stores.
     return {
       base,
       cover_image: null,
@@ -590,6 +563,7 @@ const createLocalModels = (count) =>
       key: `fixture-model-${id}`,
       name: `Fixture Model ${id}`,
       path: `fixtures/models/fixture-model-${id}.safetensors`,
+      roles: [],
       source: `fixtures/models/fixture-model-${id}.safetensors`,
       source_type: 'path',
       source_url: null,
@@ -599,10 +573,7 @@ const createLocalModels = (count) =>
     };
   });
 
-/**
- * A model record in the shape the list endpoint serves; the seed sets below override only what they need. Main,
- * LoRA and Control LoRA seeds add `trigger_phrases`, which only those configs store.
- */
+/** Main, LoRA and Control LoRA seeds add `trigger_phrases`, which only those configs store. */
 const seedModel = ({ key, name, ...fields }) => ({
   base: 'any',
   cover_image: null,
@@ -614,6 +585,7 @@ const seedModel = ({ key, name, ...fields }) => ({
   key,
   name,
   path: `seeds/${key}.safetensors`,
+  roles: [],
   source: `seeds/${key}.safetensors`,
   source_type: 'path',
   source_url: null,
@@ -621,7 +593,6 @@ const seedModel = ({ key, name, ...fields }) => ({
   ...fields,
 });
 
-/** A control adapter seed keyed and named by its install name; a ControlNet unless `fields` says otherwise. */
 const controlSeed = (name, base, preprocessor, fields = {}) => ({
   record: seedModel({
     base,
@@ -633,13 +604,8 @@ const controlSeed = (name, base, preprocessor, fields = {}) => ({
   }),
 });
 
-/**
- * Opt-in model sets for browser checks, added by `POST /__models` so the profiles' fixture counts stay fixed. Each
- * entry is the record as installed plus `probe`: the fields `POST /api/v2/models/i/{key}/reidentify` fills in, as
- * the backend's probe would for a record installed before it recorded them.
- */
+/** Sets for `POST /__models`; `probe` is what reidentify fills in for a record installed before it recorded them. */
 export const MODEL_SEED_SETS = Object.freeze({
-  // Anima ControlNet-LLLite adapters: one usable, two from before `cond_in_channels` was recorded.
   'anima-lllite': [
     {
       record: seedModel({
@@ -680,7 +646,6 @@ export const MODEL_SEED_SETS = Object.freeze({
       }),
     },
   ],
-  // Spandrel upscalers with a recorded native scale, a 1x model, and one from before the scale was recorded.
   spandrel: [
     {
       record: seedModel({ key: 'seed-spandrel-4x', name: '4x-UltraSharp', scale: 4, type: 'spandrel_image_to_image' }),
@@ -699,8 +664,6 @@ export const MODEL_SEED_SETS = Object.freeze({
       }),
     },
   ],
-  // SDXL control models for the control-layer panel: two depth models naming their preprocessor in the legacy and
-  // the node form, a pose model, a Union model, one whose purpose nothing names, and a T2I-Adapter.
   'control-sdxl': [
     controlSeed('controlnet-depth-sdxl-1.0', 'sdxl', 'depth_anything_image_processor'),
     controlSeed('controlnet-zoe-depth-sdxl', 'sdxl', 'depth_anything_depth_estimation'),
@@ -712,7 +675,6 @@ export const MODEL_SEED_SETS = Object.freeze({
       type: 't2i_adapter',
     }),
   ],
-  // A FLUX dev main with a depth Control LoRA and a Union ControlNet.
   'control-flux': [
     {
       record: seedModel({
@@ -730,6 +692,84 @@ export const MODEL_SEED_SETS = Object.freeze({
       type: 'control_lora',
     }),
     controlSeed('flux-controlnet-union-pro', 'flux', null),
+  ],
+  // A Krea-2 Turbo main with a depth Control LoRA, Krea-2's only control kind.
+  'control-krea2': [
+    {
+      record: seedModel({
+        base: 'krea-2',
+        format: 'diffusers',
+        key: 'seed-krea2-turbo',
+        name: 'Krea-2 Turbo',
+        trigger_phrases: null,
+        type: 'main',
+        variant: 'krea2_turbo',
+      }),
+    },
+    controlSeed('krea2-depth-control-lora', 'krea-2', 'depth_anything_image_processor', {
+      format: 'lycoris',
+      trigger_phrases: null,
+      type: 'control_lora',
+    }),
+  ],
+  // Models whose files also serve as another type: single-file MOSS-Image and Z-Image mains with their VAEs, a Text
+  // LLM that is also the Qwen3.5 9B encoder, a Qwen3.5 encoder that is also a Text LLM, and a Qwen3 4B causal-LM
+  // folder that is also the Qwen3 encoder.
+  'model-roles': [
+    {
+      record: seedModel({
+        base: 'moss-image',
+        key: 'seed-moss-image-main',
+        name: 'MOSS-Image (single file)',
+        trigger_phrases: null,
+        type: 'main',
+      }),
+    },
+    {
+      record: seedModel({ base: 'flux2', cpu_only: null, key: 'seed-flux2-vae', name: 'FLUX.2 VAE', type: 'vae' }),
+    },
+    {
+      record: seedModel({
+        cpu_only: null,
+        key: 'seed-text-llm-qwen35-9b',
+        name: 'Qwen3.5 9B VLM (int8)',
+        roles: [{ format: null, type: 'qwen3_5_encoder', variant: 'qwen3_5_9b' }],
+        supports_images: true,
+        type: 'text_llm',
+        variant: undefined,
+      }),
+    },
+    {
+      record: seedModel({
+        cpu_only: null,
+        key: 'seed-qwen35-encoder-9b',
+        name: 'Qwen3.5 9B Encoder (int8)',
+        roles: [{ format: null, type: 'text_llm', variant: null }],
+        type: 'qwen3_5_encoder',
+        variant: 'qwen3_5_9b',
+      }),
+    },
+    {
+      record: seedModel({
+        base: 'z-image',
+        key: 'seed-z-image-main',
+        name: 'Z-Image (single file)',
+        trigger_phrases: null,
+        type: 'main',
+      }),
+    },
+    { record: seedModel({ base: 'flux', cpu_only: null, key: 'seed-flux-vae', name: 'FLUX VAE', type: 'vae' }) },
+    {
+      record: seedModel({
+        cpu_only: null,
+        format: 'diffusers',
+        key: 'seed-qwen3-4b-llm',
+        name: 'Qwen3 4B',
+        roles: [{ format: 'qwen3_encoder', type: 'qwen3_encoder', variant: 'qwen3_4b' }],
+        type: 'text_llm',
+        variant: undefined,
+      }),
+    },
   ],
 });
 
@@ -891,7 +931,6 @@ export const collectCanvasLeaves = (document) => {
   return leaves;
 };
 
-/** Use 64 leaves, including 24 in three groups with two-level nesting, to exercise forest behavior. */
 const createRasterForest = (layers) => {
   if (layers.length < 32) {
     return layers;
@@ -918,7 +957,6 @@ const createRasterForest = (layers) => {
   ];
 };
 
-/** A schema-2 style graph; the workflow collection wraps it, or a legacy document carries it as `projectGraph`. */
 const createWorkflowDocument = ({ description, graphId, index, name, workflowNodes }) => {
   const formRootId = `${graphId}-form-root`;
 
@@ -948,11 +986,7 @@ const createWorkflowDocument = ({ description, graphId, index, name, workflowNod
   };
 };
 
-/**
- * Project 0 is a current schema-3 document that owns two workflows (a second, blank one beside the representative
- * graph, so the This-project view has something to switch to). Project 1 stays a schema-2 document with a single
- * `projectGraph`, which the project-file journey loads, exports and imports through the migration boundary.
- */
+/** Project 0 is schema 3 with two workflows; project 1 stays schema 2 for the project-file journey's migration. */
 const createProjectDocument = ({ index, layers = [], workflowNodes = [] }) => {
   const id = fixtureProjectId(index);
   const graphId = `${id}-graph`;
@@ -1031,7 +1065,6 @@ const createProjectDocument = ({ index, layers = [], workflowNodes = [] }) => {
   };
 };
 
-/** The first workflow a project document carries, whichever schema it uses. */
 export const getFixtureProjectWorkflowDocument = (data) =>
   data?.workflows?.entries?.[0]?.document ?? data?.projectGraph ?? null;
 
@@ -1092,7 +1125,6 @@ const createWorkflows = (count) =>
     };
   });
 
-/** Opt-in library workload; ordinary route fixtures and their budgets stay unchanged. */
 export const createLargeWorkflowLibraryFixture = () =>
   createWorkflows(1000).map((record, index) => ({
     ...record,
@@ -1109,7 +1141,6 @@ export const createLargeWorkflowLibraryFixture = () =>
     },
   }));
 
-/** Per-project intermediates rows for the Settings manager; ids match the projects fixture so entry points preselect. */
 const createIntermediates = () => [
   {
     user_id: 'fixture-user',

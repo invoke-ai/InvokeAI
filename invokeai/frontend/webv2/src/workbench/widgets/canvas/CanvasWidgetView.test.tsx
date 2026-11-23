@@ -40,7 +40,7 @@ vi.mock('@workbench/useCanvasProjectMutationDispatch', () => ({
   useCanvasProjectMutationDispatch: () => () => undefined,
 }));
 vi.mock('@features/queue', () => ({ useQueueItemProgressImage: () => null }));
-vi.mock('./engineStoreHooks', () => ({ useCanvasOperation: () => null }));
+vi.mock('./engineStoreHooks', () => ({ useCanvasOperation: () => null, useVectorEditSession: () => null }));
 vi.mock('@workbench/canvas-operations/react', () => ({ useCanvasEngine: () => harness.engine }));
 vi.mock('./useCanvasGallerySave', () => ({
   useCanvasGallerySave: () => ({ isSaving: false, save: () => undefined }),
@@ -52,6 +52,7 @@ vi.mock('./useCreateFromBbox', () => ({
   useCreateFromBbox: () => ({ createFromBbox: () => undefined, isCreating: false }),
 }));
 vi.mock('./CanvasCreateFromBboxSubmenu', () => ({ CanvasCreateFromBboxSubmenu: () => null }));
+vi.mock('./CanvasFrameSizeReadout', () => ({ CanvasFrameSizeReadout: () => null }));
 vi.mock('./CanvasGlobalContextMenu', () => ({ CanvasGlobalContextMenu: () => null }));
 vi.mock('./CanvasImageDropOverlay', () => ({ CanvasImageDropOverlay: () => null }));
 vi.mock('./CanvasSaveToGallerySubmenu', () => ({ CanvasSaveToGallerySubmenu: () => null }));

@@ -13,6 +13,7 @@ import json
 import pytest
 import safetensors.torch
 import torch
+from diffusers import Flux3Transformer2DModel
 
 from invokeai.backend.model_manager.configs.main import Main_Checkpoint_Flux3_Config
 from invokeai.backend.model_manager.load import load_default
@@ -26,15 +27,18 @@ from invokeai.backend.quantization.int8_convrot import Int8ConvrotLinear
 from invokeai.backend.quantization.nvfp4 import NVFP4Linear
 from tests.backend.flux3.flux3_fixture import (
     QUANTIZED_SCHEMES,
+    TINY_CONFIG,
     QuantizedFlux3,
     flux3_model_from_native,
     forward,
     quantize_flux3_native,
+    quantize_flux3_torchao,
     tiny_flux3_model,
     to_native,
 )
 from tests.fixtures.loader_seams import Seam, SeamRun, prepare
 from tests.fixtures.quantized_payloads import nvfp4_codes, nvfp4_tensors
+from tests.fixtures.safetensors_files import needs_mapping_that_shows_file_writes, tensors_reading_the_file
 
 SEAM = Seam(
     loader=Flux3CheckpointModel,
@@ -76,9 +80,9 @@ def _build(scheme: str, *, flow_map: bool = True, **options) -> QuantizedFlux3:
     return quantize_flux3_native(to_native(tiny_flux3_model(flow_map=flow_map)), scheme, **options)
 
 
-def _config(flow_map: bool = True) -> Main_Checkpoint_Flux3_Config:
+def _config(flow_map: bool = True, path: str = "flux3.safetensors") -> Main_Checkpoint_Flux3_Config:
     variant = Flux3VariantType.Klein if flow_map else Flux3VariantType.KleinBase
-    return Main_Checkpoint_Flux3_Config.model_construct(path="flux3.safetensors", name="flux3", variant=variant)
+    return Main_Checkpoint_Flux3_Config.model_construct(path=path, name="flux3", variant=variant)
 
 
 def _load(
@@ -321,3 +325,103 @@ def test_a_packed_input_embedder_is_refused_before_room_is_reserved(monkeypatch:
     run = _refused(monkeypatch, build, "stores 'txt_in.weight' packed")
 
     assert run.reserved == []
+
+
+# unsloth's torchao FP8 build: diffusers' key names, `<layer>._weight_qdata` + a `[out, 1]` `<layer>._weight_scale`.
+_TORCHAO_QUANTIZED = tuple(f"{block}.{linear}" for block in _BLOCKS["fp8r"] for linear in _LINEARS)
+
+
+def _torchao(*, adaln: bool = False) -> QuantizedFlux3:
+    return quantize_flux3_torchao(tiny_flux3_model(flow_map=True), adaln=adaln)
+
+
+def _assert_torchao_predicts_what_it_means(model: torch.nn.Module, build: QuantizedFlux3) -> None:
+    reference = Flux3Transformer2DModel(**TINY_CONFIG, flow_map=True).eval()
+    reference.load_state_dict(build.meant)
+    expected = forward(reference, flow_map=True)
+    assert expected.abs().max() > 0, "a forward that is zero everywhere would compare equal to anything"
+    assert torch.equal(forward(model, flow_map=True), expected)
+
+
+@pytest.mark.parametrize("adaln", [False, True], ids=["released", "adaln-quantized"])
+def test_a_torchao_fp8_build_loads_as_the_model_it_means(monkeypatch: pytest.MonkeyPatch, adaln: bool) -> None:
+    """Folded, every quantized layer is exactly `codes * scale`. The file is already in diffusers' names and row order,
+    so the output adaLN's [scale, shift] halves must not be swapped -- dense as released, or quantized with a per-row
+    scale that would otherwise have to move with its rows."""
+    build = _torchao(adaln=adaln)
+
+    run, model = _load(monkeypatch, build)
+
+    _assert_torchao_predicts_what_it_means(model, build)
+    assert torch.equal(model.norm_out.linear.weight, build.meant["norm_out.linear.weight"])
+    assert not any(p.dtype is torch.float8_e4m3fn for p in model.parameters())
+    assert len(run.reserved) == 1
+
+
+def test_kept_torchao_fp8_layers_have_fp8_codes_and_a_flat_per_row_scale(monkeypatch: pytest.MonkeyPatch) -> None:
+    """torchao writes the scale `[out, 1]`; a 2-D scale is block-wise to the fp8 matmul, which would fold the layer."""
+    monkeypatch.setattr(load_default, "should_keep_fp8_weights", lambda _device: True)
+    build = _torchao(adaln=True)
+
+    _, model = _load(monkeypatch, build)
+
+    for name in _TORCHAO_QUANTIZED:
+        module = model.get_submodule(name)
+        assert module.weight.dtype is torch.float8_e4m3fn, name
+        assert torch.equal(module.weight.view(torch.uint8), build.state_dict[f"{name}._weight_qdata"].view(torch.uint8))
+        assert module.weight_scale.shape == (module.out_features,), name
+        assert torch.equal(module.weight_scale, build.state_dict[f"{name}._weight_scale"].reshape(-1)), name
+    # The output adaLN is under the model's `norm` pattern: decoded with its scale, and in diffusers' row order.
+    assert model.norm_out.linear.weight.dtype is torch.float32
+    assert model.get_submodule("txt_mode_blocks.0.attn.to_q").weight.dtype is torch.float32
+    apply_custom_layers_to_model(model)
+    _assert_torchao_predicts_what_it_means(model, build)
+
+
+@pytest.mark.parametrize(
+    ("payload", "scale_columns", "reason"),
+    [(torch.int8, 1, "torch.int8, not float8_e4m3fn"), (torch.float8_e4m3fn, 2, "not per-tensor or block-wise scales")],
+    ids=["int8", "blockwise"],
+)
+def test_a_torchao_build_the_loader_cannot_decode_is_refused_before_room_is_reserved(
+    monkeypatch: pytest.MonkeyPatch, payload: torch.dtype, scale_columns: int, reason: str
+) -> None:
+    build = _torchao()
+    state_dict = dict(build.state_dict)
+    layer = _TORCHAO_QUANTIZED[0]
+    codes = state_dict[f"{layer}._weight_qdata"]
+    state_dict[f"{layer}._weight_qdata"] = codes.float().to(payload)
+    state_dict[f"{layer}._weight_scale"] = state_dict[f"{layer}._weight_scale"].repeat(1, scale_columns)
+
+    run = _refused(monkeypatch, build._replace(state_dict=state_dict), reason)
+
+    assert run.reserved == []
+
+
+@needs_mapping_that_shows_file_writes
+@pytest.mark.parametrize("keep_fp8", [False, True], ids=["folded", "kept"])
+def test_no_parameter_of_a_torchao_load_reads_the_file_afterwards(
+    monkeypatch: pytest.MonkeyPatch, tmp_path, keep_fp8: bool
+) -> None:
+    """Dense tensors already in the compute dtype (the text blocks and the embedders) are left in place by the fold and
+    the cast, and a kept load leaves the fp8 codes as read too. A parameter that is still a slice of the file's mapping
+    pins the whole file, which the cache's size calculation cannot see. Read from a real file: only one has a mapping."""
+    monkeypatch.setattr(load_default, "should_keep_fp8_weights", lambda _device: keep_fp8)
+    build = _torchao()
+    path = tmp_path / "flux3.safetensors"
+    safetensors.torch.save_file({key: value.clone() for key, value in build.state_dict.items()}, str(path))
+
+    run = prepare(SEAM, monkeypatch, metadata=build.metadata)
+    model = run.load(_config(path=str(path)), SubModelType.Transformer)
+
+    assert tensors_reading_the_file(model, path) == []
+
+
+def test_a_kept_torchao_load_does_not_copy_the_fp8_codes(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(load_default, "should_keep_fp8_weights", lambda _device: True)
+    build = _torchao()
+
+    _, model = _load(monkeypatch, build)
+
+    layer = _TORCHAO_QUANTIZED[0]
+    assert model.get_submodule(layer).weight.data_ptr() == build.state_dict[f"{layer}._weight_qdata"].data_ptr()

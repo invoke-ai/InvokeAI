@@ -21,9 +21,9 @@ import { planLibraryWorkflowOpen } from './library/useOpenLibraryWorkflow';
 import { startWorkflowUiPendingLoadRuntime } from './pendingLibraryWorkflowLoadRuntime';
 
 /**
- * Apply external library or embedded-workflow requests through the same collection commands as the library
- * dialog: a template becomes the project's first copy, or the copy-choice host asks what to do once it has one;
- * an embedded document becomes a new workflow.
+ * Apply external library or embedded-workflow requests through the same collection commands as the library dialog: a
+ * template becomes the project's first copy, or the copy-choice host asks what to do once it has one; an embedded
+ * document becomes a new workflow.
  */
 export const PendingWorkflowLoader = () => {
   const { t } = useTranslation();
@@ -84,8 +84,8 @@ export const PendingWorkflowLoader = () => {
         addWorkflow(document, {
           label,
           reusePlaceholder: true,
-          // An embedded document may carry the id of the record it was saved from; that id is provenance, never
-          // a write target.
+          // An embedded document may carry the id of the record it was saved from; that id is provenance, never a write
+          // target.
           ...(source.kind === 'library'
             ? {
                 source: {

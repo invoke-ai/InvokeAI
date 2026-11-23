@@ -1,6 +1,6 @@
 /**
- * Bounds include every nonzero-alpha pixel, preserving faint content rather than applying the mask-outline
- * solidity threshold.
+ * Bounds include every nonzero-alpha pixel, preserving faint content rather than applying the mask-outline solidity
+ * threshold.
  */
 
 import type { Rect } from '@workbench/canvas-engine/types';
@@ -40,9 +40,8 @@ export const hasVisiblePixels = (pixels: AlphaPixels): boolean => {
 };
 
 /**
- * Tight bounds of the non-transparent pixels, in the BUFFER's own coordinates (the
- * caller translates by its surface origin). Empty rect when every pixel is alpha 0.
- * Edge-inclusive: one opaque pixel yields a 1x1 rect.
+ * Tight bounds of the non-transparent pixels, in the BUFFER's own coordinates (the caller translates by its surface
+ * origin). Empty rect when every pixel is alpha 0. Edge-inclusive: one opaque pixel yields a 1x1 rect.
  */
 export const alphaBounds = (pixels: AlphaPixels): Rect => {
   if (hasNonPositiveDimensions(pixels)) {

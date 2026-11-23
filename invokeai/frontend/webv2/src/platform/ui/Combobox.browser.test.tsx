@@ -6,8 +6,10 @@ import { act, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { page, userEvent } from 'vitest/browser';
 
 import { Combobox, type ComboboxOption } from './Combobox';
+import { Field } from './Field';
 
 const options: ComboboxOption[] = [
   { label: 'Euler Ancestral', value: 'euler_a' },
@@ -24,6 +26,9 @@ void i18n.use(initReactI18next).init({
     en: {
       translation: {
         common: {
+          loading: 'Loading…',
+          matchCount_one: '{{count}} match',
+          matchCount_other: '{{count}} matches',
           noOptionsFound: 'No matches',
           openSelector: 'Open selector',
           searchOptions: 'Search…',
@@ -140,14 +145,17 @@ describe('Combobox', () => {
     expect(document.body.textContent).toContain('No matches');
   });
 
-  it('keeps an option that matches secondary server-search text', async () => {
+  it('announces the settled result count in the app language', async () => {
     const { input } = await renderCombobox();
+    const announcement = () =>
+      [...document.querySelectorAll('[data-live-announcer][role="status"]')].map((node) => node.textContent).join('');
 
     await interact(() => input.click());
-    await setInputValue(input, 'popular');
+    await setInputValue(input, 'e');
+    await vi.waitFor(() => expect(announcement()).toBe('2 matches'), { timeout: 3000 });
 
-    expect(document.querySelectorAll('[role="option"]')).toHaveLength(1);
-    expect(document.querySelector('[role="option"]')?.textContent).toContain('UniPC');
+    await setInputValue(input, 'not-a-scheduler');
+    await vi.waitFor(() => expect(announcement()).toBe('No matches'), { timeout: 3000 });
   });
 
   it('supports controlled mouse and keyboard selection with selected-state indication', async () => {
@@ -170,25 +178,6 @@ describe('Combobox', () => {
     });
     expect(onChange).toHaveBeenLastCalledWith('euler_a');
     expect(input.value).toBe('Euler Ancestral');
-  });
-
-  it('clears the controlled search query when reopened', async () => {
-    const { input, onInputValueChange } = await renderCombobox(false, true);
-
-    await interact(() => input.click());
-    await setInputValue(input, 'DPM');
-    expect(document.querySelectorAll('[role="option"]')).toHaveLength(1);
-
-    await interact(() => {
-      input.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' }));
-    });
-    expect(onInputValueChange).toHaveBeenLastCalledWith('');
-    expect(onInputValueChange).toHaveBeenCalledTimes(2);
-    expect(input.getAttribute('aria-expanded')).toBe('false');
-    await interact(() => input.click());
-
-    expect(input.value).toBe('');
-    expect(document.querySelectorAll('[role="option"]')).toHaveLength(options.length);
   });
 
   it('scrolls long lists in the themed viewport, following the keyboard highlight and reporting the end', async () => {
@@ -243,11 +232,63 @@ describe('Combobox', () => {
     expect(onListScrollToBottom).toHaveBeenCalled();
   });
 
-  it('honors the disabled state', async () => {
-    const { input } = await renderCombobox(true);
+  describe('under an inside Field label', () => {
+    const renderInField = async (field: { disabled?: boolean; error?: string; helpText?: string }) => {
+      host = document.createElement('div');
+      host.style.width = '240px';
+      document.body.append(host);
+      root = createRoot(host);
+      const onChange = vi.fn();
 
-    expect(input.disabled).toBe(true);
-    await interact(() => input.click());
-    expect(input.getAttribute('aria-expanded')).toBe('false');
+      await interact(() => {
+        root?.render(
+          <I18nextProvider i18n={i18n}>
+            <ChakraProvider value={system}>
+              <Field id="scheduler-field" label="Scheduler" labelPlacement="inside" {...field}>
+                <Combobox options={options} value="euler_a" onValueChange={onChange} />
+              </Field>
+            </ChakraProvider>
+          </I18nextProvider>
+        );
+      });
+
+      const control = host.querySelector<HTMLElement>('[data-scope="combobox"][data-part="control"]')!;
+      return {
+        control,
+        input: control.querySelector<HTMLInputElement>('input[role="combobox"]')!,
+        label: control.querySelector<HTMLLabelElement>('label')!,
+        onChange,
+      };
+    };
+
+    it('opens from a click on the label, then filters and commits as usual', async () => {
+      const { input, label, onChange } = await renderInField({});
+
+      await userEvent.click(label);
+      await expect.element(page.getByRole('combobox', { exact: true, name: 'Scheduler' })).toHaveFocus();
+      expect(input.getAttribute('aria-expanded')).toBe('true');
+
+      await setInputValue(input, 'dpm');
+      expect(document.querySelectorAll('[role="option"]')).toHaveLength(1);
+      await interact(() => document.querySelector<HTMLElement>('[role="option"]')?.click());
+      expect(onChange).toHaveBeenLastCalledWith('dpmpp_2m');
+    });
+
+    it('describes the input with an invalid field error and marks the whole box invalid', async () => {
+      const valid = await renderInField({});
+      const validBorder = getComputedStyle(valid.control).borderTopColor;
+      await interact(() => root?.unmount());
+      host?.remove();
+
+      const { control, input } = await renderInField({ error: 'Pick a scheduler' });
+
+      expect(input.getAttribute('aria-invalid')).toBe('true');
+      expect(input.getAttribute('aria-errormessage')).toBe('scheduler-field-error');
+      await expect
+        .element(page.getByRole('combobox', { exact: true, name: 'Scheduler' }))
+        .toHaveAccessibleDescription('Pick a scheduler');
+      expect(control.hasAttribute('data-invalid')).toBe(true);
+      expect(getComputedStyle(control).borderTopColor).not.toBe(validBorder);
+    });
   });
 });

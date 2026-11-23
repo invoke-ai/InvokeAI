@@ -1,13 +1,22 @@
 import type { QueueActivity } from '@features/queue/core/queueActivity';
 
-import { Stack, VisuallyHidden } from '@chakra-ui/react';
+import { Box, Stack, VisuallyHidden } from '@chakra-ui/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
+import { LIST_ROW_GAP_PX } from '@platform/ui/list/listLayout';
 import { ListSectionHeader } from '@platform/ui/list/ListSectionHeader';
 import { RetryBoundary } from '@platform/ui/RetryBoundary';
 import { Scrollable } from '@platform/ui/Scrollable';
 import { StatusWidgetChip } from '@platform/ui/StatusWidgetChip';
 import { CloudOffIcon, ListOrderedIcon, PauseIcon, type LucideIcon } from 'lucide-react';
-import { lazy, Suspense, useState, useSyncExternalStore, type ComponentProps, type ComponentType } from 'react';
+import {
+  lazy,
+  Suspense,
+  useEffectEvent,
+  useState,
+  useSyncExternalStore,
+  type ComponentProps,
+  type ComponentType,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type * as LocalRunListExports from './LocalRunList';
@@ -15,6 +24,7 @@ import type { QueueFilterId } from './queueFilters';
 import type { QueueLocalRun } from './QueueUiContext';
 
 import { CurrentBatchSection } from './NowNextSection';
+import { useQueueReadModelData } from './queueDataStore';
 import { QueueFilterTabs } from './QueueFilterTabs';
 import { useShownLocalRuns } from './queueScope';
 import { useQueueUi } from './QueueUiContext';
@@ -26,22 +36,15 @@ type LocalRunListModule = Pick<typeof LocalRunListExports, 'LocalRunList'>;
 
 type LocalRunListRows = ComponentType<ComponentProps<typeof LocalRunListExports.LocalRunList>>;
 
-/** An external store of the rows component, so the section renders the fresh one a Retry creates. */
 export interface LocalRunListLoader {
-  /** The rows, lazily; replaced on Retry after a failure, since `React.lazy` keeps its first rejection. */
+  /** Replaced on Retry, since `React.lazy` keeps its first rejection. */
   getSnapshot(): { Rows: LocalRunListRows };
-  /** Starts the import without waiting; a failed one stays failed until `retry`. */
   preload(): void;
-  /** Imports again after a failure (an import in flight or done is reused), for the section's Retry. */
   retry(): Promise<unknown>;
   subscribe(listener: () => void): () => void;
 }
 
-/**
- * Loads the Submitting section's rows. Runs the backend has not accepted are rare, so they load with the first one, not
- * with the widget. A failed import stays failed until Retry, so re-rendering never refetches it: the server that
- * refused the run usually serves the chunk too.
- */
+/** Loads with the first unaccepted run, not the widget; a failed import stays failed until Retry. */
 export const createLocalRunListLoader = (importer: () => Promise<LocalRunListModule>): LocalRunListLoader => {
   const listeners = new Set<() => void>();
   let failed = false;
@@ -85,25 +88,70 @@ export const createLocalRunListLoader = (importer: () => Promise<LocalRunListMod
 
 const localRunList = createLocalRunListLoader(() => import('./LocalRunList'));
 
+/** Queue cannot import Workbench. */
+export interface QueueWidgetRuntime {
+  commands: {
+    register(command: { handler: () => unknown; id: string; title: string }): () => void;
+  };
+}
+
+type QueueWidgetRegion = 'bottom' | 'center' | 'dialog' | 'floating' | 'left' | 'popover' | 'right';
+
 export const QueueWidgetView = ({
   presentation,
   region,
+  runtime,
 }: {
   presentation?: 'compact' | 'expanded' | 'tooltip';
-  region: 'bottom' | 'center' | 'dialog' | 'floating' | 'left' | 'popover' | 'right';
+  region: QueueWidgetRegion;
+  runtime: QueueWidgetRuntime;
 }) => {
   if (region === 'bottom' && presentation !== 'expanded') {
     return <QueueStatusChip />;
   }
 
-  return <QueueContent />;
+  return <QueueContent region={region} runtime={runtime} />;
 };
 
-const QueueContent = () => {
+/** The Workbench's hotkey catalog binds `queue.recallAll` (A) to it, claimed only on a row offering recall. */
+const QUEUE_RECALL_ALL_COMMAND = 'queue.recallAll';
+
+/** The key goes to the focused element, so that is the row it names. */
+const QueueRecallAllCommand = ({ runtime }: { runtime: QueueWidgetRuntime }) => {
   const { t } = useTranslation();
+  const { recallAllFromItem } = useQueueUi();
+  const readModel = useQueueReadModelData();
+  const recallFocusedItem = useEffectEvent(() => {
+    const itemId = Number(
+      document.activeElement?.closest('[data-queue-recall-item]')?.getAttribute('data-queue-recall-item')
+    );
+    const item = readModel
+      ? [readModel.current, readModel.next, ...readModel.items].find((candidate) => candidate?.id === itemId)
+      : undefined;
+
+    if (item) {
+      recallAllFromItem(item);
+    }
+  });
+
+  /* eslint-disable react-hooks/rules-of-hooks -- useMountEffect is the repository's explicit useEffect wrapper */
+  useMountEffect(() =>
+    runtime.commands.register({
+      handler: () => recallFocusedItem(),
+      id: QUEUE_RECALL_ALL_COMMAND,
+      title: t('widgets.queue.recallAll'),
+    })
+  );
+  /* eslint-enable react-hooks/rules-of-hooks */
+
+  return null;
+};
+
+const QueueContent = ({ region, runtime }: { region: QueueWidgetRegion; runtime: QueueWidgetRuntime }) => {
+  const { i18n, t } = useTranslation();
   const [filter, setFilter] = useState<QueueFilterId>('all');
   const revealRequest = usePendingQueueItemReveal();
-  const { localRuns } = useQueueUi();
+  const { activeProjectId, localRuns } = useQueueUi();
   const shownLocalRuns = useShownLocalRuns();
   const [handledRevealRequestId, setHandledRevealRequestId] = useState<number | null>(null);
 
@@ -113,15 +161,16 @@ const QueueContent = () => {
     setFilter('all');
   }
 
-  // The counted filters stay put while the item lists scroll on their own.
+  // Sections bleed out of the list padding, so the extra row gap keeps row surfaces off the panel edges.
   return (
-    <Stack gap="3" h="full" minH="0" pt="3">
+    <Stack gap="2" h="full" minH="0" pt="2">
+      <QueueRecallAllCommand key={`${activeProjectId}:${region}:${i18n.language}`} runtime={runtime} />
       {localRuns.length > 0 ? <LocalRunListPreload rows={localRunList} /> : null}
-      <Stack flexShrink={0} gap="3" px="3">
+      <Box flexShrink={0} px="2">
         <QueueFilterTabs localRunCount={shownLocalRuns.length} value={filter} onChange={setFilter} />
-      </Stack>
+      </Box>
       <Scrollable flex="1" label={t('widgets.queue.items')} minH="0" overflowX="hidden">
-        <Stack gap="3" pb="3" px="3">
+        <Stack gap="3" pb="2" px={`calc(0.5rem + ${LIST_ROW_GAP_PX}px)`}>
           <LocalRunsSection filter={filter} rows={localRunList} runs={shownLocalRuns} />
           <CurrentBatchSection filter={filter} revealRequest={revealRequest} />
           <RecentSection filter={filter} revealRequest={revealRequest} />
@@ -131,21 +180,12 @@ const QueueContent = () => {
   );
 };
 
-/**
- * Fetches the rows with the first unaccepted run, shown or not, while the server that serves them likely still answers.
- * Mounted while there is one; mounting again later reuses the import, or keeps a failed one failed until Retry.
- */
 const LocalRunListPreload = ({ rows }: { rows: LocalRunListLoader }) => {
   useMountEffect(rows.preload);
   return null;
 };
 
-/**
- * SUBMITTING — this tab's runs the backend has not accepted yet: being sent, or retried after failures. The backend has
- * no row for them, so this is the one place to see why they wait and to cancel them. Like the current batch, they are
- * unfinished, so they show under All and Active alone. The header shows at once, so the section does not jump when its
- * rows arrive; rows that fail to load leave the rest of the widget working.
- */
+/** The backend has no row for these, so this is the only place to see why they wait and cancel them. */
 export const LocalRunsSection = ({
   filter,
   rows,
@@ -189,10 +229,8 @@ const RETRY_ANNOUNCEMENT_KEYS = {
 } satisfies Record<NonNullable<QueueLocalRun['retry']>['reason'], string>;
 
 /**
- * Tells screen readers why a run retries. Each retried run has one line keyed by its reason and naming no attempt, so a
- * line is added, and spoken, only when a run starts retrying or its reason changes, never on another attempt. It
- * stays mounted, whatever the filter, because a region inserted with its text is not announced, and switching tabs is
- * no news. Being offline, and the final failure that removes the run, are left to their own notices.
+ * One line per retried run keyed by its reason, so it speaks only when retrying starts or the reason changes.
+ * Stays mounted whatever the filter: a region inserted with its text is not announced.
  */
 const LocalRunAnnouncements = ({ runs }: { runs: readonly QueueLocalRun[] }) => {
   const { t } = useTranslation();

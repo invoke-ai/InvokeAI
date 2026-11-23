@@ -1,11 +1,12 @@
 /** Public, storage-independent contracts owned by Generation. */
+import type { ModelRole } from '@features/models';
 
 export type ResultDestination = 'canvas' | 'gallery';
 
 export interface GenerationProjectSettings {
   useCpuNoise: boolean;
-  // The Generate and Canvas output filters are required so that a caller passing its settings structurally breaks
-  // the build when it renames one, instead of silently turning a safety filter off.
+  // The Generate and Canvas output filters are required so that a caller passing its settings structurally breaks the
+  // build when it renames one, instead of silently turning a safety filter off.
   /** Blur images the NSFW checker flags before they are saved. */
   useNsfwChecker: boolean;
   /** Stamp an invisible watermark into every saved image. */
@@ -92,7 +93,10 @@ export interface GenerationModelCatalogItem {
   type: string;
   format?: string;
   variant?: string | null;
+  roles?: readonly ModelRole[];
   hash?: string;
+  /** Registered, but its files are gone: listed in the library, never loadable. */
+  is_missing?: boolean;
   submodel_type?: string;
   trigger_phrases?: string[] | null;
   default_settings?: {
@@ -105,6 +109,7 @@ export interface GenerationModelCatalogItem {
     height?: number | null;
     vae?: string | null;
     vae_precision?: string | null;
+    components?: Record<string, string> | null;
     weight?: number | null;
   } | null;
   [key: string]: unknown;

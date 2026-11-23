@@ -1,5 +1,6 @@
 import type { QueueSubmissionRetry } from '@features/queue/core/historyTypes';
 import type { QueueItemReadModel } from '@features/queue/core/types';
+import type { MenuPartLoader } from '@platform/ui/Menu';
 
 import { createContext, useContext, useSyncExternalStore, type ComponentType, type ReactNode } from 'react';
 
@@ -9,11 +10,12 @@ export interface QueueUiNotificationPort {
   success(title: string, description?: string): void;
 }
 
-/** This UI port preserves dependency direction: Queue cannot import Workbench. */
+/** Queue cannot import Workbench. */
 export interface QueueUiAdapter {
   ItemActions: ComponentType<{ item: QueueItemReadModel }>;
+  /** Mounted only while that row's menu is open. */
+  itemRecallMenuGroup: MenuPartLoader<ComponentType<{ item: QueueItemReadModel }>>;
   activeProjectId: string | null;
-  /** Names the active-project scope in confirmations and results. */
   activeProjectName: string | null;
   /** The invocation cache endpoints are admin-only; the Cache popover shows its row to administrators alone. */
   canManageInvocationCache: boolean;
@@ -25,39 +27,25 @@ export interface QueueUiAdapter {
   isConnected: boolean;
   /** Whether `projectId` is open in this tab; a Canvas rerun is staged only into a project open here. */
   isProjectOpen(projectId: string): boolean;
-  /**
-   * Runs this tab queued that the backend has not accepted yet (unsubmitted, enqueue in flight, or retried after
-   * failures), across this tab's open projects. The backend has no row for them, so only this tab can show or cancel
-   * them. Keep the array stable while its runs are unchanged: the queue widget and its actions re-render on a new one.
-   */
+  /** The backend has no row for these, so only this tab can show or cancel them; keep the array stable. */
   localRuns: readonly QueueLocalRun[];
-  /** Cancels one of those runs. */
   cancelLocalRun(projectId: string, runId: string): void;
   /** Cancels those runs in one project or (null) every open project. */
   cancelLocalRuns(projectId: string | null): void;
   notify: QueueUiNotificationPort;
   openQueue(): void;
-  /**
-   * Warms the `ItemActions` chunk ahead of the first expand. Optional: an
-   * adapter that supplies `ItemActions` eagerly has nothing to preload.
-   */
+  /** Optional: an adapter that supplies `ItemActions` eagerly has nothing to preload. */
   preloadItemActions?(): void;
   queueJobsScope: 'active-project' | 'all';
-  /**
-   * The first model the server is loading now, or null: a running item with no progress yet waits for it. A store, so
-   * only the components that read it (`useLoadingModelLabel`) re-render as loads come and go.
-   */
+  recallAllFromItem(item: QueueItemReadModel): void;
+  /** A store, so only components that read it re-render as loads come and go. */
   loadingModel: QueueLoadingModelPort;
-  /**
-   * Who bulk actions act for: single-user, an administrator (whose cancel-all and clear reach every user's items), or
-   * a member (whose reach only their own).
-   */
+  /** An administrator's cancel-all and clear reach every user's items; a member's only their own. */
   viewer: QueueViewer;
 }
 
 export type QueueViewer = 'admin' | 'member' | 'single';
 
-/** A run this tab queued that the backend has not accepted yet, as the queue widget lists it. */
 export interface QueueLocalRun {
   id: string;
   projectId: string;

@@ -319,6 +319,7 @@
         "type": "core_metadata",
         "width": 768,
         "clip_skip": 0,
+        "ref_images": [],
         "strength": 0.6,
         "control_layers": [
           {
@@ -800,6 +801,7 @@
         "type": "core_metadata",
         "width": 768,
         "clip_skip": 0,
+        "ref_images": [],
         "strength": 0.6,
         "control_layers": [
           {
@@ -1172,6 +1174,7 @@
         "type": "core_metadata",
         "width": 768,
         "clip_skip": 0,
+        "ref_images": [],
         "control_layers": [
           {
             "begin_step_percent": 0,

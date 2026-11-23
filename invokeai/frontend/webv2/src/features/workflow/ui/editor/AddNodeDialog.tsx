@@ -32,8 +32,8 @@ import { useVirtualizer } from 'react-hook-tanstack-virtual';
 import { useTranslation } from 'react-i18next';
 
 /**
- * Searching expands all node groups without capping results and ranks the closest names first; idle groups collapse
- * and UI-only nodes lead in Utility. With grouping off, results are one ranked list.
+ * Searching expands all node groups without capping results and ranks the closest names first; idle groups collapse and
+ * UI-only nodes lead in Utility. With grouping off, results are one ranked list.
  */
 
 const CATEGORY_ROW_HEIGHT_PX = 28;
@@ -683,8 +683,8 @@ const AddNodeDialogContent = ({
     setActiveIndex(null);
   }, []);
 
-  // The failure stays on screen, with its Retry busy, until the retried load settles; a later reload started
-  // elsewhere shows as plain loading.
+  // The failure stays on screen, with its Retry busy, until the retried load settles; a later reload started elsewhere
+  // shows as plain loading.
   if (isRetryRequested && status !== 'loading') {
     setIsRetryRequested(false);
   }

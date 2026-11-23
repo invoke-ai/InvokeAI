@@ -1,4 +1,3 @@
-import gc
 import json
 import math
 import re
@@ -74,11 +73,13 @@ class WrappedGGUFReader:
         return False
 
     def close(self):
-        """Drop this wrapper's references to the reader and its memory map, then collect.
+        """Drop this wrapper's references to the reader and its memory map.
 
-        The map closes once nothing references it. A caller's `with WrappedGGUFReader(path) as reader:` keeps the
-        reader, and through its tensor views the map, until that name goes out of scope -- for the callers here,
-        when they return -- so the collection releases only what reference cycles would otherwise hold.
+        The map closes once nothing references it, by reference count: the reader holds no cycle, so no collection
+        runs (a full one costs most of a second on a loaded process). A caller's
+        `with WrappedGGUFReader(path) as reader:` keeps the reader, and through its tensor views the map, until
+        that name goes out of scope -- for the callers here, when they return -- so the file can be deleted or
+        moved once the caller has returned, provided nothing it returned still views the file's data.
         """
         if hasattr(self.reader, "data"):
             try:
@@ -87,15 +88,13 @@ class WrappedGGUFReader:
             except (AttributeError, OSError, ValueError) as e:
                 logger.warning(f"Wasn't able to close GGUF memory map: {e}")
         del self.reader
-        gc.collect()
 
 
 def gguf_tensor_bytes(path: Path) -> dict[str, int]:
     """The stored size of each of a GGUF file's tensors, by name, from its header alone; no tensor data is read.
 
     For a loader that decides from the names which tensors to read, and sizes what it will read. The reader is
-    referenced by this expression only, so the memory map is released as soon as the sizes are read, without the
-    full collection `WrappedGGUFReader.close` runs, which costs most of a second on a loaded process (measured on
+    referenced by this expression only, so the memory map is released as soon as the sizes are read (measured on
     Windows, where a file still mapped cannot be deleted: it deletes at once with the collector disabled).
     """
     return {tensor.name: int(tensor.n_bytes) for tensor in _open_gguf_reader(path).tensors}

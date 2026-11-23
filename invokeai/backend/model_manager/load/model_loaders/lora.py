@@ -8,6 +8,7 @@ import torch
 from safetensors.torch import load_file
 
 from invokeai.app.services.config import InvokeAIAppConfig
+from invokeai.backend.krea2.control_lora import krea2_control_lora_from_state_dict
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.load.load_default import ModelLoader
 from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
@@ -22,6 +23,7 @@ from invokeai.backend.model_manager.taxonomy import (
     SubModelType,
 )
 from invokeai.backend.patches.lora_conversions.anima_lora_conversion_utils import lora_model_from_anima_state_dict
+from invokeai.backend.patches.lora_conversions.dora_magnitude_keys import DORA_MAGNITUDE_SUFFIX_TO_VALUE_KEY
 from invokeai.backend.patches.lora_conversions.ernie_image_lora_conversion_utils import (
     lora_model_from_ernie_image_state_dict,
 )
@@ -72,6 +74,10 @@ from invokeai.backend.patches.lora_conversions.ltx2_lora_conversion_utils import
 from invokeai.backend.patches.lora_conversions.minimax_h3_lora_conversion_utils import (
     lora_model_from_minimax_h3_state_dict,
 )
+from invokeai.backend.patches.lora_conversions.moss_image_lora_constants import has_moss_image_lora_keys
+from invokeai.backend.patches.lora_conversions.moss_image_lora_conversion_utils import (
+    lora_model_from_moss_image_state_dict,
+)
 from invokeai.backend.patches.lora_conversions.peft_adapter_utils import normalize_peft_adapter_names
 from invokeai.backend.patches.lora_conversions.qwen_image_2_1_lora_conversion_utils import (
     lora_model_from_qwen_image_21_state_dict,
@@ -85,7 +91,7 @@ from invokeai.backend.patches.lora_conversions.sdxl_lora_conversion_utils import
 from invokeai.backend.patches.lora_conversions.wan_lora_conversion_utils import lora_model_from_wan_state_dict
 from invokeai.backend.patches.lora_conversions.z_image_lora_conversion_utils import lora_model_from_z_image_state_dict
 
-_DORA_MAGNITUDE_SUFFIXES = (".dora_scale", ".dora_magnitude", ".lora_magnitude_vector.weight", ".magnitude")
+_DORA_MAGNITUDE_SUFFIXES = (*DORA_MAGNITUDE_SUFFIX_TO_VALUE_KEY, ".dora_magnitude")
 _FACTORIZED_LAYER_SUFFIXES = (".hada_w1_a", ".lokr_w1", ".lokr_w1_a")
 
 
@@ -111,6 +117,7 @@ def _count_factorized_layers_with_dora_magnitude(state_dict: dict[str, torch.Ten
 @ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.LoRA, format=ModelFormat.LyCORIS)
 @ModelLoaderRegistry.register(base=BaseModelType.Flux, type=ModelType.ControlLoRa, format=ModelFormat.LyCORIS)
 @ModelLoaderRegistry.register(base=BaseModelType.Flux, type=ModelType.ControlLoRa, format=ModelFormat.Diffusers)
+@ModelLoaderRegistry.register(base=BaseModelType.Krea2, type=ModelType.ControlLoRa, format=ModelFormat.LyCORIS)
 class LoRALoader(ModelLoader):
     """Class to load LoRA models."""
 
@@ -217,10 +224,24 @@ class LoRALoader(ModelLoader):
             model = lora_model_from_flux3_state_dict(
                 state_dict=state_dict, name=config.name, metadata=ModelOnDisk(model_path).metadata()
             )
+        elif self._model_base == BaseModelType.MossImage:
+            # ai-toolkit, ComfyUI, kohya/LyCORIS, DiffSynth and diffusers/PEFT keys already name the transformer's
+            # modules; a fused `proj.qkv` is cut into the `proj.q/k/v` it has. The header holds a diffusers file's
+            # PEFT config, which sets its scale.
+            model = lora_model_from_moss_image_state_dict(
+                state_dict=state_dict, name=config.name, metadata=ModelOnDisk(model_path).metadata()
+            )
         elif self._model_base in [BaseModelType.StableDiffusion1, BaseModelType.StableDiffusion2]:
             # Currently, we don't apply any conversions for SD1 and SD2 LoRA models.
             model = lora_model_from_sd_state_dict(state_dict=state_dict)
         elif self._model_base == BaseModelType.ZImage:
+            if has_moss_image_lora_keys(state_dict):
+                # Versions without MOSS-Image LoRA support registered these as Z-Image LoRAs, whose conversion would
+                # map their layers onto nothing.
+                raise ValueError(
+                    f"LoRA '{config.name}' is a MOSS-Image LoRA, registered as a Z-Image LoRA by an earlier version of "
+                    "InvokeAI. Use Re-identify model in the Model Manager to register it as a MOSS-Image LoRA."
+                )
             # Z-Image LoRAs use diffusers PEFT format with transformer and/or Qwen3 encoder layers.
             # We set alpha=None to use rank as alpha (common default).
             model = lora_model_from_z_image_state_dict(state_dict=state_dict, alpha=None)
@@ -229,6 +250,8 @@ class LoRALoader(ModelLoader):
         elif self._model_base == BaseModelType.QwenImage21:
             # ComfyUI, diffusers/PEFT or Kohya keys; ComfyUI's fused gate_up is split for diffusers.
             model = lora_model_from_qwen_image_21_state_dict(state_dict=state_dict)
+        elif self._model_base == BaseModelType.Krea2 and config.type is ModelType.ControlLoRa:
+            model = krea2_control_lora_from_state_dict(state_dict)
         elif self._model_base == BaseModelType.Krea2:
             # Krea-2 LoRAs use diffusers PEFT format targeting the Krea2 transformer (and optionally
             # the Qwen3-VL text encoder). alpha=None → alpha=rank (common diffusers default).

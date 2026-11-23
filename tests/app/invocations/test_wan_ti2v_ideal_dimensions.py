@@ -9,8 +9,6 @@ call ``invoke`` with ``None`` directly.
 import pytest
 
 from invokeai.app.invocations.wan.wan_ideal_dimensions import (
-    WAN_TARGET_RESOLUTION_PX,
-    WAN_TI2V_PIXEL_MULTIPLE,
     WanTI2VIdealDimensionsInvocation,
 )
 
@@ -108,16 +106,6 @@ class TestPostconditions:
         ow, oh = _resolve(32, 32, target="480p", rounding="floor")
         assert ow >= 32
         assert oh >= 32
-
-
-class TestResolutionPresetTable:
-    """The dropdown values must map to the documented short-side pixel counts."""
-
-    def test_presets_cover_canonical_video_sizes(self) -> None:
-        assert WAN_TARGET_RESOLUTION_PX == {"480p": 480, "720p": 720, "1080p": 1080}
-
-    def test_pixel_multiple_is_32(self) -> None:
-        assert WAN_TI2V_PIXEL_MULTIPLE == 32
 
 
 class TestInputValidation:

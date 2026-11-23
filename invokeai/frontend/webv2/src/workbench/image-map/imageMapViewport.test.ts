@@ -94,8 +94,7 @@ describe('zoomFactorFromWheel', () => {
   it('gives the trackpad-pinch gain only to trackpad-sized deltas', () => {
     // A pinch arrives as ctrl+wheel in small synthetic steps...
     expect(zoomFactorFromWheel(5, PIXEL, true)).toBeCloseTo(Math.exp(0.05), 10);
-    // ...but so does ctrl held over a real wheel, where the pinch gain would
-    // zoom 2.7x in a single notch.
+    // ...but so does ctrl held over a real wheel, where the pinch gain would zoom 2.7x in a single notch.
     expect(zoomFactorFromWheel(100, PIXEL, true)).toBeCloseTo(zoomFactorFromWheel(100, PIXEL, false), 10);
     expect(zoomFactorFromWheel(3, LINE, true)).toBeCloseTo(zoomFactorFromWheel(3, LINE, false), 10);
   });
@@ -185,7 +184,6 @@ describe('expandRangesToInclude', () => {
 
     expect(grown.x[1]).toBeGreaterThan(14);
     expect(grown.y[0]).toBeLessThan(-3);
-    // Untouched edges stay put.
     expect(grown.x[0]).toBe(0);
     expect(grown.y[1]).toBe(10);
   });

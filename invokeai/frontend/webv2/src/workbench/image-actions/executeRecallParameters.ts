@@ -24,10 +24,9 @@ import {
 const toErrorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 
 /**
- * Drops recalled reference images whose files are not in the gallery, reporting
- * each one. Entries the project already had are trusted as-is, so an `append`
- * never removes anything. When nothing recalled survives, the project keeps
- * the list it had instead of committing an empty replacement.
+ * Drops recalled reference images whose files are not in the gallery, reporting each one. Entries the project already
+ * had are trusted as-is, so an `append` never removes anything. When nothing recalled survives, the project keeps the
+ * list it had instead of committing an empty replacement.
  */
 const verifyRecalledReferenceImages = async (
   result: RecallParametersResult,
@@ -105,7 +104,7 @@ export const executeRecallParameters = async ({
       return false;
     }
 
-    const currentValues = getCurrentGenerateValues({ generateValues, supportedModels });
+    const currentValues = getCurrentGenerateValues({ generateValues, models, supportedModels });
 
     if (!currentValues) {
       commands.notifications.add({
@@ -168,7 +167,7 @@ export const executeRecallParameters = async ({
     if (latestRaw === null || (canvasTarget && !canvasTarget.getProject())) {
       return false;
     }
-    const latest = getCurrentGenerateValues({ generateValues: latestRaw, supportedModels });
+    const latest = getCurrentGenerateValues({ generateValues: latestRaw, models, supportedModels });
     if (!latest) {
       return false;
     }

@@ -1,6 +1,6 @@
 import type { GenerateModelConfig } from '@features/generation/core/types';
 
-import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
+import { seedArchitectureCapabilities } from '@features/models/core/architectureCapabilities.testing';
 import { describe, expect, it } from 'vitest';
 
 import { resolveCanvasProcessingSize } from './canvasProcessingSize';
@@ -84,7 +84,6 @@ describe('resolveCanvasProcessingSize', () => {
       height: 832,
       width: 1216,
     });
-    // The same size on another base is below its optimal area and still grows.
     expect(resolveCanvasProcessingSize(sd1, 'off', { height: 1216, width: 832 }, auto)).toEqual({
       height: 1216,
       width: 832,

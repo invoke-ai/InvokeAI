@@ -66,7 +66,6 @@ const run = (
   error,
   error_code: null,
   held_back: null,
-  // As the server counts: a failed or canceled decode leaves its window too, as an invalid one.
   point_count: status === 'running' ? 0 : 1,
   run_id: id,
   status,
@@ -79,7 +78,6 @@ const describeSteps = (steps: ReturnType<typeof planCalibrationSteps>) =>
 
 describe('planCalibrationSteps', () => {
   it('groups cases by precision and warms each case up right before measuring it', () => {
-    // The plan lists an fp32 case between two fp16 ones; grouping keeps one precision switch.
     const steps = planCalibrationSteps(plan([planCase('fp16', 512), planCase('fp32', 512), planCase('fp16', 1024)]));
 
     expect(describeSteps(steps)).toEqual([
@@ -115,16 +113,12 @@ describe('changesCalibration', () => {
 
   it('lets new sizes through, which the free memory moves, but not other lines or another number of runs', () => {
     expect(changesCalibration(confirmed, plan([planCase('fp16', 768), planCase('fp32', 640)]))).toBe(false);
-    // The same two cases in another order are the same calibration.
     expect(changesCalibration(confirmed, plan([planCase('fp32', 512), planCase('fp16', 512)]))).toBe(false);
 
-    // fp32 is no longer measured, though the run count stays.
     expect(changesCalibration(confirmed, plan([planCase('fp16', 512), planCase('fp16', 768)]))).toBe(true);
-    // A size more on the same lines.
     expect(
       changesCalibration(confirmed, plan([planCase('fp16', 512), planCase('fp16', 768), planCase('fp32', 512)]))
     ).toBe(true);
-    // The same cases repeated more often.
     expect(changesCalibration(confirmed, plan([planCase('fp16', 512), planCase('fp32', 512)], 1, 3))).toBe(true);
   });
 });
@@ -203,9 +197,7 @@ describe('deriveCalibrationProgress', () => {
   });
 
   it('reports the error of a failed run, which discards the attempt only where the attempt was aborted too', () => {
-    // An out-of-memory step ends its run, not the attempt: the other steps still feed the fit.
     const ranOn = [run('r0', 0, 'completed'), run('r1', 1, 'failed', 'CUDA out of memory'), run('r2', 2, 'completed')];
-    // Stopped after the failure: the server holds the attempt back as aborted.
     const stopped = [
       run('r0', 0, 'completed', null, 'attempt', ABORTED),
       run('r1', 1, 'failed', 'CUDA out of memory', 'attempt', ABORTED),
@@ -224,7 +216,6 @@ describe('deriveCalibrationProgress', () => {
       kept: false,
       kind: 'failed',
     });
-    // Every step failed out of memory: each left an invalid window, and nothing still counts.
     const allFailed = steps.map((_, index) => run(`f${String(index)}`, index, 'failed', 'OOM'));
     expect(deriveCalibrationProgress({ local: null, runs: allFailed, steps }).outcome).toEqual({
       discarded: false,
@@ -232,8 +223,6 @@ describe('deriveCalibrationProgress', () => {
       kept: false,
       kind: 'failed',
     });
-    // The first step failed and Stop canceled the rest: the server holds the attempt back, but its only window is
-    // invalid, so nothing was discarded.
     const stoppedMidDecode = [
       run('f0', 0, 'failed', 'OOM', 'attempt', ABORTED),
       ...steps
@@ -250,7 +239,6 @@ describe('deriveCalibrationProgress', () => {
 
   it('tells completed, canceled and partial attempts apart', () => {
     const completed = steps.map((_, index) => run(`r${String(index)}`, index, 'completed'));
-    // A queue clear canceled these: the server discards the attempt.
     const canceled = [
       run('r0', 0, 'canceled', null, 'attempt', ABORTED),
       run('r1', 1, 'canceled', null, 'attempt', ABORTED),
@@ -262,9 +250,7 @@ describe('deriveCalibrationProgress', () => {
     ];
 
     expect(deriveCalibrationProgress({ local: null, runs: completed, steps }).outcome).toEqual({ kind: 'completed' });
-    // Every run was canceled, the first one during its decode: its window is invalid, so nothing was lost.
     expect(deriveCalibrationProgress({ local: null, runs: canceled, steps }).outcome).toEqual({ kind: 'canceled' });
-    // A canceled run of no attempt (a script's) is judged on its own.
     expect(
       deriveCalibrationProgress({ local: null, runs: [run('r0', 0, 'canceled', null, null)], steps }).outcome
     ).toEqual({ kind: 'canceled' });
@@ -287,7 +273,6 @@ describe('deriveCalibrationProgress', () => {
   });
 
   it('reports an attempt whose queuing stopped early as partial, or failed when nothing was queued', () => {
-    // Two of six steps were queued: the server holds the attempt back as aborted.
     const shortOf = { ...ABORTED, attempt_steps: 6 };
     const runs = [run('r0', 0, 'completed', null, 'mine', shortOf), run('r1', 1, 'completed', null, 'mine', shortOf)];
 
@@ -301,7 +286,6 @@ describe('deriveCalibrationProgress', () => {
         total: 6,
       }
     );
-    // Its graphs did not compile, so nothing of it was queued; an older attempt does not hide the error.
     const older = [run('old', 0, 'completed', null, 'old')];
     const failedStart = local({ newestRunAtStart: 'old', submissionError: 'Case x: unknown model' });
     expect(deriveCalibrationProgress({ local: failedStart, runs: older, steps }).outcome).toEqual({
@@ -322,12 +306,10 @@ describe('deriveCalibrationProgress', () => {
 
     expect(deriveCalibrationProgress({ local: null, runs, steps }).outcome).toMatchObject({
       error: 'This SDXL changed after this calibration was planned (hash).',
-      // The completed step measured a model that has changed since: no claim that it still counts.
       kept: false,
       kind: 'failed',
       refusal: 'modelChanged',
     });
-    // A failure without the code is not read as one by its text.
     const worded = [run('r0', 0, 'failed', 'This SDXL changed after this calibration was planned (hash).')];
     expect(deriveCalibrationProgress({ local: null, runs: worded, steps }).outcome).not.toHaveProperty(
       'refusal',
@@ -339,11 +321,9 @@ describe('deriveCalibrationProgress', () => {
     const recorded = { attempt_steps: 6 };
     const finished = steps.map((_, index) => run(`r${String(index)}`, index, 'completed', null, 'mine', recorded));
 
-    // Stop came after the last step finished: nothing was canceled, and the server keeps the attempt.
     expect(deriveCalibrationProgress({ local: local({ stopped: true }), runs: finished, steps }).outcome).toEqual({
       kind: 'completed',
     });
-    // Stop came while the last step failed: the server keeps the other steps.
     const lastFailed = [...finished.slice(0, 5), run('r5', 5, 'failed', 'CUDA out of memory', 'mine', recorded)];
     expect(deriveCalibrationProgress({ local: local({ stopped: true }), runs: lastFailed, steps }).outcome).toEqual({
       discarded: false,
@@ -351,7 +331,6 @@ describe('deriveCalibrationProgress', () => {
       kept: true,
       kind: 'failed',
     });
-    // The last step's answer failed three times, but the server had recorded it: the attempt is complete.
     expect(
       deriveCalibrationProgress({
         local: local({ submissionError: 'The calibration store is locked' }),
@@ -362,7 +341,6 @@ describe('deriveCalibrationProgress', () => {
   });
 
   it('lets an attempt that queued nothing give way to any attempt that ran after it', () => {
-    // This tab could not reach the server; another tab then calibrated to the end.
     const failedStart = local({ newestRunAtStart: 'old', submissionError: 'Failed to fetch' });
     const theirs = steps.map((_, index) => run(`theirs-${String(index)}`, 100 + index, 'completed', null, 'theirs'));
 
@@ -379,11 +357,9 @@ describe('deriveCalibrationProgress', () => {
   });
 
   it('reports an attempt the user stopped as canceled, even where queuing ended before any run was canceled', () => {
-    // Stopped after two of six steps were queued: the server holds the attempt back as aborted.
     const shortOf = { ...ABORTED, attempt_steps: 6 };
     const runs = [run('r0', 0, 'completed', null, 'mine', shortOf), run('r1', 1, 'completed', null, 'mine', shortOf)];
 
-    // Stop discards the attempt, the steps it finished included, before the server's next summary says so.
     expect(deriveCalibrationProgress({ local: local({ stopped: true }), runs, steps }).outcome).toEqual({
       canceled: true,
       discarded: true,
@@ -392,7 +368,6 @@ describe('deriveCalibrationProgress', () => {
       queued: 2,
       total: 6,
     });
-    // Stopped before its first step was queued: nothing was measured to discard.
     expect(deriveCalibrationProgress({ local: local({ stopped: true }), runs: [], steps }).outcome).toEqual({
       kind: 'canceled',
     });
@@ -406,7 +381,6 @@ describe('deriveCalibrationProgress', () => {
     ];
     const complete = steps.map((_, index) => run(`r${String(index)}`, index, 'completed', null, 'attempt', counted));
 
-    // After a reload this tab has no record of it.
     expect(deriveCalibrationProgress({ local: null, runs: truncated, steps }).outcome).toEqual({
       canceled: false,
       discarded: true,
@@ -449,7 +423,6 @@ describe('lineDisplayState', () => {
 
   it('reads a line only stopped attempts measured as stopped, not as short of sizes', () => {
     expect(lineDisplayState(sized('insufficient', ['aborted_attempt', 'aborted_attempt']))).toBe('interrupted');
-    // A size of its own, or one left out for another reason, makes it short of sizes after all.
     expect(lineDisplayState(sized('insufficient', ['aborted_attempt', null]))).toBe('insufficient');
     expect(lineDisplayState(sized('insufficient', ['aborted_attempt', 'fragmented']))).toBe('insufficient');
     expect(lineDisplayState(sized('insufficient', []))).toBe('insufficient');
@@ -480,7 +453,6 @@ describe('describeCoverage', () => {
     describeCoverage({ current_env_id: 'current', lines, runs });
 
   it("takes the headline from the current environment's lines, else from all lines", () => {
-    // An old environment's unusable line does not outrank what applies now.
     expect(coverage([line('unusable', { envId: 'old' }), line('in_use')])).toMatchObject({
       hasCurrentLines: true,
       state: 'in_use',
@@ -495,7 +467,6 @@ describe('describeCoverage', () => {
     expect(coverage([oldVersion, line('in_use')]).state).toBe('in_use');
     expect(coverage([oldVersion, line('stale')]).state).toBe('stale');
     expect(coverage([oldVersion]).state).toBe('unusable');
-    // Only the same line supersedes it.
     expect(coverage([oldVersion, line('in_use', { lineName: 'decode_fp32' })]).state).toBe('unusable');
     expect(coverage([oldVersion, line('insufficient')]).state).toBe('unusable');
   });
@@ -509,9 +480,7 @@ describe('describeCoverage', () => {
       hasOwnMeasurements: true,
       usesOthersOnly: false,
     });
-    // A shared line that does not apply is not used.
     expect(coverage([line('insufficient', { ownWindows: 0 })]).usesOthersOnly).toBe(false);
-    // Runs that measured nothing still leave something to reset.
     expect(coverage([], [run('r0', 0, 'canceled')]).hasOwnMeasurements).toBe(true);
   });
 });
@@ -568,7 +537,6 @@ describe('modelCalibratingOnGpu', () => {
     const running = { attempt_id: 'a', model_key: 'sdxl', status: 'running' as const };
 
     expect(modelCalibratingOnGpu(statusOf(classOf(true, [running])))).toBe('sdxl');
-    // Another device class, a finished run, and a run without an attempt hold nothing here.
     expect(modelCalibratingOnGpu(statusOf(classOf(false, [running])))).toBeNull();
     expect(modelCalibratingOnGpu(statusOf(classOf(true, [{ ...running, status: 'completed' }])))).toBeNull();
     expect(modelCalibratingOnGpu(statusOf(classOf(true, [{ ...running, attempt_id: null }])))).toBeNull();
@@ -651,9 +619,7 @@ describe('compiledModelIdentities', () => {
       nodes: {
         loader: { id: 'loader', model: identifier('main'), type: 'sdxl_model_loader' },
         loras: { id: 'loras', loras: [{ lora: identifier('lora'), weight: 1 }], type: 'lora_collection_loader' },
-        // A metadata node's record of a model, which the server counts too.
         metadata: { id: 'metadata', t5_encoder: identifier('encoder'), type: 'core_metadata' },
-        // Not model identifiers the server counts: no hash, and a submodel type that is no string.
         other: {
           id: 'other',
           numbered: { ...identifier('numbered'), submodel_type: 3 },
@@ -679,8 +645,8 @@ describe('compiledModelIdentities', () => {
   });
 
   it('finds the models of a graph the canvas compiler wrote, as the server does', () => {
-    // The server's test (`test_the_models_a_compiled_graph_names_are_found_where_the_client_finds_them`) reads the
-    // same graph and expects the same keys.
+    // The server's test (`test_the_models_a_compiled_graph_names_are_found_where_the_client_finds_them`) reads the same
+    // graph and expects the same keys.
     const graph = (ANIMA_LLLITE_GRAPHS as Record<string, unknown>).inpaint_three_adapters;
     const keys = ['anima-model', 'depth', 'pose', 'qwen-vae', 'qwen3', 'sketch'];
 

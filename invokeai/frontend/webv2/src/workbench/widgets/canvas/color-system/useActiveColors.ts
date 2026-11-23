@@ -54,8 +54,8 @@ export const useActiveColorCommands = (): ActiveColorCommands => {
 
   return useMemo(() => {
     const values = (): Record<string, unknown> => getProjectWidgetValues(queries.getSnapshot().activeProject, 'canvas');
-    // A no-op edit must not dispatch: the eyedropper re-samples per pointermove,
-    // and an unchanged patch would still mint a new project snapshot.
+    // A no-op edit must not dispatch: the eyedropper re-samples per pointermove, and an unchanged patch would still
+    // mint a new project snapshot.
     const patchPair = (current: ActiveColorPair, next: ActiveColorPair): void => {
       if (!areColorPairsEqual(current, next)) {
         widgets.patchValues('canvas', { [CANVAS_ACTIVE_COLORS_KEY]: next });

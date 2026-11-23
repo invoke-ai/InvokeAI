@@ -1,7 +1,7 @@
 /**
- * Exclude submitted input media from results: primitive nodes echo inputs, while generated outputs receive fresh
- * server names. Inputs live in compiled graph nodes and, for workflow Image Batches, in the submission's batch data,
- * which the backend substitutes into nodes per session.
+ * Exclude submitted input media from results: primitive nodes echo inputs, while generated outputs receive fresh server
+ * names. Inputs live in compiled graph nodes and, for workflow Image Batches, in the submission's batch data, which the
+ * backend substitutes into nodes per session.
  */
 
 import { isQueueWorkflowBatchDatum } from './promptBatch';

@@ -1,7 +1,10 @@
+import copy
+
 import torch
 
 from invokeai.backend.patches.layers.dora_layer import DoRALayer
 from invokeai.backend.patches.layers.lora_layer import LoRALayer
+from invokeai.backend.patches.layers.merged_layer_patch import MergedLayerPatch, Range
 from invokeai.backend.patches.layers.swapped_halves_layer_patch import SwappedHalvesLayerPatch
 
 OUT_FEATURES = 12  # Two halves of 6, like the (shift, scale) / (scale, shift) modulation output.
@@ -94,3 +97,31 @@ def test_meta_original_parameters_give_the_same_lora_delta() -> None:
     meta = patch.get_parameters({"weight": torch.empty(OUT_FEATURES, IN_FEATURES, device="meta")}, weight=1.0)
 
     assert torch.equal(meta["weight"], real["weight"])
+
+
+def _lora(out_features: int, dtype: torch.dtype = torch.float32) -> LoRALayer:
+    return LoRALayer(
+        up=torch.ones(out_features, RANK, dtype=dtype),
+        mid=None,
+        down=torch.ones(RANK, IN_FEATURES, dtype=dtype),
+        alpha=None,
+        bias=None,
+    )
+
+
+def _tensors(*layers: LoRALayer) -> list[tuple[torch.device, torch.dtype]]:
+    return [(t.device, t.dtype) for layer in layers for t in (layer.up, layer.down)]
+
+
+def test_moving_a_copy_leaves_nested_sub_layers_in_place() -> None:
+    inner = [_lora(OUT_FEATURES // 2, torch.float16), _lora(OUT_FEATURES // 2, torch.float32)]
+    patch = SwappedHalvesLayerPatch(
+        MergedLayerPatch(inner, [Range(0, OUT_FEATURES // 2), Range(OUT_FEATURES // 2, OUT_FEATURES)])
+    )
+    before = _tensors(*inner)
+
+    moved = copy.copy(patch)
+    moved.to(torch.device("meta"))
+
+    assert _tensors(*inner) == before
+    assert all(layer.up.device.type == "meta" for layer in moved.layer.lora_layers)  # type: ignore[attr-defined]

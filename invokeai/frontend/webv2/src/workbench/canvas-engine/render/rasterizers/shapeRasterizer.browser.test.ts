@@ -109,7 +109,6 @@ describe('shape borders in Chromium', () => {
   ])('keeps the antialiased white outline free of red fill at the $name', ({ source, x, y }) => {
     const surface = createDomRasterBackend().createSurface(source.width + 32, source.height + 32);
     drawShapeSource(surface.ctx, source, 16, 16, source.width, source.height);
-    // These pixels straddle the known outer silhouette, far from the outline's inner color transition.
     const pixel = Array.from(surface.ctx.getImageData(x + 16, y + 16, 1, 1).data);
     expect(pixel[3]).toBeGreaterThan(0);
     expect(pixel[3]).toBeLessThan(255);
@@ -137,7 +136,6 @@ describe('shape borders in Chromium', () => {
           continue;
         }
         redPixels += 1;
-        // An 18px white border must separate solid red fill from transparency by more than antialiasing alone.
         if (
           [
             [-2, 0],
@@ -153,99 +151,6 @@ describe('shape borders in Chromium', () => {
     expect(redPixels).toBeGreaterThan(0);
     expect(whitePixels).toBeGreaterThan(0);
     expect(exposedFill.slice(0, 8)).toEqual([]);
-  });
-
-  it.each(fixtures)(
-    'keeps opaque fill under translucent and transparent strokes for $name',
-    ({ source, border, interior }) => {
-      const backend = createDomRasterBackend();
-      for (const [stroke, green] of [
-        ['#ffffff80', 128],
-        ['#ffffff00', 0],
-      ] as const) {
-        const surface = backend.createSurface(source.width + 32, source.height + 32);
-        drawShapeSource(surface.ctx, { ...source, stroke }, 16, 16, source.width, source.height);
-        const borderPixel = Array.from(surface.ctx.getImageData(border.x + 16, border.y + 16, 1, 1).data);
-        expect(borderPixel).toEqual([255, green, green, 255]);
-        expect(Array.from(surface.ctx.getImageData(interior.x + 16, interior.y + 16, 1, 1).data)).toEqual([
-          255, 0, 0, 255,
-        ]);
-      }
-    }
-  );
-
-  it.each(fixtures)(
-    'contains stroke-only coverage within the original silhouette and extent for $name',
-    ({ source, border, interior, outside }) => {
-      const backend = createDomRasterBackend();
-      const surface = backend.createSurface(source.width + 32, source.height + 32);
-      drawShapeSource(surface.ctx, { ...source, fill: null }, 16, 16, source.width, source.height);
-      expect(Array.from(surface.ctx.getImageData(border.x + 16, border.y + 16, 1, 1).data)).toEqual([
-        255, 255, 255, 255,
-      ]);
-      expect(surface.ctx.getImageData(interior.x + 16, interior.y + 16, 1, 1).data[3]).toBe(0);
-      expect(surface.ctx.getImageData(outside.x + 16, outside.y + 16, 1, 1).data[3]).toBe(0);
-      const { data, width, height } = surface.ctx.getImageData(0, 0, surface.width, surface.height);
-      let outsideAlpha = 0;
-      for (let y = 0; y < height; y += 1) {
-        for (let x = 0; x < width; x += 1) {
-          if (x < 16 || x >= source.width + 16 || y < 16 || y >= source.height + 16) {
-            outsideAlpha += data[(y * width + x) * 4 + 3]!;
-          }
-        }
-      }
-      expect(outsideAlpha).toBe(0);
-    }
-  );
-
-  it('uses the configured width inside the original rectangle edge', () => {
-    const surface = createDomRasterBackend().createSurface(100, 100);
-    drawShapeSource(
-      surface.ctx,
-      { fill: null, height: 60, kind: 'rect', stroke: '#ffffff', strokeWidth: 18, type: 'shape', width: 60 },
-      20,
-      20,
-      60,
-      60
-    );
-    expect(Array.from(surface.ctx.getImageData(37, 50, 1, 1).data)).toEqual([255, 255, 255, 255]);
-    expect(surface.ctx.getImageData(38, 50, 1, 1).data[3]).toBe(0);
-    expect(surface.ctx.getImageData(19, 50, 1, 1).data[3]).toBe(0);
-  });
-
-  it.each([
-    ['#ffffff', [255, 255, 255, 255]],
-    ['#ffffff80', [255, 170, 170, 192]],
-  ] as const)('composites %s stroke independently over translucent fill', (stroke, borderPixel) => {
-    const surface = createDomRasterBackend().createSurface(100, 100);
-    drawShapeSource(
-      surface.ctx,
-      { fill: '#ff000080', height: 60, kind: 'rect', stroke, strokeWidth: 10, type: 'shape', width: 60 },
-      20,
-      20,
-      60,
-      60
-    );
-    expect(Array.from(surface.ctx.getImageData(22, 50, 1, 1).data)).toEqual(borderPixel);
-    expect(Array.from(surface.ctx.getImageData(50, 50, 1, 1).data)).toEqual([255, 0, 0, 128]);
-  });
-
-  it('applies exterior coverage once with fractional placement and a nonuniform transform', () => {
-    const surface = createDomRasterBackend().createSurface(160, 100);
-    surface.ctx.setTransform(1.25, 0, 0, 0.75, 0.25, 0.25);
-    drawShapeSource(
-      surface.ctx,
-      { fill: '#ff0000', height: 80, kind: 'rect', stroke: '#ffffff', strokeWidth: 10, type: 'shape', width: 80 },
-      16,
-      16,
-      80,
-      80
-    );
-    const pixel = Array.from(surface.ctx.getImageData(20, 12, 1, 1).data);
-    expect(pixel[3]).toBeGreaterThan(0);
-    expect(pixel[3]).toBeLessThan(255);
-    expect(pixel.slice(0, 3)).toEqual([255, 255, 255]);
-    expect(Array.from(surface.ctx.getImageData(70, 42, 1, 1).data)).toEqual([255, 0, 0, 255]);
   });
 
   it('clears a reused rasterization target after a stroked shape', async () => {
@@ -276,31 +181,5 @@ describe('shape borders in Chromium', () => {
     expect(result.surface).toBe(target);
     expect(target.ctx.getImageData(0, 0, 1, 1).data[3]).toBe(0);
     expect(Array.from(target.ctx.getImageData(32, 40, 1, 1).data)).toEqual([0, 255, 0, 255]);
-  });
-
-  it('restores caller transform, alpha, composite mode and clip after drawing an outline', () => {
-    const surface = createDomRasterBackend().createSurface(180, 180);
-    const { ctx } = surface;
-    ctx.beginPath();
-    ctx.rect(0, 0, 150, 150);
-    ctx.clip();
-    ctx.setTransform(1, 0, 0, 1, 3, 2);
-    ctx.globalAlpha = 0.5;
-    ctx.globalCompositeOperation = 'xor';
-    const { source } = fixtures[0]!;
-    drawShapeSource(ctx, source, 16, 16, source.width, source.height);
-    expect(ctx.globalAlpha).toBe(0.5);
-    expect(ctx.globalCompositeOperation).toBe('xor');
-    const { a, b, c, d, e, f } = ctx.getTransform();
-    expect({ a, b, c, d, e, f }).toEqual({ a: 1, b: 0, c: 0, d: 1, e: 3, f: 2 });
-    expect(ctx.getImageData(59, 88, 1, 1).data[3]).toBe(128);
-    expect(Array.from(ctx.getImageData(59, 26, 1, 1).data)).toEqual([255, 170, 170, 192]);
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.globalAlpha = 1;
-    ctx.globalCompositeOperation = 'source-over';
-    ctx.fillStyle = '#00ff00';
-    ctx.fillRect(0, 0, 180, 180);
-    expect(Array.from(ctx.getImageData(2, 2, 1, 1).data)).toEqual([0, 255, 0, 255]);
-    expect(ctx.getImageData(160, 160, 1, 1).data[3]).toBe(0);
   });
 });

@@ -185,7 +185,7 @@ class TestAnimaAcceptsBothWan21VaeLayouts:
         vae.config.latents_mean = [1.0] * 16
         vae.config.latents_std = [2.0] * 16
         posterior = MagicMock()
-        posterior.sample.return_value = torch.full((1, 16, 1, 4, 4), 3.0)
+        posterior.mode.return_value = torch.full((1, 16, 1, 4, 4), 3.0)
         vae.encode.return_value = (posterior,)
 
         with patch.object(TorchDevice, "choose_torch_device", return_value=torch.device("cpu")):
@@ -388,7 +388,7 @@ class TestAnimaImageToLatentsEncode:
     def test_encode_disables_tiling_and_requests_working_memory(self):
         vae = _mock_vae(dtype=torch.float32)
         mock_dist = MagicMock()
-        mock_dist.sample.return_value = torch.zeros(1, 16, 1, 4, 4)
+        mock_dist.mode.return_value = torch.zeros(1, 16, 1, 4, 4)
         vae.encode.return_value = (mock_dist,)
         vae_info = _mock_vae_info(vae)
 

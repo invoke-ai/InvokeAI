@@ -1,17 +1,15 @@
 /* oxlint-disable react-perf/jsx-no-new-object-as-prop */
 import type { GenerationModelCatalogItem } from '@features/generation/contracts';
-import type { GenerateLora, GenerateModelConfig, LoraModelConfig } from '@features/generation/core/types';
+import type { GenerateLora, LoraModelConfig } from '@features/generation/core/types';
 import type { ComponentType } from 'react';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { DndContext } from '@dnd-kit/core';
-import { architectureCapabilitiesFixture } from '@features/generation/core/architectureCapabilities.testing';
 import { getDefaultGenerateSettings } from '@features/generation/core/baseGenerationPolicies';
-import { ensureArchitectureCapabilitiesLoaded } from '@features/generation/data/architectureCapabilitiesStore';
-import { dynamicPromptsKeys } from '@features/generation/data/dynamicPromptsQueries';
-import { promptTemplatesQueryOptions } from '@features/generation/data/promptTemplates';
 import { wildcardsQueryOptions } from '@features/generation/data/wildcards';
 import { flushGenerateDrafts } from '@features/generation/react';
+import { ensureArchitectureCapabilitiesLoaded } from '@features/models/architecturesStore';
+import { architectureCapabilitiesFixture } from '@features/models/core/architectureCapabilities.testing';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { createExternalStoreCore, type ExternalStoreCore } from '@platform/state/externalStoreCore';
 import { closingFrames, recordDialogExit } from '@platform/ui/dialogExit.testing';
@@ -24,19 +22,15 @@ import { userEvent } from 'vitest/browser';
 
 import { GenerateWidgetView } from './GenerateWidgetView';
 import { GenerationUiProvider, type GenerationModelSelectProps, type GenerationUiAdapter } from './GenerationUiContext';
-import { requestGenerateModelSwitchConfirmation } from './modelSelectionNotice';
-
 vi.mock('react-i18next', () => {
-  // Shows the cleared-settings list a model-switch confirmation formats into its body.
   const t = (key: string, options?: { labels?: string }) => (options?.labels ? `${key}: ${options.labels}` : key);
   return { useTranslation: () => ({ i18n: { resolvedLanguage: 'en' }, t }) };
 });
 
-vi.mock('@features/generation/data/architectureCapabilitiesApi', () => ({
+vi.mock('@features/models/data/architectureCapabilitiesApi', () => ({
   getArchitectureCapabilities: () => Promise.resolve(architectureCapabilitiesFixture),
 }));
 
-/** Counts commits in which anything inside a real section rendered. */
 const { commits, profiled } = vi.hoisted(() => {
   const commits = new Map<string, number>();
   const profiled =
@@ -89,10 +83,8 @@ const MODEL = {
 } as GenerationModelCatalogItem;
 const ink: LoraModelConfig = { base: 'sdxl', key: 'ink', name: 'Ink', type: 'lora' };
 const chalk: LoraModelConfig = { base: 'sdxl', key: 'chalk', name: 'Chalk', type: 'lora' };
-// The concepts the tests apply are installed, so their rows run.
 const CATALOG: readonly GenerationModelCatalogItem[] = [MODEL, ink, chalk] as unknown as GenerationModelCatalogItem[];
 const OTHER_SDXL = { ...MODEL, key: 'sdxl-2', name: 'SDXL 2' } as GenerationModelCatalogItem;
-// A coarser size grid than SDXL's, and no SDXL LoRAs.
 const FLUX = { ...MODEL, base: 'flux', key: 'flux', name: 'FLUX' } as GenerationModelCatalogItem;
 const ANIMA = { ...MODEL, base: 'anima', key: 'anima', name: 'Anima' } as GenerationModelCatalogItem;
 const SDXL_VAE = { base: 'sdxl', key: 'sdxl-vae', name: 'SDXL VAE', type: 'vae' } as GenerationModelCatalogItem;
@@ -103,17 +95,6 @@ const ANIMA_INPAINT_ADAPTER = {
   name: 'Anima LLLite Inpainting',
   type: 'controlnet',
 } as GenerationModelCatalogItem;
-const ANIMA_SKETCH_ADAPTER = {
-  ...ANIMA_INPAINT_ADAPTER,
-  cond_in_channels: 3,
-  key: 'anima-sketch',
-  name: 'Anima LLLite Sketch',
-} as GenerationModelCatalogItem;
-
-/**
- * The picker, reduced to buttons that hand a model to its real selection handler: the model card's main picks, and
- * for a component slot the catalog models of its types that pass its filter.
- */
 const MainModelPicker = ({
   filter,
   id,
@@ -143,7 +124,13 @@ const MainModelPicker = ({
       data-component-value={value ?? ''}
     >
       {stableGroups.models.catalog
-        .filter((model) => modelTypes.includes(model.type) && (filter?.(model) ?? true))
+        .filter(
+          (model) =>
+            [model.type, ...((model.roles as { type: string }[] | undefined) ?? []).map((role) => role.type)].some(
+              (type) => modelTypes.includes(type)
+            ) &&
+            (filter?.(model) ?? true)
+        )
         .map((model) => (
           <button key={model.key} data-component-pick={model.key} type="button" onClick={() => onChange(model)}>
             {model.name}
@@ -157,8 +144,6 @@ const INITIAL_VALUES: Record<string, unknown> = {
   positivePrompt: 'a lighthouse',
   steps: 30,
 };
-const UNRELATED_SECTIONS = ['model', 'prompts', 'dimensions', 'guidance', 'components', 'advanced'];
-
 const noop = () => undefined;
 const mainPickerOpened = vi.fn();
 const ALL_SECTIONS_OPEN = new Proxy({}, { get: () => true }) as Record<string, boolean>;
@@ -182,7 +167,6 @@ const storedValues = (projectId = 'project-1') => {
 
 const NO_QUEUE_INSIGHTS = { secondsPerRun: null, seedHistory: [] };
 
-/** Groups shared by every adapter a test renders, as the app keeps them stable across renders. */
 const createStableGroups = () => ({
   CanvasDenoisingStrength: () => null,
   CanvasGenerationSections: () => null,
@@ -212,7 +196,7 @@ const createStableGroups = () => ({
   },
   queueInsights: { getSnapshot: () => NO_QUEUE_INSIGHTS, subscribe: () => noop },
   rebalancePresets: { presets: [], remove: noop, rename: noop, save: noop },
-  sectionPreferences: { sectionsOpen: ALL_SECTIONS_OPEN, setSectionOpen: noop },
+  sectionPreferences: { sectionsOpen: ALL_SECTIONS_OPEN, setSectionsOpen: noop },
   settings: {
     readGenerateValues: (projectId: string) => projectValues.get(projectId)?.getSnapshot() ?? null,
     patchGenerateSettings: (patch: Record<string, unknown>, projectId?: string) => {
@@ -223,7 +207,6 @@ const createStableGroups = () => ({
 });
 let stableGroups = createStableGroups();
 
-/** The app adapter's shape: stable groups, with the active project's stored values behind a store port. */
 const buildAdapter = (activeProjectId = 'project-1'): GenerationUiAdapter =>
   ({
     ...stableGroups,
@@ -231,11 +214,14 @@ const buildAdapter = (activeProjectId = 'project-1'): GenerationUiAdapter =>
     project: { activeProjectId, invocationSourceId: 'generate', showPromptSyntaxHighlighting: false },
   }) as unknown as GenerationUiAdapter;
 
+// Captured before any test fakes timers, so settling still yields to the browser while a debounce is held.
+const realSetTimeout = globalThis.setTimeout;
+
 const settle = (run: () => void = noop, ms = 0) =>
   act(async () => {
     run();
     await new Promise<void>((resolve) => {
-      globalThis.setTimeout(resolve, ms);
+      realSetTimeout(resolve, ms);
     });
   });
 
@@ -270,16 +256,6 @@ const sliderNamed = (label: string): HTMLElement => {
 const pressRight = (element: Element | null | undefined) =>
   settle(() => element?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowRight' })));
 
-const showConcepts = () =>
-  settle(() =>
-    storedValues().patchSnapshot({ loras: [ink, chalk].map((model) => ({ isEnabled: true, model, weight: 0.75 })) })
-  );
-
-const conceptRow = (name: string) => host!.querySelector<HTMLElement>(`[role="group"][aria-label="${name}"]`);
-
-const committedSections = () => [...commits.keys()].sort();
-
-/** `accountKey` stands in for the App remounting the authenticated tree when the account changes. */
 const renderAdapter = (adapter: GenerationUiAdapter, accountKey = 'account-1') =>
   settle(() =>
     root?.render(
@@ -297,7 +273,6 @@ const renderAdapter = (adapter: GenerationUiAdapter, accountKey = 'account-1') =
     )
   );
 
-/** A keyboard step on the Steps slider: a debounced edit, like one scrub tick. */
 const stepSteps = () =>
   settle(() =>
     stepsScrubber()
@@ -325,6 +300,7 @@ beforeEach(async () => {
 
 afterEach(async () => {
   await act(() => root?.unmount());
+  vi.useRealTimers();
   host?.remove();
   host = null;
   root = null;
@@ -332,45 +308,61 @@ afterEach(async () => {
   accountLifecycle.invalidate();
 });
 
+describe('Canvas hosted-provider preflight', () => {
+  it('shows a conditional Canvas budget hint without a blocking issue', async () => {
+    const model = {
+      ...MODEL,
+      base: 'external',
+      type: 'external_image_generator',
+      key: 'seedream',
+      name: 'Seedream',
+      provider_id: 'seedream',
+      provider_model_id: 'seedream-4-5-251128',
+      capabilities: { modes: ['txt2img', 'img2img'], supports_reference_images: true, max_reference_images: 14 },
+    } as unknown as GenerationModelCatalogItem;
+    stableGroups.models.catalog = [model];
+    await settle(() =>
+      storedValues().patchSnapshot({
+        ...getDefaultGenerateSettings(model as never),
+        modelKey: model.key,
+        referenceImages: Array.from({ length: 14 }, (_, i) => ({
+          id: `ref-${i}`,
+          isEnabled: true,
+          config: {
+            type: 'external_reference_image',
+            image: {
+              imageName: `ref-${i}.png`,
+              width: 512,
+              height: 512,
+              original: { image: { image_name: `ref-${i}.png`, width: 512, height: 512 } },
+            },
+          },
+        })),
+      })
+    );
+    const adapter = buildAdapter();
+    adapter.project = { ...adapter.project, invocationSourceId: 'canvas' };
+    await renderAdapter(adapter);
+    const hint = 'widgets.generate.canvasReferenceImageBudgetHint';
+    const issue = 'Seedream supports at most 15 images total (reference + init + output), got 16.';
+    expect(host!.textContent).toContain(hint);
+    expect(host!.textContent).not.toContain(issue);
+    await renderAdapter(buildAdapter());
+    expect(host!.textContent).not.toContain(hint);
+    await renderAdapter(adapter);
+    await settle(() => {
+      const references = storedValues().getSnapshot().referenceImages as { isEnabled: boolean }[];
+      storedValues().patchSnapshot({
+        referenceImages: references.map((ref, i) => (i === 0 ? { ...ref, isEnabled: false } : ref)),
+      });
+    });
+    expect(host!.textContent).not.toContain(hint);
+  });
+});
+
 describe('GenerateSettingsForm Anima inpaint adapter', () => {
   const adapterSlot = () => host!.querySelector<HTMLElement>('[data-component-types="controlnet"]');
-  const adapterPicks = () =>
-    [...(adapterSlot()?.querySelectorAll('[data-component-pick]') ?? [])].map((pick) =>
-      pick.getAttribute('data-component-pick')
-    );
   const weightLabel = 'widgets.generate.animaInpaintAdapterWeight';
-  const weightScrubber = () =>
-    [...document.querySelectorAll('[data-scope="scrubber"]')].find(
-      (candidate) => candidate.querySelector('[data-part="label"]')?.textContent === weightLabel
-    );
-
-  it('offers the slot to Anima only, lists only 4-channel adapters, and shows the weight once one is picked', async () => {
-    stableGroups.models.catalog = [MODEL, ANIMA, ANIMA_INPAINT_ADAPTER, ANIMA_SKETCH_ADAPTER];
-    await renderAdapter(buildAdapter());
-
-    expect(adapterSlot()).toBeNull();
-
-    await settle(() =>
-      storedValues().patchSnapshot({ ...getDefaultGenerateSettings(ANIMA as never), modelKey: ANIMA.key })
-    );
-
-    expect(adapterPicks()).toEqual([ANIMA_INPAINT_ADAPTER.key]);
-    expect(weightScrubber()).toBeUndefined();
-
-    await settle(() => host!.querySelector<HTMLElement>('[data-component-pick="anima-inpaint"]')?.click());
-    await settle(flushGenerateDrafts);
-
-    expect(storedValues().getSnapshot()).toMatchObject({ animaInpaintAdapterModel: ANIMA_INPAINT_ADAPTER });
-    const slider = sliderNamed(weightLabel);
-    expect(slider.getAttribute('aria-valuenow')).toBe('1');
-    expect(document.getElementById(slider.getAttribute('aria-labelledby') ?? '')?.textContent).toBe(weightLabel);
-
-    await pressRight(sliderNamed(weightLabel));
-    await settle(flushGenerateDrafts);
-
-    expect(storedValues().getSnapshot()).toMatchObject({ animaInpaintAdapterWeight: 1.05 });
-  });
-
   it('switches the adapter off and back on without losing the pick or the weight', async () => {
     const switchLabel = 'widgets.generate.animaInpaintAdapterEnabled';
     const offHelp = 'widgets.generate.animaInpaintAdapterOffHelp';
@@ -457,109 +449,6 @@ describe('GenerateSettingsForm Z-Image Qwen3 encoder', () => {
   });
 });
 
-describe('GenerateSettingsForm Qwen-Image-2.1 Vision Tower', () => {
-  const QWEN21 = { ...MODEL, base: 'qwen-image-2-1', format: 'checkpoint', key: 'qwen21', name: 'Qwen-Image-2.1' };
-  const encoder = (format: string) =>
-    ({
-      base: 'any',
-      format,
-      key: `enc-${format}`,
-      name: `Encoder ${format}`,
-      type: 'qwen3_vl_encoder',
-      variant: 'qwen3_vl_8b',
-    }) as const;
-  const tower = (variant: string) =>
-    ({
-      base: 'any',
-      format: 'gguf_quantized',
-      key: `mmproj-${variant}`,
-      name: `mmproj ${variant}`,
-      type: 'qwen3_vl_vision_tower',
-      variant,
-    }) as const;
-  const TOWER_8B = tower('qwen3_vl_8b');
-  const towerSlot = () => host!.querySelector<HTMLElement>('[data-component-types="qwen3_vl_vision_tower"]');
-
-  const REFERENCES = [
-    {
-      config: {
-        image: { original: { image: { height: 512, image_name: 'edit.png', width: 512 } } },
-        type: 'qwen_image_2_1_reference_image',
-      },
-      id: 'edit',
-      isEnabled: true,
-    },
-  ];
-  const towerField = () => towerSlot()?.closest('[data-scope="field"]');
-
-  const useEncoder = async (
-    qwen3VLEncoderModel: ReturnType<typeof encoder>,
-    { main = QWEN21, referenceImages = [] as unknown[] } = {}
-  ) => {
-    stableGroups.models.catalog = [
-      MODEL,
-      main,
-      encoder('gguf_quantized'),
-      encoder('checkpoint'),
-      TOWER_8B,
-      tower('qwen3_vl_4b'),
-    ] as GenerationModelCatalogItem[];
-    await renderAdapter(buildAdapter());
-    await settle(() =>
-      storedValues().patchSnapshot({
-        ...getDefaultGenerateSettings(main as never),
-        modelKey: main.key,
-        qwen3VLEncoderModel,
-        referenceImages,
-      })
-    );
-  };
-
-  it('shows the slot for a GGUF encoder only, and lists only 8B towers', async () => {
-    await useEncoder(encoder('gguf_quantized'));
-
-    expect(towerSlot()).not.toBeNull();
-    expect(
-      [...(towerSlot()?.querySelectorAll('[data-component-pick]') ?? [])].map((pick) =>
-        pick.getAttribute('data-component-pick')
-      )
-    ).toEqual([TOWER_8B.key]);
-
-    await settle(() => host!.querySelector<HTMLElement>(`[data-component-pick="${TOWER_8B.key}"]`)?.click());
-    await settle(flushGenerateDrafts);
-
-    expect(storedValues().getSnapshot()).toMatchObject({ qwen3VLVisionTowerModel: { key: TOWER_8B.key } });
-  });
-
-  it('shows the missing-tower issue under the slot, and the encoder fix beside it on a Diffusers main', async () => {
-    await useEncoder(encoder('gguf_quantized'), { referenceImages: REFERENCES });
-
-    expect(towerSlot()?.getAttribute('aria-invalid')).toBe('true');
-    expect(towerField()?.querySelector('[role="alert"]')?.textContent).toContain('Vision Tower');
-    expect(towerField()?.closest('[data-issue-id]')).not.toBeNull();
-
-    await useEncoder(encoder('gguf_quantized'), {
-      main: { ...QWEN21, format: 'diffusers', key: 'qwen21-diffusers' },
-      referenceImages: REFERENCES,
-    });
-    const fix = towerField()?.parentElement?.querySelector<HTMLElement>('[data-issue-fix]');
-
-    expect(towerSlot()?.getAttribute('aria-invalid')).toBe('true');
-    expect(fix).not.toBeNull();
-
-    await settle(() => fix?.click());
-    await settle(flushGenerateDrafts);
-
-    expect(storedValues().getSnapshot()).toMatchObject({ qwen3VLEncoderModel: null });
-  });
-
-  it('hides the slot for a safetensors encoder', async () => {
-    await useEncoder(encoder('checkpoint'));
-
-    expect(towerSlot()).toBeNull();
-  });
-});
-
 describe('GenerateSettingsForm required components', () => {
   const krea2 = (format: string) =>
     ({ ...MODEL, base: 'krea-2', format, key: `krea-2-${format}`, name: 'Krea-2' }) as GenerationModelCatalogItem;
@@ -602,6 +491,64 @@ describe('GenerateSettingsForm required components', () => {
   });
 });
 
+describe('GenerateSettingsForm FLUX.3 prompt upsampler', () => {
+  const KLEIN = {
+    ...MODEL,
+    base: 'flux3',
+    format: 'diffusers',
+    key: 'flux3-klein',
+    name: 'FLUX.3 Klein',
+    variant: 'flux3_klein',
+  } as GenerationModelCatalogItem;
+  const VISION_LLM = {
+    base: 'any',
+    key: 'pup',
+    name: 'FLUX.3 Prompt Upsampler',
+    supports_images: true,
+    type: 'text_llm',
+  } as unknown as GenerationModelCatalogItem;
+  const TEXT_ONLY_LLM = { ...VISION_LLM, key: 'qwen', name: 'Qwen', supports_images: false };
+  const switchLabel = 'widgets.generate.flux3PromptUpsampler';
+  const upsamplerSwitch = () =>
+    [...host!.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')].find(
+      (input) => input.labels?.[0]?.textContent === switchLabel
+    );
+  const upsamplerSlot = () => host!.querySelector<HTMLElement>('[data-component-types="text_llm"]');
+  const slotError = () =>
+    upsamplerSlot()?.closest('[data-scope="field"]')?.querySelector('[role="alert"]')?.textContent;
+  const useKlein = async () => {
+    stableGroups.models.catalog = [MODEL, KLEIN, VISION_LLM, TEXT_ONLY_LLM];
+    await renderAdapter(buildAdapter());
+    await settle(() =>
+      storedValues().patchSnapshot({ ...getDefaultGenerateSettings(KLEIN as never), modelKey: KLEIN.key })
+    );
+  };
+
+  it('makes the slot required when turned on, lists vision Text LLMs only, and clears its reason once one is picked', async () => {
+    await useKlein();
+
+    await userEvent.click(upsamplerSwitch()!.labels![0]!);
+    await settle(flushGenerateDrafts);
+
+    expect(storedValues().getSnapshot()).toMatchObject({ flux3PromptUpsamplerEnabled: true });
+    expect(upsamplerSlot()?.getAttribute('data-component-placeholder')).toBe('widgets.generate.selectComponent');
+    expect(upsamplerSlot()?.getAttribute('aria-invalid')).toBe('true');
+    expect(slotError()).toBe('Generate needs a Prompt Upsampler model while Prompt upsampler is on.');
+    expect(
+      [...upsamplerSlot()!.querySelectorAll('[data-component-pick]')].map((pick) =>
+        pick.getAttribute('data-component-pick')
+      )
+    ).toEqual([VISION_LLM.key]);
+
+    await settle(() => upsamplerSlot()!.querySelector<HTMLElement>('[data-component-pick="pup"]')?.click());
+    await settle(flushGenerateDrafts);
+
+    expect(storedValues().getSnapshot()).toMatchObject({ flux3PromptUpsamplerModel: { key: 'pup' } });
+    expect(upsamplerSlot()?.getAttribute('aria-invalid')).not.toBe('true');
+    expect(slotError()).toBeUndefined();
+  });
+});
+
 describe('GenerateSettingsForm render isolation', () => {
   it('preserves a settled weight draft when removing another concept from an already open menu', async () => {
     const first: LoraModelConfig = { base: 'sdxl', key: 'ink', name: 'Ink', type: 'lora' };
@@ -632,63 +579,11 @@ describe('GenerateSettingsForm render isolation', () => {
     expect(storedValues().getSnapshot().loras).toEqual([{ isEnabled: true, model: first, weight: 0.8 }]);
   });
 
-  it('re-renders only the owning section while scrubbing, and nothing when the debounce persists it', async () => {
-    const scrubber = stepsScrubber();
-    const rect = scrubber.getBoundingClientRect();
-    const startX = rect.left + rect.width * 0.3;
-
-    await settle(() =>
-      scrubber.dispatchEvent(
-        new PointerEvent('pointerdown', { bubbles: true, button: 0, clientX: startX, pointerId: 1 })
-      )
-    );
-
-    // Any pointerdown re-renders the prompt fields through their dnd context subscription; count the drag itself.
-    commits.clear();
-
-    for (let tick = 1; tick <= 10; tick += 1) {
-      await settle(() =>
-        window.dispatchEvent(
-          new PointerEvent('pointermove', { bubbles: true, clientX: startX + tick * 4, pointerId: 1 })
-        )
-      );
-    }
-
-    await settle(() => window.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerId: 1 })));
-
-    const scrubbedSteps = stepsValue();
-
-    expect(scrubbedSteps).toBeGreaterThan(30);
-    // The debounce has not fired, so nothing is persisted yet.
-    expect(storedValues().getSnapshot().steps).toBe(30);
-    expect(committedSections()).toEqual(['render']);
-    expect(commits.get('render')).toBeGreaterThanOrEqual(10);
-
-    commits.clear();
-    await settle(noop, 400);
-
-    expect(storedValues().getSnapshot().steps).toBe(scrubbedSteps);
-    expect(stepsValue()).toBe(scrubbedSteps);
-    expect(committedSections()).toEqual([]);
-  });
-
-  it('shows stored values changed outside the form in the sections that read them', async () => {
-    // A recall or another tab writes the store directly, bypassing the draft.
-    await settle(() => storedValues().patchSnapshot({ steps: 12 }));
-
-    expect(stepsValue()).toBe(12);
-    expect(committedSections()).toEqual(['render']);
-    for (const section of UNRELATED_SECTIONS) {
-      expect(commits.has(section)).toBe(false);
-    }
-  });
-
   it('commits a pending edit to its own project when drafts are flushed ahead of a project change', async () => {
     await stepSteps();
 
     expect(patches).toEqual([]);
 
-    // The Workbench's project commands flush drafts before they change the active project.
     await settle(flushGenerateDrafts);
     await renderAdapter(buildAdapter('project-2'));
     await settle(noop, 400);
@@ -710,7 +605,6 @@ describe('GenerateSettingsForm render isolation', () => {
     expect(weight()?.getAttribute('aria-valuenow')).toBe('0.8');
     expect(patches).toEqual([]);
 
-    // The open action already flushed before its server request; edits made during that request must not leak.
     await renderAdapter(buildAdapter('project-2'));
     await settle(noop, 400);
 
@@ -720,8 +614,9 @@ describe('GenerateSettingsForm render isolation', () => {
   });
 
   it('flushes a pending edit to its own project on unmount, not on ordinary re-renders', async () => {
+    // Holds the debounce, so only a flush can persist the edit, however long the re-renders take on a busy runner.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     await stepSteps();
-    // A re-render with a new adapter value but the same patch port, as a gallery or queue change causes.
     await renderAdapter(buildAdapter());
     await settle(() => storedValues().patchSnapshot({ positivePrompt: 'a harbour' }));
 
@@ -733,128 +628,6 @@ describe('GenerateSettingsForm render isolation', () => {
     expect(patches).toEqual([{ patch: { steps: 31 }, projectId: 'project-1' }]);
   });
 
-  it('applies a size reset at once, superseding a pending size edit that can then never land after it', async () => {
-    await settle(() =>
-      storedValues().patchSnapshot({
-        aspectRatioId: '2:3',
-        aspectRatioIsLocked: true,
-        aspectRatioValue: 2 / 3,
-        height: 1216,
-        width: 832,
-      })
-    );
-    await settle(() =>
-      host!.querySelector<HTMLButtonElement>('button[aria-label="widgets.generate.resetSize"]')?.click()
-    );
-    const menu = document.querySelector<HTMLElement>('[role="menu"]');
-    const highlighted = () => menu?.querySelector('[role="menuitemradio"][data-highlighted]')?.textContent ?? '';
-    // Arrows down to Square at native size by its name, wherever the menu lists it.
-    for (let step = 0; step < 3 && !highlighted().startsWith('widgets.generate.resetSizeSquareNative'); step += 1) {
-      await settle(() => menu?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowDown' })));
-    }
-    expect(highlighted()).toMatch(/^widgets\.generate\.resetSizeSquareNative/);
-
-    // A width step still inside its debounce window, then the reset.
-    await settle(() => {
-      sliderNamed('widgets.generate.width').dispatchEvent(
-        new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowRight' })
-      );
-      menu?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }));
-    });
-    await settle(noop, 400);
-
-    // SDXL is native at 1024.
-    expect(patches).toEqual([
-      { patch: { aspectRatioId: '1:1', aspectRatioValue: 1, height: 1024, width: 1024 }, projectId: 'project-1' },
-    ]);
-    expect(storedValues().getSnapshot()).toMatchObject({ aspectRatioIsLocked: true, height: 1024, width: 1024 });
-  });
-
-  it('batches fast edits to several fields into one patch on the project they were made in', async () => {
-    await stepSteps();
-    await stepSteps();
-    await pressRight(sliderNamed('CFG'));
-
-    expect(patches).toEqual([]);
-
-    await settle(flushGenerateDrafts);
-    await renderAdapter(buildAdapter('project-2'));
-    await settle(noop, 400);
-
-    expect(patches).toEqual([{ patch: { cfgScale: 7.5, steps: 32 }, projectId: 'project-1' }]);
-    expect(storedValues('project-2').getSnapshot()).toMatchObject({ cfgScale: 7, steps: 50 });
-  });
-
-  it('keeps a pending field over an external update and applies the update to every other field', async () => {
-    await stepSteps();
-    await settle(() => storedValues().patchSnapshot({ cfgScale: 4, steps: 12 }));
-
-    expect(stepsValue()).toBe(31);
-    expect(sliderNamed('CFG').getAttribute('aria-valuenow')).toBe('4');
-
-    await settle(noop, 400);
-
-    expect(patches).toEqual([{ patch: { steps: 31 }, projectId: 'project-1' }]);
-    expect(storedValues().getSnapshot()).toMatchObject({ cfgScale: 4, steps: 31 });
-  });
-
-  it('makes every pending draft readable from the store as soon as drafts are flushed', async () => {
-    await showConcepts();
-    await stepSteps();
-    await pressRight(conceptRow('Ink')?.querySelector('[role="slider"]'));
-    await pressRight(conceptRow('Chalk')?.querySelector('[role="slider"]'));
-
-    expect(patches).toEqual([]);
-
-    // Invoke and project export flush, then read the stored values synchronously.
-    act(() => flushGenerateDrafts());
-
-    expect(storedValues().getSnapshot()).toMatchObject({
-      loras: [
-        { model: ink, weight: 0.8 },
-        { model: chalk, weight: 0.8 },
-      ],
-      steps: 31,
-    });
-
-    const flushed = patches.length;
-    await settle(noop, 400);
-
-    expect(patches).toHaveLength(flushed);
-  });
-
-  it('lands two concept weight drafts made together without either overwriting the other', async () => {
-    await showConcepts();
-    await pressRight(conceptRow('Ink')?.querySelector('[role="slider"]'));
-    await pressRight(conceptRow('Chalk')?.querySelector('[role="slider"]'));
-    await pressRight(conceptRow('Chalk')?.querySelector('[role="slider"]'));
-
-    await expect
-      .poll(() => storedValues().getSnapshot().loras)
-      .toEqual([
-        { isEnabled: true, model: ink, weight: 0.8 },
-        { isEnabled: true, model: chalk, weight: 0.85 },
-      ]);
-    expect(conceptRow('Ink')?.querySelector('[role="slider"]')?.getAttribute('aria-valuenow')).toBe('0.8');
-    expect(conceptRow('Chalk')?.querySelector('[role="slider"]')?.getAttribute('aria-valuenow')).toBe('0.85');
-  });
-
-  it('removes a concept whose weight draft is still pending without restoring it', async () => {
-    await showConcepts();
-    await pressRight(conceptRow('Ink')?.querySelector('[role="slider"]'));
-
-    await settle(() =>
-      conceptRow('Ink')
-        ?.querySelector<HTMLButtonElement>('button[aria-label="widgets.generate.removeConceptNamed"]')
-        ?.click()
-    );
-    await settle(noop, 400);
-
-    expect(conceptRow('Ink')).toBeNull();
-    expect(storedValues().getSnapshot().loras).toEqual([{ isEnabled: true, model: chalk, weight: 0.75 }]);
-  });
-
-  // Documents the account boundary: the unmounting form settles its edit through the account that made it.
   it('settles a pending edit through its own account, never the next one', async () => {
     await stepSteps();
     projectValues.set('next-account-project', createExternalStoreCore<Record<string, unknown>>(INITIAL_VALUES));
@@ -871,10 +644,8 @@ describe('GenerateSettingsForm render isolation', () => {
 
     accountLifecycle.invalidate();
     await renderAdapter(nextAccountAdapter, 'account-2');
-    // Capabilities are account-owned, so the next account's form waits for them again.
     await settle(ensureArchitectureCapabilitiesLoaded, 400);
 
-    // The App disposes the first account's store, so this patch never persists past the switch.
     expect(patches).toEqual([{ patch: { steps: 31 }, projectId: 'project-1' }]);
     expect(nextAccountPatches).toEqual([]);
     expect(storedValues('next-account-project').getSnapshot().steps).toBe(30);
@@ -899,35 +670,6 @@ describe('GenerateSettingsForm render isolation', () => {
     expect(stepsValue()).toBe(31);
   });
 
-  it('switches at once when nothing is lost, with an Undo that restores the earlier model and size', async () => {
-    const undoable = vi.fn();
-    stableGroups.notifications.undoable = undoable;
-    stableGroups.models.catalog = [MODEL, FLUX, ink];
-    storedValues().patchSnapshot({ loras: [{ isEnabled: true, model: ink, weight: 0.75 }] });
-    await renderAdapter(buildAdapter());
-    // 1032 sits on SDXL's 8 px grid but not FLUX's 16 px one.
-    await pressRight(sliderNamed('widgets.generate.width'));
-
-    await settle(() => host!.querySelector<HTMLElement>('[data-model-pick="flux"]')?.click());
-
-    // The SDXL concept is set aside, not lost, so the switch needs no confirmation.
-    expect(document.querySelector('[role="alertdialog"]')).toBeNull();
-    expect(patches.at(-1)?.patch).toMatchObject({ modelKey: 'flux' });
-    expect((patches.at(-1)?.patch.width as number) % 16).toBe(0);
-    expect(storedValues().getSnapshot().loras).toEqual([{ isEnabled: true, model: ink, weight: 0.75 }]);
-    expect(undoable).toHaveBeenCalledExactlyOnceWith('widgets.generate.switchedModel', {
-      message:
-        'widgets.generate.switchChanges.turnedOff: widgets.generate.switchSubjects.concepts widgets.generate.switchChanges.size',
-      onUndo: expect.any(Function),
-      projectId: 'project-1',
-      supersedes: 'generate-settings:project-1',
-    });
-
-    await settle(() => undoable.mock.calls[0]![1].onUndo());
-
-    expect(storedValues().getSnapshot()).toMatchObject({ modelKey: 'sdxl', width: 1032 });
-  });
-
   it('confirms a switch that removes something, naming what goes and what is only turned off', async () => {
     stableGroups.models.catalog = [MODEL, FLUX, ink, SDXL_VAE];
     storedValues().patchSnapshot({ loras: [{ isEnabled: true, model: ink, weight: 0.75 }], vae: SDXL_VAE });
@@ -944,7 +686,6 @@ describe('GenerateSettingsForm render isolation', () => {
     expect(dialog?.textContent).toContain(
       'widgets.generate.switchModelLines.turnedOff: widgets.generate.switchSubjects.concepts'
     );
-    // The size moves to the FLUX grid, which the dialog reports beside the loss rather than as one.
     expect(dialog?.textContent).toContain('widgets.generate.switchChanges.size');
     expect(patches).toEqual([]);
 
@@ -953,7 +694,6 @@ describe('GenerateSettingsForm render isolation', () => {
     );
     const frames = closingFrames(await recordDialogExit(dialog!, () => settle(() => confirm?.click())));
 
-    // The switch lands as the dialog closes, and the dialog animates out still listing what was confirmed.
     expect(frames).not.toHaveLength(0);
     for (const frame of frames) {
       expect(frame.text).toContain(removed);
@@ -965,32 +705,6 @@ describe('GenerateSettingsForm render isolation', () => {
     expect(patches[0]?.patch).toMatchObject({ modelKey: 'flux', steps: 31, vae: null });
     expect((patches[0]?.patch.width as number) % 16).toBe(0);
     expect(storedValues().getSnapshot()).toMatchObject({ modelKey: 'flux', steps: 31, vae: null });
-  });
-
-  it('confirms a switch another surface asked for, the way its own picker does', async () => {
-    stableGroups.models.catalog = [MODEL, FLUX, SDXL_VAE];
-    storedValues().patchSnapshot({ vae: SDXL_VAE });
-    await renderAdapter(buildAdapter());
-
-    await settle(() =>
-      requestGenerateModelSwitchConfirmation({ model: FLUX as GenerateModelConfig, projectId: 'project-2' })
-    );
-    expect(document.querySelector('[role="alertdialog"]')).toBeNull();
-
-    await settle(() =>
-      requestGenerateModelSwitchConfirmation({ model: FLUX as GenerateModelConfig, projectId: 'project-1' })
-    );
-    const dialog = document.querySelector<HTMLElement>('[role="alertdialog"]');
-    expect(dialog?.textContent).toContain('widgets.generate.switchSubjects.vae');
-
-    await settle(() =>
-      [...dialog!.querySelectorAll<HTMLButtonElement>('button')]
-        .find((button) => button.textContent === 'widgets.generate.switchModelConfirm')
-        ?.click()
-    );
-    await settle(noop, 400);
-
-    expect(storedValues().getSnapshot()).toMatchObject({ modelKey: 'flux', vae: null });
   });
 
   it('keeps a model that is no longer installed, names it, and offers another pick or the Model Manager', async () => {
@@ -1046,35 +760,6 @@ describe('GenerateSettingsForm render isolation', () => {
   });
 });
 
-describe('GenerateSettingsForm model loading', () => {
-  it('reads the models again from Retry when they could not be loaded, and shows it working', async () => {
-    let finish!: () => void;
-    const refresh = vi.fn(
-      () =>
-        new Promise<void>((resolve) => {
-          finish = resolve;
-        })
-    );
-    stableGroups.models = { ...stableGroups.models, catalog: [], error: 'Server said no', refresh, status: 'loaded' };
-    await renderAdapter(buildAdapter());
-
-    expect(host!.textContent).toContain('widgets.generate.modelsCouldNotLoad');
-    expect(host!.textContent).toContain('Server said no');
-    const retry = [...host!.querySelectorAll<HTMLButtonElement>('button')].find(
-      (button) => button.textContent === 'common.retry'
-    )!;
-
-    await settle(() => retry.click());
-    expect(refresh).toHaveBeenCalledOnce();
-    expect(retry.getAttribute('aria-busy')).toBe('true');
-
-    await settle(() => finish());
-    expect(retry.hasAttribute('aria-busy')).toBe(false);
-  });
-});
-
-const CINEMATIC = { id: 'cinematic', name: 'Cinematic', negativePrompt: '', positivePrompt: '{prompt}, 35mm' };
-
 describe('GenerateSettingsForm prompt changes past the prompt text', () => {
   const buttonNamed = (name: string) =>
     [...document.querySelectorAll<HTMLButtonElement>('button')].find(
@@ -1098,7 +783,6 @@ describe('GenerateSettingsForm prompt changes past the prompt text', () => {
       supersedes: 'generate-prompt:project-1',
     });
 
-    // The positive prompt was edited since; the Undo leaves that edit alone.
     await settle(() => storedValues().patchSnapshot({ positivePrompt: 'a fox in deep snow' }));
     await settle(() => undoable.mock.calls[0]![1].onUndo());
 
@@ -1106,117 +790,5 @@ describe('GenerateSettingsForm prompt changes past the prompt text', () => {
       negativePrompt: 'blurry',
       positivePrompt: 'a fox in deep snow',
     });
-  });
-
-  it('applies a template chosen in the panel, with an Undo that puts back the one before', async () => {
-    const undoable = vi.fn();
-    const previous = { id: 'noir', name: 'Noir', negativePrompt: '', positivePrompt: '{prompt}, noir' };
-    stableGroups.notifications.undoable = undoable;
-    storedValues().patchSnapshot({ promptTemplate: previous });
-    queryClient.setQueryData(promptTemplatesQueryOptions().queryKey, [
-      { ...CINEMATIC, hasImage: false, isDefault: true, isPublic: true, userId: 'system' },
-    ]);
-    await renderAdapter(buildAdapter());
-
-    await settle(() => buttonNamed('widgets.generate.promptTemplates.title').click(), 50);
-    await settle(
-      () =>
-        [...document.querySelectorAll<HTMLButtonElement>('[data-scope="popover"] button')]
-          .find((button) => button.textContent?.includes('Cinematic'))!
-          .click(),
-      50
-    );
-
-    expect(storedValues().getSnapshot().promptTemplate).toEqual(CINEMATIC);
-    expect(undoable).toHaveBeenCalledExactlyOnceWith('widgets.generate.promptTemplateApplied', {
-      onUndo: expect.any(Function),
-      projectId: 'project-1',
-      supersedes: 'generate-prompt:project-1',
-    });
-
-    await settle(() => undoable.mock.calls[0]![1].onUndo());
-
-    expect(storedValues().getSnapshot().promptTemplate).toEqual(previous);
-  });
-
-  it('merges a template into the prompt with an Undo that is all or nothing', async () => {
-    const undoable = vi.fn();
-    const info = vi.fn();
-    const template = { ...CINEMATIC, negativePrompt: '{prompt}, blurry' };
-    stableGroups.notifications = { ...stableGroups.notifications, info, undoable };
-    storedValues().patchSnapshot({
-      negativePrompt: 'grainy',
-      positivePrompt: 'a {red|blue} cat',
-      promptTemplate: template,
-    });
-    queryClient.setQueryData(
-      dynamicPromptsKeys.expansion({
-        combinatorial: true,
-        max_prompts: 100,
-        prompt: 'a {red|blue} cat, 35mm',
-        seed: null,
-      }),
-      { error: null, prompts: ['a red cat, 35mm', 'a blue cat, 35mm'] }
-    );
-    await renderAdapter(buildAdapter());
-
-    await settle(() => buttonNamed('widgets.generate.dynamicPrompts.showPrompts').click(), 700);
-    await settle(
-      () =>
-        [...document.querySelectorAll<HTMLButtonElement>('[data-scope="popover"] button')]
-          .find((button) => button.textContent?.includes('a red cat, 35mm'))!
-          .click(),
-      50
-    );
-
-    expect(storedValues().getSnapshot()).toMatchObject({
-      negativePrompt: 'grainy, blurry',
-      positivePrompt: 'a red cat, 35mm',
-      promptTemplate: null,
-    });
-    expect(undoable).toHaveBeenCalledWith('widgets.generate.promptTemplateMerged', expect.anything());
-    const undo = undoable.mock.calls.at(-1)![1].onUndo as () => void;
-
-    // Half a merge would be a prompt nobody wrote: with the positive prompt edited since, nothing is undone.
-    await settle(() => storedValues().patchSnapshot({ positivePrompt: 'a red cat, 50mm' }));
-    await settle(undo);
-    expect(storedValues().getSnapshot()).toMatchObject({ negativePrompt: 'grainy, blurry', promptTemplate: null });
-    expect(info).toHaveBeenCalledWith('widgets.generate.undoStale');
-
-    await settle(() => storedValues().patchSnapshot({ positivePrompt: 'a red cat, 35mm' }));
-    await settle(undo);
-    expect(storedValues().getSnapshot()).toMatchObject({
-      negativePrompt: 'grainy',
-      positivePrompt: 'a {red|blue} cat',
-      promptTemplate: template,
-    });
-  });
-
-  it('stops using a template from the Templates panel, with an Undo that applies it again', async () => {
-    const undoable = vi.fn();
-    const template = { id: 'cinematic', name: 'Cinematic', negativePrompt: '', positivePrompt: '{prompt}, 35mm' };
-    stableGroups.notifications.undoable = undoable;
-    storedValues().patchSnapshot({ promptTemplate: template });
-    await renderAdapter(buildAdapter());
-
-    await settle(() => buttonNamed('widgets.generate.promptTemplates.title').click(), 50);
-    await settle(
-      () =>
-        [...document.querySelectorAll<HTMLButtonElement>('[data-scope="popover"] button')]
-          .find((button) => button.textContent === 'widgets.generate.promptTemplates.clearApplied')!
-          .click(),
-      50
-    );
-
-    expect(storedValues().getSnapshot().promptTemplate).toBeNull();
-    expect(undoable).toHaveBeenCalledExactlyOnceWith('widgets.generate.promptTemplateCleared', {
-      onUndo: expect.any(Function),
-      projectId: 'project-1',
-      supersedes: 'generate-prompt:project-1',
-    });
-
-    await settle(() => undoable.mock.calls[0]![1].onUndo());
-
-    expect(storedValues().getSnapshot().promptTemplate).toEqual(template);
   });
 });

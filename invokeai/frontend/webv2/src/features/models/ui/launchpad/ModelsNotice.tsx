@@ -32,9 +32,9 @@ import { useTranslation } from 'react-i18next';
 import { importQueueModel } from './importQueueModel';
 
 /**
- * Home's first-run model guidance. Generation needs a main or hosted generator model; until one exists, managers get
- * a one-click install of the recommended starter bundle (and the others in the Model Manager), everyone else a
- * read-only notice naming who can add them. Managers also see installs in progress and installs that need attention.
+ * Home's first-run model guidance. Generation needs a main or hosted generator model; until one exists, managers get a
+ * one-click install of the recommended starter bundle (and the others in the Model Manager), everyone else a read-only
+ * notice naming who can add them. Managers also see installs in progress and installs that need attention.
  */
 
 const EMPTY_BUNDLES: Record<string, StarterModelBundle> = {};

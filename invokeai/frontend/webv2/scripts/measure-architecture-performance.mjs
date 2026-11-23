@@ -68,7 +68,7 @@ const backendOrigin = `http://127.0.0.1:${String(backendPort)}`;
 const updateBaseline = process.argv.includes('--update-baseline');
 const baseline = JSON.parse(await readFile(baselinePath, 'utf8'));
 if (!updateBaseline) {
-  validateBrowserBaseline(baseline, fixtures);
+  validateBrowserBaseline(baseline);
 }
 if (!updateBaseline && JSON.stringify(baseline.sampling) !== JSON.stringify(fullSampleConfig)) {
   throw new Error(
@@ -81,7 +81,6 @@ const {
   samples: samplePlan,
 } = createBrowserRunPlan({
   sampling: fullSampleConfig,
-  timingPolicy: baseline.timingPolicy,
   profile: process.argv.includes('--profile'),
   updateBaseline,
 });
@@ -797,7 +796,7 @@ try {
               tolerancePercent: 0.1,
             },
     };
-    validateBrowserBaseline(baseline, fixtures);
+    validateBrowserBaseline(baseline);
     await writeFile(baselinePath, `${JSON.stringify(baseline, null, 2)}\n`);
     await writeFile(artifactPath, `${JSON.stringify(report, null, 2)}\n`);
   } else {
@@ -835,7 +834,6 @@ try {
       const routeFailures = checkBrowserRouteBudget(
         route,
         expected,
-        baseline.timingPolicy,
         baseline.scriptSourceOwnerSets[expected.scriptSourceOwnerSet]
       );
       failures.push(...routeFailures);

@@ -1,15 +1,12 @@
-import { Badge } from '@chakra-ui/react';
 import { useDndContext, useDroppable } from '@dnd-kit/core';
 import { isGalleryImageDragData } from '@features/gallery/utility';
 import { DropZone } from '@platform/ui/DropZone';
+import { DropZoneLabel } from '@workbench/widgets/shared/DropZoneLabel';
 import { useTranslation } from 'react-i18next';
 
 import { PREVIEW_COMPARE_DROP_DATA, PREVIEW_COMPARE_DROP_ID } from './previewCompareDnd';
 
-/**
- * Show comparison drop targets for image-only drags; reject the first item if already displayed so self-comparison
- * cannot pause live-follow.
- */
+/** Image-only drags; the first item is refused if shown, so self-comparison cannot pause live-follow. */
 export const PreviewCompareDropZone = ({ currentImageName }: { currentImageName: string | null }) => {
   const { t } = useTranslation();
   const { active } = useDndContext();
@@ -40,7 +37,7 @@ export const PreviewCompareDropZone = ({ currentImageName }: { currentImageName:
       variant="overlay"
       zIndex="2"
     >
-      <Badge variant="subtle">{t('widgets.preview.dropToCompare')}</Badge>
+      <DropZoneLabel>{t('widgets.preview.dropToCompare')}</DropZoneLabel>
     </DropZone>
   );
 };

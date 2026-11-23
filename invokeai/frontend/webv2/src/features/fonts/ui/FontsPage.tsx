@@ -25,13 +25,20 @@ import {
   isAccountScopeCurrent,
 } from '@platform/state/accountLifecycle';
 import { getApiErrorMessage } from '@platform/transport/http';
-import { Button, ConfirmDialog, IconButton, Scrollable, SegmentedControl, Tabs } from '@platform/ui';
+import { Button, ConfirmDialog, Scrollable, SegmentedControl, Tabs } from '@platform/ui';
 import { EmptyState } from '@platform/ui/EmptyState';
 import { List } from '@platform/ui/list/List';
 import { ListItem } from '@platform/ui/list/ListItem';
 import { ListPager } from '@platform/ui/list/ListPager';
 import { listRowsFromItems } from '@platform/ui/list/listRows';
-import { ManagerColumn, ManagerDetailHeader, ManagerLayout, ManagerSearchField } from '@platform/ui/ManagerLayout';
+import {
+  ManagerColumn,
+  ManagerDetailHeader,
+  ManagerFilterMenu,
+  ManagerFilterResetItem,
+  ManagerLayout,
+  ManagerSearchField,
+} from '@platform/ui/ManagerLayout';
 import { MenuContent } from '@platform/ui/Menu';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -42,7 +49,6 @@ import {
   PlusIcon,
   RefreshCwIcon,
   SearchIcon,
-  SlidersHorizontalIcon,
   Trash2Icon,
   TypeIcon,
   UploadIcon,
@@ -295,8 +301,8 @@ const FontLibrary = () => {
   const [filter, setFilter] = useState<FontFilter>('all');
   // Null until the library first loads (see below).
   const [chosenTab, setActiveTab] = useState<string | null>(null);
-  // Which pane a manager too narrow for both shows; opening a font or a tab reveals the detail. Null until the
-  // library first loads (see below).
+  // Which pane a manager too narrow for both shows; opening a font or a tab reveals the detail. Null until the library
+  // first loads (see below).
   const [detailOpen, setDetailOpen] = useState<boolean | null>(null);
   const [selectedFont, setSelectedFont] = useState<FontRecord | null>(null);
   const [search, setSearch] = useState('');
@@ -319,8 +325,8 @@ const FontLibrary = () => {
   const query = useQuery(fontsQueryOptions(params));
   const fonts = query.data?.items ?? NO_FONTS;
   const rows = useMemo(() => listRowsFromItems(fonts, getFontId), [fonts]);
-  // A new page, filter or search replaces every row: remount the list so it starts from the top whether or not
-  // the query is cached.
+  // A new page, filter or search replaces every row: remount the list so it starts from the top whether or not the
+  // query is cached.
   const listKey = `${filter}:${offset}:${search}`;
 
   const invalidateFonts = useCallback(() => queryClient.invalidateQueries({ queryKey: fontKeys.all }), [queryClient]);
@@ -494,8 +500,8 @@ const FontLibrary = () => {
   }, []);
   const closeDetail = useCallback(() => setDetailOpen(false), []);
   const addAction = useMemo(() => ({ label: t('fonts.addFonts'), onAdd: () => openTab('add') }), [openTab, t]);
-  // The starting pane and tab are decided once, when the library first loads: an empty library opens on Add Fonts,
-  // any other on the list. Later uploads and deletes never move the user; only opening a font or a tab, and Back, do.
+  // The starting pane and tab are decided once, when the library first loads: an empty library opens on Add Fonts, any
+  // other on the list. Later uploads and deletes never move the user; only opening a font or a tab, and Back, do.
   if (detailOpen === null && !query.isPending) {
     const isLibraryEmpty = query.data?.total === 0 && offset === 0 && filter === 'all' && search === '';
 
@@ -622,16 +628,12 @@ const FontLibrary = () => {
                   setOffset(0);
                 }}
               />
-              <Menu.Root closeOnSelect={false} positioning={FILTER_POSITION}>
-                <Menu.Trigger asChild>
-                  <IconButton
-                    aria-label={t('fonts.filterMenu')}
-                    color={filter !== 'all' ? 'accent.solid' : 'fg.muted'}
-                    variant="outline"
-                  >
-                    <Icon as={SlidersHorizontalIcon} boxSize="4" />
-                  </IconButton>
-                </Menu.Trigger>
+              <ManagerFilterMenu
+                activeCount={Number(filter !== 'all')}
+                closeOnSelect={false}
+                label={t('fonts.filterMenu')}
+                positioning={FILTER_POSITION}
+              >
                 <Portal>
                   <Menu.Positioner>
                     <MenuContent minW="13rem">
@@ -652,10 +654,17 @@ const FontLibrary = () => {
                           </Menu.RadioItem>
                         ))}
                       </Menu.RadioItemGroup>
+                      <ManagerFilterResetItem
+                        activeCount={Number(filter !== 'all')}
+                        onReset={() => {
+                          setFilter('all');
+                          setOffset(0);
+                        }}
+                      />
                     </MenuContent>
                   </Menu.Positioner>
                 </Portal>
-              </Menu.Root>
+              </ManagerFilterMenu>
             </HStack>
             <List
               key={listKey}

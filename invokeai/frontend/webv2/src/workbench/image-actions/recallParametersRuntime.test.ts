@@ -9,6 +9,7 @@ import { createWorkbenchStore } from '@workbench/workbenchStore';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const galleryApi = vi.hoisted(() => ({
+  GALLERY_REQUEST_MAX_NAMES: 1000,
   galleryImages: {
     metadata: vi.fn(),
     resolveMany: vi.fn(),
@@ -22,7 +23,7 @@ const modelsApi = vi.hoisted(() => ({
 vi.mock('@features/gallery', () => galleryApi);
 vi.mock('@features/models', () => modelsApi);
 
-import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
+import { seedArchitectureCapabilities } from '@features/models/core/architectureCapabilities.testing';
 
 import { createRecallParametersRuntime } from './recallParametersRuntime';
 

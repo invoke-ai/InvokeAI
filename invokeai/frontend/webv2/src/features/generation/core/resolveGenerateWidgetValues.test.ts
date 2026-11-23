@@ -1,14 +1,15 @@
+import type { ArchitectureCapabilitiesRow } from '@features/models/architectures';
+
+import capabilitiesFixture from '@features/models/core/__fixtures__/architectureCapabilities.json';
+import {
+  resetArchitectureCapabilities,
+  setArchitectureCapabilities,
+} from '@features/models/core/architectureCapabilities';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import type { GenerateWidgetValues, MainModelConfig } from './types';
 
-import capabilitiesFixture from './__fixtures__/architectureCapabilities.json';
-import {
-  type ArchitectureCapabilitiesRow,
-  resetArchitectureCapabilities,
-  setArchitectureCapabilities,
-} from './architectureCapabilities';
-import { getDefaultGenerateSettings } from './baseGenerationPolicies';
+import { getDefaultGenerateSettings, getGenerateModelSelectionResult } from './baseGenerationPolicies';
 import { resolveGenerateWidgetValues } from './resolveGenerateWidgetValues';
 
 const createModel = (key: string, overrides: Partial<MainModelConfig> = {}): MainModelConfig => ({
@@ -32,7 +33,6 @@ const applySystemPatch = (
   systemPatch: Partial<GenerateWidgetValues>
 ): Record<string, unknown> => ({ ...storedValues, ...systemPatch });
 
-// Seed backend fixtures and clean up the registry to isolate policy tests.
 beforeEach(() => {
   setArchitectureCapabilities(capabilitiesFixture as ArchitectureCapabilitiesRow[]);
 });
@@ -52,7 +52,6 @@ describe('resolveGenerateWidgetValues', () => {
   it.each(['checkpoint', 'gguf_quantized'] as const)(
     'never defaults to a model that cannot run on its own (%s)',
     (format) => {
-      // Default resolution excludes unconditional Ideogram branches that cannot generate independently.
       const unconditional = createModel('ideogram4-uncond', {
         base: 'ideogram-4',
         branch: 'unconditional',
@@ -67,7 +66,6 @@ describe('resolveGenerateWidgetValues', () => {
       const result = resolveGenerateWidgetValues({ models: [unconditional, conditional], storedValues: {} });
 
       expect(result?.values.model.key).toBe('ideogram4-cond');
-      // And with nothing else installed there is no default to fall back to at all.
       expect(resolveGenerateWidgetValues({ models: [unconditional], storedValues: {} })).toBeNull();
     }
   );
@@ -87,6 +85,19 @@ describe('resolveGenerateWidgetValues', () => {
     });
     expect(result?.systemPatch).not.toBeNull();
     expect(result?.systemPatch).not.toHaveProperty('batchCount');
+  });
+
+  it('starts on the first model whose files are present, and on the first one when none are', () => {
+    const gone = createModel('gone', { is_missing: true } as Partial<MainModelConfig>);
+    const present = createModel('present');
+    const alsoGone = createModel('also-gone', { is_missing: true } as Partial<MainModelConfig>);
+
+    expect(resolveGenerateWidgetValues({ models: [gone, present], storedValues: {} })?.values.modelKey).toBe('present');
+    expect(resolveGenerateWidgetValues({ models: [gone, alsoGone], storedValues: {} })?.values.modelKey).toBe('gone');
+    // A model the project chose stays, whatever its files.
+    expect(
+      resolveGenerateWidgetValues({ models: [present, gone], storedValues: createValues(gone) })?.values.modelKey
+    ).toBe('gone');
   });
 
   it('reads dynamic prompts as on for a project saved before the toggle, without writing the flag in', () => {
@@ -160,7 +171,6 @@ describe('resolveGenerateWidgetValues', () => {
       both.loras
     );
 
-    // Two removed copies of one file: only the first takes the reinstalled concept; the other stays as saved.
     const copy = { ...removedLora, key: 'old-lora-copy' };
     const twice = createValues(model, {
       loras: [
@@ -289,7 +299,6 @@ describe('resolveGenerateWidgetValues', () => {
   });
 
   it('maps the random toggle saved before seed modes instead of reusing the record as-is', () => {
-    // Reused as-is, the record reaches the seed menu with no mode and the icon lookup throws.
     const model = createModel('model');
     const { seedMode: _, ...legacy } = createValues(model);
     const storedValues = { ...legacy, shouldRandomizeSeed: true };
@@ -334,7 +343,6 @@ describe('resolveGenerateWidgetValues', () => {
 
 describe('without the backend capability table', () => {
   it('resolves nothing rather than falling back to generic defaults', () => {
-    // Return null before capabilities load rather than persist fallback defaults.
     resetArchitectureCapabilities();
 
     const model: MainModelConfig = { base: 'sdxl', key: 'model', name: 'model', type: 'main' };
@@ -347,7 +355,6 @@ describe('resolveGenerateWidgetValues and an architecture the table omits', () =
   const rows = capabilitiesFixture as ArchitectureCapabilitiesRow[];
 
   it('will not select a model whose architecture the backend did not describe', () => {
-    // Reject missing rows to protect persisted settings from generic defaults.
     setArchitectureCapabilities(rows.filter((row) => row.base !== 'cogview4'));
 
     expect(
@@ -364,5 +371,41 @@ describe('resolveGenerateWidgetValues and an architecture the table omits', () =
     });
 
     expect(resolved?.values.modelKey).toBe('sdxl-model');
+  });
+});
+
+describe('default components through the resolver', () => {
+  const t5 = { base: 'any', key: 't5-default', name: 'T5', type: 't5_encoder' };
+  const withDefaults = createModel('flux-default', {
+    base: 'flux',
+    default_settings: { components: { t5_encoder: t5.key } },
+    format: 'checkpoint',
+  });
+  const plain = createModel('sdxl-plain');
+  const catalog = [plain, withDefaults, t5];
+
+  it('keeps the components a model switch filled in', () => {
+    const { settings } = getGenerateModelSelectionResult({
+      currentValues: createValues(plain),
+      model: withDefaults,
+      models: catalog,
+    });
+    const stored = { ...settings, model: withDefaults };
+
+    expect(settings.t5EncoderModel).toEqual(t5);
+    expect(resolveGenerateWidgetValues({ models: catalog, storedValues: stored })?.values.t5EncoderModel).toEqual(t5);
+  });
+
+  it('applies them to the initial model only, never to an ordinary resolve', () => {
+    const initial = resolveGenerateWidgetValues({ models: [withDefaults, t5], storedValues: {} });
+
+    expect(initial?.values.model.key).toBe(withDefaults.key);
+    expect(initial?.values.t5EncoderModel).toEqual(t5);
+
+    const cleared = { ...initial!.values, t5EncoderModel: null };
+
+    expect(
+      resolveGenerateWidgetValues({ models: [withDefaults, t5], storedValues: cleared })?.values.t5EncoderModel
+    ).toBeNull();
   });
 });

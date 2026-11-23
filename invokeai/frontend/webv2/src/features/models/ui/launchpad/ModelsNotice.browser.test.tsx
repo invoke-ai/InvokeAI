@@ -84,7 +84,7 @@ const adapter = (canManageModels: boolean): ModelsUiAdapter => ({
   installInPlace: true,
   isProjectActive: () => false,
   managerProjectId: null,
-  schedulerPolicy: {
+  defaultsRules: {
     getSnapshot: () => ({ status: 'loading' }),
     load: () => undefined,
     subscribe: () => () => undefined,
@@ -184,7 +184,6 @@ describe('Home models notice', () => {
       .poll(() => api.installModel.mock.calls.map(([request]) => request.source))
       .toEqual(['sdxl-source', 'sdxl-vae-source']);
     await expect.element(page.getByText('2 models installing…')).toBeVisible();
-    // The button went away with the bundles; focus stays in the panel, and the start hint stops asking for an install.
     await expect.element(page.getByRole('heading', { name: i18n.t('models.launchpad.noModelsTitle') })).toHaveFocus();
     await expect.element(page.getByText(i18n.t('models.launchpad.startAfterInstall'))).toBeVisible();
     expect(router.state.location.pathname).toBe('/');

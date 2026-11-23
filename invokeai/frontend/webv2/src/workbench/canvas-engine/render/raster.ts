@@ -1,6 +1,6 @@
 /**
- * Injected RasterBackend owns all canvas/ImageBitmap creation, allowing node tests to use recording surfaces
- * instead of browser globals.
+ * Injected RasterBackend owns all canvas/ImageBitmap creation, allowing node tests to use recording surfaces instead of
+ * browser globals.
  */
 
 /** A single drawable/resizable 2D surface, backed by either an OffscreenCanvas or an HTMLCanvasElement. */
@@ -32,7 +32,6 @@ export interface RasterBackend {
 
 const isOffscreenCanvasSupported = (): boolean => typeof OffscreenCanvas !== 'undefined';
 
-/** Encodes a DOM/Offscreen surface's canvas to an image `Blob`. */
 const encodeDomSurface = (surface: RasterSurface, type: string): Promise<Blob> => {
   const { canvas } = surface;
   if (typeof (canvas as OffscreenCanvas).convertToBlob === 'function') {

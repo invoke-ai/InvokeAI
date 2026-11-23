@@ -2,7 +2,7 @@ import itertools
 import math
 from collections.abc import Iterator
 from contextlib import ExitStack
-from typing import Optional
+from typing import Any, Optional
 
 import torch
 import torchvision.transforms as tv_transforms
@@ -19,16 +19,18 @@ from invokeai.app.invocations.fields import (
     LatentsField,
     MetadataField,
     QwenImage21ConditioningField,
-    WithBoard,
     WithMetadata,
 )
-from invokeai.app.invocations.metadata_linked import LatentsMetaOutput
+from invokeai.app.invocations.metadata import (
+    LatentsMetaOutput,
+    build_denoise_metadata,
+    serialize_lora_metadata,
+)
 from invokeai.app.invocations.model import TransformerField
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.flux.sampling_utils import clip_timestep_schedule_fractional
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, QwenImage21VariantType
 from invokeai.backend.patches.layer_patcher import LayerPatcher, PatchSpec
-from invokeai.backend.patches.layers.dora_layer import DoRALayer
 from invokeai.backend.patches.lora_conversions.qwen_image_2_1_lora_conversion_utils import (
     QWEN_IMAGE_21_LORA_NORM_PREFIX,
     QWEN_IMAGE_21_LORA_TRANSFORMER_PREFIX,
@@ -36,7 +38,6 @@ from invokeai.backend.patches.lora_conversions.qwen_image_2_1_lora_conversion_ut
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.patches.sidecar_working_memory import lora_sidecar_bytes
 from invokeai.backend.quantization.dequantizing_linear import (
-    DequantizingLinear,
     peak_dequant_transient_bytes,
     requires_sidecar_patching,
 )
@@ -203,10 +204,10 @@ def unpack_latents(latents: torch.Tensor, height: int, width: int) -> torch.Tens
     title="Denoise - Qwen-Image-2.1",
     tags=["image", "qwen_image_2_1", "qwen-image-2.1"],
     category="image",
-    version="1.2.0",
+    version="1.3.0",
     classification=Classification.Prototype,
 )
-class QwenImage21DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
+class QwenImage21DenoiseInvocation(BaseInvocation, WithMetadata):
     """Run the denoising process with a Qwen-Image-2.1 model."""
 
     latents: Optional[LatentsField] = InputField(
@@ -254,6 +255,30 @@ class QwenImage21DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             raise ValueError("cfg_scale values must be finite.")
         return value
 
+    def _build_metadata(self, *, used_prefix_cache: Optional[bool] = None) -> MetadataField:
+        updates: dict[str, Any] = {
+            "generation_mode": (
+                "qwen_image_2_1_inpaint"
+                if getattr(self, "denoise_mask", None) is not None
+                else (
+                    "qwen_image_2_1_img2img" if getattr(self, "latents", None) is not None else "qwen_image_2_1_txt2img"
+                )
+            ),
+            "width": self.width,
+            "height": self.height,
+            "steps": self.steps,
+            "cfg_scale": self.cfg_scale,
+            "denoising_start": self.denoising_start,
+            "denoising_end": self.denoising_end,
+            "seed": self.seed,
+            "model": self.transformer.transformer,
+        }
+        if used_prefix_cache is not None:
+            updates[PREFIX_CACHE_METADATA_KEY] = used_prefix_cache
+        updates["loras"] = serialize_lora_metadata(getattr(self.transformer, "loras", None))
+
+        return build_denoise_metadata(getattr(self, "metadata", None), updates)
+
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> LatentsMetaOutput:
         latents, used_prefix_cache = self._run_diffusion(context)
@@ -261,14 +286,12 @@ class QwenImage21DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         # The two modes sample visibly differently in bf16, and which one runs depends on the card's memory: the
         # image's metadata has to say, or nothing tells why one graph and seed give another image on another card.
         # A graph routes this output to the node that saves the image.
-        metadata = dict(self.metadata.root) if self.metadata is not None else {}
-        metadata[PREFIX_CACHE_METADATA_KEY] = used_prefix_cache
         # `LatentsOutput.build` assumes 8x latents; these are 16x, so report the requested size directly.
         return LatentsMetaOutput(
             latents=LatentsField(latents_name=name, seed=self.seed),
             width=self.width,
             height=self.height,
-            metadata=MetadataField.model_validate(metadata),
+            metadata=self._build_metadata(used_prefix_cache=used_prefix_cache),
         )
 
     def _load_conditioning(
@@ -445,7 +468,6 @@ class QwenImage21DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             dtype,
         )
         working_memory += peak_dequant_transient_bytes(transformer_info.model, dtype)
-        self._refuse_dora_on_int8(context, transformer_info.model)
         working_memory += self._lora_working_memory(
             context,
             transformer_info.model,
@@ -624,21 +646,6 @@ class QwenImage21DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             per_sample_rows=dict.fromkeys(_PER_SAMPLE_LINEARS, _TIMESTEP_ROWS),
             dtype=dtype,
         )
-
-    def _refuse_dora_on_int8(self, context: InvocationContext, transformer: torch.nn.Module) -> None:
-        """Fail before loading the transformer onto the device, not at the first step: a DoRA layer normalizes the
-        updated weight, and an int8 Linear's packed buffers never form one (`DoRALayer.get_parameters` raises)."""
-        loras = [lora for lora in self.transformer.loras if lora.weight != 0]
-        if not loras:
-            return
-        modules = dict(transformer.named_modules())
-        for lora in loras:
-            for key, layer in context.models.load(lora.lora).model.layers.items():
-                if isinstance(layer, DoRALayer) and isinstance(modules.get(key.partition("-")[2]), DequantizingLinear):
-                    raise ValueError(
-                        f"LoRA '{lora.lora.name}' has DoRA layers, which do not run on an int8 transformer. Use it "
-                        "with a Qwen-Image-2.1 transformer in another format, such as bf16, fp8 or GGUF."
-                    )
 
     def _lora_iterator(self, context: InvocationContext) -> Iterator[PatchSpec]:
         for lora in self.transformer.loras:

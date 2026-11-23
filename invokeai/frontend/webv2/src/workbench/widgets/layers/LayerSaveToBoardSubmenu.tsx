@@ -17,10 +17,7 @@ import type { LayerContextAction, LayerContextBoardChoice } from './layerContext
 
 const SUBMENU_POSITIONING = { placement: 'right-start' } as const;
 
-/**
- * A `picker: 'board'` layer action as a submenu of the boards the caller can add to, Uncategorized first. The list
- * mounts only while the submenu is open, so a layer menu never reads boards it does not show.
- */
+/** Boards the caller can add to, Uncategorized first, read only while the submenu is open. */
 export const LayerSaveToBoardSubmenu = ({
   action,
   onSelect,

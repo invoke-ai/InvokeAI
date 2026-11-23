@@ -16,8 +16,6 @@ import { VideoReferenceListField } from './VideoReferenceListField';
 import { VideoSourceClipField } from './VideoSourceClipField';
 import { VideoUiProvider, type VideoSpanPlaybackState, type VideoUiAdapter } from './VideoUiContext';
 
-/** Playback converts inclusive frame bounds to seconds, including the full final frame. */
-
 const galleryMocks = vi.hoisted(() => ({ resolve: vi.fn() }));
 
 vi.mock('@features/gallery', async (importOriginal) => ({
@@ -71,7 +69,6 @@ let root: Root;
 const playVideoSpanInPreview = vi.fn<VideoUiAdapter['playVideoSpanInPreview']>();
 const reportError = vi.fn();
 
-/** A stand-in for the Preview player's report, driven by the test. */
 let playbackState: VideoSpanPlaybackState | null = null;
 const playbackListeners = new Set<() => void>();
 const reportPlayback = (state: VideoSpanPlaybackState | null): void => {
@@ -156,7 +153,6 @@ const InitialVideoHarness = ({ disabled }: { disabled: boolean }) => {
   return <VideoSourceClipField disabled={disabled} sourceVideo={source} onChange={setSource} />;
 };
 
-/** The reference list with its trim reachable from the test, as a slider drag would move it. */
 let retrim: ((update: Partial<VideoSourceClip>) => void) | null = null;
 
 const RetrimmableHarness = () => {
@@ -260,7 +256,6 @@ describe('video reference span playback', () => {
     expect(button).toBeDefined();
     await press(button!);
 
-    // The lookup is cancelled with the account lifetime, like every other gallery read.
     expect(galleryMocks.resolve).toHaveBeenCalledWith(
       { kind: 'video', name: 'clip.mp4' },
       expect.any(AbortSignal) as AbortSignal
@@ -280,7 +275,6 @@ describe('video reference span playback', () => {
   });
 
   it("plays the Initial Video clip's window, and stays live while the field is disabled", async () => {
-    // Editing gates must not prevent auditioning a visible clip.
     await renderTree(<InitialVideoHarness disabled />);
     const [button] = playButtons();
 
@@ -320,21 +314,18 @@ describe('video reference span playback', () => {
     await render([videoReference(), videoReference({ startFrame: 0, endFrame: 15 })]);
     const [first, second] = playButtons();
 
-    // Another request's playback token is not this button's to stop.
     await act(() => reportPlayback({ isPlaying: true, pause: pausePlayback, token: 3 }));
     expect(pauseButtons()).toHaveLength(0);
 
     await press(first!);
     expect(playVideoSpanInPreview).toHaveBeenCalledTimes(1);
 
-    // Preview has the loop running: this card offers to stop it, its sibling still to play.
     await act(() => reportPlayback({ isPlaying: true, pause: pausePlayback, token: 7 }));
     expect(pauseButtons()).toEqual([first]);
     expect(playButtons()).toEqual([second]);
 
     await press(first!);
 
-    // A stop, not another request: the clip pauses where it is.
     expect(pausePlayback).toHaveBeenCalledTimes(1);
     expect(playVideoSpanInPreview).toHaveBeenCalledTimes(1);
     expect(galleryMocks.resolve).toHaveBeenCalledTimes(1);
@@ -351,7 +342,6 @@ describe('video reference span playback', () => {
     await press(button!);
     expect(pausePlayback).toHaveBeenCalledTimes(1);
 
-    // A re-press starts the current trim, not the previously paused window.
     playVideoSpanInPreview.mockReturnValue(8);
     await act(() => retrim?.({ endFrame: 79, startFrame: 64 }));
     await press(button!);
@@ -359,7 +349,6 @@ describe('video reference span playback', () => {
     expect(playVideoSpanInPreview).toHaveBeenCalledTimes(2);
     expect(playVideoSpanInPreview).toHaveBeenLastCalledWith({ endSeconds: 5, item: galleryVideoItem, startSeconds: 4 });
 
-    // And it is the new request's report the button now answers to.
     await act(() => reportPlayback({ isPlaying: true, pause: pausePlayback, token: 7 }));
     expect(pauseButtons()).toHaveLength(0);
     await act(() => reportPlayback({ isPlaying: true, pause: pausePlayback, token: 8 }));
@@ -375,7 +364,6 @@ describe('video reference span playback', () => {
     await press(button!);
     expect(pauseButtons()).toHaveLength(0);
 
-    // Preview refusal leaves the first loop armed and owned by this button.
     playVideoSpanInPreview.mockReturnValueOnce(null);
     await press(button!);
     expect(playVideoSpanInPreview).toHaveBeenCalledTimes(2);
@@ -392,15 +380,12 @@ describe('video reference span playback', () => {
     await act(() => reportPlayback({ isPlaying: true, pause: pausePlayback, token: 7 }));
     expect(pauseButtons()).toEqual([button]);
 
-    // A pause from the native controls shows here too: the selection is not playing.
     await act(() => reportPlayback({ isPlaying: false, pause: pausePlayback, token: 7 }));
     expect(pauseButtons()).toHaveLength(0);
 
-    // A native play resumes it, and this is still the loop that button started.
     await act(() => reportPlayback({ isPlaying: true, pause: pausePlayback, token: 7 }));
     expect(pauseButtons()).toEqual([button]);
 
-    // The user scrubbed out, or Preview closed: nothing left to stop.
     await act(() => reportPlayback(null));
     expect(pauseButtons()).toHaveLength(0);
     expect(playButtons()).toEqual([button]);

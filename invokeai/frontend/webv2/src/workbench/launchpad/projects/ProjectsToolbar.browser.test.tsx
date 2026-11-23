@@ -6,11 +6,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { ProjectsToolbar } from './ProjectsToolbar';
 
-/**
- * Verify both selected styling and keyboard tooltips: asChild on the item overwrites checked data-state, while an
- * icon-only trigger cannot receive focus.
- */
-
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -67,7 +62,6 @@ const waitUntil = async (predicate: () => boolean, description: string) => {
   throw new Error(`never became true: ${description}`);
 };
 
-/** Select by PROJECTS_VIEW_IDS order because tests render untranslated keys. */
 const viewRadios = (container: HTMLElement): HTMLInputElement[] => {
   const radios = [...container.querySelectorAll<HTMLInputElement>('input[type="radio"]')];
 
@@ -79,11 +73,6 @@ const viewRadios = (container: HTMLElement): HTMLInputElement[] => {
 const tooltipContent = (): HTMLElement | null =>
   document.querySelector<HTMLElement>('[data-scope="tooltip"][data-part="content"]');
 
-/**
- * Asked as "can someone see it", not as a `data-state` reading: the node is
- * lazily mounted and then kept, and its state attribute is not what decides
- * whether the label is on screen.
- */
 const isTooltipVisible = (): boolean => tooltipContent()?.checkVisibility() ?? false;
 
 describe('ProjectsToolbar layout control', () => {
@@ -102,10 +91,6 @@ describe('ProjectsToolbar layout control', () => {
     expect(grid!.closest('label')?.dataset.state).toBe('unchecked');
   });
 
-  /**
-   * The indicator is positioned from the checked item's measured box, so a
-   * `data-state` clobbered by a tooltip trigger collapses it to nothing.
-   */
   it('gives the selection indicator a measurable box', async () => {
     const container = await render({ view: 'grid' });
 

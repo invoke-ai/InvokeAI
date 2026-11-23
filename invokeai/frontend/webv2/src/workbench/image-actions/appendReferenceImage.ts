@@ -3,12 +3,10 @@ import type { GenerateWidgetValues } from '@features/generation/contracts';
 import type { ModelConfig } from '@features/models';
 
 import {
+  addReferenceImages,
   createReferenceImageId,
   generatedImageToReferenceImage,
-  getMaxReferenceImages,
-  isReferenceImageSupported,
   isSupportedGenerateModel,
-  withAddedReferenceImages,
 } from '@features/generation/settings';
 
 import { getCurrentGenerateValues } from './executeImageRecall';
@@ -27,19 +25,24 @@ export const appendReferenceImage = ({
   models: ModelConfig[];
 }): AppendReferenceImageResult => {
   const supportedModels = models.filter(isSupportedGenerateModel);
-  const currentValues = getCurrentGenerateValues({ generateValues, supportedModels });
+  const currentValues = getCurrentGenerateValues({ generateValues, models, supportedModels });
 
-  if (!currentValues || !isReferenceImageSupported(currentValues.model, currentValues)) {
+  if (!currentValues) {
     return { status: 'unsupported' };
   }
-  if (currentValues.referenceImages.length >= getMaxReferenceImages(currentValues.model, currentValues)) {
-    return { status: 'full' };
+
+  const { referenceImages, refusal } = addReferenceImages({
+    additions: [{ id: createReferenceImageId(), image: generatedImageToReferenceImage(image) }],
+    components: currentValues,
+    mode: 'strict',
+    model: currentValues.model,
+    models,
+    referenceImages: currentValues.referenceImages,
+  });
+
+  if (refusal) {
+    return { status: refusal === 'full' ? 'full' : 'unsupported' };
   }
 
-  return {
-    referenceImages: withAddedReferenceImages(currentValues.model, models, currentValues.referenceImages, [
-      { id: createReferenceImageId(), image: generatedImageToReferenceImage(image) },
-    ]),
-    status: 'appended',
-  };
+  return { referenceImages, status: 'appended' };
 };

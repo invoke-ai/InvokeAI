@@ -155,6 +155,11 @@ class NVFP4Linear(DequantizingLinear):
     sidecar LoRA patches, and a partial load that leaves its buffers on the CPU streams them per forward.
     """
 
+    # FP8 Storage may cast the layers the build ships in full precision. On an RTX 4090 that barely moved the step-0
+    # transformer output against bf16 (Krea-2 Turbo 8.4% -> 8.9%, Z-Image Turbo 31.6% -> 31.8%) and did not change the
+    # image PSNR, and it saves 4-16% of the model.
+    leaves_dense_layers_to_fp8_storage = True
+
     def __init__(
         self,
         weight: torch.Tensor,
@@ -302,9 +307,7 @@ def reject_nvfp4_layers_a_plain_fold_cannot_decode(sd: Mapping[str, Any], what: 
     """Refuse an nvfp4 layer to a fold that only multiplies a scale into a weight.
 
     **Wan** (`wan.py:511`) is the seam this exists for: it reads scaled fp8 and never calls
-    :func:`pop_nvfp4_layers`. The other caller of the shared fold, the Qwen2.5-VL encoder, *does*
-    pop first (`qwen_image.py:473`, forty-odd lines before its fold) and ships the packed layers, so
-    the guard is unreachable there — do not read it as evidence that encoder lacks nvfp4 support.
+    :func:`pop_nvfp4_layers`.
 
     The fold has no dtype gate, by design, so it takes the layer: the block-scale grid carries one
     entry per 16 logical elements and the weight packs two 4-bit codes per byte, so eight packed

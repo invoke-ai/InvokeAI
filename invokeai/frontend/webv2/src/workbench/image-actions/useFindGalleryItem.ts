@@ -48,9 +48,8 @@ export const useFindGalleryItem = (): ((ref: GalleryItemRef, options?: FindGalle
   return useCallback(
     (ref: GalleryItemRef, { revealPreview = true }: FindGalleryItemOptions = {}) => {
       const activeProject = queries.getSnapshot().activeProject;
-      // Minted here, not inside the import below: both the ordering and the
-      // project fence describe the PRESS, and reading either after the chunk
-      // lands would pin whatever the workspace had become by then.
+      // Minted here, not inside the import below: both the ordering and the project fence describe the PRESS, and
+      // reading either after the chunk lands would pin whatever the workspace had become by then.
       const sequence = claimGalleryNavigationSequence();
       abortGalleryLocatorRequests();
       const locatorRequest = createGalleryLocatorRequest();
@@ -74,8 +73,8 @@ export const useFindGalleryItem = (): ((ref: GalleryItemRef, options?: FindGalle
       void import('@workbench/image-actions/revealGalleryItem')
         .then(({ revealGalleryItem }) => revealGalleryItem({ commands, queries, queryClient }, ref, ticket))
         .catch((error: unknown) => {
-          // Report chunk or media failures only for the still-current gesture, since widgets already moved. Keep
-          // the failed gesture's claim so older intents cannot reclaim selection.
+          // Report chunk or media failures only for the still-current gesture, since widgets already moved. Keep the
+          // failed gesture's claim so older intents cannot reclaim selection.
           if (
             ticket.accountScope.signal.aborted ||
             !isGalleryNavigationCurrent(ticket.sequence) ||

@@ -1,6 +1,6 @@
 import type { GenerationIssue } from '@features/generation/contracts';
 
-import { flushGenerateDrafts, focusPositivePrompt, revealGenerateIssue } from '@features/generation/react';
+import { flushGenerateDrafts, revealGenerateIssue, revealPositivePrompt } from '@features/generation/react';
 import {
   describeGenerationIssueFix,
   getGenerationIssueFixPatch,
@@ -8,6 +8,7 @@ import {
 } from '@features/generation/settings';
 import { useCapabilities } from '@features/identity';
 import { openModelManager } from '@features/models';
+import { UPSCALE_SECTION_IDS } from '@features/upscale';
 import { revealWorkflowNode } from '@features/workflow/react';
 import { useWorkbenchFocus } from '@workbench/focusRegions';
 import { getWidgetTypeIdForSourceId } from '@workbench/graphWidgets';
@@ -35,11 +36,7 @@ export interface InvokeIssueAction {
 const isMissingModelIssue = (issue: GenerationIssue): boolean =>
   issue.id === 'model:unsupported' || issue.id.startsWith('model:notInstalled:');
 
-/**
- * The ways out of each Invoke issue: a one-step fix where Generate has one, then a jump to where the problem is fixed
- * (the Generate section, the canvas layer, the workflow node, the Model Manager, the widget). A lost connection has
- * none: it resolves itself on reconnect.
- */
+/** Each Invoke issue's ways out: a one-step fix where one exists, then a jump to where it is fixed. */
 export const useInvokeIssueActions = (): ((issue: InvocationIssue) => InvokeIssueAction[]) => {
   const { t } = useTranslation();
   const { generation, widgets } = useWorkbenchCommands();
@@ -114,8 +111,17 @@ export const useInvokeIssueActions = (): ((issue: InvocationIssue) => InvokeIssu
         case 'prompt':
           return [
             show(() => {
+              // Upscale's prompt, and the note saying why it cannot expand, sit in its Detail guidance section.
+              if (target.widgetId === 'upscale') {
+                void patchWorkbenchPreferences({
+                  generateSectionsOpen: {
+                    ...getWorkbenchPreferences().generateSectionsOpen,
+                    [UPSCALE_SECTION_IDS.detailGuidance]: true,
+                  },
+                });
+              }
               reveal(target.widgetId);
-              requestAnimationFrame(() => focusPositivePrompt(target.widgetId));
+              revealPositivePrompt(target.widgetId);
             }),
           ];
         case 'layer':

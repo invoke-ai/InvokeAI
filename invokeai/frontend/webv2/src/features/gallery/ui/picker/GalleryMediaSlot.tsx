@@ -76,8 +76,7 @@ const GalleryDragEndMonitor = ({ onDragEnd }: { onDragEnd: (event: DragEndEvent)
 };
 
 /**
- * Own async resolution and report complete items through onChange. onUploadFile and custom thumbnails support
- * media stored outside the gallery.
+ * Owns async resolution, reports complete items via onChange; onUploadFile/custom thumbnails serve non-gallery media.
  */
 export const GalleryMediaSlot = ({
   accept,
@@ -126,8 +125,8 @@ export const GalleryMediaSlot = ({
   const isInert = disabled || isBusy;
   const labels = useMemo(() => ({ ...getDefaultLabels(accept, t), ...labelOverrides }), [accept, labelOverrides, t]);
 
-  // Advertise single drags of accepted kinds, but stay armed for any drag of
-  // those kinds: a multi-item release must be a dead drop, not fall through.
+  // Advertise single drags of accepted kinds, but stay armed for any drag of those kinds: a multi-item release must be
+  // a dead drop, not fall through.
   const { acceptsDrag, shieldsDrag } = useMemo(
     () => ({
       acceptsDrag: (data: unknown) =>
@@ -196,8 +195,8 @@ export const GalleryMediaSlot = ({
 
       setErrorMessage(null);
 
-      // The input's `accept` is advisory ("All files" bypasses it); a kind the
-      // slot cannot take must not be handed on only to be dropped on the floor.
+      // The input's `accept` is advisory ("All files" bypasses it); a kind the slot cannot take must not be handed on
+      // only to be dropped on the floor.
       if (!file || (kind && !accept.includes(kind))) {
         setErrorMessage(
           t(kind === 'video' ? 'widgets.gallery.picker.unsupportedVideo' : 'widgets.gallery.picker.unsupportedImage')

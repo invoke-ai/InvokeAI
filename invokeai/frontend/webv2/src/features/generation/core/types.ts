@@ -1,6 +1,7 @@
 import type { BackendGraphContract, GraphContract } from '@features/generation/core/contracts';
 import type { DynamicPromptsSeedBehaviour } from '@features/generation/core/dynamicPrompts';
 import type { PromptTemplateSnapshot } from '@features/generation/core/promptTemplates';
+import type { ModelRole } from '@features/models';
 import type { SeedMode } from '@platform/core/seed';
 
 export type ModelIdentifierConfig = {
@@ -10,7 +11,10 @@ export type ModelIdentifierConfig = {
   type: string;
   format?: string;
   variant?: string | null;
+  roles?: readonly ModelRole[];
   hash?: string;
+  /** Registered, but its files are gone: listed in the library, never loadable. */
+  is_missing?: boolean;
   submodel_type?: string;
   [key: string]: unknown;
 };
@@ -27,6 +31,7 @@ export type MainModelConfig = ModelIdentifierConfig & {
     height?: number | null;
     vae?: string | null;
     vae_precision?: string | null;
+    components?: Record<string, string> | null;
   } | null;
 };
 
@@ -87,14 +92,20 @@ export type LoraModelConfig = ModelIdentifierConfig & {
   trigger_phrases?: string[] | null;
   default_settings?: {
     weight?: number | null;
+    weight_max?: number | null;
+    weight_min?: number | null;
   } | null;
   variant?: string | null;
 };
+
+export type WanLoraTarget = 'high' | 'low' | 'both';
 
 export interface GenerateLora {
   isEnabled: boolean;
   model: LoraModelConfig;
   weight: number;
+  target?: WanLoraTarget;
+  lowNoiseWeight?: number;
 }
 
 export interface ImageWithDims {
@@ -103,20 +114,16 @@ export interface ImageWithDims {
   height: number;
 }
 
-/**
- * What a widget suggests to Expand Prompt for its model family. Each part applies only until the
- * user picks a model or system prompt themselves.
- */
+/** Each part applies only until the user picks a model or system prompt themselves. */
 export interface ExpandPromptSuggestion {
-  /** Source of the family's released enhancer, preselected when an installed text LLM has it. */
   modelSource: string | null;
-  /** How the model is listed among the starter models, for the hint shown when it is not installed. */
+  /** File names of single-file builds of the same model, matched against the end of an installed model's source. */
+  modelFileNames?: readonly string[];
   modelName: string | null;
   /** For a text-only rewrite. */
   systemPromptId: string | null;
   /** Replaces `systemPromptId` whenever `image` is actually sent; a prompt written for an image must not run without one. */
   imageSystemPromptId: string | null;
-  /** An image the rewrite may describe from, such as a video's first frame. */
   image: ImageWithDims | null;
 }
 
@@ -167,16 +174,15 @@ export type GenerateReferenceImageConfig =
   | { type: 'qwen_image_reference_image'; image: GenerateReferenceImageAsset | null }
   /** Krea-2 training-free style transfer: no adapter model, a single reference, `styleStrength` 0–2 (0 bypasses). */
   | { type: 'krea2_reference_image'; image: GenerateReferenceImageAsset | null; styleStrength: number }
-  /**
-   * Krea-2 edit reference for ai-toolkit edit LoRAs, read by the encoder's vision tower and joined to the denoise as
-   * clean image tokens. Up to three, in list order; never combined with a style reference.
-   */
+  /** For ai-toolkit edit LoRAs: up to three, in list order, never beside a style reference. */
   | { type: 'krea2_edit_reference_image'; image: GenerateReferenceImageAsset | null }
   | { type: 'qwen_image_2_1_reference_image'; image: GenerateReferenceImageAsset | null }
   | { type: 'external_reference_image'; image: GenerateReferenceImageAsset | null };
 
 export interface GenerateReferenceImage {
   id: string;
+  /** Trimmed, capped, non-empty; absent shows the positional default. A label only: prompt tags stay positional. */
+  name?: string;
   isEnabled: boolean;
   config: GenerateReferenceImageConfig;
 }
@@ -216,20 +222,14 @@ export interface GenerateSettings {
   negativePromptHeightPx: number;
   /** Stored template snapshots allow pure submission without catalog lookup. */
   promptTemplate: PromptTemplateSnapshot | null;
-  /** Show the merged prompt read-only instead of the authored text. */
   promptTemplateViewMode: boolean;
-  /**
-   * Expand dynamic prompt syntax (`{a|b}`, `__wildcards__`, `#` comments) on the backend before generating. Off keeps
-   * the prompt exactly as typed. Projects saved before the toggle read as on.
-   */
+  /** Backend dynamic prompt expansion; projects saved before the toggle read as on. */
   dynamicPromptsEnabled: boolean;
-  /** Expand `{a|b}` into every combination; otherwise draw a random sample. */
   dynamicPromptsCombinatorial: boolean;
   /** Upper bound on expanded prompts (the sample size when not combinatorial). */
   dynamicPromptsMaxPrompts: number;
   /** Seeds the random sampler so the preview matches what generates. */
   dynamicPromptsSampleSeed: number;
-  /** Draw a new sample seed after each queued random-mode submission. */
   dynamicPromptsResample: boolean;
   dynamicPromptsSeedBehaviour: DynamicPromptsSeedBehaviour;
   width: number;
@@ -244,7 +244,6 @@ export interface GenerateSettings {
   scheduler: string;
   clipSkip: number;
   colorCompensation: boolean;
-  /** Enables HiDiffusion high-resolution denoising for supported SD models. */
   hiDiffusionEnabled: boolean;
   hiDiffusionRauNetEnabled: boolean;
   hiDiffusionWindowAttentionEnabled: boolean;
@@ -266,7 +265,6 @@ export interface GenerateSettings {
   clipLEmbedModel: ComponentModelConfig | null;
   clipGEmbedModel: ComponentModelConfig | null;
   qwen3EncoderModel: ComponentModelConfig | null;
-  /** FLUX.2 [dev]'s Mistral text encoder. */
   mistralEncoderModel: ComponentModelConfig | null;
   qwenVLEncoderModel: ComponentModelConfig | null;
   /** Krea-2's text encoder. Distinct from `qwenVLEncoderModel` (Qwen2.5-VL). */
@@ -275,22 +273,19 @@ export interface GenerateSettings {
   qwen3VLVisionTowerModel: ComponentModelConfig | null;
   /** Anima-3.8B's second text encoder, read by its bundled semantic connector. */
   qwen35EncoderModel: ComponentModelConfig | null;
-  /**
-   * Anima's optional 4-channel ControlNet-LLLite inpainting adapter. The canvas feeds it the raster image and the
-   * inpaint mask while inpainting or outpainting; Generate and the other canvas modes ignore it.
-   */
+  /** Anima's optional LLLite inpaint adapter; only canvas inpaint/outpaint read it. */
   animaInpaintAdapterModel: ComponentModelConfig | null;
   /** Off skips the adapter on the canvas and keeps the selected model and weight. */
   animaInpaintAdapterEnabled: boolean;
   animaInpaintAdapterWeight: number;
-  /** Wan 2.2's UMT5-XXL text encoder. */
+  /** FLUX.3 prompt upsampling before every generation; off keeps the selected model. */
+  flux3PromptUpsamplerEnabled: boolean;
+  /** A Text LLM that can read images; required while `flux3PromptUpsamplerEnabled` is on. */
+  flux3PromptUpsamplerModel: ComponentModelConfig | null;
   wanT5EncoderModel: ComponentModelConfig | null;
   /** The low-noise expert is optional; the selected expert can span the full schedule. */
   wanLowNoiseModel: MainModelConfig | null;
-  /**
-   * Ideogram 4's unconditional transformer branch. Required with a single-file main, which holds
-   * only the conditional branch; null for a diffusers pipeline, which bundles both.
-   */
+  /** Required with a single-file main (conditional branch only); null for a diffusers pipeline. */
   ideogram4UnconditionalModel: MainModelConfig | null;
   /** Optional Diffusers main model used as a component source for split/quantized model families. */
   componentSourceModel: MainModelConfig | null;
@@ -301,14 +296,11 @@ export interface GenerateSettings {
   ideogram4Steps: number | null;
   ideogram4GuidanceScale: number | null;
   ideogram4Mu: number | null;
-  /** Free-text colour terms forwarded to the caption builder. */
   ideogram4ColorPalette: string[];
-  /** Scales Krea-2 conditioning toward the prompt before denoise. Default off. */
   krea2RebalanceEnabled: boolean;
   krea2RebalanceMultiplier: number;
   /** Comma-separated per-layer weights, forwarded verbatim to the backend parser. */
   krea2RebalanceWeights: string;
-  /** Perturbs Krea-2 conditioning for variety between seeds. Default off. */
   krea2SeedVarianceEnabled: boolean;
   krea2SeedVarianceStrength: number;
   krea2SeedVarianceRandomizePercent: number;
@@ -321,7 +313,6 @@ export interface GenerateSettings {
   fluxDypeExponent: number;
   /** Z-Image sigma-schedule shift; null lets the node derive it from the image size. */
   zImageShift: number | null;
-  /** Perturbs Z-Image conditioning for variety between seeds. Default off. */
   zImageSeedVarianceEnabled: boolean;
   zImageSeedVarianceStrength: number;
   zImageSeedVarianceRandomizePercent: number;
@@ -329,16 +320,12 @@ export interface GenerateSettings {
   qwenImageShift: number | null;
   /** BitsAndBytes quantization applied to the Qwen2.5-VL encoder on load, trading quality for VRAM. */
   qwenImageEncoderQuantization: QwenImageEncoderQuantization;
-  /**
-   * Transformer blocks MOSS-Image's negative branch skips, unique and ascending; empty skips none. CFG 1 runs no
-   * negative branch, so the list has no effect there.
-   */
+  /** Unique and ascending; empty skips none. No effect at CFG 1, which runs no negative branch. */
   mossImageUncondSkipLayers: number[];
   /** PiD replaces VAE decode with caption-conditioned 4× output; requires a PiD decoder and Gemma-2 encoder. */
   pidMode: PidMode;
   /** PiD decoder checkpoint. Trained per backbone, so it must match the main model's base. */
   pidDecoderModel: ComponentModelConfig | null;
-  /** The shared Gemma-2 caption encoder PiD conditions its decode on. */
   gemma2EncoderModel: ComponentModelConfig | null;
   pidSteps: number;
   /** A provider's named size (e.g. `1K`); sent only when the selected model lists it in a resolution preset. */
@@ -360,7 +347,6 @@ export interface GenerateSettings {
   /** Aesthetic-score conditioning for the refiner's positive and negative prompts, 1 to 10. */
   refinerPositiveAestheticScore: number;
   refinerNegativeAestheticScore: number;
-  /** Fraction of the schedule at which the base model hands its latents to the refiner. */
   refinerStart: number;
 }
 
@@ -383,8 +369,7 @@ export type GeminiThinkingLevel = 'minimal' | 'high';
 /**
  * - `off`: ordinary VAE decode.
  * - `fit`: generate at the requested size, decode 4x, downscale back to it.
- * - `native`: the requested size IS the 4x target; generate at size / 4 and keep the
- *   full 4x output.
+ * - `native`: the requested size IS the 4x target; generate at size / 4 and keep the full 4x output.
  */
 export type PidMode = 'off' | 'fit' | 'native';
 

@@ -8,10 +8,7 @@ import { captureAccountScope, registerAccountOwnedResource } from '@platform/sta
 import { useCallback, useSyncExternalStore } from 'react';
 import { useTranslation } from 'react-i18next';
 
-/**
- * One publication controller per account: every editor save and preview save goes through it, so a workflow is
- * never published twice at once and a lost answer is reconciled before it is sent again.
- */
+/** One controller per account: a workflow is never published twice at once, and a lost answer is reconciled first. */
 
 let controller: WorkflowPublicationController | null = null;
 
@@ -21,10 +18,8 @@ export const getWorkflowPublicationController = (): WorkflowPublicationControlle
 };
 
 /**
- * Publications that got no definitive answer, by project workflow. Each keeps its captured request and reserved id
- * so a resend after a lost response cannot create a second template. They outlive the dialog that reported them:
- * a new save for that workflow meets the unanswered one first, and returning to the workflow offers it once more.
- * An entry ends when the publication settles, when the user discards it, or with the account.
+ * Unanswered publications by workflow, keeping their request and reserved id so a resend cannot create a second
+ * template. They end on settle, discard, or with the account.
  */
 const unresolvedPublications = new Map<string, { failure: WorkflowPublicationFailure; offered: boolean }>();
 
@@ -93,7 +88,6 @@ export interface UpdateProjectWorkflowSourceOptions {
 }
 
 export interface WorkflowPublication {
-  /** Creates a new template from the project workflow's current content and makes it the copy's update target. */
   saveAsNew: (options: PublishProjectWorkflowOptions) => Promise<WorkflowPublicationOutcome>;
   /** Replaces the template the project workflow came from, at exactly the revision the caller reviewed. */
   updateSource: (options: UpdateProjectWorkflowSourceOptions) => Promise<WorkflowPublicationOutcome>;
@@ -103,15 +97,11 @@ export interface WorkflowPublication {
     name: string,
     isPublic?: boolean
   ) => Promise<WorkflowPublicationOutcome>;
-  /** Resends the captured request of a failed publication. */
   retry: (result: WorkflowPublicationFailure) => Promise<WorkflowPublicationOutcome>;
   isPublishing: (workflowId: string) => boolean;
 }
 
-/**
- * Where a settled publication lands. `adoptNameFrom` is the workflow's name when a save as new started: the workflow
- * takes the created template's name only while it still has that one.
- */
+/** The workflow takes the created template's name only while it still has `adoptNameFrom`. */
 interface PublicationTarget {
   adoptNameFrom?: string;
   name: string;
@@ -126,7 +116,6 @@ export const useWorkflowPublication = (): WorkflowPublication => {
   const notify = useWorkflowNotifications();
   const publicationController = getWorkflowPublicationController();
 
-  // Re-render when the in-flight set changes so `isPublishing` answers stay current.
   useSyncExternalStore(
     publicationController.subscribe,
     publicationController.getVersion,
@@ -154,9 +143,7 @@ export const useWorkflowPublication = (): WorkflowPublication => {
           );
         }
 
-        // A save as new turns the workflow into the template it created, so it takes that template's name; the
-        // header and a later update confirmation then name the template the workflow is linked to. A name the user
-        // chose meanwhile stands, and so does one that cannot be checked because another project is active now.
+        // A save as new takes the template's name, unless the user renamed meanwhile or another project is active now.
         if (target.adoptNameFrom !== undefined && result.kind === 'created') {
           const snapshot = project.getSnapshot();
           const current =
@@ -306,7 +293,6 @@ export const useWorkflowPublication = (): WorkflowPublication => {
     [notify, project, publicationController, settleWithRetry, t, validate]
   );
 
-  // The failed result carries its captured request and, once settled here, its target.
   const retry = useCallback(
     (failed: WorkflowPublicationFailure): Promise<WorkflowPublicationOutcome> => failed.retry(),
     []

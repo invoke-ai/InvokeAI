@@ -1,6 +1,6 @@
 from collections.abc import Iterator
 from contextlib import ExitStack
-from typing import Callable, Optional
+from typing import Any, Callable, Optional
 
 import torch
 import torchvision.transforms as tv_transforms
@@ -15,9 +15,15 @@ from invokeai.app.invocations.fields import (
     Input,
     InputField,
     LatentsField,
+    MetadataField,
+    WithMetadata,
+)
+from invokeai.app.invocations.metadata import (
+    LatentsMetaOutput,
+    build_denoise_metadata,
+    serialize_lora_metadata,
 )
 from invokeai.app.invocations.model import TransformerField, VAEField
-from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.flux.sampling_utils import clip_timestep_schedule_fractional
 from invokeai.backend.flux2.latent_norm import bn_denormalize, bn_normalize, read_vae_bn_stats
@@ -34,11 +40,9 @@ from invokeai.backend.flux3.sampling import (
 )
 from invokeai.backend.model_manager.taxonomy import BaseModelType, Flux3VariantType, ModelType
 from invokeai.backend.patches.layer_patcher import LayerPatcher, PatchSpec
-from invokeai.backend.patches.layers.dora_layer import DoRALayer
-from invokeai.backend.patches.layers.swapped_halves_layer_patch import SwappedHalvesLayerPatch
 from invokeai.backend.patches.lora_conversions.flux3_lora_constants import FLUX3_LORA_TRANSFORMER_PREFIX
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
-from invokeai.backend.quantization.dequantizing_linear import DequantizingLinear, requires_sidecar_patching
+from invokeai.backend.quantization.dequantizing_linear import requires_sidecar_patching
 from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import RectifiedFlowInpaintExtension
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import Flux3ConditioningInfo
@@ -50,10 +54,10 @@ from invokeai.backend.util.devices import TorchDevice
     title="Denoise - FLUX.3",
     tags=["image", "flux3", "flux", "denoise"],
     category="latents",
-    version="1.0.0",
+    version="1.1.0",
     classification=Classification.Prototype,
 )
-class Flux3DenoiseInvocation(BaseInvocation):
+class Flux3DenoiseInvocation(BaseInvocation, WithMetadata):
     """Run the denoising process with a FLUX.3 Image transformer (Klein or Klein Base).
 
     Klein is step-distilled (a flow map) and samples without CFG; Klein Base takes CFG with a negative
@@ -106,11 +110,40 @@ class Flux3DenoiseInvocation(BaseInvocation):
         title="Reference Images",
     )
 
+    def _build_metadata(self) -> MetadataField:
+        updates: dict[str, Any] = {
+            "generation_mode": (
+                "flux3_inpaint"
+                if getattr(self, "denoise_mask", None) is not None
+                else ("flux3_img2img" if getattr(self, "latents", None) is not None else "flux3_txt2img")
+            ),
+            "width": self.width,
+            "height": self.height,
+            "steps": self.steps,
+            "cfg_scale": self.cfg_scale,
+            "scheduler": "euler",
+            "denoising_start": self.denoising_start,
+            "denoising_end": self.denoising_end,
+            "add_noise": self.add_noise,
+            "seed": self.seed,
+            "model": self.transformer.transformer,
+            "vae": self.vae.vae,
+        }
+        updates["loras"] = serialize_lora_metadata(getattr(self.transformer, "loras", None))
+        return build_denoise_metadata(getattr(self, "metadata", None), updates)
+
     @torch.no_grad()
-    def invoke(self, context: InvocationContext) -> LatentsOutput:
+    def invoke(self, context: InvocationContext) -> LatentsMetaOutput:
         latents = self._run_diffusion(context).detach().to("cpu")
         name = context.tensors.save(tensor=latents)
-        return LatentsOutput.build(latents_name=name, latents=latents, seed=None)
+        return LatentsMetaOutput.build(
+            latents_name=name,
+            latents=latents,
+            seed=None,
+            metadata=self._build_metadata(),
+            width=self.width,
+            height=self.height,
+        )
 
     def _run_diffusion(self, context: InvocationContext) -> torch.Tensor:
         device = TorchDevice.choose_torch_device()
@@ -214,7 +247,6 @@ class Flux3DenoiseInvocation(BaseInvocation):
         with ExitStack() as exit_stack:
             transformer_info = context.models.load(self.transformer.transformer)
             loras = self._active_loras(context)
-            self._refuse_dora_on_quantized_layers(loras, transformer_info.model)
             # Ask the model cache to keep free what one transformer forward needs. Reference images are the dominant
             # term: their tokens join the attended sequence, so ten 1 MP references add ten times the tokens of a
             # 1 MP image. Priced on the unlocked model, whose GGUF or fp8-stored layers add a transient per forward,
@@ -296,27 +328,6 @@ class Flux3DenoiseInvocation(BaseInvocation):
             for lora in self.transformer.loras
             if lora.weight != 0
         ]
-
-    @staticmethod
-    def _refuse_dora_on_quantized_layers(loras: list[tuple[str, ModelPatchRaw]], transformer: torch.nn.Module) -> None:
-        """Fail before loading the transformer onto the device, not at the first step: a DoRA layer normalizes the
-        updated weight, which a Linear keeping its weight quantized in buffers never forms (`DoRALayer.get_parameters`
-        raises on the shape it hands over instead)."""
-        # Reached once quantized FLUX.3 builds, whose Linears are `DequantizingLinear`s, load.
-        if not loras:
-            return
-        modules = dict(transformer.named_modules())
-        for name, patch in loras:
-            for key, layer in patch.layers.items():
-                # A layer on BFL's output modulation comes wrapped, to swap its halves.
-                if isinstance(layer, SwappedHalvesLayerPatch):
-                    layer = layer.layer
-                module = modules.get(key.removeprefix(FLUX3_LORA_TRANSFORMER_PREFIX))
-                if isinstance(layer, DoRALayer) and isinstance(module, DequantizingLinear):
-                    raise ValueError(
-                        f"LoRA '{name}' has DoRA layers, which do not run on this transformer's quantized layers. Use "
-                        "it with an unquantized or GGUF build of the transformer."
-                    )
 
     def _lora_iterator(self, context: InvocationContext) -> Iterator[PatchSpec]:
         for lora in self.transformer.loras:
