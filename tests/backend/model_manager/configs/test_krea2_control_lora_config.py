@@ -82,9 +82,25 @@ def test_a_plain_native_krea2_lora_is_still_a_krea2_lora(tmp_path: Path) -> None
         ),
         pytest.param({**_block_halves(2), "first.weight": torch.zeros(6144, 128)}, id="no-projection-bias"),
         pytest.param({**_block_halves(2), **_projection(width_in=64)}, id="unwidened-projection"),
+        pytest.param(
+            {**_block_halves(2), **_projection(), "blocks.0.attn.norm_q.scale": torch.zeros(128)}, id="extra-key"
+        ),
+        pytest.param(
+            {
+                **_block_halves(2),
+                **_projection(),
+                "blocks.0.foo.A": torch.zeros(1, 8),
+                "blocks.0.foo.B": torch.zeros(8, 1),
+            },
+            id="unknown-module",
+        ),
+        pytest.param(
+            {**_block_halves(2), "first.weight": torch.zeros(3072, 128), "first.bias": torch.zeros(3072)},
+            id="narrow-projection",
+        ),
     ],
 )
-def test_an_incomplete_or_unwidened_file_is_not_a_krea2_control_lora(tmp_path: Path, tensors) -> None:
+def test_a_file_off_the_published_layout_is_not_a_krea2_control_lora(tmp_path: Path, tensors) -> None:
     result = _identify(tmp_path / "depth-control-lora.safetensors", tensors)
 
     assert not any(isinstance(match, ControlLoRA_LyCORIS_Krea2_Config) for match in result.all_matches)

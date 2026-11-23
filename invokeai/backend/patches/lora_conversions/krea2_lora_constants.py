@@ -8,6 +8,7 @@ the converter: the converter pulls in the patch layers, which import ``model_man
 back into ``model_manager.configs``. Same reason ``anima_lora_constants`` exists.
 """
 
+import re
 from typing import Any
 
 from invokeai.backend.patches.lora_conversions.kohya_key_utils import (
@@ -117,21 +118,30 @@ def is_kohya_krea2_lora_key(key: str | int) -> bool:
 # Native module names, block LoRAs as ``<module>.A`` (down) / ``<module>.B`` (up), and the input projection
 # ``first`` widened to take ``[noisy latent tokens | control latent tokens]``: twice the packed latent width.
 KREA2_CONTROL_LORA_INPUT_WIDTH = 2 * 64
+KREA2_HIDDEN_SIZE = 6144
 KREA2_CONTROL_LORA_PROJECTION_KEYS = ("first.weight", "first.bias")
+_KREA2_CONTROL_LORA_BLOCK_KEY = re.compile(
+    r"blocks\.[0-9]+\.(?:"
+    + "|".join(re.escape(f"{group}.{leaf}") for group, leaves in _NATIVE_KREA2_BLOCK_SUBTREE.items() for leaf in leaves)
+    + r")\.[AB]"
+)
 
 
 def is_krea2_control_lora_state_dict(state_dict: dict[str | int, Any]) -> bool:
-    """True for a Krea-2 Control LoRA: the widened ``first`` projection, and complete A/B pairs on ``blocks.``."""
+    """True only for a ``[6144, 128]`` ``first`` projection plus complete A/B pairs on block Linears, nothing else."""
     weight = state_dict.get("first.weight")
     bias = state_dict.get("first.bias")
-    if weight is None or bias is None or len(weight.shape) != 2 or len(bias.shape) != 1:
+    if weight is None or bias is None:
         return False
-    if weight.shape[1] != KREA2_CONTROL_LORA_INPUT_WIDTH or bias.shape[0] != weight.shape[0]:
+    if tuple(weight.shape) != (KREA2_HIDDEN_SIZE, KREA2_CONTROL_LORA_INPUT_WIDTH) or tuple(bias.shape) != (
+        KREA2_HIDDEN_SIZE,
+    ):
         return False
     modules: dict[str, set[str]] = {}
     for key in state_dict:
-        if isinstance(key, str) and key.endswith((".A", ".B")):
-            modules.setdefault(key[:-2], set()).add(key[-1])
-    return any(module.startswith("blocks.") for module in modules) and all(
-        halves == {"A", "B"} for halves in modules.values()
-    )
+        if key in KREA2_CONTROL_LORA_PROJECTION_KEYS:
+            continue
+        if not isinstance(key, str) or _KREA2_CONTROL_LORA_BLOCK_KEY.fullmatch(key) is None:
+            return False
+        modules.setdefault(key[:-2], set()).add(key[-1])
+    return bool(modules) and all(halves == {"A", "B"} for halves in modules.values())

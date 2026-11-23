@@ -279,9 +279,10 @@ Qwen-Image LoRAs also patch the Qwen2.5-VL encoder when the file has text-encode
 
 A Krea-2 Control LoRA is one `.safetensors` file in the layout of
 [Krea-2-controlnet](https://github.com/Tanmaypatil123/Krea-2-controlnet): native block LoRAs written as
-`blocks.N.<module>.A` / `.B`, plus a `first.weight` / `first.bias` input projection that takes 128 features, twice
-Krea-2's latent width. It installs as a **Control LoRA** for Krea-2; a file with an unpaired `.A` or `.B` or without
-`first.bias` is not recognized as one. See the [family page](/users-guide/models/local-models/krea-2/#control-lora).
+`blocks.N.<module>.A` / `.B` on the attention and MLP Linears, plus a `first.weight` / `first.bias` input projection
+that takes 128 features, twice Krea-2's latent width, into Krea-2's 6144-wide hidden state. It installs as a **Control
+LoRA** for Krea-2; a file with any other key, an unpaired `.A` or `.B`, or a missing or differently shaped
+projection is not recognized as one. See the [family page](/users-guide/models/local-models/krea-2/#control-lora).
 
 On Z-Image, Qwen-Image, Anima and MOSS-Image, DoRA in the `lora_A`/`lora_B` layout (`dora_scale`, PEFT
 `lora_magnitude_vector`, ai-toolkit `.magnitude`) applies with its magnitude. DoRA works wherever the transformer weight can be dequantized (GGUF, SDNQ, int8/int4-convrot, nvfp4, fp8), but not

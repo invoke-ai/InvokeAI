@@ -15,7 +15,7 @@ from invokeai.backend.patches.lora_conversions.krea2_lora_constants import KREA2
 
 def test_a_control_lora_file_loads_as_a_krea2_control_lora_patch(tmp_path) -> None:
     path = tmp_path / "depth-control-lora.safetensors"
-    weight, bias = torch.randn(8, 128), torch.randn(8)
+    weight, bias = torch.randn(6144, 128), torch.randn(6144)
     save_file(
         {
             "blocks.0.attn.wq.A": torch.randn(2, 8),
