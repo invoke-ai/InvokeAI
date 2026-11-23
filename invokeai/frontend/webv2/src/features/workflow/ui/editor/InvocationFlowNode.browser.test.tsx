@@ -1735,6 +1735,7 @@ describe('CurrentImageFlowNode waiting vs active states', () => {
     expect(host.querySelector('[data-testid="current-image-progress-badge"]')?.textContent).toBe('25%');
 
     await act(() => {
+      exportMocks.framedProgressTargets = [{ itemIndex: 1, queueItemId: 'run-b' }];
       exportMocks.progressImage = {
         dataUrl: 'data:image/png;base64,bGl2ZQ==',
         height: 2,
@@ -1775,6 +1776,10 @@ describe('CurrentImageFlowNode waiting vs active states', () => {
     };
     await act(() => {
       exportMocks.activeProgressTargets = [
+        { itemIndex: 1, queueItemId: 'run-b' },
+        { itemIndex: 2, queueItemId: 'run-b' },
+      ];
+      exportMocks.framedProgressTargets = [
         { itemIndex: 1, queueItemId: 'run-b' },
         { itemIndex: 2, queueItemId: 'run-b' },
       ];
@@ -1905,6 +1910,7 @@ describe('CurrentImageFlowNode waiting vs active states', () => {
       width: 2,
     };
     exportMocks.activeProgressTargets = [{ itemIndex: 1, queueItemId: 'parent-run' }];
+    exportMocks.framedProgressTargets = [{ itemIndex: 1, queueItemId: 'parent-run' }];
     exportMocks.progressImage = { ...childFrame, target: { itemIndex: 1, queueItemId: 'parent-run' } };
     exportMocks.progressImageByTarget = { 'parent-run:1': childFrame };
     exportMocks.progressByQueueItemId = {

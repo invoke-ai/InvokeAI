@@ -220,12 +220,36 @@ describe('resolveProgressTarget', () => {
         activeTarget: slot1Target,
       })
     ).toBe(0.6);
+    // Coordinator activeItemIndex cleared when another batch slot finished -> fall back to per-slot percentage instead of null.
+    expect(
+      resolveProgressPercentage({
+        activeProgress: { activeItemIndex: undefined, percentage: null },
+        activeTarget: slot1Target,
+        slotProgressPercentage: 0.75,
+      })
+    ).toBe(0.75);
+    // Coordinator activeItemIndex undefined with no per-slot percentage -> do not leak an unattributed percentage onto a concrete batch slot.
+    expect(
+      resolveProgressPercentage({
+        activeProgress: { activeItemIndex: undefined, percentage: 0.45 },
+        activeTarget: slot1Target,
+        slotProgressPercentage: null,
+      })
+    ).toBeNull();
+    // Unindexed targets (itemIndex 0) still use the coordinator percentage.
+    expect(
+      resolveProgressPercentage({
+        activeProgress: { activeItemIndex: undefined, percentage: 0.45 },
+        activeTarget: { itemIndex: 0, queueItemId: 'batch-1' },
+        slotProgressPercentage: null,
+      })
+    ).toBe(0.45);
   });
 
-  it('prefers the most recently framed slot in the project when another project publishes the latest frame', () => {
+  it('keeps the preferred local running framed slot across foreign updates, and prefers live framed slots over unframed or settling ones', () => {
     const projectATarget1 = { itemIndex: 1, queueItemId: 'run-a-1' };
-    const projectATarget2 = { itemIndex: 1, queueItemId: 'run-a-2' };
-    const projectAIds = new Set(['run-a-1', 'run-a-2']);
+    const projectATarget2 = { itemIndex: 2, queueItemId: 'run-a-1' };
+    const projectAIds = new Set(['run-a-1']);
     const frameFromProjectB = {
       dataUrl: 'data:image/png;base64,BB==',
       height: 64,
@@ -233,14 +257,57 @@ describe('resolveProgressTarget', () => {
       width: 64,
     };
 
+    // Even when slot 2 was marked framed after slot 1, keep preferred running slot 1 while only Project B updated.
     expect(
-      resolveProgressTarget(frameFromProjectB, [projectATarget1, projectATarget2], projectAIds, [projectATarget2])
+      resolveProgressTarget(
+        frameFromProjectB,
+        [projectATarget1, projectATarget2],
+        projectAIds,
+        [projectATarget1, projectATarget2],
+        projectATarget1,
+        [projectATarget1, projectATarget2]
+      )
+    ).toEqual(projectATarget1);
+
+    // If preferred slot 1 is settling while slot 2 is still running and framed, switch to running slot 2.
+    expect(
+      resolveProgressTarget(
+        frameFromProjectB,
+        [projectATarget2, projectATarget1],
+        projectAIds,
+        [projectATarget1, projectATarget2],
+        projectATarget1,
+        [projectATarget2]
+      )
+    ).toEqual(projectATarget2);
+
+    // If slot 1 restarted after requeue (followed but not yet framed) and global progressImage still carries slot 1's old frame,
+    // pick the sibling slot 2 that is actually framed in this project rather than blanking the monitor.
+    expect(
+      resolveProgressTarget(
+        { dataUrl: 'data:image/png;base64,OLD=', height: 64, target: projectATarget1, width: 64 },
+        [projectATarget1, projectATarget2],
+        projectAIds,
+        [projectATarget2],
+        projectATarget1,
+        [projectATarget1, projectATarget2]
+      )
+    ).toEqual(projectATarget2);
+
+    // Without a preferred framed slot, fall back to the most recently framed slot in the project.
+    expect(
+      resolveProgressTarget(frameFromProjectB, [projectATarget1, projectATarget2], projectAIds, [projectATarget2], null)
+    ).toEqual(projectATarget2);
+
+    // When no local slot is framed yet, keep the preferred followed local slot over an earlier unframed sibling.
+    expect(
+      resolveProgressTarget(frameFromProjectB, [projectATarget1, projectATarget2], projectAIds, [], projectATarget2)
     ).toEqual(projectATarget2);
   });
 });
 
 describe('resolveLiveProgressImage', () => {
-  it('retains this project slot frame when another project owns the global latest frame, and drops frames when not followed', () => {
+  it('retains this project slot frame when framed, hides stale frames before a restarted attempt frames, and drops frames when not followed', () => {
     const slotFrame = { dataUrl: 'data:image/png;base64,AA==', height: 64, width: 64 };
     const otherProjectGlobalFrame = {
       dataUrl: 'data:image/png;base64,BB==',
@@ -255,16 +322,30 @@ describe('resolveLiveProgressImage', () => {
       resolveLiveProgressImage({
         activeTarget: projectATarget,
         followedTargets: [projectATarget],
+        framedTargets: [projectATarget],
         progressImage: otherProjectGlobalFrame,
         slotProgressImage: slotFrame,
       })
     ).toBe(slotFrame);
+
+    // After requeue + restart before a new frame arrives: slot is followed again, progressImageStore still holds the old frame,
+    // but framedTargets does not include the slot -> hide the stale previous-attempt frame.
+    expect(
+      resolveLiveProgressImage({
+        activeTarget: projectATarget,
+        followedTargets: [projectATarget],
+        framedTargets: [],
+        progressImage: { ...slotFrame, target: projectATarget },
+        slotProgressImage: slotFrame,
+      })
+    ).toBeNull();
 
     // Once the job moves back to pending (no activeTarget), any retained frame is ignored so Waiting returns.
     expect(
       resolveLiveProgressImage({
         activeTarget: null,
         followedTargets: [],
+        framedTargets: [],
         progressImage: { ...slotFrame, target: projectATarget },
         slotProgressImage: slotFrame,
       })
@@ -276,6 +357,7 @@ describe('resolveLiveProgressImage', () => {
         activeTarget: projectATarget,
         allowUntargetedFrame: false,
         followedTargets: [projectATarget],
+        framedTargets: [projectATarget],
         progressImage: slotFrame,
         slotProgressImage: null,
       })
@@ -285,6 +367,7 @@ describe('resolveLiveProgressImage', () => {
         activeTarget: projectATarget,
         allowUntargetedFrame: true,
         followedTargets: [projectATarget],
+        framedTargets: [projectATarget],
         progressImage: slotFrame,
         slotProgressImage: null,
       })

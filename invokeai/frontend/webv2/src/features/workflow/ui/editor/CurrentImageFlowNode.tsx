@@ -1,7 +1,6 @@
 import type {
   GalleryImageItem,
   GalleryItem,
-  GalleryItemKey,
   GalleryItemRef,
   GalleryVideoItem,
   GeneratedImageContract,
@@ -106,7 +105,9 @@ const PlayerComponent: typeof VideoPlayerModule.VideoPlayer =
   LazyVideoPlayer as unknown as typeof VideoPlayerModule.VideoPlayer;
 
 interface ResizeDragSession {
+  nodeId: string;
   pointerId: number;
+  projectId: string;
   startHeight: number;
   startWidth: number;
   startX: number;
@@ -114,49 +115,80 @@ interface ResizeDragSession {
   zoom: number;
 }
 
-// Match the displayed frame's running/settling target or fall back to a running/settling slot in the displayed project.
+const isSameProgressTarget = (
+  left: { itemIndex: number; queueItemId: string },
+  right: { itemIndex: number; queueItemId: string }
+): boolean => left.queueItemId === right.queueItemId && left.itemIndex === right.itemIndex;
+
+// Match the displayed frame's framed running/settling target, keep the previously displayed local slot across foreign updates
+// (preferring running framed slots over settling ones), or fall back to a running/settling slot in the displayed project.
 export const resolveProgressTarget = (
   progressImage: LatestProgressImageSnapshot | null | undefined,
   followedTargets: readonly { itemIndex: number; queueItemId: string }[],
   projectQueueItemIds?: ReadonlySet<string> | null,
-  framedTargets?: readonly { itemIndex: number; queueItemId: string }[]
+  framedTargets?: readonly { itemIndex: number; queueItemId: string }[],
+  preferredTarget?: { itemIndex: number; queueItemId: string } | null,
+  runningTargets?: readonly { itemIndex: number; queueItemId: string }[]
 ): { itemIndex: number; queueItemId: string } | null => {
   const matchesProject = (queueItemId: string): boolean => !projectQueueItemIds || projectQueueItemIds.has(queueItemId);
   const isFollowedInProject = (target: { itemIndex: number; queueItemId: string }): boolean =>
-    matchesProject(target.queueItemId) &&
-    followedTargets.some(
-      (candidate) => candidate.queueItemId === target.queueItemId && candidate.itemIndex === target.itemIndex
-    );
+    matchesProject(target.queueItemId) && followedTargets.some((candidate) => isSameProgressTarget(candidate, target));
+  const isFramedInProject = (target: { itemIndex: number; queueItemId: string }): boolean =>
+    isFollowedInProject(target) &&
+    (!framedTargets || framedTargets.some((candidate) => isSameProgressTarget(candidate, target)));
+  const isRunning = (target: { itemIndex: number; queueItemId: string }): boolean =>
+    !runningTargets || runningTargets.some((candidate) => isSameProgressTarget(candidate, target));
 
   const frameTarget = progressImage?.target;
-  if (frameTarget && isFollowedInProject(frameTarget)) {
+  if (frameTarget && isFramedInProject(frameTarget)) {
     return frameTarget;
   }
-  const framedInProject = framedTargets?.filter(isFollowedInProject).at(-1);
-  if (framedInProject) {
-    return framedInProject;
+
+  const framedInProject = framedTargets ? framedTargets.filter(isFollowedInProject) : [];
+  const runningFramedInProject = framedInProject.filter(isRunning);
+
+  if (preferredTarget && isFramedInProject(preferredTarget)) {
+    // Do not let a finished/settling preferred slot block a live running framed slot in the same project.
+    if (isRunning(preferredTarget) || runningFramedInProject.length === 0) {
+      return preferredTarget;
+    }
+  }
+
+  const latestRunningFramed = runningFramedInProject.at(-1);
+  if (latestRunningFramed) {
+    return latestRunningFramed;
+  }
+  const latestFramed = framedInProject.at(-1);
+  if (latestFramed) {
+    return latestFramed;
+  }
+  if (preferredTarget && isFollowedInProject(preferredTarget)) {
+    return preferredTarget;
   }
   return followedTargets.find((target) => matchesProject(target.queueItemId)) ?? null;
 };
 
-// Keep this project's retained frame while another project publishes frames, and drop frames once a slot leaves running/settling.
+// Keep this project's retained frame only while the slot is framed in the current attempt, and drop frames on requeue/settlement clear.
 export const resolveLiveProgressImage = ({
   activeTarget,
   allowUntargetedFrame = false,
   followedTargets,
+  framedTargets,
   progressImage,
   slotProgressImage,
 }: {
   activeTarget: { itemIndex: number; queueItemId: string } | null;
   allowUntargetedFrame?: boolean;
   followedTargets: readonly { itemIndex: number; queueItemId: string }[];
+  framedTargets: readonly { itemIndex: number; queueItemId: string }[];
   progressImage: LatestProgressImageSnapshot | null | undefined;
   slotProgressImage: Omit<LatestProgressImageSnapshot, 'target'> | null | undefined;
 }): Omit<LatestProgressImageSnapshot, 'target'> | null => {
   if (!activeTarget) {
     return null;
   }
-  if (slotProgressImage) {
+  const isActiveTargetFramed = framedTargets.some((candidate) => isSameProgressTarget(candidate, activeTarget));
+  if (slotProgressImage && isActiveTargetFramed) {
     return slotProgressImage;
   }
   if (!progressImage) {
@@ -165,10 +197,7 @@ export const resolveLiveProgressImage = ({
   if (!progressImage.target) {
     return allowUntargetedFrame && followedTargets.length > 0 ? progressImage : null;
   }
-  return progressImage.target.queueItemId === activeTarget.queueItemId &&
-    progressImage.target.itemIndex === activeTarget.itemIndex
-    ? progressImage
-    : null;
+  return isActiveTargetFramed && isSameProgressTarget(progressImage.target, activeTarget) ? progressImage : null;
 };
 
 // Resolve the 1-based batch slot's backend item ID for per-slot progress lookup.
@@ -182,7 +211,7 @@ export const resolveActiveBackendItemId = (
   return projectQueueItemsById.get(activeTarget.queueItemId)?.backendItemIds?.[activeTarget.itemIndex - 1] ?? null;
 };
 
-// Prefer the coordinator's percentage when its active slot matches the displayed frame; use per-slot lookup for other slots.
+// Prefer the coordinator's percentage when its active slot matches the displayed frame; use per-slot lookup otherwise.
 export const resolveProgressPercentage = ({
   activeProgress,
   activeTarget,
@@ -192,19 +221,19 @@ export const resolveProgressPercentage = ({
   activeTarget: { itemIndex: number; queueItemId: string } | null;
   slotProgressPercentage?: number | null;
 }): number | null => {
-  const coordinatorMatchesSlot =
-    activeProgress !== null &&
-    activeProgress !== undefined &&
-    (activeProgress.activeItemIndex === undefined ||
-      activeTarget === null ||
-      activeTarget.itemIndex <= 0 ||
-      activeProgress.activeItemIndex === activeTarget.itemIndex);
-
-  if (coordinatorMatchesSlot) {
-    return activeProgress.percentage;
+  if (!activeProgress) {
+    return slotProgressPercentage ?? null;
   }
 
-  return slotProgressPercentage ?? null;
+  const hasTargetSlotIndex = activeTarget !== null && activeTarget.itemIndex > 0;
+  if (hasTargetSlotIndex) {
+    if (activeProgress.activeItemIndex === activeTarget.itemIndex) {
+      return activeProgress.percentage;
+    }
+    return slotProgressPercentage ?? null;
+  }
+
+  return activeProgress.percentage ?? slotProgressPercentage ?? null;
 };
 
 export interface CurrentImageExecutionState {
@@ -433,10 +462,35 @@ const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNo
     [framedTargets, isTargetInProject]
   );
 
+  const [lastDisplayedTarget, setLastDisplayedTarget] = useState<{
+    projectId: string;
+    target: { itemIndex: number; queueItemId: string } | null;
+  }>({ projectId, target: null });
+  const preferredTarget = lastDisplayedTarget.projectId === projectId ? lastDisplayedTarget.target : null;
+
   const activeTarget = useMemo(
-    () => resolveProgressTarget(progressImage, projectFollowedTargets, null, projectFramedTargets),
-    [progressImage, projectFollowedTargets, projectFramedTargets]
+    () =>
+      resolveProgressTarget(
+        progressImage,
+        projectFollowedTargets,
+        null,
+        projectFramedTargets,
+        preferredTarget,
+        projectActiveTargets
+      ),
+    [preferredTarget, progressImage, projectActiveTargets, projectFollowedTargets, projectFramedTargets]
   );
+
+  const isSameDisplayedTarget =
+    lastDisplayedTarget.projectId === projectId &&
+    ((lastDisplayedTarget.target === null && activeTarget === null) ||
+      (lastDisplayedTarget.target !== null &&
+        activeTarget !== null &&
+        isSameProgressTarget(lastDisplayedTarget.target, activeTarget)));
+  if (!isSameDisplayedTarget) {
+    setLastDisplayedTarget({ projectId, target: activeTarget });
+  }
+
   const slotProgressImage = useQueueItemProgressImage(activeTarget?.queueItemId ?? '', activeTarget?.itemIndex ?? 0);
   const projectProgressImage = useMemo(
     () =>
@@ -444,10 +498,11 @@ const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNo
         activeTarget,
         allowUntargetedFrame: projectQueueItemIds === null,
         followedTargets: projectFollowedTargets,
+        framedTargets: projectFramedTargets,
         progressImage,
         slotProgressImage,
       }),
-    [activeTarget, progressImage, projectFollowedTargets, projectQueueItemIds, slotProgressImage]
+    [activeTarget, progressImage, projectFollowedTargets, projectFramedTargets, projectQueueItemIds, slotProgressImage]
   );
   const activeBackendItemId = useMemo(
     () => resolveActiveBackendItemId(activeTarget, projectQueueItemsById),
@@ -482,27 +537,36 @@ const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNo
     () => (!hasLiveFrame && displayedItem?.kind === 'video' ? toGalleryItemRef(displayedItem) : null),
     [displayedItem, hasLiveFrame]
   );
+  const videoSurfaceKey =
+    displayedItem?.kind === 'video' && displayedItemKey ? `${displayedItemKey}:${displayedItem.fullUrl}` : null;
 
   const node = data.documentNode;
   const savedWidth = clampCurrentImageWidth(node.data.width);
   const savedHeight = clampCurrentImageHeight(node.data.height);
-  const [liveSize, setLiveSize] = useState<{ height: number; width: number } | null>(null);
+  const [liveSizeState, setLiveSizeState] = useState<{
+    height: number;
+    nodeId: string;
+    projectId: string;
+    width: number;
+  } | null>(null);
+  const liveSize =
+    liveSizeState && liveSizeState.nodeId === node.id && liveSizeState.projectId === projectId ? liveSizeState : null;
   const displayWidth = liveSize?.width ?? savedWidth;
   const displayHeight = liveSize?.height ?? savedHeight;
   const isCustomSize = displayWidth !== CURRENT_IMAGE_DEFAULT_WIDTH || displayHeight !== CURRENT_IMAGE_DEFAULT_HEIGHT;
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const resizeHandleRef = useRef<HTMLDivElement | null>(null);
-  const [copyReadyVideoKey, setCopyReadyVideoKey] = useState<GalleryItemKey | null>(null);
-  const canCopyVideoFrame = isShowingVideo && displayedItemKey !== null && copyReadyVideoKey === displayedItemKey;
+  const [copyReadyVideoKey, setCopyReadyVideoKey] = useState<string | null>(null);
+  const canCopyVideoFrame = isShowingVideo && videoSurfaceKey !== null && copyReadyVideoKey === videoSurfaceKey;
   const dragSessionRef = useRef<ResizeDragSession | null>(null);
 
   const handleVideoElementChange = useCallback((element: HTMLVideoElement | null) => {
     videoRef.current = element;
   }, []);
 
-  const handleVideoCopyAvailabilityChange = useCallback((itemKey: GalleryItemKey, isAvailable: boolean) => {
-    setCopyReadyVideoKey((prev) => (isAvailable ? itemKey : prev === itemKey ? null : prev));
+  const handleVideoCopyAvailabilityChange = useCallback((surfaceKey: string, isAvailable: boolean) => {
+    setCopyReadyVideoKey((prev) => (isAvailable ? surfaceKey : prev === surfaceKey ? null : prev));
   }, []);
 
   const handleCopyCurrentFrame = useCallback(
@@ -581,7 +645,7 @@ const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNo
     (event: MouseEvent<HTMLElement> | KeyboardEvent<HTMLElement>) => {
       event.preventDefault();
       event.stopPropagation();
-      setLiveSize(null);
+      setLiveSizeState(null);
       editGraph({ height: undefined, nodeId: node.id, type: 'setCurrentImageNodeSize', width: undefined });
       resizeHandleRef.current?.focus();
     },
@@ -600,7 +664,9 @@ const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNo
       const rect = shell?.getBoundingClientRect();
       const zoom = rect && rect.width > 0 && savedWidth > 0 ? rect.width / savedWidth : 1;
       dragSessionRef.current = {
+        nodeId: node.id,
         pointerId: event.pointerId,
+        projectId,
         startHeight: savedHeight,
         startWidth: savedWidth,
         startX: event.clientX,
@@ -608,18 +674,26 @@ const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNo
         zoom,
       };
     },
-    [savedHeight, savedWidth]
+    [node.id, projectId, savedHeight, savedWidth]
   );
 
-  const handleResizePointerMove = useCallback((event: PointerEvent<HTMLDivElement>) => {
-    const session = dragSessionRef.current;
-    if (!session || session.pointerId !== event.pointerId) {
-      return;
-    }
-    const nextWidth = clampCurrentImageWidth(session.startWidth + (event.clientX - session.startX) / session.zoom);
-    const nextHeight = clampCurrentImageHeight(session.startHeight + (event.clientY - session.startY) / session.zoom);
-    setLiveSize({ height: nextHeight, width: nextWidth });
-  }, []);
+  const handleResizePointerMove = useCallback(
+    (event: PointerEvent<HTMLDivElement>) => {
+      const session = dragSessionRef.current;
+      if (!session || session.pointerId !== event.pointerId) {
+        return;
+      }
+      if (session.nodeId !== node.id || session.projectId !== projectId) {
+        dragSessionRef.current = null;
+        setLiveSizeState(null);
+        return;
+      }
+      const nextWidth = clampCurrentImageWidth(session.startWidth + (event.clientX - session.startX) / session.zoom);
+      const nextHeight = clampCurrentImageHeight(session.startHeight + (event.clientY - session.startY) / session.zoom);
+      setLiveSizeState({ height: nextHeight, nodeId: node.id, projectId, width: nextWidth });
+    },
+    [node.id, projectId]
+  );
 
   const handleResizePointerUp = useCallback(
     (event: PointerEvent<HTMLDivElement>) => {
@@ -628,19 +702,22 @@ const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNo
         return;
       }
       dragSessionRef.current = null;
+      setLiveSizeState(null);
+      if (session.nodeId !== node.id || session.projectId !== projectId) {
+        return;
+      }
       const nextWidth = clampCurrentImageWidth(session.startWidth + (event.clientX - session.startX) / session.zoom);
       const nextHeight = clampCurrentImageHeight(session.startHeight + (event.clientY - session.startY) / session.zoom);
-      setLiveSize(null);
       if (nextWidth !== session.startWidth || nextHeight !== session.startHeight) {
         editGraph({ height: nextHeight, nodeId: node.id, type: 'setCurrentImageNodeSize', width: nextWidth });
       }
     },
-    [editGraph, node.id]
+    [editGraph, node.id, projectId]
   );
 
   const handleResizePointerCancel = useCallback(() => {
     dragSessionRef.current = null;
-    setLiveSize(null);
+    setLiveSizeState(null);
   }, []);
 
   const handleResizeKeyDown = useCallback(
@@ -781,11 +858,11 @@ const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNo
       ) : null}
 
       <Box flex="1" minH="0" overflow="hidden" position="relative" w="full">
-        {isShowingVideo && displayedItem?.kind === 'video' && displayedItemKey ? (
+        {isShowingVideo && displayedItem?.kind === 'video' && videoSurfaceKey ? (
           <CurrentImageVideoSurface
-            key={displayedItemKey}
+            key={videoSurfaceKey}
             item={displayedItem}
-            itemKey={displayedItemKey}
+            surfaceKey={videoSurfaceKey}
             onCopyAvailabilityChange={handleVideoCopyAvailabilityChange}
             onVideoElementChange={handleVideoElementChange}
           />
@@ -879,22 +956,22 @@ const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNo
 
 const CurrentImageVideoSurface = ({
   item,
-  itemKey,
   onCopyAvailabilityChange,
   onVideoElementChange,
+  surfaceKey,
 }: {
   item: GalleryVideoItem;
-  itemKey: GalleryItemKey;
-  onCopyAvailabilityChange: (itemKey: GalleryItemKey, isAvailable: boolean) => void;
+  onCopyAvailabilityChange: (surfaceKey: string, isAvailable: boolean) => void;
   onVideoElementChange: (element: HTMLVideoElement | null) => void;
+  surfaceKey: string;
 }) => {
   const { t } = useTranslation();
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
   const [hasFailed, setHasFailed] = useState(false);
 
   const publishCopyAvailability = useCallback(() => {
-    onCopyAvailabilityChange(itemKey, canCopyImage() && isVideoFrameReady(localVideoRef.current));
-  }, [itemKey, onCopyAvailabilityChange]);
+    onCopyAvailabilityChange(surfaceKey, canCopyImage() && isVideoFrameReady(localVideoRef.current));
+  }, [onCopyAvailabilityChange, surfaceKey]);
 
   const setVideoElementRef = useCallback(
     (element: HTMLVideoElement | null) => {
@@ -903,9 +980,9 @@ const CurrentImageVideoSurface = ({
       if (element) {
         element.disablePictureInPicture = true;
       }
-      onCopyAvailabilityChange(itemKey, canCopyImage() && isVideoFrameReady(element));
+      onCopyAvailabilityChange(surfaceKey, canCopyImage() && isVideoFrameReady(element));
     },
-    [itemKey, onCopyAvailabilityChange, onVideoElementChange]
+    [onCopyAvailabilityChange, onVideoElementChange, surfaceKey]
   );
 
   const recovery = useMemo(
