@@ -44,7 +44,10 @@ const CLEAR_CLUSTER_SELECTION_COMMAND = 'image-map.clearClusterSelection';
 
 const isClusterSelected = (values: Record<string, unknown>): boolean => selectClusterSelectionId(values) !== null;
 
-/** Esc while the map owns focus, the keyboard path to the chip's clear; mounted only while a cluster is selected. */
+/**
+ * Esc while the map owns focus, the keyboard path to the chip's clear; mounted only while a cluster is selected, and
+ * again for each project, instance and region its runtime registers under.
+ */
 const ClearClusterSelectionHotkey = ({ runtime }: { runtime: WidgetViewProps['runtime'] }) => {
   const { t } = useTranslation();
   const clearClusterSelection = useClearClusterSelection();
@@ -193,7 +196,10 @@ export const ImageMapWidgetView = ({ runtime }: WidgetViewProps) => {
         >
           <ClusterSelectionChip />
           {hasClusterSelection ? (
-            <ClearClusterSelectionHotkey key={`${projectId}:${i18n.language}`} runtime={runtime} />
+            <ClearClusterSelectionHotkey
+              key={`${projectId}:${runtime.instanceId}:${runtime.region}:${i18n.language}`}
+              runtime={runtime}
+            />
           ) : null}
           {isIndexing(indexCounts) ? <ImageIndexActivityBadge counts={indexCounts} updatedAt={indexUpdatedAt} /> : null}
         </Stack>

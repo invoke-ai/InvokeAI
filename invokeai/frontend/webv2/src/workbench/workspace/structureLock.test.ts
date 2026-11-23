@@ -171,25 +171,93 @@ describe('Customize session', () => {
     expect(getLayoutOf(undone).widgetRegions).toEqual(getLayoutOf(before).widgetRegions);
   });
 
-  it('steps the route auto-routing set with the arrangement: Undo and Redo, Cancel, and undoing Done', () => {
+  describe('the route', () => {
     const routeOf = (state: ReturnType<typeof onCompose>) => getActiveProject(state).invocation.sourceId;
-    const customizing = workbenchReducer(onCompose(), { type: 'beginCustomize' });
-    const added = workbenchReducer(customizing, { region: 'left', type: 'openRegionWidget', widgetId: 'video' });
-    const undone = workbenchReducer(added, { type: 'undoProjectChange' });
+    const addVideo = { region: 'left', type: 'openRegionWidget', widgetId: 'video' } as const;
+    const undo = { type: 'undoProjectChange' } as const;
+    const cancel = { type: 'cancelCustomize' } as const;
+    const pickUpscale = { sourceId: 'upscale', type: 'setInvocationSource' } as const;
 
-    expect(routeOf(customizing)).toBe('generate');
-    expect(routeOf(added)).toBe('video');
-    expect(getLayoutOf(undone).widgetRegions.left.instanceIds).not.toContain('video');
-    expect(routeOf(undone)).toBe('generate');
-    expect(routeOf(workbenchReducer(undone, { type: 'redoProjectChange' }))).toBe('video');
+    it('steps what Customize’s auto-routing moved with the arrangement: Undo and Redo, Cancel, and undoing Done', () => {
+      const added = workbenchReducer(workbenchReducer(onCompose(), { type: 'beginCustomize' }), addVideo);
+      const undone = workbenchReducer(added, undo);
 
-    // Cancel is as it was on entry, a route picked by hand meanwhile included.
-    const picked = workbenchReducer(added, { sourceId: 'upscale', type: 'setInvocationSource' });
-    expect(routeOf(workbenchReducer(picked, { type: 'cancelCustomize' }))).toBe('generate');
+      expect(routeOf(added)).toBe('video');
+      expect(getLayoutOf(undone).widgetRegions.left.instanceIds).not.toContain('video');
+      expect(routeOf(undone)).toBe('generate');
+      expect(routeOf(workbenchReducer(undone, { type: 'redoProjectChange' }))).toBe('video');
+      expect(routeOf(workbenchReducer(added, cancel))).toBe('generate');
 
-    const done = workbenchReducer(added, finish);
-    expect(routeOf(done)).toBe('video');
-    expect(routeOf(workbenchReducer(done, { type: 'undoProjectChange' }))).toBe('generate');
+      const done = workbenchReducer(added, finish);
+      expect(routeOf(done)).toBe('video');
+      expect(routeOf(workbenchReducer(done, undo))).toBe('generate');
+      expect(routeOf(workbenchReducer(workbenchReducer(done, undo), { type: 'redoProjectChange' }))).toBe('video');
+    });
+
+    it('keeps a route or lock picked by hand through Undo, Redo, Cancel and undoing Done', () => {
+      const customizing = workbenchReducer(onCompose(), { type: 'beginCustomize' });
+      const locked = workbenchReducer(customizing, { type: 'toggleRoutingLock' });
+      expect(getActiveProject(workbenchReducer(locked, cancel)).invocation.sourceLocked).toBe(true);
+
+      const picked = workbenchReducer(workbenchReducer(customizing, addVideo), pickUpscale);
+      expect(routeOf(workbenchReducer(picked, undo))).toBe('upscale');
+      expect(routeOf(workbenchReducer(workbenchReducer(picked, undo), { type: 'redoProjectChange' }))).toBe('upscale');
+      expect(routeOf(workbenchReducer(picked, cancel))).toBe('upscale');
+      expect(routeOf(workbenchReducer(workbenchReducer(picked, finish), undo))).toBe('upscale');
+    });
+
+    it('walks back only the moves still in effect, keeping a pick made between two auto-routed steps', () => {
+      const added = workbenchReducer(workbenchReducer(onCompose(), { type: 'beginCustomize' }), addVideo);
+      const picked = workbenchReducer(added, { sourceId: 'workflow', type: 'setInvocationSource' });
+      const fronted = workbenchReducer(picked, { region: 'left', type: 'openRegionWidget', widgetId: 'upscale' });
+      const undoneTwice = workbenchReducer(workbenchReducer(fronted, undo), undo);
+      const done = workbenchReducer(fronted, finish);
+
+      expect(routeOf(added)).toBe('video');
+      expect(routeOf(fronted)).toBe('upscale');
+      expect(routeOf(workbenchReducer(fronted, cancel))).toBe('workflow');
+      expect(routeOf(undoneTwice)).toBe('workflow');
+      expect(routeOf(workbenchReducer(undoneTwice, cancel))).toBe('workflow');
+      expect(routeOf(workbenchReducer(done, undo))).toBe('workflow');
+      expect(routeOf(workbenchReducer(workbenchReducer(done, undo), { type: 'redoProjectChange' }))).toBe('upscale');
+    });
+
+    it('changes nothing of a route Customize never moved, with auto-switch off', () => {
+      const off = { autoSwitchInvocationRoute: false, availability: registryAvailability };
+      const added = workbenchReducer(workbenchReducer(onCompose(), { type: 'beginCustomize' }, off), addVideo, off);
+      const picked = workbenchReducer(added, { sourceId: 'video', type: 'setInvocationSource' }, off);
+
+      expect(routeOf(added)).toBe('generate');
+      expect(routeOf(workbenchReducer(picked, undo, off))).toBe('video');
+      expect(routeOf(workbenchReducer(picked, cancel, off))).toBe('video');
+    });
+
+    it('leaves the route alone when undoing Done cannot put its workspace back', () => {
+      const doneInA = workbenchReducer(
+        workbenchReducer(workbenchReducer(onCompose(), { type: 'beginCustomize' }), addVideo),
+        finish
+      );
+      const projectA = doneInA.activeProjectId;
+      const inB = workbenchReducer(workbenchReducer(doneInA, { type: 'createProject' }), {
+        presetId: 'compose',
+        type: 'applyPreset',
+      });
+      const doneInB = workbenchReducer(
+        workbenchReducer(workbenchReducer(inB, { type: 'beginCustomize' }), {
+          region: 'right',
+          type: 'toggleRegionWidget',
+          widgetId: 'gallery',
+        }),
+        finish
+      );
+      const undoneInA = workbenchReducer(
+        workbenchReducer(doneInB, { projectId: projectA, type: 'switchProject' }),
+        undo
+      );
+
+      expect(undoneInA.notifications[0]?.titleKey).toBe('shell.layoutUndo.workspaceChangedTitle');
+      expect(routeOf(undoneInA)).toBe('video');
+    });
   });
 
   it('resets to default as a draft edit: undoable, removing the overrides at Done and none at Cancel', () => {
@@ -302,34 +370,44 @@ describe('Customize session', () => {
     expect(getActiveProject(done).workspaceId).toBe('review');
   });
 
-  it('ends when its workspace is deleted, saying so only when that discards changes', () => {
+  it('ends when its workspace is deleted, saying so only when that discards an arrangement or edit', () => {
     const custom = addCustomWorkspace(onCompose(), { id: 'mine', label: 'Mine' });
     const customizing = workbenchReducer(custom, { type: 'beginCustomize' });
-    const deleted = workbenchReducer(customizing, { presetId: 'mine', type: 'deleteLayoutPreset' });
+    const remove = { region: 'right', type: 'toggleRegionWidget', widgetId: 'gallery' } as const;
+    const deleteMine = { presetId: 'mine', type: 'deleteLayoutPreset' } as const;
     const endedNotices = (state: typeof custom) =>
       state.notifications.filter(({ titleKey }) => titleKey === 'shell.workspace.customizeEndedTitle');
+    const resized = workbenchReducer(customizing, { region: 'left', sizePx: 600, type: 'setRegionWidgetSize' });
+    const undone = workbenchReducer(workbenchReducer(customizing, remove), { type: 'undoProjectChange' });
 
     expect(customizing.customizing).toMatchObject({ [custom.activeProjectId]: { draft: {}, presetId: 'mine' } });
-    expect(deleted.customizing).toEqual({});
-    expect(endedNotices(deleted)).toEqual([]);
+    expect(workbenchReducer(customizing, deleteMine).customizing).toEqual({});
+    // A view change stays with the project, and an undone edit leaves the arrangement as it began.
+    expect(endedNotices(workbenchReducer(resized, deleteMine))).toEqual([]);
+    expect(endedNotices(workbenchReducer(undone, deleteMine))).toEqual([]);
 
-    const edited = workbenchReducer(customizing, { region: 'left', sizePx: 600, type: 'setRegionWidgetSize' });
-    const [notice] = endedNotices(workbenchReducer(edited, { presetId: 'mine', type: 'deleteLayoutPreset' }));
-    expect(notice?.messageListValues).toEqual({ workspace: [{ text: 'Mine' }] });
+    const [notice] = endedNotices(workbenchReducer(workbenchReducer(customizing, remove), deleteMine));
+    expect(notice).toMatchObject({
+      messageKey: 'shell.workspace.customizeEndedDeletedMessage',
+      messageListValues: { workspace: [{ text: 'Mine' }] },
+    });
 
     // A new workspace drafted from it goes too, leaving no view of the draft.
-    const drafting = workbenchReducer(workbenchReducer(custom, { newWorkspace: copy, type: 'beginCustomize' }), {
-      region: 'left',
-      sizePx: 600,
-      type: 'setRegionWidgetSize',
-    });
-    const draftDeleted = workbenchReducer(drafting, { presetId: 'mine', type: 'deleteLayoutPreset' });
+    const drafting = workbenchReducer(
+      workbenchReducer(workbenchReducer(custom, { newWorkspace: copy, type: 'beginCustomize' }), remove),
+      { region: 'left', sizePx: 600, type: 'setRegionWidgetSize' }
+    );
+    const draftDeleted = workbenchReducer(drafting, deleteMine);
 
     expect(getActiveProject(drafting).views).toHaveProperty('review');
     expect(draftDeleted.customizing).toEqual({});
     expect(getActiveProject(draftDeleted).views).not.toHaveProperty('review');
-    expect(endedNotices(draftDeleted).map(({ messageListValues }) => messageListValues)).toEqual([
-      { workspace: [{ text: 'Compose copy' }] },
-    ]);
+    expect(endedNotices(draftDeleted)).toHaveLength(1);
+
+    // The project moving off the workspace (here, a switch the bar would not offer) ends it too, and says why.
+    const [moved] = endedNotices(
+      workbenchReducer(workbenchReducer(customizing, remove), { presetId: 'edit', type: 'applyPreset' })
+    );
+    expect(moved?.messageKey).toBe('shell.workspace.customizeEndedMovedMessage');
   });
 });

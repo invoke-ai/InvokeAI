@@ -85,13 +85,14 @@ vi.mock('@workbench/hotkeys/useShortcutBinding', () => ({
 }));
 
 import { LayoutPresetAdminDialogs } from './LayoutPresetAdminDialogs';
+import { LayoutPresetManagerDialog } from './LayoutPresetManagerDialog';
 import { LayoutPresetStrip } from './LayoutPresetStrip';
 
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-const renderStrip = async ({ withAdminDialogs = false } = {}) => {
+const renderStrip = async ({ withAdminDialogs = false, withManager = false } = {}) => {
   host = document.createElement('div');
   host.style.width = '900px';
   document.body.append(host);
@@ -102,6 +103,7 @@ const renderStrip = async ({ withAdminDialogs = false } = {}) => {
       <ChakraProvider value={system}>
         <LayoutPresetStrip />
         {withAdminDialogs ? <LayoutPresetAdminDialogs /> : null}
+        {withManager ? <LayoutPresetManagerDialog /> : null}
       </ChakraProvider>
     );
     await new Promise<void>((resolve) => {
@@ -457,6 +459,24 @@ describe('LayoutPresetStrip', () => {
 describe('locked workspaces', () => {
   beforeEach(() => {
     void patchWorkbenchPreferences({ rearrangeWithoutCustomize: false });
+  });
+
+  it('opens Manage workspaces from any tab’s menu and gives focus back to that tab', async () => {
+    await renderStrip({ withManager: true });
+
+    await act(() => userEvent.click(presetTab('edit')!, { button: 'right' }));
+    await expect
+      .poll(() => document.querySelector('[role="menuitem"][data-value="manage-presets"]'), POLL)
+      .not.toBeNull();
+    await act(() =>
+      userEvent.click(document.querySelector<HTMLElement>('[role="menuitem"][data-value="manage-presets"]')!)
+    );
+    await expect.poll(() => document.querySelector('[role="dialog"]')?.getAttribute('data-state'), POLL).toBe('open');
+
+    await act(() => userEvent.keyboard('{Escape}'));
+
+    await expect.poll(() => document.querySelector('[role="dialog"]'), POLL).toBeNull();
+    await expect.poll(() => document.activeElement, POLL).toBe(presetTab('edit'));
   });
 
   it('keeps the tab order when a tab is dragged, and does not announce tabs as sortable', async () => {

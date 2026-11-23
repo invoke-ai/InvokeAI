@@ -21,6 +21,7 @@ import { createLayoutResolver, resolveLayout } from './resolveLayout';
 import { normalizeStructure, PANEL_OPEN_KEYS } from './structure';
 import { reduceStructure } from './structureReducer';
 import { frontRegion, getGuestWindowRegion, pruneView, setRegionSize, setWindowGeometry, showGuest } from './view';
+import { isPlacedInstance } from './workspaceDerivations';
 
 const structureOf = (presetId: string) => normalizeStructure(getLayoutPreset(presetId).snapshot);
 const edit = structureOf('edit');
@@ -141,10 +142,14 @@ const expectValid = (
   };
 
   for (const [instanceId, surface] of guests) {
-    // A guest is the structure's instance only as the center's fallback stage.
+    // A guest is the structure's instance only as the center's fallback stage, and never one the structure places.
     expect(Object.hasOwn(structure.widgetInstances, instanceId) && instanceId !== availability.fallbackStage?.id).toBe(
       false
     );
+    expect(
+      Object.hasOwn(structure.floatingWidgets ?? {}, instanceId) ||
+        WIDGET_REGIONS.some((region) => structure.widgetRegions[region].instanceIds.includes(instanceId))
+    ).toBe(false);
 
     if (surface !== 'window') {
       continue;
@@ -215,16 +220,26 @@ describe('resolveLayout repairs', () => {
     expect(unavailableHome.widgetRegions.right.activeInstanceId).toBe('preview');
   });
 
-  it('3: a center with no available view shows the default stage as a guest', () => {
+  it('3: a center with no available view shows the default stage as a guest, never as an instance a rail places', () => {
     const canvasOnly = reduceStructure(
       edit,
       { instanceId: 'preview', region: 'center', type: 'removeWidget' },
       registryAvailability
     );
-    const layout = resolveLayout(canvasOnly, undefined, withUnavailable(registryAvailability, ['canvas']));
+    const unavailable = withUnavailable(registryAvailability, ['canvas']);
+    const layout = resolveLayout(canvasOnly, undefined, unavailable);
 
-    expect(layout.widgetRegions.center).toMatchObject({ activeInstanceId: 'preview', instanceIds: ['preview'] });
-    expect(layout.guests).toEqual({ preview: 'center' });
+    // Edit's right rail places the stage's own instance, so the center's guest is another Preview.
+    expect(canvasOnly.widgetRegions.right.instanceIds).toContain('preview');
+    expect(layout.widgetRegions.center).toMatchObject({
+      activeInstanceId: 'preview:guest',
+      instanceIds: ['preview:guest'],
+    });
+    expect(layout.guests).toEqual({ 'preview:guest': 'center' });
+    expect(isPlacedInstance(layout, 'preview')).toBe(true);
+
+    const railless = withoutType(canvasOnly, 'preview');
+    expect(resolveLayout(railless, undefined, unavailable).guests).toEqual({ preview: 'center' });
 
     // A guest window already showing that instance wins: nothing shows twice.
     const noPreview = withoutType(canvasOnly, 'preview');

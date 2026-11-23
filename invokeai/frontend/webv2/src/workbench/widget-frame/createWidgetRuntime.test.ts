@@ -29,7 +29,7 @@ const createDispatch = () => {
     dockFloating: (instanceId) => dispatch({ instanceId, type: 'dockFloatingWidget' }),
     closeFloating: (instanceId) => dispatch({ instanceId, type: 'closeFloatingWidget' }),
     closeGuest: (instanceId) => dispatch({ instanceId, type: 'closeGuest' }),
-    keepGuest: (instanceId) => dispatch({ instanceId, type: 'keepGuest' }),
+    keepGuest: (instanceId, allowMultiple) => dispatch({ allowMultiple, instanceId, type: 'keepGuest' }),
     showGuest: (options) => dispatch({ ...options, type: 'showGuest' }),
     front: (options) => dispatch({ ...options, type: 'frontRegionWidget' }),
     float: (instanceId, region) =>

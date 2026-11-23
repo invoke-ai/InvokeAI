@@ -18,6 +18,7 @@ import type { SurfaceAvailability } from './view';
 
 import { getAccountStructures, writeWorkspaceStructure } from './accountWorkspaces';
 import { migrateProjectLayout } from './migrateProjectLayout';
+import { digestStoredLayout } from './storedLayoutDigest';
 import { isStoredStructure, readStoredStructure, stripRetiredWidgets } from './storedStructure';
 import { isSamePlacement } from './structure';
 import { normalizeViews } from './view';
@@ -27,6 +28,8 @@ export interface StoredLayoutFields {
   floatingWidgets?: unknown;
   /** Not from before the split: what a held project showed (`StoredProjectLayout.heldView`), saved beside the rest. */
   heldView?: unknown;
+  /** Not from before the split: the document came in through an import (`StoredProjectLayout.imported`). */
+  importedLayout?: unknown;
   layout?: unknown;
   presetWorkingLayouts?: unknown;
   widgetRegions?: unknown;
@@ -162,8 +165,8 @@ export const isRecordValue = (value: unknown): value is Record<string, unknown> 
  * rails brought up to date, windows normalized; the instances it docks without values get them.
  */
 export const loadStoredProjectLayout = (
-  stored: Required<Omit<StoredLayoutFields, 'heldView'>> &
-    Pick<StoredLayoutFields, 'heldView'> & {
+  stored: Required<Omit<StoredLayoutFields, 'heldView' | 'importedLayout'>> &
+    Pick<StoredLayoutFields, 'heldView' | 'importedLayout'> & {
       layout: Record<string, unknown>;
     },
   instances: Record<WidgetInstanceId, WidgetInstanceContract>,
@@ -213,12 +216,13 @@ export const loadStoredProjectLayout = (
     typeof layout.presetId === 'string' ? layout.presetId : defaultLayoutPreset.id
   );
   const presetWorkingLayouts = normalizePresetWorkingLayouts(stored.presetWorkingLayouts, presetId);
-  const heldView = normalizeHeldView(stored.heldView);
+  const heldView = normalizeHeldView(stored.heldView, digestStoredLayout(stored));
 
   return {
     legacyLayout: {
       ...(placement.floatingWidgets ? { floatingWidgets: placement.floatingWidgets } : {}),
       ...(heldView ? { heldView } : {}),
+      ...(stored.importedLayout === true ? { imported: true } : {}),
       layout: {
         centerViewId: layout.centerViewId ?? defaultLayoutPreset.snapshot.layout.centerViewId,
         panels: { ...defaultLayoutPreset.snapshot.layout.panels, ...layout.panels },
@@ -237,18 +241,28 @@ export const loadStoredProjectLayout = (
   };
 };
 
-/** A held project's saved view, read as untrusted data like the views of a migrated one. */
-const normalizeHeldView = (stored: unknown): HeldView | undefined => {
-  if (!isRecordValue(stored) || typeof stored.workspaceId !== 'string' || stored.workspaceId.length === 0) {
+/** A held project's saved view, read as untrusted data, and only beside the layout it was saved with. */
+const normalizeHeldView = (stored: unknown, layoutDigest: string): HeldView | undefined => {
+  if (
+    !isRecordValue(stored) ||
+    stored.layoutDigest !== layoutDigest ||
+    typeof stored.workspaceId !== 'string' ||
+    stored.workspaceId.length === 0
+  ) {
     return undefined;
   }
 
-  const dropped = Array.isArray(stored.droppedArrangements)
-    ? [...new Set(stored.droppedArrangements.filter((id): id is string => typeof id === 'string' && id.length > 0))]
-    : [];
+  const readIds = (value: unknown) =>
+    Array.isArray(value)
+      ? [...new Set(value.filter((id): id is string => typeof id === 'string' && id.length > 0))]
+      : [];
+  const dropped = readIds(stored.dropped);
+  const untold = readIds(stored.untold);
 
   return {
-    ...(dropped.length > 0 ? { droppedArrangements: dropped } : {}),
+    ...(stored.adopted === true ? { adopted: true } : {}),
+    ...(dropped.length > 0 ? { dropped } : {}),
+    ...(untold.length > 0 ? { untold } : {}),
     views: normalizeViews(stored.views, () => true),
     workspaceId: resolveLayoutPresetId(stored.workspaceId),
   };
@@ -309,26 +323,35 @@ const isAdoptable = (account: AccountState, workspaceId: LayoutPresetId, arrange
  * A loaded project settled against the account: its stored layout migrates, and each structurally different
  * arrangement is adopted as its workspace (`adopt`, where `isAdoptable`) or dropped. Dropped are only arrangements that
  * differ from every baseline as well as from the account (the workspace as the project last saw it, as it ships): one
- * that matches is no arrangement of the project's own. `hold` keeps the stored layout to be written back until the
- * account's adoption is saved; the view it was held with, saved beside it, is the project's again. A workspace the
- * account lacks gives way to the default one, and views of workspaces it lacks go.
+ * that matches is no arrangement of the project's own. What the project is told follows from this load alone: a drop
+ * its held view says the user was already told about is not told again. `announce` tells it which workspaces took its
+ * arrangements. `hold` keeps the stored layout to be written back until the account's adoption is saved, with what
+ * this load decided; the view it was held with, saved beside it, is the project's again. A workspace the account lacks
+ * gives way to the default one, and views of workspaces it lacks go.
  */
 const settleProjectLayout = (
   account: AccountState,
   project: Project,
   {
     adopt = false,
+    announce = false,
     baselines,
     hold = false,
     surfaces,
-  }: { adopt?: boolean; baselines: readonly StructuresById[]; hold?: boolean; surfaces: SurfaceAvailability }
+  }: {
+    adopt?: boolean;
+    announce?: boolean;
+    baselines: readonly StructuresById[];
+    hold?: boolean;
+    surfaces: SurfaceAvailability;
+  }
 ): { account: AccountState; project: Project } => {
   let settledAccount = account;
   let next = project;
 
   if (project.legacyLayout) {
     const { legacyLayout, ...rest } = project;
-    const { heldView, ...stored } = legacyLayout;
+    const { held: _held, heldView, ...stored } = legacyLayout;
     const migration = migrateProjectLayout(stored, {
       defaultWorkspaceId: defaultLayoutPreset.id,
       surfaces,
@@ -349,17 +372,18 @@ const settleProjectLayout = (
           })
       )
       .map(([workspaceId]) => workspaceId);
+    const told = (heldView?.dropped ?? []).filter((id) => !heldView?.untold?.includes(id));
+    const untold = dropped.filter((id) => !told.includes(id));
 
     for (const workspaceId of adopted) {
       settledAccount = writeWorkspaceStructure(settledAccount, workspaceId, migration.structures[workspaceId]!);
     }
 
-    const notice = heldView ? heldView.droppedArrangements : dropped;
-
     next = {
       ...rest,
-      ...(notice && notice.length > 0 ? { droppedArrangements: notice } : {}),
-      ...(hold ? { heldLegacyLayout: stored } : {}),
+      ...(announce && adopted.size > 0 ? { adoptedArrangements: [...adopted] } : {}),
+      ...(untold.length > 0 ? { droppedArrangements: untold } : {}),
+      ...(hold ? { heldLegacyLayout: { ...stored, held: { adopted: adopt, dropped } } } : {}),
       // An adopted arrangement is its workspace's structure now, so nothing is left to view differently.
       views: heldView?.views ?? Object.fromEntries(Object.entries(migration.views).filter(([id]) => !adopted.has(id))),
       workspaceId: heldView?.workspaceId ?? migration.workspaceId,
@@ -391,14 +415,21 @@ const settleProjectLayout = (
   };
 };
 
-/** The project whose arrangements an account adopts: the one opening as active, else the most recently stored. */
+/** Whether a project may adopt: one stored before the split by this account, not brought in by an import. */
+const mayAdopt = (project: Project): boolean => project.legacyLayout !== undefined && !project.legacyLayout.imported;
+
+/**
+ * The project whose arrangements an account adopts: one that adopted in a load whose adoption was never saved, so the
+ * choice holds across that reload; else the one opening as active; else the most recently stored.
+ */
 const findAdoptingProject = (projects: readonly Project[], activeProjectId: string): Project | undefined => {
-  const stored = projects.filter((project) => project.legacyLayout);
-  const active = stored.find((project) => project.id === activeProjectId);
+  const stored = projects.filter(mayAdopt);
+  const adoptedBefore = stored.filter((project) => project.legacyLayout!.heldView?.adopted);
+  const candidates = adoptedBefore.length > 0 ? adoptedBefore : stored;
 
   return (
-    active ??
-    stored.reduce<Project | undefined>(
+    candidates.find((project) => project.id === activeProjectId) ??
+    candidates.reduce<Project | undefined>(
       (latest, project) =>
         latest === undefined || (project.legacyLayout!.storedAt ?? '') > (latest.legacyLayout!.storedAt ?? '')
           ? project
@@ -409,9 +440,10 @@ const findAdoptingProject = (projects: readonly Project[], activeProjectId: stri
 };
 
 /** `project` adopting into `account`, which marks itself adopted; held until a session write carrying it is saved. */
-const adoptFrom = (account: AccountState, project: Project, surfaces: SurfaceAvailability) => {
+const adoptFrom = (account: AccountState, project: Project, surfaces: SurfaceAvailability, announce: boolean) => {
   const adopted = settleProjectLayout(account, project, {
     adopt: true,
+    announce,
     baselines: [getAccountStructures(account), SHIPPED_STRUCTURES],
     hold: true,
     surfaces,
@@ -427,11 +459,11 @@ export interface SettledLayouts {
 }
 
 /**
- * Hydration's layout step. An account that has not adopted (`workspaceLayoutsAdopted`) adopts the arrangements of the
- * stored project opening as active, else the most recently stored one, and migrates every other project against the
- * adopted workspaces; each project it migrates holds its stored layout until a session write carrying that account is
- * acknowledged, so a load that never saved it adopts again the same way. With no such project open, it adopts nothing
- * and stays unadopted. An account that adopted only migrates.
+ * Hydration's layout step. An account that has not adopted (`workspaceLayoutsAdopted`) adopts, silently, the
+ * arrangements of the project `findAdoptingProject` picks, and migrates every other project against the adopted
+ * workspaces; each project it migrates holds its stored layout until a session write carrying that account is
+ * acknowledged. With no project that may adopt, it adopts nothing and stays unadopted. An account that adopted only
+ * migrates.
  */
 export const settleHydratedProjects = (
   account: AccountState,
@@ -452,7 +484,7 @@ export const settleHydratedProjects = (
     };
   }
 
-  const adopted = adoptFrom(account, adopting, surfaces);
+  const adopted = adoptFrom(account, adopting, surfaces, false);
   const baselines = [getAccountStructures(account), SHIPPED_STRUCTURES];
 
   return {
@@ -467,17 +499,17 @@ export const settleHydratedProjects = (
 };
 
 /**
- * Settles a project arriving after hydration. Into an account that has not adopted, a project stored before the split
- * adopts as hydration's would; otherwise its own arrangements are dropped, and it is held while an adoption is pending,
- * since it migrated against workspaces the server may not hold yet.
+ * Settles a project arriving after hydration. Into an account that has not adopted, a project that may adopt does, as
+ * hydration's would, and is told which workspaces took its arrangements; otherwise its own arrangements are dropped,
+ * and it is held while an adoption is pending, since it migrated against workspaces the server may not hold yet.
  */
 export const settleArrivingProject = (
   account: AccountState,
   project: Project,
   { adoptionPending, surfaces }: { adoptionPending: boolean; surfaces: SurfaceAvailability }
 ): SettledLayouts & { project: Project } => {
-  if (project.legacyLayout && account.workspaceLayoutsAdopted !== true) {
-    return { ...adoptFrom(account, project, surfaces), adoptionPending: true };
+  if (mayAdopt(project) && account.workspaceLayoutsAdopted !== true) {
+    return { ...adoptFrom(account, project, surfaces, true), adoptionPending: true };
   }
 
   return {

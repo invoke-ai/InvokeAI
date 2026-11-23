@@ -3,6 +3,7 @@ import type { WidgetInstanceId, WidgetTypeId } from '@workbench/widgetContracts'
 import type { LayoutAvailability, ResolvedLayout } from './resolveLayout';
 
 import { SIDE_REGIONS } from './structure';
+import { isPlacedInstance } from './workspaceDerivations';
 
 /** A type a shown widget acts on that is not on screen, and whether this workspace places it (else it is elsewhere). */
 export interface UnmetNeed {
@@ -34,7 +35,7 @@ const getOnScreenInstanceIds = (layout: NeedsLayout): Set<WidgetInstanceId> => {
 
 const placesHere = (layout: NeedsLayout, typeId: WidgetTypeId): boolean => {
   const isType = (instanceId: WidgetInstanceId) =>
-    layout.widgetInstances[instanceId]?.typeId === typeId && layout.guests[instanceId] === undefined;
+    layout.widgetInstances[instanceId]?.typeId === typeId && isPlacedInstance(layout, instanceId);
 
   return (
     Object.values(layout.widgetRegions).some(({ instanceIds }) => instanceIds.some(isType)) ||

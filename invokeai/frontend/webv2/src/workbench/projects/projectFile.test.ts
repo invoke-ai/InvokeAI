@@ -785,6 +785,31 @@ describe('importProjectFile', () => {
     expect(canvas.document.stacks.raster[0]?.source.image.imageName).toBe('server-legacy.png');
   });
 
+  it('marks a layout stored before the split as imported, without what the exporter was shown of it', async () => {
+    const { textEntry, writeArchive } = await import('./invk/archive');
+    const { asStoredBeforeSplit } = await import('@workbench/workbenchState.testing');
+    const { structuralLayouts } = await import('@workbench/workspace/storedLayoutFixtures.testing');
+    const project = createDraftProject([]);
+    const { legacyLayout } = asStoredBeforeSplit(project, structuralLayouts['removed a widget']);
+    const held = { ...project, heldLegacyLayout: { ...legacyLayout!, held: { adopted: true, dropped: [] } } };
+    const exported = persistence.serializeProjectDocument(held);
+    const manifest = { appVersion: '7.0', contents: 'workbench-project', createdAt: '', name: 'Held', version: 2 };
+    const blob = await writeArchive(
+      new Map([
+        ['manifest.json', textEntry(JSON.stringify(manifest))],
+        ['project.json', textEntry(JSON.stringify(exported))],
+      ])
+    );
+
+    expect(exported).toHaveProperty('heldView.adopted', true);
+
+    acceptCreate();
+    await projectFile.importProjectFile(new File([blob], 'held.invk'));
+
+    expect(createdWorkspace()).toMatchObject({ documentSchemaVersion: 4, importedLayout: true });
+    expect(createdWorkspace()).not.toHaveProperty('heldView');
+  });
+
   it('imports the shipped legacy JSON envelope under a fresh canonical identity without restoring assets', async () => {
     const legacyDocument = {
       ...persistence.serializeProjectDocument(projectWithRestorableAssets(false)),

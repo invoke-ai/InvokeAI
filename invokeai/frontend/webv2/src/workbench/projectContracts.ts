@@ -3,7 +3,7 @@ import type { BackendConnectionStatus } from '@platform/transport/types';
 import type { CanvasStateContractV3 } from './canvas-engine/api';
 import type { CanvasLoadRefusal } from './canvasLoadContracts';
 import type { GraphContract } from './graphContracts';
-import type { InvocationControllerState } from './invocationContracts';
+import type { InvocationControllerState, RouteMove } from './invocationContracts';
 import type {
   FloatingWidgetGeometry,
   LayoutPreset,
@@ -53,6 +53,8 @@ export interface Project {
   heldLegacyLayout?: StoredProjectLayout;
   /** Workspaces whose own arrangement this project lost when its stored layout migrated: told once, then cleared. */
   droppedArrangements?: readonly LayoutPresetId[];
+  /** Workspaces that took this project's arrangements when it adopted after hydration: told once. Transient. */
+  adoptedArrangements?: readonly LayoutPresetId[];
   widgetGraphs: Partial<Record<WidgetTypeId, GraphContract>>;
   canvas: CanvasStateContractV3;
   promptHistory: PromptHistoryItem[];
@@ -178,6 +180,11 @@ export interface UndoRedoEntry {
    * account still holds `after`; redo the other way round.
    */
   workspace?: { workspaceId: LayoutPresetId; before: WorkspaceRecord; after: WorkspaceRecord };
+  /**
+   * Customize's Done: the route is not the snapshot's to put back. Stepping moves it along `move` (what Customize's
+   * auto-routing changed), only while it is still where that move starts and the workspace steps with it.
+   */
+  customizeRoute?: { move?: RouteMove };
 }
 
 /** Project undo preserves the live canvas and workflow documents; the engine and workflow histories own those. */

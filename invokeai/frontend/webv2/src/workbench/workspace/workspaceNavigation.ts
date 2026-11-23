@@ -441,13 +441,17 @@ export interface StartCustomizeOptions {
 export const keepGuestInWorkspace = (
   ports: Pick<WorkspaceNavigationPorts, 'queries'> & { commands: Pick<WorkbenchCommands, 'layout' | 'widgets'> },
   instanceId: WidgetInstanceId,
-  { canEditStructure, returnFocus }: { canEditStructure: boolean } & Pick<StartCustomizeOptions, 'returnFocus'>
+  {
+    allowMultiple,
+    canEditStructure,
+    returnFocus,
+  }: { allowMultiple: boolean; canEditStructure: boolean } & Pick<StartCustomizeOptions, 'returnFocus'>
 ): void => {
   if (!canEditStructure) {
     startCustomizing(ports, { focusBar: false, returnFocus });
   }
 
-  ports.commands.widgets.keepGuest(instanceId);
+  ports.commands.widgets.keepGuest(instanceId, allowMultiple);
 };
 
 /** Enters Customize on the active project's workspace. */

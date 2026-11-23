@@ -83,7 +83,10 @@ const END_ISLAND_MAX_WIDTH = getEndIslandMaxWidth(VIEW_MENU_MIN_WIDTH);
 const END_ISLAND_MAX_WIDTH_AWAY = getEndIslandMaxWidth(`(${VIEW_MENU_MIN_WIDTH} + ${BACK_COMPACT_WIDTH} + 2px)`);
 
 const areShownGuestsEqual = (left: ShownGuest | undefined, right: ShownGuest | undefined) =>
-  left?.canClose === right?.canClose && left?.surface === right?.surface && left?.typeId === right?.typeId;
+  left?.canClose === right?.canClose &&
+  left?.canKeep === right?.canKeep &&
+  left?.surface === right?.surface &&
+  left?.typeId === right?.typeId;
 
 export const CenterArea = () => {
   const { t } = useTranslation();
@@ -188,18 +191,21 @@ export const CenterArea = () => {
   const activeId = activeItem?.id;
   const activeTypeId = activeItem?.typeId;
   // A guest is not the workspace's, the fallback stage included: it can be kept, and sometimes closed.
+  const allowMultiple = activeItem?.widget.manifest.allowMultiple === true;
   const activeGuest = useActiveLayoutSelector(
-    (layout) => (activeId === undefined ? undefined : getShownGuest(layout, activeId, queries.getAvailability())),
+    (layout) =>
+      activeId === undefined ? undefined : getShownGuest(layout, activeId, queries.getAvailability(), allowMultiple),
     areShownGuestsEqual
   );
   const isGuest = activeGuest !== undefined;
   const canCloseGuest = activeGuest?.canClose === true;
   const keepGuest = useCallback(() => {
     if (activeId !== undefined) {
-      keepGuestInWorkspace({ commands, queries }, activeId, { canEditStructure });
-      focus.focusRegion('center', activeTypeId, activeId);
+      keepGuestInWorkspace({ commands, queries }, activeId, { allowMultiple, canEditStructure });
+      // Kept, it may be the workspace's own instance of the type rather than the guest's.
+      focus.focusRegion('center', activeTypeId);
     }
-  }, [activeId, activeTypeId, canEditStructure, commands, focus, queries]);
+  }, [activeId, activeTypeId, allowMultiple, canEditStructure, commands, focus, queries]);
   const closeGuest = useCallback(() => {
     if (activeId !== undefined) {
       widgets.closeGuest(activeId);
@@ -258,7 +264,7 @@ export const CenterArea = () => {
                 activeItem={activeItem}
                 availableItems={availableCenterItems}
                 onCloseGuest={canCloseGuest ? closeGuest : undefined}
-                onKeepGuest={isGuest ? keepGuest : undefined}
+                onKeepGuest={activeGuest?.canKeep ? keepGuest : undefined}
                 isCloseDisabled={isActiveViewRequired}
                 items={centerViewItems}
                 onClose={canEditStructure && !isGuest ? closeActiveCenterView : undefined}

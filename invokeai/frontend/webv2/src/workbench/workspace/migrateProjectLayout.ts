@@ -36,13 +36,21 @@ export interface StoredProjectLayout {
   storedAt?: string;
   /** Saved beside the layout while the project was held (`Project.heldLegacyLayout`); migration does not read it. */
   heldView?: HeldView;
+  /** On a held project's layout: what the load that held it decided, saved into its `heldView`. */
+  held?: { adopted: boolean; dropped: readonly LayoutPresetId[] };
+  /** The document entered the account through an import, so it never adopts (saved as `importedLayout`). */
+  imported?: true;
 }
 
-/** What a held project showed: the workspace it was on, its views, and what it had still to tell. */
+/** What a held project showed, and what the load that held it decided. */
 export interface HeldView {
-  droppedArrangements?: readonly LayoutPresetId[];
   views: WorkspaceViews;
   workspaceId: LayoutPresetId;
+  /** It adopted: a load before the adoption is saved prefers it to adopt again. */
+  adopted?: true;
+  /** The arrangements that load dropped, and of those the ones the user had not been told about yet. */
+  dropped?: readonly LayoutPresetId[];
+  untold?: readonly LayoutPresetId[];
 }
 
 export interface ProjectLayoutMigration {

@@ -15,7 +15,15 @@ import type { SideRegion, WorkspaceStructure } from './structure';
 import type { GuestSurface, WorkspaceGuest, WorkspaceView } from './view';
 
 import { clampRegionSize, getRegionDefaults, PANEL_OPEN_KEYS, SIDE_REGIONS } from './structure';
-import { getGuestWindowRegion, getViewedWindow, getWindowView, isGuestSuperseded, showsOnceWithCenter } from './view';
+import {
+  getGuestInstanceId,
+  getGuestWindowRegion,
+  getViewedWindow,
+  getWindowView,
+  isGuestSuperseded,
+  showsOnceWithCenter,
+} from './view';
+import { isPlacedInstance } from './workspaceDerivations';
 
 /** What this account and session can show, from the widget registry; the resolver reads nothing else. */
 export interface LayoutAvailability {
@@ -52,12 +60,20 @@ const NO_GUESTS: Readonly<Record<WidgetInstanceId, GuestSurface>> = {};
 export interface ShownGuest extends WorkspaceGuest {
   /** A center guest closes only while the center has a view of its own to show instead. */
   canClose: boolean;
+  /**
+   * Keep in workspace places it, honouring the type's multiplicity as every add does: a type allowing one instance
+   * that the workspace places already is kept as that instance, which a center can share with a rail but a window
+   * cannot, so such a guest window has no Keep.
+   */
+  canKeep: boolean;
 }
 
 export const getShownGuest = (
-  layout: Pick<ResolvedLayout, 'guests' | 'widgetInstances' | 'widgetRegions'>,
+  layout: Pick<ResolvedLayout, 'floatingWidgets' | 'guests' | 'widgetInstances' | 'widgetRegions'>,
   instanceId: WidgetInstanceId,
-  availability: Pick<LayoutAvailability, 'getPresentation'>
+  availability: Pick<LayoutAvailability, 'getPresentation'>,
+  /** The type's manifest `allowMultiple`. */
+  allowMultiple: boolean
 ): ShownGuest | undefined => {
   const surface = layout.guests[instanceId];
   const typeId = layout.widgetInstances[instanceId]?.typeId;
@@ -74,7 +90,13 @@ export const getShownGuest = (
       return id !== instanceId && other !== undefined && availability.getPresentation(other, 'center') === 'view';
     });
 
-  return { canClose, surface, typeId };
+  const isPlacedOfType = (id: WidgetInstanceId) =>
+    layout.widgetInstances[id]?.typeId === typeId && isPlacedInstance(layout, id);
+  const placesType =
+    Object.values(layout.widgetRegions).some(({ instanceIds }) => instanceIds.some(isPlacedOfType)) ||
+    Object.keys(layout.floatingWidgets ?? {}).some(isPlacedOfType);
+
+  return { canClose, canKeep: surface === 'center' || allowMultiple || !placesType, surface, typeId };
 };
 
 const areListsEqual = (left: readonly string[] | undefined, right: readonly string[] | undefined): boolean =>
@@ -126,7 +148,8 @@ const shareRecord = <Value>(
  * 1. An instance whose type is unavailable in its region is skipped (the structure keeps it).
  * 2. A front that is not an available member falls back to the home front, then the first available member.
  * 3. A center with no available view, and no guest of its own, shows the fallback stage as a guest, unless a window
- *    (placed or a guest) shows that instance already.
+ *    (placed or a guest) shows that instance already. Where a side region places that instance, the guest is another
+ *    of its type (`getGuestInstanceId`), so a guest is never a placed instance.
  * 4. An instance is shown once where `showsOnceWithCenter` says so. The center keeps it over a side region's home
  *    front; an open side region the view explicitly fronts it in keeps it instead, unless the view fronts it in the
  *    center too, and the center fronts its next view (with none, both show it). Every other side region holding it
@@ -216,22 +239,38 @@ export const resolveLayout = (
   }
 
   const stage = availability.fallbackStage;
+  // A guest is never an instance the structure places: beside a rail's own, the center's is another, as any guest is.
+  const fallbackId =
+    stage === null
+      ? null
+      : WIDGET_REGIONS.some((region) => docked[region].includes(stage.id))
+        ? getGuestInstanceId(structure, stage.typeId, [])
+        : stage.id;
 
   // Repair 3: a window, placed or a guest, already shows the fallback, so it is not shown twice.
   if (
     fronts.center === null &&
     stage !== null &&
+    fallbackId !== null &&
     availability.getPresentation(stage.typeId, 'center') === 'view' &&
     !Object.hasOwn(storedWindows, stage.id) &&
-    guests[stage.id] === undefined &&
-    (widgetInstances[stage.id]?.typeId ?? stage.typeId) === stage.typeId
+    guests[fallbackId] === undefined &&
+    (widgetInstances[fallbackId]?.typeId ?? stage.typeId) === stage.typeId
   ) {
-    members.center = [...members.center, stage.id];
-    fronts.center = stage.id;
-    guests[stage.id] = 'center';
-    widgetInstances = Object.hasOwn(widgetInstances, stage.id)
+    members.center = [...members.center, fallbackId];
+    fronts.center = fallbackId;
+    guests[fallbackId] = 'center';
+    widgetInstances = Object.hasOwn(widgetInstances, fallbackId)
       ? widgetInstances
-      : { ...widgetInstances, [stage.id]: stage };
+      : {
+          ...widgetInstances,
+          [fallbackId]:
+            fallbackId === stage.id
+              ? stage
+              : previous?.widgetInstances[fallbackId]?.typeId === stage.typeId
+                ? previous.widgetInstances[fallbackId]
+                : { id: fallbackId, typeId: stage.typeId },
+        };
   }
 
   const collapsed = Object.fromEntries(

@@ -6,6 +6,7 @@ import { createWorkbenchStore } from '@workbench/workbenchStore';
 import { describe, expect, it, vi } from 'vitest';
 
 import { getWorkspaceStructure } from './accountWorkspaces';
+import { getShownGuest } from './resolveLayout';
 import {
   getWorkspaceOffer,
   goBackToPreviousWorkspace,
@@ -249,7 +250,7 @@ describe('guests', () => {
     const guestId = Object.keys(layout().guests)[0]!;
     const window = layout().floatingWidgets?.[guestId];
 
-    keepGuestInWorkspace(ports, guestId, { canEditStructure: false });
+    keepGuestInWorkspace(ports, guestId, { allowMultiple: false, canEditStructure: false });
     const draft = store.getSnapshot().customizing?.[project().id]?.structure;
     expect(draft?.floatingWidgets?.[guestId]).toMatchObject({ x: window?.x, y: window?.y });
     expect(layout().guests).toEqual({});
@@ -258,51 +259,78 @@ describe('guests', () => {
     expect(typesIn(getWorkspaceStructure(store.getSnapshot().account, 'compose'))).not.toContain('diagnostics');
     expect(Object.keys(layout().guests)).toEqual([guestId]);
 
-    keepGuestInWorkspace(ports, guestId, { canEditStructure: true });
+    keepGuestInWorkspace(ports, guestId, { allowMultiple: false, canEditStructure: true });
     expect(store.getSnapshot().customizing?.[project().id]).toBeUndefined();
     expect(getWorkspaceStructure(store.getSnapshot().account, 'compose').floatingWidgets?.[guestId]).toBeDefined();
     expect(layout().guests).toEqual({});
   });
 
-  it('Keep in workspace places the fallback stage of a center with nothing available, like any other guest', () => {
+  it('Keep in workspace places the fallback stage of a center with nothing available, as the one Preview a rail has', () => {
     const { layout, ports, project, store } = createNavigation({
       arrange: (state) => withArrangement(state, 'edit', { center: ['retired:center'] }),
       presetId: 'edit',
     });
-    const centerOf = () => getWorkspaceStructure(store.getSnapshot().account, 'edit').widgetRegions.center.instanceIds;
-    const stage = layout().widgetRegions.center.activeInstanceId;
-    expect(layout().guests).toEqual({ [stage]: 'center' });
+    const saved = () => getWorkspaceStructure(store.getSnapshot().account, 'edit');
+    const previews = (structure: ReturnType<typeof saved>) =>
+      Object.values(structure.widgetInstances).filter(({ typeId }) => typeId === 'preview');
+    // Edit's right rail places Preview, which allows one instance: the center's guest is another until kept.
+    expect(saved().widgetRegions.right.instanceIds).toContain('preview');
+    expect(layout().guests).toEqual({ 'preview:guest': 'center' });
 
-    keepGuestInWorkspace(ports, stage, { canEditStructure: false });
-    expect(store.getSnapshot().customizing?.[project().id]?.structure.widgetRegions.center.instanceIds).toEqual([
-      'retired:center',
-      stage,
-    ]);
+    keepGuestInWorkspace(ports, 'preview:guest', { allowMultiple: false, canEditStructure: false });
+    const draft = store.getSnapshot().customizing?.[project().id]?.structure;
+    expect(draft?.widgetRegions.center.instanceIds).toEqual(['retired:center', 'preview']);
+    expect(previews(draft!)).toHaveLength(1);
     expect(layout().guests).toEqual({});
-    expect(layout().widgetRegions.center.activeInstanceId).toBe(stage);
 
     store.commands.layout.cancelCustomize();
-    expect(centerOf()).toEqual(['retired:center']);
-    expect(layout().guests).toEqual({ [stage]: 'center' });
+    expect(saved().widgetRegions.center.instanceIds).toEqual(['retired:center']);
+    expect(layout().guests).toEqual({ 'preview:guest': 'center' });
 
-    keepGuestInWorkspace(ports, stage, { canEditStructure: true });
-    expect(centerOf()).toEqual(['retired:center', stage]);
+    keepGuestInWorkspace(ports, 'preview:guest', { allowMultiple: false, canEditStructure: true });
+    expect(saved().widgetRegions.center.instanceIds).toEqual(['retired:center', 'preview']);
+    expect(saved().widgetRegions.right.instanceIds).toContain('preview');
+    expect(previews(saved())).toHaveLength(1);
+    // The center shows the shared Preview; the rail fronts its next tab.
+    expect(layout().widgetRegions.center.activeInstanceId).toBe('preview');
+    expect(layout().widgetRegions.right.activeInstanceId).not.toBe('preview');
     expect(layout().guests).toEqual({});
+  });
+
+  it('offers no Keep for a guest window of a one-instance type the workspace places, and refuses it', () => {
+    const { layout, ports, store } = createNavigation({
+      arrange: (state) => withArrangement(state, 'edit', { right: ['layers'] }),
+      presetId: 'edit',
+    });
+    openInWorkspace(ports, { surface: 'panel', typeId: 'preview' }, { mode: 'stay' });
+    const [guestId, surface] = Object.entries(layout().guests)[0] ?? [];
+    const availability = store.queries.getAvailability();
+    const before = getWorkspaceStructure(store.getSnapshot().account, 'edit');
+
+    expect(surface).toBe('window');
+    expect(getShownGuest(layout(), guestId!, availability, false)?.canKeep).toBe(false);
+    expect(getShownGuest(layout(), guestId!, availability, true)?.canKeep).toBe(true);
+
+    keepGuestInWorkspace(ports, guestId!, { allowMultiple: false, canEditStructure: true });
+    expect(getWorkspaceStructure(store.getSnapshot().account, 'edit')).toBe(before);
+    expect(layout().guests).toEqual({ [guestId!]: 'window' });
   });
 });
 
 describe('showWorkflowForm', () => {
-  it('shows the form as a guest window where the only workflow is the graph in the status bar panel', () => {
-    const { layout, ports } = createNavigation({
-      arrange: (state) => withArrangement(state, 'edit', { bottom: ['workflow'] }),
+  it('raises and focuses a window of the form, expanding it, before opening any guest', () => {
+    const { focus, layout, ports, store } = createNavigation({
+      arrange: (state) => withArrangement(state, 'edit', { left: ['generate', 'workflow'] }),
       presetId: 'edit',
     });
+    store.commands.widgets.float('workflow', 'left');
+    store.commands.widgets.setFloatingMode('workflow', 'shaded');
 
     showWorkflowForm(ports);
 
-    const [guestId, surface] = Object.entries(layout().guests)[0] ?? [];
-    expect(surface).toBe('window');
-    expect(layout().widgetInstances[guestId!]?.typeId).toBe('workflow');
+    expect(layout().floatingWidgets?.workflow?.mode).toBe('windowed');
+    expect(focus.focusFloating).toHaveBeenLastCalledWith('workflow');
+    expect(layout().guests).toEqual({});
   });
 
   it('fronts the form the left rail places, behind another tab', () => {

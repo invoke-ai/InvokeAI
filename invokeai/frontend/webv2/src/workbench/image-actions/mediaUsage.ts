@@ -44,6 +44,7 @@ const PROJECT_FIELDS = {
   lastFloatingGeometry: 'scanned',
   // Written back while the project waits for the editor to migrate it.
   droppedArrangements: 'excluded',
+  adoptedArrangements: 'excluded',
   heldLegacyLayout: 'scanned',
   legacyLayout: 'scanned',
   name: 'scanned',

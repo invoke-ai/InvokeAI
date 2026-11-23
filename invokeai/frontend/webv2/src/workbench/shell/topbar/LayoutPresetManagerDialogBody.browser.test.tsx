@@ -164,6 +164,26 @@ describe('LayoutPresetManagerDialogBody', () => {
     }
   });
 
+  it('resets a changed built-in only once its confirmation says so', async () => {
+    await renderTopBarDialogs();
+    await act(() => openLayoutPresetManager());
+    const restore = () => document.querySelector<HTMLButtonElement>('button[aria-label="Restore Writing defaults"]');
+    const isOverridden = () => store.getSnapshot().account.layoutPresetMetadataOverrides?.compose !== undefined;
+    await expect.poll(restore).not.toBeNull();
+
+    await act(() => userEvent.click(restore()!));
+    await expect.poll(() => deleteConfirmation()?.textContent).toContain('topbar.presets.restoreQuestion');
+    expect(isOverridden()).toBe(true);
+    await act(() => userEvent.click(buttonNamed(deleteConfirmation()!, 'common.cancel')));
+    await expect.poll(deleteConfirmation).toBeNull();
+    expect(isOverridden()).toBe(true);
+
+    await act(() => userEvent.click(restore()!));
+    await expect.poll(deleteConfirmation).not.toBeNull();
+    await act(() => userEvent.click(buttonNamed(deleteConfirmation()!, 'topbar.presets.resetToDefault')));
+    expect(isOverridden()).toBe(false);
+  });
+
   it('renders one account-ordered list without preset descriptions', async () => {
     await renderManager();
 

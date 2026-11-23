@@ -789,6 +789,17 @@ describe('stored layouts from before the split', () => {
     asStoredBeforeSplit({ ...createInitialWorkbenchState().projects[0]!, id }, { ...stored, storedAt });
   const arrangementNotices = (state: WorkbenchState) =>
     state.notifications.filter(({ titleKey }) => titleKey === 'shell.workspace.arrangementDroppedTitle');
+  const adoptionNotices = (state: WorkbenchState) =>
+    state.notifications.filter(({ titleKey }) => titleKey === 'shell.workspace.arrangementAdoptedTitle');
+  /** `id` as the server holds it after this state's save of it, last saved at `storedAt`. */
+  const savedAs = (state: WorkbenchState, id: string, storedAt: string): Project => {
+    const loaded = deserializeProjectDocument(
+      serializeProjectDocumentV3(getProject(state, id)) as unknown as Record<string, unknown>
+    );
+    const project = loaded.status === 'loaded' ? loaded.project : expect.unreachable();
+
+    return { ...project, legacyLayout: { ...project.legacyLayout!, storedAt } };
+  };
 
   it('shows what a project showed when it changed only how it looked, with nothing to tell', () => {
     for (const [name, stored] of Object.entries(viewOnlyLayouts)) {
@@ -815,6 +826,7 @@ describe('stored layouts from before the split', () => {
     expect(getActiveProject(state).views).toEqual({});
     expect(getLayoutOf(state).widgetRegions.right.instanceIds).toEqual(['gallery', 'queue']);
     expect(arrangementNotices(state)).toEqual([]);
+    expect(adoptionNotices(state)).toEqual([]);
     // The other project shows the adopted workspace, and is told once it is looked at.
     expect(getLayoutOf(state, getProject(state, 'other')).widgetRegions.left.instanceIds).toEqual([
       'generate',
@@ -931,6 +943,10 @@ describe('stored layouts from before the split', () => {
       'queue',
     ]);
     expect(arrangementNotices(opened)).toEqual([]);
+    expect(adoptionNotices(opened)).toMatchObject([
+      { messageValues: { count: 1, workspaces: 'Compose' }, projectId: 'last-used' },
+    ]);
+    expect(adoptionNotices(workbenchReducer(opened, { projectId: 'fresh', type: 'switchProject' }))).toHaveLength(1);
 
     const another = workbenchReducer(opened, {
       project: storedProject('older', structuralLayouts['moved a tab to another rail'], '2026-01-01T00:00:00Z'),
@@ -939,6 +955,65 @@ describe('stored layouts from before the split', () => {
 
     expect(another.account).toBe(opened.account);
     expect(arrangementNotices(another)).toMatchObject([{ projectId: 'older' }]);
+  });
+
+  it('never adopts from an imported project, and tells it its arrangement was dropped', () => {
+    const fresh = { ...createInitialWorkbenchState().projects[0]!, id: 'fresh' };
+    const hydrated = hydrate(sessionOf([fresh]));
+    const stored = storedProject('imported', structuralLayouts['removed a widget'], '2026-03-01T00:00:00Z');
+    const imported = savedAs(
+      { ...hydrated, projects: [{ ...stored, legacyLayout: { ...stored.legacyLayout!, imported: true } }] },
+      'imported',
+      '2026-03-01T00:00:00Z'
+    );
+    const opened = workbenchReducer(hydrated, { project: imported, type: 'openProject' });
+
+    expect(opened.account).toBe(hydrated.account);
+    expect(adoptionNotices(opened)).toEqual([]);
+    expect(arrangementNotices(opened)).toMatchObject([{ projectId: 'imported' }]);
+  });
+
+  it('tells each load what that load dropped, and keeps the adopter across a reload that never saved it', () => {
+    const fresh = { ...createInitialWorkbenchState().projects[0]!, id: 'fresh' };
+    const first = hydrate(
+      sessionOf([
+        fresh,
+        storedProject('a', structuralLayouts['removed a widget'], '2026-02-01T00:00:00Z'),
+        storedProject('b', structuralLayouts['moved a tab to another rail'], '2026-01-01T00:00:00Z'),
+      ])
+    );
+    const compose = getWorkspaceStructure(first.account, 'compose');
+
+    expect(compose.widgetRegions.right.instanceIds).toEqual(['gallery', 'queue']);
+    expect(getProject(first, 'b').droppedArrangements).toEqual(['compose']);
+
+    // The session write keeps failing while held saves land, B's last: the reload still adopts from A.
+    const again = hydrate(
+      sessionOf([fresh, savedAs(first, 'a', '2026-11-01T00:00:00Z'), savedAs(first, 'b', '2026-11-02T00:00:00Z')])
+    );
+
+    expect(getWorkspaceStructure(again.account, 'compose')).toEqual(compose);
+    expect(getProject(again, 'a').droppedArrangements).toBeUndefined();
+    expect(getProject(again, 'b').droppedArrangements).toEqual(['compose']);
+
+    // Told once, B is not told again by the next load that drops the same arrangement.
+    const told = workbenchReducer(first, { projectId: 'b', type: 'switchProject' });
+    const afterTold = hydrate(
+      sessionOf([fresh, savedAs(told, 'a', '2026-11-01T00:00:00Z'), savedAs(told, 'b', '2026-11-02T00:00:00Z')])
+    );
+
+    expect(getProject(afterTold, 'b').droppedArrangements).toBeUndefined();
+
+    // Without A, B adopts: it keeps no notice for its own arrangement, and A, opened later, is told about its drop.
+    const withoutA = hydrate(sessionOf([fresh, savedAs(told, 'b', '2026-11-02T00:00:00Z')]));
+
+    expect(getWorkspaceStructure(withoutA.account, 'compose').widgetRegions.left.instanceIds).toContain('image-map');
+    expect(getProject(withoutA, 'b').droppedArrangements).toBeUndefined();
+    expect(
+      arrangementNotices(
+        workbenchReducer(withoutA, { project: savedAs(first, 'a', '2026-11-01T00:00:00Z'), type: 'openProject' })
+      )
+    ).toMatchObject([{ projectId: 'a' }]);
   });
 
   it('adopts nothing for a workspace the adopting project placed as it ships', () => {
@@ -1021,6 +1096,16 @@ describe('stored layouts from before the split', () => {
     expect(getActiveProject(reloaded).workspaceId).toBe('edit');
     expect(getActiveProject(reloaded).views.compose?.sizes?.left).toBe(610);
     expect(reloaded.account.layoutPresetOverrides).toEqual(adopted.account.layoutPresetOverrides);
+
+    // Beside a layout a build before the split changed, as its duplicate keeps it, the held view is not read.
+    const widgetRegions = stored.widgetRegions as Record<string, { sizePx: number }>;
+    const rewritten = deserializeProjectDocument({
+      ...stored,
+      widgetRegions: { ...widgetRegions, left: { ...widgetRegions.left!, sizePx: 300 } },
+    });
+    const rearranged = hydrate(sessionOf([rewritten.status === 'loaded' ? rewritten.project : expect.unreachable()]));
+
+    expect(getActiveProject(rearranged).workspaceId).toBe('compose');
   });
 
   it('adopts the most recently stored project when the one opening has nothing stored', () => {

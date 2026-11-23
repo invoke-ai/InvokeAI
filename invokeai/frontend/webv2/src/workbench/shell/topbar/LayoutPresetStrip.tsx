@@ -657,8 +657,8 @@ const PresetMenu = ({
   }, [layout, onClose, preset.id]);
   const manage = useCallback(() => {
     onClose();
-    openLayoutPresetManager();
-  }, [onClose]);
+    openLayoutPresetManager(preset.id);
+  }, [onClose, preset.id]);
   const handleOpenChange = useCallback(
     (event: { open: boolean }) => {
       if (!event.open) {

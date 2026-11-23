@@ -142,9 +142,11 @@ const registered = {
   commands: [] as { handler: () => unknown; id: string; runtime: string; disposed: boolean }[],
   hotkeys: [] as { commandId: string; defaultKeys: string[]; runtime: string; disposed: boolean }[],
 };
-const makeViewProps = (runtimeName: string) =>
+const makeViewProps = (runtimeName: string, region = 'center') =>
   ({
     runtime: {
+      instanceId: 'image-map',
+      region,
       commands: {
         register: (command: { handler: () => unknown; id: string }) => {
           const entry = { ...command, disposed: false, runtime: runtimeName };
@@ -540,24 +542,30 @@ describe('Image Map cluster selection chip', () => {
     expect(escBound()).toBe(0);
   });
 
-  it('moves the Esc binding to the new project when the project changes without a remount', async () => {
-    selectCluster('sunset beach');
-    await renderMap(null);
-    workbench.projectId = 'project-b';
-    await renderMap(null, makeViewProps('project-b'));
+  it.each([
+    ['project', () => (workbench.projectId = 'project-b'), 'center'],
+    ['region', () => undefined, 'right'],
+  ])(
+    'moves the Esc binding to the new runtime when its %s changes without a remount',
+    async (_what, change, region) => {
+      selectCluster('sunset beach');
+      await renderMap(null);
+      change();
+      await renderMap(null, makeViewProps('runtime-b', region));
 
-    const escBindings = registered.hotkeys.filter((entry) => entry.defaultKeys.includes('esc'));
-    expect(escBindings.map((entry) => [entry.runtime, entry.disposed])).toEqual([
-      ['project-a', true],
-      ['project-b', false],
-    ]);
-    expect(
-      registered.commands
-        .filter((entry) => entry.id === escBindings[0]!.commandId)
-        .map((entry) => [entry.runtime, entry.disposed])
-    ).toEqual([
-      ['project-a', true],
-      ['project-b', false],
-    ]);
-  });
+      const escBindings = registered.hotkeys.filter((entry) => entry.defaultKeys.includes('esc'));
+      expect(escBindings.map((entry) => [entry.runtime, entry.disposed])).toEqual([
+        ['project-a', true],
+        ['runtime-b', false],
+      ]);
+      expect(
+        registered.commands
+          .filter((entry) => entry.id === escBindings[0]!.commandId)
+          .map((entry) => [entry.runtime, entry.disposed])
+      ).toEqual([
+        ['project-a', true],
+        ['runtime-b', false],
+      ]);
+    }
+  );
 });

@@ -26,7 +26,9 @@ import {
   useWorkbenchQueries,
 } from '@workbench/WorkbenchContext';
 import { useWorkbenchWidgetRegistry } from '@workbench/WorkbenchWidgetRegistryContext';
+import { getShownGuest } from '@workbench/workspace/resolveLayout';
 import { useCanEditStructure } from '@workbench/workspace/useStructureLock';
+import { isPlacedInstance } from '@workbench/workspace/workspaceDerivations';
 import { keepGuestInWorkspace } from '@workbench/workspace/workspaceNavigation';
 import {
   ChevronsDownUpIcon,
@@ -327,7 +329,7 @@ export const FloatingWidgetWindow = ({
   const { getWidgetById } = useWorkbenchWidgetRegistry();
   const canEditStructure = useCanEditStructure();
   // A guest window returns to no region: it closes, or is kept in the workspace, but never docks.
-  const isGuest = useActiveLayoutSelector((layout) => layout.guests[instanceId] !== undefined);
+  const isGuest = useActiveLayoutSelector((layout) => !isPlacedInstance(layout, instanceId));
   const instance = useActiveProjectSelector(
     (project) => project.widgetInstances[instanceId],
     areWidgetRenderInstancesEqual
@@ -343,6 +345,10 @@ export const FloatingWidgetWindow = ({
   const startDrag = usePointerDrag();
 
   const widget = instance ? getWidgetById(instance.typeId) : undefined;
+  const allowMultiple = widget?.manifest.allowMultiple === true;
+  const canKeep = useActiveLayoutSelector(
+    (layout) => getShownGuest(layout, instanceId, queries.getAvailability(), allowMultiple)?.canKeep === true
+  );
   const { heightPx, mode, widthPx, x, y } = state;
 
   const commitGeometry = useCallback(
@@ -614,10 +620,10 @@ export const FloatingWidgetWindow = ({
     focusRegion(isRailPanelShown ? region : 'center');
   }, [focusRegion, instanceId, isGuest, queries, state.returnRegion, widgets]);
   const handleKeep = useCallback(() => {
-    keepGuestInWorkspace({ commands, queries }, instanceId, { canEditStructure });
+    keepGuestInWorkspace({ commands, queries }, instanceId, { allowMultiple, canEditStructure });
     // The window stays where it is, now placed; its Keep button is gone.
     focusFloating(instanceId);
-  }, [canEditStructure, commands, focusFloating, instanceId, queries]);
+  }, [allowMultiple, canEditStructure, commands, focusFloating, instanceId, queries]);
   const handleToggleShade = useCallback(() => {
     // Shading hides the body: its editors keep their state but stop running, so their drafts are saved first.
     if (mode !== 'shaded') {
@@ -798,17 +804,19 @@ export const FloatingWidgetWindow = ({
                 guest is not the workspace's: it closes whatever the lock, and has nowhere to dock. */}
             {isGuest ? (
               <>
-                <Tooltip content={t('widgets.guest.keep')}>
-                  <IconButton
-                    aria-label={t('widgets.guest.keepNamed', { label })}
-                    color="fg.muted"
-                    size="sm"
-                    variant="ghost"
-                    onClick={handleKeep}
-                  >
-                    <Icon as={PinIcon} boxSize="3.5" />
-                  </IconButton>
-                </Tooltip>
+                {canKeep ? (
+                  <Tooltip content={t('widgets.guest.keep')}>
+                    <IconButton
+                      aria-label={t('widgets.guest.keepNamed', { label })}
+                      color="fg.muted"
+                      size="sm"
+                      variant="ghost"
+                      onClick={handleKeep}
+                    >
+                      <Icon as={PinIcon} boxSize="3.5" />
+                    </IconButton>
+                  </Tooltip>
+                ) : null}
                 <Tooltip content={t('widgets.floating.close')}>
                   <IconButton
                     aria-label={t('widgets.floating.closeNamed', { label })}

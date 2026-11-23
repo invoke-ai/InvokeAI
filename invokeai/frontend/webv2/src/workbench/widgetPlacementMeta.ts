@@ -6,6 +6,8 @@ import type { FloatingWidgetPlacement } from './floatingWindows';
 import type { WidgetPlacementProject } from './widgetPlacementCommands';
 import type { WidgetPlacementMeta } from './widgetRegionViewModel';
 
+import { isPlacedInstance } from './workspace/workspaceDerivations';
+
 export type WidgetPlacementRegionState = Pick<WidgetRegionState, 'activeInstanceId' | 'instanceIds' | 'isCollapsed'>;
 
 /** Every instance the layout shows somewhere: region members, and windows, which belong to no region. */
@@ -43,7 +45,7 @@ const getFloatingPlacements = (
   floatingWidgets
     ? Object.fromEntries(
         Object.entries(floatingWidgets).flatMap(([instanceId, { returnIndex, returnRegion }]) =>
-          guests[instanceId] === undefined ? [[instanceId, { returnIndex, returnRegion }]] : []
+          isPlacedInstance({ guests }, instanceId) ? [[instanceId, { returnIndex, returnRegion }]] : []
         )
       )
     : NO_FLOATING_PLACEMENTS;

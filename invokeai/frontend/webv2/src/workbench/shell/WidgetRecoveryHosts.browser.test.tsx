@@ -25,6 +25,7 @@ import { createInitialWorkbenchState, withArrangement } from '@workbench/workben
 import { createWorkbenchStore } from '@workbench/workbenchStore';
 import { WorkbenchWidgetRegistryProvider } from '@workbench/WorkbenchWidgetRegistryContext';
 import { getRegionSizeBounds } from '@workbench/workspace/structure';
+import { rearrangeWithoutCustomizeInEachTest } from '@workbench/workspace/structureLock.testing';
 import { createInstance } from 'i18next';
 import { CircleIcon } from 'lucide-react';
 import { act, useState, useSyncExternalStore, useCallback } from 'react';
@@ -283,6 +284,10 @@ afterEach(async () => {
   accountLifecycle.invalidate();
 });
 describe('real shell recovery hosts', () => {
+  // The rearranging chrome (menus, drag handles, Float and Dock) is the locked chrome plus controls, so the "no button
+  // inside a button" checks below see every control either state renders.
+  rearrangeWithoutCustomizeInEachTest();
+
   it.each([
     ['center', 'lazy', 'expandable'],
     ['center', 'label', 'expandable'],
@@ -323,6 +328,10 @@ describe('real shell recovery hosts', () => {
           button.getAttribute('aria-label') === 'Fixture failed — select to retry' || button.textContent === 'Retry'
       )!;
       expect(retry.closest('button button, [role="button"] button')).toBeNull();
+      expect(host.querySelector('button button, [role="button"] button')).toBeNull();
+      if (mode === 'status') {
+        expect(host.querySelector('button[aria-label="Status bar widgets"]')).not.toBeNull();
+      }
       if (mode === 'center' && (failureMode === 'body' || failureMode === 'lazy')) {
         const card = retry.parentElement!.parentElement!;
         const menu = host.querySelector<HTMLElement>('[aria-label="Center view: Fixture"]')!;

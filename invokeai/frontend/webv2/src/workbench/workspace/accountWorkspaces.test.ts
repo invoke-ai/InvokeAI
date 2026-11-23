@@ -6,6 +6,7 @@ import {
   getWorkspaceStructure,
   readWorkspaceRecord,
   renameWorkspace,
+  restoreWorkspaceDefault,
   setWorkspaceRoute,
   writeWorkspaceRecord,
   writeWorkspaceStructure,
@@ -54,5 +55,16 @@ describe('account workspaces', () => {
         preset: { id: 'gone', label: 'Gone', snapshot: shippedCompose },
       })
     ).toBe(account);
+  });
+
+  it('lists a workspace as written by the model only while a stored structure carries it', () => {
+    const customized = writeWorkspaceStructure(account, 'compose', withoutQueue);
+
+    expect(customized.writtenStructureIds).toEqual(['compose']);
+    expect(writeWorkspaceStructure(customized, 'compose', shippedCompose).writtenStructureIds).toBeUndefined();
+    expect(restoreWorkspaceDefault(customized, 'compose').writtenStructureIds).toBeUndefined();
+    expect(
+      writeWorkspaceRecord(customized, 'compose', readWorkspaceRecord(account, 'compose')).writtenStructureIds
+    ).toBeUndefined();
   });
 });

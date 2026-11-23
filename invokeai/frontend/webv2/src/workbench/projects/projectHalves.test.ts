@@ -79,14 +79,15 @@ describe('splitting a project into content and workspace', () => {
       lastFloatingGeometry: { gallery: geometry },
       views: { compose: { sizes: { left: 500 } } },
     });
-    // A project loaded from a document stored before structure and view split writes that layout back until migrated.
-    const stored = serializeProjectDocumentV3(
-      asStoredBeforeSplit(project, {
-        ...structuralLayouts['floated a widget'],
-        heldView: { views: { edit: { sizes: { left: 500 } } }, workspaceId: 'edit' },
-        presetWorkingLayouts: [workingCopyOf('edit', { right: { sizePx: 401 } })],
-      })
-    );
+    // A project stored before structure and view split, held after an import, writes that layout back with notes.
+    const { legacyLayout } = asStoredBeforeSplit(project, {
+      ...structuralLayouts['floated a widget'],
+      presetWorkingLayouts: [workingCopyOf('edit', { right: { sizePx: 401 } })],
+    });
+    const stored = serializeProjectDocumentV3({
+      ...project,
+      heldLegacyLayout: { ...legacyLayout!, held: { adopted: false, dropped: ['compose'] }, imported: true },
+    });
     const fields = new Set<string>();
 
     for (const document of [current, stored]) {

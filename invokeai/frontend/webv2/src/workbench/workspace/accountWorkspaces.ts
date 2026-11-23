@@ -69,11 +69,26 @@ export const readWorkspaceRecord = (account: AccountState, workspaceId: LayoutPr
         })(),
       };
 
-/** The account noting that the workspace model wrote the workspace's structure, so adoption leaves it alone. */
-const withWrittenStructure = (account: AccountState, workspaceId: LayoutPresetId): AccountState =>
-  account.writtenStructureIds?.includes(workspaceId)
-    ? account
-    : { ...account, writtenStructureIds: [...(account.writtenStructureIds ?? []), workspaceId] };
+/**
+ * The account noting that the workspace model wrote the workspace's structure, so adoption leaves it alone: only while
+ * the account stores one, which the session can mark (a built-in back as it ships stores none).
+ */
+const withWrittenStructure = (account: AccountState, workspaceId: LayoutPresetId): AccountState => {
+  const isStored = isBuiltInLayoutPresetId(workspaceId)
+    ? account.layoutPresetOverrides?.[workspaceId] !== undefined
+    : (account.customLayoutPresets ?? []).some((preset) => preset.id === workspaceId);
+  const isListed = account.writtenStructureIds?.includes(workspaceId) === true;
+
+  if (isStored === isListed) {
+    return account;
+  }
+
+  const others = (account.writtenStructureIds ?? []).filter((id) => id !== workspaceId);
+  const writtenStructureIds = isStored ? [...others, workspaceId] : others;
+  const { writtenStructureIds: _previous, ...rest } = account;
+
+  return writtenStructureIds.length > 0 ? { ...rest, writtenStructureIds } : rest;
+};
 
 export const isSameWorkspaceRecord = (left: WorkspaceRecord, right: WorkspaceRecord): boolean =>
   areJsonValuesStructurallyEqual(left, right);

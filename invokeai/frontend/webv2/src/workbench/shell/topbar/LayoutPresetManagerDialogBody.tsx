@@ -15,7 +15,12 @@ import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { resolveLayoutPresetIcon } from './layoutPresetIcons';
-import { closeLayoutPresetManager, openLayoutPresetDelete } from './layoutPresetManagerStore';
+import {
+  closeLayoutPresetManager,
+  layoutPresetManagerStore,
+  openLayoutPresetDelete,
+  openLayoutPresetRestore,
+} from './layoutPresetManagerStore';
 
 /** The account's workspaces: their order, a built-in's default, deleting a custom one. Rendered lazily. */
 export const LayoutPresetManagerDialogBody = ({
@@ -99,13 +104,22 @@ export const LayoutPresetManagerDialogBody = ({
   );
 };
 
-const getReturnFocus = (): HTMLElement | null => getActiveWorkspaceTab();
+/** Back to the tab whose menu opened the manager, or the active one when that tab is gone (deleted from here). */
+const getReturnFocus = (): HTMLElement | null => {
+  const { openerPresetId } = layoutPresetManagerStore.getSnapshot();
+
+  return (
+    (openerPresetId === null
+      ? null
+      : document.querySelector<HTMLElement>(`[role="tab"][data-layout-preset-id="${CSS.escape(openerPresetId)}"]`)) ??
+    getActiveWorkspaceTab()
+  );
+};
 
 const PresetRow = ({ isOverridden, preset }: { isOverridden: boolean; preset: LayoutPreset }) => {
   const { t } = useTranslation();
-  const { layout } = useWorkbenchCommands();
   const deletePreset = useCallback(() => openLayoutPresetDelete(preset.id), [preset.id]);
-  const restoreDefault = useCallback(() => layout.restorePresetDefault(preset.id), [layout, preset.id]);
+  const restoreDefault = useCallback(() => openLayoutPresetRestore(preset.id), [preset.id]);
 
   return (
     <SortableListItem

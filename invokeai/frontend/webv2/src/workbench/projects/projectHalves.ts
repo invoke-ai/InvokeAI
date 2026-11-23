@@ -31,6 +31,7 @@ export interface ProjectWorkspaceV4 extends Pick<
   | 'droppedArrangements'
   | 'floatingWidgets'
   | 'heldView'
+  | 'importedLayout'
   | 'invocation'
   | 'lastFloatingGeometry'
   | 'layout'
@@ -63,6 +64,8 @@ export const PROJECT_DOCUMENT_HALVES = {
   // How a held project looks, beside its stored layout: per member.
   heldView: 'workspace',
   id: 'content',
+  // Where this member's copy came from: per member, like the stored layout it is about.
+  importedLayout: 'workspace',
   invocation: 'workspace',
   lastFloatingGeometry: 'workspace',
   layout: 'workspace',
@@ -114,6 +117,7 @@ export const splitProjectDocument = (document: ProjectDocumentV3): ProjectHalves
     ...(document.droppedArrangements ? { droppedArrangements: document.droppedArrangements } : {}),
     ...(document.floatingWidgets ? { floatingWidgets: document.floatingWidgets } : {}),
     ...(document.heldView ? { heldView: document.heldView } : {}),
+    ...(document.importedLayout ? { importedLayout: document.importedLayout } : {}),
     invocation: document.invocation,
     ...(document.lastFloatingGeometry ? { lastFloatingGeometry: document.lastFloatingGeometry } : {}),
     ...(document.layout ? { layout: document.layout } : {}),

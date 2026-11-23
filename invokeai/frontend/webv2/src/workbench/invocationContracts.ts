@@ -39,6 +39,15 @@ export interface InvocationRoute {
   destinationLocked: boolean;
 }
 
+/** Where Invoke runs and sends results: what auto-routing moves. The locks are the user's alone. */
+export type RouteTarget = Pick<InvocationRoute, 'destination' | 'sourceId'>;
+
+/** A move auto-routing made, or its reverse: stepping it puts the route at `to` only while it is still at `from`. */
+export interface RouteMove {
+  from: RouteTarget;
+  to: RouteTarget;
+}
+
 export interface CanvasInputValidationReason {
   canvasInputIssue: CanvasInputIssue;
 }

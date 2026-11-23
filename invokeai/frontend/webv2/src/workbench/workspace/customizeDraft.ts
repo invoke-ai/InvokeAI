@@ -1,3 +1,4 @@
+import type { RouteMove, RouteTarget } from '@workbench/invocationContracts';
 import type { LayoutPreset, LayoutPresetId } from '@workbench/layoutContracts';
 import type { AccountState } from '@workbench/projectContracts';
 
@@ -6,13 +7,8 @@ import { getLayoutPreset, isBuiltInLayoutPresetId } from '@workbench/layoutPrese
 import { resolveSavedLayoutPreset } from '@workbench/layoutPresetSnapshots';
 
 import type { WorkspaceStructure } from './structure';
-import type {
-  CustomizeDraft,
-  CustomizeHistoryEntry,
-  CustomizeProjectSide,
-  CustomizeSession,
-  NewWorkspaceDraft,
-} from './structureLock';
+import type { CustomizeDraft, CustomizeHistoryEntry, CustomizeSession, NewWorkspaceDraft } from './structureLock';
+import type { WorkspaceView } from './view';
 
 import {
   createWorkspace,
@@ -46,28 +42,66 @@ const toNewWorkspaceDraft = ({ defaultRoute, iconId, label }: NewWorkspaceDraft)
   label,
 });
 
+const toRouteTarget = ({ destination, sourceId }: RouteTarget): RouteTarget => ({ destination, sourceId });
+
+const isAtRoute = (route: RouteTarget, target: RouteTarget): boolean =>
+  route.sourceId === target.sourceId && route.destination === target.destination;
+
+/** The move a layout action's auto-routing made, from the route before it to the route after; none when it made none. */
+export const getRouteMove = (before: RouteTarget, after: RouteTarget): RouteMove | undefined =>
+  isAtRoute(before, after) ? undefined : { from: toRouteTarget(before), to: toRouteTarget(after) };
+
+const reverseRouteMove = (move: RouteMove | undefined): RouteMove | undefined =>
+  move && { from: move.to, to: move.from };
+
+/** The route with `move` stepped: only while it is still where the move starts, and never its locks. Null otherwise. */
+export const stepRouteMove = <Route extends RouteTarget>(route: Route, move: RouteMove | undefined): Route | null =>
+  move && isAtRoute(route, move.from) && !isAtRoute(route, move.to) ? { ...route, ...move.to } : null;
+
+/**
+ * Where taking back every step still in the session's history puts the route, as a move from where it is now: each
+ * step's auto-routing move, newest first, the way Undo takes it, skipping one the route has since left. For Cancel and
+ * for undoing Done. None when nothing would move it.
+ */
+export const getCustomizeRouteReturn = (session: CustomizeSession, route: RouteTarget): RouteMove | undefined =>
+  getRouteMove(
+    route,
+    session.history.past.reduceRight<RouteTarget>(
+      (current, entry) => stepRouteMove(current, entry.route) ?? current,
+      route
+    )
+  );
+
 /** A session on `structure`, the account's for an existing workspace or a new workspace's starting copy. */
 export const beginCustomizeSession = ({
-  entry,
+  entryView,
   newWorkspace,
   presetId,
   structure,
 }: {
-  /** The project's view and route as Customize begins. */
-  entry: CustomizeProjectSide;
+  entryView: WorkspaceView | undefined;
   newWorkspace?: NewWorkspaceDraft;
   presetId: LayoutPresetId;
   structure: WorkspaceStructure;
 }): CustomizeSession => ({
   draft: newWorkspace ? toNewWorkspaceDraft(newWorkspace) : {},
-  entryInvocation: entry.invocation,
   entryStructure: structure,
-  entryView: entry.view,
+  entryView,
   history: { future: [], past: [] },
   ...(newWorkspace ? { newWorkspaceId: newWorkspace.id } : {}),
   presetId,
   structure,
 });
+
+/**
+ * Whether ending the session now discards something: an arrangement other than the one it started from, a pending
+ * reset, or a name, icon or route edit to an existing workspace. A new workspace's draft starts as a copy, so only its
+ * arrangement counts.
+ */
+export const hasCustomizeChanges = (session: CustomizeSession): boolean =>
+  session.resetPending === true ||
+  (session.newWorkspaceId === undefined && Object.keys(session.draft).length > 0) ||
+  !areJsonValuesStructurallyEqual(session.structure, session.entryStructure);
 
 /** Reset to default: the built-in's shipped structure and metadata; the caller empties the view. Null when not one. */
 export const resetCustomizeSession = (session: CustomizeSession): CustomizeSession | null =>
@@ -115,11 +149,12 @@ export const saveCustomizeSessionAsNew = (
 
 const toHistoryEntry = (
   session: CustomizeSession,
-  { invocation, view }: CustomizeProjectSide
+  view: WorkspaceView | undefined,
+  route: RouteMove | undefined
 ): Omit<CustomizeHistoryEntry, 'mergedAt' | 'mergeKey'> => ({
   draft: session.draft,
-  invocation,
   ...(session.resetPending ? { resetPending: true as const } : {}),
+  ...(route ? { route } : {}),
   structure: session.structure,
   view,
 });
@@ -128,20 +163,25 @@ const toHistoryEntry = (
 export const isCustomizeStep = (
   before: CustomizeSession,
   after: CustomizeSession,
-  sideBefore: CustomizeProjectSide,
-  sideAfter: CustomizeProjectSide
+  viewBefore: WorkspaceView | undefined,
+  viewAfter: WorkspaceView | undefined,
+  route: RouteMove | undefined
 ): boolean =>
   after.structure !== before.structure ||
   after.draft !== before.draft ||
   after.resetPending !== before.resetPending ||
-  sideAfter.view !== sideBefore.view ||
-  sideAfter.invocation !== sideBefore.invocation;
+  viewAfter !== viewBefore ||
+  route !== undefined;
 
-/** Records the state before a step; a step with the previous one's merge key, within the window, folds into it. */
+/**
+ * Records the state before a step and the move its auto-routing made (`route`); a step with the previous one's merge
+ * key, within the window, folds into it.
+ */
 export const pushCustomizeHistory = (
   session: CustomizeSession,
   before: CustomizeSession,
-  sideBefore: CustomizeProjectSide,
+  viewBefore: WorkspaceView | undefined,
+  route: RouteMove | undefined,
   mergeKey: string | undefined,
   timestamp: string
 ): CustomizeSession => {
@@ -154,7 +194,15 @@ export const pushCustomizeHistory = (
     future.length === 0 &&
     Date.parse(timestamp) - Date.parse(last.mergedAt) <= LAYOUT_MERGE_WINDOW_MS
   ) {
-    return { ...session, history: { future: [], past: [...past.slice(0, -1), { ...last, mergedAt: timestamp }] } };
+    const back = route ? { from: route.to, to: last.route?.to ?? route.from } : last.route;
+
+    return {
+      ...session,
+      history: {
+        future: [],
+        past: [...past.slice(0, -1), { ...last, ...(back ? { route: back } : {}), mergedAt: timestamp }],
+      },
+    };
   }
 
   return {
@@ -163,19 +211,28 @@ export const pushCustomizeHistory = (
       future: [],
       past: [
         ...past,
-        { ...toHistoryEntry(before, sideBefore), ...(mergeKey ? { mergeKey } : {}), mergedAt: timestamp },
+        {
+          ...toHistoryEntry(before, viewBefore, reverseRouteMove(route)),
+          ...(mergeKey ? { mergeKey } : {}),
+          mergedAt: timestamp,
+        },
       ].slice(-LAYOUT_HISTORY_LIMIT),
     },
   };
 };
 
-/** Undo or Redo inside Customize: the draft, the view it is seen through and the route step together. Null at either end. */
-export const stepCustomizeHistory = (
+/**
+ * Undo or Redo inside Customize: the draft and the view it is seen through step together, and the route steps back or
+ * forward with them only where the step's auto-routing moved it and nothing has picked another route since. Null at
+ * either end.
+ */
+export const stepCustomizeHistory = <Route extends RouteTarget>(
   session: CustomizeSession,
-  side: CustomizeProjectSide,
+  view: WorkspaceView | undefined,
+  route: Route,
   direction: 'undo' | 'redo',
   timestamp: string
-): ({ session: CustomizeSession } & CustomizeProjectSide) | null => {
+): { invocation: Route; session: CustomizeSession; view: WorkspaceView | undefined } | null => {
   const { future, past } = session.history;
   const entry = direction === 'undo' ? past.at(-1) : future[0];
 
@@ -183,10 +240,15 @@ export const stepCustomizeHistory = (
     return null;
   }
 
-  const current: CustomizeHistoryEntry = { ...toHistoryEntry(session, side), mergedAt: timestamp };
+  const stepped = stepRouteMove(route, entry.route);
+  const current: CustomizeHistoryEntry = {
+    ...toHistoryEntry(session, view, reverseRouteMove(entry.route)),
+    mergedAt: timestamp,
+  };
   const { resetPending: _resetPending, ...rest } = session;
 
   return {
+    invocation: stepped ?? route,
     session: {
       ...rest,
       draft: entry.draft,
@@ -197,7 +259,6 @@ export const stepCustomizeHistory = (
           : { future: future.slice(1), past: [...past, current].slice(-LAYOUT_HISTORY_LIMIT) },
       structure: entry.structure,
     },
-    invocation: entry.invocation,
     view: entry.view,
   };
 };

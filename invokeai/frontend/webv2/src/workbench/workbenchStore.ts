@@ -562,7 +562,8 @@ const createCommands = (
       showGuest: command('showGuest'),
       closeGuest: command('closeGuest', (instanceId: string) => ({ instanceId })),
       /** Structural: places a guest in the workspace on its surface. */
-      keepGuest: command('keepGuest', (instanceId: string) => ({ instanceId })),
+      /** `allowMultiple` is the type's manifest flag, which decides whether Keep may make another instance. */
+      keepGuest: command('keepGuest', (instanceId: string, allowMultiple: boolean) => ({ allowMultiple, instanceId })),
       setAlignment: command('setWidgetInstanceAlignment'),
       select: command('selectRegionWidget'),
       setFloatingGeometry: command(

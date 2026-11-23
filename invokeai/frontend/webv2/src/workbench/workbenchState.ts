@@ -262,6 +262,9 @@ import {
   beginCustomizeSession,
   editCustomizeDraft,
   finishCustomizeSession,
+  getCustomizeRouteReturn,
+  getRouteMove,
+  hasCustomizeChanges,
   isCustomizeStep,
   LAYOUT_HISTORY_LIMIT,
   LAYOUT_MERGE_WINDOW_MS,
@@ -269,6 +272,7 @@ import {
   resetCustomizeSession,
   saveCustomizeSessionAsNew,
   stepCustomizeHistory,
+  stepRouteMove,
 } from './workspace/customizeDraft';
 import { enterWorkspace } from './workspace/entry';
 import {
@@ -427,7 +431,7 @@ type WorkbenchReducerAction =
   /** Forgets a guest; its values stay. */
   | { type: 'closeGuest'; instanceId: WidgetInstanceId }
   /** "Keep in workspace": places the guest on its surface, a guest window as a window; structural. */
-  | { type: 'keepGuest'; instanceId: WidgetInstanceId }
+  | { type: 'keepGuest'; instanceId: WidgetInstanceId; allowMultiple: boolean }
   | { type: 'setGenerateSettings'; values: GenerateWidgetValues; projectId?: string; origin?: WorkbenchActionOrigin }
   | {
       type: 'patchGenerateSettings';
@@ -1807,7 +1811,17 @@ type UndoWorkspace = NonNullable<UndoRedoEntry['workspace']>;
 const pushUndo = (
   project: Project,
   label: string,
-  { mergeKey, notice, workspace }: { mergeKey?: string; notice?: LayoutUndoNotice; workspace?: UndoWorkspace } = {}
+  {
+    customizeRoute,
+    mergeKey,
+    notice,
+    workspace,
+  }: {
+    customizeRoute?: UndoRedoEntry['customizeRoute'];
+    mergeKey?: string;
+    notice?: LayoutUndoNotice;
+    workspace?: UndoWorkspace;
+  } = {}
 ): Project => {
   const previous = project.undoRedo.past.at(-1);
   const timestamp = now();
@@ -1840,6 +1854,7 @@ const pushUndo = (
           ...(notice ? { notice } : {}),
           project: createUndoSnapshot(project),
           ...(workspace ? { workspace } : {}),
+          ...(customizeRoute ? { customizeRoute } : {}),
         },
       ].slice(-LAYOUT_HISTORY_LIMIT),
     },
@@ -1882,6 +1897,9 @@ const stepProjectHistory = (state: WorkbenchState, projectId: string, direction:
     change !== undefined && isSameWorkspaceRecord(readWorkspaceRecord(state.account, change.workspaceId), change.after);
   const account =
     change && isCurrent ? writeWorkspaceRecord(state.account, change.workspaceId, change.before) : state.account;
+  // Done's route moves only with its workspace, so Invoke never aims at a source the workspace no longer places.
+  const routeMoved =
+    entry.customizeRoute && isCurrent ? stepRouteMove(project.invocation, entry.customizeRoute.move) : null;
   const opposite: UndoRedoEntry = {
     createdAt: now(),
     id: createId(direction === 'undo' ? 'redo' : 'undo'),
@@ -1889,6 +1907,14 @@ const stepProjectHistory = (state: WorkbenchState, projectId: string, direction:
     project: createUndoSnapshot(project),
     ...(change && isCurrent
       ? { workspace: { after: change.before, before: change.after, workspaceId: change.workspaceId } }
+      : {}),
+    ...(entry.customizeRoute
+      ? {
+          customizeRoute:
+            routeMoved && entry.customizeRoute.move
+              ? { move: { from: entry.customizeRoute.move.to, to: entry.customizeRoute.move.from } }
+              : {},
+        }
       : {}),
   };
   const undoRedo =
@@ -1901,9 +1927,14 @@ const stepProjectHistory = (state: WorkbenchState, projectId: string, direction:
           future: project.undoRedo.future.slice(1),
           past: [...project.undoRedo.past, opposite].slice(-LAYOUT_HISTORY_LIMIT),
         };
+  const restored = restoreUndoSnapshot(project, entry.project, account);
   const stepped = replaceProject(
     { ...state, account },
-    { ...restoreUndoSnapshot(project, entry.project, account), undoRedo }
+    {
+      ...restored,
+      ...(entry.customizeRoute ? { invocation: routeMoved ?? project.invocation } : {}),
+      undoRedo,
+    }
   );
 
   return change && !isCurrent
@@ -2048,6 +2079,7 @@ const assembleWorkbenchProject = (
     floatingWidgets: storedFloatingWidgets,
     graphHistory: _graphHistory,
     heldView: storedHeldView,
+    importedLayout: storedImportedLayout,
     layout: storedLayout,
     droppedArrangements: storedDroppedArrangements,
     legacyLayout: carriedLegacyLayout,
@@ -2075,6 +2107,7 @@ const assembleWorkbenchProject = (
           {
             floatingWidgets: storedFloatingWidgets,
             heldView: storedHeldView,
+            importedLayout: storedImportedLayout,
             layout: storedLayout,
             presetWorkingLayouts: storedWorkingLayouts,
             widgetRegions: storedWidgetRegions,
@@ -2500,6 +2533,7 @@ const normalizeLayoutPresetOverrides = (overrides: unknown): LayoutPresetOverrid
 export const normalizeWorkbenchAccount = (value: unknown): WorkbenchState['account'] => {
   const account = value && typeof value === 'object' ? (value as Partial<WorkbenchState['account']>) : undefined;
   const customLayoutPresets = normalizeCustomLayoutPresets(account?.customLayoutPresets);
+  const layoutPresetOverrides = normalizeLayoutPresetOverrides(account?.layoutPresetOverrides);
   const resolvedActivePresetId = resolveLayoutPresetId(account?.activeLayoutPresetId ?? defaultLayoutPreset.id);
   const activeLayoutPresetId =
     isBuiltInLayoutPresetId(resolvedActivePresetId) ||
@@ -2515,14 +2549,19 @@ export const normalizeWorkbenchAccount = (value: unknown): WorkbenchState['accou
       ...layoutPresets,
       ...customLayoutPresets,
     ]),
-    layoutPresetOverrides: normalizeLayoutPresetOverrides(account?.layoutPresetOverrides),
+    layoutPresetOverrides,
     layoutPresetRouteOverrides: normalizeLayoutPresetRouteOverrides(account?.layoutPresetRouteOverrides),
     // An account with nothing stored is new: it has no stored arrangements to adopt.
     ...(account === undefined || account.workspaceLayoutsAdopted === true ? { workspaceLayoutsAdopted: true } : {}),
     ...(() => {
+      // Listed only while a stored structure carries the mark: an override read as shipped is gone.
       const written = readWrittenStructureIds(account as Record<string, unknown> | undefined)
         .map(resolveLayoutPresetId)
-        .filter((id) => isBuiltInLayoutPresetId(id) || customLayoutPresets.some((preset) => preset.id === id));
+        .filter((id) =>
+          isBuiltInLayoutPresetId(id)
+            ? layoutPresetOverrides[id] !== undefined
+            : customLayoutPresets.some((preset) => preset.id === id)
+        );
 
       return written.length > 0 ? { writtenStructureIds: [...new Set(written)] } : {};
     })(),
@@ -2582,46 +2621,75 @@ const normalizeWorkbenchState = (state: WorkbenchState, context: WorkbenchReduce
   };
 };
 
-const LAYOUT_NOTICE_TITLE_KEY = 'shell.workspace.arrangementDroppedTitle';
-const LAYOUT_NOTICE_MESSAGE_KEY = 'shell.workspace.arrangementDroppedMessage';
+/** What each one-time arrangement notice says, by the project field that holds the workspaces it names. */
+const ARRANGEMENT_NOTICES = {
+  adoptedArrangements: {
+    message: (workspaces: string, count: number) =>
+      count === 1
+        ? `${workspaces} now uses this project's arrangement in every project.`
+        : `${workspaces} now use this project's arrangement in every project.`,
+    messageKey: 'shell.workspace.arrangementAdoptedMessage',
+    title: 'Workspaces updated',
+    titleKey: 'shell.workspace.arrangementAdoptedTitle',
+  },
+  droppedArrangements: {
+    message: (workspaces: string, count: number) =>
+      count === 1
+        ? `Workspaces now look the same in every project, so this project's own arrangement of ${workspaces} was not kept. Customize the workspace to arrange it again.`
+        : `Workspaces now look the same in every project, so this project's own arrangements of ${workspaces} were not kept. Customize a workspace to arrange it again.`,
+    messageKey: 'shell.workspace.arrangementDroppedMessage',
+    title: 'Workspaces are now shared',
+    titleKey: 'shell.workspace.arrangementDroppedTitle',
+  },
+} as const;
 
 /**
- * Tells, once, that the active project's own arrangements were dropped when its stored layout migrated, offering to
- * customize the first of them. The project stores what it has to tell, so a reload before it is told keeps it.
+ * Tells, once, what happened to the active project's own arrangements when its stored layout migrated: dropped, or
+ * (adopting after hydration) taken by its workspaces, offering to customize the first of them. A drop is stored with
+ * the project, so a reload before it is told keeps it.
  */
 const announceDroppedArrangements = (state: WorkbenchState): WorkbenchState => {
   const project = state.projects.find((candidate) => candidate.id === state.activeProjectId);
-  const dropped = project?.droppedArrangements;
 
-  if (!project || !dropped) {
+  if (!project || (!project.droppedArrangements && !project.adoptedArrangements)) {
     return state;
   }
 
-  const { droppedArrangements: _told, ...told } = project;
-  const labels = dropped.map((id) => {
-    const { label, labelKey } = resolveSavedLayoutPreset(state.account, id);
+  const { adoptedArrangements: _adopted, droppedArrangements: _dropped, ...told } = project;
+  let next = replaceProject(state, told);
 
-    return labelKey === undefined ? { text: label } : { key: labelKey, text: label };
-  });
-  const workspaces = labels.map(({ text }) => text).join(', ');
+  for (const field of ['adoptedArrangements', 'droppedArrangements'] as const) {
+    const ids = project[field];
 
-  return addNotification(
-    replaceProject(state, told),
-    createNotification({
-      actions: [{ kind: 'customize-workspace', workspaceId: dropped[0]! }],
-      kind: 'info',
-      message:
-        dropped.length === 1
-          ? `Workspaces now look the same in every project, so this project's own arrangement of ${workspaces} was not kept. Customize the workspace to arrange it again.`
-          : `Workspaces now look the same in every project, so this project's own arrangements of ${workspaces} were not kept. Customize a workspace to arrange it again.`,
-      messageKey: LAYOUT_NOTICE_MESSAGE_KEY,
-      messageListValues: { workspaces: labels },
-      messageValues: { count: dropped.length, workspaces },
-      projectId: project.id,
-      title: 'Workspaces are now shared',
-      titleKey: LAYOUT_NOTICE_TITLE_KEY,
-    })
-  );
+    if (!ids) {
+      continue;
+    }
+
+    const notice = ARRANGEMENT_NOTICES[field];
+    const labels = ids.map((id) => {
+      const { label, labelKey } = resolveSavedLayoutPreset(state.account, id);
+
+      return labelKey === undefined ? { text: label } : { key: labelKey, text: label };
+    });
+    const workspaces = labels.map(({ text }) => text).join(', ');
+
+    next = addNotification(
+      next,
+      createNotification({
+        actions: [{ kind: 'customize-workspace', workspaceId: ids[0]! }],
+        kind: 'info',
+        message: notice.message(workspaces, ids.length),
+        messageKey: notice.messageKey,
+        messageListValues: { workspaces: labels },
+        messageValues: { count: ids.length, workspaces },
+        projectId: project.id,
+        title: notice.title,
+        titleKey: notice.titleKey,
+      })
+    );
+  }
+
+  return next;
 };
 
 const getAvailableLayoutPreset = (state: WorkbenchState, presetId: LayoutPresetId): LayoutPreset =>
@@ -4060,13 +4128,14 @@ const recordLayoutSteps = (
     const beforeSession = getCustomizeSession(previous.customizing, before);
 
     if (session && beforeSession) {
-      const sideBefore = { invocation: before.invocation, view: getProjectView(previous, before) };
-      const sideAfter = { invocation: project.invocation, view: getProjectView(next, project) };
+      const viewBefore = getProjectView(previous, before);
+      // Only layout actions are recorded, so what moved the route here was their auto-routing, never a pick by hand.
+      const route = getRouteMove(before.invocation, project.invocation);
 
-      if (isCustomizeStep(beforeSession, session, sideBefore, sideAfter)) {
+      if (isCustomizeStep(beforeSession, session, viewBefore, getProjectView(next, project), route)) {
         customizing = {
           ...customizing,
-          [project.id]: pushCustomizeHistory(session, beforeSession, sideBefore, step.mergeKey, now()),
+          [project.id]: pushCustomizeHistory(session, beforeSession, viewBefore, route, step.mergeKey, now()),
         };
       }
 
@@ -4103,7 +4172,8 @@ const recordLayoutSteps = (
 };
 
 const CUSTOMIZE_ENDED_TITLE_KEY = 'shell.workspace.customizeEndedTitle';
-const CUSTOMIZE_ENDED_MESSAGE_KEY = 'shell.workspace.customizeEndedMessage';
+const CUSTOMIZE_ENDED_DELETED_MESSAGE_KEY = 'shell.workspace.customizeEndedDeletedMessage';
+const CUSTOMIZE_ENDED_MOVED_MESSAGE_KEY = 'shell.workspace.customizeEndedMovedMessage';
 
 /** Customize ends with its workspace: when the project closes or leaves it, or the workspace is deleted. */
 const reconcileCustomizeSessions = (previous: WorkbenchState, next: WorkbenchState): WorkbenchState => {
@@ -4144,26 +4214,24 @@ const reconcileCustomizeSessions = (previous: WorkbenchState, next: WorkbenchSta
     if (
       customizing?.[projectId] ||
       !next.projects.some(({ id }) => id === projectId) ||
-      (session.newWorkspaceId === undefined && session.history.past.length === 0)
+      !hasCustomizeChanges(session)
     ) {
       return announced;
     }
 
     const saved = resolveSavedLayoutPreset(previous.account, session.presetId);
-    const shown =
-      session.newWorkspaceId !== undefined
-        ? { text: session.draft.label ?? saved.label }
-        : saved.labelKey === undefined
-          ? { text: saved.label }
-          : { key: saved.labelKey, text: saved.label };
+    const workspace = saved.labelKey === undefined ? { text: saved.label } : { key: saved.labelKey, text: saved.label };
+    const wasDeleted = !doesLayoutPresetExist(next.account, session.presetId);
 
     return addNotification(
       announced,
       createNotification({
         kind: 'info',
-        message: `This project left the workspace it was customizing, so the unsaved changes to ${shown.text} were discarded.`,
-        messageKey: CUSTOMIZE_ENDED_MESSAGE_KEY,
-        messageListValues: { workspace: [shown] },
+        message: wasDeleted
+          ? `${saved.label} was deleted, so the changes you were customizing were discarded.`
+          : `This project moved off ${saved.label}, so the changes you were customizing were discarded.`,
+        messageKey: wasDeleted ? CUSTOMIZE_ENDED_DELETED_MESSAGE_KEY : CUSTOMIZE_ENDED_MOVED_MESSAGE_KEY,
+        messageListValues: { workspace: [workspace] },
         projectId,
         title: 'Customize ended',
         titleKey: CUSTOMIZE_ENDED_TITLE_KEY,
@@ -4335,6 +4403,9 @@ const reduceWorkbenchAction = (
             : state.account.activeLayoutPresetId,
         customLayoutPresets,
         layoutPresetOrder,
+        ...(state.account.writtenStructureIds?.includes(action.presetId)
+          ? { writtenStructureIds: state.account.writtenStructureIds.filter((id) => id !== action.presetId) }
+          : {}),
       };
       const source: LayoutSource = { account, customizing: state.customizing };
       // Projects on it move to the default workspace as a switch would; every project forgets its view of it.
@@ -4374,7 +4445,7 @@ const reduceWorkbenchAction = (
         customizing: {
           ...state.customizing,
           [activeProject.id]: beginCustomizeSession({
-            entry: { invocation: activeProject.invocation, view: entryView },
+            entryView,
             ...(newWorkspace ? { newWorkspace } : {}),
             presetId: activeProject.workspaceId,
             structure,
@@ -4464,12 +4535,14 @@ const reduceWorkbenchAction = (
       const { [activeProject.id]: _ended, ...customizing } = state.customizing ?? {};
       const views = withView(activeProject.views, activeProject.workspaceId, session.entryView);
 
-      // As it was on entry, the route included, even one changed by hand meanwhile.
+      // The route goes back only as far as Customize's auto-routing moved it; a pick made by hand stays.
       return replaceProject(
         { ...state, customizing },
         withoutLayoutHistory({
           ...activeProject,
-          invocation: session.entryInvocation,
+          invocation:
+            stepRouteMove(activeProject.invocation, getCustomizeRouteReturn(session, activeProject.invocation)) ??
+            activeProject.invocation,
           views: session.newWorkspaceId === undefined ? views : withView(views, session.newWorkspaceId, undefined),
         })
       );
@@ -4507,11 +4580,8 @@ const reduceWorkbenchAction = (
       // Done on an existing workspace is one step back to before Customize, while nothing has changed it since.
       const workspace =
         session.newWorkspaceId === undefined ? toUndoWorkspace(state.account, account, workspaceId) : undefined;
-      const beforeCustomize = {
-        ...finished,
-        invocation: session.entryInvocation,
-        views: withView(views, workspaceId, session.entryView),
-      };
+      const beforeCustomize = { ...finished, views: withView(views, workspaceId, session.entryView) };
+      const routeReturn = getCustomizeRouteReturn(session, finished.invocation);
 
       return replaceProject(
         { ...state, account, customizing },
@@ -4519,6 +4589,7 @@ const reduceWorkbenchAction = (
           ? {
               ...finished,
               undoRedo: pushUndo(beforeCustomize, 'Update workspace', {
+                customizeRoute: routeReturn ? { move: routeReturn } : {},
                 notice: { kind: 'updateWorkspace', presetId: workspaceId },
                 workspace,
               }).undoRedo,
@@ -4834,7 +4905,8 @@ const reduceWorkbenchAction = (
       return updateActiveProject(state, (project) => {
         const layout = getLayout(state, project, context);
 
-        if (!getShownGuest(layout, action.instanceId, context.availability)?.canClose) {
+        // Close reads only `canClose`, which no multiplicity changes.
+        if (!getShownGuest(layout, action.instanceId, context.availability, false)?.canClose) {
           return project;
         }
 
@@ -4847,27 +4919,27 @@ const reduceWorkbenchAction = (
       const project = state.projects.find((candidate) => candidate.id === state.activeProjectId);
       const layout = project && getLayout(state, project, context);
       // The resolved layout's guests include the center's fallback stage, which no view records.
-      const guest = layout && getShownGuest(layout, action.instanceId, context.availability);
+      const guest = layout && getShownGuest(layout, action.instanceId, context.availability, action.allowMultiple);
       const window = layout?.floatingWidgets?.[action.instanceId];
 
-      if (!project || !guest) {
+      if (!project || !guest?.canKeep) {
         return state;
       }
 
       if (guest.surface === 'center') {
-        return applyStructureGesture(
-          state,
-          project,
-          {
-            createNew: true,
-            mintId: action.instanceId,
-            region: 'center',
-            type: 'addWidget',
-            typeId: guest.typeId,
-          },
-          context,
-          { compose: (next, source) => showInRegion(source, next, 'center', action.instanceId, context.availability) }
-        );
+        // As every add: a type allowing one instance lands on the one the workspace may place already.
+        const add: Extract<StructureAction, { type: 'addWidget' }> = {
+          ...(action.allowMultiple ? { createNew: true } : {}),
+          mintId: action.instanceId,
+          region: 'center',
+          type: 'addWidget',
+          typeId: guest.typeId,
+        };
+        const kept = getAddedInstanceId(getProjectStructure(state, project), add);
+
+        return applyStructureGesture(state, project, add, context, {
+          compose: (next, source) => showInRegion(source, next, 'center', kept, context.availability),
+        });
       }
 
       return window
@@ -6017,7 +6089,8 @@ const reduceWorkbenchAction = (
       if (session) {
         const stepped = stepCustomizeHistory(
           session,
-          { invocation: project.invocation, view: getProjectView(state, project) },
+          getProjectView(state, project),
+          project.invocation,
           direction,
           now()
         );
