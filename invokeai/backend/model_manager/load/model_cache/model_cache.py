@@ -961,8 +961,9 @@ class ModelCache:
         for cache_entry in list(self._cached_models.values()):
             cache_entry.is_stale = True
             if not (cache_entry.is_locked or cache_entry.first_use_holds > 0 or cache_entry.admission_in_flight):
-                bytes_freed += cache_entry.cached_model.total_bytes()
                 self._delete_cache_entry(cache_entry)
+                if not cache_entry.detached:
+                    bytes_freed += cache_entry.cached_model.total_bytes()
                 models_cleared += 1
 
         # A claimed admission or first-use wrapper can still be released after the normal worker
