@@ -80,6 +80,7 @@ const adapter: GalleryUiAdapter = {
   followedProgressSessionId: null,
   followProgressSession: noop,
   notifications: { add: notificationsAdd, reportError: noop },
+  openItemContextMenu: noop,
   projectId: 'project-1',
   projectName: 'Project',
   projects: [],

@@ -12,6 +12,7 @@ import type { LucideIcon } from 'lucide-react';
 import {
   getDocumentIndex,
   getSourceContentRect,
+  hittableLayerRect,
   isGroupNode,
   isEmptyPolygonShape,
   isHideableLayer,
@@ -37,6 +38,8 @@ import {
   DropletIcon,
   EyeIcon,
   FilmIcon,
+  TrianglesCenterlineDashedVerticalIcon,
+  TrianglesCenterlineDashedHorizontalIcon,
   FingerprintPatternIcon,
   FocusIcon,
   EyeOffIcon,
@@ -50,6 +53,7 @@ import {
   MergeIcon,
   PencilIcon,
   SaveIcon,
+  Settings2Icon,
   ContrastIcon,
   RainbowIcon,
   ScanSearchIcon,
@@ -92,9 +96,12 @@ export type LayerContextActionId =
   | 'duplicate'
   | 'group'
   | 'remove-from-group'
+  | 'open-properties'
   | 'rename'
   | 'transform'
   | 'fit-to-bbox'
+  | 'flip-horizontal'
+  | 'flip-vertical'
   | 'save-to-board'
   | 'copy-to-clipboard'
   | 'crop-to-bbox'
@@ -128,7 +135,14 @@ export type LayerContextActionId =
 
 export type LayerType = CanvasLayerContract['type'];
 export type LayerContextMenuSectionId = 'quick' | 'primary' | 'operations' | 'output' | 'state' | 'danger';
-export type LayerContextSubmenuId = 'arrange' | 'boolean' | 'copy-to' | 'convert-to' | 'add-adjustment' | 'color-label';
+export type LayerContextSubmenuId =
+  | 'arrange'
+  | 'boolean'
+  | 'copy-to'
+  | 'convert-to'
+  | 'add-adjustment'
+  | 'color-label'
+  | 'flip';
 
 export interface LayerContextActionState {
   canRunWorkflow: boolean;
@@ -173,6 +187,7 @@ export interface LayerContextActionEffects {
   startFilter(layerId: string): void;
   transform(): void;
   fitToBbox(): void;
+  flip(direction: 'horizontal' | 'vertical'): void;
   openProperties(): void;
   saveToBoard(board: LayerContextBoardChoice): Promise<void>;
   copyToClipboard(): Promise<void>;
@@ -611,6 +626,18 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
     supportedLayerTypes: ALL_LAYER_TYPES,
   },
   {
+    defaultLabel: 'Layer properties',
+    handler: ({ effects }) => effects.openProperties(),
+    icon: Settings2Icon,
+    id: 'open-properties',
+    isEnabled: isOperationFree,
+    isVisible: alwaysVisible,
+    labelKey: 'widgets.layers.actions.properties',
+    order: 5,
+    section: 'primary',
+    supportedLayerTypes: ALL_LAYER_TYPES,
+  },
+  {
     defaultLabel: 'Transform',
     handler: ({ effects }) => effects.transform(),
     icon: SlidersHorizontalIcon,
@@ -646,6 +673,19 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
     section: 'primary',
     supportedLayerTypes: ALL_LAYER_TYPES,
   },
+  ...(['horizontal', 'vertical'] as const).map((direction, index): LayerContextActionDefinition => ({
+    defaultLabel: direction === 'horizontal' ? 'Flip horizontal' : 'Flip vertical',
+    handler: ({ effects }) => effects.flip(direction),
+    icon: direction === 'horizontal' ? TrianglesCenterlineDashedVerticalIcon : TrianglesCenterlineDashedHorizontalIcon,
+    id: `flip-${direction}`,
+    isEnabled: (context) => isLayerMutable(context) && hittableLayerRect(context.layer, context.document) !== null,
+    isVisible: alwaysVisible,
+    labelKey: direction === 'horizontal' ? 'widgets.transform.flipHorizontal' : 'widgets.transform.flipVertical',
+    order: 30.1 + index * 0.01,
+    section: 'primary',
+    submenu: 'flip',
+    supportedLayerTypes: ['raster', 'control', 'vector', 'inpaint_mask', 'regional_guidance'],
+  })),
   ...ADJUSTMENT_ADD_ITEMS.map((item, index): LayerContextActionDefinition => ({
     defaultLabel: item.defaultLabel,
     handler: ({ effects }) => effects.addAdjustment(item.type),

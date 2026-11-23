@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 import pytest
 import torch
+from safetensors.torch import save_file
 
 from invokeai.backend.model_manager.configs.default_settings import MainModelDefaultSettings
 from invokeai.backend.model_manager.load import load_default
@@ -34,9 +35,8 @@ def _public_load(loader, config, subtype=None):
 
 
 def _constructor_case(family, monkeypatch, tmp_path):
-    """Only geometry/metadata and heavy I/O are replaced; the loader constructor path is real."""
+    """Use tiny geometry and real files for checkpoint constructors, with lightweight folder loaders."""
     import diffusers
-    import safetensors.torch
 
     from invokeai.backend.model_manager.configs import main
     from invokeai.backend.model_manager.load.model_loaders import (
@@ -70,6 +70,7 @@ def _constructor_case(family, monkeypatch, tmp_path):
     cls, config_cls = cases[family]
     reads = []
     source = {key: tensor.detach().clone() for key, tensor in _TinyTransformer().state_dict().items()}
+    model_path = tmp_path / family
 
     def read(*_args):
         reads.append(True)
@@ -87,19 +88,34 @@ def _constructor_case(family, monkeypatch, tmp_path):
     if family in ("moss", "moss-folder"):
         monkeypatch.setattr(moss_image, "MOSSImageTransformer", _TinyTransformer)
         monkeypatch.setattr(moss_image, "moss_image_transformer_config", lambda _sd: {})
-        monkeypatch.setattr(moss_image, "load_file", read)
-        monkeypatch.setattr(moss_image, "_read_component_state_dict", read)
+        if family == "moss-folder":
+            transformer = model_path / "transformer"
+            transformer.mkdir(parents=True)
+            (transformer / "config.json").write_text("{}")
+            checkpoint = transformer / "model.safetensors"
+        else:
+            checkpoint = model_path
+        save_file(source, str(checkpoint))
+        original = moss_image.load_safetensors_checkpoint
+
+        def read_checkpoint(*args, **kwargs):
+            reads.append(True)
+            return original(*args, **kwargs)
+
+        monkeypatch.setattr(moss_image, "load_safetensors_checkpoint", read_checkpoint)
     elif family == "ernie":
         monkeypatch.setattr(diffusers, "ErnieImageTransformer2DModel", _TinyTransformer)
-        monkeypatch.setattr(safetensors.torch, "load_file", read)
+        save_file(source, str(model_path))
+        original = ernie_image.load_safetensors_checkpoint
+
+        def read_checkpoint(*args, **kwargs):
+            reads.append(True)
+            return original(*args, **kwargs)
+
+        monkeypatch.setattr(ernie_image, "load_safetensors_checkpoint", read_checkpoint)
     else:
         monkeypatch.setattr(cls, "get_hf_load_class", lambda *_a: TinyPretrained)
-
-    model_path = tmp_path / family
-    model_path.mkdir()
-    if family == "moss-folder":
-        (model_path / "transformer").mkdir()
-        (model_path / "transformer" / "config.json").write_text("{}")
+        model_path.mkdir()
 
     def config():
         return config_cls.model_construct(

@@ -4,7 +4,6 @@ from pathlib import Path
 from typing import Optional
 
 import accelerate
-import safetensors.torch
 
 from invokeai.backend.model_manager.configs.base import Diffusers_Config_Base
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
@@ -19,7 +18,7 @@ from invokeai.backend.model_manager.taxonomy import (
     ModelType,
     SubModelType,
 )
-from invokeai.backend.quantization.fp8_scaled import reject_quantized_side_channel
+from invokeai.backend.quantization.fp8_scaled import load_safetensors_checkpoint, reject_quantized_side_channel
 from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader, unpack_ggml_at_load
 
 # The geometry of the released ERNIE-Image transformer, from the pipeline's `transformer/config.json`.
@@ -116,7 +115,7 @@ class ErnieImageCheckpointModel(ModelLoader):
 
         model_dtype = self._decision(config, SubModelType.Transformer).dtype
 
-        sd = safetensors.torch.load_file(Path(config.path))
+        sd = load_safetensors_checkpoint(Path(config.path))
         reject_quantized_side_channel(sd, f"ERNIE-Image checkpoint {Path(config.path).name}")
         self._ram_cache.make_room(sum(t.nelement() * model_dtype.itemsize for t in sd.values()))
         for key in sd:

@@ -37,6 +37,7 @@ from invokeai.backend.model_manager.util.qwen3_vl import (
 )
 from invokeai.backend.quantization.int8_convrot import CONVROT_GROUP_SIZE, build_regular_hadamard
 from tests.backend.model_manager.load.qwen3vl_gguf_fixture import tiny_qwen3vl_config
+from tests.fixtures.safetensors_files import needs_mapping_that_shows_file_writes, tensors_reading_the_file
 
 # --- the key filter -------------------------------------------------------------------------------
 
@@ -448,3 +449,18 @@ def test_cpu_only_tower_reservation_matches_frozen_load_dtype(
     assert all(t.dtype == cpu_dtype for t in tower.state_dict().values())
     assert reserved == sum(t.numel() * t.element_size() for t in tower.state_dict().values())
     assert reserved == sum(t.numel() for t in saved.visual.state_dict().values()) * cpu_dtype.itemsize
+
+
+@needs_mapping_that_shows_file_writes
+def test_the_tower_does_not_keep_the_text_encoders_shards_mapped(monkeypatch, tmp_path: Path) -> None:
+    """Saved in the dtype it loads in, the tower's cast is a no-op, so each tensor read from a shard would stay a view
+    of it and keep the encoder's whole shard mapped for as long as the tower is cached."""
+    loader, config, _ = _qwen_image_2_1_pipeline(
+        monkeypatch, tmp_path, conditional_generation=True, max_shard_size="40KB"
+    )
+    tower = loader._load_model(config, SubModelType.VisionEncoder)
+
+    shards = sorted((tmp_path / "text_encoder").glob("*.safetensors"))
+
+    assert len(shards) > 1
+    assert [name for shard in shards for name in tensors_reading_the_file(tower, shard)] == []

@@ -33,6 +33,7 @@ from tests.fixtures.quantized_payloads import (
     nvfp4_signed_tensors,
     quantize_scaled_fp8,
 )
+from tests.fixtures.safetensors_files import record_reads
 
 COMPUTE_DTYPE = torch.bfloat16
 HIDDEN = 128
@@ -355,3 +356,19 @@ def test_a_layer_the_decode_would_misread_is_refused_before_the_loader_reserves_
         run.load(config)
 
     assert run.reserved == []
+
+
+def test_the_visual_tower_and_the_head_are_never_read_from_the_file(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """The tower is a separate cache entry and the model has no head. Through ``pread`` a tensor that is read costs its
+    size in process memory whether or not the loader keeps it, so the file's own key names decide what is read."""
+    state_dict, metadata, _ = _checkpoint("marker")
+    run, config = _prepare(monkeypatch, tmp_path, state_dict, metadata)
+    log = record_reads(monkeypatch)
+
+    run.load(config)
+
+    unloaded = {key for key in state_dict if ".visual." in f".{key}" or key.startswith(("lm_head.", "model.lm_head."))}
+    assert any(key.startswith("lm_head.") for key in unloaded) and any("visual" in key for key in unloaded)
+    assert set(log.tensors) == set(state_dict) - unloaded

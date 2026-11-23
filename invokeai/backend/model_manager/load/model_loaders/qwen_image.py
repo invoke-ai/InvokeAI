@@ -41,6 +41,7 @@ from invokeai.backend.quantization.fp8_scaled import (
     dequantize_fp8_scaled,
     extract_comfy_quant_hints,
     extract_fp8_scaled_layers,
+    load_safetensors_checkpoint,
     parse_quantization_metadata,
     read_safetensors_metadata,
     split_fp8_scaled_layers,
@@ -287,7 +288,6 @@ class QwenImageCheckpointModel(ModelLoader):
 
     def _load_from_singlefile(self, config: AnyModelConfig) -> AnyModel:
         from diffusers import QwenImageTransformer2DModel
-        from safetensors.torch import load_file
 
         from invokeai.backend.util.logging import InvokeAILogger
 
@@ -299,7 +299,7 @@ class QwenImageCheckpointModel(ModelLoader):
 
         keep_checkpoint_fp8, model_dtype = self._storage_format(config, SubModelType.Transformer)
 
-        sd = load_file(str(model_path))
+        sd = load_safetensors_checkpoint(str(model_path))
         sd = CheckpointPrefix.detect(sd).strip(sd)
         # Earlier versions identified InstantX's Qwen-Image ControlNet, a trimmed copy of this transformer, as a main
         # model. Such a record still exists; the file only needs identifying again.
@@ -327,8 +327,8 @@ class QwenImageCheckpointModel(ModelLoader):
         if int8_markers:
             sd = drop_unconsumed_quantization_sidecars(sd)
             fp8_layers = {}
-            # Nothing scaled to keep for fp8 storage; the outer `_apply_fp8_layerwise_casting` still casts the dense
-            # remainder when the model asks for fp8 storage.
+            # Nothing scaled to keep for fp8 storage; the int8 layers make the outer `_apply_fp8_layerwise_casting`
+            # decline the model, so the dense remainder stays as loaded.
             use_fp8_storage = False
             keep_fp8 = False
         else:
@@ -497,7 +497,6 @@ class QwenVLEncoderCheckpointLoader(ModelLoader):
         )
 
     def _load_text_encoder_from_singlefile(self, config: QwenVLEncoder_Checkpoint_Config) -> AnyModel:
-        from safetensors.torch import load_file
         from transformers import Qwen2_5_VLConfig, Qwen2_5_VLForConditionalGeneration
 
         from invokeai.backend.util.logging import InvokeAILogger
@@ -508,7 +507,7 @@ class QwenVLEncoderCheckpointLoader(ModelLoader):
 
         device_keeps_fp8, model_dtype = self._storage_format(config, SubModelType.TextEncoder)
 
-        sd = load_file(str(model_path))
+        sd = load_safetensors_checkpoint(str(model_path))
 
         # Comfy's nvfp4 build keeps the language model's projections in nvfp4, beside scaled fp8 embeddings. Take those
         # layers out before the fp8 extraction: it pops every `.weight_scale`, nvfp4's block scales included.

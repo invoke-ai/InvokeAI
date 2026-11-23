@@ -26,8 +26,7 @@ def _device_loaders(cls, tmp_path, devices):
 @pytest.mark.parametrize("family", ["mistral", "qwen", "krea", "ideogram"])
 @pytest.mark.parametrize("reverse", [False, True])
 def test_checkpoint_storage_without_fp8_compute_partitions_and_adopts(family, reverse, monkeypatch, tmp_path):
-    cls, config, subtype, reads = _checkpoint_case(family, monkeypatch)
-    (tmp_path / "tiny.safetensors").touch()
+    cls, config, subtype, reads = _checkpoint_case(family, monkeypatch, tmp_path)
     from invokeai.backend.model_manager.load.model_loaders import mistral_encoder, qwen_image
 
     # M1 imported probe aliases in these modules. The same fixtures cover both native implementations.
@@ -74,15 +73,13 @@ def _qwen_vl_checkpoint(monkeypatch, tmp_path):
     save_file(weights, str(path))
     monkeypatch.setattr(krea2.Qwen3VLEncoderCheckpointLoader, "_load_te_config", lambda *_args: geometry)
     reads = []
-    import safetensors.torch
-
-    original = safetensors.torch.load_file
+    original = krea2.load_safetensors_checkpoint
 
     def read(*args, **kwargs):
         reads.append(True)
         return original(*args, **kwargs)
 
-    monkeypatch.setattr(safetensors.torch, "load_file", read)
+    monkeypatch.setattr(krea2, "load_safetensors_checkpoint", read)
 
     def config(**extra):
         return Qwen3VLEncoder_Checkpoint_Config.model_construct(

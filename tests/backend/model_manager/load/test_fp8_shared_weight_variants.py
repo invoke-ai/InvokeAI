@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 import torch
+from safetensors.torch import save_file
 
 from invokeai.backend.model_manager.configs.default_settings import MainModelDefaultSettings
 from invokeai.backend.model_manager.configs.main import Main_Diffusers_FLUX_Config
@@ -136,14 +137,13 @@ def test_layerwise_key_and_build_use_one_capability_answer(monkeypatch, tmp_path
 
 
 @pytest.fixture(params=["mistral", "qwen", "krea", "ideogram"])
-def checkpoint_case(request, monkeypatch):
-    return _checkpoint_case(request.param, monkeypatch)
+def checkpoint_case(request, monkeypatch, tmp_path):
+    return _checkpoint_case(request.param, monkeypatch, tmp_path)
 
 
-def _checkpoint_case(family, monkeypatch):
-    """Replace large model geometry and checkpoint I/O; run the real quantization and loader bodies."""
+def _checkpoint_case(family, monkeypatch, tmp_path):
+    """Use a tiny real checkpoint and model geometry with the production reader and loader bodies."""
     import diffusers
-    import safetensors.torch
 
     from invokeai.backend.ideogram4 import modeling_ideogram4
     from invokeai.backend.model_manager.configs.main import (
@@ -164,15 +164,17 @@ def _checkpoint_case(family, monkeypatch):
     subtype = SubModelType.TextEncoder if family == "mistral" else SubModelType.Transformer
     prefix = "model." if family == "mistral" else ""
     source = {prefix + "proj.weight": torch.ones(4, 4).to(FP8), prefix + "proj.weight_scale": torch.tensor(0.5)}
+    path = tmp_path / "tiny.safetensors"
+    save_file(source, str(path))
     reads = []
+    original = module.load_safetensors_checkpoint
 
-    def read(path):
-        reads.append(str(path))
-        return {key: tensor.clone() for key, tensor in source.items()}
+    def read(*args, **kwargs):
+        reads.append(str(args[0]))
+        return original(*args, **kwargs)
 
-    monkeypatch.setattr(safetensors.torch, "load_file", read)
+    monkeypatch.setattr(module, "load_safetensors_checkpoint", read)
     if family == "ideogram":
-        monkeypatch.setattr(ideogram4, "load_file", read)
         monkeypatch.setattr(modeling_ideogram4, "Ideogram4Transformer", _TinyModel)
     elif family == "qwen":
         monkeypatch.setattr(diffusers, "QwenImageTransformer2DModel", _TinyModel)
@@ -205,7 +207,7 @@ def _checkpoint_case(family, monkeypatch):
             extra.setdefault("variant", MistralVariantType.Mistral24B)
         if family == "krea":
             extra.setdefault("variant", Krea2VariantType.Turbo)
-        return config_class.model_construct(key="checkpoint", name="tiny", path="tiny.safetensors", **extra)
+        return config_class.model_construct(key="checkpoint", name="tiny", path=str(path), **extra)
 
     return cls, config, subtype, reads
 
@@ -302,7 +304,7 @@ def test_checkpoint_key_freezes_the_build_capability_and_dtype(checkpoint_case, 
 
 
 def test_cpu_only_mistral_shares_with_cpu_instead_of_the_loaders_gpu(monkeypatch, tmp_path):
-    cls, config, subtype, reads = _checkpoint_case("mistral", monkeypatch)
+    cls, config, subtype, reads = _checkpoint_case("mistral", monkeypatch, tmp_path)
     store = SharedCpuWeightsStore()
     budget = RamBudget(10**9, store)
     cpu = _loader(cls, store, budget, "cpu", tmp_path)

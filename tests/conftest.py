@@ -2,6 +2,11 @@
 # without needing to explicitly import them. (https://docs.pytest.org/en/6.2.x/fixture.html)
 import logging
 import os
+
+# Multiuser is the app's default; the suite tests single-user behavior unless a test passes `multiuser=True`, which
+# beats this environment value. Set before the imports below: some read `get_config()` at import time, which caches it.
+os.environ.setdefault("INVOKEAI_MULTIUSER", "false")
+
 import shutil
 import sys
 import warnings

@@ -7,6 +7,7 @@ import { getCapabilities } from './capabilities';
 const session = (overrides: Partial<AuthSession>): AuthSession => ({
   accountEpoch: 0,
   expiredUserId: null,
+  hasSingleUserWork: false,
   multiuserEnabled: true,
   phase: 'ready',
   sessionExpired: false,
