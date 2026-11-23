@@ -62,6 +62,7 @@ from invokeai.backend.model_manager.configs.ip_adapter import (
 from invokeai.backend.model_manager.configs.llava_onevision import LlavaOnevision_Diffusers_Config
 from invokeai.backend.model_manager.configs.lora import (
     ControlLoRA_LyCORIS_FLUX_Config,
+    ControlLoRA_LyCORIS_Krea2_Config,
     LoRA_Diffusers_Flux2_Config,
     LoRA_Diffusers_Flux3_Config,
     LoRA_Diffusers_FLUX_Config,
@@ -637,6 +638,7 @@ AnyModelConfig = Annotated[
         Annotated[LoRA_Diffusers_ZImage_Config, LoRA_Diffusers_ZImage_Config.get_tag()],
         # ControlLoRA - diffusers format
         Annotated[ControlLoRA_LyCORIS_FLUX_Config, ControlLoRA_LyCORIS_FLUX_Config.get_tag()],
+        Annotated[ControlLoRA_LyCORIS_Krea2_Config, ControlLoRA_LyCORIS_Krea2_Config.get_tag()],
         # T5 Encoder - all formats
         Annotated[T5Encoder_T5Encoder_Config, T5Encoder_T5Encoder_Config.get_tag()],
         Annotated[T5Encoder_BnBLLMint8_Config, T5Encoder_BnBLLMint8_Config.get_tag()],

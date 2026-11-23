@@ -693,6 +693,25 @@ export const MODEL_SEED_SETS = Object.freeze({
     }),
     controlSeed('flux-controlnet-union-pro', 'flux', null),
   ],
+  // A Krea-2 Turbo main with a depth Control LoRA, Krea-2's only control kind.
+  'control-krea2': [
+    {
+      record: seedModel({
+        base: 'krea-2',
+        format: 'diffusers',
+        key: 'seed-krea2-turbo',
+        name: 'Krea-2 Turbo',
+        trigger_phrases: null,
+        type: 'main',
+        variant: 'krea2_turbo',
+      }),
+    },
+    controlSeed('krea2-depth-control-lora', 'krea-2', 'depth_anything_image_processor', {
+      format: 'lycoris',
+      trigger_phrases: null,
+      type: 'control_lora',
+    }),
+  ],
   // Models whose files also serve as another type: single-file MOSS-Image and Z-Image mains with their VAEs, a Text
   // LLM that is also the Qwen3.5 9B encoder, a Qwen3.5 encoder that is also a Text LLM, and a Qwen3 4B causal-LM
   // folder that is also the Qwen3 encoder.

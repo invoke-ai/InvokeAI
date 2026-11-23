@@ -9,6 +9,7 @@ Paths and commands are relative to this package. This map links user vocabulary 
   - `anima-lllite`, `spandrel`: adapters and upscalers installed before their channels or scale were recorded; re-identify fills those fields.
   - `control-sdxl`: SDXL ControlNets naming their preprocessor in both id forms, a Union, an unpurposed model, and a T2I-Adapter.
   - `control-flux`: FLUX dev with a depth Control LoRA and a Union ControlNet.
+  - `control-krea2`: Krea-2 Turbo with a depth Control LoRA.
   - `model-roles`: single-file MOSS-Image and Z-Image mains with VAEs, a Text LLM that is also the Qwen3.5 9B encoder, a Qwen3.5 9B encoder that is also a Text LLM, and a Qwen3 4B Text LLM folder that is also the Qwen3 encoder (`roles`).
 - The mock's account used an earlier build and kept rearranging (`rearrangeWithoutCustomize` on, its one-time lock offer answered), so journeys use structural chrome directly. To see the locked default, turn off **Rearrange without Customize** in Settings › Workspaces & data, or seed `webv2:workbench-settings` without the key to see the offer.
 - The mock serves in-memory HTTP without Socket.IO. It proves nothing about real authorization, persistence, or model execution.
