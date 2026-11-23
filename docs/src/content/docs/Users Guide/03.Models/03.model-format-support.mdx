@@ -250,8 +250,9 @@ family page.
 The layout is read from module names alone, which leaves three cases unsettled:
 
 - **SD 1.x and SD 2.x.** Their UNets hold a single transformer block inside every attention, flattened at the same
-  index as SDXL's, so no name tells the two families apart. Such a file is not identified; set its base to SD 1.x
-  or SD 2.x when you install it.
+  index as SDXL's, so no name tells the two families apart. Such a file is not identified, and setting its base to
+  SD 1.x or SD 2.x does not make it load: those bases keep the flattened `lycoris_` names, while SD denoising only
+  applies `lora_unet_` keys, so none of its layers would apply.
 - **Chroma in diffusers naming.** Chroma shares FLUX.1's `single_transformer_blocks.N.attn.to_q` and `proj_mlp`
   names, so an attention-only Chroma file in that naming installs as FLUX.1 and patches FLUX.1 layers of the same
   shape. Any Chroma-only name, such as `distilled_guidance_layer`, keeps the file out; Chroma files in Black Forest
