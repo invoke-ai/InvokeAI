@@ -325,8 +325,9 @@ The file holds LoRAs for the transformer blocks and a trained replacement for th
 The control image is encoded with the VAE at the generation size, and its latent tokens are concatenated to the
 latent tokens of the image being generated before they enter the transformer, in every step and in both CFG passes.
 The LoRA's weight scales the block LoRAs; the trained input projection is always applied whole. A weight below 1
-relaxes how closely the image follows the control image, and above 1 tightens it at some cost in quality. The public
-checkpoint was trained on Krea-2-Raw and works on Raw and Turbo.
+relaxes how closely the image follows the control image, and above 1 tightens it at some cost in quality. Negative
+weights are not useful here: they invert the block LoRAs while the trained input projection still applies whole. The
+public checkpoint was trained on Krea-2-Raw and works on Raw and Turbo.
 
 A Control LoRA is trained for one control type and needs a control image of that type. The public one takes a depth
 map in which near is white, as the **Depth Anything** filter produces.
