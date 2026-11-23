@@ -37,10 +37,16 @@ export const CanvasScrollInputFeed = ({
   const subscribe = useWorkbenchSubscription();
   useMountEffect(() => {
     const { interaction } = engine;
+    let read: unknown = null;
     const feed = (): void => {
       const project = queries.getProject(projectId);
-      if (project) {
-        const values = getResolvedProjectWidgetValues(project, 'canvas', queries.getSnapshot().scopedDefaults);
+      if (!project) {
+        return;
+      }
+      // Resolved values keep their identity while the project's pins and the account defaults keep theirs.
+      const values = getResolvedProjectWidgetValues(project, 'canvas', queries.getSnapshot().scopedDefaults);
+      if (values !== read) {
+        read = values;
         interaction.set('scrollInput', readCanvasScrollInput(values));
       }
     };
