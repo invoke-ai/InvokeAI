@@ -12,6 +12,7 @@ loader that ignored the rotation would produce a weight that loads cleanly and g
 import json
 
 import pytest
+import safetensors.torch
 import torch
 
 from invokeai.backend.flux.model import FluxParams
@@ -25,6 +26,7 @@ from invokeai.backend.quantization.int8_convrot import (
 )
 from tests.fixtures.loader_seams import Seam, prepare
 from tests.fixtures.quantized_payloads import comfy_quant_marker, quantize_convrot, quantize_scaled_fp8
+from tests.fixtures.safetensors_files import record_reads
 
 # As the file carries it: rotated along the input dim, per-output-channel scales.
 MARKER = {"format": "int8_tensorwise", "per_row": True, "convrot": True, "convrot_groupsize": CONVROT_GROUP_SIZE}
@@ -106,9 +108,13 @@ SEAM = Seam(
 )
 
 
-def _driver(monkeypatch, tmp_path, state_dict: dict, header: dict | None = None):
+def _driver(monkeypatch, tmp_path, state_dict: dict, header: dict | None = None, *, written: bool = False):
+    """The loader over ``state_dict`` served in place of the file read, or with ``written`` over a real file."""
     checkpoint = tmp_path / "flux1-dev-int8-convrot.safetensors"
-    checkpoint.touch()
+    if written:
+        safetensors.torch.save_file(state_dict, str(checkpoint))
+    else:
+        checkpoint.touch()
     config = Main_Checkpoint_FLUX_Config.model_construct(
         path=str(checkpoint), name="flux1-dev-int8", variant=FluxVariantType.Dev
     )
@@ -120,14 +126,14 @@ def _driver(monkeypatch, tmp_path, state_dict: dict, header: dict | None = None)
         # module symbol being gone.
         patch.setattr(flux, "should_keep_fp8_weights", lambda _device: False, raising=False)
 
-    run = prepare(SEAM, monkeypatch, state_dict=state_dict, metadata=header, geometry=geometry)
+    run = prepare(SEAM, monkeypatch, state_dict=None if written else state_dict, metadata=header, geometry=geometry)
     # An instance attribute shadows the method, which is what keeps this working either way.
     run.loader._keep_fp8_weights = lambda _config, _submodel=None: False
     return run, config
 
 
-def _load(monkeypatch, tmp_path, state_dict, header: dict | None = None):
-    run, config = _driver(monkeypatch, tmp_path, state_dict, header)
+def _load(monkeypatch, tmp_path, state_dict, header: dict | None = None, *, written: bool = False):
+    run, config = _driver(monkeypatch, tmp_path, state_dict, header, written=written)
     return run.load(config), run
 
 
@@ -402,3 +408,20 @@ def test_a_prefixed_dense_checkpoint_is_refused_for_want_of_every_parameter(monk
 
     with pytest.raises(RuntimeError, match=r"missing \d+ parameter\(s\) that the model requires"):
         _load(monkeypatch, tmp_path, prefixed, header=header)
+
+
+def test_the_components_bundled_beside_the_transformer_are_never_read(monkeypatch, tmp_path) -> None:
+    """An all-in-one FLUX.1 file carries a VAE and text encoders under namespaces of their own. Read through ``pread``
+    they would cost their size in process memory only to be dropped by the bundle conversion."""
+    state_dict, _ = _checkpoint()
+    transformer = {f"model.diffusion_model.{key}": value for key, value in state_dict.items()}
+    bundled = {
+        "vae.decoder.conv_in.weight": torch.ones(8, 8, dtype=torch.bfloat16),
+        "text_encoders.clip_l.transformer.embeddings.weight": torch.ones(8, 8, dtype=torch.bfloat16),
+    }
+    log = record_reads(monkeypatch)
+
+    model, _ = _load(monkeypatch, tmp_path, {**transformer, **bundled}, written=True)
+
+    assert set(log.tensors) == set(transformer)
+    assert isinstance(model.double_blocks[0].img_attn.qkv, Int8ConvrotLinear)

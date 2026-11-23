@@ -74,7 +74,8 @@ FOREIGN_TRANSFORMERS = {
     "pixart-sigma": (1152, 1152, 1152),
     "sana-600m": (1152, 1152, 1152),
     "sana-1600m": (2240, 2240, 2240),
-    # Self-attention is as wide as Anima's; only the text context tells them apart.
+    # LTX-Video 2B: self-attention is as wide as Anima's; only the text context tells them apart. (The 13B is 4096
+    # wide, like LTX-2's video stream; see test_ltx2_lora_probe_independence.py.)
     "ltx-video": (2048, 2048, 2048),
 }
 

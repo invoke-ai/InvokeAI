@@ -49,6 +49,7 @@ import {
 import {
   describeNamedRefusal,
   reportLayerOperation,
+  reportFlipLayer,
   usePreparedCommit,
 } from '@workbench/widgets/canvas/useStructuralCommit';
 import { useActiveProjectId, useActiveProjectSelector } from '@workbench/WorkbenchContext';
@@ -57,6 +58,7 @@ import {
   ArrowUpDownIcon,
   ChevronRightIcon,
   CopyIcon,
+  TrianglesCenterlineDashedVerticalIcon,
   MergeIcon,
   MoreVerticalIcon,
   PaletteIcon,
@@ -78,6 +80,7 @@ import type {
 } from './layerContextMenuLayout';
 import type { LayerMenuDialogKind, LayerMenuDialogState } from './layerMenuState';
 
+import { clearLayerChildSelection } from './layerChildSelection';
 import {
   deleteLayers,
   duplicateLayers,
@@ -130,7 +133,7 @@ import {
   needsBakedControlPixels,
 } from './layerOps';
 import { LayerSaveToBoardSubmenu } from './LayerSaveToBoardSubmenu';
-import { useRevealLayerProperties } from './revealLayerProperties';
+import { revealLayerSection, useRevealLayerProperties } from './revealLayerProperties';
 import { RunLayerWorkflowDialog, useLayerWorkflowAvailability } from './RunLayerWorkflowDialog';
 import { useSelectedModelBase } from './useSelectedModelBase';
 
@@ -607,6 +610,20 @@ const LayerMenu = ({
     patchBase(getActionLabel('fit-to-bbox'), { transform });
   }, [bbox, documentRect, getActionLabel, layer, makeStatusError, patchBase]);
 
+  const handleFlip = useCallback(
+    (direction: 'horizontal' | 'vertical') => {
+      if (!engine) {
+        throw makeStatusError('not-ready');
+      }
+      reportFlipLayer(
+        engine.layers.flipLayer(layer.id, direction, getActionLabel(`flip-${direction}`)),
+        notify.error,
+        t
+      );
+    },
+    [engine, getActionLabel, layer.id, makeStatusError, notify, t]
+  );
+
   const handleSaveToBoard = useCallback(
     async (board: LayerContextBoardChoice) => {
       if (!engine) {
@@ -686,10 +703,12 @@ const LayerMenu = ({
     }
   }, [engine, layer.id, makeStatusError]);
 
-  const handleOpenProperties = useCallback(
-    () => revealProperties(layer.id, { focus: 'layers' }),
-    [layer.id, revealProperties]
-  );
+  const handleOpenProperties = useCallback(() => {
+    // A selected child row (reference image, mask modifier, adjustment) would keep its own editor in the pane.
+    clearLayerChildSelection();
+    revealProperties(layer.id, { focus: 'layers' });
+    revealLayerSection();
+  }, [layer.id, revealProperties]);
 
   const handleBooleanRaster = useCallback(
     async (operation: BooleanRasterOperation) => {
@@ -907,6 +926,7 @@ const LayerMenu = ({
       extractMaskedArea: handleExtractMaskedArea,
       group: handleGroup,
       fitToBbox: handleFitToBbox,
+      flip: handleFlip,
       mergeDown: handleMerge,
       mergeMasks: handleMergeMasks,
       mergeSelected: handleMergeSelected,
@@ -942,6 +962,7 @@ const LayerMenu = ({
       handleDuplicate,
       handleExtractMaskedArea,
       handleFitToBbox,
+      handleFlip,
       handleGroup,
       handleMergeMasks,
       handleMergeSelected,
@@ -1175,6 +1196,7 @@ const SUBMENU_META: Record<LayerContextSubmenuId, { defaultLabel: string; icon: 
   'color-label': { defaultLabel: 'Color label', icon: PaletteIcon, labelKey: 'widgets.layers.menu.colorLabel' },
   'convert-to': { defaultLabel: 'Convert to', icon: ArrowRightLeftIcon, labelKey: 'widgets.layers.menu.convertTo' },
   'copy-to': { defaultLabel: 'Copy to', icon: CopyIcon, labelKey: 'widgets.layers.menu.copyTo' },
+  flip: { defaultLabel: 'Flip', icon: TrianglesCenterlineDashedVerticalIcon, labelKey: 'widgets.layers.menu.flip' },
 };
 
 /** Runs a layer action, reporting its failure; a `picker: 'board'` action runs with the board picked for it. */

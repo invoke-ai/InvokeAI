@@ -49,6 +49,8 @@ InvokeAI searches for the root directory in this order:
 3. The directory containing the currently active virtual environment.
 4. Fallback: a directory in the current user's home directory named `invokeai`.
 
+For a Launcher install, the root directory is the folder you installed Invoke into.
+
 ### InvokeAI Configuration File
 
 Inside the root directory, we read settings from the `invokeai.yaml` file.
@@ -57,10 +59,10 @@ It has two sections - one for internal use and one for user settings:
 
 ```yaml
 # Internal metadata - do not edit:
-schema_version: 4.0.2
+schema_version: 4.0.3
 
 # Put user settings here - see https://invoke.ai/configuration/invokeai-yaml/:
-host: 0.0.0.0 # serve the app on your local network
+host: 127.0.0.1 # serve the app on this computer
 models_dir: D:\invokeai\models # store models on an external drive
 precision: float16 # always use fp16 precision
 ```
@@ -68,6 +70,12 @@ precision: float16 # always use fp16 precision
 The settings in this file will override the defaults. You only need
 to change this file if the default for a particular setting doesn't
 work for you.
+
+A new file gets `multiuser: true`. If an existing file has no `multiuser` line, InvokeAI adds the line `multiuser: true` to the end of the file when it starts. Nothing else in the file changes, so your comments and settings stay as you wrote them. If the file is read-only, or the line cannot be added without changing how the file reads, InvokeAI leaves the file alone and logs a warning at every start. When InvokeAI saves the file, for example after you change settings in the UI or when it updates an older file, it writes the whole file again. It keeps the file's `multiuser` value, but comments you added are lost. Environment variables never change what is written.
+
+The line matters if you go back to an older release: v6.12 to v7.0.0-beta.2 default to single-user mode, so without it they would start without sign-in. v6.13 and later read the file and keep sign-in on. v6.12 and earlier refuse to start with a file that v7 has updated; they need the `invokeai.yaml.bak` that v7 saved next to it at its first start. See [Upgrading to v7](/start-here/upgrading/#which-backup-to-restore).
+
+To share InvokeAI on your network, [create the first administrator privately](/configuration/multi-user-mode/admin-guide/#set-up-multi-user-mode) before changing the host address.
 
 You'll find an example file next to `invokeai.yaml` that shows the default values.
 

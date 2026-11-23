@@ -222,6 +222,7 @@ const adapter: GalleryUiAdapter = {
     reportError: (...args: unknown[]) => mocks.notificationsReportError(...args),
     undoable: (...args: unknown[]) => mocks.notificationsUndoable(...args),
   },
+  openItemContextMenu: vi.fn(),
   projectId: 'project-1',
   projectName: 'Project',
   projects: [],

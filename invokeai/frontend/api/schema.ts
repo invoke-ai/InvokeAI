@@ -25278,6 +25278,7 @@ export type components = {
          *         fp8_compute: Keep ComfyUI 'scaled fp8' checkpoints quantized instead of dequantizing them at load, and run their matmuls on the fp8 tensor cores (requires an Ada/SM 8.9 or newer NVIDIA GPU, or a ROCm GPU that passes an fp8 matmul probe; falls back automatically otherwise). Speeds up denoising and keeps the transformer at fp8 size - FP8 Storage alone also keeps it at that size, without the speedup - but quantizes activations as well, so images will differ from previous versions at the same seed. Reproducibility also requires the model to be FULLY resident in VRAM: a layer whose weights are still in RAM falls back to the dequantized path, and since which layers are resident shifts from run to run, the same seed then yields visibly different images. For repeatable output, ensure the model loads at 100% (e.g. enable_partial_loading=false with enough free VRAM).
          *         fp8_compute_full_precision_hints: Honor the per-layer 'full_precision_matrix_mult' flags that some scaled-fp8 checkpoints ship. Those layers then dequantize on every forward instead of using the fp8 tensor cores, which can cost a large part of the fp8_compute speedup - on checkpoints that mark many layers, most of it. Set to false to run every quantized layer on the fp8 tensor cores, ignoring the producer's instruction; faster, but the marked layers were flagged as numerically sensitive, so quality may suffer. Only has an effect when fp8_compute is enabled.
          *         int8_compute: Run the matmuls of ComfyUI int8 builds quantized with convrot ('int8_tensorwise' with 'convrot') on the int8 tensor cores instead of dequantizing their weights on every forward (requires an NVIDIA GPU with compute capability 8.0 or newer and Triton; falls back automatically otherwise, including on AMD, Apple and Intel GPUs and the CPU). Speeds up denoising with these builds, but quantizes activations per token as well, so images will differ from the dequantized path at the same seed. The kernels are tuned once per layer shape and token-count bucket: about 35 seconds for the first image after enabling it, about 1-5 seconds for a later size in a new token-count bucket, cached on disk across restarts.
+         *         async_weight_streaming: When a model is only partially loaded into VRAM, copy the weights it streams from RAM to the GPU asynchronously from page-locked RAM on a separate stream, overlapping with the computation, instead of one blocking copy per layer. Speeds up partially loaded models; images stay identical. Requires an NVIDIA or AMD (ROCm) GPU and keep_ram_copy_of_weights; falls back to the blocking copy automatically otherwise (Apple and Intel GPUs, the CPU, and GGUF or other specially quantized weights, which gain nothing from it). Copies in flight take up to about 384MB of VRAM; the model cache keeps that much free for them, so slightly less of such a model stays in VRAM. The RAM copy of the streamed weights is page-locked and stays locked while the model is in the cache, so models taking turns in VRAM lock it once (not swappable; at most 40% of physical RAM, where the weights of models not running are unlocked first); weights loaded from a file mapping are read into RAM when they are first locked. Has no effect on models that fit fully in VRAM.
          *         ram: DEPRECATED: This setting is no longer used. It has been replaced by `max_cache_ram_gb`, but most users will not need to use this config since automatic cache size limits should work well in most cases. This config setting will be removed once the new model cache behavior is stable.
          *         vram: DEPRECATED: This setting is no longer used. It has been replaced by `max_cache_vram_gb`, but most users will not need to use this config since automatic cache size limits should work well in most cases. This config setting will be removed once the new model cache behavior is stable.
          *         lazy_offload: DEPRECATED: This setting is no longer used. Lazy-offloading is enabled by default. This config setting will be removed once the new model cache behavior is stable.
@@ -25310,7 +25311,7 @@ export type components = {
          *         download_proxy: Optional HTTP proxy for model downloads. The proxy must enforce the public-address policy because proxy-side DNS cannot be checked by InvokeAI.
          *         unsafe_disable_picklescan: UNSAFE. Disable the picklescan security check during model installation. Recommended only for development and testing purposes. This will allow arbitrary code execution during model installation, so should never be used in production.
          *         allow_unknown_models: Allow installation of models that we are unable to identify. If enabled, models will be marked as `unknown` in the database, and will not have any metadata associated with them. If disabled, unknown models will be rejected during installation.
-         *         multiuser: Enable multiuser support. When disabled, the application runs in single-user mode using a default system account with administrator privileges. When enabled, requires user authentication and authorization.
+         *         multiuser: Enable multiuser support (the default). Requires user authentication and authorization; the first visitor creates the administrator account. Set to false for single-user mode, which uses a default system account with administrator privileges and no sign-in: anyone who can reach the server then has full control of it. Single-user mode is deprecated.
          *         strict_password_checking: Enforce strict password requirements. When True, passwords must contain uppercase, lowercase, and numbers. When False (default), any password is accepted but its strength (weak/moderate/strong) is reported to the user.
          *         image_index_enabled: Maintain a semantic embedding index of gallery images and videos, used by the image map and semantic search features.
          *         image_index_model: Name of the installed CLIP Vision or SigLIP model used to embed gallery images and video thumbnails. Changing the model discards embeddings computed by the previous model.
@@ -25696,6 +25697,12 @@ export type components = {
              */
             int8_compute?: boolean;
             /**
+             * Async Weight Streaming
+             * @description When a model is only partially loaded into VRAM, copy the weights it streams from RAM to the GPU asynchronously from page-locked RAM on a separate stream, overlapping with the computation, instead of one blocking copy per layer. Speeds up partially loaded models; images stay identical. Requires an NVIDIA or AMD (ROCm) GPU and keep_ram_copy_of_weights; falls back to the blocking copy automatically otherwise (Apple and Intel GPUs, the CPU, and GGUF or other specially quantized weights, which gain nothing from it). Copies in flight take up to about 384MB of VRAM; the model cache keeps that much free for them, so slightly less of such a model stays in VRAM. The RAM copy of the streamed weights is page-locked and stays locked while the model is in the cache, so models taking turns in VRAM lock it once (not swappable; at most 40% of physical RAM, where the weights of models not running are unlocked first); weights loaded from a file mapping are read into RAM when they are first locked. Has no effect on models that fit fully in VRAM.
+             * @default false
+             */
+            async_weight_streaming?: boolean;
+            /**
              * Ram
              * @description DEPRECATED: This setting is no longer used. It has been replaced by `max_cache_ram_gb`, but most users will not need to use this config since automatic cache size limits should work well in most cases. This config setting will be removed once the new model cache behavior is stable.
              */
@@ -25901,8 +25908,8 @@ export type components = {
             allow_unknown_models?: boolean;
             /**
              * Multiuser
-             * @description Enable multiuser support. When disabled, the application runs in single-user mode using a default system account with administrator privileges. When enabled, requires user authentication and authorization.
-             * @default false
+             * @description Enable multiuser support (the default). Requires user authentication and authorization; the first visitor creates the administrator account. Set to false for single-user mode, which uses a default system account with administrator privileges and no sign-in: anyone who can reach the server then has full control of it. Single-user mode is deprecated.
+             * @default true
              */
             multiuser?: boolean;
             /**
@@ -40619,7 +40626,8 @@ export type components = {
          *     area cap of 768x1344. "768 lowres" pins the LONG edge to 768 instead, giving a
          *     canvas with roughly half the pixels for non-square ratios (e.g. a 2:3 source becomes
          *     512x768 instead of 768x1152) — faster and cheaper, at some cost in fidelity since it
-         *     is below the model's training resolution. Both presets round each axis to the
+         *     is below the model's training resolution. "480p" and "544p" target shorter edges
+         *     under the native area cap (16:9 gives 864x480 and 960x544). All presets round each axis to the
          *     nearest multiple of 32. Only the aspect ratio of the inputs matters. Aspect ratios
          *     beyond 1:4 / 4:1 are rejected. Wire from ``Image Primitive``'s width/height outputs
          *     and into the width/height of ``Prompt - MiniMax H3``, ``Frame Conditioning - MiniMax
@@ -40657,11 +40665,11 @@ export type components = {
             height?: number;
             /**
              * Target Resolution
-             * @description Canvas preset. '768 highres' is H3's native policy (short edge 768, soft cap 768x1344). '768 lowres' pins the long edge to 768 for smaller, faster test renders (e.g. 512x768 from a 2:3 source) at some cost in fidelity.
+             * @description Canvas preset. '768 highres' is H3's native policy (short edge 768, soft cap 768x1344). '768 lowres' pins the long edge to 768 for smaller, faster test renders (e.g. 512x768 from a 2:3 source) at some cost in fidelity. 480p and 544p target a shorter edge under the same area cap for draft renders.
              * @default 768 highres
              * @enum {string}
              */
-            target_resolution?: "768 highres" | "768 lowres";
+            target_resolution?: "768 highres" | "768 lowres" | "480p" | "544p";
             /**
              * type
              * @default minimax_h3_ideal_dimensions
@@ -50851,6 +50859,12 @@ export type components = {
              * @description Email of the first active admin user, if any
              */
             admin_email?: string | null;
+            /**
+             * Has Single User Work
+             * @description Whether work made in single-user mode exists that new accounts will not see; only during setup
+             * @default false
+             */
+            has_single_user_work?: boolean;
         };
         /**
          * Show Image

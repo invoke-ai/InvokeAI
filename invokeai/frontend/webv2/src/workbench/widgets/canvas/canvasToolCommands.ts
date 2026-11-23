@@ -7,6 +7,7 @@ import type {
   LayerUnreadable,
   ShapeToolKind,
 } from '@workbench/canvas-engine/api';
+import type { WidgetHotkeyContribution } from '@workbench/widgetContracts';
 import type { TFunction } from 'i18next';
 import type { ElementType } from 'react';
 
@@ -30,7 +31,12 @@ export const showCanvasRefusalNotice = (key: string, title: string, message: str
 
 export type CanvasRefusalNotice = typeof showCanvasRefusalNotice;
 
-export type HotkeyTableEntry = readonly [id: string, titleKey: string, defaultKeys: readonly string[]];
+export type HotkeyTableEntry = readonly [
+  id: string,
+  titleKey: string,
+  defaultKeys: readonly string[],
+  options?: Pick<WidgetHotkeyContribution, 'ignoreRepeat'>,
+];
 
 /** The same layer operation is available from the Canvas and the Layers widget. */
 export const CANVAS_MERGE_DOWN_HOTKEY = ['canvas.mergeDown', 'widgets.canvas.commands.mergeDown', ['mod+e']] as const;

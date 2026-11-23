@@ -1,7 +1,7 @@
 ---
 title: Multi-User Administrator Guide
-description: Turn on multi-user mode, manage accounts, and keep a shared InvokeAI server safe.
-lastUpdated: 2026-10-26
+description: Set up the first administrator, manage accounts, and keep a shared InvokeAI server safe.
+lastUpdated: 2026-11-20
 sidebar:
   order: 4
 ---
@@ -26,30 +26,26 @@ There are two roles. Any number of accounts can be administrators.
 
 Roles are read from the database on every request, so promoting or demoting someone takes effect on their next action. See [When changes take effect](#when-changes-take-effect).
 
-## Turn on multi-user mode
+## Set up multi-user mode
+
+Multi-user mode is on by default. See [Upgrading from single-user mode](#upgrading-from-single-user-mode) if your install predates this default.
 
 <Steps>
 
-1. **Back up.** Stop InvokeAI and copy the `databases` folder in your root directory. See [Backups](#backups).
+1. **Keep setup private.** Stop InvokeAI. On an existing install, [back up the installation](#backups). Disable any reverse proxy, tunnel or port forward that gives others access to InvokeAI. Configure [local-only access](#verify-local-only-access) for your installation. Anyone who can reach the setup page can create the first administrator.
 
-2. **Edit `invokeai.yaml`** in your root directory and add `multiuser: true`. To let other computers on your network reach the server, also add `host: 0.0.0.0`:
+2. **Start in multi-user mode.** Set `multiuser: true` in `invokeai.yaml` or use the default. Remove any `INVOKEAI_MULTIUSER=false` environment override. To require strong passwords, set `strict_password_checking: true`. Start InvokeAI, verify the listener as described below, then open `http://localhost:9090` on the server. On a remote server, use a private SSH tunnel to its loopback address.
 
-   ```yaml
-   multiuser: true
-   host: 0.0.0.0                  # optional: listen on the network, not only this computer
-   strict_password_checking: true # optional: require strong passwords
-   ```
-
-3. **Start InvokeAI** from the launcher or with `invokeai-web`. With `host: 0.0.0.0`, other computers open `http://<server-address>:9090`.
-
-4. **Create the first administrator.** The first browser to open InvokeAI shows **Set up Invoke**. Enter:
+3. **Create the first administrator.** On **Set up Invoke**, enter:
    - **Email**: the sign-in name. It cannot be changed later. It must look like an email address, though `admin@localhost` also works; nothing is ever sent to it.
    - **Display name** (optional): shown to other users instead of the email.
    - **Password** and **Confirm password**.
 
-   Select **Create administrator account**, then sign in.
+   Select **Create administrator account**, then sign in. If an administrator already exists, sign in with that account. If the installation has projects, wildcards, private prompt templates or private uploaded fonts from single-user mode, a **Your earlier work is kept** notice above the button links to [If you have already upgraded](#if-you-have-already-upgraded).
 
-5. **Add the other users** from the Launchpad's **Users** page, or with `invoke-useradd`. See [Manage users](#manage-users).
+4. **Add the other users** from the Launchpad's **Users** page or with `invoke-useradd`. See [Manage users](#manage-users).
+
+5. **Enable network access if needed.** After confirming administrator sign-in, configure [HTTPS](#https-and-internet-access) and enable the intended network route. With a reverse proxy on the same host, keep InvokeAI on loopback. For a direct LAN connection, bind to the server's LAN address and restart. If you change Docker's port mapping, reuse the data volume that contains the administrator account.
 
 </Steps>
 
@@ -61,20 +57,103 @@ Browsers turn off the clipboard and Web Locks for plain-HTTP pages at a network 
 InvokeAI cannot recover a password. If you lose the last administrator's password, reset it from the command line with [`invoke-usermod`](#troubleshooting).
 :::
 
-To go back to single-user mode, set `multiuser: false` (or remove the line) and restart. Browsers that had InvokeAI open may need a hard refresh.
+### Verify local-only access
+
+- **Native install.** Set `host: 127.0.0.1` in `invokeai.yaml`. The server process's `INVOKEAI_HOST` environment variable takes precedence, so unset it or set it to `127.0.0.1` in your launcher or service environment. After starting, inspect the listening socket for your port. For example, on Linux run `ss -ltn 'sport = :9090'`, on macOS run `lsof -nP -iTCP:9090 -sTCP:LISTEN`, or on Windows run `Get-NetTCPConnection -LocalPort 9090 -State Listen`. The local address should be loopback only (`127.0.0.1` or `::1`). A wildcard or LAN address accepts network connections.
+- **Docker.** Leave the listener inside the container on `0.0.0.0`. With the supplied Compose file, set `HOST_INVOKEAI_IP=127.0.0.1` in `.env`. For older Compose files, set the port mapping itself to `127.0.0.1:9090:9090`. With `docker run`, use `--publish 127.0.0.1:9090:9090`. Keep untrusted containers off the same Docker network. After starting, run `docker port <container> 9090/tcp` on the host and confirm the published address is `127.0.0.1:9090`. Substitute your configured port in these checks.
+
+### Single-user mode
+
+Before disabling sign-in, disconnect external routes and [verify local-only access](#verify-local-only-access) with sign-in still enabled. Every visitor in single-user mode has full administrator control. Set `multiuser: false` in `invokeai.yaml` or set `INVOKEAI_MULTIUSER=false` in the container environment. Restart with the same network configuration. Browsers that had InvokeAI open may need a hard refresh.
+
+:::caution[Single-user mode is deprecated]
+Single-user mode will be removed in a future release.
+:::
+
+### Upgrading from single-user mode
+
+Already upgraded, for example because **Set up Invoke** shows **Your earlier work is kept**? See [If you have already upgraded](#if-you-have-already-upgraded).
+
+Earlier versions ran in single-user mode by default. Upgrading with no `multiuser` setting now enables sign-in, even on localhost. New accounts, including the first administrator, have their own projects, wildcards, private prompt templates and private fonts. If you want to keep working without accounts, check that the effective setting is explicitly `multiuser: false` and keep the server [local only](#single-user-mode). Earlier versions dropped `multiuser: false` from `invokeai.yaml` when they rewrote it, so check the file even if you set it before. The current version keeps the line.
+
+1. **Before switching, finish queued work.** Stop submitting jobs and let pending and running jobs finish in single-user mode. In particular, **Prompts from File** checks the submitting account when the node runs. Old jobs belong to `system`, which has no administrator role in multi-user mode, so that node fails after the switch.
+2. **Export the work you want to carry across.** While still in single-user mode, use the export instructions in the table below.
+3. **Set up accounts privately.** Follow [Set up multi-user mode](#set-up-multi-user-mode) to back up, restart and create the administrator before allowing network access. Hard-refresh any browser tabs left open across the switch. Update API clients to [sign in and send a token](/configuration/multi-user-mode/api-guide/).
+4. **Import as the intended owner.** Sign in to the destination account and follow the import instructions below.
+
+| Data | Before switching, in single-user mode | After switching, in the destination account |
+| --- | --- | --- |
+| [Workbench projects](/users-guide/projects/introduction/#exporting-and-importing) | In **Launchpad → Projects**, choose **Export** from each project's menu. Save the `.invk` file and check for missing-media warnings. | Select the file in **Launchpad → Projects → Import…**. Review warnings and check the project's boards, media and references. |
+| Private fonts | **Include font files** is off by default. Select it during project export if you can redistribute the fonts used by that project's text layers. Keep original files for fonts you leave out, including fonts unused by any exported project. | Importing the `.invk` installs embedded fonts privately. For other fonts, upload the original files to **My fonts** with **Launchpad → Fonts → Add Fonts**. Check text layers that use them. |
+| [Wildcards](/users-guide/image-generation/prompting-guide/#importing-and-exporting-wildcards) | In the prompt panel, select **Dynamic → Wildcards → Export** and save the whole collection as YAML or JSON. | Choose **Dynamic → Wildcards → Import → From files…**. |
+| [Private prompt templates](/users-guide/image-generation/prompting-guide/#importing-and-exporting-templates) | In the prompt toolbar, choose **Templates → Export**. The CSV contains every user-created template's name, positive prompt and negative prompt. It omits thumbnails, so keep the preview images separately. | An administrator can use **Templates → Import** to create copies owned by that administrator. For an ordinary user, recreate the desired rows with **Templates → New template** while signed in as that user. Add the preview image in each template's editor. |
+
+Each project import creates a new project ID and copies the archived boards and their media. Missing media can leave broken references. The archive includes the project's workflows and referenced media. It leaves out Library workflows, unrelated Library boards, models, queue history, temporary intermediates and account preferences. Older canvas-only `.invk` files require the legacy frontend.
+
+Workbench limits each archive to 2 GiB both packed and unpacked, 20,000 entries and 1,000 boards. If a project exceeds a limit, [back up the original installation](#backups). You can still open the original project in a local-only single-user session using the [steps below](#if-you-have-already-upgraded).
+
+### If you have already upgraded
+
+Invoke now asks for an account. The Workbench projects, wildcards, private prompt templates and private uploaded fonts you made before that are still on your computer, but accounts do not show them. Shared prompt templates and shared fonts stay visible. Your boards, images and videos are kept too, and administrators can see them.
+
+- **You do not need that work in your account:** create the account while only you can reach Invoke, as [Set up multi-user mode](#set-up-multi-user-mode) describes, or keep using the one you made; there is nothing else to do.
+- **You want that work in your account:** follow these steps. You turn sign-in off for a short time, export your work, then turn sign-in back on and import it.
+
+The steps change `invokeai.yaml`, which is in your [root directory](/configuration/invokeai-yaml/#invokeai-root-directory). For a Launcher install, that is the folder you installed Invoke into.
+
+<Steps>
+
+1. **Close outside access.** Turn off any reverse proxy, tunnel or port forward that lets others reach Invoke.
+
+2. **Stop Invoke.** If you already created an account, stop submitting jobs and let that account's jobs finish first.
+
+3. **Back up the installation.** See [Backups](#backups).
+
+4. **Allow access only from this computer.** Keep sign-in on. Set up [local-only access](#verify-local-only-access) for the same root directory and database.
+
+5. **Check local-only access.** Start Invoke and check the listener as [Verify local-only access](#verify-local-only-access) describes.
+
+6. **Stop Invoke.**
+
+7. **Turn sign-in off for now.** In `invokeai.yaml`, change `multiuser: true` to `multiuser: false`. If the file has no `multiuser` line, add `multiuser: false`. With Docker, you can set `INVOKEAI_MULTIUSER=false` in the container environment instead. Recreate the container (`./run.sh` or `docker compose up -d`) to apply it; a plain restart keeps the old environment. While sign-in is off, anyone who can reach Invoke has full control of it.
+
+8. **Start Invoke** with the same network settings.
+
+9. **Hard-refresh the browser** (`Ctrl+Shift+R`, or `Cmd+Shift+R` on a Mac). Invoke opens without asking you to sign in and shows your earlier work.
+
+10. **Let queued work finish.** Do not start new jobs. Open the queue and wait until no jobs are pending or running.
+
+11. **Export your work.** Follow the **Before switching, in single-user mode** column of the [table above](#upgrading-from-single-user-mode).
+
+12. **Stop Invoke.**
+
+13. **Turn sign-in back on.** If you changed `invokeai.yaml`, change the line back to `multiuser: true`. If you set `INVOKEAI_MULTIUSER=false`, remove it and recreate the container again.
+
+14. **Start Invoke** with access still limited to this computer.
+
+15. **Sign in.** If **Set up Invoke** appears, create the administrator account first, as in [Set up multi-user mode](#set-up-multi-user-mode). If Invoke opens without asking you to sign in, sign-in is still off: stop and repeat step 13 before going on.
+
+16. **Import your work.** Follow the **After switching, in the destination account** column of the table.
+
+17. **Check the imports.** Check that your projects, wildcards, prompt templates and fonts are there. In each project, check its boards, media, references and text layers.
+
+18. **Restore outside access.** Only now turn your proxy, tunnel or port forward back on, or [enable network access](#set-up-multi-user-mode).
+
+</Steps>
 
 ### What happens to existing data
 
-Switching modes changes no data. Every record keeps its owner, and the mode decides who can see it. In single-user mode everything you create belongs to an internal account named `system`, which cannot sign in.
+Switching modes preserves ownership. Work created in single-user mode belongs to the internal `system` account, which cannot sign in. Creating the first administrator does not transfer that work.
 
 | Data | Single-user → multi-user | Multi-user → single-user |
 | --- | --- | --- |
-| Boards, images, videos | Owned by `system`: only administrators can open them | All visible: the single-user mode user is an administrator |
-| Projects | Owned by `system`: no account can open them. They come back when you return to single-user mode | Only projects created in single-user mode are listed. Each account's projects come back when you return to multi-user mode |
-| Library workflows | Public, owned by `system`: every user can open, duplicate or download them from **Shared with me** | All visible |
-| Accounts | Kept. Created in multi-user mode only | Kept, unused until you switch back |
-
-Content that accounts create in multi-user mode stays theirs across any number of switches. There is no tool yet to move `system`-owned content to another account.
+| Boards, images, videos | Administrators can access them. Other accounts can view media on boards they can read | All visible to the single-user administrator |
+| Projects | The originals are visible only in single-user mode. Each recipient can import an exported copy | Only projects created in single-user mode are listed |
+| Wildcards | Each account has its own collection, including administrators. Import the exported file into the intended account | Only the single-user collection is listed |
+| Private prompt templates | The originals stay out of new accounts' Workbench template lists. Import or recreate copies as described above | User-created templates appear under **Your templates** |
+| Private uploaded fonts | The originals stay in the single-user font library | Only single-user private uploads appear under **My fonts** |
+| Library workflows | Public by default, owned by `system`. Users can open, duplicate or download public workflows from **Shared with me** | All visible |
+| Accounts | Existing accounts retain their work | Kept for the next switch back to multi-user mode |
 
 ### Upgrading from v6
 
@@ -375,14 +454,16 @@ InvokeAI has had no security audit and has no login rate limiting or lockout. Pr
 
 ## Backups
 
-The `databases` folder holds the accounts, the signing key and every record; `outputs` holds the image and video files.
+Stop InvokeAI and leave it stopped until both the database and the files have been backed up. This keeps account and project records in sync with the files they reference.
 
-- **What to copy:** `databases/`, `outputs/` and `invokeai.yaml`. `models/` is optional, since models can be downloaded again.
-- **Stop InvokeAI first.** The database runs in write-ahead log mode, and a running server can hold recent changes in `invokeai.db-wal` beside the database file. Copy the whole folder, never the `.db` file alone while the server runs.
-- **Automatic backups.** Before every database update, such as an upgrade, InvokeAI saves `databases/invokeai_backup_<YYYYMMDD>-<HHMMSS>.db`. Gallery maintenance saves its own in `databases/backup/`. InvokeAI never deletes either.
-- **MySQL or MariaDB.** InvokeAI makes no backups of a server database. Use `mysqldump` or `mariadb-dump`.
+1. Copy the complete InvokeAI root and any configured storage or configuration files outside it. Include image and video files (`outputs_dir`), uploaded fonts including private fonts (`fonts_storage_dir`), prompt-template preview images (`style_presets_dir`) and workflow thumbnails (`workflow_thumbnails_dir`). Keep original models you cannot download again.
+2. Back up the **active database**, which holds the accounts, signing key, projects and other records.
+   - **SQLite.** Copy the whole `db_dir` (by default `databases/` under the root) with all writers stopped. Keep any `invokeai.db-wal` and `invokeai.db-shm` beside `invokeai.db`. Recent commits may still be in the write-ahead log. A complete root copy already covers the default location.
+   - **MySQL or MariaDB.** Take a consistent dump of the database named by `db_url`, for example with `mysqldump --single-transaction` or `mariadb-dump --single-transaction` for its InnoDB tables. Keep schema changes paused until the dump completes. You need this dump alongside the root copy. InvokeAI makes no automatic backup of a server database.
 
-To restore, follow [Restore a backup](/start-here/upgrading/#restore-a-backup): it explains which file to pick and how to handle the `-wal` and `-shm` files.
+Before a SQLite database update, InvokeAI saves `invokeai_backup_<YYYYMMDD>-<HHMMSS>.db` in `db_dir`. To roll back an upgrade, follow [Restore a backup](/start-here/upgrading/#restore-a-backup) to select and restore the pre-upgrade snapshot. Gallery maintenance saves its SQLite snapshots in `db_dir/backup/`. Those snapshots contain the database records only.
+
+To restore a **manual backup**, stop InvokeAI and keep all writers stopped throughout the restore. For SQLite, first move the destination's `invokeai.db` and any `invokeai.db-wal` and `invokeai.db-shm` together to a separate directory. Restore the root and external files from the same backup, placing its `invokeai.db` and any accompanying `-wal` and `-shm` files together in the configured `db_dir`. For MySQL or MariaDB, restore the root and external files and load the matching dump with the database server's tools. [Restart privately and verify the active database and administrator](/start-here/upgrading/#first-start-after-switching-databases) before restoring network access.
 
 ## Troubleshooting
 
@@ -394,7 +475,7 @@ To restore, follow [Restore a backup](/start-here/upgrading/#restore-a-backup): 
 | "Cannot remove the last administrator" | Promote another account first. |
 | "The system user cannot be deleted, deactivated, promoted to administrator, or given a password" | `system` owns the content created in single-user mode. Leave it as it is. |
 | **Set up Invoke** appears again | The server found no active administrator in its database. Check that it uses the same root and database as before (`--root`, `INVOKEAI_ROOT`, `db_dir`, `db_url`). |
-| Other computers cannot connect | Set `host: 0.0.0.0`, restart, and allow port 9090 (or your `port`) through the server's firewall. |
+| Other computers cannot connect | Confirm administrator sign-in locally, then check the listener, port mapping or proxy for your intended network route. See [Set up multi-user mode](#set-up-multi-user-mode). After updating a Docker Compose setup, see [Run the Container](/configuration/docker/#run-the-container). |
 | "Database is locked" | InvokeAI already uses write-ahead logging and waits 5 seconds for a lock. Another program is holding the database: an open `sqlite3` shell, a backup or sync tool. Find it with `fuser databases/invokeai.db` on Linux. Keep the database on a local disk: write-ahead logging may not engage on network file systems. |
 | Database update fails at startup | Set `log_level: debug` in `invokeai.yaml` and start again to see the error. With SQLite, the database was backed up first and each migration rolls back when it fails; see [Upgrading](/start-here/upgrading/) to restore the backup. With MySQL or MariaDB there is no automatic backup, and a failed migration's changes are not rolled back: it runs again from the start at the next start. Restore your own backup if it keeps failing. |
 | Slow on a large library | An administrator can run **Compact database** under **Settings → Workspaces & data**. It can take a long time and pauses database activity while it runs. |

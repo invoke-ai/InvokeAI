@@ -3275,6 +3275,11 @@ export const getGuidanceBoundReason = (
   model: Pick<GenerateModelConfig, 'base' | 'name' | 'type'> & { variant?: unknown },
   cfgScale: number
 ): string | null => {
+  // Ideogram validates its own sampler override and never reads the shared guidance value.
+  if (model.base === 'ideogram-4') {
+    return null;
+  }
+
   const { guidance, guidanceLabel } = getBaseGenerationConfig(model);
 
   if (cfgScale < guidance.min) {
@@ -3552,6 +3557,23 @@ export const getGenerationValidationReasons = (
   settings: GenerateSettings,
   mode: ExternalGenerationMode = 'txt2img'
 ): string[] => getGenerationValidationIssues(model, settings, mode).map(({ message }) => message);
+
+export const needsEmptyCanvasFrameForReferenceBudget = (
+  model: GenerateModelConfig | undefined,
+  settings: Pick<GenerateSettings, 'referenceImages'>
+): boolean => {
+  if (
+    !model ||
+    model.type !== 'external_image_generator' ||
+    !isSeedreamBatchModel(model) ||
+    !model.capabilities?.modes?.includes('txt2img') ||
+    !model.capabilities.modes.includes('img2img')
+  ) {
+    return false;
+  }
+
+  return getExternalReferenceImages(settings, model).length + 1 === SEEDREAM_BATCH_MAX_TOTAL_IMAGES;
+};
 
 /** Shared by the Invoke route and the Generate form. Omit `models` while the catalog is unread. */
 export const getGenerateInvocationIssues = (

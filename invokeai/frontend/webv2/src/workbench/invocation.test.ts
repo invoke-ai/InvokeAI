@@ -298,6 +298,55 @@ describe('resolveInvocationRoute — canvas source', () => {
     ).toBe(true);
   });
 
+  it('defers an uncertain Canvas init budget while retaining definite input refusals', () => {
+    const model: GenerateModelConfig = {
+      ...unknownExternalModel,
+      provider_id: 'seedream',
+      provider_model_id: 'seedream-4-5-251128',
+      capabilities: { modes: ['txt2img', 'img2img'], supports_reference_images: true, max_reference_images: 14 },
+    };
+    const generateValues = createGenerateValues(model, {
+      referenceImages: Array.from({ length: 14 }, (_, i) => ({
+        id: `ref-${i}`,
+        isEnabled: true,
+        config: {
+          type: 'external_reference_image',
+          image: {
+            imageName: `ref-${i}.png`,
+            width: 512,
+            height: 512,
+            original: { image: { image_name: `ref-${i}.png`, width: 512, height: 512 } },
+          },
+        },
+      })),
+    });
+    const input = canvasInputFor({ generateValues, rasterInFrame: true });
+    const blocked = resolveInvocationRouteInput(
+      { ...input, canvasLayers: [modellessControlLayer()] },
+      'global',
+      canvasRoute
+    );
+    expect(blocked.validationReasons).toContainEqual({
+      canvasInputIssue: {
+        kind: 'hosted_refusal',
+        modelName: 'Unknown External Provider',
+        refusal: { kind: 'control_layer', layerName: 'Control Layer 1' },
+      },
+    });
+    expect(resolveInvocationRouteInput(input, 'global', { ...canvasRoute, sourceId: 'generate' }).sourceValid).toBe(
+      true
+    );
+    expect(resolveInvocationRouteInput(input, 'global', canvasRoute).sourceValid).toBe(true);
+    const tooMany = {
+      ...generateValues,
+      referenceImages: [...generateValues.referenceImages, { ...generateValues.referenceImages[0]!, id: 'too-many' }],
+    };
+    const rejected = resolveInvocationRouteInput(canvasInputFor({ generateValues: tooMany }), 'global', canvasRoute);
+    expect(rejected.validationReasons.map(reasonText)).toContain(
+      'Unknown External Provider supports at most 15 images total (reference + init + output), got 16.'
+    );
+  });
+
   it('blocks a typed content-bearing control layer no model resolves once models are loaded', () => {
     const route = resolveInvocationRouteInput(
       canvasInputFor({ layers: [{ ...modellessControlLayer(), controlType: 'depth', detection: null }] }),

@@ -9,6 +9,7 @@ export const PropertiesSection = ({
   children,
   disabled = false,
   ref,
+  sectionId,
   subtitle,
   subtitleDetail,
   title,
@@ -18,6 +19,8 @@ export const PropertiesSection = ({
   /** The surface is busy elsewhere (staging, generation, an operation): the rows stay in place but cannot act. */
   disabled?: boolean;
   ref?: Ref<HTMLDivElement>;
+  /** Marks the section for reveals that scroll it into view. */
+  sectionId?: 'layer';
   subtitle?: string;
   /** More about the subtitle: its tooltip, and read with it by assistive tech. */
   subtitleDetail?: string;
@@ -37,6 +40,7 @@ export const PropertiesSection = ({
       aria-label={title}
       borderBottomWidth="1px"
       borderColor="border.subtle"
+      data-properties-section={sectionId}
       gap="2"
       inert={disabled || undefined}
       opacity={disabled ? 0.5 : 1}
