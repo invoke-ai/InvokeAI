@@ -24,10 +24,7 @@ export const getQueueStatusChip = (summary: { remaining: number }, activity: Que
   }
 };
 
-/**
- * Show a progress hairline only while running; paused or offline bars look stalled. getDeterminateProgressFraction
- * handles zero as indeterminate.
- */
+/** Progress hairline only while running; paused or offline bars look stalled. */
 export const getQueueStatusProgress = (
   chip: QueueStatusChip,
   percentage: number | null | undefined

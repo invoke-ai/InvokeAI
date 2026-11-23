@@ -40,7 +40,6 @@ vi.mock('@workbench/useNotify', () => ({
 }));
 vi.mock('@features/gallery/queries', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  // The auto-add board, B, as the Gallery's board listing names it.
   galleryBoardsOptions: (query: { includeArchived?: boolean }) => ({
     queryFn: () => Promise.resolve([{ archived: false, id: 'board-b', kind: 'board', name: 'Board B' }]),
     queryKey: ['test-boards', query.includeArchived === true],
@@ -58,7 +57,6 @@ vi.mock('react-i18next', () => ({
 type Handle = ReturnType<typeof useCanvasGallerySave>;
 const engine = { projectId: 'project-1' } as unknown as Parameters<typeof useCanvasGallerySave>[0];
 
-/** Two probes stand in for the header button and the context menu, which each call the hook. */
 const Probe = ({ ref }: { ref: Ref<Handle> }) => {
   const handle = useCanvasGallerySave(engine);
   useImperativeHandle(ref, () => handle, [handle]);

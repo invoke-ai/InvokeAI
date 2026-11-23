@@ -1,5 +1,7 @@
+import type { CanvasStagingSlot } from '@workbench/canvasStagingView';
 import type { Project } from '@workbench/projectContracts';
 
+import { pickAutoSwitch } from '@features/queue/contracts';
 import {
   type CanvasDocumentContractV3,
   type CanvasLayerBasePatch,
@@ -61,15 +63,31 @@ import {
 
 export type { CanvasLayerBasePatch, CanvasLayerConfigPatch, CanvasProjectMutation } from '@workbench/canvas-engine/api';
 
-/**
- * Restore points a canvas keeps of each kind (Clear canvas and Discard all each make one); older ones of that kind
- * are dropped, so a run of discards never pushes out a cleared canvas.
- */
+/** Auto-switch after the user picks this slot: the one pick rule, shared with Preview. */
+export const pickStagedSlotAutoSwitch = (slot: CanvasStagingSlot) =>
+  pickAutoSwitch(slot.kind === 'placeholder' ? { id: slot.id, kind: 'live' } : { kind: 'result' });
+
+/** A deliberate pick (never Tab focus); picking the slot already selected still counts. */
+const pickStagedSlot = (project: Project, imageIndex: number): Project => {
+  const slots = getCanvasStagingSlots(project.canvas, project.queue.items);
+  const selectedImageIndex = clampStagedImageIndex(imageIndex, slots.length);
+  const slot = slots[selectedImageIndex];
+  const { stagingArea } = project.canvas;
+  const autoSwitchMode = slot ? pickStagedSlotAutoSwitch(slot).mode : stagingArea.autoSwitchMode;
+
+  return selectedImageIndex === stagingArea.selectedImageIndex && autoSwitchMode === stagingArea.autoSwitchMode
+    ? project
+    : {
+        ...project,
+        canvas: { ...project.canvas, stagingArea: { ...stagingArea, autoSwitchMode, selectedImageIndex } },
+      };
+};
+
+/** Per kind, so a run of discards never pushes out a cleared canvas. */
 export const MAX_CANVAS_SNAPSHOTS = 5;
 
 const snapshotKind = (snapshot: CanvasSnapshotContract): CanvasSnapshotKind => snapshot.kind ?? 'clear-canvas';
 
-/** `snapshots` plus `added`, keeping the newest `MAX_CANVAS_SNAPSHOTS` of each kind in their order. */
 const withRestorePoint = (
   snapshots: readonly CanvasSnapshotContract[],
   added: CanvasSnapshotContract
@@ -88,11 +106,7 @@ const withRestorePoint = (
   return all.filter((snapshot) => keep.has(snapshot));
 };
 
-/**
- * The restore points that outlive a document replacement. Discard all points belong to the document session they were
- * taken in: their results' placements are pinned to that document, so they leave with it. Clear canvas points carry
- * their own document and stay.
- */
+/** Discard all points are pinned to their document and leave with it; Clear canvas points carry their own. */
 const pointsSurvivingReplacement = (snapshots: readonly CanvasSnapshotContract[]): CanvasSnapshotContract[] =>
   snapshots.filter((snapshot) => snapshotKind(snapshot) !== 'discard-results');
 
@@ -221,7 +235,6 @@ const setCanvasLayersEnabled = (
 const isHideableNode = (index: CanvasDocumentIndex, node: CanvasNodeContract): boolean =>
   isGroupNode(node) ? isOverlayStack(index.byId.get(node.id)!.stack) : isHideableLayer(node);
 
-/** Bulk display-visibility update; raster-stack nodes have no display axis and are skipped. */
 const setCanvasLayersHidden = (
   document: CanvasDocumentContractV3,
   updates: readonly { id: string; isHidden: boolean }[]
@@ -271,10 +284,6 @@ const setCanvasLayerPositions = (
   );
 };
 
-/**
- * Swaps the leaf `layer.id` names for `layer`. A leaf of another type cannot stay in its forest, so
- * it leaves its group and lands in its new stack at `anchor`, or at the top like a fresh layer.
- */
 const replaceLeaf = (
   projectId: string,
   document: CanvasDocumentContractV3,
@@ -295,7 +304,7 @@ const replaceLeaf = (
   const stacks = removeNodes(document.stacks, new Set([layer.id]));
   return withStacks(
     document,
-    anchor ? insertNodesAtAnchor(stacks, anchor, [layer]) : { ...stacks, [target]: [layer, ...stacks[target]] }
+    anchor ? insertNodesAtAnchor(stacks, anchor, [layer]) : { ...stacks, [target]: [layer, ...(stacks[target] ?? [])] }
   );
 };
 
@@ -319,7 +328,6 @@ const replaceLeavesInPlace = (
     : document;
 };
 
-/** The stack every leaf of `nodes` belongs to, or `null` when they disagree; an empty group fits any stack. */
 const nodesStack = (nodes: readonly CanvasNodeContract[], fallback: CanvasNodeInsertionAnchor['stack']) => {
   const stacks = new Set(nodes.flatMap((node) => collectSubtreeLeaves(node).map(layerStackOf)));
   return stacks.size === 0 ? fallback : stacks.size === 1 ? [...stacks][0]! : null;
@@ -333,7 +341,6 @@ const isInsertionValid = (projectId: string, insertion: CanvasNodeInsertion): bo
       .flatMap((root) => collectSubtree(root))
       .every((node) => !isGroupNode(node) || node.isHidden === undefined));
 
-/** The subtrees a move detaches, or `null` when its ids are not distinct, present nodes of the anchor's stack. */
 const movedBlock = (index: CanvasDocumentIndex, move: CanvasNodeMove): CanvasNodeEntry[] | null => {
   const outer = outermostNodes(index, move.ids);
   return outer.length === new Set(move.ids).size && outer.every((entry) => entry.stack === move.anchor.stack)
@@ -361,10 +368,7 @@ const applyMovesInSequence = (stacks: CanvasStackForests, moves: readonly Canvas
 const siblingKey = (stack: CanvasNodeInsertionAnchor['stack'], parentId: string | null): string =>
   `${stack}\0${parentId ?? ''}`;
 
-/**
- * Batch rebuilds must match sequential moves. Use the sequential path when anchors name moving nodes or blocks
- * nest, because intermediate forests affect resolution.
- */
+/** Anchors naming moving nodes or nested blocks take the sequential path: intermediate forests affect resolution. */
 const applyMoves = (stacks: CanvasStackForests, moves: readonly CanvasNodeMove[], projectId: string) => {
   if (moves.length === 0) {
     return stacks;
@@ -446,7 +450,7 @@ const applyMoves = (stacks: CanvasStackForests, moves: readonly CanvasNodeMove[]
   };
   const next = { ...removed };
   for (const stack of Object.keys(next) as CanvasNodeInsertionAnchor['stack'][]) {
-    const roots = materialize(lists.get(siblingKey(stack, null)) ?? removed[stack], stack);
+    const roots = materialize(lists.get(siblingKey(stack, null)) ?? removed[stack] ?? [], stack);
     if (roots !== removed[stack]) {
       next[stack] = [...roots];
     }
@@ -587,7 +591,6 @@ const patchNode = (
   return { ...node, ...rest, transform: transform ? { ...node.transform, ...transform } : node.transform };
 };
 
-/** Group configs apply only to raster-stack groups, even from unvalidated dispatchers (previews, replays). */
 const isConfigTargetValid = (
   document: CanvasDocumentContractV3,
   id: string,
@@ -603,6 +606,20 @@ const isConfigTargetValid = (
 const patchLayerConfig = (layer: CanvasNodeContract, config: CanvasLayerConfigPatch): CanvasNodeContract => {
   if (layer.type !== config.layerType) {
     return layer;
+  }
+  if (layer.type === 'vector' && config.layerType === 'vector') {
+    return {
+      ...layer,
+      ...(Object.hasOwn(config, 'paths') ? { paths: config.paths ?? layer.paths } : {}),
+      ...(Object.hasOwn(config, 'guideColor') ? { guideColor: config.guideColor } : {}),
+      ...(Object.hasOwn(config, 'fillEnabled') ? { fillEnabled: config.fillEnabled } : {}),
+      ...(Object.hasOwn(config, 'strokeEnabled') ? { strokeEnabled: config.strokeEnabled } : {}),
+      ...(Object.hasOwn(config, 'fillColor') ? { fillColor: config.fillColor } : {}),
+      ...(config.strokeColor !== undefined ? { strokeColor: config.strokeColor } : {}),
+      ...(config.strokeWidth !== undefined ? { strokeWidth: config.strokeWidth } : {}),
+      ...(Object.hasOwn(config, 'traceTaperEnds') ? { traceTaperEnds: config.traceTaperEnds } : {}),
+      ...(Object.hasOwn(config, 'traceTaper') ? { traceTaper: config.traceTaper } : {}),
+    };
   }
   if (layer.type === 'group' && config.layerType === 'group') {
     return {
@@ -732,13 +749,10 @@ const clearStagingArea = (stagingArea: CanvasStateContractV3['stagingArea']) => 
   sourceQueueItemId: undefined,
 });
 
-/** The canvas as a restore point; null when its document no longer normalizes. */
 const captureCanvasSnapshot = (
   canvas: CanvasStateContractV3,
   point: { id: string; name: string; createdAt: string; kind?: CanvasSnapshotKind; includeStaging?: boolean }
 ): CanvasSnapshotContract | null => {
-  // A Discard all point brings back results only; an empty document of the canvas's size keeps the contract's shape
-  // without storing a copy nothing reads.
   const document =
     point.kind === 'discard-results'
       ? createEmptyCanvasDocument(canvas.document.width, canvas.document.height)
@@ -831,34 +845,12 @@ export const applyCanvasProjectMutation = (project: Project, mutation: CanvasPro
         events: project.events.slice(1),
       };
     }
-    case 'setStagedImageIndex': {
-      const selectedImageIndex = clampStagedImageIndex(
-        mutation.imageIndex,
-        getCanvasStagingSlotCount(project.canvas, project.queue.items)
-      );
-      return selectedImageIndex === project.canvas.stagingArea.selectedImageIndex
-        ? project
-        : {
-            ...project,
-            canvas: {
-              ...project.canvas,
-              stagingArea: { ...project.canvas.stagingArea, selectedImageIndex },
-            },
-          };
-    }
+    case 'setStagedImageIndex':
+      return pickStagedSlot(project, mutation.imageIndex);
     case 'cycleStagedImage': {
       const count = getCanvasStagingSlotCount(project.canvas, project.queue.items);
       const current = project.canvas.stagingArea.selectedImageIndex;
-      const selectedImageIndex = count < 2 ? 0 : (current + mutation.direction + count) % count;
-      return selectedImageIndex === current
-        ? project
-        : {
-            ...project,
-            canvas: {
-              ...project.canvas,
-              stagingArea: { ...project.canvas.stagingArea, selectedImageIndex },
-            },
-          };
+      return pickStagedSlot(project, count < 2 ? 0 : (current + mutation.direction + count) % count);
     }
     case 'discardSelectedStagedImage': {
       const selected = selectedCandidate(project);
@@ -916,7 +908,6 @@ export const applyCanvasProjectMutation = (project: Project, mutation: CanvasPro
           const fingerprint = getCanvasStagingCandidateFingerprint(image);
           return staged.has(fingerprint) || restoring.has(fingerprint);
         }),
-        // Results that arrived after the discard stay, after the ones it brings back.
         ...stagingArea.pendingImages.filter((image) => !known.has(getCanvasStagingCandidateFingerprint(image))),
       ];
       if (pendingImages.length === stagingArea.pendingImages.length) {
@@ -932,7 +923,6 @@ export const applyCanvasProjectMutation = (project: Project, mutation: CanvasPro
           sourceQueueItemId: stagingArea.sourceQueueItemId ?? mutation.images[0]!.sourceQueueItemId,
         },
       };
-      // Review resumes on the first result brought back.
       const firstRestored = getCanvasStagingSlots(canvas, project.queue.items).findIndex(
         (slot) => slot.kind === 'candidate' && restoring.has(getCanvasStagingCandidateFingerprint(slot.candidate))
       );
@@ -1022,7 +1012,6 @@ export const applyCanvasProjectMutation = (project: Project, mutation: CanvasPro
         if (!applicable) {
           return document;
         }
-        // One value edit for the batch; repeated ids apply their patches in order.
         const patches = new Map<string, (node: CanvasNodeContract) => CanvasNodeContract>();
         for (const { config, id } of mutation.updates) {
           const earlier = patches.get(id);
@@ -1061,8 +1050,7 @@ export const applyCanvasProjectMutation = (project: Project, mutation: CanvasPro
       const height = Math.max(1, Math.round(mutation.height));
       const offsetX = mutation.offsetX ?? 0;
       const offsetY = mutation.offsetY ?? 0;
-      // An offset moves every leaf and the bbox but not the rects pending results were pinned to at submission, so
-      // it would land them off their content: refused while this session has any.
+      // An offset would land pending results off their pinned rects, so it is refused while any are pending.
       if ((offsetX !== 0 || offsetY !== 0) && hasPendingCanvasResults(project.canvas, project.queue.items)) {
         return project;
       }
@@ -1100,7 +1088,6 @@ export const applyCanvasProjectMutation = (project: Project, mutation: CanvasPro
               ),
         width,
       }));
-      // The move would land a Discard all point's results off their content too, so those points are dropped.
       return resized === project || (offsetX === 0 && offsetY === 0)
         ? resized
         : {
@@ -1145,15 +1132,13 @@ export const applyCanvasProjectMutation = (project: Project, mutation: CanvasPro
       }
       const remaining = project.canvas.snapshots.filter((entry) => entry !== snapshot);
       if (snapshot.kind === 'discard-results') {
-        // The point records no revision, so the restoreStagedImages guard cannot fence it; dropping these points
-        // whenever the document is replaced is the only protection.
+        // The point records no revision, so dropping it on every document replacement is the only fence.
         const restaged = applyCanvasProjectMutation(project, {
           documentRevision: project.canvas.documentRevision,
           images: snapshot.stagedImages ?? [],
           previous: snapshot.stagedImages ?? [],
           type: 'restoreStagedImages',
         });
-        // Used up only once its results are back; when they all are already, the point stays.
         return restaged === project ? project : { ...restaged, canvas: { ...restaged.canvas, snapshots: remaining } };
       }
       const document = normalizeCanvasDocumentContract(structuredClone(snapshot.document));
@@ -1169,8 +1154,6 @@ export const applyCanvasProjectMutation = (project: Project, mutation: CanvasPro
         : null;
       const stagedImages = snapshot.stagedImages ? structuredClone(snapshot.stagedImages) : [];
       const cleared = clearStagingArea(project.canvas.stagingArea);
-      // A new canvas session, like any document replacement: the outgoing staging, in-flight results and Discard all
-      // points belong to the replaced document. Results the point kept come back with it.
       return setCanvasState(project, {
         ...project.canvas,
         document: withRepairedSelection(document),

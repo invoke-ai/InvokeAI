@@ -23,8 +23,7 @@ import { TopbarShortcutKeys } from './TopbarShortcutKeys';
 
 type InvokePopoverBodyComponent = typeof InvokePopoverBodyModule.InvokePopoverBody;
 
-// The card and its issue fixes (which reach Generate, workflow and model owners) stay off editor boot. Hover and focus
-// start the load; opening waits for it, so the card never shows empty.
+// The card and its issue fixes (which reach Generate, workflow and model owners) stay off editor boot.
 let loadedPopoverBody: InvokePopoverBodyComponent | null = null;
 let popoverBodyModule: Promise<InvokePopoverBodyComponent> | null = null;
 
@@ -38,11 +37,7 @@ const loadPopoverBody = (): Promise<InvokePopoverBodyComponent> =>
     }
   ));
 
-/**
- * Invoke ends its attached group and sits on top of the iterations field with full control corners; the field runs a
- * tail of its frame under Invoke's leading corners so it reads as a continuing border, not a notch.
- * Doubled specificity outranks the attached Group's `!important` corner reset.
- */
+/** Invoke overlaps the iterations field's frame; doubled specificity beats the Group's `!important` reset. */
 const INVOKE_BUTTON_CSS = { '&&': { borderRadius: 'control !important' } } as const;
 /** The hint inherits the button's text color; its frame is that color, faded. */
 const SHORTCUT_BORDER = 'color-mix(in oklab, currentColor 40%, transparent)';
@@ -53,28 +48,36 @@ const FOCUS_WAIT_FRAMES = 10;
 const PREVIEW_OPEN_DELAY_MS = 250;
 export const PREVIEW_CLOSE_DELAY_MS = 200;
 
-/**
- * `preview` follows hover and keyboard focus and leaves focus where it is; `pinned` stays until dismissed. The blocked
- * button's click, ArrowDown and a right-click pin it; any press inside a preview pins it too, so an edit there
- * survives a short pointer excursion.
- */
+/** `preview` follows hover and keyboard focus and leaves focus where it is; `pinned` stays until dismissed. */
 type IssuesPopoverMode = 'closed' | 'pinned' | 'preview';
 /** An open waiting on the card's chunk. Compared by identity: a later request, even of the same mode, replaces it. */
 interface PendingOpen {
   mode: Exclude<IssuesPopoverMode, 'closed'>;
 }
 
-/**
- * Keep Invoke geometry and availability stable while work runs. Only the icon changes to progress; hover or
- * keyboard focus-visible restores play to signal that more work can queue. While issues block it, the button turns
- * secondary and opens the list of them, each with the way to its fix.
- */
-export const InvokeButton = ({ state }: { state: InvocationState }) => {
+/** Keep Invoke geometry and availability stable while work runs. */
+export const InvokeButton = ({
+  isRouteFixed = false,
+  size = 'lg',
+  state,
+  onJump,
+}: {
+  /** The route is the host's to fix (a graph preview's source): the card shows it, with no source, destination or lock to change. */
+  isRouteFixed?: boolean;
+  /** The control height: the top bar's own, or the host's (a dialog footer's buttons). */
+  size?: 'lg' | 'md';
+  state: InvocationState;
+  /** Hears an issue's action leading elsewhere, after the card has closed (a host dialog closes too). */
+  onJump?: () => void;
+}) => {
   const { t } = useTranslation();
   const notify = useNotify();
   const { invoke, isPreparing, isValid, issues } = state;
-  const shortcutBinding = useShortcutBinding('app.invoke');
-  const frontBinding = useShortcutBinding('app.invokeFront');
+  // App shortcuts do nothing while a modal is open, and they run the active route: a host's copy advertises none.
+  const appShortcut = useShortcutBinding('app.invoke');
+  const appFrontShortcut = useShortcutBinding('app.invokeFront');
+  const shortcutBinding = isRouteFixed ? null : appShortcut;
+  const frontBinding = isRouteFixed ? null : appFrontShortcut;
   const shortcutParts = shortcutBinding?.parts ?? null;
   // Shift+click queues at the front: holding it over a ready button says so before the click.
   const isShiftHeld = useModifierHeld('Shift');
@@ -91,8 +94,7 @@ export const InvokeButton = ({ state }: { state: InvocationState }) => {
   const [mode, setMode] = useState<IssuesPopoverMode>('closed');
   // State, not the module variable, so the render that opens the card sees the body.
   const [PopoverBody, setPopoverBody] = useState<InvokePopoverBodyComponent | null>(() => loadedPopoverBody);
-  // The open waiting on the body's chunk; any later open or close supersedes it. The ref answers the load's callbacks;
-  // the state marks the button busy.
+  // The open waiting on the body's chunk; any later open or close supersedes it.
   const pendingOpen = useRef<PendingOpen | null>(null);
   const [isOpenPending, setIsOpenPending] = useState(false);
 
@@ -102,7 +104,7 @@ export const InvokeButton = ({ state }: { state: InvocationState }) => {
   const [isHovered, setIsHovered] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const canInvoke = isValid && !isPreparing;
-  const isLocked = isRoutingLocked(state.invocation);
+  const isLocked = !isRouteFixed && isRoutingLocked(state.invocation);
   // Blocked by issues: the count replaces the shortcut, and activation opens the issue list.
   const showsIssues = !isValid && !isPreparing && issues.length > 0;
 
@@ -342,9 +344,11 @@ export const InvokeButton = ({ state }: { state: InvocationState }) => {
   const handleJump = useCallback(() => {
     clearTimers();
     setMode('closed');
-  }, [clearTimers]);
+    onJump?.();
+  }, [clearTimers, onJump]);
   const getButton = useCallback(() => buttonRef.current, []);
-  // The button is the popover's anchor, not its trigger: pressing it while open is its own toggle, not an outside press.
+  // The button is the popover's anchor, not its trigger: pressing it while open is its own toggle, not an outside
+  // press.
   const persistentElements = useMemo(() => [getButton], [getButton]);
   const popoverIds = useMemo(() => ({ content: contentId, title: titleId }), [contentId, titleId]);
 
@@ -400,9 +404,8 @@ export const InvokeButton = ({ state }: { state: InvocationState }) => {
           cursor={isPreparing ? 'not-allowed' : undefined}
           data-blocked={showsIssues ? '' : undefined}
           flexShrink={0}
-          size="lg"
-          // Blocked is not disabled: the button opens what is in the way. It steps back from the primary color so it
-          // no longer reads as ready.
+          size={size}
+          // Blocked is not disabled: the button opens what is in the way.
           variant={showsIssues ? 'outline' : 'solid'}
           onBlur={handleBlur}
           onClick={handleClick}
@@ -486,6 +489,7 @@ export const InvokeButton = ({ state }: { state: InvocationState }) => {
             {PopoverBody ? (
               <PopoverBody
                 frontShortcut={frontBinding?.display ?? null}
+                isRouteFixed={isRouteFixed}
                 shortcutParts={shortcutParts}
                 state={state}
                 onJump={handleJump}

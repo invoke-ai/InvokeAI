@@ -46,6 +46,7 @@ export const FEATURE_HINTS = {
   layerStackInpaintMask: {},
   layerStackRaster: {},
   layerStackRegionalGuidance: {},
+  layerStackVector: {},
   loraWeight: {
     href: 'https://support.invoke.ai/support/solutions/articles/151000159072-concepts-low-rank-adaptations-loras-',
   },

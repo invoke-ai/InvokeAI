@@ -29,7 +29,7 @@ LTX2_LORA_TRANSFORMER_PREFIX = "lora_transformer-"
 # would also match nested prefixes like ``diffusion_model.transformer.blocks...``, which the
 # probe would then admit but the converter would map onto nonexistent module paths (the LoRA
 # would silently apply zero layers).
-_PEFT_PREFIX_RE = r"^(?:(?:model\.diffusion_model|diffusion_model|transformer|base_model\.model\.transformer)\.)?"
+_PEFT_PREFIX_RE = r"^(?:(?:model\.diffusion_model|diffusion_model|transformer|base_model\.model(?:\.transformer)?)\.)?"
 
 # Submodules unique to LTX-2 among the supported architectures, in the checkpoint's native
 # naming. All of them exist only because LTX-2 is a *dual-stream* video+audio transformer:
@@ -41,6 +41,11 @@ _PEFT_PREFIX_RE = r"^(?:(?:model\.diffusion_model|diffusion_model|transformer|ba
 # - ``patchify_proj`` alone — earlier LTX-Video releases use it too, so it identifies the
 #   family but not this architecture.
 # Requiring an audio-side or cross-modal marker is what makes this exclusive.
+#
+# A LoRA without such a marker (video stream only) is deliberately not identified as LTX-2, even though the
+# video stream is 4096 wide: LTX-Video 13B (``LTXVideoTransformer3DModel``: 48 blocks, 32 heads of 128, 4096-wide
+# text context) names and shapes ``transformer_blocks.N.attn1/attn2.to_q/to_k/to_v/to_out.0`` identically, as do
+# Cosmos-Predict1 7B LoRAs, so no shape separates them and a wrong claim would apply silently to the wrong model.
 _LTX2_BLOCK_RE = re.compile(
     _PEFT_PREFIX_RE + r"transformer_blocks\.\d+\.(?:audio_attn[12]|audio_to_video_attn|video_to_audio_attn|audio_ff)\."
 )

@@ -1,7 +1,6 @@
 import type { BackendConnectionStatus } from '@platform/transport/types';
 
 import { Badge, Box, Flex, HStack, Text } from '@chakra-ui/react';
-import { AccountMenu } from '@features/identity';
 import { useConnectionStatusSelector } from '@platform/transport/connectionStore';
 import { InvokeMark } from '@platform/ui/InvokeMark';
 import { PaletteButton } from '@workbench/palette/PaletteButton';
@@ -48,10 +47,7 @@ export const LaunchpadTopBar = () => (
     </HStack>
     <HStack gap="2">
       <ConnectionChip />
-      <HStack gap="0.5">
-        <PaletteButton />
-        <AccountMenu />
-      </HStack>
+      <PaletteButton />
     </HStack>
   </Flex>
 );

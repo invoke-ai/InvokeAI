@@ -70,9 +70,8 @@ export interface LayerExportGuards {
 }
 
 /**
- * Async pixel guards capture layer object identity, cache version, document generation and project id, then
- * recheck before publication. Any replacement, disposal or teardown invalidates the guard, even if pixels look
- * unchanged.
+ * Async pixel guards capture layer object identity, cache version, document generation and project id, then recheck
+ * before publication. Any replacement, disposal or teardown invalidates the guard, even if pixels look unchanged.
  */
 export const createLayerExportGuards = (deps: CreateLayerExportGuardsDeps): LayerExportGuards => {
   const { layerCache } = deps;
@@ -148,9 +147,9 @@ export const createLayerExportGuards = (deps: CreateLayerExportGuardsDeps): Laye
       if (!isEmpty(getSourceContentRect(layer, doc))) {
         return true;
       }
-      // Only paint-backed layers (including masks through renderableSourceOf) can
-      // have real pixels beyond their persisted source rect. The live cache must
-      // describe the current source revision and must not be mid-rasterization.
+      // Only paint-backed layers (including masks through renderableSourceOf) can have real pixels beyond their
+      // persisted source rect. The live cache must describe the current source revision and must not be
+      // mid-rasterization.
       if (source.type !== 'paint') {
         return false;
       }

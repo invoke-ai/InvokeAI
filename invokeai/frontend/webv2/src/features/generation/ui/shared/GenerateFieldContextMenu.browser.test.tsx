@@ -30,7 +30,6 @@ void i18n.use(initReactI18next).init({
 const FIELDS = ['Steps', 'CFG'].map((name) => ({ copyValue: () => name, name }));
 const onReset = vi.fn();
 
-/** Two stacked fields, like Steps over CFG; each menu names its field so the open one is identifiable. */
 const renderFields = async (isAtDefault = false) => {
   host = document.createElement('div');
   document.body.append(host);
@@ -63,7 +62,6 @@ const renderFields = async (isAtDefault = false) => {
 };
 
 const field = (name: string) => host!.querySelector<HTMLElement>(`[data-field="${name}"]`)!;
-/** Right-clicks near a field's left edge, or past where the other field's menu (opened at its left edge) reaches. */
 const rightClick = (element: HTMLElement, x = 8) =>
   act(() => userEvent.click(element, { button: 'right', position: { x, y: 8 } }));
 const openMenus = () => [...document.querySelectorAll<HTMLElement>('[role="menu"][data-state="open"]')];

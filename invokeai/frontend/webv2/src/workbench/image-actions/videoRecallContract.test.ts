@@ -3,9 +3,9 @@
  * deliberately inert. The video twin of `imageRecallContract.test.ts`.
  *
  * The cases are the registry-driven matrix `videoGraphCoverage.test.ts` compiles -- every base, variant, mode, model
- * shape and multi-stage preset, with and without auto duration -- each run with every recallable value tuned away
- * from its default and every component slot filled, so each key a builder can write is written. A key with no entry
- * in `VIDEO_RECALL_CONTRACT` fails G1, so a new parameter cannot reach a record untested:
+ * shape and multi-stage preset, with and without auto duration -- each run with every recallable value tuned away from
+ * its default and every component slot filled, so each key a builder can write is written. A key with no entry in
+ * `VIDEO_RECALL_CONTRACT` fails G1, so a new parameter cannot reach a record untested:
  *
  * - `restores`: a full recall puts the value back (G2), and only through this key: recalling the record without it
  *   must land somewhere else, or the round trip proves nothing. `when` is false on runs recall deliberately leaves
@@ -239,8 +239,8 @@ const VIDEO_RUNTIME_CONTRACT: Readonly<Record<string, ReasonEntry>> = {
 };
 
 /**
- * Keys only older records carry, still read so those recall; no graph writes them, and each has an old-record test
- * in videoRecall.test.ts. With a value each reads, so a reader that stops reading one shows here as a stale entry.
+ * Keys only older records carry, still read so those recall; no graph writes them, and each has an old-record test in
+ * videoRecall.test.ts. With a value each reads, so a reader that stops reading one shows here as a stale entry.
  */
 const LEGACY_READ_ONLY_KEYS: Readonly<Record<string, unknown>> = {
   guidance_scale_low_noise: 3,
@@ -377,8 +377,8 @@ const tunedLora = (model: MainModelConfig): GenerateLora => ({
 });
 
 /**
- * A main slot is offered both shapes: a component source takes a folder, but the low-noise expert and the hybrid
- * base take a single file, which the coverage pool -- it fills only required slots -- never needs.
+ * A main slot is offered both shapes: a component source takes a folder, but the low-noise expert and the hybrid base
+ * take a single file, which the coverage pool -- it fills only required slots -- never needs.
  */
 const componentCandidates = (slot: VideoComponentSlotPolicy): ModelConfig[] =>
   candidatesForSlot(slot).flatMap((candidate) =>
@@ -447,6 +447,9 @@ const tunedValuesFor = (testCase: Case, model: MainModelConfig): VideoWidgetValu
     // the grid, so a media-sized canvas there cannot be resolved from its own shape.
     targetResolution:
       testCase.targetResolution ??
+      // At this fixture's 10:7 media ratio, 544p and legacy 768 lowres both yield 768x544.
+      // Dimensions alone cannot distinguish those presets; use the unambiguous 480p draft.
+      (model.base === 'minimax-h3' ? '480p' : undefined) ??
       targetResolutions
         .filter((option) => option.id !== defaults.targetResolution && option.stages === undefined)
         .at(-1)!.id,
@@ -485,8 +488,8 @@ const recorded = (testCase: Case): RecordedCase => {
   );
 
   if (getVideoDimensions(model, tuned)?.source !== 'aspect-ratio') {
-    // A media-sized canvas that is also a preset's recalls as that preset, which would hide whether recall recovers
-    // the target resolution from the media's shape.
+    // A media-sized canvas that is also a preset's recalls as that preset, which would hide whether recall recovers the
+    // target resolution from the media's shape.
     expect(
       getVideoSizeRecalls(model, record.width as number, record.height as number),
       `${testCase.label}: the media-sized canvas is also a preset's`

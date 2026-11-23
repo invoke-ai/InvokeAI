@@ -1,12 +1,7 @@
-/**
- * Expose canvas-only infill/coherence/mask controls in Generate. Persist them in canvas values for
- * prepareCanvasInvocation and graph compilation.
- */
-
 import type { NumberInput as ChakraNumberInput, SelectValueChangeDetails } from '@chakra-ui/react';
 import type { CanvasCoherenceMode, CanvasInfillMethod } from '@workbench/widgets/canvas/invoke/canvasCompositing';
 
-import { Badge, createListCollection, NumberInput, Stack } from '@chakra-ui/react';
+import { createListCollection, NumberInput, Stack } from '@chakra-ui/react';
 import { GenerationSettingsSection } from '@features/generation/components';
 import { ColorPicker, Field, formatHexColor, parseHexColor, Select } from '@platform/ui';
 import { getCanvasEngine } from '@workbench/canvas-operations/api';
@@ -14,6 +9,7 @@ import {
   CANVAS_COHERENCE_EDGE_SIZE_MAX,
   CANVAS_COMPOSITING_KEYS,
   CANVAS_MASK_BLUR_MAX,
+  DEFAULT_CANVAS_COMPOSITING,
   readCanvasCompositingSettings,
 } from '@workbench/widgets/canvas/invoke/canvasCompositing';
 import { useActiveProjectId, useWidgetValuesSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
@@ -22,6 +18,16 @@ import { useTranslation } from 'react-i18next';
 
 const INFILL_METHODS: readonly CanvasInfillMethod[] = ['patchmatch', 'lama', 'cv2', 'color', 'tile'];
 const COHERENCE_MODES: readonly CanvasCoherenceMode[] = ['Gaussian Blur', 'Box Blur', 'Staged'];
+
+/** The section's fields besides the infill color, for its changed dot and its reset. */
+const SHOWN_VALUE_KEYS = [
+  'infillMethod',
+  'coherenceMode',
+  'coherenceEdgeSize',
+  'coherenceMinDenoise',
+  'maskBlur',
+] as const satisfies readonly (keyof typeof CANVAS_COMPOSITING_KEYS)[];
+const INFILL_COLOR_CHANNELS = ['r', 'g', 'b', 'a'] as const;
 
 // Match full-width menus to the trigger width and start edge.
 const SELECT_POSITIONING = { placement: 'bottom-start', sameWidth: true } as const;
@@ -121,8 +127,8 @@ export const GenerateCanvasCompositingSection = () => {
     [patch]
   );
 
-  // The generate form outlives the canvas widget's engine lease, so the sampler
-  // peeks non-owningly at click time instead of holding an engine alive.
+  // The generate form outlives the canvas widget's engine lease, so the sampler peeks non-owningly at click time
+  // instead of holding an engine alive.
   const handleSampleInfillColor = useCallback(
     () => getCanvasEngine(projectId)?.tools.requestColorSample() ?? Promise.resolve(null),
     [projectId]
@@ -130,22 +136,40 @@ export const GenerateCanvasCompositingSection = () => {
 
   const opt = (key: string) => t(`widgets.generate.compositingOptions.${key}`);
 
-  const badges = (
-    <>
-      <Badge>{t(`widgets.generate.compositingOptions.infillMethods.${settings.infillMethod}`)}</Badge>
-      <Badge>{settings.maskBlur}px</Badge>
-    </>
+  const summary = useMemo(
+    () => [t(`widgets.generate.compositingOptions.infillMethods.${settings.infillMethod}`), `${settings.maskBlur}px`],
+    [settings.infillMethod, settings.maskBlur, t]
+  );
+  const defaults = DEFAULT_CANVAS_COMPOSITING;
+  // The infill color counts only while color infill uses it.
+  const isChanged =
+    (settings.infillMethod === 'color' &&
+      INFILL_COLOR_CHANNELS.some(
+        (channel) => settings.infillColorValue[channel] !== defaults.infillColorValue[channel]
+      )) ||
+    SHOWN_VALUE_KEYS.some((key) => settings[key] !== defaults[key]);
+  const resetToDefaults = useCallback(
+    () =>
+      patch({
+        ...Object.fromEntries(
+          SHOWN_VALUE_KEYS.map((key) => [CANVAS_COMPOSITING_KEYS[key], DEFAULT_CANVAS_COMPOSITING[key]])
+        ),
+        [CANVAS_COMPOSITING_KEYS.infillColorValue]: { ...DEFAULT_CANVAS_COMPOSITING.infillColorValue },
+      }),
+    [patch]
   );
 
   return (
     <GenerationSettingsSection
-      badges={badges}
       defaultOpen={false}
+      isChanged={isChanged}
       label={t('widgets.generate.compositing')}
       sectionId="canvas-fill"
+      summary={summary}
+      onReset={resetToDefaults}
     >
-      <Stack gap="2" p="2">
-        <Field label={opt('infillMethod')}>
+      <Stack gap="2.5">
+        <Field label={opt('infillMethod')} labelPlacement="inside">
           <Select
             aria-label={opt('infillMethod')}
             collection={infillCollection}
@@ -166,7 +190,7 @@ export const GenerateCanvasCompositingSection = () => {
             />
           </Field>
         ) : null}
-        <Field label={opt('coherenceMode')}>
+        <Field label={opt('coherenceMode')} labelPlacement="inside">
           <Select
             aria-label={opt('coherenceMode')}
             collection={coherenceCollection}

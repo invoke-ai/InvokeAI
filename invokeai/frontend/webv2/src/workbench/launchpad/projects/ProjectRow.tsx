@@ -70,7 +70,8 @@ export const ProjectRow = ({
       <Box flexShrink={0} overflow="hidden" pointerEvents="none" rounded="sm" w={THUMBNAIL_WIDTH}>
         <ProjectCover coverUrl={summary.coverUrl} />
       </Box>
-      <Flex flex="1" gap="3" minW="0" pointerEvents="none">
+      {/* Centred: the smaller timestamp would otherwise sit at the top of the name's taller line. */}
+      <Flex align="center" flex="1" gap="3" minW="0" pointerEvents="none">
         <MiddleTruncate flex="1" fontSize="md" fontWeight="600" minW="0" text={summary.name} />
         <ProjectCompatibilityBadge summary={summary} />
         <Text color="fg.muted" flexShrink={0} fontSize="xs">

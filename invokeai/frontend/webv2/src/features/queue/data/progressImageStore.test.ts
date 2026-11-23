@@ -3,7 +3,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   consumeQueueItemSwapProgressImage,
   getLatestProgressImage,
-  getQueueItemBridgeProgressImage,
   getQueueItemSwapProgressImage,
   progressImageStore,
   SWAP_FRAME_TTL_MS,
@@ -23,28 +22,24 @@ describe('progressImageStore held frames', () => {
     vi.useRealTimers();
   });
 
-  it('copies the slot frame into both held sets and keeps the live frame', () => {
+  it('holds the slot frame for the swap and keeps it after the live slot is released', () => {
     progressImageStore.set(frame('last'), target('queue-1'));
 
     progressImageStore.hold(target('queue-1'));
     progressImageStore.bindSwapImages('queue-1', ['result.png']);
-
-    expect(getQueueItemBridgeProgressImage('queue-1')).toEqual(frame('last'));
-    expect(getQueueItemSwapProgressImage('queue-1', 'result.png')).toEqual(frame('last'));
-    // The single-slot preview keeps showing the live frame while routing runs.
     progressImageStore.clear(target('queue-1'));
-    expect(getQueueItemBridgeProgressImage('queue-1')).toEqual(frame('last'));
+
+    expect(getQueueItemSwapProgressImage('queue-1', 'result.png')).toEqual(frame('last'));
   });
 
   it('holds nothing for a slot that never produced a frame', () => {
     progressImageStore.hold(target('queue-1'));
     progressImageStore.bindSwapImages('queue-1', ['result.png']);
 
-    expect(getQueueItemBridgeProgressImage('queue-1')).toBeNull();
     expect(getQueueItemSwapProgressImage('queue-1', 'result.png')).toBeNull();
   });
 
-  it('bridges only to the last selected output of a multi-output workflow', () => {
+  it('swaps only to the last selected output of a multi-output workflow', () => {
     // Only routed output names may use a held frame; another item in the same batch must not inherit it.
     progressImageStore.set(frame('third'), target('queue-1', 3));
     progressImageStore.hold(target('queue-1', 3));
@@ -72,8 +67,6 @@ describe('progressImageStore held frames', () => {
     consumeQueueItemSwapProgressImage('queue-1');
 
     expect(getQueueItemSwapProgressImage('queue-1', 'result.png')).toBeNull();
-    // The bridge to the batch's next slot is still needed.
-    expect(getQueueItemBridgeProgressImage('queue-1')).toEqual(frame('last'));
   });
 
   it('expires the swap frame so browsing back never replays the low-resolution frame', () => {
@@ -86,7 +79,6 @@ describe('progressImageStore held frames', () => {
 
     vi.advanceTimersByTime(1);
     expect(getQueueItemSwapProgressImage('queue-1', 'result.png')).toBeNull();
-    expect(getQueueItemBridgeProgressImage('queue-1')).toEqual(frame('last'));
   });
 
   it('restarts the expiry when a later slot of the same queue item is held', () => {
@@ -109,25 +101,24 @@ describe('progressImageStore held frames', () => {
       progressImageStore.bindSwapImages(`queue-${index}`, [`image-${index}.png`]);
     }
 
-    expect(getQueueItemBridgeProgressImage('queue-0')).toBeNull();
     expect(getQueueItemSwapProgressImage('queue-0', 'image-0.png')).toBeNull();
-    expect(getQueueItemBridgeProgressImage('queue-1')).toEqual(frame('frame-1'));
+    expect(getQueueItemSwapProgressImage('queue-1', 'image-1.png')).toEqual(frame('frame-1'));
     expect(getQueueItemSwapProgressImage('queue-8', 'image-8.png')).toEqual(frame('frame-8'));
   });
 
   it('forgets a queue item on clearHeld and everything on clear', () => {
     progressImageStore.set(frame('one'), target('queue-1'));
     progressImageStore.hold(target('queue-1'));
+    progressImageStore.bindSwapImages('queue-1', ['one.png']);
     progressImageStore.set(frame('two'), target('queue-2'));
     progressImageStore.hold(target('queue-2'));
     progressImageStore.bindSwapImages('queue-2', ['two.png']);
 
     progressImageStore.clearHeld('queue-1');
-    expect(getQueueItemBridgeProgressImage('queue-1')).toBeNull();
+    expect(getQueueItemSwapProgressImage('queue-1', 'one.png')).toBeNull();
     expect(getQueueItemSwapProgressImage('queue-2', 'two.png')).toEqual(frame('two'));
 
     progressImageStore.clear();
-    expect(getQueueItemBridgeProgressImage('queue-2')).toBeNull();
     expect(getQueueItemSwapProgressImage('queue-2', 'two.png')).toBeNull();
     expect(vi.getTimerCount()).toBe(0);
   });

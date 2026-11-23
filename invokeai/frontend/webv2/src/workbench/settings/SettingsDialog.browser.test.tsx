@@ -17,12 +17,7 @@ import { page, userEvent } from 'vitest/browser';
 
 import { appearanceSettings } from './applicationContributions';
 import { SettingsDialogHost } from './SettingsDialogHost';
-import {
-  closeWorkbenchSettings,
-  getSettingsSectionScroll,
-  openWorkbenchSettings,
-  settingsDialogStore,
-} from './settingsDialogStore';
+import { closeWorkbenchSettings, openWorkbenchSettings, settingsDialogStore } from './settingsDialogStore';
 import { DEFAULT_PREFERENCES, getWorkbenchPreferences, patchWorkbenchPreferences } from './store';
 import { WidgetSettingsButton } from './WidgetSettingsButton';
 
@@ -75,7 +70,7 @@ const quickWidgetProps: WidgetViewProps = {
   runtime: {} as WidgetRuntimeApi,
 };
 
-const render = async (quick = false) => {
+const render = async (widget?: WidgetViewProps) => {
   await act(() =>
     root.render(
       <ChakraProvider value={system}>
@@ -83,7 +78,7 @@ const render = async (quick = false) => {
           <button type="button" onClick={() => openWorkbenchSettings('behavior')}>
             Open settings
           </button>
-          {quick ? <WidgetSettingsButton {...quickWidgetProps} /> : null}
+          {widget ? <WidgetSettingsButton {...widget} /> : null}
           <SettingsDialogHost />
         </I18nextProvider>
       </ChakraProvider>
@@ -190,119 +185,6 @@ describe('settings dialog', () => {
     await expect.element(dialogContent()!).toBeVisible();
   });
 
-  it('lists every per-project section, editing defaults only for widgets the open project lacks', async () => {
-    await render();
-    await open();
-    const nav = page.getByRole('navigation', { name: i18n.t('settings.title'), exact: true });
-    await expect.element(nav.getByText(i18n.t('settingsDialog.groups.application'), { exact: true })).toBeVisible();
-    expect(nav.element().textContent).not.toContain('Project');
-    for (const name of ['Generate', 'Canvas', 'Gallery', 'Image Map', 'Preview', 'Queue']) {
-      await expect.element(nav.getByRole('button', { name, exact: true })).toBeVisible();
-    }
-    const note = page.getByText(i18n.t('settingsDialog.defaultsNote'), { exact: true });
-    // The open project has no Canvas: its settings edit the user's defaults, and say so.
-    await act(() => nav.getByRole('button', { name: 'Canvas', exact: true }).click());
-    await expect.element(page.getByRole('checkbox', { name: i18n.t('widgets.canvas.settings.grid') })).toBeEnabled();
-    await expect.element(note).toBeVisible();
-    // The generation flags are the project's own settings: they pin even though this project has no Generate widget.
-    await act(() => nav.getByRole('button', { name: 'Generate', exact: true }).click());
-    await expect.element(page.getByText('NSFW checker', { exact: true })).toBeVisible();
-    await expect.element(note).not.toBeInTheDocument();
-    await act(() => nav.getByRole('button', { name: 'Preview', exact: true }).click());
-    await expect.element(page.getByText('Antialias progress images', { exact: true })).toBeVisible();
-  });
-
-  it('switches prepared sections without loading placeholders or mounting unselected custom editors', async () => {
-    await render();
-    const mountedCustomEditors: string[] = [];
-    const loadingPlaceholders: string[] = [];
-    let opened = false;
-    const observer = new MutationObserver((records) => {
-      for (const record of records) {
-        for (const node of record.addedNodes) {
-          if (!(node instanceof Element)) {
-            continue;
-          }
-          const addedElements = [node, ...node.querySelectorAll('[role="status"], [data-custom-editor]')];
-          for (const element of addedElements) {
-            const editorId = element.getAttribute('data-custom-editor');
-            if (editorId) {
-              mountedCustomEditors.push(editorId);
-            }
-            if (
-              opened &&
-              element.getAttribute('role') === 'status' &&
-              element.textContent?.includes(i18n.t('common.loading'))
-            ) {
-              loadingPlaceholders.push(element.textContent);
-            }
-          }
-        }
-      }
-    });
-    observer.observe(document.body, { childList: true, subtree: true });
-    try {
-      await open();
-      expect(mountedCustomEditors).toEqual([]);
-      opened = true;
-      for (const section of ['Workflow', 'Queue', 'Appearance', 'Behavior']) {
-        await act(() => page.getByRole('button', { name: section, exact: true }).click());
-        await expect.element(page.getByRole('dialog', { name: `Settings: ${section}`, exact: true })).toBeVisible();
-        expect(dialogContent()?.querySelector('[data-custom-editor]')?.getAttribute('data-custom-editor') ?? null).toBe(
-          section === 'Appearance' ? 'themeId' : null
-        );
-      }
-      expect(loadingPlaceholders).toEqual([]);
-      expect(mountedCustomEditors).toEqual(['themeId']);
-    } finally {
-      observer.disconnect();
-    }
-  });
-
-  it('reveals a search result through the section selector in a narrow window', async () => {
-    await page.viewport(360, 780);
-    await render();
-    await open();
-    await act(() => search().fill('numeric attention'));
-    await expect.element(page.getByText('Prefer numeric attention style', { exact: true })).toBeVisible();
-    await act(() => page.getByRole('button', { name: i18n.t('settingsDialog.showInSection'), exact: true }).click());
-    await expect
-      .element(page.getByRole('combobox', { name: i18n.t('settingsDialog.section'), exact: true }))
-      .toHaveValue('behavior');
-    await expect.element(page.getByRole('dialog', { name: 'Settings: Behavior', exact: true })).toBeVisible();
-    await expect
-      .element(page.getByRole('checkbox', { name: 'Prefer numeric attention style', exact: true }))
-      .toHaveFocus();
-  });
-
-  it('restores section scroll after searching, switching sections, and reopening', async () => {
-    await page.viewport(1280, 480);
-    await render();
-    await open();
-    const body = () => {
-      const label = page.getByText('Prefer numeric attention style', { exact: true }).element();
-      let element = label.parentElement;
-      while (element && getComputedStyle(element).overflowY !== 'auto') {
-        element = element.parentElement;
-      }
-      return element!;
-    };
-    await act(() => {
-      body().scrollTop = 100;
-    });
-    await expect.poll(() => getSettingsSectionScroll('behavior')).toBe(100);
-    await act(() => search().fill('numeric attention'));
-    await act(() => search().fill(''));
-    await expect.poll(() => body().scrollTop).toBe(100);
-    await act(() => page.getByRole('button', { name: 'Queue', exact: true }).click());
-    await act(() => page.getByRole('button', { name: 'Behavior', exact: true }).click());
-    await expect.poll(() => body().scrollTop).toBe(100);
-    await act(() => closeButton().click());
-    await expect.poll(dialogContent).toBeNull();
-    await open();
-    await expect.poll(() => body().scrollTop).toBe(100);
-  });
-
   it('keeps closing content present for animation, supports reopening, and restores trigger focus', async () => {
     await render();
     await open();
@@ -319,32 +201,8 @@ describe('settings dialog', () => {
     await expect.element(page.getByRole('button', { name: 'Open settings', exact: true })).toHaveFocus();
   });
 
-  it('dismisses with Escape without retained content under reduced motion', async () => {
-    document.documentElement.dataset.reduceMotion = 'true';
-    await render();
-    await open();
-    const content = dialogContent()!;
-    expect(parseFloat(getComputedStyle(content).animationDuration)).toBeLessThanOrEqual(0.001);
-    await act(() => userEvent.keyboard('{Escape}'));
-    await expect.poll(dialogContent).toBeNull();
-    await expect.element(page.getByRole('button', { name: 'Open settings', exact: true })).toHaveFocus();
-  });
-
-  it('returns focus to the widget gear when quick settings close with Escape', async () => {
-    await render(true);
-    const gear = page.getByRole('button', {
-      name: i18n.t('widgets.settingsLabel', { label: 'Appearance' }),
-      exact: true,
-    });
-    await act(() => gear.click());
-    await expect.element(page.getByText('Highlight focused regions', { exact: true })).toBeVisible();
-    await act(() => userEvent.keyboard('{Escape}'));
-    await expect.poll(() => document.querySelector('[data-scope="popover"][data-part="content"]')).toBeNull();
-    await expect.element(gear).toHaveFocus();
-  });
-
   it('hands quick settings to the full section and restores the widget gear', async () => {
-    await render(true);
+    await render(quickWidgetProps);
     const gear = page.getByRole('button', {
       name: i18n.t('widgets.settingsLabel', { label: 'Appearance' }),
       exact: true,

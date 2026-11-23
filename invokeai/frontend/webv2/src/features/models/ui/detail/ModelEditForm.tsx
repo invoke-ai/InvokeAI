@@ -41,8 +41,8 @@ import { useTranslation } from 'react-i18next';
 
 import { DraftConflictNotice, UnsavedChangesLabel } from './ModelDraftNotices';
 
-// `external` is the hosted-provider sentinel; assigning it to a local model
-// would misroute it across the app, so the edit form never offers it.
+// `external` is the hosted-provider sentinel; assigning it to a local model would misroute it across the app, so the
+// edit form never offers it.
 const ASSIGNABLE_BASES: readonly string[] = KNOWN_MODEL_BASES.filter((base) => base !== 'external');
 
 const MODEL_TYPE_COLLECTION = createListCollection({

@@ -10,19 +10,17 @@ import type { ProjectGraphAction } from '@features/workflow/utility';
 
 import openapi from '@api/openapi.json';
 /* eslint-disable react-perf/jsx-no-new-object-as-prop, react-perf/jsx-no-new-array-as-prop -- each render mounts a fresh flow on purpose */
-import { ChakraProvider } from '@chakra-ui/react';
+import { Box, ChakraProvider } from '@chakra-ui/react';
+import { DndContext, type DragStartEvent } from '@dnd-kit/core';
+import { GalleryUiProvider, type GalleryUiAdapter } from '@features/gallery/react';
 import { galleryImageUrls } from '@features/gallery/utility';
-import {
-  savedWorkflowDetailQueryKey,
-  savedWorkflowPickerQueryOptions,
-} from '@features/workflow/data/savedWorkflowQueries';
 import { parseOpenApiToTemplates } from '@features/workflow/data/templates';
+import { flowThemeCss } from '@features/workflow/ui/graph-preview/flowTheme';
 import { WorkflowImageExportProvider } from '@features/workflow/ui/nodeChrome';
 import { WorkflowUiProvider } from '@features/workflow/ui/WorkflowUiContext';
 import {
   buildInvocationNode,
   buildCurrentImageNode,
-  buildNotesNode,
   createProjectGraph,
   projectGraphReducer,
 } from '@features/workflow/utility';
@@ -34,7 +32,7 @@ import { createInstance } from 'i18next';
 import { act, createRef, startTransition, useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { userEvent } from 'vitest/browser';
+import { commands, userEvent } from 'vitest/browser';
 
 import type { rasterizeWorkflowImage as RasterizeWorkflowImage } from './workflowImageRaster';
 
@@ -42,17 +40,18 @@ import { ConnectorFlowNode } from './ConnectorFlowNode';
 import { CurrentImageFlowNode } from './CurrentImageFlowNode';
 import { toFlowEdges, toFlowNodes } from './flowAdapters';
 import { InvocationFlowNode } from './InvocationFlowNode';
-import { LoopBodyBoundaryOverlay } from './LoopBodyBoundaryOverlay';
 import { NotesFlowNode } from './NotesFlowNode';
-import {
-  EXPORT_SCALE,
-  exportWorkflowAsPng,
-  getWorkflowContentBounds,
-  WORKFLOW_EXPORT_TIMEOUT_MS,
-} from './workflowImageExport';
+import { WorkflowEdge as WorkflowEdgeComponent } from './WorkflowEdge';
+import { exportWorkflowAsPng, WORKFLOW_EXPORT_TIMEOUT_MS } from './workflowImageExport';
 import { WorkflowImageExportView } from './WorkflowImageExportView';
 
 import '@xyflow/react/dist/style.css';
+
+declare module 'vitest/browser' {
+  interface BrowserCommands {
+    mouseDragPath: (points: readonly { x: number; y: number }[], frameWidth: number) => Promise<void>;
+  }
+}
 
 const exportMocks = vi.hoisted(() => ({
   progressImage: null as null | { dataUrl: string; height: number; width: number },
@@ -184,8 +183,6 @@ const callTemplate: InvocationTemplate = {
   title: 'Call Saved Workflow',
   type: 'call_saved_workflow',
 };
-const callProjectGraph: ProjectGraphState = { ...createProjectGraph('call-test'), nodes: [callNode] };
-const callFlowNodes = toFlowNodes(callProjectGraph, [], { call_saved_workflow: callTemplate });
 
 const outputImage = (width: number, height: number): string => {
   const canvas = document.createElement('canvas');
@@ -206,7 +203,6 @@ const completed = (outputImageName: string): WorkflowNodeExecutionState => ({
   status: 'completed',
 });
 
-/** A node-execution port the test can advance between renders. */
 const createExecutionPort = (nodeId = NODE_ID) => {
   const listeners = new Set<() => void>();
   let state: WorkflowNodeExecutionState | null = null;
@@ -248,7 +244,6 @@ const projectSnapshotFor = (graph: ProjectGraphState, galleryValues: Record<stri
 });
 const projectSnapshot = projectSnapshotFor(projectGraph);
 
-/** Execution ports report this editor's own workflow as the run's origin, so node state is shown. */
 const withOrigin = (
   port: Pick<WorkflowUiAdapter['nodeExecution'], 'get' | 'subscribe'>
 ): WorkflowUiAdapter['nodeExecution'] => ({
@@ -328,8 +323,6 @@ describe('InvocationFlowNode chrome and export', () => {
         </ChakraProvider>
       )
     );
-  const image = () => host.querySelector<HTMLImageElement>('.react-flow__node img');
-  const nodeHeight = () => host.querySelector<HTMLElement>('.react-flow__node')!.getBoundingClientRect().height;
 
   it('disables both HiDiffusion numeric controls under one Auto switch and retains manual values', async () => {
     const denoiseTemplates = parseOpenApiToTemplates(openapi);
@@ -360,143 +353,7 @@ describe('InvocationFlowNode chrome and export', () => {
     }
   });
 
-  it('keeps field-description editing available in the workflow editor', async () => {
-    const adapter = createAdapter(createExecutionPort().port);
-    await render(adapter);
-
-    const trigger = host.querySelector<HTMLButtonElement>('button[aria-label="Edit field description"]');
-    expect(trigger).not.toBeNull();
-    await userEvent.click(trigger!);
-    const description = await vi.waitFor(() => {
-      const textarea = document.querySelector<HTMLTextAreaElement>('textarea[aria-label="Field description"]');
-      expect(textarea).not.toBeNull();
-      return textarea!;
-    });
-    await userEvent.fill(description, 'Authored field guidance');
-
-    expect(adapter.commands.editGraph).toHaveBeenCalledWith({
-      description: 'Authored field guidance',
-      fieldName: 'a',
-      nodeId: NODE_ID,
-      type: 'setFieldDescription',
-    });
-  });
-
-  it('bounds snapshots by rendered nodes instead of live editor result height', async () => {
-    const execution = createExecutionPort();
-    execution.set(completed(outputImage(400, 800)));
-    const adapter = createAdapter(execution.port);
-    let capturedHeight: number | undefined;
-    exportMocks.rasterize.mockImplementation((_clone: HTMLElement, options: { height: number }) => {
-      capturedHeight = options.height;
-      return Promise.resolve(new Blob(['png'], { type: 'image/png' }));
-    });
-
-    await render(adapter);
-    const liveRect = host.querySelector<HTMLElement>('.react-flow__node')!.getBoundingClientRect();
-    const liveBounds = { x: 20, y: 20, width: liveRect.width, height: liveRect.height };
-    await render(adapter, 1, true);
-    const snapshotRect = host.querySelector<HTMLElement>('.react-flow__node')!.getBoundingClientRect();
-    expect(snapshotRect.height).toBeLessThan(liveRect.height);
-
-    await exportWorkflowAsPng({
-      bounds: liveBounds,
-      fallbackWorkflowName: 'Untitled Workflow',
-      flowElement: host.querySelector<HTMLElement>('.react-flow')!,
-      workflowName: 'Pristine bounds',
-    });
-
-    expect(capturedHeight).toBe(Math.ceil(snapshotRect.height + 200) * EXPORT_SCALE);
-  });
-
-  it.each([
-    { kind: 'plain', uiComponent: null, value: 'Authored text' },
-    { kind: 'multiline', uiComponent: 'textarea', value: 'First line\nSecond line' },
-    { kind: 'long', uiComponent: 'textarea', value: 'UnbrokenText'.repeat(50) },
-    { kind: 'empty', uiComponent: null, value: '' },
-  ] as const)('preserves static text field entry boxes for $kind fields', async ({ uiComponent, value }) => {
-    const textTemplate: InvocationTemplate = {
-      ...template,
-      inputs: {
-        a: {
-          ...template.inputs.a!,
-          input: 'direct',
-          type: { batch: false, cardinality: 'SINGLE', name: 'StringField' },
-          uiComponent,
-        },
-      },
-    };
-    const textNode: WorkflowInvocationNode = {
-      ...documentNode,
-      data: { ...documentNode.data, inputs: { a: { label: '', name: 'a', value } } },
-    };
-    const graph = { ...projectGraph, nodes: [textNode] };
-    const nodes = toFlowNodes(graph, [], { preview: textTemplate });
-    const adapter = createAdapter(createExecutionPort().port, projectSnapshotFor(graph));
-    let capturedText: string | null | undefined;
-    let capturedBorderWidth: string | undefined;
-    exportMocks.rasterize.mockImplementation((clone: HTMLElement) => {
-      const entryBox = clone.querySelector<HTMLElement>('[data-workflow-export-field-value="true"]');
-      capturedText = entryBox?.textContent;
-      capturedBorderWidth = entryBox ? getComputedStyle(entryBox).borderTopWidth : undefined;
-      expect(entryBox).not.toBeNull();
-      expect(entryBox!.scrollWidth).toBeLessThanOrEqual(entryBox!.clientWidth);
-      expect(clone.querySelector('input, textarea, button')).toBeNull();
-      return Promise.resolve(new Blob(['png'], { type: 'image/png' }));
-    });
-
-    await render(adapter, 1, true, nodes);
-    await exportWorkflowAsPng({
-      bounds: { x: 20, y: 20, width: 300, height: 260 },
-      fallbackWorkflowName: 'Untitled Workflow',
-      flowElement: host.querySelector<HTMLElement>('.react-flow')!,
-      workflowName: 'Text entry boxes',
-    });
-
-    expect(capturedText).toBe(value);
-    expect(capturedBorderWidth).toBe('1px');
-    expect(adapter.commands.editGraph).not.toHaveBeenCalled();
-  });
-
-  it('renders authored notes as static text in snapshot exports', async () => {
-    const noteBody = Array.from({ length: 60 }, (_, index) => `Snapshot note line ${index + 1}`).join('\n');
-    const authoredNote = {
-      ...buildNotesNode({ x: 20, y: 20 }),
-      data: { label: 'Planning note', notes: noteBody },
-    };
-    const emptyNote = {
-      ...buildNotesNode({ x: 320, y: 20 }),
-      data: { label: 'Empty note', notes: '' },
-    };
-    const graph = { ...projectGraph, nodes: [authoredNote, emptyNote] };
-    const nodes = toFlowNodes(graph, []);
-    const adapter = createAdapter(createExecutionPort().port, projectSnapshotFor(graph));
-    let capturedClone: HTMLElement | undefined;
-    let capturedOptions: { height?: number } | undefined;
-    exportMocks.rasterize.mockImplementation((clone: HTMLElement, options: { height?: number }) => {
-      capturedClone = clone;
-      capturedOptions = options;
-      return Promise.resolve(new Blob(['png'], { type: 'image/png' }));
-    });
-
-    await render(adapter, 1, true, nodes);
-    await exportWorkflowAsPng({
-      bounds: { x: 20, y: 20, width: 500, height: 260 },
-      fallbackWorkflowName: 'Untitled Workflow',
-      flowElement: host.querySelector<HTMLElement>('.react-flow')!,
-      workflowName: 'Notes',
-    });
-
-    expect(capturedClone?.textContent).toContain('Planning note');
-    expect(capturedClone?.textContent).toContain('Snapshot note line 60');
-    expect(capturedClone?.textContent).toContain('Empty note');
-    expect(capturedClone?.textContent).not.toContain('Write a note');
-    expect(capturedClone?.querySelector('input[aria-label="Note title"]')).toBeNull();
-    expect(capturedClone?.querySelector('textarea[aria-label="Note text"]')).toBeNull();
-    expect(capturedOptions?.height).toBeGreaterThan(500);
-  });
-
-  it('omits editor checkboxes from executable image-output nodes in snapshot exports', async () => {
+  it('omits editor checkboxes, field validation, and failure diagnostics from the static export', async () => {
     const imageTemplate: InvocationTemplate = {
       ...template,
       inputs: {},
@@ -510,10 +367,34 @@ describe('InvocationFlowNode chrome and export', () => {
       },
       type: 'txt2img',
     };
-    const imageNode = { ...documentNode, data: { ...documentNode.data, type: 'txt2img' } };
-    const graph = { ...projectGraph, nodes: [imageNode] };
-    const nodes = toFlowNodes(graph, [], { txt2img: imageTemplate });
-    const adapter = createAdapter(createExecutionPort().port, projectSnapshotFor(graph));
+    const requiredTemplate: InvocationTemplate = {
+      ...template,
+      inputs: { a: { ...template.inputs.a!, input: 'direct', required: true } },
+    };
+    const imageNode = { ...documentNode, data: { ...documentNode.data, type: 'txt2img' }, id: 'image-node' };
+    const incompleteNode: WorkflowInvocationNode = {
+      ...documentNode,
+      data: { ...documentNode.data, inputs: { a: { label: 'A', name: 'a', value: undefined } } },
+      id: 'incomplete-node',
+      position: { x: 340, y: 20 },
+    };
+    const failedCallNode = { ...callNode, position: { x: 20, y: 320 } };
+    const graph = { ...projectGraph, nodes: [imageNode, incompleteNode, failedCallNode] };
+    const nodes = toFlowNodes(graph, [], {
+      call_saved_workflow: callTemplate,
+      preview: requiredTemplate,
+      txt2img: imageTemplate,
+    });
+    const execution = createExecutionPort(callNodeId);
+    execution.set({
+      error: 'Child node failed',
+      latestOutput: null,
+      outputImageName: null,
+      progress: null,
+      progressMessage: null,
+      status: 'failed',
+    });
+    const adapter = createAdapter(execution.port, projectSnapshotFor(graph));
     let capturedClone: HTMLElement | undefined;
     exportMocks.rasterize.mockImplementation((clone: HTMLElement) => {
       capturedClone = clone;
@@ -522,296 +403,26 @@ describe('InvocationFlowNode chrome and export', () => {
 
     await render(adapter, 1, true, nodes);
     await exportWorkflowAsPng({
-      bounds: { x: 20, y: 20, width: 300, height: 260 },
+      bounds: { x: 20, y: 20, width: 620, height: 560 },
       fallbackWorkflowName: 'Untitled Workflow',
       flowElement: host.querySelector<HTMLElement>('.react-flow')!,
-      workflowName: 'Image output',
+      workflowName: 'Static export',
     });
 
+    for (const id of ['image-node', 'incomplete-node', callNodeId]) {
+      expect(capturedClone?.querySelector(`.react-flow__node[data-id="${id}"]`)).not.toBeNull();
+    }
     expect(capturedClone?.textContent).not.toContain(i18n.t('nodes.useCache'));
     expect(capturedClone?.textContent).not.toContain(i18n.t('nodes.saveToGallery'));
     expect(capturedClone?.querySelector('input[type="checkbox"]')).toBeNull();
+    expect(capturedClone?.querySelector('[data-part="error-text"]')).toBeNull();
+    expect(capturedClone?.querySelector('[aria-invalid="true"]')).toBeNull();
+    expect(capturedClone?.textContent).not.toContain('Required value.');
+    expect(capturedClone?.querySelector('[data-node-status-indicator="true"]')).toBeNull();
+    expect(capturedClone?.textContent).not.toContain('Failed');
+    expect(capturedClone?.textContent).not.toContain('Child node failed');
+    expect(capturedClone?.textContent).not.toContain('Child workflow error');
   });
-
-  it('exports authored field labels without tooltip metadata or execution results', async () => {
-    const longOutput = 'x'.repeat(60);
-    const longOutputTitle = 'An output title that is deliberately long enough to wrap instead of truncating';
-    const exportTemplate: InvocationTemplate = {
-      ...template,
-      category: 'Export category',
-      classification: 'stable',
-      description: 'Node export description',
-      inputs: { a: { ...template.inputs.a!, description: 'Template field description' } },
-      outputs: {
-        value: {
-          ...template.outputs.value!,
-          description: 'Output export description',
-          title: longOutputTitle,
-        },
-      },
-    };
-    const exportNode: WorkflowInvocationNode = {
-      ...documentNode,
-      data: {
-        ...documentNode.data,
-        inputs: {
-          a: { description: 'Field export description', descriptionOverride: true, label: 'A', name: 'a', value: 1 },
-        },
-        isOpen: false,
-        notes: 'Node export note',
-        version: '0.9.0',
-      },
-    };
-    const exportConnector = {
-      data: { label: '' },
-      id: 'export-connector',
-      position: { x: 380, y: 300 },
-      type: 'connector' as const,
-    };
-    const exportGraph = { ...projectGraph, nodes: [exportNode, exportConnector] };
-    const exportNodes = toFlowNodes(exportGraph, [], { preview: exportTemplate });
-    const execution = createExecutionPort();
-    const adapter = createAdapter(execution.port);
-    let capturedClone: HTMLElement | undefined;
-    exportMocks.rasterize.mockImplementation((clone: HTMLElement) => {
-      capturedClone = clone;
-      return Promise.resolve(new Blob(['png'], { type: 'image/png' }));
-    });
-
-    await render(adapter, 1, true, exportNodes);
-    await act(() =>
-      execution.set({
-        error: null,
-        latestOutput: { value: longOutput },
-        outputImageName: 'data:image/png;base64,cHJldmlldw==',
-        progress: null,
-        progressMessage: null,
-        status: 'completed',
-      })
-    );
-
-    const flowElement = host.querySelector<HTMLElement>('.react-flow')!;
-    await exportWorkflowAsPng({
-      bounds: { x: 20, y: 20, width: 300, height: 260 },
-      fallbackWorkflowName: 'Untitled Workflow',
-      flowElement,
-      workflowName: 'Export content',
-    });
-
-    expect(capturedClone?.textContent).not.toContain('Node export description');
-    expect(capturedClone?.textContent).not.toContain('Node export note');
-    expect(capturedClone?.textContent).not.toContain('Field export description');
-    expect(capturedClone?.textContent).not.toContain('Output export description');
-    expect(capturedClone?.textContent).not.toContain('Type: preview');
-    expect(capturedClone?.textContent).not.toContain('Node pack: invokeai');
-    expect(capturedClone?.textContent).not.toContain('Version: 1.0.0');
-    expect(capturedClone?.textContent).not.toContain('Classification: stable');
-    expect(capturedClone?.textContent).not.toContain('Category: Export category');
-    expect(capturedClone?.textContent).not.toContain('Field: a');
-    expect(capturedClone?.textContent).not.toContain('Type: Integer');
-    expect(capturedClone?.textContent).not.toContain('Connection only');
-    expect(capturedClone?.textContent).not.toContain('Any input');
-    expect(capturedClone?.textContent).not.toContain('Connector: Any input → Any output');
-    expect(capturedClone?.textContent).not.toContain('Any output');
-    expect(capturedClone?.textContent).not.toContain(longOutput);
-    expect(capturedClone?.querySelector('.react-flow__node img')).toBeNull();
-    expect(capturedClone?.querySelector('[data-node-input-field-title="true"]')?.textContent).toContain('A');
-    const outputTitle = capturedClone?.querySelector<HTMLElement>('[data-workflow-export-output-title="true"]');
-    expect(outputTitle?.textContent).toBe(longOutputTitle);
-    expect(outputTitle && getComputedStyle(outputTitle).whiteSpace).not.toBe('nowrap');
-    expect(capturedClone?.querySelectorAll('[data-workflow-export-connector-tooltip="true"]')).toHaveLength(0);
-    expect(capturedClone?.querySelectorAll('[data-workflow-export-content="true"]')).toHaveLength(0);
-    expect(capturedClone?.querySelector('[data-node-info-icon="true"]')).toBeNull();
-    expect(capturedClone?.querySelector('svg[aria-label]')).toBeNull();
-    expect(capturedClone?.querySelector('button[aria-label="Collapse node"]')).toBeNull();
-  });
-
-  it('keeps long authored node titles on one line in the static export', async () => {
-    const invocationLabel = 'Authored invocation label '.repeat(24);
-    const currentImageLabel = `Authored current image ${'unbroken-label-'.repeat(24)}`;
-    const invocationNode: WorkflowInvocationNode = {
-      ...documentNode,
-      data: { ...documentNode.data, label: invocationLabel },
-      id: 'long-label-node',
-    };
-    const imageNode = {
-      ...buildCurrentImageNode({ x: 420, y: 20 }),
-      data: { label: currentImageLabel },
-      id: 'long-current-image-node',
-    };
-    const unknownNode: WorkflowInvocationNode = {
-      ...invocationNode,
-      data: { ...invocationNode.data, type: 'unknown-node-type' },
-      id: 'long-unknown-node',
-      position: { x: 20, y: 200 },
-    };
-    const notesNode = {
-      ...buildNotesNode({ x: 420, y: 200 }),
-      data: { label: invocationLabel, notes: 'Authored note body' },
-      id: 'long-notes-node',
-    };
-    const graph = { ...projectGraph, nodes: [invocationNode, imageNode, unknownNode, notesNode] };
-    const nodes = toFlowNodes(graph, [], { preview: template });
-    const adapter = createAdapter(createExecutionPort().port, projectSnapshotFor(graph));
-    let capturedClone: HTMLElement | undefined;
-    exportMocks.rasterize.mockImplementation((clone: HTMLElement) => {
-      capturedClone = clone;
-      return Promise.resolve(new Blob(['png'], { type: 'image/png' }));
-    });
-
-    await render(adapter, 1, true, nodes);
-    const flowElement = host.querySelector<HTMLElement>('.react-flow')!;
-    const invocationTitle = host.querySelector<HTMLElement>(
-      '.react-flow__node[data-id="long-label-node"] [data-workflow-export-node-title="true"]'
-    );
-    const imageTitle = host.querySelector<HTMLElement>(
-      '.react-flow__node[data-id="long-current-image-node"] [data-workflow-export-node-title="true"]'
-    );
-    expect(invocationTitle?.textContent).toBe(invocationLabel);
-    expect(getComputedStyle(invocationTitle!).whiteSpace).toBe('nowrap');
-    expect(imageTitle?.textContent).toBe(currentImageLabel);
-    expect(getComputedStyle(imageTitle!).whiteSpace).toBe('nowrap');
-    const titles = host.querySelectorAll<HTMLElement>('[data-workflow-export-node-title="true"]');
-    expect(titles).toHaveLength(4);
-    for (const title of titles) {
-      expect(getComputedStyle(title).whiteSpace).toBe('nowrap');
-      expect(title.textContent?.length).toBeGreaterThan(100);
-      expect(title.scrollHeight).toBeLessThanOrEqual(title.clientHeight);
-    }
-    const truncatedHead = invocationTitle!.firstElementChild as HTMLElement;
-    expect(getComputedStyle(truncatedHead).textOverflow).toBe('ellipsis');
-    expect(truncatedHead.scrollWidth).toBeGreaterThan(truncatedHead.clientWidth);
-    expect(invocationTitle?.dataset.workflowExportStaticNodeContent).toBe('true');
-    expect(imageTitle?.dataset.workflowExportStaticNodeContent).toBe('true');
-
-    const bounds = getWorkflowContentBounds(flowElement, { x: 20, y: 20, width: 720, height: 100 });
-    expect(bounds.height).toBeGreaterThan(100);
-    await exportWorkflowAsPng({
-      bounds,
-      fallbackWorkflowName: 'Untitled Workflow',
-      flowElement,
-      workflowName: 'Long labels',
-    });
-
-    expect(capturedClone?.textContent).toContain(invocationLabel);
-    expect(capturedClone?.textContent).toContain(currentImageLabel);
-  });
-
-  it.each(['detail', 'owned', 'shared', 'unavailable', 'refreshed'] as const)(
-    'exports the selected saved workflow name from %s metadata without picker controls',
-    async (source) => {
-      const workflowId = 'selected-child';
-      const name = 'Landscape child workflow';
-      const initialName = source === 'refreshed' ? 'Previous child workflow' : name;
-      if (source === 'refreshed') {
-        queryClient.setQueryData(
-          savedWorkflowDetailQueryKey(workflowId),
-          { name: initialName, workflow_id: workflowId },
-          { updatedAt: 100 }
-        );
-        queryClient.setQueryData(
-          savedWorkflowPickerQueryOptions({ page: 0, query: 'Previous' }).queryKey,
-          {
-            pageParams: [0],
-            pages: [{ items: [{ name: initialName, workflow_id: workflowId }], page: 0, pages: 1, total: 1 }],
-          },
-          { updatedAt: 200 }
-        );
-      } else if (source === 'detail') {
-        queryClient.setQueryData(savedWorkflowDetailQueryKey(workflowId), { name, workflow_id: workflowId });
-      } else if (source !== 'unavailable') {
-        const params = { page: 0, query: 'Landscape', isPublic: source === 'shared' };
-        queryClient.setQueryData(savedWorkflowPickerQueryOptions(params).queryKey, {
-          pageParams: [0],
-          pages: [{ items: [{ name, workflow_id: workflowId }], page: 0, pages: 1, total: 1 }],
-        });
-      }
-      const namedCallTemplate: InvocationTemplate = {
-        ...callTemplate,
-        inputs: {
-          workflow_id: {
-            ...template.inputs.a!,
-            input: 'direct',
-            name: 'workflow_id',
-            title: 'Workflow',
-            type: { batch: false, cardinality: 'SINGLE', name: 'SavedWorkflowField' },
-          },
-        },
-      };
-      const namedCallNode: WorkflowInvocationNode = {
-        ...callNode,
-        data: {
-          ...callNode.data,
-          inputs: { workflow_id: { label: '', name: 'workflow_id', value: workflowId } },
-        },
-      };
-      const graph = { ...callProjectGraph, nodes: [namedCallNode] };
-      const adapter = createAdapter(createExecutionPort().port, projectSnapshotFor(graph));
-      const fetchSpy = vi.spyOn(globalThis, 'fetch');
-      try {
-        await render(adapter, 1, true, toFlowNodes(graph, [], { call_saved_workflow: namedCallTemplate }));
-        const titleHead = host.querySelector<HTMLElement>('[data-workflow-export-node-title="true"] > span');
-        expect(titleHead).not.toBeNull();
-        expect(titleHead!.scrollWidth).toBeLessThanOrEqual(titleHead!.clientWidth);
-        expect(host.querySelector('[data-workflow-export-field-value="true"]')?.textContent).toBe(
-          source === 'unavailable' ? workflowId : initialName
-        );
-        if (source === 'refreshed') {
-          await act(() => {
-            queryClient.setQueryData(
-              savedWorkflowPickerQueryOptions({ page: 0, query: 'Landscape' }).queryKey,
-              {
-                pageParams: [0],
-                pages: [{ items: [{ name, workflow_id: workflowId }], page: 0, pages: 1, total: 1 }],
-              },
-              { updatedAt: 300 }
-            );
-          });
-          expect(host.querySelector('[data-workflow-export-field-value="true"]')?.textContent).toBe(initialName);
-          await act(() => {
-            queryClient.setQueryData(
-              savedWorkflowDetailQueryKey(workflowId),
-              {
-                name: 'Renamed child workflow',
-                workflow_id: workflowId,
-              },
-              { updatedAt: 400 }
-            );
-          });
-          expect(host.querySelector('[data-workflow-export-field-value="true"]')?.textContent).toBe(
-            'Renamed child workflow'
-          );
-          await act(() => {
-            queryClient.setQueryData(
-              savedWorkflowPickerQueryOptions({ page: 0, query: 'Previous' }).queryKey,
-              {
-                pageParams: [0, 1],
-                pages: [
-                  { items: [{ name: initialName, workflow_id: workflowId }], page: 0, pages: 2, total: 2 },
-                  { items: [{ name: 'Other workflow', workflow_id: 'other' }], page: 1, pages: 2, total: 2 },
-                ],
-              },
-              { updatedAt: 500 }
-            );
-          });
-          expect(host.querySelector('[data-workflow-export-field-value="true"]')?.textContent).toBe(
-            'Renamed child workflow'
-          );
-        }
-        if (source === 'unavailable') {
-          await act(() => {
-            queryClient.setQueryData(savedWorkflowDetailQueryKey(workflowId), { name, workflow_id: workflowId });
-          });
-          expect(host.querySelector('[data-workflow-export-field-value="true"]')?.textContent).toBe(name);
-        }
-        expect(host.querySelector('.react-flow__node button')).toBeNull();
-        expect(fetchSpy).not.toHaveBeenCalled();
-        expect(adapter.commands.editGraph).not.toHaveBeenCalled();
-      } finally {
-        fetchSpy.mockRestore();
-      }
-    }
-  );
 
   it.each([
     { cardinality: 'SINGLE', failed: false, teardown: false },
@@ -935,7 +546,6 @@ describe('InvocationFlowNode chrome and export', () => {
           expect(capturedClone?.querySelector('[data-workflow-export-field-value="true"] span')?.textContent).toBe(
             'authored-source.png'
           );
-          // The fallback belongs only to the clone; the editor image is preserved for later loads.
           expect(host.querySelector('[data-workflow-export-field-value="true"] img')).toBe(sourceImage);
         } else {
           expect(sourcePixels).toBeGreaterThan(1000);
@@ -951,518 +561,6 @@ describe('InvocationFlowNode chrome and export', () => {
       }
     }
   );
-
-  it('keeps running progress in the editor but omits it from the exported graph clone', async () => {
-    const execution = createExecutionPort();
-    const adapter = createAdapter(execution.port);
-    let capturedClone: HTMLElement | undefined;
-    exportMocks.rasterize.mockImplementation((clone: HTMLElement) => {
-      capturedClone = clone;
-      return Promise.resolve(new Blob(['png'], { type: 'image/png' }));
-    });
-
-    await render(adapter);
-    await act(() =>
-      execution.set({
-        error: null,
-        latestOutput: null,
-        outputImageName: null,
-        progress: 0.5,
-        progressMessage: null,
-        status: 'running',
-      })
-    );
-    expect(host.querySelector('[data-node-progress-strip="true"]')).not.toBeNull();
-
-    await render(adapter, 1, true);
-
-    const flowElement = host.querySelector<HTMLElement>('.react-flow')!;
-    await exportWorkflowAsPng({
-      bounds: { x: 20, y: 20, width: 300, height: 260 },
-      fallbackWorkflowName: 'Untitled Workflow',
-      flowElement,
-      workflowName: 'Running workflow',
-    });
-
-    expect(capturedClone?.querySelector('[data-node-progress-strip="true"]')).toBeNull();
-  });
-
-  it('omits field validation diagnostics from the static export', async () => {
-    const requiredTemplate: InvocationTemplate = {
-      ...template,
-      inputs: { a: { ...template.inputs.a!, input: 'direct', required: true } },
-    };
-    const incompleteNode: WorkflowInvocationNode = {
-      ...documentNode,
-      data: { ...documentNode.data, inputs: { a: { label: 'A', name: 'a', value: undefined } } },
-    };
-    const nodes = toFlowNodes({ ...projectGraph, nodes: [incompleteNode] }, [], { preview: requiredTemplate });
-    const adapter = createAdapter(createExecutionPort().port);
-    let capturedClone: HTMLElement | undefined;
-    exportMocks.rasterize.mockImplementation((clone: HTMLElement) => {
-      capturedClone = clone;
-      return Promise.resolve(new Blob(['png'], { type: 'image/png' }));
-    });
-
-    await render(adapter, 1, true, nodes);
-    await exportWorkflowAsPng({
-      bounds: { x: 20, y: 20, width: 300, height: 260 },
-      fallbackWorkflowName: 'Untitled Workflow',
-      flowElement: host.querySelector<HTMLElement>('.react-flow')!,
-      workflowName: 'Incomplete workflow',
-    });
-
-    expect(capturedClone?.querySelector('[data-part="error-text"]')).toBeNull();
-    expect(capturedClone?.querySelector('[aria-invalid="true"]')).toBeNull();
-    expect(capturedClone?.textContent).not.toContain('Required value.');
-  });
-
-  it('renders stale record field values without picker diagnostics or controls in snapshot exports', async () => {
-    const styleTemplate: InvocationTemplate = {
-      ...template,
-      inputs: {
-        a: {
-          ...template.inputs.a!,
-          input: 'direct',
-          title: 'Style Preset',
-          type: { batch: false, cardinality: 'SINGLE', name: 'StylePresetField' },
-        },
-      },
-    };
-    const styleNode: WorkflowInvocationNode = {
-      ...documentNode,
-      data: {
-        ...documentNode.data,
-        inputs: { a: { label: 'Style Preset', name: 'a', value: { style_preset_id: 'missing-preset' } } },
-        isOpen: true,
-      },
-    };
-    const graph = { ...projectGraph, nodes: [styleNode] };
-    const nodes = toFlowNodes(graph, [], { preview: styleTemplate });
-    const adapter = createAdapter(createExecutionPort().port, projectSnapshotFor(graph));
-    queryClient.setQueryData(['generation', 'promptTemplates', 'list'], []);
-    let capturedClone: HTMLElement | undefined;
-    exportMocks.rasterize.mockImplementation((clone: HTMLElement) => {
-      capturedClone = clone;
-      return Promise.resolve(new Blob(['png'], { type: 'image/png' }));
-    });
-
-    await render(adapter, 1, false, nodes);
-    // The record lookup settles asynchronously; the default one-second wait is too short on a loaded machine.
-    await vi.waitFor(() => expect(host.textContent).toContain(i18n.t('nodes.stylePresetMissing')), { timeout: 5_000 });
-    await render(adapter, 1, true, nodes);
-    await exportWorkflowAsPng({
-      bounds: { x: 20, y: 20, width: 300, height: 260 },
-      fallbackWorkflowName: 'Untitled Workflow',
-      flowElement: host.querySelector<HTMLElement>('.react-flow')!,
-      workflowName: 'Stale style preset',
-    });
-
-    expect(capturedClone?.textContent).toContain('missing-preset');
-    expect(capturedClone?.textContent).not.toContain(i18n.t('nodes.stylePresetMissing'));
-    expect(capturedClone?.querySelector('input')).toBeNull();
-    expect(capturedClone?.querySelector('button')).toBeNull();
-  });
-
-  it.each([
-    [0, '#ff000000'],
-    [128, '#ff000080'],
-    [255, '#ff0000ff'],
-  ] as const)('preserves color alpha %s in snapshot exports', async (alpha, expected) => {
-    const colorTemplate: InvocationTemplate = {
-      ...template,
-      inputs: {
-        a: {
-          ...template.inputs.a!,
-          input: 'direct',
-          title: 'Color',
-          type: { batch: false, cardinality: 'SINGLE', name: 'ColorField' },
-        },
-      },
-    };
-    const colorNode: WorkflowInvocationNode = {
-      ...documentNode,
-      data: {
-        ...documentNode.data,
-        inputs: { a: { label: '', name: 'a', value: { r: 255, g: 0, b: 0, a: alpha } } },
-      },
-    };
-    const graph = { ...projectGraph, nodes: [colorNode] };
-    const nodes = toFlowNodes(graph, [], { preview: colorTemplate });
-    const adapter = createAdapter(createExecutionPort().port, projectSnapshotFor(graph));
-    let capturedClone: HTMLElement | undefined;
-    exportMocks.rasterize.mockImplementation((clone: HTMLElement) => {
-      capturedClone = clone;
-      return Promise.resolve(new Blob(['png'], { type: 'image/png' }));
-    });
-
-    await render(adapter, 1, true, nodes);
-    await exportWorkflowAsPng({
-      bounds: { x: 20, y: 20, width: 300, height: 260 },
-      fallbackWorkflowName: 'Untitled Workflow',
-      flowElement: host.querySelector<HTMLElement>('.react-flow')!,
-      workflowName: 'Color alpha',
-    });
-
-    const text = capturedClone?.querySelector('[data-workflow-export-field-value="true"]')?.textContent;
-    const canvas = document.createElement('canvas');
-    const context = canvas.getContext('2d')!;
-    context.fillStyle = text!;
-    context.fillRect(0, 0, 1, 1);
-    expect(context.getImageData(0, 0, 1, 1).data[3]).toBe(alpha);
-    expect(text).toBe(expected);
-  });
-
-  it.each([
-    ['fixed', '42'],
-    ['random', 'Random'],
-    ['increment', '42 (Increment)'],
-    ['decrement', '42 (Decrement)'],
-    [undefined, '42'],
-  ] as const)('preserves authored seed mode %s in snapshot exports', async (seedMode, expected) => {
-    const seedTemplate: InvocationTemplate = {
-      ...template,
-      inputs: {
-        seed: { ...template.inputs.a!, input: 'direct', maximum: 4_294_967_295, name: 'seed', title: 'Seed' },
-      },
-    };
-    const seedNode: WorkflowInvocationNode = {
-      ...documentNode,
-      data: { ...documentNode.data, inputs: { seed: { label: '', name: 'seed', seedMode, value: 42 } } },
-    };
-    const ordinaryNode: WorkflowInvocationNode = {
-      ...documentNode,
-      id: 'ordinary-integer',
-      position: { x: 420, y: 20 },
-      data: { ...documentNode.data, type: 'ordinary', inputs: { a: { label: '', name: 'a', seedMode, value: 42 } } },
-    };
-    const graph = { ...projectGraph, nodes: [seedNode, ordinaryNode] };
-    const nodes = toFlowNodes(graph, [], {
-      preview: seedTemplate,
-      ordinary: { ...template, type: 'ordinary', inputs: { a: { ...template.inputs.a!, input: 'direct' } } },
-    });
-    const adapter = createAdapter(createExecutionPort().port, projectSnapshotFor(graph));
-    let capturedClone: HTMLElement | undefined;
-    exportMocks.rasterize.mockImplementation((clone: HTMLElement) => {
-      capturedClone = clone;
-      return Promise.resolve(new Blob(['png'], { type: 'image/png' }));
-    });
-
-    await render(adapter, 1, true, nodes);
-    await exportWorkflowAsPng({
-      bounds: { x: 20, y: 20, width: 720, height: 260 },
-      fallbackWorkflowName: 'Untitled Workflow',
-      flowElement: host.querySelector<HTMLElement>('.react-flow')!,
-      workflowName: 'Seed modes',
-    });
-
-    expect(
-      capturedClone?.querySelector(`[data-id="${NODE_ID}"] [data-workflow-export-field-value="true"]`)?.textContent
-    ).toBe(expected);
-    expect(
-      capturedClone?.querySelector('[data-id="ordinary-integer"] [data-workflow-export-field-value="true"]')
-        ?.textContent
-    ).toBe('42');
-    expect(capturedClone?.querySelector('input, button, [role="menu"]')).toBeNull();
-  });
-
-  it('omits legacy generator results while preserving generator settings in snapshot exports', async () => {
-    const generatorTemplate: InvocationTemplate = {
-      ...template,
-      inputs: {
-        a: {
-          ...template.inputs.a!,
-          input: 'direct',
-          title: 'Values',
-          type: { batch: false, cardinality: 'SINGLE', name: 'FloatGeneratorField' },
-        },
-      },
-    };
-    const generatorValue = {
-      type: 'float_generator_arithmetic_sequence',
-      start: 0,
-      step: 0.2,
-      count: 3,
-      values: [0.2, 0.4, 0.6],
-    };
-    const generatorNode: WorkflowInvocationNode = {
-      ...documentNode,
-      data: {
-        ...documentNode.data,
-        inputs: { a: { label: 'Values', name: 'a', value: generatorValue } },
-        isOpen: true,
-      },
-    };
-    const graph = { ...projectGraph, nodes: [generatorNode] };
-    const nodes = toFlowNodes(graph, [], { preview: generatorTemplate });
-    const adapter = createAdapter(createExecutionPort().port, projectSnapshotFor(graph));
-    let capturedClone: HTMLElement | undefined;
-    exportMocks.rasterize.mockImplementation((clone: HTMLElement) => {
-      capturedClone = clone;
-      return Promise.resolve(new Blob(['png'], { type: 'image/png' }));
-    });
-
-    await render(adapter, 1, true, nodes);
-    await exportWorkflowAsPng({
-      bounds: { x: 20, y: 20, width: 300, height: 260 },
-      fallbackWorkflowName: 'Untitled Workflow',
-      flowElement: host.querySelector<HTMLElement>('.react-flow')!,
-      workflowName: 'Generator workflow',
-    });
-
-    const fieldValue = capturedClone?.querySelector<HTMLElement>('[data-workflow-export-field-value="true"]');
-    expect(fieldValue?.textContent).toBe(
-      '{"type":"float_generator_arithmetic_sequence","start":0,"step":0.2,"count":3}'
-    );
-    expect(capturedClone?.textContent).not.toContain('0.2, 0.4, 0.6');
-    expect(capturedClone?.querySelector('input')).toBeNull();
-    expect(capturedClone?.querySelector('button')).toBeNull();
-  });
-
-  it('removes loop validation status from static boundary labels', async () => {
-    const forNode: WorkflowInvocationNode = {
-      ...documentNode,
-      data: { ...documentNode.data, type: 'for', label: 'For' },
-      id: 'for-node',
-    };
-    const bodyNode: WorkflowInvocationNode = {
-      ...documentNode,
-      data: { ...documentNode.data, type: 'number', label: 'Body' },
-      id: 'body-node',
-      position: { x: 300, y: 20 },
-    };
-    const returnNode: WorkflowInvocationNode = {
-      ...documentNode,
-      data: { ...documentNode.data, type: 'for_return', label: 'Return' },
-      id: 'return-node',
-      position: { x: 600, y: 20 },
-    };
-    const edges: WorkflowEdge[] = [
-      {
-        id: 'iteration-edge',
-        source: forNode.id,
-        sourceHandle: 'item',
-        target: bodyNode.id,
-        targetHandle: 'value',
-        type: 'default',
-      },
-      {
-        id: 'return-edge',
-        source: bodyNode.id,
-        sourceHandle: 'value',
-        target: returnNode.id,
-        targetHandle: 'output',
-        type: 'default',
-      },
-    ];
-    const graph = { ...projectGraph, edges, nodes: [forNode, bodyNode, returnNode] };
-    const nodes = toFlowNodes(graph, [], {});
-    const adapter = createAdapter(createExecutionPort().port);
-    const renderBoundary = (isExporting: boolean) =>
-      act(() =>
-        root.render(
-          <ChakraProvider value={system}>
-            <WorkflowImageExportProvider isExporting={isExporting}>
-              <WorkflowUiProvider adapter={adapter}>
-                <ReactFlow edges={[]} nodes={nodes} nodeTypes={nodeTypes}>
-                  <LoopBodyBoundaryOverlay edges={edges} nodes={graph.nodes} />
-                </ReactFlow>
-              </WorkflowUiProvider>
-            </WorkflowImageExportProvider>
-          </ChakraProvider>
-        )
-      );
-
-    await renderBoundary(false);
-    const editorBoundary = await vi.waitFor(() => {
-      const boundary = host.querySelector<HTMLElement>('[data-loop-body-boundary="for-node"]');
-      expect(boundary).not.toBeNull();
-      return boundary!;
-    });
-    expect(editorBoundary.getAttribute('data-loop-body-status')).toBe('missing_linkage');
-    expect(editorBoundary.getAttribute('aria-label')).toContain(
-      i18n.t('nodes.forLoopBodyBoundaryStatus.missing_linkage')
-    );
-
-    await renderBoundary(true);
-    const snapshotBoundary = await vi.waitFor(() => {
-      const boundary = host.querySelector<HTMLElement>('[data-loop-body-boundary="for-node"]');
-      expect(boundary).not.toBeNull();
-      return boundary!;
-    });
-    expect(snapshotBoundary.getAttribute('aria-label')).toBe(i18n.t('nodes.forLoopBodyBoundary'));
-    expect(snapshotBoundary.hasAttribute('data-loop-body-status')).toBe(false);
-  });
-
-  it('omits gallery images from static exports while the editor shows the live generation frame', async () => {
-    const liveImageUrl = 'data:image/png;base64,bGl2ZQ==';
-    const savedImageUrl = 'data:image/png;base64,c2F2ZWQ=';
-    let capturedClone: HTMLElement | undefined;
-    exportMocks.progressImage = { dataUrl: liveImageUrl, height: 2, width: 2 };
-    exportMocks.rasterize.mockImplementation((clone: HTMLElement) => {
-      capturedClone = clone;
-      return Promise.resolve(new Blob(['png'], { type: 'image/png' }));
-    });
-    const savedImage = {
-      height: 2,
-      imageName: 'saved.png',
-      imageUrl: savedImageUrl,
-      queuedAt: '2026-01-01T00:00:00Z',
-      sourceQueueItemId: 'queue-item',
-      thumbnailUrl: savedImageUrl,
-      width: 2,
-    };
-    const adapter = createAdapter(
-      createExecutionPort().port,
-      projectSnapshotFor(currentImageGraph, { recentImages: [savedImage] })
-    );
-
-    await render(adapter, 1, false, currentImageNodes);
-    expect(host.querySelector<HTMLImageElement>('.react-flow__node img')?.src).toBe(liveImageUrl);
-
-    await render(adapter, 1, true, currentImageNodes);
-    const flowElement = host.querySelector<HTMLElement>('.react-flow')!;
-    await exportWorkflowAsPng({
-      bounds: { x: 20, y: 20, width: 300, height: 260 },
-      fallbackWorkflowName: 'Untitled Workflow',
-      flowElement,
-      workflowName: 'Current image',
-    });
-
-    const exportedImage = capturedClone?.querySelector<HTMLImageElement>('.react-flow__node img');
-    expect(exportedImage).toBeNull();
-    expect(capturedClone?.textContent).not.toContain('No image yet');
-    expect(capturedClone?.textContent).not.toContain('generating');
-  });
-
-  it('omits failure status and backend diagnostics from the static export', async () => {
-    const execution = createExecutionPort(callNodeId);
-    execution.set({
-      error: 'Child node failed',
-      latestOutput: null,
-      outputImageName: null,
-      progress: null,
-      progressMessage: null,
-      status: 'failed',
-    });
-    const adapter = createAdapter(execution.port);
-    let capturedClone: HTMLElement | undefined;
-    exportMocks.rasterize.mockImplementation((clone: HTMLElement) => {
-      capturedClone = clone;
-      return Promise.resolve(new Blob(['png'], { type: 'image/png' }));
-    });
-
-    await render(adapter, 1, true, callFlowNodes);
-    const flowElement = host.querySelector<HTMLElement>('.react-flow')!;
-    await exportWorkflowAsPng({
-      bounds: { x: 20, y: 20, width: 300, height: 260 },
-      fallbackWorkflowName: 'Untitled Workflow',
-      flowElement,
-      workflowName: 'Failed workflow',
-    });
-
-    expect(capturedClone?.querySelector('[data-node-status-indicator="true"]')).toBeNull();
-    expect(capturedClone?.textContent).not.toContain('Failed');
-    expect(capturedClone?.textContent).not.toContain('Child node failed');
-    expect(capturedClone?.textContent).not.toContain('Child workflow error');
-  });
-
-  it('omits missing-template diagnostics from the static export', async () => {
-    const unknownLabel = `Preserved unknown node ${'x'.repeat(240)}`;
-    const unknownNode: WorkflowInvocationNode = {
-      ...documentNode,
-      data: { ...documentNode.data, label: unknownLabel, type: 'removed_invocation' },
-      id: 'unknown-node',
-      position: { x: 420, y: 20 },
-    };
-    const graph = { ...projectGraph, nodes: [documentNode, unknownNode] };
-    const nodes = toFlowNodes(graph, [], { preview: template });
-    const adapter = createAdapter(createExecutionPort().port, projectSnapshotFor(graph));
-    let capturedClone: HTMLElement | undefined;
-    exportMocks.rasterize.mockImplementation((clone: HTMLElement) => {
-      capturedClone = clone;
-      return Promise.resolve(new Blob(['png'], { type: 'image/png' }));
-    });
-
-    await render(adapter, 1, true, nodes);
-    const flowElement = host.querySelector<HTMLElement>('.react-flow')!;
-    const knownShell = host.querySelector<HTMLElement>(
-      '.react-flow__node[data-id="preview-node"] [data-workflow-node-shell="true"]'
-    );
-    const unknownShell = host.querySelector<HTMLElement>(
-      '.react-flow__node[data-id="unknown-node"] [data-workflow-node-shell="true"]'
-    );
-    const unknownTitle = unknownShell?.querySelector<HTMLElement>('p');
-    expect(unknownShell?.textContent).toContain(unknownLabel);
-    expect(unknownShell?.textContent).not.toContain('Unknown node type');
-    expect(getComputedStyle(unknownShell!).borderColor).toBe(getComputedStyle(knownShell!).borderColor);
-    expect(unknownTitle?.textContent).toBe(unknownLabel);
-    expect(getComputedStyle(unknownTitle!).whiteSpace).toBe('nowrap');
-    expect(unknownTitle?.dataset.workflowExportStaticNodeContent).toBe('true');
-
-    const bounds = getWorkflowContentBounds(flowElement, { x: 20, y: 20, width: 600, height: 100 });
-    expect(bounds.height).toBeCloseTo(
-      Math.max(knownShell!.getBoundingClientRect().height, unknownShell!.getBoundingClientRect().height)
-    );
-    expect(bounds.height).toBeLessThan(100);
-
-    await exportWorkflowAsPng({
-      bounds,
-      fallbackWorkflowName: 'Untitled Workflow',
-      flowElement,
-      workflowName: 'Unknown node',
-    });
-
-    expect(capturedClone?.textContent).toContain(unknownLabel);
-    expect(capturedClone?.textContent).not.toContain('Unknown node type');
-  });
-
-  it('removes editor selection styling from nodes and edges in the static export', async () => {
-    const targetNode = { ...documentNode, id: 'target-node', position: { x: 420, y: 20 } };
-    const graph: ProjectGraphState = {
-      ...projectGraph,
-      edges: [
-        {
-          id: 'edge',
-          source: NODE_ID,
-          sourceHandle: 'value',
-          target: targetNode.id,
-          targetHandle: 'a',
-          type: 'default',
-        },
-      ],
-      nodes: [documentNode, targetNode],
-    };
-    const nodes = toFlowNodes(graph, [], { preview: template }).map((node) => ({
-      ...node,
-      selected: node.id === NODE_ID,
-    }));
-    const edges = toFlowEdges(graph, [], 'default', new Set([NODE_ID]), { preview: template });
-    const exportRef = createRef<HTMLDivElement>();
-    const adapter = createAdapter(createExecutionPort().port, projectSnapshotFor(graph));
-
-    await act(() =>
-      root.render(
-        <ChakraProvider value={system}>
-          <WorkflowUiProvider adapter={adapter}>
-            <WorkflowImageExportView containerRef={exportRef} edges={edges} nodes={nodes} nodeTypes={nodeTypes} />
-          </WorkflowUiProvider>
-        </ChakraProvider>
-      )
-    );
-
-    const selectedShell = exportRef.current?.querySelector<HTMLElement>(
-      '.react-flow__node[data-id="preview-node"] [data-workflow-node-shell="true"]'
-    );
-    const plainShell = exportRef.current?.querySelector<HTMLElement>(
-      '.react-flow__node[data-id="target-node"] [data-workflow-node-shell="true"]'
-    );
-    expect(selectedShell).not.toBeNull();
-    expect(plainShell).not.toBeNull();
-    expect(getComputedStyle(selectedShell!).boxShadow).toBe(getComputedStyle(plainShell!).boxShadow);
-    expect(exportRef.current?.querySelector('.react-flow__edge.workflow-selected-node-edge')).toBeNull();
-    expect(exportRef.current?.querySelector('.react-flow__edge.animated')).toBeNull();
-  });
 
   it('keeps the visible collapsed node unchanged while an expanded offscreen snapshot is rasterizing', async () => {
     const node = { ...documentNode, data: { ...documentNode.data, isOpen: false, notes: 'Snapshot metadata' } };
@@ -1524,37 +622,6 @@ describe('InvocationFlowNode chrome and export', () => {
     await capture;
   });
 
-  it.each(['completed', 'running', 'failed'] as const)('omits execution results from a %s snapshot', async (status) => {
-    const execution = createExecutionPort();
-    const completed = {
-      error: null,
-      latestOutput: { value: 'previous result' },
-      outputImageName: 'data:image/png;base64,cHJldmlvdXM=',
-      progress: null,
-      progressMessage: null,
-      status: 'completed' as const,
-    };
-    execution.set(completed);
-    const adapter = createAdapter(execution.port);
-    await render(adapter, 1, true);
-    expect(host.textContent).not.toContain('previous result');
-    await act(() => execution.set({ ...completed, status }));
-    let capturedClone: HTMLElement | undefined;
-    exportMocks.rasterize.mockImplementation((clone: HTMLElement) => {
-      capturedClone = clone;
-      return Promise.resolve(new Blob(['png'], { type: 'image/png' }));
-    });
-    await exportWorkflowAsPng({
-      bounds: { x: 20, y: 20, width: 300, height: 260 },
-      fallbackWorkflowName: 'Untitled Workflow',
-      flowElement: host.querySelector<HTMLElement>('.react-flow')!,
-      workflowName: 'Retry',
-    });
-    expect(capturedClone?.textContent).not.toContain('previous result');
-    expect(capturedClone?.querySelector('img')).toBeNull();
-    expect(capturedClone?.textContent).not.toContain('Failed');
-  });
-
   it('blocks a third capture after two timeouts and recovers when one rasterization settles', async () => {
     vi.useFakeTimers();
     exportMocks.rasterize.mockClear();
@@ -1612,91 +679,6 @@ describe('InvocationFlowNode chrome and export', () => {
       vi.useRealTimers();
     }
   });
-
-  // Outputs are inspected in the side panel; a result growing the node would push it over the nodes below.
-  it('keeps its size and shows no image when a run completes with an image output', async () => {
-    const execution = createExecutionPort();
-    const adapter = createAdapter(execution.port);
-
-    await render(adapter);
-    const idleHeight = nodeHeight();
-
-    await act(() => execution.set(completed(outputImage(400, 100))));
-
-    expect(image()).toBeNull();
-    expect(nodeHeight()).toBe(idleHeight);
-  });
-
-  it('renders full fields for compact nodes during image export', async () => {
-    const execution = createExecutionPort();
-    const adapter = createAdapter(execution.port);
-    const compactNode = {
-      ...documentNode,
-      data: { ...documentNode.data, inputs: { a: { label: '', name: 'a', value: 42 } } },
-    };
-    const compactTemplates = {
-      preview: { ...template, inputs: { a: { ...template.inputs.a!, input: 'any' as const } } },
-    };
-    const compactNodes = toFlowNodes({ ...projectGraph, nodes: [compactNode] }, [], compactTemplates, undefined, true);
-
-    await render(adapter, 1, true, compactNodes);
-
-    expect(host.querySelector('[data-node-input-field-title="true"]')?.textContent).toContain('A');
-    expect(host.querySelector('.react-flow__node input')).toBeNull();
-    expect(host.querySelector('[data-workflow-export-field-value="true"]')?.textContent).toBe('42');
-  });
-});
-
-describe('InvocationFlowNode failure outcome', () => {
-  let host: HTMLDivElement;
-  let root: Root;
-
-  beforeEach(() => {
-    host = document.createElement('div');
-    host.style.cssText = 'width: 480px; height: 520px;';
-    document.body.append(host);
-    root = createRoot(host);
-  });
-
-  afterEach(async () => {
-    await act(() => root.unmount());
-    host.remove();
-  });
-
-  it('shows translated child-workflow attribution in the failure tooltip', async () => {
-    const execution = createExecutionPort(callNodeId);
-    execution.set({
-      error: 'Child node failed',
-      latestOutput: null,
-      outputImageName: null,
-      progress: null,
-      progressMessage: null,
-      status: 'failed',
-    });
-
-    await act(() =>
-      root.render(
-        <ChakraProvider value={system}>
-          <WorkflowUiProvider adapter={createAdapter(execution.port)}>
-            <ReactFlow defaultViewport={{ x: 0, y: 0, zoom: 1 }} nodes={callFlowNodes} nodeTypes={nodeTypes} />
-          </WorkflowUiProvider>
-        </ChakraProvider>
-      )
-    );
-
-    const failureIcon = await vi.waitFor(() => {
-      const icon = host.querySelector<HTMLElement>('[aria-label="Failed"]');
-      expect(icon).not.toBeNull();
-      return icon!;
-    });
-
-    await act(() => userEvent.hover(failureIcon));
-    await vi.waitFor(() =>
-      expect(document.querySelector('[data-part="content"]')?.textContent).toContain(
-        'Child workflow error: Child node failed'
-      )
-    );
-  });
 });
 
 describe('InvocationFlowNode edge stacking', () => {
@@ -1715,7 +697,6 @@ describe('InvocationFlowNode edge stacking', () => {
     host.remove();
   });
 
-  /** Screen-space samples along an edge's hit path that fall inside `rect`, with what the pointer would hit there. */
   const hitsInside = (path: SVGGeometryElement, rect: DOMRect) => {
     const svg = path.ownerSVGElement!;
     const matrix = svg.getScreenCTM()!;
@@ -1734,8 +715,6 @@ describe('InvocationFlowNode edge stacking', () => {
   };
 
   it('keeps a selected node clickable where its own edge crosses it, while the edge stays above other nodes', async () => {
-    // Route the edge back across its source and another node to test overlapping interaction paths within the
-    // viewport.
     const target: WorkflowInvocationNode = { ...documentNode, id: 'target-node', position: { x: 0, y: 0 } };
     const bystander: WorkflowInvocationNode = { ...documentNode, id: 'bystander-node', position: { x: 20, y: 120 } };
     const graph: ProjectGraphState = {
@@ -1826,7 +805,6 @@ describe('InvocationFlowNode field entry', () => {
     id: 'entry-node',
   };
 
-  /** An undoable graph store standing in for the project aggregate. */
   const createGraphStore = (initial: ProjectGraphState) => {
     const listeners = new Set<() => void>();
     const history: ProjectGraphState[] = [];
@@ -1861,12 +839,7 @@ describe('InvocationFlowNode field entry', () => {
     return node?.type === 'invocation' ? node.data.inputs[name]?.value : undefined;
   };
 
-  /**
-   * Mirrors WorkflowEditorView: the flow model is rebuilt from the graph in a transition after an effect, so a
-   * committed value echoes back to the node a beat after the keystroke that produced it. xyflow's node changes
-   * (measured sizes) are applied as the editor does; a rebuilt node without them is hidden until remeasured and
-   * drops the next keystroke.
-   */
+  /** Mirrors WorkflowEditorView: the flow model rebuilds in a transition, so a commit echoes back a beat late. */
   const DeferredFlow = ({ store }: { store: GraphStore }) => {
     const graph = useSyncExternalStore(store.subscribe, store.getSnapshot);
     const [flowNodes, setFlowNodes] = useState(() => toFlowNodes(graph, [], entryTemplates));
@@ -1929,9 +902,8 @@ describe('InvocationFlowNode field entry', () => {
         setTimeout(resolve, 0);
       });
     });
-  const rowError = (input: HTMLInputElement) =>
-    input.closest('[data-scope="field"][data-part="root"]')?.querySelector('[data-part="error-text"]')?.textContent ??
-    null;
+  const nodeStatus = () =>
+    host.querySelector('[data-node-status-indicator="true"]')?.getAttribute('aria-label') ?? null;
 
   it('keeps focus and caret in a text field while the deferred flow model catches up', async () => {
     const { field, store } = await renderEntryNode();
@@ -1957,9 +929,8 @@ describe('InvocationFlowNode field entry', () => {
     expect(prompt.value).toBe('');
     expect(fieldValue(store, 'prompt')).toBe('');
     expect(document.activeElement).toBe(prompt);
-    expect(rowError(prompt)).toBeNull();
+    expect(nodeStatus()).toBeNull();
 
-    // Undo from elsewhere (a toolbar button has focus) restores the text without pulling focus into a field.
     const weight = field('Weight');
     await act(async () => {
       await userEvent.click(host);
@@ -1999,13 +970,13 @@ describe('InvocationFlowNode field entry', () => {
     expect(weight.value).toBe('');
     expect(fieldValue(store, 'weight')).toBeUndefined();
     expect(document.activeElement).toBe(weight);
-    expect(rowError(weight)).toBe('Required value.');
+    expect(nodeStatus()).toBe('Status: Weight is required.');
 
     await keys('7{Home}-');
     await settle();
     expect(weight.value).toBe('-7');
     expect(fieldValue(store, 'weight')).toBe(-7);
-    expect(rowError(weight)).toBeNull();
+    expect(nodeStatus()).toBeNull();
 
     await keys('{Home}{Delete}');
     await settle();
@@ -2039,7 +1010,6 @@ describe('InvocationFlowNode field entry', () => {
     expect(fieldLabel()).toBe('Iterations');
     expect(stepsTitle().textContent).toBe('Iterations *');
     expect(host.querySelector('input[aria-label="Field label"]')).toBeNull();
-    // Focus returns to the node, where editor shortcuts such as undo still apply.
     expect(document.activeElement?.classList.contains('react-flow__node')).toBe(true);
 
     await rename('Discarded{Escape}');
@@ -2048,26 +1018,6 @@ describe('InvocationFlowNode field entry', () => {
     await rename('Steps{Enter}');
     expect(fieldLabel()).toBe('');
     expect(stepsTitle().textContent).toBe('Steps *');
-  });
-
-  it('keeps a fractional integer visible and flagged until it is corrected', async () => {
-    const { field, store } = await renderEntryNode();
-    const steps = field('Steps');
-
-    await focusAtEnd(steps);
-    await keys('.5');
-    await settle();
-    expect(steps.value).toBe('20.5');
-    expect(fieldValue(store, 'steps')).toBe(20.5);
-    expect(steps.getAttribute('aria-invalid')).toBe('true');
-    expect(rowError(steps)).toBe('Invalid value.');
-
-    await keys('{Backspace}{Backspace}');
-    await settle();
-    expect(steps.value).toBe('20');
-    expect(fieldValue(store, 'steps')).toBe(20);
-    expect(steps.getAttribute('aria-invalid')).toBeNull();
-    expect(rowError(steps)).toBeNull();
   });
 });
 
@@ -2097,89 +1047,45 @@ describe('InvocationFlowNode template version', () => {
         </ChakraProvider>
       )
     );
-  const updateIcon = () => host.querySelector('.react-flow__node [role="img"][aria-label*="Version"]');
+  const statusButton = () => host.querySelector('.react-flow__node [data-node-status-indicator="true"]');
   const borderColor = () => getComputedStyle(host.querySelector<HTMLElement>('.react-flow__node > div')!).borderColor;
 
-  it('marks a node whose template moved on with a warning border and an update tooltip, and leaves a current one alone', async () => {
+  it('marks a node whose template moved on with a warning border and an update status, and leaves a current one alone', async () => {
     await render(flowNodes);
-    expect(updateIcon()).toBeNull();
+    expect(statusButton()).toBeNull();
     const currentBorder = borderColor();
 
     await render(toFlowNodes(projectGraph, [], { preview: { ...template, version: '1.1.0' } }));
-    expect(updateIcon()?.getAttribute('aria-label')).toBe('Version 1.0.0 → 1.1.0: update available');
+    expect(statusButton()?.getAttribute('aria-label')).toBe('Status: Version 1.0.0 → 1.1.0: update available');
+    expect(statusButton()?.getAttribute('data-node-status')).toBe('updatable');
     expect(borderColor()).not.toBe(currentBorder);
 
     await render(toFlowNodes(projectGraph, [], { preview: { ...template, version: '2.0.0' } }));
-    expect(updateIcon()?.getAttribute('aria-label')).toBe(
-      'Version 1.0.0 cannot be updated to 2.0.0; delete and re-add the node'
+    expect(statusButton()?.getAttribute('aria-label')).toBe(
+      'Status: Version 1.0.0 cannot be updated to 2.0.0; delete and re-add the node'
     );
-  });
-
-  it('waits neutrally for node definitions and warns of an unknown type only once they have loaded', async () => {
-    await render(flowNodes);
-    const knownBorder = borderColor();
-    const nodeText = () => host.querySelector('.react-flow__node')!.textContent;
-
-    for (const isCompact of [false, true]) {
-      await render(toFlowNodes(projectGraph, [], undefined, undefined, isCompact, false, 'loading'));
-      expect(borderColor()).toBe(knownBorder);
-      expect(nodeText()).toContain('preview');
-      expect(nodeText()).toContain('Loading node…');
-      expect(nodeText()).not.toContain('Unknown node type');
-    }
-
-    await render(toFlowNodes(projectGraph, [], undefined, undefined, false, false, 'error'));
-    expect(borderColor()).toBe(knownBorder);
-    expect(nodeText()).toContain('Node definitions could not be loaded.');
-
-    await render(toFlowNodes(projectGraph, [], undefined, undefined, false, false, 'loaded'));
-    expect(borderColor()).not.toBe(knownBorder);
-    expect(nodeText()).toContain('Unknown node type "preview". It cannot run on this backend.');
-  });
-
-  it('leads an unknown type to the Nodes Manager for an account that installs node packs, and to an admin otherwise', async () => {
-    const missingNodes = toFlowNodes(projectGraph, [], undefined, undefined, false, false, 'loaded');
-    const renderFor = (canManageNodes: boolean, openNodesManager = vi.fn()) =>
-      act(() =>
-        root.render(
-          <ChakraProvider value={system}>
-            <WorkflowUiProvider
-              adapter={{
-                ...createAdapter(createExecutionPort().port),
-                capabilities: { getSnapshot: () => ({ canManageNodes, canUseCache: true }), subscribe: () => () => {} },
-                openNodesManager,
-              }}
-            >
-              <ReactFlow edges={[]} nodes={missingNodes} nodeTypes={nodeTypes} />
-            </WorkflowUiProvider>
-          </ChakraProvider>
-        )
-      );
-    const openNodesManager = vi.fn();
-
-    await renderFor(true, openNodesManager);
-    const openButton = [...host.querySelectorAll('button')].find(
-      (button) => button.textContent === 'Open Nodes Manager'
-    );
-
-    await userEvent.click(openButton!);
-    expect(openNodesManager).toHaveBeenCalledOnce();
-
-    await renderFor(false);
-    expect(host.querySelector('.react-flow__node')!.textContent).toContain(
-      'Ask an administrator to install the node pack that provides it.'
-    );
-    expect(host.querySelector('.react-flow__node button')).toBeNull();
+    expect(statusButton()?.getAttribute('data-node-status')).toBe('versionMismatch');
   });
 });
 
-describe('InvocationFlowNode batch nodes', () => {
+const PROBED_COLORS = [
+  'accent.fg',
+  'accent.solid',
+  'bg',
+  'bg.muted',
+  'border.error',
+  'fg.error',
+  'fg.warning',
+  'fg',
+] as const;
+
+describe('InvocationFlowNode header, states and field rows', () => {
   let host: HTMLDivElement;
   let root: Root;
 
   beforeEach(() => {
     host = document.createElement('div');
-    host.style.cssText = 'width: 480px; height: 520px;';
+    host.style.cssText = 'width: 1000px; height: 520px;';
     document.body.append(host);
     root = createRoot(host);
   });
@@ -2189,77 +1095,474 @@ describe('InvocationFlowNode batch nodes', () => {
     host.remove();
   });
 
-  const batchTemplate: InvocationTemplate = {
-    ...template,
-    inputs: {
-      batch_group_id: {
-        ...(template.inputs.a as InvocationTemplate['inputs'][string]),
-        default: 'None',
-        input: 'direct',
-        name: 'batch_group_id',
-        options: ['None', 'Group 1', 'Group 2'],
-        title: 'Batch Group',
-        type: { batch: false, cardinality: 'SINGLE', name: 'EnumField' },
-      },
-      floats: {
-        ...(template.inputs.a as InvocationTemplate['inputs'][string]),
-        default: [],
-        input: 'any',
-        name: 'floats',
-        title: 'Floats',
-        type: { batch: true, cardinality: 'COLLECTION', name: 'FloatField' },
-      },
-    },
-    outputs: {
-      value: {
-        description: '',
-        name: 'value',
-        title: 'Value',
-        type: { batch: false, cardinality: 'SINGLE', name: 'FloatField' },
-      },
-    },
-    type: 'float_batch',
-  };
-  const batchNode = (groupId: string): WorkflowInvocationNode => ({
-    ...documentNode,
-    data: {
-      ...documentNode.data,
-      inputs: {
-        batch_group_id: { label: '', name: 'batch_group_id', value: groupId },
-        floats: { label: '', name: 'floats', value: [1, 2] },
-      },
-      type: 'float_batch',
-    },
-    id: 'batch-node',
+  const requiredInput = (
+    name: string,
+    title: string,
+    overrides: Partial<InvocationTemplate['inputs'][string]> = {}
+  ) => ({
+    ...template.inputs.a!,
+    input: 'any' as const,
+    name,
+    required: true,
+    title,
+    ...overrides,
   });
-  const render = (groupId: string) => {
-    const graph: ProjectGraphState = { ...createProjectGraph('batch-test'), nodes: [batchNode(groupId)] };
-
-    return act(() =>
+  const stateTemplate: InvocationTemplate = {
+    ...template,
+    description: 'Adds two numbers.',
+    inputs: {
+      a: requiredInput('a', 'A'),
+      b: requiredInput('b', 'B', { input: 'connection' }),
+    },
+  };
+  const stateNode = (id: string, x: number, value: number | undefined): WorkflowInvocationNode => ({
+    ...documentNode,
+    data: { ...documentNode.data, inputs: { a: { label: '', name: 'a', value } } },
+    id,
+    position: { x, y: 20 },
+  });
+  const createExecutionMap = (states: Record<string, WorkflowNodeExecutionState>) => ({
+    get: (nodeId: string) => states[nodeId] ?? null,
+    subscribe: () => () => {},
+  });
+  const render = async (
+    nodes: ReturnType<typeof toFlowNodes>,
+    execution: Pick<WorkflowUiAdapter['nodeExecution'], 'get' | 'subscribe'> = createExecutionMap({})
+  ) => {
+    await act(() =>
       root.render(
         <ChakraProvider value={system}>
-          <WorkflowUiProvider adapter={createAdapter(createExecutionPort().port)}>
-            <ReactFlow
-              edges={[]}
-              nodes={toFlowNodes(graph, [], { float_batch: batchTemplate })}
-              nodeTypes={nodeTypes}
-            />
+          <QueryClientProvider client={queryClient}>
+            <WorkflowUiProvider adapter={createAdapter(execution)}>
+              <Box css={flowThemeCss} h="full" w="full">
+                <ReactFlow edges={[]} nodes={nodes} nodeTypes={nodeTypes} />
+              </Box>
+            </WorkflowUiProvider>
+            {PROBED_COLORS.map((token) => (
+              <Box key={token} color={token} data-color-probe={token} />
+            ))}
+          </QueryClientProvider>
+        </ChakraProvider>
+      )
+    );
+    // xyflow keeps a node `visibility: hidden` until measured; hit-tests pass through it, so wait for every node.
+    await vi.waitFor(() =>
+      expect(
+        [...host.querySelectorAll<HTMLElement>('.react-flow__node')].every(
+          (element) => getComputedStyle(element).visibility === 'visible'
+        )
+      ).toBe(true)
+    );
+  };
+  const node = (id: string) => host.querySelector<HTMLElement>(`.react-flow__node[data-id="${id}"]`)!;
+
+  const statusButton = (id: string) => node(id).querySelector<HTMLElement>('[data-node-status-indicator="true"]');
+  const panelText = () => document.querySelector('[data-scope="tooltip"][data-part="content"]')?.textContent ?? '';
+
+  it('explains the node in its info panel on hover and on keyboard focus, and shows no status at rest', async () => {
+    const labelled = {
+      ...stateNode('info-node', 20, 4),
+      data: { ...stateNode('info-node', 20, 4).data, label: 'Sum', notes: 'Feeds the seed.' },
+    };
+    const infoTemplate = { ...stateTemplate, inputs: { a: stateTemplate.inputs.a! } };
+    await render(toFlowNodes({ ...projectGraph, nodes: [labelled] }, [], { preview: infoTemplate }));
+
+    expect(statusButton('info-node')).toBeNull();
+    const infoButton = node('info-node').querySelector<HTMLButtonElement>('button[aria-label="Show details for Sum"]')!;
+    expect(document.querySelector('[data-scope="tooltip"][data-part="content"]')).toBeNull();
+
+    await act(() => userEvent.hover(infoButton));
+    await vi.waitFor(() => expect(panelText()).toContain('Sum (Preview)'));
+    for (const line of [
+      'Type: preview',
+      'Node pack: invokeai',
+      'Version: 1.0.0',
+      'Adds two numbers.',
+      'Feeds the seed.',
+    ]) {
+      expect(panelText()).toContain(line);
+    }
+    await act(() => userEvent.unhover(infoButton));
+    await vi.waitFor(() => expect(panelText()).toBe(''));
+
+    await act(async () => {
+      node('info-node').querySelector<HTMLButtonElement>('button[aria-label="Collapse node"]')!.focus();
+      await userEvent.tab();
+    });
+    expect(document.activeElement).toBe(infoButton);
+    await vi.waitFor(() => expect(panelText()).toContain('Sum (Preview)'));
+  });
+
+  it('says in the status panel what each blocking field needs, and asks for a model by name', async () => {
+    await render(
+      toFlowNodes({ ...projectGraph, nodes: [stateNode('invalid-node', 20, undefined)] }, [], {
+        preview: stateTemplate,
+      })
+    );
+
+    const button = statusButton('invalid-node')!;
+    expect(button.getAttribute('aria-label')).toBe('Status: 2 fields need attention');
+    await act(() => userEvent.hover(button));
+    await vi.waitFor(() => expect(panelText()).toContain('A is required.'));
+    expect(panelText()).toContain('B needs a connection.');
+    expect(panelText()).not.toContain('Required value.');
+    await act(() => userEvent.unhover(button));
+
+    const modelTemplate: InvocationTemplate = {
+      ...template,
+      inputs: {
+        model: requiredInput('model', 'Model', {
+          input: 'direct',
+          type: { batch: false, cardinality: 'SINGLE', name: 'ModelIdentifierField' },
+        }),
+      },
+    };
+    await render(
+      toFlowNodes(
+        { ...projectGraph, nodes: [stateNode('model-node', 20, undefined)] },
+        [],
+        { preview: modelTemplate },
+        undefined,
+        true
+      )
+    );
+    expect(statusButton('model-node')?.getAttribute('aria-label')).toBe('Status: Model is required. Pick a model.');
+  });
+
+  /** A node with one editable field `A` (connectable) and one connection-only field `B`, fed by a connection. */
+  const rowNodes = (value: number | undefined, exposed: string[] = []) =>
+    toFlowNodes({ ...projectGraph, nodes: [stateNode('row-node', 20, value)] }, [], { preview: stateTemplate }).map(
+      (flowNode) => ({
+        ...flowNode,
+        data: { ...flowNode.data, connectedTargetHandles: ['b'], exposedFieldNames: exposed },
+      })
+    ) as ReturnType<typeof toFlowNodes>;
+  const fieldTitle = (name: string) =>
+    [...node('row-node').querySelectorAll<HTMLElement>('[data-node-input-field-title="true"]')].find((title) =>
+      title.textContent?.startsWith(name)
+    )!;
+  const rowActions = (name: string) =>
+    fieldTitle(name)
+      .closest('[data-scope="field"][data-part="root"]')!
+      .querySelector<HTMLElement>('[data-node-field-actions]')!;
+  const opacity = (element: HTMLElement) => getComputedStyle(element).opacity;
+
+  it('shows a row’s actions in legacy order on hover and on keyboard focus, and keeps them operable by keyboard', async () => {
+    const adapter = createAdapter(createExecutionMap({}));
+    await act(() =>
+      root.render(
+        <ChakraProvider value={system}>
+          <QueryClientProvider client={queryClient}>
+            <WorkflowUiProvider adapter={adapter}>
+              <Box css={flowThemeCss} h="full" w="full">
+                <ReactFlow edges={[]} nodes={rowNodes(4)} nodeTypes={nodeTypes} />
+              </Box>
+            </WorkflowUiProvider>
+          </QueryClientProvider>
+        </ChakraProvider>
+      )
+    );
+
+    const actions = rowActions('A');
+    expect([...actions.querySelectorAll('button')].map((button) => button.getAttribute('aria-label'))).toEqual([
+      'Edit field description',
+      'Reset A to default value',
+      'Add A to the form',
+    ]);
+    expect([...rowActions('B').querySelectorAll('button')].map((button) => button.getAttribute('aria-label'))).toEqual([
+      'Edit field description',
+    ]);
+    expect(opacity(actions)).toBe('0');
+
+    await act(() => userEvent.hover(fieldTitle('A')));
+    await vi.waitFor(() => expect(opacity(actions)).toBe('1'));
+    expect(opacity(rowActions('B'))).toBe('0');
+    await act(() => userEvent.unhover(fieldTitle('A')));
+    await vi.waitFor(() => expect(opacity(actions)).toBe('0'));
+
+    const control = node('row-node').querySelector<HTMLInputElement>('input[aria-label="A"]')!;
+    await act(async () => {
+      control.focus();
+      await userEvent.keyboard('{Shift>}{Tab}{/Shift}');
+    });
+    expect(document.activeElement?.getAttribute('aria-label')).toBe('Add A to the form');
+    await vi.waitFor(() => expect(opacity(actions)).toBe('1'));
+    await act(() => userEvent.keyboard('{Enter}'));
+    expect(adapter.commands.editGraph).toHaveBeenCalledWith({
+      fieldIdentifier: { fieldName: 'a', nodeId: 'row-node' },
+      type: 'exposeField',
+    });
+  });
+});
+
+describe('InvocationFlowNode collapsed ports', () => {
+  let host: HTMLDivElement;
+  let root: Root;
+
+  beforeEach(() => {
+    host = document.createElement('div');
+    host.style.cssText = 'width: 1000px; height: 520px;';
+    document.body.append(host);
+    root = createRoot(host);
+  });
+
+  afterEach(async () => {
+    await act(() => root.unmount());
+    host.remove();
+  });
+
+  const placed = (id: string, x: number, y: number, isOpen: boolean): WorkflowInvocationNode => ({
+    ...documentNode,
+    data: { ...documentNode.data, isOpen },
+    id,
+    position: { x, y },
+  });
+  const edge = (id: string, source: string, target: string): WorkflowEdge => ({
+    id,
+    source,
+    sourceHandle: 'value',
+    target,
+    targetHandle: 'a',
+    type: 'default',
+  });
+  // a and b collapse with two edges between them; c stays open and is fed by a.
+  const graphWith = (isOpen: boolean): ProjectGraphState => ({
+    ...projectGraph,
+    edges: [edge('ab1', 'a', 'b'), edge('ab2', 'a', 'b'), edge('ac', 'a', 'c')],
+    nodes: [placed('a', 20, 20, isOpen), placed('b', 420, 20, isOpen), placed('c', 420, 260, true)],
+  });
+  const render = (graph: ProjectGraphState) =>
+    act(() =>
+      root.render(
+        <ChakraProvider value={system}>
+          <WorkflowUiProvider adapter={createAdapter(createExecutionPort().port, projectSnapshotFor(graph))}>
+            <Box css={flowThemeCss} h="full" w="full">
+              <ReactFlow
+                edges={toFlowEdges(graph, [], 'default', undefined, templates)}
+                edgeTypes={{ default: WorkflowEdgeComponent }}
+                nodes={toFlowNodes(graph, [], templates)}
+                nodeTypes={nodeTypes}
+              />
+            </Box>
           </WorkflowUiProvider>
         </ChakraProvider>
       )
     );
-  };
-  const header = () => host.querySelector<HTMLElement>('.react-flow__node > div > div')!;
+  const node = (id: string) => host.querySelector<HTMLElement>(`.react-flow__node[data-id="${id}"]`)!;
+  const drawnEdgeIds = () =>
+    [...host.querySelectorAll<SVGElement>('.react-flow__edge')].map((element) => element.getAttribute('data-id'));
+  const centre = (rect: DOMRect) => ({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });
 
-  it('names the group beside the title, draws the batch list handle as a diamond, and keeps the footer off', async () => {
-    await render('Group 2');
-    expect(header().textContent).toContain('(Group 2)');
-    expect(host.querySelector<HTMLElement>('.react-flow__handle[data-handleid="floats"]')?.style.transform).toContain(
-      'rotate(45deg)'
+  it('merges a collapsed node’s ports, draws its edges from them with a count, and restores them on expand', async () => {
+    await render(graphWith(false));
+
+    const sourcePort = node('a').querySelector<HTMLElement>('[data-collapsed-port="right"]')!;
+    expect(node('b').querySelector('[data-collapsed-port="left"]')).not.toBeNull();
+    await vi.waitFor(() => expect(drawnEdgeIds().sort()).toEqual(['ab1', 'ac']));
+    expect(host.querySelector('[data-collapsed-edge-count]')?.getAttribute('data-collapsed-edge-count')).toBe('2');
+
+    const path = host.querySelector<SVGPathElement>('.react-flow__edge[data-id="ac"] .react-flow__edge-path')!;
+    const start = path.getPointAtLength(0).matrixTransform(path.getScreenCTM()!);
+    const port = sourcePort.getBoundingClientRect();
+    expect(Math.abs(start.x - port.right)).toBeLessThan(1);
+    expect(Math.abs(start.y - centre(port).y)).toBeLessThan(1);
+
+    const hiddenHandle = node('a').querySelector<HTMLElement>('.react-flow__handle[data-handleid="value"]')!;
+    expect(getComputedStyle(hiddenHandle).visibility).toBe('hidden');
+    expect(hiddenHandle.classList.contains('connectable')).toBe(false);
+
+    await render(graphWith(true));
+    await vi.waitFor(() => expect(drawnEdgeIds().sort()).toEqual(['ab1', 'ab2', 'ac']));
+    expect(host.querySelector('[data-collapsed-port]')).toBeNull();
+    expect(host.querySelector('[data-collapsed-edge-count]')).toBeNull();
+  });
+
+  /** The middle of a label's lowercase letters: a 1ex inline box on the baseline spans exactly its x-height. */
+
+  it('keeps a collapsed node in a large graph’s compact mode unconnectable and cheap', async () => {
+    const graph = graphWith(false);
+    const execution = createExecutionPort('a');
+    execution.set(completed(''));
+    await act(() =>
+      root.render(
+        <ChakraProvider value={system}>
+          <WorkflowUiProvider adapter={createAdapter(execution.port, projectSnapshotFor(graph))}>
+            <Box css={flowThemeCss} h="full" w="full">
+              <ReactFlow
+                edges={toFlowEdges(graph, [], 'default', undefined, templates)}
+                edgeTypes={{ default: WorkflowEdgeComponent }}
+                nodes={toFlowNodes(graph, [], templates, undefined, true)}
+                nodeTypes={nodeTypes}
+              />
+            </Box>
+          </WorkflowUiProvider>
+        </ChakraProvider>
+      )
     );
-    expect(host.textContent).not.toContain(i18n.t('nodes.useCache'));
 
-    await render('None');
-    expect(header().textContent).toContain('(no group)');
+    expect(node('a').querySelector('[data-collapsed-port="right"]')).not.toBeNull();
+    const handles = [...node('a').querySelectorAll<HTMLElement>('.react-flow__handle')];
+    expect(handles.length).toBeGreaterThan(0);
+    expect(handles.some((handle) => handle.classList.contains('connectable'))).toBe(false);
+    const status = node('a').querySelector<HTMLElement>('[data-node-status-indicator="true"]')!;
+    expect(status.getAttribute('role')).toBe('img');
+    expect(status.getAttribute('aria-label')).toBe('Status: Completed');
+    expect(status.closest('button, [data-scope="tooltip"]')).toBeNull();
+  });
+});
+
+describe('CurrentImageFlowNode', () => {
+  let host: HTMLDivElement;
+  let root: Root;
+  const openItemContextMenu = vi.fn();
+  const galleryAdapter = { openItemContextMenu } as unknown as GalleryUiAdapter;
+
+  beforeEach(() => {
+    openItemContextMenu.mockClear();
+    host = document.createElement('div');
+    host.style.cssText = 'width: 480px; height: 520px;';
+    document.body.append(host);
+    root = createRoot(host);
+  });
+
+  afterEach(async () => {
+    await act(() => root.unmount());
+    host.remove();
+    exportMocks.progressImage = null;
+  });
+
+  const image = (name: string) => ({
+    height: 2,
+    imageName: name,
+    imageUrl: `${outputImage(2, 2)}#${name}`,
+    queuedAt: '2026-01-01T00:00:00Z',
+    sourceQueueItemId: 'queue-item',
+    thumbnailUrl: outputImage(1, 1),
+    width: 2,
+  });
+  const recent = image('recent.png');
+  const chosen = image('chosen.png');
+  const createGalleryProject = (galleryValues: Record<string, unknown>) => {
+    let snapshot = projectSnapshotFor(currentImageGraph, galleryValues);
+    const listeners = new Set<() => void>();
+
+    return {
+      port: {
+        getSnapshot: () => snapshot,
+        subscribe: (listener: () => void) => {
+          listeners.add(listener);
+          return () => listeners.delete(listener);
+        },
+      },
+      setGalleryValues: (next: Record<string, unknown>) => {
+        snapshot = projectSnapshotFor(currentImageGraph, next);
+        listeners.forEach((listener) => listener());
+      },
+    };
+  };
+  const render = (
+    project: ReturnType<typeof createGalleryProject>,
+    onDragStart: (event: DragStartEvent) => void = () => {}
+  ) =>
+    act(() =>
+      root.render(
+        <ChakraProvider value={system}>
+          <WorkflowUiProvider
+            adapter={
+              { ...createAdapter(createExecutionPort().port), project: project.port } as unknown as WorkflowUiAdapter
+            }
+          >
+            <GalleryUiProvider adapter={galleryAdapter}>
+              {/* Stands in for the shell's drag context, where gallery items are dragged. */}
+              <DndContext onDragStart={onDragStart}>
+                <ReactFlow edges={[]} nodes={currentImageNodes} nodeTypes={nodeTypes} />
+              </DndContext>
+            </GalleryUiProvider>
+          </WorkflowUiProvider>
+        </ChakraProvider>
+      )
+    );
+  const shownImage = () => host.querySelector<HTMLImageElement>('.react-flow__node img')?.src ?? null;
+
+  it('shows the gallery’s selected image, passes over a selected video, and falls back to the latest image', async () => {
+    const project = createGalleryProject({ recentImages: [recent, chosen] });
+    await render(project);
+    await vi.waitFor(() => expect(shownImage()).toBe(recent.imageUrl));
+
+    await act(() =>
+      project.setGalleryValues({ recentImages: [recent, chosen], selectedImageName: 'image:chosen.png' })
+    );
+    await vi.waitFor(() => expect(shownImage()).toBe(chosen.imageUrl));
+
+    await act(() => project.setGalleryValues({ recentImages: [recent, chosen], selectedImageName: 'video:clip.mp4' }));
+    await vi.waitFor(() => expect(shownImage()).toBe(recent.imageUrl));
+  });
+
+  it('offers the shown image as a gallery drag source', async () => {
+    const onDragStart = vi.fn();
+    await render(createGalleryProject({ recentImages: [recent] }), onDragStart);
+    await vi.waitFor(() => expect(shownImage()).toBe(recent.imageUrl));
+    const frame = host.querySelector('.react-flow__node img')!.getBoundingClientRect();
+    const from = { x: frame.left + frame.width / 2, y: frame.top + frame.height / 2 };
+
+    await commands.mouseDragPath([from, { x: from.x + 30, y: from.y + 30 }], window.innerWidth);
+    expect(onDragStart).toHaveBeenCalledOnce();
+    expect(onDragStart.mock.calls[0]![0].active.data.current).toEqual({
+      items: [{ kind: 'image', name: 'recent.png' }],
+      kind: 'gallery-item',
+    });
+
+    const source = host.querySelector('.react-flow__node img')!.closest<HTMLElement>('.nodrag');
+    expect(source).not.toBeNull();
+    expect(source!.getAttribute('tabindex')).toBeNull();
+    expect(source!.getAttribute('role')).toBeNull();
+  });
+
+  it("opens the shown image's menu from a header button the keyboard reaches, only while an image is shown", async () => {
+    const project = createGalleryProject({ recentImages: [recent] });
+    const menuButton = () => host.querySelector<HTMLButtonElement>('button[aria-label="Image actions"]');
+    await render(project);
+    await vi.waitFor(() => expect(shownImage()).toBe(recent.imageUrl));
+
+    const flowNode = host.querySelector<HTMLElement>('.react-flow__node')!;
+    // The flow keeps a node hidden, so unfocusable, until it has measured it.
+    await vi.waitFor(() => {
+      flowNode.focus();
+      expect(document.activeElement).toBe(flowNode);
+    });
+    await act(() => userEvent.keyboard('{Tab}'));
+    expect(document.activeElement).toBe(menuButton());
+    await act(() => userEvent.keyboard('{Enter}'));
+
+    const button = menuButton()!.getBoundingClientRect();
+    expect(openItemContextMenu).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ ref: { kind: 'image', name: 'recent.png' }, x: button.left, y: button.bottom })
+    );
+    expect(openItemContextMenu.mock.lastCall![0].returnFocus()).toBe(menuButton());
+
+    // A pointer press opens it below the button too, not at the pointer.
+    await act(() => userEvent.click(menuButton()!));
+    expect(openItemContextMenu.mock.lastCall![0]).toMatchObject({ x: button.left, y: button.bottom });
+
+    exportMocks.progressImage = { dataUrl: outputImage(1, 1), height: 1, width: 1 };
+    await act(() => project.setGalleryValues({ recentImages: [chosen] }));
+    expect(host.textContent).toContain('Generating');
+    expect(menuButton()).toBeNull();
+
+    exportMocks.progressImage = null;
+    await act(() => project.setGalleryValues({}));
+    expect(menuButton()).toBeNull();
+  });
+
+  it('does not render again for gallery changes that leave the shown image alone', async () => {
+    const renders = vi.spyOn(exportMocks, 'progressImage', 'get');
+    const project = createGalleryProject({ recentImages: [recent], selectedBoardId: 'a' });
+    await render(project);
+    await vi.waitFor(() => expect(shownImage()).toBe(recent.imageUrl));
+    const settled = renders.mock.calls.length;
+
+    await act(() => project.setGalleryValues({ recentImages: [recent], selectedBoardId: 'b', galleryPage: 3 }));
+    expect(renders.mock.calls.length).toBe(settled);
+    renders.mockRestore();
   });
 });

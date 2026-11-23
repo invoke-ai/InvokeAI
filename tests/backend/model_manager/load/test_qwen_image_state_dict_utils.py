@@ -10,9 +10,7 @@ import torch
 
 from invokeai.backend.model_manager.load.model_loaders.qwen_image import (
     _build_qwen_image_transformer_config,
-    _dequantize_comfyui_fp8,
     _remap_qwen_vl_checkpoint_keys,
-    _strip_quantization_metadata,
 )
 from tests.backend.model_manager.load.state_dicts.qwen_vl_encoder_comfyui_keys import (
     state_dict_keys as qwen_vl_keys,
@@ -27,9 +25,8 @@ _VALID_QWEN_VL_PREFIXES = ("model.visual.", "model.language_model.", "lm_head")
 class TestRemapQwenVlCheckpointKeys:
     def test_every_key_maps_to_the_transformers_layout(self):
         """Every legacy ComfyUI key must land under `model.visual.*` / `model.language_model.*`."""
-        sd = keys_to_mock_state_dict(qwen_vl_keys)
-        # The loader strips fp8 metadata (`scaled_fp8` etc.) before remapping; mirror that order.
-        _strip_quantization_metadata(sd)
+        # `scaled_fp8` is the file's quantization marker, which the fp8 extraction removes; it names no module.
+        sd = {key: value for key, value in keys_to_mock_state_dict(qwen_vl_keys).items() if key != "scaled_fp8"}
 
         remapped = _remap_qwen_vl_checkpoint_keys(sd)
 
@@ -68,47 +65,20 @@ class TestRemapQwenVlCheckpointKeys:
         assert set(once.keys()) == set(twice.keys())
 
 
-class TestStripQuantizationMetadata:
-    def test_drops_fp8_metadata_keeps_weights(self):
+class TestRemapKeepsScalesBesideTheirWeights:
+    def test_every_scale_of_the_captured_fp8_scaled_file_pairs_with_a_weight_after_the_remap(self):
+        """The loader extracts scales after the remap, so each scale must travel with its weight."""
         sd = keys_to_mock_state_dict(qwen_vl_keys)
-        # The captured checkpoint is fp8_scaled, so it really does ship this metadata.
-        assert any(k.endswith((".scale_weight", ".scale_input")) or k == "scaled_fp8" for k in sd)
-        n_weights_before = sum(1 for k in sd if k.endswith(".weight"))
+        scales = [k for k in sd if k.endswith((".scale_weight", ".scale_input"))]
+        assert scales, "the captured checkpoint is fp8_scaled, so it ships scales"
 
-        _strip_quantization_metadata(sd)
+        remapped = _remap_qwen_vl_checkpoint_keys(sd)
 
-        assert not any(
-            k.endswith((".scale_weight", ".scale_input")) or "comfy_quant" in k or k == "scaled_fp8" for k in sd
-        )
-        # Real weights are untouched.
-        assert sum(1 for k in sd if k.endswith(".weight")) == n_weights_before
-
-
-class TestDequantizeComfyuiFp8:
-    def test_scalar_scale(self):
-        sd = {
-            "l.weight": torch.full((2, 2), 2.0),
-            "l.scale_weight": torch.tensor(3.0),
-            "l.scale_input": torch.tensor(9.0),  # activation scale, must be ignored
-        }
-
-        count = _dequantize_comfyui_fp8(sd, torch.float32)
-
-        assert count == 1
-        assert torch.allclose(sd["l.weight"], torch.full((2, 2), 6.0))
-
-    def test_block_wise_scale_is_broadcast(self):
-        # Per-block scale [2, 1] must be repeat_interleaved up to the weight shape [4, 2].
-        sd = {
-            "l.weight": torch.ones(4, 2),
-            "l.weight_scale": torch.tensor([[10.0], [20.0]]),
-        }
-
-        count = _dequantize_comfyui_fp8(sd, torch.float32)
-
-        assert count == 1
-        expected = torch.tensor([[10.0, 10.0], [10.0, 10.0], [20.0, 20.0], [20.0, 20.0]])
-        assert torch.allclose(sd["l.weight"], expected)
+        for key in scales:
+            moved = _remap_qwen_vl_checkpoint_keys({key: None})
+            (new_key,) = moved
+            module = new_key.rsplit(".", 1)[0]
+            assert f"{module}.weight" in remapped, new_key
 
 
 class TestBuildQwenImageTransformerConfig:

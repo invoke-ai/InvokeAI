@@ -86,10 +86,10 @@ const SAME_ZOOM_EPSILON = 1e-9;
 
 /**
  * One exponential wheel step (`zoom *= exp(-deltaY * step)`) with sticky snapping: resting on a snap point once the
- * intended zoom comes within tolerance of it, until the intended zoom leaves that tolerance. Pass the previous
- * result's `snap`, or null to start from `currentZoom`, and the event's time as `now`. After a pause longer than
- * {@link WHEEL_ZOOM_SNAP_IDLE_MS} the intended zoom starts again from `currentZoom`, still resting on its snap point.
- * Zoom values are actual zoom (1 = 100%).
+ * intended zoom comes within tolerance of it, until the intended zoom leaves that tolerance. Pass the previous result's
+ * `snap`, or null to start from `currentZoom`, and the event's time as `now`. After a pause longer than {@link
+ * WHEEL_ZOOM_SNAP_IDLE_MS} the intended zoom starts again from `currentZoom`, still resting on its snap point. Zoom
+ * values are actual zoom (1 = 100%).
  */
 export const snapWheelZoom = (
   snap: WheelZoomSnap | null,
@@ -118,7 +118,6 @@ export const snapWheelZoom = (
     : { activeSnapPoint: snapPoint, at: now, intendedZoom, zoom: snapPoint };
 };
 
-/** Pans by a screen-space delta. */
 export const panBy = (transform: PanZoomTransform, screenDelta: PanZoomPoint): PanZoomTransform => ({
   pan: { x: transform.pan.x + screenDelta.x, y: transform.pan.y + screenDelta.y },
   zoom: transform.zoom,

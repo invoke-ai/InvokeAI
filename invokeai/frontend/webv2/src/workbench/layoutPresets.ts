@@ -168,8 +168,8 @@ export const builtInLayoutPresetDescriptors: BuiltInLayoutPresetDescriptor[] = [
         isCollapsed: true,
         sizePx: 180,
       }),
-      // Keep Gallery placed in Compose so migrated gallery presets remain reachable without the add-widget path
-      // warming Canvas.
+      // Keep Gallery placed in Compose so migrated gallery presets remain reachable without the add-widget path warming
+      // Canvas.
       center: createRegion({
         activeInstanceId: 'preview',
         instanceIds: ['preview', 'gallery:center'],
@@ -193,7 +193,7 @@ export const builtInLayoutPresetDescriptors: BuiltInLayoutPresetDescriptor[] = [
     defaultRoute: { destination: 'canvas', sourceId: 'canvas' },
     hotkeyId: 'selectEditPreset',
     id: 'edit',
-    iconId: 'layers',
+    iconId: 'pencil-ruler',
     label: BUILT_IN_LAYOUT_PRESET_LABELS.edit,
     panels: { isBottomOpen: false, isLeftOpen: true, isRightOpen: true },
     widgetRegions: {

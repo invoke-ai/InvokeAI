@@ -13,8 +13,8 @@ import { registerAccountOwnedResource } from '@platform/state/accountLifecycle';
 import { createExternalStore } from '@platform/state/externalStore';
 
 /**
- * Keep deep-cloned node fragments in a session clipboard; paste remaps internal edges to fresh IDs. Fragments are
- * not valid system-clipboard workflow documents.
+ * Keep deep-cloned node fragments in a session clipboard; paste remaps internal edges to fresh IDs. Fragments are not
+ * valid system-clipboard workflow documents.
  */
 
 interface WorkflowClipboardSnapshot {
@@ -233,8 +233,8 @@ const materializeElements = (
 };
 
 /**
- * Assign fresh IDs and place the group (a fixed offset from the original without a placement). With connections,
- * edges that fed the copied nodes from outside feed the pasted copies from the same sources.
+ * Assign fresh IDs and place the group (a fixed offset from the original without a placement). With connections, edges
+ * that fed the copied nodes from outside feed the pasted copies from the same sources.
  */
 export const buildPasteElements = (
   options: { placement?: WorkflowPastePlacement; withConnections?: boolean } = {}

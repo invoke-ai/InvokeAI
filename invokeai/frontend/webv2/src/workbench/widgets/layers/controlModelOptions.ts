@@ -2,10 +2,7 @@ import type { ModelConfig } from '@features/models';
 
 import { getControlModelUnusableReason } from '@features/generation/graph';
 
-/**
- * Anima ControlNet-LLLite models installed before `cond_in_channels` was recorded. The Model row lists them disabled,
- * so users learn they exist and need re-identifying; they never count as usable models.
- */
+/** Anima LLLite models from before `cond_in_channels` was recorded: listed disabled, never usable. */
 export const getReidentifyPendingControlModels = (
   models: readonly ModelConfig[],
   base: string | null

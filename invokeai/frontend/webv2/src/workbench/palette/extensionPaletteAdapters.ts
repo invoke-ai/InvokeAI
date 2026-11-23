@@ -37,8 +37,8 @@ export const createExtensionSearchProvider = (
     contextKey: `${providerKey}:${getObjectIdentity(provider, 'registration')}:${provider.contextKey ?? 'default'}`,
     label: provider.label,
     providerKey,
-    // Extensions keep their plain-string search contract; they receive the
-    // query text with date tokens stripped and never see the range.
+    // Extensions keep their plain-string search contract; they receive the query text with date tokens stripped and
+    // never see the range.
     search: async (query, { signal }) => {
       const results = await provider.search(query.text, { signal });
 

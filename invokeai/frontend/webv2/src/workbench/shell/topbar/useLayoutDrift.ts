@@ -56,10 +56,7 @@ export const useLayoutDrift = (): LayoutDriftState => ({
   hasDrifted: useDebouncedWorkbenchSelector(selectDrift, DRIFT_SETTLE_MS, isSameDrift, isNewSubject).hasDrifted,
 });
 
-/**
- * Inactive presets the active project holds unsaved arrangements of. Working copies change only when presets switch,
- * save or revert, so the comparison reruns on those and on account edits rather than on every layout change.
- */
+/** Inactive presets the active project holds unsaved arrangements of; reruns only on preset and account changes. */
 export const useUnsavedInactiveLayoutPresetIds = (): ReadonlySet<LayoutPresetId> => {
   const presetWorkingLayouts = useWorkbenchSelector(selectPresetWorkingLayouts, Object.is);
   const account = useWorkbenchSelector(selectAccount, Object.is);

@@ -8,7 +8,7 @@ export interface InteractionControllerOptions {
   readonly getToolContext: () => ToolContext;
   /** Cancels an in-flight gesture through the still-active outgoing tool. */
   readonly cancelGesture?: () => void;
-  readonly beforeSwitch?: (from: ToolId, to: ToolId, options?: { temporary?: boolean }) => void;
+  readonly beforeSwitch?: (from: ToolId, to: ToolId, options?: { temporary?: boolean }) => void | boolean;
   readonly publishActiveTool: (toolId: ToolId) => void;
   readonly updateCursor: () => void;
   readonly invalidateOverlay: () => void;
@@ -53,7 +53,9 @@ export class InteractionController {
       }
     }
     const previous = this.activeToolId;
-    this.options.beforeSwitch?.(previous, toolId, switchOptions);
+    if (this.options.beforeSwitch?.(previous, toolId, switchOptions) === false) {
+      return;
+    }
     this.options.getTool(previous)?.onDeactivate?.(this.options.getToolContext(), switchOptions);
     this.activeToolId = toolId;
     this.options.getTool(toolId)?.onActivate?.(this.options.getToolContext(), switchOptions);

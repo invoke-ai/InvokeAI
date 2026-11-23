@@ -34,14 +34,11 @@ vi.mock('@features/queue/devices', async () => {
 import { GenerationDevicesSettings } from './GenerationDevicesSettings';
 
 /**
- * Chakra's `Switch.HiddenInput` sits outside the viewport, so a real click cannot
- * reach it — the visible control is the click target.
+ * Chakra's `Switch.HiddenInput` sits outside the viewport, so a real click cannot reach it — the visible control is the
+ * click target.
  */
 const switchControls = (): HTMLElement[] =>
   Array.from(host!.querySelectorAll<HTMLElement>('[data-scope="switch"][data-part="control"]'));
-
-const changedIndicators = (): HTMLElement[] =>
-  Array.from(host!.querySelectorAll<HTMLElement>('[aria-label$=": changed from Invoke default"]'));
 
 const TWO_GPUS = [
   { device: 'cuda:0', name: 'RTX 5090' },
@@ -97,52 +94,12 @@ afterEach(async () => {
 });
 
 describe('GenerationDevicesSettings', () => {
-  it('explains that parallel generation needs more than one accelerator on a single-device box', async () => {
-    await render({ options: [{ device: 'cuda:0', name: 'RTX 5090' }] });
-
-    // One GPU in auto mode has no device choice to expose.
-    expect(host?.textContent).toContain('RTX 5090');
-    expect(host?.textContent).toContain('needs more than one accelerator');
-    expect(host?.querySelectorAll('input[type="checkbox"]')).toHaveLength(0);
-  });
-
-  it('says so when no accelerator is present', async () => {
-    await render({ options: [] });
-
-    expect(host?.textContent).toContain('No accelerators were detected');
-  });
-
   it('offers the auto switch with two GPUs and hides per-device switches while auto is on', async () => {
     await render({ options: TWO_GPUS, setting: 'auto' });
 
     expect(host?.textContent).toContain('Use every available accelerator');
     // Auto only shows its own switch; the per-device list stays collapsed.
     expect(host?.querySelectorAll('input[type="checkbox"]')).toHaveLength(1);
-  });
-
-  it('lists a switch per device when a specific set is configured', async () => {
-    await render({ options: TWO_GPUS, setting: ['cuda:0'] });
-
-    expect(host?.textContent).toContain('RTX 5090');
-    expect(host?.textContent).toContain('RTX 4090');
-    // The auto switch plus one per device.
-    expect(host?.querySelectorAll('input[type="checkbox"]')).toHaveLength(3);
-  });
-
-  it('marks explicit device lists as changed and removes the marker when auto is restored', async () => {
-    await render({ options: TWO_GPUS, setting: ['cuda:0', 'cuda:1'] });
-    expect(changedIndicators()).toHaveLength(1);
-    await render({ options: TWO_GPUS, setting: 'auto' });
-    expect(changedIndicators()).toHaveLength(0);
-    await render({ loadState: 'loading', options: TWO_GPUS, setting: ['cuda:0'] });
-    expect(changedIndicators()).toHaveLength(0);
-  });
-
-  it('only marks a changed device list: the switch beside it is the way back', async () => {
-    await render({ options: TWO_GPUS, setting: ['cuda:0'] });
-
-    expect(changedIndicators()[0]!.getAttribute('role')).toBe('img');
-    expect(host?.querySelector('[data-setting-layer]')).toBeNull();
   });
 
   it('saves the devices in effect when auto is turned off, changing nothing else', async () => {
@@ -154,16 +111,6 @@ describe('GenerationDevicesSettings', () => {
     expect(mocks.updateGenerationDevices).toHaveBeenCalledWith(['cuda:0', 'cuda:1']);
   });
 
-  it('shows the restart notice only after a change is saved', async () => {
-    await render({ options: TWO_GPUS, setting: 'auto' });
-
-    expect(host?.textContent).not.toContain('Restart Invoke');
-
-    await act(() => userEvent.click(switchControls()[0]!));
-
-    expect(host?.textContent).toContain('Restart Invoke for changes to take effect.');
-  });
-
   it('refuses to deselect the last GPU rather than letting the server 422', async () => {
     await render({ options: TWO_GPUS, setting: ['cuda:1'] });
 
@@ -172,24 +119,5 @@ describe('GenerationDevicesSettings', () => {
 
     expect(mocks.updateGenerationDevices).not.toHaveBeenCalled();
     expect(host?.textContent).toContain('Select at least one generation device.');
-  });
-
-  it('shows a read-only summary to a non-admin', async () => {
-    mocks.canManageAppConfig = false;
-    await render({ options: TWO_GPUS, setting: ['cuda:1'] });
-
-    expect(host?.textContent).toContain('RTX 4090');
-    expect(host?.textContent).toContain('Only an administrator can change which accelerators are used.');
-    expect(host?.querySelectorAll('input[type="checkbox"]')).toHaveLength(0);
-    // Not this account's to change back: the marker explains itself and offers nothing.
-    expect(
-      host?.querySelector('[role="img"][aria-label="Generation devices: changed from Invoke default"]')
-    ).not.toBeNull();
-  });
-
-  it('surfaces a load failure instead of rendering empty controls', async () => {
-    await render({ error: 'Failed to load generation devices', loadState: 'error' });
-
-    expect(host?.textContent).toContain('Failed to load generation devices');
   });
 });

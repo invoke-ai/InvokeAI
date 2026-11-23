@@ -8,15 +8,22 @@ import { getWorkflowFieldSeedMode, isSeedInputField } from '@features/workflow/g
 import { FieldDescriptionPopover } from '@features/workflow/ui/fields/FieldDescriptionPopover';
 import { WorkflowFieldInput, WorkflowFieldSnapshot } from '@features/workflow/ui/fields/WorkflowFieldInput';
 import {
+  getWorkflowNodeAppearance,
   getWorkflowNodeBodyProps,
   getWorkflowNodeHandleStyle,
   getWorkflowNodeHeaderProps,
   getWorkflowNodeShellProps,
   WORKFLOW_NODE_DENSITY,
-  WorkflowNodeInfoIcon,
-  WorkflowNodeOutcomeIcon,
+  WORKFLOW_NODE_FIELD_CONTROL_ATTRIBUTE,
+  WORKFLOW_NODE_LABEL_TEXT_CSS,
+  WORKFLOW_NODE_SPLIT_LABEL_TEXT_PROPS,
+  WORKFLOW_NODE_FIELD_ROW_ATTRIBUTE,
+  WorkflowNodeHeaderButton,
+  WorkflowNodeInfoButton,
+  WorkflowNodeStatusButton,
   useIsWorkflowImageExport,
-  type WorkflowNodeOutcome,
+  type WorkflowNodeChromeState,
+  type WorkflowNodeStatus,
 } from '@features/workflow/ui/nodeChrome';
 import { useProjectGraphCommands } from '@features/workflow/ui/useProjectGraphCommands';
 import {
@@ -40,30 +47,54 @@ import {
   getWorkflowBatchGroupId,
   isWorkflowBatchNodeType,
   getOutputFieldRows,
-  getWorkflowFieldInvalidReason,
+  getWorkflowFieldIssue,
   isDirectInputField,
   isExposableField,
   isWorkflowFieldValueDefault,
+  type WorkflowNodeUpdateStatus,
 } from '@features/workflow/utility';
+import { createDeferredModule } from '@platform/react/deferredModule';
 import { Tooltip } from '@platform/ui';
 import { Button } from '@platform/ui/Button';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { Handle, Position, useStore, type NodeProps } from '@xyflow/react';
-import { ChevronDownIcon, ChevronRightIcon, PinIcon, PinOffIcon, RotateCcwIcon, TriangleAlertIcon } from 'lucide-react';
-import { memo, useRef, useState, type ChangeEvent, type KeyboardEvent } from 'react';
+import {
+  ChevronDownIcon,
+  ChevronRightIcon,
+  CpuIcon,
+  FlaskConicalIcon,
+  HammerIcon,
+  LinkIcon,
+  MinusIcon,
+  PlusIcon,
+  RotateCcwIcon,
+  TriangleAlertIcon,
+  ZapIcon,
+  type LucideIcon,
+} from 'lucide-react';
+import { memo, useRef, useState, type ChangeEvent, type KeyboardEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { InvocationFlowNode as InvocationFlowNodeType, InvocationNodeTemplateView } from './flowAdapters';
+import type * as NodePanelsModule from './NodePanels';
 
 import { getHandleTypeTooltip } from './handleTooltip';
+import { getExecutionStatusText, getFieldIssueMessage, type InvocationNodeFieldIssue } from './nodeStatusText';
 
 const NODE_WIDTH = '18rem';
 /** Row padding-x in px; inline handles sit in the label rows, so they pull back out past it. */
 const ROW_PADDING_X = 12;
+const PORT_TOP = `calc(${WORKFLOW_NODE_DENSITY.labelLine} / 2)`;
+/** A wrapping export title has no single line to centre; `ex` padding sets its first line's x-height on the port. */
+const EXPORT_OUTPUT_TITLE_CSS = {
+  '@supports (text-box: trim-start ex alphabetic)': {
+    pt: `calc(${PORT_TOP} - 0.5ex)`,
+    textBox: 'trim-start ex alphabetic',
+  },
+} as const;
 /** Below this viewport zoom, field content renders as skeleton bars (ComfyUI-style) for performance/readability. */
 export const CONTENT_VISIBILITY_ZOOM = 0.4;
 
-/** True while the viewport is zoomed out far enough that field content is unreadable noise. */
 const useIsZoomedOut = (): boolean => {
   const isWorkflowImageExport = useIsWorkflowImageExport();
   const isZoomedOut = useStore((state) => state.transform[2] < CONTENT_VISIBILITY_ZOOM);
@@ -71,11 +102,9 @@ const useIsZoomedOut = (): boolean => {
   return isZoomedOut && !isWorkflowImageExport;
 };
 
-/** The node-level loading hint is only useful while a selected child signature is being fetched. */
 export const shouldShowCallSavedWorkflowLoadingHint = (node: WorkflowInvocationNode): boolean =>
   node.data.type === 'call_saved_workflow' && node.data.callSavedWorkflowStatus === 'loading';
 
-/** A callable child can be valid without exposing any fields; explain the empty body instead of showing a blank node. */
 export const shouldShowCallSavedWorkflowNoExposedFieldsHint = (node: WorkflowInvocationNode): boolean => {
   if (node.data.type !== 'call_saved_workflow' || node.data.callSavedWorkflowStatus !== 'ready') {
     return false;
@@ -93,124 +122,224 @@ export const shouldShowCallSavedWorkflowNoExposedFieldsHint = (node: WorkflowInv
 /** Static placeholder bar standing in for text/controls at far zoom. No animation — there may be hundreds. */
 const SkeletonBar = ({ h = '2', w }: { h?: string; w?: string }) => <Box bg="bg.emphasized" h={h} rounded="sm" w={w} />;
 
-const hasMissingRequiredInputs = (
-  node: WorkflowInvocationNode,
-  templateInputs: FieldInputTemplate[],
-  connectedFieldNames: Set<string>
-): boolean =>
-  templateInputs.some(
-    (inputTemplate) =>
-      getWorkflowFieldInvalidReason({
-        isConnected: connectedFieldNames.has(inputTemplate.name),
-        template: inputTemplate,
-        value: node.data.inputs[inputTemplate.name]?.value,
-      }) !== null
-  );
+const HIDIFFUSION_RATIO_FIELDS = ['hidiffusion_t1_ratio', 'hidiffusion_t2_ratio'] as const;
+/** Invoke's validation reports the ratio order on T2 (buildGraph); the status lists it once, there. */
+const HIDIFFUSION_RATIO_REPORTED_FIELD = 'hidiffusion_t2_ratio';
 
-const getExecutionOutcome = (execution: NodeExecutionState | null): WorkflowNodeOutcome | null =>
-  execution?.status === 'completed' || execution?.status === 'failed' ? execution.status : null;
+const EMPTY_FIELD_ISSUES: InvocationNodeFieldIssue[] = [];
 
-export const getNodeExecutionError = (
+const getInvocationNodeFieldIssues = (
   node: WorkflowInvocationNode,
-  error: string | null | undefined,
-  translate: (key: string, options: { error: string }) => string
-): string | null | undefined => {
-  if (!error || node.data.type !== 'call_saved_workflow') {
-    return error;
+  inputTemplates: readonly FieldInputTemplate[],
+  connectedFieldNames: ReadonlySet<string>
+): InvocationNodeFieldIssue[] => {
+  let issues: InvocationNodeFieldIssue[] | null = null;
+  const ratioIssue = inputTemplates.some((template) => isHiDiffusionRatioField(template.name))
+    ? getHiDiffusionRatioOrderIssue(node, connectedFieldNames)
+    : null;
+
+  for (const template of inputTemplates) {
+    const instance = node.data.inputs[template.name];
+    const label = instance?.label || template.title;
+
+    // A ratio order problem stands in for the ratios' own checks, as it always has on these rows.
+    if (ratioIssue && isHiDiffusionRatioField(template.name)) {
+      if (template.name === HIDIFFUSION_RATIO_REPORTED_FIELD) {
+        (issues ??= []).push({
+          issue: { kind: 'invalidValue', reason: ratioIssue },
+          label,
+          markedFieldNames: HIDIFFUSION_RATIO_FIELDS,
+          template,
+        });
+      }
+      continue;
+    }
+
+    const issue = getWorkflowFieldIssue({
+      isConnected: connectedFieldNames.has(template.name),
+      template,
+      value: instance?.value,
+    });
+
+    if (issue) {
+      (issues ??= []).push({ issue, label, markedFieldNames: [template.name], template });
+    }
   }
 
-  return translate('nodes.childWorkflowError', { error });
+  return issues ?? EMPTY_FIELD_ISSUES;
+};
+
+const invalidByFlowData = new WeakMap<InvocationFlowNodeType['data'], boolean>();
+
+/** Cached per flow-node data (rebuilt only when its document, template or edges change), so the minimap can ask. */
+export const isInvocationFlowNodeInvalid = (data: InvocationFlowNodeType['data']): boolean => {
+  const cached = invalidByFlowData.get(data);
+
+  if (cached !== undefined) {
+    return cached;
+  }
+
+  const invalid = data.template
+    ? getInvocationNodeFieldIssues(
+        data.documentNode,
+        data.template.inputTemplates,
+        new Set(data.connectedTargetHandles)
+      ).length > 0
+    : data.templateStatus === 'loaded';
+  invalidByFlowData.set(data, invalid);
+
+  return invalid;
+};
+
+/** Status priority: a live run, a failed run, a run blocker, a version change, then a completed run. */
+export const getInvocationNodeState = ({
+  execution,
+  hasFieldIssues,
+  isMissingTemplate = false,
+  updateStatus,
+}: {
+  execution: NodeExecutionState | null;
+  hasFieldIssues: boolean;
+  isMissingTemplate?: boolean;
+  /** Null for a node without a template. */
+  updateStatus: WorkflowNodeUpdateStatus | null;
+}): { chrome: Omit<WorkflowNodeChromeState, 'selected'>; status: WorkflowNodeStatus | null } => {
+  const executionStatus = execution?.status ?? null;
+  const isOutdated = updateStatus !== null && updateStatus !== 'current';
+
+  return {
+    chrome: {
+      failed: executionStatus === 'failed',
+      invalid: hasFieldIssues || isMissingTemplate,
+      outdated: isOutdated,
+      running: executionStatus === 'running',
+    },
+    status:
+      executionStatus === 'running' || executionStatus === 'failed'
+        ? executionStatus
+        : hasFieldIssues
+          ? 'invalid'
+          : updateStatus === 'updatable'
+            ? 'updatable'
+            : isOutdated
+              ? 'versionMismatch'
+              : executionStatus,
+  };
 };
 
 const NodeShell = ({
-  hasMissingRequiredInput,
+  chrome,
   children,
-  isMissing,
-  isOutdated,
-  isRunning,
-  outcome,
   selected,
 }: {
-  hasMissingRequiredInput?: boolean;
+  chrome?: Omit<WorkflowNodeChromeState, 'selected'>;
   children: React.ReactNode;
-  isMissing?: boolean;
-  isOutdated?: boolean;
-  isRunning?: boolean;
-  outcome?: WorkflowNodeOutcome | null;
   selected: boolean;
-}) => {
-  const isInvalid = isMissing || hasMissingRequiredInput;
+}) => (
+  <Box
+    data-is-selected={selected}
+    data-workflow-node-shell="true"
+    position="relative"
+    w={NODE_WIDTH}
+    {...getWorkflowNodeShellProps({ ...chrome, selected })}
+  >
+    {children}
+  </Box>
+);
 
-  return (
-    <Box
-      data-is-selected={selected}
-      data-workflow-node-shell="true"
-      w={NODE_WIDTH}
-      {...getWorkflowNodeShellProps({
-        invalid: isInvalid,
-        outcome,
-        outdated: isOutdated,
-        running: isRunning,
-        selected,
-      })}
-    >
-      {children}
-    </Box>
-  );
-};
+// Panels load on first hover or focus; a failed load retries on the next open, showing the button's label meanwhile.
+const nodePanels = createDeferredModule(() => import('./NodePanels'));
+const preloadNodePanels = nodePanels.preload;
 
-/** The header's completed/failed mark, named for screen readers and tooltipped with the failure. */
-const NodeOutcomeIcon = ({
+const DeferredNodePanel = ({
+  label,
+  render,
+}: {
+  label: string;
+  render: (module: typeof NodePanelsModule) => ReactNode;
+}) => <nodePanels.Deferred fallback={<Text>{label}</Text>} render={render} />;
+
+const NodeStatusButton = ({
   execution,
+  isPlain = false,
+  issues,
   node,
+  status,
+  template,
 }: {
   execution: NodeExecutionState | null;
+  /** A plain mark with no panel, for compact nodes; selecting the node opens it with its full header. */
+  isPlain?: boolean;
+  issues: readonly InvocationNodeFieldIssue[];
   node: WorkflowInvocationNode;
+  status: WorkflowNodeStatus | null;
+  template: InvocationNodeTemplateView['template'];
 }) => {
   const { t } = useTranslation();
-  const outcome = getExecutionOutcome(execution);
 
-  if (!outcome) {
+  if (status === null) {
     return null;
   }
 
+  const updateText = getUpdateStatusText(t, node, template);
+  const summary =
+    status === 'invalid'
+      ? issues.length === 1
+        ? getFieldIssueMessage(t, issues[0]!)
+        : t('nodes.status.issueCount', { count: issues.length })
+      : status === 'updatable' || status === 'versionMismatch'
+        ? updateText
+        : getExecutionStatusText(t, execution!);
+
+  const label = t('nodes.status.label', { status: summary });
+
   return (
-    <WorkflowNodeOutcomeIcon
-      error={getNodeExecutionError(node, execution?.error, t)}
-      label={outcome === 'completed' ? t('nodes.executionCompleted') : t('nodes.executionFailed')}
-      outcome={outcome}
+    <WorkflowNodeStatusButton
+      content={
+        isPlain ? null : (
+          <DeferredNodePanel
+            label={label}
+            render={(module) => (
+              <module.NodeStatusPanel execution={execution} issues={issues} node={node} updateText={updateText} />
+            )}
+          />
+        )
+      }
+      label={label}
+      onPreload={preloadNodePanels}
+      progress={execution?.status === 'running' ? execution.progress : null}
+      status={status}
     />
   );
 };
 
-/** Thin progress strip under the header while the node's invocation executes. */
-const NodeProgressStrip = ({ execution }: { execution: NodeExecutionState | null }) => {
-  const isWorkflowImageExport = useIsWorkflowImageExport();
+/** Lies over its label in the label's text size, on its own surface, so nothing around it moves when it opens. */
+const INLINE_RENAME_FIELD_PROPS = {
+  left: '-6px',
+  minW: '10rem',
+  position: 'absolute',
+  top: '50%',
+  transform: 'translateY(-50%)',
+  w: 'calc(100% + 12px)',
+  zIndex: 1,
+} as const;
+const INLINE_RENAME_INPUT_PROPS = { bg: 'bg', color: 'fg', fontWeight: '400', px: '1.5' } as const;
 
-  if (isWorkflowImageExport || execution?.status !== 'running') {
-    return null;
-  }
+const INLINE_RENAME_HIDDEN_LABEL_CSS = { '& > :first-child': { visibility: 'hidden' } } as const;
 
-  return (
-    <Box bg="bg.muted" data-node-progress-strip="true" h="2px" overflow="hidden" position="relative" w="full">
-      <Box
-        bg="brand.solid"
-        h="full"
-        transition="width var(--wb-motion-duration-slow) ease"
-        w={execution.progress === null ? 'full' : `${Math.round(execution.progress * 100)}%`}
-        {...(execution.progress === null
-          ? {
-              animationDuration: 'var(--wb-motion-duration-slow)',
-              animationIterationCount: 'var(--wb-motion-animation-iteration-count)',
-              animationName: 'pulse',
-            }
-          : {})}
-      />
-    </Box>
-  );
-};
+const InlineRename = ({ children, editor }: { children: ReactNode; editor: ReactNode }) => (
+  <Box
+    alignItems="center"
+    display="flex"
+    minW="0"
+    position="relative"
+    css={editor ? INLINE_RENAME_HIDDEN_LABEL_CSS : undefined}
+  >
+    {children}
+    {editor}
+  </Box>
+);
 
-/** The editor a label double-click opens: Enter or blur commits, Escape keeps the current name. */
 const InlineLabelInput = ({
   ariaLabel,
   fontSize,
@@ -219,7 +348,7 @@ const InlineLabelInput = ({
   onEnd,
 }: {
   ariaLabel: string;
-  fontSize?: 'xs';
+  fontSize: 'md' | 'sm';
   initialValue: string;
   onCommit: (value: string) => void;
   onEnd: () => void;
@@ -229,14 +358,13 @@ const InlineLabelInput = ({
 
   // Its own field: inside a value row it would otherwise take that control's id and invalid state.
   return (
-    <Field.Root flex="1" minW="0">
+    <Field.Root {...INLINE_RENAME_FIELD_PROPS}>
       <Input
         autoFocus
         aria-label={ariaLabel}
         className="nodrag"
-        flex="1"
+        {...INLINE_RENAME_INPUT_PROPS}
         fontSize={fontSize}
-        minW="0"
         value={draft}
         onBlur={() => {
           if (!isCancelled.current && draft.trim() !== initialValue) {
@@ -285,38 +413,39 @@ const NodeTitle = ({
   if (isWorkflowImageExport) {
     return (
       <MiddleTruncate
+        {...WORKFLOW_NODE_SPLIT_LABEL_TEXT_PROPS}
         data-workflow-export-node-title="true"
         data-workflow-export-static-node-content="true"
-        fontSize="lg"
-        fontWeight="700"
+        fontWeight="600"
         minW="0"
         text={title}
       />
     );
   }
 
-  if (isEditing) {
-    return (
-      <InlineLabelInput
-        ariaLabel={t('nodes.nodeLabel')}
-        // Start from the displayed title, including the template fallback for unset labels.
-        initialValue={title}
-        onCommit={(label) => editGraph({ label, nodeId: node.id, type: 'setNodeLabel' })}
-        onEnd={() => setIsEditing(false)}
-      />
-    );
-  }
-
   return (
-    <MiddleTruncate
-      fontSize="lg"
-      fontWeight="700"
-      minW="0"
-      text={title}
-      // Keeps the full title MiddleTruncate would show, for a title cut short.
-      title={t('nodes.nodeTitleHint', { title })}
-      onDoubleClick={() => setIsEditing(true)}
-    />
+    <InlineRename
+      editor={
+        isEditing ? (
+          <InlineLabelInput
+            ariaLabel={t('nodes.nodeLabel')}
+            fontSize="md"
+            initialValue={title}
+            onCommit={(label) => editGraph({ label, nodeId: node.id, type: 'setNodeLabel' })}
+            onEnd={() => setIsEditing(false)}
+          />
+        ) : null
+      }
+    >
+      <MiddleTruncate
+        {...WORKFLOW_NODE_SPLIT_LABEL_TEXT_PROPS}
+        fontWeight="600"
+        minW="0"
+        text={title}
+        title={t('nodes.nodeTitleHint', { title })}
+        onDoubleClick={() => setIsEditing(true)}
+      />
+    </InlineRename>
   );
 };
 
@@ -324,12 +453,14 @@ const InputFieldTooltip = ({
   description,
   isConnected,
   isExposed,
+  issue,
   label,
   template,
 }: {
   description: string;
   isConnected: boolean;
   isExposed: boolean;
+  issue: InvocationNodeFieldIssue | null;
   label: string;
   template: FieldInputTemplate;
 }) => {
@@ -337,13 +468,14 @@ const InputFieldTooltip = ({
 
   return (
     <Stack gap="0.5" maxW="18rem">
-      <Text fontWeight="700">{label}</Text>
+      <Text fontWeight="600">{label}</Text>
       <Text color="fg.subtle">
         {t('nodes.fieldInfo', { name: template.name, type: getFieldTypeLabel(template.type) })} ·{' '}
         {t(template.required ? 'nodes.required' : 'nodes.optional')} · {t(`nodes.inputModes.${template.input}`)}
         {isConnected ? ` · ${t('nodes.providedByConnection')}` : null}
-        {isExposed ? ` · ${t('nodes.pinnedToForm')}` : null}
+        {isExposed ? ` · ${t('nodes.inForm')}` : null}
       </Text>
+      {issue ? <Text color="fg.error">{getFieldIssueMessage(t, issue)}</Text> : null}
       {description ? <Text>{description}</Text> : null}
       <Text color="fg.subtle">{t('nodes.renameFieldHint')}</Text>
     </Stack>
@@ -370,7 +502,6 @@ const OutputFieldTooltip = ({
   );
 };
 
-/** One line naming the node's version against its template's, for the tooltip and the inspector. */
 const getUpdateStatusText = (
   t: ReturnType<typeof useTranslation>['t'],
   node: WorkflowInvocationNode,
@@ -388,8 +519,6 @@ const getUpdateStatusText = (
         : t('nodes.nodeVersionIncompatible', versions);
 };
 
-const UPDATE_TOOLTIP_POSITIONING = { placement: 'top-end' } as const;
-
 /** Legacy's group tints, so a zipped group reads as one colour across the canvas. */
 const BATCH_GROUP_COLORS: Record<string, string> = {
   'Group 1': 'green.fg',
@@ -399,7 +528,6 @@ const BATCH_GROUP_COLORS: Record<string, string> = {
   'Group 5': 'yellow.fg',
 };
 
-/** A batch node's group beside its title: zipped groups share a colour, an ungrouped node says so. */
 const BatchGroupSuffix = ({ node }: { node: WorkflowInvocationNode }) => {
   const { t } = useTranslation();
 
@@ -410,35 +538,51 @@ const BatchGroupSuffix = ({ node }: { node: WorkflowInvocationNode }) => {
   const groupId = getWorkflowBatchGroupId(node);
 
   return (
-    <Text color={BATCH_GROUP_COLORS[groupId] ?? 'fg.subtle'} flexShrink={0} fontSize="xs" fontWeight="600">
+    <Text
+      color={BATCH_GROUP_COLORS[groupId] ?? 'fg.subtle'}
+      css={WORKFLOW_NODE_LABEL_TEXT_CSS}
+      flexShrink={0}
+      fontSize="xs"
+      fontWeight="600"
+    >
       ({groupId === 'None' ? t('nodes.noBatchGroup') : groupId})
     </Text>
   );
 };
 
-/** Header mark for a node whose version is not its template's; the tooltip says what can be done about it. */
-const NodeUpdateIcon = ({
-  node,
-  template,
-}: {
-  node: WorkflowInvocationNode;
-  template: InvocationNodeTemplateView['template'];
-}) => {
-  const { t } = useTranslation();
-  const label = getUpdateStatusText(t, node, template);
+const CLASSIFICATION_GLYPHS: Record<string, { color: string; icon: LucideIcon }> = {
+  beta: { color: 'yellow.fg', icon: HammerIcon },
+  internal: { color: 'purple.fg', icon: CpuIcon },
+  prototype: { color: 'red.fg', icon: FlaskConicalIcon },
+  special: { color: 'green.fg', icon: ZapIcon },
+};
 
-  if (label === null) {
+const CLASSIFICATION_TOOLTIP_POSITIONING = { placement: 'top-start' } as const;
+
+const NodeClassificationIcon = ({ classification, isPlain = false }: { classification: string; isPlain?: boolean }) => {
+  const { t } = useTranslation();
+  const glyph = CLASSIFICATION_GLYPHS[classification];
+
+  if (!glyph) {
     return null;
   }
 
-  return (
-    <Tooltip content={label} positioning={UPDATE_TOOLTIP_POSITIONING} showArrow>
-      <Icon aria-label={label} as={TriangleAlertIcon} boxSize="3.5" color="fg.warning" flexShrink={0} role="img" />
+  const description = t(`nodes.classificationDescriptions.${classification}`);
+
+  const icon = (
+    <Icon aria-label={description} as={glyph.icon} boxSize="3.5" color={glyph.color} flexShrink={0} role="img" />
+  );
+
+  return isPlain ? (
+    icon
+  ) : (
+    <Tooltip content={description} positioning={CLASSIFICATION_TOOLTIP_POSITIONING} showArrow>
+      {icon}
     </Tooltip>
   );
 };
 
-const NodeInfoTooltipContent = ({
+const NodeInfoButton = ({
   node,
   template,
 }: {
@@ -446,38 +590,18 @@ const NodeInfoTooltipContent = ({
   template: InvocationNodeTemplateView['template'];
 }) => {
   const { t } = useTranslation();
-  const title = node.data.label ? `${node.data.label} (${template.title})` : template.title;
-  const nodePack = node.data.nodePack || template.nodePack;
-  const updateStatusText = getUpdateStatusText(t, node, template);
+  const label = t('nodes.showNodeDetails', { title: node.data.label || template.title });
 
   return (
-    <Stack gap="1" maxW="20rem">
-      <Text fontWeight="700">{title}</Text>
-      <Text color="fg.subtle">{t('nodes.nodeType', { type: template.type })}</Text>
-      <Text color="fg.subtle">{t('nodes.nodePackLabel', { name: nodePack })}</Text>
-      <Text color="fg.subtle">{t('nodes.nodeVersion', { version: node.data.version })}</Text>
-      {updateStatusText ? <Text color="fg.warning">{updateStatusText}</Text> : null}
-      <Text color="fg.subtle">{t('nodes.nodeClassification', { classification: template.classification })}</Text>
-      <Text color="fg.subtle">{t('nodes.nodeCategory', { category: template.category })}</Text>
-      {template.description ? <Text fontStyle="italic">{template.description}</Text> : null}
-      {node.data.notes ? <Text>{node.data.notes}</Text> : null}
-    </Stack>
-  );
-};
-
-const NodeInfoIcon = ({
-  node,
-  template,
-}: {
-  node: WorkflowInvocationNode;
-  template: InvocationNodeTemplateView['template'];
-}) => {
-  const { t } = useTranslation();
-
-  return (
-    <WorkflowNodeInfoIcon
-      content={<NodeInfoTooltipContent node={node} template={template} />}
-      label={t('nodes.showNodeDetails', { title: node.data.label || template.title })}
+    <WorkflowNodeInfoButton
+      content={
+        <DeferredNodePanel
+          label={label}
+          render={(module) => <module.NodeInfoPanel node={node} template={template} />}
+        />
+      }
+      label={label}
+      onPreload={preloadNodePanels}
     />
   );
 };
@@ -532,7 +656,7 @@ const NodeFooter = ({ canUseCache, node }: { canUseCache: boolean; node: Workflo
   );
 };
 
-/** The upstream node owns the seed now; the local mode waits for a disconnect. A leaf so only this row subscribes to i18n. */
+/** A leaf, so only this row subscribes to i18n. */
 const ProvidedByConnectionNote = () => {
   const { t } = useTranslation();
 
@@ -543,17 +667,116 @@ const ProvidedByConnectionNote = () => {
   );
 };
 
+/**
+ * Value controls sit in a `--wb-control-well` of the canvas colour, a step darker than the node body; every control
+ * surface reads it. Scoped to the node's rows, so the form view and the form builder keep their own surfaces.
+ */
+const NODE_FIELD_WELL_VARIABLE = { '--wb-control-well': '{colors.bg}' } as const;
+const NODE_FIELD_WELL_CSS = {
+  '& :is(input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"]), textarea, [data-scope="select"][data-part="trigger"], [data-scope="combobox"][data-part="control"], button[aria-haspopup="listbox"])':
+    { bg: 'var(--wb-control-well)' },
+} as const;
+
+/** Row actions stay in the tab order; CSS shows them while the row is hovered, holds focus, or has a popover open. */
+const INPUT_ROW_CSS = {
+  ...NODE_FIELD_WELL_VARIABLE,
+  '& [data-node-field-actions]': {
+    opacity: 0,
+    transition: 'opacity var(--wb-motion-duration-fast) ease',
+  },
+  '&:hover [data-node-field-actions], &:focus-within [data-node-field-actions], & [data-node-field-actions]:has([data-state="open"])':
+    { opacity: 1 },
+} as const;
+
+const InputFieldActions = ({
+  fieldName,
+  isExposed,
+  label,
+  node,
+  showsControl,
+  template,
+}: {
+  fieldName: string;
+  isExposed: boolean;
+  label: string;
+  node: WorkflowInvocationNode;
+  showsControl: boolean;
+  template: FieldInputTemplate;
+}) => {
+  const { t } = useTranslation();
+  const { editGraph } = useProjectGraphCommands();
+  const instance = node.data.inputs[fieldName];
+  const formLabel = isExposed ? t('nodes.removeFieldFromForm', { label }) : t('nodes.addFieldToForm', { label });
+  const isDefault = showsControl && isWorkflowFieldValueDefault(template, instance?.value);
+
+  return (
+    <HStack data-node-field-actions="true" flexShrink={0} gap="0" ml="auto">
+      <FieldDescriptionPopover
+        description={instance?.description}
+        fieldName={fieldName}
+        nodeId={node.id}
+        size="xs"
+        templateDescription={template.description}
+      />
+      {showsControl ? (
+        // As legacy: present but disabled at the default. A disabled button shows no tooltip, so none is mounted.
+        <Tooltip content={t('nodes.resetToDefault')} disabled={isDefault}>
+          <IconButton
+            aria-label={t('nodes.resetFieldToDefault', { label })}
+            className="nodrag"
+            color="fg.subtle"
+            disabled={isDefault}
+            size="xs"
+            variant="ghost"
+            onClick={() =>
+              editGraph({
+                fieldName,
+                nodeId: node.id,
+                type: 'setFieldValue',
+                value: cloneWorkflowFieldDefault(template),
+              })
+            }
+          >
+            <Icon as={RotateCcwIcon} boxSize="3" />
+          </IconButton>
+        </Tooltip>
+      ) : null}
+      {showsControl && isExposableField(template) ? (
+        <Tooltip content={formLabel}>
+          <IconButton
+            aria-label={formLabel}
+            className="nodrag"
+            color="fg.subtle"
+            size="xs"
+            variant="ghost"
+            onClick={() =>
+              editGraph({
+                fieldIdentifier: { fieldName, nodeId: node.id },
+                type: isExposed ? 'unexposeField' : 'exposeField',
+              })
+            }
+          >
+            <Icon as={isExposed ? MinusIcon : PlusIcon} boxSize="3" />
+          </IconButton>
+        </Tooltip>
+      ) : null}
+    </HStack>
+  );
+};
+
 const InputFieldRow = ({
   connectedFieldNames,
   isConnected,
   isExposed,
   isSkeleton,
+  issue,
   node,
   template,
 }: {
   connectedFieldNames: ReadonlySet<string>;
   isConnected: boolean;
   isExposed: boolean;
+  issue: InvocationNodeFieldIssue | null;
   isSkeleton: boolean;
   node: WorkflowInvocationNode;
   template: FieldInputTemplate;
@@ -562,53 +785,52 @@ const InputFieldRow = ({
   const { t } = useTranslation();
   const { editGraph } = useProjectGraphCommands();
   const instance = node.data.inputs[template.name];
-  const fieldIdentifier = { fieldName: template.name, nodeId: node.id };
   const showsControl = !isConnected && isDirectInputField(template);
   const label = instance?.label || template.title;
   const description = getEffectiveWorkflowFieldDescription(instance, template);
   const ratiosDisabled =
     isHiDiffusionNode(node.data.type) && isHiDiffusionRatioField(template.name) && areHiDiffusionRatiosAutomatic(node);
-  const invalidReason =
-    (isHiDiffusionRatioField(template.name) ? getHiDiffusionRatioOrderIssue(node, connectedFieldNames) : null) ??
-    getWorkflowFieldInvalidReason({
-      isConnected,
-      template,
-      value: instance?.value,
-    });
-  const isInvalid = invalidReason !== null;
+  const isInvalid = issue !== null;
   const showInvalid = isInvalid && !isWorkflowImageExport;
+  const showsInForm = isExposed && !isWorkflowImageExport;
   const handleTooltip = getHandleTypeTooltip(template.type, t('nodes.any'), t);
-  const canReset = !isWorkflowImageExport && showsControl && !isWorkflowFieldValueDefault(template, instance?.value);
   const [isEditingLabel, setIsEditingLabel] = useState(false);
   const fieldTitle = (
     <Text
-      color={showInvalid ? 'fg.error' : isConnected ? 'fg.muted' : 'fg'}
+      alignItems="center"
+      color={showInvalid ? 'fg.error' : showsInForm ? 'accent.fg' : showsControl ? 'fg' : 'fg.muted'}
       data-node-input-field-title="true"
-      fontSize="xs"
-      lineHeight="shorter"
+      display="flex"
+      fontSize="sm"
+      fontWeight={showsControl ? '600' : '400'}
+      gap="1"
+      h={WORKFLOW_NODE_DENSITY.labelLine}
+      lineHeight={WORKFLOW_NODE_DENSITY.labelLine}
       minW="0"
-      truncate
       onDoubleClick={isWorkflowImageExport ? undefined : () => setIsEditingLabel(true)}
     >
-      {label}
-      {template.required ? (
-        <Text as="span" color="fg.error">
-          {' *'}
-        </Text>
-      ) : null}
+      <Text as="span" css={WORKFLOW_NODE_LABEL_TEXT_CSS}>
+        {label}
+        {template.required ? (
+          <Text as="span" color="fg.error">
+            {' *'}
+          </Text>
+        ) : null}
+      </Text>
+      {showsInForm ? <Icon aria-label={t('nodes.inForm')} as={LinkIcon} boxSize="3" flexShrink={0} role="img" /> : null}
     </Text>
   );
 
   if (isSkeleton) {
     return (
       <Box px={WORKFLOW_NODE_DENSITY.rowPaddingX} py={WORKFLOW_NODE_DENSITY.rowPaddingY}>
-        <HStack gap="1.5" h="5" position="relative">
+        <HStack gap="1.5" h={WORKFLOW_NODE_DENSITY.labelLine} position="relative">
           {template.input !== 'direct' ? (
             <Tooltip content={handleTooltip} showArrow>
               <Handle
                 id={template.name}
                 position={Position.Left}
-                style={{ ...getWorkflowNodeHandleStyle(template.type, 'left'), left: -ROW_PADDING_X, top: '50%' }}
+                style={{ ...getWorkflowNodeHandleStyle(template.type, 'left'), left: -ROW_PADDING_X, top: PORT_TOP }}
                 type="target"
               />
             </Tooltip>
@@ -622,106 +844,86 @@ const InputFieldRow = ({
 
   return (
     <Box
+      css={INPUT_ROW_CSS}
+      {...{ [WORKFLOW_NODE_FIELD_ROW_ATTRIBUTE]: '' }}
+      data-control-well=""
       data-workflow-export-field-content={isWorkflowImageExport ? 'true' : undefined}
       px={WORKFLOW_NODE_DENSITY.rowPaddingX}
       py={WORKFLOW_NODE_DENSITY.rowPaddingY}
       w="full"
     >
       <Field.Root gap="0" invalid={isInvalid && !isWorkflowImageExport} minW="0" w="full">
-        {/* The handle lives inside the label row so it stays centered on the
-            label even when the value control below grows the row. */}
-        <HStack gap="1.5" h="5" justify="space-between" minW="0" position="relative" w="full">
+        {/* Inside the label row, so the handle stays centred on the label as the control grows the row. */}
+        <HStack
+          gap="1.5"
+          h={WORKFLOW_NODE_DENSITY.labelLine}
+          justify="space-between"
+          minW="0"
+          position="relative"
+          w="full"
+        >
           {template.input !== 'direct' ? (
             <Tooltip content={handleTooltip} positioning={{ placement: 'right-end' }} showArrow>
               <Handle
                 id={template.name}
                 position={Position.Left}
-                style={{ ...getWorkflowNodeHandleStyle(template.type, 'left'), left: -ROW_PADDING_X, top: '50%' }}
+                style={{ ...getWorkflowNodeHandleStyle(template.type, 'left'), left: -ROW_PADDING_X, top: PORT_TOP }}
                 type="target"
               />
             </Tooltip>
           ) : null}
           {isWorkflowImageExport ? (
             fieldTitle
-          ) : isEditingLabel ? (
-            <InlineLabelInput
-              ariaLabel={t('nodes.fieldLabel')}
-              fontSize="xs"
-              initialValue={label}
-              // The template title is the unset label, so renaming back to it follows template changes again.
-              onCommit={(next) =>
-                editGraph({
-                  fieldName: template.name,
-                  label: next === template.title ? '' : next,
-                  nodeId: node.id,
-                  type: 'setFieldLabel',
-                })
-              }
-              onEnd={() => setIsEditingLabel(false)}
-            />
           ) : (
-            <Tooltip
-              positioning={{ placement: 'top-start' }}
-              content={
-                <InputFieldTooltip
-                  description={description}
-                  isConnected={isConnected}
-                  isExposed={isExposed}
-                  label={label}
-                  template={template}
-                />
+            <InlineRename
+              editor={
+                isEditingLabel ? (
+                  <InlineLabelInput
+                    ariaLabel={t('nodes.fieldLabel')}
+                    fontSize="sm"
+                    initialValue={label}
+                    // The template title is the unset label, so renaming back to it follows template changes again.
+                    onCommit={(next) =>
+                      editGraph({
+                        fieldName: template.name,
+                        label: next === template.title ? '' : next,
+                        nodeId: node.id,
+                        type: 'setFieldLabel',
+                      })
+                    }
+                    onEnd={() => setIsEditingLabel(false)}
+                  />
+                ) : null
               }
             >
-              {fieldTitle}
-            </Tooltip>
+              <Tooltip
+                disabled={isEditingLabel}
+                positioning={{ placement: 'top-start' }}
+                content={
+                  <InputFieldTooltip
+                    description={description}
+                    isConnected={isConnected}
+                    isExposed={isExposed}
+                    issue={issue}
+                    label={label}
+                    template={template}
+                  />
+                }
+              >
+                {fieldTitle}
+              </Tooltip>
+            </InlineRename>
           )}
-          <HStack flexShrink={0} gap="0" ml="auto">
-            {canReset ? (
-              <Tooltip content={t('nodes.resetToDefault')}>
-                <IconButton
-                  aria-label={t('nodes.resetFieldToDefault', { label })}
-                  className="nodrag"
-                  color="fg.subtle"
-                  size="sm"
-                  variant="ghost"
-                  onClick={() =>
-                    editGraph({
-                      fieldName: template.name,
-                      nodeId: node.id,
-                      type: 'setFieldValue',
-                      value: cloneWorkflowFieldDefault(template),
-                    })
-                  }
-                >
-                  <Icon as={RotateCcwIcon} boxSize="3" />
-                </IconButton>
-              </Tooltip>
-            ) : null}
-            {!isWorkflowImageExport ? (
-              <FieldDescriptionPopover
-                description={instance?.description}
-                fieldName={template.name}
-                nodeId={node.id}
-                templateDescription={template.description}
-              />
-            ) : null}
-            {!isWorkflowImageExport && isExposableField(template) ? (
-              <Tooltip content={isExposed ? t('nodes.removeFromForm') : t('nodes.addToForm')}>
-                <IconButton
-                  aria-label={
-                    isExposed ? t('nodes.removeFieldFromForm', { label }) : t('nodes.addFieldToForm', { label })
-                  }
-                  className="nodrag"
-                  color={isExposed ? 'accent.solid' : 'fg.subtle'}
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => editGraph({ fieldIdentifier, type: isExposed ? 'unexposeField' : 'exposeField' })}
-                >
-                  <Icon as={isExposed ? PinOffIcon : PinIcon} boxSize="3" />
-                </IconButton>
-              </Tooltip>
-            ) : null}
-          </HStack>
+          {!isWorkflowImageExport ? (
+            <InputFieldActions
+              fieldName={template.name}
+              isExposed={isExposed}
+              label={label}
+              node={node}
+              showsControl={showsControl}
+              template={template}
+            />
+          ) : null}
         </HStack>
         {showsControl ? (
           isWorkflowImageExport ? (
@@ -731,7 +933,7 @@ const InputFieldRow = ({
               value={instance?.value}
             />
           ) : (
-            <Box mt="0.5" w="full">
+            <Box css={NODE_FIELD_WELL_CSS} mt="0.5" w="full" {...{ [WORKFLOW_NODE_FIELD_CONTROL_ATTRIBUTE]: '' }}>
               <WorkflowFieldInput
                 disabled={ratiosDisabled}
                 id={`${node.id}-${template.name}-value`}
@@ -756,9 +958,8 @@ const InputFieldRow = ({
         ) : !isWorkflowImageExport && isConnected && isSeedInputField(template) ? (
           <ProvidedByConnectionNote />
         ) : null}
-        {invalidReason && !isWorkflowImageExport ? (
-          <Field.ErrorText fontSize="xs">{invalidReason}</Field.ErrorText>
-        ) : null}
+        {/* On screen the reason lives in the status panel and the label's hover. */}
+        {showInvalid && issue ? <Field.ErrorText srOnly>{getFieldIssueMessage(t, issue)}</Field.ErrorText> : null}
       </Field.Root>
     </Box>
   );
@@ -783,16 +984,16 @@ const OutputFieldRow = ({
     <Box px={WORKFLOW_NODE_DENSITY.rowPaddingX} py={WORKFLOW_NODE_DENSITY.rowPaddingY}>
       <Flex
         align="center"
-        h={isWorkflowImageExport ? 'auto' : '5'}
+        h={isWorkflowImageExport ? 'auto' : WORKFLOW_NODE_DENSITY.labelLine}
         justify="flex-end"
-        minH={isWorkflowImageExport ? '5' : undefined}
+        minH={isWorkflowImageExport ? WORKFLOW_NODE_DENSITY.labelLine : undefined}
         position="relative"
       >
         <Tooltip content={handleTooltip} positioning={{ placement: 'left-start' }} showArrow>
           <Handle
             id={template.name}
             position={Position.Right}
-            style={{ ...getWorkflowNodeHandleStyle(template.type, 'right'), right: -ROW_PADDING_X, top: '50%' }}
+            style={{ ...getWorkflowNodeHandleStyle(template.type, 'right'), right: -ROW_PADDING_X, top: PORT_TOP }}
             type="source"
           />
         </Tooltip>
@@ -801,12 +1002,13 @@ const OutputFieldRow = ({
             <SkeletonBar w="40%" />
           </Flex>
         ) : isWorkflowImageExport ? (
-          <Box flexShrink={0} maxW="full" textAlign="end">
+          <Box alignSelf="flex-start" flexShrink={0} maxW="full" textAlign="end">
             <Text
               color="fg.muted"
+              css={EXPORT_OUTPUT_TITLE_CSS}
               data-workflow-export-output-title="true"
               fontSize="xs"
-              lineHeight="shorter"
+              lineHeight={WORKFLOW_NODE_DENSITY.labelLine}
               maxW="full"
               overflowWrap="anywhere"
               textAlign="end"
@@ -821,12 +1023,10 @@ const OutputFieldRow = ({
               <Tooltip content={value.full} positioning={{ placement: 'top-end' }}>
                 <Text
                   color="fg.subtle"
+                  css={WORKFLOW_NODE_LABEL_TEXT_CSS}
                   fontSize="xs"
-                  lineHeight="shorter"
+                  lineHeight={WORKFLOW_NODE_DENSITY.labelLine}
                   minW="0"
-                  overflow="hidden"
-                  textOverflow="ellipsis"
-                  whiteSpace="nowrap"
                 >
                   {value.short}
                 </Text>
@@ -837,9 +1037,11 @@ const OutputFieldRow = ({
                 <MiddleTruncate
                   as="span"
                   color="fg.muted"
+                  {...WORKFLOW_NODE_SPLIT_LABEL_TEXT_PROPS}
+                  data-node-output-field-title="true"
                   fontSize="xs"
                   justifyContent="flex-end"
-                  lineHeight="shorter"
+                  lineHeight={WORKFLOW_NODE_DENSITY.labelLine}
                   maxW="full"
                   text={template.title}
                 />
@@ -896,6 +1098,79 @@ const HiddenHandles = ({
   </Box>
 );
 
+const MERGED_PORT_SIZE = 14;
+/** Behind a merged port: present so edges attach there, port-sized so they leave its outer side; not connectable. */
+const COLLAPSED_FIELD_HANDLE_STYLE = {
+  height: MERGED_PORT_SIZE,
+  minHeight: 0,
+  minWidth: 0,
+  visibility: 'hidden',
+  width: MERGED_PORT_SIZE,
+} as const;
+
+const MergedPort = ({ side }: { side: 'left' | 'right' }) => (
+  <Box
+    aria-hidden
+    bg="border.emphasized"
+    boxShadow="0 0 0 1.5px var(--xy-background-color, {colors.bg})"
+    boxSize={`${MERGED_PORT_SIZE}px`}
+    data-collapsed-port={side}
+    pointerEvents="none"
+    position="absolute"
+    rounded="3px"
+    top="50%"
+    transform={side === 'left' ? 'translate(-50%, -50%)' : 'translate(50%, -50%)'}
+    {...(side === 'left' ? { left: '0' } : { right: '0' })}
+  />
+);
+
+/** Every field keeps a hidden, unconnectable handle at the merged port, so edges draw from it unchanged. */
+const CollapsedPorts = ({
+  connected,
+  inputTemplates,
+  outputTemplates,
+}: {
+  /** In a large graph's compact mode, only the handles with edges mount, as `CompactHiddenHandles` does. */
+  connected?: { sources: readonly string[]; targets: readonly string[] };
+  inputTemplates: FieldInputTemplate[];
+  outputTemplates: FieldOutputTemplate[];
+}) => {
+  const targetTemplates = inputTemplates.filter((inputTemplate) => inputTemplate.input !== 'direct');
+  const targetHandles = connected
+    ? targetTemplates.filter((inputTemplate) => connected.targets.includes(inputTemplate.name))
+    : targetTemplates;
+  const sourceHandles = connected
+    ? outputTemplates.filter((outputTemplate) => connected.sources.includes(outputTemplate.name))
+    : outputTemplates;
+
+  return (
+    <>
+      {targetTemplates.length > 0 ? <MergedPort side="left" /> : null}
+      {targetHandles.map((inputTemplate) => (
+        <Handle
+          key={inputTemplate.name}
+          id={inputTemplate.name}
+          isConnectable={false}
+          position={Position.Left}
+          style={COLLAPSED_FIELD_HANDLE_STYLE}
+          type="target"
+        />
+      ))}
+      {outputTemplates.length > 0 ? <MergedPort side="right" /> : null}
+      {sourceHandles.map((outputTemplate) => (
+        <Handle
+          key={outputTemplate.name}
+          id={outputTemplate.name}
+          isConnectable={false}
+          position={Position.Right}
+          style={COLLAPSED_FIELD_HANDLE_STYLE}
+          type="source"
+        />
+      ))}
+    </>
+  );
+};
+
 const CompactHiddenHandles = ({
   connectedSourceHandles,
   connectedTargetHandles,
@@ -938,7 +1213,6 @@ const CompactNodeBody = ({ inputCount, outputCount }: { inputCount: number; outp
   );
 };
 
-/** What a node without a template says: still loading, definitions unavailable, or a type this backend lacks. */
 const getTemplatelessNodeMessage = (
   t: TFunction,
   { documentNode, templateStatus }: InvocationFlowNodeType['data'],
@@ -952,10 +1226,6 @@ const getTemplatelessNodeMessage = (
         ? t('nodes.unknownNodeType')
         : t('nodes.unknownNodeTypeOnBackend', { type: documentNode.data.type });
 
-/**
- * Where a node type this backend lacks can come from: the Nodes Manager installs node packs, for an account that may;
- * anyone else is told who can.
- */
 const MissingNodeTypeAction = () => {
   const { t } = useTranslation();
   const canManageNodes = useWorkflowCapabilitiesSelector((capabilities) => capabilities.canManageNodes);
@@ -980,36 +1250,66 @@ const CompactInvocationNode = ({ data, selected }: NodeProps<InvocationFlowNodeT
   const inputTemplates = templateView?.inputTemplates ?? [];
   const outputTemplates = templateView?.outputTemplates ?? [];
   const title = node.data.label || templateView?.template.title || node.data.type;
-  const isOutdated = templateView ? getNodeUpdateStatus(node, templateView.template) !== 'current' : false;
+  const fieldIssues = templateView
+    ? getInvocationNodeFieldIssues(node, inputTemplates, new Set(data.connectedTargetHandles))
+    : EMPTY_FIELD_ISSUES;
+  const { chrome, status } = getInvocationNodeState({
+    execution,
+    hasFieldIssues: fieldIssues.length > 0,
+    isMissingTemplate: !templateView && data.templateStatus === 'loaded',
+    updateStatus: templateView ? getNodeUpdateStatus(node, templateView.template) : null,
+  });
+  const { tone } = getWorkflowNodeAppearance({ ...chrome, selected: false });
+  const isCollapsed = templateView !== null && !node.data.isOpen;
 
+  // Compact nodes stay cheap in a large graph: the status is a plain mark named for what it means, with no tooltip.
   return (
-    <NodeShell
-      isMissing={!templateView && data.templateStatus === 'loaded'}
-      isOutdated={isOutdated}
-      isRunning={execution?.status === 'running'}
-      outcome={getExecutionOutcome(execution)}
-      selected={selected ?? false}
-    >
-      <Flex {...getWorkflowNodeHeaderProps()}>
-        <MiddleTruncate fontSize="lg" fontWeight="700" minW="0" text={title} />
+    <NodeShell chrome={chrome} selected={selected ?? false}>
+      <Flex
+        {...getWorkflowNodeHeaderProps({
+          endsWithButton: templateView !== null && status !== null,
+          roundedBottom: isCollapsed,
+          tone,
+        })}
+      >
+        {templateView ? <NodeClassificationIcon classification={templateView.template.classification} isPlain /> : null}
+        <MiddleTruncate {...WORKFLOW_NODE_SPLIT_LABEL_TEXT_PROPS} fontWeight="600" minW="0" text={title} />
         <BatchGroupSuffix node={node} />
         <Box flex="1" />
-        <NodeOutcomeIcon execution={execution} node={node} />
-        {templateView && isOutdated ? <NodeUpdateIcon node={node} template={templateView.template} /> : null}
+        {templateView ? (
+          <NodeStatusButton
+            execution={execution}
+            isPlain
+            issues={fieldIssues}
+            node={node}
+            status={status}
+            template={templateView.template}
+          />
+        ) : null}
       </Flex>
-      {templateView ? (
-        <CompactNodeBody inputCount={inputTemplates.length} outputCount={outputTemplates.length} />
+      {isCollapsed ? (
+        <CollapsedPorts
+          connected={{ sources: data.connectedSourceHandles, targets: data.connectedTargetHandles }}
+          inputTemplates={inputTemplates}
+          outputTemplates={outputTemplates}
+        />
       ) : (
-        <Text color="fg.subtle" fontSize="xs" px="3" {...getWorkflowNodeBodyProps()} py="2">
-          {getTemplatelessNodeMessage(t, data, true)}
-        </Text>
+        <>
+          {templateView ? (
+            <CompactNodeBody inputCount={inputTemplates.length} outputCount={outputTemplates.length} />
+          ) : (
+            <Text color="fg.subtle" fontSize="xs" px="3" {...getWorkflowNodeBodyProps()} py="2">
+              {getTemplatelessNodeMessage(t, data, true)}
+            </Text>
+          )}
+          <CompactHiddenHandles
+            connectedSourceHandles={data.connectedSourceHandles}
+            connectedTargetHandles={data.connectedTargetHandles}
+            inputTemplates={inputTemplates}
+            outputTemplates={outputTemplates}
+          />
+        </>
       )}
-      <CompactHiddenHandles
-        connectedSourceHandles={data.connectedSourceHandles}
-        connectedTargetHandles={data.connectedTargetHandles}
-        inputTemplates={inputTemplates}
-        outputTemplates={outputTemplates}
-      />
     </NodeShell>
   );
 };
@@ -1027,23 +1327,20 @@ const ExpandedInvocationNode = ({ data, selected }: NodeProps<InvocationFlowNode
     const isMissing = !isWorkflowImageExport && data.templateStatus === 'loaded';
 
     return (
-      <NodeShell isMissing={isMissing} selected={selected ?? false}>
+      <NodeShell chrome={{ invalid: isMissing }} selected={selected ?? false}>
         <HStack gap="1.5" minW={isWorkflowImageExport ? '0' : undefined} p="3">
-          {isMissing ? <Icon as={TriangleAlertIcon} boxSize="3.5" color="red.solid" /> : null}
+          {isMissing ? <Icon as={TriangleAlertIcon} boxSize="3.5" color="fg.error" /> : null}
           <Stack flex={isWorkflowImageExport ? '1' : undefined} gap="0" minW={isWorkflowImageExport ? '0' : undefined}>
             {isWorkflowImageExport ? (
               <MiddleTruncate
                 data-workflow-export-node-title="true"
                 data-workflow-export-static-node-content="true"
-                fontSize="lg"
-                fontWeight="700"
+                fontWeight="600"
                 minW="0"
                 text={node.data.label || node.data.type}
               />
             ) : (
-              <Text fontSize="lg" fontWeight="700">
-                {node.data.label || node.data.type}
-              </Text>
+              <Text fontWeight="600">{node.data.label || node.data.type}</Text>
             )}
             {!isWorkflowImageExport ? (
               <Text color="fg.subtle" fontSize="xs">
@@ -1058,7 +1355,6 @@ const ExpandedInvocationNode = ({ data, selected }: NodeProps<InvocationFlowNode
   }
 
   const template = templateView.template;
-  const isOutdated = getNodeUpdateStatus(node, template) !== 'current';
   const connectedFieldNames = new Set(data.connectedTargetHandles);
   const exposedFieldNames = new Set(data.exposedFieldNames);
   const inputTemplates = templateView.inputTemplates;
@@ -1066,56 +1362,71 @@ const ExpandedInvocationNode = ({ data, selected }: NodeProps<InvocationFlowNode
   const outputTemplatesByName = new Map(outputTemplates.map((template) => [template.name, template]));
   const outputRows = getOutputFieldRows(getOutputFieldNamesByScope(outputTemplates));
   const isOpen = node.data.isOpen || isWorkflowImageExport;
-  const isRunning = execution?.status === 'running';
-  const isMissingRequiredInput = hasMissingRequiredInputs(node, inputTemplates, connectedFieldNames);
+  const fieldIssues = getInvocationNodeFieldIssues(node, inputTemplates, connectedFieldNames);
+  const issuesByField = new Map(
+    fieldIssues.flatMap((fieldIssue) => fieldIssue.markedFieldNames.map((name) => [name, fieldIssue] as const))
+  );
+  const { chrome, status } = isWorkflowImageExport
+    ? { chrome: undefined, status: null }
+    : getInvocationNodeState({
+        execution,
+        hasFieldIssues: fieldIssues.length > 0,
+        updateStatus: getNodeUpdateStatus(node, template),
+      });
+  const { tone } = getWorkflowNodeAppearance({ ...chrome, selected: false });
   const isCompact = data.isCompact && !selected && !isWorkflowImageExport;
   const withFooter = !isWorkflowImageExport && !isZoomedOut && templateView.isExecutable && templateView.hasImageOutput;
   const resultExecution = isWorkflowImageExport ? null : execution;
   const latestResult = resultExecution?.latestOutput;
+  const title = node.data.label || template.title;
 
   return (
-    <NodeShell
-      hasMissingRequiredInput={!isWorkflowImageExport && isMissingRequiredInput}
-      isOutdated={!isWorkflowImageExport && isOutdated}
-      isRunning={!isWorkflowImageExport && isRunning}
-      outcome={isWorkflowImageExport ? null : getExecutionOutcome(execution)}
-      selected={selected ?? false}
-    >
-      {/* The collapse chevron carries its own hit padding, so the header pulls its start padding in. */}
+    <NodeShell chrome={chrome} selected={selected ?? false}>
+      {/* Buttons at either end of the header sit at the same inset from the border. */}
       <Flex
-        {...getWorkflowNodeHeaderProps({ roundedBottom: !isOpen })}
-        gap="1"
-        ps={isWorkflowImageExport ? WORKFLOW_NODE_DENSITY.headerPaddingStart : '1'}
+        {...getWorkflowNodeHeaderProps({
+          endsWithButton: !isWorkflowImageExport && !isZoomedOut,
+          roundedBottom: !isOpen,
+          startsWithButton: !isWorkflowImageExport,
+          tone,
+        })}
+        gap="0.5"
       >
         {!isWorkflowImageExport ? (
-          <IconButton
+          <WorkflowNodeHeaderButton
             aria-label={isOpen ? t('nodes.collapseNode') : t('nodes.expandNode')}
             className="nodrag"
-            size="sm"
-            variant="ghost"
+            content={isOpen ? t('nodes.collapseNode') : t('nodes.expandNode')}
             onClick={() => editGraph({ isOpen: !isOpen, nodeId: node.id, type: 'setNodeIsOpen' })}
           >
             <Icon as={isOpen ? ChevronDownIcon : ChevronRightIcon} boxSize="3.5" />
-          </IconButton>
+          </WorkflowNodeHeaderButton>
+        ) : null}
+        {!isWorkflowImageExport && !isZoomedOut ? (
+          <NodeClassificationIcon classification={template.classification} />
         ) : null}
         {isZoomedOut ? (
-          <MiddleTruncate fontSize="lg" fontWeight="700" minW="0" text={node.data.label || template.title} />
+          <MiddleTruncate {...WORKFLOW_NODE_SPLIT_LABEL_TEXT_PROPS} fontWeight="600" minW="0" text={title} />
         ) : (
           <>
-            <NodeTitle
-              isWorkflowImageExport={isWorkflowImageExport}
-              node={node}
-              title={node.data.label || template.title}
-            />
+            <NodeTitle isWorkflowImageExport={isWorkflowImageExport} node={node} title={title} />
             <BatchGroupSuffix node={node} />
             <Box flex="1" />
-            {!isWorkflowImageExport ? <NodeOutcomeIcon execution={execution} node={node} /> : null}
-            {!isWorkflowImageExport && isOutdated ? <NodeUpdateIcon node={node} template={template} /> : null}
-            {!isWorkflowImageExport ? <NodeInfoIcon node={node} template={template} /> : null}
+            {!isWorkflowImageExport ? (
+              <>
+                <NodeStatusButton
+                  execution={execution}
+                  issues={fieldIssues}
+                  node={node}
+                  status={status}
+                  template={template}
+                />
+                <NodeInfoButton node={node} template={template} />
+              </>
+            ) : null}
           </>
         )}
       </Flex>
-      <NodeProgressStrip execution={execution} />
       {isOpen && isCompact ? (
         <>
           <CompactNodeBody inputCount={inputTemplates.length} outputCount={outputTemplates.length} />
@@ -1139,6 +1450,7 @@ const ExpandedInvocationNode = ({ data, selected }: NodeProps<InvocationFlowNode
             <InputFieldRow
               key={inputTemplate.name}
               connectedFieldNames={connectedFieldNames}
+              issue={issuesByField.get(inputTemplate.name) ?? null}
               isConnected={connectedFieldNames.has(inputTemplate.name)}
               isExposed={exposedFieldNames.has(inputTemplate.name)}
               isSkeleton={isZoomedOut}
@@ -1157,7 +1469,7 @@ const ExpandedInvocationNode = ({ data, selected }: NodeProps<InvocationFlowNode
           ) : null}
         </Box>
       ) : (
-        <HiddenHandles inputTemplates={inputTemplates} outputTemplates={outputTemplates} />
+        <CollapsedPorts inputTemplates={inputTemplates} outputTemplates={outputTemplates} />
       )}
       {isOpen && withFooter ? <NodeFooter canUseCache={data.canUseCache} node={node} /> : null}
     </NodeShell>

@@ -262,7 +262,6 @@ const getConnectorDeletionOutputEdges = (
   return visit(connectorId) ? outputEdges : null;
 };
 
-/** Builds replacement edges before deleting one or more connector nodes. */
 export const getConnectorDeletionSpliceConnections = (
   connectorId: string,
   nodes: WorkflowNode[],

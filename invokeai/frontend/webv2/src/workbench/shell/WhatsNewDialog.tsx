@@ -22,10 +22,7 @@ import { useTranslation } from 'react-i18next';
 import { useWhatsNew } from './useWhatsNew';
 import { dismissWhatsNew } from './whatsNewStore';
 
-/**
- * Headline features get an icon and a title; the `whatsNew.items` catalog lists the smaller notes beneath them. Notes
- * about sharing (`multiuser`, and `whatsNew.multiuserItems`) show only where there are other accounts to share with.
- */
+/** Headline features get an icon and a title; the `whatsNew.items` catalog lists the smaller notes beneath them. */
 const HIGHLIGHTS: readonly { descriptionKey: string; icon: LucideIcon; multiuser?: true; titleKey: string }[] = [
   {
     descriptionKey: 'whatsNew.highlights.interface.description',
@@ -58,12 +55,6 @@ const HIGHLIGHTS: readonly { descriptionKey: string; icon: LucideIcon; multiuser
 const readItems = (value: unknown): string[] =>
   Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === 'string') : [];
 
-/**
- * The modal traps focus, so focus outside it is never the user leaving. Under StrictMode the first, lazily loaded
- * mount restores focus to the launcher button mid-open, and the stale dismiss layer closed the notes on that.
- */
-const keepOpenOnFocusOutside = (event: { preventDefault: () => void }) => event.preventDefault();
-
 export const WhatsNewDialog = ({ onExitComplete }: { onExitComplete?: () => void }) => {
   const { t } = useTranslation();
   const { isOpen, isUnseen, version } = useWhatsNew();
@@ -74,8 +65,8 @@ export const WhatsNewDialog = ({ onExitComplete }: { onExitComplete?: () => void
     ...readItems(t('whatsNew.items', { returnObjects: true })),
   ];
   const contentRef = useRef<HTMLDivElement | null>(null);
-  // Start on the panel, not the first link: focus that opens without a click (the automatic showing) counts as
-  // keyboard focus and would ring the link. Tab still reaches the links, and Escape still closes.
+  // Start on the panel, not the first link: focus that opens without a click (the automatic showing) counts as keyboard
+  // focus and would ring the link. Tab still reaches the links, and Escape still closes.
   const getInitialFocusEl = useCallback(() => contentRef.current, []);
 
   const handleOpenChange = useCallback(
@@ -102,7 +93,6 @@ export const WhatsNewDialog = ({ onExitComplete }: { onExitComplete?: () => void
       scrollBehavior="inside"
       size="lg"
       onExitComplete={onExitComplete}
-      onFocusOutside={keepOpenOnFocusOutside}
       onOpenChange={handleOpenChange}
     >
       <Portal>

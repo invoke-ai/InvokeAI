@@ -117,7 +117,6 @@ beforeEach(async () => {
   accountLifecycle.activate('staged-save-user');
   mocks.activeProjectId = 'project-1';
   vi.clearAllMocks();
-  // The listing hides archived boards, as the Gallery does by default.
   mocks.fetchBoards.mockImplementation(({ includeArchived }) =>
     Promise.resolve(includeArchived ? [...BOARDS, ARCHIVED_BOARD] : BOARDS)
   );
@@ -155,7 +154,6 @@ describe('saving a staged result to the Gallery', () => {
 
     expect(mocks.invalidateGallery).toHaveBeenCalledOnce();
     await act(() => toastButton('Show in Gallery')!.click());
-    // In a Gallery panel only: the Canvas under review keeps the center.
     expect(mocks.findGalleryItem).toHaveBeenCalledExactlyOnceWith(
       { kind: 'image', name: 'staged.png' },
       { revealPreview: false }
@@ -251,7 +249,6 @@ describe('saving a staged result to the Gallery', () => {
     mocks.invalidateGallery.mockClear();
     await act(() => accountLifecycle.activate('another-user'));
 
-    // The toast names the previous account's image and board: it is leaving, and its buttons act for nobody.
     expect(toastRoot()?.getAttribute('data-state')).toBe('closed');
     await act(() => show.click());
     await act(() => retry.click());
@@ -276,7 +273,6 @@ describe('saving a staged result to the Gallery', () => {
     await act(() => saving);
     await until(() => expect(toastText()).toContain('Saved to Board A'));
     expect(toastButton('Show in Gallery')).toBeNull();
-    // Checked synchronously around the switch: the toaster's own timeout would also close it within a wait.
     expect(toastRoot()?.getAttribute('data-state')).toBe('open');
 
     await act(() => accountLifecycle.activate('another-user'));

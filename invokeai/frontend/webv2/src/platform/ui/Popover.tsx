@@ -5,7 +5,10 @@ import { Popover, usePopoverContext } from '@chakra-ui/react';
 import { useRegisterWidgetOverlay } from './widgetOverlays';
 
 type PopoverContentProps = ComponentProps<typeof Popover.Content> & {
-  /** Anchored panels keep the arrow; dropdown-shaped popovers (pickers) opt out. */
+  /**
+   * Every popover anchored to a trigger points at it, as menus and hover cards do. Only listboxes that sit flush under
+   * their field opt out (ModelSelect's picker, as Select and Combobox do).
+   */
   showArrow?: boolean;
 };
 

@@ -14,7 +14,6 @@ import { PreviewFilmstrip } from './PreviewFilmstrip';
 
 const renderedThumbs = vi.hoisted(() => [] as string[]);
 
-// Every thumb render calls the drag hook once with its item's drag id, which names the thumb that rendered.
 vi.mock('@dnd-kit/core', async (importOriginal) => {
   const actual = await importOriginal<typeof dndKitModule>();
 
