@@ -70,7 +70,11 @@ from invokeai.backend.patches.lora_conversions.ideogram4_lora_constants import (
     patches_ideogram4_width,
     split_ideogram4_lora_key,
 )
-from invokeai.backend.patches.lora_conversions.krea2_lora_constants import LOKR_WEIGHT_KEYS, is_kohya_krea2_lora_key
+from invokeai.backend.patches.lora_conversions.krea2_lora_constants import (
+    LOKR_WEIGHT_KEYS,
+    is_kohya_krea2_lora_key,
+    is_krea2_control_lora_state_dict,
+)
 from invokeai.backend.patches.lora_conversions.ltx2_lora_constants import (
     has_ltx2_lora_keys,
     has_non_ltx2_architecture_keys,
@@ -2193,6 +2197,24 @@ class ControlLoRA_LyCORIS_FLUX_Config(ControlAdapter_Config_Base, Config_Base):
 
         if not is_state_dict_likely_flux_control(state_dict):
             raise NotAMatchError("model state dict does not look like a Flux Control LoRA")
+
+
+class ControlLoRA_LyCORIS_Krea2_Config(ControlAdapter_Config_Base, Config_Base):
+    """Model config for Krea-2 Control LoRAs: native block LoRAs (`.A`/`.B`) and a widened `first` projection."""
+
+    base: Literal[BaseModelType.Krea2] = Field(default=BaseModelType.Krea2)
+    type: Literal[ModelType.ControlLoRa] = Field(default=ModelType.ControlLoRa)
+    format: Literal[ModelFormat.LyCORIS] = Field(default=ModelFormat.LyCORIS)
+
+    trigger_phrases: set[str] | None = Field(None)
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+        raise_for_override_fields(cls, override_fields)
+        if not is_krea2_control_lora_state_dict(mod.load_state_dict()):
+            raise NotAMatchError("model state dict does not look like a Krea-2 Control LoRA")
+        return cls(**override_fields)
 
 
 class LoRA_Diffusers_Config_Base(LoRA_Config_Base):
