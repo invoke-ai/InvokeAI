@@ -1033,7 +1033,9 @@ export const compileCanvasGraph = (input: CompileCanvasGraphInput): CompiledCanv
     addControlLayers(backendGraph, {
       base: model.base as SupportedGenerateBase,
       denoise: family.denoise,
+      denoiseSize: family.denoiseSize,
       inpaint,
+      latents: family.latents,
       layers: input.controlLayers,
       modelVariant: model.variant ?? undefined,
     });

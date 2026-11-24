@@ -1,3 +1,4 @@
+import dataclasses
 import io
 import logging
 
@@ -391,3 +392,33 @@ def test_openai_generate_txt2img_with_references_uses_edit_endpoint(monkeypatch:
     assert image_files[0][1][0] == "image_0.png"
     assert image_files[1][1][0] == "image_1.png"
     assert result.images
+
+
+def test_decode_image_base64_keeps_alpha_and_flattens_opaque_images() -> None:
+    transparent = Image.new("RGBA", (8, 8), (255, 0, 0, 0))
+    assert decode_image_base64(encode_image_base64(transparent)).mode == "RGBA"
+    assert decode_image_base64(encode_image_base64(_make_image("white"))).mode == "RGB"
+    palette = Image.new("P", (8, 8))
+    palette.info["transparency"] = 0
+    assert decode_image_base64(encode_image_base64(palette)).mode == "RGBA"
+
+
+def test_openai_transparent_background_result_keeps_alpha(monkeypatch: pytest.MonkeyPatch) -> None:
+    config = InvokeAIAppConfig(external_openai_api_key="openai-key")
+    provider = OpenAIProvider(config, logging.getLogger("test"))
+    request = dataclasses.replace(
+        _build_request(_build_model("openai", "gpt-image-1")), provider_options={"background": "transparent"}
+    )
+    encoded = encode_image_base64(Image.new("RGBA", (32, 32), (0, 0, 0, 0)))
+    captured: dict[str, object] = {}
+
+    def fake_post(url: str, headers: dict, json: dict, timeout: int) -> DummyResponse:
+        captured["json"] = json
+        return DummyResponse(ok=True, json_data={"data": [{"b64_json": encoded}]})
+
+    monkeypatch.setattr("requests.post", fake_post)
+
+    result = provider.generate(request)
+
+    assert captured["json"]["background"] == "transparent"  # type: ignore[index]
+    assert result.images[0].image.mode == "RGBA"

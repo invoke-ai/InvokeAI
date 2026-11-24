@@ -1380,7 +1380,12 @@ class Qwen3VLEncoderGGUFLoader(_Qwen3VLEncoderSingleFileLoader[Qwen3VLEncoder_GG
 
         load_state_dict_ignoring_extras(model, sd, source="Qwen3-VL encoder GGUF", assign=True, allow_missing=True)
 
-        materialize_quantized_embedding(model.language_model.embed_tokens, ram_cache=self._ram_cache)
+        materialize_quantized_embedding(
+            model.language_model.embed_tokens,
+            ram_cache=self._ram_cache,
+            model=model,
+            state_dict=sd,
+        )
 
         _reject_incomplete_load(model, what="Qwen3-VL encoder GGUF")
 
