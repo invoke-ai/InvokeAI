@@ -483,6 +483,66 @@ describe('queueCoordinator', () => {
     expect(harness.progressImage.clear).toHaveBeenCalledWith({ itemIndex: 1, queueItemId: 'local-1' });
   });
 
+  it('clears stored slot percentage when an active item is requeued via socket or HTTP sweep', async () => {
+    const listeners = new Map<string, () => void>();
+    vi.stubGlobal('document', {
+      addEventListener: (type: string, listener: () => void) => listeners.set(type, listener),
+      removeEventListener: (type: string) => listeners.delete(type),
+      visibilityState: 'visible',
+    });
+
+    try {
+      harness.coordinator.connect();
+      await harness.coordinator.submitGenerate('local-1', generateRequest);
+
+      harness.socket.fire('invocation_progress', {
+        ...createStatusEvent({ item_id: 1 }),
+        message: 'Denoising',
+        percentage: 0.88,
+      });
+      expect(harness.progressEntries.get('local-1')).toMatchObject({
+        activeItemIndex: 1,
+        percentage: 0.88,
+      });
+
+      // Socket requeue back to pending clears the stored percentage and active slot index.
+      harness.socket.fire('queue_item_status_changed', createStatusEvent({ item_id: 1, status: 'pending' }));
+      expect(harness.progressEntries.get('local-1')).toEqual({
+        activeItemIndex: undefined,
+        completedItemCount: 0,
+        message: '',
+        percentage: null,
+        totalItemCount: 1,
+      });
+
+      // HTTP reconciliation sweep returning pending clears a restarted attempt's percentage as well.
+      harness.socket.fire('invocation_progress', {
+        ...createStatusEvent({ item_id: 1 }),
+        message: 'Denoising',
+        percentage: 0.66,
+      });
+      expect(harness.progressEntries.get('local-1')).toMatchObject({
+        activeItemIndex: 1,
+        percentage: 0.66,
+      });
+
+      harness.api.getItem.mockResolvedValueOnce(createQueueBackendItem({ id: 1, status: 'pending' }));
+      listeners.get('visibilitychange')?.();
+      await vi.waitFor(() =>
+        expect(harness.progressEntries.get('local-1')).toEqual({
+          activeItemIndex: undefined,
+          completedItemCount: 0,
+          message: '',
+          percentage: null,
+          totalItemCount: 1,
+        })
+      );
+    } finally {
+      harness.coordinator.dispose();
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("signals each slot's first frame of its own once, after the frame is stored", async () => {
     harness.callbacks.onFirstProgressFrame = vi.fn(() => {
       // Live surfaces follow the slot from here; its frame must already be there to show.

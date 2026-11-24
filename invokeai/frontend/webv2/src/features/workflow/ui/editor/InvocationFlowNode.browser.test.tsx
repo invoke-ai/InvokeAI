@@ -1518,7 +1518,8 @@ describe('CurrentImageFlowNode', () => {
   };
   const render = (
     project: ReturnType<typeof createGalleryProject>,
-    onDragStart: (event: DragStartEvent) => void = () => {}
+    onDragStart: (event: DragStartEvent) => void = () => {},
+    onNodeContextMenu?: (event: React.MouseEvent, node: unknown) => void
   ) =>
     act(() =>
       root.render(
@@ -1531,7 +1532,12 @@ describe('CurrentImageFlowNode', () => {
             <GalleryUiProvider adapter={galleryAdapter}>
               {/* Stands in for the shell's drag context, where gallery items are dragged. */}
               <DndContext onDragStart={onDragStart}>
-                <ReactFlow edges={[]} nodes={currentImageNodes} nodeTypes={nodeTypes} />
+                <ReactFlow
+                  edges={[]}
+                  nodes={currentImageNodes}
+                  nodeTypes={nodeTypes}
+                  onNodeContextMenu={onNodeContextMenu}
+                />
               </DndContext>
             </GalleryUiProvider>
           </WorkflowUiProvider>
@@ -1647,9 +1653,18 @@ describe('CurrentImageFlowNode', () => {
       thumbnailUrl: 'data:image/png;base64,c2F2ZWQ=',
       width: 1024,
     };
+    // Mirror WorkflowEditorView.onNodeContextMenu: it opens the node menu only when media did not preventDefault.
+    const nodeMenuOpened = vi.fn();
+    const onNodeContextMenu = vi.fn((event: React.MouseEvent) => {
+      if (event.defaultPrevented) {
+        return;
+      }
+      event.preventDefault();
+      nodeMenuOpened();
+    });
     const project = createGalleryProject({ selectedImage: selectedVideo });
     const menuButton = () => host.querySelector<HTMLButtonElement>('button[aria-label="Image actions"]');
-    await render(project);
+    await render(project, undefined, onNodeContextMenu);
 
     await vi.waitFor(
       async () => {
@@ -1661,7 +1676,7 @@ describe('CurrentImageFlowNode', () => {
 
     await act(() => userEvent.click(menuButton()!));
     expect(openItemContextMenu).toHaveBeenCalledWith(
-      expect.objectContaining({ ref: { kind: 'video', name: 'clip.mp4' } })
+      expect.objectContaining({ item: selectedVideo, ref: { kind: 'video', name: 'clip.mp4' } })
     );
 
     openItemContextMenu.mockClear();
@@ -1670,8 +1685,72 @@ describe('CurrentImageFlowNode', () => {
       video.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 80, clientY: 90 }));
     });
     expect(openItemContextMenu).toHaveBeenCalledWith(
-      expect.objectContaining({ ref: { kind: 'video', name: 'clip.mp4' }, x: 80, y: 90 })
+      expect.objectContaining({ item: selectedVideo, ref: { kind: 'video', name: 'clip.mp4' }, x: 80, y: 90 })
     );
+
+    // Right-clicking the video drag grip opens the same media menu rather than falling through to workflow-node actions.
+    openItemContextMenu.mockClear();
+    nodeMenuOpened.mockClear();
+    const grip = host.querySelector<HTMLElement>('[data-testid="current-image-media-drag-grip"]')!;
+    const gripEvent = new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 95, clientY: 40 });
+    await act(() => {
+      grip.dispatchEvent(gripEvent);
+    });
+    expect(gripEvent.defaultPrevented).toBe(true);
+    expect(nodeMenuOpened).not.toHaveBeenCalled();
+    expect(openItemContextMenu).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ item: selectedVideo, ref: { kind: 'video', name: 'clip.mp4' }, x: 95, y: 40 })
+    );
+
+    // Metadata updates (starred, boardId) refresh the full item passed to the menu without a refetch.
+    openItemContextMenu.mockClear();
+    const starredVideo = { ...selectedVideo, boardId: 'board-2', hasWorkflow: true, starred: true };
+    await act(() => project.setGalleryValues({ selectedImage: starredVideo }));
+    await act(() => {
+      video.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 84, clientY: 92 }));
+    });
+    expect(openItemContextMenu).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ item: starredVideo, ref: { kind: 'video', name: 'clip.mp4' }, x: 84, y: 92 })
+    );
+
+    // In fullscreen, right-clicking the video preserves the browser menu and stops ReactFlow's node menu from firing.
+    openItemContextMenu.mockClear();
+    onNodeContextMenu.mockClear();
+    nodeMenuOpened.mockClear();
+    const playerRoot = video.parentElement!;
+    const originalFullscreenDescriptor = Object.getOwnPropertyDescriptor(document, 'fullscreenElement');
+    Object.defineProperty(document, 'fullscreenElement', { configurable: true, get: () => playerRoot });
+    try {
+      const fullscreenEvent = new MouseEvent('contextmenu', {
+        bubbles: true,
+        cancelable: true,
+        clientX: 120,
+        clientY: 130,
+      });
+      await act(() => {
+        video.dispatchEvent(fullscreenEvent);
+      });
+      expect(openItemContextMenu).not.toHaveBeenCalled();
+      expect(onNodeContextMenu).not.toHaveBeenCalled();
+      expect(nodeMenuOpened).not.toHaveBeenCalled();
+      expect(fullscreenEvent.defaultPrevented).toBe(false);
+    } finally {
+      if (originalFullscreenDescriptor) {
+        Object.defineProperty(document, 'fullscreenElement', originalFullscreenDescriptor);
+      } else {
+        delete (document as { fullscreenElement?: Element | null }).fullscreenElement;
+      }
+    }
+
+    // Outside the media surface (node resize handle), right-click still reaches workflow-node actions.
+    nodeMenuOpened.mockClear();
+    const resizeHandle = host.querySelector<HTMLElement>('[data-testid="current-image-node-resize-handle"]')!;
+    await act(() => {
+      resizeHandle.dispatchEvent(
+        new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 140, clientY: 150 })
+      );
+    });
+    expect(nodeMenuOpened).toHaveBeenCalledOnce();
   });
 
   it('does not render again for gallery changes that leave the shown image alone', async () => {

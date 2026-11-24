@@ -502,6 +502,12 @@ describe('node updates', () => {
       label: 'Resize workflow current image node',
       mergeKey: 'setCurrentImageNodeSize:ci-1',
     });
+    // Resetting size earns its own undo step so it never folds into a resize made moments earlier.
+    expect(
+      getProjectGraphUndoEntry({ height: undefined, nodeId: 'ci-1', type: 'setCurrentImageNodeSize', width: undefined })
+    ).toEqual({
+      label: 'Resize workflow current image node',
+    });
 
     const oversizedPersisted = {
       ...doc,

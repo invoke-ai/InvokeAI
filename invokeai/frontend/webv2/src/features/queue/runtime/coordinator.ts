@@ -614,6 +614,17 @@ export const createQueueCoordinator = (
     wait.settle(outcome);
   };
 
+  const resetRequeuedSlotProgress = (localQueueItemId: string, backendItemId: number): void => {
+    const state = runProgress.get(localQueueItemId);
+
+    if (state && state.activeBackendItemId === backendItemId) {
+      state.activeBackendItemId = undefined;
+      state.message = '';
+      state.percentage = null;
+      publishRunProgress(localQueueItemId);
+    }
+  };
+
   const settleFromQueueItem = (queueItem: QueueBackendItem): void => {
     const wait = waits.get(queueItem.id);
     if (wait) {
@@ -623,6 +634,7 @@ export const createQueueCoordinator = (
       } else if ((queueItem.status === 'pending' || queueItem.status === 'waiting') && !wait.hasWorkflowCall) {
         wait.hasOwnFrame = false;
         activeProgressTarget.clear(target);
+        resetRequeuedSlotProgress(wait.localQueueItemId, queueItem.id);
       }
     }
     if (isTerminalBackendStatus(queueItem.status)) {
@@ -785,6 +797,7 @@ export const createQueueCoordinator = (
         if (wait && !wait.hasWorkflowCall) {
           wait.hasOwnFrame = false;
           activeProgressTarget.clear(getProgressImageTarget(wait.localQueueItemId, event.item_id));
+          resetRequeuedSlotProgress(wait.localQueueItemId, event.item_id);
         }
         wait?.frameGates.clear();
       }

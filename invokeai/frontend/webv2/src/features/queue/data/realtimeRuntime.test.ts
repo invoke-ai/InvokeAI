@@ -122,9 +122,13 @@ describe('queue realtime runtime', () => {
     runtime.start();
     handlers.get('queue_item_status_changed')?.({ item_id: 42, status: 'completed' } as never);
     handlers.get('queue_item_status_changed')?.({ item_id: 43, status: 'failed' } as never);
+    handlers.get('queue_item_status_changed')?.({ item_id: 44, status: 'pending' } as never);
+    handlers.get('queue_item_status_changed')?.({ item_id: 45, status: 'waiting' } as never);
 
     expect(progress.clear).not.toHaveBeenCalledWith(42);
     expect(progress.clear).toHaveBeenCalledWith(43);
+    expect(progress.clear).toHaveBeenCalledWith(44);
+    expect(progress.clear).toHaveBeenCalledWith(45);
     runtime.dispose();
   });
 

@@ -2,11 +2,13 @@ import type { WorkflowUiAdapter } from '@features/workflow/ui/WorkflowUiContext'
 
 /* eslint-disable react-perf/jsx-no-new-object-as-prop, react-perf/jsx-no-new-array-as-prop -- each render mounts a fresh flow on purpose */
 import { ChakraProvider } from '@chakra-ui/react';
-// Drive the real production queue stores directly to exercise multi-slot transitions without mock drift.
+// Drive the real production queue stores and runtimes directly to exercise multi-slot transitions without mock drift.
 import { activeProgressTargetStore } from '@features/queue/data/activeProgressTargetStore';
 import { itemProgressStore } from '@features/queue/data/itemProgressStore';
 import { progressImageStore } from '@features/queue/data/progressImageStore';
 import { queueItemProgressStore } from '@features/queue/data/progressStore';
+import { createQueueRealtimeRuntime } from '@features/queue/data/realtimeRuntime';
+import { createQueueCoordinator } from '@features/queue/runtime/coordinator';
 import { WorkflowUiProvider } from '@features/workflow/ui/WorkflowUiContext';
 import { buildCurrentImageNode, createProjectGraph } from '@features/workflow/utility';
 import { system } from '@theme/system';
@@ -389,5 +391,277 @@ describe('CurrentImageFlowNode with production queue stores', () => {
     });
 
     expect(editGraph).not.toHaveBeenCalled();
+  });
+
+  it('prefers a still-running framed batch slot over a finished settling slot that sent the latest frame', async () => {
+    const finishedSlot1Frame = { dataUrl: 'data:image/png;base64,ZmluaXNoZWQx', height: 2, width: 2 };
+    const runningSlot2Frame = { dataUrl: 'data:image/png;base64,cnVubmluZzI=', height: 2, width: 2 };
+    const adapter = createProjectAdapter({
+      queueItems: [{ backendItemIds: [501, 502], id: 'batch-e' }],
+    });
+
+    await renderNode(adapter);
+
+    // Both slots emit frames; slot 1 sends the most recent global frame.
+    await act(() => {
+      activeProgressTargetStore.markFramed({ itemIndex: 2, queueItemId: 'batch-e' });
+      progressImageStore.set(runningSlot2Frame, { itemIndex: 2, queueItemId: 'batch-e' });
+      itemProgressStore.set(502, { message: 'Denoising', percentage: 0.5 });
+
+      activeProgressTargetStore.markFramed({ itemIndex: 1, queueItemId: 'batch-e' });
+      progressImageStore.set(finishedSlot1Frame, { itemIndex: 1, queueItemId: 'batch-e' });
+      itemProgressStore.set(501, { message: 'Finishing', percentage: 0.95 });
+      queueItemProgressStore.set('batch-e', {
+        activeItemIndex: 1,
+        completedItemCount: 0,
+        message: 'Finishing',
+        percentage: 0.95,
+        totalItemCount: 2,
+      });
+    });
+
+    // Slot 1 finishes and enters settling while its result loads; slot 2 keeps running at 73% without sending a new frame.
+    await act(() => {
+      activeProgressTargetStore.settle({ itemIndex: 1, queueItemId: 'batch-e' });
+      itemProgressStore.clear(501);
+      itemProgressStore.set(502, { message: 'Denoising', percentage: 0.73 });
+      queueItemProgressStore.set('batch-e', {
+        activeItemIndex: undefined,
+        completedItemCount: 1,
+        message: '',
+        percentage: null,
+        totalItemCount: 2,
+      });
+    });
+
+    const badge = host.querySelector<HTMLElement>('[data-testid="current-image-progress-badge"]')!;
+    expect(host.querySelector('img')?.getAttribute('src')).toBe(runningSlot2Frame.dataUrl);
+    expect(badge.textContent).toBe('73%');
+    expect(badge.querySelector('.chakra-spinner')).toBeNull();
+  });
+
+  it('clears a requeued slot percentage across coordinator and realtime runtime so restart shows spinner until fresh progress', async () => {
+    const attempt1Frame = { dataUrl: 'data:image/png;base64,YXR0ZW1wdDE=', height: 2, width: 2 };
+    const handlers = new Map<string, Set<(payload: unknown) => void>>();
+    const emit = (event: string, payload: unknown) => {
+      for (const listener of handlers.get(event) ?? []) {
+        listener(payload);
+      }
+    };
+    const backend = {
+      connect: vi.fn(),
+      disconnect: vi.fn(),
+      enqueueGenerate: vi.fn().mockResolvedValue({
+        batchId: 'batch-requeue',
+        enqueued: 1,
+        itemIds: [601],
+        requested: 1,
+      }),
+      getItem: vi.fn(),
+      getResultImageNames: vi.fn().mockResolvedValue([]),
+      listItemsByOrigin: vi.fn().mockResolvedValue([]),
+      on: (event: string, listener: (payload: unknown) => void) => {
+        const set = handlers.get(event) ?? new Set();
+        set.add(listener);
+        handlers.set(event, set);
+        return () => set.delete(listener);
+      },
+      onConnectionChange: () => () => {},
+      readProgressPreviews: vi.fn().mockResolvedValue([]),
+    };
+    const coordinator = createQueueCoordinator(
+      { onGalleryRefresh: vi.fn() },
+      {
+        backend: backend as never,
+        modelLoads: { completed: vi.fn(), reset: vi.fn(), started: vi.fn() },
+        nodeExecution: {
+          clearAll: vi.fn(),
+          completed: vi.fn(),
+          failed: vi.fn(),
+          progress: vi.fn(),
+          setOrigin: vi.fn(),
+          settleRunning: vi.fn(),
+          started: vi.fn(),
+        },
+        sweepIntervalMs: 60_000,
+      }
+    );
+    const realtime = createQueueRealtimeRuntime({
+      applyStatusChange: vi.fn(),
+      backend: backend as never,
+      invalidate: vi.fn(),
+      progress: itemProgressStore,
+      refreshModelCache: vi.fn(),
+    });
+
+    try {
+      coordinator.connect();
+      realtime.start();
+      await coordinator.submitGenerate('run-requeue', {
+        batchCount: 1,
+        destination: 'gallery',
+        graph: { edges: [], id: 'g', nodes: {} },
+        origin: 'webv2:p:project-a:q:run-requeue',
+      } as never);
+
+      const adapter = createProjectAdapter({
+        queueItems: [{ backendItemIds: [601], id: 'run-requeue' }],
+      });
+      await renderNode(adapter);
+
+      // Attempt 1 reaches 88% with a preview frame.
+      await act(() => {
+        emit('invocation_progress', {
+          image: { dataURL: attempt1Frame.dataUrl, height: 2, width: 2 },
+          invocation_source_id: 'denoise',
+          item_id: 601,
+          message: 'Denoising',
+          percentage: 0.88,
+          revision: 1,
+          session_id: 'session-1',
+        });
+      });
+      expect(host.querySelector('[data-testid="current-image-progress-badge"]')?.textContent).toBe('88%');
+      expect(host.querySelector('img')?.getAttribute('src')).toBe(attempt1Frame.dataUrl);
+
+      // Requeue back to pending: both coordinator and itemProgressStore drop the 88%.
+      await act(() => {
+        emit('queue_item_status_changed', {
+          item_id: 601,
+          status: 'pending',
+          status_sequence: 1,
+        });
+      });
+      expect(host.querySelector('[data-node-status-indicator="true"]')?.textContent).toBe(
+        i18n.t('common.status.waiting')
+      );
+
+      // Attempt 2 starts running before reporting any progress: must show spinner, NOT stale 88% or old frame.
+      await act(() => {
+        emit('queue_item_status_changed', {
+          item_id: 601,
+          status: 'in_progress',
+          status_sequence: 2,
+        });
+      });
+      const restartingBadge = host.querySelector<HTMLElement>('[data-testid="current-image-progress-badge"]')!;
+      expect(restartingBadge.textContent).toBe('');
+      expect(restartingBadge.querySelector('.chakra-spinner')).not.toBeNull();
+      expect(host.querySelector(`img[src="${attempt1Frame.dataUrl}"]`)).toBeNull();
+
+      // Fresh progress arrives on attempt 2 -> displays the new 15%.
+      await act(() => {
+        emit('invocation_progress', {
+          invocation_source_id: 'denoise',
+          item_id: 601,
+          message: 'Denoising',
+          percentage: 0.15,
+          revision: 1,
+          session_id: 'session-2',
+        });
+      });
+      expect(host.querySelector('[data-testid="current-image-progress-badge"]')?.textContent).toBe('15%');
+    } finally {
+      realtime.dispose();
+      coordinator.dispose();
+    }
+  });
+
+  it('keeps showing a saved-workflow child percentage when the parent item enters waiting', async () => {
+    const childFrame = { dataUrl: 'data:image/png;base64,Y2hpbGQ=', height: 2, width: 2 };
+    const handlers = new Map<string, Set<(payload: unknown) => void>>();
+    const emit = (event: string, payload: unknown) => {
+      for (const listener of handlers.get(event) ?? []) {
+        listener(payload);
+      }
+    };
+    const backend = {
+      connect: vi.fn(),
+      disconnect: vi.fn(),
+      enqueueGenerate: vi.fn().mockResolvedValue({
+        batchId: 'batch-call-wf',
+        enqueued: 1,
+        itemIds: [701],
+        requested: 1,
+      }),
+      getItem: vi.fn(),
+      getResultImageNames: vi.fn().mockResolvedValue([]),
+      listItemsByOrigin: vi.fn().mockResolvedValue([]),
+      on: (event: string, listener: (payload: unknown) => void) => {
+        const set = handlers.get(event) ?? new Set();
+        set.add(listener);
+        handlers.set(event, set);
+        return () => set.delete(listener);
+      },
+      onConnectionChange: () => () => {},
+      readProgressPreviews: vi.fn().mockResolvedValue([]),
+    };
+    const coordinator = createQueueCoordinator(
+      { onGalleryRefresh: vi.fn() },
+      {
+        backend: backend as never,
+        modelLoads: { completed: vi.fn(), reset: vi.fn(), started: vi.fn() },
+        nodeExecution: {
+          clearAll: vi.fn(),
+          completed: vi.fn(),
+          failed: vi.fn(),
+          progress: vi.fn(),
+          setOrigin: vi.fn(),
+          settleRunning: vi.fn(),
+          started: vi.fn(),
+        },
+        sweepIntervalMs: 60_000,
+      }
+    );
+    const realtime = createQueueRealtimeRuntime({
+      applyStatusChange: vi.fn(),
+      backend: backend as never,
+      invalidate: vi.fn(),
+      progress: itemProgressStore,
+      refreshModelCache: vi.fn(),
+    });
+
+    try {
+      coordinator.connect();
+      realtime.start();
+      await coordinator.submitGenerate('run-call-wf', {
+        batchCount: 1,
+        destination: 'gallery',
+        graph: { edges: [], id: 'g', nodes: { call: { id: 'call', type: 'call_saved_workflow' } } },
+        origin: 'webv2:p:project-a:q:run-call-wf',
+      } as never);
+
+      const adapter = createProjectAdapter({
+        queueItems: [{ backendItemIds: [701], id: 'run-call-wf' }],
+      });
+      await renderNode(adapter);
+
+      // Parent enters waiting while its child runs; realtime clears parent's itemProgressStore,
+      // while coordinator keeps tracking the child's percentage and frame under root_item_id 701.
+      await act(() => {
+        emit('queue_item_status_changed', {
+          item_id: 701,
+          status: 'waiting',
+          status_sequence: 1,
+        });
+        emit('invocation_progress', {
+          image: { dataURL: childFrame.dataUrl, height: 2, width: 2 },
+          invocation_source_id: 'denoise',
+          item_id: 702,
+          message: 'Denoising child',
+          percentage: 0.45,
+          revision: 1,
+          root_item_id: 701,
+          session_id: 'child-session-1',
+          workflow_call_parent_source_id: 'call',
+        });
+      });
+
+      expect(host.querySelector('img')?.getAttribute('src')).toBe(childFrame.dataUrl);
+      expect(host.querySelector('[data-testid="current-image-progress-badge"]')?.textContent).toBe('45%');
+    } finally {
+      realtime.dispose();
+      coordinator.dispose();
+    }
   });
 });

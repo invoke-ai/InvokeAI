@@ -121,8 +121,8 @@ const isSameProgressTarget = (
   right: { itemIndex: number; queueItemId: string }
 ): boolean => left.queueItemId === right.queueItemId && left.itemIndex === right.itemIndex;
 
-// Match the displayed frame's framed running/settling target, keep the previously displayed local slot across foreign updates
-// (preferring running framed slots over settling ones), or fall back to a running/settling slot in the displayed project.
+// Prefer running framed slots over finished/settling ones, preserve the previously shown local slot across foreign updates,
+// and fall back to running unframed before settling unframed slots in the displayed project.
 export const resolveProgressTarget = (
   progressImage: LatestProgressImageSnapshot | null | undefined,
   followedTargets: readonly { itemIndex: number; queueItemId: string }[],
@@ -141,28 +141,43 @@ export const resolveProgressTarget = (
     !runningTargets || runningTargets.some((candidate) => isSameProgressTarget(candidate, target));
 
   const frameTarget = progressImage?.target;
-  if (frameTarget && isFramedInProject(frameTarget)) {
-    return frameTarget;
-  }
-
   const framedInProject = framedTargets ? framedTargets.filter(isFollowedInProject) : [];
   const runningFramedInProject = framedInProject.filter(isRunning);
 
-  if (preferredTarget && isFramedInProject(preferredTarget)) {
-    // Do not let a finished/settling preferred slot block a live running framed slot in the same project.
-    if (isRunning(preferredTarget) || runningFramedInProject.length === 0) {
-      return preferredTarget;
-    }
+  // 1. Running framed slots always take precedence over finished/settling slots.
+  if (frameTarget && isFramedInProject(frameTarget) && isRunning(frameTarget)) {
+    return frameTarget;
   }
-
+  if (preferredTarget && isFramedInProject(preferredTarget) && isRunning(preferredTarget)) {
+    return preferredTarget;
+  }
   const latestRunningFramed = runningFramedInProject.at(-1);
   if (latestRunningFramed) {
     return latestRunningFramed;
+  }
+
+  // 2. Settling framed slots hold their final frame until results land when no running slot is framed.
+  if (frameTarget && isFramedInProject(frameTarget)) {
+    return frameTarget;
+  }
+  if (preferredTarget && isFramedInProject(preferredTarget)) {
+    return preferredTarget;
   }
   const latestFramed = framedInProject.at(-1);
   if (latestFramed) {
     return latestFramed;
   }
+
+  // 3. Running unframed slots before settling unframed slots.
+  if (preferredTarget && isFollowedInProject(preferredTarget) && isRunning(preferredTarget)) {
+    return preferredTarget;
+  }
+  const firstRunning = followedTargets.find((target) => matchesProject(target.queueItemId) && isRunning(target));
+  if (firstRunning) {
+    return firstRunning;
+  }
+
+  // 4. Settling unframed fallback.
   if (preferredTarget && isFollowedInProject(preferredTarget)) {
     return preferredTarget;
   }
@@ -340,29 +355,53 @@ export const createVideoErrorRecovery = ({
   };
 };
 
-const resolveDisplayedGalleryItem = (values: Record<string, unknown>): GalleryItem | null => {
+interface DisplayedGalleryMedia {
+  item: GalleryItem;
+  /** Full selected GalleryItem opens the menu without refetching; legacy recentImages fall back to a ref. */
+  menuTarget: GalleryItem | GalleryItemRef;
+}
+
+const isFullGalleryItem = (media: GalleryItem | GalleryItemRef): media is GalleryItem => 'fullUrl' in media;
+
+const resolveDisplayedGalleryMedia = (values: Record<string, unknown>): DisplayedGalleryMedia | null => {
   const selected = getSelectedGalleryItemFromValues(values);
   if (selected) {
-    return selected;
+    return { item: selected, menuTarget: selected };
   }
 
   const recentImages = Array.isArray(values.recentImages) ? (values.recentImages as GeneratedImageContract[]) : [];
   const latest = recentImages[0];
+  if (!latest) {
+    return null;
+  }
 
-  return latest ? legacyGeneratedImageToGalleryItem(latest) : null;
+  const item = legacyGeneratedImageToGalleryItem(latest);
+  return { item, menuTarget: toGalleryItemRef(item) };
 };
 
-const isSameDisplayedGalleryItem = (a: GalleryItem | null, b: GalleryItem | null): boolean =>
+const isSameDisplayedGalleryItem = (a: GalleryItem | null, b: GalleryItem | null): boolean => {
+  if (a === b) {
+    return true;
+  }
+  if (a === null || b === null) {
+    return false;
+  }
+  const aRecord = a as unknown as Record<string, unknown>;
+  const bRecord = b as unknown as Record<string, unknown>;
+  const aKeys = Object.keys(aRecord);
+  const bKeys = Object.keys(bRecord);
+  return aKeys.length === bKeys.length && aKeys.every((key) => Object.is(aRecord[key], bRecord[key]));
+};
+
+const isSameDisplayedGalleryMedia = (a: DisplayedGalleryMedia | null, b: DisplayedGalleryMedia | null): boolean =>
   a === b ||
   (a !== null &&
     b !== null &&
-    a.kind === b.kind &&
-    a.name === b.name &&
-    a.fullUrl === b.fullUrl &&
-    a.thumbnailUrl === b.thumbnailUrl &&
-    a.width === b.width &&
-    a.height === b.height &&
-    (a.kind !== 'video' || b.kind !== 'video' || a.fps === b.fps));
+    isFullGalleryItem(a.menuTarget) === isFullGalleryItem(b.menuTarget) &&
+    isSameDisplayedGalleryItem(a.item, b.item));
+
+const isTargetInFullscreen = (target: EventTarget | null): boolean =>
+  target instanceof Node && Boolean(target.ownerDocument?.fullscreenElement?.contains(target));
 
 const isVideoFrameReady = (video: HTMLVideoElement | null): video is HTMLVideoElement =>
   Boolean(
@@ -390,15 +429,7 @@ const seekVideo = (video: HTMLVideoElement, seconds: number): void => {
 };
 
 /** The image under the node's frame, draggable wherever gallery images can be dropped. */
-const DraggableCurrentImage = ({
-  children,
-  itemRef,
-  onContextMenu,
-}: {
-  children: ReactNode;
-  itemRef: GalleryItemRef | null;
-  onContextMenu: ((event: MouseEvent<HTMLElement>) => void) | undefined;
-}) => {
+const DraggableCurrentImage = ({ children, itemRef }: { children: ReactNode; itemRef: GalleryItemRef | null }) => {
   const disabledId = useId();
   const dragData = useMemo(() => (itemRef ? getGalleryItemDragData([itemRef]) : undefined), [itemRef]);
   // Pointer drags only, as the Preview frame's: the image is no tab stop, so the canvas keeps its own keys. The header's
@@ -413,15 +444,7 @@ const DraggableCurrentImage = ({
 
   return (
     // `nodrag`: the canvas leaves the pointer to the image drag rather than moving the node.
-    <Box
-      ref={setNodeRef}
-      className="nodrag"
-      cursor={itemRef ? 'grab' : undefined}
-      h="full"
-      w="full"
-      onContextMenu={onContextMenu}
-      {...listeners}
-    >
+    <Box ref={setNodeRef} className="nodrag" cursor={itemRef ? 'grab' : undefined} h="full" w="full" {...listeners}>
       {children}
     </Box>
   );
@@ -433,10 +456,11 @@ const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNo
   const notifications = useWorkflowNotifications();
   const { nodeExecution } = useWorkflowUi();
   // Select only the shown media item so unrelated gallery changes (board filter, page, scroll) do not re-render.
-  const displayedItem = useWorkflowProjectSelector(
-    (project) => resolveDisplayedGalleryItem(project.galleryValues),
-    isSameDisplayedGalleryItem
+  const displayedMedia = useWorkflowProjectSelector(
+    (project) => resolveDisplayedGalleryMedia(project.galleryValues),
+    isSameDisplayedGalleryMedia
   );
+  const displayedItem = displayedMedia?.item ?? null;
   const projectId = useWorkflowProjectSelector((project) => project.id);
   const isWorkflowRunning = useWorkflowProjectSelector((project) => project.isWorkflowRunning);
   const queueItems = useWorkflowProjectSelector((project) => project.queueItems);
@@ -670,6 +694,7 @@ const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNo
     (event: MouseEvent<HTMLElement> | KeyboardEvent<HTMLElement>) => {
       event.preventDefault();
       event.stopPropagation();
+      dragSessionRef.current = null;
       setLiveSizeState(null);
       editGraph({ height: undefined, nodeId: node.id, type: 'setCurrentImageNodeSize', width: undefined });
       resizeHandleRef.current?.focus();
@@ -775,7 +800,20 @@ const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNo
     [displayedItem, hasLiveFrame]
   );
   const draggableImageRef = shownMediaRef?.kind === 'image' ? shownMediaRef : null;
-  const openItemMenu = useGalleryItemContextMenu(shownMediaRef);
+  const shownMediaMenuTarget = !hasLiveFrame && displayedMedia ? displayedMedia.menuTarget : null;
+  const openItemMenu = useGalleryItemContextMenu(shownMediaMenuTarget);
+  const handleMediaContextMenu = useCallback(
+    (event: MouseEvent<HTMLElement>) => {
+      // The gallery menu portals under document.body, which sits behind a fullscreen top-layer video.
+      // Stop propagation without preventDefault so ReactFlow's node menu stays closed and the browser menu opens.
+      if (isTargetInFullscreen(event.target)) {
+        event.stopPropagation();
+        return;
+      }
+      openItemMenu?.(event);
+    },
+    [openItemMenu]
+  );
   const imageActionsLabel = t('widgets.preview.imageActions');
   const fallbackImage = useMemo(
     () =>
@@ -899,18 +937,24 @@ const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNo
         </Box>
       ) : null}
 
-      <Box flex="1" minH="0" overflow="hidden" position="relative" w="full">
+      <Box
+        flex="1"
+        minH="0"
+        overflow="hidden"
+        position="relative"
+        w="full"
+        onContextMenu={openItemMenu || isShowingVideo ? handleMediaContextMenu : undefined}
+      >
         {isShowingVideo && displayedItem?.kind === 'video' && videoSurfaceKey ? (
           <CurrentImageVideoSurface
             key={videoSurfaceKey}
             item={displayedItem}
             surfaceKey={videoSurfaceKey}
-            onContextMenu={openItemMenu}
             onCopyAvailabilityChange={handleVideoCopyAvailabilityChange}
             onVideoElementChange={handleVideoElementChange}
           />
         ) : (
-          <DraggableCurrentImage itemRef={draggableImageRef} onContextMenu={openItemMenu}>
+          <DraggableCurrentImage itemRef={draggableImageRef}>
             <StreamingImageFrame fallbackImage={fallbackImage} fit="contain" h="full" liveImage={liveImage} w="full">
               <Flex align="center" color="fg.subtle" fontSize="xs" h="full" justify="center" px="4" textAlign="center">
                 {t('widgets.workflow.currentImageEmpty')}
@@ -999,13 +1043,11 @@ const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNo
 
 const CurrentImageVideoSurface = ({
   item,
-  onContextMenu,
   onCopyAvailabilityChange,
   onVideoElementChange,
   surfaceKey,
 }: {
   item: GalleryVideoItem;
-  onContextMenu?: (event: MouseEvent<HTMLElement>) => void;
   onCopyAvailabilityChange: (surfaceKey: string, isAvailable: boolean) => void;
   onVideoElementChange: (element: HTMLVideoElement | null) => void;
   surfaceKey: string;
@@ -1122,14 +1164,7 @@ const CurrentImageVideoSurface = ({
   );
 
   return (
-    <Box
-      bg="black"
-      className="nodrag nopan nowheel"
-      h="full"
-      position="relative"
-      w="full"
-      onContextMenu={onContextMenu}
-    >
+    <Box bg="black" className="nodrag nopan nowheel" h="full" position="relative" w="full">
       <Suspense fallback={videoPosterFallback}>
         <PlayerComponent
           ref={setVideoElementRef}

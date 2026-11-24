@@ -303,6 +303,25 @@ describe('resolveProgressTarget', () => {
     expect(
       resolveProgressTarget(frameFromProjectB, [projectATarget1, projectATarget2], projectAIds, [], projectATarget2)
     ).toEqual(projectATarget2);
+
+    // A finished/settling slot that sent the latest global frame must not hide a sibling slot that is still running and framed.
+    expect(
+      resolveProgressTarget(
+        { dataUrl: 'data:image/png;base64,DONE=', height: 64, target: projectATarget1, width: 64 },
+        [projectATarget2, projectATarget1],
+        projectAIds,
+        [projectATarget1, projectATarget2],
+        projectATarget1,
+        [projectATarget2]
+      )
+    ).toEqual(projectATarget2);
+
+    // Even when no slot is framed yet, a settling preferred slot must not block a still-running sibling slot.
+    expect(
+      resolveProgressTarget(null, [projectATarget2, projectATarget1], projectAIds, [], projectATarget1, [
+        projectATarget2,
+      ])
+    ).toEqual(projectATarget2);
   });
 });
 

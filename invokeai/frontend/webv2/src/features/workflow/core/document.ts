@@ -838,6 +838,8 @@ const getUndoMergeKey = (action: ProjectGraphAction): string | undefined => {
 
       return variant ? `${action.type}:${action.nodeId}:${action.fieldName}:${variant}` : undefined;
     case 'setCurrentImageNodeSize':
+      // Resetting to default size is an explicit action, not part of a continuous resize stream.
+      return action.width === undefined && action.height === undefined ? undefined : `${action.type}:${action.nodeId}`;
     case 'setNodeLabel':
     case 'setNodeNotes':
       return `${action.type}:${action.nodeId}`;

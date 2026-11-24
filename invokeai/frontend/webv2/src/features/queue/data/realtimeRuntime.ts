@@ -87,7 +87,12 @@ export const createQueueRealtimeRuntime = ({
 
         const event = payload as unknown as QueueItemStatusChangedEvent;
 
-        if (isTerminalBackendStatus(event.status) && event.status !== 'completed') {
+        // Requeued items must not keep a prior attempt's percentage; saved-workflow calls report child progress via the coordinator.
+        if (
+          (isTerminalBackendStatus(event.status) && event.status !== 'completed') ||
+          event.status === 'pending' ||
+          event.status === 'waiting'
+        ) {
           progress.clear(event.item_id);
         }
 
