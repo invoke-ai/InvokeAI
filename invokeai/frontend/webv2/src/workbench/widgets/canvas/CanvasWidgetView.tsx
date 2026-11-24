@@ -54,6 +54,7 @@ import { CANVAS_ONLY_HOTKEYS, executeCanvasHotkeyCommand } from './canvasHotkeyC
 import { findCanvasImageDropDestination, resolveCanvasImageDrop, type CanvasImageDropData } from './canvasImageDnd';
 import { CanvasImageDropOverlay } from './CanvasImageDropOverlay';
 import { CanvasSaveToGallerySubmenu } from './CanvasSaveToGallerySubmenu';
+import { CanvasScrollInputFeed } from './CanvasScrollInputFeed';
 import {
   CANVAS_SETTINGS,
   CANVAS_SHOW_PROGRESS_KEY,
@@ -674,6 +675,9 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
       ) : null}
       <CanvasColorFeed engine={engine} />
       {engine ? <CanvasFrameLockFeed key={`${projectId}:frame-lock`} engine={engine} projectId={projectId} /> : null}
+      {engine ? (
+        <CanvasScrollInputFeed key={`${projectId}:scroll-input`} engine={engine} projectId={projectId} />
+      ) : null}
       {engine ? <CanvasEditRefusalNotices key={`${projectId}:edit-refusals`} engine={engine} /> : null}
       {engine ? (
         <CanvasStagedRegionsFeed key={`${projectId}:staged-regions`} engine={engine} projectId={projectId} />
