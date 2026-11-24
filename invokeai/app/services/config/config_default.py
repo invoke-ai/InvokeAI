@@ -49,6 +49,8 @@ EXTERNAL_PROVIDER_CONFIG_FIELDS = (
     "external_atlascloud_base_url",
     "external_gemini_api_key",
     "external_gemini_base_url",
+    "external_minimax_api_key",
+    "external_minimax_base_url",
     "external_openai_api_key",
     "external_openai_base_url",
     "external_seedream_api_key",
@@ -170,6 +172,8 @@ class InvokeAIAppConfig(BaseSettings):
         external_atlascloud_api_key: API key for Atlas Cloud image generation.
         external_atlascloud_base_url: Base URL override for Atlas Cloud image generation.
         external_gemini_api_key: API key for Gemini image generation.
+        external_minimax_api_key: API key for MiniMax generation.
+        external_minimax_base_url: Base URL for MiniMax generation. Hosted video supports the Global and China endpoints.
         external_openai_api_key: API key for OpenAI image generation.
         external_gemini_base_url: Base URL override for Gemini image generation.
         external_openai_base_url: Base URL override for OpenAI image generation.
@@ -327,6 +331,10 @@ class InvokeAIAppConfig(BaseSettings):
         default=None, description="Base URL override for Atlas Cloud image generation."
     )
     external_gemini_api_key: Optional[str] = Field(default=None, description="API key for Gemini image generation.")
+    external_minimax_api_key: Optional[str] = Field(default=None, description="API key for MiniMax generation.")
+    external_minimax_base_url: Optional[str] = Field(
+        default=None, description="Base URL for MiniMax generation. Hosted video supports the Global and China endpoints."
+    )
     external_openai_api_key: Optional[str] = Field(default=None, description="API key for OpenAI image generation.")
     external_gemini_base_url: Optional[str] = Field(
         default=None, description="Base URL override for Gemini image generation."

@@ -424,6 +424,7 @@ def test_runtime_config_response_has_no_secrets(
     """End-to-end: even an admin's browser never receives the raw credentials."""
     config = InvokeAIAppConfig(
         external_openai_api_key="sk-super-secret",
+        external_minimax_api_key="private-minimax-key",
         remote_api_tokens=[URLRegexTokenPair(url_regex="example.com", token="bearer-secret")],
     )
     monkeypatch.setattr("invokeai.app.api.routers.app_info.get_config", lambda: config)
@@ -431,6 +432,7 @@ def test_runtime_config_response_has_no_secrets(
     response = client.get("/api/v1/app/runtime_config", headers=_auth(admin_token))
     assert response.status_code == status.HTTP_200_OK
     assert "sk-super-secret" not in response.text
+    assert "private-minimax-key" not in response.text
     assert "bearer-secret" not in response.text
 
 
