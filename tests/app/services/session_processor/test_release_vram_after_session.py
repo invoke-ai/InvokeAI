@@ -28,6 +28,7 @@ from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.graph import Graph, GraphExecutionState
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.util.devices import EmptyCacheOutcome, TorchDevice
+from tests.fixtures.model_offload import assert_load_lock_idle
 
 # Bounds a hang, not worker latency.
 _TIMEOUT = 30
@@ -135,6 +136,7 @@ def test_clear_vram_after_session_moves_every_model_to_ram_and_forces_the_releas
     leaves VRAM (staying cached in RAM) and the allocator hands its blocks back, whatever the session's outcome."""
     cache = _Cache()
     processor, logger = _processor(clear_vram_after_session=True, cache=cache)
+    device_requests.sample = assert_load_lock_idle
 
     processor._release_vram_after_session(_worker(outcome), run_returned=True)  # type: ignore[arg-type]
 
@@ -155,6 +157,34 @@ def test_clear_vram_after_session_logs_a_refused_forced_release_instead_of_faili
 
     assert len(logger.warnings) == 1
     assert "cuda:0" in logger.warnings[0]
+
+
+def test_session_cleanup_retains_weights_during_concurrent_construction(offload_race) -> None:
+    def release(cache):
+        processor, logger = _processor(clear_vram_after_session=True, cache=cache)
+        result = processor._release_vram_after_session(_worker(), run_returned=True)  # type: ignore[arg-type]
+        assert logger.warnings == []
+        return result
+
+    assert offload_race(release, construction_first=True) is None
+    assert offload_race(release, construction_first=False) is None
+
+
+def test_failed_session_offload_logs_without_emptying_allocator(monkeypatch) -> None:
+    class BrokenCache:
+        def offload_models_from_vram_except(self, keep_model_keys):
+            assert tuple(keep_model_keys) == ()
+            raise RuntimeError("offload failed")
+
+    emptied = []
+    monkeypatch.setattr(TorchDevice, "empty_cache", classmethod(lambda cls, **kwargs: emptied.append(True)))
+    processor, logger = _processor(clear_vram_after_session=True, cache=BrokenCache())
+
+    assert processor._release_vram_after_session(_worker(), run_returned=True) is None  # type: ignore[arg-type]
+
+    assert len(logger.warnings) == 1
+    assert "cuda:0" in logger.warnings[0]
+    assert emptied == []
 
 
 def test_clear_vram_after_session_leaves_other_gpus_caches_alone(monkeypatch) -> None:
