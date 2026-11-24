@@ -5,7 +5,7 @@ import sys
 import threading
 import time
 import weakref
-from contextlib import contextmanager
+from contextlib import AbstractContextManager, contextmanager, nullcontext
 from dataclasses import dataclass
 from functools import wraps
 from logging import Logger
@@ -28,6 +28,7 @@ from invokeai.backend.model_manager.load.model_cache.cached_model.cached_model_w
 from invokeai.backend.model_manager.load.model_cache.ram_budget import RamBudget
 from invokeai.backend.model_manager.load.model_cache.shared_cpu_weights import (
     SHARED_CPU_WEIGHTS,
+    SharedCpuWeightsPin,
     SharedCpuWeightsStore,
 )
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch_module_autocast import (
@@ -411,7 +412,8 @@ MODEL_LOAD_LOCK = _ModelLoadReadWriteLock()
 # passes. Without this, a multi-GB stream (e.g. a partially-loaded video transformer) holds the
 # read lock for its full duration, and because the lock is write-preferring, one construction
 # queued behind it stalls every VRAM move on every GPU for that long. The cap bounds any queued
-# construction's wait to roughly one pass. 1 GiB keeps the per-pass overhead (lock churn plus a
+# construction's wait during these streams to roughly one pass; full offloads and the first lock
+# pass are not paced. 1 GiB keeps the per-pass overhead (lock churn plus a
 # re-scan of the model's state dict) negligible against the transfer itself.
 VRAM_MOVE_PASS_BYTES = 1 << 30
 
@@ -650,6 +652,9 @@ class ModelCache:
         """
         self._shared_cpu_weights = shared_cpu_weights
         self._ram_budget = ram_budget
+        self._budget_counts_store = (
+            ram_budget is not None and shared_cpu_weights is not None and ram_budget.counts_store(shared_cpu_weights)
+        )
         self._enable_partial_loading = enable_partial_loading
         self._keep_ram_copy_of_weights = keep_ram_copy_of_weights
         # Notices already emitted, keyed by (topic, device), so each is logged once rather than
@@ -756,6 +761,9 @@ class ModelCache:
         computed from their individual sizes (see ModelManagerService.build_model_manager).
         """
         self._ram_budget = ram_budget
+        self._budget_counts_store = self._shared_cpu_weights is not None and ram_budget.counts_store(
+            self._shared_cpu_weights
+        )
         ram_budget.register_cache(self)
 
     @property
@@ -998,6 +1006,8 @@ class ModelCache:
         execution_device: Optional[torch.device] = None,
         prefetch: bool = False,
         claim_admission: bool = False,
+        *,
+        adoption: SharedCpuWeightsPin | None = None,
     ) -> Optional[FirstUseClaim]:
         """Add a model to the cache.
 
@@ -1020,6 +1030,7 @@ class ModelCache:
                 cannot outlive its load, so a load that is cancelled or errors before its
                 retrieval releases the admission by dying, instead of leaving a grace standing
                 that nothing can clear (see shutdown()).
+            adoption: Source pin passed by the loader so a full reservation can release it early.
         """
         if key in self._cached_models:
             self._logger.debug(
@@ -1120,11 +1131,6 @@ class ModelCache:
             return None
 
         size = calc_model_size_by_data(self._logger, model)
-        self._make_room_internal(size)
-
-        # Inject custom modules into the model.
-        if isinstance(model, torch.nn.Module):
-            apply_custom_layers_to_model(model)
 
         # Use the provided execution device, or fall back to the cache's default
         effective_execution_device = execution_device if execution_device is not None else self._execution_device
@@ -1138,19 +1144,18 @@ class ModelCache:
         #   ("no choice but to try and fit it all"), and on Linux that overshoot is an uncatchable OOM-kill rather than
         #   a degraded load. Combined with keep_ram_copy=False below, streaming moves weights rather than copying them.
         running_with_dedicated_vram = device_has_dedicated_vram(effective_execution_device)
+        integrated_xpu = _is_integrated_xpu(effective_execution_device)
         supports_partial_loading = (
-            running_with_dedicated_vram
-            or _is_integrated_xpu(effective_execution_device)
-            or _is_integrated_cuda(effective_execution_device)
+            running_with_dedicated_vram or integrated_xpu or _is_integrated_cuda(effective_execution_device)
         )
 
-        # The model manager resolves the automatic topology policy before constructing this cache; integrated XPU
-        # still drops the CPU copy because its device residency is system RAM.
-        keep_ram_copy = self._keep_ram_copy_of_weights and not _is_integrated_xpu(effective_execution_device)
+        # The model manager resolves automatic topology policy for CUDA. Integrated XPU always drops
+        # the duplicate CPU copy because its device residency is system RAM.
+        keep_ram_copy = self._keep_ram_copy_of_weights and not integrated_xpu
 
         # Overriding a setting the user turned on is worth saying once, rather than leaving someone
         # to wonder why it made no difference.
-        if self._keep_ram_copy_of_weights and _is_integrated_xpu(effective_execution_device):
+        if self._keep_ram_copy_of_weights and integrated_xpu:
             self._warn_once(
                 "keep_ram_copy",
                 effective_execution_device,
@@ -1159,24 +1164,39 @@ class ModelCache:
                 "footprint against the same memory. Weights are moved rather than copied.",
             )
 
-        # Wrap model.
-        if isinstance(model, torch.nn.Module) and supports_partial_loading and self._enable_partial_loading:
-            wrapped_model = CachedModelWithPartialLoad(
-                model,
-                effective_execution_device,
-                keep_ram_copy=keep_ram_copy,
-                shared_store=self._shared_cpu_weights,
-                cache_key=key,
-            )
-        else:
-            wrapped_model = CachedModelOnlyFullLoad(
-                model,
-                effective_execution_device,
-                size,
-                keep_ram_copy=keep_ram_copy,
-                shared_store=self._shared_cpu_weights,
-                cache_key=key,
-            )
+        store = self._shared_cpu_weights
+        if adoption is not None and (store is None or not isinstance(model, torch.nn.Module)):
+            raise RuntimeError("Adoption requires a module and a shared CPU weights store.")
+        reservation: AbstractContextManager[bool] = nullcontext(False)
+        if store is not None and isinstance(model, torch.nn.Module):
+            check_match = keep_ram_copy and self._budget_counts_store
+            if check_match or adoption is not None:
+                reservation = store.pin_for_admission(key, model if check_match else None, size, adoption)
+
+        with reservation as shares_reservation:
+            self._make_room_internal(0 if shares_reservation else size)
+
+            # Inject custom modules into the model.
+            if isinstance(model, torch.nn.Module):
+                apply_custom_layers_to_model(model)
+
+            if isinstance(model, torch.nn.Module) and supports_partial_loading and self._enable_partial_loading:
+                wrapped_model = CachedModelWithPartialLoad(
+                    model,
+                    effective_execution_device,
+                    keep_ram_copy=keep_ram_copy,
+                    shared_store=store,
+                    cache_key=key,
+                )
+            else:
+                wrapped_model = CachedModelOnlyFullLoad(
+                    model,
+                    effective_execution_device,
+                    size,
+                    keep_ram_copy=keep_ram_copy,
+                    shared_store=store,
+                    cache_key=key,
+                )
 
         # awaiting_first_use protects an unclaimed new entry from the asynchronous eviction paths
         # (budget reconcile, peer-requested eviction) until the loader locks it - see CacheRecord.
@@ -2458,7 +2478,11 @@ class ModelCache:
                 # refuse the re-lock and (via the except handler below) evict a healthy model.
                 model_bytes_needed = cache_entry.cached_model.total_bytes() - cache_entry.cached_model.cur_vram_bytes()
                 device = cache_entry.cached_model.compute_device
-                if (_is_integrated_xpu(device) or _is_integrated_cuda(device)) and model_bytes_needed > vram_available:
+                if (
+                    hasattr(cache_entry.cached_model.model, "to")
+                    and (_is_integrated_xpu(device) or _is_integrated_cuda(device))
+                    and model_bytes_needed > vram_available
+                ):
                     raise torch.OutOfMemoryError(
                         f"Cannot load model '{cache_entry.key}' onto {device}: it needs "
                         f"{model_bytes_needed / MB:.2f}MB but only {vram_available / MB:.2f}MB is available. "
@@ -3223,6 +3247,7 @@ class ModelCache:
                     f"({(cache_entry.cached_model.total_bytes() / MB):.2f}MB)."
                 )
                 bytes_freed += self._delete_cache_entry(cache_entry)
+                del cache_entry
                 models_cleared += 1
             # Cumulative: a peer request can follow this cache's own make_room within one session.
             self._notify_models_cleared(
@@ -3418,6 +3443,8 @@ class ModelCache:
         probe.dropped(self, cache_entry)
         uses_shared = cache_entry.cached_model.uses_shared_weights
         total_bytes = cache_entry.cached_model.total_bytes()
+        if isinstance(cache_entry.cached_model, CachedModelWithPartialLoad):
+            cache_entry.cached_model.release_pinned_weights()
         cache_entry.cached_model.release_shared_weights()
         if self._ram_budget is not None and not uses_shared:
             self._ram_budget.remove_non_shared(total_bytes, cache=self)
@@ -3470,6 +3497,10 @@ class ModelCache:
         a setting toggled during an in-flight generation would survive on the locked entry and quietly
         get reused by the next generation.
 
+        Callers must serialize this operation against loads and admissions in every device cache,
+        using MODEL_LOAD_LOCK.write_lock() if they may run concurrently. The per-cache lock alone
+        cannot provide that fence.
+
         Returns the number of entries immediately dropped (locked entries that are only marked
         stale do not count).
         """
@@ -3515,6 +3546,8 @@ class ModelCache:
     def make_room_in_vram(self, vram_bytes_needed: int, working_mem_bytes: Optional[int] = None) -> int:
         """Offload unlocked models from VRAM to RAM until `vram_bytes_needed` bytes are free on the execution device.
 
+        The caller must hold `MODEL_LOAD_LOCK`'s read lock before entering the cache lock.
+
         This is the entry point for code that has to put a model on the GPU *outside* the cache - e.g. a
         BitsAndBytes-quantized text encoder, which is pinned to the device it was quantized on and so cannot be
         managed by the cache. Such a load competes with cached models for VRAM, but never passes through `lock()`,
@@ -3550,6 +3583,8 @@ class ModelCache:
     def offload_model_from_vram(self, model_key: str) -> int:
         """Move a model (and its submodels) from VRAM to RAM without dropping it from the cache.
 
+        The caller must hold `MODEL_LOAD_LOCK`'s read lock before entering the cache lock.
+
         Unlike `drop_model`, the cache entry is kept, so the model stays resident in RAM and the next load does
         not have to rebuild it from disk - only re-stream its weights back to VRAM. This is useful for freeing
         VRAM after a one-shot use (e.g. a text encoder that has already produced its embeddings) before a much
@@ -3557,12 +3592,18 @@ class ModelCache:
 
         Returns the number of VRAM bytes freed.
         """
+        if not device_has_dedicated_vram(self._execution_device) and not (
+            _is_integrated_cuda(self._execution_device) and self._keep_ram_copy_of_weights
+        ):
+            return 0
         prefix = f"{model_key}:"
         return self._offload_entries_from_vram(lambda key: key == model_key or key.startswith(prefix))
 
     @integrated_cuda_synchronized
     def offload_models_from_vram_except(self, keep_model_keys: Collection[str]) -> int:
         """Move every model whose key is not in `keep_model_keys` from VRAM to RAM, keeping it cached.
+
+        The caller must hold `MODEL_LOAD_LOCK`'s read lock before entering the cache lock.
 
         `keep_model_keys` are plain model keys; a kept model keeps its submodels too. As with
         `offload_model_from_vram`, the entries stay resident in RAM, so a later use re-streams weights instead of
@@ -3581,6 +3622,8 @@ class ModelCache:
     @integrated_cuda_synchronized
     def offload_unlocked_models_from_vram(self, keep_cache_keys: Collection[str] = ()) -> int:
         """Move every unlocked entry but those in `keep_cache_keys` from VRAM to RAM whole, keeping it cached.
+
+        The caller must hold `MODEL_LOAD_LOCK`'s read lock before entering the cache lock.
 
         `keep_cache_keys` are exact cache keys: keeping a submodel (`<model key>:vae`) keeps none of its siblings, unlike
         `offload_models_from_vram_except`. Each entry leaves whole, where `lock()` moves out only the shortfall it

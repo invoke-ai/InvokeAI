@@ -45,7 +45,7 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     ConditioningFieldData,
     QwenImageConditioningInfo,
 )
-from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.devices import TorchDevice, device_is_integrated
 
 # Prompt templates and drop indices for the two Qwen Image model modes.
 # These are taken directly from the diffusers pipelines.
@@ -527,10 +527,10 @@ class QwenImageTextEncoderInvocation(BaseInvocation):
 
         # Three steps, each under the lock its kind of work requires (see MODEL_LOAD_LOCK), so that the process-global
         # lock is held no longer than necessary - while a writer holds it, or waits for it, every VRAM move on every
-        # worker stalls, and every reader delays every cold model construction. The integrated-CUDA admission guard
-        # spans all three steps because the out-of-cache allocation competes with the cache's system-RAM residency.
+        # worker stalls, and every reader delays every cold model construction. `make_room_in_vram` takes the model
+        # read lock itself; integrated-CUDA admission is acquired only after the model lock for construction.
         # 1. the offload is a VRAM move like any other (`load_state_dict(assign=True)` -> `register_parameter`), so it
-        #    takes the read lock, acquired *before* the cache lock `make_room_in_vram` takes, per the lock-ordering
+        #    takes the read lock inside `make_room_in_vram`, before its cache lock, per the lock-ordering
         #    contract;
         # 2. the checkpoint read takes no lock: it creates no parameters and touches no global state, and it is the
         #    slow part on anything but NVMe. It runs after the offload so the offload's RAM cannot evict its pages;
@@ -542,27 +542,44 @@ class QwenImageTextEncoderInvocation(BaseInvocation):
         #    `setattr` -> `register_parameter`) on the meta device, and its own `torch.set_default_dtype` would change
         #    what a concurrent move allocates. TestTransformersLoadPathAssumptions pins both facts against the
         #    installed transformers.
+        integrated_cuda = device.type == "cuda" and torch.version.hip is None and device_is_integrated(device) is True
         vram_available: int | None = None
         state_dict: dict[str, torch.Tensor] | None = None
         text_encoder: torch.nn.Module | None = None
         patches = ExitStack()
         try:
-            with integrated_cuda_admission_lock(device):
-                # A CPU execution device has no VRAM to make room in (recent bitsandbytes can quantize on the CPU).
-                if quantized_bytes > 0 and device.type != "cpu":
-                    with MODEL_LOAD_LOCK.read_lock():
-                        vram_available = context.models.make_room_in_vram(quantized_bytes)
-                    if vram_available < quantized_bytes:
-                        context.logger.warning(
-                            f"Only {max(vram_available, 0) / MB:.0f} MB of VRAM could be made available on {device} for "
-                            f"the {self.quantization}-quantized Qwen2.5-VL encoder (~{quantized_bytes / MB:.0f} MB); "
-                            "locked (in-use) models cannot be offloaded. The load may run out of memory."
+            # `make_room_in_vram` acquires MODEL_LOAD_LOCK before the cache/admission locks.
+            if quantized_bytes > 0 and device.type != "cpu":
+                vram_available = context.models.make_room_in_vram(quantized_bytes)
+                if vram_available < quantized_bytes:
+                    if integrated_cuda:
+                        raise torch.OutOfMemoryError(
+                            f"Only {max(vram_available, 0) / MB:.0f} MB of shared memory could be made available "
+                            f"on {device} for the {self.quantization}-quantized Qwen2.5-VL encoder (~"
+                            f"{quantized_bytes / MB:.0f} MB); refusing to read the checkpoint while shared memory "
+                            "is below the estimated allocation."
                         )
+                    context.logger.warning(
+                        f"Only {max(vram_available, 0) / MB:.0f} MB of VRAM could be made available on {device} for "
+                        f"the {self.quantization}-quantized Qwen2.5-VL encoder (~{quantized_bytes / MB:.0f} MB); "
+                        "locked (in-use) models cannot be offloaded. The load may run out of memory."
+                    )
 
-                model_config = Qwen2_5_VLConfig.from_pretrained(str(encoder_path), local_files_only=True)
-                state_dict = _read_checkpoint(encoder_path)
+            model_config = Qwen2_5_VLConfig.from_pretrained(str(encoder_path), local_files_only=True)
+            state_dict = _read_checkpoint(encoder_path)
 
-                with MODEL_LOAD_LOCK.write_lock():
+            if integrated_cuda and quantized_bytes > 0:
+                vram_available = context.models.make_room_in_vram(quantized_bytes)
+                if vram_available < quantized_bytes:
+                    raise torch.OutOfMemoryError(
+                        f"Only {max(vram_available, 0) / MB:.0f} MB of shared memory could be made available "
+                        f"on {device} for the {self.quantization}-quantized Qwen2.5-VL encoder (~"
+                        f"{quantized_bytes / MB:.0f} MB); refusing construction while shared memory is below "
+                        "the estimated allocation."
+                    )
+
+            with MODEL_LOAD_LOCK.write_lock():
+                with integrated_cuda_admission_lock(device):
                     text_encoder = Qwen2_5_VLForConditionalGeneration.from_pretrained(
                         None if state_dict is not None else str(encoder_path),
                         config=model_config,

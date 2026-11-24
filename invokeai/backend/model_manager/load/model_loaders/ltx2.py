@@ -55,7 +55,7 @@ from invokeai.backend.model_manager.load.model_loaders._single_file_guards impor
     reject_float8_weights,
     reject_formats_declared_in_the_header,
 )
-from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
+from invokeai.backend.model_manager.model_on_disk import ModelOnDisk, read_safetensors_header
 from invokeai.backend.model_manager.taxonomy import (
     AnyModel,
     BaseModelType,
@@ -186,14 +186,8 @@ def _is_bundled_component(key: str) -> bool:
 
 def _safetensors_payload_size(path: Path, key_filter: Callable[[str], bool]) -> int:
     """Return selected tensor payload bytes from a safetensors header without reading tensor data."""
-    with path.open("rb") as file:
-        header_size = int.from_bytes(file.read(8), "little")
-        header = json.loads(file.read(header_size))
-    return sum(
-        entry["data_offsets"][1] - entry["data_offsets"][0]
-        for key, entry in header.items()
-        if key != "__metadata__" and key_filter(key)
-    )
+    header = read_safetensors_header(path)
+    return sum(entry["data_offsets"][1] - entry["data_offsets"][0] for key, entry in header.items() if key_filter(key))
 
 
 def _diffusers_transformer_key_map(official_keys: Iterable[str]) -> dict[str, str]:
@@ -238,11 +232,11 @@ class _LTX2ComponentLoading:
     _logger: Any
 
     def _reserve_for_cast(self, sd: dict[str, torch.Tensor], dtype: torch.dtype) -> None:
-        """Reserve what the cast to ``dtype`` will leave resident, before any tensor widens."""
+        """Reserve the distinct cast output; dense component sources are file-backed mappings."""
         reserved_bytes = predict_cast_state_dict_size(sd, dtype, keep_fp8=False)
-        _, additional_bytes = state_dict_cast_bytes(sd, dtype, in_place=True)
+        _, host_bytes_needed = state_dict_cast_bytes(sd, dtype, in_place=False)
         require_ram_headroom(
-            self._ram_cache.make_room(reserved_bytes, host_bytes_needed=additional_bytes), additional_bytes
+            self._ram_cache.make_room(reserved_bytes, host_bytes_needed=host_bytes_needed), host_bytes_needed
         )
 
     def _build_dense(

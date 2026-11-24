@@ -27,6 +27,7 @@ from invokeai.backend.model_manager.load.model_loaders.ltx2 import (
     LTX2DurationHeadLoader,
     LTX2FolderModel,
     LTX2Gemma4EncoderModel,
+    _LTX2ComponentLoading,
 )
 from invokeai.backend.model_manager.taxonomy import LTX2VariantType, SubModelType
 from invokeai.backend.quantization.int8_convrot import Int8ConvrotLinear
@@ -212,6 +213,89 @@ def _folder_loader(reserved: list[int] | None = None) -> LTX2FolderModel:
     loader._logger = SimpleNamespace(info=lambda *_a, **_k: None)
     loader._torch_device = torch.device("cpu")
     return loader
+
+
+@pytest.mark.parametrize(
+    ("loader_type", "source_dtype", "target_dtype", "expected_host_bytes"),
+    [
+        (LTX2FolderModel, torch.bfloat16, torch.float32, 12 * torch.float32.itemsize),
+        (LTX2DurationHeadLoader, torch.bfloat16, torch.float32, 12 * torch.float32.itemsize),
+        (LTX2FolderModel, torch.bfloat16, torch.bfloat16, 0),
+    ],
+    ids=["audio-components-fp32", "duration-head-fp32", "same-dtype-noop"],
+)
+def test_mapped_bf16_components_reserve_the_distinct_fp32_output(
+    loader_type: type[_LTX2ComponentLoading],
+    source_dtype: torch.dtype,
+    target_dtype: torch.dtype,
+    expected_host_bytes: int,
+    tmp_path: Path,
+) -> None:
+    """Mapped BF16 sources remain file-backed while each dense component is widened to FP32."""
+    from safetensors import safe_open
+
+    path = tmp_path / "component.safetensors"
+    safetensors.torch.save_file(
+        {"first": torch.zeros(4, dtype=source_dtype), "second": torch.zeros(8, dtype=source_dtype)}, path
+    )
+    with safe_open(path, framework="pt", device="cpu") as file:
+        sd = {key: file.get_tensor(key) for key in file.keys()}
+
+    reservations: list[tuple[tuple[int, ...], dict[str, int]]] = []
+    loader = object.__new__(loader_type)
+    loader._ram_cache = SimpleNamespace(make_room=lambda *args, **kwargs: reservations.append((args, kwargs)))
+    loader._reserve_for_cast(sd, target_dtype)
+
+    expected = 12 * target_dtype.itemsize
+    assert reservations == [((expected,), {"host_bytes_needed": expected_host_bytes})]
+
+
+@pytest.mark.parametrize(
+    "header,declared_length",
+    [
+        (b'{"tensor": {"dtype": "BF16", "shape": [1], "data_offsets": [0, 2]}', None),
+        (b'{"tensor": {"dtype": "BF16", "shape": [1], "data_offsets": [0, 2]}}', 1_000_000),
+    ],
+    ids=["truncated-json", "oversized-header"],
+)
+def test_connector_header_is_validated_before_filtered_payload_read(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, header: bytes, declared_length: int | None
+) -> None:
+    """Connector sizing must reject malformed headers before requesting their declared length."""
+    path = tmp_path / "connectors.safetensors"
+    path.write_bytes((declared_length or len(header)).to_bytes(8, "little") + header + b"\0" * 2)
+    reads: list[int] = []
+    original_open = Path.open
+
+    class _TrackedFile:
+        def __init__(self, file):
+            self.file = file
+
+        def __enter__(self):
+            self.file.__enter__()
+            return self
+
+        def __exit__(self, *args):
+            return self.file.__exit__(*args)
+
+        def read(self, size=-1):
+            reads.append(size)
+            return self.file.read(size)
+
+    def tracked_open(self: Path, *args, **kwargs):
+        return _TrackedFile(original_open(self, *args, **kwargs))
+
+    monkeypatch.setattr(Path, "open", tracked_open)
+    components = {
+        "text_projection": path.name,
+        "video_connector": path.name,
+        "audio_connector": path.name,
+    }
+    config = Main_Diffusers_LTX2_Config.model_construct(path=str(tmp_path), components=components)
+
+    with pytest.raises(ValueError, match="not a safetensors file"):
+        _folder_loader().get_size_fs(config, tmp_path, SubModelType.Connectors)
+    assert all(size <= len(header) for size in reads if size >= 0)
 
 
 def _cpu(monkeypatch) -> None:

@@ -444,7 +444,7 @@ def unpack_ggml_at_load(
     is incremental because the GGUF reader already copied packed tensors into RAM. BF16 is
     reinterpreted rather than run through the GGML kernel, which widens through int32 and float32 on
     the way -- about 8 bytes per element. What is in flight beside a result is the packed original it
-    replaces and, for a quantized tensor, the temporaries of one row slice (see `_unpack`).
+    replaces and, for a quantized tensor, the temporaries of one row slice (see `unpack_ggml_tensor`).
     """
     linear_params = {
         f"{module_name}.{param_name}"
@@ -468,25 +468,28 @@ def unpack_ggml_at_load(
         for key, value in sd.items()
         if key not in unpacked
     )
-    in_flight = max((_in_flight_bytes(sd[key]) for key in keys), default=0)
+    in_flight = max((sd[key].quantized_data.nbytes + ggml_unpack_temp_bytes(sd[key]) for key in keys), default=0)
     reserved_bytes = kept + sum(unpacked.values()) + in_flight
-    unpack_scratch = max(
-        (_in_flight_bytes(sd[key]) - sd[key].quantized_data.nbytes for key in keys),
-        default=0,
-    )
-    # BF16-to-BF16 unpacking is a view of the mapped payload, so it adds no host allocation.
+    unpack_scratch = max((ggml_unpack_temp_bytes(sd[key]) for key in keys), default=0)
+    # Same-dtype F16/F32 and BF16 unpacking are views of the mapped payload, so they add no host allocation.
     zero_copy = {
         key
         for key in keys
-        if sd[key]._ggml_quantization_type is gguf.GGMLQuantizationType.BF16 and sd[key].compute_dtype is torch.bfloat16
+        if (
+            sd[key]._ggml_quantization_type is gguf.GGMLQuantizationType.BF16
+            and sd[key].compute_dtype is torch.bfloat16
+        )
+        or (
+            sd[key]._ggml_quantization_type in (gguf.GGMLQuantizationType.F16, gguf.GGMLQuantizationType.F32)
+            and sd[key].compute_dtype is sd[key].quantized_data.dtype
+        )
     }
-    host_bytes_needed = (
-        sum(bytes_needed for key, bytes_needed in unpacked.items() if key not in zero_copy) + unpack_scratch
-    )
+    host_bytes_needed = sum(bytes_needed for key, bytes_needed in unpacked.items() if key not in zero_copy)
+    host_bytes_needed += unpack_scratch
     require_ram_headroom(_reserve(reserve, reserved_bytes, host_bytes_needed), host_bytes_needed)
     # One at a time, so each packed original is released as its replacement lands.
     for key in keys:
-        sd[key] = _unpack(sd[key])
+        sd[key] = unpack_ggml_tensor(sd[key])
     return len(keys)
 
 
@@ -497,17 +500,19 @@ def _row_slices(value: GGMLTensor) -> tuple[torch.Tensor, int, int]:
     return rows, per_row, max(1, _UNPACK_CHUNK_ELEMENTS // per_row)
 
 
-def _in_flight_bytes(value: GGMLTensor) -> int:
-    """What replacing `value` holds beside its result: the packed original, released only once the result
-    lands, and for a quantized tensor the decode temporaries of one slice."""
-    packed = value.quantized_data.nbytes
+def ggml_unpack_temp_bytes(value: GGMLTensor) -> int:
+    """Decode temporaries beside the output and packed original, bounded to one row slice.
+
+    Callers budget the original separately: a state dict can release it as its replacement lands,
+    whereas materializing a model parameter can leave its checkpoint alias alive.
+    """
     if value._ggml_quantization_type in _UNQUANTIZED_GGML_TYPES:
-        return packed
+        return 0
     rows, per_row, step = _row_slices(value)
-    return packed + HOST_DEQUANT_PEAK_COPIES * min(step, rows.shape[0]) * per_row * value.compute_dtype.itemsize
+    return HOST_DEQUANT_PEAK_COPIES * min(step, rows.shape[0]) * per_row * value.compute_dtype.itemsize
 
 
-def _unpack(value: GGMLTensor) -> torch.Tensor:
+def unpack_ggml_tensor(value: GGMLTensor) -> torch.Tensor:
     """`value` as a plain tensor in its compute dtype; BF16 as a view of its bytes, not a decode.
 
     A quantized tensor is decoded a slice of rows at a time into its preallocated result. GGML blocks

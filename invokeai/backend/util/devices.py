@@ -29,35 +29,39 @@ MPS_DEVICE = torch.device("mps")
 _XPU_MEM_FALLBACK_WARNED: set[str] = set()
 
 
+class _WindowsPerformanceInformation(ctypes.Structure):
+    _fields_ = [
+        ("cb", ctypes.c_uint32),
+        ("commit_total", ctypes.c_size_t),
+        ("commit_limit", ctypes.c_size_t),
+        ("commit_peak", ctypes.c_size_t),
+        ("physical_total", ctypes.c_size_t),
+        ("physical_available", ctypes.c_size_t),
+        ("system_cache", ctypes.c_size_t),
+        ("kernel_total", ctypes.c_size_t),
+        ("kernel_paged", ctypes.c_size_t),
+        ("kernel_nonpaged", ctypes.c_size_t),
+        ("page_size", ctypes.c_size_t),
+        ("handle_count", ctypes.c_uint32),
+        ("process_count", ctypes.c_uint32),
+        ("thread_count", ctypes.c_uint32),
+    ]
+
+
+_WINDOWS_PERFORMANCE_INFORMATION_PTR = ctypes.POINTER(_WindowsPerformanceInformation)
+
+
 def _windows_commit_available() -> int | None:
     """Return system commit bytes still available, or None when Windows cannot report it."""
     if sys.platform != "win32":
         return None
 
-    class PerformanceInformation(ctypes.Structure):
-        _fields_ = [
-            ("cb", ctypes.c_uint32),
-            ("commit_total", ctypes.c_size_t),
-            ("commit_limit", ctypes.c_size_t),
-            ("commit_peak", ctypes.c_size_t),
-            ("physical_total", ctypes.c_size_t),
-            ("physical_available", ctypes.c_size_t),
-            ("system_cache", ctypes.c_size_t),
-            ("kernel_total", ctypes.c_size_t),
-            ("kernel_paged", ctypes.c_size_t),
-            ("kernel_nonpaged", ctypes.c_size_t),
-            ("page_size", ctypes.c_size_t),
-            ("handle_count", ctypes.c_uint32),
-            ("process_count", ctypes.c_uint32),
-            ("thread_count", ctypes.c_uint32),
-        ]
-
     try:
-        info = PerformanceInformation()
+        info = _WindowsPerformanceInformation()
         info.cb = ctypes.sizeof(info)
         psapi = ctypes.WinDLL("psapi", use_last_error=True)
         get_performance_info = psapi.GetPerformanceInfo
-        get_performance_info.argtypes = [ctypes.POINTER(PerformanceInformation), ctypes.c_uint32]
+        get_performance_info.argtypes = [_WINDOWS_PERFORMANCE_INFORMATION_PTR, ctypes.c_uint32]
         get_performance_info.restype = ctypes.c_int
         if not get_performance_info(ctypes.byref(info), info.cb):
             raise ctypes.WinError(ctypes.get_last_error())

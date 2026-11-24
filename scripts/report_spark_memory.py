@@ -20,6 +20,28 @@ import torch
 from invokeai.backend.util.devices import _host_memory_available
 
 
+class _PerformanceInformation(ctypes.Structure):
+    _fields_ = [
+        ("cb", ctypes.c_uint32),
+        ("commit_total", ctypes.c_size_t),
+        ("commit_limit", ctypes.c_size_t),
+        ("commit_peak", ctypes.c_size_t),
+        ("physical_total", ctypes.c_size_t),
+        ("physical_available", ctypes.c_size_t),
+        ("system_cache", ctypes.c_size_t),
+        ("kernel_total", ctypes.c_size_t),
+        ("kernel_paged", ctypes.c_size_t),
+        ("kernel_nonpaged", ctypes.c_size_t),
+        ("page_size", ctypes.c_size_t),
+        ("handle_count", ctypes.c_uint32),
+        ("process_count", ctypes.c_uint32),
+        ("thread_count", ctypes.c_uint32),
+    ]
+
+
+_PERFORMANCE_INFORMATION_POINTER = ctypes.POINTER(_PerformanceInformation)
+
+
 def _read_text(path: Path) -> str | None:
     try:
         return path.read_text().strip()
@@ -89,30 +111,12 @@ def _windows_memory() -> dict[str, int | str] | None:
     if os.name != "nt":
         return None
 
-    class PerformanceInformation(ctypes.Structure):
-        _fields_ = [
-            ("cb", ctypes.c_uint32),
-            ("commit_total", ctypes.c_size_t),
-            ("commit_limit", ctypes.c_size_t),
-            ("commit_peak", ctypes.c_size_t),
-            ("physical_total", ctypes.c_size_t),
-            ("physical_available", ctypes.c_size_t),
-            ("system_cache", ctypes.c_size_t),
-            ("kernel_total", ctypes.c_size_t),
-            ("kernel_paged", ctypes.c_size_t),
-            ("kernel_nonpaged", ctypes.c_size_t),
-            ("page_size", ctypes.c_size_t),
-            ("handle_count", ctypes.c_uint32),
-            ("process_count", ctypes.c_uint32),
-            ("thread_count", ctypes.c_uint32),
-        ]
-
     try:
-        info = PerformanceInformation()
+        info = _PerformanceInformation()
         info.cb = ctypes.sizeof(info)
         psapi = ctypes.WinDLL("psapi", use_last_error=True)
         get_performance_info = psapi.GetPerformanceInfo
-        get_performance_info.argtypes = [ctypes.POINTER(PerformanceInformation), ctypes.c_uint32]
+        get_performance_info.argtypes = [_PERFORMANCE_INFORMATION_POINTER, ctypes.c_uint32]
         get_performance_info.restype = ctypes.c_int
         if not get_performance_info(ctypes.byref(info), info.cb):
             raise ctypes.WinError(ctypes.get_last_error())

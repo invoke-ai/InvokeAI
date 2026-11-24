@@ -8,6 +8,7 @@ import {
   supportsExternalModelSettings,
   type ExternalModelSettingsModel,
 } from '@features/models/core/externalModelFields';
+import { isSafeUrl } from '@features/models/core/modelSettingsIO';
 import { isLinkableModel } from '@features/models/core/relationships';
 import { isAbsoluteModelPath, resolveModelAbsolutePath } from '@features/models/core/schemas';
 import {
@@ -81,6 +82,7 @@ type ModelIdentityModel = Pick<
   | 'source'
   | 'source_type'
   | 'source_url'
+  | 'source_urls'
   | 'type'
   | 'variant'
 >;
@@ -133,6 +135,7 @@ const selectModelIdentity = (snapshot: ModelsSnapshot, modelKey: string): ModelI
         source: model.source,
         source_type: model.source_type,
         source_url: model.source_url,
+        source_urls: model.source_urls,
         type: model.type,
         variant: model.variant,
       }
@@ -538,6 +541,26 @@ const RelatedModelsSectionContainer = memo(function RelatedModelsSectionContaine
   return <RelatedModelsSection model={model} onError={handleSectionError} />;
 });
 
+const AttributeValue = ({ href, value }: { href: string | undefined; value: string }) =>
+  href ? (
+    <chakra.a
+      alignItems="center"
+      display="inline-flex"
+      gap="1"
+      href={href}
+      minW="0"
+      rel="noreferrer"
+      target="_blank"
+      wordBreak="break-all"
+      _hover={{ textDecoration: 'underline' }}
+    >
+      {value}
+      <Icon as={ExternalLinkIcon} boxSize="3" color="fg.subtle" flexShrink={0} />
+    </chakra.a>
+  ) : (
+    value
+  );
+
 const ModelAttributes = ({ isMissing, model }: { isMissing: boolean; model: ModelIdentityModel }) => {
   const { i18n, t } = useTranslation();
   const modelsDir = useModelsSelector((snapshot) => snapshot.modelsDir);
@@ -549,7 +572,15 @@ const ModelAttributes = ({ isMissing, model }: { isMissing: boolean; model: Mode
   // Allow repointing absolute-path installs, including missing files.
   const canUpdatePath = isAbsoluteModelPath(model.path) || isMissing;
 
-  const attributes: { action?: ReactNode; href?: string; label: string; value: string }[] = [
+  const sourceHref = getModelSourceHref(model.source, model.source_type);
+  const modelPages = [...new Set(model.source_urls ?? [])].filter(
+    (url) => url !== model.source_url && url !== sourceHref
+  );
+
+  const attributes: ({ action?: ReactNode; label: string } & (
+    | { href?: string; value: string }
+    | { links: readonly string[] }
+  ))[] = [
     { label: t('models.fileSize'), value: formatBytes(model.file_size) },
     { label: t('models.variant'), value: model.variant ?? '—' },
     { label: t('models.predictionType'), value: model.prediction_type ?? '—' },
@@ -587,20 +618,20 @@ const ModelAttributes = ({ isMissing, model }: { isMissing: boolean; model: Mode
       value: fullPath,
     },
     {
-      href: getModelSourceHref(model.source, model.source_type) ?? undefined,
+      href: sourceHref ?? undefined,
       label: t('models.source'),
       value: model.source,
     },
-    // Render legacy non-HTTP(S) source links as text rather than unsafe anchors.
     ...(model.source_url
       ? [
           {
-            href: model.source_url.startsWith('http') ? model.source_url : undefined,
+            href: isSafeUrl(model.source_url) ? model.source_url : undefined,
             label: t('models.sourceUrl'),
             value: model.source_url,
           },
         ]
       : []),
+    ...(modelPages.length ? [{ label: t('models.modelPage', { count: modelPages.length }), links: modelPages }] : []),
     // Format-specific attrs; truthiness also skips repo_variant's '' default.
     ...(model.format === 'diffusers' && model.repo_variant
       ? [{ label: t('models.repoVariant'), value: model.repo_variant }]
@@ -624,23 +655,14 @@ const ModelAttributes = ({ isMissing, model }: { isMissing: boolean; model: Mode
               {attribute.label}
             </DataList.ItemLabel>
             <DataList.ItemValue alignItems="center" display="flex" fontSize="xs" gap="1" overflowWrap="anywhere">
-              {attribute.href ? (
-                <chakra.a
-                  alignItems="center"
-                  display="inline-flex"
-                  gap="1"
-                  href={attribute.href}
-                  minW="0"
-                  rel="noreferrer"
-                  target="_blank"
-                  wordBreak="break-all"
-                  _hover={{ textDecoration: 'underline' }}
-                >
-                  {attribute.value}
-                  <Icon as={ExternalLinkIcon} boxSize="3" color="fg.subtle" flexShrink={0} />
-                </chakra.a>
+              {'links' in attribute ? (
+                <Stack alignItems="flex-start" gap="1" minW="0">
+                  {attribute.links.map((url) => (
+                    <AttributeValue key={url} href={isSafeUrl(url) ? url : undefined} value={url} />
+                  ))}
+                </Stack>
               ) : (
-                attribute.value
+                <AttributeValue href={attribute.href} value={attribute.value} />
               )}
               {attribute.action ?? null}
             </DataList.ItemValue>

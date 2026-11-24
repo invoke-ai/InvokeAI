@@ -111,6 +111,38 @@ def test_host_memory_available_is_limited_by_windows_commit(monkeypatch):
     assert devices_module._host_memory_available() == 40
 
 
+def test_windows_commit_query_reuses_ctypes_types(monkeypatch):
+    monkeypatch.setattr(devices_module.sys, "platform", "win32")
+    argtypes = []
+
+    class GetPerformanceInfo:
+        def __init__(self):
+            self.argtypes = None
+            self._calls = 0
+
+        def __call__(self, pointer, _size):
+            argtypes.append(self.argtypes[0])
+            self._calls += 1
+            if self._calls == 2:
+                return 0
+            info = pointer._obj
+            info.commit_total = 2
+            info.commit_limit = 5
+            info.page_size = 4096
+            return 1
+
+    class Api:
+        def __init__(self):
+            self.GetPerformanceInfo = GetPerformanceInfo()
+
+    api = Api()
+    monkeypatch.setattr(devices_module.ctypes, "WinDLL", lambda *_args, **_kwargs: api, raising=False)
+    assert devices_module._windows_commit_available() == 3 * 4096
+    assert devices_module._windows_commit_available() is None
+    assert devices_module._windows_commit_available() == 3 * 4096
+    assert argtypes[0] is argtypes[1] is argtypes[2]
+
+
 @pytest.mark.parametrize(
     "properties",
     [SimpleNamespace(is_integrated=0), SimpleNamespace()],

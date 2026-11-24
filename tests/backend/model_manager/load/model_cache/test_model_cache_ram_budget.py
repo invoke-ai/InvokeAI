@@ -19,6 +19,9 @@ from invokeai.app.services.model_manager.model_manager_default import _calc_glob
 from invokeai.backend.model_manager.load.load_base import LoadedModelWithoutConfig
 from invokeai.backend.model_manager.load.model_cache import model_cache as model_cache_module
 from invokeai.backend.model_manager.load.model_cache.cache_stats import CacheStats
+from invokeai.backend.model_manager.load.model_cache.cached_model.cached_model_with_partial_load import (
+    CachedModelWithPartialLoad,
+)
 from invokeai.backend.model_manager.load.model_cache.model_cache import (
     GB,
     MIN_RAM_CACHE_BYTES,
@@ -52,10 +55,10 @@ def _collect_only_this_tests_objects():
     gc.unfreeze()
 
 
-def _make_cache(store, budget, logger, keep_ram_copy=True) -> ModelCache:
+def _make_cache(store, budget, logger, keep_ram_copy=True, partial=False) -> ModelCache:
     return ModelCache(
         execution_device_working_mem_gb=1.0,
-        enable_partial_loading=False,
+        enable_partial_loading=partial,
         keep_ram_copy_of_weights=keep_ram_copy,
         execution_device="cpu",
         storage_device="cpu",
@@ -101,6 +104,90 @@ def test_shared_model_counts_once_in_global_budget(mock_logger):
     finally:
         cache_a.shutdown()
         cache_b.shutdown()
+
+
+def test_matching_put_releases_pin_if_injection_fails_after_peer_eviction(mock_logger, monkeypatch):
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=8 * 8 * 4, shared_store=store)
+    source = _make_cache(store, budget, mock_logger)
+    dest = _make_cache(store, budget, mock_logger)
+    try:
+        source.put("m", torch.nn.Linear(8, 8, bias=False))
+        _use_and_release(source, "m")
+        canonical = store.peek("m")
+        assert canonical is not None
+        adopted = torch.nn.Linear(8, 8, bias=False)
+        adopted.load_state_dict(canonical, assign=True)
+
+        # Even a zero-byte reservation must attempt eviction when the budget is over its cap.
+        budget.add_non_shared(1)
+
+        def fail_injection(model):
+            with pytest.raises(IndexError):
+                source.get("m")
+            assert store.peek("m") is canonical
+            raise RuntimeError("custom-layer injection failed")
+
+        monkeypatch.setattr(model_cache_module, "apply_custom_layers_to_model", fail_injection)
+        with pytest.raises(RuntimeError, match="custom-layer injection failed"):
+            dest.put("m", adopted)
+
+        with pytest.raises(IndexError):
+            dest.get("m")
+        assert store.peek("m") is None
+        assert budget.total_in_use() == 1
+    finally:
+        source.shutdown()
+        dest.shutdown()
+
+
+@pytest.mark.parametrize("case", ["independent", "fresh_weights", "private_buffer"])
+def test_nonmatching_admission_reserves_full_size(mock_logger, case):
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=356, shared_store=store)
+    source = _make_cache(store, budget, mock_logger)
+    dest = _make_cache(store, budget, mock_logger)
+    try:
+        source.put("m", torch.nn.Linear(8, 8, bias=False))
+        _use_and_release(source, "m")
+        canonical = store.peek("m")
+        assert canonical is not None
+        model = torch.nn.Linear(8, 8, bias=False)
+        if case == "private_buffer":
+            model.load_state_dict(canonical, assign=True)
+            model.register_buffer("private", torch.ones(8), persistent=False)
+        dest.put("other" if case == "independent" else "m", model)
+        with pytest.raises(IndexError):
+            source.get("m")
+    finally:
+        source.shutdown()
+        dest.shutdown()
+    assert store.total_bytes_in_use() == 0
+
+
+def test_partial_loading_matching_admission_keeps_peer(mock_logger, monkeypatch):
+    # Exercise the partial wrapper without selecting an accelerator.
+    monkeypatch.setattr(model_cache_module, "device_has_dedicated_vram", lambda _: True)
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=356, shared_store=store)
+    source = _make_cache(store, budget, mock_logger, partial=True)
+    dest = _make_cache(store, budget, mock_logger, partial=True)
+    try:
+        source.put("m", torch.nn.Linear(8, 8, bias=False))
+        first = _use_and_release(source, "m")
+        canonical = store.peek("m")
+        assert canonical is not None
+        model = torch.nn.Linear(8, 8, bias=False)
+        model.load_state_dict(canonical, assign=True)
+        dest.put("m", model)
+        assert source.get("m") is first
+        assert isinstance(dest.get("m").cached_model, CachedModelWithPartialLoad)
+        assert store.refcount("m") == 2
+        assert budget.total_in_use() == 256
+    finally:
+        source.shutdown()
+        dest.shutdown()
+    assert budget.total_in_use() == 0
 
 
 def _collect_until(predicate, attempts: int = 5) -> bool:
@@ -2650,6 +2737,34 @@ def test_peer_eviction_syncs_the_evicted_caches_stats(mock_logger):
     finally:
         cache_a.shutdown()
         cache_b.shutdown()
+
+
+def test_peer_eviction_releases_record_before_resampling_headroom(mock_logger):
+    """A peer eviction must drop its local record before asking whether one model was enough."""
+
+    class SizedModel(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.weights = torch.nn.Parameter(torch.empty(10_368, dtype=torch.uint8), requires_grad=False)
+
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=10**12, shared_store=store)
+    cache = _make_cache(store, budget, mock_logger)
+    first_model = SizedModel()
+    first_model_ref = weakref.ref(first_model)
+    try:
+        cache.put("first", first_model)
+        del first_model
+        cache.put("second", SizedModel())
+        _use_and_release(cache, "first")
+        _use_and_release(cache, "second")
+
+        assert first_model_ref() is not None
+        assert cache.evict_unlocked_for_peer(lambda: first_model_ref() is None) == 1
+        assert "first" not in cache._cached_models
+        assert "second" in cache._cached_models
+    finally:
+        cache.shutdown()
 
 
 def test_budget_reconcile_syncs_the_reconciling_caches_stats(mock_logger):

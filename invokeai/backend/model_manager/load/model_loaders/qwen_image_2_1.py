@@ -30,6 +30,7 @@ from invokeai.backend.quantization.fp8_scaled import (
     load_safetensors_checkpoint,
     parse_quantization_metadata,
     read_safetensors_metadata,
+    safetensors_backend,
     split_fp8_scaled_layers,
     strip_layer_path_prefix,
     translate_torchao_fp8_layers,
@@ -221,6 +222,7 @@ class QwenImage21CheckpointModel(ModelLoader):
 
         model_path = Path(config.path)
         model_dtype = TorchDevice.choose_bfloat16_safe_dtype(TorchDevice.choose_torch_device())
+        source_tensors_mapped = safetensors_backend(model_path) == "mmap"
 
         sd = load_safetensors_checkpoint(model_path)
         sd = CheckpointPrefix.detect(sd).strip(sd)
@@ -260,7 +262,7 @@ class QwenImage21CheckpointModel(ModelLoader):
                 architecture="Qwen-Image-2.1",
                 reserve=self._ram_cache.make_room,
                 skip_patterns=skip_patterns,
-                source_tensors_mapped=True,
+                source_tensors_mapped=source_tensors_mapped,
             )
             self._logger.info(
                 f"Qwen-Image-2.1: kept {len(quantized)} of {len(int8_markers)} layer(s) in int8 "
@@ -277,9 +279,7 @@ class QwenImage21CheckpointModel(ModelLoader):
                 skip_patterns=skip_patterns,
                 fp8_layers=fp8_layers,
                 nvfp4_payloads={},
-                source_tensors_retained=bool(fp8_layers and not keep_fp8),
-                source_tensors_mapped=True,
-                source_tensors_cloned=bool(fp8_layers and not keep_fp8),
+                source_tensors_mapped=source_tensors_mapped,
             )
             if fp8_layers and not keep_fp8:
                 dequantize_fp8_scaled(sd, fp8_layers, model_dtype)

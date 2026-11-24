@@ -88,11 +88,14 @@ def _config(flow_map: bool = True, path: str = "flux3.safetensors") -> Main_Chec
 def _load(
     monkeypatch: pytest.MonkeyPatch, build: QuantizedFlux3, observe: tuple[str, ...] = (), *, flow_map: bool = True
 ) -> tuple[SeamRun, torch.nn.Module]:
+    # The seam serves in-memory tensors without a real file header; leave the mapped-source path explicit.
+    monkeypatch.setattr(flux3_loaders, "safetensors_backend", lambda _path: "mmap")
     run = prepare(SEAM, monkeypatch, state_dict=build.state_dict, metadata=build.metadata, observe=observe)
     return run, run.load(_config(flow_map), SubModelType.Transformer)
 
 
 def _refused(monkeypatch: pytest.MonkeyPatch, build: QuantizedFlux3, match: str) -> SeamRun:
+    monkeypatch.setattr(flux3_loaders, "safetensors_backend", lambda _path: "mmap")
     run = prepare(SEAM, monkeypatch, state_dict=build.state_dict, metadata=build.metadata)
     with pytest.raises(ValueError, match=match):
         run.load(_config(), SubModelType.Transformer)
@@ -202,8 +205,6 @@ def test_one_reservation_holds_a_folded_fp8r_build_at_the_compute_dtype(monkeypa
 
     run, _ = _load(monkeypatch, build)
 
-    assert run.reservation_kwargs[-1]["source_tensors_mapped"] is True
-    assert run.reservation_kwargs[-1]["source_tensors_cloned"] is True
     assert run.reserved == [4 * sum(t.numel() for t in build.state_dict.values())]
 
 
@@ -430,6 +431,9 @@ def test_no_parameter_of_a_torchao_load_reads_the_file_afterwards(
     run = prepare(SEAM, monkeypatch, metadata=build.metadata)
     model = run.load(_config(path=str(path)), SubModelType.Transformer)
 
+    assert run.reservation_kwargs[-1]["source_tensors_mapped"] is False
+    assert run.reservation_kwargs[-1].get("source_tensors_retained", False) is False
+    assert run.reservation_kwargs[-1].get("source_tensors_cloned", False) is False
     assert tensors_reading_the_file(model, path) == []
 
 

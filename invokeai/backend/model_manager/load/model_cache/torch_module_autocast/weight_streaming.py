@@ -32,7 +32,7 @@ from typing import Iterable, Iterator
 import psutil
 import torch
 
-from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.devices import TorchDevice, _host_memory_available
 from invokeai.backend.util.logging import InvokeAILogger
 
 logger = InvokeAILogger.get_logger(__name__)
@@ -401,6 +401,9 @@ class PinnedStorageRegistry:
         # Storages whose unregistration failed, kept alive for the process lifetime rather than freed while possibly
         # still registered. The cap keeps counting them.
         self._stranded: list[_StorageEntry] = []
+        # Reserve live host headroom while `_fault_in` runs outside the registration lock. This prevents concurrent
+        # updates from admitting the same bytes twice when the OS headroom counter is slow to reflect page faults.
+        self._host_reserved_bytes = 0
         self._cond = threading.Condition()
         # Storages locks hold (count), and storages being unregistered right now. Guarded by `_cond`.
         self._locked: dict[_StorageKey, int] = {}
@@ -426,7 +429,8 @@ class PinnedStorageRegistry:
 
     def update(self, holder: PinHolder, storages: Iterable[torch.UntypedStorage], register_new: bool = True) -> None:
         """Mark ``holder`` active and streaming exactly ``storages``, and register those it does not hold yet, as far
-        as they fit under the cap. What it holds beyond them stays registered, reclaimable. Never raises a driver
+        as they fit under the hard cap and current host-memory headroom. What it holds beyond them stays registered,
+        reclaimable. Never raises a driver
         error. Registration and the first call's self-test run on ``holder.device``.
         ``register_new=False``: the lock did not plan the VRAM for the copies that would follow, so the holder
         registers and joins nothing new; it streams only what it holds already."""
@@ -455,26 +459,84 @@ class PinnedStorageRegistry:
                     self._log_cap()
         if self._driver_ok is False:
             return  # The self-test failed: nothing registers.
-        for storage in missing.values():
-            _fault_in(storage)
-        # One storage per lock hold: a release (another device's offload or eviction, under its cache lock) waits
-        # for at most one registration and the reclaim it needs, not for a whole model's.
-        for key, storage in missing.items():
-            with self._registering():
-                if key in holder.keys or not holder.active or key not in holder.wanted:
-                    continue  # Released or marked idle meanwhile.
-                try:
-                    if key not in self._entries and not self._register_locked(key, storage, holder.device):
+        ready: set[_StorageKey] = {key for key, storage in missing.items() if storage.is_pinned()}
+        reserved: dict[_StorageKey, int] = {}
+
+        def release_reserved(key: _StorageKey | None = None, *, locked: bool = False) -> None:
+            """Drop reservations without draining deferred work while unwinding an update failure."""
+            if key is None:
+                amount = sum(reserved.values())
+                reserved.clear()
+            else:
+                amount = reserved.pop(key, 0)
+            if amount:
+                if locked:
+                    self._host_reserved_bytes -= amount
+                else:
+                    with self._registration_lock:
+                        self._host_reserved_bytes -= amount
+
+        try:
+            for storage in missing.values():
+                key = _storage_key(storage)
+                if key in ready:
+                    continue
+                nbytes = storage.nbytes()
+                with self._registering():
+                    if not holder.active or key not in holder.wanted:
                         continue
-                    self._join_locked(holder, key)
+                    host_room = _host_memory_available() - self._pinned_bytes - self._host_reserved_bytes
+                    if nbytes > host_room:
+                        self._log_headroom()
+                        continue
+                    self._host_reserved_bytes += nbytes
+                    reserved[key] = nbytes
+                try:
+                    _fault_in(storage)
                 except BaseException:
-                    # An interrupt between tracking the registration and the join would leave an entry no holder
-                    # holds, which nothing reclaims. Best effort, like the rest of the interrupt handling here: Python
-                    # delivers it between any two statements.
-                    entry = self._entries.get(key)
-                    if entry is not None and not entry.holders:
-                        self._drop_locked([entry])
+                    release_reserved(key)
                     raise
+                ready.add(key)
+            # One storage per lock hold: a release (another device's offload or eviction, under its cache lock) waits
+            # for at most one registration and the reclaim it needs, not for a whole model's.
+            for key, storage in missing.items():
+                if key not in ready:
+                    continue
+                with self._registering():
+                    if key in holder.keys or not holder.active or key not in holder.wanted:
+                        release_reserved(key, locked=True)
+                        continue  # Released or marked idle meanwhile.
+                    try:
+                        if key not in self._entries and not storage.is_pinned():
+                            nbytes = storage.nbytes()
+                            host_room = (
+                                _host_memory_available()
+                                - self._pinned_bytes
+                                - self._host_reserved_bytes
+                                + reserved.get(key, 0)
+                            )
+                            if nbytes > host_room:
+                                self._log_headroom()
+                                release_reserved(key, locked=True)
+                                continue
+                        if key not in self._entries and not self._register_locked(key, storage, holder.device):
+                            release_reserved(key, locked=True)
+                            continue
+                        self._join_locked(holder, key)
+                        release_reserved(key, locked=True)
+                    except BaseException:
+                        # An interrupt between tracking the registration and the join would leave an entry no holder
+                        # holds, which nothing reclaims. Best effort, like the rest of the interrupt handling here: Python
+                        # delivers it between any two statements.
+                        entry = self._entries.get(key)
+                        if entry is not None and not entry.holders:
+                            self._drop_locked([entry])
+                        release_reserved(key, locked=True)
+                        raise
+
+        except BaseException:
+            release_reserved()
+            raise
 
     def activate(self, holder: PinHolder) -> bool:
         """Mark ``holder`` active again, streaming what it streamed in its last `update`, for a lock that moved
@@ -684,6 +746,13 @@ class PinnedStorageRegistry:
             logging.INFO,
             f"async_weight_streaming: the pinned-RAM cap of {PINNED_RAM_CAP_BYTES / 2**30:.1f} GiB is reached; "
             "further weights in RAM are copied synchronously.",
+        )
+
+    def _log_headroom(self) -> None:
+        _log_once(
+            "headroom",
+            logging.INFO,
+            "async_weight_streaming: current host-memory headroom is too low; further weights stay pageable.",
         )
 
     def _decide_driver_locked(self, device: torch.device | None) -> None:

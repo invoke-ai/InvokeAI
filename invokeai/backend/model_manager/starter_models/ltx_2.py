@@ -36,6 +36,7 @@ _LICENSE_NOTE = (
 _MIRROR = "DeepBeepMeep/LTX-2"
 
 ltx2_5_components = StarterModel(
+    source_urls=["https://huggingface.co/DeepBeepMeep/LTX-2"],
     name="LTX-2.5 Components",
     base=BaseModelType.LTX2,
     source=(
@@ -51,6 +52,7 @@ ltx2_5_components = StarterModel(
 )
 
 ltx2_5_prompt_enhancer = StarterModel(
+    source_urls=["https://huggingface.co/google/gemma-4-E2B-it"],
     name="LTX-2.5 Prompt Enhancer (Gemma-4 E2B)",
     base=BaseModelType.Any,
     source="google/gemma-4-E2B-it",
@@ -62,6 +64,7 @@ ltx2_5_prompt_enhancer = StarterModel(
 )
 
 ltx2_5_text_encoder_int8 = StarterModel(
+    source_urls=["https://huggingface.co/DeepBeepMeep/LTX-2"],
     name="LTX-2.5 Text Encoder (Gemma-4 12B, int8)",
     base=BaseModelType.LTX2,
     source=(
@@ -76,6 +79,7 @@ ltx2_5_text_encoder_int8 = StarterModel(
 )
 
 ltx2_5_text_encoder_bf16 = StarterModel(
+    source_urls=["https://huggingface.co/DeepBeepMeep/LTX-2"],
     name="LTX-2.5 Text Encoder (Gemma-4 12B, bf16)",
     base=BaseModelType.LTX2,
     source=(
@@ -92,6 +96,7 @@ ltx2_5_text_encoder_bf16 = StarterModel(
 # A community conversion of the release's encoder (ungated, like the mirror), with the tokenizer and config packed in.
 # Its text projection and vision stubs are left unread.
 ltx2_5_text_encoder_gguf_q4_k_m = StarterModel(
+    source_urls=["https://huggingface.co/Rootport/Nz-Gemma4-12B-LTX25"],
     name="LTX-2.5 Text Encoder (Gemma-4 12B, GGUF Q4_K_M)",
     base=BaseModelType.LTX2,
     source="Rootport/Nz-Gemma4-12B-LTX25::TextEncoder/LTX-2.5-gemma4-12b-text-encoder-Q4_K_M.gguf",
@@ -103,6 +108,7 @@ ltx2_5_text_encoder_gguf_q4_k_m = StarterModel(
 )
 
 ltx2_5_dev_transformer_int8 = StarterModel(
+    source_urls=["https://huggingface.co/DeepBeepMeep/LTX-2"],
     name="LTX-2.5 Dev Transformer (int8)",
     base=BaseModelType.LTX2,
     source=f"{_MIRROR}::ltx-2.5-22b-dev_diffusion_model_int8_convrot.safetensors",
@@ -116,6 +122,7 @@ ltx2_5_dev_transformer_int8 = StarterModel(
 )
 
 ltx2_5_distilled_transformer_int8 = StarterModel(
+    source_urls=["https://huggingface.co/DeepBeepMeep/LTX-2"],
     name="LTX-2.5 Distilled Transformer (int8)",
     base=BaseModelType.LTX2,
     source=f"{_MIRROR}::ltx-2.5-22b-distilled_diffusion_model_int8_convrot.safetensors",
@@ -131,6 +138,7 @@ ltx2_5_distilled_transformer_int8 = StarterModel(
 # From the gated official repo (see the module docstring). The bundled connectors it carries are
 # dropped at load; the components entry still supplies them.
 ltx2_5_distilled_transformer_nvfp4 = StarterModel(
+    source_urls=["https://huggingface.co/Lightricks/LTX-2.5"],
     name="LTX-2.5 Distilled Transformer (NVFP4)",
     base=BaseModelType.LTX2,
     source="Lightricks/LTX-2.5::diffusion_models/ltx-2.5-22b-distilled-transformer-nvfp4.safetensors",
@@ -146,6 +154,7 @@ ltx2_5_distilled_transformer_nvfp4 = StarterModel(
 )
 
 ltx2_5_distilled_lora = StarterModel(
+    source_urls=["https://huggingface.co/DeepBeepMeep/LTX-2"],
     name="LTX-2.5 Distilled LoRA",
     base=BaseModelType.LTX2,
     source=f"{_MIRROR}::ltx-2.5-22b-distilled-lora-450_bf16.safetensors",
@@ -160,6 +169,7 @@ ltx2_5_distilled_lora = StarterModel(
 _GGUF_REPO = "vantagewithai/LTX-2.5-GGUF"
 
 ltx2_5_dev_transformer_gguf_q4_k_m = StarterModel(
+    source_urls=["https://huggingface.co/vantagewithai/LTX-2.5-GGUF"],
     name="LTX-2.5 Dev Transformer (GGUF Q4_K_M)",
     base=BaseModelType.LTX2,
     source=f"{_GGUF_REPO}::dev/ltx-2.5-22b-dev-transformer-Q4_K_M.gguf",
@@ -173,6 +183,7 @@ ltx2_5_dev_transformer_gguf_q4_k_m = StarterModel(
 )
 
 ltx2_5_distilled_transformer_gguf_q4_k_m = StarterModel(
+    source_urls=["https://huggingface.co/vantagewithai/LTX-2.5-GGUF"],
     name="LTX-2.5 Distilled Transformer (GGUF Q4_K_M)",
     base=BaseModelType.LTX2,
     source=f"{_GGUF_REPO}::distilled/ltx-2.5-22b-distilled-transformer-Q4_K_M.gguf",
@@ -186,6 +197,7 @@ ltx2_5_distilled_transformer_gguf_q4_k_m = StarterModel(
 )
 
 ltx2_5_dev_transformer_bf16 = StarterModel(
+    source_urls=["https://huggingface.co/DeepBeepMeep/LTX-2"],
     name="LTX-2.5 Dev Transformer (bf16)",
     base=BaseModelType.LTX2,
     source=f"{_MIRROR}::ltx-2.5-22b-dev_diffusion_model_bf16.safetensors",
@@ -202,6 +214,7 @@ ltx2_5_dev_transformer_bf16 = StarterModel(
 # therefore requires `huggingface-cli login` with an account that has accepted the LTX-2.5 licence,
 # which is why the description says so outright rather than letting the install fail with a 403.
 ltx2_5_duration_head = StarterModel(
+    source_urls=["https://huggingface.co/Lightricks/LTX-2.5-Diffusers"],
     name="LTX-2.5 Duration Head",
     base=BaseModelType.LTX2,
     source="Lightricks/LTX-2.5-Diffusers::duration_head/diffusion_pytorch_model.safetensors",
@@ -216,6 +229,7 @@ ltx2_5_duration_head = StarterModel(
 # taeltx2_3 is upstream's decoder for LTX-2.3 and later. taeltx_2 (LTX-2) has the same network but
 # scored 11.0 dB against the VAE on LTX-2.5 latents, below the linear preview's 26.6 (taeltx2_3: 37.8).
 taeltx2_3 = StarterModel(
+    source_urls=["https://github.com/madebyollin/taehv"],
     name="TAELTX2.3 (LTX-2.5 preview decoder)",
     base=BaseModelType.LTX2,
     source="https://github.com/madebyollin/taehv/raw/62f7591f59dfbb4c3c02b7a621d180a9eeaba26c/safetensors/taeltx2_3.safetensors",

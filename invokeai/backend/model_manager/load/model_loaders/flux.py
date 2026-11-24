@@ -653,6 +653,15 @@ class T5EncoderGGUFModel(_T5DtypeByDevice):
     that dtype, since embedding lookups can't operate on quantized tensors.
     """
 
+    def get_size_fs(
+        self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
+    ) -> int:
+        # GGUF files use the vendored tokenizer, so size the assets that the tokenizer actually reads.
+        if submodel_type in (SubModelType.Tokenizer2, SubModelType.Tokenizer3):
+            tokenizer_path = Path(__file__).parents[3] / "t5" / "tokenizer"
+            return sum(file.stat().st_size for file in tokenizer_path.iterdir() if file.is_file())
+        return super().get_size_fs(config, model_path, submodel_type)
+
     def _load_model(
         self,
         config: AnyModelConfig,

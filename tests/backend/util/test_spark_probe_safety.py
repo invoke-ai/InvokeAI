@@ -129,6 +129,38 @@ def test_windows_memory_converts_performance_counters(monkeypatch):
     }
 
 
+def test_windows_memory_reuses_performance_types_across_samples_and_errors(monkeypatch):
+    monkeypatch.setattr(report.os, "name", "nt")
+    seen: list[tuple[type, type]] = []
+    calls = 0
+
+    class Api:
+        @staticmethod
+        def GetPerformanceInfo(pointer, _size):
+            nonlocal calls
+            calls += 1
+            seen.append((type(pointer._obj), Api.GetPerformanceInfo.argtypes[0]))
+            if calls == 2:
+                return 0
+            pointer._obj.page_size = 4096
+            pointer._obj.commit_total = 1
+            pointer._obj.commit_limit = 2
+            pointer._obj.commit_peak = 2
+            pointer._obj.physical_total = 3
+            pointer._obj.physical_available = 4
+            return 1
+
+    monkeypatch.setattr(report.ctypes, "WinDLL", lambda *_args, **_kwargs: Api(), raising=False)
+    monkeypatch.setattr(report.ctypes, "get_last_error", lambda: 0, raising=False)
+    monkeypatch.setattr(report.ctypes, "WinError", lambda _error: OSError("failed"), raising=False)
+
+    assert report._windows_memory()["commit_total_bytes"] == 4096
+    assert report._windows_memory() == {"error": "failed"}
+    assert report._windows_memory()["commit_total_bytes"] == 4096
+    assert len({structure for structure, _pointer in seen}) == 1
+    assert len({_pointer for _structure, _pointer in seen}) == 1
+
+
 def test_probe_cleanup_preserves_oom_output(monkeypatch):
     chunks = [object()]
     released = []

@@ -29,7 +29,7 @@ import edge into `backend/model_manager/load/model_cache`, which nothing in this
 """
 
 import inspect
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Collection, Iterable, Mapping
 from typing import Any
 
 import torch
@@ -48,7 +48,7 @@ from invokeai.backend.quantization.nvfp4 import (
     predict_nvfp4_install_host_size,
     predict_nvfp4_install_size,
 )
-from invokeai.backend.util.ram import require_ram_headroom, state_dict_cast_bytes
+from invokeai.backend.util.ram import _source_is_mapped, require_ram_headroom, state_dict_cast_bytes
 
 
 def side_channel_bytes(fp8_layers: Mapping[str, Fp8ScaledLayer]) -> int:
@@ -95,7 +95,7 @@ def reserve_for_load(
     nvfp4_payloads: Mapping[str, NVFP4Payload],
     skip_patterns: Iterable[str] = (),
     source_tensors_retained: bool = False,
-    source_tensors_mapped: bool = False,
+    source_tensors_mapped: bool | Collection[int] | None = False,
     source_tensors_cloned: bool = False,
     modelopt_nvfp4_relayout: bool = False,
 ) -> int:
@@ -140,12 +140,6 @@ def reserve_for_load(
         + nvfp4_bytes
         + side_channel_bytes(fp8_layers)
     )
-    source_bytes = sum(
-        tensor.nelement() * tensor.element_size() for tensor in state_dict.values() if not tensor.is_meta
-    )
-    state_dict_source_bytes = source_bytes
-    source_bytes += side_channel_bytes(fp8_layers)
-    source_bytes += sum(payload.nbytes() for payload in nvfp4_payloads.values())
     # `dequantize_fp8_scaled` consumes this same mapping in insertion order. The state dict's key order is
     # independent (and often differs after extraction), so use the mapping order for the cumulative fold peak.
     fold_sd = {}
@@ -168,11 +162,13 @@ def reserve_for_load(
         output_bytes = tensor.nelement() * dtype.itemsize
         fold_peak = max(
             fold_peak,
-            (fold_output_total if source_tensors_retained or source_tensors_mapped else fold_delta)
-            + output_bytes
-            + fold_transient_bytes(tensor, layer.weight_scale),
+            fold_delta + output_bytes + fold_transient_bytes(tensor, layer.weight_scale),
         )
-        fold_delta += output_bytes - tensor.nelement() * tensor.element_size()
+        fold_delta += output_bytes - (
+            0
+            if source_tensors_retained or _source_is_mapped(tensor, source_tensors_mapped)
+            else tensor.nelement() * tensor.element_size()
+        )
         fold_output_total += output_bytes
     cast_sd = {
         key: tensor
@@ -181,14 +177,43 @@ def reserve_for_load(
         and not (keep_fp8 and survives_split_and_cast(key, tensor, model, patterns, scaled_layer_for(key, fp8_layers)))
         and key not in fold_sd
     }
-    cast_target_bytes, cast_peak = state_dict_cast_bytes(cast_sd, dtype, in_place=True)
+    cast_target_bytes, cast_peak = state_dict_cast_bytes(
+        cast_sd,
+        dtype,
+        in_place=True,
+        source_tensors_mapped=True if source_tensors_retained else source_tensors_mapped,
+    )
+    source_bytes = sum(
+        tensor.nelement() * tensor.element_size()
+        for key, tensor in state_dict.items()
+        if not tensor.is_meta
+        and (
+            source_tensors_retained
+            or not _source_is_mapped(tensor, source_tensors_mapped)
+            or (key not in fold_sd and key not in cast_sd)
+            or getattr(tensor, "dtype", None) == dtype
+        )
+    )
+    source_bytes += sum(
+        scale.nelement() * scale.element_size()
+        for layer in fp8_layers.values()
+        for scale in (layer.weight_scale, layer.input_scale)
+        if scale is not None and (source_tensors_retained or not _source_is_mapped(scale, source_tensors_mapped))
+    )
+    source_bytes += sum(
+        payload.nbytes()
+        for payload in nvfp4_payloads.values()
+        if source_tensors_retained or not _source_is_mapped(payload.weight, source_tensors_mapped)
+    )
     cast_source_bytes = sum(tensor.nelement() * tensor.element_size() for tensor in cast_sd.values())
     cast_delta = cast_target_bytes - cast_source_bytes
     # A mapped source at the destination dtype is reused by `cast_state_dict`; only differing dtypes allocate.
     mapped_cast_bytes = sum(
         tensor.nelement() * dtype.itemsize
         for tensor in cast_sd.values()
-        if is_castable_float(tensor) and getattr(tensor, "dtype", None) != dtype
+        if is_castable_float(tensor)
+        and getattr(tensor, "dtype", None) != dtype
+        and (source_tensors_retained or _source_is_mapped(tensor, source_tensors_mapped))
     )
     cloned_mapped_bytes = (
         sum(
@@ -211,7 +236,7 @@ def reserve_for_load(
             released_side_channel_bytes += sum(
                 scale.nelement() * scale.element_size()
                 for scale in (layer.weight_scale, layer.input_scale)
-                if scale is not None
+                if scale is not None and not _source_is_mapped(scale, source_tensors_mapped)
             )
     nvfp4_host_bytes = (
         predict_nvfp4_install_host_size(
@@ -219,22 +244,30 @@ def reserve_for_load(
             nvfp4_payloads,
             dtype,
             patterns,
-            payloads_relaid_out=modelopt_nvfp4_relayout and source_tensors_mapped,
+            payloads_relaid_out=modelopt_nvfp4_relayout and bool(source_tensors_mapped),
         )
         if model is not None
         else 0
     )
-    if source_tensors_mapped:
+    mapped_sources = bool(source_tensors_mapped)
+    all_sources_mapped = mapped_sources and all(
+        _source_is_mapped(tensor, source_tensors_mapped)
+        for tensor in state_dict.values()
+        if isinstance(tensor, torch.Tensor) and not tensor.is_meta
+    )
+    if all_sources_mapped:
         cast_phase_peak = max(fold_peak, fold_output_total + mapped_cast_bytes + cloned_mapped_bytes)
         cast_phase_delta = fold_output_total + mapped_cast_bytes + cloned_mapped_bytes
-    elif source_tensors_retained:
-        final_state_dict_bytes = sum(
-            tensor.nelement() * (dtype.itemsize if tensor.is_floating_point() else tensor.element_size())
-            for tensor in state_dict.values()
-            if not tensor.is_meta
+    elif mapped_sources or source_tensors_retained:
+        cast_delta = sum(
+            tensor.nelement() * dtype.itemsize - tensor.nelement() * tensor.element_size()
+            for tensor in cast_sd.values()
+            if is_castable_float(tensor)
+            and getattr(tensor, "dtype", None) != dtype
+            and not (source_tensors_retained or _source_is_mapped(tensor, source_tensors_mapped))
         )
-        cast_phase_peak = max(fold_peak, final_state_dict_bytes)
-        cast_phase_delta = final_state_dict_bytes - state_dict_source_bytes - released_side_channel_bytes
+        cast_phase_peak = max(fold_peak, fold_delta + cast_peak)
+        cast_phase_delta = fold_delta + cast_delta - released_side_channel_bytes
     else:
         cast_phase_peak = fold_delta + cast_peak
         cast_phase_delta = fold_delta + cast_delta - released_side_channel_bytes

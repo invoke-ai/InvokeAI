@@ -325,8 +325,8 @@ class TestQuantizedEncoderLoad:
         context.models.get_absolute_path.return_value = model_root
 
         def make_room(vram_bytes_needed: int) -> int:
-            # The offload is a VRAM move like any other, so it runs under the model-load *read* lock.
-            events.append("make_room" if _read_lock_held() else "make_room(wrong lock)")
+            # The public interface takes the read lock itself; its caller must not already hold it.
+            events.append("make_room" if not (_read_lock_held() or _write_lock_held()) else "make_room(wrong lock)")
             return vram_bytes_needed if vram_available is None else vram_available
 
         context.models.make_room_in_vram.side_effect = make_room
@@ -400,7 +400,7 @@ class TestQuantizedEncoderLoad:
         ):
             self._make_invocation("int8")._load_quantized_encoder(context)
 
-        assert events == ["admission-enter", "make_room", "from_pretrained", "admission-exit"]
+        assert events == ["make_room", "admission-enter", "from_pretrained", "admission-exit"]
 
     def test_checkpoint_is_read_outside_the_model_load_lock(self, tmp_path: Path):
         """The disk read is the slow part of the load on anything but NVMe, and while MODEL_LOAD_LOCK is held (or
@@ -456,6 +456,78 @@ class TestQuantizedEncoderLoad:
         assert "1000 MB" in message
         assert f"{int(self.TOTAL_SIZE * 0.6) / MB:.0f} MB" in message
         assert "cuda:0" in message
+
+    def test_integrated_cuda_shortfall_stops_before_checkpoint_read(self, tmp_path: Path):
+        """Shared CUDA memory is the same resource as host RAM, so do not start an oversized external load."""
+        events: list[str] = []
+        context, _ = self._make_context(tmp_path, events, vram_available=1000 * MB)
+        device = torch.device("cuda:0")
+
+        def fake_read(path: Path):
+            events.append("read")
+            return {}
+
+        def fake_from_pretrained(path, **kwargs):
+            events.append("from_pretrained")
+            return MagicMock()
+
+        with (
+            patch.object(qwen_image_text_encoder_module, "device_is_integrated", return_value=True),
+            patch.object(qwen_image_text_encoder_module, "_read_checkpoint", side_effect=fake_read),
+            patch.object(Qwen2_5_VLForConditionalGeneration, "from_pretrained", side_effect=fake_from_pretrained),
+            patch.object(TorchDevice, "choose_torch_device", return_value=device),
+            pytest.raises(torch.OutOfMemoryError) as excinfo,
+        ):
+            self._make_invocation("int8")._load_quantized_encoder(context)
+
+        assert events == ["make_room"]
+        context.logger.warning.assert_not_called()
+        assert "refusing to read the checkpoint" in str(excinfo.value.__cause__)
+
+    def test_integrated_cuda_rechecks_admission_after_checkpoint_read(self, tmp_path: Path):
+        """A cold load can consume shared memory while this checkpoint is read; construction must recheck before
+        taking the model-load writer, avoiding an admission/model-lock inversion."""
+        events: list[str] = []
+        lock_modes: list[str] = []
+        context, _ = self._make_context(tmp_path, events)
+        device = torch.device("cuda:0")
+        calls = 0
+
+        def make_room(_needed: int) -> int:
+            nonlocal calls
+            calls += 1
+            events.append("make_room")
+            lock_modes.append("read" if _read_lock_held() else "write" if _write_lock_held() else "none")
+            return _needed if calls == 1 else 0
+
+        context.models.make_room_in_vram.side_effect = make_room
+
+        def fake_read(path: Path):
+            events.append("read")
+
+            def ordinary_cold_load() -> None:
+                with MODEL_LOAD_LOCK.write_lock():
+                    events.append("ordinary-cold-load")
+
+            thread = threading.Thread(target=ordinary_cold_load)
+            thread.start()
+            thread.join(timeout=5)
+            assert not thread.is_alive()
+            return {}
+
+        with (
+            patch.object(qwen_image_text_encoder_module, "device_is_integrated", return_value=True),
+            patch.object(qwen_image_text_encoder_module, "_read_checkpoint", side_effect=fake_read),
+            patch.object(Qwen2_5_VLForConditionalGeneration, "from_pretrained") as from_pretrained,
+            patch.object(TorchDevice, "choose_torch_device", return_value=device),
+            pytest.raises(torch.OutOfMemoryError) as excinfo,
+        ):
+            self._make_invocation("int8")._load_quantized_encoder(context)
+
+        assert events == ["make_room", "read", "ordinary-cold-load", "make_room"]
+        assert lock_modes == ["none", "none"]
+        from_pretrained.assert_not_called()
+        assert "refusing construction" in str(excinfo.value.__cause__)
 
     @pytest.mark.parametrize(
         ("error_type", "error_message"), [(torch.OutOfMemoryError, "CUDA out of memory"), (ValueError, "bad shard")]

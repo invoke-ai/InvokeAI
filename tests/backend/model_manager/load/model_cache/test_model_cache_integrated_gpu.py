@@ -481,6 +481,29 @@ def test_relocking_a_resident_integrated_cuda_model_is_not_refused(mock_logger: 
         cache.shutdown()
 
 
+def test_integrated_cuda_lock_skips_admission_for_cpu_only_tokenizer(mock_logger: MagicMock):
+    """A tokenizer without device transfer must survive shared-memory pressure unchanged."""
+
+    class TokenizerLike:
+        pass
+
+    cache = _make_cuda_cache(mock_logger)
+    try:
+        with _patch_integrated_cuda(), patch.object(model_cache_module, "calc_model_size_by_data", return_value=1):
+            cache.put("tokenizer", TokenizerLike())
+            entry = _entry(cache, "tokenizer")
+            cache._offload_unlocked_models = MagicMock(return_value=0)  # type: ignore[method-assign]
+            cache._move_model_to_ram = MagicMock(return_value=0)  # type: ignore[method-assign]
+            cache._get_vram_available = MagicMock(return_value=-1)  # type: ignore[method-assign]
+
+            assert cache.lock(entry, None)
+            assert cache._cached_models["tokenizer"] is entry
+            assert entry.cached_model.cur_vram_bytes() == 0
+            cache.unlock(entry)
+    finally:
+        cache.shutdown()
+
+
 @pytest.mark.parametrize("offload", ["except", "unlocked"])
 @pytest.mark.parametrize("keep_ram_copy", [True, False], ids=["retained-copy", "no-copy"])
 def test_integrated_cuda_offload_only_releases_a_retained_device_copy(
@@ -1087,6 +1110,71 @@ def test_integrated_cuda_detached_handle_release_refreshes_stats(mock_logger: Ma
         assert cache.stats.cache_used == 0
         assert cache.stats.in_cache == 0
         assert cache.stats.cleared == cleared
+    finally:
+        cache.shutdown()
+
+
+def test_integrated_cuda_detached_handle_release_releases_streaming_pins_once(mock_logger: MagicMock, fake_streaming):
+    """A detached live handle retains pinned weights until its finalizer releases the record."""
+    registry, _ = fake_streaming
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=2**30, shared_store=store)
+    cache = _make_cuda_cache(
+        mock_logger,
+        enable_partial_loading=True,
+        keep_ram_copy=True,
+        ram_budget=budget,
+        shared_cpu_weights=store,
+    )
+    try:
+        with _patch_integrated_cuda():
+            cache.put("m", DummyModule())
+            entry = _entry(cache, "m")
+            cached = entry.cached_model
+            assert isinstance(cached, CachedModelWithPartialLoad)
+            assert cached.weight_streaming_reserve_bytes() > 0
+            cached.pin_streamed_weights()
+            assert registry.holds_registrations()
+
+            loaded = LoadedModelWithoutConfig(entry, cache)
+            loaded._end_first_use_window()
+            entry.awaiting_first_use = False
+            assert cache._delete_cache_entry(entry) == 0
+            assert entry.detached
+            assert budget.total_in_use() == cached.total_bytes()
+            assert registry.holds_registrations()
+
+        released = threading.Event()
+        release = cache._release_detached_model_handle
+        release_observed: list[tuple[int, bool, bool]] = []
+        original_release_pins = cached.release_pinned_weights
+
+        def release_pins() -> bool:
+            release_observed.append((budget.total_in_use(), registry.holds_registrations(), True))
+            had_pins = original_release_pins()
+            release_observed[-1] = (release_observed[-1][0], release_observed[-1][1], had_pins)
+            return had_pins
+
+        def release_and_signal(cache_entry):
+            release(cache_entry)
+            released.set()
+
+        with (
+            patch.object(cached, "release_pinned_weights", side_effect=release_pins),
+            patch.object(cache, "_release_detached_model_handle", side_effect=release_and_signal),
+        ):
+            del loaded
+            gc.collect()
+            assert released.wait(timeout=10)
+
+        assert not entry.detached
+        assert release_observed == [(cached.total_bytes(), True, True)]
+        assert budget.total_in_use() == 0
+        registry.drain_deferred()
+        assert not registry.holds_registrations()
+        cache._release_detached_model_handle(entry)
+        assert budget.total_in_use() == 0
+        assert not registry.holds_registrations()
     finally:
         cache.shutdown()
 

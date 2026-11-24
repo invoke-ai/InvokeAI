@@ -1625,6 +1625,28 @@ def test_a_sidecar_reserves_what_its_forward_allocates(kinds: list[str], monkeyp
     assert abs(reserved - beyond_cpu - mode.peak) < weight_copy / 2, (reserved / weight_copy, mode.peak / weight_copy)
 
 
+@pytest.mark.parametrize("kind", ["peft-dora", "lycoris-dora"])
+@torch.no_grad()
+def test_bfloat16_sidecar_reserves_promoted_dora_workspace(kind: str) -> None:
+    # The base cast lives alongside the FP32 DoRA calculation. Measure that calculation with
+    # actual BF16 factors and base, and include the already-materialized BF16 base in the bound.
+    transformer = torch.nn.Module()
+    block = torch.nn.Module()
+    block.attn = torch.nn.Module()
+    block.attn.to_q = torch.nn.Linear(_W, _W, bias=False, dtype=torch.bfloat16)
+    transformer.transformer_blocks = torch.nn.ModuleList([block])
+    patch = _sidecar_kind(kind)
+    patch.to(dtype=torch.bfloat16)
+    layer = next(iter(patch.layers.values()))
+    base = block.attn.to_q.weight
+    mode = _PeakAllocation()
+    with mode:
+        layer.get_parameters({"weight": base}, 1.0)
+
+    reserved = _reserve(patch, transformer, seq_len=2, dtype=torch.bfloat16)
+    assert reserved >= patch.calc_size() + base.nbytes + mode.peak
+
+
 def test_a_dora_lora_runs_on_an_int8_transformer(monkeypatch: pytest.MonkeyPatch) -> None:
     from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch_module_autocast import (
         apply_custom_layers_to_model,

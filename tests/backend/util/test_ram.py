@@ -39,3 +39,14 @@ def test_state_dict_cast_bytes_out_of_place_keeps_source_and_outputs() -> None:
 
     assert final_bytes == 32
     assert additional_bytes == 32
+
+
+def test_state_dict_cast_bytes_mapped_upcast_does_not_credit_reclaimable_source() -> None:
+    state_dict = {f"weight_{index}": torch.zeros(1024 * 1024, dtype=torch.bfloat16) for index in range(4)}
+
+    final_bytes, additional_bytes = state_dict_cast_bytes(
+        state_dict, torch.float32, in_place=True, source_tensors_mapped=True
+    )
+
+    assert final_bytes == 16 * 1024 * 1024
+    assert additional_bytes == final_bytes

@@ -84,13 +84,13 @@ def _checkpoint() -> tuple[dict[str, torch.Tensor], dict[str, torch.Tensor], dic
 
 
 def _load(
-    monkeypatch: pytest.MonkeyPatch, tmp_path, *, keep_fp8: bool
-) -> tuple[torch.nn.Module, dict[str, torch.Tensor], object]:
+    monkeypatch: pytest.MonkeyPatch, tmp_path, *, keep_fp8: bool, make_room=None
+) -> tuple[torch.nn.Module, dict[str, torch.Tensor], object, object]:
     """The model, tensors read from the real file, and the loader seam record."""
     state_dict, _, _ = _checkpoint()
     checkpoint = tmp_path / CHECKPOINT
     safetensors.torch.save_file(state_dict, checkpoint)
-    loaded = record_reads(monkeypatch).tensors
+    read_log = record_reads(monkeypatch)
     config = Main_Checkpoint_QwenImage21_Config.model_construct(
         path=str(checkpoint), name="qwen21", default_settings=MainModelDefaultSettings(fp8_storage=False)
     )
@@ -100,11 +100,13 @@ def _load(
         patch.setattr(qwen_image_2_1, "_build_transformer", lambda _sd: _TinyTransformer())
 
     run = prepare(SEAM, monkeypatch, metadata=None, geometry=install)
-    return run.load(config, SubModelType.Transformer), loaded, run
+    if make_room is not None:
+        run.loader._ram_cache.make_room = make_room
+    return run.load(config, SubModelType.Transformer), read_log.tensors, run, read_log
 
 
 def test_the_fp8_layers_stay_quantized_with_a_flat_per_row_scale(monkeypatch, tmp_path) -> None:
-    model, _, _ = _load(monkeypatch, tmp_path, keep_fp8=True)
+    model, _, _, _ = _load(monkeypatch, tmp_path, keep_fp8=True)
     _, codes, scales = _checkpoint()
 
     layer = model.transformer_blocks[0].attn.to_q
@@ -126,7 +128,7 @@ def test_the_fp8_layers_stay_quantized_with_a_flat_per_row_scale(monkeypatch, tm
 
 @pytest.mark.parametrize("keep_fp8", [True, False])
 def test_a_folded_layer_is_exactly_the_codes_times_the_scale(monkeypatch, tmp_path, keep_fp8: bool) -> None:
-    model, _, _ = _load(monkeypatch, tmp_path, keep_fp8=keep_fp8)
+    model, _, _, _ = _load(monkeypatch, tmp_path, keep_fp8=keep_fp8)
     _, codes, scales = _checkpoint()
 
     folded = codes["norm_out.linear"].float() * scales["norm_out.linear"]
@@ -142,17 +144,37 @@ PREFIX = "model.diffusion_model."
 @pytest.mark.parametrize("keep_fp8", [False, True], ids=["folded", "kept"])
 def test_no_parameter_reads_the_file_after_the_load(monkeypatch, tmp_path, keep_fp8: bool) -> None:
     """A loaded parameter must not pin the checkpoint mapping outside cache accounting."""
-    model, _, run = _load(monkeypatch, tmp_path, keep_fp8=keep_fp8)
+    model, _, run, read_log = _load(monkeypatch, tmp_path, keep_fp8=keep_fp8)
 
+    assert read_log.backends == ["pread"]
+    assert run.reservation_kwargs[-1]["source_tensors_mapped"] is False
     if not keep_fp8:
-        assert run.reservation_kwargs[-1]["source_tensors_mapped"] is True
-        assert run.reservation_kwargs[-1]["source_tensors_cloned"] is True
+        assert run.reservation_kwargs[-1].get("source_tensors_retained", False) is False
+        assert run.reservation_kwargs[-1].get("source_tensors_cloned", False) is False
 
     assert tensors_reading_the_file(model, tmp_path / CHECKPOINT) == []
 
 
+def test_a_pread_fp8_load_fits_a_32k_host_admission(monkeypatch, tmp_path) -> None:
+    requested: list[int] = []
+
+    def admit(_reserved: int, *, host_bytes_needed: int = 0) -> object:
+        requested.append(host_bytes_needed)
+        if host_bytes_needed > 32 * 1024:
+            raise AssertionError(f"pread FP8 load requested {host_bytes_needed} host bytes")
+        return object()
+
+    _model, _loaded, run, read_log = _load(monkeypatch, tmp_path, keep_fp8=False, make_room=admit)
+
+    assert read_log.backends == ["pread"]
+    assert requested == [6_656]
+    assert run.reservation_kwargs[-1]["source_tensors_mapped"] is False
+    assert run.reservation_kwargs[-1].get("source_tensors_retained", False) is False
+    assert run.reservation_kwargs[-1].get("source_tensors_cloned", False) is False
+
+
 def test_a_kept_fp8_load_does_not_copy_the_codes(monkeypatch, tmp_path) -> None:
-    model, loaded, _ = _load(monkeypatch, tmp_path, keep_fp8=True)
+    model, loaded, _, _ = _load(monkeypatch, tmp_path, keep_fp8=True)
 
     codes = model.transformer_blocks[0].attn.to_q.weight
     assert codes.data_ptr() == loaded[PREFIX + "transformer_blocks.0.attn.to_q._weight_qdata"].data_ptr()
