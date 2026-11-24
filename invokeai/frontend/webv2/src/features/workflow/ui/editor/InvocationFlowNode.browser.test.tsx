@@ -12,6 +12,7 @@ import openapi from '@api/openapi.json';
 /* eslint-disable react-perf/jsx-no-new-object-as-prop, react-perf/jsx-no-new-array-as-prop -- each render mounts a fresh flow on purpose */
 import { Box, ChakraProvider } from '@chakra-ui/react';
 import { DndContext, type DragStartEvent } from '@dnd-kit/core';
+import { GalleryUiProvider, type GalleryUiAdapter } from '@features/gallery/react';
 import { galleryImageUrls } from '@features/gallery/utility';
 import { parseOpenApiToTemplates } from '@features/workflow/data/templates';
 import { flowThemeCss } from '@features/workflow/ui/graph-preview/flowTheme';
@@ -1413,8 +1414,11 @@ describe('InvocationFlowNode collapsed ports', () => {
 describe('CurrentImageFlowNode', () => {
   let host: HTMLDivElement;
   let root: Root;
+  const openItemContextMenu = vi.fn();
+  const galleryAdapter = { openItemContextMenu } as unknown as GalleryUiAdapter;
 
   beforeEach(() => {
+    openItemContextMenu.mockClear();
     host = document.createElement('div');
     host.style.cssText = 'width: 480px; height: 520px;';
     document.body.append(host);
@@ -1468,10 +1472,12 @@ describe('CurrentImageFlowNode', () => {
               { ...createAdapter(createExecutionPort().port), project: project.port } as unknown as WorkflowUiAdapter
             }
           >
-            {/* Stands in for the shell's drag context, where gallery items are dragged. */}
-            <DndContext onDragStart={onDragStart}>
-              <ReactFlow edges={[]} nodes={currentImageNodes} nodeTypes={nodeTypes} />
-            </DndContext>
+            <GalleryUiProvider adapter={galleryAdapter}>
+              {/* Stands in for the shell's drag context, where gallery items are dragged. */}
+              <DndContext onDragStart={onDragStart}>
+                <ReactFlow edges={[]} nodes={currentImageNodes} nodeTypes={nodeTypes} />
+              </DndContext>
+            </GalleryUiProvider>
           </WorkflowUiProvider>
         </ChakraProvider>
       )
@@ -1510,6 +1516,42 @@ describe('CurrentImageFlowNode', () => {
     expect(source).not.toBeNull();
     expect(source!.getAttribute('tabindex')).toBeNull();
     expect(source!.getAttribute('role')).toBeNull();
+  });
+
+  it("opens the shown image's menu from a header button the keyboard reaches, only while an image is shown", async () => {
+    const project = createGalleryProject({ recentImages: [recent] });
+    const menuButton = () => host.querySelector<HTMLButtonElement>('button[aria-label="Image actions"]');
+    await render(project);
+    await vi.waitFor(() => expect(shownImage()).toBe(recent.imageUrl));
+
+    const flowNode = host.querySelector<HTMLElement>('.react-flow__node')!;
+    // The flow keeps a node hidden, so unfocusable, until it has measured it.
+    await vi.waitFor(() => {
+      flowNode.focus();
+      expect(document.activeElement).toBe(flowNode);
+    });
+    await act(() => userEvent.keyboard('{Tab}'));
+    expect(document.activeElement).toBe(menuButton());
+    await act(() => userEvent.keyboard('{Enter}'));
+
+    const button = menuButton()!.getBoundingClientRect();
+    expect(openItemContextMenu).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ ref: { kind: 'image', name: 'recent.png' }, x: button.left, y: button.bottom })
+    );
+    expect(openItemContextMenu.mock.lastCall![0].returnFocus()).toBe(menuButton());
+
+    // A pointer press opens it below the button too, not at the pointer.
+    await act(() => userEvent.click(menuButton()!));
+    expect(openItemContextMenu.mock.lastCall![0]).toMatchObject({ x: button.left, y: button.bottom });
+
+    exportMocks.progressImage = { dataUrl: outputImage(1, 1), height: 1, width: 1 };
+    await act(() => project.setGalleryValues({ recentImages: [chosen] }));
+    expect(host.textContent).toContain('Generating');
+    expect(menuButton()).toBeNull();
+
+    exportMocks.progressImage = null;
+    await act(() => project.setGalleryValues({}));
+    expect(menuButton()).toBeNull();
   });
 
   it('does not render again for gallery changes that leave the shown image alone', async () => {

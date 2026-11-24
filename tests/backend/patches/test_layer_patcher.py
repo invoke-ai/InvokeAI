@@ -829,6 +829,8 @@ def test_direct_patching_that_fails_still_returns_the_cached_patch(
     # 12 output rows cannot be reshaped onto the module's 16.
     patch = ModelPatchRaw(layers={"linear_layer_1": make_layer(8, 12)})
     before = _placements(patch)
+    [(leaf, _, _)] = LayerPatcher._leaf_placements(patch.layers["linear_layer_1"])
+    up, down = leaf.up, leaf.down
 
     with pytest.raises(RuntimeError, match="is invalid for input of size"):
         with LayerPatcher.apply_smart_model_patches(
@@ -837,6 +839,7 @@ def test_direct_patching_that_fails_still_returns_the_cached_patch(
             pass
 
     assert _placements(patch) == before
+    assert leaf.up is up and leaf.down is down
 
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="requires a GPU")

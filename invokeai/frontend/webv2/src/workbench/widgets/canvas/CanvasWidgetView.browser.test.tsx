@@ -10,14 +10,17 @@ import type {
 import type { CanvasStagingCandidateContract } from '@workbench/canvas-engine/contracts';
 import type * as CanvasOperationsApi from '@workbench/canvas-operations/api';
 import type { CanvasEngine } from '@workbench/canvas-operations/createCanvasEngine';
+import type { ExtensionRegistry } from '@workbench/extensions/extensionRegistry';
 import type { Project } from '@workbench/projectContracts';
+import type * as ProjectsApi from '@workbench/projects/api';
 import type { WorkbenchQueueItem as QueueItem } from '@workbench/queueHistoryContracts';
-import type { WidgetViewProps } from '@workbench/widgetContracts';
+import type { WidgetHotkeyContribution, WidgetCommandContribution, WidgetViewProps } from '@workbench/widgetContracts';
 import type * as WorkbenchContextModule from '@workbench/WorkbenchContext';
 
-import { ChakraProvider } from '@chakra-ui/react';
+import { Box, ChakraProvider } from '@chakra-ui/react';
 import { auditAccessibility } from '@platform/browser/auditAccessibility.testing';
 import { TINY_PNG_BASE64 } from '@platform/browser/nativeDrag.testing';
+import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import { createControlLayer, createVectorLayer } from '@workbench/canvas-engine/api';
@@ -28,11 +31,15 @@ import { getCanvasOperations } from '@workbench/canvas-operations/api';
 import { createControlDetectionStatusStore } from '@workbench/canvas-operations/controlDetectionStatusStore';
 import { createCanvasEngine } from '@workbench/canvas-operations/createCanvasEngine';
 import { createCanvasProjectMutationPort } from '@workbench/canvasProjectMutationPort';
+import { createExtensionRegistry } from '@workbench/extensions/extensionRegistry';
+import { WorkbenchHotkeyRuntime } from '@workbench/hotkeys/WorkbenchHotkeyRuntime';
+import { DEFAULT_PREFERENCES, patchWorkbenchPreferences } from '@workbench/settings/store';
 import { runNotificationUndo } from '@workbench/shell/notifications/undoRegistry';
+import { WorkbenchFocusProvider } from '@workbench/WorkbenchRuntime';
 import { createInitialWorkbenchState } from '@workbench/workbenchState';
 import { createWorkbenchStore } from '@workbench/workbenchStore';
 import { createInstance } from 'i18next';
-import { act } from 'react';
+import { act, useSyncExternalStore } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
@@ -42,6 +49,7 @@ import type * as EngineStoreHooks from './engineStoreHooks';
 
 const harness = vi.hoisted(() => ({
   dragData: null as unknown,
+  extensions: null as ExtensionRegistry | null,
   engine: null as CanvasEngine | null,
   isEngineLive: true,
   operation: null as unknown,
@@ -76,7 +84,12 @@ vi.mock('@workbench/canvas-operations/api', async (importOriginal) => ({
 vi.mock('@workbench/WorkbenchContext', async (importOriginal) => ({
   ...(await importOriginal<typeof WorkbenchContextModule>()),
   useActiveProjectId: () => activeProject().id,
-  useActiveProjectSelector: (selector: (project: Project) => unknown) => selector(activeProject()),
+  useActiveProjectSelector: (selector: (project: Project) => unknown) => {
+    const project = useSyncExternalStore(harness.store!.subscribe, activeProject, activeProject);
+    return selector(project);
+  },
+  useWorkbenchExtensions: () => harness.extensions,
+  useOptionalWorkbenchExtensions: () => harness.extensions,
   useWidgetValuesSelector: (widgetId: string, selector: (values: Record<string, unknown>) => unknown) =>
     selector(
       Object.values(activeProject().widgetInstances).find((instance) => instance.typeId === widgetId)?.state.values ??
@@ -86,6 +99,11 @@ vi.mock('@workbench/WorkbenchContext', async (importOriginal) => ({
   useWorkbenchCommands: () => harness.store!.commands,
   useWorkbenchQueries: () => harness.store!.queries,
   useWorkbenchSubscription: () => harness.store!.subscribe,
+}));
+vi.mock('@workbench/hotkeys/firstPartyCommands', () => ({ useRegisterFirstPartyCommands: () => {} }));
+vi.mock('@workbench/projects/api', async (importOriginal) => ({
+  ...(await importOriginal<typeof ProjectsApi>()),
+  setClientStateValue: async () => {},
 }));
 vi.mock('@workbench/useCanvasProjectMutationDispatch', () => ({
   useCanvasProjectMutationDispatch: () => () => undefined,
@@ -132,9 +150,21 @@ beforeAll(async () => {
 
 afterEach(async () => {
   await act(() => root?.unmount());
+  await act(() => i18n.changeLanguage('en'));
   host?.remove();
   harness.engine?.lifecycle.dispose();
-  Object.assign(harness, { dragData: null, engine: null, isEngineLive: true, operation: null, store: null });
+  if (harness.extensions) {
+    await patchWorkbenchPreferences(DEFAULT_PREFERENCES);
+    accountLifecycle.invalidate();
+  }
+  Object.assign(harness, {
+    dragData: null,
+    engine: null,
+    extensions: null,
+    isEngineLive: true,
+    operation: null,
+    store: null,
+  });
   harness.uploadImage.mockReset();
   root = null;
   host = null;
@@ -158,6 +188,7 @@ const renderView = async (
     beforeRender,
     domRaster = false,
     hostWidth = 1000,
+    hotkeys = false,
     nodes,
     selectedLayer,
     staged = true,
@@ -165,6 +196,7 @@ const renderView = async (
     beforeRender?: (engine: CanvasEngine) => void;
     domRaster?: boolean;
     hostWidth?: number;
+    hotkeys?: boolean;
     nodes?: CanvasNodeContract[];
     selectedLayer?: CanvasLayerContract;
     staged?: boolean;
@@ -222,30 +254,168 @@ const renderView = async (
   document.body.append(host);
   root = createRoot(host);
   const commandHandlers = new Map<string, () => void>();
-  const runtime = {
+  const extensions = hotkeys ? createExtensionRegistry() : null;
+  harness.extensions = extensions;
+  const source = { instanceId: 'canvas', projectId, region: 'center', typeId: 'canvas' } as const;
+  const createRuntime = (extensions: ExtensionRegistry | null) => ({
     commands: {
-      register: ({ handler, id }: { handler: () => void; id: string }) => {
-        commandHandlers.set(id, handler);
-        return () => commandHandlers.delete(id);
+      register: (command: WidgetCommandContribution) => {
+        commandHandlers.set(command.id, command.handler);
+        const dispose = extensions?.commands.register({ ...command, source });
+        return () => {
+          commandHandlers.delete(command.id);
+          dispose?.();
+        };
       },
     },
-    hotkeys: { register: () => () => undefined },
+    hotkeys: {
+      register: (hotkey: WidgetHotkeyContribution) =>
+        extensions?.hotkeys.register({ ...hotkey, source }) ?? (() => undefined),
+    },
+  });
+  const queryClient = new QueryClient();
+  const render = (extensions: ExtensionRegistry | null) => {
+    const runtime = createRuntime(extensions);
+    return act(() =>
+      root!.render(
+        <I18nextProvider i18n={i18n}>
+          <ChakraProvider value={system}>
+            <QueryClientProvider client={queryClient}>
+              <WorkbenchFocusProvider>
+                {hotkeys ? <WorkbenchHotkeyRuntime /> : null}
+                <Box
+                  h="full"
+                  data-hotkey-widget-instance-id="canvas"
+                  data-hotkey-widget-region="center"
+                  data-hotkey-widget-type-id="canvas"
+                >
+                  <CanvasWidgetView
+                    {...({ instance: activeProject().widgetInstances.canvas, runtime } as unknown as WidgetViewProps)}
+                  />
+                </Box>
+              </WorkbenchFocusProvider>
+            </QueryClientProvider>
+          </ChakraProvider>
+        </I18nextProvider>
+      )
+    );
   };
-  await act(() =>
-    root!.render(
-      <I18nextProvider i18n={i18n}>
-        <ChakraProvider value={system}>
-          <QueryClientProvider client={new QueryClient()}>
-            <CanvasWidgetView
-              {...({ instance: activeProject().widgetInstances.canvas, runtime } as unknown as WidgetViewProps)}
-            />
-          </QueryClientProvider>
-        </ChakraProvider>
-      </I18nextProvider>
-    )
-  );
-  return { commandHandlers, projectId, store };
+  await render(extensions);
+  return {
+    commandHandlers,
+    extensions,
+    projectId,
+    store,
+    replaceRuntime: async () => {
+      const next = createExtensionRegistry();
+      harness.extensions = next;
+      await render(next);
+      return next;
+    },
+  };
 };
+
+describe('mounted Canvas hotkeys', () => {
+  it('creates one layer and undo step per press, suppresses held repeats, and keeps nudges repeating', async () => {
+    accountLifecycle.activate('canvas-hotkeys-test');
+    await patchWorkbenchPreferences({
+      customHotkeys: { 'canvas.newRasterLayer': ['alt+shift+n'] },
+    });
+    await renderView('completed', { hotkeys: true, staged: false });
+    const engine = harness.engine!;
+    const target = host!.querySelector<HTMLElement>('[data-hotkey-widget-instance-id="canvas"]')!;
+    const document = () => engine.document.model()!.document;
+    const layerCount = () => document().stacks.raster.length;
+    const initialCount = layerCount();
+    const press = (repeat = false) =>
+      act(() => {
+        target.dispatchEvent(
+          new KeyboardEvent('keydown', {
+            altKey: true,
+            bubbles: true,
+            cancelable: true,
+            code: 'KeyN',
+            shiftKey: true,
+            key: 'N',
+            repeat,
+          })
+        );
+      });
+
+    await press();
+    expect(layerCount()).toBe(initialCount + 1);
+    expect(engine.history.getEntries().past).toEqual(['Raster layer']);
+    await press(true);
+    await press(true);
+    expect(layerCount()).toBe(initialCount + 1);
+    expect(engine.history.getEntries().past).toEqual(['Raster layer']);
+    await act(() => {
+      target.dispatchEvent(
+        new KeyboardEvent('keyup', { altKey: true, bubbles: true, code: 'KeyN', key: 'N', shiftKey: true })
+      );
+    });
+    await press();
+    expect(layerCount()).toBe(initialCount + 2);
+    expect(engine.history.getEntries().past).toEqual(['Raster layer', 'Raster layer']);
+
+    await act(() => engine.history.undo());
+    expect(layerCount()).toBe(initialCount + 1);
+    await act(() => engine.history.redo());
+    expect(layerCount()).toBe(initialCount + 2);
+    const selected = document().stacks.raster.find((layer) => layer.id === document().selectedLayerId)!;
+    if (selected.type !== 'raster') {
+      throw new Error('Expected the new raster layer to be selected');
+    }
+    const initialX = selected.transform.x;
+    for (const repeat of [false, true, true]) {
+      await act(() =>
+        target.dispatchEvent(
+          new KeyboardEvent('keydown', {
+            bubbles: true,
+            cancelable: true,
+            code: 'ArrowRight',
+            key: 'ArrowRight',
+            repeat,
+          })
+        )
+      );
+    }
+    expect(document().stacks.raster.find((layer) => layer.id === selected.id)).toMatchObject({
+      transform: { x: initialX + 3 },
+    });
+  });
+});
+
+describe('Canvas hotkey registration lifetime', () => {
+  it('releases and refreshes locale and runtime registrations without discarding Canvas history', async () => {
+    accountLifecycle.activate('canvas-hotkey-lifetime-test');
+    const { commandHandlers, extensions, replaceRuntime } = await renderView('completed', {
+      hotkeys: true,
+      staged: false,
+    });
+    const engine = harness.engine!;
+    await act(() => commandHandlers.get('canvas.newRasterLayer')!());
+    expect(engine.history.getEntries().past).toEqual(['Raster layer']);
+    const hotkey = (registry: ExtensionRegistry) =>
+      registry.stores.hotkeys.list().find(({ id }) => id === 'canvas.newRasterLayer');
+    expect(hotkey(extensions!)?.title).toBe('New raster layer');
+    i18n.addResource('en-GB', 'translation', 'widgets.canvas.commands.newRasterLayer', 'Create Raster Layer');
+    await act(() => i18n.changeLanguage('en-GB'));
+    await expect.poll(() => hotkey(extensions!)?.title).toBe('Create Raster Layer');
+    expect(extensions!.stores.hotkeys.list().filter(({ id }) => id === 'canvas.newRasterLayer')).toHaveLength(1);
+
+    const next = await replaceRuntime();
+    expect(extensions!.stores.commands.list()).toEqual([]);
+    expect(extensions!.stores.hotkeys.list()).toEqual([]);
+    expect(hotkey(next)).toMatchObject({ ignoreRepeat: true, title: 'Create Raster Layer' });
+    expect(harness.engine).toBe(engine);
+    expect(engine.history.getEntries().past).toEqual(['Raster layer']);
+    await act(() => root!.unmount());
+    root = null;
+    expect(next.stores.commands.list()).toEqual([]);
+    expect(next.stores.hotkeys.list()).toEqual([]);
+  });
+});
 
 describe('Canvas spline context menu', () => {
   const renderSpline = async (selectPath = true) => {

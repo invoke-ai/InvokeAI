@@ -9,7 +9,7 @@ import type {
 import type { AdjustedSurfaceStatus } from '@workbench/canvas-engine/render/spatialDisplay';
 import type { VectorShapePreview } from '@workbench/canvas-engine/render/vectorGuides';
 import type { SamInteractionState } from '@workbench/canvas-engine/samInteraction';
-import type { LayerTransform } from '@workbench/canvas-engine/transform/transformMath';
+import type { LayerTransform, TransformAnchor } from '@workbench/canvas-engine/transform/transformMath';
 import type { Rect, SelectionOp, ToolId, Vec2 } from '@workbench/canvas-engine/types';
 import type { VectorEditSession } from '@workbench/canvas-engine/vectorEditState';
 
@@ -225,10 +225,16 @@ export interface ControlLayerView {
   view: 'original' | 'overlay';
 }
 
+/** How wheel events route: `auto` judges each one as a mouse wheel or a trackpad. */
+export type ScrollInput = 'auto' | 'mouse' | 'trackpad';
+
 export interface TransformOptions {
   smoothing: boolean;
   resampleMode: 'bilinear' | 'bicubic' | 'hamming' | 'lanczos';
   fitMode: 'contain' | 'cover' | 'fill';
+  aspectLinked: boolean;
+  /** Only the numeric fields use it; gestures keep their own pivots. */
+  referencePoint: TransformAnchor;
 }
 
 /** Spans gestures until Apply or Cancel; `startTransform` is the undo and cancel baseline. */
@@ -452,6 +458,9 @@ export interface EngineStores {
   showGrid: ScalarStore<boolean>;
   /** Default wheel-up grows. */
   invertBrushSizeScroll: ScalarStore<boolean>;
+  scrollInput: ScalarStore<ScrollInput>;
+  /** Set by the engine on trackpad proof, never cleared by it; the frontend persists and restores it. */
+  trackpadDetected: ScalarStore<boolean>;
   /** The active bbox tool always draws its frame and handles. */
   showBbox: ScalarStore<boolean>;
   /** Toggling never recomposites document pixels. */
@@ -657,6 +666,7 @@ export const createEngineStores = (initialTool: ToolId = 'view'): EngineStores =
   documentEpoch: createScalarStore<number>(0),
   ruleOfThirds: createScalarStore<boolean>(false),
   samInteraction: createScalarStore(null),
+  scrollInput: createScalarStore<ScrollInput>('auto'),
   shapeOptions: createScalarStore<ShapeToolOptions>({ ...DEFAULT_SHAPE_OPTIONS }, shapeOptionsEqual),
   shapePreview: createScalarStore<{ rect: Rect; kind: ParametricShapeKind } | null>(null, rectShapePreviewEqual),
   vectorShapePreview: createScalarStore<VectorShapePreview | null>(null),
@@ -668,6 +678,7 @@ export const createEngineStores = (initialTool: ToolId = 'view'): EngineStores =
   stagingHidesOverlays: createScalarStore<boolean>(false),
   textEditSession: createScalarStore<TextEditSession | null>(null, textEditSessionEqual),
   textOptions: createScalarStore<TextToolOptions>({ ...DEFAULT_TEXT_OPTIONS }, textOptionsEqual),
+  trackpadDetected: createScalarStore<boolean>(false),
   thumbnailVersion: createKeyedVersionStore(),
   thumbnailStatus: createKeyedStatusStore<LayerThumbnailStatus>(),
   adjustmentStatus: createKeyedStatusStore<LayerAdjustmentStatus>(),
@@ -675,6 +686,8 @@ export const createEngineStores = (initialTool: ToolId = 'view'): EngineStores =
     smoothing: false,
     resampleMode: 'bicubic',
     fitMode: 'contain',
+    aspectLinked: true,
+    referencePoint: 'center',
   }),
   transformSession: createScalarStore<TransformSession | null>(null, transformSessionEqual),
   pendingTransformLayerId: createScalarStore<string | null>(null),

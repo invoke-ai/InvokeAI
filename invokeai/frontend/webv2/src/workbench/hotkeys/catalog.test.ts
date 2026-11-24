@@ -35,6 +35,32 @@ describe('firstPartyHotkeyCatalog', () => {
     expect(openSettings).toMatchObject({ allowInEditable: true, defaultKeys: ['mod+,'] });
   });
 
+  it('keeps new raster layer unbound until remapped, and limits it to Canvas focus outside modals', () => {
+    const definition = firstPartyHotkeyCatalog.find((hotkey) => hotkey.id === 'canvas.newRasterLayer')!;
+    const context = {
+      activeInstanceId: 'canvas',
+      activeWidgetTypeId: 'canvas',
+      focusedRegion: 'center',
+      isModalPresent: false,
+      projectId: 'project-1',
+    } as const;
+    const resolve = (customHotkeys: Record<string, string[]>, overrides = {}) =>
+      resolveHotkey({
+        context: { ...context, ...overrides },
+        event: { target: null } as KeyboardEvent,
+        hotkeys: firstPartyHotkeyCatalog.map((hotkey) => applyCustomHotkeys(hotkey, customHotkeys)),
+        matchedKey: 'alt+shift+n',
+      });
+
+    expect(definition.defaultKeys).toEqual([]);
+    expect(definition.allowInEditable).toBe(false);
+    expect(resolve({})).toBeNull();
+    const custom = { 'canvas.newRasterLayer': ['alt+shift+n'] };
+    expect(resolve(custom)?.commandId).toBe('canvas.newRasterLayer');
+    expect(resolve(custom, { activeWidgetTypeId: 'gallery' })).toBeNull();
+    expect(resolve(custom, { isModalPresent: true })).toBeNull();
+  });
+
   it('binds transform to Shift+T only, leaving Mod+T to the browser', () => {
     const transform = firstPartyHotkeyCatalog.find((hotkey) => hotkey.id === 'canvas.transformSelected');
 
