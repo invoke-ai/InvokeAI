@@ -16,7 +16,7 @@ import {
   ALL_OVERLAY_STACKS_SHOWN,
   planScreenComposition,
 } from '@workbench/canvas-engine/document-model/screenComposition';
-import { fromTRS, invert, multiply } from '@workbench/canvas-engine/math/mat2d';
+import { fromTRS, multiply } from '@workbench/canvas-engine/math/mat2d';
 import { intersect, isEmpty, roundOut, transformBounds, union } from '@workbench/canvas-engine/math/rect';
 
 import type { DerivedSurfaceCache } from './derivedSurfaceCache';
@@ -73,12 +73,6 @@ export interface CompositeOptions {
   screenMask?: {
     dpr: number;
     getScratch: (width: number, height: number) => RasterSurface;
-    /**
-     * For a target other than the viewport, such as a color sample: the viewport's document-to-device `view` and
-     * smoothing, and `fromTarget`, which places target pixels on viewport device pixels. Patterned masks then stencil
-     * exactly as the viewport draws them and land on the target nearest-neighbor.
-     */
-    device?: { view: Mat2d; smoothing: boolean; fromTarget: Mat2d };
   };
   /** Display-only: pixel-consuming composites must omit them, or the tint becomes generated content. */
   regionOverlays?: boolean;
@@ -453,24 +447,13 @@ export const compositeDocument = (
   opts.diagnostics?.increment('compositeFrames');
   const repaint = damage.kind === 'rect' ? damage.rect : targetRect;
   let usedMaskScratch = false;
-  const device = opts.screenMask?.device;
-  // Target matrices become viewport device matrices through the document; an off-screen target maps back afterwards.
-  const targetToDocument = device ? invert(view) : null;
-  const targetToDevice = device && targetToDocument ? multiply(device.view, targetToDocument) : null;
-  const deviceToTarget = device ? invert(device.fromTarget) : null;
   const drawMaskFill: DrawMaskFill = (layerId, fill, coverage, matrix, kind) => {
     const { surface, rect, version } = coverage;
     const tile = opts.maskPatternTile?.(fill.style, fill.color) ?? null;
     if (tile && opts.screenMask) {
       const { dpr, getScratch } = opts.screenMask;
-      const targetArea = intersect(roundOut(transformBounds(matrix, rect)), repaint);
-      if (!targetArea || isEmpty(targetArea) || (device && (!targetToDevice || !deviceToTarget))) {
-        return;
-      }
-      const deviceMatrix = targetToDevice ? multiply(targetToDevice, matrix) : matrix;
-      // Rounding out in device space keeps every target pixel of `targetArea` fully inside the stencil.
-      const area = device ? roundOut(transformBounds(device.fromTarget, targetArea)) : targetArea;
-      if (isEmpty(area) || ![area.x, area.y, area.width, area.height].every(Number.isFinite)) {
+      const area = intersect(roundOut(transformBounds(matrix, rect)), repaint);
+      if (!area || isEmpty(area) || ![area.x, area.y, area.width, area.height].every(Number.isFinite)) {
         return;
       }
       const scratch = getScratch(area.width, area.height);
@@ -484,8 +467,8 @@ export const compositeDocument = (
       stencil.rect(0, 0, area.width, area.height);
       stencil.clip();
       stencil.globalCompositeOperation = 'source-over';
-      stencil.imageSmoothingEnabled = device?.smoothing ?? ctx.imageSmoothingEnabled;
-      setTransformFromMat(stencil, { ...deviceMatrix, e: deviceMatrix.e - area.x, f: deviceMatrix.f - area.y });
+      stencil.imageSmoothingEnabled = ctx.imageSmoothingEnabled;
+      setTransformFromMat(stencil, { ...matrix, e: matrix.e - area.x, f: matrix.f - area.y });
       stencil.drawImage(surface.canvas, rect.x, rect.y);
 
       // Fill in viewport CSS coordinates so damage and layer transforms cannot shift the pattern.
@@ -498,13 +481,6 @@ export const compositeDocument = (
 
       ctx.save();
       identityTransform(ctx);
-      if (deviceToTarget) {
-        ctx.beginPath();
-        ctx.rect(targetArea.x, targetArea.y, targetArea.width, targetArea.height);
-        ctx.clip();
-        setTransformFromMat(ctx, deviceToTarget);
-        ctx.imageSmoothingEnabled = false;
-      }
       ctx.drawImage(scratch.canvas, 0, 0, area.width, area.height, area.x, area.y, area.width, area.height);
       ctx.restore();
       return;

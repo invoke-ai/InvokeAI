@@ -25,7 +25,7 @@ const sampleAt = (ctx: ToolContext, sampler: ColorSampler, input: PointerInput):
   if (!doc) {
     return null;
   }
-  const sample = sampler.sample(doc, ctx.layers, input.documentPoint, ctx.sampleProviders, input.screenPoint);
+  const sample = sampler.sample(doc, ctx.layers, input.documentPoint, ctx.sampleProviders);
   return sample ? rgbaToHex(sample.r, sample.g, sample.b) : null;
 };
 
