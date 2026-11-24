@@ -219,6 +219,18 @@ export const emptyModelCache = (signal?: AbortSignal): Promise<EmptyModelCacheRe
 
 const EXTERNAL_PROVIDERS_BASE = '/api/v1/app/external_providers';
 
+interface ExternalProviderStatus {
+  provider_id: string;
+  configured: boolean;
+  region?: 'cn' | 'global' | null;
+}
+
+export const fetchMiniMaxStatus = async (signal: AbortSignal) => {
+  const rows = await requestJson<ExternalProviderStatus[]>(`${EXTERNAL_PROVIDERS_BASE}/status`, { signal });
+  const provider = rows.find((row) => row.provider_id === 'minimax');
+  return provider ? { configured: provider.configured, region: provider.region ?? null } : null;
+};
+
 export interface ExternalProviderConfig {
   provider_id: string;
   api_key_configured: boolean;

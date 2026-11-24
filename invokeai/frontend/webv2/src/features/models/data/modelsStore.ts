@@ -1,5 +1,6 @@
 import type { ModelConfig } from '@features/models/core/types';
 
+import { queryClient } from '@platform/query/client';
 import {
   type AccountScope,
   captureAccountScope,
@@ -9,8 +10,9 @@ import {
 import { createExternalStore } from '@platform/state/externalStore';
 import { createTrailingSingleFlight } from '@platform/state/singleFlight';
 import { getApiErrorMessage } from '@platform/transport/http';
+import { queryOptions, useQuery } from '@tanstack/react-query';
 
-import { getModelsDir, listMissingModels, listModels } from './api';
+import { fetchMiniMaxStatus, getModelsDir, listMissingModels, listModels } from './api';
 
 /**
  * Share backend-owned model state outside the workbench reducer; mutations patch snapshots or refresh to keep all
@@ -192,3 +194,20 @@ export const setModelsSnapshotForTests = (next: Partial<ModelsSnapshot>): void =
 };
 
 export const useModelsSelector = store.useSelector;
+
+const miniMaxStatusOptions = (owner: AccountScope) =>
+  queryOptions({
+    queryKey: ['external-provider-status', owner.accountId, owner.epoch, 'minimax'],
+    queryFn: ({ signal }) => fetchMiniMaxStatus(AbortSignal.any([owner.signal, signal])),
+  });
+
+export const getMiniMaxStatus = () => {
+  const state = queryClient.getQueryState(miniMaxStatusOptions(captureAccountScope()).queryKey);
+  return state?.status === 'success' && !state.isInvalidated ? state.data : undefined;
+};
+
+export const useMiniMaxStatus = (enabled: boolean) =>
+  useQuery({ ...miniMaxStatusOptions(captureAccountScope()), enabled }, queryClient);
+
+export const invalidateMiniMaxStatus = (owner: AccountScope) =>
+  queryClient.invalidateQueries({ queryKey: miniMaxStatusOptions(owner).queryKey });

@@ -87,7 +87,7 @@ export const ModelsNotice = () => {
   return <ManagerModelsNotice isMissingModels={isMissingModels} />;
 };
 
-/** Beside Home's "Start something" tiles: they still open the editor, but nothing generates without a model. */
+/** An empty installed catalog can still generate hosted videos. */
 export const ModelsRequiredHint = () => {
   const { t } = useTranslation();
   const { canManageModels } = useModelsUi();
@@ -114,9 +114,12 @@ export const ModelsRequiredHint = () => {
       : 'models.launchpad.startNeedsModel';
 
   return (
-    <Flex align="center" color="fg.muted" gap="1.5">
-      <Icon as={TriangleAlertIcon} boxSize="3.5" color="fg.warning" />
-      <Text fontSize="md">{t(messageKey)}</Text>
+    <Flex align="start" color="fg.muted" gap="1.5">
+      <Icon as={TriangleAlertIcon} boxSize="3.5" color="fg.warning" mt="1" />
+      <Stack gap="0.5">
+        <Text fontSize="md">{t(messageKey)}</Text>
+        <Text fontSize="md">{t('models.launchpad.startHostedVideo')}</Text>
+      </Stack>
     </Flex>
   );
 };

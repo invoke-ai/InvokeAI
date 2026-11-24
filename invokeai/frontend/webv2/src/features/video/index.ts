@@ -1,5 +1,6 @@
 /** React-free video settings, capabilities, canvas math, and model-selection policy. */
 export type {
+  HostedH3Status,
   MiniMaxH3TargetResolution,
   VideoAspectRatioId,
   VideoConditioningClip,
@@ -94,6 +95,8 @@ export {
   MINIMAX_H3_TURBO_ACCELERATOR,
   snapVideoNumFrames,
   SUPPORTED_VIDEO_BASES,
+  HOSTED_H3_MODELS,
+  getHostedH3ProviderIssue,
   VIDEO_GENERATION,
   WAN_LIGHTNING_ACCELERATOR,
   type ResolvedVideoDimensions,
@@ -110,7 +113,7 @@ export {
   type VideoTargetResolutionOption,
   type WanExpertWiringWarning,
 } from './core/videoPolicies';
-export { compileVideoGraph, type CompiledVideoGraph } from './core/graph';
+export { compileHostedH3Graph, compileVideoGraph, type CompiledVideoGraph } from './core/graph';
 export {
   createDefaultVideoWidgetValues,
   getVideoWidgetValidationReasons,

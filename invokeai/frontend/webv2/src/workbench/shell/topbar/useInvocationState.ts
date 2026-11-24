@@ -14,7 +14,7 @@ import {
   sanitizeBatchCount,
   sanitizeDynamicPromptsConfig,
 } from '@features/generation/settings';
-import { ensureModelsLoaded, useModelsSelector } from '@features/models';
+import { ensureModelsLoaded, useMiniMaxStatus, useModelsSelector } from '@features/models';
 import {
   getArchitectureCapabilitiesSnapshot,
   subscribeArchitectureCapabilities,
@@ -160,6 +160,8 @@ export const useInvocationState = ({ sourceId }: { sourceId?: InvocationSourceId
     [routeInput.invocation, sourceId]
   );
   const isPreparing = useIsInvocationPreparing(routeInput.projectId);
+  const statusQuery = useMiniMaxStatus(invocation.sourceId === 'video' && Boolean(routeInput.videoValues.hostedH3));
+  const miniMaxStatus = statusQuery.isSuccess ? statusQuery.data : null;
 
   useMountEffect(() => {
     void ensureModelsLoaded();
@@ -171,8 +173,16 @@ export const useInvocationState = ({ sourceId }: { sourceId?: InvocationSourceId
     subscribeRouteSources,
     getRouteSourcesSnapshot,
     useCallback(
-      () => resolveInvocationRouteInput(routeInput, sourceId ? 'dialog' : 'global', invocation, availabilityModels),
-      [availabilityModels, invocation, routeInput, sourceId]
+      () =>
+        resolveInvocationRouteInput(
+          routeInput,
+          sourceId ? 'dialog' : 'global',
+          invocation,
+          availabilityModels,
+          undefined,
+          miniMaxStatus
+        ),
+      [availabilityModels, invocation, miniMaxStatus, routeInput, sourceId]
     )
   );
   const isConnected = backendConnectionStatus === 'connected';

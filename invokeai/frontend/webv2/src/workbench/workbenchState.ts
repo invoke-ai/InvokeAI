@@ -200,6 +200,7 @@ import {
   clearDeletedVideoMedia,
   cloneVideoWidgetValues,
   compileVideoGraph,
+  compileHostedH3Graph,
   getVideoDimensions,
   getVideoWidgetValidationReasons,
   normalizeVideoWidgetValues,
@@ -434,6 +435,7 @@ type WorkbenchReducerAction =
   | { type: 'redoWorkflowChange'; projectId?: string; workflowId?: string }
   | ({
       type: 'submitResolvedInvocationSnapshot';
+      expectedMiniMaxRegion?: ResolvedInvocationRoute['expectedMiniMaxRegion'];
       runtime: InvocationRuntimeInputs;
       backendSupportsCancellation: boolean;
       prepend?: boolean;
@@ -3270,12 +3272,27 @@ const compileInvocationSnapshot = (
     // Video's prompt is deliberately independent of the draft Generate and Upscale share.
     const currentValues: VideoWidgetValues = models ? syncVideoWidgetValuesWithModels(values, models) : values;
 
-    if (!currentValues.model || getVideoWidgetValidationReasons(currentValues, models).length > 0) {
+    if (getVideoWidgetValidationReasons(currentValues, models).length > 0) {
       return null;
     }
 
     const resolvedValues: VideoWidgetValues = { ...currentValues, seed: resolveVideoSeed(currentValues) };
-    const compiledGraph = compileVideoGraph(resolvedValues, currentValues.model).graph;
+    let compiledGraph: GraphContract;
+    if (currentValues.hostedH3 && runtime.miniMaxStatus?.region) {
+      const boardId = getGalleryAutoAddBoardId(getResolvedProjectWidgetValues(project, 'gallery', defaults), (id) =>
+        runtime.boardDestinationIds.includes(id)
+      );
+      compiledGraph = compileHostedH3Graph(
+        resolvedValues,
+        currentValues.hostedH3,
+        runtime.miniMaxStatus.region,
+        boardId
+      );
+    } else if (!currentValues.hostedH3 && currentValues.model) {
+      compiledGraph = compileVideoGraph(resolvedValues, currentValues.model).graph;
+    } else {
+      return null;
+    }
 
     widgetStates.video = {
       ...widgetStates.video,
@@ -4022,6 +4039,9 @@ const enqueueCompiledSnapshot = (
   const upscaleSettings =
     route.sourceId === 'upscale' ? normalizeUpscaleWidgetValues(widgetStates.upscale.values) : null;
   const videoSettings = route.sourceId === 'video' ? normalizeVideoWidgetValues(widgetStates.video.values) : null;
+  const videoBatchSettings = videoSettings?.hostedH3
+    ? { ...videoSettings, negativePromptEnabled: false, seedMode: 'random' as const }
+    : videoSettings;
   const backendGraph = graph.backendGraph;
   const canvasGenerateSettings = route.sourceId === 'canvas' ? normalizeGenerateSettings(generate?.values) : null;
   const upscalePromptDraft = upscaleSettings ? getPromptDraftFromValues(widgetStates.generate?.values ?? {}) : null;
@@ -4030,7 +4050,7 @@ const enqueueCompiledSnapshot = (
       ? canvasGenerateSettings
       : route.sourceId === 'generate'
         ? generateSettings
-        : (videoSettings ??
+        : (videoBatchSettings ??
           (upscaleSettings && upscalePromptDraft
             ? getUpscaleSubmissionSource(upscaleSettings, upscalePromptDraft)
             : null));
@@ -4088,7 +4108,9 @@ const enqueueCompiledSnapshot = (
         );
   const generatePresentationSettings = normalizeGenerateSettings(widgetStates.generate?.values);
   const videoPresentationDimensions =
-    route.sourceId === 'video' && videoSettings?.model ? getVideoDimensions(videoSettings.model, videoSettings) : null;
+    route.sourceId === 'video' && !videoSettings?.hostedH3 && videoSettings?.model
+      ? getVideoDimensions(videoSettings.model, videoSettings)
+      : null;
   const presentationDimensions =
     route.sourceId === 'upscale' && upscaleSettings?.inputImage
       ? getUpscaleOutputDimensions(upscaleSettings.inputImage, upscaleSettings)
@@ -4212,7 +4234,7 @@ const enqueueCompiledSnapshot = (
           })
         : videoSettings
           ? addPromptHistoryItem(project.promptHistory, {
-              negativePrompt: videoSettings.negativePromptEnabled ? videoSettings.negativePrompt : null,
+              negativePrompt: videoBatchSettings?.negativePromptEnabled ? videoSettings.negativePrompt : null,
               positivePrompt: videoSettings.positivePrompt,
             })
           : project.promptHistory,
@@ -5471,6 +5493,23 @@ const reduceWorkbenchAction = (
             : getActiveProjectWorkflow(target)
           : undefined;
 
+      if (target && action.route.sourceId === 'video') {
+        const hosted = getWidgetValues(target, 'video').hostedH3;
+        const regionAtEnqueue = hosted ? action.runtime.miniMaxStatus?.region : undefined;
+        if ((hosted && !regionAtEnqueue) || action.expectedMiniMaxRegion !== regionAtEnqueue) {
+          return addNotification(
+            state,
+            createNotification({
+              category: 'enqueue',
+              kind: 'error',
+              projectId: target.id,
+              title: 'The MiniMax service or region changed. Check the Video panel and invoke again.',
+              titleKey: 'widgets.video.hosted.regionChanged',
+            })
+          );
+        }
+      }
+
       if (target && action.route.sourceId === 'workflow' && !workflow) {
         return addNotification(
           state,
@@ -5537,7 +5576,8 @@ const reduceWorkbenchAction = (
               action.route,
               action.models,
               workflow?.document,
-              action.runtime.templates
+              action.runtime.templates,
+              action.runtime.miniMaxStatus
             ),
             action.models,
             { positivePrompts: action.positivePrompts, positivePromptsSampleSeed: action.positivePromptsSampleSeed },

@@ -3,7 +3,6 @@ import re
 from enum import Enum
 from importlib.metadata import distributions
 from pathlib import Path as FilePath
-from threading import Lock
 from typing import Any, Literal, Union
 
 import torch
@@ -16,6 +15,7 @@ from invokeai.app.api.auth_dependencies import AdminUserOrDefault, CurrentUserOr
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.services.config.config_default import (
     EXTERNAL_PROVIDER_CONFIG_FIELDS,
+    EXTERNAL_PROVIDER_CONFIG_LOCK,
     IMAGE_SUBFOLDER_STRATEGY,
     DefaultInvokeAIAppConfig,
     InvokeAIAppConfig,
@@ -24,6 +24,7 @@ from invokeai.app.services.config.config_default import (
     load_external_api_keys,
 )
 from invokeai.app.services.external_generation.external_generation_common import ExternalProviderStatus
+from invokeai.app.services.external_generation.minimax_video import minimax_api_base_url, minimax_video_region
 from invokeai.app.services.external_generation.startup import sync_configured_external_starter_models
 from invokeai.app.services.invocation_cache.invocation_cache_common import InvocationCacheStatus
 from invokeai.app.services.model_records.model_records_base import UnknownModelException
@@ -117,6 +118,7 @@ class ExternalProviderStatusModel(BaseModel):
     provider_id: str = Field(description="The external provider identifier")
     configured: bool = Field(description="Whether credentials are configured for the provider")
     message: str | None = Field(default=None, description="Optional provider status detail")
+    region: Literal["global", "cn"] | None = Field(default=None, description="MiniMax hosted video region")
 
 
 class ExternalProviderConfigUpdate(BaseModel):
@@ -134,10 +136,10 @@ EXTERNAL_PROVIDER_FIELDS: dict[str, tuple[str, str]] = {
     "alibabacloud": ("external_alibabacloud_api_key", "external_alibabacloud_base_url"),
     "atlascloud": ("external_atlascloud_api_key", "external_atlascloud_base_url"),
     "gemini": ("external_gemini_api_key", "external_gemini_base_url"),
+    "minimax": ("external_minimax_api_key", "external_minimax_base_url"),
     "openai": ("external_openai_api_key", "external_openai_base_url"),
     "seedream": ("external_seedream_api_key", "external_seedream_base_url"),
 }
-_EXTERNAL_PROVIDER_CONFIG_LOCK = Lock()
 
 
 def _remove_nullable_default_from_schema(schema: dict[str, Any]) -> None:
@@ -303,7 +305,7 @@ def update_runtime_config(
             TorchDevice.get_generation_devices(changes.generation_devices)
         except ValueError as e:
             raise HTTPException(status_code=422, detail=str(e))
-    with _EXTERNAL_PROVIDER_CONFIG_LOCK:
+    with EXTERNAL_PROVIDER_CONFIG_LOCK:
         config = get_config()
         update_dict = changes.model_dump(exclude_unset=True)
         config.update_config(update_dict)
@@ -323,10 +325,21 @@ def update_runtime_config(
     operation_id="get_external_provider_statuses",
     status_code=200,
     response_model=list[ExternalProviderStatusModel],
+    response_model_exclude_unset=True,
 )
 def get_external_provider_statuses(current_user: CurrentUserOrDefault) -> list[ExternalProviderStatusModel]:
     statuses = ApiDependencies.invoker.services.external_generation.get_provider_statuses()
-    return [status_to_model(status) for status in statuses.values()]
+    api_key, base_url = get_config().minimax_credentials()
+    result = {key: status_to_model(status) for key, status in statuses.items()}
+    # Hosted video uses the same credential as MiniMax image generation. Only the
+    # region is public; a custom image-only URL may contain private information.
+    result["minimax"] = ExternalProviderStatusModel(
+        provider_id="minimax",
+        configured=bool(api_key),
+        message=None,
+        region=minimax_video_region(base_url),
+    )
+    return list(result.values())
 
 
 @app_router.get(
@@ -418,7 +431,7 @@ def _write_external_api_keys_file(api_keys_file_path: FilePath, api_keys: dict[s
 
 
 def _apply_external_provider_update(updates: dict[str, str | None]) -> None:
-    with _EXTERNAL_PROVIDER_CONFIG_LOCK:
+    with EXTERNAL_PROVIDER_CONFIG_LOCK:
         runtime_config = get_config()
         config_path = runtime_config.config_file_path
         api_keys_file_path = runtime_config.api_keys_file_path
@@ -427,7 +440,6 @@ def _apply_external_provider_update(updates: dict[str, str | None]) -> None:
         else:
             file_config = DefaultInvokeAIAppConfig()
 
-        runtime_config.update_config(updates)
         provider_config_fields = set(EXTERNAL_PROVIDER_CONFIG_FIELDS)
         provider_updates = {field: value for field, value in updates.items() if field in provider_config_fields}
         non_provider_updates = {field: value for field, value in updates.items() if field not in provider_config_fields}
@@ -441,6 +453,29 @@ def _apply_external_provider_update(updates: dict[str, str | None]) -> None:
             if field_name not in persisted_api_keys and isinstance(file_value, str) and file_value.strip():
                 persisted_api_keys[field_name] = file_value
 
+        # Environment overrides can make the live and persisted MiniMax endpoints differ.
+        # A partial edit must keep each key bound to its intended destination in both.
+        key_field, url_field = EXTERNAL_PROVIDER_FIELDS["minimax"]
+        if url_field in updates and key_field not in updates:
+            destination = minimax_api_base_url(updates[url_field])
+            existing = (
+                runtime_config.minimax_credentials(),
+                (persisted_api_keys.get(key_field), persisted_api_keys.get(url_field)),
+            )
+            if any(key and minimax_api_base_url(url) != destination for key, url in existing):
+                raise HTTPException(
+                    status_code=409, detail="Enter a MiniMax API key for the new endpoint, or clear the existing key."
+                )
+        elif updates.get(key_field) and url_field not in updates:
+            runtime_url = minimax_api_base_url(runtime_config.external_minimax_base_url)
+            stored_url = minimax_api_base_url(persisted_api_keys.get(url_field))
+            if runtime_url != stored_url:
+                raise HTTPException(
+                    status_code=409,
+                    detail="Specify base_url with the MiniMax API key. The live and stored endpoints differ.",
+                )
+
+        runtime_config.update_config(updates)
         for field_name, value in provider_updates.items():
             if value is None:
                 persisted_api_keys.pop(field_name, None)

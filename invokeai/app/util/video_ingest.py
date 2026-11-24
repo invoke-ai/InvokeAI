@@ -31,6 +31,7 @@ banner ffmpeg prints for a probe-only invocation — the established fallback us
 
 import re
 import subprocess
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, Optional
@@ -137,13 +138,21 @@ def plan_ingest(probe: MediaProbe) -> IngestAction:
     raise VideoIngestError("The uploaded file contains no video or audio stream")
 
 
-def ingest_media_to_mp4(src: Path, dst: Path, *, max_output_bytes: int) -> IngestAction:
+def ingest_media_to_mp4(
+    src: Path,
+    dst: Path,
+    *,
+    max_output_bytes: int,
+    probe: MediaProbe | None = None,
+    is_canceled: Callable[[], bool] | None = None,
+) -> IngestAction:
     """Converts ``src`` into a browser-safe H.264/AAC MP4 at ``dst``.
 
     Returns the action taken. Raises VideoIngestError (user-safe message) on any
     failure; ``dst`` is left absent or partial on failure and the caller owns cleanup.
     """
-    probe = probe_media_streams(src)
+    if probe is None:
+        probe = probe_media_streams(src)
     action = plan_ingest(probe)
 
     # `-fs` bounds the output *during* the encode, so a long audio wrap or a
@@ -222,7 +231,7 @@ def ingest_media_to_mp4(src: Path, dst: Path, *, max_output_bytes: int) -> Inges
         ]
 
     try:
-        proc = run_ffmpeg_process(args, INGEST_TIMEOUT_SECONDS)
+        proc = run_ffmpeg_process(args, INGEST_TIMEOUT_SECONDS, is_canceled=is_canceled)
     except subprocess.TimeoutExpired as e:
         raise VideoIngestError("Timed out converting the uploaded file to MP4") from e
     if proc.returncode != 0:

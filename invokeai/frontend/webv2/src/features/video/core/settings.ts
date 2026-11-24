@@ -19,6 +19,7 @@ import {
 import { isSeedMode } from '@platform/core/seed';
 
 import type {
+  HostedH3Settings,
   Ltx2TargetResolution,
   MiniMaxH3TargetResolution,
   VideoAspectRatioId,
@@ -40,6 +41,21 @@ import { LTX2_EXTEND_CONTEXT_FRAMES, LTX2_NUM_FRAMES_STEP, MINIMAX_H3_FPS, snapL
 
 const isRecord = (value: unknown): value is Record<string, unknown> => Boolean(value) && typeof value === 'object';
 
+const normalizeHostedH3 = (value: unknown): HostedH3Settings | undefined => {
+  if (typeof value !== 'object' || value === null) {
+    return undefined;
+  }
+  const raw = value as Record<string, unknown>;
+  return {
+    model: typeof raw.model === 'string' ? raw.model : '',
+    duration: typeof raw.duration === 'number' ? raw.duration : 0,
+    resolution: typeof raw.resolution === 'string' ? raw.resolution : '',
+    ratio: typeof raw.ratio === 'string' ? raw.ratio : '',
+    generateAudio: raw.generateAudio === true,
+    input: raw.input === 'frames' || raw.input === 'references' ? raw.input : 'text',
+  };
+};
+
 const hasFiniteNumber = (record: Record<string, unknown>, key: string): boolean =>
   typeof record[key] === 'number' && Number.isFinite(record[key]);
 
@@ -48,6 +64,15 @@ const getClampedNumber = (record: Record<string, unknown>, key: string, min: num
 
 /** H3 has blocks 0–49; overlay Ref2VA AdaLN from the chosen start through 49, defaulting to the upper half. */
 export const MINIMAX_H3_HYBRID_BLOCK_RANGE = { defaultStart: 25, max: 49, min: 0 } as const;
+
+export const DEFAULT_HOSTED_H3: HostedH3Settings = {
+  model: 'MiniMax-H3',
+  duration: 5,
+  resolution: '768P',
+  ratio: '16:9',
+  generateAudio: true,
+  input: 'text',
+};
 
 export const VIDEO_ASPECT_RATIO_IDS: readonly VideoAspectRatioId[] = [
   '21:9',
@@ -494,7 +519,12 @@ export const normalizeVideoWidgetValues = (values: unknown): VideoWidgetValues |
     return null;
   }
 
-  return { ...settings, model: isMainModelConfig(values.model) ? values.model : null };
+  const hostedH3 = normalizeHostedH3(values.hostedH3);
+  return {
+    ...settings,
+    ...(hostedH3 ? { hostedH3 } : {}),
+    model: isMainModelConfig(values.model) ? values.model : null,
+  };
 };
 
 export const isVideoWidgetValues = (values: unknown): values is VideoWidgetValues => {
@@ -509,6 +539,7 @@ export const isVideoWidgetValues = (values: unknown): values is VideoWidgetValue
 
 export const cloneVideoWidgetValues = (values: VideoWidgetValues): VideoWidgetValues & Record<string, unknown> => ({
   ...values,
+  hostedH3: values.hostedH3 ? { ...values.hostedH3 } : undefined,
   acceleratorLoraKeys: [...values.acceleratorLoraKeys],
   componentSourceModel: values.componentSourceModel ? { ...values.componentSourceModel } : null,
   firstFrameImage: values.firstFrameImage ? { ...values.firstFrameImage } : null,

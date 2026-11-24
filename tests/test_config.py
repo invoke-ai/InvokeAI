@@ -1,6 +1,8 @@
 import os
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from threading import Event
 from typing import Any
 
 import pytest
@@ -594,3 +596,34 @@ def test_base_url_validator_rejects_reserved_prefix(reserved: str, patch_rootdir
     """A `base_url` whose first segment collides with a real route prefix must fail fast, not brick the server."""
     with pytest.raises(ValidationError, match="reserved path segment"):
         InvokeAIAppConfig(base_url=reserved)
+
+
+def test_minimax_credentials_cannot_observe_a_half_applied_update(monkeypatch: pytest.MonkeyPatch):
+    config = InvokeAIAppConfig(external_minimax_api_key="old-key", external_minimax_base_url=None)
+    updates = {"external_minimax_api_key": "new-key", "external_minimax_base_url": "https://api.minimax.cn"}
+    half_written, resume_update, reader_started = Event(), Event(), Event()
+    original_setattr = InvokeAIAppConfig.__setattr__
+
+    def pause_after_first_change(self, name, value):
+        original_setattr(self, name, value)
+        if self is config and name in updates and not half_written.is_set():
+            half_written.set()
+            assert resume_update.wait(timeout=5)
+
+    def read_credentials():
+        reader_started.set()
+        return config.minimax_credentials()
+
+    monkeypatch.setattr(InvokeAIAppConfig, "__setattr__", pause_after_first_change)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        writer = pool.submit(config.update_config, updates)
+        try:
+            assert half_written.wait(timeout=5)
+            reader = pool.submit(read_credentials)
+            assert reader_started.wait(timeout=5)
+            with pytest.raises(TimeoutError):
+                reader.result(timeout=0.05)
+        finally:
+            resume_update.set()
+        writer.result(timeout=5)
+        assert reader.result(timeout=5) == ("new-key", "https://api.minimax.cn")

@@ -2,6 +2,7 @@ import type { ModelConfig } from '@features/models';
 import type { AccountScope } from '@platform/state/accountLifecycle';
 
 import { flushGenerateDrafts } from '@features/generation/react';
+import { getMiniMaxStatus } from '@features/models';
 import {
   assertAccountScopeCurrent,
   captureAccountScope,
@@ -95,7 +96,15 @@ export const submitActiveInvocation = async (
     ...(sourceId === 'video' ? { destination: 'gallery' as const } : {}),
   };
   const models = getModels();
-  const route = resolveInvocationRoute(snapshot.activeProject, sourceId ? 'dialog' : 'global', invocation, models);
+  const route = resolveInvocationRoute(
+    snapshot.activeProject,
+    sourceId ? 'dialog' : 'global',
+    invocation,
+    models,
+    undefined,
+    undefined,
+    invocation.sourceId === 'video' ? getMiniMaxStatus() : undefined
+  );
 
   if (!isInvocationRouteValid(route) || snapshot.backendConnection.status !== 'connected') {
     return;

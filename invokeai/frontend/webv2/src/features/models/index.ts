@@ -15,6 +15,8 @@ export { useActiveInstallSources } from './data/installsStore';
 export {
   ensureModelsLoaded,
   getModelsSnapshot,
+  getMiniMaxStatus,
+  useMiniMaxStatus,
   refreshModels,
   subscribeModels,
   useModelsSelector,

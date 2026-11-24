@@ -14,6 +14,8 @@ Paths and commands are relative to this package. This map links user vocabulary 
 - The mock serves in-memory HTTP without Socket.IO. It proves nothing about real authorization, persistence, or model execution.
 - Production-build journeys start and stop their own preview and backend. Run their package commands; do not write a new driver. Their setup, fault injection, and selectors are working examples. Focused runs use a spare port and respect the one-performance-gate-per-machine rule.
 
+To exercise the MiniMax H3 API Video panel, use the mock backend and save a dummy key under **Model Manager → API Keys → MiniMax**. In the Video panel select **Generation service → MiniMax H3 API (paid)**. Verify Mainland China offers four models and Global offers seven. Select frames or reference images from Gallery, choose the output board, then inspect the enqueued graph. The mock retains pending queue items. [Video model selection](src/app/VideoModelSwitch.browser.test.tsx) exercises the controls and [Workbench submission](src/workbench/workbenchState.test.ts) covers region gating, the hosted invocation and its destination board.
+
 ## Bounded local verification
 
 Shared development machine: cap Vitest at two workers. Run from this package in a POSIX shell, with the `.nvmrc` Node, pnpm 10, frozen dependencies, and the locked Chromium/Firefox/WebKit engines ([install](AGENTS.md#performance-and-validation)):

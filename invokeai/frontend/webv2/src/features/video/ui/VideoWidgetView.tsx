@@ -6,7 +6,7 @@ import type {
   VideoWidgetValues,
 } from '@features/video/core/types';
 
-import { createListCollection, HStack, Stack, Switch, Text } from '@chakra-ui/react';
+import { createListCollection, HStack, Spinner, Stack, Switch, Text } from '@chakra-ui/react';
 import {
   AspectRatioPicker,
   GenerationSectionIssuesProvider,
@@ -69,7 +69,7 @@ import { Button } from '@platform/ui/Button';
 import { ScrubberField } from '@platform/ui/ScrubberField';
 import { toaster } from '@platform/ui/toaster';
 import { ArrowLeftRightIcon } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { areVideoValuesEqual } from './videoComparators';
@@ -79,12 +79,15 @@ import { VideoConditioningClipField } from './VideoConditioningClipField';
 import { VideoPromptFields } from './VideoFormFields';
 import { VideoFrameImageField } from './VideoFrameImageField';
 import { VideoLengthControls } from './VideoLengthControls';
-import { VideoModelField } from './VideoModelField';
+import { VideoModelField, VideoServiceField } from './VideoModelField';
 import { VideoReferenceListField } from './VideoReferenceListField';
 import { VideoSourceClipField } from './VideoSourceClipField';
 import { useVideoUi, useVideoUiActions, VIDEO_SECTION_IDS } from './VideoUiContext';
 
 /** Keep section props stable: project patches rerender this widget on every keystroke. */
+
+const HostedH3Panel = lazy(() => import('./HostedH3Panel').then((module) => ({ default: module.HostedH3Panel })));
+const LOADING_HOSTED_PANEL = <Spinner color="fg.muted" size="md" />;
 
 const SWITCH_CHECKED_PROPS = { bg: 'accent.solid' };
 
@@ -148,6 +151,23 @@ const VideoModelReconciler = ({
 
 /** `instance` ties the sections to the header's jump menu; a view rendered outside a widget frame has none. */
 export const VideoWidgetView = ({ instance }: { instance?: { id: string } }) => {
+  const { rawValues } = useVideoUi();
+  const values = rawValues.hostedH3 ? normalizeVideoWidgetValues(rawValues) : null;
+  return (
+    <>
+      <VideoServiceField hosted={Boolean(values?.hostedH3)} />
+      {values?.hostedH3 ? (
+        <Suspense fallback={LOADING_HOSTED_PANEL}>
+          <HostedH3Panel hosted={values.hostedH3} values={values} />
+        </Suspense>
+      ) : (
+        <LocalVideoPanel instance={instance} />
+      )}
+    </>
+  );
+};
+
+const LocalVideoPanel = ({ instance }: { instance?: { id: string } }) => {
   const { t } = useTranslation();
   const selection = useVideoUi();
   const models = useModelsSelector((snapshot) => snapshot.models);

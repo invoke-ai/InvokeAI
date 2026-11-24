@@ -13,6 +13,7 @@ import {
   setExternalProviderConfig,
   type ExternalProviderConfig,
 } from './api';
+import { invalidateMiniMaxStatus } from './modelsStore';
 
 /** Share provider config state so credential saves immediately update installation affordances. */
 
@@ -93,6 +94,9 @@ export const saveExternalProviderConfig = async (
 
   if (isAccountScopeCurrent(owner)) {
     replaceConfigInStore(next);
+    if (providerId === 'minimax') {
+      await invalidateMiniMaxStatus(owner);
+    }
   }
 
   return next;
@@ -105,6 +109,9 @@ export const clearExternalProviderConfig = async (providerId: string): Promise<E
 
   if (isAccountScopeCurrent(owner)) {
     replaceConfigInStore(next);
+    if (providerId === 'minimax') {
+      await invalidateMiniMaxStatus(owner);
+    }
   }
 
   return next;

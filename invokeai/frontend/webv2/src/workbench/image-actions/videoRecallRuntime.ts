@@ -183,7 +183,9 @@ export const createVideoRecallRuntime = ({
     } else if (event.action === 'initial_video') {
       const placement = placeInitialVideo({ models, video: toPlaceableVideo(event.video), videoValues });
 
-      if (placement.status === 'full') {
+      if (placement.status === 'unsupported') {
+        commands.notifications.add({ kind: 'info', title: t('widgets.video.hosted.clipUnsupported') });
+      } else if (placement.status === 'full') {
         commands.notifications.add({
           kind: 'info',
           message: t('widgets.video.placement.initialVideoFull'),

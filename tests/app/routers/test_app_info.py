@@ -14,6 +14,7 @@ from invokeai.app.api.routers import app_info
 from invokeai.app.api_app import app
 from invokeai.app.services.auth.token_service import TokenData
 from invokeai.app.services.config.config_default import (
+    InvokeAIAppConfig,
     get_config,
     load_and_migrate_config,
     load_config_from_root,
@@ -199,6 +200,10 @@ def test_get_external_provider_statuses(monkeypatch: Any, mock_invoker: Invoker,
 
     monkeypatch.setattr("invokeai.app.api.routers.app_info.ApiDependencies", MockApiDependencies(mock_invoker))
     monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", MockApiDependencies(mock_invoker))
+    config = mock_invoker.services.configuration
+    monkeypatch.setattr(config, "external_minimax_api_key", None)
+    monkeypatch.setattr(config, "external_minimax_base_url", None)
+    monkeypatch.setattr(app_info, "get_config", lambda: config)
     monkeypatch.setattr(mock_invoker.services.external_generation, "get_provider_statuses", lambda: statuses)
 
     response = client.get("/api/v1/app/external_providers/status")
@@ -207,8 +212,120 @@ def test_get_external_provider_statuses(monkeypatch: Any, mock_invoker: Invoker,
     payload = sorted(response.json(), key=lambda item: item["provider_id"])
     assert payload == [
         {"provider_id": "gemini", "configured": True, "message": None},
+        {"provider_id": "minimax", "configured": False, "message": None, "region": "global"},
         {"provider_id": "openai", "configured": False, "message": "Missing key"},
     ]
+
+
+@pytest.fixture
+def minimax_config(monkeypatch: pytest.MonkeyPatch, mock_invoker: Invoker, tmp_path: Path) -> InvokeAIAppConfig:
+    config = load_config_from_root(tmp_path)
+    monkeypatch.setattr(app_info, "get_config", lambda: config)
+    mock_deps = MockApiDependencies(mock_invoker)
+    monkeypatch.setattr(app_info, "ApiDependencies", mock_deps)
+    monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", mock_deps)
+    models = Mock()
+    models.store.search_by_attr.return_value = []
+    monkeypatch.setattr(mock_invoker.services, "model_manager", models)
+    return config
+
+
+def test_minimax_credentials_are_private_and_shared_across_regions(
+    minimax_config: InvokeAIAppConfig, client: TestClient
+) -> None:
+    config = minimax_config
+    endpoint = "/api/v1/app/external_providers/config/minimax"
+    key = "test-only-minimax-key"
+    saved = client.post(endpoint, json={"api_key": key, "base_url": "https://api.minimax.cn/"})
+    assert saved.status_code == 200
+    assert saved.json()["api_key_configured"]
+    assert key not in saved.text
+    assert key not in config.config_file_path.read_text()
+    assert load_external_api_keys(config.api_keys_file_path)["external_minimax_api_key"] == key
+    runtime = client.get("/api/v1/app/runtime_config").json()["config"]
+    assert runtime["external_minimax_api_key"] == app_info.REDACTED_SECRET
+
+    def status() -> dict[str, Any]:
+        return _get_provider_config(client.get("/api/v1/app/external_providers/status").json(), "minimax")
+
+    assert status() == {"provider_id": "minimax", "configured": True, "message": None, "region": "cn"}
+    # A custom endpoint used for image generation cannot receive video credentials or
+    # disclose its host to ordinary signed-in users through the public status response.
+    assert (
+        client.post(
+            endpoint, json={"api_key": "image-gateway-key", "base_url": "https://private-image-gateway.test"}
+        ).status_code
+        == 200
+    )
+    assert config.minimax_credentials() == ("image-gateway-key", "https://private-image-gateway.test")
+    assert status() == {"provider_id": "minimax", "configured": True, "message": None, "region": None}
+    assert client.delete(endpoint).status_code == 200
+    assert status() == {"provider_id": "minimax", "configured": False, "message": None, "region": "global"}
+    assert "external_minimax_api_key" not in load_external_api_keys(config.api_keys_file_path)
+
+
+@pytest.mark.parametrize(
+    ("old_url", "same_destination", "new_url"),
+    [
+        ("", "https://api.minimax.io/", "https://api.minimax.cn"),
+        ("https://api.minimax.cn/", "https://api.minimax.cn", ""),
+        ("https://private.test/a/", "https://private.test/a", "https://private.test/b"),
+    ],
+)
+def test_minimax_endpoint_change_cannot_rebind_an_existing_key(
+    minimax_config: InvokeAIAppConfig, client: TestClient, old_url: str, same_destination: str, new_url: str
+) -> None:
+    endpoint = "/api/v1/app/external_providers/config/minimax"
+    key = "endpoint-specific-key"
+    assert client.post(endpoint, json={"api_key": key, "base_url": old_url}).status_code == 200
+    assert client.post(endpoint, json={"base_url": same_destination}).status_code == 200
+    key = "rotated-key-for-same-endpoint"
+    assert client.post(endpoint, json={"api_key": key}).status_code == 200
+    persisted = minimax_config.api_keys_file_path.read_bytes()
+    config_yaml = minimax_config.config_file_path.read_bytes()
+
+    refused = client.post(endpoint, json={"base_url": new_url})
+    assert refused.status_code == 409
+    assert key not in refused.text
+    assert minimax_config.minimax_credentials() == (key, same_destination)
+    assert minimax_config.api_keys_file_path.read_bytes() == persisted
+    assert minimax_config.config_file_path.read_bytes() == config_yaml
+
+    assert client.post(endpoint, json={"api_key": "", "base_url": new_url}).status_code == 200
+    assert minimax_config.minimax_credentials() == (None, new_url or None)
+    assert "external_minimax_api_key" not in load_external_api_keys(minimax_config.api_keys_file_path)
+
+
+@pytest.mark.parametrize(
+    ("partial_update", "required_field"),
+    [({"base_url": "https://api.minimax.io"}, "API key"), ({"api_key": "rotated-key"}, "base_url")],
+)
+def test_minimax_partial_update_checks_both_credential_pairs_with_a_runtime_override(
+    minimax_config: InvokeAIAppConfig, client: TestClient, partial_update: dict[str, str], required_field: str
+) -> None:
+    endpoint = "/api/v1/app/external_providers/config/minimax"
+    assert (
+        client.post(endpoint, json={"api_key": "stored-key", "base_url": "https://api.minimax.cn"}).status_code == 200
+    )
+    # The effective environment uses Global while api_keys.yaml retains its China key.
+    minimax_config.update_config({"external_minimax_api_key": "runtime-key", "external_minimax_base_url": None})
+    persisted = minimax_config.api_keys_file_path.read_bytes()
+    config_yaml = minimax_config.config_file_path.read_bytes()
+    refused = client.post(endpoint, json=partial_update)
+    assert refused.status_code == 409
+    assert required_field in refused.json()["detail"]
+    assert minimax_config.minimax_credentials() == ("runtime-key", None)
+    assert minimax_config.api_keys_file_path.read_bytes() == persisted
+    assert minimax_config.config_file_path.read_bytes() == config_yaml
+
+    explicit = {"api_key": "rotated-key", "base_url": "https://api.minimax.io"}
+    assert client.post(endpoint, json=explicit).status_code == 200
+    assert minimax_config.minimax_credentials() == (explicit["api_key"], explicit["base_url"])
+    saved = load_external_api_keys(minimax_config.api_keys_file_path)
+    assert (
+        saved["external_minimax_api_key"],
+        saved["external_minimax_base_url"],
+    ) == minimax_config.minimax_credentials()
 
 
 def test_external_provider_config_update_and_reset(monkeypatch: Any, mock_invoker: Invoker, client: TestClient) -> None:
@@ -534,8 +651,11 @@ def test_get_generation_device_options_lists_devices(
 
 
 def test_update_runtime_config_reads_and_writes_yaml_under_config_lock(
-    monkeypatch: Any, mock_invoker: Invoker, client: TestClient
+    monkeypatch: Any, mock_invoker: Invoker, client: TestClient, tmp_path: Path
 ) -> None:
+    config = load_config_from_root(tmp_path)
+    config.write_file(config.config_file_path)
+    monkeypatch.setattr(app_info, "get_config", lambda: config)
     monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", MockApiDependencies(mock_invoker))
 
     class TrackingLock:
@@ -565,7 +685,7 @@ def test_update_runtime_config_reads_and_writes_yaml_under_config_lock(
         tracking_lock.write_seen = True
         return original_write_file(config, dest_path, as_example)
 
-    monkeypatch.setattr(app_info, "_EXTERNAL_PROVIDER_CONFIG_LOCK", tracking_lock)
+    monkeypatch.setattr(app_info, "EXTERNAL_PROVIDER_CONFIG_LOCK", tracking_lock)
     monkeypatch.setattr(app_info, "load_and_migrate_config", load_and_migrate_config_with_lock_assertion)
     monkeypatch.setattr(app_info.InvokeAIAppConfig, "write_file", write_file_with_lock_assertion)
 
@@ -597,7 +717,7 @@ def test_update_runtime_config_rejects_non_admin_users(
     assert response.json()["detail"] == "Admin privileges required"
 
 
-@pytest.mark.parametrize("provider_id", ["alibabacloud", "gemini", "openai", "seedream"])
+@pytest.mark.parametrize("provider_id", ["alibabacloud", "gemini", "minimax", "openai", "seedream"])
 def test_set_external_provider_config_rejects_non_admin_users(
     monkeypatch: Any, mock_invoker: Invoker, client: TestClient, provider_id: str
 ) -> None:
@@ -619,7 +739,7 @@ def test_set_external_provider_config_rejects_non_admin_users(
     assert response.json()["detail"] == "Admin privileges required"
 
 
-@pytest.mark.parametrize("provider_id", ["alibabacloud", "gemini", "openai", "seedream"])
+@pytest.mark.parametrize("provider_id", ["alibabacloud", "gemini", "minimax", "openai", "seedream"])
 def test_reset_external_provider_config_rejects_non_admin_users(
     monkeypatch: Any, mock_invoker: Invoker, client: TestClient, provider_id: str
 ) -> None:

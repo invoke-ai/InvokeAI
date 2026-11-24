@@ -75,6 +75,8 @@ CORE_METADATA_REGISTRY: tuple[tuple[str, MetadataType | tuple[MetadataType, ...]
     # 2. Common feature extensions and denoise parameters
     ("seamless_x", T.BOOLEAN),
     ("seamless_y", T.BOOLEAN),
+    ("external_provider", T.STRING),
+    ("external_model_id", T.STRING),
     ("guidance", T.FLOAT),
     ("cfg_scale_start_step", T.INTEGER),
     ("cfg_scale_end_step", T.INTEGER),

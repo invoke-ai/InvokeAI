@@ -310,6 +310,25 @@ describe('createVideoRecallRuntime', () => {
     runtime.dispose();
   });
 
+  it('declines an external clip extension without changing hosted settings or revealing the panel', async () => {
+    const { lastNotice, projectId, runtime, socket, store, videoShown, videoValues } = setup();
+    store.commands.widgets.patchValues(
+      'video',
+      {
+        hostedH3: { model: 'MiniMax-H3', input: 'frames' },
+        firstFrameImage: { image_name: 'first.png', width: 1024, height: 768 },
+      },
+      projectId
+    );
+    const before = videoValues();
+    socket.emit(placementEvent('initial_video'));
+    await flush();
+    expect(videoValues()).toBe(before);
+    expect(videoShown()).toBe(false);
+    expect(lastNotice()).toMatchObject({ kind: 'info', title: 'widgets.video.hosted.clipUnsupported' });
+    runtime.dispose();
+  });
+
   it('sets the initial video as the Initial Video field would', async () => {
     const { lastNotice, videoShown, runtime, socket, videoValues } = setup();
 

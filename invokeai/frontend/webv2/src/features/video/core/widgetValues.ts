@@ -13,6 +13,7 @@ import {
   getAcceleratorLoraChangeResult,
   getAcceleratorToggleResult,
   getEffectiveVideoModel,
+  getHostedH3InputIssue,
   getDefaultVideoSettings,
   getVideoComponentSectionPolicy,
   getVideoIssueSections,
@@ -43,6 +44,9 @@ export const syncVideoWidgetValuesWithModels = (
   values: VideoWidgetValues,
   models: readonly ModelConfig[]
 ): VideoWidgetValues => {
+  if (values.hostedH3) {
+    return values;
+  }
   // Promote only installed H3 checkpoint overrides before other reconciliation; retain the old Diffusers main as
   // components and drop invalid overrides without evicting it.
   if (values.model?.base === 'minimax-h3' && values.model.format === 'diffusers' && values.h3TransformerModel) {
@@ -229,6 +233,10 @@ export const getVideoWidgetValidationIssues = (
   values: VideoWidgetValues,
   models?: readonly ModelConfig[]
 ): VideoValidationIssue[] => {
+  if (values.hostedH3) {
+    const message = getHostedH3InputIssue(values, values.hostedH3);
+    return message ? [{ fields: [], message }] : [];
+  }
   // The model picker fixes it, and it sits in no section.
   if (!values.model) {
     return [{ fields: [], message: 'Video needs a Wan 2.2, MiniMax H3 or LTX-2 main model.' }];

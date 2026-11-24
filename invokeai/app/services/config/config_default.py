@@ -12,6 +12,7 @@ import re
 import shutil
 from functools import lru_cache
 from pathlib import Path
+from threading import RLock
 from typing import Any, Literal, Optional, Union
 
 import yaml
@@ -42,6 +43,7 @@ CONFIG_SCHEMA_VERSION = "4.0.3"
 # Path prefixes owned by real routes/mounts. A `base_url` starting with one of these would collide
 # with routing and silently brick the server, so it is rejected during validation.
 RESERVED_BASE_URL_PREFIXES = {"api", "ws", "static", "docs", "redoc", "openapi.json", "locales", "assets"}
+EXTERNAL_PROVIDER_CONFIG_LOCK = RLock()
 EXTERNAL_PROVIDER_CONFIG_FIELDS = (
     "external_alibabacloud_api_key",
     "external_alibabacloud_base_url",
@@ -49,6 +51,8 @@ EXTERNAL_PROVIDER_CONFIG_FIELDS = (
     "external_atlascloud_base_url",
     "external_gemini_api_key",
     "external_gemini_base_url",
+    "external_minimax_api_key",
+    "external_minimax_base_url",
     "external_openai_api_key",
     "external_openai_base_url",
     "external_seedream_api_key",
@@ -170,6 +174,8 @@ class InvokeAIAppConfig(BaseSettings):
         external_atlascloud_api_key: API key for Atlas Cloud image generation.
         external_atlascloud_base_url: Base URL override for Atlas Cloud image generation.
         external_gemini_api_key: API key for Gemini image generation.
+        external_minimax_api_key: API key for MiniMax generation.
+        external_minimax_base_url: Base URL for MiniMax generation. Hosted video supports the Global and China endpoints.
         external_openai_api_key: API key for OpenAI image generation.
         external_gemini_base_url: Base URL override for Gemini image generation.
         external_openai_base_url: Base URL override for OpenAI image generation.
@@ -327,6 +333,10 @@ class InvokeAIAppConfig(BaseSettings):
         default=None, description="Base URL override for Atlas Cloud image generation."
     )
     external_gemini_api_key: Optional[str] = Field(default=None, description="API key for Gemini image generation.")
+    external_minimax_api_key: Optional[str] = Field(default=None, description="API key for MiniMax generation.")
+    external_minimax_base_url: Optional[str] = Field(
+        default=None, description="Base URL for MiniMax generation. Hosted video supports the Global and China endpoints."
+    )
     external_openai_api_key: Optional[str] = Field(default=None, description="API key for OpenAI image generation.")
     external_gemini_base_url: Optional[str] = Field(
         default=None, description="Base URL override for Gemini image generation."
@@ -397,6 +407,11 @@ class InvokeAIAppConfig(BaseSettings):
             raise ValueError(f"base_url must not start with reserved path segment '/{first_segment}'")
         return f"/{v}"
 
+    def minimax_credentials(self) -> tuple[str | None, str | None]:
+        """Snapshot the key and its destination together before a hosted request."""
+        with EXTERNAL_PROVIDER_CONFIG_LOCK:
+            return self.external_minimax_api_key, self.external_minimax_base_url
+
     def update_config(self, config: dict[str, Any] | InvokeAIAppConfig, clobber: bool = True) -> None:
         """Updates the config, overwriting existing values.
 
@@ -411,11 +426,12 @@ class InvokeAIAppConfig(BaseSettings):
         else:
             new_config = config
 
-        for field_name in new_config.model_fields_set:
-            if field_name in self.model_fields_set and not clobber:
-                continue
+        with EXTERNAL_PROVIDER_CONFIG_LOCK:
+            for field_name in new_config.model_fields_set:
+                if field_name in self.model_fields_set and not clobber:
+                    continue
 
-            setattr(self, field_name, getattr(new_config, field_name))
+                setattr(self, field_name, getattr(new_config, field_name))
 
     def write_file(self, dest_path: Path, as_example: bool = False) -> None:
         """Write the current configuration to file. This will overwrite the existing file.

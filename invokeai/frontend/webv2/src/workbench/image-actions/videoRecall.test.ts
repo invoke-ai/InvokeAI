@@ -68,7 +68,56 @@ const wanMetadata = (extra: Record<string, unknown> = {}): Record<string, unknow
   ...extra,
 });
 
+it('recalls the matching installed model into local generation while a prompt-only recall keeps the paid service', () => {
+  const currentValues: VideoWidgetValues = {
+    ...createDefaultVideoWidgetValues([WAN_T2V]),
+    hostedH3: {
+      model: 'MiniMax-H3',
+      duration: 5,
+      ratio: '16:9',
+      resolution: '768P',
+      input: 'text',
+      generateAudio: true,
+    },
+  };
+  const recall = (kind: 'all' | 'remix' | 'prompts') =>
+    buildVideoRecallSettings({
+      currentValues,
+      kind,
+      models: [WAN_T2V],
+      metadata: wanMetadata(),
+    })?.values;
+  expect(currentValues.model?.key).toBe(WAN_T2V.key);
+  for (const kind of ['all', 'remix'] as const) {
+    expect(recall(kind)).toMatchObject({ hostedH3: undefined, model: { key: WAN_T2V.key } });
+  }
+  expect(recall('prompts')).toMatchObject({ hostedH3: currentValues.hostedH3, positivePrompt: 'a red fox running' });
+});
+
 describe('getVideoRecallCapabilities', () => {
+  it('restores only the saved hosted prompt into the current service', () => {
+    const metadata = {
+      external_provider: 'minimax',
+      external_model_id: 'MiniMax-H3-MG',
+      positive_prompt: 'Ocean waves',
+      width: 1024,
+      height: 768,
+      fps: 24,
+    };
+    const values = createDefaultVideoWidgetValues([WAN_T2V]);
+    expect(getVideoRecallCapabilities(metadata)).toEqual({
+      all: false,
+      prompts: true,
+      remix: false,
+      seed: false,
+      size: false,
+    });
+    expect(
+      buildVideoRecallSettings({ currentValues: values, kind: 'prompts', metadata, models: [WAN_T2V] })?.values
+    ).toEqual({ ...values, positivePrompt: 'Ocean waves' });
+    expect(buildVideoRecallSettings({ currentValues: values, kind: 'all', metadata, models: [WAN_T2V] })).toBeNull();
+  });
+
   it('derives per-verb availability from what the metadata contains', () => {
     expect(getVideoRecallCapabilities(wanMetadata())).toEqual({
       all: true,

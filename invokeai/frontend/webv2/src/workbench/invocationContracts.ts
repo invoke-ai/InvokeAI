@@ -1,4 +1,5 @@
 import type { GenerationIssue } from '@features/generation/contracts';
+import type { HostedH3Status } from '@features/video';
 import type { InvocationTemplatesSnapshot, WorkflowReadinessReason } from '@features/workflow/contracts';
 import type { CanvasInputIssue } from '@workbench/canvasGenerationInputs';
 
@@ -71,6 +72,7 @@ export type InvocationValidationReason =
   | RouteValidationReason;
 
 export interface ResolvedInvocationRoute extends InvocationRoute {
+  expectedMiniMaxRegion?: NonNullable<HostedH3Status['region']>;
   mode: InvocationMode;
   sourceValid: boolean;
   destinationValid: boolean;
@@ -90,6 +92,7 @@ export interface InvocationControllerState extends InvocationRoute {
 export interface InvocationRuntimeInputs {
   /** GPU noise choice; the aggregate still applies the project's current CPU-noise preference. */
   readonly noiseDevice: string;
+  readonly miniMaxStatus?: HostedH3Status | null;
   readonly templates: Readonly<InvocationTemplatesSnapshot>;
   readonly boardDestinationIds: readonly string[];
 }

@@ -7,10 +7,12 @@ import type {
   VideoModelSwitchAdjustment,
   VideoModelSwitchLossKey,
 } from '@features/video/core/videoPolicies';
+import type { ReactNode } from 'react';
 
-import { Box, HStack, Text } from '@chakra-ui/react';
+import { Box, HStack, NativeSelect, Stack, Text } from '@chakra-ui/react';
 import { isMainModelConfig } from '@features/generation/settings';
 import { ModelSelect, useHasModelPickerCandidates } from '@features/models/react';
+import { DEFAULT_HOSTED_H3 } from '@features/video/core/settings';
 import { getVideoModelSelectionResult, isVideoModelSelectable } from '@features/video/core/videoPolicies';
 import { syncVideoWidgetValuesWithModels } from '@features/video/core/widgetValues';
 import { flushWorkbenchDrafts } from '@platform/react/draftRegistry';
@@ -22,6 +24,47 @@ import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useVideoUiActions } from './VideoUiContext';
+
+export const VideoChoiceField = ({
+  label,
+  value,
+  onChange,
+  children,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  children: ReactNode;
+}) => (
+  <Field label={label}>
+    <NativeSelect.Root>
+      <NativeSelect.Field aria-label={label} value={value} onChange={(event) => onChange(event.currentTarget.value)}>
+        {children}
+      </NativeSelect.Field>
+      <NativeSelect.Indicator />
+    </NativeSelect.Root>
+  </Field>
+);
+
+export const VideoServiceField = ({ hosted }: { hosted: boolean }) => {
+  const { t } = useTranslation();
+  const { patchValues } = useVideoUiActions();
+  return (
+    <Stack px="2" pt="2">
+      <VideoChoiceField
+        label={t('widgets.video.hosted.service')}
+        value={hosted ? 'minimax' : 'local'}
+        onChange={(value) => {
+          flushWorkbenchDrafts();
+          patchValues({ hostedH3: value === 'minimax' ? { ...DEFAULT_HOSTED_H3 } : undefined });
+        }}
+      >
+        <option value="local">{t('widgets.video.hosted.local')}</option>
+        <option value="minimax">{t('widgets.video.hosted.serviceName')}</option>
+      </VideoChoiceField>
+    </Stack>
+  );
+};
 
 const MAIN_MODEL_TYPES: readonly ModelTaxonomyType[] = ['main'];
 

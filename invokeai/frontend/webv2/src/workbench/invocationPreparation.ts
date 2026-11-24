@@ -1,4 +1,5 @@
 import { getGalleryBoardDestinationIds } from '@features/gallery/queries';
+import { getMiniMaxStatus } from '@features/models';
 import { getGenerationDevicesSnapshot, resolveRandDeviceMetadata } from '@features/queue/devices';
 import { getInvocationTemplatesSnapshot } from '@features/workflow/react';
 import { registerAccountOwnedResource } from '@platform/state/accountLifecycle';
@@ -63,6 +64,7 @@ registerAccountOwnedResource({
 
 /** Capture after async prerequisites; the template owner replaces snapshots, so its published value is safe to share. */
 export const captureInvocationRuntimeInputs = (sourceId: InvocationSourceId): InvocationRuntimeInputs => ({
+  ...(sourceId === 'video' ? { miniMaxStatus: getMiniMaxStatus() ?? null } : {}),
   noiseDevice: resolveRandDeviceMetadata(false, getGenerationDevicesSnapshot().options),
   templates:
     sourceId === 'workflow' ? getInvocationTemplatesSnapshot() : { error: null, status: 'idle', templates: {} },

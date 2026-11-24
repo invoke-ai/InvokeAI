@@ -50,6 +50,20 @@ const panel = (selected: ModelConfig, overrides: Record<string, unknown> = {}) =
 });
 
 describe('placeInitialVideo', () => {
+  it('leaves hosted frame images intact when a Gallery or external request tries to extend a clip', () => {
+    const videoValues = panel(WAN_I2V, {
+      hostedH3: { model: 'MiniMax-H3', input: 'frames' },
+      firstFrameImage: { width: 800, height: 600, image_name: 'keep.png' },
+    });
+    expect(getVideoPlacementRoom({ models: [WAN_I2V], videoValues })).toEqual({
+      initialVideo: false,
+      conditioningAudio: false,
+      conditioningVideo: false,
+      referenceVideo: false,
+    });
+    expect(placeInitialVideo({ models: [WAN_I2V], video: clip, videoValues })).toEqual({ status: 'unsupported' });
+  });
+
   it('sets the initial video and displaces the first frame on a model that extends clips', () => {
     const placement = placeInitialVideo({
       models: [WAN_I2V],
@@ -248,11 +262,13 @@ describe('placeConditioningClip', () => {
       status: 'unsupported',
     });
     expect(getVideoPlacementRoom({ models: [REF2VA, LTX2], videoValues })).toEqual({
+      initialVideo: true,
       conditioningAudio: false,
       conditioningVideo: false,
       referenceVideo: true,
     });
     expect(getVideoPlacementRoom({ models: [LTX2], videoValues: panel(LTX2) })).toEqual({
+      initialVideo: true,
       conditioningAudio: true,
       conditioningVideo: true,
       referenceVideo: false,

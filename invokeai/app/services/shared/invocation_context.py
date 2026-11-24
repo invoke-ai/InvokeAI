@@ -487,6 +487,28 @@ class VideosInterface(InvocationContextInterface):
         except ItemAccessDeniedError:
             raise PermissionError(refusal)
 
+    def get_authorized_output_board(self, board_id: Optional[str] = None) -> Optional[str]:
+        """Resolve the output board and check the queue user's current permission to save there.
+
+        Paid providers may check before submitting the job. Saving checks again in case access changed.
+        """
+        board_id_ = None
+        if board_id:
+            board_id_ = board_id
+        elif isinstance(self._data.invocation, WithBoard) and self._data.invocation.board:
+            board_id_ = self._data.invocation.board.board_id
+
+        if self._services.configuration.multiuser:
+            viewer = self._viewer("Queue user is not authorized to save videos")
+            if board_id_ is not None:
+                try:
+                    self._services.board_access.require(
+                        board_id_, viewer.user_id, viewer.is_admin, BoardAction.AddMedia
+                    )
+                except (BoardAccessDeniedError, BoardRecordNotFoundException):
+                    raise PermissionError("Queue user is not authorized to save videos to this board")
+        return board_id_
+
     def save(
         self,
         source_path: Path,
@@ -497,6 +519,7 @@ class VideosInterface(InvocationContextInterface):
         board_id: Optional[str] = None,
         image_category: ImageCategory = ImageCategory.GENERAL,
         metadata: Optional[MetadataField] = None,
+        first_frame: Optional[Image] = None,
     ) -> VideoDTO:
         """Save a video produced by an invocation. The file at ``source_path`` is moved into
         the videos output folder; the caller should treat the path as consumed after this
@@ -516,23 +539,7 @@ class VideosInterface(InvocationContextInterface):
         elif isinstance(self._data.invocation, WithMetadata) and self._data.invocation.metadata:
             metadata_ = self._data.invocation.metadata.model_dump_json()
 
-        board_id_ = None
-        if board_id:
-            board_id_ = board_id
-        elif isinstance(self._data.invocation, WithBoard) and self._data.invocation.board:
-            board_id_ = self._data.invocation.board.board_id
-
-        # See ImagesInterface.save.
-        if self._services.configuration.multiuser:
-            viewer = self._viewer("Queue user is not authorized to save videos")
-            if board_id_ is not None:
-                # Checked when the output is saved, against the role the user has now.
-                try:
-                    self._services.board_access.require(
-                        board_id_, viewer.user_id, viewer.is_admin, BoardAction.AddMedia
-                    )
-                except (BoardAccessDeniedError, BoardRecordNotFoundException):
-                    raise PermissionError("Queue user is not authorized to save videos to this board")
+        board_id_ = self.get_authorized_output_board(board_id)
 
         workflow_ = self._get_workflow_json()
 
@@ -542,6 +549,7 @@ class VideosInterface(InvocationContextInterface):
 
         return self._services.videos.create(
             source_path=source_path,
+            first_frame=first_frame,
             width=width,
             height=height,
             duration=duration,

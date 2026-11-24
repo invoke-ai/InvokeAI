@@ -1,9 +1,12 @@
+import type * as GallerySlots from '@features/gallery/mediaSlot';
 import type { ModelConfig } from '@features/models';
 import type { VideoWidgetValues } from '@features/video';
 import type { Project } from '@workbench/projectContracts';
 import type { WorkbenchInternalStore } from '@workbench/workbenchStore';
+import type { ComponentProps } from 'react';
 
 import { ChakraProvider } from '@chakra-ui/react';
+import { GalleryHostProvider, type GalleryHost } from '@features/gallery/picker';
 import { GenerationUiProvider, type GenerationUiAdapter } from '@features/generation/ui/GenerationUiContext';
 import { seedArchitectureCapabilities } from '@features/models/core/architectureCapabilities.testing';
 import { setModelsSnapshotForTests } from '@features/models/data/modelsStore';
@@ -18,7 +21,7 @@ import { act, useSyncExternalStore } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { userEvent } from 'vitest/browser';
+import { page, userEvent } from 'vitest/browser';
 
 import { VideoUiAdapterProvider } from './VideoUiAdapter';
 
@@ -84,6 +87,7 @@ vi.mock('@features/models', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   ensureModelsLoaded: () => Promise.resolve(),
   getModelImageUrl: () => '',
+  useMiniMaxStatus: () => ({ data: { configured: true, region: 'global' } }),
   useModelsSelector: (selector: (snapshot: unknown) => unknown) => selector(useModelSnapshot()),
   useOpenModelInManager: () => undefined,
 }));
@@ -136,10 +140,24 @@ vi.mock('@features/models/react', async (importOriginal) => ({
     );
   },
 }));
-vi.mock('@features/gallery/mediaSlot', async (importOriginal) => ({
-  ...(await importOriginal<Record<string, unknown>>()),
-  GalleryMediaSlot: () => null,
-}));
+vi.mock('@features/gallery/mediaSlot', async (importOriginal) => {
+  const original = await importOriginal<typeof GallerySlots>();
+  // oxlint-disable-next-line react-perf/jsx-no-new-object-as-prop -- this host is created once by the module mock.
+  const host = {
+    galleryValues: {},
+    projectName: 'Video',
+    notifications: { reportError: vi.fn() },
+  } as unknown as GalleryHost;
+  return {
+    ...original,
+    GalleryMediaSlot: (props: ComponentProps<typeof original.GalleryMediaSlot>) =>
+      props.dropId.startsWith('hosted-h3-') ? (
+        <GalleryHostProvider host={host}>
+          <original.GalleryMediaSlot {...props} />
+        </GalleryHostProvider>
+      ) : null,
+  };
+});
 vi.mock('@features/generation/components', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   NegativePromptField: () => null,
@@ -266,6 +284,57 @@ afterEach(async () => {
 });
 
 describe('video model switch confirmation', () => {
+  it('switches between local and paid hosted generation and applies the model and input limits', async () => {
+    await render();
+    const select = (label: string) => host.querySelector<HTMLSelectElement>(`select[aria-label="${label}"]`)!;
+    const change = (label: string, value: string) =>
+      act(async () => {
+        await userEvent.selectOptions(select(label), value);
+      });
+    await change('Generation service', 'minimax');
+    await expect.element(page.getByText(/Each generated video uses your MiniMax API balance/)).toBeVisible();
+    expect(stored().hostedH3?.input).toBe('text');
+    expect(select('Model').options.length).toBe(7);
+    await change('Duration (seconds)', '4');
+    await change('Model', 'MiniMax-H3-Max-Turbo');
+    expect(select('Duration (seconds)').value).toBe('5');
+    expect([...select('Target Resolution').options].map((item) => item.value)).toEqual(['480P', '768P']);
+    await change('Input mode', 'frames');
+    expect(select('Aspect Ratio').value).toBe('adaptive');
+    expect(host.textContent).toContain('Last Frame');
+    await change('Input mode', 'references');
+    await change('Aspect Ratio', 'adaptive');
+    await change('Model', 'MiniMax-H3-Lite');
+    expect(select('Aspect Ratio').value).toBe('16:9');
+    await change('Generation service', 'local');
+    expect(modelSelect().value).toBe(ltxDev.key);
+    expect(stored().hostedH3).toBeUndefined();
+  });
+
+  it('names hosted image choosers by position and keeps focus at a reference slot across replacement and removal', async () => {
+    await render();
+    const change = (label: string, value: string) =>
+      act(() => userEvent.selectOptions(page.getByRole('combobox', { name: label, exact: true }), value));
+    await change('Generation service', 'minimax');
+    await change('Input mode', 'frames');
+    await expect.element(page.getByRole('button', { name: /Choose First Frame/ })).toBeVisible();
+    await expect.element(page.getByRole('button', { name: 'Replace Last Frame (dusk.png)' })).toBeVisible();
+    await change('Input mode', 'references');
+    const refs = (names: string[]) =>
+      names.map((image_name) => ({ kind: 'image', detail: 'match', image: { image_name, width: 1024, height: 768 } }));
+    await act(() => store.commands.widgets.patchValues('video', { references: refs(['a.png', 'b.png']) }));
+    const first = page
+      .getByRole('button', { name: 'Replace Reference image 1 (a.png)' })
+      .element() as HTMLButtonElement;
+    first.focus();
+    await act(() => store.commands.widgets.patchValues('video', { references: refs(['c.png', 'b.png']) }));
+    await expect.element(page.getByRole('button', { name: 'Replace Reference image 1 (c.png)' })).toHaveFocus();
+    await act(() => userEvent.click(page.getByRole('button', { name: 'Remove Reference image 1' })));
+    await expect.element(page.getByRole('button', { name: 'Replace Reference image 1 (b.png)' })).toHaveFocus();
+    await act(() => userEvent.click(page.getByRole('button', { name: 'Remove Reference image 1' })));
+    await expect.element(page.getByRole('button', { name: /Choose Reference image 1/ })).toHaveFocus();
+  });
+
   it('lists what an incompatible model discards, keeps everything on cancel, and clears exactly that on confirm', async () => {
     await render();
     const before = stored();

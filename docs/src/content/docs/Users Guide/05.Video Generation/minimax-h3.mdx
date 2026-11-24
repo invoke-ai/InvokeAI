@@ -1,11 +1,33 @@
 ---
 title: MiniMax H3
-lastUpdated: 2026-09-29
+lastUpdated: 2026-11-24
 alsoListedIn:
   - users-guide/models/local-models
 sidebar:
    order: 2
 ---
+
+import { Image } from 'astro:assets';
+import hostedGallery from '../assets/minimax-h3-api-gallery.png';
+
+## Generate with the hosted API
+
+Use the Video tab to generate a clip on your MiniMax account without installing H3 weights.
+
+1. In **Model Manager → API Keys**, select the MiniMax region where your API key was issued, enter the key and save. On a shared installation, ask the administrator to configure the provider. The server sends the prompt and any selected input images to that region.
+2. Open **Video**, select the MiniMax API option, then choose a model. Both regions offer H3, Highspeed, Lite and Max. The international service also offers Max-Turbo, MG and NC. The panel shows the resolutions and durations available for the selected model.
+3. Enter a prompt and choose a duration, resolution and soundtrack setting. For a first or last frame, select the image from your Gallery. For reference conditioning, choose up to nine Gallery images. Frame conditioning and reference conditioning are separate modes.
+4. Choose the destination board and generate. Invoke queues the request, waits for MiniMax to finish and saves the returned video in the Gallery. You can play it there after the provider's download URL expires.
+
+<Image src={hostedGallery} alt="The Video tab with MiniMax H3-Lite selected and a generated paper boat clip open from the project Inbox." />
+
+While Invoke waits for MiniMax, the job occupies one generation slot on the Invoke server. On a server with a single slot, other jobs stay queued.
+
+Each submitted generation can incur a charge. Canceling in Invoke stops waiting for the result. A task already submitted to MiniMax may still finish and be billed. If the connection drops during submission, check your MiniMax task history before submitting again.
+
+See the [international API reference](https://platform.minimax.io/docs/api-reference/video-generation-v2-create) or the [mainland China API reference](https://platform.minimax.cn/docs/api-reference/video-generation-v2-create) for current model options.
+
+## Generate with local weights
 
 MiniMax H3 creates high-quality videos with sound at a fixed framerate
 of 24 fps with a duration of up to ~15s. The FL2VA variant supports pure

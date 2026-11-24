@@ -11,7 +11,6 @@ from fastapi import Body, HTTPException, Query, Request, Response
 from fastapi import Path as PathParam
 from fastapi.responses import StreamingResponse
 from fastapi.routing import APIRouter
-from PIL import Image as PILImage
 from pydantic import BaseModel, Field, StringConstraints, ValidationError
 from python_multipart.exceptions import MultipartParseError
 from python_multipart.multipart import MultipartParser, parse_options_header
@@ -59,13 +58,9 @@ from invokeai.app.services.videos.videos_common import (
     VideoDTO,
     VideoUrlsDTO,
 )
-from invokeai.app.util.mp4_metadata import read_ftyp_major_brand
+from invokeai.app.util.mp4_metadata import is_mp4_file as _is_mp4_file
 from invokeai.app.util.video_ingest import VideoIngestError, ingest_media_to_mp4, probe_media_streams
-from invokeai.app.util.video_thumbnails import (
-    VideoDecodeTimeoutError,
-    extract_representative_video_frame,
-    probe_video_with_codec,
-)
+from invokeai.app.util.video_thumbnails import probe_decodable_video as _probe_decodable_video
 
 videos_router = APIRouter(prefix="/v1/videos", tags=["videos"])
 
@@ -355,40 +350,6 @@ async def _stream_video_upload(request: Request, destination: BinaryIO) -> _Vide
     if not parser_state.saw_file_part:
         raise HTTPException(status_code=422, detail="Expected a video file in the upload")
     return parser_state
-
-
-def _is_mp4_file(path: Path) -> bool:
-    try:
-        major_brand = read_ftyp_major_brand(path)
-    except OSError:
-        return False
-    return major_brand is not None and major_brand != b"qt  "
-
-
-def _probe_decodable_video(path: Path) -> tuple[tuple[int, int, float, Optional[float]], Optional[PILImage.Image]]:
-    """Probes metadata and proves the video has a decodable frame.
-
-    Returns the metadata plus the decoded frame so the save path can reuse it as the
-    thumbnail source instead of spawning another decode worker. The frame comes from the
-    thumbnail seek ladder (see extract_representative_video_frame): the first informative
-    frame found starting ~1s in, else the best-scoring one, with frame 0 as the last rung.
-    Acceptance is thereby slightly WIDER than a frame-0 check: a file whose frame 0 is
-    corrupt but whose later frame decodes is accepted rather than 415'd. A decode timeout
-    is contention on a loaded server, not evidence the video is bad — probe_video already
-    succeeded — so it yields (metadata, None) and the upload proceeds, with save-time
-    thumbnail extraction as the backstop.
-    """
-    width, height, duration, fps, codec = probe_video_with_codec(path)
-    if codec is None or codec.lower() not in {"h264", "avc", "avc1", "libx264"}:
-        raise ValueError("Video must use a browser-compatible H.264/AVC codec")
-    metadata = (width, height, duration, fps)
-    try:
-        first_frame = extract_representative_video_frame(path, duration, fps, raise_on_timeout=True)
-    except VideoDecodeTimeoutError:
-        return metadata, None
-    if first_frame is None:
-        raise ValueError("Video has no decodable frame")
-    return metadata, first_frame
 
 
 # The body of a video upload is parsed by hand (see _stream_video_upload) so the file lands in

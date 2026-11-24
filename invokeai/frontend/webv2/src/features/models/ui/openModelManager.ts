@@ -8,24 +8,30 @@ import type { ModelTaxonomyType } from '@features/models/core/types';
 export const openModelManager = ({
   modelType,
   projectId,
+  providerId,
   search,
-}: { modelType?: ModelTaxonomyType; projectId?: string | null; search?: string } = {}): void => {
+}: { modelType?: ModelTaxonomyType; projectId?: string | null; providerId?: string; search?: string } = {}): void => {
   const navigate = () => {
     window.location.hash = projectId ? `#/models?project=${encodeURIComponent(projectId)}` : '#/models';
   };
 
-  if (modelType === undefined && search === undefined) {
+  if (modelType === undefined && search === undefined && providerId === undefined) {
     navigate();
     return;
   }
 
-  void import('@features/models/launchpad').then(({ requestAddModelsSearch, requestAddModelsTypeFilter }) => {
-    if (modelType !== undefined) {
-      requestAddModelsTypeFilter(modelType);
+  void import('@features/models/launchpad').then(
+    ({ openExternalProviderKeys, requestAddModelsSearch, requestAddModelsTypeFilter }) => {
+      if (modelType !== undefined) {
+        requestAddModelsTypeFilter(modelType);
+      }
+      if (search !== undefined) {
+        requestAddModelsSearch(search);
+      }
+      if (providerId !== undefined) {
+        openExternalProviderKeys(providerId);
+      }
+      navigate();
     }
-    if (search !== undefined) {
-      requestAddModelsSearch(search);
-    }
-    navigate();
-  });
+  );
 };

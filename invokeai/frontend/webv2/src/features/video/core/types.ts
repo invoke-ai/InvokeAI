@@ -8,6 +8,19 @@ import type {
 } from '@features/generation/contracts';
 import type { SeedMode } from '@platform/core/seed';
 
+export interface HostedH3Settings {
+  model: string;
+  duration: number;
+  resolution: string;
+  ratio: string;
+  generateAudio: boolean;
+  input: 'text' | 'frames' | 'references';
+}
+export interface HostedH3Status {
+  configured: boolean;
+  region: 'cn' | 'global' | null;
+}
+
 export type VideoGenerationMode =
   | 'txt2vid'
   | 'first-frame'
@@ -141,6 +154,7 @@ export interface VideoSettings extends DynamicPromptsSettings {
 }
 
 export interface VideoWidgetValues extends VideoSettings {
+  hostedH3?: HostedH3Settings;
   /** The selected main model; null until the user picks one (or none is installed). */
   model: MainModelConfig | null;
 }

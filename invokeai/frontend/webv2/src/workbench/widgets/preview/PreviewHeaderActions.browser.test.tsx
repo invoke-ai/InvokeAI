@@ -112,6 +112,7 @@ const openItemMenu = vi.hoisted(() => vi.fn());
 const itemActions = vi.hoisted(() => ({
   canUseAsConditioningClip: { audio: true, video: true },
   canUseAsReferenceImage: false,
+  canUseAsInitialVideo: true,
   canUseAsReferenceVideo: true,
   deriveImageRecallCapabilities: vi.fn(),
   recallImageData: vi.fn(() => Promise.resolve()),

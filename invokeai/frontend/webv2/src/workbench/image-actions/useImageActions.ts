@@ -114,6 +114,7 @@ import { buildPbrMapsGraph } from './pbrMapsGraph';
 export interface ImageActions extends GalleryItemActions {
   canUseAsReferenceImage: boolean;
   canUseAsReferenceVideo: boolean;
+  canUseAsInitialVideo: boolean;
   canUseAsConditioningClip: Record<VideoConditioningRole, boolean>;
   copyImage: (image: GalleryImage) => Promise<void>;
   createCanvasFromImages: (images: readonly GalleryImage[]) => Promise<void>;
@@ -195,7 +196,12 @@ const holdPendingCheckNotice = (title: string): (() => void) => {
 /** Booleans so Video panel edits re-render consumers only when an answer flips (the selector compares shallowly). */
 const createVideoPlacementRoomSelector = (models: readonly ModelConfig[], projectId: string | undefined) => {
   let lastValues: Record<string, unknown> | null = null;
-  let lastResult: VideoPlacementRoom = { conditioningAudio: false, conditioningVideo: false, referenceVideo: false };
+  let lastResult: VideoPlacementRoom = {
+    initialVideo: true,
+    conditioningAudio: false,
+    conditioningVideo: false,
+    referenceVideo: false,
+  };
 
   return (snapshot: WorkbenchSnapshot): VideoPlacementRoom => {
     const project = projectId
@@ -279,6 +285,7 @@ export const useImageActions = ({
     [models, projectId]
   );
   const videoPlacementRoom = useWorkbenchSelector(selectVideoPlacementRoom);
+  const canUseAsInitialVideo = videoPlacementRoom.initialVideo;
   const canUseAsReferenceVideo = videoPlacementRoom.referenceVideo;
   const { conditioningAudio, conditioningVideo } = videoPlacementRoom;
   const canUseAsConditioningClip = useMemo(
@@ -1419,10 +1426,15 @@ export const useImageActions = ({
         ),
       canUseAsConditioningClip,
       canUseAsReferenceImage,
+      canUseAsInitialVideo,
       canUseAsReferenceVideo,
       sendToInitialVideo: (item) => {
         const placement = placeInitialVideo({ models, video: item, videoValues: getLatestVideoValues() });
 
+        if (placement.status === 'unsupported') {
+          notifications.add({ kind: 'info', title: t('widgets.video.hosted.clipUnsupported') });
+          return;
+        }
         if (placement.status === 'full') {
           notifications.add({
             kind: 'info',
@@ -1505,6 +1517,7 @@ export const useImageActions = ({
     boards,
     canUseAsConditioningClip,
     canUseAsReferenceImage,
+    canUseAsInitialVideo,
     canUseAsReferenceVideo,
     confirmImageDeletion,
     currentGenerateValues,
