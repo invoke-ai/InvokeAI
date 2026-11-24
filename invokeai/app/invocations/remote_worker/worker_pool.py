@@ -238,6 +238,13 @@ def _is_local_handoff(item_id: int) -> bool:
         return int(item_id) in _LOCAL_HANDOFF_ITEMS
 
 
+def _queue_is_paused(services: Any) -> bool:
+    """Use the primary session processor's pause state for remote dispatch."""
+    processor = getattr(services, "session_processor", None)
+    get_status = getattr(processor, "get_status", None)
+    return callable(get_status) and get_status().is_started is False
+
+
 def _local_worker_reservation(services: Any, first_seen: float | None) -> tuple[int, float | None]:
     """Temporarily reserve the oldest Distributed items for idle Local workers.
 
@@ -306,6 +313,8 @@ def _claim_for_worker(
     excluded: set[int],
     local_reservation: int = 0,
 ) -> tuple[Any, PoolSettings] | None:
+    if _queue_is_paused(services):
+        return None
     queue = services.session_queue
     reserved = 0
     for item_id in _queue_item_ids(services, queue_id=queue_id, user_id=user_id, statuses=("pending", "waiting")):
@@ -327,6 +336,10 @@ def _claim_for_worker(
         if settings.mode == "Distributed" and reserved < local_reservation:
             reserved += 1
             continue
+
+        # Pause may have been requested while inspecting eligible items.
+        if _queue_is_paused(services):
+            return None
 
         # The conditional UPDATE is atomic across threads/processes/database
         # backends; at most one local or remote execution lane wins.
@@ -1162,6 +1175,11 @@ class _RemoteWorkerPool:
                 continue
 
             idle_checks = 0
+            if _queue_is_paused(self.services):
+                local_preference_first_seen = None
+                time.sleep(0.25)
+                continue
+
             lock = _slot_lock(worker)
             if not lock.acquire(blocking=False):
                 time.sleep(0.05)
@@ -1182,6 +1200,11 @@ class _RemoteWorkerPool:
                         )
                         last_unavailable_log = now
                     time.sleep(2.0)
+                    continue
+
+                # The availability request may have been in flight during Pause.
+                if _queue_is_paused(self.services):
+                    local_preference_first_seen = None
                     continue
 
                 local_reservation, local_preference_first_seen = _local_worker_reservation(

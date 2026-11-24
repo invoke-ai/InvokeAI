@@ -371,3 +371,77 @@ def test_cancel_remote_deletes_confirmed_canceled_worker_item(monkeypatch):
 
     client.cancel_queue_item.assert_called_once_with(42, "default")
     client.delete_queue_item.assert_called_once_with(42, "default")
+
+
+def test_worker_lane_waits_for_resume_and_finishes_active_job(monkeypatch, pool_environment):
+    env = pool_environment
+    state = SimpleNamespace(is_started=False)
+    env.services.session_processor = SimpleNamespace(get_status=lambda: state)
+    pool = worker_pool._RemoteWorkerPool(env.services, "default", "user-1")
+    remaining = [env.queue_item, SimpleNamespace(item_id=322)]
+    rendered = []
+    client = Mock()
+    lock = Mock()
+    lock.acquire.return_value = True
+
+    def claim(*_args, **_kwargs):
+        assert state.is_started
+        return remaining.pop(0), env.settings
+
+    def run_job(_services, item, *_args, **_kwargs):
+        rendered.append(item.item_id)
+        # Simulate Pause during an active render; the next claim must wait.
+        state.is_started = False
+        return "completed"
+
+    pauses = []
+
+    def sleep(_seconds):
+        if remaining and not state.is_started:
+            pauses.append(len(rendered))
+            assert client.get_current_item.call_count == len(rendered)
+            state.is_started = True
+
+    monkeypatch.setattr(worker_pool, "_park_remote_only_items", lambda *_args: None)
+    monkeypatch.setattr(worker_pool, "_has_eligible_item", lambda *_args, **_kwargs: bool(remaining))
+    monkeypatch.setattr(worker_pool, "_slot_lock", lambda _worker: lock)
+    monkeypatch.setattr(remote_nodes, "_remote_client", lambda *_args: client)
+    monkeypatch.setattr(worker_pool, "_claim_for_worker", claim)
+    monkeypatch.setattr(worker_pool, "_run_remote_job", run_job)
+    monkeypatch.setattr(worker_pool.time, "sleep", sleep)
+
+    pool._run_lane(env.worker)
+
+    assert pauses == [0, 1]
+    assert rendered == [321, 322]
+    assert lock.release.call_count == 2
+
+
+def test_worker_lane_rechecks_pause_after_availability_request(monkeypatch, pool_environment):
+    env = pool_environment
+    state = SimpleNamespace(is_started=True)
+    env.services.session_processor = SimpleNamespace(get_status=lambda: state)
+    pool = worker_pool._RemoteWorkerPool(env.services, "default", "user-1")
+    client = Mock()
+    lock = Mock()
+    lock.acquire.return_value = True
+    claim = Mock()
+    eligible = [True]
+
+    def probe():
+        state.is_started = False
+        eligible[0] = False
+
+    client.get_current_item.side_effect = probe
+    monkeypatch.setattr(worker_pool, "_park_remote_only_items", lambda *_args: None)
+    monkeypatch.setattr(worker_pool, "_has_eligible_item", lambda *_args, **_kwargs: eligible[0])
+    monkeypatch.setattr(worker_pool, "_slot_lock", lambda _worker: lock)
+    monkeypatch.setattr(remote_nodes, "_remote_client", lambda *_args: client)
+    monkeypatch.setattr(worker_pool, "_claim_for_worker", claim)
+    monkeypatch.setattr(worker_pool.time, "sleep", lambda _seconds: None)
+
+    pool._run_lane(env.worker)
+
+    client.get_current_item.assert_called_once()
+    claim.assert_not_called()
+    lock.release.assert_called_once()

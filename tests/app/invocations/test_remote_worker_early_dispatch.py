@@ -135,3 +135,49 @@ def test_local_priority_ignores_paused_or_lent_gpu_workers(monkeypatch):
     processor._workers[0].queue_item = None
     processor._resume_event.clear()
     assert processor.get_available_local_worker_count() == 0
+
+
+def test_remote_claim_respects_pause_and_resume_in_both_modes(monkeypatch):
+    from threading import Event
+
+    from invokeai.app.services.session_processor.session_processor_default import DefaultSessionProcessor
+
+    for mode, status in (("Distributed", "pending"), ("Remote Only", "pending"), ("Remote Only", "waiting")):
+        services, worker, queue, items = _priority_claim_environment(monkeypatch, [mode])
+        items[1].status = status
+        processor = object.__new__(DefaultSessionProcessor)
+        processor._resume_event = Event()
+        processor._workers = []
+        services.session_processor = processor
+        processor.pause()
+
+        assert (
+            worker_pool._claim_for_worker(services, queue_id="default", user_id="user", worker=worker, excluded=set())
+            is None
+        )
+        queue.transition_queue_item_if_status.assert_not_called()
+
+        processor.resume()
+        claimed = worker_pool._claim_for_worker(
+            services, queue_id="default", user_id="user", worker=worker, excluded=set()
+        )
+        assert claimed is not None
+        assert claimed[0] is items[1]
+        queue.transition_queue_item_if_status.assert_called_once()
+
+
+def test_remote_claim_rechecks_pause_after_reading_candidate(monkeypatch):
+    services, worker, queue, items = _priority_claim_environment(monkeypatch, ["Distributed"])
+    state = SimpleNamespace(is_started=True)
+    services.session_processor = SimpleNamespace(get_status=lambda: state)
+
+    def read_candidate(item_id):
+        state.is_started = False
+        return items[item_id]
+
+    queue.get_queue_item.side_effect = read_candidate
+    assert (
+        worker_pool._claim_for_worker(services, queue_id="default", user_id="user", worker=worker, excluded=set())
+        is None
+    )
+    queue.transition_queue_item_if_status.assert_not_called()
