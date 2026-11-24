@@ -519,6 +519,7 @@ def test_linear_sidecar_patches(device: str, patch_under_test: PatchUnderTest):
             patch=patch,
             patch_weight=weight,
             original_weights=OriginalWeightsStorage(),
+            shared_storage=set(),
         )
 
     # Wrap the original layer in a custom layer and add the patch to it as a sidecar.
