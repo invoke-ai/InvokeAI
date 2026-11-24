@@ -4,6 +4,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import numpy
+import pytest
 import torch
 from PIL import Image, ImageFilter
 
@@ -37,6 +38,7 @@ _COMPOSITION_NODES_SPEC.loader.exec_module(composition_nodes)
 InvokeAdjustImageHuePlusInvocation = composition_nodes.InvokeAdjustImageHuePlusInvocation
 InvokeImageBlendInvocation = composition_nodes.InvokeImageBlendInvocation
 InvokeImageDilateOrErodeInvocation = composition_nodes.InvokeImageDilateOrErodeInvocation
+InvokeImageValueThresholdsInvocation = composition_nodes.InvokeImageValueThresholdsInvocation
 
 
 def _build_context(input_image: Image.Image) -> MagicMock:
@@ -527,3 +529,23 @@ def test_dilate_keeps_16_bit_grayscale_mode() -> None:
     assert saved_image.mode == "I;16"
     saved = numpy.asarray(saved_image)
     assert saved[2, 1] == 40000 and saved[1, 2] == 40000 and saved[0, 0] == 0
+
+
+@pytest.mark.parametrize("lightness_only", [False, True])
+def test_value_thresholds_keeps_image_size_and_thresholds_every_pixel(lightness_only: bool) -> None:
+    # 13x10: neither side is a multiple of 8. Left half dark, right half light.
+    pixels = numpy.zeros((10, 13, 3), dtype=numpy.uint8)
+    pixels[:, :6] = 40
+    pixels[:, 6:] = 220
+    input_image = Image.fromarray(pixels)
+
+    context = _build_context(input_image)
+    InvokeImageValueThresholdsInvocation(image=ImageField(image_name="in"), lightness_only=lightness_only).invoke(
+        context
+    )
+    saved_image = context.images.save.call_args.args[0]
+
+    assert saved_image.size == (13, 10)
+    saved = numpy.asarray(saved_image.convert("L"))
+    assert (saved[:, :6] == 0).all()
+    assert (saved[:, 6:] == 255).all()

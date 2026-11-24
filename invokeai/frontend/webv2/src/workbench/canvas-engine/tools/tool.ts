@@ -20,7 +20,7 @@ import type { SamInteractionState, SamVisualInput } from '@workbench/canvas-engi
 import type { FloatingSelection, FloatLiftResult } from '@workbench/canvas-engine/selection/floatingSelection';
 import type { SelectionCommit } from '@workbench/canvas-engine/selection/selectionState';
 import type { LayerTransform } from '@workbench/canvas-engine/transform/transformMath';
-import type { PlacedSurface, PointerInput, PointerModifiers, Rect, ToolId, Vec2 } from '@workbench/canvas-engine/types';
+import type { PlacedSurface, PointerInput, Rect, ToolId, Vec2 } from '@workbench/canvas-engine/types';
 import type { Viewport } from '@workbench/canvas-engine/viewport';
 
 /** Before/after images sized to `dirtyRect`, for exact undo/redo and persistence. */
@@ -163,9 +163,6 @@ export interface Tool {
   onModifierKey?(ctx: ToolContext, code: 'Space' | 'Alt' | 'Shift', pressed: boolean): boolean;
   /** Drop or reconcile an unfinished gesture when its document target changes. Never dispatch from this hook. */
   onDocumentChanged?(ctx: ToolContext): void;
-
-  /** Wheel over the canvas; `screenAnchor` is the CSS-pixel cursor position. */
-  onWheel?(ctx: ToolContext, deltaY: number, screenAnchor: { x: number; y: number }, modifiers: PointerModifiers): void;
   cursor?(ctx: ToolContext): string;
   /** The pointer pipeline must not turn this tool's alt-hold into the temporary color picker. */
   readonly usesAltKey?: boolean;
