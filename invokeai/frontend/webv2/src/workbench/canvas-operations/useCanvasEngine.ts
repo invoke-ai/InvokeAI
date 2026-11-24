@@ -22,6 +22,7 @@ import { useMemo, useSyncExternalStore } from 'react';
 
 import type { EngineDeps } from './engineRegistry';
 
+import { createCanvasEngine } from './createCanvasEngine';
 import { getOrCreateEngine, releaseEngine } from './engineRegistry';
 
 export type CanvasEngineHandle = CanvasEngine;
@@ -59,7 +60,7 @@ export const createCanvasEngineResource = (projectId: string, deps: EngineDeps):
     subscribe: (listener) => {
       listeners.add(listener);
       if (listeners.size === 1) {
-        engine = getOrCreateEngine(projectId, deps);
+        engine = getOrCreateEngine(projectId, deps, createCanvasEngine);
         listener();
       }
       return () => {
