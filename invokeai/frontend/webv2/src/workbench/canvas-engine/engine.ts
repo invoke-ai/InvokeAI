@@ -159,7 +159,7 @@ import {
   type RasterCompositeExportSnapshot,
 } from '@workbench/canvas-engine/exportRasterComposite';
 import { createPointerPipeline, type PointerPipeline } from '@workbench/canvas-engine/input/pointerPipeline';
-import { createWheelHandler } from '@workbench/canvas-engine/input/wheel';
+import { createWheelInput } from '@workbench/canvas-engine/input/wheel';
 import { isEmpty, union } from '@workbench/canvas-engine/math/rect';
 import { hasSpatialAdjustments } from '@workbench/canvas-engine/render/adjustments';
 import { createColorSampler } from '@workbench/canvas-engine/render/colorSample';
@@ -390,6 +390,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     layerPixelEpoch: stores.layerPixelEpoch,
     documentEpoch: stores.documentEpoch,
     ruleOfThirds: stores.ruleOfThirds,
+    scrollInput: stores.scrollInput,
     shapeOptions: stores.shapeOptions,
     showBbox: stores.showBbox,
     showGrid: stores.showGrid,
@@ -398,6 +399,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     textEditSession: stores.textEditSession,
     vectorEditSession: stores.vectorEditSession,
     textOptions: stores.textOptions,
+    trackpadDetected: stores.trackpadDetected,
     transformOptions: stores.transformOptions,
     transformSession: stores.transformSession,
     pendingTransformLayerId: stores.pendingTransformLayerId,
@@ -1448,7 +1450,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
 
   const renderController = new RenderController({
     applyCursor: (value) => applyCursorToInput(value),
-    getInputHandlers: () => ({ ...pipeline, onPointerLeave: onCanvasPointerLeave, onWheel, reset: resetInput }),
+    getInputHandlers: () => ({ ...pipeline, ...wheelInput, onPointerLeave: onCanvasPointerLeave, reset: resetInput }),
     isEngineDisposed: () => disposed,
     onPageHide: () => onPageHide(),
     onVisibilityChange: () => onVisibilityChange(),
@@ -1948,6 +1950,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     getKeyOwnerResolver: () => renderController.getKeyOwnerResolver(),
     getToolContext: () => toolContext,
     handleEscape: handleEscapePriority,
+    hasFocus: () => typeof document === 'undefined' || document.hasFocus(),
     hasTool: (id) => tools.has(id),
     isReplaying: () => history.isReplaying(),
     maybeCommitModalSession: () => commitOpenTextSession(),
@@ -1957,13 +1960,20 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     viewport,
   });
 
-  const onWheel = createWheelHandler({
+  // A view change under a still pointer moves the document beneath it; hover-derived tool state must follow.
+  const unsubscribeHoverRefresh = viewport.subscribe(() => pipeline.refreshHover());
+
+  const wheelInput = createWheelInput({
     getActiveTool: activeTool,
+    getControlKeyState: () => pipeline.controlKeyState(),
     getInputElement: () => renderController.getInputElement(),
     getInvertBrushSizeScroll: () => stores.invertBrushSizeScroll.get(),
-    getToolContext: () => toolContext,
+    getScrollInput: () => stores.scrollInput.get(),
     invalidate: (payload) => scheduler.invalidate(payload),
+    isGestureActive: () => pipeline.isGestureActive(),
+    onWheelWithoutControl: () => pipeline.onWheelWithoutControl(),
     stepActiveBrushSize,
+    trackpadDetected: stores.trackpadDetected,
     viewport,
   });
 
@@ -1978,6 +1988,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   const onVisibilityChange = (): void => {
     if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
       kickPendingFlush();
+      // Key releases while hidden never arrive; held keys (Space, Alt, Control) must not outlive the page.
+      onWindowBlur();
     }
   };
   const onWindowBlur = (): void => {
@@ -2558,6 +2570,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     cleanup.run(() => colorSamples.dispose());
     cleanup.run(() => activeTool()?.onDeactivate?.(toolContext));
     cleanup.run(unsubscribeViewport);
+    cleanup.run(unsubscribeHoverRefresh);
     cleanup.run(unsubscribeBrushOptions);
     cleanup.run(unsubscribeEraserOptions);
     cleanup.run(unsubscribeCheckerboard);

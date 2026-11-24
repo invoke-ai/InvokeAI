@@ -45,6 +45,7 @@ import type {
   LayerQuickSwitchState,
   LayerThumbnailStatus,
   MarqueeToolOptions,
+  ScrollInput,
   ShapeToolOptions,
   TextEditSession,
   TextToolOptions,
@@ -203,6 +204,7 @@ export interface CanvasInteractionState {
   /** Advances after the engine reacted to the document change. */
   documentEpoch: number;
   ruleOfThirds: boolean;
+  scrollInput: ScrollInput;
   shapeOptions: ShapeToolOptions;
   showBbox: boolean;
   showGrid: boolean;
@@ -211,6 +213,8 @@ export interface CanvasInteractionState {
   stagingHidesOverlays: boolean;
   textEditSession: TextEditSession | null;
   textOptions: TextToolOptions;
+  /** Engine-set on trackpad proof; callers restore it. */
+  trackpadDetected: boolean;
   transformOptions: TransformOptions;
   transformSession: TransformSession | null;
   /** Waits for fresh pixels to persist; clears on tool switch, selection change, Escape, removal or failure. */
@@ -236,11 +240,13 @@ export type CanvasWritableInteractionKey = Extract<
   | 'layerQuickSwitch'
   | 'marqueeOptions'
   | 'ruleOfThirds'
+  | 'scrollInput'
   | 'shapeOptions'
   | 'showBbox'
   | 'showGrid'
   | 'snapToGrid'
   | 'textOptions'
+  | 'trackpadDetected'
   | 'transformOptions'
 >;
 
@@ -815,6 +821,7 @@ export type {
   LayerQuickSwitchState,
   LayerThumbnailStatus,
   MarqueeToolOptions,
+  ScrollInput,
   ShapeToolKind,
   ShapeToolOptions,
   ShapeToolTarget,

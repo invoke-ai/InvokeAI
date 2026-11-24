@@ -296,6 +296,18 @@ def _malformed_cases() -> list[tuple[str, dict[str, torch.Tensor], str]]:
     peft_dora = _make_turbo_style_state_dict()
     peft_dora["blocks.0.attn.out_proj.lora_magnitude_vector.weight"] = torch.ones(HIDDEN)
 
+    # Valid H3 adapter plus a complete text-encoder pair, which would map onto no H3 module.
+    with_text_encoder = _make_turbo_style_state_dict()
+    with_text_encoder["lora_te_text_model_encoder_layers_0_mlp_fc1.lora_A.weight"] = torch.zeros(RANK, HIDDEN)
+    with_text_encoder["lora_te_text_model_encoder_layers_0_mlp_fc1.lora_B.weight"] = torch.zeros(HIDDEN, RANK)
+
+    def _with_layer(stem: str, kohya: bool = False) -> dict[str, torch.Tensor]:
+        sd = _make_turbo_style_state_dict()
+        down, up = _lora_pair(HIDDEN, HIDDEN)
+        sd[f"{stem}.attn.out_proj.lora_A.weight"] = down
+        sd[f"{stem}.attn.out_proj.lora_B.weight"] = up
+        return _to_kohya(sd, alpha=RANK) if kohya else sd
+
     return [
         ("kohya-down-only", kohya_down_only, r"\['alpha', 'lora_down.weight'\]"),
         ("dotted-A-only", dotted_a_only, r"\['lora_A.weight'\]"),
@@ -303,6 +315,16 @@ def _malformed_cases() -> list[tuple[str, dict[str, torch.Tensor], str]]:
         ("dotted-and-kohya", dotted_and_kohya, "two spellings"),
         ("mixed-A/B-and-down/up", mixed_spellings, "'lora_A.weight', 'lora_B.weight', 'lora_down.weight'"),
         ("peft-dora-magnitude", peft_dora, "lora_magnitude_vector"),
+        ("foreign-text-encoder-pair", with_text_encoder, "lora_te_text_model.*targets no MiniMax H3"),
+        ("zero-padded-block", _with_layer("blocks.01"), "'blocks.01.attn.out_proj' has block index '01'"),
+        (
+            "zero-padded-block-kohya",
+            _with_layer("blocks.01", kohya=True),
+            "'blocks.01.attn.out_proj' has block index '01'",
+        ),
+        ("non-ascii-digit-block", _with_layer("blocks.1\u0660"), "has block index"),
+        ("out-of-range-block", _with_layer("blocks.50"), "index '50'; expected 0-49"),
+        ("out-of-range-refiner-block", _with_layer("token_refiner.blocks.2"), "index '2'; expected 0-1"),
     ]
 
 
