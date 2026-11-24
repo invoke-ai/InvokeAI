@@ -1,7 +1,7 @@
 ---
 title: Managing media generation models
 description: Install, add API keys for, edit and maintain image and video models in the Model Manager.
-lastUpdated: 2026-10-26
+lastUpdated: 2026-11-10
 ---
 
 import { Card, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
@@ -80,6 +80,8 @@ The Model Manager is for administrators: in [multi-user mode](/configuration/mul
 4. Follow the downloads in the **Install queue**. Large models take a while. A finished model appears in the library and in every model picker. Each row's stop button cancels its install; the **X** on a finished row only removes it from the list. Cancelling a download that has already fetched data asks first, since that data is discarded, and **Cancel all…** confirms how many installs it stops.
 
 </Steps>
+
+Use **Visit source** on a starter model to open its model page in a new tab. If it has several source pages, choose one from the menu. These links stay in the installed model's details after downloading, including for dependencies installed with it.
 
 Until a model that can generate is installed, the Launchpad's **Home** page says so. Administrators can install the recommended starter bundle there in one click (it says what the bundle suits and links the hardware requirements) or open another bundle in the Model Manager; other users see a notice to ask an administrator. Home also counts installs that failed or need attention, with **Review** to open the install queue.
 

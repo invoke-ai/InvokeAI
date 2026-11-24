@@ -33,12 +33,15 @@ def slerp(
         v2 (np.ndarray): Interpolation vector between v0 and v1
     """
     inputs_are_torch = False
+    dtype = None
+    # Interpolate in float32: numpy has no bfloat16, and a float16 norm overflows for a full-size latent.
     if not isinstance(v0, np.ndarray):
         inputs_are_torch = True
-        v0 = v0.detach().cpu().numpy()
+        dtype = v0.dtype
+        v0 = v0.detach().cpu().float().numpy()
     if not isinstance(v1, np.ndarray):
         inputs_are_torch = True
-        v1 = v1.detach().cpu().numpy()
+        v1 = v1.detach().cpu().float().numpy()
 
     dot = np.sum(v0 * v1 / (np.linalg.norm(v0) * np.linalg.norm(v1)))
     if np.abs(dot) > DOT_THRESHOLD:
@@ -53,7 +56,7 @@ def slerp(
         v2 = s0 * v0 + s1 * v1
 
     if inputs_are_torch:
-        v2 = torch.from_numpy(v2).to(device)
+        v2 = torch.from_numpy(v2).to(device=device, dtype=dtype)
 
     return v2
 
@@ -63,7 +66,7 @@ def slerp(
     title="Blend Latents",
     tags=["latents", "blend", "mask"],
     category="latents",
-    version="1.1.0",
+    version="1.1.1",
 )
 class BlendLatentsInvocation(BaseInvocation):
     """Blend two latents using a given alpha. If a mask is provided, the second latents will be masked before blending.
