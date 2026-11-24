@@ -40,7 +40,7 @@ MiniMaxRatio = Literal["adaptive", "21:9", "16:9", "4:3", "1:1", "3:4", "9:16"]
 MiniMaxRegion = Literal["global", "cn"]
 
 _API_ORIGINS: dict[MiniMaxRegion, str] = {"global": "https://api.minimax.io", "cn": "https://api.minimax.cn"}
-_GLOBAL_ONLY = {"MiniMax-H3-Max-Turbo", "MiniMax-H3-MG", "MiniMax-H3-NC"}
+GLOBAL_ONLY_MODELS = ("MiniMax-H3-Max-Turbo", "MiniMax-H3-MG", "MiniMax-H3-NC")
 _POLL_INTERVAL = 5
 _POLL_TIMEOUT = 30 * 60
 _REQUEST_TIMEOUT = 30
@@ -73,7 +73,7 @@ class MiniMaxVideoRequest:
     reference_images: Sequence[Callable[[], Image]] = ()
 
     def validate(self, region: MiniMaxRegion) -> None:
-        if self.model not in get_args(MiniMaxModel) or (region == "cn" and self.model in _GLOBAL_ONLY):
+        if self.model not in get_args(MiniMaxModel) or (region == "cn" and self.model in GLOBAL_ONLY_MODELS):
             raise ValueError("The selected MiniMax H3 model is unavailable in the configured region.")
         if self.model == "MiniMax-H3":
             resolutions = ("480P", "768P", "2K") if region == "global" else ("768P", "2K")

@@ -97647,7 +97647,16 @@
             "orig_default": "MiniMax-H3",
             "orig_required": false,
             "title": "Model",
-            "type": "string"
+            "type": "string",
+            "ui_choice_labels": {
+              "MiniMax-H3": "MiniMax-H3",
+              "MiniMax-H3-Highspeed": "MiniMax-H3-Highspeed",
+              "MiniMax-H3-Lite": "MiniMax-H3-Lite",
+              "MiniMax-H3-MG": "MiniMax-H3-MG (international only)",
+              "MiniMax-H3-Max": "MiniMax-H3-Max",
+              "MiniMax-H3-Max-Turbo": "MiniMax-H3-Max-Turbo (international only)",
+              "MiniMax-H3-NC": "MiniMax-H3-NC (international only)"
+            }
           },
           "expected_region": {
             "anyOf": [

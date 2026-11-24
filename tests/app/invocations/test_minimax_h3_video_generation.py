@@ -35,6 +35,20 @@ def isolate_model_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("INVOKEAI_ROOT", str(tmp_path))
 
 
+def test_workflow_model_choices_label_only_international_models() -> None:
+    model = hosted.MiniMaxH3VideoGenerationInvocation.model_json_schema()["properties"]["model"]
+    assert model["ui_choice_labels"] == {
+        "MiniMax-H3": "MiniMax-H3",
+        "MiniMax-H3-Highspeed": "MiniMax-H3-Highspeed",
+        "MiniMax-H3-Lite": "MiniMax-H3-Lite",
+        "MiniMax-H3-Max": "MiniMax-H3-Max",
+        "MiniMax-H3-Max-Turbo": "MiniMax-H3-Max-Turbo (international only)",
+        "MiniMax-H3-MG": "MiniMax-H3-MG (international only)",
+        "MiniMax-H3-NC": "MiniMax-H3-NC (international only)",
+    }
+    assert set(model["enum"]) == set(model["ui_choice_labels"])
+
+
 @pytest.fixture
 def invoker(mock_invoker: Invoker, tmp_path: Path) -> Invoker:
     services = mock_invoker.services

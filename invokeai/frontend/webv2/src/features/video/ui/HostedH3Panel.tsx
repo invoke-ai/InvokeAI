@@ -219,7 +219,7 @@ export const HostedH3Panel = ({ values, hosted }: { values: VideoWidgetValues; h
             })}
           </Stack>
         )}
-        <SimpleGrid columns={2} gap="2">
+        <SimpleGrid minChildWidth="min(100%, 15rem)" gap="2">
           <VideoChoiceField
             label={t('widgets.video.targetResolution')}
             value={hosted.resolution}
@@ -231,7 +231,11 @@ export const HostedH3Panel = ({ values, hosted }: { values: VideoWidgetValues; h
               </option>
             )}
             {resolutions.map((id) => (
-              <option key={id}>{id}</option>
+              <option key={id} value={id}>
+                {region === 'global' && hosted.model === 'MiniMax-H3' && id === '480P'
+                  ? t('widgets.video.hosted.runningHub480p')
+                  : id}
+              </option>
             ))}
           </VideoChoiceField>
           <VideoChoiceField

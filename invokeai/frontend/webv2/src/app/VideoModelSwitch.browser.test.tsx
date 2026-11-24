@@ -60,7 +60,7 @@ const catalog = [
   filmGrain,
 ];
 
-const { modelStore, notify, pickerIds } = vi.hoisted(() => {
+const { modelStore, miniMaxStatus, notify, pickerIds } = vi.hoisted(() => {
   let snapshot: { models: readonly unknown[]; status: string } = { models: [], status: 'loaded' };
   const listeners = new Set<() => void>();
 
@@ -76,6 +76,7 @@ const { modelStore, notify, pickerIds } = vi.hoisted(() => {
         return () => void listeners.delete(listener);
       },
     },
+    miniMaxStatus: { configured: true, region: 'global' },
     notify: vi.fn(),
     /** The id each main-model picker rendered with; it keys the picker's remembered view and filter. */
     pickerIds: [] as (string | undefined)[],
@@ -87,7 +88,7 @@ vi.mock('@features/models', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   ensureModelsLoaded: () => Promise.resolve(),
   getModelImageUrl: () => '',
-  useMiniMaxStatus: () => ({ data: { configured: true, region: 'global' } }),
+  useMiniMaxStatus: () => ({ data: miniMaxStatus }),
   useModelsSelector: (selector: (snapshot: unknown) => unknown) => selector(useModelSnapshot()),
   useOpenModelInManager: () => undefined,
 }));
@@ -269,6 +270,7 @@ const nudgeLoraWeight = () =>
   });
 
 beforeEach(() => {
+  miniMaxStatus.region = 'global';
   modelStore.set(catalog);
   store = createWorkbenchStore();
   host = document.createElement('div');
@@ -295,8 +297,12 @@ describe('video model switch confirmation', () => {
     await expect.element(page.getByText(/Each generated video uses your MiniMax API balance/)).toBeVisible();
     expect(stored().hostedH3?.input).toBe('text');
     expect(select('Model').options.length).toBe(7);
+    await change('Target Resolution', '480P');
+    expect(select('Target Resolution').selectedOptions[0]?.label).toBe('480P (RunningHub / H3-RH)');
+    expect(stored().hostedH3?.resolution).toBe('480P');
     await change('Duration (seconds)', '4');
     await change('Model', 'MiniMax-H3-Max-Turbo');
+    expect(select('Target Resolution').selectedOptions[0]?.label).toBe('480P');
     expect(select('Duration (seconds)').value).toBe('5');
     expect([...select('Target Resolution').options].map((item) => item.value)).toEqual(['480P', '768P']);
     await change('Input mode', 'frames');
@@ -309,6 +315,19 @@ describe('video model switch confirmation', () => {
     await change('Generation service', 'local');
     expect(modelSelect().value).toBe(ltxDev.key);
     expect(stored().hostedH3).toBeUndefined();
+  });
+
+  it('offers only the domestic resolutions for H3 and keeps the plain 480P label for Lite in China', async () => {
+    miniMaxStatus.region = 'cn';
+    await render();
+    const change = (label: string, value: string) =>
+      act(() => userEvent.selectOptions(page.getByRole('combobox', { name: label, exact: true }), value));
+    await change('Generation service', 'minimax');
+    const resolution = page.getByRole('combobox', { name: 'Target Resolution' }).element() as HTMLSelectElement;
+    expect([...resolution.options].map((option) => option.label)).toEqual(['768P', '2K']);
+    await change('Model', 'MiniMax-H3-Lite');
+    await change('Target Resolution', '480P');
+    expect(resolution.selectedOptions[0]?.label).toBe('480P');
   });
 
   it('names hosted image choosers by position and keeps focus at a reference slot across replacement and removal', async () => {

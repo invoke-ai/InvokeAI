@@ -6750,6 +6750,7 @@
         "service": "Generation service",
         "local": "Local models",
         "serviceName": "MiniMax H3 API (paid)",
+        "runningHub480p": "480P (RunningHub / H3-RH)",
         "billing": "Invoke sends the prompt and selected images to MiniMax. Each generated video uses your MiniMax API balance.",
         "checking": "Checking MiniMax connection…",
         "statusFailed": "Could not check the MiniMax connection.",

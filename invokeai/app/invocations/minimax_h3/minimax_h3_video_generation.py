@@ -4,6 +4,7 @@ from contextlib import ExitStack
 from functools import partial
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from typing import get_args
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, Bottleneck, invocation
 from invokeai.app.invocations.fields import (
@@ -21,6 +22,7 @@ from invokeai.app.services.external_generation.errors import (
     ExternalProviderRequestError,
 )
 from invokeai.app.services.external_generation.minimax_video import (
+    GLOBAL_ONLY_MODELS,
     MAX_VIDEO_BYTES,
     MiniMaxModel,
     MiniMaxRatio,
@@ -50,7 +52,14 @@ from invokeai.app.util.video_thumbnails import decoder_frame_count, probe_decoda
 class MiniMaxH3VideoGenerationInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Generate one video with the configured MiniMax account. Each submitted request can incur a charge."""
 
-    model: MiniMaxModel = InputField(default="MiniMax-H3", description="MiniMax hosted video model")
+    model: MiniMaxModel = InputField(
+        default="MiniMax-H3",
+        description="MiniMax hosted video model",
+        ui_choice_labels={
+            model: f"{model} (international only)" if model in GLOBAL_ONLY_MODELS else model
+            for model in get_args(MiniMaxModel)
+        },
+    )
     expected_region: MiniMaxRegion | None = InputField(
         default=None, input=Input.Direct, description="Require the region selected when the job was queued."
     )
