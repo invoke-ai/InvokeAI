@@ -56,12 +56,14 @@ export interface PointerPipeline {
   onKeyCapture(event: KeyboardEvent): void;
   /** A Control press or release made while the window was away went unseen. */
   onWindowFocus(): void;
+  /** A wheel event without Control shows the key up; one with it may be a pinch, which says nothing. */
+  onWheelWithoutControl(): void;
   /** Records whether focus arrived by pointer, which decides hold-key ownership. */
   onFocusIn(event: FocusEvent): void;
   isGestureActive(): boolean;
   /** CSS pixels, including middle-pan moves; null once it left outside a gesture. */
   hoverPoint(): Vec2 | null;
-  /** `unknown` until a key or focused pointer event shows it, and again whenever focus may have changed hands. */
+  /** `unknown` until a key or a focused pointer or plain wheel event shows it, and again once focus may have moved. */
   controlKeyState(): ControlKeyState;
   /** Re-delivers a hover move after the view moved under a still pointer; skipped mid-gesture. */
   refreshHover(): void;
@@ -173,8 +175,16 @@ export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipelin
   const inputOrigin = (): { left: number; top: number } =>
     deps.getInputElement()?.getBoundingClientRect() ?? { left: 0, top: 0 };
 
+  const observeControlUp = (): void => {
+    controlKey = deps.hasFocus?.() === false ? 'unknown' : 'up';
+  };
+
   const observePointerControl = (event: PointerEvent): void => {
-    controlKey = event.ctrlKey ? 'down' : deps.hasFocus?.() === false ? 'unknown' : 'up';
+    if (event.ctrlKey) {
+      controlKey = 'down';
+    } else {
+      observeControlUp();
+    }
   };
 
   const buildPointerInput = (event: PointerEvent, origin = inputOrigin()): PointerInput => {
@@ -592,6 +602,7 @@ export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipelin
         endTempTool();
       }
     },
+    onWheelWithoutControl: observeControlUp,
     onWindowFocus: () => {
       controlKey = 'unknown';
     },

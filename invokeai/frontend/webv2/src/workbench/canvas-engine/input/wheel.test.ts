@@ -31,14 +31,19 @@ const createHarness = (
   const invalidate = vi.fn();
   const detected = { value: opts.trackpadDetected ?? false };
   const tool: Tool = { id: opts.tool ?? 'brush' };
+  let controlKey = opts.controlKey ?? 'down';
   const input = createWheelInput({
     getActiveTool: () => tool,
-    getControlKeyState: () => opts.controlKey ?? 'down',
+    getControlKeyState: () => controlKey,
     getInputElement: () => ({ getBoundingClientRect: () => ({ left: 0, top: 0 }) }) as unknown as HTMLElement,
     getInvertBrushSizeScroll: () => opts.invertBrushSizeScroll ?? false,
     getScrollInput: () => opts.scrollInput ?? 'auto',
     invalidate,
     isGestureActive: () => opts.gestureActive ?? false,
+    // As the focused pipeline does.
+    onWheelWithoutControl: () => {
+      controlKey = 'up';
+    },
     stepActiveBrushSize,
     trackpadDetected: {
       get: () => detected.value,
@@ -188,6 +193,14 @@ describe('wheel input: auto', () => {
     h.wheel(-3, { ctrlKey: true, deltaMode: 1 });
     expect(h.stepActiveBrushSize.mock.calls).toEqual([[1], [1]]);
     expect(h.detected.value).toBe(false);
+  });
+
+  it('reads an unstamped pinch, as Firefox sends it, once a plain scroll after focus showed Control up', () => {
+    const h = createHarness({ controlKey: 'unknown' });
+    h.smooth(4);
+    h.smooth(-10, { ctrlKey: true });
+    expect(h.detected.value).toBe(true);
+    expect(h.stepActiveBrushSize).not.toHaveBeenCalled();
   });
 
   it('sizes the brush on smooth ctrl+wheel while Control may be held', () => {

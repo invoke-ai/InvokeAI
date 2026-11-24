@@ -49,6 +49,7 @@ const createAttachedInput = () => {
     getScrollInput: () => 'auto',
     invalidate: () => undefined,
     isGestureActive: () => pipeline.isGestureActive(),
+    onWheelWithoutControl: () => pipeline.onWheelWithoutControl(),
     stepActiveBrushSize: () => undefined,
     trackpadDetected: { get: () => false, set: () => undefined },
     viewport,
@@ -80,12 +81,12 @@ const createAttachedInput = () => {
     overlay.dispatchEvent(event);
     return event;
   };
-  return { control, controller, pinch, pipeline, viewport };
+  return { control, controller, overlay, pinch, pipeline, viewport };
 };
 
 describe('RenderController in Chromium: physical Control key', () => {
-  it('sees key events a control stops from bubbling, and forgets the key when the window regains focus', () => {
-    const { control, pipeline } = createAttachedInput();
+  it('sees key events a control stops from bubbling, forgets it on window focus, relearns it from a scroll', () => {
+    const { control, overlay, pipeline } = createAttachedInput();
     control('keydown');
     expect(pipeline.controlKeyState()).toBe('down');
     control('keyup');
@@ -93,6 +94,8 @@ describe('RenderController in Chromium: physical Control key', () => {
 
     globalThis.dispatchEvent(new FocusEvent('focus'));
     expect(pipeline.controlKeyState()).toBe('unknown');
+    overlay.dispatchEvent(new WheelEvent('wheel', { cancelable: true, deltaY: 4 }));
+    expect(pipeline.controlKeyState()).toBe('up');
   });
 
   it('stops tracking once detached', () => {

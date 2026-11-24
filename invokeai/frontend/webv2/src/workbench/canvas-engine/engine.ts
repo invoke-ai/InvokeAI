@@ -2042,6 +2042,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     getScrollInput: () => stores.scrollInput.get(),
     invalidate: (payload) => scheduler.invalidate(payload),
     isGestureActive: () => pipeline.isGestureActive(),
+    onWheelWithoutControl: () => pipeline.onWheelWithoutControl(),
     stepActiveBrushSize,
     trackpadDetected: stores.trackpadDetected,
     viewport,

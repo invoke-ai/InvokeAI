@@ -27,6 +27,8 @@ export interface WheelHandlerDeps {
   getScrollInput(): ScrollInput;
   /** The physical Control key; a pinch's ctrl+wheel arrives with it `up` or, right after window focus, `unknown`. */
   getControlKeyState(): ControlKeyState;
+  /** A wheel without ctrlKey shows Control up, so a pinch that follows a scroll right after focus is known as one. */
+  onWheelWithoutControl(): void;
   /** Set on trackpad proof; gates `auto` routing of smooth scrolling. */
   trackpadDetected: Pick<ScalarStore<boolean>, 'get' | 'set'>;
   /** A pointer gesture is under way: iPadOS also sends pinch gesture events for touches, mid-stroke. */
@@ -101,6 +103,9 @@ export const createWheelInput = (deps: WheelHandlerDeps): WheelInputHandlers => 
     },
     onWheel: (event) => {
       event.preventDefault();
+      if (!event.ctrlKey) {
+        deps.onWheelWithoutControl();
+      }
       const sample = classify(event, deps.viewport.getViewportSize(), deps.getControlKeyState());
       const anchor = screenAnchor(event);
 

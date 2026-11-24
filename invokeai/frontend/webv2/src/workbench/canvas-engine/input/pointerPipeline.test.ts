@@ -292,6 +292,18 @@ describe('pointer pipeline: physical Control key', () => {
     expect(h.pipeline.controlKeyState()).toBe('down');
   });
 
+  it('takes a wheel event without Control as the key up, but only while focused', () => {
+    const focus = { has: true };
+    const h = createHarness({ hasFocus: () => focus.has });
+    h.pipeline.onWindowFocus();
+    h.pipeline.onWheelWithoutControl();
+    expect(h.pipeline.controlKeyState()).toBe('up');
+
+    focus.has = false;
+    h.pipeline.onWheelWithoutControl();
+    expect(h.pipeline.controlKeyState()).toBe('unknown');
+  });
+
   it('becomes unknown whenever focus may have changed hands: window focus, and reset on blur or a hidden page', () => {
     const focused = createHarness();
     focused.pipeline.onKeyCapture(control('keyup', false));
