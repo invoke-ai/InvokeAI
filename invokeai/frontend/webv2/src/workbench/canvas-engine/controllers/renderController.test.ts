@@ -17,9 +17,12 @@ const createHarness = () => {
       frame = null;
     },
     getInputHandlers: () => ({
+      onKeyCapture: vi.fn(),
       onKeyDown: vi.fn(),
       onKeyUp: vi.fn(),
       onFocusIn: vi.fn(),
+      onPinchGestureChange: vi.fn(),
+      onPinchGestureStart: vi.fn(),
       onPointerCancel: vi.fn(),
       onPointerDown: vi.fn(),
       onPointerEnter: vi.fn(),
@@ -27,6 +30,7 @@ const createHarness = () => {
       onPointerMove: vi.fn(),
       onPointerUp: vi.fn(),
       onWheel: vi.fn(),
+      onWindowFocus: vi.fn(),
       reset: vi.fn(),
     }),
     isEngineDisposed: () => false,
