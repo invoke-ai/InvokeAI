@@ -54031,7 +54031,7 @@
         ],
         "title": "Multiply Image Channel",
         "type": "object",
-        "version": "1.2.3",
+        "version": "1.2.4",
         "output": {
           "$ref": "#/components/schemas/ImageOutput"
         }
@@ -54188,7 +54188,7 @@
         ],
         "title": "Offset Image Channel",
         "type": "object",
-        "version": "1.2.3",
+        "version": "1.2.4",
         "output": {
           "$ref": "#/components/schemas/ImageOutput"
         }

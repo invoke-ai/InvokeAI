@@ -972,6 +972,9 @@ CHANNEL_FORMATS = {
     "Cr (YCbCr)": ("YCbCr", 2),
 }
 
+# PIL stores the a* and b* channels of a LAB image as signed bytes: 0 is neutral, and negative values wrap to 128..255.
+SIGNED_CHANNELS = {"A (LAB)", "B (LAB)"}
+
 
 @invocation(
     "img_channel_offset",
@@ -993,7 +996,7 @@ CHANNEL_FORMATS = {
         "value",
     ],
     category="image",
-    version="1.2.3",
+    version="1.2.4",
 )
 class ImageChannelOffsetInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Add or subtract a value from a specific color channel of an image."""
@@ -1010,21 +1013,23 @@ class ImageChannelOffsetInvocation(BaseInvocation, WithMetadata, WithBoard):
         channel_number = CHANNEL_FORMATS[self.channel][1]
 
         # Convert PIL image to new format
-        converted_image = numpy.array(image.convert(mode)).astype(int)
-        image_channel = converted_image[:, :, channel_number]
+        channel_dtype = numpy.int8 if self.channel in SIGNED_CHANNELS else numpy.uint8
+        converted_image = numpy.array(image.convert(mode))
+        image_channel = converted_image[:, :, channel_number].view(channel_dtype).astype(int)
 
         if self.channel == "Hue (HSV)":
             # loop around the values because hue is special
             image_channel = (image_channel + self.offset) % 256
         else:
-            # Adjust the value, clipping to 0..255
-            image_channel = numpy.clip(image_channel + self.offset, 0, 255)
+            # Adjust the value, clipping to the channel's range
+            channel_range = numpy.iinfo(channel_dtype)
+            image_channel = numpy.clip(image_channel + self.offset, channel_range.min, channel_range.max)
 
         # Put the channel back into the image
-        converted_image[:, :, channel_number] = image_channel
+        converted_image[:, :, channel_number] = image_channel.astype(channel_dtype).view(numpy.uint8)
 
         # Convert back to RGBA format and output
-        pil_image = Image.fromarray(converted_image.astype(numpy.uint8), mode=mode).convert("RGBA")
+        pil_image = Image.fromarray(converted_image, mode=mode).convert("RGBA")
 
         # restore the alpha channel
         if self.channel != "Alpha (RGBA)":
@@ -1057,7 +1062,7 @@ class ImageChannelOffsetInvocation(BaseInvocation, WithMetadata, WithBoard):
         "value",
     ],
     category="image",
-    version="1.2.3",
+    version="1.2.4",
 )
 class ImageChannelMultiplyInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Scale a specific color channel of an image."""
@@ -1075,21 +1080,23 @@ class ImageChannelMultiplyInvocation(BaseInvocation, WithMetadata, WithBoard):
         channel_number = CHANNEL_FORMATS[self.channel][1]
 
         # Convert PIL image to new format
-        converted_image = numpy.array(image.convert(mode)).astype(float)
-        image_channel = converted_image[:, :, channel_number]
+        channel_dtype = numpy.int8 if self.channel in SIGNED_CHANNELS else numpy.uint8
+        channel_range = numpy.iinfo(channel_dtype)
+        converted_image = numpy.array(image.convert(mode))
+        image_channel = converted_image[:, :, channel_number].view(channel_dtype).astype(float)
 
-        # Adjust the value, clipping to 0..255
-        image_channel = numpy.clip(image_channel * self.scale, 0, 255)
+        # Adjust the value, clipping to the channel's range
+        image_channel = numpy.clip(image_channel * self.scale, channel_range.min, channel_range.max)
 
         # Invert the channel if requested
         if self.invert_channel:
-            image_channel = 255 - image_channel
+            image_channel = channel_range.min + channel_range.max - image_channel
 
         # Put the channel back into the image
-        converted_image[:, :, channel_number] = image_channel
+        converted_image[:, :, channel_number] = image_channel.astype(channel_dtype).view(numpy.uint8)
 
         # Convert back to RGBA format and output
-        pil_image = Image.fromarray(converted_image.astype(numpy.uint8), mode=mode).convert("RGBA")
+        pil_image = Image.fromarray(converted_image, mode=mode).convert("RGBA")
 
         # restore the alpha channel
         if self.channel != "Alpha (RGBA)":

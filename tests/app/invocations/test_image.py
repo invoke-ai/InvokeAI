@@ -9,6 +9,8 @@ import torch
 from PIL import Image, ImageFilter
 
 from invokeai.app.invocations.image import (
+    ImageChannelMultiplyInvocation,
+    ImageChannelOffsetInvocation,
     ImageField,
     MaskFromAlphaInvocation,
     OklabUnsharpMaskInvocation,
@@ -549,3 +551,47 @@ def test_value_thresholds_keeps_image_size_and_thresholds_every_pixel(lightness_
     saved = numpy.asarray(saved_image.convert("L"))
     assert (saved[:, :6] == 0).all()
     assert (saved[:, 6:] == 255).all()
+
+
+def _invoke_channel_node(node: ImageChannelOffsetInvocation | ImageChannelMultiplyInvocation, input_image: Image.Image):
+    context = MagicMock()
+    context.images.get_pil.side_effect = lambda image_name, mode=None: input_image.convert(mode)
+    context.images.save.side_effect = lambda image: SimpleNamespace(
+        image_name="out", width=image.width, height=image.height
+    )
+    node.invoke(context)
+    return context.images.save.call_args.kwargs["image"]
+
+
+def _lab_a_star(image: Image.Image) -> list[int]:
+    # PIL stores a* as a signed byte.
+    return numpy.asarray(image.convert("RGB").convert("LAB"))[0, :, 1].view(numpy.int8).tolist()
+
+
+def test_channel_multiply_scales_lab_a_toward_neutral_for_negative_values() -> None:
+    # Green has a negative a*, magenta a positive one.
+    input_image = Image.new("RGBA", (2, 1))
+    input_image.putdata([(0, 160, 0, 255), (200, 0, 200, 255)])
+    green_a, magenta_a = _lab_a_star(input_image)
+    assert green_a < -40 and magenta_a > 40
+
+    node = ImageChannelMultiplyInvocation(image=ImageField(image_name="in"), channel="A (LAB)", scale=0.5)
+    saved_image = _invoke_channel_node(node, input_image)
+
+    out_green_a, out_magenta_a = _lab_a_star(saved_image)
+    assert green_a < out_green_a < 0
+    assert 0 < out_magenta_a < magenta_a
+    red, green, _blue = saved_image.convert("RGB").getpixel((0, 0))
+    assert green > red
+
+
+def test_channel_offset_moves_neutral_lab_a_below_zero() -> None:
+    input_image = Image.new("RGBA", (1, 1), (128, 128, 128, 255))
+    assert _lab_a_star(input_image) == [0]
+
+    node = ImageChannelOffsetInvocation(image=ImageField(image_name="in"), channel="A (LAB)", offset=-20)
+    saved_image = _invoke_channel_node(node, input_image)
+
+    assert -24 <= _lab_a_star(saved_image)[0] <= -16
+    red, green, _blue = saved_image.convert("RGB").getpixel((0, 0))
+    assert green > red
