@@ -15,6 +15,7 @@ from invokeai.backend.model_manager.taxonomy import (
 # HuggingFace model page and a HuggingFace token configured before the download will succeed — same as
 # FLUX.1 dev.
 ideogram_4_nf4 = StarterModel(
+    source_urls=["https://huggingface.co/ideogram-ai/ideogram-4-nf4"],
     name="Ideogram 4 (nf4)",
     base=BaseModelType.Ideogram4,
     source="ideogram-ai/ideogram-4-nf4",
@@ -24,6 +25,7 @@ ideogram_4_nf4 = StarterModel(
 )
 
 ideogram_4_fp8 = StarterModel(
+    source_urls=["https://huggingface.co/ideogram-ai/ideogram-4-fp8"],
     name="Ideogram 4 (fp8)",
     base=BaseModelType.Ideogram4,
     source="ideogram-ai/ideogram-4-fp8",
@@ -41,6 +43,7 @@ ideogram_4_fp8 = StarterModel(
 # by name in Components and any conditional accepts any unconditional. Dropping it from one name is
 # how a user ends up guiding an int8 branch against an fp8 one without meaning to.
 ideogram_4_unconditional_single_file = StarterModel(
+    source_urls=["https://huggingface.co/Comfy-Org/Ideogram-4"],
     name="Ideogram 4 Unconditional (single file, fp8)",
     previous_names=["Ideogram 4 Unconditional (single file)"],
     base=BaseModelType.Ideogram4,
@@ -52,6 +55,7 @@ ideogram_4_unconditional_single_file = StarterModel(
 )
 
 ideogram_4_unconditional_int8 = StarterModel(
+    source_urls=["https://huggingface.co/Comfy-Org/Ideogram-4"],
     name="Ideogram 4 Unconditional (single file, int8)",
     base=BaseModelType.Ideogram4,
     source="https://huggingface.co/Comfy-Org/Ideogram-4/resolve/main/diffusion_models/ideogram4_unconditional_int8_convrot.safetensors",
@@ -62,6 +66,7 @@ ideogram_4_unconditional_int8 = StarterModel(
 )
 
 ideogram_4_int8 = StarterModel(
+    source_urls=["https://huggingface.co/Comfy-Org/Ideogram-4"],
     name="Ideogram 4 (single file, int8)",
     base=BaseModelType.Ideogram4,
     source="https://huggingface.co/Comfy-Org/Ideogram-4/resolve/main/diffusion_models/ideogram4_int8_convrot.safetensors",
@@ -75,6 +80,7 @@ ideogram_4_int8 = StarterModel(
 )
 
 ideogram_4_single_file = StarterModel(
+    source_urls=["https://huggingface.co/Comfy-Org/Ideogram-4"],
     name="Ideogram 4 (single file, fp8)",
     previous_names=["Ideogram 4 (single file)"],
     base=BaseModelType.Ideogram4,
@@ -102,6 +108,7 @@ _RECTANGLEWORM_GGUF = (
 )
 
 ideogram_4_unconditional_gguf_q4_0 = StarterModel(
+    source_urls=["https://huggingface.co/molbal/ideogram-4-gguf"],
     name="Ideogram 4 Unconditional (GGUF, Q4_0)",
     base=BaseModelType.Ideogram4,
     source=f"{_MOLBAL_GGUF}/ideogram4-unconditional_transformer-q4_0.gguf",
@@ -112,6 +119,7 @@ ideogram_4_unconditional_gguf_q4_0 = StarterModel(
 )
 
 ideogram_4_gguf_q4_0 = StarterModel(
+    source_urls=["https://huggingface.co/molbal/ideogram-4-gguf"],
     name="Ideogram 4 (GGUF, Q4_0)",
     base=BaseModelType.Ideogram4,
     source=f"{_MOLBAL_GGUF}/ideogram4-transformer-q4_0.gguf",
@@ -124,6 +132,7 @@ ideogram_4_gguf_q4_0 = StarterModel(
 )
 
 ideogram_4_unconditional_gguf_q5_k = StarterModel(
+    source_urls=["https://huggingface.co/rectangleworm/ideogram-4-gguf"],
     name="Ideogram 4 Unconditional (GGUF, Q5_K)",
     base=BaseModelType.Ideogram4,
     source=f"{_RECTANGLEWORM_GGUF}/uncond/ideogram4_unconditional_Q5_K.gguf",
@@ -134,6 +143,7 @@ ideogram_4_unconditional_gguf_q5_k = StarterModel(
 )
 
 ideogram_4_gguf_q5_k = StarterModel(
+    source_urls=["https://huggingface.co/rectangleworm/ideogram-4-gguf"],
     name="Ideogram 4 (GGUF, Q5_K)",
     base=BaseModelType.Ideogram4,
     source=f"{_RECTANGLEWORM_GGUF}/cond/ideogram4_Q5_K.gguf",
@@ -146,6 +156,7 @@ ideogram_4_gguf_q5_k = StarterModel(
 )
 
 ideogram_4_unconditional_gguf_q5_1 = StarterModel(
+    source_urls=["https://huggingface.co/molbal/ideogram-4-gguf"],
     name="Ideogram 4 Unconditional (GGUF, Q5_1)",
     base=BaseModelType.Ideogram4,
     source=f"{_MOLBAL_GGUF}/ideogram4-unconditional_transformer-q5_1.gguf",
@@ -156,6 +167,7 @@ ideogram_4_unconditional_gguf_q5_1 = StarterModel(
 )
 
 ideogram_4_gguf_q5_1 = StarterModel(
+    source_urls=["https://huggingface.co/molbal/ideogram-4-gguf"],
     name="Ideogram 4 (GGUF, Q5_1)",
     base=BaseModelType.Ideogram4,
     source=f"{_MOLBAL_GGUF}/ideogram4-transformer-q5_1.gguf",

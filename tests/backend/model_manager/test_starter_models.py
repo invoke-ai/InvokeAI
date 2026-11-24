@@ -7,6 +7,8 @@ two standalone dependencies so installing it also pulls the pieces needed to run
 one click on the Launchpad, so it must stay free of gated or non-commercial weights and still run on its own.
 """
 
+from urllib.parse import urlsplit
+
 from invokeai.backend.model_manager.configs.tiny_autoencoder import named_tiny_autoencoder_space
 from invokeai.backend.model_manager.starter_models import (
     STARTER_BUNDLES,
@@ -30,6 +32,32 @@ def _hf_repo(source: str) -> str:
     if source.startswith(hf_url_prefix):
         return "/".join(source.removeprefix(hf_url_prefix).split("/")[:2])
     return source.split("::")[0]
+
+
+def _source_repo_page(source: str) -> str:
+    """The repository page a starter source downloads from."""
+    if not source.startswith(("https://", "http://")):
+        return f"https://huggingface.co/{_hf_repo(source)}"
+    url = urlsplit(source)
+    assert url.netloc in ("huggingface.co", "github.com"), f"No repository page rule for {source}"
+    return f"https://{url.netloc}/" + "/".join(url.path.split("/")[1:3])
+
+
+def test_every_downloadable_starter_links_the_repository_it_downloads_from() -> None:
+    starters = {
+        m.source: m
+        for m in [
+            *STARTER_MODELS,
+            *(dependency for m in STARTER_MODELS for dependency in m.dependencies or []),
+            *(m for bundle in STARTER_BUNDLES.values() for m in bundle.models),
+        ]
+    }
+    missing = [
+        m.name
+        for m in starters.values()
+        if m.format is not ModelFormat.ExternalApi and _source_repo_page(m.source) not in m.source_urls
+    ]
+    assert missing == [], f"Starters without a link to their source repository: {missing}"
 
 
 def _flux2_bundle_installs() -> list[StarterModelWithoutDependencies]:
