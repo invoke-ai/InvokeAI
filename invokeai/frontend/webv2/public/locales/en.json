@@ -1477,7 +1477,7 @@
     "cancelInstall": "Cancel install",
     "changedElsewhere": "This model changed elsewhere; your unsaved edits are kept.",
     "civitaiKey": "Civitai key",
-    "civitaiKeyDescription": "Attached automatically when installing civitai.com models that require login. Stored in this browser only.",
+    "civitaiKeyDescription": "Attached automatically when installing civitai.com or civitai.red models that require login. Stored in this browser only.",
     "civitaiKeyPlaceholder": "32-character key from civitai.com/user/account",
     "cleanupOrphaned": "Clean up orphaned models…",
     "clearSelectedModel": "Clear selected model",
