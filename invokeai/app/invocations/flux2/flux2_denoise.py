@@ -3,9 +3,10 @@
 Run denoising process with a FLUX.2 transformer model: Klein (Qwen3 conditioning) or [dev] (Mistral conditioning).
 """
 
+import copy
 from contextlib import ExitStack
 from functools import partial
-from typing import Any, Callable, Iterator, Optional, Tuple
+from typing import Any, Callable, Optional, Tuple
 
 import torch
 import torch.nn.functional as F
@@ -39,7 +40,10 @@ from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.flux.sampling_utils import clip_timestep_schedule_fractional
 from invokeai.backend.flux.schedulers import FLUX_SCHEDULER_LABELS, FLUX_SCHEDULER_MAP, FLUX_SCHEDULER_NAME_VALUES
 from invokeai.backend.flux2.denoise import denoise
-from invokeai.backend.flux2.denoise_working_memory import estimate_flux2_denoise_working_memory
+from invokeai.backend.flux2.denoise_working_memory import (
+    estimate_flux2_denoise_working_memory,
+    flux2_dora_patch_bytes,
+)
 from invokeai.backend.flux2.extensions.regional_prompting_extension import Flux2RegionalPromptingExtension
 from invokeai.backend.flux2.latent_norm import bn_denormalize, bn_normalize, read_vae_bn_stats
 from invokeai.backend.flux2.ref_image_extension import Flux2RefImageExtension
@@ -59,7 +63,7 @@ from invokeai.backend.fun_controlnet.hooks import FunControlHooks, install_fun_c
 from invokeai.backend.model_manager.configs.flux2_variant import flux2_hidden_size
 from invokeai.backend.model_manager.load.load_base import LoadedModel
 from invokeai.backend.model_manager.taxonomy import BaseModelType, Flux2VariantType, ModelType
-from invokeai.backend.patches.layer_patcher import LayerPatcher, PatchSpec
+from invokeai.backend.patches.layer_patcher import LayerPatcher
 from invokeai.backend.patches.lora_conversions.flux_bfl_peft_lora_conversion_utils import (
     convert_bfl_lora_patch_to_diffusers,
 )
@@ -482,6 +486,10 @@ class Flux2DenoiseInvocation(BaseInvocation, WithMetadata):
 
         with ExitStack() as exit_stack:
             transformer_info = context.models.load(self.transformer.transformer)
+            # Cold adapter loads can take the global model-load write lock. Finish them before
+            # moving the transformer and before the patcher takes the read lock.
+            lora_patches = self._materialize_lora_patches(context, exit_stack)
+            text_seq_len = max(txt.shape[1], neg_txt.shape[1] if neg_txt is not None else 0)
 
             # Ask the model cache to keep free what the transformer forward needs. Without it the cache keeps only
             # the default working memory and fills the rest of the card with the model, so anything beyond a plain
@@ -497,13 +505,19 @@ class Flux2DenoiseInvocation(BaseInvocation, WithMetadata):
                 hidden_size=flux2_hidden_size(getattr(transformer_config, "variant", None)) or FLUX2_MAX_HIDDEN_SIZE,
                 image_seq_len=packed_h * packed_w,
                 ref_image_seq_len=ref_image_seq_len,
-                text_seq_len=max(txt.shape[1], neg_txt.shape[1] if neg_txt is not None else 0),
+                text_seq_len=text_seq_len,
                 # Taken from `x`, not from `b`. `b` is the *noise* tensor's batch, which this node builds at 1 from
                 # width/height/seed even when the init latents carry more; the img2img preblend above then
                 # broadcasts the two, so `x` is the only thing that knows how many samples actually go through the
                 # transformer. Reference latents are repeated to match it (`ensure_batch_size` below).
                 batch_size=x.shape[0],
-                lora_count=len(self.transformer.loras),
+                lora_count=len(lora_patches),
+                dora_patch_bytes=flux2_dora_patch_bytes(
+                    transformer_info.model,
+                    lora_patches,
+                    dtype=inference_dtype,
+                    rows=(image_seq_len + ref_image_seq_len + text_seq_len) * x.shape[0],
+                ),
                 control_blocks=len(control_branch_info.model.control_blocks) if control_branch_info is not None else 0,
                 # The additive bias is skipped entirely when reference images are present (see below), so the mask
                 # only costs anything without them.
@@ -554,7 +568,7 @@ class Flux2DenoiseInvocation(BaseInvocation, WithMetadata):
             exit_stack.enter_context(
                 LayerPatcher.apply_smart_model_patches(
                     model=transformer,
-                    patches=self._lora_iterator(context),
+                    patches=lora_patches,
                     prefix=FLUX_LORA_TRANSFORMER_PREFIX,
                     dtype=inference_dtype,
                     cached_weights=cached_weights,
@@ -768,18 +782,25 @@ class Flux2DenoiseInvocation(BaseInvocation, WithMetadata):
             out.append(Flux2TextConditioning(txt_embeddings=info.t5_embeds, mask=mask_processed))
         return out
 
-    def _lora_iterator(self, context: InvocationContext) -> Iterator[PatchSpec]:
-        """Iterate over LoRA models to apply.
+    def _materialize_lora_patches(
+        self, context: InvocationContext, stack: ExitStack
+    ) -> list[tuple[ModelPatchRaw, float]]:
+        """Load and RAM-pin the LoRAs through patch restoration and transformer unlock.
 
         Converts BFL-format LoRA keys to diffusers format if needed, since FLUX.2 Klein
         uses Flux2Transformer2DModel (diffusers naming) but LoRAs may have been loaded
         with BFL naming (e.g. when a Klein 4B LoRA is misidentified as FLUX.1).
         """
+        patches = []
         for lora in self.transformer.loras:
-            lora_info = context.models.load(lora.lora)
-            assert isinstance(lora_info.model, ModelPatchRaw)
-            converted = convert_bfl_lora_patch_to_diffusers(lora_info.model)
-            yield (converted, lora.weight, lora_info.model_in_ram())
+            adapter = stack.enter_context(context.models.load(lora.lora).model_in_ram())
+            assert isinstance(adapter, ModelPatchRaw)
+            converted = convert_bfl_lora_patch_to_diffusers(adapter)
+            # Copy patch objects, including wrapper leaves, per application; their tensors remain shared
+            # until a patch's `to()` rebinds them. The cached objects must not be moved by patching.
+            local = ModelPatchRaw({key: copy.copy(layer) for key, layer in converted.layers.items()})
+            patches.append((local, lora.weight))
+        return patches
 
     def _build_step_callback(self, context: InvocationContext) -> Callable[[PipelineIntermediateState], None]:
         """Build a callback for step progress updates."""

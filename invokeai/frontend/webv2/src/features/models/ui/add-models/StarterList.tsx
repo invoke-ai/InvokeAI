@@ -21,6 +21,8 @@ import { KeyRoundIcon } from 'lucide-react';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { StarterSourceLinks } from './StarterSourceLinks';
+
 const getExternalProviderId = (source: string): string | null => {
   if (!source.startsWith('external://')) {
     return null;
@@ -126,16 +128,19 @@ export const StarterList = ({
             <ListItem
               key={`${model.source}-${model.name}`}
               actions={
-                configuredExternalProviders.has(externalProviderId) ? (
-                  <Badge colorPalette="green" fontSize="xs" size="lg" variant="surface">
-                    {t('models.installed')}
-                  </Badge>
-                ) : (
-                  <Button size="sm" variant="outline" onClick={() => onConfigureExternalProvider(externalProviderId)}>
-                    <Icon as={KeyRoundIcon} boxSize="3" />
-                    {t('common.configure')}
-                  </Button>
-                )
+                <>
+                  <StarterSourceLinks name={model.name} urls={model.source_urls} />
+                  {configuredExternalProviders.has(externalProviderId) ? (
+                    <Badge colorPalette="green" fontSize="xs" size="lg" variant="surface">
+                      {t('models.installed')}
+                    </Badge>
+                  ) : (
+                    <Button size="sm" variant="outline" onClick={() => onConfigureExternalProvider(externalProviderId)}>
+                      <Icon as={KeyRoundIcon} boxSize="3" />
+                      {t('common.configure')}
+                    </Button>
+                  )}
+                </>
               }
               badges={<StarterBadges model={model} />}
               description={<StarterDescription text={description} />}
@@ -195,6 +200,7 @@ const StarterSourceRow = memo(function StarterSourceRow({
   return (
     <InstallSourceRow
       {...row}
+      actions={<StarterSourceLinks name={model.name} urls={model.source_urls} />}
       badges={<StarterBadges model={model} />}
       description={<StarterDescription text={description} />}
       name={model.name}

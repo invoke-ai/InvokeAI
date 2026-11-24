@@ -1873,6 +1873,10 @@
       "hfRepo": "Hugging Face repo",
       "url": "URL"
     },
+    "visitSource": "Visit source",
+    "visitModelSource": "Visit source for {{name}}",
+    "modelPage_one": "Model page",
+    "modelPage_other": "Model pages",
     "sourceUrl": "Source URL",
     "sourceUrlHelp": "Model page or download URL.",
     "statusCancelled": "Cancelled",
