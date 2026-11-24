@@ -1,8 +1,3 @@
-/**
- * Per-engine React-free external stores expose narrow interaction snapshots and subscriptions. Widget hooks adapt
- * them to React without coupling the engine to UI.
- */
-
 import type { PsdExportStatus } from '@workbench/canvas-engine/capabilities';
 import type {
   CanvasLayerSourceContract,
@@ -12,68 +7,54 @@ import type {
   ParametricShapeKind,
 } from '@workbench/canvas-engine/contracts';
 import type { AdjustedSurfaceStatus } from '@workbench/canvas-engine/render/spatialDisplay';
+import type { VectorShapePreview } from '@workbench/canvas-engine/render/vectorGuides';
 import type { SamInteractionState } from '@workbench/canvas-engine/samInteraction';
-import type { LayerTransform } from '@workbench/canvas-engine/transform/transformMath';
+import type { LayerTransform, TransformAnchor } from '@workbench/canvas-engine/transform/transformMath';
 import type { Rect, SelectionOp, ToolId, Vec2 } from '@workbench/canvas-engine/types';
+import type { VectorEditSession } from '@workbench/canvas-engine/vectorEditState';
 
 import { type CheckerColors, DEFAULT_CHECKER_COLORS } from '@workbench/canvas-engine/render/compositor';
 
 export type { CheckerColors };
 
-/** A `text` layer source (content + style params). */
 export type TextSource = Extract<CanvasLayerSourceContract, { type: 'text' }>;
 
-/** Brush tool options (document-space size, style, and pressure behavior). */
 export interface BrushOptions {
-  /** Base stroke diameter in document units. */
+  /** Document units. */
   size: number;
-  /** Fill color (any CSS color string). */
   color: string;
-  /** Per-stroke opacity in [0, 1]. */
   opacity: number;
-  /** Edge hardness in [0, 1]: 1 is a crisp edge, lower feathers the silhouette. */
+  /** 1 is a crisp edge; lower feathers the silhouette. */
   hardness: number;
-  /** Whether pen pressure modulates the stroke width. */
   pressureAffectsWidth: boolean;
-  /**
-   * Pressure-alpha is off by default: unlike width modulation it refills the full scratch region each frame and
-   * changes stroke appearance.
-   */
+  /** Off by default: it refills the full scratch region each frame and changes stroke appearance. */
   pressureAffectsOpacity: boolean;
 }
 
-/** Eraser tool options. */
 export interface EraserOptions {
-  /** Base eraser diameter in document units. */
+  /** Document units. */
   size: number;
-  /** Per-stroke erase strength in [0, 1]. */
   opacity: number;
-  /** Edge hardness in [0, 1]: 1 is a crisp edge, lower feathers the silhouette. */
+  /** 1 is a crisp edge; lower feathers the silhouette. */
   hardness: number;
-  /** Whether pen pressure modulates the eraser width; pressure never modulates erase strength. */
+  /** Pressure never modulates erase strength. */
   pressureAffectsWidth: boolean;
 }
 
-/**
- * Quick-switch memory (Q): the layer a user bookmarked from its menu, and the layer selected before the current
- * one. Transient like tool options: it lives with the engine, never in the project.
- */
+/** Q quick-switch memory; transient, it lives with the engine, never in the project. */
 export interface LayerQuickSwitchState {
-  /** Set from the layer menu; a stale id (the layer was removed) is ignored by readers. */
+  /** Readers ignore a stale id. */
   bookmarkedLayerId: string | null;
-  /** Engine-maintained: the layer left by the last explicit switch; internal edits and deselection preserve it. */
+  /** Engine-maintained; internal edits and deselection preserve it. */
   previousLayerId: string | null;
 }
 
-/** Lasso (selection) tool options: how the path is drawn, and the op it applies. */
 export interface LassoToolOptions {
-  /** The op a committed lasso path applies to the selection, when no modifier overrides it. */
+  /** Applies when no modifier overrides it. */
   mode: SelectionOp;
-  /** `freehand` traces a drag; `polygon` places straight-edged vertices by click. */
   shape: 'freehand' | 'polygon';
 }
 
-/** Default lasso options: a freehand path that replaces the selection. */
 export const DEFAULT_LASSO_OPTIONS: LassoToolOptions = {
   mode: 'replace',
   shape: 'freehand',
@@ -81,33 +62,27 @@ export const DEFAULT_LASSO_OPTIONS: LassoToolOptions = {
 
 export interface MarqueeToolOptions {
   kind: 'rect' | 'ellipse';
-  /** The op a committed marquee applies to the selection, when no modifier overrides it. */
+  /** Applies when no modifier overrides it. */
   mode: SelectionOp;
 }
 
-/** Default marquee options: a rectangle that replaces the selection. */
 export const DEFAULT_MARQUEE_OPTIONS: MarqueeToolOptions = {
   kind: 'rect',
   mode: 'replace',
 };
 
-/** A single gradient stop (offset in [0,1], any CSS color). */
+/** Offset in [0, 1]. */
 export interface GradientStop {
   offset: number;
   color: string;
 }
 
-/**
- * Next-shape kind and fill/stroke toggles. Colors come from foreground/background at gesture start; selected-shape
- * colors belong to the document.
- */
 export type ShapeToolKind = ParametricShapeKind | 'polygon' | 'freehand';
 
-/** Where a drawn shape lands: pixels on the selected paint layer, or its own shape layer. */
 export type ShapeToolTarget = 'selected' | 'new';
 
+/** Colors come from the color pair at gesture start; selected-shape colors belong to the document. */
 export interface ShapeToolOptions {
-  /** The box-parametric kinds drag out a rect; `polygon` places vertices, `freehand` traces a drag. */
   kind: ShapeToolKind;
   /** Falls back to a new shape layer whenever the selected layer cannot take pixels. */
   target: ShapeToolTarget;
@@ -116,7 +91,6 @@ export interface ShapeToolOptions {
   strokeWidth: number;
 }
 
-/** Sensible starting shape options: a filled rect, no stroke, drawn onto the selected paint layer. */
 export const DEFAULT_SHAPE_OPTIONS: Readonly<ShapeToolOptions> = {
   fillEnabled: true,
   kind: 'rect',
@@ -125,41 +99,34 @@ export const DEFAULT_SHAPE_OPTIONS: Readonly<ShapeToolOptions> = {
   target: 'selected',
 };
 
-/** Largest shape stroke width (document px) the options bar clamps to. */
 export const MAX_SHAPE_STROKE_WIDTH = 2000;
 
-/**
- * Gradient kind, angle, preset and custom stops. Pair resolves foreground/background at gesture start; custom uses
- * stops verbatim. The editor changes first and last stops.
- */
+/** `custom` uses `stops` verbatim. */
 export interface GradientToolOptions {
   kind: 'linear' | 'radial';
   angle: number;
-  /** `pair` = the built-in FG→BG preset, resolved when the drag starts. */
+  /** `pair` is the FG→BG preset, resolved when the drag starts. */
   preset: 'pair' | 'custom';
   stops: GradientStop[];
 }
 
-/** The lasso tool's in-flight outline: a freehand drag, or a polygon being placed vertex by vertex. */
 export type LassoPreview =
   | { kind: 'freehand'; points: readonly Vec2[] }
   | {
       kind: 'polygon';
       points: readonly Vec2[];
       cursor: Vec2 | null;
-      /** Once the polygon can close, a press this many screen px from the first vertex closes it; the overlay rings that radius. */
+      /** Screen px from the first vertex that closes the polygon; null until it can close. */
       closeRadiusPx: number | null;
       closeArmed: boolean;
     };
 
-/** The gradient tool's in-flight drag: start → end in document space. */
 export interface GradientPreview {
   kind: 'linear' | 'radial';
   start: Vec2;
   end: Vec2;
 }
 
-/** Sensible starting gradient options: the FG→BG preset, horizontal linear. */
 export const DEFAULT_GRADIENT_OPTIONS: Readonly<Omit<GradientToolOptions, 'stops'>> & {
   readonly stops: readonly Readonly<GradientStop>[];
 } = {
@@ -172,22 +139,18 @@ export const DEFAULT_GRADIENT_OPTIONS: Readonly<Omit<GradientToolOptions, 'stops
   ],
 };
 
-/**
- * New-text defaults and live style. Initial color comes from foreground; active session and selected-layer colors
- * are independently stored.
- */
+/** Initial color is the foreground; session and selected-layer colors are stored apart. */
 export interface TextToolOptions {
   fontFamily: string;
   fontSize: number;
-  /** CSS numeric weight (400/500/600/700). */
   fontWeight: number;
-  /** Stable custom-font identity, omitted for built-in font stacks. */
+  /** Omitted for built-in font stacks. */
   fontRef?: CanvasTextFontRef;
-  /** CSS style used by both the editing portal and Canvas rasterizer. Defaults to `normal`. */
+  /** Defaults to `normal`. */
   fontStyle?: CanvasTextFontStyle;
-  /** Explicit OpenType variation coordinates for custom or variable faces. Defaults to `{}`. */
+  /** Defaults to `{}`. */
   fontVariations?: CanvasTextFontVariations;
-  /** Unitless line-height multiplier over `fontSize`. */
+  /** Unitless multiplier over `fontSize`. */
   lineHeight: number;
   align: 'left' | 'center' | 'right';
 }
@@ -199,17 +162,14 @@ export const TEXT_FONT_FAMILIES: readonly { label: string; value: string }[] = [
   { label: 'Monospace', value: "'JetBrains Mono', ui-monospace, monospace" },
 ];
 
-/** Weights the text options bar offers. */
 export const TEXT_FONT_WEIGHTS: readonly number[] = [400, 500, 600, 700];
 
-/** Smallest / largest font size (document px) the text options bar clamps to. */
+/** Document px. */
 export const MIN_TEXT_FONT_SIZE = 1;
 export const MAX_TEXT_FONT_SIZE = 2000;
 
-/** What a live text session (or a selected text layer) can restyle: the options plus its explicit color. */
 export type TextStylePatch = Partial<TextToolOptions> & { color?: string };
 
-/** Sensible starting text options: left-aligned Inter at 48px. */
 export const DEFAULT_TEXT_OPTIONS: Readonly<TextToolOptions> = {
   align: 'left',
   fontFamily: TEXT_FONT_FAMILIES[0]!.value,
@@ -220,37 +180,30 @@ export const DEFAULT_TEXT_OPTIONS: Readonly<TextToolOptions> = {
   lineHeight: 1.2,
 };
 
-/** Bbox (generation-frame) tool options: the aspect-ratio lock. */
 export interface BboxToolOptions {
-  /** Whether corner/edge resize preserves {@link BboxToolOptions.aspectRatio}. */
   aspectLocked: boolean;
-  /** The locked width / height ratio. */
   aspectRatio: number;
 }
 
-/** Default grid size (document px) the bbox snaps to before a model feeds a real one. */
+/** Used until a model feeds a real grid. */
 export const DEFAULT_BBOX_GRID = 8;
 
-/** Default bbox tool options: aspect unlocked, square ratio. */
 export const DEFAULT_BBOX_OPTIONS: BboxToolOptions = {
   aspectLocked: false,
   aspectRatio: 1,
 };
 
-/** Smallest and largest brush/eraser diameters (document units) the size step clamps to. */
+/** Document units. */
 export const MIN_BRUSH_SIZE = 0.1;
 export const MAX_BRUSH_SIZE = 2000;
 
-/** The mirrored foreground/background pair the object tools read at gesture start. */
 export interface ActiveColorPairState {
   foreground: string;
   background: string;
 }
 
-/** Matches the workbench pair's default: black on white. */
 export const DEFAULT_COLOR_PAIR_STATE: ActiveColorPairState = { background: '#ffffff', foreground: '#000000' };
 
-/** Sensible starting brush options. */
 export const DEFAULT_BRUSH_OPTIONS: Readonly<BrushOptions> = {
   color: '#000000',
   hardness: 1,
@@ -260,7 +213,6 @@ export const DEFAULT_BRUSH_OPTIONS: Readonly<BrushOptions> = {
   size: 50,
 };
 
-/** Sensible starting eraser options. */
 export const DEFAULT_ERASER_OPTIONS: Readonly<EraserOptions> = {
   hardness: 1,
   opacity: 1,
@@ -268,29 +220,34 @@ export const DEFAULT_ERASER_OPTIONS: Readonly<EraserOptions> = {
   size: 50,
 };
 
-/** The control layer displayed as its kept original, alone or under its map. */
 export interface ControlLayerView {
   layerId: string;
   view: 'original' | 'overlay';
 }
 
-/**
- * Transform sessions span gestures until Apply/Cancel. `startTransform` is the committed undo/cancel baseline;
- * `transform` drives preview and numeric controls.
- */
+/** How wheel events route: `auto` judges each one as a mouse wheel or a trackpad. */
+export type ScrollInput = 'auto' | 'mouse' | 'trackpad';
+
+export interface TransformOptions {
+  smoothing: boolean;
+  resampleMode: 'bilinear' | 'bicubic' | 'hamming' | 'lanczos';
+  fitMode: 'contain' | 'cover' | 'fill';
+  aspectLinked: boolean;
+  /** Only the numeric fields use it; gestures keep their own pivots. */
+  referencePoint: TransformAnchor;
+}
+
+/** Spans gestures until Apply or Cancel; `startTransform` is the undo and cancel baseline. */
 export interface TransformSession {
+  processing?: boolean;
+  processingPhase?: 'preparing' | 'queued' | 'resampling';
+  applyFailed?: boolean;
   layerId: string;
   startTransform: LayerTransform;
   transform: LayerTransform;
 }
 
-/**
- * Text sessions suppress the edited layer while its portal renders. Create has no layer/start source until one add
- * commit; edit keeps `startSource` as undo and no-change baseline for one source-update commit.
- *
- * `source` holds live styles but only seeded content; typing stays in the DOM until commit. `transform` places the
- * portal, and incrementing `id` remounts it per session.
- */
+/** Create has no layer until its add commits; `source` holds live styles but typing stays in the DOM until commit. */
 export interface TextEditSession {
   id: number;
   mode: 'create' | 'edit';
@@ -300,7 +257,7 @@ export interface TextEditSession {
   transform: LayerTransform;
 }
 
-/** A single-value store, `useSyncExternalStore`-compatible. */
+/** `useSyncExternalStore`-compatible. */
 export interface ScalarStore<T> {
   get(): T;
   set(next: T): void;
@@ -331,23 +288,21 @@ const createScalarStore = <T>(initial: T, isEqual: (a: T, b: T) => boolean = Obj
   };
 };
 
-/** Per-key subscriptions rerender only the affected thumbnail; global subscription supports coarse observers. */
+/** Per-key subscriptions rerender only the affected thumbnail. */
 export interface KeyedVersionStore {
   get(key: string): number | undefined;
   set(key: string, value: number): void;
   delete(key: string): void;
-  /** Subscribes to changes for a single key. */
   subscribeKey(key: string, listener: () => void): () => void;
-  /** Subscribes to any change across all keys. */
   subscribe(listener: () => void): () => void;
 }
 
 export type LayerThumbnailStatus = 'loading' | 'ready' | 'error';
 
-/** Why a layer's displayed spatial adjustments are not exact yet; absence means they are (or it has none). */
+/** Absent means exact, or no adjustments. */
 export type LayerAdjustmentStatus = AdjustedSurfaceStatus;
 
-/** A per-layer status; absence represents `idle`. */
+/** Absent means `idle`. */
 export interface KeyedStatusStore<T extends string> {
   get(key: string): T | undefined;
   set(key: string, value: T): void;
@@ -448,7 +403,6 @@ const createKeyedStatusStore = <T extends string>(): KeyedStatusStore<T> => {
   };
 };
 
-/** The bundle of transient stores owned by one engine instance. */
 export interface EngineStores {
   activeTool: ScalarStore<ToolId>;
   zoom: ScalarStore<number>;
@@ -457,94 +411,69 @@ export interface EngineStores {
   thumbnailVersion: KeyedVersionStore;
   thumbnailStatus: KeyedStatusStore<LayerThumbnailStatus>;
   adjustmentStatus: KeyedStatusStore<LayerAdjustmentStatus>;
-  /** Monotonic aggregate version for consumers whose eligibility depends on live layer content. */
   layerPixelEpoch: ScalarStore<number>;
-  /** Monotonic version of the mirrored document, for consumers that read the engine's model during render. */
   documentEpoch: ScalarStore<number>;
-  /** Brush tool options (size / color / opacity / pressure). */
   brushOptions: ScalarStore<BrushOptions>;
-  /** One-way foreground/background mirror for gesture-start reads; the engine never writes it. */
+  /** One-way mirror; the engine never writes it. */
   colorPair: ScalarStore<ActiveColorPairState>;
-  /** Eraser tool options (size / opacity / pressure width). */
   eraserOptions: ScalarStore<EraserOptions>;
-  /** The Q quick-switch memory: the bookmarked layer and the previously selected one. */
   layerQuickSwitch: ScalarStore<LayerQuickSwitchState>;
-  /** Whether the engine-owned canvas history has an entry to undo. */
   canUndo: ScalarStore<boolean>;
-  /** Whether the engine-owned canvas history has an entry to redo. */
   canRedo: ScalarStore<boolean>;
-  /** Bumped on every history-stack mutation, so a history list can re-read the entries. */
   historyEpoch: ScalarStore<number>;
-  /** Bbox tool options (aspect lock / ratio). */
   bboxOptions: ScalarStore<BboxToolOptions>;
-  /** Lasso tool options (the committed boolean op mode). */
   lassoOptions: ScalarStore<LassoToolOptions>;
-  /** Marquee tool options (shape kind / the committed boolean op mode). */
   marqueeOptions: ScalarStore<MarqueeToolOptions>;
-  /** Shape tool options (kind / fill and stroke enablement / stroke width). */
   shapeOptions: ScalarStore<ShapeToolOptions>;
-  /** Gradient tool options (kind / angle / preset / stops). */
   gradientOptions: ScalarStore<GradientToolOptions>;
-  /** Text tool options (font family / size / weight / line-height / align). */
   textOptions: ScalarStore<TextToolOptions>;
-  /**
-   * Text session drives the portal, live style controls and composite suppression. Commit, cancel, real tool
-   * switch, deletion or replacement clears it.
-   */
+  /** Cleared by commit, cancel, a real tool switch, deletion or replacement. */
   textEditSession: ScalarStore<TextEditSession | null>;
-  /** Document-space shape preview replaces dispatch during drag; null when idle, cleared on commit/cancel. */
   shapePreview: ScalarStore<{ rect: Rect; kind: ParametricShapeKind } | null>;
+  /** Vector creation preview is guide geometry, never a rasterization source. */
+  vectorShapePreview: ScalarStore<VectorShapePreview | null>;
+  vectorEditSession: ScalarStore<VectorEditSession | null>;
+  vectorToolsStatus: ScalarStore<'idle' | 'loading' | 'ready' | 'failed'>;
   /** Document-space gradient drag vector; overlay shows a linear ramp or radial circle. Cleared on commit/cancel. */
   gradientPreview: ScalarStore<GradientPreview | null>;
   hasSelection: ScalarStore<boolean>;
-  /** Floating pixels enable Apply/Cancel without a separate transform session. */
   hasFloatingSelection: ScalarStore<boolean>;
-  /** Core-only visual SAM interaction state; application session status remains outside the engine. */
+  /** Application session status stays outside the engine. */
   samInteraction: ScalarStore<SamInteractionState | null>;
-  /**
-   * Transient lasso overlay: freehand outline or polygon vertices, cursor band and close target. Cleared on
-   * commit/cancel without dispatch.
-   */
   lassoPreview: ScalarStore<LassoPreview | null>;
-  /** Transient marquee outline; the selection mask changes only on commit. */
+  /** The selection mask changes only on commit. */
   marqueePreview: ScalarStore<{ rect: Rect; kind: 'rect' | 'ellipse' } | null>;
-  /** Legacy bbox stroke clipping, captured once per paint gesture. */
+  /** Captured once per paint gesture. */
   clipToBbox: ScalarStore<boolean>;
-  /** Model-dependent grid size (document px) the bbox snaps to. React feeds this from generate settings. */
+  /** React feeds this from generate settings. */
   bboxGrid: ScalarStore<number>;
-  /**
-   * Document-space bbox preview replaces the committed overlay frame during drag without dispatch. Cleared on
-   * commit/cancel.
-   */
   bboxPreview: ScalarStore<Rect | null>;
-  /** Transform session supplies numeric controls, Apply/Cancel and live preview; null when closed. */
+  /** Transient; not part of the persisted document. */
+  transformOptions: ScalarStore<TransformOptions>;
   transformSession: ScalarStore<TransformSession | null>;
-  /** The layer a requested transform session waits on until its fresh pixels are persisted; null when none waits. */
   pendingTransformLayerId: ScalarStore<string | null>;
-  /** Checkerboard defaults on; disabling reveals the widget surface through transparent document pixels. */
   checkerboard: ScalarStore<boolean>;
-  /**
-   * React supplies semantic checker colors; changes rebuild the tile and recompose. {@link DEFAULT_CHECKER_COLORS}
-   * supplies the React-free initial fallback.
-   */
+  /** {@link DEFAULT_CHECKER_COLORS} is the React-free fallback. */
   checkerColors: ScalarStore<CheckerColors>;
   showGrid: ScalarStore<boolean>;
-  /** Inverts ctrl+wheel sizing; default wheel-up grows. Input-only preference. */
+  /** Default wheel-up grows. */
   invertBrushSizeScroll: ScalarStore<boolean>;
-  /** Passive bbox frame defaults on. The active bbox tool always draws its editable frame and handles. */
+  scrollInput: ScalarStore<ScrollInput>;
+  /** Set by the engine on trackpad proof, never cleared by it; the frontend persists and restores it. */
+  trackpadDetected: ScalarStore<boolean>;
+  /** The active bbox tool always draws its frame and handles. */
   showBbox: ScalarStore<boolean>;
-  /** Optional shade outside the generation bbox. Overlay-only toggling never recomposites document pixels. */
+  /** Toggling never recomposites document pixels. */
   bboxOverlay: ScalarStore<boolean>;
   ruleOfThirds: ScalarStore<boolean>;
-  /** Bbox moves, resizes and fit actions use grid snapping by default; Alt bypasses it. Input-only preference. */
+  /** Alt bypasses it. */
   snapToGrid: ScalarStore<boolean>;
-  /** Whether an engine-owned operation currently excludes ordinary document edits. */
   documentEditingLocked: ScalarStore<boolean>;
   psdExportStatus: ScalarStore<PsdExportStatus>;
-  /** The layer targeted by that operation, or null when no operation is active. */
+
   documentEditingLayerId: ScalarStore<string | null>;
-  /** The control layer displayed as its original (or original under map); null displays every map. */
   controlLayerView: ScalarStore<ControlLayerView | null>;
+  stagingHidesOverlays: ScalarStore<boolean>;
 }
 
 const brushOptionsEqual = (a: BrushOptions, b: BrushOptions): boolean =>
@@ -591,7 +520,6 @@ const stopsEqual = (a: readonly GradientStop[], b: readonly GradientStop[]): boo
 const gradientOptionsEqual = (a: GradientToolOptions, b: GradientToolOptions): boolean =>
   a.kind === b.kind && a.angle === b.angle && a.preset === b.preset && stopsEqual(a.stops, b.stops);
 
-/** Shared by the shape and marquee previews — both are a rect plus a shape kind. */
 const rectShapePreviewEqual = (
   a: { rect: Rect; kind: ParametricShapeKind } | null,
   b: { rect: Rect; kind: ParametricShapeKind } | null
@@ -636,6 +564,9 @@ const transformSessionEqual = (a: TransformSession | null, b: TransformSession |
     return a === b;
   }
   return (
+    a.processing === b.processing &&
+    a.processingPhase === b.processingPhase &&
+    a.applyFailed === b.applyFailed &&
     a.layerId === b.layerId &&
     transformEqual(a.startTransform, b.startTransform) &&
     transformEqual(a.transform, b.transform)
@@ -695,7 +626,6 @@ const textEditSessionEqual = (a: TextEditSession | null, b: TextEditSession | nu
   );
 };
 
-/** Creates a fresh bundle of engine stores with their initial values. */
 export const createEngineStores = (initialTool: ToolId = 'view'): EngineStores => ({
   activeTool: createScalarStore<ToolId>(initialTool),
   bboxGrid: createScalarStore<number>(DEFAULT_BBOX_GRID),
@@ -736,16 +666,29 @@ export const createEngineStores = (initialTool: ToolId = 'view'): EngineStores =
   documentEpoch: createScalarStore<number>(0),
   ruleOfThirds: createScalarStore<boolean>(false),
   samInteraction: createScalarStore(null),
+  scrollInput: createScalarStore<ScrollInput>('auto'),
   shapeOptions: createScalarStore<ShapeToolOptions>({ ...DEFAULT_SHAPE_OPTIONS }, shapeOptionsEqual),
   shapePreview: createScalarStore<{ rect: Rect; kind: ParametricShapeKind } | null>(null, rectShapePreviewEqual),
+  vectorShapePreview: createScalarStore<VectorShapePreview | null>(null),
+  vectorEditSession: createScalarStore<VectorEditSession | null>(null),
+  vectorToolsStatus: createScalarStore<'idle' | 'loading' | 'ready' | 'failed'>('idle'),
   showBbox: createScalarStore<boolean>(true),
   showGrid: createScalarStore<boolean>(false),
   snapToGrid: createScalarStore<boolean>(true),
+  stagingHidesOverlays: createScalarStore<boolean>(false),
   textEditSession: createScalarStore<TextEditSession | null>(null, textEditSessionEqual),
   textOptions: createScalarStore<TextToolOptions>({ ...DEFAULT_TEXT_OPTIONS }, textOptionsEqual),
+  trackpadDetected: createScalarStore<boolean>(false),
   thumbnailVersion: createKeyedVersionStore(),
   thumbnailStatus: createKeyedStatusStore<LayerThumbnailStatus>(),
   adjustmentStatus: createKeyedStatusStore<LayerAdjustmentStatus>(),
+  transformOptions: createScalarStore<TransformOptions>({
+    smoothing: false,
+    resampleMode: 'bicubic',
+    fitMode: 'contain',
+    aspectLinked: true,
+    referencePoint: 'center',
+  }),
   transformSession: createScalarStore<TransformSession | null>(null, transformSessionEqual),
   pendingTransformLayerId: createScalarStore<string | null>(null),
   viewportReady: createScalarStore<boolean>(false),

@@ -282,15 +282,17 @@ def test_empty_model_cache_aggregates_per_device_results(monkeypatch: Any, clien
     from invokeai.backend.model_manager.load.model_cache.model_cache import CacheClearResult
 
     class _Cache:
-        def __init__(self, models_cleared: int, bytes_freed: int) -> None:
-            self._result = CacheClearResult(models_cleared=models_cleared, bytes_freed=bytes_freed)
+        def __init__(self, models_cleared: int, bytes_freed: int, vram_release_refused: bool = False) -> None:
+            self._result = CacheClearResult(
+                models_cleared=models_cleared, bytes_freed=bytes_freed, vram_release_refused=vram_release_refused
+            )
             self.requested: list[int] = []
 
         def make_room(self, bytes_needed: int) -> CacheClearResult:
             self.requested.append(bytes_needed)
             return self._result
 
-    cache_0 = _Cache(models_cleared=2, bytes_freed=100)
+    cache_0 = _Cache(models_cleared=2, bytes_freed=100, vram_release_refused=True)
     cache_1 = _Cache(models_cleared=3, bytes_freed=250)
     services = _make_stats_services({"cuda:0": cache_0, "cuda:1": cache_1})
     invoker = DummyInvoker(services)
@@ -300,7 +302,7 @@ def test_empty_model_cache_aggregates_per_device_results(monkeypatch: Any, clien
     response = client.post("/api/v2/models/empty_model_cache")
 
     assert response.status_code == 200
-    assert response.json() == {"models_cleared": 5, "bytes_freed": 350}
+    assert response.json() == {"models_cleared": 5, "bytes_freed": 350, "vram_release_refused": True}
     # Both devices were actually asked to clear, not just the API thread's default cache.
     assert len(cache_0.requested) == 1
     assert len(cache_1.requested) == 1
@@ -317,7 +319,7 @@ def test_empty_model_cache_clears_duplicate_cache_objects_once(monkeypatch: Any,
 
         def make_room(self, bytes_needed: int) -> CacheClearResult:
             self.calls += 1
-            return CacheClearResult(models_cleared=2, bytes_freed=100)
+            return CacheClearResult(models_cleared=2, bytes_freed=100, vram_release_refused=False)
 
     shared = _Cache()
     services = _make_stats_services({"cuda:0": shared, "cpu": shared})
@@ -328,8 +330,93 @@ def test_empty_model_cache_clears_duplicate_cache_objects_once(monkeypatch: Any,
     response = client.post("/api/v2/models/empty_model_cache")
 
     assert response.status_code == 200
-    assert response.json() == {"models_cleared": 2, "bytes_freed": 100}
+    assert response.json() == {"models_cleared": 2, "bytes_freed": 100, "vram_release_refused": False}
     assert shared.calls == 1
+
+
+def test_empty_model_cache_succeeds_when_the_device_refuses_to_release_its_cached_memory(
+    monkeypatch: Any, client: TestClient
+) -> None:
+    """The models are dropped before the allocator is asked to hand its blocks back; a device context that refuses
+    (here a CUDA error) must not turn the finished eviction into a server error."""
+    import torch
+
+    from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
+    from invokeai.backend.util import devices
+    from tests.backend.model_manager.load.model_cache.cached_model.utils import DummyModule
+
+    releases = []
+
+    def refuse() -> None:
+        releases.append("refused")
+        # The type the report hit; older torch builds only have RuntimeError.
+        raise getattr(torch, "AcceleratorError", RuntimeError)("CUDA error: out of memory")
+
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(torch.cuda, "empty_cache", refuse)
+    monkeypatch.setattr(torch.backends.mps, "is_available", lambda: False)
+    monkeypatch.setattr(devices, "_xpu_is_available", lambda: False)
+
+    cache = ModelCache(
+        execution_device_working_mem_gb=1.0,
+        enable_partial_loading=False,
+        keep_ram_copy_of_weights=True,
+        execution_device="cpu",
+        storage_device="cpu",
+        logger=logging.getLogger("test.model_manager_router"),
+    )
+    cache.put("model", DummyModule())
+    size = cache.get("model").cached_model.total_bytes()
+    invoker = DummyInvoker(_make_stats_services({"cpu": cache}))
+    monkeypatch.setattr("invokeai.app.api.routers.model_manager.ApiDependencies", MockApiDependencies(invoker))
+    monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", MockApiDependencies(invoker))
+
+    response = client.post("/api/v2/models/empty_model_cache")
+
+    assert response.status_code == 200
+    assert response.json() == {"models_cleared": 1, "bytes_freed": size, "vram_release_refused": True}
+    assert "model" not in cache._cached_models
+    assert releases == ["refused"]
+
+
+def test_empty_model_cache_does_not_report_a_deferred_release_as_refused(monkeypatch: Any, client: TestClient) -> None:
+    """A release skipped because another generation device is mid-session runs later; it is not a refusal, so the
+    client must not warn about unreleased GPU memory."""
+    import torch
+
+    from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
+    from invokeai.backend.util import devices
+    from invokeai.backend.util.devices import TorchDevice
+    from tests.backend.model_manager.load.model_cache.cached_model.utils import DummyModule
+
+    releases = []
+
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(torch.cuda, "empty_cache", lambda: releases.append("released"))
+    monkeypatch.setattr(torch.backends.mps, "is_available", lambda: False)
+    monkeypatch.setattr(devices, "_xpu_is_available", lambda: False)
+    monkeypatch.setattr(TorchDevice, "_another_generation_device_busy", classmethod(lambda cls: True))
+
+    cache = ModelCache(
+        execution_device_working_mem_gb=1.0,
+        enable_partial_loading=False,
+        keep_ram_copy_of_weights=True,
+        execution_device="cpu",
+        storage_device="cpu",
+        logger=logging.getLogger("test.model_manager_router"),
+    )
+    cache.put("model", DummyModule())
+    size = cache.get("model").cached_model.total_bytes()
+    invoker = DummyInvoker(_make_stats_services({"cpu": cache}))
+    monkeypatch.setattr("invokeai.app.api.routers.model_manager.ApiDependencies", MockApiDependencies(invoker))
+    monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", MockApiDependencies(invoker))
+
+    response = client.post("/api/v2/models/empty_model_cache")
+
+    assert response.status_code == 200
+    assert response.json() == {"models_cleared": 1, "bytes_freed": size, "vram_release_refused": False}
+    assert "model" not in cache._cached_models
+    assert releases == []
 
 
 def test_get_stats_returns_null_when_no_stats(monkeypatch: Any, client: TestClient) -> None:
@@ -427,6 +514,21 @@ def test_update_model_record_answers_with_the_service_outcome(client: TestClient
     assert model_record_routes.store.get_model(key).name == "legacy"
 
 
+def test_update_model_record_sets_keeps_and_clears_source_links(client: TestClient, model_record_routes: Any) -> None:
+    key = "test_config_1"
+    links = ["https://example.com/model", "https://example.com/quantized"]
+
+    assert client.patch(f"/api/v2/models/i/{key}", json={"source_urls": links}).status_code == 200
+    kept = client.patch(f"/api/v2/models/i/{key}", json={"name": "renamed"})
+    assert kept.status_code == 200
+    assert kept.json()["source_urls"] == links
+
+    cleared = client.patch(f"/api/v2/models/i/{key}", json={"source_urls": None})
+    assert cleared.status_code == 200
+    assert cleared.json()["source_urls"] == []
+    assert model_record_routes.store.get_model(key).source_urls == []
+
+
 def test_reidentify_model_answers_with_the_service_outcome(
     client: TestClient, model_record_routes: Any, mm2_app_config: Any
 ) -> None:
@@ -504,6 +606,73 @@ def test_convert_model_releases_the_lock_when_the_conversion_fails() -> None:
         with pytest.raises(HTTPException) as exc_info:
             convert_model(MagicMock(), key="some-key")
     assert exc_info.value.status_code == 424
+
+
+@pytest.mark.parametrize("source_urls", [[], ["https://example.com/model", "https://example.com/quantization"]])
+def test_conversion_preserves_source_links_on_the_replacement_record(
+    monkeypatch: Any, mm2_installer: Any, mm2_app_config: Any, diffusers_dir: Path, source_urls: list[str]
+) -> None:
+    import shutil
+    from types import SimpleNamespace
+
+    from invokeai.app.api.routers import model_manager as model_manager_router
+    from invokeai.app.services.model_images.model_images_common import ModelImageFileNotFoundException
+    from invokeai.app.services.model_records import UnknownModelException
+    from invokeai.backend.model_manager.configs.main import Main_Checkpoint_SD1_Config
+    from invokeai.backend.model_manager.taxonomy import ModelFormat, ModelVariantType, SchedulerPredictionType
+
+    store = mm2_installer.record_store
+    checkpoint = mm2_app_config.models_path / "original.safetensors"
+    checkpoint.parent.mkdir(parents=True, exist_ok=True)
+    checkpoint.write_bytes(b"original checkpoint")
+    original = Main_Checkpoint_SD1_Config(
+        key="original",
+        path=checkpoint.name,
+        name="Original Model",
+        config_path="model.yaml",
+        hash="original-hash",
+        file_size=checkpoint.stat().st_size,
+        source="org/original",
+        source_type=ModelSourceType.HFRepoID,
+        source_urls=source_urls,
+        variant=ModelVariantType.Normal,
+        prediction_type=SchedulerPredictionType.Epsilon,
+    )
+    store.add_model(original)
+
+    class ConvertedPipeline:
+        def save_pretrained(self, path: Path) -> None:
+            shutil.copytree(diffusers_dir, path)
+
+    class ModelImages(DummyModelImages):
+        def get(self, _key: str) -> None:
+            raise ModelImageFileNotFoundException()
+
+    services = SimpleNamespace(
+        model_manager=SimpleNamespace(
+            store=store,
+            install=mm2_installer,
+            load=SimpleNamespace(load_model=lambda *_args, **_kwargs: SimpleNamespace(model=ConvertedPipeline())),
+        ),
+        configuration=mm2_app_config,
+        model_images=ModelImages(),
+        logger=logging.getLogger(__name__),
+    )
+    monkeypatch.setattr(model_manager_router, "ApiDependencies", MockApiDependencies(DummyInvoker(services)))
+
+    converted = model_manager_router.convert_model(current_admin=SimpleNamespace(user_id="test-user"), key=original.key)
+
+    assert converted.key != original.key
+    assert converted.format == ModelFormat.Diffusers
+    assert converted.source_urls == source_urls
+    replacement = store.get_model(converted.key)
+    assert replacement.name == "Original Model"
+    assert replacement.source == "org/original"
+    assert replacement.source_urls == source_urls
+    assert (mm2_app_config.models_path / replacement.path).is_dir()
+    with pytest.raises(UnknownModelException):
+        store.get_model(original.key)
+    assert not checkpoint.exists()
 
 
 def test_convert_model_retains_recovery_source_and_restores_model_name(monkeypatch: Any, tmp_path: Path) -> None:

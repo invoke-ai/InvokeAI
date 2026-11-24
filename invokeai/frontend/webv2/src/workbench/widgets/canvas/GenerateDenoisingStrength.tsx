@@ -1,7 +1,7 @@
 import type { CanvasDenoisingStrength, CanvasDenoisingStrengthProps } from '@features/generation/react';
 import type { ReactNode } from 'react';
 
-import { Badge } from '@chakra-ui/react';
+import { HStack } from '@chakra-ui/react';
 import { useDebouncedDraftValue, useRegisterGenerateDraftFlusher } from '@features/generation/react';
 import { ScrubberField } from '@platform/ui/ScrubberField';
 import {
@@ -41,11 +41,7 @@ const useStrengthDraft = (): StrengthDraft => {
   return draft;
 };
 
-/**
- * Owns the strength draft: persists it in canvas widget values after a debounce and flushes it with the Generate
- * form before invocation. Its `children` keep their element identity across draft changes, so a scrub re-renders
- * only the badge and field that read the draft, not the section laid out around them.
- */
+/** Owns the strength draft; `children` keep element identity so a scrub re-renders only draft readers. */
 const StrengthDraftProvider = ({ children }: { children: ReactNode }) => {
   const { widgets } = useWorkbenchCommands();
   const projectId = useActiveProjectSelector((project) => project.id);
@@ -75,13 +71,13 @@ const StrengthDraftProvider = ({ children }: { children: ReactNode }) => {
   return <StrengthDraftContext value={draft}>{children}</StrengthDraftContext>;
 };
 
-const StrengthBadge = () => {
+const StrengthSummary = () => {
   const { value } = useStrengthDraft();
   return (
-    <Badge gap="1.5">
+    <HStack as="span" display="inline-flex" gap="1.5" verticalAlign="middle">
       {formatStrengthPercent(value)}
       <DenoisingStrengthWave value={value} />
-    </Badge>
+    </HStack>
   );
 };
 
@@ -103,9 +99,9 @@ const StrengthField = () => {
   );
 };
 
-const STRENGTH_SLOTS: CanvasDenoisingStrength = { badges: <StrengthBadge />, field: <StrengthField /> };
+const STRENGTH_SLOTS: CanvasDenoisingStrength = { field: <StrengthField />, summary: <StrengthSummary /> };
 
-/** Lays out the Render section with canvas denoising strength: its badge in the header, its control under guidance. */
+/** Lays out the Render section with canvas denoising strength: its summary in the title, its control under guidance. */
 export const GenerateDenoisingStrength = ({ children }: CanvasDenoisingStrengthProps) => (
   <StrengthDraftProvider>{children(STRENGTH_SLOTS)}</StrengthDraftProvider>
 );

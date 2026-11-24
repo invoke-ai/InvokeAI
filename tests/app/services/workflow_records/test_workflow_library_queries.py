@@ -200,18 +200,21 @@ def test_each_order_key_sorts_by_its_column(
             "created_at": "2026-01-01 00:00:00.000",
             "updated_at": "2026-01-03 00:00:00.000",
             "opened_at": "2026-01-02 00:00:00.000",
+            "last_run_at": "2026-01-01 00:00:00.000",
             "is_public": True,
         },
         "a": {
             "created_at": "2026-01-02 00:00:00.000",
             "updated_at": "2026-01-01 00:00:00.000",
             "opened_at": "2026-01-03 00:00:00.000",
+            "last_run_at": "2026-01-03 00:00:00.000",
             "is_public": False,
         },
         "b": {
             "created_at": "2026-01-03 00:00:00.000",
             "updated_at": "2026-01-02 00:00:00.000",
             "opened_at": "2026-01-01 00:00:00.000",
+            "last_run_at": "2026-01-02 00:00:00.000",
             "is_public": False,
         },
     }
@@ -225,6 +228,24 @@ def test_each_order_key_sorts_by_its_column(
         return (name if order_by == WorkflowRecordOrderBy.Name else rows[name][order_by.value]), ids[name]
 
     assert [item.name for item in listed] == sorted(rows, key=key)
+
+
+@pytest.mark.parametrize("direction", list(SQLiteDirection))
+@pytest.mark.parametrize("order_by", [WorkflowRecordOrderBy.OpenedAt, WorkflowRecordOrderBy.LastRunAt])
+def test_workflows_never_opened_or_run_sort_last_in_both_directions(
+    workflow_records: WorkflowRecordsStorage,
+    database: Database,
+    order_by: WorkflowRecordOrderBy,
+    direction: SQLiteDirection,
+) -> None:
+    times = {"never-1": None, "late": "2026-01-02 00:00:00.000", "never-2": None, "early": "2026-01-01 00:00:00.000"}
+    for name, value in times.items():
+        _set(database, workflow_records.create(_workflow(name), user_id=USER).workflow_id, **{order_by.value: value})
+
+    listed = [item.name for item in workflow_records.get_many(order_by, direction, [WorkflowCategory.User]).items]
+
+    assert listed[:2] == (["late", "early"] if direction == SQLiteDirection.Descending else ["early", "late"])
+    assert sorted(listed[2:]) == ["never-1", "never-2"]
 
 
 def test_tags_are_counted_one_by_one_under_the_filters(workflow_records: WorkflowRecordsStorage) -> None:

@@ -14,9 +14,9 @@ import { useTranslation } from 'react-i18next';
 import { NodePreviewCard } from './NodePreviewCard';
 
 /**
- * Build previews from backend invocation templates; nodeTypes are invocation keys and nodePack identifies their
- * owning pack. The host owns the uninstall confirmation because an uninstall unmounts this detail before the dialog
- * finishes closing.
+ * Build previews from backend invocation templates; nodeTypes are invocation keys and nodePack identifies their owning
+ * pack. The host owns the uninstall confirmation because an uninstall unmounts this detail before the dialog finishes
+ * closing.
  */
 export const NodePackDetail = ({
   onRequestUninstall,

@@ -26,8 +26,8 @@ export interface ThumbnailControllerOptions {
   readonly isDisposed: () => boolean;
   readonly isSupportedSource: (source: CanvasLayerSourceContract) => boolean;
   /**
-   * What the display shows for a raster layer's cache (a spatial interim included), or null; never builds a
-   * layer-sized surface.
+   * What the display shows for a raster layer's cache (a spatial interim included), or null; never builds a layer-sized
+   * surface.
    */
   readonly peekDisplayedSurface: (layer: CanvasLayerContract, entry: LayerCacheEntry) => RasterSurface | null;
   readonly rasterize: (

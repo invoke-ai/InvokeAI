@@ -1,11 +1,12 @@
 # conftest.py is a special pytest file. Fixtures defined in this file will be accessible to all tests in this directory
 # without needing to explicitly import them. (https://docs.pytest.org/en/6.2.x/fixture.html)
-
-
-# We import the model_installer and torch_device fixtures here so that they can be used by all tests. Flake8 does not
-# play well with fixtures (F401 and F811), so this is cleaner than importing in all files that use these fixtures.
 import logging
 import os
+
+# Multiuser is the app's default; the suite tests single-user behavior unless a test passes `multiuser=True`, which
+# beats this environment value. Set before the imports below: some read `get_config()` at import time, which caches it.
+os.environ.setdefault("INVOKEAI_MULTIUSER", "false")
+
 import shutil
 import sys
 import warnings
@@ -60,6 +61,7 @@ from tests.fixtures.database import (  # noqa: F401
     empty_database,
     external_test_db_url,
 )
+from tests.fixtures.model_offload import offload_race  # noqa: F401
 from tests.fixtures.races import lost_races  # noqa: F401
 from tests.fixtures.sqlite_database import create_mock_sqlite_database  # noqa: F401
 from tests.test_nodes import TestEventService

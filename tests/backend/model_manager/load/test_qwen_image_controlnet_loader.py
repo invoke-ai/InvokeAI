@@ -9,7 +9,6 @@ published (alibaba-pai and Comfy-Org ship dense bf16 files), so refusing costs n
 from pathlib import Path
 
 import pytest
-import safetensors.torch
 import torch
 from diffusers.models.controlnets.controlnet_qwenimage import QwenImageControlNetModel
 
@@ -236,7 +235,6 @@ def test_an_instantx_file_an_earlier_version_recorded_as_a_main_model_is_refused
         loader=QwenImageCheckpointModel,
         module=qwen_image,
         entry="_load_from_singlefile",
-        load_file_host=safetensors.torch,
         compute_dtype=torch.bfloat16,
         patches_device=True,
         sets_torch_dtype=False,

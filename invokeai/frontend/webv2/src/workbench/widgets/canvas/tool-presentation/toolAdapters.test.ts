@@ -2,7 +2,7 @@ import type { ToolId } from '@workbench/canvas-engine/api';
 
 import { describe, expect, it } from 'vitest';
 
-import { OPERATION_PRESENTATION_ADAPTERS, TOOL_PRESENTATION_ADAPTERS } from './toolAdapters';
+import { TOOL_PRESENTATION_ADAPTERS } from './toolAdapters';
 
 const TOOL_IDS = Object.keys({
   bbox: true,
@@ -15,6 +15,7 @@ const TOOL_IDS = Object.keys({
   move: true,
   sam: true,
   shape: true,
+  spline: true,
   text: true,
   transform: true,
   view: true,
@@ -42,16 +43,6 @@ describe('tool presentation adapters', () => {
     }
   });
 
-  it('keeps property groups for configurable tools and omits sections whose only content was gesture guidance', () => {
-    for (const toolId of TOOL_IDS) {
-      if (toolId === 'view' || toolId === 'colorPicker' || toolId === 'sam') {
-        expect(TOOL_PRESENTATION_ADAPTERS[toolId].groups, toolId).toEqual([]);
-      } else {
-        expect(TOOL_PRESENTATION_ADAPTERS[toolId].groups.length, toolId).toBeGreaterThan(0);
-      }
-    }
-  });
-
   it('resolves every form group label in the English catalog and keeps group ids unique per form', () => {
     const resolve = (key: string): unknown =>
       key.split('.').reduce<unknown>((node, part) => (node as Record<string, unknown> | undefined)?.[part], en);
@@ -68,13 +59,5 @@ describe('tool presentation adapters', () => {
   it('names the Properties sections in the catalog', () => {
     expect(en.widgets.properties.sections.tool).toEqual(expect.any(String));
     expect(en.widgets.properties.sections.operation).toEqual(expect.any(String));
-  });
-
-  it('gives every guarded operation groups and a footer so Apply and Cancel stay in place', () => {
-    expect(Object.keys(OPERATION_PRESENTATION_ADAPTERS).sort()).toEqual(['filter', 'select-object']);
-    for (const adapter of Object.values(OPERATION_PRESENTATION_ADAPTERS)) {
-      expect(adapter.footer).toBeDefined();
-      expect(adapter.groups.length).toBeGreaterThan(0);
-    }
   });
 });

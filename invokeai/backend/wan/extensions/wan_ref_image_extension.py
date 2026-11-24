@@ -66,7 +66,7 @@ def encode_reference_image_to_ti2v_condition(
 
     with torch.inference_mode():
         encoded = vae.encode(pixel, return_dict=False)[0]
-        latents = encoded.sample()  # [1, 48, 1, H_lat, W_lat]
+        latents = encoded.mode()  # [1, 48, 1, H_lat, W_lat]
 
         latents_mean = torch.tensor(vae.config.latents_mean).view(1, -1, 1, 1, 1).to(latents.device, latents.dtype)
         latents_std = torch.tensor(vae.config.latents_std).view(1, -1, 1, 1, 1).to(latents.device, latents.dtype)
@@ -98,7 +98,7 @@ def encode_reference_image_to_condition(
 
     with torch.inference_mode():
         encoded = vae.encode(pixel, return_dict=False)[0]
-        latents = encoded.sample()  # [1, 16, 1, H_lat, W_lat]
+        latents = encoded.mode()  # [1, 16, 1, H_lat, W_lat]
 
         # Normalise against the VAE's per-channel mean/std, matching diffusers'
         # ``WanImageToVideoPipeline.prepare_latents`` (lines 440-459). Note the
@@ -189,7 +189,7 @@ def encode_reference_image_to_video_condition(
 
     with torch.inference_mode():
         encoded = vae.encode(video_condition, return_dict=False)[0]
-        latents = encoded.sample()  # [1, 16, T_lat, H_lat, W_lat]
+        latents = encoded.mode()  # [1, 16, T_lat, H_lat, W_lat]
 
         latents_mean = torch.tensor(vae.config.latents_mean).view(1, -1, 1, 1, 1).to(latents.device, latents.dtype)
         latents_std = torch.tensor(vae.config.latents_std).view(1, -1, 1, 1, 1).to(latents.device, latents.dtype)

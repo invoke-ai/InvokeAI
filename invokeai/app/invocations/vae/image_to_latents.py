@@ -169,9 +169,7 @@ class ImageToLatentsInvocation(BaseInvocation):
     def _encode_to_tensor(vae: AutoencoderKL, image_tensor: torch.FloatTensor) -> torch.FloatTensor:
         assert isinstance(vae, torch.nn.Module)
         image_tensor_dist = vae.encode(image_tensor).latent_dist
-        latents: torch.Tensor = image_tensor_dist.sample().to(
-            dtype=vae.dtype
-        )  # FIXME: uses torch.randn. make reproducible!
+        latents: torch.Tensor = image_tensor_dist.mode().to(dtype=vae.dtype)
         return latents
 
     @_encode_to_tensor.register

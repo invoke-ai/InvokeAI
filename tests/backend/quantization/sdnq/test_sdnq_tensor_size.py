@@ -37,6 +37,7 @@ def test_uint4_with_svd_size_is_packed_plus_auxiliary():
     )
 
     expected = _nbytes(data, scale, zero_point, svd_up, svd_down)
+    assert all(a is b for a, b in zip(t.storage_tensors(), (data, scale, zero_point, svd_up, svd_down), strict=True))
     assert t.sdnq_storage_nbytes() == expected
     assert calc_tensor_size(t) == expected
     # The naive accounting (dequantized shape × uint8) both over-counts and omits the aux payloads.
@@ -59,5 +60,6 @@ def test_int5_size_is_packed_plus_scale():
     )
 
     expected = _nbytes(data, scale)
+    assert all(a is b for a, b in zip(t.storage_tensors(), (data, scale), strict=True))
     assert t.sdnq_storage_nbytes() == expected
     assert calc_tensor_size(t) == expected

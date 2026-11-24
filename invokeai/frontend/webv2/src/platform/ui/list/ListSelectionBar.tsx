@@ -32,9 +32,9 @@ export interface ListSelectionBarProps extends Omit<StackProps, 'children'> {
 const BAR_HEIGHT = 'calc({sizes.control.sm} + {spacing.2} + 1px)';
 
 /**
- * Select-all row above a multi-select list. Keep it mounted whatever the selection so rows never shift beneath
- * it; toggle the actions instead. Its height is fixed to fit actions of size `sm` or smaller, so it is as tall with
- * actions as without them; keep every action at `sm` or below. Its insets put the checkbox in the rows' checkbox column.
+ * Select-all row above a multi-select list. Keep it mounted whatever the selection so rows never shift beneath it;
+ * toggle the actions instead. Its height is fixed to fit actions of size `sm` or smaller, so it is as tall with actions
+ * as without them; keep every action at `sm` or below. Its insets put the checkbox in the rows' checkbox column.
  */
 export const ListSelectionBar = ({
   checked,

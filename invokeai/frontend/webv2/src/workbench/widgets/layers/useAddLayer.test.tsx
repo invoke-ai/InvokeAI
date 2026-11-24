@@ -17,7 +17,6 @@ const harness = vi.hoisted(() => ({
 
 vi.mock('@workbench/canvas-operations/react', () => ({ useCanvasEngine: () => null }));
 vi.mock('@workbench/widgets/canvas/useStructuralCommit', () => ({
-  // Records what the add prepares and answers as the engine would, without one.
   usePreparedCommit:
     () =>
     (_label: string, prepare: (model: unknown) => unknown): unknown => {

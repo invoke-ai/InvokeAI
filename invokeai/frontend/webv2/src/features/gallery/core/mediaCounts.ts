@@ -9,8 +9,8 @@ export interface GalleryMediaCounts {
 }
 
 /**
- * The nonzero counts as one phrase ("2 images and 1 video"), so a summary never reads "0 videos"; an empty string
- * when every count is zero. The list's joining words are translations of their own, so each language places them.
+ * The nonzero counts as one phrase ("2 images and 1 video"), so a summary never reads "0 videos"; an empty string when
+ * every count is zero. The list's joining words are translations of their own, so each language places them.
  */
 export const formatGalleryMediaCounts = (t: GalleryCountTranslate, counts: GalleryMediaCounts): string => {
   const [first = '', second, third] = (

@@ -59,19 +59,33 @@ def read_safetensors_header(path: Path) -> dict[str, Any]:
 
     Raises:
         OSError: The file could not be read.
-        ValueError: The header is not valid JSON (an empty or truncated file, or not safetensors at all).
+        ValueError: The file is not safetensors: its header length, JSON or tensor entries are not a safetensors
+            header's. The one error for every way a file can fail that, so callers need not guess which.
     """
+    not_safetensors = f"{path} is not a safetensors file"
     with open(path, "rb") as f:
         header_length = int.from_bytes(f.read(8), "little")
         # Any 8 bytes decode to a length; for a file that is not safetensors that length is garbage, and reading it
         # would try to allocate it.
         if header_length > os.fstat(f.fileno()).st_size - 8:
-            raise ValueError(f"{path} is not a safetensors file: its header length exceeds the file size")
-        header = json.loads(f.read(header_length))
+            raise ValueError(f"{not_safetensors}: its header length exceeds the file size")
+        try:
+            header = json.loads(f.read(header_length))
+        except ValueError as e:  # JSONDecodeError and UnicodeDecodeError
+            raise ValueError(f"{not_safetensors}: its header is not valid JSON ({e})") from e
 
     if not isinstance(header, dict):
-        raise ValueError(f"{path} is not a safetensors file: its header is not a JSON object")
+        raise ValueError(f"{not_safetensors}: its header is not a JSON object")
     header.pop("__metadata__", None)
+    for key, entry in header.items():
+        if not (
+            isinstance(entry, dict)
+            and isinstance(entry.get("dtype"), str)
+            and isinstance(entry.get("shape"), list)
+            and isinstance(entry.get("data_offsets"), list)
+            and len(entry["data_offsets"]) == 2
+        ):
+            raise ValueError(f"{not_safetensors}: its header entry '{key}' is not a tensor's dtype, shape and offsets")
     return header
 
 

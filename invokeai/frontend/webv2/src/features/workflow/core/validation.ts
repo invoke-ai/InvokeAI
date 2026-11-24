@@ -117,7 +117,6 @@ export const wouldCreateCycle = (sourceNodeId: string, targetNodeId: string, edg
   return false;
 };
 
-/** True if the graph already contains a cycle anywhere. */
 export const hasAnyCycle = (nodes: WorkflowNode[], edges: WorkflowEdge[]): boolean => {
   const adjacency = new Map<string, string[]>();
 

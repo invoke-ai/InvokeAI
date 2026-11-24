@@ -65,6 +65,7 @@ class WorkflowRecordOrderBy(str, Enum, metaclass=MetaEnum):
     CreatedAt = "created_at"
     UpdatedAt = "updated_at"
     OpenedAt = "opened_at"
+    LastRunAt = "last_run_at"
     Name = "name"
     IsPublic = "is_public"
 

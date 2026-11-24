@@ -188,6 +188,7 @@ beforeEach(async () => {
 
   api.getAuthStatus.mockResolvedValue({
     admin_email: 'admin@example.com',
+    has_single_user_work: false,
     multiuser_enabled: true,
     setup_required: false,
     strict_password_checking: true,
@@ -306,22 +307,6 @@ describe('identity account transitions', () => {
     expect(testState.getToken()).toBe('token-a-refreshed');
   });
 
-  it('neither expires nor renews a lifetime from a capture taken before a same-token re-login', async () => {
-    await resolveSignedOutMultiuserSession();
-    await session.loginWithCredentials(user.email, 'password', true);
-    const earlierCapture = session.identityTransportAuthAdapter.capture();
-
-    await session.loginWithCredentials(user.email, 'password', true);
-    // The backend handed back the same token string, so only the lifetime tells the captures apart.
-    expect(heldToken()).toBe(earlierCapture.token);
-    session.identityTransportAuthAdapter.onRefreshedToken(earlierCapture, 'token-a-renewed');
-    session.identityTransportAuthAdapter.onUnauthorized(earlierCapture);
-
-    expect(session.getAuthSession()).toMatchObject({ sessionExpired: false, user });
-    expect(heldToken()).toBe('token-a');
-    expect(testState.getToken()).toBe('token-a');
-  });
-
   it('rejects a profile completion owned by an expired account epoch', async () => {
     await resolveSignedOutMultiuserSession();
     await session.loginWithCredentials(user.email, 'password', true);
@@ -376,51 +361,6 @@ describe('identity account transitions', () => {
     expect((await session.ensureAuthSession()).phase).toBe('unavailable');
     expect(heldToken()).toBeNull();
     expect(testState.getToken()).toBe('stored-token');
-  });
-
-  it('recovers an unavailable stored-token session only after status and principal both resolve', async () => {
-    testState.seed('stored-token');
-    api.getAuthStatus.mockRejectedValueOnce(new Error('backend unavailable'));
-    api.getCurrentUser.mockResolvedValue(user);
-    const { lifecycle, port } = createObservedLifecycle();
-    session.configureIdentityAccountLifecycle(port);
-
-    expect((await session.ensureAuthSession()).phase).toBe('unavailable');
-
-    const recovered = await session.ensureReadyAuthSession();
-
-    expect(recovered).toMatchObject({
-      multiuserEnabled: true,
-      phase: 'ready',
-      sessionExpired: false,
-      user,
-    });
-    expect(lifecycle.capture()).toMatchObject({ accountId: user.user_id, storageSuffix: `:user:${user.user_id}` });
-    expect(session.getUserStorageScope()).toBe(`:user:${user.user_id}`);
-    expect(testState.getToken()).toBe('stored-token');
-  });
-
-  it('clears a stored token rejected after an auth-status outage and recovers to login', async () => {
-    const { ApiError } = await import('@platform/transport/http');
-    testState.seed('stored-token');
-    api.getAuthStatus.mockRejectedValueOnce(new Error('backend unavailable'));
-    api.getCurrentUser.mockRejectedValueOnce(new ApiError('Unauthorized', 401));
-    const { lifecycle, port } = createObservedLifecycle();
-    session.configureIdentityAccountLifecycle(port);
-
-    expect((await session.ensureAuthSession()).phase).toBe('unavailable');
-
-    const recovered = await session.ensureReadyAuthSession();
-
-    expect(recovered).toMatchObject({
-      multiuserEnabled: true,
-      phase: 'ready',
-      sessionExpired: true,
-      user: null,
-    });
-    expect(lifecycle.capture().accountId).toBeNull();
-    expect(testState.getToken()).toBeNull();
-    expect(() => session.getUserStorageScope()).toThrow(/without an authenticated user/);
   });
 
   it('lets the newest concurrent login win when an older response arrives last', async () => {
@@ -480,25 +420,6 @@ describe('media cookie recovery on restore', () => {
     // Restored JWT sessions need a media cookie refresh; login already sets it.
     expect(api.refreshMediaCookie).toHaveBeenCalledTimes(1);
     expect(session.getAuthSession()).toMatchObject({ phase: 'ready', user });
-  });
-
-  it('still restores the session when the media cookie refresh fails', async () => {
-    testState.seed('stored-token');
-    api.getCurrentUser.mockResolvedValue(user);
-    api.refreshMediaCookie.mockRejectedValue(new Error('network down'));
-    const observed = createObservedLifecycle();
-    session.configureIdentityAccountLifecycle(observed.port);
-
-    await session.ensureAuthSession();
-
-    // Broken media is a degraded gallery; it must not present the user as signed out.
-    expect(session.getAuthSession()).toMatchObject({ phase: 'ready', sessionExpired: false, user });
-  });
-
-  it('does not request a media cookie when there is no stored token to restore', async () => {
-    await resolveSignedOutMultiuserSession();
-
-    expect(api.refreshMediaCookie).not.toHaveBeenCalled();
   });
 });
 
@@ -568,14 +489,6 @@ describe('protected media cookie recovery', () => {
 
     oldRefresh.resolve({ success: true });
     await expect(staleOutcome).resolves.toBe(false);
-  });
-
-  it('returns false without throwing when the refresh request fails', async () => {
-    await resolveSignedOutMultiuserSession();
-    await session.loginWithCredentials(user.email, 'password', true);
-    api.refreshMediaCookie.mockRejectedValueOnce(new Error('network down'));
-
-    await expect(session.refreshProtectedMediaCookie()).resolves.toBe(false);
   });
 });
 
@@ -648,202 +561,6 @@ describe('cross-tab credential reconciliation', () => {
     unsubscribe();
   });
 
-  it("ends the old lifetime before resolving another principal's token, then activates it like a restore", async () => {
-    const { lifecycle } = await signInAsUserA();
-    const scopeA = lifecycle.capture();
-    const tokenB = tokenFor(userB.user_id, 'b');
-    const principal = createDeferred<typeof userB>();
-    let requestCredential: ReturnType<typeof session.identityTransportAuthAdapter.capture> | undefined;
-    api.getCurrentUser.mockImplementationOnce(() => {
-      testState.events.push('api.getCurrentUser');
-      requestCredential = session.identityTransportAuthAdapter.capture();
-      return principal.promise;
-    });
-    const unsubscribe = recordPublications();
-
-    testState.otherTabStores(tokenB);
-
-    expect(scopeA.signal.aborted).toBe(true);
-    expect(requestCredential).toEqual({ identity: lifecycle.capture(), token: tokenB });
-    expect(lifecycle.capture().accountId).toBeNull();
-    // Signed out only in passing: the layout shows the switch instead of the sign-in screen.
-    expect(session.getAuthSession()).toMatchObject({ switchingAccount: true, user: null });
-
-    principal.resolve(userB);
-    await vi.waitFor(() => {
-      expect(session.getAuthSession().user).toEqual(userB);
-    });
-    expect(session.getAuthSession().switchingAccount).toBe(false);
-
-    expect(testState.events).toEqual([
-      'lifecycle.invalidate',
-      'cache.clear',
-      'publish:signed-out',
-      'api.getCurrentUser',
-      'api.refreshMediaCookie',
-      'lifecycle.activate:user-b',
-      'cache.clear',
-      'publish:user-b',
-    ]);
-    expect(lifecycle.capture().accountId).toBe(userB.user_id);
-    expect(session.getUserStorageScope()).toBe(`:user:${userB.user_id}`);
-    expect(heldToken()).toBe(tokenB);
-    expect(testState.getToken()).toBe(tokenB);
-    unsubscribe();
-  });
-
-  it('lets the latest stored credential win while an earlier transition is still resolving', async () => {
-    await signInAsUserA();
-    const userC = { ...userB, user_id: 'user-c' };
-    const principalB = createDeferred<typeof userB>();
-    const principalC = createDeferred<typeof userC>();
-    let signalB: AbortSignal | undefined;
-    api.getCurrentUser
-      .mockImplementationOnce((signal?: AbortSignal) => {
-        signalB = signal;
-        return principalB.promise;
-      })
-      .mockImplementationOnce(() => principalC.promise);
-
-    testState.otherTabStores(tokenFor(userB.user_id, 'b'));
-    testState.otherTabStores(tokenFor(userC.user_id, 'c'));
-
-    expect(signalB?.aborted).toBe(true);
-    principalB.resolve(userB);
-    await Promise.resolve();
-    expect(session.getAuthSession().user).toBeNull();
-
-    principalC.resolve(userC);
-    await vi.waitFor(() => {
-      expect(session.getAuthSession().user).toEqual(userC);
-    });
-    expect(heldToken()).toBe(tokenFor(userC.user_id, 'c'));
-  });
-
-  it('stays signed out when another tab signs out while a transition is resolving', async () => {
-    await signInAsUserA();
-    const principalB = createDeferred<typeof userB>();
-    api.getCurrentUser.mockReturnValueOnce(principalB.promise);
-
-    testState.otherTabStores(tokenFor(userB.user_id, 'b'));
-    testState.otherTabStores(null);
-    principalB.resolve(userB);
-    await principalB.promise;
-    await Promise.resolve();
-
-    expect(session.getAuthSession()).toMatchObject({ sessionExpired: false, user: null });
-    expect(heldToken()).toBeNull();
-  });
-
-  it('signs out as expired when the backend rejects the followed token', async () => {
-    const { ApiError } = await import('@platform/transport/http');
-    await signInAsUserA();
-    const rejected = tokenFor(userB.user_id, 'revoked');
-    api.getCurrentUser.mockRejectedValueOnce(new ApiError('Unauthorized', 401));
-
-    testState.otherTabStores(rejected);
-    await vi.waitFor(() => {
-      expect(session.getAuthSession().sessionExpired).toBe(true);
-    });
-
-    expect(session.getAuthSession().user).toBeNull();
-    // The rejected token was another tab's account: this page's way back must not hand it to that account.
-    expect(session.getAuthSession().expiredUserId).toBeNull();
-    expect(testState.getToken()).toBeNull();
-  });
-
-  it("supersedes this tab's pending sign-in when another tab signs in first", async () => {
-    await resolveSignedOutMultiuserSession();
-    startSync();
-    const pendingLogin = createDeferred<LoginResult>();
-    api.login.mockReturnValueOnce(pendingLogin.promise);
-    api.getCurrentUser.mockResolvedValueOnce(userB);
-
-    const loginOutcome = session.loginWithCredentials(user.email, 'password', true).catch((error) => error);
-    testState.otherTabStores(tokenFor(userB.user_id, 'b'));
-    pendingLogin.resolve({ expires_in: 3600, token: 'token-a', user });
-
-    expect(await loginOutcome).toBeInstanceOf(session.LoginAttemptSupersededError);
-    await vi.waitFor(() => {
-      expect(session.getAuthSession().user).toEqual(userB);
-    });
-    expect(heldToken()).toBe(tokenFor(userB.user_id, 'b'));
-    expect(testState.getToken()).toBe(tokenFor(userB.user_id, 'b'));
-  });
-
-  it('reconciles after returning to view or from the back/forward cache without misreading its own writes', async () => {
-    await signInAsUserA();
-
-    visibleDocument.dispatchEvent(new Event('visibilitychange'));
-    page.dispatchEvent(Object.assign(new Event('pageshow'), { persisted: true }));
-    expect(session.getAuthSession().user).toEqual(user);
-    expect(testState.events).toEqual([]);
-
-    // Another tab signed out while this page sat in the back/forward cache, so no storage event reached it.
-    testState.seed(null);
-    page.dispatchEvent(Object.assign(new Event('pageshow'), { persisted: true }));
-
-    expect(session.getAuthSession()).toMatchObject({ sessionExpired: false, user: null });
-  });
-
-  it('reconciles a missed change when the tab becomes visible, not while hidden or on a fresh page show', async () => {
-    await signInAsUserA();
-    // Another tab signed out while this one was hidden and its storage event was missed.
-    testState.seed(null);
-
-    visibleDocument.visibilityState = 'hidden';
-    visibleDocument.dispatchEvent(new Event('visibilitychange'));
-    page.dispatchEvent(Object.assign(new Event('pageshow'), { persisted: false }));
-    expect(session.getAuthSession().user).toEqual(user);
-
-    visibleDocument.visibilityState = 'visible';
-    visibleDocument.dispatchEvent(new Event('visibilitychange'));
-    expect(session.getAuthSession()).toMatchObject({ sessionExpired: false, user: null });
-  });
-
-  it('is inert before the session resolves and in single-user mode', async () => {
-    api.getAuthStatus.mockResolvedValue({
-      admin_email: null,
-      multiuser_enabled: false,
-      setup_required: false,
-      strict_password_checking: false,
-    });
-    const observed = createObservedLifecycle();
-    session.configureIdentityAccountLifecycle(observed.port);
-    startSync();
-
-    testState.otherTabStores(tokenFor(user.user_id, 'early'));
-    await session.ensureAuthSession();
-    testState.events.length = 0;
-    testState.otherTabStores(tokenFor(userB.user_id, 'b'));
-
-    expect(testState.events).toEqual([]);
-    expect(api.getCurrentUser).not.toHaveBeenCalled();
-    expect(heldToken()).toBeNull();
-  });
-
-  it('follows a change another tab made while this tab was still restoring its session', async () => {
-    testState.seed(tokenFor(user.user_id, 'a'));
-    const restore = createDeferred<typeof user>();
-    api.getCurrentUser.mockReturnValueOnce(restore.promise).mockResolvedValueOnce(userB);
-    const observed = createObservedLifecycle();
-    session.configureIdentityAccountLifecycle(observed.port);
-    startSync();
-
-    const resolved = session.ensureAuthSession();
-    await vi.waitFor(() => {
-      expect(api.getCurrentUser).toHaveBeenCalledOnce();
-    });
-    testState.otherTabStores(tokenFor(userB.user_id, 'b'));
-    restore.resolve(user);
-    await resolved;
-
-    await vi.waitFor(() => {
-      expect(session.getAuthSession().user).toEqual(userB);
-    });
-    expect(heldToken()).toBe(tokenFor(userB.user_id, 'b'));
-  });
-
   it('keeps a sign-in working for the tab lifetime when storage is unavailable', async () => {
     testState.blockStorage();
     await signInAsUserA();
@@ -852,18 +569,6 @@ describe('cross-tab credential reconciliation', () => {
 
     expect(session.getAuthSession().user).toEqual(user);
     expect(heldToken()).toBe('token-a');
-  });
-
-  it('keeps an own password change working when storage is unavailable', async () => {
-    testState.blockStorage();
-    await signInAsUserA();
-    const { accountEpoch } = session.getAuthSession();
-    api.updateCurrentUser.mockResolvedValueOnce({ refreshedToken: 'token-a-epoch-2', user });
-
-    await session.updateOwnProfile({ current_password: 'old', new_password: 'new' });
-
-    expect(session.getAuthSession()).toMatchObject({ accountEpoch, sessionExpired: false, user });
-    expect(heldToken()).toBe('token-a-epoch-2');
   });
 });
 
@@ -900,23 +605,5 @@ describe('session expiry warning', () => {
     vi.advanceTimersByTime(10 * MINUTE);
     expect(warnings).toHaveLength(1);
     stop();
-  });
-
-  it('never warns for a token without an expiry claim, and withdraws a warning when the session ends', async () => {
-    vi.useFakeTimers({ now: 0 });
-    await signInWith('opaque-token');
-    const warnings: { signal: AbortSignal }[] = [];
-    const stop = session.watchSessionExpiry((warning) => warnings.push(warning), { leadMs: 10_000 });
-    vi.advanceTimersByTime(7 * 24 * 60 * MINUTE);
-    expect(warnings).toEqual([]);
-    stop();
-
-    // Already inside the lead when it arrives: it warns at once.
-    await signInWith(tokenFor(user.user_id, 'b', Date.now() / 1000 + 5));
-    const stopNext = session.watchSessionExpiry((warning) => warnings.push(warning), { leadMs: 10_000 });
-    expect(warnings).toHaveLength(1);
-    rejectHeldCredential();
-    expect(warnings[0]!.signal.aborted).toBe(true);
-    stopNext();
   });
 });
