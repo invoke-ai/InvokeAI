@@ -29,7 +29,10 @@ export interface ColorSampleMaskPatterns {
   readonly screen: () => { dpr: number; view: Mat2d; smoothing: boolean };
 }
 
-export type ColorSampleProviders = Pick<CompositeOptions, 'adjustedSurface' | 'derivedSurfaces' | 'groupSurface'> & {
+export type ColorSampleProviders = Pick<
+  CompositeOptions,
+  'adjustedSurface' | 'derivedSurfaces' | 'groupSurface' | 'showOverlayStacks'
+> & {
   /** Absent draws patterned masks solid. */
   maskPatterns?: ColorSampleMaskPatterns;
 };

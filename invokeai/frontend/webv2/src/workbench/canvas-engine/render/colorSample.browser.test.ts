@@ -183,6 +183,26 @@ describe('color sampling with real browser rasterization', () => {
     expect(blended).toBeGreaterThan(0);
   });
 
+  it('samples the raster beneath a visible patterned mask when mask stacks are omitted', () => {
+    const { caches, doc, providers, sampler, shown, toDocument } = hatchScene('vertical', {
+      dpr: 1,
+      pan: { x: 0, y: 0 },
+      zoom: 2,
+    });
+    const point = { x: 32.5, y: 32.5 };
+    expect(shown(32, 32)).not.toEqual([0, 0, 255, 255]);
+
+    const imageProviders = {
+      ...providers,
+      showOverlayStacks: { control: true, inpaint_mask: false, regional_guidance: false, vector: true },
+    };
+    const expected = { r: 0, g: 0, b: 255, a: 255 };
+    expect(sampler.sample(doc, caches, toDocument(point), imageProviders, point)).toEqual(expected);
+    const area = sampler.sampleArea(doc, caches, toDocument(point), 3, imageProviders, point)!;
+    expect(area.center).toEqual(expected);
+    expect([...area.pixels.ctx.getImageData(0, 0, 1, 1).data]).toEqual([0, 0, 255, 255]);
+  });
+
   it('fills each loupe cell with the screen pixel where its document pixel is drawn at 4x zoom', () => {
     const zoom = 4;
     const { caches, doc, providers, sampler, shown, toDocument } = hatchScene(

@@ -499,7 +499,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   const groupSurfaces = rasterController.groups;
   const getGroupSurface: NonNullable<CompositeOptions['groupSurface']> = (scope, members, matrices, content) =>
     groupSurfaces.get(scope, members, matrices, content);
-  /** Picking and the picker's loupe see the same adjusted, derived and grouped pixels and mask hatch as the display. */
+  /** Picking and the loupe sample the image underneath the mask overlays. */
   const colorSampleProviders: ColorSampleProviders = {
     adjustedSurface: getAdjustedSurface,
     derivedSurfaces: derivedSurfaceCache,
@@ -511,6 +511,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       },
       tile: getMaskPatternTile,
     },
+    showOverlayStacks: { control: true, inpaint_mask: false, regional_guidance: false, vector: true },
   };
 
   const strokeListeners = new Set<(event: StrokeCommittedEvent) => void>();
