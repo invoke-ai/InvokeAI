@@ -27,7 +27,7 @@ import threading
 from collections import deque
 from contextlib import contextmanager
 from dataclasses import dataclass, field, replace
-from typing import Iterable, Iterator
+from typing import Callable, Iterable, Iterator
 
 import psutil
 import torch
@@ -485,7 +485,9 @@ class PinnedStorageRegistry:
                 with self._registering():
                     if not holder.active or key not in holder.wanted:
                         continue
-                    host_room = _host_memory_available() - self._pinned_bytes - self._host_reserved_bytes
+                    # The live headroom sample already reflects completed page faults. Only pending faults need a
+                    # separate commitment; subtracting `_pinned_bytes` here would charge registered pages twice.
+                    host_room = _host_memory_available() - self._host_reserved_bytes
                     if nbytes > host_room:
                         self._log_headroom()
                         continue
@@ -509,12 +511,7 @@ class PinnedStorageRegistry:
                     try:
                         if key not in self._entries and not storage.is_pinned():
                             nbytes = storage.nbytes()
-                            host_room = (
-                                _host_memory_available()
-                                - self._pinned_bytes
-                                - self._host_reserved_bytes
-                                + reserved.get(key, 0)
-                            )
+                            host_room = _host_memory_available() - self._host_reserved_bytes + reserved.get(key, 0)
                             if nbytes > host_room:
                                 self._log_headroom()
                                 release_reserved(key, locked=True)
@@ -545,6 +542,12 @@ class PinnedStorageRegistry:
             self._drain_deferred_locked()
             self._set_wanted_locked(holder, holder.wanted, active=True)
             return holder.wanted <= holder.keys
+
+    def host_memory_available(self, sample: Callable[[], int] | None = None) -> int:
+        """Host headroom available to another allocation while registrations are in flight."""
+        with self._registration_lock:
+            sample = _host_memory_available if sample is None else sample
+            return max(sample() - self._host_reserved_bytes, 0)
 
     def idle(self, holder: PinHolder) -> None:
         """Mark the end of the last lock of ``holder``'s model: what it holds stays registered but becomes reclaimable.

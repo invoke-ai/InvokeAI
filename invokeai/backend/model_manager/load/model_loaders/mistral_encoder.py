@@ -50,7 +50,10 @@ from invokeai.backend.model_manager.load.load_default import (
     _model_declared_skip_patterns,
 )
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
-from invokeai.backend.model_manager.load.model_util import calc_tokenizer_size_by_fs
+from invokeai.backend.model_manager.load.model_util import (
+    TOKENIZER_EMBEDDED_RUNTIME_MULTIPLIER,
+    calc_tokenizer_size_by_fs,
+)
 from invokeai.backend.model_manager.load.quantized_embedding import materialize_quantized_embedding
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.model_manager.taxonomy import (
@@ -794,7 +797,7 @@ def _has_hf_tokenizer_vocabulary(tokenizer_dir: Path) -> bool:
 def _mistral_tokenizer_size(model_path: Path) -> int:
     """Size only the tokenizer asset selected by the loader's local probes."""
     if model_path.is_file():
-        return _embedded_tekken_size(model_path)
+        return _embedded_tekken_size(model_path) * TOKENIZER_EMBEDDED_RUNTIME_MULTIPLIER
     tokenizer_dir = model_path / "tokenizer"
     if tokenizer_dir.is_dir():
         sibling_tekken = tokenizer_dir / _TEKKEN_FILENAME
@@ -810,7 +813,7 @@ def _mistral_tokenizer_size(model_path: Path) -> int:
     for checkpoint in sorted((model_path / "text_encoder").glob("*.safetensors")):
         embedded = _embedded_tekken_size(checkpoint)
         if embedded:
-            return embedded
+            return embedded * TOKENIZER_EMBEDDED_RUNTIME_MULTIPLIER
     return calc_tokenizer_size_by_fs(model_path)
 
 

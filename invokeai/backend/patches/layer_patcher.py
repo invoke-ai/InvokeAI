@@ -1,13 +1,13 @@
 import re
 from collections import Counter
-from contextlib import AbstractContextManager, ExitStack, contextmanager
+from contextlib import AbstractContextManager, ExitStack, contextmanager, nullcontext
 from itertools import chain
 from typing import Dict, Iterable, Iterator, Optional, Tuple
 
 import torch
 from transformers import CLIPTextModel
 
-from invokeai.backend.model_manager.load.model_cache.model_cache import MODEL_LOAD_LOCK
+from invokeai.backend.model_manager.load.model_cache.model_cache import MODEL_LOAD_LOCK, integrated_cuda_admission_lock
 from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch, sub_patches
 from invokeai.backend.patches.layers.flux_control_lora_layer import FluxControlLoRALayer
 from invokeai.backend.patches.layers.fused_input_dora_layer import FusedInputDoRALayer, UnsupportedFusedInputDoRABase
@@ -35,9 +35,13 @@ class LayerPatcher:
         force_direct_patching: bool = False,
         force_sidecar_patching: bool = False,
         suppress_warning_layers: Optional[re.Pattern] = None,
+        admission_device: torch.device | None = None,
+        exclusive_model_load_lock: bool = False,
     ):
         """Apply 'smart' model patching that chooses whether to use direct patching or a sidecar wrapper for each
-        module.
+        module. When ``admission_device`` is provided, patch allocations are serialized with integrated-CUDA model
+        admission after taking the model-load lock. ``exclusive_model_load_lock`` uses the write lock so device
+        allocations that must exclude concurrent cache moves can opt out of shared read semantics.
         """
 
         # original_weights are stored for unpatching layers that are directly patched.
@@ -77,7 +81,11 @@ class LayerPatcher:
             # patch application must exclude construction, like any VRAM load. Read semantics:
             # patching on different devices may overlap; only construction is exclusive. The lock
             # is released before the yield — patched inference must not block model loads.
-            with MODEL_LOAD_LOCK.read_lock():
+            admission = (
+                integrated_cuda_admission_lock(admission_device) if admission_device is not None else nullcontext()
+            )
+            model_load_lock = MODEL_LOAD_LOCK.write_lock() if exclusive_model_load_lock else MODEL_LOAD_LOCK.read_lock()
+            with model_load_lock, admission:
                 for patch_spec in patches:
                     patch, patch_weight = patch_spec[:2]
                     LayerPatcher.apply_smart_model_patch(

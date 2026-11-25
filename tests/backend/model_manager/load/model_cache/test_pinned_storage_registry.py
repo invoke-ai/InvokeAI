@@ -653,19 +653,42 @@ def test_registration_headroom_is_cumulative(fake_streaming, monkeypatch: pytest
     registry.release(holder)
 
 
-def test_headroom_budget_is_shared_across_updates(fake_streaming, monkeypatch: pytest.MonkeyPatch):
+def test_live_headroom_is_shared_across_updates(fake_streaming, monkeypatch: pytest.MonkeyPatch):
     registry, _ = fake_streaming
     first, second = _storage(), _storage()
-    monkeypatch.setattr(weight_streaming, "_host_memory_available", lambda: int(1.5 * MB))
+    available = iter((2 * MB, int(1.5 * MB), int(1.5 * MB)))
+    monkeypatch.setattr(weight_streaming, "_host_memory_available", lambda: next(available, int(1.5 * MB)))
     first_holder, second_holder = PinHolder(CUDA0), PinHolder(CUDA0)
 
     registry.update(first_holder, [first])
     registry.update(second_holder, [second])
 
     assert registry.is_registered(first)
-    assert not registry.is_registered(second)
+    assert registry.is_registered(second)
     registry.release(second_holder)
     registry.release(first_holder)
+
+
+def test_pending_pin_reservation_is_visible_to_host_admission(fake_streaming, monkeypatch: pytest.MonkeyPatch):
+    registry, _ = fake_streaming
+    storage = _storage()
+    entered, proceed = threading.Event(), threading.Event()
+    monkeypatch.setattr(weight_streaming, "_host_memory_available", lambda: 2 * MB)
+
+    def fault_in(_storage: torch.UntypedStorage) -> None:
+        entered.set()
+        assert proceed.wait(timeout=30)
+
+    monkeypatch.setattr(weight_streaming, "_fault_in", fault_in)
+    holder = PinHolder(CUDA0)
+    thread = threading.Thread(target=registry.update, args=(holder, [storage]))
+    thread.start()
+    assert entered.wait(timeout=30)
+    assert registry.host_memory_available() == MB
+    proceed.set()
+    thread.join(timeout=30)
+    assert not thread.is_alive()
+    registry.release(holder)
 
 
 def test_registration_headroom_failure_releases_reservation(fake_streaming, monkeypatch: pytest.MonkeyPatch):

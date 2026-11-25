@@ -23,6 +23,9 @@ from invokeai.backend.spandrel_image_to_image_model import SpandrelImageToImageM
 from invokeai.backend.textual_inversion import TextualInversionModelRaw
 from invokeai.backend.util.calc_tensor_size import calc_tensor_size
 
+# Embedded FP16 Tekken decoding measured about 8x the recovered byte payload before parsing.
+TOKENIZER_EMBEDDED_RUNTIME_MULTIPLIER = 8
+
 
 def calc_model_size_by_data(logger: logging.Logger, model: AnyModel) -> int:
     """Get size of a model in memory in bytes."""
@@ -196,8 +199,14 @@ def calc_model_size_by_fs(model_path: Path, subfolder: Optional[str] = None, var
     return 0  # scheduler/feature_extractor/tokenizer - models without loading to gpu
 
 
-def calc_tokenizer_size_by_fs(model_path: Path, subfolder: Optional[str] = None) -> int:
-    """Estimate only the local files a Hugging Face tokenizer loads."""
+def calc_tokenizer_size_by_fs(
+    model_path: Path, subfolder: Optional[str] = None, *, include_runtime_overhead: bool = False
+) -> int:
+    """Estimate the host memory needed by a tokenizer loaded from local files.
+
+    Compressed JSON tokenizers are tiny on disk but expand into a large parsed Rust/Python graph. Callers that load a
+    bundled tokenizer before any model tensors exist can include that cold-construction cost explicitly.
+    """
     path = model_path / subfolder if subfolder is not None else model_path
     if not path.is_dir():
         return 0
@@ -214,4 +223,10 @@ def calc_tokenizer_size_by_fs(model_path: Path, subfolder: Optional[str] = None)
         "vocab.json",
         "merges.txt",
     }
-    return sum(file.stat().st_size for file in path.iterdir() if file.is_file() and file.name in tokenizer_names)
+    files = [file for file in path.iterdir() if file.is_file() and file.name in tokenizer_names]
+    size = sum(file.stat().st_size for file in files)
+    if include_runtime_overhead and any(file.name == "tokenizer.json.gz" for file in files):
+        # Measured Qwen3 tokenizer construction retains about 130 MiB above the compressed assets. Keep this separate
+        # from the file estimate so ordinary uncompressed/local tokenizers retain their exact sizing contract.
+        size += 130 * 2**20
+    return size

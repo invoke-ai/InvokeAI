@@ -462,6 +462,7 @@ class QwenImageTextEncoderInvocation(BaseInvocation):
         *,
         cached_weights: dict[str, torch.Tensor] | None,
         force_sidecar_patching: bool,
+        exclusive_model_load_lock: bool = False,
     ) -> None:
         """Patch the encoder with the connected LoRAs until `stack` closes. The caller says whether the layers are
         quantized (`force_sidecar_patching`): the patcher does not detect that itself."""
@@ -473,6 +474,8 @@ class QwenImageTextEncoderInvocation(BaseInvocation):
                 dtype=TorchDevice.choose_bfloat16_safe_dtype(device),
                 cached_weights=cached_weights,
                 force_sidecar_patching=force_sidecar_patching,
+                admission_device=device,
+                exclusive_model_load_lock=exclusive_model_load_lock,
             )
         )
 
@@ -599,12 +602,18 @@ class QwenImageTextEncoderInvocation(BaseInvocation):
                         local_files_only=True,
                     )
 
-                if self.qwen_vl_encoder.loras:
-                    _make_bnb_layers_patchable(text_encoder)
-                    # Quantized layers cannot be patched in place, and there are no cached weights to restore from.
-                    self._apply_lora_patches(
-                        context, patches, text_encoder, device, cached_weights=None, force_sidecar_patching=True
-                    )
+            if self.qwen_vl_encoder.loras:
+                _make_bnb_layers_patchable(text_encoder)
+                # Quantized layers cannot be patched in place, and there are no cached weights to restore from.
+                self._apply_lora_patches(
+                    context,
+                    patches,
+                    text_encoder,
+                    device,
+                    cached_weights=None,
+                    force_sidecar_patching=True,
+                    exclusive_model_load_lock=True,
+                )
         except BaseException as exc:
             # A failed load (an OOM is the expected way) leaves the partially built model referenced only by the
             # in-flight traceback's frames. Without releasing it here its weights stay allocated until the session

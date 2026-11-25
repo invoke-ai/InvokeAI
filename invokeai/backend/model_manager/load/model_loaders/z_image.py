@@ -1074,7 +1074,7 @@ class Qwen3EncoderCheckpointLoader(ModelLoader):
         self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
     ) -> int:
         if submodel_type is SubModelType.Tokenizer:
-            return calc_tokenizer_size_by_fs(_TOKENIZER_DIR)
+            return calc_tokenizer_size_by_fs(_TOKENIZER_DIR, include_runtime_overhead=True)
         return super().get_size_fs(config, model_path, submodel_type)
 
     def _storage_format(self, config: AnyModelConfig) -> tuple[bool, torch.dtype]:
@@ -1423,7 +1423,7 @@ class Qwen3EncoderGGUFLoader(ModelLoader):
         self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
     ) -> int:
         if submodel_type is SubModelType.Tokenizer:
-            return calc_tokenizer_size_by_fs(_TOKENIZER_DIR)
+            return calc_tokenizer_size_by_fs(_TOKENIZER_DIR, include_runtime_overhead=True)
         return super().get_size_fs(config, model_path, submodel_type)
 
     def _load_model(
@@ -1650,7 +1650,7 @@ class Qwen3EncoderSDNQLoader(ModelLoader):
         self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
     ) -> int:
         if submodel_type is SubModelType.Tokenizer:
-            return calc_tokenizer_size_by_fs(_TOKENIZER_DIR)
+            return calc_tokenizer_size_by_fs(_TOKENIZER_DIR, include_runtime_overhead=True)
         return super().get_size_fs(config, model_path, submodel_type)
 
     def _load_model(

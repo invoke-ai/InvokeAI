@@ -19,9 +19,11 @@ from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch
     apply_custom_layers_to_model,
 )
 from invokeai.backend.model_manager.load.model_loaders.krea2 import Qwen3VLEncoderGGUFLoader
-from invokeai.backend.model_manager.taxonomy import Qwen3VLVariantType
+from invokeai.backend.model_manager.load.model_util import calc_tokenizer_size_by_fs
+from invokeai.backend.model_manager.taxonomy import Qwen3VLVariantType, SubModelType
 from invokeai.backend.quantization.gguf.ggml_tensor import HOST_DEQUANT_PEAK_COPIES as PEAK_COPIES
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
+from invokeai.backend.qwen3_vl.qwen3_vl_assets import _TOKENIZER_DIR as QWEN3_VL_TOKENIZER_DIR
 from tests.backend.model_manager.load.qwen3vl_gguf_fixture import (
     FILL_VALUE,
     HIDDEN_SIZE,
@@ -92,6 +94,17 @@ def test_the_embedding_weight_is_materialized(loaded_encoder) -> None:
     loaded_encoder.language_model.embed_tokens(torch.tensor([[0, 1, 2]]))
 
 
+def test_the_bundled_tokenizer_is_sized_from_its_assets(monkeypatch, tmp_path) -> None:
+    loader = object.__new__(Qwen3VLEncoderGGUFLoader)
+    config = Qwen3VLEncoder_GGUF_Config.model_construct(
+        path=str(tmp_path / "qwen3vl_tiny.gguf"), variant=Qwen3VLVariantType.Qwen3VL_4B, name="tiny"
+    )
+
+    assert loader.get_size_fs(config, tmp_path / "qwen3vl_tiny.gguf", SubModelType.Tokenizer) == (
+        calc_tokenizer_size_by_fs(QWEN3_VL_TOKENIZER_DIR, include_runtime_overhead=True)
+    )
+
+
 def test_a_krea2_shaped_forward_produces_hidden_states(loaded_encoder) -> None:
     """Every other test here stops at "the weights are in the right modules". This one runs the call
     the Krea-2 node makes, through the cache's GGUF-aware layers, over the packed weights.
@@ -136,7 +149,9 @@ def test_the_embedding_materialization_is_reserved(monkeypatch, tmp_path) -> Non
     # This tiny embedding fits in one slice. The whole tensor's logical size, not its packed
     # element count, gives both the output and the decode allowance.
     expected = packed_bytes + buffer_bytes + (1 + PEAK_COPIES) * embed_weight.shape.numel() * torch.float32.itemsize
-    assert ram_cache.make_room.call_args_list == [call(expected)]
+    assert ram_cache.make_room.call_args_list == [
+        call(expected, host_bytes_needed=(1 + PEAK_COPIES) * embed_weight.shape.numel() * embed_weight.element_size())
+    ]
 
 
 def test_the_architecture_config_comes_from_the_bundle_and_never_the_network(monkeypatch, tmp_path) -> None:

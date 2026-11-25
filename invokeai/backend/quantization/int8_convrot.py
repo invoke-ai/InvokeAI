@@ -1304,6 +1304,11 @@ def install_int8_convrot_layers(
             if isinstance(tensor, torch.Tensor) and _source_is_mapped(tensor, source_tensors_mapped)
         )
         anonymous_source_bytes = source_bytes - mapped_source_bytes
+        mapped_pinned_bytes = sum(
+            tensor.nelement() * tensor.element_size()
+            for key, tensor in sd.items()
+            if key in pinned and isinstance(tensor, torch.Tensor) and _source_is_mapped(tensor, source_tensors_mapped)
+        )
         mapped_dequant_source_bytes = 0
         for path in quantized:
             if path in surviving:
@@ -1330,7 +1335,11 @@ def install_int8_convrot_layers(
             cast_peak,
             post_cast_live_bytes,
         )
-        host_bytes_needed = max(0, mixed_peak - anonymous_source_bytes, int8_target_bytes - anonymous_source_bytes)
+        host_bytes_needed = max(
+            0,
+            mixed_peak - anonymous_source_bytes,
+            int8_target_bytes - anonymous_source_bytes - mapped_pinned_bytes,
+        )
     else:
         host_peak = max(int8_target_bytes, dequant_peak, cast_peak)
         host_peak = max(host_peak, read_peak)

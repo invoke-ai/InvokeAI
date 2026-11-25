@@ -1,6 +1,7 @@
 """Tests for make_room()'s eviction guards."""
 
 import logging
+import threading
 from unittest.mock import MagicMock
 
 import pytest
@@ -10,8 +11,11 @@ from invokeai.backend.model_manager.load.load_base import LoadedModelWithoutConf
 from invokeai.backend.model_manager.load.model_cache import model_cache as model_cache_module
 from invokeai.backend.model_manager.load.model_cache.model_cache import GB, ModelCache
 from invokeai.backend.model_manager.load.model_cache.ram_budget import RamBudget
+from invokeai.backend.model_manager.load.model_cache.torch_module_autocast import weight_streaming
 from invokeai.backend.util.devices import EmptyCacheOutcome, TorchDevice
 from tests.backend.model_manager.load.model_cache.cached_model.utils import DummyModule
+
+CUDA0 = torch.device("cuda", 0)
 
 
 def _make_cache() -> ModelCache:
@@ -112,6 +116,80 @@ def test_make_room_separates_cache_capacity_from_additional_host_bytes(monkeypat
 
         assert not result.ram_headroom_satisfied
     finally:
+        cache.shutdown()
+
+
+def test_make_room_accounts_for_pending_weight_pin_reservation(fake_streaming, monkeypatch: pytest.MonkeyPatch):
+    registry, _ = fake_streaming
+    cache = _make_cache()
+    storage = torch.empty(1 * 2**20, dtype=torch.uint8).untyped_storage()
+    entered, proceed = threading.Event(), threading.Event()
+    monkeypatch.setattr(model_cache_module, "_host_memory_available", lambda: 2 * GB)
+    monkeypatch.setattr(weight_streaming, "_host_memory_available", lambda: 2 * GB)
+
+    def fault_in(_storage: torch.UntypedStorage) -> None:
+        entered.set()
+        assert proceed.wait(timeout=30)
+
+    monkeypatch.setattr(weight_streaming, "_fault_in", fault_in)
+    holder = weight_streaming.PinHolder(CUDA0)
+    thread = threading.Thread(target=registry.update, args=(holder, [storage]))
+    thread.start()
+    assert entered.wait(timeout=30)
+
+    try:
+        result = cache.make_room(1, host_bytes_needed=2 * GB)
+        assert not result.ram_headroom_satisfied
+    finally:
+        proceed.set()
+        thread.join(timeout=30)
+        registry.release(holder)
+        cache.shutdown()
+
+
+def test_make_room_samples_host_headroom_atomically_with_pin_reservation(
+    fake_streaming, monkeypatch: pytest.MonkeyPatch
+):
+    registry, _ = fake_streaming
+    cache = _make_cache()
+    storage = torch.empty(1 * 2**20, dtype=torch.uint8).untyped_storage()
+    fault_entered, fault_proceed, update_done = threading.Event(), threading.Event(), threading.Event()
+    monkeypatch.setattr(weight_streaming, "_host_memory_available", lambda: 2 * GB)
+
+    def fault_in(_storage: torch.UntypedStorage) -> None:
+        fault_entered.set()
+        assert fault_proceed.wait(timeout=30)
+
+    monkeypatch.setattr(weight_streaming, "_fault_in", fault_in)
+    holder = weight_streaming.PinHolder(CUDA0)
+
+    def update() -> None:
+        try:
+            registry.update(holder, [storage])
+        finally:
+            update_done.set()
+
+    thread = threading.Thread(target=update)
+    thread.start()
+    assert fault_entered.wait(timeout=30)
+
+    def host_available() -> int:
+        acquired = registry._registration_lock.acquire(blocking=False)
+        if acquired:
+            registry._registration_lock.release()
+            fault_proceed.set()
+            assert update_done.wait(timeout=30)
+        return 2 * GB
+
+    monkeypatch.setattr(model_cache_module, "_host_memory_available", host_available)
+    try:
+        result = cache.make_room(1, host_bytes_needed=2 * GB)
+        assert not result.ram_headroom_satisfied
+    finally:
+        fault_proceed.set()
+        thread.join(timeout=30)
+        assert not thread.is_alive()
+        registry.release(holder)
         cache.shutdown()
 
 

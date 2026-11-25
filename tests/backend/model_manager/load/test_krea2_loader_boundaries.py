@@ -1,3 +1,4 @@
+import json
 import weakref
 from types import SimpleNamespace
 from unittest.mock import MagicMock
@@ -936,7 +937,23 @@ class _TinyNativeKrea2(torch.nn.Module):
         self.transformer_blocks = torch.nn.ModuleList([_TinyNativeKrea2Block(self.WIDTH)])
 
 
-def _native_fp8_driver(monkeypatch, tmp_path, state_dict, observe: tuple[str, ...] = ()):
+class _TinyWideNativeKrea2(torch.nn.Module):
+    WIDTH = 128
+
+    def __init__(self, **_kwargs) -> None:
+        super().__init__()
+        self.img_in = torch.nn.Linear(self.WIDTH, self.WIDTH, bias=True)
+        self.transformer_blocks = torch.nn.ModuleList([_TinyNativeKrea2Block(self.WIDTH)])
+
+
+def _native_fp8_driver(
+    monkeypatch,
+    tmp_path,
+    state_dict,
+    observe: tuple[str, ...] = (),
+    metadata=None,
+    model_class=_TinyNativeKrea2,
+):
     import diffusers
 
     from invokeai.backend.model_manager.load.model_loaders import krea2
@@ -952,8 +969,8 @@ def _native_fp8_driver(monkeypatch, tmp_path, state_dict, observe: tuple[str, ..
         seam,
         monkeypatch,
         state_dict=state_dict,
-        metadata=None,
-        geometry=lambda patch: patch.setattr(diffusers, "Krea2Transformer2DModel", _TinyNativeKrea2, raising=False),
+        metadata=metadata,
+        geometry=lambda patch: patch.setattr(diffusers, "Krea2Transformer2DModel", model_class, raising=False),
         observe=observe,
     )
     return run, config
@@ -1074,6 +1091,38 @@ def test_room_is_reserved_before_the_scaled_weights_are_widened(monkeypatch, tmp
     assert torch.allclose(model.transformer_blocks[0].attn.to_q.weight.float(), payload.dequantized, atol=1e-5)
     assert [step for step, _ in run.order] == list(widening), run.order
     assert all(reserved for _step, reserved in run.order), run.order
+
+
+def test_mxfp8_scale_decode_has_host_room_before_extraction(monkeypatch, tmp_path) -> None:
+    """The compact MXFP8 grids must be admitted before extraction expands them to float32."""
+    from tests.fixtures.quantized_payloads import mxfp8_marker, mxfp8_tensors
+
+    exponents = (torch.arange(128 * 4, dtype=torch.int64).reshape(128, 4) % 8) + 124
+    tensors, _expected = mxfp8_tensors("blocks.0.attn.wq", exponents)
+    state_dict = {**_native_block(_TinyWideNativeKrea2.WIDTH), **tensors}
+    metadata = {"_quantization_metadata": json.dumps({"layers": {"blocks.0.attn.wq": mxfp8_marker()}})}
+    run, config = _native_fp8_driver(
+        monkeypatch,
+        tmp_path,
+        state_dict,
+        observe=("extract_fp8_scaled_layers",),
+        metadata=metadata,
+        model_class=_TinyWideNativeKrea2,
+    )
+    admissions = []
+    make_room = run.loader._ram_cache.make_room
+
+    def record_admission(*args, **kwargs):
+        admissions.append((args, kwargs))
+        return make_room(*args, **kwargs)
+
+    run.loader._ram_cache.make_room = record_admission
+
+    run.load(config)
+
+    assert run.order == [("extract_fp8_scaled_layers", 1)]
+    assert run.reserved[0] == 0
+    assert admissions[0] == ((0,), {"host_bytes_needed": 512 * (4 + 1 + 2 * 4 + 4)})
 
 
 def test_qwen3vl_tower_releases_folded_scale_before_nvfp4_install(monkeypatch) -> None:

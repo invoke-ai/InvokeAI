@@ -407,6 +407,37 @@ class TestTheDictAndThePayloads:
 
         assert asked == [(needed, {"host_bytes_needed": 0})]
 
+    @pytest.mark.parametrize("use_bool_mapping", [False, True])
+    def test_mapped_packed_nvfp4_payload_reuses_source_without_host_demand(self, use_bool_mapping: bool) -> None:
+        tensors, _ = nvfp4_signed_tensors("lin", torch.randint(0, 2, (128, 64), dtype=torch.bool))
+        sd = dict(tensors)
+        payloads = pop_nvfp4_layers(sd, {"lin": {"format": "nvfp4"}})
+        mapped = {
+            tensor.untyped_storage().data_ptr()
+            for tensor in (
+                payloads["lin"].weight,
+                payloads["lin"].weight_scale,
+                payloads["lin"].weight_scale_2,
+            )
+        }
+        asked: list[tuple[int, dict[str, int]]] = []
+
+        def reserve(bytes_needed: int, **kwargs: int) -> None:
+            asked.append((bytes_needed, kwargs))
+
+        needed = reserve_for_load(
+            reserve,
+            sd,
+            torch.float32,
+            keep_fp8=False,
+            model=_linear_model(64, 128),
+            fp8_layers={},
+            nvfp4_payloads=payloads,
+            source_tensors_mapped=True if use_bool_mapping else mapped,
+        )
+
+        assert asked == [(needed, {"host_bytes_needed": 0})]
+
     def test_modelopt_nvfp4_relayout_is_admitted_before_packed_install(self) -> None:
         tensors, _ = nvfp4_signed_tensors("lin", torch.randint(0, 2, (128, 64), dtype=torch.bool))
         sd = dict(tensors)
@@ -702,6 +733,36 @@ class TestTheDictAndThePayloads:
             + fold_transient_bytes(sd["second.weight"], second.scale),
         )
         assert asked == [(needed, {"host_bytes_needed": expected})]
+
+    def test_fold_peak_keeps_shared_source_storage_until_its_last_view(self) -> None:
+        fused = torch.zeros(4, 8, dtype=torch.float8_e4m3fn)
+        sd = {
+            "first.weight": fused[:2],
+            "first.weight_scale": torch.ones(1),
+            "second.weight": fused[2:],
+            "second.weight_scale": torch.ones(1),
+        }
+        layers = extract_fp8_scaled_layers(sd)
+        asked: list[tuple[int, dict[str, int]]] = []
+
+        def reserve(bytes_needed: int, **kwargs: int) -> None:
+            asked.append((bytes_needed, kwargs))
+
+        needed = reserve_for_load(
+            reserve,
+            sd,
+            torch.bfloat16,
+            keep_fp8=False,
+            model=None,
+            fp8_layers=layers,
+            nvfp4_payloads={},
+        )
+
+        output_bytes = 2 * 8 * torch.bfloat16.itemsize
+        expected_fold_peak = (
+            output_bytes + output_bytes + fold_transient_bytes(sd["first.weight"], layers["first"].weight_scale)
+        )
+        assert asked == [(needed, {"host_bytes_needed": expected_fold_peak})]
 
     def test_plain_dense_weight_remains_in_cast_peak_accounting(self) -> None:
         sd = {"lin.weight": torch.zeros(4, 8, dtype=torch.float32)}

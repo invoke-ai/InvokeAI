@@ -40,9 +40,8 @@ from invokeai.backend.qwen3.qwen3_tokenizer import _TOKENIZER_DIR
 from invokeai.backend.t5.t5_tokenizer import _TOKENIZER_DIR as _T5_TOKENIZER_DIR
 
 
-def _sparse(path: Path, size: int) -> Path:
-    with path.open("wb") as file:
-        file.truncate(size)
+def _file_of_size(path: Path, size: int) -> Path:
+    path.write_bytes(b"\x00" * size)
     return path
 
 
@@ -59,7 +58,7 @@ def _loader(cls: type):
     ],
 )
 def test_tokenizer_only_single_file_does_not_size_checkpoint(loader_cls: type, checkpoint_name: str, tmp_path: Path):
-    checkpoint = _sparse(tmp_path / checkpoint_name, 4 * 2**30)
+    checkpoint = _file_of_size(tmp_path / checkpoint_name, 4096)
     loader = _loader(loader_cls)
 
     assert loader.get_size_fs(SimpleNamespace(), checkpoint, SubModelType.Tokenizer) == 0
@@ -68,17 +67,17 @@ def test_tokenizer_only_single_file_does_not_size_checkpoint(loader_cls: type, c
 
 @pytest.mark.parametrize("loader_cls", [Qwen3EncoderCheckpointLoader, Qwen3EncoderGGUFLoader, Qwen3EncoderSDNQLoader])
 def test_qwen3_tokenizer_sizes_bundled_compressed_assets(loader_cls: type, tmp_path: Path):
-    checkpoint = _sparse(tmp_path / "qwen3.safetensors", 4 * 2**30)
+    tokenizer_bytes = calc_tokenizer_size_by_fs(_TOKENIZER_DIR, include_runtime_overhead=True)
+    checkpoint = _file_of_size(tmp_path / "qwen3.safetensors", 4096)
     loader = _loader(loader_cls)
-    tokenizer_bytes = calc_tokenizer_size_by_fs(_TOKENIZER_DIR)
 
     assert tokenizer_bytes > 0
+    assert tokenizer_bytes > checkpoint.stat().st_size
     assert loader.get_size_fs(SimpleNamespace(), checkpoint, SubModelType.Tokenizer) == tokenizer_bytes
-    assert tokenizer_bytes < checkpoint.stat().st_size
 
 
 def test_bundled_qwen3_tokenizer_fits_bounded_host_admission(monkeypatch: pytest.MonkeyPatch):
-    tokenizer_bytes = calc_tokenizer_size_by_fs(_TOKENIZER_DIR)
+    tokenizer_bytes = calc_tokenizer_size_by_fs(_TOKENIZER_DIR, include_runtime_overhead=True)
     monkeypatch.setattr(model_cache_module, "_host_memory_available", lambda: tokenizer_bytes)
     cache = ModelCache(
         execution_device_working_mem_gb=1.0,
@@ -92,23 +91,34 @@ def test_bundled_qwen3_tokenizer_fits_bounded_host_admission(monkeypatch: pytest
     try:
         result = cache.make_room(tokenizer_bytes)
         assert result.ram_headroom_satisfied
-        assert not cache.make_room(4 * 2**30).ram_headroom_satisfied
+        assert not cache.make_room(tokenizer_bytes + 1).ram_headroom_satisfied
     finally:
         cache.shutdown()
+
+
+def test_compressed_tokenizer_size_can_include_cold_parse_overhead(tmp_path: Path):
+    _file_of_size(tmp_path / "tokenizer.json.gz", 128)
+    _file_of_size(tmp_path / "tokenizer_config.json", 16)
+
+    on_disk = calc_tokenizer_size_by_fs(tmp_path)
+    cold = calc_tokenizer_size_by_fs(tmp_path, include_runtime_overhead=True)
+
+    assert on_disk == 144
+    assert cold == on_disk + 130 * 2**20
 
 
 def test_mistral_tokenizer_sizes_local_assets_not_model_file(tmp_path: Path):
     from invokeai.backend.model_manager.load.model_loaders.mistral_encoder import MistralEncoderDiffusersLoader
 
     (tmp_path / "text_encoder").mkdir()
-    _sparse(tmp_path / "text_encoder" / "model.safetensors", 4 * 2**30)
+    checkpoint = _file_of_size(tmp_path / "text_encoder" / "model.safetensors", 4096)
     (tmp_path / "tokenizer").mkdir()
     (tmp_path / "tokenizer" / "tekken.json").write_bytes(b"tekken")
     (tmp_path / "tokenizer" / "README.md").write_bytes(b"not loaded")
     loader = _loader(MistralEncoderDiffusersLoader)
 
     assert loader.get_size_fs(SimpleNamespace(), tmp_path, SubModelType.Tokenizer) == len(b"tekken")
-    assert loader.get_size_fs(SimpleNamespace(), tmp_path, SubModelType.TextEncoder) == 4 * 2**30
+    assert loader.get_size_fs(SimpleNamespace(), tmp_path, SubModelType.TextEncoder) == checkpoint.stat().st_size
 
 
 def test_mistral_embedded_gguf_tokenizer_size_uses_tensor_metadata(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
@@ -125,7 +135,24 @@ def test_mistral_embedded_gguf_tokenizer_size_uses_tensor_metadata(monkeypatch: 
     monkeypatch.setattr(mistral_encoder, "_extract_tekken_bytes", lambda _path: (_ for _ in ()).throw(AssertionError()))
     loader = _loader(MistralEncoderGGUFLoader)
 
-    assert loader.get_size_fs(SimpleNamespace(), checkpoint, SubModelType.Tokenizer) == 17
+    assert loader.get_size_fs(SimpleNamespace(), checkpoint, SubModelType.Tokenizer) == 17 * 8
+
+
+def test_mistral_embedded_safetensors_tokenizer_size_uses_tensor_metadata(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
+    import torch
+    from safetensors.torch import save_file
+
+    from invokeai.backend.model_manager.load.model_loaders import mistral_encoder
+
+    checkpoint = tmp_path / "mistral.safetensors"
+    save_file({"tekken_model": torch.zeros(17, dtype=torch.uint8)}, str(checkpoint))
+
+    monkeypatch.setattr(mistral_encoder, "_extract_tekken_bytes", lambda _path: (_ for _ in ()).throw(AssertionError()))
+    loader = _loader(MistralEncoderCheckpointLoader)
+
+    assert loader.get_size_fs(SimpleNamespace(), checkpoint, SubModelType.Tokenizer) == 17 * 8
 
 
 def test_mistral_tokenizer_size_follows_root_tekken_fallback_with_empty_sibling(tmp_path: Path):
@@ -152,14 +179,14 @@ def test_mistral_tokenizer_size_skips_metadata_only_sibling_for_root_fallback(tm
 
 
 def test_gemma_tokenizer_sizes_local_assets_not_model_file(tmp_path: Path):
-    _sparse(tmp_path / "model.safetensors", 4 * 2**30)
+    checkpoint = _file_of_size(tmp_path / "model.safetensors", 4096)
     (tmp_path / "config.json").write_text('{"architectures": ["Gemma2ForCausalLM"]}')
     (tmp_path / "tokenizer.json").write_bytes(b"tokenizer")
     (tmp_path / "tokenizer_config.json").write_bytes(b"config")
     loader = _loader(Gemma2EncoderLoader)
 
     assert loader.get_size_fs(SimpleNamespace(), tmp_path, SubModelType.Tokenizer) == len(b"tokenizer") + len(b"config")
-    assert loader.get_size_fs(SimpleNamespace(), tmp_path, SubModelType.TextEncoder) == 4 * 2**30
+    assert loader.get_size_fs(SimpleNamespace(), tmp_path, SubModelType.TextEncoder) == checkpoint.stat().st_size
 
 
 @pytest.mark.parametrize("submodel_type", [SubModelType.Tokenizer2, SubModelType.Tokenizer3])
@@ -201,10 +228,11 @@ def test_bnb_t5_tokenizer_sizes_its_local_assets(loader_cls: type, submodel_type
 @pytest.mark.parametrize("submodel_type", [SubModelType.Tokenizer2, SubModelType.Tokenizer3])
 def test_bundled_t5_tokenizer_sizes_its_assets(loader_cls: type, submodel_type: SubModelType, tmp_path: Path):
     loader = _loader(loader_cls)
-    checkpoint = _sparse(tmp_path / "t5.safetensors", 4 * 2**30)
     size = calc_tokenizer_size_by_fs(_T5_TOKENIZER_DIR)
+    checkpoint = _file_of_size(tmp_path / "t5.safetensors", 4096)
 
     assert size > 0
+    assert size > checkpoint.stat().st_size
     assert loader.get_size_fs(SimpleNamespace(path=str(checkpoint)), checkpoint, submodel_type) == size
 
 

@@ -155,6 +155,17 @@ def reserve_for_load(
     fold_delta = 0
     fold_output_total = 0
     fold_peak = 0
+    fold_source_counts: dict[int, int] = {}
+    fold_source_bytes: dict[int, int] = {}
+    fold_source_mapped: dict[int, bool] = {}
+    for tensor in state_dict.values():
+        if not isinstance(tensor, torch.Tensor) or tensor.is_meta:
+            continue
+        storage = tensor.untyped_storage()
+        storage_id = storage.data_ptr()
+        fold_source_counts[storage_id] = fold_source_counts.get(storage_id, 0) + 1
+        fold_source_bytes[storage_id] = storage.nbytes()
+        fold_source_mapped[storage_id] = _source_is_mapped(tensor, source_tensors_mapped)
     for key, tensor in fold_sd.items():
         layer = scaled_layer_for(key, fp8_layers)
         if layer is None:
@@ -164,10 +175,13 @@ def reserve_for_load(
             fold_peak,
             fold_delta + output_bytes + fold_transient_bytes(tensor, layer.weight_scale),
         )
-        fold_delta += output_bytes - (
-            0 if _source_is_mapped(tensor, source_tensors_mapped) else tensor.nelement() * tensor.element_size()
-        )
+        fold_delta += output_bytes
         fold_output_total += output_bytes
+        # Fused checkpoints can expose several views of one source storage; release it only after the last view folds.
+        storage_id = tensor.untyped_storage().data_ptr()
+        fold_source_counts[storage_id] -= 1
+        if fold_source_counts[storage_id] == 0 and not fold_source_mapped[storage_id]:
+            fold_delta -= fold_source_bytes[storage_id]
     cast_sd = {
         key: tensor
         for key, tensor in state_dict.items()
@@ -202,6 +216,11 @@ def reserve_for_load(
         payload.nbytes()
         for payload in nvfp4_payloads.values()
         if source_tensors_retained or not _source_is_mapped(payload.weight, source_tensors_mapped)
+    )
+    mapped_nvfp4_source_bytes = sum(
+        payload.nbytes()
+        for payload in nvfp4_payloads.values()
+        if not source_tensors_retained and _source_is_mapped(payload.weight, source_tensors_mapped)
     )
     cast_source_bytes = sum(tensor.nelement() * tensor.element_size() for tensor in cast_sd.values())
     cast_delta = cast_target_bytes - cast_source_bytes
@@ -277,7 +296,7 @@ def reserve_for_load(
     )
     host_bytes_needed = max(
         0,
-        needed - source_bytes,
+        needed - source_bytes - mapped_nvfp4_source_bytes,
         fold_peak,
         cast_phase_peak,
         cast_phase_delta + later_install_peak,

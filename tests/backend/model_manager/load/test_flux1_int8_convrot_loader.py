@@ -114,7 +114,9 @@ def _driver(monkeypatch, tmp_path, state_dict: dict, header: dict | None = None,
     if written:
         safetensors.torch.save_file(state_dict, str(checkpoint))
     else:
-        checkpoint.touch()
+        # The seam serves the state dict below, but production still inspects the real safetensors header to
+        # choose mmap versus pread. Keep that boundary exercised with a tiny valid file instead of a touch-only path.
+        safetensors.torch.save_file(state_dict, str(checkpoint))
     config = Main_Checkpoint_FLUX_Config.model_construct(
         path=str(checkpoint), name="flux1-dev-int8", variant=FluxVariantType.Dev
     )

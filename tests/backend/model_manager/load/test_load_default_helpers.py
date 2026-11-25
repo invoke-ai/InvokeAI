@@ -10,10 +10,12 @@ from unittest.mock import MagicMock
 
 import pytest
 import torch
+from safetensors.torch import save_file
 
+from invokeai.backend.model_manager.configs.main import Main_Checkpoint_FLUX_Config
 from invokeai.backend.model_manager.load.load_default import put_in_eval_mode, resolve_submodel_path
 from invokeai.backend.model_manager.load.model_cache.model_cache import CacheClearResult, ModelCache
-from invokeai.backend.model_manager.taxonomy import ModelFormat, ModelType, SubModelType
+from invokeai.backend.model_manager.taxonomy import FluxVariantType, ModelFormat, ModelType, SubModelType
 
 
 class TestPutInEvalMode:
@@ -160,7 +162,7 @@ class TestGetSizeFs:
     """Cache admission must size the folder loading will actually read.
 
     `make_room()` runs before the component is constructed, so a size of 0 reserves nothing and the
-    real multi-GB read lands on top of whatever was already resident.
+    real model read lands on top of whatever was already resident.
     """
 
     def _loader(self):
@@ -205,8 +207,7 @@ class TestGetSizeFs:
     def test_qwen_vl_checkpoint_tokenizer_does_not_size_the_checkpoint(self, tmp_path: Path) -> None:
         """The checkpoint is unrelated to the vendored tokenizer loaded for this component."""
         checkpoint = tmp_path / "qwen_vl.safetensors"
-        with checkpoint.open("wb") as file:
-            file.truncate(8 * 2**30)
+        checkpoint.write_bytes(b"\x00" * 8192)
         config = SimpleNamespace(
             path=str(checkpoint),
             repo_variant=None,
@@ -215,7 +216,110 @@ class TestGetSizeFs:
         )
 
         assert self._loader().get_size_fs(config, checkpoint, SubModelType.Tokenizer) == 0
-        assert self._loader().get_size_fs(config, checkpoint, SubModelType.TextEncoder) == 8 * 2**30
+        assert self._loader().get_size_fs(config, checkpoint, SubModelType.TextEncoder) == checkpoint.stat().st_size
+
+    def test_flux_bundle_sizes_only_the_selected_transformer_payload(self, tmp_path: Path) -> None:
+        checkpoint = tmp_path / "flux-bundle.safetensors"
+        marker = "model.diffusion_model.double_blocks.0.img_attn.norm.key_norm.scale"
+        save_file(
+            {
+                marker: torch.zeros(4),
+                "model.diffusion_model.img_in.weight": torch.zeros(32),
+                "text_encoders.clip.weight": torch.zeros(4096),
+                "vae.decoder.weight": torch.zeros(4096),
+            },
+            checkpoint,
+        )
+        config = Main_Checkpoint_FLUX_Config.model_construct(
+            path=str(checkpoint), variant=FluxVariantType.Dev, repo_variant=None, name="bundle"
+        )
+
+        selected = self._loader().get_size_fs(config, checkpoint, SubModelType.Transformer)
+
+        assert selected == (4 + 32) * torch.float32.itemsize
+
+    def test_flux_bundle_reserves_selected_scale_conversion_bytes_separately(self, tmp_path: Path) -> None:
+        checkpoint = tmp_path / "flux-bundle.safetensors"
+        marker = "model.diffusion_model.double_blocks.0.img_attn.norm.key_norm.scale"
+        save_file(
+            {
+                marker: torch.zeros(4),
+                "model.diffusion_model.double_blocks.0.img_attn.norm.query.scale": torch.zeros(32),
+                "text_encoders.clip.scale": torch.zeros(4096),
+                "vae.decoder.scale": torch.zeros(4096),
+            },
+            checkpoint,
+        )
+        config = Main_Checkpoint_FLUX_Config.model_construct(
+            path=str(checkpoint), variant=FluxVariantType.Dev, repo_variant=None
+        )
+
+        selected_source_bytes = (4 + 32) * torch.float32.itemsize
+        assert self._loader()._get_host_bytes_needed(config, checkpoint, SubModelType.Transformer) == (
+            selected_source_bytes + (4 + 32) * 2
+        )
+
+    def test_flux_non_bundle_does_not_reserve_scale_conversion_bytes(self, tmp_path: Path) -> None:
+        checkpoint = tmp_path / "flux.safetensors"
+        save_file({"double_blocks.0.img_attn.norm.key_norm.scale": torch.zeros(32)}, checkpoint)
+        config = Main_Checkpoint_FLUX_Config.model_construct(
+            path=str(checkpoint), variant=FluxVariantType.Dev, repo_variant=None
+        )
+
+        assert self._loader()._get_host_bytes_needed(config, checkpoint, SubModelType.Transformer) == 0
+
+    def test_flux_bundle_marker_counts_scale_conversion_even_when_all_keys_are_selected(self, tmp_path: Path) -> None:
+        checkpoint = tmp_path / "flux-bundle.safetensors"
+        marker = "model.diffusion_model.double_blocks.0.img_attn.norm.key_norm.scale"
+        save_file(
+            {
+                marker: torch.zeros(4),
+                "model.diffusion_model.single_blocks.0.linear.scale": torch.zeros(8),
+            },
+            checkpoint,
+        )
+        config = Main_Checkpoint_FLUX_Config.model_construct(
+            path=str(checkpoint), variant=FluxVariantType.Dev, repo_variant=None
+        )
+
+        selected_source_bytes = (4 + 8) * torch.float32.itemsize
+        assert self._loader()._get_host_bytes_needed(config, checkpoint, SubModelType.Transformer) == (
+            selected_source_bytes + (4 + 8) * torch.bfloat16.itemsize
+        )
+
+    def test_flux_bundle_passes_total_host_peak_to_initial_admission(self, tmp_path: Path) -> None:
+        checkpoint = tmp_path / "flux-bundle.safetensors"
+        marker = "model.diffusion_model.double_blocks.0.img_attn.norm.key_norm.scale"
+        save_file(
+            {
+                marker: torch.zeros(4),
+                "model.diffusion_model.img_in.weight": torch.zeros(32),
+                "model.diffusion_model.single_blocks.0.linear.scale": torch.zeros(8),
+                "text_encoders.clip.weight": torch.zeros(4096),
+            },
+            checkpoint,
+        )
+        config = Main_Checkpoint_FLUX_Config.model_construct(
+            path=str(checkpoint), variant=FluxVariantType.Dev, repo_variant=None, name="bundle"
+        )
+        loader = self._loader()
+        loader._ram_cache = MagicMock()
+        loader._ram_cache.shared_cpu_weights = None
+        loader._ram_cache.get_with_first_use_claim.side_effect = [IndexError, IndexError, (MagicMock(), None)]
+        loader._ram_cache.make_room.return_value = CacheClearResult(0, 0, False, True)
+        loader._ram_cache.put.return_value = MagicMock()
+        loader._app_config = SimpleNamespace(log_memory_usage=False)
+        loader._logger = MagicMock()
+        loader.config_check = None
+        loader._get_model_path = lambda _config: checkpoint  # type: ignore[method-assign]
+        loader._get_execution_device = lambda *_args: torch.device("cpu")  # type: ignore[method-assign]
+        loader._load_model = MagicMock(return_value=object())  # type: ignore[method-assign]
+
+        loader._load_and_cache(config, SubModelType.Transformer)
+
+        selected = loader.get_size_fs(config, checkpoint, SubModelType.Transformer)
+        converted = (4 + 8) * torch.bfloat16.itemsize
+        loader._ram_cache.make_room.assert_called_once_with(selected, host_bytes_needed=selected + converted)
 
 
 def test_cold_load_refuses_before_model_construction_when_host_headroom_is_insufficient(tmp_path: Path) -> None:
@@ -235,7 +339,7 @@ def test_cold_load_refuses_before_model_construction_when_host_headroom_is_insuf
     loader._app_config = SimpleNamespace(log_memory_usage=False)
     loader._logger = MagicMock()
     loader._get_model_path = lambda _config: tmp_path  # type: ignore[method-assign]
-    loader.get_size_fs = lambda *_args: 25 * 2**30  # type: ignore[method-assign]
+    loader.get_size_fs = lambda *_args: cache.local_ram_cache_size_bytes + 1  # type: ignore[method-assign]
     loader._load_model = MagicMock(return_value=object())  # type: ignore[method-assign]
     cache.make_room = MagicMock(return_value=CacheClearResult(0, 0, False, False))  # type: ignore[method-assign]
     config = SimpleNamespace(

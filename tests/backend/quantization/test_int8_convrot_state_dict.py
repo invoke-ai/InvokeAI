@@ -443,6 +443,29 @@ class TestTheSharedInstall:
 
         assert empty_collection == owned
 
+    @pytest.mark.parametrize("use_bool_mapping", [False, True])
+    def test_mapped_packed_layer_reuses_source_without_host_demand(self, use_bool_mapping: bool) -> None:
+        sd = self._int8_layer("keeps")
+        mapped = {tensor.untyped_storage().data_ptr() for tensor in sd.values()}
+        asked: list[tuple[int, dict[str, int]]] = []
+
+        def reserve(bytes_needed: int, **kwargs: int) -> None:
+            asked.append((bytes_needed, kwargs))
+
+        install_int8_convrot_layers(
+            self._model(),
+            sd,
+            {"keeps": MARKER},
+            torch.float32,
+            architecture="Z-Image",
+            reserve=reserve,
+            source_tensors_mapped=True if use_bool_mapping else mapped,
+        )
+
+        codes = 4 * CONVROT_GROUP_SIZE
+        scale = 4 * 4
+        assert asked == [(codes + scale, {"host_bytes_needed": 0})]
+
     def test_mixed_mapped_storage_releases_owned_sources_after_each_decode(self) -> None:
         sd = {
             f"layer_{index}.{suffix}": tensor

@@ -31,6 +31,7 @@ from invokeai.backend.model_manager.load.model_cache.shared_cpu_weights import (
     SharedCpuWeightsPin,
     SharedCpuWeightsStore,
 )
+from invokeai.backend.model_manager.load.model_cache.torch_module_autocast import weight_streaming
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch_module_autocast import (
     apply_custom_layers_to_model,
 )
@@ -3087,7 +3088,7 @@ class ModelCache:
                 return True
             # Use a fresh sample after eviction. Cache bytes may already be represented by reclaimable
             # file pages, or may still be held by a deferred/refused CUDA allocator release.
-            return host_bytes_needed <= _host_memory_available()
+            return host_bytes_needed <= weight_streaming.PINNED_STORAGES.host_memory_available(_host_memory_available)
 
         def has_room() -> bool:
             # A cache cap is an eviction target, not a hard per-model load limit. If one model is

@@ -202,11 +202,11 @@ def test_one_reservation_counts_the_nvfp4_layers_as_they_are_held(loaded) -> Non
     loaded.loader._ram_cache.make_room.assert_called_once()
     call = loaded.loader._ram_cache.make_room.call_args
     assert call.args == (packed + decoded + dense + neighbour,)
-    # With a dense neighbour every source widens or installs, so mmap pages are reclaimable and the complete
-    # destination total is the host peak. The int8 neighbour remains packed in-place, so its smaller decode peak is
-    # intentionally below the final reservation while still requiring nonzero headroom.
+    # Packed mmap payloads are installed zero-copy, so they belong to the retained reservation but not to incremental
+    # host demand. The dense path's decode/cast peak is therefore below the final reservation as well.
     if loaded.neighbour == "dense":
-        assert call.kwargs["host_bytes_needed"] == packed + decoded + dense + neighbour
+        decoded_peak = 128 * 64 * (2 + COMPUTE_DTYPE.itemsize) + (128 * 64 // 16) * COMPUTE_DTYPE.itemsize
+        assert call.kwargs["host_bytes_needed"] == dense + neighbour + decoded_peak
     else:
         assert 0 < call.kwargs["host_bytes_needed"] < call.args[0]
 
