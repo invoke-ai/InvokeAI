@@ -359,6 +359,21 @@
           "signature": "(vram_bytes_needed: int) -> int"
         },
         {
+          "description": "Make room while the caller holds `MODEL_LOAD_LOCK`'s write lock.\nThis is for an out-of-cache load that has already serialized construction and must recheck shared memory\nwithout dropping the writer lock. The cache call still acquires its own admission and cache locks.",
+          "name": "make_room_in_vram_with_write_lock",
+          "parameters": [
+            {
+              "default": "",
+              "description": "",
+              "name": "vram_bytes_needed",
+              "type": "int"
+            }
+          ],
+          "return_type": "int",
+          "returns": "",
+          "signature": "(vram_bytes_needed: int) -> int"
+        },
+        {
           "description": "Move a model (and all of its submodels) from VRAM to RAM, freeing its VRAM but keeping it cached.\nUse this when an invocation is done with a model for the rest of the run - e.g. a one-shot text encoder -\nso the next, larger load does not have to compete with it for VRAM. The model stays in the RAM cache, so\na subsequent load only re-streams it back to VRAM rather than rebuilding it from disk.\nThe caller must not hold `MODEL_LOAD_LOCK`; this method acquires its read lock.",
           "name": "offload_from_vram",
           "parameters": [
