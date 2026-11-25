@@ -15,6 +15,7 @@ import {
   numberInputSlotRecipe,
   popoverSlotRecipe,
   progressCircleSlotRecipe,
+  ratingGroupSlotRecipe,
   scrollAreaSlotRecipe,
   segmentGroupSlotRecipe,
   selectSlotRecipe,
@@ -120,6 +121,9 @@ const categoricalPalettes = Object.fromEntries(
     return [
       name,
       {
+        // The hue itself in every theme, for identity marks (color labels, rating stars); edge it with `fg` where it
+        // must stand out from a light surface.
+        swatch: { value: seed },
         fg: colorToken(fg),
         solid: colorToken(fg),
         contrast: stepRef(950, 50),
@@ -393,6 +397,7 @@ const config = defineConfig({
       numberInput: numberInputSlotRecipe,
       popover: popoverSlotRecipe,
       progressCircle: progressCircleSlotRecipe,
+      ratingGroup: ratingGroupSlotRecipe,
       scrollArea: scrollAreaSlotRecipe,
       segmentGroup: segmentGroupSlotRecipe,
       select: selectSlotRecipe,
