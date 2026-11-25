@@ -10,7 +10,7 @@ import { createExternalStore } from '@platform/state/externalStore';
 import { createTrailingSingleFlight } from '@platform/state/singleFlight';
 import { getApiErrorMessage } from '@platform/transport/http';
 
-import { getModelsDir, listMissingModels, listModels } from './api';
+import { getModelsDir, listMissingModels, listModelKeysByDateAdded, listModels } from './api';
 
 /**
  * Share backend-owned model state outside the workbench reducer; mutations patch snapshots or refresh to keep all
@@ -22,6 +22,8 @@ export interface ModelsSnapshot {
   /** Same models keyed for point lookups; always derived from `models`. */
   modelsByKey: ReadonlyMap<string, ModelConfig>;
   missingModelKeys: ReadonlySet<string>;
+  /** Each model's position in install order, oldest first; null until the Date added sort asks for it. */
+  dateAddedRanks: ReadonlyMap<string, number> | null;
   /** Bumped when a model's cover image changes; cache-busts thumbnail URLs. */
   coverImageVersions: Readonly<Record<string, number>>;
   /** Absolute server path of the models directory (resolves relative model paths). */
@@ -35,6 +37,7 @@ const EMPTY_MODELS_BY_KEY: ReadonlyMap<string, ModelConfig> = new Map<string, Mo
 
 const EMPTY_MODELS_SNAPSHOT: ModelsSnapshot = {
   coverImageVersions: {},
+  dateAddedRanks: null,
   error: null,
   missingModelKeys: EMPTY_MISSING_KEYS,
   models: [],
@@ -52,10 +55,12 @@ const store = createExternalStore<ModelsSnapshot>(EMPTY_MODELS_SNAPSHOT);
 
 const refreshFlight = createTrailingSingleFlight();
 let mutationGeneration = 0;
+let dateAddedOrderWanted = false;
 
 registerAccountOwnedResource({
   clear: () => {
     mutationGeneration = 0;
+    dateAddedOrderWanted = false;
     refreshFlight.reset();
     store.setSnapshot(EMPTY_MODELS_SNAPSHOT);
   },
@@ -90,8 +95,10 @@ export const refreshModels = (owner: AccountScope = captureAccountScope()): Prom
       listMissingModels(owner.signal).catch(() => [] as ModelConfig[]),
       // Static server config: fetched once, best-effort.
       store.getSnapshot().modelsDir ?? getModelsDir(owner.signal).catch(() => null),
+      // Read with the catalog so the ranks describe the same refresh as `models`; best-effort like the two above.
+      dateAddedOrderWanted ? listModelKeysByDateAdded(owner.signal).catch(() => null) : null,
     ])
-      .then(([models, missingModels, modelsDir]) => {
+      .then(([models, missingModels, modelsDir, dateAddedKeys]) => {
         if (!isAccountScopeCurrent(owner)) {
           return;
         }
@@ -106,6 +113,8 @@ export const refreshModels = (owner: AccountScope = captureAccountScope()): Prom
 
         store.patchSnapshot({
           ...withModels(withMissingFlags(models, missingKeys)),
+          // A failed order read keeps the previous ranks.
+          ...(dateAddedKeys ? { dateAddedRanks: new Map(dateAddedKeys.map((key, index) => [key, index])) } : null),
           error: null,
           missingModelKeys: missingKeys,
           modelsDir,
@@ -138,6 +147,27 @@ export const ensureModelsLoaded = (): Promise<void> => {
   }
 
   return refreshFlight.inflight() ?? Promise.resolve();
+};
+
+/**
+ * Start reading install order with the catalog, from now until the account changes. Resolves whether the order is
+ * loaded once the read this call asked for has settled; after a failed read, calling again retries.
+ */
+export const ensureDateAddedOrderLoaded = async (): Promise<boolean> => {
+  if (store.getSnapshot().dateAddedRanks) {
+    return true;
+  }
+
+  dateAddedOrderWanted = true;
+  await refreshModels();
+
+  // A refresh already in flight when this was called did not read the order, and one a mutation fenced discarded
+  // it; each queues a rerun that reads it, so wait those out too.
+  while (!store.getSnapshot().dateAddedRanks && refreshFlight.inflight()) {
+    await refreshFlight.inflight();
+  }
+
+  return store.getSnapshot().dateAddedRanks !== null;
 };
 
 export const getModelsSnapshot = (): ModelsSnapshot => store.getSnapshot();
