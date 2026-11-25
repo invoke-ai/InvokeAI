@@ -29,7 +29,9 @@ import {
   getDefaultGenerateSettings,
   getGenerateInvocationIssues,
   getGenerateModelSelectionResult,
+  getGenerationDefaults,
   getGenerationDimensions,
+  getGuidanceBoundReason,
   getGenerationModelAvailabilityReasons,
   getGenerationUiPolicy,
   getGenerationValidationIssues,
@@ -651,7 +653,7 @@ describe('component policies', () => {
     ).not.toContain(reasons()[0]);
   });
 
-  it('blocks FLUX Fill below its guidance floor and offers the model default', () => {
+  it('holds FLUX Fill to a guidance floor of 25 with the field reason and a one-step fix', () => {
     const model = createModel('flux', { variant: 'dev_fill' });
     const settings = { ...createSettings(model), clipEmbedModel: clipEmbed, t5EncoderModel: t5Encoder, vae: fluxVae };
     const guidanceIssues = (cfgScale: number) =>
@@ -659,14 +661,36 @@ describe('component policies', () => {
         ({ target }) => target.field === 'cfgScale'
       );
 
+    expect(getGuidanceBoundReason(model, 3.5)).toBe(`Guidance must be at least 25 for ${model.name}.`);
     expect(guidanceIssues(3.5)).toEqual([
       expect.objectContaining({
-        fix: { kind: 'clampGuidance', value: 30 },
-        messageKey: 'widgets.generate.issues.fluxFillGuidance',
+        fix: { kind: 'clampGuidance', value: 25 },
+        message: getGuidanceBoundReason(model, 3.5),
       }),
     ]);
+    expect(getGuidanceBoundReason(model, 25)).toBeNull();
     expect(guidanceIssues(25)).toEqual([]);
     expect(guidanceIssues(30)).toEqual([]);
+    expect(getGenerationUiPolicy(model).guidanceMin).toBe(25);
+  });
+
+  it('lands on the FLUX Fill floor when switching from FLUX dev at its default guidance', () => {
+    const dev = createModel('flux', { key: 'flux-dev', variant: 'dev' });
+    const fill = createModel('flux', { key: 'flux-fill', variant: 'dev_fill' });
+    const currentValues = createSettings(dev, { cfgScale: 3.5 });
+
+    const { settings } = getGenerateModelSelectionResult({ currentValues, model: fill, models: [dev, fill] });
+
+    expect(settings.cfgScale).toBeGreaterThanOrEqual(25);
+  });
+
+  it('raises a FLUX Fill model default saved below the floor to the floor', () => {
+    const fill = createModel('flux', { variant: 'dev_fill', default_settings: { guidance: 3.5 } });
+
+    expect(getGenerationDefaults(fill).cfgScale).toBe(25);
+    expect(
+      getGenerationDefaults(createModel('flux', { variant: 'dev', default_settings: { guidance: 3.5 } })).cfgScale
+    ).toBe(3.5);
   });
 
   it('keeps concepts but clears incompatible selections when the selected model changes', () => {
@@ -1585,7 +1609,9 @@ describe('the guidance range the architecture declares', () => {
       }
 
       const where = `${row.base}/${row.variant ?? '-'}`;
-      const { guidance_max: max, guidance_min: min } = row.features;
+      const { guidance_max: max } = row.features;
+      // FLUX Fill is the one deliberate exception: a product floor above the served node minimum.
+      const min = where === 'flux/dev_fill' ? 25 : row.features.guidance_min;
 
       expect(guidanceReasons(model, min), `${where} rejected its own floor`).toEqual([]);
 

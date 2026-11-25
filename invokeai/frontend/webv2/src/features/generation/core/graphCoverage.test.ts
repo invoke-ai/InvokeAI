@@ -147,7 +147,7 @@ const sdxlCanvasCase = (colorCompensation: boolean) => {
 
 const fluxFillCanvasCase = () => {
   const shape: ModelShape = {
-    label: 'canvas-fill-inpaint',
+    label: 'canvas-fill-outpaint-masked',
     overrides: { format: 'checkpoint', variant: 'dev_fill' },
   };
   const { filled, model, settings } = satisfiedSettingsFor('flux', shape);
@@ -167,7 +167,7 @@ const fluxFillCanvasCase = () => {
     },
     destination: 'canvas',
     maskImageName: 'canvas-mask.png',
-    mode: 'inpaint',
+    mode: 'outpaint',
     model,
     projectSettings: { useCpuNoise: true, useNsfwChecker: false, useWatermark: false },
     settings,

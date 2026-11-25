@@ -111,7 +111,7 @@
           "t5EncoderModel",
           "vae"
         ],
-        "canvas-fill-inpaint": [
+        "canvas-fill-outpaint-masked": [
           "clipEmbedModel",
           "t5EncoderModel",
           "vae"
@@ -135,8 +135,10 @@
         "invert_tensor_mask",
         "invokeai_img_blend",
         "lora_selector",
+        "mask_combine",
         "string",
-        "tensor_mask_to_image"
+        "tensor_mask_to_image",
+        "tomask"
       ]
     },
     "flux2": {
@@ -777,7 +779,7 @@
           "anima_txt2img",
           "cogview4_txt2img",
           "ernie_image_txt2img",
-          "flux_inpaint",
+          "flux_outpaint",
           "flux_txt2img",
           "flux2_txt2img",
           "flux3_txt2img",
@@ -1833,12 +1835,13 @@
       ]
     },
     "image_mask_to_tensor": {
-      "inputs": [],
+      "inputs": [
+        "image"
+      ],
       "literalInputs": {
         "cutoff": [
           255
         ],
-        "image": [],
         "is_intermediate": [
           true
         ],
@@ -2154,6 +2157,23 @@
         "clip",
         "unet",
         "vae"
+      ]
+    },
+    "mask_combine": {
+      "inputs": [
+        "mask2"
+      ],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "mask1": [],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "image"
       ]
     },
     "moss_image_denoise": {
@@ -2794,6 +2814,21 @@
         "mask"
       ],
       "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "image"
+      ]
+    },
+    "tomask": {
+      "inputs": [],
+      "literalInputs": {
+        "image": [],
         "is_intermediate": [
           true
         ],

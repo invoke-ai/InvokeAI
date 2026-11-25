@@ -3443,9 +3443,6 @@ export type GenerationValidationMode = ExternalGenerationMode | 'outpaint' | 'ca
 const FLUX_FILL_MODE_REASON =
   'FLUX Fill only inpaints and outpaints: add an inpaint mask on the Canvas, or move the frame past the image edge.';
 
-/** `flux_denoise` warns below this: FLUX Fill was trained on guidance of about 30 and degrades at the FLUX dev default. */
-const FLUX_FILL_MIN_GUIDANCE = 25;
-
 export const getGenerationValidationIssues = (
   model: GenerateModelConfig,
   settings: GenerateSettings,
@@ -3552,21 +3549,6 @@ export const getGenerationValidationIssues = (
 
   if (isFluxFillModel(model) && (mode === 'txt2img' || mode === 'img2img')) {
     issues.push(issue('model:fluxFillMode', 'fluxFillMode', FLUX_FILL_MODE_REASON, MODEL_TARGET));
-  }
-
-  if (isFluxFillModel(model) && settings.cfgScale < FLUX_FILL_MIN_GUIDANCE) {
-    const recommended = getBaseGenerationConfig(model).defaults.cfgScale;
-
-    issues.push(
-      issue(
-        'render:cfgScale:fluxFillGuidance',
-        'fluxFillGuidance',
-        `FLUX Fill needs a guidance of at least ${FLUX_FILL_MIN_GUIDANCE}; about ${recommended} is recommended.`,
-        { field: 'cfgScale', section: 'render' },
-        { min: FLUX_FILL_MIN_GUIDANCE, recommended },
-        { kind: 'clampGuidance', value: recommended }
-      )
-    );
   }
 
   issues.push(...getModelFamilyValidationIssues(model, settings));
