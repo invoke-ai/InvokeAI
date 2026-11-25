@@ -1,11 +1,12 @@
 /* oxlint-disable react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop */
-import type { PromptTemplateSnapshot } from '@features/generation/core/promptTemplates';
+import type { PromptTemplateFieldValues, PromptTemplateSnapshot } from '@features/generation/core/promptTemplates';
 import type { GenerateModelConfig } from '@features/generation/core/types';
 import type { WildcardRecord } from '@features/generation/data/wildcards';
 import type { DynamicPromptsFieldConfig } from '@features/generation/ui/promptFields/DynamicPromptsPanel';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { DndContext } from '@dnd-kit/core';
+import { EMPTY_PROMPT_TEMPLATE_FIELD_VALUES } from '@features/generation/core/promptTemplates';
 import { PositivePromptField } from '@features/generation/ui/promptFields/PositivePromptField';
 import { adjustFocusedPromptAttention } from '@features/generation/ui/promptFields/promptAttentionHotkeys';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -210,20 +211,24 @@ const renderField = async ({
   dynamicPrompts = null,
   isTemplateViewMode,
   onChange = vi.fn(),
+  onTemplateFieldValuesChange = vi.fn(),
   onTemplateViewModeChange,
   onUsePrompt = vi.fn(),
   promptTemplate,
   showSyntaxHighlighting = false,
+  templateFieldValues = EMPTY_PROMPT_TEMPLATE_FIELD_VALUES,
   value,
 }: {
   batchCount?: number;
   dynamicPrompts?: DynamicPromptsFieldConfig | null;
   isTemplateViewMode?: boolean;
   onChange?: (value: string) => void;
+  onTemplateFieldValuesChange?: (values: PromptTemplateFieldValues) => void;
   onTemplateViewModeChange?: (isTemplateViewMode: boolean) => void;
   onUsePrompt?: (prompt: { negativePrompt: string | null; positivePrompt: string }) => void;
   promptTemplate?: PromptTemplateSnapshot;
   showSyntaxHighlighting?: boolean;
+  templateFieldValues?: PromptTemplateFieldValues;
   value: string;
 }) => {
   host = document.createElement('div');
@@ -243,12 +248,14 @@ const renderField = async ({
                 isTemplateViewMode={isTemplateViewMode}
                 loras={[]}
                 projectId="project-1"
-                promptTemplate={promptTemplate}
+                promptTemplate={promptTemplate ?? null}
                 selectedModel={undefined}
                 showSyntaxHighlighting={showSyntaxHighlighting}
+                templateFieldValues={templateFieldValues}
                 value={value}
                 onChange={onChange}
                 onResizeEnd={vi.fn()}
+                onTemplateFieldValuesChange={onTemplateFieldValuesChange}
                 onTemplateViewModeChange={onTemplateViewModeChange}
                 onUsePrompt={onUsePrompt}
               />
@@ -388,6 +395,42 @@ it('shows a JSON prompt under a template whole, as it generates, and never expan
   expect(dynamicButton).toBeDefined();
   expect(dynamicButton?.textContent).not.toMatch(/\d/);
   expect(parseDynamicPrompts).not.toHaveBeenCalled();
+});
+
+it('gives each template field a labelled input whose text lands in the merged prompt and is saved', async () => {
+  const onTemplateFieldValuesChange = vi.fn();
+
+  await renderField({
+    isTemplateViewMode: true,
+    onTemplateFieldValuesChange,
+    promptTemplate: {
+      id: 'still',
+      name: 'Still',
+      negativePrompt: 'not {style}',
+      positivePrompt: 'a still of {subject}. {prompt}. {style} style',
+    },
+    templateFieldValues: { style: 'noir' },
+    value: 'at dusk',
+  });
+
+  const fields = host!.querySelector('[role="group"][aria-label="widgets.generate.promptTemplates.fields"]')!;
+  const inputFor = (label: string) => {
+    const labelElement = [...fields.querySelectorAll('label')].find((element) => element.textContent === label)!;
+
+    return document.getElementById(labelElement.htmlFor) as HTMLInputElement;
+  };
+
+  expect([...fields.querySelectorAll('label')].map((label) => label.textContent)).toEqual(['Subject', 'Style']);
+  expect(inputFor('Style').value).toBe('noir');
+  expect(inputFor('Subject').placeholder).toBe('{subject}');
+  expect(textarea().value).toBe('a still of . at dusk. noir style');
+
+  await act(() => userEvent.type(inputFor('Subject'), 'a fox'));
+
+  expect(textarea().value).toBe('a still of a fox. at dusk. noir style');
+  await vi.waitFor(() =>
+    expect(onTemplateFieldValuesChange).toHaveBeenLastCalledWith({ style: 'noir', subject: 'a fox' })
+  );
 });
 
 it('keeps overflowing wildcard suggestions open when the list scrolls', async () => {

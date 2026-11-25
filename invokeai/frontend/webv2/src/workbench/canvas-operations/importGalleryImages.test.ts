@@ -105,6 +105,7 @@ const setModel = (project: Project, base: GenerateWidgetValues['model']['base'])
     expandPromptModelKey: null,
     imageToPromptModelKey: null,
     promptTemplate: null,
+    promptTemplateFieldValues: {},
     promptTemplateViewMode: false,
     mistralEncoderModel: null,
     qwen3EncoderModel: null,

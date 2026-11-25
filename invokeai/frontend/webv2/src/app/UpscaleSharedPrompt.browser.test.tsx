@@ -74,6 +74,13 @@ const CINEMATIC: PromptTemplateRecord = {
   positivePrompt: '{prompt}, film grain',
   userId: 'user-1',
 };
+const STILL: PromptTemplateRecord = {
+  ...CINEMATIC,
+  id: 'still',
+  name: 'Still',
+  negativePrompt: '',
+  positivePrompt: '{prompt}, {style}',
+};
 const noop = () => undefined;
 const generationAdapterBase = {
   account: { currentUserId: null, multiuserEnabled: false },
@@ -218,7 +225,7 @@ const render = async ({
 }: { openDetailGuidance?: boolean; withGenerateField?: boolean } = {}) => {
   const queryClient = new QueryClient();
   // Fresh for the query's stale time, so the catalog the panel lists is this one and no request leaves the test.
-  queryClient.setQueryData(promptTemplatesQueryOptions().queryKey, [CINEMATIC]);
+  queryClient.setQueryData(promptTemplatesQueryOptions().queryKey, [CINEMATIC, STILL]);
   store.commands.widgets.patchValues('upscale', {
     ...createDefaultUpscaleWidgetValues(models),
     inputImage: { height: 100, image_name: 'input.png', width: 200 },
@@ -313,22 +320,28 @@ afterEach(async () => {
 
 describe("Upscale's prompt templates and dynamic prompts", () => {
   it('applies a template to the prompt it shares with Generate, queues the prompt inside it, and undoes', async () => {
+    const chooseTemplate = async (name: string) => {
+      await act(async () => {
+        await userEvent.click(button('widgets.generate.promptTemplates.title')!);
+      });
+      await act(async () => {
+        await userEvent.click(
+          [...document.querySelectorAll<HTMLButtonElement>('[data-scope="popover"][data-part="content"] button')].find(
+            (candidate) => candidate.textContent?.includes(name)
+          )!
+        );
+      });
+    };
+    // Notifications are listed newest first.
+    const latestUndo = () =>
+      store
+        .getSnapshot()
+        .notifications.flatMap((notification) => notification.actions ?? [])
+        .find((action) => action.kind === 'undo') as { undoId: string } | undefined;
+
     await render();
-
-    const templates = button('widgets.generate.promptTemplates.title');
-
-    expect(templates).not.toBeNull();
-
-    await act(async () => {
-      await userEvent.click(templates!);
-    });
-    await act(async () => {
-      await userEvent.click(
-        [...document.querySelectorAll<HTMLButtonElement>('[data-scope="popover"][data-part="content"] button')].find(
-          (candidate) => candidate.textContent?.includes('Cinematic')
-        )!
-      );
-    });
+    expect(button('widgets.generate.promptTemplates.title')).not.toBeNull();
+    await chooseTemplate('Cinematic');
 
     expect(generateValues().promptTemplate).toEqual({
       id: 'cinematic',
@@ -343,15 +356,49 @@ describe("Upscale's prompt templates and dynamic prompts", () => {
       positivePrompt: 'fine detail, film grain',
     });
 
-    const undo = store
-      .getSnapshot()
-      .notifications.flatMap((notification) => notification.actions ?? [])
-      .find((action) => action.kind === 'undo') as { undoId: string } | undefined;
-
-    expect(undo).toBeDefined();
-    act(() => runNotificationUndo(undo!.undoId));
+    expect(latestUndo()).toBeDefined();
+    act(() => runNotificationUndo(latestUndo()!.undoId));
 
     expect(generateValues().promptTemplate).toBeNull();
+
+    // Choosing a template keeps the values of the fields it declares and drops the rest, in one undoable change.
+    act(() =>
+      store.commands.generation.patchPromptDraft(
+        { promptTemplateFieldValues: { style: 'noir', subject: 'a fox' } },
+        'upscale',
+        store.getSnapshot().activeProject.id
+      )
+    );
+    await chooseTemplate('Still');
+
+    expect(generateValues().promptTemplate).toMatchObject({ id: 'still' });
+    expect(generateValues().promptTemplateFieldValues).toEqual({ style: 'noir' });
+
+    act(() => runNotificationUndo(latestUndo()!.undoId));
+
+    expect(generateValues().promptTemplate).toBeNull();
+    expect(generateValues().promptTemplateFieldValues).toEqual({ style: 'noir', subject: 'a fox' });
+  });
+
+  it("shows the template's fields with the values Generate holds, and queues the prompt with them", async () => {
+    await render();
+    act(() =>
+      store.commands.generation.patchPromptDraft(
+        {
+          promptTemplate: { ...STILL },
+          promptTemplateFieldValues: { style: 'noir' },
+        },
+        'upscale',
+        store.getSnapshot().activeProject.id
+      )
+    );
+
+    const style = host.querySelector<HTMLInputElement>(
+      '[data-testid="upscale"] [aria-label="widgets.generate.promptTemplates.fields"] input'
+    );
+
+    expect(style?.value).toBe('noir');
+    expect(queueUpscale()).toMatchObject({ positivePrompt: 'fine detail, noir' });
   });
 
   it('shows the merged prompt read-only and goes back to the prompt as written', async () => {

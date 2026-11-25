@@ -1,5 +1,6 @@
 /* oxlint-disable react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop */
 import { ChakraProvider } from '@chakra-ui/react';
+import { EMPTY_PROMPT_TEMPLATE_FIELD_VALUES } from '@features/generation/core/promptTemplates';
 import { NegativePromptField } from '@features/generation/ui/promptFields/NegativePromptField';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
@@ -55,6 +56,7 @@ const render = async (templateNegativePrompt: string | null, isTemplateViewMode 
               projectId="project-1"
               selectedModel={SELECTED_MODEL as never}
               showSyntaxHighlighting={false}
+              templateFieldValues={EMPTY_PROMPT_TEMPLATE_FIELD_VALUES}
               templateNegativePrompt={templateNegativePrompt}
               value="blurry"
               onChange={vi.fn()}

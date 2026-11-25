@@ -119,6 +119,7 @@ const selectRenderSettings = pickGenerateSettings([
   'negativePrompt',
   'positivePrompt',
   'promptTemplate',
+  'promptTemplateFieldValues',
   'qwenImageShift',
   'scheduler',
   'seed',

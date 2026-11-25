@@ -114,6 +114,7 @@ const createValues = (overrides: Partial<GenerateWidgetValues> = {}): GenerateWi
   expandPromptModelKey: null,
   imageToPromptModelKey: null,
   promptTemplate: null,
+  promptTemplateFieldValues: {},
   promptTemplateViewMode: false,
   mistralEncoderModel: null,
   qwen3EncoderModel: null,

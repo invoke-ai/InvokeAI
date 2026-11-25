@@ -247,6 +247,7 @@ const createGenerateValues = (overrides: Partial<GenerateWidgetValues> = {}): Ge
   expandPromptModelKey: null,
   imageToPromptModelKey: null,
   promptTemplate: null,
+  promptTemplateFieldValues: {},
   promptTemplateViewMode: false,
   mistralEncoderModel: null,
   qwen3EncoderModel: null,

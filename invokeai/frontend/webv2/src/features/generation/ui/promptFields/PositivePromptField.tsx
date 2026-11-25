@@ -1,17 +1,31 @@
 import type { PromptHistoryItem } from '@features/generation/contracts';
-import type { PromptTemplateSnapshot } from '@features/generation/core/promptTemplates';
+import type {
+  PromptTemplateField,
+  PromptTemplateFieldValues,
+  PromptTemplateSnapshot,
+} from '@features/generation/core/promptTemplates';
 import type { ExpandPromptSuggestion, GenerateLora, GenerateModelConfig } from '@features/generation/core/types';
 import type { ChangeEvent, KeyboardEvent } from 'react';
 
-import { Box, Text } from '@chakra-ui/react';
+import { Box, chakra, Grid, Input, Text } from '@chakra-ui/react';
 import { supportsPromptAttentionSyntax } from '@features/generation/core/prompt/compel';
-import { getEffectivePositivePrompt, getPositivePromptTemplateChunks } from '@features/generation/core/promptTemplates';
+import {
+  EMPTY_PROMPT_TEMPLATE_FIELD_VALUES,
+  getEffectivePositivePrompt,
+  getPositivePromptTemplateSegments,
+  getPromptTemplateFields,
+  getPromptTemplateFieldValue,
+  setPromptTemplateFieldValue,
+} from '@features/generation/core/promptTemplates';
 import { useRegisterGenerateDraftFlusher } from '@features/generation/ui/generateDraftRegistry';
 import { useDebouncedDraftValue } from '@features/generation/ui/useDebouncedDraftValue';
 import { useDynamicPrompts } from '@features/generation/ui/useDynamicPrompts';
 import { useWildcards } from '@features/generation/ui/useWildcards';
+import { areJsonValuesStructurallyEqual } from '@platform/core/json';
 import { DropZone, Field } from '@platform/ui';
-import { useCallback, useMemo, useRef } from 'react';
+import { FieldLabel } from '@platform/ui/Field';
+import { PROMPT_FONT_SIZE } from '@theme/scale';
+import { memo, useCallback, useId, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { DynamicPromptsFieldConfig } from './DynamicPromptsPanel';
@@ -39,7 +53,16 @@ import { usePromptTriggerPicker } from './usePromptTriggerPicker';
 
 const PROMPT_INPUT_DEBOUNCE_MS = 250;
 
-interface PositivePromptFieldProps {
+/** A template comes with what its fields hold and the way to change it. Surfaces with no templates (Video) pass none. */
+type PromptTemplateProps =
+  | { promptTemplate?: undefined; templateFieldValues?: undefined; onTemplateFieldValuesChange?: undefined }
+  | {
+      promptTemplate: PromptTemplateSnapshot | null;
+      templateFieldValues: PromptTemplateFieldValues;
+      onTemplateFieldValuesChange: (values: PromptTemplateFieldValues) => void;
+    };
+
+interface PositivePromptFieldBaseProps {
   batchCount?: number;
   /** Absent on surfaces whose prompt is not batch-expanded. */
   dynamicPrompts?: DynamicPromptsFieldConfig | null;
@@ -47,8 +70,6 @@ interface PositivePromptFieldProps {
   expandPromptSuggestion?: ExpandPromptSuggestion | null;
   /** Whose prompt focus requests reach this field. */
   focusOwner?: PositivePromptOwner;
-  /** Absent on surfaces with no template concept (Video). */
-  promptTemplate?: PromptTemplateSnapshot | null;
   /**
    * Whether a template draft handed over from the gallery opens in this field's templates. The handover reveals
    * Generate, so Upscale, which shares Generate's template, leaves it to Generate's field.
@@ -64,8 +85,11 @@ interface PositivePromptFieldProps {
   showSyntaxHighlighting: boolean;
   value: string;
   onChange: (value: string) => void;
-  /** Replace the prompt and remove its template atomically; omit this action on non-template surfaces. */
-  onFlattenPromptTemplate?: (prompt: string) => void;
+  /**
+   * Replace the prompt and remove its template atomically; omit this action on non-template surfaces. `fieldValues`
+   * are the field values as typed, which the surface's own may trail.
+   */
+  onFlattenPromptTemplate?: (prompt: string, fieldValues: PromptTemplateFieldValues) => void;
   /** Apply or clear the active template. Absent on surfaces with no templates. */
   onApplyPromptTemplate?: (template: PromptTemplateSnapshot | null, change: PromptTemplateChange) => void;
   onResizeEnd: (heightPx: number) => void;
@@ -73,6 +97,75 @@ interface PositivePromptFieldProps {
   /** Where Expand and Image to Prompt save their model picks; absent keeps them for the session. */
   savedPromptModels?: SavedPromptModels;
 }
+
+interface PromptTemplateFieldsProps {
+  fields: readonly PromptTemplateField[];
+  values: PromptTemplateFieldValues;
+  onChange: (name: string, value: string) => void;
+}
+
+const PromptTemplateFieldRow = memo(function PromptTemplateFieldRow({
+  field,
+  onChange,
+  value,
+}: {
+  field: PromptTemplateField;
+  value: string;
+  onChange: (name: string, value: string) => void;
+}) {
+  const id = useId();
+  const handleChange = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => onChange(field.name, event.currentTarget.value),
+    [field.name, onChange]
+  );
+
+  return (
+    <>
+      <chakra.label htmlFor={id} minW="0" overflowWrap="anywhere">
+        <FieldLabel>{field.label}</FieldLabel>
+      </chakra.label>
+      <Input
+        autoComplete="off"
+        fontFamily="mono"
+        fontSize={PROMPT_FONT_SIZE}
+        id={id}
+        minW="0"
+        placeholder={`{${field.name}}`}
+        value={value}
+        onChange={handleChange}
+      />
+    </>
+  );
+});
+
+/** One input per custom placeholder of the applied template. */
+const PromptTemplateFields = memo(function PromptTemplateFields({
+  fields,
+  onChange,
+  values,
+}: PromptTemplateFieldsProps) {
+  const { t } = useTranslation();
+
+  return (
+    <Grid
+      alignItems="center"
+      aria-label={t('widgets.generate.promptTemplates.fields')}
+      columnGap="2"
+      role="group"
+      rowGap="1"
+      templateColumns="fit-content(40%) minmax(0, 1fr)"
+    >
+      {fields.map((field) => (
+        <PromptTemplateFieldRow
+          key={field.name}
+          field={field}
+          value={getPromptTemplateFieldValue(values, field.name)}
+          onChange={onChange}
+        />
+      ))}
+    </Grid>
+  );
+});
 
 /** The positive prompt is the only field whose `__name__` references resolve. */
 const POSITIVE_PROMPT_TRIGGER_KEYS = ['<', '_'] as const;
@@ -89,6 +182,7 @@ export const PositivePromptField = ({
   onChange,
   onFlattenPromptTemplate,
   onResizeEnd,
+  onTemplateFieldValuesChange,
   onTemplateViewModeChange,
   onUsePrompt,
   projectId,
@@ -97,8 +191,9 @@ export const PositivePromptField = ({
   selectedModel,
   showSyntaxHighlighting,
   takesPendingTemplateDraft = true,
+  templateFieldValues = EMPTY_PROMPT_TEMPLATE_FIELD_VALUES,
   value,
-}: PositivePromptFieldProps) => {
+}: PositivePromptFieldBaseProps & PromptTemplateProps) => {
   const { t } = useTranslation();
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const { knownNames: knownWildcards } = useWildcards();
@@ -111,6 +206,35 @@ export const PositivePromptField = ({
   });
 
   useRegisterGenerateDraftFlusher(flushDraftValue);
+
+  const commitTemplateFieldValues = useCallback(
+    (values: PromptTemplateFieldValues) => onTemplateFieldValuesChange?.(values),
+    [onTemplateFieldValuesChange]
+  );
+  const {
+    draftValue: fieldValuesDraft,
+    flushDraftValue: flushFieldValuesDraft,
+    readDraftValue: readFieldValuesDraft,
+    setDraftValue: setFieldValuesDraft,
+  } = useDebouncedDraftValue({
+    delayMs: PROMPT_INPUT_DEBOUNCE_MS,
+    isEqual: areJsonValuesStructurallyEqual,
+    onCommit: commitTemplateFieldValues,
+    resetKey: projectId,
+    value: templateFieldValues,
+  });
+
+  useRegisterGenerateDraftFlusher(flushFieldValuesDraft);
+
+  const templateFields = useMemo(
+    () => (promptTemplate ? getPromptTemplateFields(promptTemplate) : []),
+    [promptTemplate]
+  );
+  const changeTemplateFieldValue = useCallback(
+    (name: string, fieldValue: string) =>
+      setFieldValuesDraft(setPromptTemplateFieldValue(readFieldValuesDraft(), name, fieldValue)),
+    [readFieldValuesDraft, setFieldValuesDraft]
+  );
 
   const commitPromptChange = useCallback(
     (nextValue: string) => {
@@ -222,17 +346,18 @@ export const PositivePromptField = ({
 
   // Merge against the live draft so expansion counts do not lag behind debounce.
   const effectivePositivePrompt = useMemo(
-    () => getEffectivePositivePrompt(draftValue, promptTemplate),
-    [draftValue, promptTemplate]
+    () => getEffectivePositivePrompt(draftValue, promptTemplate, fieldValuesDraft),
+    [draftValue, fieldValuesDraft, promptTemplate]
   );
 
   const flattenPromptTemplate = useCallback(
     (prompt: string) => {
       flushDraftValue();
-      onFlattenPromptTemplate?.(prompt);
+      flushFieldValuesDraft();
+      onFlattenPromptTemplate?.(prompt, readFieldValuesDraft());
       writePrompt(prompt);
     },
-    [flushDraftValue, onFlattenPromptTemplate, writePrompt]
+    [flushDraftValue, flushFieldValuesDraft, onFlattenPromptTemplate, readFieldValuesDraft, writePrompt]
   );
   const expansion = useDynamicPrompts(effectivePositivePrompt, dynamicPrompts);
 
@@ -310,73 +435,78 @@ export const PositivePromptField = ({
   /** Clicking moves the caret, which may land in — or out of — a trigger. */
   const handlePromptClick = useCallback(() => autocomplete.refresh(textareaRef.current), [autocomplete]);
 
-  const templateChunks = useMemo(
-    () => (isViewingMerged ? getPositivePromptTemplateChunks(draftValue, promptTemplate) : null),
-    [draftValue, isViewingMerged, promptTemplate]
+  const templateSegments = useMemo(
+    () => (isViewingMerged ? getPositivePromptTemplateSegments(draftValue, promptTemplate, fieldValuesDraft) : null),
+    [draftValue, fieldValuesDraft, isViewingMerged, promptTemplate]
   );
 
   /** Clicking the merged text is the way back to editing, as it is in legacy. */
   const exitViewMode = useCallback(() => onTemplateViewModeChange?.(false), [onTemplateViewModeChange]);
 
   return (
-    <Field hint="positivePrompt" label={t('common.prompt')} labelEnd={labelEnd}>
-      <Box ref={setImageDropRef} position="relative">
-        <PromptTextarea
-          {...autocomplete.comboboxProps}
-          aria-label={t('widgets.generate.positivePrompt')}
-          attentionSyntax={readsAttentionSyntax ? 'edit' : 'none'}
-          defaultHeightPx={heightPx}
-          minHeightPx={96}
-          resizeHandleAriaLabel={t('widgets.generate.resizePositivePrompt')}
-          fontFamily="mono"
-          highlightDynamicPrompts={dynamicPrompts?.enabled === true}
-          knownWildcards={knownWildcards}
-          readOnly={isViewingMerged}
-          showSyntaxHighlighting={showSyntaxHighlighting}
-          templateChunks={templateChunks}
-          textareaRef={handleTextareaRef}
-          title={isViewingMerged ? t('widgets.generate.promptTemplates.editAuthored') : undefined}
-          value={isViewingMerged ? effectivePositivePrompt : draftValue}
-          onBlur={autocomplete.close}
-          onChange={handlePromptChange}
-          onClick={isViewingMerged ? exitViewMode : handlePromptClick}
-          onKeyDown={handlePromptKeyDown}
-          onResizeEnd={onResizeEnd}
-        />
-        {/* Keep pointer events off; dnd-kit targets the wrapper. */}
-        {isImageDragActive ? (
-          <DropZone
-            alignItems="center"
-            display="flex"
-            inset="0"
-            isOver={isImageDropOver}
-            justifyContent="center"
-            pointerEvents="none"
-            position="absolute"
-            variant="overlay"
-            zIndex="2"
-          >
-            <Text color="fg" fontSize="lg" fontWeight="700" textAlign="center">
-              {t('widgets.generate.dropImageToPrompt')}
-            </Text>
-          </DropZone>
+    <>
+      <Field hint="positivePrompt" label={t('common.prompt')} labelEnd={labelEnd}>
+        <Box ref={setImageDropRef} position="relative">
+          <PromptTextarea
+            {...autocomplete.comboboxProps}
+            aria-label={t('widgets.generate.positivePrompt')}
+            attentionSyntax={readsAttentionSyntax ? 'edit' : 'none'}
+            defaultHeightPx={heightPx}
+            minHeightPx={96}
+            resizeHandleAriaLabel={t('widgets.generate.resizePositivePrompt')}
+            fontFamily="mono"
+            highlightDynamicPrompts={dynamicPrompts?.enabled === true}
+            knownWildcards={knownWildcards}
+            readOnly={isViewingMerged}
+            showSyntaxHighlighting={showSyntaxHighlighting}
+            templateSegments={templateSegments}
+            textareaRef={handleTextareaRef}
+            title={isViewingMerged ? t('widgets.generate.promptTemplates.editAuthored') : undefined}
+            value={isViewingMerged ? effectivePositivePrompt : draftValue}
+            onBlur={autocomplete.close}
+            onChange={handlePromptChange}
+            onClick={isViewingMerged ? exitViewMode : handlePromptClick}
+            onKeyDown={handlePromptKeyDown}
+            onResizeEnd={onResizeEnd}
+          />
+          {/* Keep pointer events off; dnd-kit targets the wrapper. */}
+          {isImageDragActive ? (
+            <DropZone
+              alignItems="center"
+              display="flex"
+              inset="0"
+              isOver={isImageDropOver}
+              justifyContent="center"
+              pointerEvents="none"
+              position="absolute"
+              variant="overlay"
+              zIndex="2"
+            >
+              <Text color="fg" fontSize="lg" fontWeight="700" textAlign="center">
+                {t('widgets.generate.dropImageToPrompt')}
+              </Text>
+            </DropZone>
+          ) : null}
+        </Box>
+        {dynamicPrompts ? (
+          <DynamicPromptsNotice config={dynamicPrompts} expansion={expansion} prompt={effectivePositivePrompt} />
         ) : null}
-      </Box>
-      {dynamicPrompts ? (
-        <DynamicPromptsNotice config={dynamicPrompts} expansion={expansion} prompt={effectivePositivePrompt} />
+        {autocomplete.element}
+        {triggerPicker.dismissElement}
+        {triggerPicker.isOpen ? (
+          <PromptTriggerPopover
+            loras={loras}
+            open
+            positioning={triggerPicker.positioning}
+            selectedModel={selectedModel}
+            onClose={triggerPicker.close}
+            onSelect={triggerPicker.select}
+          />
+        ) : null}
+      </Field>
+      {templateFields.length > 0 ? (
+        <PromptTemplateFields fields={templateFields} values={fieldValuesDraft} onChange={changeTemplateFieldValue} />
       ) : null}
-      {autocomplete.element}
-      {triggerPicker.dismissElement}
-      {triggerPicker.isOpen ? (
-        <PromptTriggerPopover
-          loras={loras}
-          open
-          positioning={triggerPicker.positioning}
-          selectedModel={selectedModel}
-          onClose={triggerPicker.close}
-          onSelect={triggerPicker.select}
-        />
-      ) : null}
-    </Field>
+    </>
   );
 };

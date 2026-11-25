@@ -316,6 +316,7 @@ const getGenerateSnapshotValidationReasons = (
     base: values.model.base,
     positivePrompt: values.positivePrompt,
     promptTemplate: values.promptTemplate,
+    promptTemplateFieldValues: values.promptTemplateFieldValues,
   });
 
   // Generate itself stays text to image; the Canvas source checks the provider at the size its frame asks for.

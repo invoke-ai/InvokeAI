@@ -205,6 +205,7 @@ export const buildQueueRecallValues = (
       positivePrompt,
       // Clear templates for already-merged session prompts to avoid double wrapping; never write undefined.
       promptTemplate: snapshot ? (snapshot.promptTemplate ?? null) : null,
+      ...(snapshot ? { promptTemplateFieldValues: snapshot.promptTemplateFieldValues } : {}),
       ...(negativePrompt !== undefined
         ? { negativePrompt, negativePromptEnabled: snapshot?.negativePromptEnabled ?? negativePrompt.length > 0 }
         : {}),

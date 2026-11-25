@@ -1,13 +1,17 @@
 import type { PromptHistoryItem } from '@features/generation/contracts';
 import type { DynamicPromptsConfig } from '@features/generation/core/dynamicPrompts';
-import type { PromptTemplateSnapshot } from '@features/generation/core/promptTemplates';
+import type { PromptTemplateFieldValues, PromptTemplateSnapshot } from '@features/generation/core/promptTemplates';
 import type { GenerateModelConfig, GenerateSettings } from '@features/generation/core/types';
 import type { PromptTemplateChange } from '@features/generation/ui/promptFields/PromptTemplatesButton';
 
 import { Stack } from '@chakra-ui/react';
 import { getImageExpandPromptSuggestion, getPromptPolicy } from '@features/generation/core/baseGenerationPolicies';
 import { sanitizeBatchCount } from '@features/generation/core/batch';
-import { flattenPromptTemplateExpansion } from '@features/generation/core/promptTemplates';
+import {
+  flattenPromptTemplateExpansion,
+  normalizePromptTemplateFieldValues,
+  retainPromptTemplateFieldValues,
+} from '@features/generation/core/promptTemplates';
 import { getDynamicPromptsSettingsPatch } from '@features/generation/core/settings';
 import { type GenerateDraft, pickGenerateSettings } from '@features/generation/ui/generateDebounce';
 import { flushGenerateDrafts } from '@features/generation/ui/generateDraftRegistry';
@@ -55,6 +59,7 @@ const selectPromptSettings = pickGenerateSettings([
   'imageToPromptModelKey',
   'loras',
   'promptTemplate',
+  'promptTemplateFieldValues',
   'promptTemplateViewMode',
   'seedMode',
 ]);
@@ -87,12 +92,18 @@ export const GeneratePromptFields = ({
 
   /**
    * Applies a prompt change that reaches past the prompt text, which Ctrl+Z in the prompt cannot undo, with an Undo
-   * toast. Drafts flush first so the Undo restores what the user saw. `isWhole` changes undo all or nothing.
+   * toast. Drafts flush first so the Undo restores what the user saw; a patch that depends on that typing is built
+   * from the values read after the flush. `isWhole` changes undo all or nothing.
    */
   const commitWithUndo = useCallback(
-    (patch: Partial<GenerateSettings>, title: string, isWhole = false) => {
+    (
+      change: Partial<GenerateSettings> | ((before: Record<string, unknown>) => Partial<GenerateSettings>),
+      title: string,
+      isWhole = false
+    ) => {
       flushGenerateDrafts();
       const before = ui.settings.readGenerateValues(projectId) ?? {};
+      const patch = typeof change === 'function' ? change(before) : change;
 
       onCommitImmediate(patch);
       offerGenerateUndo({ after: { ...before, ...patch }, before, isWhole, projectId, slot: 'prompt', t, title, ui });
@@ -152,7 +163,17 @@ export const GeneratePromptFields = ({
       if (change === 'synced' || promptTemplate?.id === previous?.id) {
         onCommitImmediate(patch);
       } else if (promptTemplate) {
-        commitWithUndo(patch, t('widgets.generate.promptTemplateApplied', { name: promptTemplate.name }));
+        // Kept from the stored values, which hold field typing the form's draft has not caught up with yet.
+        commitWithUndo(
+          (before) => ({
+            ...patch,
+            promptTemplateFieldValues: retainPromptTemplateFieldValues(
+              normalizePromptTemplateFieldValues(before.promptTemplateFieldValues),
+              promptTemplate
+            ),
+          }),
+          t('widgets.generate.promptTemplateApplied', { name: promptTemplate.name })
+        );
       } else {
         commitWithUndo(patch, t('widgets.generate.promptTemplateCleared', { name: previous?.name ?? '' }));
       }
@@ -162,7 +183,7 @@ export const GeneratePromptFields = ({
 
   /** Bake the template into the authored prompt and stop applying it. */
   const flattenPromptTemplate = useCallback(
-    (positivePrompt: string) => {
+    (positivePrompt: string, fieldValues: PromptTemplateFieldValues) => {
       if (!settings.promptTemplate) {
         onCommitImmediate({ positivePrompt, promptTemplateViewMode: false });
         return;
@@ -171,6 +192,7 @@ export const GeneratePromptFields = ({
       commitWithUndo(
         flattenPromptTemplateExpansion({
           authoredNegativePrompt: promptValues.negativePrompt,
+          fieldValues,
           selectedPositivePrompt: positivePrompt,
           template: settings.promptTemplate,
         }),
@@ -180,6 +202,11 @@ export const GeneratePromptFields = ({
       );
     },
     [commitWithUndo, onCommitImmediate, promptValues.negativePrompt, settings.promptTemplate, t]
+  );
+
+  const handleTemplateFieldValuesChange = useCallback(
+    (promptTemplateFieldValues: PromptTemplateFieldValues) => onCommit({ promptTemplateFieldValues }),
+    [onCommit]
   );
 
   const handleDynamicPromptsChange = useCallback(
@@ -249,6 +276,7 @@ export const GeneratePromptFields = ({
         loras={settings.loras}
         projectId={projectId}
         promptTemplate={settings.promptTemplate}
+        templateFieldValues={settings.promptTemplateFieldValues}
         savedPromptModels={savedPromptModels}
         selectedModel={selectedModel}
         showSyntaxHighlighting={showPromptSyntaxHighlighting}
@@ -257,6 +285,7 @@ export const GeneratePromptFields = ({
         onChange={handlePositivePromptChange}
         onFlattenPromptTemplate={flattenPromptTemplate}
         onResizeEnd={handlePositivePromptResizeEnd}
+        onTemplateFieldValuesChange={handleTemplateFieldValuesChange}
         onTemplateViewModeChange={setTemplateViewMode}
         onUsePrompt={usePromptHistoryItem}
       />
@@ -271,6 +300,7 @@ export const GeneratePromptFields = ({
           helpText={promptPolicy.negativeHelpText}
           isTemplateViewMode={settings.promptTemplateViewMode}
           showSyntaxHighlighting={showPromptSyntaxHighlighting}
+          templateFieldValues={settings.promptTemplateFieldValues}
           templateNegativePrompt={settings.promptTemplate?.negativePrompt ?? null}
           value={promptValues.negativePrompt}
           onEnabledChange={handleNegativePromptEnabledChange}

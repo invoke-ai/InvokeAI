@@ -33,7 +33,10 @@ const SEARCH_VISIBLE_MIN_PRESETS = 6;
 
 type PresetDialogSubject = { mode: 'save' } | { mode: 'rename'; preset: GeneratePresetRecord };
 
-/** What "include prompts" covers: the prompt text and the template applied to it, with their panel arrangement. */
+/**
+ * What "include prompts" covers: the prompt text, the template applied to it and its field values, with their panel
+ * arrangement.
+ */
 const PRESET_PROMPT_KEYS = [
   'negativePrompt',
   'negativePromptEnabled',
@@ -41,11 +44,15 @@ const PRESET_PROMPT_KEYS = [
   'positivePrompt',
   'positivePromptHeightPx',
   'promptTemplate',
+  'promptTemplateFieldValues',
   'promptTemplateViewMode',
 ] as const satisfies readonly (keyof GenerateSettings)[];
 
 /** Settings newer than some saved presets: a preset without one keeps the current value instead of the default. */
-const PRESET_NEWER_KEYS = ['dynamicPromptsEnabled'] as const satisfies readonly (keyof GenerateSettings)[];
+const PRESET_NEWER_KEYS = [
+  'dynamicPromptsEnabled',
+  'promptTemplateFieldValues',
+] as const satisfies readonly (keyof GenerateSettings)[];
 
 /**
  * A preset's settings; one saved without prompts keeps the current prompts, one saved before a newer setting keeps the

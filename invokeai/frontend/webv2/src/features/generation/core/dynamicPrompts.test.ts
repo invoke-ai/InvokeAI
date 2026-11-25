@@ -287,6 +287,7 @@ const source = (overrides: Partial<GenerateSubmissionSource> = {}): GenerateSubm
   negativePromptEnabled: true,
   positivePrompt: 'a cat',
   promptTemplate: null,
+  promptTemplateFieldValues: {},
   seed: 10,
   seedMode: 'increment',
   ...overrides,
@@ -310,6 +311,26 @@ describe('planGenerateSubmission', () => {
 
     expect(suppressed.submission.negativePrompt).toBe('');
     expect(suppressed.effectivePrompts.negativePrompt).toBe('blurry, lowres');
+  });
+
+  it('fills template fields before expansion, so a field value can carry dynamic syntax', () => {
+    const promptTemplate = {
+      id: 't',
+      name: 'Photo',
+      negativePrompt: 'not {style}',
+      positivePrompt: '{prompt}, {style}',
+    };
+    const expansion = ['a cat, oil', 'a cat, ink'];
+    const plan = planGenerateSubmission(
+      source({ promptTemplate, promptTemplateFieldValues: { style: '{oil|ink}' } }),
+      expansion
+    );
+
+    expect(plan.submission).toMatchObject({
+      negativePrompt: 'blurry not {oil|ink}',
+      positivePrompt: 'a cat, {oil|ink}',
+      positivePrompts: expansion,
+    });
   });
 
   it('sends a JSON prompt whole and unexpanded under a template, with the negative side templated', () => {

@@ -109,6 +109,15 @@ describe('resolveGenerateWidgetValues', () => {
     expect(result?.systemPatch).toBeNull();
   });
 
+  it('reads no template field values for a project saved before fields, without writing the key in', () => {
+    const model = createModel('current');
+    const { promptTemplateFieldValues: _absent, ...storedValues } = createValues(model);
+    const result = resolveGenerateWidgetValues({ models: [model], storedValues });
+
+    expect(result?.values.promptTemplateFieldValues).toEqual({});
+    expect(result?.systemPatch).toBeNull();
+  });
+
   it('keeps dynamic prompts off once the user turned them off', () => {
     const model = createModel('current');
     const storedValues = createValues(model, { dynamicPromptsEnabled: false });
