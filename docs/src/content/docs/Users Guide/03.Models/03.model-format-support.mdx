@@ -267,8 +267,34 @@ timestep, text and guidance embedders, `norm_out` and the final `proj_out`; thes
 A kohya file holding only such layers, with no transformer block or text-encoder layer, is not recognized as FLUX,
 because Qwen-Image and SD 3 name some of them alike. On FLUX.2 the guidance embedder exists in FLUX.2 [dev] only.
 
+SimpleTuner's LyCORIS training writes its layers with the model's own module names flattened behind a `lycoris_`
+prefix (for example `lycoris_single_transformer_blocks_0_attn_to_k.lokr_w1`). Files in this layout are recognized
+on FLUX.1 (both `lycoris_` and `lycoris__` spellings), FLUX.2, SDXL, Z-Image and Wan, as they already were on
+SD 3 / 3.5; FLUX.3's own flattened names are a different layout and are still not recognized, as noted on its
+family page.
+
+The layout is read from module names alone, which leaves three cases unsettled:
+
+- **SD 1.x and SD 2.x.** Their UNets hold a single transformer block inside every attention, flattened at the same
+  index as SDXL's, so no name tells the two families apart. Such a file is not identified, and setting its base to
+  SD 1.x or SD 2.x does not make it load: those bases keep the flattened `lycoris_` names, while SD denoising only
+  applies `lora_unet_` keys, so none of its layers would apply.
+- **Chroma in diffusers naming.** Chroma shares FLUX.1's `single_transformer_blocks.N.attn.to_q` and `proj_mlp`
+  names, so an attention-only Chroma file in that naming installs as FLUX.1 and patches FLUX.1 layers of the same
+  shape. Any Chroma-only name, such as `distilled_guidance_layer`, keeps the file out; Chroma files in Black Forest
+  Labs' naming stay unrecognized.
+- **Wan image-to-video cross-attention.** `attn2.add_k_proj` and `attn2.add_v_proj` are outside the module sets that
+  both this layout and the kohya one cover, so a file that trains them is not identified.
+
 For SD 1.x / 2.x and FLUX.2, LyCORIS LoKr files may store either Kronecker operand whole or as a
 factorized `_a` / `_b` pair. FLUX.2 also accepts LoHA files in the same BFL and kohya layouts.
+
+FLUX.2 BFL and kohya DoRA adapters on fused image/text QKV projections support input-axis and output-axis
+magnitudes. Output-axis DoRA also works on supported FLUX.2 int8 checkpoints. Input-axis
+normalization uses all Q, K and V rows together and requires ordinary floating-point weights, including
+native FP8 storage; on packed modules and GGUF/SDNQ tensor subclasses, the fused group is skipped with a
+warning while the adapter's other supported layers apply. See the
+[FLUX.2 LoRA notes](/users-guide/models/local-models/flux-2/#lora).
 
 Qwen-Image LoRAs, LoKR and LoHA files also load in ComfyUI's `diffusion_model.` key layout, as raw PEFT adapters
 (`base_model.model.`), and in the LyCORIS `lycoris_transformer_blocks_…` and ai-toolkit
