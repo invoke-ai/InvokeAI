@@ -27,7 +27,7 @@ The **Color** tab edits the two painting colors: the **Foreground color**, which
 
 * The color wheel, or a box picker via **Switch to box picker**, and the hex value, always shown. The format button next to it cycles through hex only, RGB, HSB and HSL, adding a field for each channel.
 * **Swap foreground and background colors** (**X**) and **Reset colors to black and white** (**D**).
-* **Pick a color from the canvas** — the eyedropper. You can also hold **Alt** on the canvas with the Brush, Eraser, Gradient, Text or Pan tool. A magnifying loupe shows the pixel under the pointer and its RGB values; see the [Canvas guide](/users-guide/canvas/canvas-guide/#tools).
+* **Pick a color from the canvas** — the eyedropper. You can also hold **Alt** on the canvas with the Brush, Eraser, Gradient, Text or Pan tool. A magnifying loupe shows the image color under the pointer and its RGB values, ignoring Inpaint Mask and Regional Guidance overlays. Use **Fill color** in the mask’s Properties to access its own color. See the [Canvas guide](/users-guide/canvas/canvas-guide/#tools).
 * When an inpaint mask or regional guidance layer is selected, a third chip, **Mask tint**, edits the color of its overlay.
 
 Picking with **Alt** on the canvas writes to what you are editing: the mask tint while **Mask tint** is chosen, the selected shape layer's fill (foreground chip) or stroke (background chip), the selected text layer's color, and otherwise the active foreground or background color. A pick never turns on a fill or stroke the shape does not have: on such a shape it sets the active foreground or background color instead. A pick that changes a layer is one undoable step. The eyedropper button sets the mask tint while **Mask tint** is chosen, and otherwise the active foreground or background color.
@@ -200,7 +200,7 @@ A control layer made in an earlier version of Invoke keeps its model and works w
 
 ### Inpaint mask
 
-A new Canvas starts with a coral inpaint mask (`#e07575`). The first mask you add in the session is green (`#83d683`). New masks cycle through ten colors, including coral. Regional Guidance uses the same palette in a separate cycle, also starting at green. You can change any layer’s fill color in Properties.
+A new Canvas starts with a coral inpaint mask (`#e07575`). The first mask you add in the session starts at green (`#83d683`). Added masks cycle through ten colors. The cycle skips colors already used by that mask type on the current Canvas while unused colors remain. Regional Guidance uses the same palette in a separate cycle, also starting at green. You can change any layer’s fill color in Properties.
 
 * **Fill color** and **Fill style** (Solid, Grid, Crosshatch, Diagonal Left, Diagonal Right, Horizontal or Vertical) — how the mask is drawn on screen. The lines keep their spacing as you zoom the canvas.
 * **Invert mask** — swap the masked and unmasked areas.

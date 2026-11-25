@@ -59,21 +59,21 @@ it('cycles mask colors independently in palette order and restarts at the sessio
   expect(nextMaskFillColor('regional_guidance')).toBe('#83d683');
   expect(Array.from({ length: 10 }, (_, index) => nextMaskFillColor('inpaint_mask', index))).toEqual([
     '#83d683',
-    '#F59E42',
-    '#F4D35E',
-    '#38C9C5',
-    '#62B5F5',
-    '#637BE8',
-    '#AD80E8',
-    '#ED79BA',
-    '#B7D65A',
+    '#f59e42',
+    '#f4d35e',
+    '#38c9c5',
+    '#62b5f5',
+    '#637be8',
+    '#ad80e8',
+    '#ed79ba',
+    '#b7d65a',
     '#e07575',
   ]);
   advanceMaskFillColors('inpaint_mask');
-  expect(nextMaskFillColor('inpaint_mask')).toBe('#F59E42');
+  expect(nextMaskFillColor('inpaint_mask')).toBe('#f59e42');
   expect(nextMaskFillColor('regional_guidance')).toBe('#83d683');
   advanceMaskFillColors('regional_guidance');
-  expect(nextMaskFillColor('regional_guidance')).toBe('#F59E42');
+  expect(nextMaskFillColor('regional_guidance')).toBe('#f59e42');
   resetMaskFillColors();
   expect(nextMaskFillColor('regional_guidance')).toBe('#83d683');
   expect(nextMaskFillColor('inpaint_mask')).toBe('#83d683');

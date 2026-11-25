@@ -280,7 +280,8 @@ export const createCompositeFrame = (deps: CreateCompositeFrameDeps): CompositeF
         fullFrameUsage = usage;
       }
 
-      const usedMaskScratch = compositeDocument(screen, doc, layerCache, view, {
+      let usedMaskScratch = false;
+      compositeDocument(screen, doc, layerCache, view, {
         damage: frameDamage,
         adjustedSurface: deps.getAdjustedSurface,
         groupSurface: deps.getGroupSurface,
@@ -298,7 +299,13 @@ export const createCompositeFrame = (deps: CreateCompositeFrameDeps): CompositeF
         preparation: frame,
         // Screen frames are display-time: the region tint may draw, except over a staged result.
         regionOverlays: !staging,
-        screenMask: { dpr: viewport.getDpr(), getScratch: deps.maskScratch.getMaskScratch },
+        screenMask: {
+          dpr: viewport.getDpr(),
+          getScratch: (width, height) => {
+            usedMaskScratch = true;
+            return deps.maskScratch.getMaskScratch(width, height);
+          },
+        },
         showOverlayStacks,
         // Candidates and progress frames alike land at the rect pinned at submission, never the live bbox.
         stagedPreview:

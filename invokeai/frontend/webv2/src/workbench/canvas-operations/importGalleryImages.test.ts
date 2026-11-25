@@ -237,7 +237,7 @@ const expectedLayer = (
       };
     case 'inpaint-mask':
       return createInpaintMaskFromImage({
-        fill: { ...DEFAULT_INPAINT_MASK_FILL, color: ['#83d683', '#F59E42'][index]! },
+        fill: { ...DEFAULT_INPAINT_MASK_FILL, color: ['#83d683', '#f59e42'][index]! },
         id: expect.any(String) as string,
         image: ref,
         name: `Inpaint Mask ${index + 1}`,
@@ -245,7 +245,7 @@ const expectedLayer = (
       });
     case 'regional-guidance':
       return createRegionalGuidanceFromImage({
-        fill: { color: ['#83d683', '#F59E42'][index]!, style: 'solid' },
+        fill: { color: ['#83d683', '#f59e42'][index]!, style: 'solid' },
         id: expect.any(String) as string,
         image: ref,
         name: `Regional Guidance ${index + 1}`,
@@ -254,7 +254,7 @@ const expectedLayer = (
     case 'regional-reference': {
       const layer = createRegionalGuidanceLayerWithRefImage(
         `Regional Guidance ${index + 1}`,
-        ['#83d683', '#F59E42'][index]!,
+        ['#83d683', '#f59e42'][index]!,
         base
       );
       const reference = layer.referenceImages[0]!;
@@ -642,6 +642,26 @@ describe('importGalleryImagesToCanvas', () => {
     expect(result).toEqual({ status: 'blocked' });
     expect(applyCanvasMutation).toHaveBeenCalledOnce();
     expect(nextMaskFillColor('regional_guidance')).toBe('#83d683');
+  });
+
+  it('advances the palette across accepted imports and skips a refusal between them', async () => {
+    const { project, state } = withProject();
+    const applyCanvasMutation = vi.fn().mockReturnValueOnce(true).mockReturnValueOnce(false).mockReturnValueOnce(true);
+    const options = {
+      applyCanvasMutation,
+      destination: 'regional-guidance' as const,
+      engine: null,
+      ...queriesFor(() => state),
+      images: [image('a.png')],
+      project,
+    };
+    expect((await importGalleryImagesToCanvas(options)).status).toBe('imported');
+    expect((await importGalleryImagesToCanvas(options)).status).toBe('blocked');
+    expect((await importGalleryImagesToCanvas(options)).status).toBe('imported');
+    const colors = applyCanvasMutation.mock.calls.map(([, mutation]) =>
+      getForwardLayers(mutation).map((layer) => layer.type === 'regional_guidance' && layer.mask.fill.color)
+    );
+    expect(colors).toEqual([['#83d683'], ['#f59e42'], ['#f59e42']]);
   });
 
   it('returns stale-document when the captured target document identity changes', async () => {

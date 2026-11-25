@@ -190,6 +190,33 @@ describe('compositor goldens', () => {
     });
   }
 
+  it('keeps both colors visible where two opaque diagonal masks overlap', () => {
+    const layers = [
+      inpaintMask('upper', { color: '#ff0000', style: 'diagonal' }),
+      inpaintMask('lower', { color: '#0000ff', style: 'diagonal' }),
+    ];
+    const coverage = { paint: solid('#000000'), rect: { height: 30, width: 30, x: 4, y: 4 } };
+    const { backend, caches } = scene(layers, { lower: coverage, upper: coverage });
+    const target = backend.createSurface(WIDTH, HEIGHT);
+    const scratch = backend.createSurface(WIDTH, HEIGHT);
+    compositeDocument(
+      target,
+      doc(layers),
+      caches,
+      { a: 2, b: 0, c: 0, d: 2, e: 0, f: 0 },
+      {
+        backend,
+        maskPatternTile: (_, color) => createMaskPatternTile(backend, 'diagonal', color),
+        screenMask: { dpr: 2, getScratch: () => scratch },
+      }
+    );
+    const { data } = target.ctx.getImageData(24, 24, 12, 1);
+    const red = Array.from(data).filter((_, index) => index % 4 === 0);
+    const blue = Array.from(data).filter((_, index) => index % 4 === 2);
+    expect(red.some((value, index) => value > blue[index]! + 32 && data[index * 4 + 3]! > 32)).toBe(true);
+    expect(blue.some((value, index) => value > red[index]! + 32 && data[index * 4 + 3]! > 32)).toBe(true);
+  });
+
   it.each(['diagonal', 'diagonal_left'] as const)('renders the %s mask at a fixed screen scale', (style) => {
     const layers = [inpaintMask('mask', { color: '#e07575', style })];
     const { backend, caches } = scene(layers, {

@@ -23,6 +23,7 @@ import { IconButton, MenuActionItem, MenuContent, MenuIconItem, RenameDialog, To
 import { useQueryClient } from '@tanstack/react-query';
 import {
   advanceMaskFillColors,
+  getDocumentLeaves,
   canMergeSelectedRasters,
   getDocumentIndex,
   getDocumentLayer,
@@ -468,9 +469,15 @@ const LayerMenu = ({
         layer.type === 'raster' && targetType === 'control'
           ? convertRasterToControl(layer, base)
           : layer.type === 'raster' && targetType === 'inpaint_mask'
-            ? convertRasterToInpaintMask(layer, nextMaskFillColor('inpaint_mask'))
+            ? convertRasterToInpaintMask(
+                layer,
+                nextMaskFillColor('inpaint_mask', 0, getDocumentLeaves(canvas.document))
+              )
             : layer.type === 'raster' && targetType === 'regional_guidance'
-              ? convertRasterToRegionalGuidance(layer, nextMaskFillColor('regional_guidance'))
+              ? convertRasterToRegionalGuidance(
+                  layer,
+                  nextMaskFillColor('regional_guidance', 0, getDocumentLeaves(canvas.document))
+                )
               : targetType === 'raster'
                 ? convertRasterControlLayer(layer, 'raster')
                 : null;
@@ -486,7 +493,7 @@ const LayerMenu = ({
         advanceMaskFillColors(converted.type);
       }
     },
-    [base, engine, layer, makeStatusError]
+    [base, canvas.document, engine, layer, makeStatusError]
   );
 
   const handleToggleVisibility = useCallback(() => {
@@ -767,7 +774,7 @@ const LayerMenu = ({
 
   const handleCopyToInpaintMask = useCallback(() => {
     const id = createLayerId();
-    const color = nextMaskFillColor('inpaint_mask');
+    const color = nextMaskFillColor('inpaint_mask', 0, getDocumentLeaves(canvas.document));
     const copied =
       layer.type === 'raster'
         ? copyRasterToInpaintMask(layer, id, color)
@@ -780,11 +787,11 @@ const LayerMenu = ({
     if (layer.type === 'raster' || layer.type === 'control') {
       advanceMaskFillColors('inpaint_mask');
     }
-  }, [addCopy, getActionLabel, layer]);
+  }, [addCopy, canvas.document, getActionLabel, layer]);
 
   const handleCopyToRegionalGuidance = useCallback(() => {
     const id = createLayerId();
-    const color = nextMaskFillColor('regional_guidance');
+    const color = nextMaskFillColor('regional_guidance', 0, getDocumentLeaves(canvas.document));
     const copied =
       layer.type === 'raster'
         ? copyRasterToRegionalGuidance(layer, id, color)
@@ -797,7 +804,7 @@ const LayerMenu = ({
     if (layer.type === 'raster' || layer.type === 'control') {
       advanceMaskFillColors('regional_guidance');
     }
-  }, [addCopy, getActionLabel, layer]);
+  }, [addCopy, canvas.document, getActionLabel, layer]);
 
   const handleCopyTo = useCallback(
     (target: LayerType): void | Promise<void> => {

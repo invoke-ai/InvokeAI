@@ -297,6 +297,14 @@ const isMaskLayer = (
 ): layer is Extract<CanvasLayerContract, { type: 'regional_guidance' | 'inpaint_mask' }> =>
   layer.type === 'regional_guidance' || layer.type === 'inpaint_mask';
 
+const maskPhaseHash = (layerId: string): number => {
+  let hash = 2166136261;
+  for (let index = 0; index < layerId.length; index += 1) {
+    hash = Math.imul(hash ^ layerId.charCodeAt(index), 16777619);
+  }
+  return hash;
+};
+
 type DrawMaskFill = (
   layerId: string,
   fill: CanvasMaskFillContract,
@@ -436,17 +444,16 @@ export const compositeDocument = (
   caches: LayerCacheStore,
   view: Mat2d,
   opts: CompositeOptions
-): boolean => {
+): void => {
   const plan = reusePreparation(opts.preparation, doc, opts);
   const targetRect: Rect = { height: target.height, width: target.width, x: 0, y: 0 };
   const damage = resolveDamage(plan, view, target, opts.damage);
   if (damage.kind === 'none') {
-    return false;
+    return;
   }
   const ctx = target.ctx;
   opts.diagnostics?.increment('compositeFrames');
   const repaint = damage.kind === 'rect' ? damage.rect : targetRect;
-  let usedMaskScratch = false;
   const drawMaskFill: DrawMaskFill = (layerId, fill, coverage, matrix, kind) => {
     const { surface, rect, version } = coverage;
     const tile = opts.maskPatternTile?.(fill.style, fill.color) ?? null;
@@ -457,7 +464,6 @@ export const compositeDocument = (
         return;
       }
       const scratch = getScratch(area.width, area.height);
-      usedMaskScratch = true;
       const stencil = scratch.ctx;
       stencil.save();
       identityTransform(stencil);
@@ -471,12 +477,15 @@ export const compositeDocument = (
       setTransformFromMat(stencil, { ...matrix, e: matrix.e - area.x, f: matrix.f - area.y });
       stencil.drawImage(surface.canvas, rect.x, rect.y);
 
-      // Fill in viewport CSS coordinates so damage and layer transforms cannot shift the pattern.
+      // Give each layer a stable phase in viewport CSS coordinates, independent of damage and transforms.
+      const phase = maskPhaseHash(layerId);
+      const offsetX = ((phase & 0xffff) / 0x10000) * tile.width;
+      const offsetY = ((phase >>> 16) / 0x10000) * tile.height;
       stencil.imageSmoothingEnabled = true;
-      stencil.setTransform(dpr, 0, 0, dpr, -area.x, -area.y);
+      stencil.setTransform(dpr, 0, 0, dpr, offsetX * dpr - area.x, offsetY * dpr - area.y);
       stencil.globalCompositeOperation = 'source-in';
       stencil.fillStyle = stencil.createPattern(tile.canvas, 'repeat') ?? fill.color;
-      stencil.fillRect(area.x / dpr, area.y / dpr, area.width / dpr, area.height / dpr);
+      stencil.fillRect(area.x / dpr - offsetX, area.y / dpr - offsetY, area.width / dpr, area.height / dpr);
       stencil.restore();
 
       ctx.save();
@@ -659,5 +668,4 @@ export const compositeDocument = (
   }
 
   ctx.restore();
-  return usedMaskScratch;
 };

@@ -4,6 +4,7 @@ import {
   advanceMaskFillColors,
   createControlLayer,
   getDocumentIndex,
+  getDocumentLeaves,
   nextControlLayerName,
   nextMaskFillColor,
 } from '@workbench/canvas-engine/api';
@@ -55,6 +56,8 @@ export const useAddLayer = (): ((id: AddLayerItemId) => void) => {
         }
         return outcome;
       };
+      const document = engine?.document.getDocument();
+      const maskLayers = () => (document ? getDocumentLeaves(document) : []);
       switch (id) {
         case 'vector': {
           if (!engine) {
@@ -109,7 +112,7 @@ export const useAddLayer = (): ((id: AddLayerItemId) => void) => {
           const layer = createInpaintMaskLayer(
             nextInpaintMaskName(layerNames),
             undefined,
-            nextMaskFillColor('inpaint_mask')
+            nextMaskFillColor('inpaint_mask', 0, maskLayers())
           );
           add(t('widgets.layers.actions.addInpaintMask'), layer);
           return;
@@ -117,7 +120,7 @@ export const useAddLayer = (): ((id: AddLayerItemId) => void) => {
         case 'regional_guidance': {
           const layer = createRegionalGuidanceLayer(
             nextRegionalGuidanceName(layerNames),
-            nextMaskFillColor('regional_guidance')
+            nextMaskFillColor('regional_guidance', 0, maskLayers())
           );
           add(t('widgets.layers.actions.addRegionalGuidance'), layer);
           return;
@@ -125,7 +128,7 @@ export const useAddLayer = (): ((id: AddLayerItemId) => void) => {
         case 'regional_reference_image': {
           const layer = createRegionalGuidanceLayerWithRefImage(
             nextRegionalGuidanceName(layerNames),
-            nextMaskFillColor('regional_guidance'),
+            nextMaskFillColor('regional_guidance', 0, maskLayers()),
             base
           );
           add(t('widgets.layers.actions.addRegionalReferenceImage'), layer);

@@ -3,6 +3,7 @@ import type {
   CanvasImageRef,
   CanvasInpaintMaskLayerContract,
   CanvasLayerBaseContract,
+  CanvasLayerContract,
   CanvasLayerSourceContract,
   CanvasMaskFillContract,
   CanvasPixelSourceContract,
@@ -17,14 +18,14 @@ export const DEFAULT_REGIONAL_GUIDANCE_FILL_COLOR = '#83d683';
 const MASK_FILL_COLORS = [
   '#e07575',
   DEFAULT_REGIONAL_GUIDANCE_FILL_COLOR,
-  '#F59E42',
-  '#F4D35E',
-  '#38C9C5',
-  '#62B5F5',
-  '#637BE8',
-  '#AD80E8',
-  '#ED79BA',
-  '#B7D65A',
+  '#f59e42',
+  '#f4d35e',
+  '#38c9c5',
+  '#62b5f5',
+  '#637be8',
+  '#ad80e8',
+  '#ed79ba',
+  '#b7d65a',
 ] as const;
 
 type MaskLayerKind = 'inpaint_mask' | 'regional_guidance';
@@ -34,8 +35,25 @@ type MaskLayerKind = 'inpaint_mask' | 'regional_guidance';
 // New canvases already contain a coral inpaint mask.
 const nextColorIndex = { inpaint_mask: 1, regional_guidance: 1 };
 
-export const nextMaskFillColor = (kind: MaskLayerKind, offset = 0): string =>
-  MASK_FILL_COLORS[(nextColorIndex[kind] + offset) % MASK_FILL_COLORS.length]!;
+export const nextMaskFillColor = (
+  kind: MaskLayerKind,
+  offset = 0,
+  layers: readonly CanvasLayerContract[] = []
+): string => {
+  const used = new Set(layers.flatMap((layer) => (layer.type === kind ? [layer.mask.fill.color.toLowerCase()] : [])));
+  const start = nextColorIndex[kind];
+  let available = 0;
+  for (let step = 0; step < MASK_FILL_COLORS.length; step += 1) {
+    const color = MASK_FILL_COLORS[(start + step) % MASK_FILL_COLORS.length]!;
+    if (!used.has(color)) {
+      if (available === offset) {
+        return color;
+      }
+      available += 1;
+    }
+  }
+  return MASK_FILL_COLORS[(start + offset - available) % MASK_FILL_COLORS.length]!;
+};
 
 export const advanceMaskFillColors = (kind: MaskLayerKind, count = 1): void => {
   nextColorIndex[kind] = (nextColorIndex[kind] + count) % MASK_FILL_COLORS.length;

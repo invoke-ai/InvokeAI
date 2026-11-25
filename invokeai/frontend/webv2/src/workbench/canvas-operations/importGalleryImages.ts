@@ -79,6 +79,7 @@ interface BuildLayerContext {
   existingLayers: readonly CanvasLayerContract[];
   modelBase: string | null;
   colorOffset: number;
+  paletteLayers: readonly CanvasLayerContract[];
 }
 
 type LayerImage = CanvasImageRef | GalleryImage;
@@ -133,7 +134,10 @@ const buildLayer = (
       );
     case 'inpaint-mask':
       return createInpaintMaskFromImage({
-        fill: { ...DEFAULT_INPAINT_MASK_FILL, color: nextMaskFillColor('inpaint_mask', context.colorOffset) },
+        fill: {
+          ...DEFAULT_INPAINT_MASK_FILL,
+          color: nextMaskFillColor('inpaint_mask', context.colorOffset, context.paletteLayers),
+        },
         id,
         image: ref,
         name: nextInpaintMaskName(names),
@@ -141,7 +145,10 @@ const buildLayer = (
       });
     case 'regional-guidance': {
       return createRegionalGuidanceFromImage({
-        fill: { color: nextMaskFillColor('regional_guidance', context.colorOffset), style: 'solid' },
+        fill: {
+          color: nextMaskFillColor('regional_guidance', context.colorOffset, context.paletteLayers),
+          style: 'solid',
+        },
         id,
         image: ref,
         name: nextRegionalGuidanceName(names),
@@ -151,7 +158,7 @@ const buildLayer = (
     case 'regional-reference': {
       const layer = createRegionalGuidanceLayerWithRefImage(
         nextRegionalGuidanceName(names),
-        nextMaskFillColor('regional_guidance', context.colorOffset),
+        nextMaskFillColor('regional_guidance', context.colorOffset, context.paletteLayers),
         context.modelBase,
         id
       );
@@ -177,12 +184,14 @@ const buildLayers = (
 ): CanvasLayerContract[] => {
   const layers: CanvasLayerContract[] = [];
   const modelBase = getSelectedModelBase(project);
+  const paletteLayers = getDocumentLeaves(project.canvas.document);
   for (const image of images) {
     layers.push(
       buildLayer(image, destination, {
         bbox: project.canvas.document.bbox,
         colorOffset: layers.length,
-        existingLayers: [...getDocumentLeaves(project.canvas.document), ...layers],
+        existingLayers: [...paletteLayers, ...layers],
+        paletteLayers,
         modelBase,
       })
     );

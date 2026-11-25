@@ -19,14 +19,14 @@ export const DEFAULT_COLOR_SWATCHES: readonly string[] = [
   '#808080',
   '#e07575',
   '#83d683',
-  '#F59E42',
-  '#F4D35E',
-  '#38C9C5',
-  '#62B5F5',
-  '#637BE8',
-  '#AD80E8',
-  '#ED79BA',
-  '#B7D65A',
+  '#f59e42',
+  '#f4d35e',
+  '#38c9c5',
+  '#62b5f5',
+  '#637be8',
+  '#ad80e8',
+  '#ed79ba',
+  '#b7d65a',
 ];
 
 const isColorPickerFormat = (value: unknown): value is ColorPickerFormat =>

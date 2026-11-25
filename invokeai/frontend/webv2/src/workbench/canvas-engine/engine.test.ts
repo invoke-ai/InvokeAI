@@ -24,6 +24,7 @@ import type { CanvasProjectMutationPort } from '@workbench/canvasProjectMutation
 import type { Project, WorkbenchState } from '@workbench/projectContracts';
 import type { WorkbenchAction } from '@workbench/workbenchState.testing';
 
+import { resetMaskFillColors } from '@workbench/canvas-engine/document/layerFactories';
 import {
   applyCanvasProjectMutation,
   isCanvasProjectMutation,
@@ -51,7 +52,7 @@ import {
 } from '@workbench/canvas-operations/createCanvasEngine';
 import { getCanvasOperationImplementation as getCanvasOperations } from '@workbench/canvas-operations/operationAccess';
 import { createInitialWorkbenchState, workbenchReducer } from '@workbench/workbenchState.testing';
-import { afterEach, describe, expect, it, type Mock, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 
 import type { BitmapStore } from './document/bitmapStore';
 import type { StrokeCommittedEvent } from './tools/tool';
@@ -5898,6 +5899,8 @@ describe('replaceSelectionFromImage', () => {
 });
 
 describe('commitMaskImageResult', () => {
+  beforeEach(resetMaskFillColors);
+
   const resultImage = { height: 12, imageName: 'durable-sam-result.png', width: 16 };
   const resultRect = { height: 12, width: 16, x: -5, y: 7 };
 
@@ -5981,7 +5984,7 @@ describe('commitMaskImageResult', () => {
         isLocked: false,
         mask: {
           bitmap: resultImage,
-          fill: { color: '#83d683', style: 'solid' },
+          fill: { color: '#f59e42', style: 'solid' },
           offset: { x: -5, y: 7 },
         },
         name: 'Regional Guidance 2',

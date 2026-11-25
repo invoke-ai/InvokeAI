@@ -74,12 +74,13 @@ export class MaskResultController {
     if (options.signal?.aborted) {
       return Promise.resolve({ status: 'aborted' });
     }
-    const names = getDocumentLeaves(document).map((layer) => layer.name);
+    const layers = getDocumentLeaves(document);
+    const names = layers.map((layer) => layer.name);
     const layerId = o.ctx.createLayerId();
     const layer =
       options.target === 'inpaint_mask'
         ? createInpaintMaskFromImage({
-            fill: { ...DEFAULT_INPAINT_MASK_FILL, color: nextMaskFillColor('inpaint_mask') },
+            fill: { ...DEFAULT_INPAINT_MASK_FILL, color: nextMaskFillColor('inpaint_mask', 0, layers) },
             id: layerId,
             image: options.image,
             name: nextInpaintMaskName(names),
@@ -87,7 +88,7 @@ export class MaskResultController {
           })
         : createRegionalGuidanceFromImage({
             fill: {
-              color: nextMaskFillColor('regional_guidance'),
+              color: nextMaskFillColor('regional_guidance', 0, layers),
               style: 'solid',
             },
             id: layerId,

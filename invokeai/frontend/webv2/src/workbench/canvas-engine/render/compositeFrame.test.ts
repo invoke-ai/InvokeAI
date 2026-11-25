@@ -102,7 +102,7 @@ const makeHarness = (): Harness => {
       stores,
       transformOverrides: overrides,
       viewport: {
-        getDpr: () => 1,
+        getDpr: () => 2,
         getViewportSize: () => ({ height: 64, width: 64 }),
         getZoom: () => 1,
         screenToDocument: ({ x, y }: { x: number; y: number }) => ({ x, y }),
@@ -129,7 +129,15 @@ const lastCompositeOptions = () => composite.mock.calls.at(-1)?.[4] as Record<st
 
 beforeEach(() => {
   harness = makeHarness();
-  composite = vi.spyOn(compositor, 'compositeDocument').mockImplementation(() => false);
+  composite = vi.spyOn(compositor, 'compositeDocument').mockImplementation(() => undefined);
+});
+
+it('passes the viewport DPR and its mask scratch to the screen compositor', () => {
+  draw();
+  expect(lastCompositeOptions().screenMask).toEqual({
+    dpr: 2,
+    getScratch: expect.any(Function),
+  });
 });
 
 describe('cache preparation', () => {
@@ -339,7 +347,9 @@ describe('the surface budget', () => {
     const frame = createCompositeFrame(harness.deps);
     const screen = surface();
     const release = harness.deps.maskScratch.releaseMaskScratch;
-    composite.mockReturnValueOnce(true);
+    composite.mockImplementationOnce((...[, , , , options]: Parameters<typeof compositor.compositeDocument>) => {
+      options.screenMask!.getScratch(8, 8);
+    });
     frame.draw(screen, doc, VIEW, null, null);
     frame.draw(screen, doc, VIEW, null, null, { kind: 'regions', regions: [{ layerId: 'a', rect: entryFor().rect }] });
     expect(release).not.toHaveBeenCalled();
