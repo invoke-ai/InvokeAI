@@ -23,7 +23,6 @@ from invokeai.app.invocations.model import VAEField
 from invokeai.app.invocations.primitives import ImageOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.ernie_image.sampling_utils import unpatchify_latents, vae_denormalize
-from invokeai.backend.util.devices import TorchDevice
 
 
 @invocation(
@@ -46,7 +45,7 @@ class ErnieImageVaeDecodeInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         vae_info = context.models.load(self.vae.vae)
         with vae_info.model_on_device() as (_, vae):
-            device = TorchDevice.choose_torch_device()
+            device = vae_info.compute_device
             vae_dtype = next(iter(vae.parameters())).dtype
             latents = latents.to(device=device, dtype=vae_dtype)
 

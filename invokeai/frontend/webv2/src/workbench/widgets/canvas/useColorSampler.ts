@@ -1,7 +1,4 @@
-/**
- * Prefer the engine's document sampler over Chromium's composited-screen eyedropper. Return a stable callback with
- * an engine, otherwise preserve ColorPicker's fallback.
- */
+/** Prefers the engine's document sampler over Chromium's composited-screen eyedropper. */
 
 import type { CanvasEngineToolCapability } from '@workbench/canvas-engine/api';
 

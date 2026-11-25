@@ -22,6 +22,7 @@ import { useMemo, useSyncExternalStore } from 'react';
 
 import type { EngineDeps } from './engineRegistry';
 
+import { createCanvasEngine } from './createCanvasEngine';
 import { getOrCreateEngine, releaseEngine } from './engineRegistry';
 
 export type CanvasEngineHandle = CanvasEngine;
@@ -48,20 +49,18 @@ export const createImageResolver = (): ImageResolver => async (imageName, signal
 };
 
 /**
- * Turns one registry lease into a React external store. The first subscriber
- * acquires the engine and the last subscriber releases it, so speculative
- * renders never create engines and StrictMode subscriptions remain balanced.
+ * Turns one registry lease into a React external store. The first subscriber acquires the engine and the last
+ * subscriber releases it, so speculative renders never create engines and StrictMode subscriptions remain balanced.
  */
 export const createCanvasEngineResource = (projectId: string, deps: EngineDeps): CanvasEngineResource => {
   let engine: CanvasEngine | null = null;
   const listeners = new Set<() => void>();
-
   return {
     getSnapshot: () => engine,
     subscribe: (listener) => {
       listeners.add(listener);
       if (listeners.size === 1) {
-        engine = getOrCreateEngine(projectId, deps);
+        engine = getOrCreateEngine(projectId, deps, createCanvasEngine);
         listener();
       }
       return () => {
@@ -110,7 +109,7 @@ export const useCanvasEngine = (): CanvasEngineHandle | null => {
         imageResolver: createImageResolver(),
         fonts,
         mutationPort: createCanvasProjectMutationPort(store, projectId),
-        readSelectObjectAutoProcess: () => getWorkbenchPreferences().selectObjectAutoProcess,
+        readSelectObjectAutoUpdate: () => getWorkbenchPreferences().selectObjectAutoUpdate,
         toolMemory: {
           read: () => getWorkbenchPreferences().canvasToolMemory,
           subscribe: (listener) => subscribeWorkbenchPreferences(() => listener()),

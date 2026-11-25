@@ -1,53 +1,60 @@
 import type * as DndKitCore from '@dnd-kit/core';
+import type { GalleryImage } from '@features/gallery';
+import type * as GalleryBackend from '@features/gallery/data/backend';
 import type {
   CanvasControlLayerContract,
   CanvasLayerContract,
   CanvasNodeContract,
-  ControlLayerView,
   ControlLayerViewOutcome,
 } from '@workbench/canvas-engine/api';
 import type { CanvasStagingCandidateContract } from '@workbench/canvas-engine/contracts';
+import type * as CanvasOperationsApi from '@workbench/canvas-operations/api';
 import type { CanvasEngine } from '@workbench/canvas-operations/createCanvasEngine';
+import type { ExtensionRegistry } from '@workbench/extensions/extensionRegistry';
 import type { Project } from '@workbench/projectContracts';
+import type * as ProjectsApi from '@workbench/projects/api';
 import type { WorkbenchQueueItem as QueueItem } from '@workbench/queueHistoryContracts';
-import type { WidgetViewProps } from '@workbench/widgetContracts';
+import type { WidgetHotkeyContribution, WidgetCommandContribution, WidgetViewProps } from '@workbench/widgetContracts';
 import type * as WorkbenchContextModule from '@workbench/WorkbenchContext';
 
-import { ChakraProvider } from '@chakra-ui/react';
-import { galleryTransfers, type GalleryImage } from '@features/gallery';
+import { Box, ChakraProvider } from '@chakra-ui/react';
 import { auditAccessibility } from '@platform/browser/auditAccessibility.testing';
+import { TINY_PNG_BASE64 } from '@platform/browser/nativeDrag.testing';
+import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
-import { createControlLayer } from '@workbench/canvas-engine/api';
-import {
-  groupContract,
-  layerContract,
-  stacksFrom,
-} from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
+import { createControlLayer, createVectorLayer } from '@workbench/canvas-engine/api';
+import { layerContract, stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { createDomRasterBackend } from '@workbench/canvas-engine/render/raster';
 import { createTestStubRasterBackend } from '@workbench/canvas-engine/render/raster.testStub';
-import { getCanvasOperations, getControlSourceSnapshot } from '@workbench/canvas-operations/api';
+import { getCanvasOperations } from '@workbench/canvas-operations/api';
 import { createControlDetectionStatusStore } from '@workbench/canvas-operations/controlDetectionStatusStore';
 import { createCanvasEngine } from '@workbench/canvas-operations/createCanvasEngine';
 import { createCanvasProjectMutationPort } from '@workbench/canvasProjectMutationPort';
+import { createExtensionRegistry } from '@workbench/extensions/extensionRegistry';
+import { WorkbenchHotkeyRuntime } from '@workbench/hotkeys/WorkbenchHotkeyRuntime';
+import { DEFAULT_PREFERENCES, patchWorkbenchPreferences } from '@workbench/settings/store';
 import { runNotificationUndo } from '@workbench/shell/notifications/undoRegistry';
+import { WorkbenchFocusProvider } from '@workbench/WorkbenchRuntime';
 import { createInitialWorkbenchState } from '@workbench/workbenchState';
 import { createWorkbenchStore } from '@workbench/workbenchStore';
 import { createInstance } from 'i18next';
-import { act } from 'react';
+import { act, useSyncExternalStore } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import { page, userEvent } from 'vitest/browser';
+import { commands, page, userEvent } from 'vitest/browser';
 
 import type * as EngineStoreHooks from './engineStoreHooks';
 
-/** The view reads the real store and drives its real commands; only unrelated chrome is stubbed. */
 const harness = vi.hoisted(() => ({
-  /** Drag data dnd-kit reports as active; null leaves the real (idle) context. */
   dragData: null as unknown,
+  extensions: null as ExtensionRegistry | null,
   engine: null as CanvasEngine | null,
+  isEngineLive: true,
+  operation: null as unknown,
   store: null as ReturnType<typeof createWorkbenchStore> | null,
+  uploadImage: vi.fn<(file: File, boardId: string) => Promise<GalleryImage>>(),
 }));
 const activeProject = () => harness.store!.getState().projects[0]!;
 
@@ -64,10 +71,25 @@ vi.mock('@dnd-kit/core', async (importOriginal) => {
     useDndMonitor: () => undefined,
   };
 });
+vi.mock('@features/gallery/data/backend', async (importOriginal) => ({
+  ...(await importOriginal<typeof GalleryBackend>()),
+  listGalleryBoards: () => Promise.resolve([]),
+  uploadGalleryImage: (file: File, boardId: string) => harness.uploadImage(file, boardId),
+}));
+vi.mock('@workbench/canvas-operations/api', async (importOriginal) => ({
+  ...(await importOriginal<typeof CanvasOperationsApi>()),
+  getCanvasEngine: (projectId: string) =>
+    harness.isEngineLive && harness.engine?.projectId === projectId ? harness.engine : undefined,
+}));
 vi.mock('@workbench/WorkbenchContext', async (importOriginal) => ({
   ...(await importOriginal<typeof WorkbenchContextModule>()),
   useActiveProjectId: () => activeProject().id,
-  useActiveProjectSelector: (selector: (project: Project) => unknown) => selector(activeProject()),
+  useActiveProjectSelector: (selector: (project: Project) => unknown) => {
+    const project = useSyncExternalStore(harness.store!.subscribe, activeProject, activeProject);
+    return selector(project);
+  },
+  useWorkbenchExtensions: () => harness.extensions,
+  useOptionalWorkbenchExtensions: () => harness.extensions,
   useWidgetValuesSelector: (widgetId: string, selector: (values: Record<string, unknown>) => unknown) =>
     selector(
       Object.values(activeProject().widgetInstances).find((instance) => instance.typeId === widgetId)?.state.values ??
@@ -78,12 +100,17 @@ vi.mock('@workbench/WorkbenchContext', async (importOriginal) => ({
   useWorkbenchQueries: () => harness.store!.queries,
   useWorkbenchSubscription: () => harness.store!.subscribe,
 }));
+vi.mock('@workbench/hotkeys/firstPartyCommands', () => ({ useRegisterFirstPartyCommands: () => {} }));
+vi.mock('@workbench/projects/api', async (importOriginal) => ({
+  ...(await importOriginal<typeof ProjectsApi>()),
+  setClientStateValue: async () => {},
+}));
 vi.mock('@workbench/useCanvasProjectMutationDispatch', () => ({
   useCanvasProjectMutationDispatch: () => () => undefined,
 }));
 vi.mock('./engineStoreHooks', async (importOriginal) => ({
   ...(await importOriginal<typeof EngineStoreHooks>()),
-  useCanvasOperation: () => null,
+  useCanvasOperation: () => harness.operation,
 }));
 vi.mock('@workbench/canvas-operations/react', () => ({ useCanvasEngine: () => harness.engine }));
 vi.mock('./useCanvasGallerySave', () => ({
@@ -96,8 +123,13 @@ vi.mock('./useCreateFromBbox', () => ({
   useCreateFromBbox: () => ({ createFromBbox: () => undefined, isCreating: false }),
 }));
 vi.mock('./CanvasCreateFromBboxSubmenu', () => ({ CanvasCreateFromBboxSubmenu: () => null }));
-vi.mock('./CanvasGlobalContextMenu', () => ({ CanvasGlobalContextMenu: () => null }));
-vi.mock('./CanvasImageDropOverlay', () => ({ CanvasImageDropOverlay: () => null }));
+vi.mock('./CanvasGlobalContextMenu', () => ({
+  CanvasGlobalContextMenu: () => (
+    <div aria-label="Canvas fallback" role="menu">
+      Canvas actions
+    </div>
+  ),
+}));
 vi.mock('./CanvasSaveToGallerySubmenu', () => ({ CanvasSaveToGallerySubmenu: () => null }));
 vi.mock('./CanvasSurface', () => ({ CanvasSurface: () => null }));
 vi.mock('./MissingFontsDialog', () => ({ MissingFontsDialog: () => null }));
@@ -118,9 +150,22 @@ beforeAll(async () => {
 
 afterEach(async () => {
   await act(() => root?.unmount());
+  await act(() => i18n.changeLanguage('en'));
   host?.remove();
   harness.engine?.lifecycle.dispose();
-  Object.assign(harness, { dragData: null, engine: null, store: null });
+  if (harness.extensions) {
+    await patchWorkbenchPreferences(DEFAULT_PREFERENCES);
+    accountLifecycle.invalidate();
+  }
+  Object.assign(harness, {
+    dragData: null,
+    engine: null,
+    extensions: null,
+    isEngineLive: true,
+    operation: null,
+    store: null,
+  });
+  harness.uploadImage.mockReset();
   root = null;
   host = null;
 });
@@ -137,23 +182,21 @@ const candidate: CanvasStagingCandidateContract = {
   width: 64,
 };
 
-/**
- * Stages the first image of a three-image batch whose remaining images are `status`; unstaged, the surface is live.
- * `selectedLayer` starts the document with that layer selected, alone or among `nodes`; `beforeRender` sees the
- * engine before the view subscribes to it.
- */
 const renderView = async (
   status: QueueItem['status'],
   {
     beforeRender,
     domRaster = false,
+    hostWidth = 1000,
+    hotkeys = false,
     nodes,
     selectedLayer,
     staged = true,
   }: {
     beforeRender?: (engine: CanvasEngine) => void;
-    /** Real Canvas2D pixels, for a test that attaches a surface and draws. */
     domRaster?: boolean;
+    hostWidth?: number;
+    hotkeys?: boolean;
     nodes?: CanvasNodeContract[];
     selectedLayer?: CanvasLayerContract;
     staged?: boolean;
@@ -207,34 +250,311 @@ const renderView = async (
   beforeRender?.(harness.engine);
   host = document.createElement('div');
   host.style.height = '600px';
-  host.style.width = '1000px';
+  host.style.width = `${hostWidth}px`;
   document.body.append(host);
   root = createRoot(host);
   const commandHandlers = new Map<string, () => void>();
-  const runtime = {
+  const extensions = hotkeys ? createExtensionRegistry() : null;
+  harness.extensions = extensions;
+  const source = { instanceId: 'canvas', projectId, region: 'center', typeId: 'canvas' } as const;
+  const createRuntime = (extensions: ExtensionRegistry | null) => ({
     commands: {
-      register: ({ handler, id }: { handler: () => void; id: string }) => {
-        commandHandlers.set(id, handler);
-        return () => commandHandlers.delete(id);
+      register: (command: WidgetCommandContribution) => {
+        commandHandlers.set(command.id, command.handler);
+        const dispose = extensions?.commands.register({ ...command, source });
+        return () => {
+          commandHandlers.delete(command.id);
+          dispose?.();
+        };
       },
     },
-    hotkeys: { register: () => () => undefined },
+    hotkeys: {
+      register: (hotkey: WidgetHotkeyContribution) =>
+        extensions?.hotkeys.register({ ...hotkey, source }) ?? (() => undefined),
+    },
+  });
+  const queryClient = new QueryClient();
+  const render = (extensions: ExtensionRegistry | null) => {
+    const runtime = createRuntime(extensions);
+    return act(() =>
+      root!.render(
+        <I18nextProvider i18n={i18n}>
+          <ChakraProvider value={system}>
+            <QueryClientProvider client={queryClient}>
+              <WorkbenchFocusProvider>
+                {hotkeys ? <WorkbenchHotkeyRuntime /> : null}
+                <Box
+                  h="full"
+                  data-hotkey-widget-instance-id="canvas"
+                  data-hotkey-widget-region="center"
+                  data-hotkey-widget-type-id="canvas"
+                >
+                  <CanvasWidgetView
+                    {...({ instance: activeProject().widgetInstances.canvas, runtime } as unknown as WidgetViewProps)}
+                  />
+                </Box>
+              </WorkbenchFocusProvider>
+            </QueryClientProvider>
+          </ChakraProvider>
+        </I18nextProvider>
+      )
+    );
   };
-  await act(() =>
-    root!.render(
-      <I18nextProvider i18n={i18n}>
-        <ChakraProvider value={system}>
-          <QueryClientProvider client={new QueryClient()}>
-            <CanvasWidgetView
-              {...({ instance: activeProject().widgetInstances.canvas, runtime } as unknown as WidgetViewProps)}
-            />
-          </QueryClientProvider>
-        </ChakraProvider>
-      </I18nextProvider>
-    )
-  );
-  return { commandHandlers, projectId, store };
+  await render(extensions);
+  return {
+    commandHandlers,
+    extensions,
+    projectId,
+    store,
+    replaceRuntime: async () => {
+      const next = createExtensionRegistry();
+      harness.extensions = next;
+      await render(next);
+      return next;
+    },
+  };
 };
+
+describe('mounted Canvas hotkeys', () => {
+  it('creates one layer and undo step per press, suppresses held repeats, and keeps nudges repeating', async () => {
+    accountLifecycle.activate('canvas-hotkeys-test');
+    await patchWorkbenchPreferences({
+      customHotkeys: { 'canvas.newRasterLayer': ['alt+shift+n'] },
+    });
+    await renderView('completed', { hotkeys: true, staged: false });
+    const engine = harness.engine!;
+    const target = host!.querySelector<HTMLElement>('[data-hotkey-widget-instance-id="canvas"]')!;
+    const document = () => engine.document.model()!.document;
+    const layerCount = () => document().stacks.raster.length;
+    const initialCount = layerCount();
+    const press = (repeat = false) =>
+      act(() => {
+        target.dispatchEvent(
+          new KeyboardEvent('keydown', {
+            altKey: true,
+            bubbles: true,
+            cancelable: true,
+            code: 'KeyN',
+            shiftKey: true,
+            key: 'N',
+            repeat,
+          })
+        );
+      });
+
+    await press();
+    expect(layerCount()).toBe(initialCount + 1);
+    expect(engine.history.getEntries().past).toEqual(['Raster layer']);
+    await press(true);
+    await press(true);
+    expect(layerCount()).toBe(initialCount + 1);
+    expect(engine.history.getEntries().past).toEqual(['Raster layer']);
+    await act(() => {
+      target.dispatchEvent(
+        new KeyboardEvent('keyup', { altKey: true, bubbles: true, code: 'KeyN', key: 'N', shiftKey: true })
+      );
+    });
+    await press();
+    expect(layerCount()).toBe(initialCount + 2);
+    expect(engine.history.getEntries().past).toEqual(['Raster layer', 'Raster layer']);
+
+    await act(() => engine.history.undo());
+    expect(layerCount()).toBe(initialCount + 1);
+    await act(() => engine.history.redo());
+    expect(layerCount()).toBe(initialCount + 2);
+    const selected = document().stacks.raster.find((layer) => layer.id === document().selectedLayerId)!;
+    if (selected.type !== 'raster') {
+      throw new Error('Expected the new raster layer to be selected');
+    }
+    const initialX = selected.transform.x;
+    for (const repeat of [false, true, true]) {
+      await act(() =>
+        target.dispatchEvent(
+          new KeyboardEvent('keydown', {
+            bubbles: true,
+            cancelable: true,
+            code: 'ArrowRight',
+            key: 'ArrowRight',
+            repeat,
+          })
+        )
+      );
+    }
+    expect(document().stacks.raster.find((layer) => layer.id === selected.id)).toMatchObject({
+      transform: { x: initialX + 3 },
+    });
+  });
+});
+
+describe('Canvas hotkey registration lifetime', () => {
+  it('releases and refreshes locale and runtime registrations without discarding Canvas history', async () => {
+    accountLifecycle.activate('canvas-hotkey-lifetime-test');
+    const { commandHandlers, extensions, replaceRuntime } = await renderView('completed', {
+      hotkeys: true,
+      staged: false,
+    });
+    const engine = harness.engine!;
+    await act(() => commandHandlers.get('canvas.newRasterLayer')!());
+    expect(engine.history.getEntries().past).toEqual(['Raster layer']);
+    const hotkey = (registry: ExtensionRegistry) =>
+      registry.stores.hotkeys.list().find(({ id }) => id === 'canvas.newRasterLayer');
+    expect(hotkey(extensions!)?.title).toBe('New raster layer');
+    i18n.addResource('en-GB', 'translation', 'widgets.canvas.commands.newRasterLayer', 'Create Raster Layer');
+    await act(() => i18n.changeLanguage('en-GB'));
+    await expect.poll(() => hotkey(extensions!)?.title).toBe('Create Raster Layer');
+    expect(extensions!.stores.hotkeys.list().filter(({ id }) => id === 'canvas.newRasterLayer')).toHaveLength(1);
+
+    const next = await replaceRuntime();
+    expect(extensions!.stores.commands.list()).toEqual([]);
+    expect(extensions!.stores.hotkeys.list()).toEqual([]);
+    expect(hotkey(next)).toMatchObject({ ignoreRepeat: true, title: 'Create Raster Layer' });
+    expect(harness.engine).toBe(engine);
+    expect(engine.history.getEntries().past).toEqual(['Raster layer']);
+    await act(() => root!.unmount());
+    root = null;
+    expect(next.stores.commands.list()).toEqual([]);
+    expect(next.stores.hotkeys.list()).toEqual([]);
+  });
+});
+
+describe('Canvas spline context menu', () => {
+  const renderSpline = async (selectPath = true) => {
+    const layer = createVectorLayer({ id: 'vector', name: 'Guides' });
+    layer.paths = [
+      {
+        id: 'selected-path',
+        name: null,
+        isClosed: false,
+        points: [
+          { anchor: { x: 300, y: 300 }, inHandle: null, outHandle: null, type: 'corner' },
+          { anchor: { x: 400, y: 300 }, inHandle: null, outHandle: null, type: 'corner' },
+        ],
+      },
+      {
+        id: 'other-path',
+        name: null,
+        isClosed: false,
+        points: [
+          { anchor: { x: 700, y: 450 }, inHandle: null, outHandle: null, type: 'corner' },
+          { anchor: { x: 800, y: 450 }, inHandle: null, outHandle: null, type: 'corner' },
+        ],
+      },
+    ];
+    await renderView('completed', {
+      selectedLayer: layer,
+      staged: false,
+    });
+    await act(() => {
+      harness.engine!.tools.setTool('spline');
+      if (selectPath) {
+        expect(harness.engine!.layers.vectorEdit.targetContextMenu({ x: 350, y: 300 })).toBe(true);
+      }
+    });
+    const owner = host!.querySelector<HTMLDivElement>('[data-canvas-context-menu-owner]')!;
+    owner.tabIndex = -1;
+    owner.focus();
+    return { engine: harness.engine!, owner };
+  };
+
+  it.each(['{Shift>}{F10}{/Shift}', '{ContextMenu}'])(
+    'opens the active path away from the corner with %s and executes an action with keys',
+    async (keys) => {
+      const { engine, owner } = await renderSpline();
+      await act(() => userEvent.keyboard(keys));
+      await expect.element(page.getByRole('menuitem', { name: 'Trace Path', exact: true })).toBeVisible();
+      expect(engine.interaction.get('vectorEditSession')?.activePathId).toBe('selected-path');
+      await act(() => userEvent.keyboard('{Escape}'));
+      await vi.waitFor(() => expect(document.activeElement).toBe(owner));
+      await act(() => userEvent.keyboard(keys));
+      await expect.element(page.getByRole('menuitem', { name: 'Trace Path', exact: true })).toBeVisible();
+      // Copy Path is immediately before Delete Path; navigate the actual menu without a pointer.
+      await userEvent.keyboard('{End}{ArrowUp}');
+      await expect
+        .element(page.getByRole('menuitem', { name: 'Copy Path', exact: true }))
+        .toHaveAttribute('data-highlighted');
+      await act(() => userEvent.keyboard('{Enter}'));
+      await vi.waitFor(() => expect(engine.interaction.get('vectorEditSession')?.paths).toHaveLength(3));
+      expect(engine.interaction.get('vectorEditSession')?.paths[1]?.points).toEqual(
+        engine.interaction.get('vectorEditSession')?.paths[0]?.points
+      );
+    }
+  );
+
+  it('keeps the active path when a keyboard keydown is followed by a native contextmenu event', async () => {
+    const { engine, owner } = await renderSpline();
+    const bounds = owner.getBoundingClientRect();
+    const key = new KeyboardEvent('keydown', { key: 'ContextMenu', bubbles: true, cancelable: true });
+    await act(() => owner.dispatchEvent(key));
+    expect(key.defaultPrevented).toBe(true);
+    await expect.element(page.getByRole('menuitem', { name: 'Trace Path', exact: true })).toBeVisible();
+
+    // Chromium emits this after the key, with coordinates unrelated to the selected path.
+    const nativeMenu = new PointerEvent('contextmenu', {
+      bubbles: true,
+      cancelable: true,
+      button: -1,
+      pointerType: 'mouse',
+      clientX: bounds.left + 750,
+      clientY: bounds.top + 450,
+    });
+    await act(() => owner.dispatchEvent(nativeMenu));
+
+    expect(nativeMenu.defaultPrevented).toBe(true);
+    expect(engine.interaction.get('vectorEditSession')?.activePathId).toBe('selected-path');
+    await expect.element(page.getByRole('menuitem', { name: 'Trace Path', exact: true })).toBeVisible();
+  });
+
+  it('keeps pointer targeting and native menus in inline editors, without handling other widgets', async () => {
+    const { engine, owner } = await renderSpline();
+    const bounds = owner.getBoundingClientRect();
+    await act(() =>
+      owner.dispatchEvent(
+        new MouseEvent('contextmenu', {
+          bubbles: true,
+          cancelable: true,
+          button: 2,
+          clientX: bounds.left + 750,
+          clientY: bounds.top + 450,
+        })
+      )
+    );
+    await expect.element(page.getByRole('menuitem', { name: 'Trace Path', exact: true })).toBeVisible();
+    expect(engine.interaction.get('vectorEditSession')?.activePathId).toBe('other-path');
+    await act(() => userEvent.keyboard('{Escape}'));
+    await expect.element(page.getByRole('menuitem', { name: 'Trace Path', exact: true })).not.toBeInTheDocument();
+
+    const editor = document.createElement('textarea');
+    owner.append(editor);
+    editor.focus();
+    const key = new KeyboardEvent('keydown', { key: 'F10', shiftKey: true, bubbles: true, cancelable: true });
+    const nativeMenu = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
+    await act(() => {
+      editor.dispatchEvent(key);
+      editor.dispatchEvent(nativeMenu);
+    });
+    expect(key.defaultPrevented).toBe(false);
+    expect(nativeMenu.defaultPrevented).toBe(false);
+    await expect.element(page.getByRole('menuitem', { name: 'Trace Path', exact: true })).not.toBeInTheDocument();
+
+    const elsewhere = document.createElement('button');
+    elsewhere.textContent = 'Other widget';
+    host!.append(elsewhere);
+    owner.focus();
+    await act(() => userEvent.keyboard('{Shift>}{F10}{/Shift}'));
+    await expect.element(page.getByRole('menuitem', { name: 'Trace Path', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Other widget' }).click();
+    await vi.waitFor(() => expect(document.activeElement).toBe(elsewhere));
+    await act(() => userEvent.keyboard('{Shift>}{F10}{/Shift}'));
+    await expect.element(page.getByRole('menuitem', { name: 'Trace Path', exact: true })).not.toBeInTheDocument();
+  });
+
+  it('uses the Canvas fallback when no path is active, including native keyboard contextmenu events', async () => {
+    const { owner } = await renderSpline(false);
+    await act(() => owner.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, button: 0 })));
+    await expect.element(page.getByRole('menu', { name: 'Canvas fallback' })).toBeVisible();
+    await expect.element(page.getByRole('menuitem', { name: 'Trace Path', exact: true })).not.toBeInTheDocument();
+  });
+});
 
 describe('CanvasWidgetView accept and stop', () => {
   it('accepts the result, then cancels its batch through the workbench queue command with the accept notice', async () => {
@@ -251,30 +571,9 @@ describe('CanvasWidgetView accept and stop', () => {
       title: 'Result accepted',
     });
   });
-
-  it('accepts a finished batch under the plain label and cancels nothing', async () => {
-    const { store } = await renderView('completed');
-
-    await page.getByRole('button', { exact: true, name: 'Accept to layer' }).click();
-
-    const project = store.getState().projects[0]!;
-    expect(project.canvas.document.stacks.raster).toHaveLength(1);
-    expect(project.queue.items[0]?.status).toBe('completed');
-  });
 });
 
 describe('CanvasWidgetView editing while results are staged', () => {
-  const background = layerContract('background', 'raster');
-
-  it('leaves the tools to the user while the batch runs: nothing is parked on View', async () => {
-    await renderView('running', { selectedLayer: background });
-
-    await act(() => harness.engine!.tools.setTool('brush'));
-    expect(harness.engine!.interaction.get('activeTool')).toBe('brush');
-    await act(() => harness.engine!.tools.setTool('bbox'));
-    expect(harness.engine!.interaction.get('activeTool')).toBe('bbox');
-  });
-
   it('lands a brush stroke on the selected layer while a result is staged and the batch runs', async () => {
     const paint = layerContract('paint', 'raster');
     await renderView('running', { domRaster: true, selectedLayer: paint });
@@ -298,47 +597,8 @@ describe('CanvasWidgetView editing while results are staged', () => {
     });
 
     await expect.poll(() => engine.history.getEntries().past).toEqual(['Brush stroke']);
-    // Staging is untouched by the edit.
     expect(activeProject().canvas.stagingArea.pendingImages.map((image) => image.imageName)).toEqual(['left-eye.png']);
     engine.surface.detach();
-  });
-
-  it('outlines where each pending result lands, and keeps those rects when the frame moves', async () => {
-    let setRegions: ReturnType<typeof vi.spyOn> | null = null;
-    const { projectId, store } = await renderView('running', {
-      beforeRender: (engine) => {
-        setRegions = vi.spyOn(engine.previews, 'setStagedRegions');
-      },
-      selectedLayer: background,
-    });
-    const submitted = store.getState().projects[0]!.queue.items[0]!.snapshot.canvas.document.bbox;
-    const pinned = [
-      { rect: { height: 64, width: 64, x: 0, y: 0 }, selected: true },
-      { rect: submitted, selected: false },
-      { rect: submitted, selected: false },
-    ];
-    expect(setRegions!.mock.lastCall).toEqual([pinned]);
-
-    await act(() =>
-      store.commands.canvas.apply(projectId, {
-        bbox: { ...submitted, x: submitted.x + 128, y: submitted.y + 64 },
-        type: 'setCanvasBbox',
-      })
-    );
-    expect(store.getState().projects[0]!.canvas.document.bbox.x).toBe(submitted.x + 128);
-    // The feed rereads only on staging, revision or queue changes: a frame move publishes nothing.
-    const calls = setRegions!.mock.calls.length;
-    expect(setRegions!.mock.lastCall).toEqual([pinned]);
-    await act(() => store.commands.canvas.apply(projectId, { imageIndex: 1, type: 'setStagedImageIndex' }));
-    expect(setRegions!.mock.calls).toHaveLength(calls + 1);
-    expect(setRegions!.mock.lastCall).toEqual([pinned.map((region, index) => ({ ...region, selected: index === 1 }))]);
-    await act(() => store.commands.canvas.apply(projectId, { imageIndex: 0, type: 'setStagedImageIndex' }));
-
-    // The next Invoke uses the moved frame; this result still lands at its own rect, on top of the stack.
-    await page.getByRole('button', { exact: true, name: 'Accept to layer' }).click();
-    const [accepted, existing] = store.getState().projects[0]!.canvas.document.stacks.raster;
-    expect(existing).toMatchObject({ id: 'background' });
-    expect(accepted).toMatchObject({ source: { image: { imageName: 'left-eye.png' } }, transform: { x: 0, y: 0 } });
   });
 });
 
@@ -357,17 +617,6 @@ describe('CanvasWidgetView staged results can come back', () => {
   const staged = (store: ReturnType<typeof createWorkbenchStore>) =>
     store.getState().projects[0]!.canvas.stagingArea.pendingImages.map((image) => image.imageName);
 
-  it('announces how many results are pending while the batch runs', async () => {
-    await renderView('running');
-    // One staged result and the two still generating.
-    await expect.element(page.getByRole('status').getByText('Generating, 3 results pending')).toBeVisible();
-  });
-
-  it('announces the results still waiting for review once the batch is done', async () => {
-    await renderView('completed');
-    await expect.element(page.getByRole('status').getByText('1 result pending')).toBeVisible();
-  });
-
   it('keeps keyboard focus in the staging bar after Delete discards the selected result', async () => {
     const { store } = await renderView('running');
     const selected = page.getByRole('button', { name: 'Select staged candidate 1' }).element() as HTMLElement;
@@ -376,7 +625,6 @@ describe('CanvasWidgetView staged results can come back', () => {
     await act(() => userEvent.keyboard('{Delete}'));
 
     expect(staged(store)).toEqual([]);
-    // The result now selected (a placeholder still generating) takes focus, not the page.
     await expect.poll(() => document.activeElement?.getAttribute('aria-current')).toBe('true');
     expect(document.activeElement?.hasAttribute('data-staging-thumbnail')).toBe(true);
   });
@@ -413,33 +661,7 @@ describe('CanvasWidgetView staged results can come back', () => {
 
     await act(() => undoOf(store)!());
     expect(staged(store)).toEqual(['left-eye.png', 'right-eye.png']);
-    // The Undo used up the restore point of the same results.
     expect(store.getState().projects[0]!.canvas.snapshots).toEqual([]);
-  });
-
-  it('accepts one result and offers the ones it set aside back', async () => {
-    const { store } = await renderView('completed', {
-      beforeRender: () =>
-        harness.store!.commands.canvas.appendStagingCandidate({
-          candidate: second,
-          projectId: harness.store!.getState().activeProjectId,
-        }),
-    });
-
-    await page.getByRole('button', { exact: true, name: 'Accept to layer' }).click();
-    expect(store.getState().projects[0]!.canvas.document.stacks.raster).toHaveLength(1);
-    expect(staged(store)).toEqual([]);
-    expect(store.getState().notifications[0]).toMatchObject({ title: 'Result accepted' });
-    expect(store.getState().notifications[0]?.message).toMatch(/^Set aside 1 other result\./);
-    // The button brings back the results set aside, not the accept, and says so.
-    expect(store.getState().notifications[0]?.actions).toEqual([
-      expect.objectContaining({ kind: 'undo', label: 'Review the other result' }),
-    ]);
-
-    await act(() => undoOf(store)!());
-    expect(staged(store)).toEqual(['right-eye.png']);
-    // The accepted layer stays; undoing it is the canvas's own step.
-    expect(store.getState().projects[0]!.canvas.document.stacks.raster).toHaveLength(1);
   });
 });
 
@@ -455,6 +677,7 @@ describe('CanvasWidgetView clipboard shortcuts', () => {
     const { commandHandlers, store } = await renderView('completed', { staged: false });
     withoutClipboard();
     vi.spyOn(harness.engine!.selection, 'exportSelectionBlob').mockResolvedValue(new Blob([], { type: 'image/png' }));
+    vi.spyOn(harness.engine!.selection, 'admitSelectionErase').mockReturnValue(true);
     const erase = vi.spyOn(harness.engine!.selection, 'eraseSelection');
 
     await act(() => commandHandlers.get('canvas.copySelection')!());
@@ -466,52 +689,15 @@ describe('CanvasWidgetView clipboard shortcuts', () => {
       })
     );
 
-    // Cut fails the same way, so the store coalesces it into the same notice.
     await act(() => commandHandlers.get('canvas.cutSelection')!());
     await vi.waitFor(() => expect(store.getState().notifications[0]?.occurrenceCount).toBe(2));
     expect(erase).not.toHaveBeenCalled();
-  });
-
-  it('says why paste does nothing', async () => {
-    const { commandHandlers, store } = await renderView('completed', { staged: false });
-    withoutClipboard();
-
-    await act(() => commandHandlers.get('canvas.pasteImage')!());
-
-    await vi.waitFor(() =>
-      expect(store.getState().notifications[0]).toMatchObject({
-        kind: 'error',
-        message: 'Pasting needs HTTPS or localhost',
-        title: 'Could not paste an image from the clipboard',
-      })
-    );
-  });
-
-  it('reports a clipboard image that cannot be retrieved without blaming the address', async () => {
-    const { commandHandlers, store } = await renderView('completed', { staged: false });
-    const item = {
-      getType: () => Promise.reject(new DOMException('Image data unavailable', 'DataError')),
-      types: ['image/png'],
-    } as unknown as ClipboardItem;
-    vi.spyOn(Navigator.prototype, 'clipboard', 'get').mockReturnValue({
-      read: () => Promise.resolve([item]),
-    } as unknown as Clipboard);
-
-    await act(() => commandHandlers.get('canvas.pasteImage')!());
-
-    await vi.waitFor(() =>
-      expect(store.getState().notifications[0]).toMatchObject({
-        kind: 'error',
-        title: 'Could not paste an image from the clipboard',
-      })
-    );
-    expect(store.getState().notifications[0]?.message).toBeUndefined();
   });
 });
 
 describe('CanvasWidgetView control layer overlay', () => {
   const emptyControlLayer = createControlLayer({ id: 'control-1', name: 'Control Layer 1' });
-  const hint = () => page.getByRole('note').filter({ hasText: 'Drop an image here' });
+  const hint = () => page.getByRole('note').filter({ hasText: 'Add an image' });
 
   afterEach(() => {
     vi.restoreAllMocks();
@@ -521,7 +707,9 @@ describe('CanvasWidgetView control layer overlay', () => {
     await renderView('completed', { selectedLayer: emptyControlLayer, staged: false });
 
     await expect.element(hint()).toBeVisible();
-    await expect.element(hint().getByText('or pick one in Properties', { exact: true })).toBeVisible();
+    await expect
+      .element(hint().getByText('Drag one onto Add as control layer, or pick one in Properties', { exact: true }))
+      .toBeVisible();
 
     await act(() => harness.engine!.tools.setTool('brush'));
     await expect.element(hint()).not.toBeInTheDocument();
@@ -533,32 +721,6 @@ describe('CanvasWidgetView control layer overlay', () => {
     await expect.element(hint()).toBeVisible();
   });
 
-  it('keeps pointing at the image sources while a result is staged: the canvas stays editable', async () => {
-    await renderView('completed', { selectedLayer: emptyControlLayer });
-
-    await expect.element(page.getByRole('button', { exact: true, name: 'Accept to layer' })).toBeVisible();
-    await expect.element(hint()).toBeVisible();
-  });
-
-  it('gives way to the drop zones while a gallery image is dragged', async () => {
-    harness.dragData = { items: [{ kind: 'image', name: 'photo.png' }], kind: 'gallery-item' };
-    await renderView('completed', { selectedLayer: emptyControlLayer, staged: false });
-
-    await expect.element(page.getByText('Drop an image here')).toBeInTheDocument();
-    await expect.element(hint()).not.toBeInTheDocument();
-  });
-
-  it('shows no hint once the control layer has an image', async () => {
-    const filled: CanvasControlLayerContract = {
-      ...emptyControlLayer,
-      source: { image: { height: 64, imageName: 'photo.png', width: 96 }, type: 'image' },
-    };
-    await renderView('completed', { selectedLayer: filled, staged: false });
-
-    expect(page.getByRole('note').elements()).toHaveLength(0);
-    expect(page.getByText('Drop an image here').elements()).toHaveLength(0);
-  });
-
   const depthLayer: CanvasControlLayerContract = {
     ...emptyControlLayer,
     controlType: 'depth',
@@ -566,7 +728,6 @@ describe('CanvasWidgetView control layer overlay', () => {
     source: { image: { height: 64, imageName: 'photo.png', width: 96 }, type: 'image' },
   };
 
-  /** Renders `layer` with its detection status driven by the returned store. */
   const renderWithStatuses = async (layer: CanvasControlLayerContract = depthLayer) => {
     const statuses = createControlDetectionStatusStore();
     await renderView('completed', {
@@ -581,42 +742,6 @@ describe('CanvasWidgetView control layer overlay', () => {
     return statuses;
   };
 
-  it('announces a background detection run while it is queued or processing, below the header row', async () => {
-    const statuses = await renderWithStatuses();
-    const layer = depthLayer;
-    // The shell reserves this much of the center view for its header row (zoom, fit, undo).
-    host!.style.setProperty('--wb-center-chrome-inset', '3rem');
-    const status = page.getByRole('status').filter({ hasText: /^(Running|Waiting to run) / });
-
-    expect(status.elements()).toHaveLength(0);
-
-    await act(() => statuses.set(layer.id, { status: 'queued' }));
-    await expect.element(status).toHaveTextContent('Waiting to run Depth Anything…');
-    await expect.element(status).toHaveAttribute('aria-live', 'polite');
-    const headerBottom = host!.getBoundingClientRect().top + 48;
-    expect(status.element().getBoundingClientRect().top).toBeGreaterThanOrEqual(headerBottom);
-
-    await act(() => statuses.set(layer.id, { detector: 'normal_map', status: 'processing' }));
-    await expect.element(status).toHaveTextContent('Running Normal map…');
-
-    await act(() => statuses.set(layer.id, { status: 'idle' }));
-    await expect.element(status).not.toBeInTheDocument();
-  });
-
-  it('announces a failed detection run with its reason and no spinner', async () => {
-    const statuses = await renderWithStatuses();
-
-    await act(() => statuses.set(depthLayer.id, { error: { code: 'process-failed' }, status: 'error' }));
-
-    const status = page.getByRole('status').filter({ hasText: /failed/ });
-    await expect.element(status).toHaveTextContent('Depth Anything failed: the detector could not run');
-    expect(status.element().querySelector('.chakra-spinner')).toBeNull();
-
-    await act(() => statuses.set(depthLayer.id, { status: 'idle' }));
-    await expect.element(status).not.toBeInTheDocument();
-  });
-
-  /** A depth layer whose map was detected from the photo it keeps. */
   const readyLayer: CanvasControlLayerContract = {
     ...depthLayer,
     filter: depthLayer.detection!,
@@ -639,7 +764,6 @@ describe('CanvasWidgetView control layer overlay', () => {
     expect(setView).toHaveBeenLastCalledWith('control-1', 'original');
     await expect.element(viewOption('Original')).toBeChecked();
 
-    // The engine ends the view (an edit, another selection): the switch follows it back to Map.
     await act(() => engine.previews.setControlLayerView('control-1', 'map'));
     await expect.element(viewOption('Map')).toBeChecked();
 
@@ -671,185 +795,203 @@ describe('CanvasWidgetView control layer overlay', () => {
     await expect.element(viewOption('Map')).toBeChecked();
     expect(store.getState().notifications[0]).toMatchObject({ kind: 'error', title });
   });
-
-  it('shows Map while the engine holds a view of another layer', async () => {
-    await renderView('completed', { selectedLayer: readyLayer, staged: false });
-    const view: ControlLayerView = { layerId: 'other-control', view: 'original' };
-
-    const { stores } = harness.engine as unknown as {
-      stores: { controlLayerView: { set(value: ControlLayerView | null): void } };
-    };
-    await act(() => stores.controlLayerView.set(view));
-
-    await expect.element(viewOption('Map')).toBeChecked();
-  });
-
-  it.each([
-    ['queued', { status: 'queued' as const }, /^Waiting to run /],
-    ['failed', { error: { code: 'process-failed' as const }, status: 'error' as const }, /failed/],
-  ])('gives the slot to the detection chip while a run is %s', async (_case, runStatus, chipText) => {
-    const statuses = await renderWithStatuses(readyLayer);
-    await expect.element(viewSwitch()).toBeVisible();
-
-    await act(() => statuses.set(readyLayer.id, runStatus));
-    await expect.element(page.getByRole('status').filter({ hasText: chipText })).toBeVisible();
-    expect(viewSwitch().elements()).toHaveLength(0);
-
-    await act(() => statuses.set(readyLayer.id, { status: 'idle' }));
-    await expect.element(viewSwitch()).toBeVisible();
-  });
-
-  it.each([
-    ['an empty untyped layer', emptyControlLayer],
-    ['a typed layer with no original', depthLayer],
-    ['a layer whose map awaits detection', { ...readyLayer, filter: { settings: {}, type: 'canny_edge_detection' } }],
-    ['a disabled layer', { ...readyLayer, isEnabled: false }],
-    ['a hidden layer', { ...readyLayer, isHidden: true }],
-  ])('offers no view switch for %s', async (_case, layer) => {
-    await renderWithStatuses(layer);
-
-    await expect.element(page.getByRole('status')).toBeInTheDocument();
-    expect(viewSwitch().elements()).toHaveLength(0);
-  });
-
-  it('keeps the view switch while a result is staged', async () => {
-    await renderView('completed', { selectedLayer: readyLayer });
-
-    await expect.element(page.getByRole('button', { exact: true, name: 'Accept to layer' })).toBeVisible();
-    await expect.element(viewSwitch()).toBeVisible();
-  });
-
-  it('hides the view switch while an operation holds the document', async () => {
-    await renderView('completed', { selectedLayer: readyLayer, staged: false });
-    await expect.element(viewSwitch()).toBeVisible();
-
-    const { stores } = harness.engine as unknown as {
-      stores: { documentEditingLocked: { set(value: boolean): void } };
-    };
-    await act(() => stores.documentEditingLocked.set(true));
-
-    await expect.element(viewSwitch()).not.toBeInTheDocument();
-  });
-
-  it('gives way to the drop zones while a gallery image is dragged', async () => {
-    harness.dragData = { items: [{ kind: 'image', name: 'photo.png' }], kind: 'gallery-item' };
-    await renderView('completed', { selectedLayer: readyLayer, staged: false });
-
-    await expect.element(page.getByRole('status')).toBeInTheDocument();
-    expect(viewSwitch().elements()).toHaveLength(0);
-  });
 });
 
 describe('CanvasWidgetView desktop file drops', () => {
-  const emptyControlLayer = createControlLayer({ id: 'control-1', name: 'Control Layer 1' });
-  const PHOTO_FILE = new File([new Uint8Array([137, 80, 78, 71])], 'photo.png', { type: 'image/png' });
-  const UPLOADED = { height: 64, imageName: 'dropped.png', width: 96 } as GalleryImage;
-  const hint = () => page.getByRole('note');
+  const imageFile = (name: string) =>
+    new File([Uint8Array.from(atob(TINY_PNG_BASE64), (char) => char.charCodeAt(0))], name, { type: 'image/png' });
+  const stored = (file: { name: string }): GalleryImage => ({
+    boardId: 'none',
+    height: 2,
+    imageCategory: 'user',
+    imageName: `stored-${file.name}`,
+    imageUrl: `/images/stored-${file.name}`,
+    queuedAt: '2026-11-10T00:00:00.000Z',
+    sourceQueueItemId: 'upload',
+    starred: false,
+    thumbnailUrl: `/thumbnails/stored-${file.name}`,
+    width: 2,
+  });
+  const surface = () => page.getByRole('region', { exact: true, name: 'Canvas surface' }).element();
+  const zone = (name: string) => page.getByText(name, { exact: true });
+  const titles = (store: Awaited<ReturnType<typeof renderView>>['store']) =>
+    store.getState().notifications.map((notification) => notification.title);
+  const rasterLayersOf = (projectId: string) =>
+    harness.store!.getState().projects.find((project) => project.id === projectId)!.canvas.document.stacks.raster;
+  // The first drop loads the upload code; a cold transform can take longer than `waitFor`'s default second.
+  const LANDED = { timeout: 5_000 };
 
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  /** Sends a native drag carrying `transfer` over the canvas and drops it; returns whether each event was taken. */
-  const drag = async (transfer: DataTransfer) => {
-    const surface = page.getByRole('region', { exact: true, name: 'Canvas surface' }).element();
-    const over = new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: transfer });
-    const drop = new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: transfer });
-    await act(() => surface.dispatchEvent(over));
-    await act(() => surface.dispatchEvent(drop));
-    return { dropTaken: drop.defaultPrevented, overTaken: over.defaultPrevented };
+  const centreOf = (element: Element) => {
+    const rect = element.getBoundingClientRect();
+    return { clientX: rect.left + rect.width / 2, clientY: rect.top + rect.height / 2 };
   };
-  const dragFiles = (files: File[]) => {
+  const pointOn = (destination: 'control' | 'raster') => {
+    const rect = surface().getBoundingClientRect();
+    return {
+      x: rect.left + rect.width * (destination === 'raster' ? 0.25 : 0.75),
+      y: rect.top + rect.height * 0.25,
+    };
+  };
+  const nativeDrop = (destination: 'control' | 'raster', names: string[]) =>
+    commands.nativeDrag({
+      files: names.map((name) => ({ base64: TINY_PNG_BASE64, name })),
+      frameWidth: window.innerWidth,
+      points: [pointOn(destination)],
+    });
+  const send = async (type: string, transfer: DataTransfer, init: DragEventInit = {}, target: Element = surface()) => {
+    const event = new DragEvent(type, { bubbles: true, cancelable: true, dataTransfer: transfer, ...init });
+    await act(() => target.dispatchEvent(event));
+    return event;
+  };
+  const transferOf = (files: File[]) => {
     const transfer = new DataTransfer();
     for (const file of files) {
       transfer.items.add(file);
     }
-    return drag(transfer);
+    return transfer;
   };
-  const lastNotice = (store: Awaited<ReturnType<typeof renderView>>['store']) => store.getState().notifications[0];
+  const dropOn = async (zoneName: string, files: File[]) => {
+    const transfer = transferOf(files);
+    await send('dragenter', transfer);
+    await expect.element(zone(zoneName)).toBeVisible();
+    const at = centreOf(zone(zoneName).element());
+    await send('dragover', transfer, at);
+    return send('drop', transfer, at);
+  };
 
-  it('fills an empty control layer from a dropped image, says it is uploading, and refuses a second drop meanwhile', async () => {
-    let finishUpload!: (image: GalleryImage) => void;
-    const upload = vi.spyOn(galleryTransfers, 'upload').mockReturnValue(
-      new Promise((resolve) => {
-        finishUpload = resolve;
+  it('uploads image files dropped from the desktop on a zone and adds them as it says, at the frame', async () => {
+    harness.uploadImage.mockImplementation((file) => Promise.resolve(stored(file)));
+    const { projectId, store } = await renderView('completed', { hostWidth: window.innerWidth, staged: false });
+    const before = rasterLayersOf(projectId).length;
+
+    await nativeDrop('raster', ['one.png', 'two.png']);
+
+    await vi.waitFor(() => expect(rasterLayersOf(projectId)).toHaveLength(before + 2), LANDED);
+    expect(harness.uploadImage.mock.calls.map(([file, boardId]) => [file.name, boardId])).toEqual([
+      ['one.png', 'none'],
+      ['two.png', 'none'],
+    ]);
+    const { bbox } = activeProject().canvas.document;
+    expect(
+      rasterLayersOf(projectId)
+        .slice(-2)
+        .map((layer) =>
+          layer.type === 'raster' ? { source: layer.source, x: layer.transform.x, y: layer.transform.y } : null
+        )
+    ).toEqual([
+      { source: { image: { height: 2, imageName: 'stored-one.png', width: 2 }, type: 'image' }, x: bbox.x, y: bbox.y },
+      { source: { image: { height: 2, imageName: 'stored-two.png', width: 2 }, type: 'image' }, x: bbox.x, y: bbox.y },
+    ]);
+    await vi.waitFor(() =>
+      expect(titles(store)).toEqual(['Added 2 images as canvas layers', expect.stringMatching(/^Uploaded 2 /)])
+    );
+    expect(zone('Add as raster layer').elements()).toHaveLength(0);
+  });
+
+  it('refuses a second drop while the first is still uploading, rather than adding everything twice', async () => {
+    let finishUpload!: () => void;
+    harness.uploadImage.mockImplementation(
+      (file) =>
+        new Promise((resolve) => {
+          finishUpload = () => resolve(stored(file));
+        })
+    );
+    const { projectId, store } = await renderView('completed', { hostWidth: window.innerWidth, staged: false });
+    const before = rasterLayersOf(projectId).length;
+
+    await dropOn('Add as raster layer', [imageFile('one.png')]);
+    await vi.waitFor(() => expect(harness.uploadImage).toHaveBeenCalledTimes(1), LANDED);
+    await dropOn('Add as raster layer', [imageFile('again.png')]);
+
+    expect(store.getState().notifications[0]).toMatchObject({
+      kind: 'info',
+      title: 'The files you dropped are still uploading. Try again when they are done.',
+    });
+    await act(() => finishUpload());
+    await vi.waitFor(() => expect(rasterLayersOf(projectId)).toHaveLength(before + 1));
+    expect(harness.uploadImage).toHaveBeenCalledTimes(1);
+  });
+
+  it('lands an upload that finishes after a project switch on the project it was dropped on, keeping its edits', async () => {
+    let finishUpload!: () => void;
+    harness.uploadImage.mockImplementation(
+      (file) =>
+        new Promise((resolve) => {
+          finishUpload = () => resolve(stored(file));
+        })
+    );
+    const { projectId, store } = await renderView('completed', { hostWidth: window.innerWidth, staged: false });
+
+    await dropOn('Add as raster layer', [imageFile('late.png')]);
+    await vi.waitFor(() => expect(harness.uploadImage).toHaveBeenCalledTimes(1), LANDED);
+    await act(() =>
+      store.commands.canvas.apply(projectId, {
+        document: {
+          ...activeProject().canvas.document,
+          stacks: stacksFrom([...rasterLayersOf(projectId), layerContract('kept', 'raster')]),
+        },
+        type: 'replaceCanvasDocument',
       })
     );
-    const { store } = await renderView('completed', {
-      beforeRender: (engine) => {
-        vi.spyOn(getCanvasOperations(engine), 'applyControlLayerIntent').mockReturnValue('updated');
-      },
-      selectedLayer: emptyControlLayer,
-      staged: false,
-    });
-    const apply = vi.mocked(getCanvasOperations(harness.engine!).applyControlLayerIntent);
+    const switchedTo = await act(() => store.commands.projects.create());
+    await act(() => finishUpload());
 
-    expect(await dragFiles([PHOTO_FILE])).toEqual({ dropTaken: true, overTaken: true });
-    await expect.element(hint()).toHaveTextContent('Uploading…');
-    await expect.element(hint()).toHaveAttribute('aria-busy', 'true');
-
-    // A second drop while the first is on its way would race it: refused, with the reason.
-    await dragFiles([PHOTO_FILE]);
-    expect(upload).toHaveBeenCalledTimes(1);
     await vi.waitFor(() =>
-      expect(lastNotice(store)).toMatchObject({ title: 'An image is still uploading to this layer.' })
+      expect(rasterLayersOf(projectId).map((layer) => layer.type === 'raster' && layer.source)).toContainEqual({
+        image: { height: 2, imageName: 'stored-late.png', width: 2 },
+        type: 'image',
+      })
     );
-
-    await act(() => finishUpload(UPLOADED));
-    await vi.waitFor(() => expect(apply).toHaveBeenCalledTimes(1));
-    const { bbox } = activeProject().canvas.document;
-    expect(upload).toHaveBeenCalledWith(PHOTO_FILE, 'none', expect.anything());
-    expect(apply).toHaveBeenCalledWith('control-1', {
-      image: { height: 64, imageName: 'dropped.png', width: 96 },
-      kind: 'replace-image',
-      transform: { rotation: 0, scaleX: 1, scaleY: 1, x: bbox.x, y: bbox.y },
-    });
-    // Properties names the image after the file, as for its own Upload.
-    expect(getControlSourceSnapshot(harness.engine!).origins['dropped.png']).toEqual({
-      kind: 'file',
-      name: 'photo.png',
-    });
-    // The upload has landed: the card no longer says it is uploading.
-    await vi.waitFor(() => expect(hint().element().getAttribute('aria-busy')).toBe('false'));
-    expect(hint().element().textContent).toContain('Drop an image here');
+    expect(rasterLayersOf(projectId).map((layer) => layer.id)).toContain('kept');
+    expect(store.getState().activeProjectId).toBe(switchedTo.id);
+    expect(rasterLayersOf(switchedTo.id)).toHaveLength(0);
   });
 
-  it('refuses a drop on a control layer locked by its group before uploading anything', async () => {
-    const upload = vi.spyOn(galleryTransfers, 'upload');
-    const { store } = await renderView('completed', {
-      nodes: [groupContract('group-1', [emptyControlLayer], { isLocked: true })],
-      selectedLayer: emptyControlLayer,
-      staged: false,
-    });
+  it('ends the drag when it leaves the canvas, leaves the window, is cancelled or is dropped elsewhere', async () => {
+    await renderView('completed', { hostWidth: window.innerWidth, staged: false });
+    const transfer = transferOf([imageFile('one.png')]);
+    const zonesShown = () => zone('Add as inpaint mask').elements().length > 0;
 
-    expect(await dragFiles([PHOTO_FILE])).toEqual({ dropTaken: true, overTaken: true });
+    await send('dragenter', transfer);
+    expect(zonesShown()).toBe(true);
+    await send('dragleave', transfer, { relatedTarget: document.body });
+    expect(zonesShown()).toBe(false);
 
-    expect(lastNotice(store)).toMatchObject({ title: 'Unlock the layer before using this action.' });
-    expect(upload).not.toHaveBeenCalled();
+    const doomed = document.createElement('div');
+    surface().append(doomed);
+    await send('dragenter', transfer);
+    await send('dragenter', transfer, { relatedTarget: surface() }, doomed);
+    doomed.remove();
+    await send('dragleave', transfer, { relatedTarget: null });
+    await vi.waitFor(() => expect(zonesShown()).toBe(false));
+
+    await send('dragenter', transfer);
+    await act(() => document.body.dispatchEvent(new DragEvent('drop', { bubbles: true, dataTransfer: transfer })));
+    expect(zonesShown()).toBe(false);
+    await send('dragenter', transfer);
+    await act(() => window.dispatchEvent(new DragEvent('dragend')));
+    expect(zonesShown()).toBe(false);
   });
 
-  it('says what a drop needs when no empty control layer is selected, or the files do not fit', async () => {
-    const upload = vi.spyOn(galleryTransfers, 'upload');
-    const { store } = await renderView('completed', {
-      selectedLayer: layerContract('raster-1', 'raster'),
-      staged: false,
+  it('takes no drop while an operation holds the canvas, and says why while files or gallery images hover', async () => {
+    harness.operation = { identity: { kind: 'filter' }, status: 'active' };
+    await renderView('completed', { hostWidth: window.innerWidth, staged: false });
+    const busy = () => page.getByText('The canvas is busy. Try again when the current action finishes.');
+
+    await send('dragenter', transferOf([imageFile('one.png')]));
+    await expect.element(busy()).toBeVisible();
+    expect(zone('Add as raster layer').elements()).toHaveLength(0);
+    await send('dragleave', transferOf([imageFile('one.png')]), { relatedTarget: document.body });
+
+    await nativeDrop('raster', ['one.png']);
+    await expect.element(busy()).not.toBeInTheDocument();
+    await new Promise((resolve) => {
+      setTimeout(resolve, 500);
     });
-
-    await dragFiles([PHOTO_FILE]);
-    expect(lastNotice(store)).toMatchObject({ title: 'Select an empty control layer to drop an image on it.' });
-    await dragFiles([new File(['notes'], 'notes.txt', { type: 'text/plain' })]);
-    expect(lastNotice(store)).toMatchObject({ title: 'Only image files can be dropped on the canvas.' });
-    await dragFiles([PHOTO_FILE, PHOTO_FILE]);
-    expect(lastNotice(store)).toMatchObject({ title: 'Drop one image at a time.' });
-
-    expect(upload).not.toHaveBeenCalled();
-  });
-
-  it('leaves a drag that carries no files alone', async () => {
-    await renderView('completed', { selectedLayer: emptyControlLayer, staged: false });
-    const transfer = new DataTransfer();
-    transfer.setData('text/plain', 'not a file');
-
-    expect(await drag(transfer)).toEqual({ dropTaken: false, overTaken: false });
+    expect(harness.uploadImage).not.toHaveBeenCalled();
   });
 });

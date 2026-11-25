@@ -21,8 +21,8 @@ const wrapCanvasSurface = (canvas: HTMLCanvasElement): RasterSurface => {
       canvas.width = width;
       canvas.height = height;
     },
-    // The mounted canvas element must retain identity, so growth copies through a temporary surface instead of
-    // swapping backing stores. Only layer caches currently grow.
+    // The mounted canvas element must retain identity, so growth copies through a temporary surface instead of swapping
+    // backing stores. Only layer caches currently grow.
     resizePreserving(width: number, height: number, dx: number, dy: number) {
       const previous = document.createElement('canvas');
       previous.width = canvas.width;
@@ -49,8 +49,13 @@ export interface RenderControllerOptions extends RenderSchedulerDeps {
     onPointerLeave: (event: PointerEvent) => void;
     onKeyDown: (event: KeyboardEvent) => void;
     onKeyUp: (event: KeyboardEvent) => void;
+    /** Both key events in the capture phase, so no handler that stops propagation hides them. */
+    onKeyCapture: (event: KeyboardEvent) => void;
     onFocusIn: (event: FocusEvent) => void;
+    onWindowFocus: () => void;
     onWheel: (event: WheelEvent) => void;
+    onPinchGestureStart: (event: Event) => void;
+    onPinchGestureChange: (event: Event) => void;
     reset(): void;
   };
   readonly onPageHide: () => void;
@@ -123,10 +128,15 @@ export class RenderController {
     this.input.addEventListener('pointerenter', handlers.onPointerEnter);
     this.input.addEventListener('pointerleave', handlers.onPointerLeave);
     this.input.addEventListener('wheel', handlers.onWheel, { passive: false });
+    this.input.addEventListener('gesturestart', handlers.onPinchGestureStart, { passive: false });
+    this.input.addEventListener('gesturechange', handlers.onPinchGestureChange, { passive: false });
     if (typeof globalThis.addEventListener === 'function') {
       globalThis.addEventListener('keydown', handlers.onKeyDown);
       globalThis.addEventListener('keyup', handlers.onKeyUp);
+      globalThis.addEventListener('keydown', handlers.onKeyCapture, true);
+      globalThis.addEventListener('keyup', handlers.onKeyCapture, true);
       globalThis.addEventListener('focusin', handlers.onFocusIn);
+      globalThis.addEventListener('focus', handlers.onWindowFocus);
       globalThis.addEventListener('pagehide', this.options.onPageHide);
       globalThis.addEventListener('blur', this.options.onWindowBlur);
     }
@@ -150,12 +160,17 @@ export class RenderController {
       this.input.removeEventListener('pointerenter', handlers.onPointerEnter);
       this.input.removeEventListener('pointerleave', handlers.onPointerLeave);
       this.input.removeEventListener('wheel', handlers.onWheel);
+      this.input.removeEventListener('gesturestart', handlers.onPinchGestureStart);
+      this.input.removeEventListener('gesturechange', handlers.onPinchGestureChange);
       this.options.applyCursor('');
     }
     if (typeof globalThis.removeEventListener === 'function') {
       globalThis.removeEventListener('keydown', handlers.onKeyDown);
       globalThis.removeEventListener('keyup', handlers.onKeyUp);
+      globalThis.removeEventListener('keydown', handlers.onKeyCapture, true);
+      globalThis.removeEventListener('keyup', handlers.onKeyCapture, true);
       globalThis.removeEventListener('focusin', handlers.onFocusIn);
+      globalThis.removeEventListener('focus', handlers.onWindowFocus);
       globalThis.removeEventListener('pagehide', this.options.onPageHide);
       globalThis.removeEventListener('blur', this.options.onWindowBlur);
     }

@@ -22,6 +22,9 @@ and ``order`` make the ordering constraint visible -- room has to be reserved *b
 widen, or the reservation is for a smaller model than the one about to exist -- and that constraint
 is held at every seam today by the order the calls happen to be written in. An end-state assertion
 cannot see it. These can.
+
+:func:`assert_fp8_storage_declined` is the shared assertion for a quantized build that FP8 Storage must
+leave as loaded.
 """
 
 from collections.abc import Callable, Mapping
@@ -34,6 +37,7 @@ import pytest
 import torch
 
 from invokeai.backend.util.devices import TorchDevice
+from tests.fixtures.safetensors_files import served_checkpoint
 
 #: Distinguishes "do not touch `read_safetensors_metadata`" from "make it return nothing". Both are
 #: real cases: a loader can be tested against a file whose header it really reads, and against that
@@ -49,9 +53,11 @@ class Seam:
     #: Where the loader's ``from x import y`` names live, and so where a patch has to land.
     module: ModuleType
     entry: str = "_load_from_singlefile"
-    #: Only for a loader that calls ``safetensors.torch.load_file`` through the package rather than
-    #: importing the name. Patching the wrong host patches a name nobody reads, and the loader then
-    #: quietly reads whatever file the config points at.
+    #: Only for a seam whose entry point makes a raw ``load_file`` read, beside or instead of the shared
+    #: ``load_safetensors_checkpoint`` helper (which is patched whenever ``module`` has it). It names where
+    #: that read resolves ``load_file``: ``safetensors.torch`` for a loader that imports the name inside the
+    #: method, the module itself for one that imports it at module level. Patching the wrong host patches a
+    #: name nobody reads, and the loader then quietly reads whatever file the config points at.
     load_file_host: ModuleType | None = None
     compute_dtype: torch.dtype = torch.float32
     #: ``TorchDevice`` is one class shared by every loader module, so this is a switch rather than a
@@ -120,8 +126,8 @@ def prepare(
     run = SeamRun(seam=seam, loader=None)
     served: list[dict[str, torch.Tensor]] = []
 
-    def load_file(_path):
-        served.append(dict(state_dict or {}))
+    def load_file(_path, *, select=None, owned: bool = False):
+        served.append(served_checkpoint(dict(state_dict or {}))(_path, select=select, owned=owned))
         return served[-1]
 
     def make_room(reserve: int) -> None:
@@ -144,7 +150,11 @@ def prepare(
     run.loader = loader
 
     if state_dict is not None:
-        monkeypatch.setattr(seam.load_file_host or seam.module, "load_file", load_file)
+        has_helper = hasattr(seam.module, "load_safetensors_checkpoint")
+        if has_helper:
+            monkeypatch.setattr(seam.module, "load_safetensors_checkpoint", load_file)
+        if seam.load_file_host is not None or not has_helper:
+            monkeypatch.setattr(seam.load_file_host or seam.module, "load_file", load_file)
     if metadata is not UNSET:
         header = dict(metadata) if metadata is not None else None
         monkeypatch.setattr(seam.module, "read_safetensors_metadata", lambda _path, _logger: header)
@@ -166,3 +176,36 @@ def prepare(
         monkeypatch.setattr(seam.module, name, step)
 
     return run
+
+
+FP8_STORAGE_SKIPPED = (
+    "FP8 Storage skipped for {name} - this quantized build keeps its quantized layers as stored and its other "
+    "layers in the precision the build chose."
+)
+
+
+def logged_info(logger: MagicMock) -> list[str]:
+    """The messages a loader's mocked logger received at INFO."""
+    return [call.args[0] for call in logger.info.call_args_list]
+
+
+def assert_fp8_storage_declined(
+    stored: torch.nn.Module,
+    plain: torch.nn.Module,
+    info: list[str],
+    name: str,
+) -> None:
+    """``stored`` is the load with FP8 Storage on, ``plain`` the same load with it off.
+
+    A quantized build is left exactly as loaded: same keys, same dtypes, same values, and one notice saying so.
+    """
+    stored_state, plain_state = stored.state_dict(), plain.state_dict()
+    assert stored_state.keys() == plain_state.keys()
+    for key, tensor in stored_state.items():
+        assert tensor.dtype is plain_state[key].dtype, key
+        # Widened where the dtype has no equality kernel (float8); the dtype itself is asserted above.
+        widen = tensor.dtype.is_floating_point
+        assert torch.equal(
+            tensor.float() if widen else tensor, plain_state[key].float() if widen else plain_state[key]
+        ), key
+    assert info.count(FP8_STORAGE_SKIPPED.format(name=name)) == 1

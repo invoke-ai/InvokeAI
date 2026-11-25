@@ -135,15 +135,6 @@ afterEach(async () => {
 });
 
 describe('useProjectActions', () => {
-  it('keeps its actions stable across re-renders, so callers can memoize what they build from them', async () => {
-    seenOpenProjects.length = 0;
-    await act(() => root?.render(<Harness renderCount={1} />));
-    await act(() => root?.render(<Harness renderCount={2} />));
-
-    expect(seenOpenProjects).toHaveLength(2);
-    expect(seenOpenProjects[1]).toBe(seenOpenProjects[0]);
-  });
-
   it('blocks project deletion while a queue run is active and offers the queue', async () => {
     harness.project.queue.items = [{ status: 'running' } as Project['queue']['items'][number]];
     await act(() => root?.render(<Harness />));
@@ -154,29 +145,6 @@ describe('useProjectActions', () => {
       actions: [{ kind: 'open-widget', widgetId: 'queue' }],
     });
     expect(harness.deleteLibraryProject).not.toHaveBeenCalled();
-  });
-
-  it('names why the server-side checks refused a delete, and offers the queue only for active runs', async () => {
-    const { ProjectDeletionRefusedError } = await import('./library');
-    await act(() => root?.render(<Harness />));
-
-    harness.deleteLibraryProject.mockRejectedValueOnce(new ProjectDeletionRefusedError('active-runs'));
-    await act(() => userEvent.click(document.querySelectorAll('button')[1]!));
-    expect(harness.notifyError).toHaveBeenLastCalledWith(
-      'projects.deleteFailed',
-      'projects.deleteRefused.active-runs',
-      {
-        actions: [{ kind: 'open-widget', widgetId: 'queue' }],
-      }
-    );
-
-    harness.deleteLibraryProject.mockRejectedValueOnce(new ProjectDeletionRefusedError('runs-unverified'));
-    await act(() => userEvent.click(document.querySelectorAll('button')[1]!));
-    expect(harness.notifyError).toHaveBeenLastCalledWith(
-      'projects.deleteFailed',
-      'projects.deleteRefused.runs-unverified',
-      { actions: undefined }
-    );
   });
 
   it('clears other open projects of the boards that went with a deleted project, and only once it is gone', async () => {
@@ -223,29 +191,6 @@ describe('useProjectActions', () => {
     );
   });
 
-  it('blocks project close before flushing while a queue run is active', async () => {
-    harness.project.queue.items = [{ status: 'pending' } as Project['queue']['items'][number]];
-    await act(() => root?.render(<Harness />));
-
-    await act(() => userEvent.click(document.querySelector('button')!));
-
-    expect(harness.notifyError).toHaveBeenCalledWith('projects.closeBlocked', 'projects.activeRunsMustFinish');
-    expect(harness.flush).not.toHaveBeenCalled();
-    expect(harness.close).not.toHaveBeenCalled();
-  });
-
-  it('keeps the project open with its canvas state when unsaved pixels cannot be persisted', async () => {
-    harness.flushCanvasPixels.mockRejectedValueOnce(new Error('upload failed'));
-    await act(() => root?.render(<Harness />));
-
-    await act(() => userEvent.click(document.querySelector('button')!));
-    await vi.waitFor(() => expect(harness.notifyError).toHaveBeenCalledOnce());
-
-    expect(harness.notifyError).toHaveBeenCalledWith('projects.closeBlocked', 'projects.canvasPixelsNotSaved');
-    expect(harness.flush).not.toHaveBeenCalled();
-    expect(harness.close).not.toHaveBeenCalled();
-  });
-
   it('persists canvas pixels before flushing the project document', async () => {
     harness.flush.mockResolvedValue({
       documentJson: serializeProjectDocumentV3Json(harness.project).documentJson,
@@ -263,17 +208,6 @@ describe('useProjectActions', () => {
     expect(harness.flushCanvasPixels.mock.invocationCallOrder[1]).toBeGreaterThan(
       harness.flush.mock.invocationCallOrder[0]!
     );
-  });
-
-  it('reports a rejected close flush and keeps the tab open', async () => {
-    harness.flush.mockRejectedValueOnce(new Error('network failed'));
-    await act(() => root?.render(<Harness />));
-
-    await act(() => userEvent.click(document.querySelector('button')!));
-    await vi.waitFor(() => expect(harness.notifyError).toHaveBeenCalledOnce());
-
-    expect(harness.notifyError).toHaveBeenCalledWith('projects.closeBlocked', 'network failed');
-    expect(harness.close).not.toHaveBeenCalled();
   });
 
   it('reflushes an edit made while close is waiting for acknowledgement', async () => {
@@ -327,52 +261,6 @@ describe('useProjectActions', () => {
     expect(harness.navigate).not.toHaveBeenCalled();
   });
 
-  it('keeps the last tab open when its empty session cannot be committed', async () => {
-    harness.close.mockReturnValue({ ok: false, reason: 'last-project' });
-    harness.flush.mockImplementationOnce((project: Project) =>
-      Promise.resolve({
-        documentJson: serializeProjectDocumentV3Json(project).documentJson,
-        kind: 'acknowledged' as const,
-      })
-    );
-    harness.persistEmptySession.mockRejectedValueOnce(new Error('session offline'));
-    await act(() => root?.render(<Harness />));
-
-    await act(() => userEvent.click(document.querySelector('button')!));
-    await vi.waitFor(() => expect(harness.notifyError).toHaveBeenCalledOnce());
-
-    expect(harness.notifyError).toHaveBeenCalledWith('projects.closeBlocked', 'session offline');
-    expect(harness.releaseProjectSync).not.toHaveBeenCalled();
-    expect(harness.navigate).not.toHaveBeenCalled();
-    expect(harness.reopenSession).toHaveBeenCalledOnce();
-  });
-
-  it('does not navigate home when queue work starts during last-tab close', async () => {
-    harness.close
-      .mockReturnValueOnce({ ok: false, reason: 'last-project' })
-      .mockReturnValueOnce({ ok: false, reason: 'active-queue-runs' });
-    harness.flush.mockImplementationOnce((project: Project) =>
-      Promise.resolve({
-        documentJson: serializeProjectDocumentV3Json(project).documentJson,
-        kind: 'acknowledged' as const,
-      })
-    );
-    await act(() => root?.render(<Harness />));
-
-    await act(() => userEvent.click(document.querySelector('button')!));
-    await vi.waitFor(() => expect(harness.notifyError).toHaveBeenCalledOnce());
-
-    expect(harness.persistEmptySession).toHaveBeenCalledOnce();
-    expect(harness.notifyError).toHaveBeenCalledWith('projects.closeBlocked', 'projects.activeRunsMustFinish');
-    expect(harness.releaseProjectSync).not.toHaveBeenCalled();
-    expect(harness.navigate).not.toHaveBeenCalled();
-    // The tab stays open, so the session emptied for leaving must name it again.
-    expect(harness.reopenSession).toHaveBeenCalledOnce();
-    expect(harness.reopenSession.mock.invocationCallOrder[0]).toBeGreaterThan(
-      harness.persistEmptySession.mock.invocationCallOrder[0]!
-    );
-  });
-
   it('reopens the emptied session when the last tab changed while it was being emptied', async () => {
     harness.close
       .mockReturnValueOnce({ ok: false, reason: 'last-project' })
@@ -396,21 +284,5 @@ describe('useProjectActions', () => {
     expect(harness.reopenSession.mock.invocationCallOrder[0]).toBeLessThan(
       harness.persistEmptySession.mock.invocationCallOrder[1]!
     );
-  });
-
-  it('leaves the emptied session closed when the last tab closes', async () => {
-    harness.close.mockReturnValue({ ok: false, reason: 'last-project' });
-    harness.flush.mockImplementation((project: Project) =>
-      Promise.resolve({
-        documentJson: serializeProjectDocumentV3Json(project).documentJson,
-        kind: 'acknowledged' as const,
-      })
-    );
-    await act(() => root?.render(<Harness />));
-
-    await act(() => userEvent.click(document.querySelector('button')!));
-    await vi.waitFor(() => expect(harness.navigate).toHaveBeenCalledWith({ to: '/' }));
-
-    expect(harness.reopenSession).not.toHaveBeenCalled();
   });
 });

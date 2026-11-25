@@ -46,12 +46,9 @@ describe('video span playback requests', () => {
 
     expect(listener).toHaveBeenCalledTimes(2);
     expect(second).toMatchObject(span);
-    // Pressing play again on a window the user has not touched must still read as a new
-    // request: the player has already retired the first one.
     expect(second?.token).not.toBe(first?.token);
 
     unsubscribe();
-    // The publisher gets the token back: it is what the player's report is matched on.
     expect(requestVideoSpanPlayback(span)).toBe(getVideoSpanPlaybackRequest()?.token);
     expect(listener).toHaveBeenCalledTimes(2);
   });
@@ -61,8 +58,6 @@ describe('video span playback requests', () => {
     const stale = getVideoSpanPlaybackRequest();
 
     requestVideoSpanPlayback({ endSeconds: 9, itemKey: 'video:second.mp4', startSeconds: 8 });
-    // A player that reads late must not clear the gesture that superseded it — pressing
-    // play on a second reference while the first is still resolving is exactly that race.
     consumeVideoSpanPlaybackRequest(stale?.token ?? -1);
 
     expect(getVideoSpanPlaybackRequest()?.itemKey).toBe('video:second.mp4');
@@ -95,7 +90,6 @@ describe('video span playback state', () => {
     expect(getVideoSpanPlaybackState()).toMatchObject({ isPlaying: true, token: 1 });
     expect(listener).toHaveBeenCalledTimes(1);
 
-    // Deduplicate identical playback reports so repeated handlers do not rerender subscribers.
     publishVideoSpanPlaybackState({ isPlaying: true, pause, token: 1 });
     expect(listener).toHaveBeenCalledTimes(1);
 
@@ -103,7 +97,6 @@ describe('video span playback state', () => {
     expect(getVideoSpanPlaybackState()?.isPlaying).toBe(false);
     expect(listener).toHaveBeenCalledTimes(2);
 
-    // A newer loop replaces the report outright: two cannot be on screen at once.
     publishVideoSpanPlaybackState({ isPlaying: true, pause, token: 2 });
     expect(getVideoSpanPlaybackState()?.token).toBe(2);
 
@@ -118,8 +111,6 @@ describe('video span playback state', () => {
 
     publishVideoSpanPlaybackState({ isPlaying: true, pause, token: 1 });
     publishVideoSpanPlaybackState({ isPlaying: true, pause, token: 2 });
-    // A player unmounting late — the hidden keep-alive of a clip a newer request has
-    // already replaced — must not take the live loop's report down with it.
     clearVideoSpanPlaybackState(1);
 
     expect(getVideoSpanPlaybackState()?.token).toBe(2);

@@ -119,7 +119,7 @@ def encode_reference_image(
     image_tensor = T.ToTensor()(image) * 2.0 - 1.0
     image_tensor = image_tensor.unsqueeze(0)
 
-    device = TorchDevice.choose_torch_device()
+    device = vae_info.compute_device
     tile_size = reference_encode_tile_size(image_tensor, vae_info.model, device, tiling)
 
     # A tiled encode peaks at one tile; tell the cache up front so it frees the room instead of hitting the

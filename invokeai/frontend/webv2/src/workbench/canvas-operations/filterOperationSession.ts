@@ -277,8 +277,8 @@ export const createFilterOperationSession = (
         target,
       });
       if (result.status === 'committed') {
-        // The operation stays active: the owner ends it by disposing the
-        // session, keeping teardown out of this call stack.
+        // The operation stays active: the owner ends it by disposing the session, keeping teardown out of this call
+        // stack.
         publish({ ...state, error: null, preview: null, status: 'ready' });
         return 'committed';
       }

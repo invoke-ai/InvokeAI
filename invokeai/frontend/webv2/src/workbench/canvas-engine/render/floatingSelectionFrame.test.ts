@@ -43,8 +43,6 @@ describe('floatingSelectionFrame', () => {
 
   it('hands the compositor the same matrix the ants ride through', () => {
     const frame = floatingSelectionFrame(float(), documentOf(['layer-1']));
-    // The ants matrix is the composite matrix projected into document space, so
-    // a divergence here means the outline would drift off the drawn pixels.
     expect(frame?.composite.matrix).toBeTruthy();
     expect(frame?.ants).not.toBe(frame?.composite.matrix);
   });

@@ -1,6 +1,5 @@
 import type { AdjustmentOwnerStatus, AdjustmentStatusEngine } from './AdjustmentStatusIcon';
 
-/** A keyed status store standing in for the engine's, which tests drive with `set`. */
 export const createFakeAdjustmentStatus = (): AdjustmentStatusEngine & {
   set(ownerId: string, status: AdjustmentOwnerStatus): void;
 } => {

@@ -9,6 +9,7 @@ import type {
   WorkflowCurrentImageNode,
   WorkflowEdge,
   WorkflowInvocationNode,
+  WorkflowNode,
   WorkflowNotesNode,
 } from '@features/workflow/contracts';
 import type { Edge as FlowEdge, Node as FlowNode } from '@xyflow/react';
@@ -29,26 +30,17 @@ import {
   type WorkflowGraphIndex,
 } from '@features/workflow/utility';
 
-/**
- * Rebuild from document truth while preserving unchanged identities and selection. Precompute connection/exposure
- * facts so nodes need no workbench subscriptions.
- */
+/** Rebuilds from the document, keeping unchanged identities and selection; nodes need no workbench subscriptions. */
 
-/**
- * Whether node definitions are known yet. A node without a template is unknown only once they have loaded; until then
- * it is waiting, and after a failed load nothing can be said about its type.
- */
+/** A node without a template is unknown only once templates have loaded; until then it is waiting. */
 export type InvocationTemplateStatus = 'error' | 'loaded' | 'loading';
 
 export type InvocationFlowNode = FlowNode<
   {
     canUseCache: boolean;
     documentNode: WorkflowInvocationNode;
-    /** Source handle names with an outgoing edge. */
     connectedSourceHandles: string[];
-    /** Target handle names with an incoming edge. */
     connectedTargetHandles: string[];
-    /** Field names of this node exposed in the Linear UI form. */
     exposedFieldNames: string[];
     /** Large workflows render unselected nodes without field controls until selected. */
     isCompact: boolean;
@@ -321,7 +313,6 @@ export const toFlowNodes = (
   });
 };
 
-/** Returns nodes with exactly `selectedIds` selected, preserving identity where unchanged. */
 export const withNodeSelection = (nodes: WorkflowFlowNode[], selectedIds: Set<string>): WorkflowFlowNode[] =>
   nodes.map((node) => {
     const selected = selectedIds.has(node.id);
@@ -346,12 +337,13 @@ export const withNodeSelection = (nodes: WorkflowFlowNode[], selectedIds: Set<st
     return { ...node, selected };
   });
 
-/** xyflow edge component per the user's connection-style preference. */
 export type FlowEdgeType = 'default' | 'step';
 export type WorkflowFlowEdgeType = FlowEdgeType | 'loop_linkage';
 
 /** The edge component names the edge from these facts, so the copy follows the UI language. */
 export interface WorkflowEdgeData extends Record<string, unknown> {
+  /** On the one edge drawn between two collapsed nodes: every document edge it stands for, itself first. */
+  collapsedEdgeIds?: string[];
   /** The carried field type's name; null for a loop linkage or a type no template declares. */
   fieldTypeLabel: string | null;
   pathType: FlowEdgeType;
@@ -431,6 +423,7 @@ export const getWorkflowEdgeData = (
 };
 
 const isSameEdgeData = (a: WorkflowEdgeData | undefined, b: WorkflowEdgeData): boolean =>
+  sameNames(a?.collapsedEdgeIds ?? EMPTY_NAMES, b.collapsedEdgeIds ?? EMPTY_NAMES) &&
   a?.fieldTypeLabel === b.fieldTypeLabel &&
   a.isBatch === b.isBatch &&
   a.isLoopLinkage === b.isLoopLinkage &&
@@ -438,6 +431,142 @@ const isSameEdgeData = (a: WorkflowEdgeData | undefined, b: WorkflowEdgeData): b
   a.stroke === b.stroke &&
   a.strokeDasharray === b.strokeDasharray &&
   a.strokeWidth === b.strokeWidth;
+
+const isCollapsedInvocation = (node: WorkflowNode | undefined): boolean =>
+  node?.type === 'invocation' && !node.data.isOpen;
+
+export interface CollapsedEdgeLayout {
+  collapsedNodeIds: ReadonlySet<string>;
+  /** Each edge between two collapsed nodes, keyed to all edges between that pair in document order; the first draws. */
+  groupByEdge: ReadonlyMap<string, readonly string[]>;
+}
+
+const NO_COLLAPSED_EDGES: CollapsedEdgeLayout = { collapsedNodeIds: new Set(), groupByEdge: new Map() };
+const collapsedEdgeLayoutCache = new WeakMap<
+  ProjectGraphState['nodes'],
+  { edges: ProjectGraphState['edges']; layout: CollapsedEdgeLayout }
+>();
+
+/** Cached per document nodes and edges, which change identity only when the graph changes. */
+export const getCollapsedEdgeLayout = (document: Pick<ProjectGraphState, 'edges' | 'nodes'>): CollapsedEdgeLayout => {
+  const cached = collapsedEdgeLayoutCache.get(document.nodes);
+
+  if (cached?.edges === document.edges) {
+    return cached.layout;
+  }
+
+  const collapsedNodeIds = new Set(document.nodes.filter(isCollapsedInvocation).map((node) => node.id));
+  const groups = new Map<string, string[]>();
+
+  if (collapsedNodeIds.size > 0) {
+    for (const edge of document.edges) {
+      if (edge.type !== 'loop_linkage' && collapsedNodeIds.has(edge.source) && collapsedNodeIds.has(edge.target)) {
+        const key = `${edge.source}\u0000${edge.target}`;
+        const group = groups.get(key);
+
+        if (group) {
+          group.push(edge.id);
+        } else {
+          groups.set(key, [edge.id]);
+        }
+      }
+    }
+  }
+
+  const groupByEdge = new Map<string, readonly string[]>();
+
+  for (const ids of groups.values()) {
+    for (const id of ids) {
+      groupByEdge.set(id, ids);
+    }
+  }
+
+  const layout = collapsedNodeIds.size > 0 ? { collapsedNodeIds, groupByEdge } : NO_COLLAPSED_EDGES;
+  collapsedEdgeLayoutCache.set(document.nodes, { edges: document.edges, layout });
+
+  return layout;
+};
+
+export const withCollapsedEdgeSiblings = (
+  document: Pick<ProjectGraphState, 'edges' | 'nodes'>,
+  edgeIds: readonly string[]
+): string[] => {
+  const { groupByEdge } = getCollapsedEdgeLayout(document);
+
+  return groupByEdge.size === 0 ? [...edgeIds] : [...new Set(edgeIds.flatMap((id) => groupByEdge.get(id) ?? [id]))];
+};
+
+/**
+ * A collapsed group follows its drawn edge. Changes to hidden members are dropped: xyflow reports them only because
+ * their state differs, and they would overturn the drawn edge.
+ */
+export const withCollapsedGroupSelection = <Change extends { id?: string; type: string }>(
+  document: Pick<ProjectGraphState, 'edges' | 'nodes'>,
+  changes: readonly Change[],
+  edges: readonly { id: string; selected?: boolean }[]
+): (Change | { id: string; selected: boolean; type: 'select' })[] => {
+  const { groupByEdge } = getCollapsedEdgeLayout(document);
+
+  if (groupByEdge.size === 0 || !changes.some((change) => change.type === 'select')) {
+    return [...changes];
+  }
+
+  const drawnChanges = new Map<string, boolean>();
+  const touchedGroups = new Set<readonly string[]>();
+  const kept = changes.filter((change) => {
+    const group = change.type === 'select' && change.id !== undefined ? groupByEdge.get(change.id) : undefined;
+
+    if (!group) {
+      return true;
+    }
+
+    touchedGroups.add(group);
+
+    if (group[0] === change.id) {
+      drawnChanges.set(change.id, (change as unknown as { selected: boolean }).selected);
+      return true;
+    }
+
+    return false;
+  });
+
+  if (touchedGroups.size === 0) {
+    return kept;
+  }
+
+  const isSelected = new Map(edges.map((edge) => [edge.id, edge.selected ?? false]));
+  const memberChanges: { id: string; selected: boolean; type: 'select' }[] = [];
+
+  for (const group of touchedGroups) {
+    const drawnId = group[0]!;
+    const selected = drawnChanges.get(drawnId) ?? isSelected.get(drawnId) ?? false;
+
+    for (const id of group.slice(1)) {
+      if ((isSelected.get(id) ?? false) !== selected) {
+        memberChanges.push({ id, selected, type: 'select' });
+      }
+    }
+  }
+
+  return [...kept, ...memberChanges];
+};
+
+/** An end at a collapsed node's merged port stands for every field, so it cannot be dragged; an open end can. */
+const getReconnectableEnds = (
+  edge: WorkflowEdge,
+  collapsedNodeIds: ReadonlySet<string>
+): WorkflowFlowEdge['reconnectable'] => {
+  const isSourceCollapsed = collapsedNodeIds.has(edge.source);
+  const isTargetCollapsed = collapsedNodeIds.has(edge.target);
+
+  return isSourceCollapsed && isTargetCollapsed
+    ? false
+    : isSourceCollapsed
+      ? 'target'
+      : isTargetCollapsed
+        ? 'source'
+        : undefined;
+};
 
 export const toFlowEdges = (
   document: ProjectGraphState,
@@ -449,10 +578,19 @@ export const toFlowEdges = (
   index: WorkflowGraphIndex = createWorkflowGraphIndex(document.nodes, document.edges)
 ): WorkflowFlowEdge[] => {
   const previousById = new Map(previousEdges.map((edge) => [edge.id, edge]));
+  const { collapsedNodeIds, groupByEdge } = getCollapsedEdgeLayout(document);
 
   return getEdgesWithLoopLinkageAliases(document.nodes, document.edges).map((edge) => {
     const previous = previousById.get(edge.id);
-    const data = getWorkflowEdgeData(document, edge, edgeType, templates, index);
+    const collapsedGroup = groupByEdge.get(edge.id);
+    const hidden = collapsedGroup !== undefined && collapsedGroup[0] !== edge.id ? true : undefined;
+    const typedData = getWorkflowEdgeData(document, edge, edgeType, templates, index);
+    // The edge keeps its own type data, so a view drawing every node open (the image export) draws it as itself.
+    const data: WorkflowEdgeData = collapsedGroup ? { ...typedData, collapsedEdgeIds: [...collapsedGroup] } : typedData;
+    const reconnectable = getReconnectableEnds(edge, collapsedNodeIds);
+    const selected = collapsedGroup
+      ? collapsedGroup.some((id) => previousById.get(id)?.selected)
+      : (previous?.selected ?? false);
     const flowType: WorkflowFlowEdgeType = edge.type === 'loop_linkage' ? 'loop_linkage' : edgeType;
     const isConnectedToSelectedNode = selectedNodeIds.has(edge.source) || selectedNodeIds.has(edge.target);
     const animated = isConnectedToSelectedNode && !reduceMotion ? true : undefined;
@@ -468,6 +606,9 @@ export const toFlowEdges = (
       previous.targetHandle === edge.targetHandle &&
       previous.animated === animated &&
       previous.className === className &&
+      previous.hidden === hidden &&
+      previous.reconnectable === reconnectable &&
+      (previous.selected ?? false) === selected &&
       isSameEdgeData(previous.data, data) &&
       previous.style === style
     ) {
@@ -479,7 +620,9 @@ export const toFlowEdges = (
       animated,
       className,
       data,
-      selected: previous?.selected ?? false,
+      hidden,
+      reconnectable,
+      selected,
       source: edge.source,
       sourceHandle: edge.sourceHandle,
       style,

@@ -8,10 +8,7 @@ interface TopbarMenuChevronProps {
   fillTrigger?: boolean;
 }
 
-/**
- * The dropdown chevron of a topbar menu trigger: a 12px glyph beside the trigger's content unless `fillTrigger`. It
- * brightens while its trigger is hovered or its menu is open, so the trigger must carry `className="group"`.
- */
+/** The trigger's dropdown chevron; it brightens with its trigger, which must carry `className="group"`. */
 export const TopbarMenuChevron = ({ fillTrigger = false }: TopbarMenuChevronProps) => (
   <Icon
     as={ChevronDownIcon}

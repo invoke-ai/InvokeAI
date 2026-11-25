@@ -95,7 +95,6 @@ const createCommands = (
 
   return {
     account: {
-      /** Patches the active project's settings, or those of `projectId` while it is open. */
       updateProjectPreferences: command(
         'setActiveProjectSettings',
         (settings: ActionPayload<'setActiveProjectSettings'>['settings'], projectId?: string) => ({
@@ -134,9 +133,13 @@ const createCommands = (
           itemKeys,
         })
       ),
-      removeItems: command('removeGalleryItems', (itemKeys: ActionPayload<'removeGalleryItems'>['itemKeys']) => ({
-        itemKeys,
-      })),
+      removeItems: command(
+        'removeGalleryItems',
+        (
+          itemKeys: ActionPayload<'removeGalleryItems'>['itemKeys'],
+          options?: Pick<ActionPayload<'removeGalleryItems'>, 'keepComparisonForSuccessor' | 'projectId'>
+        ) => ({ itemKeys, ...options })
+      ),
       reconcileDeletedBoardOutcome: command(
         'reconcileDeletedGalleryBoard',
         (outcome: ActionPayload<'reconcileDeletedGalleryBoard'>['outcome']) => ({ outcome })
@@ -155,7 +158,6 @@ const createCommands = (
           selectionPage,
         })
       ),
-      /** Select an image or video picked outside the Gallery's listing; Preview navigates within the item's own board. */
       selectItemInItsBoard: command(
         'selectGalleryItem',
         (item: ActionPayload<'selectGalleryItem'>['item'], projectId?: string) => ({
@@ -205,7 +207,6 @@ const createCommands = (
           selectionPage,
           type: 'selectGalleryItem',
         }),
-      /** Select an image found outside the Gallery; Preview navigates within the image's own board. */
       selectImageInItsBoard: (image: GeneratedImageContract & Partial<GalleryImage>, projectId?: string): void =>
         dispatch({
           item: legacyGeneratedImageToGalleryItem(image),
@@ -331,10 +332,7 @@ const createCommands = (
     layout: {
       activatePreset: (presetId: ActionPayload<'applyPreset'>['presetId']) =>
         layoutPresetActivator.activate(resolveSavedLayoutPreset(getState().account, presetId)),
-      /**
-       * Drop an activation still waiting on its widgets, leaving the active preset as it is. Choosing the active preset
-       * while another is pending means "stay", not the active preset's revert.
-       */
+      /** Choosing the active preset while another is pending means "stay", not a revert. */
       cancelPresetActivation: (): void => layoutPresetActivator.invalidate(),
       applyPreset: command('applyPreset', (presetId: ActionPayload<'applyPreset'>['presetId']) => ({ presetId })),
       createPreset: command(
@@ -382,21 +380,17 @@ const createCommands = (
         })
       ),
       reset: command('resetActiveLayout'),
-      /** Steps the project's layout back (the active project by default), or back to before one step's change. */
       undo: command('undoProjectChange', (projectId?: string, throughEntryId?: string) => ({
         ...(projectId === undefined ? {} : { projectId }),
         ...(throughEntryId === undefined ? {} : { throughEntryId }),
       })),
       redo: command('redoProjectChange', (projectId?: string) => (projectId === undefined ? {} : { projectId })),
-      /** Discards the named preset's unsaved arrangement in the active project. */
       revertPreset: command('revertLayoutPreset', (presetId: ActionPayload<'revertLayoutPreset'>['presetId']) => ({
         presetId,
       })),
-      /** Writes the preset's arrangement (live when active, else this project's working copy) back onto it. */
       savePreset: command('saveLayoutPreset', (presetId: ActionPayload<'saveLayoutPreset'>['presetId']) => ({
         presetId,
       })),
-      /** Drops saved arrangement, identity, and route edits from a built-in preset. */
       restorePresetDefault: command(
         'restoreLayoutPresetDefault',
         (presetId: ActionPayload<'restoreLayoutPresetDefault'>['presetId']) => ({ presetId })
@@ -433,8 +427,7 @@ const createCommands = (
       ),
       reportError: command('recordError'),
     },
-    // Commands that change the active or open projects first commit drafts still held by mounted editors, so an edit
-    // made while a caller awaited (hydration, a close flush) lands on the project it was typed in.
+    // Commit mounted editors' drafts first, so an edit made while a caller awaited lands on its project.
     projects: {
       /** With `unchangedFrom`, closes only while the project, drafts included, is still exactly that version. */
       close: (projectId: string, unchangedFrom?: Project): ProjectCommandResult => {
@@ -505,6 +498,7 @@ const createCommands = (
       clearCompleted: command('clearCompletedQueueItems'),
       markBackendCancelled: command('markQueueItemBackendCancelled'),
       markBackendSubmitted: command('markQueueItemBackendSubmitted'),
+      noteFirstProgressFrame: command('noteQueueItemFirstProgressFrame'),
       recordSubmissionRetry: command('recordQueueItemSubmissionRetry'),
       setCancellationPending: command('setQueueItemCancellationPending'),
       setLocalRecoveryState: command('setQueueItemLocalRecoveryState'),
@@ -530,7 +524,6 @@ const createCommands = (
       raiseFloating: command('raiseFloatingWidget', (instanceId: string) => ({ instanceId })),
       move: command('moveWidgetInstance'),
       open: command('openRegionWidget'),
-      /** Deletes these pins from the instance, so it follows the user's defaults for them. */
       clearInstanceValues: command(
         'clearWidgetInstanceValues',
         (instanceId: string, keys: readonly string[], projectId?: string) => ({ instanceId, keys, projectId })
@@ -591,7 +584,6 @@ const createCommands = (
       toggle: command('toggleRegionWidget'),
     },
     workflows: {
-      /** Adds a workflow to the project and activates it; returns the id it is known by. */
       add: (
         document: ProjectGraphState,
         options: { label: string; projectId?: string; reusePlaceholder?: boolean; source?: ProjectWorkflowSource }
@@ -647,7 +639,6 @@ const createCommands = (
         });
         return { ok: true };
       },
-      /** Replaces a copy's document with a fresh load and activates it; one undo step restores the old one. */
       replaceDocument: command(
         'replaceProjectWorkflowDocument',
         (
@@ -657,7 +648,6 @@ const createCommands = (
         ) => ({ ...target, ...options, document })
       ),
       select: command('selectProjectWorkflow', (workflowId: string, projectId?: string) => ({ projectId, workflowId })),
-      /** Records where a workflow was explicitly published; a no-op once the project or workflow is gone. */
       setSource: command(
         'setProjectWorkflowSource',
         (projectId: string, workflowId: string, source: ProjectWorkflowSource | undefined) => ({
@@ -678,10 +668,7 @@ const createPersistenceAdapter = (dispatch: WorkbenchDispatch, getState: () => W
   const command = createCommandFactory(dispatch);
 
   return {
-    /**
-     * Record the server-assigned board without selecting it: the user may have changed selection during creation,
-     * and unresolved selections already fall back to the project board.
-     */
+    /** Without selecting it: the user may have changed selection during creation. */
     assignProjectBoard: ({ boardId, projectId }: { boardId: string; projectId: string }) => {
       dispatch({ boardId, projectId, type: 'setGalleryProjectBoardId' });
     },
@@ -743,7 +730,6 @@ export interface WorkbenchSnapshot {
   scopedDefaults: WorkbenchState['scopedDefaults'];
 }
 
-/** Imperative, read-only views for event handlers that must observe post-flush state. */
 export interface WorkbenchQueries {
   getProject(projectId: string): Project | null;
   getSnapshot(): WorkbenchSnapshot;
@@ -791,12 +777,10 @@ const hasPersistedStateChanged = (previous: WorkbenchState, next: WorkbenchState
 const getDiagnosticProjectId = (state: WorkbenchState, projectId?: string): string | undefined =>
   projectId ?? getActiveProject(state)?.id;
 
-/** The reason of the retry warning last logged: a retrying save repeats it until a save finishes or fails. */
 interface AutosaveDiagnosticState {
   loggedRetryReason: string | null;
 }
 
-/** The store is the one diagnostic owner for reported errors, widget failures and autosave outcomes. */
 const recordDiagnosticForAction = (
   action: WorkbenchAction,
   previousState: WorkbenchState,
@@ -961,8 +945,7 @@ export const createWorkbenchStore = (
   initialState = createInitialWorkbenchState(),
   options: WorkbenchStoreOptions = {}
 ): WorkbenchInternalStore => {
-  // Seeded so a workbench created after settings load reads the user's defaults on its first render; the runtime's
-  // settings subscription keeps the mirror current from then on.
+  // Seeded so a workbench created after settings load reads the user's defaults on first render.
   let state: WorkbenchState = { ...initialState, scopedDefaults: getWorkbenchPreferences().scopedDefaults };
   const widgetRecovery = new Map(
     Object.keys(getActiveProject(state).widgetInstances).map((id) => [id, createWidgetRecovery()])
@@ -1025,9 +1008,7 @@ export const createWorkbenchStore = (
     if (action.type === 'hydrateWorkbench') {
       clearLayerPanelStates();
     } else if (nextState !== previousState) {
-      // The always-live store boundary collapses stale secondaries after an
-      // external primary change or layer removal, even while the Layers widget
-      // is unmounted.
+      // Runs here so stale secondaries collapse even while the Layers widget is unmounted.
       reconcileLayerPanelStates(nextState.projects);
     }
 
@@ -1044,7 +1025,6 @@ export const createWorkbenchStore = (
 
       return current.id === preset.id && current.snapshot === preset.snapshot;
     },
-    // Switching lays out the active project's working copy when it has one, so that is what has to be in memory.
     isLoaded: (preset) => {
       const incoming = { ...preset, snapshot: getLayoutPresetArrangement(getActiveProject(state), preset) };
 

@@ -70,7 +70,7 @@ describe('isImageDataUrl / dataUrlToFile', () => {
 
 describe('buildExportData', () => {
   it('includes only present, non-empty fields', () => {
-    expect(buildExportData(model({ description: null, name: '' }))).toEqual({});
+    expect(buildExportData(model({ description: null, name: '', source_urls: [] }))).toEqual({});
 
     expect(
       buildExportData(
@@ -80,6 +80,7 @@ describe('buildExportData', () => {
           description: 'desc',
           name: 'Named',
           source_url: 'https://example.com',
+          source_urls: ['https://example.com/model', 'https://example.com/quantized'],
           trigger_phrases: ['t1'],
         })
       )
@@ -89,6 +90,7 @@ describe('buildExportData', () => {
       description: 'desc',
       name: 'Named',
       source_url: 'https://example.com',
+      source_urls: ['https://example.com/model', 'https://example.com/quantized'],
       trigger_phrases: ['t1'],
     });
   });
@@ -109,6 +111,7 @@ describe('validateImportData', () => {
         description: 'd',
         name: 'n',
         source_url: 'https://example.com',
+        source_urls: ['https://example.com/model'],
         trigger_phrases: ['a', 'b'],
         unknown_field: 'ignored',
       })
@@ -123,6 +126,10 @@ describe('validateImportData', () => {
     expect(validateImportData({ description: {} })).toBe(false);
     expect(validateImportData({ source_url: 'javascript:alert(1)' })).toBe(false);
     expect(validateImportData({ source_url: '' })).toBe(true);
+    expect(validateImportData({ source_urls: ['https://example.com', 'javascript:alert(1)'] })).toBe(false);
+    expect(validateImportData({ source_urls: 'https://example.com' })).toBe(false);
+    expect(validateImportData({ source_urls: ['https:///no-host'] })).toBe(false);
+    expect(validateImportData({ source_urls: ['https://example.com/a b'] })).toBe(false);
     expect(validateImportData({ cover_image: 'https://example.com/x.png' })).toBe(false);
     expect(validateImportData({ trigger_phrases: ['ok', 5] })).toBe(false);
     expect(validateImportData({ default_settings: [] })).toBe(false);
@@ -133,13 +140,23 @@ describe('validateImportData', () => {
 describe('partitionImportableFields', () => {
   it('applies fields the target config carries and skips the rest', () => {
     const target = model({ default_settings: null, description: null, trigger_phrases: null });
-    // cpu_only is absent from this main-model config entirely.
     const { body, skipped } = partitionImportableFields(
-      { cpu_only: true, default_settings: { steps: 20 }, name: 'Renamed', trigger_phrases: ['x'] },
-      target
+      {
+        cpu_only: true,
+        default_settings: { steps: 20 },
+        name: 'Renamed',
+        source_urls: ['https://example.com/model'],
+        trigger_phrases: ['x'],
+      },
+      { ...target, source_urls: [] }
     );
 
-    expect(body).toEqual({ default_settings: { steps: 20 }, name: 'Renamed', trigger_phrases: ['x'] });
+    expect(body).toEqual({
+      default_settings: { steps: 20 },
+      name: 'Renamed',
+      source_urls: ['https://example.com/model'],
+      trigger_phrases: ['x'],
+    });
     expect(skipped).toEqual(['cpu_only']);
   });
 

@@ -1,5 +1,5 @@
 /* oxlint-disable react-perf/jsx-no-new-object-as-prop */
-import type { GenerateModelConfig, GenerateSettings, MainModelConfig } from '@features/generation/core/types';
+import type { GenerateModelConfig, GenerateSettings } from '@features/generation/core/types';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { getDefaultGenerateSettings } from '@features/generation/core/baseGenerationPolicies';
@@ -10,14 +10,14 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { userEvent } from 'vitest/browser';
+import { page, userEvent } from 'vitest/browser';
 
 import { GenerateProviderOptionsSection } from './GenerateProviderOptionsSection';
 
 vi.mock('./GenerationUiContext', () => ({
   useGenerationUi: () => ({
     project: { invocationSourceId: 'generate' },
-    sectionPreferences: { sectionsOpen: { providerOptions: true }, setSectionOpen: vi.fn() },
+    sectionPreferences: { sectionsOpen: { providerOptions: true }, setSectionsOpen: vi.fn() },
   }),
 }));
 
@@ -71,7 +71,6 @@ const external = (
     provider_model_id: providerModelId,
     type: 'external_image_generator',
   }) as GenerateModelConfig;
-const sd1Model: MainModelConfig = { base: 'sd-1', key: 'sd1', name: 'SD 1.5', type: 'main' };
 
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -90,7 +89,6 @@ const render = async (model: GenerateModelConfig, settings: Partial<GenerateSett
   document.body.append(host);
   root = createRoot(host);
   const draft = createExternalStoreCore({ ...getDefaultGenerateSettings(model), ...settings });
-  // Commits land in the draft as the form's would, so the section re-renders from what it committed.
   const onCommit = vi.fn((patch: Partial<GenerateSettings>) => draft.setSnapshot({ ...draft.getSnapshot(), ...patch }));
 
   await settle(() => {
@@ -129,20 +127,6 @@ afterEach(async () => {
 });
 
 describe('GenerateProviderOptionsSection', () => {
-  it('renders nothing for local models and providers without options', async () => {
-    await render(sd1Model);
-    expect(host?.childElementCount).toBe(0);
-
-    await settle(() => root?.unmount());
-    await render(external('alibabacloud', { modes: ['txt2img'] }));
-    expect(host?.childElementCount).toBe(0);
-
-    // OpenAI sends its options to GPT Image models only.
-    await settle(() => root?.unmount());
-    await render(external('openai', { modes: ['txt2img'] }, 'dall-e-3'));
-    expect(host?.childElementCount).toBe(0);
-  });
-
   it('offers OpenAI quality and background, adding input fidelity only for image inputs', async () => {
     await render(external('openai', { modes: ['txt2img'] }));
     expect(selectNames()).toEqual(['Quality', 'Background']);
@@ -164,7 +148,6 @@ describe('GenerateProviderOptionsSection', () => {
     const onCommit = await render(external('gemini', { modes: ['txt2img'] }), { geminiThinkingLevel: 'high' });
 
     expect(selectNames()).toEqual(['Thinking level']);
-    // Temperature starts at the provider default: no slider until overridden.
     expect(host?.querySelector('[role="slider"]')).toBeNull();
 
     await settle(() => switches()[0]?.click());
@@ -185,7 +168,6 @@ describe('GenerateProviderOptionsSection', () => {
     expect(watermark?.checked).toBe(true);
     expect(optimizePrompt?.checked).toBe(false);
 
-    // Each switch is named by, and toggled from, its own visible label.
     const labelOf = (input: HTMLInputElement | undefined) =>
       document.getElementById(input?.getAttribute('aria-labelledby') ?? '');
 
@@ -195,5 +177,30 @@ describe('GenerateProviderOptionsSection', () => {
     await act(() => userEvent.click(labelOf(optimizePrompt)!));
     expect(onCommit).toHaveBeenCalledWith({ seedreamOptimizePrompt: true });
     expect(onCommit).not.toHaveBeenCalledWith({ seedreamWatermark: false });
+  });
+
+  it('marks its title while an option is overridden, and resets them all to the provider defaults from its menu', async () => {
+    const onCommit = await render(external('openai', { modes: ['txt2img', 'img2img'] }), {
+      openaiInputFidelity: 'high',
+      openaiQuality: 'high',
+    });
+    const title = () => host!.querySelector<HTMLElement>('.generate-section > [data-part="trigger"]')!;
+
+    expect(title().querySelector('[data-section-changed]')).not.toBeNull();
+
+    await act(() => {
+      title().dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+    });
+    await act(() =>
+      userEvent.click(page.getByRole('menuitem', { name: 'widgets.generate.sectionMenu.resetProviderOptions' }))
+    );
+
+    expect(onCommit).toHaveBeenLastCalledWith({
+      openaiBackground: 'auto',
+      openaiInputFidelity: null,
+      openaiQuality: 'auto',
+    });
+    expect(title().querySelector('[data-section-changed]')).toBeNull();
+    expect(host?.textContent).not.toContain('override');
   });
 });

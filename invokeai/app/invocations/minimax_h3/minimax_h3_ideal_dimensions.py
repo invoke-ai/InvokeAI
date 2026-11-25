@@ -8,7 +8,8 @@ the released pipeline's canvas resolution). This node wraps it for workflow grap
 image-to-video workflows can derive the canvas from the uploaded keyframe instead of
 asking the user to type matching width/height values, and adds a reduced "768 lowres"
 preset (:func:`~invokeai.backend.minimax_h3.presets.resolve_lowres_canvas_size`) that
-pins the LONG edge to 768 for cheaper preview/test renders.
+pins the LONG edge to 768 for cheaper preview/test renders. Draft presets target
+480 or 544 px short edges under the same native area cap.
 """
 
 from typing import Literal
@@ -18,11 +19,13 @@ from invokeai.app.invocations.fields import InputField
 from invokeai.app.invocations.ideal_size import IdealSizeOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.minimax_h3.packing import resolve_canvas_size
-from invokeai.backend.minimax_h3.presets import resolve_lowres_canvas_size
+from invokeai.backend.minimax_h3.presets import resolve_lowres_canvas_size, resolve_reduced_canvas_size
 
-MiniMaxH3TargetResolution = Literal["768 highres", "768 lowres"]
+MiniMaxH3TargetResolution = Literal["768 highres", "768 lowres", "480p", "544p"]
 
 MINIMAX_H3_TARGET_RESOLUTION_LABELS: dict[str, str] = {
+    "480p": "480p draft (target short edge 480)",
+    "544p": "544p draft (target short edge 544)",
     "768 highres": "768 highres (native: short edge 768, cap 768x1344)",
     "768 lowres": "768 lowres (long edge 768 — smaller, faster)",
 }
@@ -33,7 +36,7 @@ MINIMAX_H3_TARGET_RESOLUTION_LABELS: dict[str, str] = {
     title="MiniMax H3 Ideal Dimensions",
     tags=["minimax", "video", "dimensions", "math"],
     category="video",
-    version="1.1.0",
+    version="1.2.0",
     classification=Classification.Prototype,
 )
 class MiniMaxH3IdealDimensionsInvocation(BaseInvocation):
@@ -43,7 +46,8 @@ class MiniMaxH3IdealDimensionsInvocation(BaseInvocation):
     area cap of 768x1344. "768 lowres" pins the LONG edge to 768 instead, giving a
     canvas with roughly half the pixels for non-square ratios (e.g. a 2:3 source becomes
     512x768 instead of 768x1152) — faster and cheaper, at some cost in fidelity since it
-    is below the model's training resolution. Both presets round each axis to the
+    is below the model's training resolution. "480p" and "544p" target shorter edges
+    under the native area cap (16:9 gives 864x480 and 960x544). All presets round each axis to the
     nearest multiple of 32. Only the aspect ratio of the inputs matters. Aspect ratios
     beyond 1:4 / 4:1 are rejected. Wire from ``Image Primitive``'s width/height outputs
     and into the width/height of ``Prompt - MiniMax H3``, ``Frame Conditioning - MiniMax
@@ -65,13 +69,17 @@ class MiniMaxH3IdealDimensionsInvocation(BaseInvocation):
         description=(
             "Canvas preset. '768 highres' is H3's native policy (short edge 768, soft cap "
             "768x1344). '768 lowres' pins the long edge to 768 for smaller, faster test "
-            "renders (e.g. 512x768 from a 2:3 source) at some cost in fidelity."
+            "renders (e.g. 512x768 from a 2:3 source) at some cost in fidelity. "
+            "480p and 544p target a shorter edge under the same area cap for draft renders."
         ),
         ui_choice_labels=MINIMAX_H3_TARGET_RESOLUTION_LABELS,
     )
 
     def invoke(self, context: InvocationContext) -> IdealSizeOutput:
-        resolver = resolve_lowres_canvas_size if self.target_resolution == "768 lowres" else resolve_canvas_size
-        # Both resolvers return (height, width).
-        h, w = resolver(float(self.width), float(self.height))
+        if self.target_resolution in ("480p", "544p"):
+            short_edge = 480 if self.target_resolution == "480p" else 544
+            h, w = resolve_reduced_canvas_size(float(self.width), float(self.height), short_edge)
+        else:
+            resolver = resolve_lowres_canvas_size if self.target_resolution == "768 lowres" else resolve_canvas_size
+            h, w = resolver(float(self.width), float(self.height))
         return IdealSizeOutput(width=w, height=h)

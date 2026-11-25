@@ -289,7 +289,7 @@
       "type": "invocation",
       "data": {
         "id": "denoise_latents",
-        "version": "1.5.0",
+        "version": "1.6.0",
         "nodePack": "invokeai",
         "label": "",
         "notes": "The four guidance scales here are the released Dev recipe (CFG 3 arrives over an edge, Audio CFG 7, STG 1, modality 3). Each scale away from its off value (1, or 0 for STG) costs one extra model evaluation per step.",
@@ -427,7 +427,7 @@
       "type": "invocation",
       "data": {
         "id": "core_metadata",
-        "version": "2.9.0",
+        "version": "2.10.0",
         "nodePack": "invokeai",
         "label": "",
         "notes": "Recorded on the output. The prompt, seed, model, canvas, frame count, steps, CFG and frame rate arrive over edges from the nodes that set them. They are the requested values: on the Distilled checkpoint the run itself takes 8 unguided steps whatever Steps and CFG say.",

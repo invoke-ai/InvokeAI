@@ -8,4 +8,4 @@ export {
 export { GalleryPickerPopover, type GalleryPickerPopoverProps } from './ui/picker/GalleryPickerPopover';
 export type { GalleryPickerOpeningScope } from './ui/picker/useGalleryPickerScope';
 export { GalleryHostProvider, type GalleryHost } from './ui/GalleryUiContext';
-export { useGalleryUploadAction } from './ui/useGalleryUploadAction';
+export { uploadGalleryFiles, useGalleryUploadAction } from './ui/useGalleryUploadAction';

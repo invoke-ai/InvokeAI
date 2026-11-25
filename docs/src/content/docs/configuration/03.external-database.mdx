@@ -48,13 +48,15 @@ db_url: mariadb+pymysql://invokeai:a-strong-password@db.example:3306/invokeai
 
 Use `mysql+pymysql://` for MySQL and `mariadb+pymysql://` for MariaDB. Characters in the password that have a meaning in a URL (`@`, `:`, `/`, `%`, `#`) must be percent-encoded, e.g. `@` as `%40`. InvokeAI reads `db_url` when it starts, and shows it without the password in its settings. `db_dir` and `db_synchronous` apply to a SQLite database only.
 
-On its first start InvokeAI creates the tables. On later starts it updates them to its version, as it does a SQLite database. It makes no backup of a server database before an update: back the database up yourself, e.g. with `mysqldump` or `mariadb-dump`, before upgrading InvokeAI.
+For a **new installation**, follow the [private administrator setup instructions](/configuration/multi-user-mode/admin-guide/#set-up-multi-user-mode) before starting InvokeAI against the empty database. The database user in the SQL above is separate from the InvokeAI administrator. InvokeAI creates the tables at startup. Verify the database host and name in the startup log, create the first InvokeAI administrator privately and confirm sign-in before enabling network access.
+
+For an **existing installation**, leave the target empty until you have copied the source database. On later starts InvokeAI updates the active database to its version. [Back it up before upgrading InvokeAI](/configuration/multi-user-mode/admin-guide/#backups).
 
 ## Moving an existing install
 
 `invoke-db-copy` copies an install's SQLite database into a new, empty server database. It copies the database only: images, models and the other files stay where they are, in the root directory. The SQLite database is not changed.
 
-1. Stop InvokeAI. What it writes during the copy is not copied.
+1. Stop InvokeAI and [back up the installation](/configuration/multi-user-mode/admin-guide/#backups). If the SQLite database needs an update, leave `db_url` and `INVOKEAI_DB_URL` unset. [Start the upgraded release privately](/start-here/upgrading/#first-start-after-switching-databases) against the source SQLite file, verify the database and administrator, then stop InvokeAI again. Keep external routes closed through the copy.
 2. Set `db_url` in `invokeai.yaml` (or `INVOKEAI_DB_URL`) to the new database. Do not start InvokeAI yet: it would start the new database empty.
 3. Check the copy, which copies nothing yet:
 
@@ -68,11 +70,11 @@ On its first start InvokeAI creates the tables. On later starts it updates them 
    invoke-db-copy
    ```
 
-5. Start InvokeAI.
+5. [Start InvokeAI privately and verify the copied database](/start-here/upgrading/#first-start-after-switching-databases). Check that the startup log names the intended MySQL or MariaDB database and that administrator sign-in and the expected data are present before restoring network access.
 
 `invoke-db-copy` takes the install it runs in, or the one `--root` names, and copies into the database its `db_url` names. `--target URL` names another one; a password on the command line is visible to the other users of the computer and stays in the shell's history.
 
-It copies from a snapshot of the SQLite database, which it makes in the database's directory and deletes afterwards: that needs free space as large as the database. It brings the snapshot to no newer version: if InvokeAI has not started since an upgrade, start it once first. The target must be empty, for the check too, and no InvokeAI process may use it.
+It copies from a snapshot of the SQLite database, which it makes in the database's directory and deletes afterwards: that needs free space as large as the database. The target must be empty, for the check too, and no InvokeAI process may use it.
 
 It stops before copying anything when the server would refuse a row:
 
@@ -90,15 +92,15 @@ After copying, `invoke-db-copy` compares every table of the copy with its source
 
 `invoke-db-copy --to-sqlite FILE` copies the server database back into a new SQLite file. Removing `db_url` alone is not a way back: InvokeAI then opens the SQLite database it used before the move, as it was then. The boards, image records, workflows and accounts made since are not in it, and the gallery no longer shows the images made since, although their files are in the outputs folder.
 
-1. Stop InvokeAI. `invoke-db-copy` refuses to copy a database an InvokeAI process uses.
+1. Stop InvokeAI and [back up the installation, including the server database](/configuration/multi-user-mode/admin-guide/#backups). If the source needs an update, keep `db_url` pointing at the server database, [start the upgraded release privately](/start-here/upgrading/#first-start-after-switching-databases), verify the database and administrator, then stop InvokeAI again. Keep external routes closed through the copy. `invoke-db-copy` refuses to copy a server database an InvokeAI process uses.
 2. Copy into a new file:
 
    ```bash
    invoke-db-copy --to-sqlite invokeai-from-server.db
    ```
 
-3. In the install's database directory (`db_dir`, by default `databases` in the root), rename `invokeai.db`, which holds the state before the move, and put the new file in its place, named `invokeai.db`.
-4. Remove `db_url` from `invokeai.yaml`, and `INVOKEAI_DB_URL` from the environment, and start InvokeAI.
+3. In the install's database directory (`db_dir`, by default `databases` in the root), move the previous `invokeai.db` and any matching `invokeai.db-wal` and `invokeai.db-shm` together to a separate backup directory. Put the new file in place as `invokeai.db`.
+4. Remove `db_url` from `invokeai.yaml` and `INVOKEAI_DB_URL` from the environment. [Start InvokeAI privately and verify the copied database](/start-here/upgrading/#first-start-after-switching-databases). Check the active SQLite path, administrator sign-in and the data you expect from the server database before restoring network access.
 
 The source is the database `db_url` names, unless `--source URL` names another; it is not changed. The new file appears only once every table matches its source, so a copy that fails leaves no file behind, and `invoke-db-copy` never overwrites an existing file. Ids continue as they did on the server: a queue item gets no id the server already gave out.
 
@@ -107,4 +109,4 @@ The source is the database `db_url` names, unless `--source URL` names another; 
 - **One InvokeAI process per database.** At startup a process cancels the queue items left running and updates its bundled workflows and style presets, which a second process would undo. The first process holds a lock on the database; a second one refuses to start. If a process ends without closing its connection, because its computer crashed or lost the network, the server releases its lock within ten minutes; the refusal names the query that finds the connection to end sooner with `KILL`.
 - **One database server.** Setups with several writing servers (Galera, group replication with several primaries) are not supported.
 - **Busy database.** When a request waits too long for a lock held by another, finds no free connection, or cannot reach the server, it fails with HTTP 503 and `Retry-After: 1`, and can be repeated. If this happens often, the server is overloaded or another program holds locks in InvokeAI's database.
-- **Command-line tools.** The account commands (`invoke-useradd`, `invoke-userdel`, `invoke-usermod`, `invoke-userlist`) and the maintenance scripts use the database `invokeai.yaml` names. They refuse a database InvokeAI has not updated to their version: start InvokeAI once after an upgrade before using them.
+- **Command-line tools.** The account commands (`invoke-useradd`, `invoke-userdel`, `invoke-usermod`, `invoke-userlist`) and the maintenance scripts use the configured database. They refuse a database InvokeAI has not updated to their version. After an upgrade, [start InvokeAI privately and verify the active database](/start-here/upgrading/#first-start-after-switching-databases) before using them.

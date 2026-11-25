@@ -7,14 +7,14 @@ are what tell them apart, and the Qwen3 and Qwen3-VL configs reject them for the
 one requires them.
 """
 
-import re
 from collections.abc import Container
+from pathlib import Path
 from typing import Any, Literal, Optional, Self
 
 import torch
 from pydantic import Field
 
-from invokeai.backend.model_manager.configs.base import Checkpoint_Config_Base, Config_Base
+from invokeai.backend.model_manager.configs.base import Checkpoint_Config_Base, Config_Base, ModelRole
 from invokeai.backend.model_manager.configs.identification_utils import (
     InvalidMatchError,
     NotAMatchError,
@@ -54,21 +54,6 @@ _MXFP8_SCALE_DTYPES = tuple(
 )
 
 
-#: Where Comfy-Org publishes MOSS-Image's Qwen3.5 encoders: a `resolve`/`blob` URL of its `text_encoders/` folder at any
-#: revision, or the same file as a Hugging Face `repo_id[:variant]::subfolder` source. These files carry the vision
-#: tower, `lm_head.weight` and `mtp.*` -- the key set of the FLUX.3 prompt upsampler -- so only where they came from
-#: tells the two apart.
-_MOSS_IMAGE_ENCODER_SOURCE = re.compile(
-    r"^(?:https?://[^/]+/Comfy-Org/MOSS-Image/(?:resolve|blob)/[^/?#]+/|Comfy-Org/MOSS-Image(?::[^:/]*)?::)"
-    r"text_encoders/[^/?#]+\.safetensors(?:[?#].*)?$"
-)
-
-
-def is_moss_image_encoder_source(source: Any) -> bool:
-    """Whether an install source is one of Comfy-Org's MOSS-Image text encoder files (a Qwen3.5 encoder, never a Text LLM)."""
-    return isinstance(source, str) and _MOSS_IMAGE_ENCODER_SOURCE.match(source) is not None
-
-
 def has_qwen3_5_linear_attention(state_dict: dict[str | int, Any]) -> bool:
     """True if the state dict holds Gated DeltaNet (`linear_attn`) layers -- Qwen3.5, never Qwen3."""
     return any(isinstance(key, str) and ".linear_attn." in key for key in state_dict)
@@ -98,10 +83,9 @@ def is_qwen3_5_vision_language_lm(state_dict: dict[str | int, Any]) -> bool:
     """Whether this is a whole `Qwen3_5ForConditionalGeneration` that loads as a Text LLM.
 
     Language model, vision tower and LM head under transformers' names, at a size with a vendored config: the
-    FLUX.3 prompt upsampler's single files, which are `TextLLM_Checkpoint_Config`'s. The weights alone cannot tell
-    them from Comfy-Org's MOSS-Image encoders, which carry the same tensors (tower, `lm_head`, `mtp.*`);
-    `is_moss_image_encoder_source` does that, by where the file came from. Anything else stays the encoder config's,
-    LM head or not: a 4B with its tower, which Anima-3.8B can read, or a text-only export.
+    FLUX.3 prompt upsampler's single files. Comfy-Org's MOSS-Image encoders carry the same tensors (tower, `lm_head`,
+    `mtp.*`), so such a file serves both roles. Anything else stays the encoder config's, LM head or not: a 4B with
+    its tower, which Anima-3.8B can read, or a text-only export.
     """
     return (
         qwen3_5_key_prefix(state_dict) == QWEN3_5_VL_LANGUAGE_MODEL_PREFIX
@@ -109,6 +93,14 @@ def is_qwen3_5_vision_language_lm(state_dict: dict[str | int, Any]) -> bool:
         and _QWEN3_5_VISION_TOWER_KEY in state_dict
         and get_qwen3_5_variant(state_dict, QWEN3_5_VL_LANGUAGE_MODEL_PREFIX) in QWEN3_5_VL_VARIANTS
     )
+
+
+def is_text_llm_qwen3_5_file(path: Path, state_dict: dict[str | int, Any]) -> bool:
+    """Whether `TextLLM_Checkpoint_Config` accepts this file, and so whether it serves as a Text LLM.
+
+    One predicate for both configs, so the Text LLM and encoder identifications cannot drift apart.
+    """
+    return path.suffix.lower() == ".safetensors" and is_qwen3_5_vision_language_lm(state_dict)
 
 
 def _raise_if_not_whole(state_dict: dict[str | int, Any], prefix: str, variant: Qwen35VariantType) -> None:
@@ -207,14 +199,13 @@ class Qwen35Encoder_Checkpoint_Config(Checkpoint_Config_Base, Config_Base):
         prefix = qwen3_5_key_prefix(state_dict)
         if prefix is None:
             raise NotAMatchError("state dict does not look like a Qwen3.5 language model (no linear_attn layer 0)")
-        # The FLUX.3 prompt upsampler is a TextLLM. An explicit type, or Comfy-Org's MOSS-Image encoder source, still
-        # installs a file of its layout here.
-        if (
-            override_fields.get("type") != ModelType.Qwen35Encoder
-            and not is_moss_image_encoder_source(override_fields.get("source"))
-            and is_qwen3_5_vision_language_lm(state_dict)
-        ):
-            raise NotAMatchError("state dict is a whole Qwen3.5 vision-language model with an LM head: a TextLLM")
+        # A whole vision-language model is a Text LLM that also serves as this encoder. Only an explicit type files
+        # it here, with the Text LLM role.
+        if is_qwen3_5_vision_language_lm(state_dict) and override_fields.get("type") != ModelType.Qwen35Encoder:
+            raise NotAMatchError(
+                "state dict is a whole Qwen3.5 vision-language model with an LM head: a TextLLM, which also serves "
+                "as a Qwen3.5 encoder"
+            )
         if any(isinstance(v, GGMLTensor) for v in state_dict.values()):
             raise NotAMatchError("state dict looks like GGUF quantized")
         raise_for_unsupported_qwen3_5_quantization(mod, state_dict)
@@ -224,4 +215,6 @@ class Qwen35Encoder_Checkpoint_Config(Checkpoint_Config_Base, Config_Base):
             raise NotAMatchError("hidden size does not match a known Qwen3.5 variant")
         if variant in QWEN3_5_FINAL_NORM_VARIANTS:
             _raise_if_not_whole(state_dict, prefix, Qwen35VariantType(variant))
-        return cls(**override_fields, variant=variant)
+        text_llm_file = is_text_llm_qwen3_5_file(mod.path, state_dict)
+        roles = [ModelRole(type=ModelType.TextLLM)] if text_llm_file else []
+        return cls(**override_fields, variant=variant, roles=roles)

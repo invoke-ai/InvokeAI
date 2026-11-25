@@ -195,6 +195,7 @@ export interface WidgetHotkeyContribution {
   source?: WidgetContributionSource;
   preventDefault?: boolean;
   allowInEditable?: boolean;
+  ignoreRepeat?: boolean;
 }
 
 export interface WidgetCommandPaletteApi {
@@ -249,6 +250,12 @@ export interface WidgetWorkbenchApi {
   closeWidgetInstance: (instanceId: WidgetInstanceId) => WidgetWorkbenchApiResult;
 }
 
+/**
+ * How a docked widget's body is sized. `flow` (default): the body grows with the view and scrolls as a whole. `fill`:
+ * the view gets exactly the body's height, for views that scroll or resize their own regions (lists, trees, panes).
+ */
+export type WidgetBodySizing = 'fill' | 'flow';
+
 export interface WidgetManifest {
   /** Widget runtime API contract version. Defaults to 1 during registry normalization. */
   apiVersion?: 1;
@@ -266,16 +273,16 @@ export interface WidgetManifest {
   /** Compact content uses the strip's remaining width while keeping its trigger sized to visible content. */
   compactSizing?: 'remaining-space';
   centerPlacement?: 'toolbar' | 'view';
-  /** Opt-in: the widget can be detached into a movable floating window. */
   allowFloating?: boolean;
   /** Only offered while an admin is signed in to a multi-user backend. */
   requiresAdmin?: boolean;
   chrome?: {
     header?: 'hidden' | 'visible';
+    body?: WidgetBodySizing;
   };
   /**
-   * Literal dynamic loader for all render slots. The registry owns caching,
-   * failure state, and retry; callers never invoke this directly.
+   * Literal dynamic loader for all render slots. The registry owns caching, failure state, and retry; callers never
+   * invoke this directly.
    */
   load: () => Promise<WidgetImplementation>;
   /** Load always-on runtimes and dialog shells separately so boot does not download their widget views. */

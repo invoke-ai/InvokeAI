@@ -1,9 +1,8 @@
 import type { WidgetTypeId } from '@workbench/widgetContracts';
 
 /**
- * The subset of a project or preset snapshot that determines which widgets a
- * layout renders. Both `Project` and `LayoutPresetSnapshot` satisfy it
- * structurally.
+ * The subset of a project or preset snapshot that determines which widgets a layout renders. Both `Project` and
+ * `LayoutPresetSnapshot` satisfy it structurally.
  */
 export interface LayoutWidgetSource {
   widgetInstances: Record<string, { typeId: WidgetTypeId }>;

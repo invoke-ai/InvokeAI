@@ -1,3 +1,4 @@
+import type * as MenuModule from '@platform/ui/Menu';
 import type { CanvasCandidateSlot } from '@workbench/canvasStagingView';
 import type { ImageRecallCapabilities, ImageRecallKind } from '@workbench/image-actions';
 import type * as WorkbenchContextModule from '@workbench/WorkbenchContext';
@@ -7,10 +8,34 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { page } from 'vitest/browser';
 
-import { StagingItemContextMenu } from './StagingItemContextMenu';
+import { loadStagingItemRecall, StagingItemContextMenu } from './StagingItemContextMenu';
+
+const menuParts = vi.hoisted(() => ({
+  loaders: [] as { getSnapshot: () => { status: string }; reset: () => void }[],
+}));
+vi.mock('@platform/ui/Menu', async (importOriginal) => {
+  const original = await importOriginal<typeof MenuModule>();
+
+  return {
+    ...original,
+    createMenuPartLoader: <Part,>(importPart: () => Promise<Part>) => {
+      let current = original.createMenuPartLoader(importPart);
+      const loader = {
+        getSnapshot: () => current.getSnapshot(),
+        load: () => current.load(),
+        reset: () => {
+          current = original.createMenuPartLoader(importPart);
+        },
+        subscribe: (listener: () => void) => current.subscribe(listener),
+      };
+      menuParts.loaders.push(loader);
+      return loader;
+    },
+  };
+});
 
 const mocks = vi.hoisted(() => ({
   capabilities: {
@@ -52,7 +77,7 @@ vi.mock('@workbench/queue-integration/useQueueItemRecall', () => ({
   useQueueItemRecall: (origin: string, meta: unknown) => {
     mocks.origin = origin;
     mocks.meta = meta;
-    return { capabilities: mocks.capabilities, isPending: false, recall: mocks.recall };
+    return { capabilities: mocks.capabilities, isPending: false, reasons: {}, recall: mocks.recall };
   },
 }));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
@@ -136,6 +161,19 @@ const render = async (handlers: Partial<Parameters<typeof StagingItemContextMenu
   );
 };
 
+// The verbs' first load transforms their module graph, which can outlast `vi.waitFor`'s default second.
+const COLD_LOAD = { timeout: 10_000 };
+
+const loadRecall = async () => {
+  await act(() => loadStagingItemRecall());
+  await vi.waitFor(
+    () => expect(menuParts.loaders.map((loader) => loader.getSnapshot().status)).toEqual(['loaded']),
+    COLD_LOAD
+  );
+};
+
+beforeEach(() => menuParts.loaders.forEach((loader) => loader.reset()));
+
 afterEach(async () => {
   await act(() => root?.unmount());
   host?.remove();
@@ -148,8 +186,7 @@ describe('StagingItemContextMenu', () => {
   it('recalls from the staged result’s own queue item and disables verbs its snapshot cannot back', async () => {
     await render();
 
-    expect(mocks.origin).toBe('webv2:p:project-1:q:local-queue-item');
-    // The executed prompt and seed come from the backend item that produced the result.
+    await vi.waitFor(() => expect(mocks.origin).toBe('webv2:p:project-1:q:local-queue-item'), COLD_LOAD);
     await vi.waitFor(() => expect(mocks.meta).toEqual({ positivePrompt: 'a staged cat', seed: 4242 }));
     expect(menuItem('widgets.gallery.itemActions.recall.verbs.seed').getAttribute('aria-disabled')).toBe('true');
     expect(menuItem('widgets.gallery.itemActions.recall.verbs.clipSkip').getAttribute('aria-disabled')).toBe('true');
@@ -158,9 +195,24 @@ describe('StagingItemContextMenu', () => {
     await activate('widgets.gallery.itemActions.recall.verbs.prompts');
     expect(mocks.recall).toHaveBeenCalledWith('prompts');
 
-    // A greyed verb must stay inert: the row is only visually disabled.
     await activate('widgets.gallery.itemActions.recall.verbs.seed');
     expect(mocks.recall).not.toHaveBeenCalledWith('seed');
+  });
+
+  it('opens on its recall verbs’ first frame once they have loaded', async () => {
+    await loadRecall();
+    const placeholders: Node[] = [];
+    const observer = new MutationObserver(() =>
+      placeholders.push(...document.querySelectorAll('[data-value="menu-part-placeholder"]'))
+    );
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    await render();
+    observer.disconnect();
+
+    expect(placeholders).toEqual([]);
+    expect(menuItem('widgets.gallery.itemActions.recall.verbs.prompts')).toBeDefined();
+    expect(document.querySelector('[role="menu"]')?.getAttribute('aria-busy')).toBe('false');
   });
 
   it('keeps Accept inert while accepting is not allowed', async () => {

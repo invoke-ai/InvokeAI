@@ -47,7 +47,6 @@ describe('LayerController', () => {
       projectId: 'p',
     },
   });
-  // The layer operations are exercised by their own tests; here they only need to construct.
   const rasterize = { backend: {} as never, ctx: {} as never, rasterizeDeps: vi.fn() };
   const merge = {
     backend: {} as never,

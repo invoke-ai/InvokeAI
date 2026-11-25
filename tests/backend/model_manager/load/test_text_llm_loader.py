@@ -13,6 +13,7 @@ from unittest.mock import MagicMock
 import pytest
 import torch
 from PIL import Image
+from safetensors.torch import save_file
 from transformers import (
     Gemma4Config,
     Gemma4ForConditionalGeneration,
@@ -26,6 +27,7 @@ from transformers import (
     Qwen3_5VisionConfig,
 )
 
+from invokeai.backend.model_manager.configs.roles import view_as
 from invokeai.backend.model_manager.configs.text_llm import TextLLM_Checkpoint_Config, TextLLM_Diffusers_Config
 from invokeai.backend.model_manager.load.model_loaders import text_llm as loader_module
 from invokeai.backend.model_manager.load.model_loaders.text_llm import (
@@ -33,12 +35,14 @@ from invokeai.backend.model_manager.load.model_loaders.text_llm import (
     TextLLMModelLoader,
     qwen3_5_vl_from_state_dict,
 )
-from invokeai.backend.model_manager.taxonomy import SubModelType
+from invokeai.backend.model_manager.taxonomy import ModelType, SubModelType
 from invokeai.backend.quantization.int8_convrot import Int8ConvrotLinear
 from invokeai.backend.qwen3_5.qwen3_5_encoder import load_bundled_qwen3_5_tokenizer
 from tests.backend.model_manager.load.state_dicts import flux3_pup_bf16_keys, flux3_pup_int8_convrot_keys
 from tests.fixtures.loader_seams import Seam, prepare
+from tests.fixtures.model_roles import encoder_file
 from tests.fixtures.quantized_payloads import comfy_quant_marker, quantize_convrot
+from tests.fixtures.safetensors_files import record_reads
 
 Keys = dict[str, tuple[list[int], str]]
 
@@ -259,6 +263,21 @@ class TestTheCheckpointLoader:
         torch.testing.assert_close(_image_features(model), expected_features, rtol=1e-4, atol=1e-5)
         assert run.reserved == [_nbytes(model.state_dict())]
 
+    def test_the_multi_token_prediction_head_is_never_read(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        """Generation never runs it; read through ``pread`` it would cost its size in process memory first."""
+        state_dict = _int8_checkpoint(_reference())
+        config = _config(tmp_path)
+        save_file({key: value.contiguous() for key, value in state_dict.items()}, config.path)
+        run = prepare(SEAM, monkeypatch, geometry=_tiny_geometry)
+        log = record_reads(monkeypatch)
+
+        run.load(config, None)
+
+        assert any(key.startswith("mtp.") for key in state_dict)
+        assert set(log.tensors) == {key for key in state_dict if not key.startswith("mtp.")}
+
     def test_the_model_generates_with_the_releases_end_of_turn_tokens_and_real_rope_buffers(
         self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     ) -> None:
@@ -315,6 +334,30 @@ class TestTheCheckpointLoader:
         with pytest.raises(ValueError, match="quantization side channel"):
             run.load(_config(tmp_path), None)
         assert run.reserved == []
+
+
+class TestAnEncoderRecordServingAsATextLLM:
+    """A whole-model file installed as a Qwen3.5 encoder serves as a Text LLM: its view loads through this loader."""
+
+    @staticmethod
+    def _view(tmp_path: Path):
+        record = encoder_file("enc").model_copy(update={"path": str(_config(tmp_path).path)})
+        return view_as(record, ModelType.TextLLM)
+
+    def test_the_view_loads_the_whole_model_and_serves_its_own_tokenizer(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        reference = _reference()
+        state_dict = {key: value.detach().clone() for key, value in reference.state_dict().items()}
+        run = prepare(SEAM, monkeypatch, state_dict=state_dict, geometry=_tiny_geometry)
+        view = self._view(tmp_path)
+        assert isinstance(view, TextLLM_Checkpoint_Config)
+
+        model = run.load(view, None)
+        tokenizer = run.load(view, SubModelType.Tokenizer)
+
+        torch.testing.assert_close(_text_logits(model), _text_logits(reference))
+        assert tokenizer is not load_bundled_qwen3_5_tokenizer()
 
 
 # -- The text side a single file cannot carry, pinned against the release's own tokenizer and processor. -----------

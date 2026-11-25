@@ -7,10 +7,17 @@ import type {
 } from '@features/video/core/types';
 
 import { createListCollection, HStack, Stack, Switch, Text } from '@chakra-ui/react';
-import { AspectRatioPicker, GenerationSettingsSection, SeedField } from '@features/generation/components';
+import {
+  AspectRatioPicker,
+  GenerationSectionIssuesProvider,
+  GenerationSectionPanel,
+  GenerationSettingsSection,
+  SeedField,
+} from '@features/generation/components';
 import {
   getDynamicPromptsConfig,
   getLockedAspectRatioSettings,
+  isMainModelConfig,
   normalizeDynamicPromptsSettings,
   sanitizeBatchCount,
 } from '@features/generation/settings';
@@ -39,15 +46,23 @@ import {
 import {
   getAcceleratorLoraChangeResult,
   getAcceleratorToggleResult,
+  getH3ModeSwitchSettings,
+  getEffectiveVideoModel,
   getEffectiveVideoTiming,
   getVideoDimensions,
   getAutoDurationBounds,
   getVideoExpandPromptSuggestion,
   getVideoModelPolicy,
+  getVideoPanelFields,
   isAutoDurationActive,
   isAutoDurationSupportedForMode,
 } from '@features/video/core/videoPolicies';
-import { createDefaultVideoWidgetValues, syncVideoWidgetValuesWithModels } from '@features/video/core/widgetValues';
+import {
+  createDefaultVideoWidgetValues,
+  getVideoPanelIssueSections,
+  syncVideoWidgetValuesWithModels,
+} from '@features/video/core/widgetValues';
+import { flushWorkbenchDrafts } from '@platform/react/draftRegistry';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { Field, IconButton, Select } from '@platform/ui';
 import { Button } from '@platform/ui/Button';
@@ -67,7 +82,7 @@ import { VideoLengthControls } from './VideoLengthControls';
 import { VideoModelField } from './VideoModelField';
 import { VideoReferenceListField } from './VideoReferenceListField';
 import { VideoSourceClipField } from './VideoSourceClipField';
-import { useVideoUi, useVideoUiActions } from './VideoUiContext';
+import { useVideoUi, useVideoUiActions, VIDEO_SECTION_IDS } from './VideoUiContext';
 
 /** Keep section props stable: project patches rerender this widget on every keystroke. */
 
@@ -91,7 +106,7 @@ const StaleMediaStub = ({ label, onClear }: { label: string; onClear: () => void
   const { t } = useTranslation();
 
   return (
-    <HStack bg="bg.subtle" gap="2" justify="space-between" p="2" rounded="md">
+    <HStack bg="bg.muted" gap="2" justify="space-between" p="2" rounded="md">
       <Text color="fg.muted" fontSize="xs" textWrap="pretty">
         {label}
       </Text>
@@ -115,8 +130,7 @@ const VideoModelReconciler = ({
     const normalized = normalizeVideoWidgetValues(rawValues);
 
     if (normalized && areVideoValuesEqual(normalized, values)) {
-      // Pin whether this panel expands prompts while the record still says which kind it is: a later partial edit
-      // (a prompt resize) would make an unseeded panel read as one saved before Video expanded prompts.
+      // Pin expansion while the record still says which kind it is; a later partial edit would make it read as saved.
       if (typeof rawValues.dynamicPromptsEnabled !== 'boolean') {
         patchValues(normalizeDynamicPromptsSettings(values), 'system');
       }
@@ -132,7 +146,8 @@ const VideoModelReconciler = ({
   return null;
 };
 
-export const VideoWidgetView = () => {
+/** `instance` ties the sections to the header's jump menu; a view rendered outside a widget frame has none. */
+export const VideoWidgetView = ({ instance }: { instance?: { id: string } }) => {
   const { t } = useTranslation();
   const selection = useVideoUi();
   const models = useModelsSelector((snapshot) => snapshot.models);
@@ -156,9 +171,19 @@ export const VideoWidgetView = () => {
     [models]
   );
   const policy = useMemo(() => getVideoModelPolicy(values.model ?? undefined, values), [values]);
+  const panelFields = useMemo(() => getVideoPanelFields(values.model ?? undefined, values, policy), [policy, values]);
+  // Unsynced values, so a section counts an uninstalled pick while Invoke reports it.
+  const issueSections = useMemo(
+    () =>
+      getVideoPanelIssueSections(
+        normalizeVideoWidgetValues(rawValues),
+        panelFields,
+        modelsStatus === 'loaded' ? models : undefined
+      ).map((section) => VIDEO_SECTION_IDS[section]),
+    [models, modelsStatus, panelFields, rawValues]
+  );
   const dimensions = useMemo(() => getVideoDimensions(values.model ?? undefined, values), [values]);
-  // What the run will actually use: a conditioning clip decides the length, and in the video role
-  // the frame rate too. The stored values stay put underneath, so clearing the clip restores them.
+  // A conditioning clip decides the length (and the rate in the video role); stored values stay underneath.
   const timing = useMemo(() => getEffectiveVideoTiming(values.model ?? undefined, values), [values]);
   const autoDurationActive = useMemo(() => isAutoDurationActive(values), [values]);
   const autoDurationBounds = useMemo(() => getAutoDurationBounds(values.model ?? undefined, values), [values]);
@@ -182,10 +207,50 @@ export const VideoWidgetView = () => {
 
   const patch = useCallback((next: Partial<VideoWidgetValues>) => patchValues(next), [patchValues]);
 
-  // Async writes must use the latest committed list for this project while the sync effect is live. Hidden
-  // Activity panels stop syncing, and old callbacks still target their original project; drop writes in either
-  // case to avoid restoring stale references. Two resolves in one microtask drain may still see the same
-  // pre-commit list.
+  const toggleH3Mode = useCallback(
+    ({ checked }: { checked: boolean }) => {
+      flushWorkbenchDrafts();
+      let blocked = false;
+      let removedTurbo = false;
+      patchValues((current) => {
+        if (
+          current.references.length ||
+          current.firstFrameImage ||
+          current.lastFrameImage ||
+          current.sourceVideo ||
+          current.h3HybridBaseModel
+        ) {
+          blocked = true;
+          return {};
+        }
+        const latest = modelsStatus === 'loaded' ? syncVideoWidgetValuesWithModels(current, models) : current;
+        if (latest.model?.base !== 'minimax-h3' || latest.model.format !== 'checkpoint') {
+          return {};
+        }
+        const registered = models.find((item) => item.key === latest.model?.key && item.type === 'main');
+        const detected = registered && isMainModelConfig(registered) ? registered : latest.model;
+        removedTurbo = latest.acceleratorEnabled;
+        const next = getH3ModeSwitchSettings(latest, detected, models, checked);
+        return next;
+      });
+      if (blocked) {
+        toaster.create({
+          title: t('widgets.video.h3ClearModeInputs'),
+          description: t('widgets.video.h3ClearModeInputsDescription'),
+          type: 'warning',
+        });
+      } else if (removedTurbo) {
+        toaster.create({
+          title: t('widgets.video.settingsAdjusted'),
+          description: t('widgets.video.h3TurboRemoved'),
+          type: 'info',
+        });
+      }
+    },
+    [models, modelsStatus, patchValues, t]
+  );
+
+  // Hidden Activity panels stop syncing and old callbacks target their project; drop writes then to avoid stale lists.
   const referencesRef = useRef({ live: true, projectId, references: values.references });
 
   useEffect(() => {
@@ -224,7 +289,6 @@ export const VideoWidgetView = () => {
     [models, patch, policy.ui.accelerator?.label, t, values]
   );
 
-  // Stable per-field setters preserve child memo boundaries.
   const set = useMemo(
     () => ({
       // Matched to a built-in the way the picker matches its tiles.
@@ -243,9 +307,7 @@ export const VideoWidgetView = () => {
       fps: (fps: number) => patch({ fps }),
       autoDuration: ({ checked }: { checked: boolean }) => patch({ autoDuration: checked }),
       steps: (steps: number) => patch({ steps }),
-      // Snapped on the way out: the VAE encodes 8k + 1 frames and the node snaps a ragged request
-      // down silently, so an unsnapped value would leave the panel showing a number the run did
-      // not use. The scrubber's own step keeps dragging on-grid; this covers typed input.
+      // Snapped to 8k + 1, or the node snaps silently and the panel shows a number the run did not use.
       ltx2ExtendContextFrames: (frames: number) =>
         patch({ ltx2ExtendContextFrames: Math.max(1 + LTX2_NUM_FRAMES_STEP, snapLtx2FramesDown(frames)) }),
       targetResolution: ({ value }: { value: string[] }) => {
@@ -264,8 +326,7 @@ export const VideoWidgetView = () => {
     [patch, values.aspectRatioId]
   );
 
-  // First frame and initial video share one conditioning slot; last frame can accompany either. Reference
-  // extension also keeps the linked tail reference synchronized.
+  // First frame and initial video share one slot; last frame can accompany either.
   const referenceExtend = Boolean(policy.references?.extend);
   const maxVideoReferences = policy.references?.maxVideos ?? 3;
   const conditioningClip = values.conditioningClip;
@@ -279,15 +340,12 @@ export const VideoWidgetView = () => {
   const frameClearsClipText = isConditioningClipExcludingFrames(conditioningClip)
     ? t('widgets.video.frameClearsConditioningClip')
     : undefined;
-  // A conditioning clip claims a whole modality, so it excludes the initial video and references, and in the picture
-  // role the frames too -- and each of those clears it in turn. The role a dropped clip arrives in comes from the
-  // gallery record: an uploaded soundtrack has no picture to condition on.
+  // A clip claims a whole modality, and each of those media clears it in turn; the gallery record sets its role.
   const setConditioningClip = useCallback(
     (conditioningClip: VideoConditioningClip | null) => patch(getConditioningClipPatch(conditioningClip)),
     [patch]
   );
-  // This setter tracks references separately from patch-only field setters. Rebudget the linked tail with frame
-  // count so backend truncation cannot discard its seam end; derivation must tolerate intermediate input values.
+  // Rebudget the linked tail with frame count so backend truncation cannot discard its seam end.
   const setNumFrames = useCallback(
     (numFrames: number) =>
       patch(
@@ -295,8 +353,7 @@ export const VideoWidgetView = () => {
           ? { numFrames, references: applyReferenceExtendNumFrames(referencesRef.current.references, numFrames) }
           : { numFrames }
       ),
-    // Read committed references through the guarded ref to keep the Frames callback stable; rebudgeting is
-    // idempotent.
+    // Read committed references through the guarded ref to keep the Frames callback stable; rebudgeting is idempotent.
     [patch, projectId, referenceExtend]
   );
   const setSourceVideo = useCallback(
@@ -312,8 +369,7 @@ export const VideoWidgetView = () => {
         sourceVideo,
       });
 
-      // No tail-reference slot is available: refuse the whole drop so the clip cannot be set without its
-      // continuity anchor.
+      // No tail-reference slot: refuse the drop so the clip is never set without its continuity anchor.
       if (!placement) {
         toaster.create({
           description: t('widgets.video.referenceExtendCapFullDescription'),
@@ -327,7 +383,6 @@ export const VideoWidgetView = () => {
     },
     [maxVideoReferences, patch, projectId, referenceExtend, t, values.numFrames]
   );
-  // Generation continues from the last reference; pin the continuity anchor after every list edit.
   const setReferences = useCallback(
     (update: (current: VideoReferenceItem[]) => VideoReferenceItem[]) => {
       if (!referencesRef.current.live || referencesRef.current.projectId !== projectId) {
@@ -353,8 +408,7 @@ export const VideoWidgetView = () => {
         if (loras === current.loras) {
           return {};
         }
-        // While enabled, follow a replacement accelerator set or restore model sampling defaults if none remains.
-        // Preserve the edit and notify; never enable acceleration from a list edit.
+        // Never enable acceleration from a list edit; only follow a replacement set or restore defaults.
         if (!current.model) {
           return { loras };
         }
@@ -398,9 +452,7 @@ export const VideoWidgetView = () => {
     () => createListCollection({ items: policy.targetResolutions.map((option) => ({ ...option, value: option.id })) }),
     [policy.targetResolutions]
   );
-  // A two-stage preset generates at half the canvas it names, which the size line below does not
-  // say -- it reports the output size, which is the final one. Without this the whole signal that a
-  // preset costs two passes is the three words in its own label.
+  // The size line shows the final output, so this says a two-stage preset costs two passes.
   const twoStageHelpText = useMemo(() => {
     const option = policy.targetResolutions.find((entry) => entry.id === values.targetResolution);
 
@@ -438,8 +490,8 @@ export const VideoWidgetView = () => {
 
   const hasAdvancedGuidance = policy.ui.audioCfgVisible || policy.ui.stgVisible || policy.ui.modalityVisible;
   const mode = resolveVideoMode(values);
-  const supportsFirstFrame = policy.modes.includes('first-frame') || policy.modes.includes('first-last');
-  const supportsLastFrame = policy.modes.includes('first-last') || policy.modes.includes('last-frame');
+  const supportsFirstFrame = panelFields.has('firstFrame');
+  const supportsLastFrame = panelFields.has('lastFrame');
   const promptEnhancer = policy.prompt.enhancer;
   const firstFrameImage = values.firstFrameImage;
   // Memoized for VideoPromptFields' equality check; both inputs keep their identity between patches.
@@ -475,22 +527,18 @@ export const VideoWidgetView = () => {
       dynamicPromptsSeedBehaviour,
     ]
   );
-  const supportsExtend = policy.modes.includes('extend');
-  const supportsReferences = policy.modes.includes('reference');
-  const supportsConditioningClip = policy.modes.includes('audio-to-video') || policy.modes.includes('video-to-audio');
-  const supportsInitialVideo = supportsExtend || referenceExtend;
-  // Use the setter's capacity predicate: recalled unflagged references can be adopted without consuming a slot,
-  // and must not disable clip trimming.
+  const supportsReferences = panelFields.has('references');
+  const supportsConditioningClip = panelFields.has('conditioningClip');
+  const supportsInitialVideo = panelFields.has('initialVideo');
+  // The setter's capacity predicate: recalled unflagged references can be adopted without a slot.
   const initialVideoCapBlocked =
     referenceExtend &&
     !canPlaceReferenceExtendAnchor(values.references, values.sourceVideo?.video_name, maxVideoReferences);
-  // The aspect-ratio control is locked by media that pins the frame. A clip in the `audio` role
-  // does not: its picture is what gets generated, so the ratio is still the user's to choose.
+  // A clip in the `audio` role does not lock the ratio: its picture is generated.
   const hasConditioningMedia = Boolean(
     values.firstFrameImage || values.lastFrameImage || values.sourceVideo || values.conditioningClip?.role === 'video'
   );
   const otherMediaSet = Boolean(values.sourceVideo || values.references.length > 0);
-  // Frames block only the clip's picture role; its soundtrack is what they can be combined with.
   const framesSet = Boolean(values.firstFrameImage || values.lastFrameImage);
   const conditioningDerivedText = values.conditioningClip
     ? t(
@@ -501,8 +549,7 @@ export const VideoWidgetView = () => {
       )
     : undefined;
   const derivedSourceText = dimensions ? t(`widgets.video.dimensionSource.${dimensions.source}`) : undefined;
-  // Media determines output proportions. Show its ratio source while disabled, preserving the saved preset for
-  // when media is removed.
+  // Media determines proportions; the saved preset returns when the media is removed.
   const dimensionSource = dimensions?.source;
   const derivedSourceValueText = useMemo(
     () =>
@@ -519,372 +566,420 @@ export const VideoWidgetView = () => {
       }`
     : t('widgets.video.derivedSizeUnavailable');
   const fpsLockedForExtend = policy.ui.fpsVisible && mode === 'extend';
-  const fpsLocked = fpsLockedForExtend || timing.fpsFromClip;
+  const fpsLocked = !panelFields.has('fps');
   const durationText =
     durationSeconds === null
       ? undefined
       : t('widgets.video.framesDuration', { seconds: DURATION_FORMATTER.format(durationSeconds) });
 
   return (
-    <Stack gap="1" minW="0" p="1">
-      <VideoModelReconciler
-        key={`${projectId}:${modelsStatus}:${modelsFingerprint}`}
-        rawValues={rawValues}
-        values={values}
-      />
-
-      <Stack gap="1" px="2" py="1">
-        <VideoModelField
-          models={models}
-          modelsLoaded={modelsStatus === 'loaded'}
-          projectId={projectId}
-          values={values}
-        />
-      </Stack>
-
-      <VideoPromptFields
-        batchCount={values.batchCount}
-        dynamicPrompts={dynamicPrompts}
-        expandPromptSuggestion={expandPromptSuggestion}
-        isSeedFixed={values.seedMode === 'fixed'}
-        loras={values.loras}
-        model={values.model}
-        negativeHelpText={policy.prompt.negativeHelpTextKey ? t(policy.prompt.negativeHelpTextKey) : undefined}
-        negativePrompt={values.negativePrompt}
-        negativePromptEnabled={values.negativePromptEnabled}
-        negativePromptHeightPx={values.negativePromptHeightPx}
-        negativeVisible={policy.prompt.negativeVisible}
-        positivePrompt={values.positivePrompt}
-        positivePromptHeightPx={values.positivePromptHeightPx}
-        projectId={projectId}
-        showSyntaxHighlighting={selection.showPromptSyntaxHighlighting}
-        onPatchValues={patch}
-      />
-
-      {supportsFirstFrame || supportsLastFrame ? (
-        <GenerationSettingsSection label={t('widgets.video.initialFrames')} sectionId="video-frames" defaultOpen>
-          <Stack gap="3" p="2">
-            {supportsFirstFrame ? (
-              <Field
-                helpText={
-                  values.sourceVideo
-                    ? undefined
-                    : [t('widgets.video.firstFrameHelp'), frameClearsClipText].filter(Boolean).join(' ')
-                }
-                label={t('widgets.video.firstFrame')}
-              >
-                <VideoFrameImageField
-                  disabled={Boolean(values.sourceVideo)}
-                  disabledReason={values.sourceVideo ? t('widgets.video.firstFrameBlocked') : undefined}
-                  dropId="video-first-frame"
-                  dropLabel={t('widgets.video.dropFirstFrame')}
-                  image={values.firstFrameImage}
-                  onChange={setFirstFrame}
-                />
-              </Field>
-            ) : null}
-            {supportsLastFrame ? (
-              <Field
-                helpText={[
-                  values.sourceVideo ? t('widgets.video.lastFrameExtendHelp') : t('widgets.video.lastFrameHelp'),
-                  frameClearsClipText,
-                ]
-                  .filter(Boolean)
-                  .join(' ')}
-                label={t('widgets.video.lastFrame')}
-              >
-                <VideoFrameImageField
-                  dropId="video-last-frame"
-                  dropLabel={t('widgets.video.dropLastFrame')}
-                  image={values.lastFrameImage}
-                  onChange={setLastFrame}
-                />
-              </Field>
-            ) : null}
-          </Stack>
-        </GenerationSettingsSection>
-      ) : null}
-
-      {!supportsFirstFrame && values.firstFrameImage ? (
-        <StaleMediaStub label={t('widgets.video.staleFirstFrame')} onClear={clearFirstFrame} />
-      ) : null}
-      {!supportsLastFrame && values.lastFrameImage ? (
-        <StaleMediaStub label={t('widgets.video.staleLastFrame')} onClear={clearLastFrame} />
-      ) : null}
-      {!supportsInitialVideo && values.sourceVideo ? (
-        <StaleMediaStub label={t('widgets.video.staleSourceVideo')} onClear={clearSourceVideo} />
-      ) : null}
-      {!supportsReferences && values.references.length > 0 ? (
-        <StaleMediaStub label={t('widgets.video.staleReferences')} onClear={clearReferences} />
-      ) : null}
-      {!supportsConditioningClip && values.conditioningClip ? (
-        <StaleMediaStub label={t('widgets.video.staleConditioningClip')} onClear={clearConditioningClip} />
-      ) : null}
-
-      {supportsReferences ? (
-        <GenerationSettingsSection label={t('widgets.video.references')} sectionId="video-references" defaultOpen>
-          <Stack gap="3" p="2">
-            <VideoReferenceListField
-              maxImages={policy.references?.maxImages ?? 9}
-              maxVideos={policy.references?.maxVideos ?? 3}
-              references={values.references}
-              targetArea={dimensions ? dimensions.width * dimensions.height : null}
-              onChange={setReferences}
-            />
-          </Stack>
-        </GenerationSettingsSection>
-      ) : null}
-
-      {supportsInitialVideo ? (
-        <GenerationSettingsSection label={t('widgets.video.initialVideo')} sectionId="video-source" defaultOpen>
-          <Stack gap="3" p="2">
-            {referenceExtend ? (
-              <Text color="fg.muted" fontSize="xs" textWrap="pretty">
-                {t('widgets.video.referenceExtendHelp')}
-              </Text>
-            ) : null}
-            <VideoSourceClipField
-              disabled={Boolean(values.firstFrameImage) || initialVideoCapBlocked}
-              disabledReason={
-                values.firstFrameImage
-                  ? t('widgets.video.initialVideoBlocked')
-                  : initialVideoCapBlocked
-                    ? t('widgets.video.initialVideoCapBlocked')
-                    : undefined
-              }
-              sourceVideo={values.sourceVideo}
-              onChange={setSourceVideo}
-            />
-            {policy.ui.extendContext ? (
-              <ScrubberField
-                defaultValue={LTX2_EXTEND_CONTEXT_FRAMES}
-                // The trade this control makes, which Frames alone does not show: the join consumes
-                // the context from both halves, so every frame held is a frame of new video given up.
-                // Under auto duration Frames is only a ceiling, so the new material is too.
-                helpText={t(
-                  autoDurationBounds ? 'widgets.video.extendContextHelpAuto' : 'widgets.video.extendContextHelp',
-                  {
-                    frames: extendNewFrames,
-                    // The continuation plays at the source's rate, not the panel's.
-                    seconds: (extendNewFrames / Math.max(1, values.sourceVideo?.fps ?? values.fps)).toFixed(1),
-                  }
-                )}
-                inputMax={policy.ui.extendContext.max}
-                label={t('widgets.video.extendContext')}
-                max={policy.ui.extendContext.max}
-                min={policy.ui.extendContext.min}
-                step={policy.ui.extendContext.step}
-                value={policy.ui.extendContext.value}
-                onChange={set.ltx2ExtendContextFrames}
-              />
-            ) : null}
-          </Stack>
-        </GenerationSettingsSection>
-      ) : null}
-
-      {supportsConditioningClip ? (
-        <GenerationSettingsSection
-          label={t('widgets.video.conditioningClip')}
-          sectionId="video-conditioning-clip"
-          defaultOpen={Boolean(values.conditioningClip)}
-        >
-          <Stack gap="3" p="2">
-            <VideoConditioningClipField
-              conditioningClip={values.conditioningClip}
-              derivedText={conditioningDerivedText}
-              disabled={otherMediaSet}
-              disabledReason={otherMediaSet ? t('widgets.video.conditioningClipBlocked') : undefined}
-              pictureRoleDisabledReason={framesSet ? t('widgets.video.conditioningRoleVideoBlocked') : undefined}
-              onChange={setConditioningClip}
-            />
-          </Stack>
-        </GenerationSettingsSection>
-      ) : null}
-
-      <GenerationSettingsSection label={t('widgets.video.dimensions')} sectionId="video-dimensions" defaultOpen>
-        <Stack gap="3" p="2">
-          <Field helpText={derivedSizeText} label={t('widgets.video.aspectRatio')}>
-            <HStack gap="1">
-              <AspectRatioPicker
-                disabled={hasConditioningMedia}
-                lockedRatio={getAspectRatio(values.aspectRatioId)}
-                valueText={derivedSourceValueText}
-                onChange={set.aspectRatio}
-              />
-              <IconButton
-                aria-label={t('widgets.video.swapAspectRatio')}
-                disabled={hasConditioningMedia}
-                variant="ghost"
-                onClick={swapAspectRatio}
-              >
-                <ArrowLeftRightIcon />
-              </IconButton>
-            </HStack>
-          </Field>
-          <Field helpText={twoStageHelpText} label={t('widgets.video.targetResolution')}>
-            <Select
-              collection={targetResolutionCollection}
-              value={targetResolutionValue}
-              onValueChange={set.targetResolution}
-            />
-          </Field>
-          <VideoLengthControls
-            autoDuration={values.autoDuration}
-            autoDurationActive={autoDurationActive}
-            autoDurationCeiling={autoDurationCeiling}
-            autoDurationSupported={autoDurationSupported}
-            durationText={durationText}
-            framesSlider={framesSlider}
-            hasDurationHead={Boolean(values.ltx2DurationHeadModel)}
-            numFrames={timing.numFrames}
-            numFramesFromClip={timing.numFramesFromClip}
-            onAutoDurationChange={set.autoDuration}
-            onNumFramesChange={setNumFrames}
+    <GenerationSectionPanel id={instance?.id}>
+      <GenerationSectionIssuesProvider issueSections={issueSections}>
+        <Stack gap="0" minW="0">
+          <VideoModelReconciler
+            key={`${projectId}:${modelsStatus}:${modelsFingerprint}`}
+            rawValues={rawValues}
+            values={values}
           />
-          {policy.ui.fpsVisible ? (
-            <ScrubberField
-              disabled={fpsLocked}
-              helpText={
-                timing.fpsFromClip
-                  ? t('widgets.video.fpsFromClip')
-                  : fpsLockedForExtend
-                    ? t('widgets.video.fpsExtendLocked')
-                    : undefined
-              }
-              inputMax={policy.fps.max}
-              label={t('widgets.video.fps')}
-              max={60}
-              min={policy.fps.min}
-              step={1}
-              value={timing.fps}
-              onChange={set.fps}
-            />
-          ) : (
-            <Text color="fg.muted" fontSize="xs">
-              {t('widgets.video.fixedFps', { fps: policy.fps.defaultValue })}
-            </Text>
-          )}
-        </Stack>
-      </GenerationSettingsSection>
 
-      {/* Sampling and variation — how the model renders, not which model it is. */}
-      <GenerationSettingsSection label={t('widgets.video.render')} sectionId="video-render" defaultOpen>
-        <Stack gap="3" p="2">
-          {policy.ui.accelerator && values.model ? (
-            <Field
-              helpText={t('widgets.video.acceleratorHelp', {
-                label: policy.ui.accelerator.label,
-                steps: policy.ui.acceleratorSteps ?? policy.ui.accelerator.steps,
-              })}
-              label={t('widgets.video.accelerator', { label: policy.ui.accelerator.label })}
-            >
-              <Switch.Root checked={values.acceleratorEnabled} onCheckedChange={toggleAccelerator}>
+          <Stack gap="1" px="2" pt="3" pb="1">
+            <VideoModelField
+              models={models}
+              modelsLoaded={modelsStatus === 'loaded'}
+              projectId={projectId}
+              values={values}
+            />
+          </Stack>
+
+          {values.model?.base === 'minimax-h3' && values.model.format === 'checkpoint' ? (
+            <HStack px="2" py="1" justify="space-between">
+              <Text fontSize="sm">
+                {t('widgets.video.h3Mode', {
+                  mode: getEffectiveVideoModel(values.model, values).variant === 'ref2va' ? 'Ref2VA' : 'FL2VA',
+                  source: values.h3TaskOverride ? t('widgets.video.h3ModeOverride') : t('widgets.video.h3ModeDetected'),
+                })}
+              </Text>
+              <Switch.Root
+                checked={values.h3TaskOverride !== undefined}
+                disabled={modelsStatus !== 'loaded'}
+                onCheckedChange={toggleH3Mode}
+              >
                 <Switch.HiddenInput />
                 <Switch.Control _checked={SWITCH_CHECKED_PROPS}>
                   <Switch.Thumb />
                 </Switch.Control>
+                <Switch.Label>{t('widgets.video.h3SwitchMode')}</Switch.Label>
               </Switch.Root>
-            </Field>
+            </HStack>
           ) : null}
-          {policy.ui.stepsEditable ? (
-            <ScrubberField
-              defaultValue={policy.defaults.steps}
-              hint="steps"
-              inputMax={500}
-              label={t('widgets.video.steps')}
-              max={100}
-              min={policy.minSteps}
-              step={1}
-              value={values.steps}
-              onChange={set.steps}
-            />
-          ) : (
-            <Text color="fg.muted" fontSize="xs">
-              {t('widgets.video.stepsFixed', { steps: policy.defaults.steps })}
-            </Text>
-          )}
-          {policy.ui.cfgVisible ? (
-            <ScrubberField
-              hint="cfgScale"
-              inputMax={100}
-              label={t('widgets.video.cfg')}
-              max={15}
-              min={1}
-              step={0.1}
-              value={values.cfgScale}
-              onChange={set.cfgScale}
-            />
-          ) : null}
-          {policy.ui.cfgLowNoiseVisible ? (
-            <ScrubberField
-              helpText={t('widgets.video.cfgLowNoiseHelp')}
-              inputMax={100}
-              label={t('widgets.video.cfgLowNoise')}
-              max={15}
-              min={1}
-              step={0.1}
-              value={values.cfgScaleLowNoise ?? values.cfgScale}
-              onChange={set.cfgScaleLowNoise}
-            />
-          ) : null}
-          <SeedField
+
+          <VideoPromptFields
             batchCount={values.batchCount}
-            label={t('widgets.video.seed')}
-            seed={values.seed}
-            seedMode={values.seedMode}
-            onCommit={patch}
+            dynamicPrompts={dynamicPrompts}
+            expandPromptSuggestion={expandPromptSuggestion}
+            isSeedFixed={values.seedMode === 'fixed'}
+            loras={values.loras}
+            model={values.model}
+            negativeHelpText={policy.prompt.negativeHelpTextKey ? t(policy.prompt.negativeHelpTextKey) : undefined}
+            negativePrompt={values.negativePrompt}
+            negativePromptEnabled={values.negativePromptEnabled}
+            negativePromptHeightPx={values.negativePromptHeightPx}
+            negativeVisible={policy.prompt.negativeVisible}
+            positivePrompt={values.positivePrompt}
+            positivePromptHeightPx={values.positivePromptHeightPx}
+            projectId={projectId}
+            showSyntaxHighlighting={selection.showPromptSyntaxHighlighting}
+            onPatchValues={patch}
           />
+
+          {supportsFirstFrame || supportsLastFrame ? (
+            <GenerationSettingsSection
+              label={t('widgets.video.initialFrames')}
+              sectionId={VIDEO_SECTION_IDS.frames}
+              defaultOpen
+            >
+              <Stack gap="2.5">
+                {supportsFirstFrame ? (
+                  <Field
+                    helpText={
+                      values.sourceVideo
+                        ? undefined
+                        : [t('widgets.video.firstFrameHelp'), frameClearsClipText].filter(Boolean).join(' ')
+                    }
+                    label={t('widgets.video.firstFrame')}
+                  >
+                    <VideoFrameImageField
+                      disabled={Boolean(values.sourceVideo)}
+                      disabledReason={values.sourceVideo ? t('widgets.video.firstFrameBlocked') : undefined}
+                      dropId="video-first-frame"
+                      dropLabel={t('widgets.video.dropFirstFrame')}
+                      image={values.firstFrameImage}
+                      onChange={setFirstFrame}
+                    />
+                  </Field>
+                ) : null}
+                {supportsLastFrame ? (
+                  <Field
+                    helpText={[
+                      values.sourceVideo ? t('widgets.video.lastFrameExtendHelp') : t('widgets.video.lastFrameHelp'),
+                      frameClearsClipText,
+                    ]
+                      .filter(Boolean)
+                      .join(' ')}
+                    label={t('widgets.video.lastFrame')}
+                  >
+                    <VideoFrameImageField
+                      dropId="video-last-frame"
+                      dropLabel={t('widgets.video.dropLastFrame')}
+                      image={values.lastFrameImage}
+                      onChange={setLastFrame}
+                    />
+                  </Field>
+                ) : null}
+              </Stack>
+            </GenerationSettingsSection>
+          ) : null}
+
+          {!supportsFirstFrame && values.firstFrameImage ? (
+            <StaleMediaStub label={t('widgets.video.staleFirstFrame')} onClear={clearFirstFrame} />
+          ) : null}
+          {!supportsLastFrame && values.lastFrameImage ? (
+            <StaleMediaStub label={t('widgets.video.staleLastFrame')} onClear={clearLastFrame} />
+          ) : null}
+          {!supportsInitialVideo && values.sourceVideo ? (
+            <StaleMediaStub label={t('widgets.video.staleSourceVideo')} onClear={clearSourceVideo} />
+          ) : null}
+          {!supportsReferences && values.references.length > 0 ? (
+            <StaleMediaStub label={t('widgets.video.staleReferences')} onClear={clearReferences} />
+          ) : null}
+          {!supportsConditioningClip && values.conditioningClip ? (
+            <StaleMediaStub label={t('widgets.video.staleConditioningClip')} onClear={clearConditioningClip} />
+          ) : null}
+
+          {supportsReferences ? (
+            <GenerationSettingsSection
+              label={t('widgets.video.references')}
+              sectionId={VIDEO_SECTION_IDS.references}
+              defaultOpen
+            >
+              <Stack gap="2.5">
+                <VideoReferenceListField
+                  maxImages={policy.references?.maxImages ?? 9}
+                  maxVideos={policy.references?.maxVideos ?? 3}
+                  references={values.references}
+                  targetArea={dimensions ? dimensions.width * dimensions.height : null}
+                  onChange={setReferences}
+                />
+              </Stack>
+            </GenerationSettingsSection>
+          ) : null}
+
+          {supportsInitialVideo ? (
+            <GenerationSettingsSection
+              label={t('widgets.video.initialVideo')}
+              sectionId={VIDEO_SECTION_IDS.source}
+              defaultOpen
+            >
+              <Stack gap="2.5">
+                {referenceExtend ? (
+                  <Text color="fg.muted" fontSize="xs" textWrap="pretty">
+                    {t('widgets.video.referenceExtendHelp')}
+                  </Text>
+                ) : null}
+                <VideoSourceClipField
+                  disabled={Boolean(values.firstFrameImage) || initialVideoCapBlocked}
+                  disabledReason={
+                    values.firstFrameImage
+                      ? t('widgets.video.initialVideoBlocked')
+                      : initialVideoCapBlocked
+                        ? t('widgets.video.initialVideoCapBlocked')
+                        : undefined
+                  }
+                  sourceVideo={values.sourceVideo}
+                  onChange={setSourceVideo}
+                />
+                {policy.ui.extendContext ? (
+                  <ScrubberField
+                    defaultValue={LTX2_EXTEND_CONTEXT_FRAMES}
+                    // The join consumes the context from both halves; under auto duration Frames is only a ceiling.
+                    helpText={t(
+                      autoDurationBounds ? 'widgets.video.extendContextHelpAuto' : 'widgets.video.extendContextHelp',
+                      {
+                        frames: extendNewFrames,
+                        // The continuation plays at the source's rate, not the panel's.
+                        seconds: (extendNewFrames / Math.max(1, values.sourceVideo?.fps ?? values.fps)).toFixed(1),
+                      }
+                    )}
+                    inputMax={policy.ui.extendContext.max}
+                    label={t('widgets.video.extendContext')}
+                    max={policy.ui.extendContext.max}
+                    min={policy.ui.extendContext.min}
+                    step={policy.ui.extendContext.step}
+                    value={policy.ui.extendContext.value}
+                    onChange={set.ltx2ExtendContextFrames}
+                  />
+                ) : null}
+              </Stack>
+            </GenerationSettingsSection>
+          ) : null}
+
+          {supportsConditioningClip ? (
+            <GenerationSettingsSection
+              label={t('widgets.video.conditioningClip')}
+              sectionId={VIDEO_SECTION_IDS.conditioningClip}
+              defaultOpen={Boolean(values.conditioningClip)}
+            >
+              <Stack gap="2.5">
+                <VideoConditioningClipField
+                  conditioningClip={values.conditioningClip}
+                  derivedText={conditioningDerivedText}
+                  disabled={otherMediaSet}
+                  disabledReason={otherMediaSet ? t('widgets.video.conditioningClipBlocked') : undefined}
+                  pictureRoleDisabledReason={framesSet ? t('widgets.video.conditioningRoleVideoBlocked') : undefined}
+                  onChange={setConditioningClip}
+                />
+              </Stack>
+            </GenerationSettingsSection>
+          ) : null}
+
+          <GenerationSettingsSection
+            label={t('widgets.video.dimensions')}
+            sectionId={VIDEO_SECTION_IDS.dimensions}
+            defaultOpen
+          >
+            <Stack gap="2.5">
+              <Field helpText={derivedSizeText} label={t('widgets.video.aspectRatio')}>
+                <HStack gap="1">
+                  <AspectRatioPicker
+                    disabled={hasConditioningMedia}
+                    lockedRatio={getAspectRatio(values.aspectRatioId)}
+                    valueText={derivedSourceValueText}
+                    onChange={set.aspectRatio}
+                  />
+                  <IconButton
+                    aria-label={t('widgets.video.swapAspectRatio')}
+                    disabled={hasConditioningMedia}
+                    variant="ghost"
+                    onClick={swapAspectRatio}
+                  >
+                    <ArrowLeftRightIcon />
+                  </IconButton>
+                </HStack>
+              </Field>
+              <Field helpText={twoStageHelpText} label={t('widgets.video.targetResolution')}>
+                <Select
+                  collection={targetResolutionCollection}
+                  value={targetResolutionValue}
+                  onValueChange={set.targetResolution}
+                />
+              </Field>
+              <VideoLengthControls
+                autoDuration={values.autoDuration}
+                autoDurationActive={autoDurationActive}
+                autoDurationCeiling={autoDurationCeiling}
+                autoDurationSupported={autoDurationSupported}
+                durationText={durationText}
+                framesSlider={framesSlider}
+                hasDurationHead={Boolean(values.ltx2DurationHeadModel)}
+                numFrames={timing.numFrames}
+                numFramesFromClip={timing.numFramesFromClip}
+                onAutoDurationChange={set.autoDuration}
+                onNumFramesChange={setNumFrames}
+              />
+              {policy.ui.fpsVisible ? (
+                <ScrubberField
+                  disabled={fpsLocked}
+                  helpText={
+                    timing.fpsFromClip
+                      ? t('widgets.video.fpsFromClip')
+                      : fpsLockedForExtend
+                        ? t('widgets.video.fpsExtendLocked')
+                        : undefined
+                  }
+                  inputMax={policy.fps.max}
+                  label={t('widgets.video.fps')}
+                  max={60}
+                  min={policy.fps.min}
+                  step={1}
+                  value={timing.fps}
+                  onChange={set.fps}
+                />
+              ) : (
+                <Text color="fg.muted" fontSize="xs">
+                  {t('widgets.video.fixedFps', { fps: policy.fps.defaultValue })}
+                </Text>
+              )}
+            </Stack>
+          </GenerationSettingsSection>
+
+          {/* Sampling and variation — how the model renders, not which model it is. */}
+          <GenerationSettingsSection label={t('widgets.video.render')} sectionId={VIDEO_SECTION_IDS.render} defaultOpen>
+            <Stack gap="2.5">
+              {policy.ui.accelerator && values.model ? (
+                <Field
+                  helpText={t('widgets.video.acceleratorHelp', {
+                    label: policy.ui.accelerator.label,
+                    steps: policy.ui.acceleratorSteps ?? policy.ui.accelerator.steps,
+                  })}
+                  label={t('widgets.video.accelerator', { label: policy.ui.accelerator.label })}
+                >
+                  <Switch.Root checked={values.acceleratorEnabled} onCheckedChange={toggleAccelerator}>
+                    <Switch.HiddenInput />
+                    <Switch.Control _checked={SWITCH_CHECKED_PROPS}>
+                      <Switch.Thumb />
+                    </Switch.Control>
+                  </Switch.Root>
+                </Field>
+              ) : null}
+              {policy.ui.stepsEditable ? (
+                <ScrubberField
+                  defaultValue={policy.defaults.steps}
+                  hint="steps"
+                  inputMax={500}
+                  label={t('widgets.video.steps')}
+                  max={100}
+                  min={policy.minSteps}
+                  step={1}
+                  value={values.steps}
+                  onChange={set.steps}
+                />
+              ) : (
+                <Text color="fg.muted" fontSize="xs">
+                  {t('widgets.video.stepsFixed', { steps: policy.defaults.steps })}
+                </Text>
+              )}
+              {policy.ui.cfgVisible ? (
+                <ScrubberField
+                  hint="cfgScale"
+                  inputMax={100}
+                  label={t('widgets.video.cfg')}
+                  max={15}
+                  min={1}
+                  step={0.1}
+                  value={values.cfgScale}
+                  onChange={set.cfgScale}
+                />
+              ) : null}
+              {policy.ui.cfgLowNoiseVisible ? (
+                <ScrubberField
+                  helpText={t('widgets.video.cfgLowNoiseHelp')}
+                  inputMax={100}
+                  label={t('widgets.video.cfgLowNoise')}
+                  max={15}
+                  min={1}
+                  step={0.1}
+                  value={values.cfgScaleLowNoise ?? values.cfgScale}
+                  onChange={set.cfgScaleLowNoise}
+                />
+              ) : null}
+              <SeedField
+                batchCount={values.batchCount}
+                label={t('widgets.video.seed')}
+                seed={values.seed}
+                seedMode={values.seedMode}
+                onCommit={patch}
+              />
+            </Stack>
+          </GenerationSettingsSection>
+
+          {hasAdvancedGuidance ? (
+            <GenerationSettingsSection
+              label={t('widgets.video.advancedGuidance')}
+              sectionId={VIDEO_SECTION_IDS.guidance}
+            >
+              <Stack gap="2.5">
+                {policy.ui.audioCfgVisible ? (
+                  <ScrubberField
+                    defaultValue={policy.defaults.audioCfgScale ?? undefined}
+                    helpText={t('widgets.video.audioCfgHelp')}
+                    inputMax={100}
+                    label={t('widgets.video.audioCfg')}
+                    max={15}
+                    min={1}
+                    step={0.1}
+                    value={values.audioCfgScale ?? policy.defaults.audioCfgScale ?? 1}
+                    onChange={set.audioCfgScale}
+                  />
+                ) : null}
+                {policy.ui.stgVisible ? (
+                  <ScrubberField
+                    defaultValue={policy.defaults.stgScale ?? undefined}
+                    helpText={t('widgets.video.stgHelp')}
+                    inputMax={10}
+                    label={t('widgets.video.stg')}
+                    max={3}
+                    min={0}
+                    step={0.1}
+                    value={values.stgScale ?? policy.defaults.stgScale ?? 0}
+                    onChange={set.stgScale}
+                  />
+                ) : null}
+                {policy.ui.modalityVisible ? (
+                  <ScrubberField
+                    defaultValue={policy.defaults.modalityScale ?? undefined}
+                    helpText={t('widgets.video.modalityHelp')}
+                    inputMax={10}
+                    label={t('widgets.video.modality')}
+                    max={5}
+                    min={1}
+                    step={0.1}
+                    value={values.modalityScale ?? policy.defaults.modalityScale ?? 1}
+                    onChange={set.modalityScale}
+                  />
+                ) : null}
+              </Stack>
+            </GenerationSettingsSection>
+          ) : null}
+
+          <VideoConceptsSection
+            projectId={projectId}
+            loras={values.loras}
+            model={values.model}
+            onChangeLoras={setLoras}
+          />
+          <VideoComponentsSection values={values} onPatch={patch} />
         </Stack>
-      </GenerationSettingsSection>
-
-      {hasAdvancedGuidance ? (
-        <GenerationSettingsSection label={t('widgets.video.advancedGuidance')} sectionId="video-guidance">
-          <Stack gap="3" p="2">
-            {policy.ui.audioCfgVisible ? (
-              <ScrubberField
-                defaultValue={policy.defaults.audioCfgScale ?? undefined}
-                helpText={t('widgets.video.audioCfgHelp')}
-                inputMax={100}
-                label={t('widgets.video.audioCfg')}
-                max={15}
-                min={1}
-                step={0.1}
-                value={values.audioCfgScale ?? policy.defaults.audioCfgScale ?? 1}
-                onChange={set.audioCfgScale}
-              />
-            ) : null}
-            {policy.ui.stgVisible ? (
-              <ScrubberField
-                defaultValue={policy.defaults.stgScale ?? undefined}
-                helpText={t('widgets.video.stgHelp')}
-                inputMax={10}
-                label={t('widgets.video.stg')}
-                max={3}
-                min={0}
-                step={0.1}
-                value={values.stgScale ?? policy.defaults.stgScale ?? 0}
-                onChange={set.stgScale}
-              />
-            ) : null}
-            {policy.ui.modalityVisible ? (
-              <ScrubberField
-                defaultValue={policy.defaults.modalityScale ?? undefined}
-                helpText={t('widgets.video.modalityHelp')}
-                inputMax={10}
-                label={t('widgets.video.modality')}
-                max={5}
-                min={1}
-                step={0.1}
-                value={values.modalityScale ?? policy.defaults.modalityScale ?? 1}
-                onChange={set.modalityScale}
-              />
-            ) : null}
-          </Stack>
-        </GenerationSettingsSection>
-      ) : null}
-
-      <VideoConceptsSection projectId={projectId} loras={values.loras} model={values.model} onChangeLoras={setLoras} />
-      <VideoComponentsSection values={values} onPatch={patch} />
-    </Stack>
+      </GenerationSectionIssuesProvider>
+    </GenerationSectionPanel>
   );
 };

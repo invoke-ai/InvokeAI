@@ -150,8 +150,8 @@ const WidgetFailureCard = ({
 
   useScrollAreaPhantomHeal(viewportRef);
   const canCopy = canCopyText();
-  // The card has no other feedback channel: without a toast the click is
-  // indistinguishable from one that silently failed.
+  // The card has no other feedback channel: without a toast the click is indistinguishable from one that silently
+  // failed.
   const copy = useCallback(
     () =>
       onCopy().then(

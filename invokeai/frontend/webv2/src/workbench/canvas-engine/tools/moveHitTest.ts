@@ -1,7 +1,7 @@
 /**
- * Transform document points into layer-local content bounds for exact rotation/scale hit tests. All renderable
- * source types and mask alpha use the same bounds; empty content returns null/false. Helpers locate a specified
- * layer, never choose a stack target instead of panel selection.
+ * Transform document points into layer-local content bounds for exact rotation/scale hit tests. All renderable source
+ * types and mask alpha use the same bounds; empty content returns null/false. Helpers locate a specified layer, never
+ * choose a stack target instead of panel selection.
  */
 
 import type {
@@ -13,19 +13,27 @@ import type { Rect, Vec2 } from '@workbench/canvas-engine/types';
 
 import { getSourceContentRect, renderableSourceOf } from '@workbench/canvas-engine/document/sources';
 import { applyToPoint, fromTRS, invert } from '@workbench/canvas-engine/math/mat2d';
-import { isEmpty, union } from '@workbench/canvas-engine/math/rect';
+import { getBezierPathBounds, isEmpty, union } from '@workbench/canvas-engine/math/rect';
 
 type LayerTransform = CanvasLayerBaseContract['transform'];
 
-/**
- * Local content bounds include off-origin paint/mask pixels and share {@link getSourceContentRect}. Empty or
- * unsupported layers return null.
- */
+/** Off-origin-aware local content bounds via {@link getSourceContentRect}; null for empty or unsupported layers. */
 export const hittableLayerRect = (
   layer: CanvasLayerContract,
-  doc: CanvasDocumentContractV3,
+  doc: Pick<CanvasDocumentContractV3, 'width' | 'height'>,
   liveRect?: Rect
 ): Rect | null => {
+  if (layer.type === 'vector') {
+    let bounds: Rect | null = null;
+    for (const path of layer.paths) {
+      if (path.points.length < 2) {
+        continue;
+      }
+      const rect = getBezierPathBounds(path.points, path.isClosed);
+      bounds = bounds ? union(bounds, rect) : rect;
+    }
+    return bounds ? { ...bounds, width: Math.max(1, bounds.width), height: Math.max(1, bounds.height) } : null;
+  }
   if (!renderableSourceOf(layer)) {
     return null;
   }
@@ -72,10 +80,7 @@ export const hitTestLayer = (
   return local.x >= rect.x && local.x <= rect.x + rect.width && local.y >= rect.y && local.y <= rect.y + rect.height;
 };
 
-/**
- * Returns transformed content corners or null. Partial overrides preview move/scale/rotation without mutation;
- * omitted fields retain committed values.
- */
+/** Transformed content corners or null; a partial override previews without mutation, omitted fields stay committed. */
 export const layerOutlineCorners = (
   layer: CanvasLayerContract,
   doc: CanvasDocumentContractV3,

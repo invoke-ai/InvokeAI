@@ -11,7 +11,6 @@ import { ProgressBadge } from '@platform/ui/ProgressBadge';
 import { StreamingImageFrame } from '@platform/ui/streaming-image/StreamingImageFrame';
 import { progressImageToStreamingSource } from '@platform/ui/streaming-image/streamingImageSource';
 import { wheelScrollsHorizontally } from '@platform/ui/wheelScrollsHorizontally';
-import { getCancelableCanvasStagingQueueItemId } from '@workbench/canvasStagingView';
 import { CanvasOptionsBar } from '@workbench/widgets/canvas/tool-options/CanvasOptionsBar';
 import { AutoSwitchMenu } from '@workbench/widgets/shared/AutoSwitchMenu';
 import {
@@ -37,22 +36,20 @@ import {
 import { useTranslation } from 'react-i18next';
 
 import { CanvasFloatingBarDivider } from './CanvasFloatingBar';
-import { StagingItemContextMenu, type StagingItemContextMenuTarget } from './StagingItemContextMenu';
+import {
+  loadStagingItemRecall,
+  StagingItemContextMenu,
+  type StagingItemContextMenuTarget,
+} from './StagingItemContextMenu';
 import { CANVAS_SURFACE_ATTR } from './surfaceFocus';
 
 type AutoSwitchMode = CanvasStagingAreaContractV2['autoSwitchMode'];
 
 const THUMBNAIL_STRIP_HEIGHT = '5rem';
 const MENU_POSITIONING = { placement: 'top-end' } as const;
-/**
- * Below this bar width the "Generating" text and "Discard all" collapse to icons, so the accept split button (the
- * only pointer path to "Keep as hidden layer") stays inside the canvas. Measured on the staging slot itself.
- */
+/** Below this width, text collapses to icons so the accept split button stays inside the canvas. */
 const COMPACT = '@container staging-bar (width < 56rem)';
-/**
- * Below this the remaining text goes too (the candidate counter, the auto-switch mode, Cancel and the accept label),
- * leaving icons whose names and tooltips carry the words, so the bar fits a canvas down to about 360px.
- */
+/** Below this the remaining text goes too, so the bar fits a canvas down to about 360px. */
 const NARROW = '@container staging-bar (width < 36rem)';
 const STAGING_ROOT_CSS = { containerName: 'staging-bar', containerType: 'inline-size' } as const;
 const WIDE_ONLY_CSS = { [COMPACT]: { display: 'none' } } as const;
@@ -71,9 +68,10 @@ const COMPACT_SR_ONLY_CSS = { [COMPACT]: SR_ONLY } as const;
 const NARROW_SR_ONLY_CSS = { [NARROW]: SR_ONLY } as const;
 /** Gone while narrow: group rules (the icons' spacing still separates the groups) and labelled buttons. */
 const NARROW_HIDDEN_CSS = { [NARROW]: { display: 'none' } } as const;
-const NARROW_ONLY_CSS = { display: 'none', [NARROW]: { display: 'inline-flex' } } as const;
 /** Buttons whose text goes while narrow keep a square icon footprint. */
 const NARROW_ICON_BUTTON_CSS = { [NARROW]: { minW: '8', px: '0' } } as const;
+/** Closer controls once narrow: a finished result's actions and Stop generating fit side by side. */
+const NARROW_BAR_CSS = { [NARROW]: { gap: '0.5' } } as const;
 /** Marks a thumbnail with its slot index, for roving focus and focus restore. */
 const THUMBNAIL_ATTR = 'data-staging-thumbnail';
 /** Marks the previous/next buttons, a focus target once no thumbnail shows. */
@@ -89,7 +87,6 @@ interface StagingBarProps {
   canAccept: boolean;
   hasMultipleSlots: boolean;
   isGenerating: boolean;
-  /** A gallery save of the selected candidate is in flight. */
   isSavingToGallery: boolean;
   isVisible: boolean;
   selectedCandidate: CanvasStagingCandidateContract | undefined;
@@ -97,7 +94,8 @@ interface StagingBarProps {
   selectedSlot: CanvasStagingSlot | undefined;
   slots: CanvasStagingSlot[];
   onAccept: () => void;
-  onCancelQueueItem: (queueItemId: string) => void;
+  /** Stops every run still generating results for this canvas. */
+  onStopGenerating: () => void;
   onCycle: (direction: -1 | 1) => void;
   onDiscardAll: () => void;
   onDiscardSelected: () => void;
@@ -111,10 +109,6 @@ interface StagingBarProps {
   onToggleVisibility: () => void;
 }
 
-/**
- * Show staging controls for running or pending canvas results. {@link CanvasWidgetView} feeds pixels to
- * engine.previews; the parent positions this bar above tool options.
- */
 export const StagingBar = ({
   antialiasProgressImages,
   areThumbnailsVisible,
@@ -129,7 +123,6 @@ export const StagingBar = ({
   selectedSlot,
   slots,
   onAccept,
-  onCancelQueueItem,
   onCycle,
   onDiscardAll,
   onDiscardSelected,
@@ -138,20 +131,22 @@ export const StagingBar = ({
   onSaveToGallery,
   onSaveToLayerAndContinue,
   onSetAutoSwitch,
+  onStopGenerating,
   onToggleThumbnails,
   onToggleVisibility,
 }: StagingBarProps) => {
   const { t } = useTranslation();
   const rootRef = useRef<HTMLDivElement | null>(null);
   const [contextMenuTarget, setContextMenuTarget] = useState<StagingItemContextMenuTarget | null>(null);
-  // The menu's candidate actions act on the selection, so it only stays open
-  // while its slot is the selected one: an auto-switch to a newer result
-  // closes it rather than letting Discard hit the wrong candidate.
+  // The menu's candidate actions act on the selection, so it only stays open while its slot is the selected one: an
+  // auto-switch to a newer result closes it rather than letting Discard hit the wrong candidate.
   if (contextMenuTarget && selectedSlot?.id !== contextMenuTarget.slot.id) {
     setContextMenuTarget(null);
   }
   const hasSlots = slots.length > 0;
-  const cancelableQueueItemId = getCancelableCanvasStagingQueueItemId(selectedSlot);
+  // Whatever is selected: a finished result stays selected while the next image of its run starts.
+  const canStopGenerating = slots.some((slot) => slot.kind === 'placeholder');
+  const stopGeneratingLabel = t('widgets.canvas.staging.stopGenerating');
   const acceptLabel = t('widgets.canvas.acceptToLayer');
   const acceptMenuIds = useTooltipTriggerIds();
   const thumbnailsLabel = areThumbnailsVisible
@@ -164,12 +159,7 @@ export const StagingBar = ({
     }
   };
 
-  /**
-   * After a discard or a closed thumbnail menu, focus stays with the results instead of falling to the page: on
-   * `preferred` (the thumbnail the menu opened from), else the result now selected when thumbnails show, else a step
-   * button that still works, else the bar itself. Once the last result is gone, and the bar with it, the canvas
-   * surface takes focus, so the canvas's keys keep working. Focus the user already moved elsewhere stays there.
-   */
+  /** Keeps focus with the results after a discard or closed menu; the canvas takes it once the bar is gone. */
   const keepFocusWithResults = (preferred?: () => HTMLElement | null) => {
     const root = rootRef.current;
     if (!root) {
@@ -200,6 +190,11 @@ export const StagingBar = ({
     onDiscardAll();
     keepFocusWithResults();
   };
+  // The button goes with the last placeholder; focus stays with the results.
+  const stopGenerating = () => {
+    onStopGenerating();
+    keepFocusWithResults();
+  };
   // A menu with no trigger restores focus nowhere; send it back to the thumbnail it opened from.
   const closeContextMenu = () => {
     const slotId = contextMenuTarget?.slot.id;
@@ -210,9 +205,9 @@ export const StagingBar = ({
     });
   };
 
-  // With focus in the bar, the arrows step through results and Delete discards the focused one, which is the
-  // selected one (focusing a thumbnail selects it); the canvas's own keys (nudge, delete the layer or selected
-  // pixels) never act on the document from here.
+  // With focus in the bar, the arrows step through results and Delete discards the selected one (the thumbnail Tab or
+  // an arrow puts focus on); the canvas's own keys (nudge, delete the layer or selected pixels) never act on the
+  // document from here.
   const handleKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
     if (
       event.altKey ||
@@ -236,10 +231,10 @@ export const StagingBar = ({
       const direction = event.key === 'ArrowLeft' ? -1 : 1;
       const index = thumbnail ? Number(thumbnail.getAttribute(THUMBNAIL_ATTR)) : Number.NaN;
       if (Number.isInteger(index)) {
-        // Roving focus: the next thumbnail takes focus, which selects it.
-        event.currentTarget
-          .querySelector<HTMLElement>(`[${THUMBNAIL_ATTR}="${(index + direction + slots.length) % slots.length}"]`)
-          ?.focus();
+        // Roving focus: an arrow is the pick (it steers Auto-switch), and focus goes with it.
+        const next = (index + direction + slots.length) % slots.length;
+        onSelectImage(next);
+        event.currentTarget.querySelector<HTMLElement>(`[${THUMBNAIL_ATTR}="${next}"]`)?.focus();
       } else {
         onCycle(direction);
       }
@@ -282,8 +277,7 @@ export const StagingBar = ({
         />
       ) : null}
       {hasSlots ? (
-        // Constrain thumbnail scrolling to canvas width so centered overflow cannot be clipped outside the
-        // surface.
+        // Constrain thumbnail scrolling to canvas width so centered overflow cannot be clipped outside the surface.
         <ScrollArea.Root
           h={areThumbnailsVisible ? THUMBNAIL_STRIP_HEIGHT : '0'}
           opacity={areThumbnailsVisible ? 1 : 0}
@@ -293,12 +287,9 @@ export const StagingBar = ({
           w="full"
         >
           <ScrollArea.Viewport ref={wheelScrollsHorizontally} h="full" scrollPaddingInline="2" w="full">
-            {/*
-             * Leave the content slot's width alone: its inline `min-width:
-             * fit-content` grows it to hold every thumbnail, so `justify` only
-             * centers when the strip fits and no thumbnail ever lands at a
-             * negative offset that scrolling cannot reach.
-             */}
+            {/* Leave the content slot's width alone: its inline `min-width: fit-content` grows it to hold every
+                thumbnail, so `justify` only centers when the strip fits and no thumbnail ever lands at a negative
+                offset that scrolling cannot reach. */}
             <ScrollArea.Content asChild>
               <HStack h="full" justify="center">
                 {slots.map((slot, index) => (
@@ -307,13 +298,13 @@ export const StagingBar = ({
                     antialiasProgressImages={antialiasProgressImages}
                     index={index}
                     isSelected={index === selectedImageIndex}
+                    isTabStop={areThumbnailsVisible}
                     slot={slot}
                     onContextMenu={(event) => {
                       if (slot.kind !== 'candidate') {
                         return;
                       }
                       // The menu acts on the selected candidate, so a right-click selects first.
-                      // The keyboard's context-menu key reports no pointer; anchor to the thumbnail.
                       event.preventDefault();
                       onSelectImage(index);
                       const rect = event.currentTarget.getBoundingClientRect();
@@ -337,14 +328,41 @@ export const StagingBar = ({
         </ScrollArea.Root>
       ) : null}
 
-      <CanvasOptionsBar>
+      <CanvasOptionsBar css={NARROW_BAR_CSS}>
+        {/* First, beside the status it acts on and away from the result's own actions: it stops every run still
+            generating for this canvas, not the result shown. Labelled while there is room, an icon once compact. */}
+        {canStopGenerating ? (
+          <>
+            {/* The one label that gives way to a long translation: it shortens, and the tooltip says it in full. */}
+            <Tooltip content={stopGeneratingLabel}>
+              <Button css={WIDE_ONLY_CSS} flexShrink="1" minW="0" variant="ghost" onClick={stopGenerating}>
+                <CircleStopIcon />
+                <Box as="span" minW="0" truncate>
+                  {stopGeneratingLabel}
+                </Box>
+              </Button>
+            </Tooltip>
+            <Tooltip content={stopGeneratingLabel}>
+              <IconButton
+                aria-label={stopGeneratingLabel}
+                css={COMPACT_ONLY_CSS}
+                variant="ghost"
+                onClick={stopGenerating}
+              >
+                <CircleStopIcon />
+              </IconButton>
+            </Tooltip>
+          </>
+        ) : null}
+
         {/* Results keep coming in and waiting here while the canvas stays editable; the status says how many. */}
         <Tooltip content={statusLabel}>
           <HStack
             color="fg.muted"
             // Once compact a running batch keeps its spinner; otherwise the status goes, since the counter shows the
-            // count, and it still reads the sentence.
-            css={isGenerating ? undefined : COMPACT_SR_ONLY_CSS}
+            // count, and it still reads the sentence. Once narrow, the stop button's icon says a run is going in its
+            // place.
+            css={isGenerating ? (canStopGenerating ? NARROW_SR_ONLY_CSS : undefined) : COMPACT_SR_ONLY_CSS}
             flexShrink="0"
             gap="1.5"
             position="relative"
@@ -416,31 +434,6 @@ export const StagingBar = ({
               valueCss={NARROW_SR_ONLY_CSS}
               onChange={onSetAutoSwitch}
             />
-
-            {cancelableQueueItemId ? (
-              <>
-                {/* Labelled while there is room; an icon with the tooltip once narrow, as Discard all does. */}
-                <Button
-                  css={NARROW_HIDDEN_CSS}
-                  flexShrink="0"
-                  variant="ghost"
-                  onClick={() => onCancelQueueItem(cancelableQueueItemId)}
-                >
-                  <CircleStopIcon />
-                  {t('common.cancel')}
-                </Button>
-                <Tooltip content={t('common.cancel')}>
-                  <IconButton
-                    aria-label={t('common.cancel')}
-                    css={NARROW_ONLY_CSS}
-                    variant="ghost"
-                    onClick={() => onCancelQueueItem(cancelableQueueItemId)}
-                  >
-                    <CircleStopIcon />
-                  </IconButton>
-                </Tooltip>
-              </>
-            ) : null}
 
             {selectedCandidate ? (
               <>
@@ -550,6 +543,7 @@ const StagingThumbnail = ({
   antialiasProgressImages,
   index,
   isSelected,
+  isTabStop,
   slot,
   onContextMenu,
   onPreloadCandidate,
@@ -558,6 +552,8 @@ const StagingThumbnail = ({
   antialiasProgressImages: boolean;
   index: number;
   isSelected: boolean;
+  /** Whether the strip takes a Tab stop at all: not while its thumbnails are hidden. */
+  isTabStop: boolean;
   slot: CanvasStagingSlot;
   onContextMenu: (event: ReactMouseEvent<HTMLElement>) => void;
   onPreloadCandidate: (imageName: string) => void;
@@ -574,9 +570,8 @@ const StagingThumbnail = ({
     [isSelected]
   );
   const preloadCandidate = useCallback(() => {
-    // Once a candidate's small thumbnail settles, warm its full bytes in the
-    // engine so cycling to it only pays the bitmap decode. The cache promotes a
-    // selected candidate out of the background queue when necessary.
+    // Once a candidate's small thumbnail settles, warm its full bytes in the engine so cycling to it only pays the
+    // bitmap decode. The cache promotes a selected candidate out of the background queue when necessary.
     if (slot.kind === 'candidate') {
       onPreloadCandidate(slot.candidate.imageName);
     }
@@ -599,10 +594,13 @@ const StagingThumbnail = ({
       rounded="md"
       shadow={isSelected ? '0 0 0 1px {colors.accent.solid}' : 'md'}
       style={{ aspectRatio: '1 / 1' }}
+      // One stop for the strip: the selected thumbnail; the arrows move between them.
+      tabIndex={isSelected && isTabStop ? 0 : -1}
       onClick={onSelect}
       onContextMenu={onContextMenu}
-      // Focus follows selection: the bar's keys act on the thumbnail the keyboard is on.
-      onFocus={isSelected ? undefined : onSelect}
+      // A staged result's menu offers recall; warm it on intent.
+      onFocus={slot.kind === 'candidate' ? loadStagingItemRecall : undefined}
+      onPointerEnter={slot.kind === 'candidate' ? loadStagingItemRecall : undefined}
     >
       {slot.kind === 'candidate' ? (
         <img

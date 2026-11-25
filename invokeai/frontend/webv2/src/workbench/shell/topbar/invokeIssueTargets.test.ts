@@ -28,6 +28,29 @@ describe('getInvocationIssueTarget', () => {
     });
   });
 
+  it('leads a blocking control layer to that layer, and a hosted refusal to the Canvas', () => {
+    expect(
+      getInvocationIssueTarget(
+        {
+          canvasInputIssue: { code: 'missing_model', kind: 'control_layer', layerId: 'control-1', layerName: 'Sketch' },
+        },
+        'canvas'
+      )
+    ).toEqual({ kind: 'layer', layerId: 'control-1' });
+    expect(
+      getInvocationIssueTarget(
+        {
+          canvasInputIssue: {
+            kind: 'hosted_refusal',
+            modelName: 'OpenAI Image',
+            refusal: { kind: 'regional_guidance', layerName: 'Hat' },
+          },
+        },
+        'canvas'
+      )
+    ).toEqual({ kind: 'widget', widgetId: 'canvas' });
+  });
+
   it('leads a plain reason to the source widget that owns it', () => {
     expect(getInvocationIssueTarget('Upscale settings are incomplete.', 'upscale')).toEqual({
       kind: 'widget',

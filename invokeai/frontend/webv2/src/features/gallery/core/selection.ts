@@ -96,10 +96,7 @@ export const getPersistedSelectedGalleryItemKeys = (galleryValues: Record<string
   return selectedItem ? [toGalleryItemKey(selectedItem)] : [];
 };
 
-/**
- * Successor after deleting `primaryKey`: the next eligible entry in display
- * order, else the nearest earlier one — later-first stays out of the starred block.
- */
+/** Later-first, so the successor stays out of the starred block. */
 export const getGalleryDeletionSuccessor = (
   orderedRefs: readonly GalleryItemRef[],
   primaryKey: GalleryItemKey,
@@ -130,15 +127,7 @@ export const getGalleryDeletionSuccessor = (
   return null;
 };
 
-/*
- * Explicit, tokenized reveals can repeat without selection changes. Keep them ephemeral to avoid replaying stale
- * scrolls; colocating avoids another gallery chunk.
- */
-
-/**
- * Why a reveal is announced, once, by a Gallery widget mounted when it is requested; unset for reveals the user asked
- * for themselves.
- */
+/** Announced once by a mounted Gallery widget; unset when the user asked. */
 export type GalleryRevealAnnouncement = 'external-generation';
 
 export interface GalleryRevealRequest {
@@ -167,7 +156,7 @@ export const requestGalleryItemReveal = (
   }
 };
 
-/** Ignore a pending intent after its account lifetime changes, including when Gallery mounts later. */
+/** Ignored after its account lifetime changes, including when Gallery mounts later. */
 export const getGalleryRevealRequest = (): GalleryRevealRequest | null => {
   const request = currentRequest;
 
@@ -182,11 +171,6 @@ export const subscribeGalleryRevealRequests = (listener: () => void): (() => voi
   };
 };
 
-/*
- * Order navigation gestures across mounts and surfaces before async hydration; only the latest may update the
- * shared selection.
- */
-
 export interface GalleryLocatorRequest {
   signal: AbortSignal;
   release: () => void;
@@ -194,7 +178,6 @@ export interface GalleryLocatorRequest {
 
 const activeGalleryLocatorRequests = new Set<AbortController>();
 
-/** Create a cancellable locator lifetime shared by Gallery reveal entry points. */
 export const createGalleryLocatorRequest = (): GalleryLocatorRequest => {
   const controller = new AbortController();
   activeGalleryLocatorRequests.add(controller);
@@ -205,10 +188,9 @@ export const createGalleryLocatorRequest = (): GalleryLocatorRequest => {
   };
 };
 
-/** Whether a reveal is still locating its item; a reveal nobody asked for must not supersede it. */
+/** A reveal nobody asked for must not supersede one still locating its item. */
 export const hasGalleryLocatorRequests = (): boolean => activeGalleryLocatorRequests.size > 0;
 
-/** A later Gallery navigation supersedes every locator currently in flight. */
 export const abortGalleryLocatorRequests = (): void => {
   for (const controller of activeGalleryLocatorRequests) {
     controller.abort();
@@ -219,17 +201,11 @@ export const abortGalleryLocatorRequests = (): void => {
 
 let navigationSequence = 0;
 
-/** Claims this navigation's place in the global ordering; every later claim supersedes it. */
 export const claimGalleryNavigationSequence = (): number => ++navigationSequence;
 
-/** False once a newer navigation has been claimed, which is when a slow hydrate must stand down. */
 export const isGalleryNavigationCurrent = (sequence: number): boolean => sequence === navigationSequence;
 
-/**
- * The Gallery navigation a user controls, as one comparable value: the latest claimed navigation, plus the board,
- * selection, view, filters, search and page in the Gallery widget's values. Ordinary clicks claim no navigation, so
- * the values cover them.
- */
+/** The widget values cover ordinary clicks, which claim no sequence. */
 export interface GalleryNavigationSnapshot {
   readonly sequence: number;
   readonly state: string;
@@ -253,25 +229,16 @@ export const captureGalleryNavigation = (values: Record<string, unknown>): Galle
   state: JSON.stringify(NAVIGATION_VALUE_KEYS.map((key) => values[key] ?? null)),
 });
 
-/** Whether the Gallery values still hold the captured navigation; the claimed sequence is compared separately. */
 export const isGalleryNavigationStateUnchanged = (
   snapshot: GalleryNavigationSnapshot,
   values: Record<string, unknown>
 ): boolean => captureGalleryNavigation(values).state === snapshot.state;
 
-/**
- * Whether the user composed a search a reveal would discard: search text, semantic text, or a semantic query. An open
- * but empty semantic field holds nothing to lose.
- */
+/** An empty semantic field holds no search. */
 export const hasGalleryListingSearch = (values: Record<string, unknown>): boolean =>
   (typeof values.searchTerm === 'string' && values.searchTerm !== '') ||
   (typeof values.semanticSearchText === 'string' && values.semanticSearchText !== '') ||
   (values.semanticImageQuery !== null && values.semanticImageQuery !== undefined);
-
-/*
- * Grid and Preview share section order: the starred strip, the in-progress sessions, then the listing. Horizontal
- * navigation crosses seams while vertical navigation preserves columns.
- */
 
 export type GalleryNavigationEntry =
   | { kind: 'item'; item: GalleryItem }
@@ -289,11 +256,7 @@ const getGalleryNavigationEntryKey = (entry: GalleryNavigationEntry): string =>
       ? entry.id
       : getGallerySessionNavigationKey(entry.id);
 
-/**
- * Where an arrow steps from: the first candidate the sections show. A candidate they do not show (a followed session
- * under a collapsed section, a selection on another page) is passed over rather than read as no cursor at all; null
- * means no candidate is shown.
- */
+/** A cursor candidate the sections do not show is passed over; null means none is shown. */
 export const getGalleryNavigationCursor = (
   sections: readonly (readonly GalleryNavigationEntry[])[],
   cursorKeys: readonly (string | null)[]
@@ -303,11 +266,7 @@ export const getGalleryNavigationCursor = (
   return cursorKeys.find((key): key is string => key !== null && shownKeys.has(key)) ?? null;
 };
 
-/**
- * Each section starts its own rows. Vertical navigation preserves columns, selects the nearest navigable cell, and
- * skips empty rows; with no cursor shown it starts at the first navigable entry. `itemsOnly` steps over sessions
- * without removing them, so a session can still be the cursor and still holds its rows.
- */
+/** Vertical steps keep columns and skip empty rows; `itemsOnly` steps over sessions without removing their rows. */
 export const getGalleryNavigationStep = (
   sections: readonly (readonly GalleryNavigationEntry[])[],
   cursorKeys: readonly (string | null)[],
@@ -360,7 +319,7 @@ export const getGalleryNavigationStep = (
     const row = rows[target]!;
     const landing = Math.min(column, row.length - 1);
 
-    // Nearest navigable cell of the row by column distance, the left one on a tie.
+    // The left one on a tie.
     for (let distance = 0; distance < row.length; distance += 1) {
       for (const candidate of [landing - distance, landing + distance]) {
         if (candidate >= 0 && candidate < row.length && isNavigable(entries[row.start + candidate])) {

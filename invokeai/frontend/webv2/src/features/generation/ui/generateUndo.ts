@@ -9,8 +9,9 @@ import { flushGenerateDrafts } from './generateDraftRegistry';
 
 /**
  * Generate's Undo slots, one pair per project. A newer Undo in a slot withdraws the older, since undoing an older step
- * after a newer one would leave a mix of both. Whole-form changes (a model switch, a preset, Reset all) share one slot;
- * prompt changes that Ctrl+Z in the prompt cannot undo (a template choice, a history entry, a rewrite) share the other.
+ * after a newer one would leave a mix of both. Whole-form changes (a model switch, a preset, Apply model defaults,
+ * Reset everything) share one slot; prompt changes that Ctrl+Z in the prompt cannot undo (a template choice, a history
+ * entry, a rewrite) share the other.
  */
 export const getGenerateSettingsUndoKey = (projectId: string): string => `generate-settings:${projectId}`;
 export const getGeneratePromptUndoKey = (projectId: string): string => `generate-prompt:${projectId}`;
@@ -31,6 +32,8 @@ interface GenerateUndoOffer {
    * Undo does nothing. Otherwise it puts back the keys still holding what the change wrote and leaves the rest.
    */
   isWhole?: boolean;
+  /** Runs after an Undo that restored something, for state the caller keeps beside the settings. */
+  onUndone?: () => void;
 }
 
 /**
@@ -54,15 +57,16 @@ export const readStillAppliedRevert = (
 };
 
 /**
- * Reports a Generate change that already happened, with an Undo that restores the earlier value of each key the
- * change set. A key edited since keeps the edit, so an Undo never discards later work; with nothing left to restore it
- * says so. No toast when the change set nothing.
+ * Reports a Generate change that already happened, with an Undo that restores the earlier value of each key the change
+ * set. A key edited since keeps the edit, so an Undo never discards later work; with nothing left to restore it says
+ * so. No toast when the change set nothing.
  */
 export const offerGenerateUndo = ({
   after,
   before,
   isWhole = false,
   message,
+  onUndone,
   projectId,
   slot,
   t,
@@ -86,6 +90,7 @@ export const offerGenerateUndo = ({
         (!isWhole || stillApplied.length === Object.keys(revertPatch).length)
       ) {
         ui.settings.patchGenerateSettings(Object.fromEntries(stillApplied), projectId);
+        onUndone?.();
       } else {
         ui.notifications.info(t('widgets.generate.undoStale'));
       }

@@ -111,7 +111,6 @@ const openRepresentativePage = async (browser, path, viewport = { height: 1_000,
   return { consoleErrors, context, page, pageErrors };
 };
 
-/** `/` is Home: the greeting, the resume card, and the intent tiles. */
 const waitForHome = async (page) => {
   await page.getByRole('heading', { exact: true, name: 'Welcome to Invoke' }).waitFor();
   await page.getByRole('link', { exact: true, name: 'Open Fixture Project 001' }).waitFor();
@@ -142,7 +141,6 @@ const waitForWorkbench = async (page) => {
   await waitForRenderedMedia(page);
 };
 
-/** Every built-in widget the status bar can hold, by its menu label (manifests allowing the `bottom` region). */
 const BUILT_IN_BOTTOM_WIDGETS = [
   'Autosave',
   'Gallery',
@@ -154,10 +152,8 @@ const BUILT_IN_BOTTOM_WIDGETS = [
 ];
 const centerViewTrigger = (page, label) => page.getByRole('button', { exact: true, name: `Center view: ${label}` });
 
-/** Preset names need not match their center views; pass the expected view explicitly. */
 const selectLayoutPreset = async (page, preset, centerView) => {
-  // Match the full preset name plus optional drift marker within the strip; custom presets and Workflow tabs can
-  // share prefixes.
+  // Custom presets and Workflow tabs can share prefixes.
   const name = new RegExp(`^${preset}(, unsaved changes)?$`);
   const strip = presetStrip(page);
   const selected = strip.getByRole('tab', { name, selected: true });
@@ -170,7 +166,6 @@ const selectLayoutPreset = async (page, preset, centerView) => {
   await centerViewTrigger(page, centerView).waitFor();
 };
 
-/** Compose keeps a Gallery in the right rail too, so gallery locators are scoped. */
 const centerRegion = (page) => page.getByRole('region', { exact: true, name: 'Center view' });
 
 const selectCenterView = async (page, from, to) => {
@@ -241,16 +236,42 @@ const surfaces = [
       await waitForWorkbench(page);
       await selectLayoutPreset(page, 'Edit', 'Canvas');
       await waitForRenderedMedia(page, { canvas: true });
-      // The Layers panel's Properties pane is the canvas's settings surface; the journey must scan it, not a fallback.
       await page.getByRole('tab', { exact: true, name: 'Properties', selected: true }).waitFor();
       await page.getByRole('tabpanel').getByRole('group', { exact: true, name: 'Layer' }).waitFor();
+    },
+  },
+  {
+    id: 'workbench-canvas-first-spline-focus',
+    path: representativeProjectPath,
+    ready: async (page) => {
+      await waitForWorkbench(page);
+      await selectLayoutPreset(page, 'Edit', 'Canvas');
+      await waitForRenderedMedia(page, { canvas: true });
+      const spline = page.getByRole('button', { exact: true, name: 'Spline Edit' });
+      await spline.waitFor();
+      assert.equal(await spline.getAttribute('aria-pressed'), 'false');
+
+      const surface = page.locator('[data-canvas-surface]');
+      await surface.focus();
+      const original = await surface.elementHandle();
+      try {
+        assert.equal(await original.evaluate((element) => document.activeElement === element), true);
+        await page.keyboard.press('s');
+        await page.getByRole('button', { exact: true, name: 'Spline Edit', pressed: true }).waitFor();
+        assert.equal(
+          await original.evaluate((element) => element.isConnected && document.activeElement === element),
+          true,
+          'The first Spline shortcut must preserve the original focused Canvas surface.'
+        );
+      } finally {
+        await original.dispose();
+      }
     },
   },
   {
     id: 'workbench-canvas-control-layer',
     path: representativeProjectPath,
     ready: async (page) => {
-      // Seed after the reset in openRepresentativePage, then reload so the model list includes the seed.
       const seeded = await fetch(`${backendOrigin}/__models`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -261,24 +282,20 @@ const surfaces = [
       await waitForWorkbench(page);
       await selectLayoutPreset(page, 'Edit', 'Canvas');
       await waitForRenderedMedia(page, { canvas: true });
-      // The representative main model is SD 1.x; the seeded control models are SDXL, so switch to an SDXL main
-      // (Fixture Model 006) through the Generate panel's model picker.
+      // The seeded control models are SDXL, so switch to an SDXL main.
       await page.getByText('Fixture Model 001', { exact: true }).click();
       const search = page.getByRole('combobox', { name: /^Search / });
       await search.fill('Fixture Model 006');
       await page.getByRole('option', { name: /Fixture Model 006(?!\d)/ }).click();
-      // Once the picker has closed, the trigger is the only place naming the new model.
       await search.waitFor({ state: 'hidden' });
       await page.getByText('Fixture Model 006', { exact: true }).waitFor();
       await page.getByRole('button', { exact: true, name: 'Add layer' }).click();
       await page.getByRole('menuitem', { exact: true, name: 'Control layer' }).click();
-      // The new layer's Properties panel and the canvas hint over its empty source are both scanned.
       const type = page.getByRole('combobox', { exact: true, name: 'Type' });
       await type.waitFor();
-      await page.getByRole('note').filter({ hasText: 'Drop an image here' }).waitFor();
+      await page.getByRole('note').filter({ hasText: 'Add an image' }).waitFor();
       await waitForSettledDocument(page);
       await assertNoAxeViolations(page, 'workbench-canvas-control-layer-untyped');
-      // Typed as Depth: the seed holds two depth models, so the panel asks for one; the runner scans this state.
       await type.click();
       await page.getByRole('option', { name: /^Depth/ }).click();
       await page
@@ -294,7 +311,6 @@ const surfaces = [
       await waitForWorkbench(page);
       await selectLayoutPreset(page, 'Compose', 'Preview');
       await selectCenterView(page, 'Preview', 'Gallery');
-      // Choose the populated board row; the disclosure also names the currently selected board.
       await centerRegion(page).locator('button:not([aria-expanded])').filter({ hasText: 'Uncategorized' }).click();
       await centerRegion(page).getByRole('list', { exact: true, name: 'Gallery items' }).waitFor();
     },
@@ -393,7 +409,7 @@ const runShortcutGuideJourney = async (browser) => {
       await waitForRenderedMedia(page, { canvas: true });
       const viewTool = page
         .getByRole('toolbar', { exact: true, name: 'Tools' })
-        .getByRole('button', { exact: true, name: 'View' });
+        .getByRole('button', { exact: true, name: 'Pan' });
       await viewTool.click();
       const guide = page.locator('footer').getByRole('button', { exact: true, name: 'Shortcuts' });
       await guide.waitFor();
@@ -427,10 +443,7 @@ const runShortcutGuideJourney = async (browser) => {
   return { id: 'workbench-shortcuts', status: 'passed' };
 };
 
-/**
- * A status-bar chip is named by its compact content, so every built-in chip must say which widget it is first. Enable
- * every bottom widget the menu offers, then match each chip's name to one enabled label.
- */
+/** Every built-in status-bar chip's name must lead with its widget label. */
 const runStatusBarNamesJourney = async (browser) => {
   const { context, page, pageErrors } = await openRepresentativePage(browser, representativeProjectPath);
   const id = 'workbench-status-bar-names';
@@ -438,7 +451,7 @@ const runStatusBarNamesJourney = async (browser) => {
   try {
     await waitForWorkbench(page);
     const footer = page.locator('footer');
-    await footer.getByRole('button', { exact: true, name: 'Bottom widget visibility' }).click();
+    await footer.getByRole('button', { exact: true, name: 'Status bar widgets' }).click();
     const menu = page.getByRole('menu');
     await menu.waitFor();
     const items = menu.getByRole('menuitemcheckbox');
@@ -492,7 +505,6 @@ const runStatusBarNamesJourney = async (browser) => {
     assert.equal(await chips.count(), labels.length, 'Each enabled bottom widget must render one status-bar chip.');
 
     for (const label of labels) {
-      // Chromium's computed name; the label must lead as whole words ("Gallery: 102 items", "Queue status Queue idle").
       const named = footer.getByRole('button', { name: new RegExp(`^${escapeRegExp(label)}(?:$|[\\s:])`) });
       assert.equal(
         await chips.and(named).count(),
@@ -529,7 +541,6 @@ const runKeyboardJourney = async (browser) => {
     const nodesLink = rail.getByRole('link', { exact: true, name: 'Nodes' });
     const modelsLink = rail.getByRole('link', { exact: true, name: 'Models' });
 
-    // The rail's links are in visual order, so Tab and reading order follow what it shows.
     const railLinkTops = await rail
       .getByRole('link')
       .evaluateAll((links) => links.map((link) => link.getBoundingClientRect().top));
@@ -586,7 +597,6 @@ const runKeyboardJourney = async (browser) => {
 
     await previewTrigger.press('Enter');
 
-    // Compose keeps Preview and Gallery as its center views; Canvas lives under "Add to center".
     const previewItem = page.getByRole('menuitemradio', { exact: true, name: 'Preview' });
     const galleryItem = page.getByRole('menuitemradio', { exact: true, name: 'Gallery' });
     const centerViewMenu = page.getByRole('menu');
@@ -684,13 +694,12 @@ const runTopbarMenuJourney = async (browser) => {
   try {
     await waitForWorkbench(page);
 
-    // Open Workflow first: the fixture routes from it, but Compose does not mount it by default.
     await centerViewTrigger(page, 'Preview').click();
     await page.getByRole('menuitem', { exact: true, name: 'Workflow' }).click();
     await centerViewTrigger(page, 'Workflow').waitFor();
     await selectCenterView(page, 'Workflow', 'Preview');
 
-    const leftWidgetRail = page.getByRole('navigation', { exact: true, name: 'Create widget visibility' });
+    const leftWidgetRail = page.getByRole('navigation', { exact: true, name: 'Left rail' });
     const upscaleWidget = leftWidgetRail.getByRole('button', { exact: true, name: 'Upscale' });
     await upscaleWidget.click({ button: 'right' });
     await page.getByRole('menuitem', { exact: true, name: 'Remove Upscale' }).click();
@@ -699,14 +708,12 @@ const runTopbarMenuJourney = async (browser) => {
     const activeLeftWidgetName = await activeLeftWidget.getAttribute('aria-label');
     assert.ok(activeLeftWidgetName);
 
-    // Routing lives in the Invoke card: no separate routing button beside Invoke.
     assert.equal(await page.locator('[data-routing-control]').count(), 0);
     const invokeButton = page.getByRole('button', { name: /^Invoke(?: · \d+ issues?)?$/ });
     const invokeCard = page.locator('[data-scope="popover"][data-part="content"][data-state="open"]');
     const routingLockIndicator = invokeButton.locator('[data-routing-lock-indicator]');
     const invokeBoundsBeforeLock = await invokeButton.boundingBox();
     assert.ok(invokeBoundsBeforeLock);
-    // Activation opens the card only while issues block Invoke; when ready it queues, and announces no popup.
     const invokeBlocked = (await invokeButton.getAttribute('data-blocked')) !== null;
     const expectedInvokeExpanded = (expanded) => (invokeBlocked ? String(expanded) : null);
     assert.equal(await invokeButton.getAttribute('aria-haspopup'), invokeBlocked ? 'dialog' : null);
@@ -715,7 +722,6 @@ const runTopbarMenuJourney = async (browser) => {
       ((await invokeButton.getAttribute('aria-keyshortcuts')) ?? '').split(' ').includes('ArrowDown'),
       'Invoke must list ArrowDown, its keyboard way into the card, among its shortcuts.'
     );
-    // The route and its lock show only in the card and a decorative mark, so the description must carry them.
     const invokeDescription = () =>
       invokeButton.evaluate((button) =>
         (button.getAttribute('aria-describedby') ?? '')
@@ -729,7 +735,6 @@ const runTopbarMenuJourney = async (browser) => {
     assert.match(await invokeDescription(), routeDescriptionPattern(false));
     assert.equal(await routingLockIndicator.count(), 0);
 
-    // Hover previews the card without expanding it or taking focus.
     await invokeButton.hover();
     await invokeCard.getByText('Source', { exact: true }).waitFor();
     await invokeCard.getByText('Destination', { exact: true }).waitFor();
@@ -737,19 +742,16 @@ const runTopbarMenuJourney = async (browser) => {
     await page.mouse.move(0, 0);
     await invokeCard.waitFor({ state: 'hidden' });
 
-    // ArrowDown pins it and moves focus into it, whether or not Invoke is ready to queue.
     await invokeButton.focus();
     await page.keyboard.press('ArrowDown');
     await invokeCard.waitFor();
     assert.equal(await invokeButton.getAttribute('aria-expanded'), expectedInvokeExpanded(true));
     assert.equal(await invokeButton.getAttribute('aria-controls'), await invokeCard.getAttribute('id'));
-    // The card the Down Arrow hint points to is named by its title.
     assert.equal(
       await page.getByRole('dialog', { name: /^(?:Add to queue|Unable to queue|Preparing generation…)$/ }).count(),
       1,
       'The open Invoke card must be named by its title.'
     );
-    // Focus moves once the card's controls mount.
     await invokeCard.locator(':focus').waitFor();
     await waitForSettledDocument(page);
     await assertNoAxeViolations(page, `${id}:invoke-card`, {
@@ -759,9 +761,7 @@ const runTopbarMenuJourney = async (browser) => {
     const lockRouting = invokeCard.getByRole('button', { exact: true, name: 'Lock routing' });
     assert.equal(await lockRouting.getAttribute('aria-pressed'), 'false');
     await lockRouting.click();
-    // One fixed name; the pressed state says whether the route is locked.
     await invokeCard.locator('[data-routing-lock][aria-pressed="true"]').waitFor();
-    // The lock is marked on Invoke itself, without moving or resizing it.
     await routingLockIndicator.waitFor();
     const invokeBoundsLocked = await invokeButton.boundingBox();
     assert.ok(invokeBoundsLocked);
@@ -773,7 +773,6 @@ const runTopbarMenuJourney = async (browser) => {
     assert.equal(await routingLockIndicator.count(), 0);
     assert.ok(await invokeCard.isVisible(), 'Toggling the lock should keep the card open.');
 
-    // Only sources this layout holds are offered; switching one keeps the layout and the card as they are.
     const sourceGroup = invokeCard.getByRole('radiogroup', { exact: true, name: 'Source' });
     assert.equal(await sourceGroup.getByText('Upscale', { exact: true }).count(), 0);
     await sourceGroup.getByText('Generate', { exact: true }).click();
@@ -786,16 +785,21 @@ const runTopbarMenuJourney = async (browser) => {
     await invokeCard.waitFor({ state: 'hidden' });
     await expectFocused(invokeButton, 'Closing the Invoke card should return focus to Invoke.');
 
-    await page.getByRole('button', { exact: true, name: 'Open menu' }).click();
+    const appMenuButton = page.getByRole('button', { exact: true, name: 'Open menu' });
+    await appMenuButton.click();
     const appMenu = page.getByRole('menu', { exact: true, name: 'Open menu' });
-    const commandPaletteItem = page.getByRole('menuitem', { name: /^Command palette/ });
-    const settingsItem = appMenu.getByRole('menuitem', { name: /^Settings(?: \(.+\))?$/ });
+    const launchpadItem = appMenu.getByRole('menuitem', { exact: true, name: 'Launchpad' });
+    const settingsItem = appMenu.getByRole('menuitem', { exact: true, name: 'Settings' });
+    const commandPaletteItem = appMenu.getByRole('menuitem', { exact: true, name: 'Command palette' });
     const whatsNewItem = page.getByRole('menuitem', { exact: true, name: "What's New in Invoke" });
     const documentationItem = page.getByRole('menuitem', { exact: true, name: 'Documentation' });
     const discordItem = page.getByRole('menuitem', { exact: true, name: 'Discord' });
     const donationItem = appMenu.getByRole('menuitem', { exact: true, name: 'Donate to Invoke' });
+    await launchpadItem.waitFor();
     await commandPaletteItem.waitFor();
     await settingsItem.waitFor();
+    assert.equal(await settingsItem.getAttribute('aria-keyshortcuts'), 'Control+,');
+    assert.equal(await commandPaletteItem.getAttribute('aria-keyshortcuts'), 'Control+K');
     await whatsNewItem.waitFor();
     await documentationItem.waitFor();
     await discordItem.waitFor();
@@ -805,42 +809,54 @@ const runTopbarMenuJourney = async (browser) => {
 
     const footerMetrics = await appMenu.evaluate((menu) => {
       const menuBounds = menu.getBoundingClientRect();
-      const footerValues = ['command-palette', 'settings', 'whats-new', 'documentation', 'discord'];
-      const footerItems = [...menu.querySelectorAll('[role="menuitem"]')].filter((item) =>
-        footerValues.includes(item.getAttribute('data-value'))
+      const items = [...menu.querySelectorAll('[role="menuitem"]')];
+      const footerValues = ['whats-new', 'documentation', 'discord'];
+      const footerItems = items.filter((item) => footerValues.includes(item.getAttribute('data-value')));
+      const leadingItems = items.filter((item) =>
+        ['launchpad', 'settings', 'command-palette'].includes(item.getAttribute('data-value'))
       );
+      const fits = (bounds) => bounds.left >= menuBounds.left && bounds.right <= menuBounds.right;
 
       return {
+        footerCount: footerItems.length,
         itemsFit: footerItems.every((item) => {
           const bounds = item.getBoundingClientRect();
 
-          return bounds.left >= menuBounds.left && bounds.right <= menuBounds.right && bounds.width <= 32.5;
+          return fits(bounds) && bounds.width <= 32.5;
+        }),
+        leadingRowsFit: leadingItems.every((item) => {
+          const bounds = item.getBoundingClientRect();
+          const label = item.querySelector('[data-part="item-text"]')?.getBoundingClientRect();
+
+          return fits(bounds) && bounds.width > 32.5 && label !== undefined && label.right <= bounds.right;
         }),
         menuClientWidth: menu.clientWidth,
         menuScrollWidth: menu.scrollWidth,
       };
     });
+    assert.equal(footerMetrics.footerCount, 3);
     assert.equal(footerMetrics.itemsFit, true);
+    assert.equal(footerMetrics.leadingRowsFit, true);
     assert.equal(footerMetrics.menuScrollWidth, footerMetrics.menuClientWidth);
 
     await expectFocused(appMenu, 'Opening the app menu should focus its composite.');
-    assert.notEqual(await appMenu.getAttribute('aria-activedescendant'), await commandPaletteItem.getAttribute('id'));
+    assert.equal(await appMenu.locator('[role="menuitem"][data-highlighted]').count(), 0);
     await new Promise((resolveWait) => {
       setTimeout(resolveWait, 750);
     });
-    assert.equal(await page.getByRole('tooltip', { name: /^Command palette/ }).count(), 0);
+    assert.equal(
+      await page.getByRole('tooltip', { name: /^(?:What's New in Invoke|Documentation|Discord)$/ }).count(),
+      0
+    );
 
-    // Donate is its own group right after Manage (ending with Queue and Widgets), above the footer icon row; this mock journey
-    // is single-user, so no account section sits between them.
     const menuItemValues = await appMenu.evaluate((menu) =>
       [...menu.querySelectorAll('[role="menuitem"]')].map((item) => item.getAttribute('data-value'))
     );
+    assert.deepEqual(menuItemValues.slice(0, 3), ['launchpad', 'settings', 'command-palette']);
     assert.deepEqual(menuItemValues.slice(menuItemValues.indexOf('queue')), [
       'queue',
       'widgets',
       'donate',
-      'command-palette',
-      'settings',
       'whats-new',
       'documentation',
       'discord',
@@ -850,19 +866,43 @@ const runTopbarMenuJourney = async (browser) => {
 
     await appMenu.press('End');
     assert.equal(await appMenu.getAttribute('aria-activedescendant'), await discordItem.getAttribute('id'));
-    for (const item of [
-      documentationItem,
-      whatsNewItem,
-      settingsItem,
-      commandPaletteItem,
-      donationItem,
-      widgetsItem,
-      queueItem,
-    ]) {
+    for (const item of [documentationItem, whatsNewItem, donationItem, widgetsItem, queueItem]) {
       await appMenu.press('ArrowUp');
       assert.equal(await appMenu.getAttribute('aria-activedescendant'), await item.getAttribute('id'));
     }
+    await appMenu.press('Home');
+    assert.equal(await appMenu.getAttribute('aria-activedescendant'), await launchpadItem.getAttribute('id'));
+    await appMenu.press('ArrowDown');
+    assert.equal(await appMenu.getAttribute('aria-activedescendant'), await settingsItem.getAttribute('id'));
+    await appMenu.press('ArrowDown');
+    assert.equal(await appMenu.getAttribute('aria-activedescendant'), await commandPaletteItem.getAttribute('id'));
+
+    // Each opens from the keyboard and closes back to the menu's button: the item that opened it is gone by then.
+    await appMenu.press('Enter');
+    const paletteDialog = page.getByRole('dialog', { exact: true, name: 'Command palette' });
+    await paletteDialog.waitFor();
+    await expectFocused(
+      page.getByRole('combobox', { exact: true, name: 'Search commands and settings' }),
+      'Opening the command palette from the app menu should focus its search field.'
+    );
     await page.keyboard.press('Escape');
+    await paletteDialog.waitFor({ state: 'hidden' });
+    await expectFocused(appMenuButton, 'Closing the command palette should return focus to the app menu button.');
+
+    await appMenuButton.press('Enter');
+    await launchpadItem.waitFor();
+    // Keys pressed before the reopened menu holds focus are lost.
+    await expectFocused(appMenu, 'Reopening the app menu from the keyboard should focus its composite.');
+    await appMenu.press('Home');
+    await appMenu.press('ArrowDown');
+    assert.equal(await appMenu.getAttribute('aria-activedescendant'), await settingsItem.getAttribute('id'));
+    await appMenu.press('Enter');
+    const settingsDialog = page.getByRole('dialog', { name: /^Settings:/ });
+    await settingsDialog.waitFor();
+    await waitForSettledDocument(page);
+    await page.keyboard.press('Escape');
+    await settingsDialog.waitFor({ state: 'hidden' });
+    await expectFocused(appMenuButton, 'Closing Settings should return focus to the app menu button.');
 
     const projectSwitcher = page.getByRole('button', { name: /^Switch project\./ });
     await projectSwitcher.click();
@@ -959,10 +999,12 @@ const runVideoPreviewJourney = async (browser) => {
     const rightPanel = page.getByRole('complementary', { exact: true, name: 'right widget panel' });
     await rightPanel.locator('button:not([aria-expanded])').filter({ hasText: 'Uncategorized' }).click();
     const gallery = rightPanel.getByRole('list', { exact: true, name: 'Gallery items' });
-    const selectVideo = rightPanel.getByRole('button', {
-      exact: true,
-      name: `Select video ${MOCK_BACKEND_REPRESENTATIVE_VIDEO_NAME}, duration 0:01, for preview`,
-    });
+    const selectVideoName = `Select video ${MOCK_BACKEND_REPRESENTATIVE_VIDEO_NAME}, duration 0:01, for preview`;
+    const selectVideo = rightPanel.getByRole('button', { exact: true, name: selectVideoName });
+    // Tile badges sit outside the bordered image box; the panel-wide lookup covers the starred strip and main list.
+    const videoTile = rightPanel
+      .getByRole('listitem')
+      .filter({ has: page.getByRole('button', { exact: true, name: selectVideoName }) });
 
     try {
       await gallery.waitFor();
@@ -975,7 +1017,7 @@ const runVideoPreviewJourney = async (browser) => {
     await selectVideo.waitFor();
     await selectVideo.focus();
     await expectFocused(selectVideo, 'The video gallery item must be keyboard focusable.');
-    assert.equal(await selectVideo.locator('xpath=..').locator('svg.lucide-play').getAttribute('aria-hidden'), 'true');
+    assert.equal(await videoTile.locator('svg.lucide-play').getAttribute('aria-hidden'), 'true');
     await selectVideo.press('Enter');
 
     const player = centerRegion(page).getByRole('group', {
@@ -992,13 +1034,11 @@ const runVideoPreviewJourney = async (browser) => {
         `${error instanceof Error ? error.message : String(error)}\nPage errors: ${pageErrors.map(String).join('\n')}\nConsole errors: ${consoleErrors.join('\n')}\nBody:\n${bodyText}`
       );
     }
-    // The player's own controls replace the browser's.
     assert.equal(await video.getAttribute('controls'), null);
     assert.equal(await video.getAttribute('playsinline'), '');
     assert.match((await video.getAttribute('poster')) ?? '', /fixture-video-001\.mp4\/thumbnail$/);
     assert.equal(await video.getAttribute('draggable'), null);
 
-    // The video can be operated from the keyboard: its controls are tab stops, and Space plays and pauses it.
     const play = player.locator('button[aria-label="Play"]:not([disabled])');
     await play.waitFor();
     assert.notEqual(await play.getAttribute('tabindex'), '-1');
@@ -1019,7 +1059,6 @@ const runVideoPreviewJourney = async (browser) => {
       .or(player.getByRole('button', { exact: true, name: 'Volume' }));
     assert.equal(await volume.isEnabled(), true);
 
-    // Media details live in the floating header chrome's Details popover; audit the surface with it open.
     const details = page
       .locator('[data-hotkey-widget-region="center"][data-hotkey-widget-type-id="preview"]')
       .getByRole('button', { exact: true, name: 'Details' });
@@ -1042,18 +1081,12 @@ const runVideoPreviewJourney = async (browser) => {
   }
 };
 
-/**
- * Verify retained scroll and canvas state across layout switches; mounted-node identity alone cannot detect state
- * loss.
- */
+/** Mounted-node identity alone cannot detect state loss. */
 const runKeepAliveStateJourney = async (browser) => {
   const { context, page, pageErrors } = await openRepresentativePage(browser, representativeProjectPath);
   const id = 'workbench-keep-alive-state';
 
-  /**
-   * Capture both axes of actual scroll containers; clipped text is not scroll state, and filmstrips may overflow
-   * only horizontally.
-   */
+  /** Clipped text is not scroll state; filmstrips may overflow only horizontally. */
   const SCROLLER_QUERY = `(element) => [...element.querySelectorAll('*')].filter((node) => {
     const style = getComputedStyle(node);
     const scrollsY = (style.overflowY === 'auto' || style.overflowY === 'scroll') && node.scrollHeight > node.clientHeight + 40;
@@ -1093,7 +1126,6 @@ const runKeepAliveStateJourney = async (browser) => {
     const galleryItems = rightPanel.getByRole('list', { exact: true, name: 'Gallery items' });
     await galleryItems.waitFor();
 
-    // Select an unstarred item so the filmstrip exists and has enough entries to overflow.
     await galleryItems
       .locator('[data-gallery-section="regular"]')
       .getByRole('button', { name: /for preview$/ })
@@ -1108,8 +1140,7 @@ const runKeepAliveStateJourney = async (browser) => {
       `The representative gallery must have scrollable boards and items; got ${JSON.stringify(scrolledOffsets)}.`
     );
 
-    // Wait for filmstrip overflow: its board-scoped fetch completes independently of the gallery and exercises
-    // horizontal scroll retention.
+    // Filmstrip overflow arrives with its own board-scoped fetch.
     const centerPanel = centerRegion(page);
     await page.waitForFunction(
       () => {
@@ -1145,7 +1176,6 @@ const runKeepAliveStateJourney = async (browser) => {
     await waitForSettledDocument(page);
     assert.equal((await zoomTrigger.textContent())?.trim(), '200%', 'The zoom control must report the chosen zoom.');
 
-    // Away and back, which is the whole point of keeping the widgets mounted.
     await selectLayoutPreset(page, 'Workflow', 'Workflow');
     await waitForSettledDocument(page);
     await selectLayoutPreset(page, 'Edit', 'Canvas');
@@ -1188,10 +1218,6 @@ const runKeepAliveStateJourney = async (browser) => {
   }
 };
 
-/**
- * Exercise pane switching by pointer and keyboard, tool-dependent Properties, and accessibility of non-default
- * panes.
- */
 const LAYERS_PANEL_SCOPE = { include: ['[data-hotkey-widget-type-id="layers"]'] };
 
 const runLayersPanesJourney = async (browser) => {
@@ -1204,17 +1230,15 @@ const runLayersPanesJourney = async (browser) => {
     const propertiesTab = page.getByRole('tab', { exact: true, name: 'Properties' });
     await propertiesTab.waitFor();
 
-    // Tool switching swaps the Tool section's rows in place.
     const tools = page.getByRole('toolbar', { exact: true, name: 'Tools' });
     await tools.getByRole('button', { exact: true, name: 'Brush' }).click();
     await page
       .getByRole('tabpanel', { exact: true, name: 'Properties' })
       .getByRole('slider', { exact: true, name: 'Brush size' })
       .waitFor();
-    await tools.getByRole('button', { exact: true, name: 'View' }).click();
+    await tools.getByRole('button', { exact: true, name: 'Pan' }).click();
     await page.getByRole('tabpanel', { exact: true, name: 'Properties' }).waitFor();
 
-    // Pointer: activate every non-default pane across the three blocks.
     await page.getByRole('tab', { exact: true, name: 'Overview' }).click();
     await page.getByRole('button', { exact: true, name: 'Pan the canvas view' }).waitFor();
     await page.getByRole('tab', { exact: true, name: 'History' }).click();
@@ -1226,7 +1250,6 @@ const runLayersPanesJourney = async (browser) => {
     // Scope this audit to Layers so unrelated lazy generation panels cannot change its result.
     await assertNoAxeViolations(page, 'workbench-layers-panes', LAYERS_PANEL_SCOPE);
 
-    // Keyboard: arrows rove within the block's tablist, Enter activates.
     const overviewTab = page.getByRole('tab', { exact: true, name: 'Overview' });
     await overviewTab.focus();
     await overviewTab.press('ArrowLeft');
@@ -1249,10 +1272,6 @@ const runLayersPanesJourney = async (browser) => {
   }
 };
 
-/**
- * Floating a rail panel that is also the center's only view: the rail keeps a marker, the center says where the
- * view went, and removing or docking the window gives the center its view — and keyboard focus — back.
- */
 const runFloatingWindowJourney = async (browser) => {
   const { context, page, pageErrors } = await openRepresentativePage(browser, representativeProjectPath);
   const id = 'workbench-floating-window';
@@ -1261,12 +1280,12 @@ const runFloatingWindowJourney = async (browser) => {
     await waitForWorkbench(page);
     await selectLayoutPreset(page, 'Video', 'Preview');
 
-    const rail = page.getByRole('navigation', { exact: true, name: 'Inspect widget visibility' });
+    const rail = page.getByRole('navigation', { exact: true, name: 'Right rail' });
     const center = centerRegion(page);
     const floatingWindow = page.locator('[data-hotkey-widget-region="floating"]');
     const marker = rail.getByRole('button', { exact: true, name: 'Preview, floating window' });
     const floatPreviewFromRail = async () => {
-      await rail.getByRole('button', { exact: true, name: 'Inspect widgets' }).click();
+      await rail.getByRole('button', { exact: true, name: 'Right panel widgets' }).click();
       await page.getByRole('menuitemcheckbox', { exact: true, name: 'Preview' }).click();
       await page.keyboard.press('Escape');
       await page.getByRole('button', { exact: true, name: 'Float Window' }).click();
@@ -1275,7 +1294,6 @@ const runFloatingWindowJourney = async (browser) => {
     };
     const focusedRegion = () =>
       page.evaluate(() => document.activeElement?.closest('[data-focus-region]')?.getAttribute('data-focus-region'));
-    // Focus, the accent outline, and the top of the stack all name the same window.
     const waitForActiveWindow = () =>
       page.waitForFunction(() => {
         const active = document.activeElement?.closest('[data-floating-window]');
@@ -1295,7 +1313,6 @@ const runFloatingWindowJourney = async (browser) => {
     await waitForSettledDocument(page);
     await assertNoAxeViolations(page, `${id}:floating`);
 
-    // The window is operable from the keyboard: the one labelled grip resizes it, and the title bar moves it.
     const width = async () => Math.round((await floatingWindow.boundingBox()).width);
     const left = async () => Math.round((await floatingWindow.boundingBox()).x);
     const windowedWidth = await width();
@@ -1313,7 +1330,6 @@ const runFloatingWindowJourney = async (browser) => {
       ['[data-hotkey-widget-region="floating"]', windowedLeft + 16]
     );
 
-    // Maximize and collapse are explicit, labelled controls; each state is scanned.
     await floatingWindow.getByRole('button', { exact: true, name: 'Maximize' }).click();
     await floatingWindow.getByRole('button', { exact: true, name: 'Restore' }).waitFor();
     await waitForSettledDocument(page);
@@ -1327,7 +1343,6 @@ const runFloatingWindowJourney = async (browser) => {
     await floatingWindow.getByRole('button', { exact: true, name: 'Expand' }).click();
     await floatingWindow.getByRole('button', { exact: true, name: 'Collapse' }).waitFor();
 
-    // The marker is a keyboard stop, and it shows the window rather than docking it.
     await marker.focus();
     await page.keyboard.press('Enter');
     assert.equal(await floatingWindow.count(), 1, 'Activating the marker must keep the window floating.');
@@ -1350,8 +1365,6 @@ const runFloatingWindowJourney = async (browser) => {
     await waitForFocusedRegion('center');
     assert.equal(await focusedRegion(), 'center');
 
-    // Docking brought Preview to the front of the right panel. Float it again: docking from the window's own
-    // control returns focus to that panel.
     await page.getByRole('button', { exact: true, name: 'Float Window' }).click();
     await floatingWindow.waitFor();
     await waitForActiveWindow();
@@ -1359,7 +1372,6 @@ const runFloatingWindowJourney = async (browser) => {
     await floatingWindow.waitFor({ state: 'detached' });
     await waitForFocusedRegion('right');
 
-    // The rail's own dock path: the marker's menu, reached from the keyboard, with focus following the panel.
     await page.getByRole('button', { exact: true, name: 'Float Window' }).click();
     await floatingWindow.waitFor();
     await waitForActiveWindow();
@@ -1371,8 +1383,6 @@ const runFloatingWindowJourney = async (browser) => {
     await waitForSettledDocument(page);
     await assertNoAxeViolations(page, `${id}:docked`);
 
-    // Removing a window from its marker's menu takes the menu and the marker with it. Focus goes to the panel the
-    // window's rail is showing, or to the center when that rail shows none: collapsed, or emptied by the float.
     const floatImageMapFrom = async (widgetRail, menuName) => {
       await widgetRail.getByRole('button', { exact: true, name: menuName }).click();
       await page.getByRole('menuitemcheckbox', { exact: true, name: 'Image Map' }).click();
@@ -1381,7 +1391,6 @@ const runFloatingWindowJourney = async (browser) => {
       await floatingWindow.waitFor();
       await waitForActiveWindow();
     };
-    // From the keyboard, where losing focus costs the most: Remove is the menu's last item.
     const removeImageMapFrom = async (widgetRail, focusedRegionAfter) => {
       await widgetRail.getByRole('button', { exact: true, name: 'Image Map, floating window' }).focus();
       await page.keyboard.press('Shift+F10');
@@ -1392,26 +1401,25 @@ const runFloatingWindowJourney = async (browser) => {
       await waitForFocusedRegion(focusedRegionAfter);
     };
 
-    await floatImageMapFrom(rail, 'Inspect widgets');
+    await floatImageMapFrom(rail, 'Right panel widgets');
     await removeImageMapFrom(rail, 'right');
 
-    await floatImageMapFrom(rail, 'Inspect widgets');
+    await floatImageMapFrom(rail, 'Right panel widgets');
     await rail.getByRole('button', { pressed: true }).click();
     await page.getByRole('complementary', { exact: true, name: 'right widget panel' }).waitFor({ state: 'detached' });
     await removeImageMapFrom(rail, 'center');
 
-    const leftRail = page.getByRole('navigation', { exact: true, name: 'Create widget visibility' });
+    const leftRail = page.getByRole('navigation', { exact: true, name: 'Left rail' });
     for (const name of ['Video', 'Upscale']) {
       await leftRail.getByRole('button', { exact: true, name }).click({ button: 'right' });
       await page.getByRole('menuitem', { exact: true, name: `Remove ${name}` }).click();
     }
-    await floatImageMapFrom(leftRail, 'Create widgets');
+    await floatImageMapFrom(leftRail, 'Left panel widgets');
     await page.getByRole('complementary', { exact: true, name: 'left widget panel' }).waitFor({ state: 'detached' });
     await removeImageMapFrom(leftRail, 'center');
 
-    // The enable menu stays open across a toggle and keeps focus; removing a window from it moves none.
-    await floatImageMapFrom(leftRail, 'Create widgets');
-    await leftRail.getByRole('button', { exact: true, name: 'Create widgets' }).click();
+    await floatImageMapFrom(leftRail, 'Left panel widgets');
+    await leftRail.getByRole('button', { exact: true, name: 'Left panel widgets' }).click();
     await page.getByRole('menuitemcheckbox', { exact: true, name: 'Image Map' }).click();
     await floatingWindow.waitFor({ state: 'detached' });
     // A focus move would have landed within a frame of the removal.
@@ -1467,7 +1475,6 @@ const runSettingsJourney = async (browser) => {
       await page.getByRole('dialog', { exact: true, name: `Settings: ${name}` }).waitFor();
       await page.waitForLoadState('networkidle');
       await waitForSettledDocument(page);
-      // Certify the settings surface; representative surface scans retain page-wide workbench coverage.
       await assertNoAxeViolations(page, `${id}:${name}`, SETTINGS_DIALOG_SCOPE);
     }
 
@@ -1516,7 +1523,6 @@ const runSettingsJourney = async (browser) => {
   }
 };
 
-/** Browser history can leave a modal section; authorized work must settle while its Activity is hidden. */
 const runHiddenMaintenanceJourney = async (browser) => {
   const id = 'launchpad-hidden-maintenance';
   for (const outcome of ['success', 'error']) {
@@ -1616,7 +1622,6 @@ const runHiddenMaintenanceJourney = async (browser) => {
   };
 };
 
-/** Fault the actual first-party production module request; Retry never silently reloads the editor. */
 const runNativeWidgetRecoveryJourney = async (browser, failures, activeWorker = false) => {
   const id = activeWorker
     ? 'workbench-native-import-active-worker-recovery'

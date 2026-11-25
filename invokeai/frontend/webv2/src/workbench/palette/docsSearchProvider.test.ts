@@ -69,12 +69,9 @@ afterEach(() => {
 describe('docs palette provider', () => {
   it('ranks title matches by closeness, pages before headings, and description-only pages last', async () => {
     expect(await titles('lora')).toEqual([
-      // Page title prefix.
       'LoRAs',
-      // Heading prefix, then a heading with every term at a word start.
       'LoRA',
       'Training LoRAs',
-      // Matched only through the page title.
       'Weights',
       // Matched only through the description.
       'Models',
@@ -132,7 +129,6 @@ describe('docs index loading', () => {
   it('loads the index again after a failed chunk load', async () => {
     let failLoads = 1;
     vi.resetModules();
-    // A factory call stands for the index chunk loading; the first one fails like a dropped network.
     vi.doMock('./docsSearchIndex.json', () => {
       if (failLoads > 0) {
         failLoads -= 1;

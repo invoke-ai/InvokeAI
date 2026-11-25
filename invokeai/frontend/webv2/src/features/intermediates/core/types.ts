@@ -2,8 +2,8 @@
  * Read models of the intermediates manager. Pure: no transport, React or UI imports.
  *
  * An intermediate is classified once by the server under the cleanup policy: `safe` (deleted by either mode),
- * `referenced` (named by a saved document or persisted editor state; deleted only by a force clear), `active` (produced or
- * consumed by queued or running work) and `recent` (inside the grace window). The last two are never deleted.
+ * `referenced` (named by a saved document or persisted editor state; deleted only by a force clear), `active` (produced
+ * or consumed by queued or running work) and `recent` (inside the grace window). The last two are never deleted.
  */
 
 export type IntermediatesCleanupMode = 'safe' | 'force';
@@ -96,8 +96,8 @@ export interface IntermediatesImpact {
 
 /**
  * What names the media: a saved project, one account's workspace in a project (`ownerId` is the project's id), a
- * library workflow, the legacy editor's persisted state (`ownerId` is its state key), or a project set aside for
- * repair by an earlier migration.
+ * library workflow, the legacy editor's persisted state (`ownerId` is its state key), or a project set aside for repair
+ * by an earlier migration.
  */
 export type IntermediatesAffectedDocumentKind =
   | 'project'
@@ -108,7 +108,6 @@ export type IntermediatesAffectedDocumentKind =
 
 export interface IntermediatesAffectedDocument {
   kind: IntermediatesAffectedDocumentKind;
-  /** The document's owner. */
   userId: string;
   userDisplayName: string | null;
   userEmail: string | null;

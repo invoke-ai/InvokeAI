@@ -19,7 +19,6 @@ const documentWith = (...layerIds: string[]): CanvasDocumentContractV3 =>
     stacks: stacksFrom(layerIds.map((id) => ({ id, type: 'raster' }) as CanvasLayerContract)),
   }) as CanvasDocumentContractV3;
 
-/** The real state controller — it has no collaborators, so faking it would only weaken the assertions. */
 let previews: PreviewStateController;
 let invalidateAll: Mock<() => void>;
 let invalidateLayer: Mock<(layerId: string) => void>;
@@ -36,6 +35,7 @@ const build = (overrides: Partial<CreatePreviewPublisherDeps> = {}): PreviewPubl
     invalidateLayer,
     isGuardCurrent,
     previews,
+    publishHidesStagingOverlays: () => undefined,
     resolveImage,
     ...overrides,
   });
@@ -50,7 +50,6 @@ beforeEach(() => {
   isGuardCurrent = vi.fn(() => true);
 });
 
-/** A staged candidate input at an arbitrary pinned rect. */
 const staged = (imageName: string) => ({
   imageName,
   placement: { height: 8, opacity: 1, width: 8, x: 0, y: 0 },
@@ -122,7 +121,6 @@ describe('staged previews', () => {
     const [blob] = decodeBlob.mock.calls[0] ?? [];
     expect(blob?.type).toBe('image/png');
     await expect(blob?.text()).resolves.toBe('pixels');
-    // A latent-sized frame is never decoded at the (possibly upscaled) output size; the compositor scales it.
     expect(previews.getStaged()).toMatchObject({
       height: 8,
       placement: { height: 3, opacity: 1, width: 5, x: -2, y: 7 },
@@ -212,6 +210,56 @@ describe('staged previews', () => {
     expect(previews.getStaged()).toBeNull();
     expect(invalidateAll).toHaveBeenCalledTimes(1);
   });
+
+  it('drops a hidden candidate without decoding it, keeping the overlays hidden until staging ends', async () => {
+    const published = vi.fn<(hidden: boolean) => void>();
+    const publisher = build({ publishHidesStagingOverlays: published });
+    publisher.setStagedPreview(staged('shown.png'));
+    await vi.waitFor(() => expect(previews.getStaged()).not.toBeNull());
+    invalidateAll.mockClear();
+
+    publisher.setStagedPreview({ ...staged('shown.png'), hidden: true });
+    expect(previews.getStaged()).toBeNull();
+    expect(previews.hidesStagingOverlays()).toBe(true);
+    expect(invalidateAll).toHaveBeenCalledOnce();
+    publisher.setStagedPreview({ ...staged('other.png'), hidden: true });
+    expect(invalidateAll).toHaveBeenCalledOnce();
+    expect(decodeBlob).toHaveBeenCalledOnce();
+
+    publisher.setStagedPreview(null);
+    expect(previews.hidesStagingOverlays()).toBe(false);
+    expect(invalidateAll).toHaveBeenCalledTimes(2);
+    expect(published.mock.calls).toEqual([[true], [true], [false]]);
+  });
+
+  it('never shows a result the eye hid while it was still decoding, nor masks while showing it decodes', async () => {
+    const releases: Array<() => void> = [];
+    decodeBlob.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          releases.push(() => resolve({ decodedHeight: 8, decodedWidth: 8, surface: surface() }));
+        })
+    );
+    const publisher = build();
+    publisher.setStagedPreview(staged('candidate.png'));
+    await vi.waitFor(() => expect(decodeBlob).toHaveBeenCalledOnce());
+    publisher.setStagedPreview({ ...staged('candidate.png'), hidden: true });
+    invalidateAll.mockClear();
+    releases[0]!();
+    // A macrotask runs only once the decode's whole promise chain has settled.
+    await new Promise((resolve) => {
+      setTimeout(resolve, 0);
+    });
+    expect(previews.getStaged()).toBeNull();
+    expect(previews.hidesStagingOverlays()).toBe(true);
+    expect(invalidateAll).not.toHaveBeenCalled();
+
+    publisher.setStagedPreview(staged('candidate.png'));
+    await vi.waitFor(() => expect(decodeBlob).toHaveBeenCalledTimes(2));
+    expect(previews.hidesStagingOverlays()).toBe(true);
+    releases[1]!();
+    await vi.waitFor(() => expect(previews.getStaged()).not.toBeNull());
+  });
 });
 
 describe('setGuardedFilterPreview', () => {
@@ -247,7 +295,6 @@ describe('setGuardedFilterPreview', () => {
   });
 
   it('re-checks the guard after the decode, not only before it', async () => {
-    // Current on the pre-decode check, outdated by the time the image lands.
     isGuardCurrent = vi.fn().mockReturnValueOnce(true).mockReturnValue(false);
     await expect(build().setGuardedFilterPreview('layer-1', input, guardFor('layer-1'))).resolves.toBe('stale');
     expect(previews.getFilter('layer-1')).toBeUndefined();
@@ -256,7 +303,6 @@ describe('setGuardedFilterPreview', () => {
 
   it('discards a decode that a newer request for the same layer superseded', async () => {
     decodeBlob.mockImplementationOnce(() => {
-      // Stand in for a competing publish landing while this decode is in flight.
       previews.beginGuardedFilter('layer-1');
       return Promise.resolve({ decodedHeight: 8, decodedWidth: 8, surface: surface() });
     });
@@ -288,7 +334,6 @@ describe('setGuardedFilterPreview', () => {
   ])('releases the guarded-request slot after %s', async (_label, arrange) => {
     arrange();
     await build().setGuardedFilterPreview('layer-1', input, guardFor('layer-1'));
-    // A released slot leaves only the bumped token behind, never a pending request.
     previews.clearFilter('layer-1');
     expect(previews.filterLayerIds()).toEqual(['layer-1']);
   });
