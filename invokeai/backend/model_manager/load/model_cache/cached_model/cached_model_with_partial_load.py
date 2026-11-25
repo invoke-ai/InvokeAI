@@ -113,6 +113,7 @@ class CachedModelWithPartialLoad:
         # drop our freshly-built duplicate so the weights live once in RAM.
         if cpu_state_dict is not None and shared_store is not None and cache_key is not None:
             canonical = shared_store.acquire(cache_key, cpu_state_dict)
+            self._cpu_state_dict = canonical  # Release this exact entry if construction fails.
             self._shared_store = shared_store
             self._shared_key = cache_key
             try:
@@ -132,7 +133,7 @@ class CachedModelWithPartialLoad:
                     self, shared_store.release_deferred, cache_key, canonical
                 )
                 self._shared_release_finalizer.atexit = False
-            except Exception:
+            except BaseException:
                 # The re-point or finalizer registration failed after acquiring a reference;
                 # release it so the shared entry's refcount isn't leaked (this wrapper will never
                 # be inserted into the cache).

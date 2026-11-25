@@ -29,12 +29,17 @@ from invokeai.app.invocations.vae.flux2_vae_encode import Flux2VaeEncodeInvocati
 from invokeai.backend.flux2.denoise_working_memory import estimate_flux2_denoise_working_memory
 from invokeai.backend.fun_controlnet.flux2 import FLUX2_FUN_CONTROL_IN_DIM, Flux2FunControlBranch
 from invokeai.backend.fun_controlnet.hooks import FunControlHooks
+from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch_module_autocast import (
+    apply_custom_layers_to_model,
+)
 from invokeai.backend.model_manager.taxonomy import BaseModelType, Flux2VariantType, ModelFormat, ModelType
 from invokeai.backend.patches.layer_patcher import LayerPatcher
+from invokeai.backend.quantization.int8_convrot import Int8ConvrotLinear
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData, FLUXConditioningInfo
 from invokeai.backend.util import attention
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.working_memory import probe
+from tests.backend.patches.lora_conversions.test_flux2_dora_application import load_state
 
 SIDE = 64  # an 8x8 latent: 16 image tokens
 IMAGE_TOKENS = (SIDE // 16) ** 2
@@ -253,6 +258,121 @@ def _loaded_types(context) -> list[ModelType]:
 
 def _hook_count(transformer) -> int:
     return sum(len(block._forward_hooks) + len(block._forward_pre_hooks) for block in transformer.transformer_blocks)
+
+
+def test_packed_output_axis_dora_adds_to_transformer_reservation(tmp_path, monkeypatch) -> None:
+    transformer = _tiny_transformer()
+    attention = transformer.transformer_blocks[0].attn
+    width = attention.to_q.in_features
+    for name in ("to_q", "to_k", "to_v"):
+        setattr(
+            attention,
+            name,
+            Int8ConvrotLinear(torch.ones(width, width, dtype=torch.int8), torch.full((width, 1), 0.125), convrot=False),
+        )
+    apply_custom_layers_to_model(transformer)
+    prefix = "lora_unet_double_blocks_0_img_attn_qkv"
+    strength = 0.5
+    adapter = load_state(
+        tmp_path,
+        {
+            f"{prefix}.lora_up.weight": torch.ones(3 * width, 2),
+            f"{prefix}.lora_down.weight": torch.ones(2, width),
+            f"{prefix}.dora_scale": torch.ones(3 * width, 1),
+        },
+    )
+    x = torch.ones(1, width)
+    baseline = attention.to_q(x)
+    changed = []
+
+    def check_forward(*args, **kwargs):
+        changed.append(attention.to_q(x))
+        raise _Stop
+
+    monkeypatch.setattr(flux2_denoise, "denoise", check_forward)
+    transformer_info = _loaded(transformer, _yielding(transformer))
+    context = _context(transformer_info=transformer_info)
+    adapter_identifier = _model(ModelType.LoRA)
+    adapter_info = SimpleNamespace(model=adapter, model_in_ram=lambda: nullcontext(adapter))
+    load = context.models.load.side_effect
+    context.models.load.side_effect = lambda identifier: (
+        adapter_info if identifier == adapter_identifier else load(identifier)
+    )
+    node = _denoise(
+        control=None,
+        transformer=SimpleNamespace(
+            transformer=_model(ModelType.Main), loras=[SimpleNamespace(lora=adapter_identifier, weight=strength)]
+        ),
+    )
+    with pytest.raises(_Stop):
+        node._run_diffusion(context)
+    torch.testing.assert_close(changed[0], (1 - strength) * baseline + strength * torch.full_like(baseline, width**0.5))
+    torch.testing.assert_close(attention.to_q(x), baseline, rtol=0, atol=0)
+
+    legacy = estimate_flux2_denoise_working_memory(
+        transformer,
+        hidden_size=DEV_HIDDEN,
+        image_seq_len=IMAGE_TOKENS,
+        ref_image_seq_len=0,
+        text_seq_len=TEXT_TOKENS,
+        batch_size=1,
+        lora_count=1,
+        device=torch.device("cpu"),
+        dtype=torch.bfloat16,
+    )
+    reserved = transformer_info.model_on_device.call_args.kwargs["working_memory"].reservation_bytes
+    # Widened base, scaled delta, direction and residual can be live at once.
+    assert reserved - legacy.reservation_bytes >= 4 * width**2 * torch.float32.itemsize
+
+
+def test_fused_dora_is_reserved_before_transformer_lock_and_unpinned_on_failure(tmp_path) -> None:
+    transformer = _tiny_transformer()
+    attention = transformer.transformer_blocks[0].attn
+    out_features, in_features = attention.to_q.weight.shape
+    prefix = "lora_unet_double_blocks_0_img_attn_qkv"
+    adapter = load_state(
+        tmp_path,
+        {
+            f"{prefix}.lora_up.weight": torch.ones(3 * out_features, 2),
+            f"{prefix}.lora_down.weight": torch.ones(2, in_features),
+            f"{prefix}.dora_scale": torch.ones(1, in_features),
+        },
+    )
+    pin_count = 0
+
+    @contextmanager
+    def pin():
+        nonlocal pin_count
+        pin_count += 1
+        try:
+            yield adapter
+        finally:
+            pin_count -= 1
+
+    def stop_at_lock(*, working_memory):
+        assert working_memory.features.get("dora_patch_bytes", 0) >= 4 * attention.to_q.weight.nbytes
+        assert pin_count == 1
+        raise _Stop
+
+    transformer_info = _loaded(transformer, stop_at_lock)
+    context = _context(transformer_info=transformer_info)
+    adapter_identifier = _model(ModelType.LoRA)
+    adapter_info = SimpleNamespace(model=adapter, model_in_ram=pin)
+    load = context.models.load.side_effect
+    context.models.load.side_effect = lambda identifier: (
+        adapter_info if identifier == adapter_identifier else load(identifier)
+    )
+    node = _denoise(
+        control=None,
+        transformer=SimpleNamespace(
+            transformer=_model(ModelType.Main), loras=[SimpleNamespace(lora=adapter_identifier, weight=0.5)]
+        ),
+    )
+
+    with pytest.raises(_Stop):
+        node._run_diffusion(context)
+
+    assert pin_count == 0
 
 
 @pytest.mark.parametrize("variant", [Flux2VariantType.Klein9B, Flux2VariantType.Klein4BBase], ids=lambda v: v.value)

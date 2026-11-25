@@ -1477,7 +1477,7 @@
     "cancelInstall": "Cancel install",
     "changedElsewhere": "This model changed elsewhere; your unsaved edits are kept.",
     "civitaiKey": "Civitai key",
-    "civitaiKeyDescription": "Attached automatically when installing civitai.com models that require login. Stored in this browser only.",
+    "civitaiKeyDescription": "Attached automatically when installing civitai.com or civitai.red models that require login. Stored in this browser only.",
     "civitaiKeyPlaceholder": "32-character key from civitai.com/user/account",
     "cleanupOrphaned": "Clean up orphaned models…",
     "clearSelectedModel": "Clear selected model",
@@ -1873,6 +1873,10 @@
       "hfRepo": "Hugging Face repo",
       "url": "URL"
     },
+    "visitSource": "Visit source",
+    "visitModelSource": "Visit source for {{name}}",
+    "modelPage_one": "Model page",
+    "modelPage_other": "Model pages",
     "sourceUrl": "Source URL",
     "sourceUrlHelp": "Model page or download URL.",
     "statusCancelled": "Cancelled",
@@ -4663,6 +4667,13 @@
         "logDebugInfo": "Log debug info",
         "outputOnlyMaskedRegions": "Output only generated regions",
         "ruleOfThirds": "Rule of thirds",
+        "scrollInput": "Scroll input",
+        "scrollInputDescription": "Auto-detect zooms with a mouse wheel, and pans and pinch-zooms with a trackpad. Once a trackpad has been used in this browser, a smooth-scrolling mouse wheel pans too; choose Mouse wheel if yours does.",
+        "scrollInputOptions": {
+          "auto": "Auto-detect",
+          "mouse": "Mouse wheel",
+          "trackpad": "Trackpad"
+        },
         "sections": {
           "behavior": "Behavior",
           "debug": "Debug",
