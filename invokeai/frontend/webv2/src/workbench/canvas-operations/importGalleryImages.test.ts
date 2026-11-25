@@ -237,7 +237,7 @@ const expectedLayer = (
       };
     case 'inpaint-mask':
       return createInpaintMaskFromImage({
-        fill: { ...DEFAULT_INPAINT_MASK_FILL, color: ['#e07575', '#83d683'][index]! },
+        fill: { ...DEFAULT_INPAINT_MASK_FILL, color: ['#83d683', '#F59E42'][index]! },
         id: expect.any(String) as string,
         image: ref,
         name: `Inpaint Mask ${index + 1}`,

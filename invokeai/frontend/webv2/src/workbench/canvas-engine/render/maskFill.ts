@@ -10,7 +10,7 @@ const PATTERN_SPECS: Record<
   // Diagonals repeat every 6px along either axis.
   diagonal: { size: 6, spacing: 6, width: 1.3 },
   diagonal_left: { size: 6, spacing: 6, width: 1.3 },
-  // 6px tile, 45° lines in BOTH directions (legacy `pattern-crosshatch.svg`).
+  // Crosshatch repeats both diagonal families every 6px along either axis.
   crosshatch: { size: 6, spacing: 6, width: 1.2 },
   // 12px tile, 3 vertical + 3 horizontal lines 4px apart (legacy `pattern-grid.svg`).
   grid: { size: 12, spacing: 4, width: 1 },

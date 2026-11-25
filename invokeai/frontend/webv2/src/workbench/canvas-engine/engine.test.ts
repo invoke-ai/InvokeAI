@@ -5963,7 +5963,7 @@ describe('commitMaskImageResult', () => {
         isLocked: false,
         mask: {
           bitmap: resultImage,
-          fill: { color: '#e07575', style: 'diagonal' },
+          fill: { color: '#83d683', style: 'diagonal' },
           offset: { x: -5, y: 7 },
         },
         name: 'Inpaint Mask 2',

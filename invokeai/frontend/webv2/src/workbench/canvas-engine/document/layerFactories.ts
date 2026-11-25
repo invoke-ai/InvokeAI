@@ -31,7 +31,8 @@ type MaskLayerKind = 'inpaint_mask' | 'regional_guidance';
 
 // Keep top-level code side-effect free (no spreads, member reads or account registration): the eager editor bundle
 // imports the Canvas API, which would otherwise keep this module. The engine registry registers the account reset.
-const nextColorIndex = { inpaint_mask: 0, regional_guidance: 1 };
+// New canvases already contain a coral inpaint mask.
+const nextColorIndex = { inpaint_mask: 1, regional_guidance: 1 };
 
 export const nextMaskFillColor = (kind: MaskLayerKind, offset = 0): string =>
   MASK_FILL_COLORS[(nextColorIndex[kind] + offset) % MASK_FILL_COLORS.length]!;
@@ -41,7 +42,7 @@ export const advanceMaskFillColors = (kind: MaskLayerKind, count = 1): void => {
 };
 
 export const resetMaskFillColors = (): void => {
-  nextColorIndex.inpaint_mask = 0;
+  nextColorIndex.inpaint_mask = 1;
   nextColorIndex.regional_guidance = 1;
 };
 

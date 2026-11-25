@@ -50,7 +50,7 @@ describe('color sampling with real browser rasterization', () => {
     expect(createColorSampler(backend).sample(doc, caches, { x: 20, y: 0 })).toEqual(EXPECTED_COLOR);
   });
 
-  it('picks the document pixel at the pointer beneath a displayed mask at 50% zoom', () => {
+  it('picks the document pixel at the pointer beneath a displayed mask', () => {
     const backend = createDomRasterBackend();
     const caches = createLayerCacheStore(backend);
     const raster = layer(0);
@@ -77,7 +77,6 @@ describe('color sampling with real browser rasterization', () => {
     };
     const sampler = createColorSampler(backend);
     const providers = { showOverlayStacks: { control: true, inpaint_mask: false, regional_guidance: false } };
-    // At 50%, CSS x=0.25 and x=0.75 land on different document pixels within the same device pixel.
     expect(sampler.sample(doc, caches, { x: 0.5, y: 0.5 }, providers)).toEqual(EXPECTED_COLOR);
     expect(sampler.sample(doc, caches, { x: 1.5, y: 0.5 }, providers)).toEqual({ a: 255, b: 255, g: 0, r: 0 });
     expect(sampler.sampleArea(doc, caches, { x: 0.5, y: 0.5 }, 3, providers)?.center).toEqual(EXPECTED_COLOR);
