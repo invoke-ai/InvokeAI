@@ -1,7 +1,8 @@
+import re
 from enum import Enum
 from typing import Any, Callable, Literal, Optional, Tuple
 
-from pydantic import BaseModel, ConfigDict, Field, RootModel, TypeAdapter
+from pydantic import BaseModel, ConfigDict, Field, RootModel, TypeAdapter, field_validator
 from pydantic.fields import _Unset
 from pydantic_core import PydanticUndefined
 
@@ -306,6 +307,29 @@ class StylePresetField(BaseModel):
     """A style preset primitive field"""
 
     style_preset_id: str = Field(description="The id of the style preset")
+
+
+# A template's custom placeholder is this name in braces. `prompt` in any casing is the reserved prompt placeholder.
+PROMPT_TEMPLATE_FIELD_NAME_PATTERN = "[A-Za-z][A-Za-z0-9_]*"
+
+
+def check_prompt_template_value_name(name: str) -> str:
+    """Returns the name, or raises the one-line rule a user reads when theirs is not a placeholder name."""
+    if re.fullmatch(PROMPT_TEMPLATE_FIELD_NAME_PATTERN, name) is None or name.lower() == "prompt":
+        raise ValueError(
+            f"'{name}' is not a prompt template placeholder name. Use letters A-Z, numbers and underscores, "
+            "starting with a letter, without braces. 'prompt' is reserved."
+        )
+    return name
+
+
+class PromptTemplateValueField(BaseModel):
+    """The text for one custom placeholder of a prompt template"""
+
+    name: str = Field(description="The placeholder's name, without braces")
+    value: str = Field(description="The text that replaces the placeholder")
+
+    _name_is_a_placeholder_name = field_validator("name")(check_prompt_template_value_name)
 
 
 class SystemPromptField(BaseModel):

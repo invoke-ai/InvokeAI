@@ -197,7 +197,9 @@ The merged prompt view shows field text as your words, not the template's. Image
 
 A template you made earlier that already contains a one-word name in braces, such as `{style}`, now shows it as a field and sends nothing for it until you fill it in.
 
-The workflow editor's **Prompt Template** node and the legacy web interface replace only `{prompt}`; other names in braces are left in the text there.
+In the workflow editor, the **Prompt Template** node fills the same fields through its **Values** input. Add a **Prompt Template Value** node for each field, give it the field's **Name** without braces and the text as its **Value**, and connect it to **Values**. For several fields, connect them through a **Collect** node. A field with no value connected adds nothing, a value whose name the template does not use is ignored, and two values for the same name stop the workflow with an error. The node replaces every `{prompt}` in the template, and does not add your prompt to a template that has none.
+
+Outside its workflow editor, the legacy web interface replaces only `{prompt}` when it applies a prompt template; other names in braces are left in the text there.
 
 ### Built-in templates
 

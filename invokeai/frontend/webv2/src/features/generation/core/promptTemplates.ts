@@ -65,7 +65,8 @@ type TemplatePart =
   | { kind: 'prompt' }
   | { kind: 'field'; name: string; spelling: string };
 
-// The optional `$` marks a dynamic-prompt variable (`${name}`), which is not a field.
+// The optional `$` marks a dynamic-prompt variable (`${name}`), which is not a field. The backend's Prompt Template
+// node reads the same field names: `invokeai/app/invocations/prompt_template.py`.
 const TEMPLATE_TOKEN_RE = /\$?\{([A-Za-z][A-Za-z0-9_]*)\}/g;
 const FIELD_VALUE_KEY_RE = /^[a-z][a-z0-9_]*$/;
 const RESERVED_FIELD_NAME = 'prompt';
