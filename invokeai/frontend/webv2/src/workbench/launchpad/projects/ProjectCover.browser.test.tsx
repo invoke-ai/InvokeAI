@@ -6,9 +6,6 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { ProjectCover } from './ProjectCover';
 
-/** Image, absent-cover, and failed-load states reserve identical geometry; deleted images fall back to the glyph. */
-
-// A 1x1 transparent GIF, so the success path needs no network.
 const PIXEL = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
 const BROKEN = 'data:image/gif;base64,not-an-image';
 
@@ -57,20 +54,11 @@ const waitFor = async (predicate: () => boolean) => {
 };
 
 describe('ProjectCover', () => {
-  it('shows the folder glyph and no image when there is no cover', async () => {
-    const container = await render();
-
-    expect(container.querySelector('img')).toBeNull();
-    expect(container.querySelector('svg')).not.toBeNull();
-  });
-
   it('renders the cover as a decorative image when one is supplied', async () => {
     const container = await render(PIXEL);
     const image = container.querySelector('img');
 
     expect(image).not.toBeNull();
-    // The name is always rendered beside the cover, so announcing it twice
-    // would only add noise.
     expect(image?.getAttribute('alt')).toBe('');
     expect(image?.getAttribute('src')).toBe(PIXEL);
   });

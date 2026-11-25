@@ -73,7 +73,6 @@ describe('ThumbnailController adjusted rasters', () => {
   };
   const invert: CanvasAdjustmentEntry = { id: 'i', isEnabled: true, type: 'invert' };
 
-  /** A 200×100 cache drawn into a 50×25 thumbnail (scale ¼), with the given display-copy peek. */
   const drawThumbnail = (
     peek: (surface: RasterSurface) => RasterSurface | null,
     noise: CanvasAdjustmentEntry = grain

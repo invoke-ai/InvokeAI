@@ -67,9 +67,8 @@ export const useInstallActions = () => {
   );
 
   /**
-   * Queue many installs sequentially and silently; returns how many were
-   * accepted so the caller can emit one summary. Failures still toast
-   * individually via `install`'s error path.
+   * Queue many installs sequentially and silently; returns how many were accepted so the caller can emit one summary.
+   * Failures still toast individually via `install`'s error path.
    */
   const installMany = useCallback(
     async (requests: InstallModelRequest[]): Promise<number> => {

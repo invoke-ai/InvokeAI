@@ -24,7 +24,6 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { page, userEvent } from 'vitest/browser';
 
-/** The real shell and the real model manager; the other pages and the top bar are stand-ins. */
 const pending = vi.hoisted(() => () => new Promise<never>(() => {}));
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -38,7 +37,6 @@ vi.mock('@features/identity', async (importOriginal) => ({
   UsersPage: () => null,
 }));
 vi.mock('@features/identity/launchpad', () => ({ UsersPage: () => null }));
-/** Single-user unless a test signs someone in. */
 const auth = vi.hoisted(() => ({ session: null as SessionModule.AuthSession | null }));
 vi.mock('@features/identity/session', async (importOriginal) => {
   const original = await importOriginal<typeof SessionModule>();
@@ -147,7 +145,6 @@ const rail = () => page.getByRole('navigation', { name: 'launchpad.sectionsLabel
 const rect = (element: Element) => element.getBoundingClientRect();
 const row = (key: string) => document.querySelector<HTMLElement>(`[data-list-row="${key}"] [data-list-primary]`)!;
 
-/** Inside the window and inside the scroll viewport that holds it, on both axes. */
 const isInView = (element: Element) => {
   const bounds = rect(element);
   const viewport = element.closest('[data-scope="scroll-area"][data-part="viewport"]');
@@ -209,7 +206,6 @@ describe('Launchpad shell', () => {
       .element(page.getByRole('link', { name: 'launchpad.sections.models' }))
       .toHaveAttribute('aria-current', 'page');
 
-    // The manager loads lazily, as in the app.
     await vi.waitFor(() => expect(row('b')).not.toBeNull(), { timeout: 10_000 });
     await userEvent.click(row('b'));
 
@@ -253,6 +249,7 @@ describe('Launchpad shell', () => {
     auth.session = {
       accountEpoch: 1,
       expiredUserId: null,
+      hasSingleUserWork: false,
       multiuserEnabled: true,
       phase: 'ready',
       sessionExpired: false,
@@ -270,20 +267,17 @@ describe('Launchpad shell', () => {
         user_id: 'max',
       },
     };
-    // The row is named by its lines, the icon-only button by its label; both start from the name.
     const account = page.getByRole('button', { name: new RegExp(name) });
     const help = page.getByRole('button', { name: 'launchpad.help.label' });
     await page.viewport(1280, 900);
     await render();
 
-    // Last in the rail, after Help, in both tab and visual order; a long name truncates rather than widening the rail.
     await expect.element(account).toBeVisible();
     expect(rail().element().contains(account.element())).toBe(true);
     expect(help.element().compareDocumentPosition(account.element()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(rect(account.element()).top).toBeGreaterThan(rect(help.element()).bottom);
     expect(rect(rail().element()).width).toBe(224);
     expect(rect(account.element()).right).toBeLessThanOrEqual(rect(rail().element()).right);
-    // The name truncates inside the row, which keeps its chevron; the email shows under it.
     const [nameLine, emailLine] = account.element().querySelectorAll('p');
     expect(nameLine!.textContent).toBe(name);
     expect(nameLine!.scrollWidth).toBeGreaterThan(nameLine!.clientWidth);
@@ -297,7 +291,6 @@ describe('Launchpad shell', () => {
     await account.click();
     const menu = page.getByRole('menu');
     await expect.element(page.getByRole('menuitem', { name: 'auth.accountSettings' })).toBeVisible();
-    // Beside the trigger, as Help's menu opens, and inside the window whatever the name's length.
     expect(rect(menu.element()).left).toBeGreaterThan(rect(account.element()).right);
     expect(rect(menu.element()).bottom).toBeLessThanOrEqual(innerHeight);
     expect(await auditAccessibility(menu.element())).toEqual([]);
@@ -306,7 +299,6 @@ describe('Launchpad shell', () => {
       .element(page.getByRole('link', { name: 'launchpad.sections.users' }))
       .toHaveAttribute('aria-current', 'page');
 
-    // The icon rail names the avatar with a tooltip, which leaves once the menu opens.
     await page.viewport(720, 450);
     await expect.poll(() => rect(rail().element()).width).toBeLessThan(64);
     expect(await auditAccessibility(rail().element())).toEqual([]);

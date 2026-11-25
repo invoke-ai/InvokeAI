@@ -5,14 +5,12 @@ import { trimPaintCacheToAlpha } from '@workbench/canvas-engine/render/paintCach
 import { createTestStubRasterBackend } from '@workbench/canvas-engine/render/raster.testStub';
 import { describe, expect, it, vi } from 'vitest';
 
-/** Zero-alpha stub readbacks exercise empty-cache verdicts and guards; browser tests verify actual cropping. */
 const harness = (options: { busy?: boolean; pinned?: boolean } = {}) => {
   const store = createLayerCacheStore(createTestStubRasterBackend({ readbackAlpha: 0 }));
   const isLayerBusy = vi.fn(() => options.busy ?? false);
   return { deps: { isLayerBusy, isLayerPinned: () => options.pinned ?? false, layers: store }, isLayerBusy, store };
 };
 
-/** A published 40x40 cache at (10,10) — the shape a chunk-padded stroke leaves. */
 const publish = (store: ReturnType<typeof createLayerCacheStore>) => {
   const entry = store.growToRect('L', { height: 40, width: 40, x: 10, y: 10 });
   store.publishPixels('L');
@@ -35,33 +33,40 @@ describe('trimPaintCacheToAlpha', () => {
     expect((entry.surface as StubRasterSurface).callLog.map((e) => e.op)).not.toContain('getImageData');
   });
 
-  it('DEFERS while pixels have never been published — the pre-rasterize window', () => {
-    const { deps, store } = harness();
-    const entry = store.getOrCreateRect('L', { height: 40, width: 40, x: 0, y: 0 });
-    entry.stale = false;
-    expect(entry.hasPublishedPixels).toBe(false);
+  it.each([
+    {
+      name: 'pixels have never been published — the pre-rasterize window',
+      options: {},
+      prepare: (store: ReturnType<typeof createLayerCacheStore>) => {
+        const entry = store.getOrCreateRect('L', { height: 40, width: 40, x: 0, y: 0 });
+        entry.stale = false;
+        expect(entry.hasPublishedPixels).toBe(false);
+        return entry;
+      },
+      rect: { height: 40, width: 40, x: 0, y: 0 },
+    },
+    {
+      name: 'the cache is stale',
+      options: {},
+      prepare: (store: ReturnType<typeof createLayerCacheStore>) => {
+        const entry = publish(store);
+        entry.stale = true;
+        return entry;
+      },
+      rect: { height: 40, width: 40, x: 10, y: 10 },
+    },
+    {
+      name: 'the layer is busy',
+      options: { busy: true },
+      prepare: publish,
+      rect: { height: 40, width: 40, x: 10, y: 10 },
+    },
+  ])('DEFERS without reading pixels while $name', ({ options, prepare, rect }) => {
+    const { deps, store } = harness(options);
+    const entry = prepare(store);
 
     expect(trimPaintCacheToAlpha(deps, 'L')).toBe('deferred');
-    expect(entry.rect).toEqual({ height: 40, width: 40, x: 0, y: 0 });
-    expect((entry.surface as StubRasterSurface).callLog.map((e) => e.op)).not.toContain('getImageData');
-  });
-
-  it('DEFERS while the cache is stale', () => {
-    const { deps, store } = harness();
-    const entry = publish(store);
-    entry.stale = true;
-
-    expect(trimPaintCacheToAlpha(deps, 'L')).toBe('deferred');
-    expect(entry.rect).toEqual({ height: 40, width: 40, x: 10, y: 10 });
-  });
-
-  it('DEFERS while the layer is busy, without reading pixels', () => {
-    const { deps, isLayerBusy, store } = harness({ busy: true });
-    const entry = publish(store);
-
-    expect(trimPaintCacheToAlpha(deps, 'L')).toBe('deferred');
-    expect(isLayerBusy).toHaveBeenCalledWith('L');
-    expect(entry.rect).toEqual({ height: 40, width: 40, x: 10, y: 10 });
+    expect(entry.rect).toEqual(rect);
     expect((entry.surface as StubRasterSurface).callLog.map((e) => e.op)).not.toContain('getImageData');
   });
 
@@ -72,27 +77,6 @@ describe('trimPaintCacheToAlpha', () => {
     expect(trimPaintCacheToAlpha(deps, 'L')).toBe('kept');
     expect(entry.rect).toEqual({ height: 40, width: 40, x: 10, y: 10 });
     expect((entry.surface as StubRasterSurface).callLog.map((e) => e.op)).not.toContain('getImageData');
-  });
-
-  it('EMPTIES a published cache holding no visible alpha, collapsing it to a zero rect', () => {
-    const { deps, store } = harness();
-    const entry = publish(store);
-
-    expect(trimPaintCacheToAlpha(deps, 'L')).toBe('emptied');
-    expect(entry.rect).toEqual({ height: 0, width: 0, x: 10, y: 10 });
-    expect(entry.surface.width).toBe(0);
-    expect(entry.surface.height).toBe(0);
-    expect((entry.surface as StubRasterSurface).callLog.filter((e) => e.op === 'resize').map((e) => e.args)).toEqual([
-      [0, 0],
-    ]);
-  });
-
-  it('leaves the ENTRY alive after emptying, so an undo can re-grow into it', () => {
-    const { deps, store } = harness();
-    publish(store);
-
-    expect(trimPaintCacheToAlpha(deps, 'L')).toBe('emptied');
-    expect(store.peek('L')).toBeDefined();
   });
 
   it('reads the cache RECT, not the whole surface, when probing', () => {

@@ -19,26 +19,21 @@ describe('formatRelativeTime', () => {
     expect(formatRelativeTime(ago(45 * SECOND), NOW)).toBe('45 seconds ago');
   });
 
-  it('climbs to minutes up to the hour boundary', () => {
-    expect(formatRelativeTime(ago(5 * MINUTE), NOW)).toBe('5 minutes ago');
-    expect(formatRelativeTime(ago(59 * MINUTE), NOW)).toBe('59 minutes ago');
-  });
-
-  it('climbs to hours up to the day boundary', () => {
-    expect(formatRelativeTime(ago(3 * HOUR), NOW)).toBe('3 hours ago');
-    expect(formatRelativeTime(ago(23 * HOUR), NOW)).toBe('23 hours ago');
-  });
-
-  it('climbs to days up to the week boundary', () => {
-    // The caption the mock shows verbatim.
-    expect(formatRelativeTime(ago(2 * DAY), NOW)).toBe('2 days ago');
-    expect(formatRelativeTime(ago(6 * DAY), NOW)).toBe('6 days ago');
-  });
-
-  it('climbs to weeks, months, and years', () => {
-    expect(formatRelativeTime(ago(3 * WEEK), NOW)).toBe('3 weeks ago');
-    expect(formatRelativeTime(ago(150 * DAY), NOW)).toBe('5 months ago');
-    expect(formatRelativeTime(ago(800 * DAY), NOW)).toBe('2 years ago');
+  it('climbs through minutes, hours, days, weeks, months and years up to each boundary', () => {
+    for (const [elapsed, caption] of [
+      [5 * MINUTE, '5 minutes ago'],
+      [59 * MINUTE, '59 minutes ago'],
+      [3 * HOUR, '3 hours ago'],
+      [23 * HOUR, '23 hours ago'],
+      // The caption the mock shows verbatim.
+      [2 * DAY, '2 days ago'],
+      [6 * DAY, '6 days ago'],
+      [3 * WEEK, '3 weeks ago'],
+      [150 * DAY, '5 months ago'],
+      [800 * DAY, '2 years ago'],
+    ] as const) {
+      expect(formatRelativeTime(ago(elapsed), NOW)).toBe(caption);
+    }
   });
 
   it('uses the natural phrasing for the single-unit steps', () => {

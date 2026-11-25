@@ -268,6 +268,14 @@ class CalibrationRun(_StoreModel):
         "record: a retry may exist that the run does not record, so the run's attempt never feeds a fit until a reset "
         "removes the run",
     )
+    retried_at: Optional[datetime.datetime] = Field(
+        default=None,
+        description="Only for a run without an attempt: when the queue last began a retry of items of it, as the "
+        "retry was checked and counted (`retries_starting`), before it committed. Such a retry measures the GPU "
+        "after the runs created before it, as a run created then would, so it cuts off an attempt begun before it "
+        "the same way: a later step or retry of that attempt is refused. Kept also when the retry then committed "
+        "nothing. Absent until a retry of the run began",
+    )
 
     @model_validator(mode="after")
     def _steps_belong_to_an_attempt(self) -> "CalibrationRun":
@@ -279,7 +287,7 @@ class CalibrationRun(_StoreModel):
     def _omit_absent_fields(self, handler: SerializerFunctionWrapHandler) -> dict:
         # Written only when set: a run without them stays readable by a version that forbids the unknown fields.
         data = handler(self)
-        for name in ("attempt_id", "attempt_steps", "soft", "model_identity"):
+        for name in ("attempt_id", "attempt_steps", "soft", "model_identity", "retried_at"):
             if data.get(name) is None:
                 data.pop(name, None)
         if not data.get("graph_models"):

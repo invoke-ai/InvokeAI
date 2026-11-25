@@ -85,8 +85,8 @@ export const formatCount = (count: number, locale: string | undefined = document
   getNumberFormat(locale, {}).format(count);
 
 /**
- * A byte size with one decimal from kilobytes up, in the document language by default. Decimal (SI) units are the
- * ones Intl can name; `binary` scales by 1024 and appends IEC labels (KiB, GiB) that Intl lacks. Missing, negative or
+ * A byte size with one decimal from kilobytes up, in the document language by default. Decimal (SI) units are the ones
+ * Intl can name; `binary` scales by 1024 and appends IEC labels (KiB, GiB) that Intl lacks. Missing, negative or
  * non-finite sizes render as a dash.
  */
 export const formatBytes = (

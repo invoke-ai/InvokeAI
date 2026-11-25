@@ -109,7 +109,6 @@ describe('Video prompt dynamic prompts', () => {
       )
     );
 
-    // The notice under the prompt offers the switch, as the panel's does; both write through the same handler.
     const turnOff = [...document.querySelectorAll<HTMLButtonElement>('button')].find(
       (button) => button.textContent === 'widgets.generate.dynamicPrompts.turnOff'
     );

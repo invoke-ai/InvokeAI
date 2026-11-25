@@ -128,9 +128,11 @@ class ZImageModelLoaderInvocation(BaseInvocation):
         # Determine Qwen3 Encoder source
         if self.qwen3_encoder_model is not None:
             # Use standalone Qwen3 Encoder
-            self._validate_qwen3_encoder_variant(context, self.qwen3_encoder_model)
-            qwen3_tokenizer = self.qwen3_encoder_model.model_copy(update={"submodel_type": SubModelType.Tokenizer})
-            qwen3_encoder = self.qwen3_encoder_model.model_copy(update={"submodel_type": SubModelType.TextEncoder})
+            # Asked for as an encoder: a Text LLM holding a Qwen3 folder serves as one.
+            encoder = self.qwen3_encoder_model.model_copy(update={"type": ModelType.Qwen3Encoder})
+            self._validate_qwen3_encoder_variant(context, encoder)
+            qwen3_tokenizer = encoder.model_copy(update={"submodel_type": SubModelType.Tokenizer})
+            qwen3_encoder = encoder.model_copy(update={"submodel_type": SubModelType.TextEncoder})
         elif self.qwen3_source_model is not None:
             # Extract from Diffusers Z-Image model
             self._validate_diffusers_format(context, self.qwen3_source_model, "Qwen3 Source")

@@ -15,6 +15,7 @@ vi.mock('@features/identity/session', async (importOriginal) => {
   const signedIn: SessionModule.AuthSession = {
     accountEpoch: 1,
     expiredUserId: null,
+    hasSingleUserWork: false,
     multiuserEnabled: true,
     phase: 'ready',
     sessionExpired: false,
@@ -49,11 +50,9 @@ vi.mock('@tanstack/react-router', async (importOriginal) => ({
 }));
 vi.mock('@workbench/useOpenWorkbenchWidget', () => ({ useOpenWorkbenchWidget: () => vi.fn() }));
 vi.mock('@workbench/hotkeys/useShortcutBinding', () => ({
-  // Settings has a binding; the command palette is unbound, so it advertises none.
   useShortcutBinding: (commandId: string) =>
     commandId === 'app.openSettings' ? { aria: 'Control+Comma', display: 'Ctrl+,', parts: ['ctrl', ','] } : null,
 }));
-// The real store preloads the whole settings dialog; the call is the contract the dialog honours.
 const openSettings = vi.hoisted(() => vi.fn());
 vi.mock('@workbench/settings/settingsDialogStore', () => ({ openWorkbenchSettings: openSettings }));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
@@ -110,21 +109,17 @@ describe('AppMenu', () => {
         .map((item) => item.dataset.value)
         .slice(0, 3)
     ).toEqual(['launchpad', 'settings', 'command-palette']);
-    // Keycaps show the binding but stay out of the name; aria-keyshortcuts announces it.
     const settings = itemNamed('common.settings')!;
     expect(settings.querySelector('kbd')?.closest('[aria-hidden="true"]')).not.toBeNull();
     expect(settings.getAttribute('aria-keyshortcuts')).toBe('Control+Comma');
-    // Unbound: no shortcut is advertised.
     expect(itemNamed('commandPalette.buttonLabel')?.querySelector('kbd')).toBeNull();
     expect(itemNamed('commandPalette.buttonLabel')?.hasAttribute('aria-keyshortcuts')).toBe(false);
-    // The icon-only footer keeps the actions that have no item of their own.
     expect(menuItems().flatMap((item) => item.getAttribute('aria-label') ?? [])).toEqual([
       'whatsNew.whatsNewInInvoke',
       'topbar.appMenu.documentation',
       'Discord',
     ]);
 
-    // Each dialog closes back to the menu's button: the item that opened it is gone by then.
     const trigger = host.querySelector<HTMLButtonElement>('[aria-label="topbar.appMenu.open"]')!;
     await act(() => userEvent.click(itemNamed('common.settings')!));
     expect(openSettings).toHaveBeenCalledExactlyOnceWith(undefined, trigger);
@@ -141,7 +136,6 @@ describe('AppMenu', () => {
     expect(getCommandPaletteReturnFocusElement()).toBe(trigger);
   });
 
-  // The account lives in the launchpad's rail; the editor's menu ends at the app's own items and the footer.
   it.each([
     ['a signed-in admin', true],
     ['single-user mode', false],

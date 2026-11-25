@@ -21,8 +21,8 @@ export const registerWidgetOverlayCloser = (close: () => void): (() => void) => 
 };
 
 /**
- * Call before hiding widgets: deferred library closes may be dropped. Epochs hide content synchronously; all
- * widget overlays close, while shell overlays remain.
+ * Call before hiding widgets: deferred library closes may be dropped. Epochs hide content synchronously; all widget
+ * overlays close, while shell overlays remain.
  */
 export const closeWidgetOverlays = (): void => {
   epoch += 1;

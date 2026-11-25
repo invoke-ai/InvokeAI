@@ -17,12 +17,6 @@ export type AddNodeConnectionFilter =
       targetType: FieldType | null;
     };
 
-/** Bridge transient menu actions to always-mounted workflow dialogs and file input through session UI state. */
-
-/**
- * The library dialog's places: project workflows, recently opened templates, owned templates, bundled templates, or
- * public templates.
- */
 export type WorkflowLibraryTab = 'project' | 'recent' | 'user' | 'default' | 'shared';
 
 /** How This project orders its workflows: the project's own order, or a key. Client side, kept for the session. */
@@ -33,7 +27,6 @@ export interface ProjectWorkflowOrder {
   sort: ProjectWorkflowSort;
 }
 
-/** What a surface asked the publication host to do with one project workflow. */
 export type WorkflowPublicationIntent =
   | { kind: 'save-as-new'; workflowId: string }
   | { kind: 'update-source'; workflowId: string };
@@ -49,24 +42,18 @@ export interface WorkflowUiSnapshot {
   libraryQuery: { search: string; tags: readonly string[] };
   /** This project's order; the template places' order is an account preference. */
   libraryProjectOrder: ProjectWorkflowOrder;
-  /**
-   * The project workflow selected on the This-project view; only meaningful for the project it was made in, and only
-   * for the opening it was made in. Null shows the active workflow.
-   */
+  /** Meaningful only for the project and the opening it was made in; null shows the active workflow. */
   librarySelection: { projectId: string; workflowId: string } | null;
   /** Bumped to ask the dialog host to open the JSON file picker. */
   importRequestCount: number;
-  /** A rename the dialog host should offer; it names the workflow it was asked for. */
   renameRequest: { requestId: number; workflowId: string } | null;
-  /** A workflow a shell surface (command palette, an image's context menu) asked to load; consumed by the widget chrome. */
+  /** Asked for by a shell surface (palette, image menu); consumed by the widget chrome. */
   pendingWorkflowLoad: WorkflowLoadRequest | null;
-  /** A publication the always-mounted host should start a dialog for. */
   publicationIntent: WorkflowPublicationIntent | null;
   /** A template the project already holds copies of; the host asks whether to open, add, or replace a copy. */
   libraryCopyChoice: LibraryCopyChoiceRequest | null;
 }
 
-/** The library template being opened; the name labels the dialog and the undo step. */
 export interface LibraryOpenItem {
   name: string;
   workflow_id: string;
@@ -124,10 +111,8 @@ registerAccountOwnedResource({
 });
 
 /**
- * Opens or closes the library. An opening that names no workflow starts This project on the active workflow: a
- * selection left from an earlier opening would point the rail's actions (Update library template among them) at a
- * workflow the user has since moved away from. Closing clears the search and the checked tags, so the next opening
- * never starts on a filtered, possibly empty, view; the place stays.
+ * An opening that names no workflow starts This project on the active workflow, so an old selection never aims the
+ * rail's actions elsewhere. Closing clears the search and tags; the place stays.
  */
 export const setWorkflowLibraryOpen = (isOpen: boolean): void => {
   const wasOpen = workflowUiStore.getSnapshot().isLibraryOpen;
@@ -173,7 +158,6 @@ export const setWorkflowLibrarySelection = (selection: { projectId: string; work
   workflowUiStore.patchSnapshot({ librarySelection: selection });
 };
 
-/** Opens the library on the project's own workflows with one of them selected. */
 export const openWorkflowLibraryAtProjectWorkflow = (projectId: string, workflowId: string): void => {
   workflowUiStore.patchSnapshot({
     isLibraryOpen: true,

@@ -57,7 +57,6 @@ const pointer = (
   timeStamp: 0,
 });
 
-/** A pointer input at an explicit SCREEN point, with the doc point derived at `zoom`. */
 const pointerAtScreen = (screen: Vec2, zoom: number): PointerInput => ({
   buttons: 1,
   documentPoint: { x: screen.x / zoom, y: screen.y / zoom },
@@ -68,7 +67,6 @@ const pointerAtScreen = (screen: Vec2, zoom: number): PointerInput => ({
   timeStamp: 0,
 });
 
-/** The screen-space tip of the drawn rotation nub for `transform` at `zoom`. */
 const nubTipScreen = (
   transform: LayerTransform,
   sz: { x: number; y: number; width: number; height: number },
@@ -84,7 +82,6 @@ const nubTipScreen = (
   return { x: a.x + (dx / len) * TRANSFORM_ROTATE_NUB_PX, y: a.y + (dy / len) * TRANSFORM_ROTATE_NUB_PX };
 };
 
-/** Rotates `p` about `pivot` by `rad` (screen space). */
 const rotateAbout = (p: Vec2, pivot: Vec2, rad: number): Vec2 => {
   const cos = Math.cos(rad);
   const sin = Math.sin(rad);
@@ -104,10 +101,6 @@ interface Harness {
   floatTransforms: LayerTransform[];
 }
 
-/**
- * Real session stores reflect tool writes during 1:1 gesture tests. Snap defaults off here to isolate deltas;
- * dedicated cases enable the product-default behavior.
- */
 const createHarness = (doc: CanvasDocumentContractV3, zoom = 1, float?: FloatingSelection | null): Harness => {
   const stores = createEngineStores();
   stores.snapToGrid.set(false);
@@ -254,7 +247,6 @@ describe('transform tool: session lifecycle', () => {
   });
 
   it('does not adopt the layer under the pointer over the selected one', () => {
-    // 'top' covers the press point; 'bottom' is what the panel selected.
     const doc = makeDoc(
       [imageLayer('top', { width: 100, height: 100 }), imageLayer('bottom', { width: 100, height: 100 })],
       'bottom'
@@ -274,7 +266,6 @@ describe('transform tool: gestures', () => {
     const tool = createTransformTool();
     activate(tool, h.ctx);
 
-    // se corner is at doc (100,100); drag it to (150,150).
     down(tool, h.ctx, pointer(100, 100));
     move(tool, h.ctx, pointer(150, 150));
     up(tool, h.ctx, pointer(150, 150));
@@ -282,8 +273,25 @@ describe('transform tool: gestures', () => {
     const s = h.session();
     expect(s?.transform.scaleX).toBeCloseTo(1.5, 5);
     expect(s?.transform.scaleY).toBeCloseTo(1.5, 5);
-    // No structural dispatch — the session holds the preview until Apply.
     expect(h.ctx.commitStructural).not.toHaveBeenCalled();
+  });
+
+  it('keeps an edge drag proportional while the aspect link is on, and Shift frees it', () => {
+    const dragEastEdge = (shift: boolean) => {
+      const h = createHarness(makeDoc([imageLayer('a', { width: 100, height: 100 })], 'a'));
+      const tool = createTransformTool();
+      activate(tool, h.ctx);
+      down(tool, h.ctx, pointer(100, 50));
+      move(tool, h.ctx, pointer(150, 50, { shift }));
+      return h.session()!.transform;
+    };
+
+    const linked = dragEastEdge(false);
+    expect(linked.scaleX).toBeCloseTo(1.5, 9);
+    expect(linked.scaleY).toBeCloseTo(1.5, 9);
+    const free = dragEastEdge(true);
+    expect(free.scaleX).toBeCloseTo(1.5, 9);
+    expect(free.scaleY).toBe(1);
   });
 
   it('moves via an interior drag', () => {
@@ -307,7 +315,6 @@ describe('transform tool: gestures', () => {
     const tool = createTransformTool();
     activate(tool, h.ctx);
 
-    // Just outside the se corner (100,100) is a rotate zone.
     down(tool, h.ctx, pointer(112, 112));
     move(tool, h.ctx, pointer(100, 130));
     up(tool, h.ctx, pointer(100, 130));
@@ -327,14 +334,12 @@ describe('transform tool: gestures', () => {
     move(tool, h.ctx, pointer(101, 101));
     up(tool, h.ctx, pointer(101, 101));
 
-    // No update beyond the initial begin override.
     expect(h.overrides.length).toBe(startOverrides);
     expect(h.session()?.transform.scaleX).toBe(1);
   });
 });
 
 describe('transform tool: grid snapping', () => {
-  /** A harness with snapping on at `grid`. */
   const snapHarness = (grid: number, float?: FloatingSelection) => {
     const doc = makeDoc([imageLayer('a', { width: 100, height: 100 })], 'a');
     const h = createHarness(doc, 1, float);
@@ -349,7 +354,7 @@ describe('transform tool: grid snapping', () => {
     activate(tool, h.ctx);
 
     down(tool, h.ctx, pointer(50, 50));
-    move(tool, h.ctx, pointer(71, 65)); // raw (21, 15) → (24, 16)
+    move(tool, h.ctx, pointer(71, 65));
     up(tool, h.ctx, pointer(71, 65));
 
     expect(h.session()?.transform.x).toBeCloseTo(24, 5);
@@ -389,7 +394,6 @@ describe('transform tool: grid snapping', () => {
     down(tool, h.ctx, pointer(100, 100));
     move(tool, h.ctx, pointer(153, 153, { alt: true }));
 
-    // The layer center (50,50) stays put — the alt anchor, not a snap bypass.
     const next = h.session()!.transform;
     const center = applyToPoint(layerTransformMatrix(next), { x: 50, y: 50 });
     expect(center.x).toBeCloseTo(50, 5);
@@ -427,11 +431,9 @@ describe('transform tool: rotation nub (regression — a nub press must rotate, 
     expect(startTransform).toEqual(transformed);
     const overridesBefore = h.overrides.length;
 
-    // Pointer-down EXACTLY on the drawn rotation nub (above the top edge).
     const tip = nubTipScreen(transformed, layerSize, zoom);
     down(tool, h.ctx, pointerAtScreen(tip, zoom));
 
-    // Pressing the nub must preserve live session values rather than reopening from committed transforms.
     expect(h.session()?.transform).toEqual(startTransform);
     expect(h.overrides.length).toBe(overridesBefore);
 
@@ -447,8 +449,7 @@ describe('transform tool: rotation nub (regression — a nub press must rotate, 
     expect(after?.rotation).toBeCloseTo(transformed.rotation + 0.5, 6);
   };
 
-  it('rotates (does not reset) at zoom 1', () => run(1));
-  it('rotates (does not reset) at a non-1 zoom', () => run(2.5));
+  it.each([1, 2.5])('rotates (does not reset) at zoom %s', (zoom) => run(zoom));
 });
 
 describe('transform tool: apply / cancel', () => {
@@ -460,7 +461,6 @@ describe('transform tool: apply / cancel', () => {
 
     tool.onKeyCommand?.(h.ctx, 'apply');
 
-    // The engine apply seam was invoked exactly once.
     expect(h.applyCount()).toBe(1);
   });
 
@@ -499,7 +499,6 @@ describe('transform tool: apply / cancel', () => {
 
     tool.onPointerCancel?.(h.ctx);
 
-    // Session persists, reverted to the start transform.
     const s = h.session();
     expect(s).not.toBeNull();
     expect(s?.transform.scaleX).toBe(1);
@@ -511,7 +510,6 @@ describe('transform tool: apply / cancel', () => {
     const tool = createTransformTool();
     activate(tool, h.ctx);
 
-    // Southeast drag crosses the threshold and owns pointer capture.
     down(tool, h.ctx, pointer(100, 100));
     move(tool, h.ctx, pointer(120, 120));
     const midDrag = h.session()?.transform.scaleX;
@@ -521,11 +519,9 @@ describe('transform tool: apply / cancel', () => {
 
     expect(h.applyCount()).toBe(0);
 
-    // The gesture is still alive — it did not silently freeze mid-drag.
     move(tool, h.ctx, pointer(150, 150));
     expect(h.session()?.transform.scaleX).toBeGreaterThan(midDrag!);
 
-    // Pointer-up still ends the gesture normally, keeping the session.
     up(tool, h.ctx, pointer(150, 150));
     expect(h.session()).not.toBeNull();
   });
@@ -540,11 +536,9 @@ describe('transform tool: temp-tool switch (space/alt hold)', () => {
     h.ctx.updateTransformSession?.({ rotation: 0, scaleX: 2, scaleY: 1, x: 40, y: 5 });
     const edited = h.session()?.transform;
 
-    // Space down: a temporary deactivate must not cancel the session.
     tool.onDeactivate?.(h.ctx, { temporary: true });
     expect(h.session()?.transform).toEqual(edited);
 
-    // Temporary reactivation must preserve live edits instead of reopening from committed values.
     tool.onActivate?.(h.ctx, { temporary: true });
     expect(h.session()?.transform).toEqual(edited);
   });
@@ -557,7 +551,6 @@ describe('transform tool: temp-tool switch (space/alt hold)', () => {
     expect(h.session()).not.toBeNull();
 
     tool.onDeactivate?.(h.ctx, { temporary: true });
-    // Simulate engine cancellation while temporarily switched away after the layer disappears.
     h.ctx.cancelTransform?.();
     expect(h.session()).toBeNull();
 
@@ -569,7 +562,6 @@ describe('transform tool: temp-tool switch (space/alt hold)', () => {
 describe('transform tool: floating selections', () => {
   const IDENTITY: LayerTransform = { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 };
 
-  /** A stand-in float over `layerId`, holding pixels at a known layer-local rect. */
   const makeFloat = (layerId: string, rect = { height: 100, width: 100, x: 0, y: 0 }): FloatingSelection =>
     ({ layerId, pixels: { rect }, transform: { ...IDENTITY } }) as FloatingSelection;
 
@@ -593,7 +585,6 @@ describe('transform tool: floating selections', () => {
     move(tool, h.ctx, pointer(70, 60));
 
     expect(h.floatTransforms.at(-1)).toMatchObject({ x: 20, y: 10 });
-    // The layer session is untouched.
     expect(h.session()).toBeNull();
   });
 
@@ -601,7 +592,6 @@ describe('transform tool: floating selections', () => {
     const h = createHarness(doc(), 1, makeFloat('a'));
     const tool = createTransformTool();
 
-    // The float's own se corner, at the pixels' layer-local bounds (100,100).
     down(tool, h.ctx, pointer(100, 100));
     move(tool, h.ctx, pointer(150, 150));
 
@@ -611,7 +601,6 @@ describe('transform tool: floating selections', () => {
   });
 
   it('maps the pointer through the layer matrix, so a scaled layer drags true', () => {
-    // On a 2× layer, dragging 40 document px must move the float 20 layer-local px.
     const h = createHarness(doc({ height: 100, width: 100 }), 1, makeFloat('a'));
     const scaled = getDocumentLeaves(h.ctx.getDocument())[0]!;
     scaled.transform.scaleX = 2;

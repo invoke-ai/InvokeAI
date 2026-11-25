@@ -1,6 +1,6 @@
 /**
- * Pure rules for the control layer Properties panel: each intent maps the live layer to the next one. Detection
- * itself never runs here; the coordinator schedules it when the result needs a fresh map.
+ * Pure rules for the control layer Properties panel: each intent maps the live layer to the next one. Detection itself
+ * never runs here; the coordinator schedules it when the result needs a fresh map.
  */
 
 import type {

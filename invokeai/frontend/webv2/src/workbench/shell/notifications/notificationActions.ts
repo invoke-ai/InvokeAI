@@ -21,7 +21,6 @@ export interface NotificationActionContext {
   isProjectOpen: (projectId: string) => boolean;
   /** Brings the widget forward where the layout has it, otherwise opens it, and moves focus there. */
   openWidget: (widgetId: WidgetTypeId) => void;
-  /** Opens the queue at a backend item. */
   revealQueueItem: (itemId: number) => void;
   /** Whether a notice may still offer Retry for these backend items: not once they were retried from one. */
   canRetryQueueItem: (itemIds: readonly number[]) => boolean;
@@ -97,24 +96,19 @@ export const resolveNotificationActions = (
     return label === null ? [] : [{ label, onClick: () => handler.run(action, context) }];
   });
 
-/** Called when a toast shows `actions`. */
 export const holdNotificationActions = (actions: readonly WorkbenchNotificationAction[]): void => {
   for (const action of actions) {
     (handlers[action.kind] as NotificationActionHandler<typeof action>).hold?.(action);
   }
 };
 
-/** Called when the toast that offered `actions` has closed. */
 export const releaseNotificationActions = (actions: readonly WorkbenchNotificationAction[]): void => {
   for (const action of actions) {
     (handlers[action.kind] as NotificationActionHandler<typeof action>).release?.(action);
   }
 };
 
-/**
- * Keeps the undo entries the listed notifications still offer and frees the rest no toast holds: after the list
- * changed (a dismiss, Clear, a record pushed past the limit) or a project closed, whose undos are no longer offered.
- */
+/** Keeps undo entries listed notifications still offer and frees the rest no toast holds. */
 export const retainNotificationActions = (
   notifications: readonly WorkbenchNotification[],
   { isProjectOpen }: Pick<NotificationActionContext, 'isProjectOpen'>

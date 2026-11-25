@@ -48,7 +48,6 @@ describe('paint percent control', () => {
       (slider.element() as HTMLElement).focus();
       await userEvent.keyboard('{ArrowRight}{ArrowRight}');
     });
-    // Tool options are not history: each step reaches the store, not just the settled value.
     expect(setValue.mock.calls).toEqual([[0.51], [0.52]]);
     await expect.element(slider).toHaveAttribute('aria-valuetext', '52%');
 
@@ -69,7 +68,6 @@ describe('paint size control', () => {
     root = null;
   });
 
-  /** Owns the size like the tool store does, so each key steps from what the previous one produced. */
   const renderSize = async (initial: number, setSize = vi.fn(), controlled = true) => {
     const Harness = () => {
       const [size, setHarnessSize] = useState(initial);

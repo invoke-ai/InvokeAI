@@ -45,8 +45,8 @@ export interface InstallSourceMenuTarget extends ListContextMenuAnchor {
 
 /**
  * One context menu per list: `target` is the row that was right-clicked, until the menu closes; `shown` keeps it
- * through the menu's exit animation. `open` keeps its identity so memoized rows skip re-rendering when only the
- * target changes.
+ * through the menu's exit animation. `open` keeps its identity so memoized rows skip re-rendering when only the target
+ * changes.
  */
 export const useInstallSourceMenu = () => {
   const [target, setTarget] = useState<InstallSourceMenuTarget | null>(null);
@@ -66,8 +66,8 @@ export const useInstallSourceMenu = () => {
 };
 
 /**
- * The list's single row menu. The list resolves `status` for the target on every render, so the menu follows the
- * source while it is open; it offers the same next step as the row's install button.
+ * The list's single row menu. The list resolves `status` for the target on every render, so the menu follows the source
+ * while it is open; it offers the same next step as the row's install button.
  */
 export const InstallSourceContextMenu = ({
   isOpen,
@@ -81,7 +81,6 @@ export const InstallSourceContextMenu = ({
   onClose: () => void;
   /** Releases the retained target once the menu has animated out. */
   onExitComplete: () => void;
-  /** Installs the target source. */
   onInstall: () => void;
   /** Null when the target is no longer listed. */
   status: InstallSourceStatus | null;

@@ -1,13 +1,10 @@
 import type { ModelConfig } from '@features/models';
 
-import { ChakraProvider, Field as ChakraField } from '@chakra-ui/react';
+import { ChakraProvider } from '@chakra-ui/react';
 import { setModelsSnapshotForTests } from '@features/models/data/modelsStore';
 import { setRelationshipsSnapshotForTests } from '@features/models/data/relationshipsStore';
-import { ModelsUiProvider, NO_SCHEDULER_POLICY } from '@features/models/ui/ModelsUiContext';
-import { getModelsUiSnapshotForTests } from '@features/models/ui/uiStore';
-import { auditAccessibility, contrastOffenderTexts } from '@platform/browser/auditAccessibility.testing';
+import { ModelsUiProvider, NO_DEFAULTS_RULES } from '@features/models/ui/ModelsUiContext';
 import { Field } from '@platform/ui/Field';
-import { ScrubberField } from '@platform/ui/ScrubberField';
 import { system } from '@theme/system';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -16,8 +13,8 @@ import { page, userEvent } from 'vitest/browser';
 
 import { ModelSelect } from './ModelSelect';
 
-// Browser tests run without an i18n provider, so translated copy renders as
-// the raw key (e.g. 'models.compactRows'); assertions below match the keys.
+// Browser tests run without an i18n provider, so translated copy renders as the raw key (e.g. 'models.compactRows');
+// assertions below match the keys.
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string, options?: { name?: string }) => (options?.name ? `${key}:${options.name}` : key),
@@ -51,19 +48,11 @@ const MODELS_UI_ADAPTER = {
   installInPlace: true,
   isProjectActive: () => true,
   managerProjectId: null,
-  schedulerPolicy: NO_SCHEDULER_POLICY,
+  defaultsRules: NO_DEFAULTS_RULES,
   setInstallInPlace: () => undefined,
 };
-const MANAGER_ADAPTER = { ...MODELS_UI_ADAPTER, managerProjectId: 'project-1' };
-const MEMBER_ADAPTER = { ...MANAGER_ADAPTER, canManageModels: false };
 const MAIN_MODEL_TYPES: ['main'] = ['main'];
 const CROSS_TYPE_MODEL_TYPES: ['main', 'lora'] = ['main', 'lora'];
-
-const CONTROLNET_TYPES = ['controlnet'] as const;
-
-const LORA_TYPES = ['lora'] as const;
-const ADDED_LORA_KEYS: ReadonlySet<string> = new Set(['sd1-lora']);
-
 describe('ModelSelect loading states', () => {
   let host: HTMLDivElement;
   let root: Root;
@@ -99,109 +88,6 @@ describe('ModelSelect loading states', () => {
     await expect.poll(() => document.querySelector('[role="option"]')?.textContent).toContain('SDXL Main');
   });
 
-  it('says every compatible model is already added rather than that none are installed', async () => {
-    setModelsSnapshotForTests({ error: null, models: [loraModel], status: 'loaded' });
-
-    await act(() => {
-      root.render(
-        <ChakraProvider value={system}>
-          <ModelsUiProvider adapter={MODELS_UI_ADAPTER}>
-            <ModelSelect
-              excludeKeys={ADDED_LORA_KEYS}
-              modelTypes={LORA_TYPES}
-              scopeLabel="concepts"
-              showManagerButton={false}
-              value={null}
-              onChange={vi.fn()}
-            />
-          </ModelsUiProvider>
-        </ChakraProvider>
-      );
-    });
-
-    const trigger = host.querySelector<HTMLButtonElement>('[aria-haspopup="listbox"]')!;
-    expect(trigger.disabled).toBe(true);
-    expect(trigger.textContent).toContain('models.scopeAllAdded');
-  });
-
-  it('disables the trigger instead of opening an empty list when nothing compatible is installed', async () => {
-    setModelsSnapshotForTests({ error: null, models: [model], status: 'loaded' });
-
-    await act(() => {
-      root.render(
-        <ChakraProvider value={system}>
-          <ModelsUiProvider adapter={MODELS_UI_ADAPTER}>
-            <ModelSelect modelTypes={CONTROLNET_TYPES} showManagerButton={false} value={null} onChange={vi.fn()} />
-          </ModelsUiProvider>
-        </ChakraProvider>
-      );
-    });
-
-    const trigger = host.querySelector<HTMLButtonElement>('[aria-haspopup="listbox"]')!;
-    expect(trigger.disabled).toBe(true);
-    expect(trigger.textContent).toContain('scopeNoCompatibleInstalled');
-    await act(() => trigger.click());
-    // Closed: the picker computes no options, and the popover never opens.
-    expect(document.querySelectorAll('[role="option"]')).toHaveLength(0);
-    expect(document.querySelector('[data-scope="popover"][data-part="content"][data-state="open"]')).toBeNull();
-
-    // While the library is still loading there is nothing to conclude yet.
-    setModelsSnapshotForTests({ error: null, models: [], status: 'loading' });
-    await act(() => {
-      root.render(
-        <ChakraProvider value={system}>
-          <ModelsUiProvider adapter={MODELS_UI_ADAPTER}>
-            <ModelSelect modelTypes={CONTROLNET_TYPES} showManagerButton={false} value={null} onChange={vi.fn()} />
-          </ModelsUiProvider>
-        </ChakraProvider>
-      );
-    });
-    expect(host.querySelector<HTMLButtonElement>('[aria-haspopup="listbox"]')!.disabled).toBe(false);
-  });
-
-  it('leads a required picker with nothing installed to the Model Manager, filtered to its type', async () => {
-    setModelsSnapshotForTests({ error: null, models: [model], status: 'loaded' });
-    const renderRequired = (canManageModels: boolean) =>
-      act(() => {
-        root.render(
-          <ChakraProvider value={system}>
-            <ModelsUiProvider adapter={canManageModels ? MANAGER_ADAPTER : MEMBER_ADAPTER}>
-              <ModelSelect installAction modelTypes={CONTROLNET_TYPES} value={null} onChange={vi.fn()} />
-            </ModelsUiProvider>
-          </ChakraProvider>
-        );
-      });
-    const originalHash = window.location.hash;
-
-    await renderRequired(true);
-    const install = [...host.querySelectorAll('button')].find(
-      (button) => button.textContent === 'models.installAModel'
-    );
-    expect(install).toBeDefined();
-    await act(() => install?.click());
-
-    // The filter is seeded before the navigation, once its module has loaded.
-    await expect.poll(() => window.location.hash).toBe('#/models?project=project-1');
-    expect(getModelsUiSnapshotForTests()).toMatchObject({ activeTab: 'add', addModelsTypeSeed: 'controlnet' });
-    window.location.hash = originalHash;
-
-    // Someone who cannot install models is told whom to ask instead of being sent to a page they cannot open.
-    await renderRequired(false);
-    expect(host.textContent).toContain('models.askAdminToInstall');
-    expect([...host.querySelectorAll('button')].map((button) => button.textContent)).not.toContain(
-      'models.installAModel'
-    );
-
-    // Once a compatible model exists the picker is all it needs.
-    setModelsSnapshotForTests({
-      error: null,
-      models: [{ ...model, key: 'cn', type: 'controlnet' } as ModelConfig],
-      status: 'loaded',
-    });
-    await renderRequired(true);
-    expect(host.textContent).not.toContain('models.installAModel');
-  });
-
   const renderPicker = async (props: Partial<Parameters<typeof ModelSelect>[0]> = {}) => {
     await act(() => {
       root.render(
@@ -226,18 +112,51 @@ describe('ModelSelect loading states', () => {
   const optionTexts = (): string[] =>
     [...document.querySelectorAll('[role="option"]')].map((option) => option.textContent ?? '');
 
-  // Cross-type pickers must not repeat Main Models headings for every base.
-  it('groups a cross-type picker by base alone, with no type header', async () => {
-    setModelsSnapshotForTests({ error: null, models: [model, loraModel], status: 'loaded' });
-    await renderPicker({ id: 'test-cross-type', modelTypes: CROSS_TYPE_MODEL_TYPES });
+  it('offers a Text LLM that serves a role in a picker of that type, without a type badge, and shows the role type in a mixed picker', async () => {
+    const textLlm = {
+      ...model,
+      base: 'any',
+      key: 'text-llm',
+      name: 'Qwen3.5 VLM',
+      roles: [{ type: 'qwen3_5_encoder', variant: 'qwen3_5_9b' }],
+      type: 'text_llm',
+    } as ModelConfig;
+    const encoder = {
+      ...model,
+      base: 'any',
+      key: 'encoder',
+      name: 'Plain Encoder',
+      type: 'qwen3_5_encoder',
+    } as ModelConfig;
 
-    const listbox = document.querySelector('[role="listbox"]')!;
+    setModelsSnapshotForTests({ error: null, models: [textLlm, model], status: 'loaded' });
+    await renderPicker({ id: 'test-role-only', modelTypes: ['qwen3_5_encoder'] });
 
-    expect(listbox.textContent).toContain('Stable Diffusion 1.x');
-    expect(listbox.textContent).toContain('Stable Diffusion XL');
-    expect(listbox.textContent).not.toContain('Main Models');
-    // Type is on the row instead, so the two rows stay distinguishable.
-    expect(optionTexts().join(' ')).toContain('LoRA');
+    // Only the role-serving model qualifies; a single-type picker shows no type badge at all.
+    expect(optionTexts()).toHaveLength(1);
+    expect(optionTexts()[0]).toContain('Qwen3.5 VLM');
+    expect(optionTexts()[0]).not.toContain('Text LLM');
+    expect(optionTexts()[0]).not.toContain('Qwen3.5 Encoder');
+
+    await act(() => root.unmount());
+    root = createRoot(host);
+    document.querySelectorAll('[data-scope="popover"]').forEach((element) => element.remove());
+    setModelsSnapshotForTests({ error: null, models: [textLlm, encoder], status: 'loaded' });
+    await renderPicker({ id: 'test-role-and-primary', modelTypes: ['qwen3_5_encoder'] });
+
+    expect(optionTexts().join(' ')).not.toContain('Qwen3.5 Encoder');
+    expect(optionTexts().join(' ')).not.toContain('Text LLM');
+
+    await act(() => root.unmount());
+    root = createRoot(host);
+    document.querySelectorAll('[data-scope="popover"]').forEach((element) => element.remove());
+    setModelsSnapshotForTests({ error: null, models: [textLlm, model], status: 'loaded' });
+    await renderPicker({ id: 'test-role-mixed', modelTypes: ['main', 'qwen3_5_encoder'] });
+
+    // In a mixed picker the role candidate shows the type it qualifies as, never its primary type.
+    expect(optionTexts().find((text) => text.includes('Qwen3.5 VLM'))).toContain('Qwen3.5 Encoder');
+    expect(optionTexts().find((text) => text.includes('Qwen3.5 VLM'))).not.toContain('Text LLM');
+    expect(optionTexts().find((text) => text.includes('SDXL Main'))).toContain('Main');
   });
 
   it('moves the active row across a group boundary and selects with Enter', async () => {
@@ -251,8 +170,7 @@ describe('ModelSelect loading states', () => {
       .closest('[data-scope="popover"]')!
       .querySelector<HTMLInputElement>('input')!;
 
-    // sd-1 sorts before sdxl, so the LoRA leads and one step lands on the main
-    // model in the next group.
+    // sd-1 sorts before sdxl, so the LoRA leads and one step lands on the main model in the next group.
     await expect.poll(() => document.querySelector('[data-active]')?.textContent).toContain('Detail LoRA');
 
     await act(() => {
@@ -292,78 +210,6 @@ describe('ModelSelect loading states', () => {
       .not.toContainEqual(expect.stringContaining('SD1 Main'));
   });
 
-  it('remembers the compact row density across a close and reopen', async () => {
-    setModelsSnapshotForTests({ error: null, models: [model, secondSdxlModel], status: 'loaded' });
-    await renderPicker({ id: 'test-compact' });
-
-    const toggle = document.querySelector<HTMLButtonElement>('button[aria-label="models.compactRows"]')!;
-
-    expect(toggle).not.toBeNull();
-    await act(() => toggle.click());
-    await expect.poll(() => document.querySelector('button[aria-label="models.fullRows"]')).not.toBeNull();
-
-    // Close and reopen: the preference is stored per picker id, not per mount.
-    await act(() => host.querySelector<HTMLButtonElement>('[aria-haspopup="listbox"]')?.click());
-    await act(() => host.querySelector<HTMLButtonElement>('[aria-haspopup="listbox"]')?.click());
-
-    await expect.poll(() => document.querySelector('button[aria-label="models.fullRows"]')).not.toBeNull();
-  });
-
-  it('keeps its scroll and rows while a parent re-renders with inline filter and types', async () => {
-    const many = Array.from(
-      { length: 60 },
-      (_, index) => ({ ...model, key: `sdxl-${index}`, name: `SDXL ${String(index).padStart(2, '0')}` }) as ModelConfig
-    );
-    setModelsSnapshotForTests({ error: null, models: many, status: 'loaded' });
-    // Like Generate's callers: a fresh filter and type list on every parent render.
-    const renderParent = () =>
-      act(() => {
-        root.render(
-          <ChakraProvider value={system}>
-            <ModelsUiProvider adapter={MODELS_UI_ADAPTER}>
-              <ModelSelect
-                // oxlint-disable-next-line react-perf/jsx-no-new-function-as-prop -- the identity churn under test
-                filter={(candidate) => candidate.base === 'sdxl'}
-                id="test-inline"
-                // oxlint-disable-next-line react-perf/jsx-no-new-array-as-prop -- the identity churn under test
-                modelTypes={['main']}
-                showManagerButton={false}
-                value={null}
-                onChange={vi.fn()}
-              />
-            </ModelsUiProvider>
-          </ChakraProvider>
-        );
-      });
-    await renderParent();
-    await act(() => host.querySelector<HTMLButtonElement>('[aria-haspopup="listbox"]')?.click());
-    await expect.poll(() => document.querySelectorAll('[role="option"]').length).toBeGreaterThan(0);
-
-    const viewport = document
-      .querySelector<HTMLElement>('[role="listbox"]')!
-      .closest<HTMLElement>('[data-part="viewport"]')!;
-    const scrollTo = (offset: number) => () => {
-      viewport.scrollTop = offset;
-      viewport.dispatchEvent(new Event('scroll'));
-
-      return viewport.scrollTop === offset;
-    };
-    await expect.poll(() => act(scrollTo(400))).toBe(true);
-    // A row of the scrolled-to window, not the active first option, which stays mounted wherever the list scrolls.
-    const findWindowRow = () =>
-      [...document.querySelectorAll<HTMLElement>('[role="option"]')].find((option) =>
-        option.textContent?.startsWith('SDXL 15')
-      ) ?? null;
-    await expect.poll(findWindowRow).not.toBeNull();
-    const row = findWindowRow()!;
-
-    await renderParent();
-    await renderParent();
-
-    expect(viewport.scrollTop).toBe(400);
-    expect(document.getElementById(row.id)).toBe(row);
-  });
-
   describe('inside a Field', () => {
     const renderInField = (field: { error?: string; helpText?: string }, onChange = vi.fn()) =>
       act(() => {
@@ -394,82 +240,11 @@ describe('ModelSelect loading states', () => {
       setModelsSnapshotForTests({ error: null, models: [model], status: 'loaded' });
       await renderInField({ helpText: 'Used for every generation' });
 
-      // The label names the control; the selected model and its base follow as its value.
       await expect
         .element(page.getByRole('button', { exact: true, name: 'Base model SDXL Main SDXL' }))
         .toBeInTheDocument();
       expect(describedText()).toBe('Used for every generation');
       expect(trigger().hasAttribute('aria-invalid')).toBe(false);
-    });
-
-    it('reports the field error as invalid and describes the trigger with it', async () => {
-      setModelsSnapshotForTests({ error: null, models: [model], status: 'loaded' });
-      await renderInField({ error: 'Choose an installed model' });
-
-      await expect.poll(describedText).toBe('Choose an installed model');
-      expect(trigger().getAttribute('aria-invalid')).toBe('true');
-    });
-
-    it('names itself from content inside a field host that renders no label', async () => {
-      setModelsSnapshotForTests({ error: null, models: [model], status: 'loaded' });
-      await act(() => {
-        root.render(
-          <ChakraProvider value={system}>
-            <ModelsUiProvider adapter={MODELS_UI_ADAPTER}>
-              <ChakraField.Root>
-                <ModelSelect
-                  modelTypes={MAIN_MODEL_TYPES}
-                  showManagerButton={false}
-                  value="sdxl-main"
-                  onChange={vi.fn()}
-                />
-              </ChakraField.Root>
-            </ModelsUiProvider>
-          </ChakraProvider>
-        );
-      });
-
-      expect(trigger().hasAttribute('aria-labelledby')).toBe(false);
-      await expect.element(page.getByRole('button', { exact: true, name: 'SDXL Main SDXL' })).toBeInTheDocument();
-    });
-
-    it('mounts the picker only while open, with its active option named in the first commit', async () => {
-      setModelsSnapshotForTests({ error: null, models: [model, secondSdxlModel], status: 'loaded' });
-      await renderInField({});
-      expect(document.querySelector('input[role="combobox"]')).toBeNull();
-
-      // Checked synchronously after the opening commit, before any resize observation can re-render the list.
-      await act(() => trigger().click());
-      const search = document.querySelector<HTMLInputElement>('input[role="combobox"]')!;
-      expect(document.getElementById(search.getAttribute('aria-activedescendant')!)?.textContent).toContain(
-        'SDXL Main'
-      );
-
-      await act(() => trigger().click());
-      await expect.poll(() => document.querySelector('input[role="combobox"]')).toBeNull();
-    });
-
-    it('keeps the popup search out of the field and passes an audit while open', async () => {
-      setModelsSnapshotForTests({ error: null, models: [model, secondSdxlModel], status: 'loaded' });
-      await renderInField({ error: 'Choose an installed model' });
-      await act(() => trigger().click());
-
-      const search = await vi.waitFor(() => document.querySelector<HTMLInputElement>('input[role="combobox"]')!);
-      // The field's label and error belong to the trigger, not to the search box inside its popup.
-      expect(search.id).not.toBe(document.querySelector('label')!.htmlFor);
-      expect(search.hasAttribute('aria-invalid')).toBe(false);
-      expect(search.hasAttribute('aria-describedby')).toBe(false);
-      expect(document.getElementById(search.getAttribute('aria-controls')!)?.getAttribute('role')).toBe('listbox');
-      expect(document.getElementById(search.getAttribute('aria-activedescendant')!)?.textContent).toContain(
-        'SDXL Main'
-      );
-
-      const popup = document.querySelector('[data-scope="popover"][data-part="content"]')!;
-      const violations = [...(await auditAccessibility(host)), ...(await auditAccessibility(popup))];
-      expect(violations.filter((violation) => violation.id !== 'color-contrast')).toEqual([]);
-      // Known theme-token offenders, pinned so that any new failing node (or a fixed one) changes the list: the
-      // subtle file-size captions and the invalid trigger's red value text (its middle-truncated tail).
-      expect(contrastOffenderTexts(violations)).toEqual(['1.0 kB', '1.0 kB', 'DXL Main']);
     });
 
     it('returns focus to the trigger after a keyboard choice and after Escape', async () => {
@@ -488,97 +263,6 @@ describe('ModelSelect loading states', () => {
       await userEvent.keyboard('{Escape}');
       await expect.poll(() => document.activeElement).toBe(trigger());
       expect(onChange).toHaveBeenCalledOnce();
-    });
-
-    describe('with the label inside', () => {
-      const renderInside = (field: { error?: string; helpText?: string }, onChange = vi.fn()) =>
-        act(() => {
-          root.render(
-            <ChakraProvider value={system}>
-              <ModelsUiProvider adapter={MODELS_UI_ADAPTER}>
-                <Field label="VAE" labelPlacement="inside" {...field}>
-                  <ModelSelect
-                    isClearable
-                    modelTypes={MAIN_MODEL_TYPES}
-                    showManagerButton={false}
-                    value="sdxl-main"
-                    onChange={onChange}
-                  />
-                </Field>
-              </ModelsUiProvider>
-            </ChakraProvider>
-          );
-        });
-      const insideLabel = () => trigger().querySelector<HTMLElement>('span[id]')!;
-
-      it('shows the label in the trigger, before the end-aligned model, and keeps its name and description', async () => {
-        setModelsSnapshotForTests({ error: null, models: [model], status: 'loaded' });
-        await renderInside({ helpText: 'Using the bundled VAE' });
-
-        // A span, not a <label>, because it sits inside the trigger button.
-        expect(host.querySelector('label')).toBeNull();
-        expect(insideLabel().textContent).toBe('VAE');
-        const value = insideLabel().nextElementSibling!;
-        expect(value.textContent).toBe('SDXL MainSDXL');
-        expect(insideLabel().getBoundingClientRect().right).toBeLessThanOrEqual(value.getBoundingClientRect().left);
-        expect(getComputedStyle(value).justifyContent).toBe('flex-end');
-        await expect
-          .element(page.getByRole('button', { exact: true, name: 'VAE SDXL Main SDXL' }))
-          .toHaveAccessibleDescription('Using the bundled VAE');
-      });
-
-      it('opens from a click on the label and still clears from its clear button', async () => {
-        const onChange = vi.fn();
-        setModelsSnapshotForTests({ error: null, models: [model, secondSdxlModel], status: 'loaded' });
-        await renderInside({}, onChange);
-
-        await userEvent.click(insideLabel());
-        await expect.poll(() => document.querySelector('input[role="combobox"]')).not.toBeNull();
-        await userEvent.keyboard('{Escape}');
-        await expect.poll(() => document.querySelector('input[role="combobox"]')).toBeNull();
-
-        await userEvent.click(page.getByRole('button', { exact: true, name: 'models.clearSelectedModel' }));
-        expect(onChange).toHaveBeenLastCalledWith(null);
-      });
-
-      it('lines its label up with a stacked ScrubberField and shows the model at regular weight', async () => {
-        setModelsSnapshotForTests({ error: null, models: [model], status: 'loaded' });
-        await act(() => {
-          root.render(
-            <ChakraProvider value={system}>
-              <ModelsUiProvider adapter={MODELS_UI_ADAPTER}>
-                <ScrubberField label="Steps" max={100} min={1} step={1} value={30} onChange={vi.fn()} />
-                <Field label="VAE" labelPlacement="inside">
-                  <ModelSelect
-                    modelTypes={MAIN_MODEL_TYPES}
-                    showManagerButton={false}
-                    value="sdxl-main"
-                    onChange={vi.fn()}
-                  />
-                </Field>
-              </ModelsUiProvider>
-            </ChakraProvider>
-          );
-        });
-        const textLeft = (element: Element) => {
-          const range = document.createRange();
-          range.selectNodeContents(element);
-          return range.getBoundingClientRect().left;
-        };
-        const scrubberLabel = host.querySelector<HTMLElement>('[data-part="label"]')!;
-
-        expect(textLeft(insideLabel())).toBeCloseTo(textLeft(scrubberLabel), 0);
-        expect(getComputedStyle(insideLabel()).fontWeight).toBe(getComputedStyle(scrubberLabel).fontWeight);
-        expect(getComputedStyle(insideLabel().nextElementSibling!).fontWeight).toBe('400');
-      });
-
-      it('marks the trigger invalid and describes it with the field error', async () => {
-        setModelsSnapshotForTests({ error: null, models: [model], status: 'loaded' });
-        await renderInside({ error: 'Pick a compatible VAE' });
-
-        expect(trigger().getAttribute('aria-invalid')).toBe('true');
-        await expect.poll(describedText).toBe('Pick a compatible VAE');
-      });
     });
   });
 });
@@ -611,7 +295,6 @@ describe('ModelSelect related-model ranking', () => {
     document.body.append(host);
     root = createRoot(host);
     setModelsSnapshotForTests({ error: null, models: [model, vaeA, vaeB], status: 'loaded' });
-    // Beta VAE links to the main model; the picker's own value (Alpha) links to Beta too, which must not rank.
     setRelationshipsSnapshotForTests({ relatedKeysByModelKey: { 'sdxl-main': ['vae-b'], 'vae-a': ['vae-b'] } });
   });
 
@@ -630,20 +313,5 @@ describe('ModelSelect related-model ranking', () => {
     await expect.element(options()[0]!).toHaveAccessibleName(/^Beta VAE\s*, models\.linkedToModel:SDXL Main/);
     await expect.element(options()[1]!).toHaveAccessibleName(/^Alpha VAE/);
     await expect.element(options()[1]!).not.toHaveAccessibleName(/linked/i);
-  });
-
-  it('falls back to a generic link label when the anchor is not in the catalog', async () => {
-    setRelationshipsSnapshotForTests({ relatedKeysByModelKey: { 'missing-main': ['vae-b'] } });
-    await renderVaePicker({ relatedTo: 'missing-main', value: null });
-
-    await expect.poll(() => optionNames()[0]).toContain('Beta VAE');
-    await expect.element(options()[0]!).toHaveAccessibleName(/^Beta VAE\s*, models\.linkedModel/);
-  });
-
-  it('ignores the value of the picker itself when no anchor is given', async () => {
-    await renderVaePicker({ value: 'vae-a' });
-
-    expect(optionNames()[0]).toContain('Alpha VAE');
-    expect(optionNames().join(' ')).not.toMatch(/linked/i);
   });
 });

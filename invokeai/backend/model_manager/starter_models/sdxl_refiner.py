@@ -8,6 +8,7 @@ from invokeai.backend.model_manager.taxonomy import (
 )
 
 sdxl_refiner = StarterModel(
+    source_urls=["https://huggingface.co/stabilityai/stable-diffusion-xl-refiner-1.0"],
     name="SDXL Refiner",
     base=BaseModelType.StableDiffusionXLRefiner,
     source="stabilityai/stable-diffusion-xl-refiner-1.0",

@@ -1,3 +1,5 @@
+import gc
+import weakref
 from collections.abc import Sequence
 
 import gguf
@@ -421,6 +423,38 @@ def _quantized_embedding(qtype: gguf.GGMLQuantizationType, rows: int = 37, width
     )
 
 
+@pytest.mark.parametrize("rows_per_chunk", [1, 3])
+@pytest.mark.parametrize("dtype", [torch.float32, torch.float16, torch.bfloat16])
+@pytest.mark.parametrize(
+    "qtype",
+    [gguf.GGMLQuantizationType.Q8_0, gguf.GGMLQuantizationType.Q6_K, gguf.GGMLQuantizationType.IQ4_NL],
+    ids=lambda qtype: qtype.name,
+)
+def test_unpack_decodes_bounded_rows_bit_exactly(monkeypatch, qtype, dtype, rows_per_chunk):
+    # A row wider than the budget still decodes whole; 37 rows also gives a short final slice.
+    budget = 511 if rows_per_chunk == 1 else 3 * 512
+    monkeypatch.setattr(loaders, "_UNPACK_CHUNK_ELEMENTS", budget)
+    weight = _quantized_embedding(qtype)
+    weight.compute_dtype = dtype
+    expected = weight.get_dequantized_tensor()
+    decoded = []
+    real_decode = GGMLTensor.get_dequantized_tensor
+
+    def record_rows(tensor):
+        result = real_decode(tensor)
+        decoded.append(result.numel())
+        return result
+
+    monkeypatch.setattr(GGMLTensor, "get_dequantized_tensor", record_rows)
+    result = loaders.unpack_ggml_tensor(weight)
+
+    assert decoded == ([512] * 37 if rows_per_chunk == 1 else [3 * 512] * 12 + [512])
+    assert result.dtype == dtype
+    assert result.device == weight.quantized_data.device
+    # Compare bytes so NaNs, their payloads, and signed zeros must match exactly.
+    assert torch.equal(result.view(torch.uint8), expected.view(torch.uint8))
+
+
 @pytest.mark.parametrize(
     "qtype",
     [
@@ -472,3 +506,45 @@ def test_unpacking_a_quantized_tensor_reserves_one_slice_of_temporaries_not_the_
 
     result = 37 * 512 * torch.bfloat16.itemsize
     assert reserved == [result + packed + HOST_DEQUANT_PEAK_COPIES * 3 * 512 * torch.bfloat16.itemsize]
+
+
+def _tensor_names_through_reader(path):
+    # A function of its own: like the callers of `WrappedGGUFReader`, the name `reader` ends when it returns.
+    with WrappedGGUFReader(path) as reader:
+        return [tensor.name for tensor in reader.tensors]
+
+
+@pytest.mark.parametrize("probe", ["header_read", "metadata", "state_dict", "reader"])
+def test_a_probed_gguf_is_free_to_delete_at_once(tmp_path, monkeypatch, probe):
+    """Installing a model deletes or moves the file right after identification, and Windows refuses that while
+    it is still mapped. The map must be released by reference count, not by a later collection.
+
+    The map's death is asserted directly as well, since POSIX renames and deletes a mapped file without complaint."""
+    path = tmp_path / "model.gguf"
+    write_gguf(path, {"proj.weight": torch.ones(4, 32)}, metadata={"general.name": "probe"})
+
+    maps: list[weakref.ref] = []
+    original_init = gguf.GGUFReader.__init__
+
+    def init_and_track_the_map(self, *args, **kwargs):
+        original_init(self, *args, **kwargs)
+        maps.append(weakref.ref(self.data))
+
+    monkeypatch.setattr(gguf.GGUFReader, "__init__", init_and_track_the_map)
+
+    gc.disable()
+    try:
+        if probe == "header_read":
+            gguf_header_state_dict(path, compute_dtype=torch.float32)
+        elif probe == "metadata":
+            assert ModelOnDisk(path).metadata()["general.name"] == "probe"
+        elif probe == "state_dict":
+            assert "proj.weight" in ModelOnDisk(path).load_state_dict()
+        else:
+            _tensor_names_through_reader(path)
+        assert maps
+        assert all(ref() is None for ref in maps)
+        path.rename(tmp_path / "moved.gguf")
+        (tmp_path / "moved.gguf").unlink()
+    finally:
+        gc.enable()

@@ -51,7 +51,6 @@ const queueItem = (
     ...overrides,
   }) as QueueItem;
 
-/** A project staging the first image of a three-image batch, beside an unrelated running batch. */
 const setup = (eyes: Partial<QueueItem> = {}) => {
   const initial = createInitialWorkbenchState();
   const base = initial.projects[0]!;
@@ -135,7 +134,6 @@ describe('acceptStagedCandidate', () => {
     const layerId = result.status === 'committed' ? result.layerId : '';
     expect(h.project().canvas.document.stacks.raster[0]).toMatchObject({ id: layerId, isEnabled: true });
 
-    // A sibling that finished before the backend stopped is dropped; the unrelated batch still stages.
     h.store.commands.queue.routePartialResults({
       backendItemId: 2,
       images: [image('right-eye.png', 'batch-eyes')],
@@ -172,7 +170,6 @@ describe('acceptStagedCandidate', () => {
   it('leaves the batch running when the accept is refused', () => {
     const h = setup();
 
-    // Index 1 is a placeholder, not the candidate the user saw.
     expect(h.accept(false, 1).status).not.toBe('committed');
 
     expect(h.stopped).toEqual([]);

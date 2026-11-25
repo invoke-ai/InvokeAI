@@ -47,6 +47,7 @@ const SimpleDialog = ({
   onOpenChange,
   open,
   title,
+  trapFocus,
 }: {
   children?: ReactNode;
   modal?: boolean;
@@ -54,11 +55,13 @@ const SimpleDialog = ({
   onOpenChange: (details: Dialog.OpenChangeDetails) => void;
   open: boolean;
   title: string;
+  trapFocus?: boolean;
 }) => (
   <Dialog.Root
     closeOnInteractOutside
     modal={modal}
     open={open}
+    trapFocus={trapFocus}
     onFocusOutside={onFocusOutside}
     onOpenChange={onOpenChange}
   >
@@ -139,15 +142,24 @@ const Observed = ({
   children,
   modal,
   onFocusOutside,
+  trapFocus,
 }: {
   children?: ReactNode;
   modal?: boolean;
   onFocusOutside?: () => void;
+  trapFocus?: boolean;
 }) => {
   const [open, setOpen] = useState(true);
   const changeOpen = useCallback((details: Dialog.OpenChangeDetails) => setOpen(details.open), []);
   return (
-    <SimpleDialog modal={modal} open={open} title="Observed" onFocusOutside={onFocusOutside} onOpenChange={changeOpen}>
+    <SimpleDialog
+      modal={modal}
+      open={open}
+      title="Observed"
+      trapFocus={trapFocus}
+      onFocusOutside={onFocusOutside}
+      onOpenChange={changeOpen}
+    >
       {children ?? <button type="button">Inside</button>}
     </SimpleDialog>
   );
@@ -187,7 +199,8 @@ describe('Dialog', () => {
 
   it('keeps a modal open when focus is moved outside it, still telling its own handler', async () => {
     const onFocusOutside = vi.fn();
-    await render(<Observed onFocusOutside={onFocusOutside} />);
+    // Zag reports focus outside only once it stays there for a frame; an active trap would pull it straight back.
+    await render(<Observed trapFocus={false} onFocusOutside={onFocusOutside} />);
     await settled('Observed');
 
     await act(() => host!.querySelector<HTMLButtonElement>('button')!.focus());

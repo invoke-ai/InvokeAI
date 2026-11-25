@@ -1,3 +1,4 @@
+import { resolvedValues } from '@platform/core/resolvedValues.testing';
 import { describe, expect, it } from 'vitest';
 
 import { DEFAULT_CANVAS_COMPOSITING, readCanvasCompositingSettings } from './canvasCompositing';
@@ -22,14 +23,16 @@ describe('readCanvasCompositingSettings', () => {
   });
 
   it('reads valid persisted values', () => {
-    const settings = readCanvasCompositingSettings({
-      coherenceEdgeSize: 32,
-      coherenceMinDenoise: 0.2,
-      coherenceMode: 'Box Blur',
-      infillMethod: 'patchmatch',
-      maskBlur: 8,
-      outputOnlyMaskedRegions: false,
-    });
+    const settings = readCanvasCompositingSettings(
+      resolvedValues({
+        coherenceEdgeSize: 32,
+        coherenceMinDenoise: 0.2,
+        coherenceMode: 'Box Blur',
+        infillMethod: 'patchmatch',
+        maskBlur: 8,
+        outputOnlyMaskedRegions: false,
+      })
+    );
     expect(settings.coherenceEdgeSize).toBe(32);
     expect(settings.coherenceMinDenoise).toBe(0.2);
     expect(settings.coherenceMode).toBe('Box Blur');
@@ -39,17 +42,19 @@ describe('readCanvasCompositingSettings', () => {
   });
 
   it('falls back to defaults for invalid enum values', () => {
-    const settings = readCanvasCompositingSettings({ coherenceMode: 'Wobble', infillMethod: 'magic' });
+    const settings = readCanvasCompositingSettings(resolvedValues({ coherenceMode: 'Wobble', infillMethod: 'magic' }));
     expect(settings.coherenceMode).toBe('Gaussian Blur');
     expect(settings.infillMethod).toBe('lama');
   });
 
   it('clamps numeric ranges and rounds integers', () => {
-    const settings = readCanvasCompositingSettings({
-      coherenceEdgeSize: -5,
-      coherenceMinDenoise: 5,
-      maskBlur: 12.7,
-    });
+    const settings = readCanvasCompositingSettings(
+      resolvedValues({
+        coherenceEdgeSize: -5,
+        coherenceMinDenoise: 5,
+        maskBlur: 12.7,
+      })
+    );
     expect(settings.coherenceEdgeSize).toBe(0);
     expect(settings.coherenceMinDenoise).toBe(1);
     expect(settings.maskBlur).toBe(13);

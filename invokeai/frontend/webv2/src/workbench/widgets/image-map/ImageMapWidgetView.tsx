@@ -41,8 +41,8 @@ import { ImageIndexActivityBadge, ImageIndexProgressPanel } from './ImageIndexPr
 import { useClearClusterSelection } from './useSelectMapImage';
 
 const CLEAR_CLUSTER_SELECTION_COMMAND = 'image-map.clearClusterSelection';
-// In the center area the view selector floats over the content's top-left
-// corner; the shell publishes its height so overlays can start below it.
+// In the center area the view selector floats over the content's top-left corner; the shell publishes its height so
+// overlays can start below it.
 const OVERLAY_COLUMN_TOP = 'calc(var(--chakra-spacing-2) + var(--wb-center-chrome-inset, 0px))';
 const MAP_SURFACE_FOCUS_STYLE = { outline: '2px solid {colors.accent.solid}', outlineOffset: '-2px' } as const;
 
@@ -93,10 +93,7 @@ export const ImageMapWidgetView = ({ runtime }: WidgetViewProps) => {
   }, [galleryCommands]);
   const clearClusterSelection = useClearClusterSelection();
 
-  // Esc while the map owns focus, the keyboard path to the chip's clear. Also
-  // a palette command. The runtime stamps registrations with the active
-  // project and is rebuilt on a project switch without remounting this view,
-  // so registration follows it; the clear reads the selection when it fires.
+  // Esc while the map owns focus, the keyboard path to the chip's clear.
   const { commands: runtimeCommands, hotkeys: runtimeHotkeys } = runtime;
 
   useEffect(() => {
@@ -121,8 +118,8 @@ export const ImageMapWidgetView = ({ runtime }: WidgetViewProps) => {
     };
   }, [clearClusterSelection, runtimeCommands, runtimeHotkeys, t]);
 
-  // Before the first load, so it carries the chosen strength rather than
-  // fetching at the default and immediately refetching.
+  // Before the first load, so it carries the chosen strength rather than fetching at the default and immediately
+  // refetching.
   useEffect(() => {
     setClusterEps(clusterEps);
   }, [clusterEps]);
@@ -131,7 +128,6 @@ export const ImageMapWidgetView = ({ runtime }: WidgetViewProps) => {
     const detachViewer = attachImageMapViewer();
 
     // Before the first load, like the strength: a cold start under a media filter must not cluster both kinds first.
-    // Later changes reach the store through the data runtime.
     setImageMapMediaKind(toGalleryMediaKind(mediaFilter));
     ensureImageMapLoaded();
     const detachPolling = attachImageMapStatusPolling();
@@ -142,8 +138,7 @@ export const ImageMapWidgetView = ({ runtime }: WidgetViewProps) => {
     };
   });
 
-  // Pushed into the store so turning labels off stops the request, not just the
-  // drawing of what it returns.
+  // Pushed into the store so turning labels off stops the request, not just the drawing of what it returns.
   useEffect(() => {
     setClusterLabelsEnabled(showClusterLabels);
   }, [showClusterLabels]);
@@ -160,15 +155,13 @@ export const ImageMapWidgetView = ({ runtime }: WidgetViewProps) => {
     );
   }
 
-  // A working map beats a full-screen error: when a refresh fails but prior
-  // points exist, keep showing them (the next successful refresh recovers).
+  // A working map beats a full-screen error: when a refresh fails but prior points exist, keep showing them (the next
+  // successful refresh recovers).
   if (data && data.points.length > 0) {
     // Keep a nested Suspense boundary around Plotly so its separate lazy load preserves widget chrome and places
     // loading feedback in the plot area.
     return (
-      // Overlay indexing status on usable stale points because this branch bypasses the progress panel. Focusable so a
-      // cleared selection can hand focus back to the map (the chip's button unmounts with it), keeping Esc and the
-      // map's other widget hotkeys in reach.
+      // Overlay indexing status on usable stale points because this branch bypasses the progress panel.
       <Box
         _focusVisible={MAP_SURFACE_FOCUS_STYLE}
         data-image-map-surface=""
@@ -181,10 +174,9 @@ export const ImageMapWidgetView = ({ runtime }: WidgetViewProps) => {
         <Suspense fallback={plotLoadingFallback}>
           <ImageMapPlot clickSelectsCluster={clickSelectsCluster} showClusterLabels={showClusterLabels} />
         </Suspense>
-        {/* One corner, stacked: the selection first, since the user made it.
-            The column passes pointer events through, because the plot under
-            it is drag-panned and wheel-zoomed across its whole area; each
-            overlay takes its own back. */}
+        {/* One corner, stacked: the selection first, since the user made it. The column passes pointer events through,
+            because the plot under it is drag-panned and wheel-zoomed across its whole area; each overlay takes its own
+            back. */}
         <Stack
           align="flex-start"
           gap="1.5"
@@ -205,18 +197,15 @@ export const ImageMapWidgetView = ({ runtime }: WidgetViewProps) => {
   const loadFailed = error ?? t('widgets.imageMap.loadFailed');
   const retainedDataError = loadState === 'error' ? loadFailed : null;
 
-  // Ahead of the loading spinner, unlike every other message: a refresh from
-  // this state flips `loadState` to `loading`, and flashing a spinner over the
-  // message would unmount the model link — losing the "refresh when the
-  // download lands" watcher with it. The diagnosis is also what a refresh is
-  // least likely to change.
+  // Ahead of the loading spinner, unlike every other message: a refresh from this state flips `loadState` to `loading`,
+  // and flashing a spinner over the message would unmount the model link — losing the "refresh when the download lands"
+  // watcher with it. The diagnosis is also what a refresh is least likely to change.
   if (data?.state === 'model_missing') {
     const modelName = data.modelName?.trim() || DEFAULT_IMAGE_INDEX_MODEL;
 
     return (
       <CenteredMessage
-        // Keep a standing refresh action to discover newly installed encoders while the indexer is otherwise
-        // inert.
+        // Keep a standing refresh action to discover newly installed encoders while the indexer is otherwise inert.
         actionLabel={retainedDataError ? t('common.retry') : t('widgets.imageMap.checkAgain')}
         detail={
           canManageModels ? (
@@ -269,8 +258,7 @@ export const ImageMapWidgetView = ({ runtime }: WidgetViewProps) => {
     );
   }
 
-  // Prioritize backfill progress over computing/empty states before points exist. Preserve refresh errors and
-  // retry within that panel.
+  // Prioritize backfill progress over computing/empty states before points exist.
   if (isIndexing(indexCounts)) {
     return (
       <Center h="full" p="6">
@@ -370,10 +358,7 @@ const CenteredMessage = ({
   </Center>
 );
 
-/**
- * Link the encoder to its Add Models entry, where the user reviews and installs it; plain text while the catalog
- * does not carry it, while it downloads, or for sessions that cannot manage models.
- */
+/** Links the encoder to Add Models; plain text when uncatalogued, downloading, or unmanageable. */
 const ImageIndexModelInstallLink = ({ modelName }: { modelName: string }) => {
   const { t } = useTranslation();
   const starterModels = useStartersSelector(selectStarterModels);
@@ -393,9 +378,8 @@ const ImageIndexModelInstallLink = ({ modelName }: { modelName: string }) => {
   const installing = sources.some((entry) => activeInstallSources.has(entry.source));
   const wasInstalling = useRef(false);
 
-  // The server picks a freshly installed encoder up on the next map request,
-  // so ask for one as soon as the download lands: without it the panel keeps
-  // saying "not installed" until someone reopens it.
+  // The server picks a freshly installed encoder up on the next map request, so ask for one as soon as the download
+  // lands: without it the panel keeps saying "not installed" until someone reopens it.
   useEffect(() => {
     if (wasInstalling.current && !installing) {
       handleRefresh();

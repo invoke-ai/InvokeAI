@@ -11,6 +11,7 @@ from invokeai.backend.model_manager.taxonomy import (
 
 # Same network and file name as TAEF1; the base override the installer sends is what files it under SD3.
 taesd3 = StarterModel(
+    source_urls=["https://huggingface.co/madebyollin/taesd3"],
     name="TAESD3 (SD3 preview decoder)",
     base=BaseModelType.StableDiffusion3,
     source="https://huggingface.co/madebyollin/taesd3/resolve/d58dcaccd2b36fcb7a6b9e93c1cc507acab5a778/diffusion_pytorch_model.safetensors",
@@ -23,6 +24,7 @@ taesd3 = StarterModel(
 # checkpoint's directory name (`…official_sd3_distill…`); if the HF single-file download drops that name, the
 # explicit base=StableDiffusion3 override the installer sends is trusted instead (see pid_decoder.py::_validate_base).
 pid_decoder_sd3_2k = StarterModel(
+    source_urls=["https://huggingface.co/nvidia/PiD"],
     name="PiD Decoder SD3 (2K)",
     base=BaseModelType.StableDiffusion3,
     source="nvidia/PiD::checkpoints/PiD_res2k_sr4x_official_sd3_distill_4step/model_ema_bf16.pth",
@@ -34,6 +36,7 @@ pid_decoder_sd3_2k = StarterModel(
 )
 
 pid_decoder_sd3_2kto4k = StarterModel(
+    source_urls=["https://huggingface.co/nvidia/PiD"],
     name="PiD Decoder SD3 (2K to 4K)",
     base=BaseModelType.StableDiffusion3,
     source="nvidia/PiD::checkpoints/PiD_res2kto4k_sr4x_official_sd3_distill_4step/model_ema_bf16.pth",
@@ -45,6 +48,7 @@ pid_decoder_sd3_2kto4k = StarterModel(
 )
 
 sd35_medium = StarterModel(
+    source_urls=["https://huggingface.co/stabilityai/stable-diffusion-3.5-medium"],
     name="SD3.5 Medium",
     base=BaseModelType.StableDiffusion3,
     source="stabilityai/stable-diffusion-3.5-medium",
@@ -54,6 +58,7 @@ sd35_medium = StarterModel(
 )
 
 sd35_large = StarterModel(
+    source_urls=["https://huggingface.co/stabilityai/stable-diffusion-3.5-large"],
     name="SD3.5 Large",
     base=BaseModelType.StableDiffusion3,
     source="stabilityai/stable-diffusion-3.5-large",

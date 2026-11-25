@@ -22,7 +22,7 @@ from invokeai.backend.model_manager.configs.qwen3_5_encoder import (
 from invokeai.backend.model_manager.load.load_default import ModelLoader, _model_declared_skip_patterns
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.model_manager.taxonomy import AnyModel, BaseModelType, ModelFormat, ModelType, SubModelType
-from invokeai.backend.quantization.fp8_scaled import cast_state_dict, reject_quantized_side_channel
+from invokeai.backend.quantization.fp8_scaled import cast_state_dict, reject_quantized_side_channel, safetensors_backend
 from invokeai.backend.quantization.int8_convrot import (
     drop_unconsumed_quantization_sidecars,
     extract_int8_convrot_markers,
@@ -105,7 +105,7 @@ def load_qwen3_5_text_encoder(
 
     sd: dict[str, torch.Tensor] = {}
     for path, keys in keys_by_file.items():
-        with safe_open(path, framework="pt", device="cpu") as f:
+        with safe_open(path, framework="pt", device="cpu", backend=safetensors_backend(path)) as f:
             for key in keys:
                 if key in names:
                     sd[names[key]] = f.get_tensor(key)
@@ -174,6 +174,14 @@ def load_qwen3_5_text_encoder(
 @ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.Qwen35Encoder, format=ModelFormat.Checkpoint)
 class Qwen35EncoderCheckpointLoader(ModelLoader):
     """Loads a single-file Qwen3.5 text encoder and the vendored Qwen3.5 tokenizer."""
+
+    def get_size_fs(
+        self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
+    ) -> int:
+        # A few small tokenizer files, or the vendored one: the generic sizing would charge the whole model.
+        if submodel_type is SubModelType.Tokenizer:
+            return 0
+        return super().get_size_fs(config, model_path, submodel_type)
 
     def _load_model(self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> AnyModel:
         if not isinstance(config, Qwen35Encoder_Checkpoint_Config):

@@ -29,8 +29,10 @@ ControlKind = Literal[
     "qwen_image_control",
     "flux2_control",
 ]
-"""A kind names the graph node webv2 compiles a control layer to, so an architecture with its own control node
-is its own kind -- the Z-Image, Qwen-Image and FLUX.2 Fun branches are the same design and still three kinds."""
+"""A kind is what a control layer's model is, and webv2 compiles each kind to a graph node. A control design of one
+architecture is its own kind -- the Z-Image, Qwen-Image and FLUX.2 Fun branches are the same design and still three
+kinds. `controlnet` and `control_lora` are model types several architectures have, each with its own node, which
+webv2 picks by base."""
 
 SchedulerSet = Literal["standard", "flow", "flow-no-lcm", "anima"]
 """Which family of schedulers to offer. `None` means the architecture drives its own and offers no

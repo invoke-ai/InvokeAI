@@ -6,6 +6,9 @@ export const sanitizeFilename = (name: string): string => name.replace(/[<>:"/\\
 
 export const isSafeUrl = (url: string): boolean => url.startsWith('https://') || url.startsWith('http://');
 
+// Mirrors the backend SourceURL pattern so an import the server would reject fails before any field is applied.
+const SOURCE_LINK_PATTERN = /^https?:\/\/[^\s/?#]+(?:[/?#]\S*)?$/;
+
 export const isImageDataUrl = (value: string): boolean => /^data:image\/[a-zA-Z0-9.+-]+;base64,/.test(value);
 
 export const dataUrlToFile = (dataUrl: string, filename: string): File | null => {
@@ -40,6 +43,7 @@ const IMPORTABLE_FIELDS = [
   'name',
   'description',
   'source_url',
+  'source_urls',
   'default_settings',
   'trigger_phrases',
   'cpu_only',
@@ -58,6 +62,10 @@ export const buildExportData = (model: ModelConfig): Record<string, unknown> => 
 
   if (typeof model.source_url === 'string' && model.source_url.length > 0) {
     data.source_url = model.source_url;
+  }
+
+  if (model.source_urls?.length) {
+    data.source_urls = model.source_urls;
   }
 
   if (model.default_settings !== undefined && model.default_settings !== null) {
@@ -96,6 +104,15 @@ export const validateImportData = (data: unknown): data is Record<string, unknow
     }
 
     if (obj.source_url.length > 0 && !isSafeUrl(obj.source_url)) {
+      return false;
+    }
+  }
+
+  if (obj.source_urls !== undefined && obj.source_urls !== null) {
+    if (
+      !Array.isArray(obj.source_urls) ||
+      !obj.source_urls.every((url) => typeof url === 'string' && SOURCE_LINK_PATTERN.test(url))
+    ) {
       return false;
     }
   }

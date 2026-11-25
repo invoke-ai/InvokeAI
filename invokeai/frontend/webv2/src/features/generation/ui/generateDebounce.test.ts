@@ -12,7 +12,6 @@ import {
   reuseEqualGenerateSettingsValues,
 } from './generateDebounce';
 
-/** Updaters run for both draft and flush; mint IDs outside them. */
 const buildSettings = (referenceImages: GenerateReferenceImage[] = []): GenerateSettings =>
   ({ referenceImages }) as unknown as GenerateSettings;
 
@@ -39,7 +38,6 @@ describe('pending generate settings updates', () => {
     expect(idsOf(draft)).toEqual(['a', 'minted-1']);
     expect(idsOf(committed)).toEqual(['a', 'minted-2']);
 
-    // The rendered ID must match the flushed ID for reordering to work.
     const chained = mergeGenerateSettingsUpdate(pending, (settings) => ({
       ...settings,
       referenceImages: [...moveReferenceImage(settings.referenceImages, 'minted-1', -1)],
@@ -73,7 +71,6 @@ describe('draft selection', () => {
       seed: 1,
       steps: 30,
     } as unknown as GenerateSettings);
-  // The shallow equality the external-store selector hooks apply by default.
   const selectSampling = () => createStableSelector(pickGenerateSettings(['seed', 'steps']));
 
   it('keeps a selection until one of its own fields changes', () => {
@@ -94,7 +91,6 @@ describe('draft selection', () => {
     const draft = createDraft();
     const select = createStableSelector(pickGenerateSettings(['loras']));
     const selected = select(draft.getSnapshot());
-    // A stored-value round trip re-creates arrays that are structurally unchanged.
     const recreated = { ...draft.getSnapshot(), loras: [] };
 
     draft.setSnapshot(reuseEqualGenerateSettingsValues(draft.getSnapshot(), recreated));

@@ -1,7 +1,6 @@
 /**
- * Trim grown paint caches to visible alpha before persistence so erased padding does not become phantom layer
- * bounds. Full-surface synchronous readback runs in debounced flush, outside the stroke hot path, and scales with
- * cache extent.
+ * Trim grown paint caches to visible alpha before persistence so erased padding does not become phantom layer bounds.
+ * Full-surface synchronous readback runs in debounced flush, outside the stroke hot path, and scales with cache extent.
  */
 
 import type { LayerCacheStore } from '@workbench/canvas-engine/render/layerCache';
@@ -10,9 +9,8 @@ import { isEmpty } from '@workbench/canvas-engine/math/rect';
 import { alphaBounds } from '@workbench/canvas-engine/render/alphaBounds';
 
 /**
- * `deferred` — something else owns these pixels; retry later. `emptied` — none
- * visible, cache now zero-rect. `kept` — already tight, or no cache. `trimmed` —
- * cropped smaller.
+ * `deferred` — something else owns these pixels; retry later. `emptied` — none visible, cache now zero-rect. `kept` —
+ * already tight, or no cache. `trimmed` — cropped smaller.
  */
 export type PaintCacheTrim = 'deferred' | 'emptied' | 'kept' | 'trimmed';
 
@@ -30,9 +28,9 @@ export const trimPaintCacheToAlpha = (deps: TrimPaintCacheDeps, layerId: string)
   if (!entry || isEmpty(entry.rect)) {
     return 'kept';
   }
-  // The unpublished/stale guard is correctness, not thrift: the rasterizer sizes the
-  // entry from the persisted rect BEFORE its async decode fills it, so scanning there
-  // would read a blank surface and clear a good bitmap on every document load.
+  // The unpublished/stale guard is correctness, not thrift: the rasterizer sizes the entry from the persisted rect
+  // BEFORE its async decode fills it, so scanning there would read a blank surface and clear a good bitmap on every
+  // document load.
   if (!entry.hasPublishedPixels || entry.stale || deps.isLayerBusy(layerId)) {
     return 'deferred';
   }

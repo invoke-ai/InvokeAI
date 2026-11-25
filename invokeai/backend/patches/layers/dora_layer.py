@@ -33,6 +33,7 @@ class DoRALayer(LoRALayerBase):
         alpha: float | None,
         bias: Optional[torch.Tensor],
         magnitude_is_out_dim: bool = False,
+        direction_norm: torch.Tensor | None = None,
     ):
         super().__init__(alpha, bias)
         self.up = up
@@ -41,6 +42,8 @@ class DoRALayer(LoRALayerBase):
         # False -> LyCORIS convention (magnitude indexes in_features). True -> PEFT/ai-toolkit convention
         # (magnitude indexes out_features).
         self.magnitude_is_out_dim = magnitude_is_out_dim
+        # Application-local shared norm for a split fused input-axis layer; never bound on a cached adapter.
+        self.direction_norm = direction_norm
 
     @classmethod
     def from_state_dict_values(cls, values: Dict[str, torch.Tensor]):
@@ -106,8 +109,14 @@ class DoRALayer(LoRALayerBase):
     def get_weight(self, orig_weight: torch.Tensor) -> torch.Tensor:
         orig_weight = cast_to_device(orig_weight, self.up.device)
 
+        # Form the direction and residual in float32 so low-precision rounding cannot erase a small update.
+        up, down = self.up, self.down
+        if orig_weight.dtype in (torch.float16, torch.bfloat16) or up.dtype in (torch.float16, torch.bfloat16):
+            orig_weight = orig_weight.float()
+            up, down = up.float(), down.float()
+
         # Note: Variable names (e.g. delta_v) are based on the paper.
-        delta_v = self.up.reshape(self.up.shape[0], -1) @ self.down.reshape(self.down.shape[0], -1)
+        delta_v = up.reshape(up.shape[0], -1) @ down.reshape(down.shape[0], -1)
         delta_v = delta_v.reshape(orig_weight.shape)
 
         delta_v = delta_v * self.scale()
@@ -115,7 +124,10 @@ class DoRALayer(LoRALayerBase):
         # At this point, out_weight is the unnormalized direction matrix.
         out_weight = orig_weight + delta_v
 
-        if self.magnitude_is_out_dim:
+        if self.direction_norm is not None:
+            direction_norm = self.direction_norm
+            dora_scale = self.dora_scale
+        elif self.magnitude_is_out_dim:
             # PEFT / ai-toolkit: norm over the input dim, one entry per output row.
             trailing_dims = [1] * (out_weight.dim() - 1)
             direction_norm = (
@@ -139,13 +151,19 @@ class DoRALayer(LoRALayerBase):
         return out_weight - orig_weight
 
     def to(self, device: torch.device | None = None, dtype: torch.dtype | None = None):
+        if self.direction_norm is not None:
+            # Keep the cached factors' precision; get_weight promotes them only while computing the residual.
+            dtype = None
         super().to(device=device, dtype=dtype)
         self.up = self.up.to(device=device, dtype=dtype)
         self.down = self.down.to(device=device, dtype=dtype)
         self.dora_scale = self.dora_scale.to(device=device, dtype=dtype)
+        if self.direction_norm is not None:
+            # Accumulated in float32 across all fused rows; keep that precision with low-precision factors.
+            self.direction_norm = self.direction_norm.to(device=device)
 
     def calc_size(self) -> int:
-        return super().calc_size() + calc_tensors_size([self.up, self.down, self.dora_scale])
+        return super().calc_size() + calc_tensors_size([self.up, self.down, self.dora_scale, self.direction_norm])
 
     def get_parameters(self, orig_parameters: dict[str, torch.Tensor], weight: float) -> dict[str, torch.Tensor]:
         if any(p.device.type == "meta" for p in orig_parameters.values()):

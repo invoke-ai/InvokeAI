@@ -44,12 +44,7 @@ const PreviewDropZoneTarget = ({ isOver, label, zone }: { isOver: boolean; label
   </DropZone>
 );
 
-/**
- * Preview's root, taking media files dragged in from the operating system. While they hover it shows where they go:
- * shown in Preview, and beside it, while Preview shows an image outside live progress and comparison, the compare zone
- * a gallery drag offers there. A drop uploads them as the Gallery does, then shows them (see `importPreviewFileDrop`,
- * loaded on the first drop to keep uploads out of Preview's startup).
- */
+/** Takes dropped OS media files; upload code loads on the first drop to stay out of Preview's startup. */
 export const PreviewDropSurface = ({
   children,
   isComparing,
