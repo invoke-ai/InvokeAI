@@ -79,10 +79,10 @@ const isRefusal = (status: PublishedStatus): status is Extract<CanvasEditRefusal
 
 /**
  * A float is admitted before it cuts anything and keeps that admission until it lands or is dropped; each transform
- * grows it to cover the commit there, so an accepted transform always fits its undo entry. The cut layer's
- * persistence is suspended meanwhile, so the hole never uploads. Commit records pre-lift and post-bake pixels across
- * the hole/landing union with both selections as one undo entry; a commit that cannot be recorded puts the pixels
- * back instead. Cancellation restores pixels without history.
+ * grows it to cover the commit there, so an accepted transform always fits its undo entry. The cut layer's persistence
+ * is suspended meanwhile, so the hole never uploads. Commit records pre-lift and post-bake pixels across the
+ * hole/landing union with both selections as one undo entry; a commit that cannot be recorded puts the pixels back
+ * instead. Cancellation restores pixels without history.
  */
 export class FloatingSelectionController {
   private float: FloatingSelection | null = null;
@@ -110,8 +110,8 @@ export class FloatingSelectionController {
   }
 
   /**
-   * Lifts selected pixels once the edit is admitted. `unavailable` means there is nothing to lift (no selection,
-   * an ineligible layer, no overlap); `refused` means the edit was refused and the refusal reported.
+   * Lifts selected pixels once the edit is admitted. `unavailable` means there is nothing to lift (no selection, an
+   * ineligible layer, no overlap); `refused` means the edit was refused and the refusal reported.
    */
   lift(layerId: string): FloatLiftResult {
     if (this.disposed || this.float) {
@@ -211,8 +211,8 @@ export class FloatingSelectionController {
   }
 
   /**
-   * Accepts the float's live (layer-local) transform once the admission covers a commit there. A transform that
-   * would not fit keeps the last accepted one and reports the refusal once per float.
+   * Accepts the float's live (layer-local) transform once the admission covers a commit there. A transform that would
+   * not fit keeps the last accepted one and reports the refusal once per float.
    */
   setTransform(transform: LayerTransform): boolean {
     const float = this.float;
@@ -240,8 +240,8 @@ export class FloatingSelectionController {
   }
 
   /**
-   * Bakes pixels and moves the selection in one undo entry under the float's admission. An unmoved float restores
-   * its cut pixels without adding history.
+   * Bakes pixels and moves the selection in one undo entry under the float's admission. An unmoved float restores its
+   * cut pixels without adding history.
    */
   commit(): void {
     const float = this.float;
@@ -293,8 +293,8 @@ export class FloatingSelectionController {
 
   private land(float: FloatingSelection, layer: CanvasLayerContract, txn: EditTransaction): void {
     const matrix = bakeMatrix(float.transform);
-    // The patch spans both the hole left behind and where the pixels land, so a
-    // single undo restores both halves of the move.
+    // The patch spans both the hole left behind and where the pixels land, so a single undo restores both halves of the
+    // move.
     const patchRect = union(float.before.rect, roundOut(transformBounds(matrix, float.pixels.rect)));
     const selectionBefore = this.deps.selection.snapshot();
     const existing = this.deps.layers.get(float.layerId);
@@ -304,8 +304,8 @@ export class FloatingSelectionController {
     let before: ImageData | null = null;
     let committed = false;
     try {
-      // Reconstruct the pre-lift pixels over the patch: the live cache is correct
-      // everywhere except the hole, which `before` refills exactly.
+      // Reconstruct the pre-lift pixels over the patch: the live cache is correct everywhere except the hole, which
+      // `before` refills exactly.
       const scratch = this.deps.backend.createSurface(patchRect.width, patchRect.height);
       const sctx = scratch.ctx;
       sctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -333,8 +333,8 @@ export class FloatingSelectionController {
         patchRect.height
       );
 
-      // The ants travel with the pixels inside the same step, so one undo puts
-      // both back; the raw selection records nothing of its own here.
+      // The ants travel with the pixels inside the same step, so one undo puts both back; the raw selection records
+      // nothing of its own here.
       this.moveSelectionWithFloat(layer, matrix, float);
       const selectionAfter = this.deps.selection.snapshot();
 

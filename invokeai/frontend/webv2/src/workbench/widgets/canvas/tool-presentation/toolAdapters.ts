@@ -7,9 +7,15 @@ import { brushForm, eraserForm } from '@workbench/widgets/canvas/tool-options/pa
 import { selectObjectOperationForm } from '@workbench/widgets/canvas/tool-options/SamOptions';
 import { lassoForm, marqueeForm } from '@workbench/widgets/canvas/tool-options/selectionForm';
 import { shapeForm } from '@workbench/widgets/canvas/tool-options/ShapeOptions';
+import { SplineSettings } from '@workbench/widgets/canvas/tool-options/SplineOptions';
 import { textForm } from '@workbench/widgets/canvas/tool-options/textForm';
 
 import type { CanvasOperationKind, OperationPropertyForm, ToolPropertyForm } from './toolFormContracts';
+
+const splineForm: ToolPropertyForm = {
+  id: 'spline',
+  groups: [{ body: SplineSettings, id: 'spline-points', labelKey: 'widgets.layers.vector.pointsTitle' }],
+};
 
 export const TOOL_PRESENTATION_ADAPTERS: Readonly<Record<ToolId, ToolPropertyForm>> = {
   bbox: bboxForm,
@@ -22,6 +28,7 @@ export const TOOL_PRESENTATION_ADAPTERS: Readonly<Record<ToolId, ToolPropertyFor
   move: moveForm,
   sam: { groups: [], id: 'sam' },
   shape: shapeForm,
+  spline: splineForm,
   text: textForm,
   transform: transformForm,
   view: { groups: [], id: 'view' },

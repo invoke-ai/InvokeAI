@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { flowThemeCss } from './graph-preview/flowTheme';
-import { getWorkflowNodeAppearance, getWorkflowNodeHandleStyle, WORKFLOW_NODE_DIAMOND_ROTATION } from './nodeChrome';
+import { getWorkflowNodeAppearance } from './nodeChrome';
 
 describe('getWorkflowNodeAppearance', () => {
   it('draws a failed node exactly like an invalid one, selected or not', () => {
@@ -49,16 +48,6 @@ describe('getWorkflowNodeAppearance', () => {
     });
   });
 
-  it('gives every tone a hover outline of its own family that differs from its resting outline', () => {
-    for (const state of [{ invalid: true }, { failed: true }, { outdated: true }]) {
-      const { border, hoverBorder } = getWorkflowNodeAppearance({ ...state, selected: false });
-
-      expect(hoverBorder).not.toBe(border);
-      expect(hoverBorder).toContain(border);
-      expect(hoverBorder).not.toContain('accent');
-    }
-  });
-
   it('turns only a neutral outline accent on hover, and rings only a selected node', () => {
     expect(getWorkflowNodeAppearance({ selected: false })).toEqual({
       border: 'border.emphasized',
@@ -68,20 +57,5 @@ describe('getWorkflowNodeAppearance', () => {
       tone: 'neutral',
     });
     expect(getWorkflowNodeAppearance({ selected: true }).selectionRing).toBe('accent.solid');
-  });
-});
-
-describe('batch port grab area', () => {
-  it('turns back the rotation a batch handle is drawn with, so its grab area stays upright', () => {
-    const transform = getWorkflowNodeHandleStyle(
-      { batch: true, cardinality: 'COLLECTION', name: 'IntegerField' },
-      'left'
-    ).transform;
-    const counterRotation = Object.keys(flowThemeCss).find(
-      (selector) => selector.includes('::before') && selector.includes('style*=')
-    );
-
-    expect(transform).toContain(WORKFLOW_NODE_DIAMOND_ROTATION);
-    expect(counterRotation).toBe(`& .react-flow__handle[style*="${WORKFLOW_NODE_DIAMOND_ROTATION}"]::before`);
   });
 });

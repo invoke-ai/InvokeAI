@@ -48,7 +48,6 @@ const scope = (
   children: readonly GroupCompositeScope[] = []
 ): GroupCompositeScope => ({ adjustments, blendMode: 'normal', children, end: 1, id, opacity: 1, start: 0 });
 
-/** An executor whose jobs settle when the test says; an `ok` job's pixels all become its 1-based job number. */
 const createManualExecutor = () => {
   const jobs: { settle: (status: SpatialExecutorResult['status']) => void; steps: SpatialExecutorJob['steps'] }[] = [];
   const executor: SpatialAdjustmentExecutor = {
@@ -74,10 +73,8 @@ const flush = async () => {
   }
 };
 
-/** Member `b`'s cache: inside `a`'s, so editing or nudging it leaves the group bounds alone. */
 const B_RECT = { height: 2, width: 3, x: 2, y: 1 };
 
-/** Member `a` in group `g`, plus `b` for `showPair`; nested setups put `inner` around `a` inside `outer`. */
 const setup = (ancestors: Readonly<Record<string, readonly string[]>> = {}) => {
   const { executor, jobs } = createManualExecutor();
   const backend = createTestStubRasterBackend({ readbackAlpha: 255 });
@@ -92,7 +89,6 @@ const setup = (ancestors: Readonly<Record<string, readonly string[]>> = {}) => {
   });
   const diagnostics = createCanvasDiagnostics(true);
   const memberStates = new Map<string, DisplayedPixelsState>();
-  /** The stack each member was last read with. */
   const memberStacks = new Map<string, CanvasAdjustmentsContract | undefined>();
   const settled: string[] = [];
   const statuses: [string, AdjustedSurfaceStatus | null][] = [];
@@ -111,7 +107,6 @@ const setup = (ancestors: Readonly<Record<string, readonly string[]>> = {}) => {
     },
     getCacheEntry: (layerId) => layers.get(layerId),
     spatial: {
-      // Mirrors the engine: a landing redraws the groups holding the owner, never the owner itself.
       onSettle: (groupId) => {
         settled.push(groupId);
         groups.invalidate(ancestors[groupId] ?? []);
@@ -121,7 +116,6 @@ const setup = (ancestors: Readonly<Record<string, readonly string[]>> = {}) => {
     },
   });
   const show = (target: GroupCompositeScope) => groups.get(target, [leaf('a')], [identity()], NO_CONTENT)!;
-  /** Draws `a` under `b` in a two-member group. */
   const showPair = (stack: CanvasAdjustmentsContract, b: SemanticLeaf, bMatrix: Mat2d = identity()) =>
     groups.get({ ...scope('g', stack), end: 2 }, [leaf('a'), b], [identity(), bMatrix], NO_CONTENT)!;
   const rawPaints = () => {
@@ -143,7 +137,6 @@ const setup = (ancestors: Readonly<Record<string, readonly string[]>> = {}) => {
   };
 };
 
-/** The first byte of the last whole-surface write: 0 for a per-pixel interim, a job number for a result. */
 const shownTag = (surface: StubRasterSurface): number => {
   const writes = surface.callLog.filter(
     (call) => call.op === 'putImageData' && (call.args[0] as ImageData).width === W && call.args[1] === 0
@@ -151,7 +144,6 @@ const shownTag = (surface: StubRasterSurface): number => {
   return (writes[writes.length - 1]!.args[0] as ImageData).data[0]!;
 };
 
-/** Source regions drawn into a surface, as [x, y, width, height]. */
 const sourceReads = (surface: StubRasterSurface) =>
   surface.callLog
     .filter((call) => call.op === 'drawImage' && call.args.length === 9)
@@ -245,7 +237,6 @@ describe('spatial group surfaces', () => {
     const adjusted = h.surfaces[1]!;
     const reads = sourceReads(adjusted).length;
 
-    // The member's result landed: the engine redraws the group without any member version change.
     h.memberStates.set('a', 'exact');
     h.groups.invalidate(['g']);
     expect(h.show(scope('g', clarity(50))).state).toBe('pending');
@@ -311,16 +302,13 @@ describe('spatial group surfaces', () => {
     expect(h.show(scope('g', clarity(50))).state).toBe('inexact');
     expect(h.jobs).toHaveLength(1);
 
-    // Edited to a per-pixel stack: the group reports the slot it now draws, which has no adjusted surface.
     const perPixel = h.show(scope('g', [{ id: 'inv', isEnabled: true, type: 'invert' }]));
     expect(perPixel.state).toBe('exact');
     expect(h.statuses.at(-1)).toEqual(['g', null]);
     expect(h.groups.byteSize()).toBe(3 * W * H * 4);
 
-    // Undone: the warm spatial slot still knows its target cannot run.
     h.show(scope('g', clarity(50)));
     expect(h.statuses.at(-1)).toEqual(['g', 'too-large']);
-    // No longer drawn at all (disabled, or its stack reset): only `retainSpatial` can tell.
     h.groups.retainSpatial(() => false);
     expect(h.statuses.at(-1)).toEqual(['g', null]);
     expect(h.groups.byteSize()).toBe(W * H * 4);
@@ -336,7 +324,6 @@ describe('spatial group surfaces', () => {
     const target = scope('g', clarity(50));
     const frame = () => h.groups.get(target, [leaf('a')], [identity()], previewed, { frame: true })!;
 
-    // The frame shows a filter preview on `a`; the overview composites the committed pixels in another slot.
     frame();
     h.show(target);
     expect(h.statuses).toEqual([['g', 'computing']]);
@@ -399,7 +386,6 @@ describe('spatial group surfaces', () => {
     const brighten = (brightness: number): CanvasAdjustmentsContract => [
       { brightness, contrast: 0, id: 'bc', isEnabled: true, type: 'brightness-contrast' },
     ];
-    /** `b`'s bounds plus one pixel of antialiasing, clamped to the group: what its edits repaint. */
     const B_REGION = [1, 0, 5, 4];
 
     const settledPair = async (b: SemanticLeaf = leaf('b')) => {
@@ -424,7 +410,6 @@ describe('spatial group surfaces', () => {
       await vi.advanceTimersByTimeAsync(SPATIAL_CONTENT_DEBOUNCE_MS);
       expect(h.jobs).toHaveLength(2);
 
-      // Changed again while that job runs: its result lands as an interim, never as exact.
       const faded = leaf('b', { adjustments: brighten(0.2), opacity: 0.5 });
       h.showPair(clarity(50), faded);
       expect(sourceReads(h.adjusted).at(-1)).toEqual(B_REGION);

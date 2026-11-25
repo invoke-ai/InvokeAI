@@ -67,12 +67,20 @@ def _service() -> WorkingMemoryCalibrationServiceBase:
     return service
 
 
+def coded_conflict(
+    error: CalibrationAttemptBusyError | CalibrationAttemptInterleavedError | CalibrationModelChangedError,
+) -> HTTPException:
+    """The 409 of a calibration refusal a client acts on: coded, as other routes' refusals a client acts on are, as
+    `{"code": ..., "message": ...}` in `detail`, which tells these 409s from the others. Also the queue's retry
+    route's, which refuses a retry of calibration items that would break attempt exclusivity."""
+    return HTTPException(status_code=409, detail={"code": error.code, "message": str(error)})
+
+
 def _http_error(error: Exception) -> HTTPException:
     if isinstance(
         error, (CalibrationAttemptBusyError, CalibrationAttemptInterleavedError, CalibrationModelChangedError)
     ):
-        # Coded, as other routes' refusals a client acts on are: it tells these 409s from the others.
-        return HTTPException(status_code=409, detail={"code": error.code, "message": str(error)})
+        return coded_conflict(error)
     if isinstance(error, (CalibrationRunNotFoundError, UnknownModelException)):
         return HTTPException(status_code=404, detail=str(error))
     if isinstance(error, CalibrationGraphError):

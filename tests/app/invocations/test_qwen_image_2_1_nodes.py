@@ -788,13 +788,19 @@ def test_the_metadata_records_whether_the_prefix_was_cached(cache_fits: bool, mo
     node = _denoise(
         reference_latents=LatentsField(latents_name="ref"),
         cfg_scale=4.0,
-        metadata=MetadataField.model_validate({"seed": 7, "steps": 3}),
+        seed=7,
+        steps=3,
+        metadata=MetadataField.model_validate({"positive_prompt": "a cat"}),
     )
 
     output = node.invoke(context)
 
-    # What the graph recorded passes through, with the mode this run took beside it.
-    assert output.metadata.root == {"seed": 7, "steps": 3, PREFIX_CACHE_METADATA_KEY: cache_fits}
+    # What the graph recorded passes through, with the denoise fields and cache mode beside it.
+    assert output.metadata.root["positive_prompt"] == "a cat"
+    assert output.metadata.root["seed"] == 7
+    assert output.metadata.root["steps"] == 3
+    assert output.metadata.root["cfg_scale"] == 4.0
+    assert output.metadata.root[PREFIX_CACHE_METADATA_KEY] is cache_fits
     assert (output.latents.latents_name, output.width, output.height) == ("out", 64, 64)
 
 
@@ -1607,6 +1613,28 @@ def test_a_sidecar_reserves_what_its_forward_allocates(kinds: list[str], monkeyp
     weight_copy = _W * _W * torch.float32.itemsize
     beyond_cpu = max(_CUDA_ONLY_COPIES.get(kind, 0) for kind in kinds) * weight_copy
     assert abs(reserved - beyond_cpu - mode.peak) < weight_copy / 2, (reserved / weight_copy, mode.peak / weight_copy)
+
+
+@pytest.mark.parametrize("kind", ["peft-dora", "lycoris-dora"])
+@torch.no_grad()
+def test_bfloat16_sidecar_reserves_promoted_dora_workspace(kind: str) -> None:
+    # The base cast lives alongside the FP32 DoRA calculation. Measure that calculation with
+    # actual BF16 factors and base, and include the already-materialized BF16 base in the bound.
+    transformer = torch.nn.Module()
+    block = torch.nn.Module()
+    block.attn = torch.nn.Module()
+    block.attn.to_q = torch.nn.Linear(_W, _W, bias=False, dtype=torch.bfloat16)
+    transformer.transformer_blocks = torch.nn.ModuleList([block])
+    patch = _sidecar_kind(kind)
+    patch.to(dtype=torch.bfloat16)
+    layer = next(iter(patch.layers.values()))
+    base = block.attn.to_q.weight
+    mode = _PeakAllocation()
+    with mode:
+        layer.get_parameters({"weight": base}, 1.0)
+
+    reserved = _reserve(patch, transformer, seq_len=2, dtype=torch.bfloat16)
+    assert reserved >= patch.calc_size() + base.nbytes + mode.peak
 
 
 def test_a_dora_lora_runs_on_an_int8_transformer(monkeypatch: pytest.MonkeyPatch) -> None:

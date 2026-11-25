@@ -26,8 +26,8 @@ export const SettingLayerIndicator = ({ label, layer }: { label: string; layer: 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const handleOpenChange = useCallback((details: { open: boolean }) => setIsMenuOpen(details.open), []);
   const trigger = useRef<HTMLButtonElement>(null);
-  // Every action returns the row to following its default, which removes this indicator and the trigger the menu
-  // would restore focus to: focus goes to the row's control instead (`data-setting-control` marks the row).
+  // Every action returns the row to following its default, which removes this indicator and the trigger the menu would
+  // restore focus to: focus goes to the row's control instead (`data-setting-control` marks the row).
   const select = useCallback(
     (action: () => void) => () => {
       const row = trigger.current?.closest('[data-setting-control]');
@@ -57,9 +57,10 @@ export const SettingLayerIndicator = ({ label, layer }: { label: string; layer: 
   }
 
   return (
-    // Inline with fixed positioning, as the setting Select is: fixed escapes the gear popover's scroll area, and staying
-    // inside the modal dialog's DOM keeps its focus scope from pulling focus out of the menu and dismissing it. Mounted
-    // up front: a menu mounted on first open let the dialog's focus scope claim focus for a frame before the menu did.
+    // Inline with fixed positioning, as the setting Select is: fixed escapes the gear popover's scroll area, and
+    // staying inside the modal dialog's DOM keeps its focus scope from pulling focus out of the menu and dismissing it.
+    // Mounted up front: a menu mounted on first open let the dialog's focus scope claim focus for a frame before the
+    // menu did.
     <Menu.Root ids={ids} positioning={MENU_POSITIONING} onOpenChange={handleOpenChange}>
       {/* Quiet while the menu is open: it opens below the dot, where the tooltip would cover its first item. */}
       <Tooltip

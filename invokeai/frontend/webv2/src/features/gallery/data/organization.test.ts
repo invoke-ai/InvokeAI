@@ -210,7 +210,10 @@ describe('galleryItemOrganization transport and confirmed outcomes', () => {
       failed: [imageRef('gone.png'), videoRef('locked.mp4')],
       succeeded: [videoRef('gone.mp4')],
     });
-    expect(mocks.apiFetchJson).toHaveBeenCalledTimes(2);
+    expect(mocks.apiFetchJson.mock.calls.map(([url]) => url).filter((url) => url.endsWith('/delete'))).toEqual([
+      '/api/v1/images/delete',
+      '/api/v1/videos/delete',
+    ]);
   });
 
   it('moves mixed media to a real board once per deduplicated item and ignores unconfirmed response effects', async () => {

@@ -15,7 +15,6 @@ const pointer = (x: number, y: number, timeStamp = 0): PointerInput => ({
   timeStamp,
 });
 
-// Identity viewport: document and screen coordinates coincide.
 const ctx = { viewport: { documentToScreen: (p: { x: number; y: number }) => p } } as unknown as ToolContext;
 
 describe('polylineSession', () => {

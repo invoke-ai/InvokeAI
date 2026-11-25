@@ -30,7 +30,6 @@ afterEach(async () => {
   delete document.documentElement.dataset.reduceMotion;
 });
 
-/** An island holding `row`, in a parent `width` pixels wide. */
 const mountIsland = async (row: ReactNode, { dir = 'ltr', width }: { dir?: 'ltr' | 'rtl'; width: number }) => {
   const tree = (nextRow: ReactNode) => (
     <I18nextProvider i18n={i18n}>
@@ -65,7 +64,6 @@ const controls = (count: number, props: ComponentProps<typeof Box> = {}) =>
     <Box key={index} aria-label={`Control ${index + 1}`} as="button" boxSize="6" flexShrink={0} {...props} />
   ));
 
-/** An island holding `count` 24px controls, in a parent `width` pixels wide. */
 const renderIsland = async ({ count, dir, width }: { count: number; dir?: 'ltr' | 'rtl'; width: number }) => {
   const { rerender } = await mountIsland(controls(count), { dir, width });
 
@@ -95,7 +93,6 @@ describe('ChromeIsland overflow', () => {
     expect(scrollRange()).toBeGreaterThan(0);
     expect(shownCues()).toEqual(['end']);
     expect(cueButton('end')?.getAttribute('aria-label')).toBe('Scroll to end');
-    // A pointer shortcut only: Tab moves through the controls themselves.
     expect(cueButton('end')?.tabIndex).toBe(-1);
   });
 
@@ -114,7 +111,6 @@ describe('ChromeIsland overflow', () => {
     });
     expect(shownCues()).toEqual(['start']);
 
-    // The island is already at its widest: only the row's content changes size.
     await rerender(14);
 
     expect(shownCues()).toEqual(['start', 'end']);
@@ -183,7 +179,6 @@ describe('ChromeIsland overflow', () => {
   it('scrolls toward the inline end of a right-to-left row', async () => {
     await renderIsland({ count: 12, dir: 'rtl', width: 160 });
     expect(shownCues()).toEqual(['end']);
-    // The hidden controls, and the cue pointing at them, sit on the left.
     expect(cue('end')!.getBoundingClientRect().left).toBe(island().getBoundingClientRect().left + 1);
 
     await userEvent.click(cueButton('end')!);
@@ -192,7 +187,6 @@ describe('ChromeIsland overflow', () => {
     await expect.poll(shownCues).toEqual(['start']);
   });
   it('cues the end when nested text grows past a control that keeps its size', async () => {
-    // A fixed-width counter whose text overflows it: no control resizes, only the row's scrollable width grows.
     const counter = (text: string) => (
       <>
         {controls(4)}
@@ -220,7 +214,6 @@ describe('ChromeIsland overflow', () => {
     expect(scroller().scrollLeft).toBe(40);
     expect(shownCues()).toEqual(['start', 'end']);
 
-    // The cues take the pointer over the row's ends, yet a wheel or swipe over one still scrolls the row.
     await act(async () => {
       cue('end')!.dispatchEvent(new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: 40 }));
       await nextFrame();
@@ -243,7 +236,6 @@ describe('ChromeIsland overflow', () => {
     const fade = cue('end')!.getBoundingClientRect();
     const fadeX = fade.left + 4;
     const centerY = fade.top + fade.height / 2;
-    // A control does sit under the fade's open side, half hidden.
     expect(control(5).getBoundingClientRect().right).toBeGreaterThan(fadeX);
 
     expect(

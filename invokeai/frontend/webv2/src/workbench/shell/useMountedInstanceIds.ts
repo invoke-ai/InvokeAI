@@ -3,11 +3,7 @@ import { useState } from 'react';
 /** Bound kept mounts because each retains DOM and widgets may retain decoded images and measurement caches. */
 export const MOUNTED_INSTANCE_LIMIT = 3;
 
-/**
- * Remember recently shown instances independently of replaced region membership. Reset on project id because
- * instance ids repeat across projects. State is ephemeral; closing hides rather than destroys retained instances,
- * bounded by limit.
- */
+/** Recently shown instances, reset per project because instance ids repeat across projects. */
 export const useMountedInstanceIds = (
   activeId: string | undefined,
   resetKey: string,
@@ -30,10 +26,7 @@ export const useMountedInstanceIds = (
   return next;
 };
 
-/**
- * Exclude instances active in another region or floating window to prevent hidden duplicate mounts. Consult
- * active/floating ids, not preset-replaced membership lists.
- */
+/** Excludes instances active in another region or floating window, so none mounts twice. */
 export const withoutInstancesShownElsewhere = (
   mountedIds: string[],
   activeId: string | undefined,

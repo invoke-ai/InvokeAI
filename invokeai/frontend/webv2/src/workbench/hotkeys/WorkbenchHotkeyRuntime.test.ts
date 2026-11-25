@@ -44,7 +44,6 @@ describe('shouldPreventHotkeyDefault', () => {
   });
 
   it('prevents the browser default for a matched binding with no explicit preventDefault', () => {
-    // Claimed widget bindings must prevent browser defaults even without an explicit preventDefault flag.
     expect(shouldPreventHotkeyDefault(createHotkey({}))).toBe(true);
   });
 
@@ -64,8 +63,6 @@ describe('shouldPreventHotkeyDefault', () => {
     }
     vi.stubGlobal('HTMLElement', FakeHTMLElement);
 
-    // A canvas-scoped binding claimed by an active canvas widget, registered
-    // without an explicit preventDefault (like the real widget registrations).
     const canvasDeselect: RegisteredHotkey = createHotkey({
       allowInEditable: false,
       commandId: 'canvas.deselect',
@@ -82,7 +79,6 @@ describe('shouldPreventHotkeyDefault', () => {
       projectId: 'project-1',
     };
 
-    // Non-editable target: the binding resolves and must prevent the default.
     const matched = resolveHotkey({
       context,
       event: { target: null } as KeyboardEvent,
@@ -92,8 +88,6 @@ describe('shouldPreventHotkeyDefault', () => {
     expect(matched?.commandId).toBe('canvas.deselect');
     expect(shouldPreventHotkeyDefault(matched)).toBe(true);
 
-    // Editable target: the binding is skipped (allowInEditable: false) so the
-    // event is left alone and the browser default is untouched.
     const skipped = resolveHotkey({
       context,
       event: { target: new FakeHTMLElement() } as unknown as KeyboardEvent,

@@ -5,21 +5,19 @@ import type {
 } from '@features/generation/core/contracts';
 import type { BaseGenerationConfig, GuidanceLabel } from '@features/generation/core/generationConfig';
 
-import {
-  getArchitectureFeatures,
-  getArchitectureGenerationConfig,
-  hasArchitectureCapabilities,
-} from '@features/generation/core/architectureCapabilities';
+import { getArchitectureGenerationConfig } from '@features/generation/core/architectureGenerationConfig';
 import {
   isSupportedGenerateBase,
   SUPPORTED_GENERATE_BASES,
   type SupportedGenerateBase,
 } from '@features/generation/core/supportedBases';
+import { getArchitectureFeatures, hasArchitectureCapabilities } from '@features/models/architectures';
 import { areJsonValuesStructurallyEqual } from '@platform/core/json';
 import { SEED_MAX } from '@platform/core/seed';
 
 import type {
   ExpandPromptSuggestion,
+  ComponentModelConfig,
   ExternalGenerationMode,
   GenerateLora,
   GenerateModelConfig,
@@ -56,12 +54,17 @@ import {
   isIdeogram4UnconditionalBranch,
   isMossImageQwen35Encoder,
   isQwen3Vl4bEncoder,
+  doesWanSourceSupplyVae,
+  hasWanLowNoiseSlot,
   isSelfContainedSDNQFlux1Pipeline,
   isVaeAcceptedByBase,
+  isWanLowNoiseExpertFor,
   isVaeCompatibleWithGenerateModel,
   isZImageQwen3Encoder,
+  servesAsType,
   type GenerateComponentFilter,
 } from './componentCompatibility';
+import { DEFAULT_COMPONENT_SLOTS, type DefaultComponentSlot, getDefaultComponentSlot } from './componentDefaults';
 import { MAX_DIMENSION, MIN_DIMENSION } from './dimensionLimits';
 import { DEFAULT_DYNAMIC_PROMPTS_SETTINGS } from './dynamicPrompts';
 import {
@@ -121,14 +124,15 @@ import {
   isGenerateSettings,
   isLoraCompatibleWithModel,
   isSameInstalledModel,
+  isMainModelConfig,
+  isModelIdentifierConfig,
+  isVaeModelConfig,
   isValidKrea2RebalanceWeights,
   isValidMossImageSkipLayers,
   KREA2_REBALANCE_WEIGHT_COUNT,
   MAX_MOSS_IMAGE_SKIP_LAYER,
   normalizeGenerateSettings,
 } from './settings';
-
-// Models owns display identity; graph.ts owns graph topology.
 
 export interface SchedulerOption {
   value: string;
@@ -241,7 +245,7 @@ const getBaseGenerationConfig = (
 /** Pixel-exact: hosted providers bucket requests to their own size tables, which are not grid-aligned. */
 const EXTERNAL_DIMENSION_GRID = 1;
 
-/** Use variant-aware grids; return null for undescribed local architectures. External providers have no grid. */
+/** Variant-aware; null for undescribed local architectures. */
 export const getDimensionGrid = (base: string, variant?: unknown): number | null =>
   base === 'external' ? EXTERNAL_DIMENSION_GRID : (getArchitectureFeatures(base, variant)?.dimension_grid ?? null);
 
@@ -252,13 +256,11 @@ export const isArchitectureDescribed = (model: Pick<GenerateModelConfig, 'base' 
 const getNumber = (value: number | null | undefined, fallback: number): number =>
   Number.isFinite(value) && value !== null && value !== undefined ? value : fallback;
 
-/** Hold a guidance value to what the architecture's denoise node accepts. */
 const clampGuidance = (value: number, guidance: BaseGenerationConfig['guidance']): number =>
   Math.min(guidance.max ?? Number.POSITIVE_INFINITY, Math.max(guidance.min, value));
 
 /** Native PiD uses model grid × 4 and a 2048 target optimum. */
 export const getGenerationDimensions = (
-  // Use the variant-specific optimum, or the base row when no variant is supplied.
   model: (Pick<GenerateModelConfig, 'base' | 'type'> & { variant?: unknown }) | undefined,
   pidMode: PidMode = 'off'
 ) => {
@@ -278,7 +280,6 @@ export const getGenerationDimensions = (
   };
 };
 
-/** guidanceLabel selects between guidance and cfg_scale defaults. */
 const getRecordGuidanceValue = (
   defaults: GenerateDefaultSettings | undefined,
   guidanceLabel: GuidanceLabel
@@ -338,7 +339,7 @@ export const coerceSchedulerForGraph = (
 ): string => {
   const config = getBaseGenerationConfig(model);
 
-  // Some graph builders ignore scheduler entirely; coerce to stable metadata/defaults instead of leaking stale UI state.
+  // Some graph builders ignore scheduler; use the default so stale UI state never leaks into metadata.
   if (!config.schedulerAppliesToGraph) {
     return config.defaults.scheduler;
   }
@@ -386,10 +387,7 @@ export const getPromptPolicy = (
 
 const HF_REPO_SOURCE = /^([A-Za-z0-9][\w.-]*\/[\w.-]+)(?::[\w.-]+)?$/;
 
-/**
- * Whether an installed model's source is the Hugging Face repo `repoId`: the repo itself (also with a `:variant` or
- * `::subfolder` suffix), a huggingface.co URL, or a local folder named like the repo. Matching is case-insensitive.
- */
+/** The repo id (with `:variant`/`::subfolder`), a huggingface.co URL, or a local folder named like it; any case. */
 export const isModelFromRepo = (source: string | null | undefined, repoId: string): boolean => {
   if (!source) {
     return false;
@@ -410,16 +408,12 @@ export const isModelFromRepo = (source: string | null | undefined, repoId: strin
   return folder.toLowerCase() === wanted.split('/').pop();
 };
 
-/**
- * Whether an installed model's source is the single file `fileName`: a Hugging Face file URL or a local path ending in
- * it. Case-insensitive.
- */
+/** A Hugging Face file URL or a local path ending in `fileName`; case-insensitive. */
 const isModelFromFile = (source: string | null | undefined, fileName: string): boolean => {
   const file = source?.split('::')[0]!.split(/[?#]/)[0]!.split(/[/\\]/).pop();
   return Boolean(file) && file!.toLowerCase() === fileName.toLowerCase();
 };
 
-/** Whether an installed model's source is the model Expand Prompt suggests, in any of its builds. */
 export const isSuggestedExpandPromptModel = (
   source: string | null | undefined,
   suggestion: Pick<ExpandPromptSuggestion, 'modelFileNames' | 'modelSource'>
@@ -427,15 +421,12 @@ export const isSuggestedExpandPromptModel = (
   (suggestion.modelSource !== null && isModelFromRepo(source, suggestion.modelSource)) ||
   (suggestion.modelFileNames ?? []).some((fileName) => isModelFromFile(source, fileName));
 
-/** A family's released prompt enhancer, which Expand Prompt preselects for a text-only rewrite. */
 interface ImagePromptEnhancer {
   /** Starter source of the enhancer model; an installed text LLM with this source is preselected. */
   modelSource: string;
   /** Single-file builds of the same model, which Expand Prompt preselects too. */
   modelFileNames?: readonly string[];
-  /** The starter model's name, for the hint shown when it is not installed. */
   modelName: string;
-  /** Seeded public system prompt. */
   systemPromptId: string;
 }
 
@@ -446,8 +437,7 @@ const IMAGE_PROMPT_ENHANCERS: Partial<Record<string, ImagePromptEnhancer>> = {
     modelSource: 'google/gemma-4-E4B-it',
     systemPromptId: '0f8f5b2e-1c9e-4f2a-9a4e-1f1f1f1f0011',
   },
-  // The text-only rewrite uses BFL's `t2i` system prompt; reference images and boxes only reach the upsampler node.
-  // The bf16 folder and ComfyUI's two single files (int8 convrot, bf16) are the same model.
+  // Text-only rewrites use BFL's `t2i` prompt. The bf16 folder and ComfyUI's int8/bf16 single files are one model.
   flux3: {
     modelFileNames: [
       'qwen3.5_9b_flux3_prompt_upsampler_int8_convrot.safetensors',
@@ -459,7 +449,6 @@ const IMAGE_PROMPT_ENHANCERS: Partial<Record<string, ImagePromptEnhancer>> = {
   },
 };
 
-/** What Expand Prompt starts from for this image family, or null when the family ships no enhancer. */
 export const getImageExpandPromptSuggestion = (
   model: GenerateModelConfig | undefined
 ): ExpandPromptSuggestion | null => {
@@ -508,14 +497,23 @@ export const isSupportedGenerateModel = <T extends { base: string; type: string 
   (model.type === 'main' && isSupportedGenerateBase(model.base)) ||
   (model.type === 'external_image_generator' && model.base === 'external');
 
-/**
- * Exclude unconditional Ideogram branches from selection but retain lookup support. Wan's other expert can span
- * the full schedule.
- */
+/** Unconditional Ideogram branches stay resolvable but unselectable; Wan's other expert can span the schedule. */
 export const isGenerateModelSelectable = <T extends ModelConfig>(model: T): model is T & GenerateModelConfig =>
   isSupportedGenerateModel(model) && !isIdeogram4UnconditionalBranch(model);
 
-/** Pure prompt-history recall patch shared by keyboard and palette entry points. */
+/**
+ * The model a fresh project starts on, or the Generate form falls back to when none is chosen: the first one Generate
+ * can select as a main model (so no standalone Ideogram 4 branch) whose files are present, else the first. Where a
+ * model is stored or chosen, that one stays.
+ */
+export const pickFallbackGenerateModel = <T extends ModelConfig>(
+  models: readonly T[]
+): (T & GenerateModelConfig) | undefined => {
+  const selectable = models.filter(isGenerateModelSelectable);
+
+  return selectable.find((model) => !model.is_missing) ?? selectable[0];
+};
+
 export const getPromptHistoryRecallPatch = ({
   item,
   models,
@@ -686,30 +684,21 @@ export const getSettingsWithModelDefaults = (
   };
 };
 
-/** The VAE a model's defaults choose, classified; each context states what it does with `missing`. */
 export type ModelDefaultVae =
   /** Sets none, or the "default" sentinel where the VAE is a required component with nothing bundled. */
   | { kind: 'none' }
-  /**
-   * Names a VAE that is not installed or does not fit the model. `hasBundledVae` says whether the model and settings
-   * have a bundled VAE to fall back to (the VAE component is not required).
-   */
+  /** Not installed or does not fit; `hasBundledVae` says whether a bundled VAE can stand in. */
   | { kind: 'missing'; hasBundledVae: boolean }
   /** `null` is the bundled VAE, which the "default" sentinel asks for wherever there is one. */
   | { kind: 'apply'; vae: VaeModelConfig | null };
 
-/** Whether the model and settings need a VAE component, having no bundled VAE (or component source) to use. */
 const isVaeComponentRequired = (model: MainModelConfig, settings: GenerateSettings): boolean => {
   const vaeSlotPolicy = getComponentSectionPolicy(model, settings).slots.find((slotPolicy) => slotPolicy.key === 'vae');
 
   return Boolean(vaeSlotPolicy?.required?.(getComponentPolicyContext(model, settings)));
 };
 
-/**
- * The one classification of a model's default VAE. The Model Manager stores "default" when the VAE default is on with
- * no VAE picked: that is the bundled VAE, which only a model whose VAE is a required component lacks. Requiredness
- * follows the component policy, so it reads the settings (a component source can bundle one).
- */
+/** "default" is the bundled VAE; requiredness reads settings, since a component source can bundle one. */
 export const resolveModelDefaultVae = (
   model: GenerateModelConfig,
   settings: GenerateSettings,
@@ -721,6 +710,13 @@ export const resolveModelDefaultVae = (
     return { kind: 'none' };
   }
 
+  // A graph that loads no VAE pick (a self-contained pipeline's own decodes) takes no default either.
+  const vaeSlot = getComponentSectionPolicy(model, settings).slots.find((slotPolicy) => slotPolicy.key === 'vae');
+
+  if (vaeSlot?.neverLoaded?.(getComponentPolicyContext(model, settings))) {
+    return { kind: 'none' };
+  }
+
   const hasBundledVae = !isVaeComponentRequired(model, settings);
 
   if (key === '' || key === 'default') {
@@ -728,18 +724,13 @@ export const resolveModelDefaultVae = (
   }
 
   const vae = vaeModels.find(
-    (candidate) => candidate.key === key && isVaeCompatibleWithGenerateModel(model, candidate)
+    (candidate) => candidate.key === key && !candidate.is_missing && isVaeCompatibleWithGenerateModel(model, candidate)
   );
 
   return vae ? { kind: 'apply', vae } : { kind: 'missing', hasBundledVae };
 };
 
-/**
- * Recall's policy (a model switch from recalled parameters or an image, and graph export): the model's default VAE,
- * else the bundled VAE when the default cannot apply, as recall always did, so an image made with the bundled VAE is
- * reproduced. Only where the VAE is required and nothing is bundled does the current VAE stay (`undefined`), since
- * clearing it would leave the form unable to run.
- */
+/** Recall: default VAE, else bundled, so bundled-VAE images reproduce; `undefined` keeps a required current VAE. */
 export const getRecallDefaultVae = (defaultVae: ModelDefaultVae): VaeModelConfig | null | undefined =>
   defaultVae.kind === 'apply'
     ? defaultVae.vae
@@ -768,7 +759,6 @@ export type GenerateComponentValueKey =
   | 'gemma2EncoderModel'
   | 'vae';
 
-/** The settings component slot rules read beyond the selected components themselves. */
 export type ComponentPolicySettings = Pick<
   GenerateSettings,
   | 'animaInpaintAdapterEnabled'
@@ -795,17 +785,15 @@ export interface ComponentSlotPolicy {
   defaultOpen?: boolean;
   filter?: (candidate: ModelConfig, ctx: ComponentPolicyContext) => boolean;
   required?: (ctx: ComponentPolicyContext) => boolean;
-  /**
-   * Whether a generation may load the selection. A slot behind a switch keeps its selection while the switch is off,
-   * and nothing loads it then, so a kept selection that is no longer installed does not block Invoke. Absent, a set
-   * selection is always in use.
-   */
+  /** False while the slot's switch is off: nothing loads a kept selection, so an uninstalled one does not block. */
   inUse?: (ctx: ComponentPolicyContext) => boolean;
-  missingMessage?: string;
   /**
-   * Reported whenever the selected value fails `filter`, required or not, so a saved selection the graph cannot use
-   * blocks Invoke by name instead of being dropped in favour of a component source.
+   * The model's graph loads no pick for the slot whatever the switches (a self-contained pipeline takes its bundled
+   * components), so a default stored for it would do nothing and the Model Manager does not offer it.
    */
+  neverLoaded?: (ctx: ComponentPolicyContext) => boolean;
+  missingMessage?: string;
+  /** Reported even when optional, so a saved unusable selection blocks Invoke by name instead of silently dropping. */
   incompatibleMessage?: string;
 }
 
@@ -816,11 +804,7 @@ export interface ComponentSectionPolicy {
   rules?: (ctx: ComponentPolicyContext) => string[];
 }
 
-/**
- * What a model switch does to one choice the user made. `turnedOff` keeps it and the new model just does not run it,
- * so switching back runs it again; `adjusted` moves a value into the new model's range; `removed` clears a selection
- * and `reset` returns a value to its default, both lost for good once the switch is kept.
- */
+/** `turnedOff` returns on switching back; `removed` and `reset` are lost for good once the switch is kept. */
 export type GenerateModelSwitchChangeKind = 'adjusted' | 'removed' | 'reset' | 'turnedOff';
 
 export type GenerateModelSwitchSubject =
@@ -838,15 +822,13 @@ export type GenerateModelSwitchSubject =
 export interface GenerateModelSwitchChange {
   kind: GenerateModelSwitchChangeKind;
   subject: GenerateModelSwitchSubject;
-  /** How many items of a list (concepts, reference images) it affects. */
   count?: number;
 }
 
 export interface GenerateModelSelectionResult {
   settings: GenerateSettings;
-  /** Choices the switch changes, which callers confirm or report. */
   changes: readonly GenerateModelSwitchChange[];
-  /** The size moved to the model's grid or provider sizes. Nothing is lost and it stays on screen, so it is reported. */
+  /** Nothing is lost and it stays on screen, so it is reported rather than confirmed. */
   dimensionsAdjusted: boolean;
 }
 
@@ -965,7 +947,7 @@ const animaInpaintAdapterSlot = (): ComponentSlotPolicy =>
 
 const isFlux3PromptUpsamplerOn = (ctx: ComponentPolicyContext): boolean => ctx.settings.flux3PromptUpsamplerEnabled;
 
-/** Exposed before the switch is on, like PiD's; required only while it is. The node reads images, so the model must see them. */
+/** Exposed before the switch is on, like PiD's; the node reads images, so the model must see them. */
 const flux3PromptUpsamplerSlot = (): ComponentSlotPolicy =>
   slot({
     key: 'flux3PromptUpsamplerModel',
@@ -1011,7 +993,6 @@ const gemma2EncoderSlot = (): ComponentSlotPolicy =>
     missingMessage: 'Generate needs a Gemma-2 encoder while PiD is on.',
   });
 
-/** The PiD slots, for splicing into a PiD-capable base's component list. */
 const pidSlots = (): ComponentSlotPolicy[] => [pidDecoderSlot(), gemma2EncoderSlot()];
 
 const wanT5EncoderSlot = (helpText: string): ComponentSlotPolicy =>
@@ -1032,10 +1013,13 @@ const wanLowNoiseSlot = (helpText: string): ComponentSlotPolicy =>
     modelTypes: TYPE_MAIN,
     valueKind: 'main',
     helpText,
-    filter: (candidate) => candidate.type === 'main' && candidate.base === 'wan',
+    // The loader pairs a single-file A14B model with a different single-file expert of its variant.
+    filter: (candidate, ctx) =>
+      ctx.model.type !== 'external_image_generator' && isWanLowNoiseExpertFor(ctx.model)(candidate),
+    incompatibleMessage:
+      'The selected low-noise expert is not a different single-file model of this variant. Select one or clear it.',
   });
 
-/** Standalone Ideogram models require the second branch. */
 const ideogram4UnconditionalSlot = (helpText: string): ComponentSlotPolicy =>
   slot({
     key: 'ideogram4UnconditionalModel',
@@ -1054,8 +1038,8 @@ const qwen3EncoderSlot = (helpText: string, filter?: GenerateComponentFilter): C
     valueKind: 'component',
     helpText,
     filter: filter
-      ? (candidate) => candidate.type === 'qwen3_encoder' && filter(candidate)
-      : (candidate) => candidate.type === 'qwen3_encoder',
+      ? (candidate) => servesAsType(candidate, 'qwen3_encoder') && filter(candidate)
+      : (candidate) => servesAsType(candidate, 'qwen3_encoder'),
   });
 
 const mistralEncoderSlot = (
@@ -1095,6 +1079,7 @@ const hasCompatibleComponentSource = (ctx: ComponentPolicyContext): boolean =>
 
 type ComponentSourceCandidate = {
   base: string;
+  is_missing?: boolean;
   key: string;
   name: string;
   type: string;
@@ -1155,15 +1140,15 @@ export const getAutoFlux2ComponentSourceModel = (
     return null;
   }
 
-  const pipelines = models.filter(isFlux2SourceFor(model));
+  // A registered pipeline whose files are gone is listed but cannot be loaded.
+  const pipelines = models.filter((candidate) => !candidate.is_missing).filter(isFlux2SourceFor(model));
   const encoderSource = pipelines.find(isFlux2EncoderSourceForModel(model));
 
   if (!encoderModel && settings.vae) {
     return encoderSource ?? null;
   }
 
-  // No VAE is set here. A pipeline that cannot give the encoder still gives the VAE; the encoder slot then asks for a
-  // standalone one, if none is set yet.
+  // A pipeline that cannot give the encoder still gives the VAE; the encoder slot then asks for a standalone one.
   return encoderSource ?? pipelines[0] ?? null;
 };
 
@@ -1172,10 +1157,16 @@ const isBundledOrDiffusersSourceSatisfied = (ctx: ComponentPolicyContext): boole
   ctx.model.type !== 'external_image_generator' &&
   (isBundledMainForBase(ctx.model.base)(ctx.model) || hasCompatibleComponentSource(ctx));
 
-/**
- * What blocks Invoke on one slot, or null. Shared by the picker, invocation readiness and graph preflight so picker
- * requirements cannot drift.
- */
+/** A Diffusers pipeline loads its own components, so the loader reads no component source or second transformer. */
+const isDiffusersPipeline = (ctx: ComponentPolicyContext): boolean => ctx.model.format === 'diffusers';
+
+/** Whether a Diffusers component source of a single-file Wan model supplies the VAE: the loader needs its width to fit. */
+const hasWanSourceVae = (ctx: ComponentPolicyContext): boolean =>
+  ctx.model.type !== 'external_image_generator' &&
+  hasCompatibleComponentSource(ctx) &&
+  doesWanSourceSupplyVae(ctx.model, ctx.settings.componentSourceModel!);
+
+/** Shared by the picker, invocation readiness and graph preflight so their requirements cannot drift. */
 export const getComponentSlotIssue = (slotPolicy: ComponentSlotPolicy, ctx: ComponentPolicyContext): string | null => {
   const value = ctx.selectedComponents[slotPolicy.key];
   const isValid = value && (!slotPolicy.filter || slotPolicy.filter(value as ModelConfig, ctx));
@@ -1190,6 +1181,10 @@ export const getComponentSlotIssue = (slotPolicy: ComponentSlotPolicy, ctx: Comp
 
   return isValid ? null : (slotPolicy.missingMessage ?? `Generate needs a ${slotPolicy.label} for this model.`);
 };
+
+/** A self-contained SDNQ FLUX.1 pipeline always loads its own encoders and VAE (`buildFluxGraph` sends none). */
+const hasBundledFlux1Components = (ctx: ComponentPolicyContext): boolean =>
+  ctx.model.type !== 'external_image_generator' && isSelfContainedSDNQFlux1Pipeline(ctx.model);
 
 const createPolicy = (defaultOpen: boolean, slots: readonly ComponentSlotPolicy[]): ComponentSectionPolicy => ({
   defaultOpen,
@@ -1215,17 +1210,20 @@ const getBaseComponentSectionPolicy = (
         ...createPolicy(!isSelfContainedSDNQFlux1Pipeline(model), [
           {
             ...t5EncoderSlot('Required for FLUX.1 models.'),
-            required: (ctx) => !isSelfContainedSDNQFlux1Pipeline(ctx.model),
+            neverLoaded: hasBundledFlux1Components,
+            required: (ctx) => !hasBundledFlux1Components(ctx),
             missingMessage: 'Generate needs a T5 Encoder for FLUX models.',
           },
           {
             ...clipEmbedSlot('Required for FLUX.1 models.'),
-            required: (ctx) => !isSelfContainedSDNQFlux1Pipeline(ctx.model),
+            neverLoaded: hasBundledFlux1Components,
+            required: (ctx) => !hasBundledFlux1Components(ctx),
             missingMessage: 'Generate needs a CLIP Embed model for FLUX models.',
           },
           {
             ...vaeSlot('Required for FLUX.1 models.', isAcceptedVae),
-            required: (ctx) => !isSelfContainedSDNQFlux1Pipeline(ctx.model),
+            neverLoaded: hasBundledFlux1Components,
+            required: (ctx) => !hasBundledFlux1Components(ctx),
             missingMessage: 'Generate needs a VAE for FLUX models.',
           },
         ]),
@@ -1331,10 +1329,13 @@ const getBaseComponentSectionPolicy = (
     }
     case 'qwen-image':
       return createPolicy(model.format !== 'diffusers', [
-        componentSourceSlot(
-          (candidate) => isDiffusersMainForBase('qwen-image')(candidate),
-          'For non-Diffusers Qwen Image models, select this or provide separate VAE and Qwen VL models.'
-        ),
+        {
+          ...componentSourceSlot(
+            (candidate) => isDiffusersMainForBase('qwen-image')(candidate),
+            'For non-Diffusers Qwen Image models, select this or provide separate VAE and Qwen VL models.'
+          ),
+          neverLoaded: isDiffusersPipeline,
+        },
         {
           ...qwenVlEncoderSlot('Optional override, or required with a non-Diffusers model and no component source.'),
           required: (ctx) => !isBundledOrDiffusersSourceSatisfied(ctx),
@@ -1376,7 +1377,6 @@ const getBaseComponentSectionPolicy = (
         },
       ]);
     case 'flux3':
-      // A Diffusers FLUX.3 model bundles its VAE and encoder; single-file and GGUF models need both picked.
       return createPolicy(model.format !== 'diffusers', [
         {
           ...vaeSlot(
@@ -1397,7 +1397,6 @@ const getBaseComponentSectionPolicy = (
         flux3PromptUpsamplerSlot(),
       ]);
     case 'krea-2':
-      // Bundled Krea models supply components; standalone models need a separate encoder and VAE.
       return createPolicy(model.format !== 'diffusers', [
         {
           ...vaeSlot(
@@ -1425,7 +1424,6 @@ const getBaseComponentSectionPolicy = (
           : []),
       ]);
     case 'qwen-image-2-1':
-      // A Diffusers pipeline brings its own VAE and encoder; single-file and GGUF transformers need both.
       return createPolicy(model.format !== 'diffusers', [
         {
           ...vaeSlot(
@@ -1458,7 +1456,6 @@ const getBaseComponentSectionPolicy = (
           : []),
       ]);
     case 'ernie-image':
-      // Bundled ERNIE models supply components; standalone models need explicit components.
       return createPolicy(model.format !== 'diffusers', [
         {
           ...mistralEncoderSlot(
@@ -1478,7 +1475,6 @@ const getBaseComponentSectionPolicy = (
         },
       ]);
     case 'moss-image':
-      // A Diffusers pipeline brings its encoder and VAE; a single-file transformer needs both.
       return createPolicy(model.format !== 'diffusers', [
         {
           ...qwen35EncoderSlot(
@@ -1500,13 +1496,13 @@ const getBaseComponentSectionPolicy = (
         },
       ]);
     case 'ideogram-4':
-      // Standalone Ideogram needs the other branch, encoder, and VAE.
       return createPolicy(model.format !== 'diffusers', [
         {
           ...ideogram4UnconditionalSlot(
             'The second transformer branch. Required for single-file Ideogram 4 models, which hold ' +
               'only the conditional branch.'
           ),
+          neverLoaded: isDiffusersPipeline,
           required: (ctx) => ctx.model.format !== 'diffusers',
           missingMessage: 'Generate needs the unconditional transformer for single-file Ideogram 4 models.',
         },
@@ -1530,23 +1526,30 @@ const getBaseComponentSectionPolicy = (
         },
       ]);
     case 'wan':
-      // GGUF Wan needs external component sources.
       return createPolicy(model.format !== 'diffusers', [
-        componentSourceSlot(
-          (candidate) => isDiffusersMainForBase('wan')(candidate),
-          'Select a Diffusers Wan model to provide VAE and text-encoder components.'
-        ),
         {
-          ...vaeSlot('Required unless a Diffusers component source is available.', isAcceptedVae),
-          required: (ctx) => !isBundledOrDiffusersSourceSatisfied(ctx),
-          missingMessage: 'Generate needs a VAE for Wan models.',
+          ...componentSourceSlot(
+            (candidate) => isDiffusersMainForBase('wan')(candidate),
+            'Select a Diffusers Wan model to provide VAE and text-encoder components. Its VAE is used only when it ' +
+              'is a TI2V-5B pipeline for a TI2V-5B model, or an A14B one for an A14B model.'
+          ),
+          neverLoaded: isDiffusersPipeline,
+        },
+        {
+          ...vaeSlot('Required unless a matching Diffusers component source is available.', isAcceptedVae),
+          required: (ctx) => !(isBundledMainForBase('wan')(ctx.model) || hasWanSourceVae(ctx)),
+          missingMessage:
+            'Generate needs a VAE for Wan models: a component source supplies one only when it is the same variant family.',
         },
         {
           ...wanT5EncoderSlot('Required unless a Diffusers component source is available.'),
           required: (ctx) => !isBundledOrDiffusersSourceSatisfied(ctx),
           missingMessage: 'Generate needs a Wan T5 Encoder for Wan models.',
         },
-        wanLowNoiseSlot('Optional second A14B expert. Without it the high-noise expert runs the whole schedule.'),
+        // Only a single-file A14B model reads it; the loader ignores it for the others, so it is not offered there.
+        ...(hasWanLowNoiseSlot(model)
+          ? [wanLowNoiseSlot('Optional second A14B expert. Without it the high-noise expert runs the whole schedule.')]
+          : []),
       ]);
     case 'anima':
       return createPolicy(true, [
@@ -1583,7 +1586,6 @@ const getBaseComponentSectionPolicy = (
   }
 };
 
-/** Add the PiD slots; each base policy keeps its other slots and rules. */
 export const getComponentSectionPolicy = (
   model: GenerateModelConfig | undefined,
   settings: ComponentPolicySettings
@@ -1651,7 +1653,6 @@ const COMPONENT_SETTING_LABELS: Record<GenerateComponentValueKey, string> = {
   componentSourceModel: 'Component source',
 };
 
-/** Every settings key that holds a component model. */
 export const GENERATE_COMPONENT_VALUE_KEYS = Object.keys(COMPONENT_SETTING_LABELS) as GenerateComponentValueKey[];
 
 const isSelectedComponentCompatible = (
@@ -1690,7 +1691,322 @@ export const isComponentCompatibleWithModel = (
   return isSelectedComponentCompatible(slotPolicy, model, nextSettings, key);
 };
 
-type ReferenceModelCandidate = { base: string; key: string; name: string; type: string };
+export type ModelDefaultComponents = Partial<Pick<GenerateSettings, DefaultComponentSlot['setting']>>;
+
+/**
+ * `settings` with each component pick replaced by the catalog's record of it, where it is installed: a copy saved with
+ * the project keeps the variant or base the pick had when it was made, which the catalog may have reclassified since.
+ */
+const withCatalogRecords = (settings: GenerateSettings, models: readonly ModelConfig[]): GenerateSettings => {
+  const current: Record<string, unknown> = { ...settings };
+
+  for (const setting of GENERATE_COMPONENT_VALUE_KEYS) {
+    const picked = settings[setting];
+    const installed = picked ? models.find((candidate) => candidate.key === picked.key && !candidate.is_missing) : null;
+
+    if (installed) {
+      current[setting] = installed;
+    }
+  }
+
+  return current as unknown as GenerateSettings;
+};
+
+/** Registered and loadable: a model whose files moved is listed (`is_missing`) but a default cannot take it. */
+const isInstalled = (models: readonly ModelConfig[], selected: { key: string }): boolean =>
+  models.some((installed) => installed.key === selected.key && !installed.is_missing);
+
+const isSlotOffered = (model: GenerateModelConfig, settings: GenerateSettings, setting: GenerateComponentValueKey) =>
+  getComponentSectionPolicy(model, settings).slots.some((slotPolicy) => slotPolicy.key === setting);
+
+/** Whether a default for the slot can take effect: the family offers it and the graph loads what it holds. */
+const isSlotLoaded = (model: GenerateModelConfig, settings: GenerateSettings, setting: GenerateComponentValueKey) => {
+  const context = getComponentPolicyContext(model, settings);
+
+  return getComponentSectionPolicy(model, settings).slots.some(
+    (slotPolicy) => slotPolicy.key === setting && !slotPolicy.neverLoaded?.(context)
+  );
+};
+
+/**
+ * The default components the model stores for slots it offers that Apply cannot take: the model is not installed, or
+ * it does not fit the slot (an encoder reclassified to another size). Judged beside the defaults that are taken (a
+ * vision tower is offered once its encoder default is).
+ */
+export const getMissingDefaultComponents = (
+  model: GenerateModelConfig,
+  models: readonly ModelConfig[]
+): DefaultComponentSlot['setting'][] => {
+  const stored = (model.default_settings as { components?: Record<string, string> | null } | null | undefined)
+    ?.components;
+  const defaults = getDefaultGenerateSettings(model);
+  const taken = getModelDefaultComponents(model, defaults, models);
+  const settings = { ...defaults, ...taken };
+  const context = getComponentPolicyContext(model, settings);
+  const loaded = new Set(
+    getComponentSectionPolicy(model, settings)
+      .slots.filter((slotPolicy) => !slotPolicy.neverLoaded?.(context))
+      .map((slotPolicy) => slotPolicy.key)
+  );
+
+  return Object.entries(stored ?? {}).flatMap(([persistenceKey, modelKey]) => {
+    const slot = getDefaultComponentSlot(persistenceKey);
+
+    return slot && loaded.has(slot.setting) && taken[slot.setting]?.key !== modelKey ? [slot.setting] : [];
+  });
+};
+
+/** Whether a generation with `model` loads the VAE it is given, so a default VAE for it can take effect. */
+export const isDefaultVaeLoaded = (model: GenerateModelConfig): boolean => {
+  const settings = getDefaultGenerateSettings(model);
+  const vaeSlot = getComponentSectionPolicy(model, settings).slots.find((slotPolicy) => slotPolicy.key === 'vae');
+
+  return !vaeSlot?.neverLoaded?.(getComponentPolicyContext(model, settings));
+};
+
+/** The selections of `before` whose slot is offered there but not in `after`: they stay hidden and unloaded. */
+export const getClosedComponentSettings = (
+  model: GenerateModelConfig,
+  before: GenerateSettings,
+  after: GenerateSettings
+): GenerateComponentValueKey[] =>
+  GENERATE_COMPONENT_VALUE_KEYS.filter(
+    (setting) => before[setting] && isSlotOffered(model, before, setting) && !isSlotOffered(model, after, setting)
+  );
+
+/**
+ * The model's default components that fill a slot of `settings`: one that is empty, or whose selection is not
+ * installed or does not fit `model`. A selection that fits stays, unless `replace` (a reset to the model's defaults)
+ * takes the default over it. Defaults naming an unknown slot, a model that is not installed or one the slot rejects are
+ * skipped. A slot that depends on another (the vision tower follows a GGUF encoder) is judged beside the defaults
+ * already taken, whatever order they are stored in, and a selection whose slot a taken default closes is cleared
+ * (`null`), so no hidden pick is left to block or leak into a later choice.
+ */
+export const getModelDefaultComponents = (
+  model: GenerateModelConfig,
+  settings: GenerateSettings,
+  models: readonly ModelConfig[],
+  { replace = false }: { replace?: boolean } = {}
+): ModelDefaultComponents => {
+  const stored = (model.default_settings as { components?: Record<string, string> | null } | null | undefined)
+    ?.components;
+  const patch: Partial<Record<DefaultComponentSlot['setting'], ComponentModelConfig>> = {};
+  const fresh = withCatalogRecords(settings, models);
+  let next = fresh;
+  let pending = Object.entries(stored ?? {}).flatMap(([persistenceKey, modelKey]) => {
+    const slot = getDefaultComponentSlot(persistenceKey);
+    const candidate = models.find((installed) => installed.key === modelKey && !installed.is_missing);
+
+    return slot && candidate && (slot.isMainModel ? isMainModelConfig(candidate) : isModelIdentifierConfig(candidate))
+      ? [{ candidate, setting: slot.setting }]
+      : [];
+  });
+  let progressed = true;
+
+  while (progressed && pending.length > 0) {
+    progressed = false;
+    pending = pending.filter(({ candidate, setting }) => {
+      const picked = next[setting];
+
+      if (
+        !replace &&
+        picked &&
+        isInstalled(models, picked) &&
+        isComponentCompatibleWithModel(model, next, setting, picked as ModelConfig)
+      ) {
+        return false;
+      }
+
+      // Only a slot the family offers (the Model Manager lists the same ones); a dependent slot waits for the one it
+      // hangs on.
+      if (!isSlotLoaded(model, next, setting) || !isComponentCompatibleWithModel(model, next, setting, candidate)) {
+        return true;
+      }
+
+      patch[setting] = candidate;
+      next = { ...next, [setting]: candidate };
+      progressed = true;
+      return false;
+    });
+  }
+
+  // A default taken beside a pick that a later default replaced (a tower before the encoder that closes it) is judged
+  // again in the final settings, so the order they are stored in cannot change the result.
+  for (let settled = false; !settled;) {
+    settled = true;
+
+    for (const setting of Object.keys(patch) as DefaultComponentSlot['setting'][]) {
+      if (
+        !isSlotLoaded(model, next, setting) ||
+        !isComponentCompatibleWithModel(model, next, setting, patch[setting]!)
+      ) {
+        delete patch[setting];
+        next = { ...next, [setting]: fresh[setting] };
+        settled = false;
+      }
+    }
+  }
+
+  const cleared: ModelDefaultComponents = {};
+
+  for (const setting of getClosedComponentSettings(model, fresh, next)) {
+    if (setting !== 'vae' && !(setting in patch)) {
+      cleared[setting as DefaultComponentSlot['setting']] = null;
+    }
+  }
+
+  // A slot that holds a main model only took a main model above.
+  return { ...cleared, ...patch } as ModelDefaultComponents;
+};
+
+/** A component slot Generate offers `model`, as the Model Manager lists it among the model's default components. */
+export interface DefaultComponentSlotPolicy {
+  helpText?: string;
+  filter: (candidate: ModelConfig) => boolean;
+  label: string;
+  modelTypes: readonly ModelTaxonomyType[];
+  persistenceKey: string;
+}
+
+/**
+ * The slots Generate offers a model for its family, given the default components it stores: resolved like a model
+ * switch resolves them, so a slot that depends on another opens once that one is set. The VAE has its own default.
+ */
+export const getDefaultComponentSlotPolicies = (
+  model: GenerateModelConfig,
+  models: readonly ModelConfig[]
+): DefaultComponentSlotPolicy[] => {
+  const defaults = getDefaultGenerateSettings(model);
+  const settings = { ...defaults, ...getModelDefaultComponents(model, defaults, models) };
+  const context = getComponentPolicyContext(model, settings);
+
+  return getComponentSectionPolicy(model, settings).slots.flatMap((slot) => {
+    if (slot.neverLoaded?.(context)) {
+      return [];
+    }
+
+    const persistenceKey = DEFAULT_COMPONENT_SLOTS.find(({ setting }) => setting === slot.key)?.persistenceKey;
+
+    return persistenceKey
+      ? [
+          {
+            filter: (candidate) =>
+              (slot.modelTypes as readonly string[]).some((type) => servesAsType(candidate, type)) &&
+              (!slot.filter || slot.filter(candidate, context)),
+            helpText: slot.helpText,
+            label: slot.label,
+            modelTypes: slot.modelTypes,
+            persistenceKey,
+          },
+        ]
+      : [];
+  });
+};
+
+/**
+ * The default components `model` stores, less the ones whose slot an edit closed: a dependent slot (the vision tower)
+ * goes with the pick it hangs on when that is cleared, or when the pick still installed no longer opens it (a
+ * safetensors encoder for a GGUF one). Keys this client has no slot for stay, as do the dependents of a pick that is
+ * no longer installed, which the user sees and clears first.
+ */
+export const pruneClosedDefaultComponents = (
+  model: GenerateModelConfig,
+  models: readonly ModelConfig[]
+): Record<string, string> => {
+  const stored = (model.default_settings as { components?: Record<string, string> | null } | null | undefined)
+    ?.components;
+  const components = { ...stored };
+  const offered = new Set(getDefaultComponentSlotPolicies(model, models).map((slot) => slot.persistenceKey));
+
+  for (const key of Object.keys(components)) {
+    const parent = getDefaultComponentSlot(key)?.dependsOn;
+    const parentKey = parent === undefined ? undefined : components[parent];
+
+    if (
+      parent !== undefined &&
+      (parentKey === undefined || (isInstalled(models, { key: parentKey }) && !offered.has(key)))
+    ) {
+      delete components[key];
+    }
+  }
+
+  return components;
+};
+
+/** `model` without the stored defaults of the `held` slots, which the caller keeps as they are, empty ones included. */
+const withoutDefaultsOf = (
+  model: GenerateModelConfig,
+  held: readonly (DefaultComponentSlot['setting'] | 'vae')[]
+): GenerateModelConfig => {
+  if (held.length === 0 || model.type === 'external_image_generator') {
+    return model;
+  }
+
+  const stored = model.default_settings as { components?: Record<string, string> | null; vae?: string | null } | null;
+  const heldKeys = new Set(
+    DEFAULT_COMPONENT_SLOTS.filter(({ setting }) => held.includes(setting)).map(({ persistenceKey }) => persistenceKey)
+  );
+  const components = Object.fromEntries(Object.entries(stored?.components ?? {}).filter(([key]) => !heldKeys.has(key)));
+
+  return {
+    ...model,
+    default_settings: {
+      ...stored,
+      components,
+      ...(held.includes('vae') ? { vae: null } : {}),
+    },
+  } as GenerateModelConfig;
+};
+
+/**
+ * What a model's defaults fill into the slots of `settings` that are empty: its default components, and its default
+ * VAE where the model has a VAE picker the VAE fits. A selection that fits stays.
+ */
+export const getModelDefaultFills = (
+  fillModel: GenerateModelConfig,
+  settings: GenerateSettings,
+  models: readonly ModelConfig[],
+  { held = [] }: { held?: readonly (DefaultComponentSlot['setting'] | 'vae')[] } = {}
+): Partial<GenerateSettings> => {
+  const model = withoutDefaultsOf(fillModel, held);
+  const components = getModelDefaultComponents(model, settings, models);
+  const current = withCatalogRecords(settings, models);
+  const filled = { ...current, ...components };
+  const hasVaeSlot = isSlotOffered(model, filled, 'vae');
+  const fitsVae = (vae: VaeModelConfig) =>
+    hasVaeSlot
+      ? isComponentCompatibleWithModel(model, filled, 'vae', vae)
+      : getGenerationUiPolicy(model).sdVaeVisible && isVaeCompatibleWithGenerateModel(model, vae);
+
+  // A VAE that is installed and fits stays; one left over from another family (a fallback from an unsupported model)
+  // gives way to the default.
+  if (current.vae && isInstalled(models, current.vae) && fitsVae(current.vae)) {
+    return components;
+  }
+
+  const defaultVae = resolveModelDefaultVae(model, filled, models.filter(isVaeModelConfig));
+
+  if (defaultVae.kind !== 'apply') {
+    return components;
+  }
+
+  // The bundled VAE (`null`) is what an empty slot already uses, and what a pick that is gone gives way to.
+  if (defaultVae.vae === null) {
+    return settings.vae ? { ...components, vae: null } : components;
+  }
+
+  return fitsVae(defaultVae.vae) ? { ...components, vae: defaultVae.vae } : components;
+};
+
+/** The IP-Adapter a reference image takes by default for `base`: the first one whose files are present. */
+const findDefaultIpAdapter = <T extends ReferenceModelCandidate>(
+  models: readonly T[],
+  base: string | undefined
+): T | null =>
+  models.find((candidate) => candidate.type === 'ip_adapter' && candidate.base === base && !candidate.is_missing) ??
+  null;
+
+type ReferenceModelCandidate = { base: string; is_missing?: boolean; key: string; name: string; type: string };
 
 // FLUX.1 Kontext starter sources from invokeai/backend/model_manager/starter_models/flux.py.
 const FLUX_KONTEXT_REPOS = [
@@ -1709,10 +2025,7 @@ const isKnownFluxKontextModel = ({ name, source }: MainModelConfig): boolean =>
 const isBoundKontextReference = (model: MainModelConfig, config: GenerateReferenceImageConfig): boolean =>
   config.type === 'flux_kontext_reference_image' && config.model !== null && isSameInstalledModel(model, config.model);
 
-/**
- * Families whose Generate graph loads LoRAs. The backend installs no LoRAs for the others, so their concept picker
- * could only ever be empty; graph coverage holds the builders to this list.
- */
+/** Bases whose Generate graph loads LoRAs; graph coverage holds the builders to this list. */
 const LORA_SUPPORTED_BASES: ReadonlySet<string> = new Set<SupportedGenerateBase>([
   'anima',
   'ernie-image',
@@ -1735,17 +2048,13 @@ const LORA_SUPPORTED_BASES: ReadonlySet<string> = new Set<SupportedGenerateBase>
 export const isLoraSupported = (model: GenerateModelConfig | undefined): boolean =>
   Boolean(model && model.type !== 'external_image_generator' && LORA_SUPPORTED_BASES.has(model.base));
 
-/** The component picks that decide which vision tower reads the references; callers pass their settings or values. */
 export type ReferenceVisionComponents = Partial<
   Pick<GenerateSettings, 'qwen3VLEncoderModel' | 'qwen3VLVisionTowerModel'>
 >;
 
 /**
- * The encoder that reads the references is the selected Qwen3-VL 8B encoder when there is one, else the model's own.
- * Only a Diffusers main brings its own. A GGUF encoder keeps no vision tower (llama.cpp splits it into an mmproj
- * file), so it reads references only beside a separately selected 8B tower; a tower beside any other encoder is
- * never sent. The 8B filters are Qwen-Image-2.1's, the only base with `reference_images_require_vision_tower`; a base
- * that sets the flag with another encoder size needs its own filters here.
+ * A GGUF encoder has no vision tower (llama.cpp's mmproj), so it reads references only beside a selected 8B tower.
+ * The 8B filters are Qwen-Image-2.1's, the only base with `reference_images_require_vision_tower`.
  */
 const hasReferenceVisionTower = (
   model: Exclude<GenerateModelConfig, { type: 'external_image_generator' }>,
@@ -1758,11 +2067,7 @@ const hasReferenceVisionTower = (
   return isGgufQwen3Vl8bEncoder(encoder) ? Boolean(tower && isQwen3Vl8bVisionTower(tower)) : true;
 };
 
-/**
- * Whether the base and variant take references at all, whichever encoder reads them. Model switches and recall use
- * this, so a change of encoder never deletes references: they stay and validation flags them while
- * `isReferenceImageSupported` is false.
- */
+/** Base and variant alone, so an encoder change never deletes references; validation flags them instead. */
 export const takesReferenceImages = (model: GenerateModelConfig | undefined): boolean => {
   if (!model) {
     return false;
@@ -1783,10 +2088,7 @@ export const takesReferenceImages = (model: GenerateModelConfig | undefined): bo
   );
 };
 
-/**
- * Picker and validation must agree on compatibility, including required variants. `components` carries the selected
- * Qwen3-VL encoder and vision tower; they matter only for bases whose references the encoder reads.
- */
+/** `components` (Qwen3-VL encoder, vision tower) matter only for bases whose references the encoder reads. */
 export const isReferenceImageSupported = (
   model: GenerateModelConfig | undefined,
   components: ReferenceVisionComponents = {}
@@ -1805,14 +2107,13 @@ export const isReferenceImageSupported = (
   );
 };
 
-/**
- * Why references are unavailable although the base takes them, so the UI can say what to change instead of hiding the
- * section without a reason. Null when they are available or the base never takes them.
- */
+export type ReferenceImageUnavailableReason = 'ggufVisionTower' | 'visionTower';
+
+/** Why references are unavailable although the base takes them; null otherwise. */
 export const getReferenceImageUnavailableReason = (
   model: GenerateModelConfig | undefined,
   components: ReferenceVisionComponents = {}
-): 'visionTower' | 'ggufVisionTower' | null => {
+): ReferenceImageUnavailableReason | null => {
   if (!model || model.type === 'external_image_generator' || isReferenceImageSupported(model, components)) {
     return null;
   }
@@ -1826,8 +2127,7 @@ export const getReferenceImageUnavailableReason = (
     : 'visionTower';
 };
 
-/** The base's limit, whichever encoder reads the references. */
-export const getReferenceImageLimit = (model: GenerateModelConfig | undefined): number => {
+const getReferenceImageLimit = (model: GenerateModelConfig | undefined): number => {
   if (!model || !takesReferenceImages(model)) {
     return 0;
   }
@@ -1839,17 +2139,36 @@ export const getReferenceImageLimit = (model: GenerateModelConfig | undefined): 
   return getArchitectureFeatures(model.base)?.max_reference_images ?? DEFAULT_REFERENCE_IMAGE_LIMIT;
 };
 
-export const getMaxReferenceImages = (
+export type ReferenceImageRefusal = 'full' | 'unsupported' | ReferenceImageUnavailableReason;
+
+export interface ReferenceImageRoom {
+  free: number;
+  isSupported: boolean;
+  limit: number;
+  refusal: ReferenceImageRefusal | null;
+  unavailableReason: ReferenceImageUnavailableReason | null;
+}
+
+export const getReferenceImageRoom = (
   model: GenerateModelConfig | undefined,
-  components: ReferenceVisionComponents = {}
-): number => (isReferenceImageSupported(model, components) ? getReferenceImageLimit(model) : 0);
+  components: ReferenceVisionComponents,
+  referenceImages: readonly GenerateReferenceImage[]
+): ReferenceImageRoom => {
+  if (!isReferenceImageSupported(model, components)) {
+    const unavailableReason = getReferenceImageUnavailableReason(model, components);
+
+    return { free: 0, isSupported: false, limit: 0, refusal: unavailableReason ?? 'unsupported', unavailableReason };
+  }
+
+  const limit = getReferenceImageLimit(model);
+  const free = Math.max(0, limit - referenceImages.length);
+
+  return { free, isSupported: true, limit, refusal: free > 0 ? null : 'full', unavailableReason: null };
+};
 
 const IP_ADAPTER_BASES: ReadonlySet<string> = new Set(['sd-1', 'sdxl', 'flux', 'anima']);
 
-/**
- * Anima's IP-Adapter node takes a strength alone: it has no method choice and brings its own SigLIP2 encoder, so the
- * UI hides those controls and the graph never sends them.
- */
+/** Anima's IP-Adapter node takes only a strength (own SigLIP2 encoder), so method and encoder are never sent. */
 export const isStrengthOnlyIPAdapterBase = (base: string | undefined): boolean => base === 'anima';
 
 export const createReferenceImageId = (): string =>
@@ -1861,11 +2180,7 @@ export const hasEnabledKrea2EditReferences = (referenceImages: readonly Generate
     (referenceImage) => referenceImage.isEnabled && referenceImage.config.type === 'krea2_edit_reference_image'
   );
 
-/**
- * Whether running Krea-2 edit references have an active LoRA to read them. The base model is no instruction editor:
- * without an edit LoRA it copies the references, and the graph leaves the reference K/V cache, which only such a LoRA
- * reads, at the denoise default. A LoRA counts as the graph counts it: enabled and compatible with the model.
- */
+/** Without an edit LoRA the Krea-2 base just copies the references; a LoRA counts if enabled and compatible. */
 export const getKrea2EditLoraState = (
   model: GenerateModelConfig | undefined,
   settings: Pick<GenerateSettings, 'loras' | 'referenceImages'>
@@ -1884,7 +2199,6 @@ const isReferenceImageActive = (referenceImage: GenerateReferenceImage): boolean
   referenceImage.isEnabled &&
   !(referenceImage.config.type === 'krea2_reference_image' && referenceImage.config.styleStrength <= 0);
 
-/** The family's one reference kind; Krea-2's choice between style and edit is `getDefaultReferenceImageConfigs`'s. */
 const getFamilyDefaultReferenceImageConfig = (
   model: GenerateModelConfig | undefined,
   models: readonly ReferenceModelCandidate[],
@@ -1909,8 +2223,7 @@ const getFamilyDefaultReferenceImageConfig = (
     return { image, type: 'qwen_image_2_1_reference_image' };
   }
 
-  const adapterModel =
-    models.find((candidate) => candidate.type === 'ip_adapter' && candidate.base === modelBase) ?? null;
+  const adapterModel = findDefaultIpAdapter(models, modelBase);
 
   return {
     beginEndStepPct: [0, 1],
@@ -1974,17 +2287,12 @@ export const isReferenceImageCompatibleWithModel = (
   return true;
 };
 
-/** A new or re-targeted reference, typed for the model; existing references keep theirs. */
 interface ReferenceImageAddition {
   image: GenerateReferenceImageAsset | null;
   isEnabled: boolean;
 }
 
-/**
- * Configs for `additions` joining `referenceImages`. A Krea-2 addition is the style reference only when it would be
- * the sole running Krea-2 reference, counting the other additions and itself as switched on; arriving with or beside
- * others, it is an edit reference.
- */
+/** A Krea-2 addition is the style reference only if it would be the sole running Krea-2 reference. */
 const getDefaultReferenceImageConfigs = (
   model: GenerateModelConfig | undefined,
   models: readonly ReferenceModelCandidate[],
@@ -2031,10 +2339,7 @@ const canRunWithEnabledReferenceImages = (
     : enabled.every((kept) => kept.config.type !== 'krea2_reference_image');
 };
 
-/**
- * The list's one running reference when it is a Krea-2 style reference still at its default strength, which an
- * addition turns into an edit reference.
- */
+/** The lone running Krea-2 style reference at default strength, which an addition turns into an edit reference. */
 const getLoneDefaultStyleReference = (
   referenceImages: readonly GenerateReferenceImage[]
 ): GenerateReferenceImage | null => {
@@ -2048,17 +2353,17 @@ const getLoneDefaultStyleReference = (
     : null;
 };
 
-/**
- * `referenceImages` with `additions` appended as enabled references typed for the model; every way of adding a
- * reference goes through here. A lone first Krea-2 reference starts as the style reference, so an edit set built one
- * image at a time begins with one: the next addition turns it into an edit reference too, unless its strength was
- * changed, which marks it as meant for style. Validation then reports the mix.
- */
-export const withAddedReferenceImages = (
+export interface NewReferenceImage {
+  id: string;
+  image: GenerateReferenceImageAsset | null;
+}
+
+// A lone first Krea-2 reference starts as style; the next addition turns it into edit unless its strength was tuned.
+const withAddedReferenceImages = (
   model: GenerateModelConfig | undefined,
   models: readonly ReferenceModelCandidate[],
   referenceImages: GenerateReferenceImage[],
-  additions: readonly { id: string; image: GenerateReferenceImageAsset | null }[]
+  additions: readonly NewReferenceImage[]
 ): GenerateReferenceImage[] => {
   if (additions.length === 0) {
     return referenceImages;
@@ -2082,12 +2387,7 @@ export const withAddedReferenceImages = (
   return [...kept, ...additions.map(({ id }, index) => ({ config: configs[index]!, id, isEnabled: true }))];
 };
 
-/**
- * An SD reference that never had an adapter (model null) passes the base check, so a switch to a strength-only base
- * would keep its unset adapter and its SD weight, which may be negative. Re-target it when that leaves it unusable and
- * re-targeting can help: a weight the node rejects, or no adapter while one is installed. Without an installed adapter
- * the re-targeted config is stable, so a repeated switch changes nothing.
- */
+/** Re-target an adapter-less SD reference on a strength-only base when its weight is rejected or an adapter exists. */
 const needsStrengthOnlyRetarget = (
   model: GenerateModelConfig,
   referenceImage: GenerateReferenceImage,
@@ -2103,17 +2403,10 @@ const needsStrengthOnlyRetarget = (
     return true;
   }
 
-  return (
-    config.model === null &&
-    models.some((candidate) => candidate.type === 'ip_adapter' && candidate.base === model.base)
-  );
+  return config.model === null && findDefaultIpAdapter(models, model.base) !== null;
 };
 
-/**
- * Drop unsupported references; retarget incompatible ones, and strength-only IP-Adapter references left unusable,
- * while preserving image/enabled state. The re-targeted ones are typed together, beside the others; a strength-only
- * base then keeps their step window, same-base adapter and strength. No changes return the same array.
- */
+/** Drops unsupported, retargets incompatible ones, keeping image/enabled state. No changes return the same array. */
 export const getCompatibleReferenceImages = (
   referenceImages: GenerateReferenceImage[],
   model: GenerateModelConfig,
@@ -2175,13 +2468,8 @@ export const getCompatibleReferenceImages = (
 };
 
 /**
- * References as a switch to `model` leaves them, for every path that puts references in front of a model they were
- * not set up for (a model switch, an Undo that brings removed ones back). Incompatible ones are retargeted (see
- * `getCompatibleReferenceImages`); enabled ones the family cannot run together are switched off rather than deleted,
- * so Invoke is not left blocked, the first enabled ones keep running, and a model that takes the rest can turn them on
- * again. A model without references keeps them as they are, all switched off, for the next model that takes them.
- * `retargetedReferenceImages` is the list before the switch-off, for reporting what each step changed. No changes
- * return the same array.
+ * Incompatible references are retargeted; ones the family cannot run together are switched off, not deleted.
+ * `retargetedReferenceImages` is the list before the switch-off. No changes return the same array.
  */
 export const reconcileReferenceImagesWithModel = (
   referenceImages: GenerateReferenceImage[],
@@ -2214,10 +2502,75 @@ export const reconcileReferenceImagesWithModel = (
   };
 };
 
+export type ReferenceImageAddRequest = {
+  model: GenerateModelConfig | undefined;
+  models: readonly ReferenceModelCandidate[];
+  referenceImages: GenerateReferenceImage[];
+  additions: readonly NewReferenceImage[];
+} & (
+  | { mode: 'strict'; components: ReferenceVisionComponents }
+  | { mode: 'keep'; recalled?: readonly GenerateReferenceImage[] }
+);
+
+export interface ReferenceImageAddResult {
+  referenceImages: GenerateReferenceImage[];
+  added: number;
+  dropped: number;
+  limit: number;
+  refusal: ReferenceImageRefusal | null;
+  unavailableReason: ReferenceImageUnavailableReason | null;
+}
+
+/** `strict`: a user add, gated on vision components. `keep`: a recall; validation flags a missing encoder. */
+export const addReferenceImages = (request: ReferenceImageAddRequest): ReferenceImageAddResult => {
+  const { additions, model, models, referenceImages } = request;
+
+  if (request.mode === 'strict') {
+    const { free, isSupported, limit, refusal, unavailableReason } = getReferenceImageRoom(
+      model,
+      request.components,
+      referenceImages
+    );
+
+    if (!isSupported) {
+      return { added: 0, dropped: 0, limit, referenceImages, refusal, unavailableReason };
+    }
+
+    const fitting = additions.slice(0, free);
+
+    return {
+      added: fitting.length,
+      dropped: additions.length - fitting.length,
+      limit,
+      referenceImages: withAddedReferenceImages(model, models, referenceImages, fitting),
+      refusal,
+      unavailableReason: null,
+    };
+  }
+
+  if (!model || !takesReferenceImages(model)) {
+    return { added: 0, dropped: 0, limit: 0, referenceImages, refusal: 'unsupported', unavailableReason: null };
+  }
+
+  const limit = getReferenceImageLimit(model);
+  const joined = getCompatibleReferenceImages([...referenceImages, ...(request.recalled ?? [])], model, models);
+  const fitting = additions.slice(0, Math.max(0, limit - joined.length));
+  const placed = withAddedReferenceImages(model, models, joined, fitting).slice(0, limit);
+
+  return {
+    added: fitting.length,
+    dropped: joined.length + additions.length - placed.length,
+    limit,
+    referenceImages: placed,
+    refusal: null,
+    unavailableReason: null,
+  };
+};
+
 const getSettingsWithCompatibleModelSelections = (
   settings: GenerateSettings,
   model: GenerateModelConfig,
-  models: readonly ReferenceModelCandidate[],
+  models: readonly ModelConfig[],
   isCanvasFrame: boolean
 ): GenerateModelSelectionResult => {
   const nextSettings: GenerateSettings = { ...settings, modelKey: model.key };
@@ -2269,8 +2622,7 @@ const getSettingsWithCompatibleModelSelections = (
     nextSettings.externalImageSize = resolveExternalImageSize(nextSettings, model);
   }
 
-  // Concepts stay listed as they are: the graph loads only those the model can, the panel badges the rest, and a
-  // compatible model runs them again. Only the ones that ran before and stop now are reported.
+  // Concepts stay listed; only the ones that ran before and stop now are reported.
   const previousModel = models.find((candidate) => candidate.key === settings.modelKey);
   const runsConcept = (candidate: GenerateModelConfig | undefined, lora: GenerateLora) =>
     Boolean(candidate && isLoraSupported(candidate) && isLoraCompatibleWithModel(lora.model, candidate));
@@ -2293,8 +2645,7 @@ const getSettingsWithCompatibleModelSelections = (
 
   if (compatibleReferenceImages !== settings.referenceImages) {
     nextSettings.referenceImages = compatibleReferenceImages;
-    // A retargeted reference keeps its image; its adapter and weights take the new family's defaults. Only tuning
-    // the user chose is lost: a reference still at the previous family's defaults loses nothing.
+    // Only user tuning is lost: a reference still at the previous family's defaults loses nothing.
     const isPreviousDefault = (referenceImage: GenerateReferenceImage) => {
       if (!previousModel || !isGenerateModelConfig(previousModel)) {
         return false;
@@ -2347,6 +2698,12 @@ const getSettingsWithCompatibleModelSelections = (
       nextSettings[key] = null;
       change(key, 'removed');
     }
+  }
+
+  // The new model's defaults fill the slots left empty, which the confirmation does not count as a loss. A pick that
+  // fits stays, and picking the same model again changes nothing.
+  if (settings.modelKey !== model.key) {
+    Object.assign(nextSettings, getModelDefaultFills(model, nextSettings, models));
   }
 
   // Clamp and report during selection; validation remains the backstop for other write paths.
@@ -2412,7 +2769,6 @@ const getSettingsWithCompatibleModelSelections = (
   };
 };
 
-/** Normalize, reconcile, and apply component policy before persisting model selection. */
 export const getGenerateModelSelectionResult = ({
   currentValues,
   isCanvasFrame = false,
@@ -2425,10 +2781,17 @@ export const getGenerateModelSelectionResult = ({
   model: GenerateModelConfig;
   models: readonly ModelConfig[];
 }): GenerateModelSelectionResult => {
-  const currentSettings = isGenerateSettings(currentValues)
-    ? currentValues
-    : (normalizeGenerateSettings(currentValues) ?? getDefaultGenerateSettings(model));
-  const result = getSettingsWithCompatibleModelSelections(currentSettings, model, models, isCanvasFrame);
+  const stored = isGenerateSettings(currentValues) ? currentValues : normalizeGenerateSettings(currentValues);
+  const computed = getSettingsWithCompatibleModelSelections(
+    stored ?? getDefaultGenerateSettings(model),
+    model,
+    models,
+    isCanvasFrame
+  );
+  // Nothing chosen before (an initial model): the model's defaults fill in as they do on a switch.
+  const result = stored
+    ? computed
+    : { ...computed, settings: { ...computed.settings, ...getModelDefaultFills(model, computed.settings, models) } };
   const componentSourceModel = getAutoFlux2ComponentSourceModel(model, result.settings, models);
 
   if (componentSourceModel === undefined || componentSourceModel?.key === result.settings.componentSourceModel?.key) {
@@ -2465,10 +2828,7 @@ const issue = (
 
 const MODEL_TARGET: GenerationIssue['target'] = { section: 'model' };
 
-/**
- * How an issue names one reference: its own name, else its position. `describeGenerationIssue` turns the position
- * into the localized default ("Reference image 2"), so the message reads as the reference's row does.
- */
+/** Its name, else its position, which `describeGenerationIssue` localizes ("Reference image 2"). */
 const referenceNameValues = (
   referenceImage: Pick<GenerateReferenceImage, 'name'>,
   position: number
@@ -2478,19 +2838,13 @@ const referenceNameValues = (
 });
 const englishReferenceName = (referenceImage: Pick<GenerateReferenceImage, 'name'>, position: number): string =>
   referenceImage.name ?? `Reference image ${position}`;
-/** The reference images as a group (their count, or a rule over all of them); the section lists it above the cards. */
 const REFERENCE_IMAGES_TARGET: GenerationIssue['target'] = { field: 'referenceImages', section: 'guidance' };
-/** One reference image: its card shows the issue. */
 const referenceImageTarget = (referenceImageId: string): GenerationIssue['target'] => ({
   field: 'referenceImage',
   referenceImageId,
   section: 'guidance',
 });
 
-/**
- * Installed-model checks: the main model, the components the generation can load, concepts and enabled references must
- * all be installed.
- */
 export const getGenerationModelAvailabilityIssues = (
   model: GenerateModelConfig,
   settings: GenerateSettings,
@@ -2530,7 +2884,6 @@ export const getGenerationModelAvailabilityIssues = (
           'componentNotInstalled',
           `${COMPONENT_SETTING_LABELS[key]} "${value.name}" is not installed. Choose another, or clear it.`,
           { section: 'components' },
-          // The locale nests its own name for the slot, keyed by `component`.
           { component: key, name: value.name },
           { key, kind: 'clearModel' }
         )
@@ -2686,7 +3039,6 @@ const getDimensionValidationIssues = (model: GenerateModelConfig, settings: Gene
   return issues;
 };
 
-/** Reject unsupported PiD instead of silently using ordinary decode. */
 const getPidValidationIssues = (model: GenerateModelConfig, settings: GenerateSettings): GenerationIssue[] => {
   if (settings.pidMode === 'off') {
     return [];
@@ -2710,7 +3062,7 @@ const getPidValidationIssues = (model: GenerateModelConfig, settings: GenerateSe
   return settings.pidSteps < 1 ? [issue('advanced:pidSteps', 'pidSteps', 'PiD steps must be at least 1.', target)] : [];
 };
 
-/** The vision tower that reads references comes with a Diffusers pipeline's encoder, a non-GGUF Qwen3-VL one, or a GGUF encoder's mmproj file. */
+/** References are read by a Diffusers encoder's tower, a non-GGUF Qwen3-VL, or a GGUF encoder's mmproj. */
 export const QWEN_IMAGE_21_NO_VISION_TOWER_REASON =
   'Reference images need a Qwen3-VL 8B encoder with a vision tower. Select one under Components, or use a Diffusers Qwen-Image-2.1 model.';
 
@@ -2731,8 +3083,7 @@ const getReferenceImageValidationIssues = (
   settings: GenerateSettings
 ): GenerationIssue[] => {
   const issues: GenerationIssue[] = [];
-  // Use the shared reference limit, but report unsupported images individually rather than a misleading maximum of
-  // zero.
+  // Use the shared limit, but report unsupported images individually rather than a misleading maximum of zero.
   const maxReferenceImages = getReferenceImageLimit(model);
   const active = settings.referenceImages.filter(isReferenceImageActive);
 
@@ -2851,9 +3202,7 @@ const getReferenceImageValidationIssues = (
     }
   });
 
-  // A GGUF Qwen VL Encoder is the language model alone (llama.cpp ships the vision tower as a separate file), and the
-  // prompt node refuses reference images with it. A selected encoder replaces the bundled one, so it decides. One
-  // reason for all images: the fix is the same for each.
+  // A GGUF Qwen VL Encoder has no vision tower (llama.cpp splits it out), so the prompt node refuses references.
   const qwenVLEncoder = settings.qwenVLEncoderModel;
   if (
     qwenVLEncoder?.format === 'gguf_quantized' &&
@@ -2880,12 +3229,10 @@ const getReferenceImageValidationIssues = (
       (referenceImage) => referenceImage.isEnabled && referenceImage.config.type === 'qwen_image_2_1_reference_image'
     );
 
-  // The encoder slot stays filled across models (Ideogram 4 and the GGUF builds share it), so a Diffusers model can
-  // inherit one that cannot read the references. Clearing it helps only where the model brings its own encoder.
+  // The shared encoder slot can carry one that cannot read references; clearing helps only with a bundled encoder.
   if (hasQwen21References && !isReferenceImageSupported(model, settings)) {
     issues.push(
-      // A GGUF 8B encoder is fixed by adding its tower, so the issue points at that slot. Otherwise a single-file main
-      // has to swap the encoder and the issue points at its slot; a Diffusers one clears it from the references.
+      // A GGUF 8B encoder needs its tower; a single-file main must swap the encoder; a Diffusers one clears it.
       createUntranslatedGenerationIssue(
         getReferenceImageUnavailableReason(model, settings) === 'ggufVisionTower'
           ? QWEN_IMAGE_21_GGUF_VISION_TOWER_REASON
@@ -2928,6 +3275,11 @@ export const getGuidanceBoundReason = (
   model: Pick<GenerateModelConfig, 'base' | 'name' | 'type'> & { variant?: unknown },
   cfgScale: number
 ): string | null => {
+  // Ideogram validates its own sampler override and never reads the shared guidance value.
+  if (model.base === 'ideogram-4') {
+    return null;
+  }
+
   const { guidance, guidanceLabel } = getBaseGenerationConfig(model);
 
   if (cfgScale < guidance.min) {
@@ -2941,11 +3293,7 @@ export const getGuidanceBoundReason = (
   return null;
 };
 
-/**
- * Combinations the backend refuses only after queueing. The encoder reads edit references with its vision tower, which
- * a GGUF Qwen3-VL encoder replaces with its mmproj Vision Tower; a Diffusers main without an encoder override uses its
- * bundled one.
- */
+/** Combinations the backend refuses only after queueing. */
 const getKrea2ReferenceValidationReasons = (
   settings: GenerateSettings
 ): Array<{ reason: string; target: GenerationIssue['target'] }> => {
@@ -2996,7 +3344,6 @@ const getModelFamilyValidationIssues = (model: MainModelConfig, settings: Genera
     );
   }
 
-  // Parse raw rebalance strings before forwarding them to the backend.
   if (
     model.base === 'krea-2' &&
     settings.krea2RebalanceEnabled &&
@@ -3020,9 +3367,7 @@ const getModelFamilyValidationIssues = (model: MainModelConfig, settings: Genera
     );
   }
 
-  // The field commits only lists in range, but a persisted one can still name a block MOSS-Image lacks, which would fail
-  // the queue item. Without CFG the negative branch never runs, so the list has no effect and its disabled field cannot
-  // be fixed.
+  // A persisted list can name a block MOSS-Image lacks; without CFG it has no effect and its field cannot be fixed.
   if (
     model.base === 'moss-image' &&
     settings.cfgScale > 1 &&
@@ -3036,7 +3381,6 @@ const getModelFamilyValidationIssues = (model: MainModelConfig, settings: Genera
     );
   }
 
-  // Finite persisted Ideogram overrides still need range validation.
   if (model.base === 'ideogram-4') {
     for (const [label, value, min, max] of [
       ['steps', settings.ideogram4Steps, IDEOGRAM4_STEPS_MIN, IDEOGRAM4_STEPS_MAX],
@@ -3063,7 +3407,6 @@ const EXTERNAL_MODE_LABELS: Record<ExternalGenerationMode, string> = {
   txt2img: 'text-to-image generation',
 };
 
-/** Why an external model cannot run `mode`, or null when it advertises it. */
 export const getExternalModeReason = (model: GenerateModelConfig, mode: ExternalGenerationMode): string | null =>
   model.type === 'external_image_generator' && !(model.capabilities?.modes ?? ['txt2img']).includes(mode)
     ? `${model.name} does not support ${EXTERNAL_MODE_LABELS[mode]}.`
@@ -3077,7 +3420,6 @@ export const NO_GENERATE_MODEL_ISSUE: GenerationIssue = issue(
   MODEL_TARGET
 );
 
-/** The Components section's issues: one per slot, which the slot shows itself, then the family's other rules. */
 const getComponentValidationIssues = (model: GenerateModelConfig, settings: GenerateSettings): GenerationIssue[] => {
   const policy = getComponentSectionPolicy(model, settings);
   const ctx = getComponentPolicyContext(model, settings);
@@ -3102,7 +3444,6 @@ export const getGenerationValidationIssues = (
   settings: GenerateSettings,
   mode: ExternalGenerationMode = 'txt2img'
 ): GenerationIssue[] => {
-  // All compilers share this validator; check capabilities before model-specific policy.
   if (!hasArchitectureCapabilities()) {
     // Keep core independent of the load-state store; failures direct callers to retry.
     return [
@@ -3217,12 +3558,24 @@ export const getGenerationValidationReasons = (
   mode: ExternalGenerationMode = 'txt2img'
 ): string[] => getGenerationValidationIssues(model, settings, mode).map(({ message }) => message);
 
-/**
- * What blocks Invoke for Generate's values, shared by the Invoke route and the Generate form so the two always agree.
- * With a Canvas frame, a hosted provider is checked at the size it will be asked for (its own size nearest the frame),
- * and one without text to image as the edit the Canvas will ask for. `models` adds the installed-model checks; leave it
- * out while the catalog is unread, which would otherwise name every model as missing.
- */
+export const needsEmptyCanvasFrameForReferenceBudget = (
+  model: GenerateModelConfig | undefined,
+  settings: Pick<GenerateSettings, 'referenceImages'>
+): boolean => {
+  if (
+    !model ||
+    model.type !== 'external_image_generator' ||
+    !isSeedreamBatchModel(model) ||
+    !model.capabilities?.modes?.includes('txt2img') ||
+    !model.capabilities.modes.includes('img2img')
+  ) {
+    return false;
+  }
+
+  return getExternalReferenceImages(settings, model).length + 1 === SEEDREAM_BATCH_MAX_TOTAL_IMAGES;
+};
+
+/** Shared by the Invoke route and the Generate form. Omit `models` while the catalog is unread. */
 export const getGenerateInvocationIssues = (
   values: GenerateSettings & { model: GenerateModelConfig },
   { canvasFrame, models }: { canvasFrame?: { height: number; width: number }; models?: readonly ModelConfig[] } = {}

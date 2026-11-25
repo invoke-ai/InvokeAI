@@ -1,6 +1,7 @@
 import type { GalleryUiAdapter } from '@features/gallery/react';
 
 import { GalleryUiProvider } from '@features/gallery/react';
+import { resolvedValues } from '@platform/core/resolvedValues.testing';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { ApiError } from '@platform/transport/http';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -98,7 +99,7 @@ const adapter: GalleryUiAdapter = {
     toggleItemSelection: noop,
     updateSettings: noop,
   },
-  galleryValues: {},
+  galleryValues: resolvedValues(),
   generateValues: {},
   getItemLabel: () => Promise.resolve(null),
   liveFollowEnabled: false,
@@ -110,6 +111,7 @@ const adapter: GalleryUiAdapter = {
     add: (...args: unknown[]) => mocks.notificationsAdd(...args),
     reportError: (...args: unknown[]) => mocks.notificationsReportError(...args),
   },
+  openItemContextMenu: noop,
   projectId: 'project-1',
   projectName: 'Project',
   projects: [],

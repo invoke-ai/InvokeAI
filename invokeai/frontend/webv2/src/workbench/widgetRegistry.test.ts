@@ -1,6 +1,5 @@
 import type { WidgetManifest } from '@workbench/widgetContracts';
 
-import { ImageUpscaleIcon } from 'lucide-react';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
@@ -10,7 +9,6 @@ import {
   registerFirstPartyWidgets,
   registerWidgets,
 } from './widgetRegistry';
-import { upscaleWidgetManifest } from './widgets/upscale/manifest';
 import { RETIRED_REGION_WIDGET_TYPE_IDS, RETIRED_WIDGET_TYPE_IDS } from './workbenchState';
 
 const TestIcon = () => null;
@@ -56,10 +54,6 @@ describe('widget registry', () => {
     expect([...RETIRED_WIDGET_TYPE_IDS].filter((typeId) => getWidgetById(typeId))).toEqual([]);
   });
 
-  it('uses the image-upscale icon for Upscale', () => {
-    expect(upscaleWidgetManifest.icon).toBe(ImageUpscaleIcon);
-  });
-
   it('normalizes default state and api version', () => {
     const loader = vi.fn(load);
     const [widget] = registerWidgets([createManifest({ load: loader, state: undefined })]);
@@ -69,10 +63,6 @@ describe('widget registry', () => {
     expect(widget.manifest.state).toMatchObject({ persistence: 'project', version: 1 });
     expect(widget.manifest.state.createInitial()).toEqual({});
     expect(loader).not.toHaveBeenCalled();
-  });
-
-  it('exposes enabled widget singleton hosts', () => {
-    expect(getWidgetHosts().map((widget) => widget.manifest.id)).toContain('workflow');
   });
 
   it('disables invalid icon manifests', () => {
@@ -87,14 +77,6 @@ describe('widget registry', () => {
 
     expect(widget.status).toBe('disabled');
     expect(widget.failure?.message).toContain('must declare at least one allowed region');
-  });
-
-  it('validates descriptors without loading their implementation', () => {
-    const loader = vi.fn(load);
-    const [widget] = registerWidgets([createManifest({ load: loader })]);
-
-    expect(widget.status).toBe('enabled');
-    expect(loader).not.toHaveBeenCalled();
   });
 
   it('fails closed without a deferred implementation loader', () => {

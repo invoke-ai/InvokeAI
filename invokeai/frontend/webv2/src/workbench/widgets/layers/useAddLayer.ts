@@ -10,15 +10,14 @@ import { useCanvasEngine } from '@workbench/canvas-operations/react';
 import { setLayerGroupExpanded } from '@workbench/layerPanelState';
 import { usePreparedCommit } from '@workbench/widgets/canvas/useStructuralCommit';
 import { useActiveProjectId, useActiveProjectSelector } from '@workbench/WorkbenchContext';
-import { nextLayerName } from '@workbench/workbenchState';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { AddLayerItemId } from './addLayerMenu';
 
 import { isAddLayerItemAvailable } from './addLayerMenu';
+import { prepareNewRasterLayer } from './layerCommands';
 import {
-  createEmptyPaintLayer,
   createInpaintMaskLayer,
   createLayerId,
   createRegionalGuidanceLayer,
@@ -30,10 +29,7 @@ import {
 import { requestLayerProperties } from './layerPropertiesRequestStore';
 import { useSelectedModelBase } from './useSelectedModelBase';
 
-/**
- * Share guarded undoable creation across add menus and stack buttons. Insert above the selection, inside its group
- * for selected leaves.
- */
+/** Guarded undoable creation, above the selection and inside its group for selected leaves. */
 export const useAddLayer = (): ((id: AddLayerItemId) => void) => {
   const { t } = useTranslation();
   const engine = useCanvasEngine();
@@ -58,6 +54,16 @@ export const useAddLayer = (): ((id: AddLayerItemId) => void) => {
           model.prepare({ aboveId: model.document.selectedLayerId, nodes: [node], type: 'insert' })
         );
       switch (id) {
+        case 'vector': {
+          if (!engine) {
+            return;
+          }
+          const layer = engine.layers.vectorEdit.createLayer({ id: createLayerId() });
+          if (layer) {
+            add(t('widgets.layers.actions.addVectorLayer'), layer);
+          }
+          return;
+        }
         case 'group': {
           // An empty group has no stack of its own: it joins the selected node's stack, else raster.
           const groupId = createLayerId();
@@ -86,8 +92,7 @@ export const useAddLayer = (): ((id: AddLayerItemId) => void) => {
           return;
         }
         case 'raster': {
-          const layer = createEmptyPaintLayer(nextLayerName(layerNames));
-          add(t('widgets.layers.actions.addRasterLayer'), layer);
+          commitPrepared(t('widgets.layers.actions.addRasterLayer'), prepareNewRasterLayer);
           return;
         }
         case 'control': {
@@ -119,6 +124,6 @@ export const useAddLayer = (): ((id: AddLayerItemId) => void) => {
         }
       }
     },
-    [base, commitPrepared, layerNames, projectId, regionalGuidanceCount, t]
+    [engine, base, commitPrepared, layerNames, projectId, regionalGuidanceCount, t]
   );
 };

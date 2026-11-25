@@ -34,6 +34,7 @@ from invokeai.backend.patches.lora_conversions.ltx2_lora_constants import (
     has_ltx2_lora_keys,
     has_non_ltx2_architecture_keys,
     has_unsupported_ltx2_lora_variant_keys,
+    is_ltx2_diffusers_top_level_path,
 )
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 
@@ -41,6 +42,7 @@ from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 # official paths. Ordered longest-first so the nested PEFT prefix is not left with a tail.
 _PEFT_PREFIXES_TO_STRIP = (
     "base_model.model.transformer.",
+    "base_model.model.",
     # Comfy packages some releases under this; diffusers' own rename table strips it too, so the
     # probe admits it and this keeps the two in step.
     "model.diffusion_model.",
@@ -99,7 +101,11 @@ def _official_to_diffusers_paths(layer_paths: Iterable[str]) -> dict[str, str]:
 
     from invokeai.backend.ltx2 import component_configs as cc
 
-    sentinels = {f"{path}.weight": f"{path}.weight" for path in layer_paths}
+    # A layer already in diffusers form is the runtime name; keep it out of the map so no rename can
+    # be applied to it a second time.
+    sentinels = {
+        f"{path}.weight": f"{path}.weight" for path in layer_paths if not is_ltx2_diffusers_top_level_path(path)
+    }
     renamed = convert_ltx2_transformer_to_diffusers(dict(sentinels))
     renamed, _ = cc.finish_transformer_keys(renamed)
 

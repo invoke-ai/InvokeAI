@@ -27,9 +27,9 @@ export const findScrollingPanel = (trigger: HTMLElement): HTMLElement | null => 
 };
 
 /**
- * Spans the panel across and the hovered label down, so the card points at the label from beside the panel instead
- * of covering the controls it explains. When neither side of the panel has room for the card (a maximized window),
- * the marked field stands in, then the label itself, so the card always stays on screen.
+ * Spans the panel across and the hovered label down, so the card points at the label from beside the panel instead of
+ * covering the controls it explains. When neither side of the panel has room for the card (a maximized window), the
+ * marked field stands in, then the label itself, so the card always stays on screen.
  */
 export const getHintAnchorRect = (
   trigger: HTMLElement,
@@ -54,8 +54,8 @@ const cross = (origin: Point, a: Point, b: Point): number =>
   (a.x - origin.x) * (b.y - origin.y) - (a.y - origin.y) * (b.x - origin.x);
 
 /**
- * The safe triangle from where the pointer left the label to the card's near edge: moves inside it are on their way
- * to the card. Null when the card is not beside the label, where the ordinary close delay applies.
+ * The safe triangle from where the pointer left the label to the card's near edge: moves inside it are on their way to
+ * the card. Null when the card is not beside the label, where the ordinary close delay applies.
  */
 export const createGraceCorridor = (exit: Point, label: DOMRect, card: DOMRect): ((point: Point) => boolean) | null => {
   const side = card.left >= label.right ? 1 : card.right <= label.left ? -1 : 0;

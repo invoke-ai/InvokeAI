@@ -3,40 +3,26 @@ const AUTH_TOKEN_STORAGE_KEY = 'auth_token';
 /** Each announced rotation is stored under its own key, so concurrent rotations never overwrite each other. */
 const ROTATION_STORAGE_KEY_PREFIX = 'auth_token_rotation:';
 
-/**
- * The single marker earlier builds wrote. Their announcements are not seen during a rolling upgrade; it is removed on
- * announcing so one left by a tab that unloaded mid-change does not persist.
- */
+/** Earlier builds' single marker; removed on announcing so an orphan from a mid-change unload does not persist. */
 const LEGACY_ROTATION_STORAGE_KEY = 'auth_token_rotation';
 
-/**
- * Announces to other tabs that a tab is rotating the shared credential (an own password change), so that a 401 the
- * revocation causes elsewhere waits for the replacement instead of ending the session. Stale markers are ignored by
- * age, so a tab that unloads mid-change cannot keep other tabs waiting forever.
- */
+/** Lets a 401 the revocation causes in other tabs wait for the replacement; stale markers are ignored by age. */
 export interface CredentialRotationMarker {
   /** Unique per rotation; the announcing tab withdraws only the marker with its own id. */
   readonly id: string;
-  /** `Date.now()` when the rotation started. */
   readonly at: number;
   /** Whose credential is being rotated; a 401 for another principal's token is not the rotation's doing. */
   readonly userId: string;
 }
 
-/**
- * Persists the bearer token across reloads and carries other tabs' changes to it. Requests never read it: the tab's
- * in-memory credential is authoritative.
- */
+/** Requests never read it: the tab's in-memory credential is authoritative. */
 export interface IdentityTokenAdapter {
-  /** `undefined` when storage cannot be read. */
   read(): string | null | undefined;
   write(token: string): void;
   clear(): void;
-  /** Every announced rotation, stale ones included; `undefined` when storage cannot be read. */
   readRotations(): readonly CredentialRotationMarker[] | undefined;
   writeRotation(marker: CredentialRotationMarker): void;
   clearRotation(id: string): void;
-  /** Notifies when another document changes the stored token or any rotation marker. */
   subscribe(onChange: () => void): () => void;
 }
 

@@ -195,6 +195,7 @@ export interface WidgetHotkeyContribution {
   source?: WidgetContributionSource;
   preventDefault?: boolean;
   allowInEditable?: boolean;
+  ignoreRepeat?: boolean;
 }
 
 export interface WidgetCommandPaletteApi {
@@ -272,7 +273,6 @@ export interface WidgetManifest {
   /** Compact content uses the strip's remaining width while keeping its trigger sized to visible content. */
   compactSizing?: 'remaining-space';
   centerPlacement?: 'toolbar' | 'view';
-  /** Opt-in: the widget can be detached into a movable floating window. */
   allowFloating?: boolean;
   /** Only offered while an admin is signed in to a multi-user backend. */
   requiresAdmin?: boolean;
@@ -281,8 +281,8 @@ export interface WidgetManifest {
     body?: WidgetBodySizing;
   };
   /**
-   * Literal dynamic loader for all render slots. The registry owns caching,
-   * failure state, and retry; callers never invoke this directly.
+   * Literal dynamic loader for all render slots. The registry owns caching, failure state, and retry; callers never
+   * invoke this directly.
    */
   load: () => Promise<WidgetImplementation>;
   /** Load always-on runtimes and dialog shells separately so boot does not download their widget views. */

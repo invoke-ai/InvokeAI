@@ -1,7 +1,4 @@
-/**
- * Prompts arrive pre-expanded. Backend outer groups form a Cartesian product; entries within each group zip and
- * require equal lengths.
- */
+/** Backend outer groups form a Cartesian product; entries within a group zip and need equal lengths. */
 
 import { SEED_MAX } from '@platform/core/seed';
 
@@ -32,17 +29,14 @@ export const generateSeedSequence = (start: number, count: number, step: QueueSe
   );
 };
 
-/** A value the backend substitutes into a node field per session. */
 export type QueueBatchItem = number | string | { image_name: string };
 
-/** One value list of a zipped batch group, in the backend's `BatchDatum` shape. */
 export interface QueueBatchDatum {
   field_name: string;
   items: QueueBatchItem[];
   node_path: string;
 }
 
-/** A batch-node value list, as a workflow submission persists it (camelCase, like `QueueWorkflowSeed`). */
 export interface QueueWorkflowBatchDatum {
   fieldName: string;
   items: QueueBatchItem[];
@@ -80,7 +74,6 @@ export interface GeneratePromptBatchDatum extends QueueBatchDatum {
   field_name: 'value';
 }
 
-/** Persist each workflow seed's start and step; expand deterministic runs at send time. */
 export interface QueueWorkflowSeed {
   fieldName: string;
   nodeId: string;
@@ -109,7 +102,6 @@ export const isQueueWorkflowSeed = (value: unknown): value is QueueWorkflowSeed 
 };
 
 export interface WorkflowBatchPlan {
-  /** Batch groups in the backend's shape, or undefined when one graph repeats unchanged. */
   data?: QueueBatchDatum[][];
   runs: number;
 }
@@ -120,10 +112,7 @@ const toBackendDatum = (datum: QueueWorkflowBatchDatum): QueueBatchDatum => ({
   node_path: datum.nodeId,
 });
 
-/**
- * Every combination the backend would produce from `groups`, in its order: the first group varies slowest, and
- * each group's datums are read in step. Each entry maps a datum to the index of the item that combination uses.
- */
+/** The backend's order: the first group varies slowest; each entry maps a datum to its item index. */
 const expandCombinations = (groups: readonly (readonly QueueWorkflowBatchDatum[])[]): number[][] => {
   let combinations: number[][] = [[]];
 
@@ -143,11 +132,7 @@ const expandCombinations = (groups: readonly (readonly QueueWorkflowBatchDatum[]
   return combinations;
 };
 
-/**
- * Without varying seeds the backend multiplies the batch groups itself and repeats the product `batchCount` times.
- * Once a seed steps, every session must get its own seed, so the product is expanded here into one zipped group,
- * run-major, with each seed walking straight through it.
- */
+/** Once a seed steps, each session needs its own seed, so the product expands here into one zipped run-major group. */
 export const buildQueueWorkflowBatchPlan = ({
   batchCount,
   batchData,
@@ -216,10 +201,8 @@ export interface GeneratePromptBatchPlanInput {
 }
 
 export interface GeneratePromptBatchPlan {
-  /** Outer list is a cartesian product; each inner list is zipped. */
   data: GeneratePromptBatchDatum[][];
   runs: number;
-  /** Images this plan produces, for optimistic placeholder sizing. */
   expectedImageCount: number;
 }
 
@@ -227,10 +210,7 @@ export interface GeneratePromptBatchPlan {
 const generateLegacySeedSequence = (start: number, count: number): number[] =>
   Array.from({ length: sanitizeBatchCount(count) }, (_, index) => (start + index) % SEED_MAX);
 
-/**
- * Recovery preserves legacy random-toggle seed rules, including exclusive SEED_MAX wrapping; new submissions never
- * use this path.
- */
+/** Keeps legacy random-toggle seed rules (exclusive SEED_MAX wrapping); new submissions never use this. */
 export const buildLegacyGeneratePromptBatchPlan = ({
   batchCount,
   negativePrompt,
@@ -282,10 +262,7 @@ export const buildLegacyGeneratePromptBatchPlan = ({
   };
 };
 
-/**
- * Held seeds reuse one value. Stepping per-iteration seeds form a product with prompts; per-image seeds zip with
- * repeated prompts.
- */
+/** Per-iteration seeds form a product with prompts; per-image seeds zip with repeated prompts. */
 export const buildGeneratePromptBatchPlan = ({
   batchCount,
   negativePrompt,
@@ -328,9 +305,7 @@ export const buildGeneratePromptBatchPlan = ({
     };
   }
 
-  // per-iteration: the seed list is its own dimension, so each iteration's seed
-  // is applied across the whole prompt set. Seeds first so results group by
-  // iteration rather than interleaving prompts.
+  // Seeds first so results group by iteration rather than interleaving prompts.
   const seeds = isHeld ? [seed] : generateSeedSequence(seed, iterations, seedStep);
 
   return {
@@ -340,27 +315,21 @@ export const buildGeneratePromptBatchPlan = ({
   };
 };
 
-/** The prompt and seed fields of a generate submission, from compilation to `enqueue_batch`. */
 export interface GeneratePromptSubmission {
   batchCount: number;
   negativePrompt: string;
   negativePromptNodeId: string;
   positivePrompt: string;
   positivePromptNodeId: string;
-  /**
-   * Prompts to submit as a batch dimension, already expanded by the caller.
-   * Absent or empty submits `positivePrompt` verbatim.
-   */
+  /** Already expanded by the caller; absent or empty submits `positivePrompt` verbatim. */
   positivePrompts?: string[];
   seed: number;
   seedBehaviour?: QueuePromptSeedBehaviour;
   seedNodeId: string;
   seedStep: QueueSeedStep;
-  /** Legacy recovery maps the old random toggle to seedStep and preserves its expansion rules. */
   legacySeedPlan?: true;
 }
 
-/** The batch data and run count `enqueue_batch` receives for a generate submission. */
 export const planGenerateSubmissionBatch = (submission: GeneratePromptSubmission): GeneratePromptBatchPlan =>
   (submission.legacySeedPlan ? buildLegacyGeneratePromptBatchPlan : buildGeneratePromptBatchPlan)({
     batchCount: sanitizeBatchCount(submission.batchCount),

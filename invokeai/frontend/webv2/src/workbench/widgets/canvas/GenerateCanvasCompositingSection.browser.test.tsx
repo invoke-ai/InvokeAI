@@ -10,7 +10,6 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { page, userEvent } from 'vitest/browser';
 
-/** The canvas widget's values, as the workbench holds them. */
 const canvas = vi.hoisted(() => ({
   values: null as unknown as ReturnType<typeof createExternalStoreCore<Record<string, unknown>>>,
 }));

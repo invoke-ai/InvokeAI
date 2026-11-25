@@ -1,7 +1,6 @@
 /**
- * Edit-step building blocks shared by the layer controllers: byte accounting, replay reservations, the steps that
- * add, replace and remove layers with their pixels, and how a publication's outcome is reported to each kind of
- * caller.
+ * Edit-step building blocks shared by the layer controllers: byte accounting, replay reservations, the steps that add,
+ * replace and remove layers with their pixels, and how a publication's outcome is reported to each kind of caller.
  */
 
 import type { CanvasDocumentContractV3, CanvasLayerContract } from '@workbench/canvas-engine/contracts';
@@ -33,8 +32,6 @@ export interface LayerPixels {
 }
 
 export const rgbaBytes = (rect: Rect): number => Math.max(0, rect.width) * Math.max(0, rect.height) * 4;
-
-// ---- Publication outcomes ----------------------------------------------------------------------------------
 
 /**
  * Whether a layer operation can read a layer's cache now: `not-ready` while its pixels load or cannot be fetched for
@@ -73,8 +70,8 @@ export const layerOperationStatus = (result: EditPublishResult): LayerOperationS
 export type GuardedResultRefusal = LayerEditRefusal | SubsetOf<CanvasTransactionOutcome, 'stale'>;
 
 /**
- * Guarded result operations (generated, filter, mask and staged results, mask edits, duplicate) were prepared
- * against a guard, so a step that did not land means the target moved on: `stale`.
+ * Guarded result operations (generated, filter, mask and staged results, mask edits, duplicate) were prepared against a
+ * guard, so a step that did not land means the target moved on: `stale`.
  */
 export const guardedResultRefusal = (
   result: Exclude<EditPublishResult, { status: 'committed' }>
@@ -87,8 +84,6 @@ export const guardedResultRefusal = (
       return layerEditRefusal(result.status);
   }
 };
-
-// ---- Replays -------------------------------------------------------------------------------------------------
 
 export type ReplayContext = Pick<CanvasMutationContext, 'reserveRaster'>;
 
@@ -126,8 +121,6 @@ export const replayWithPixels = (
     ctx.applyStep(step(ctx.preparePixels(layerId, snapshot.rect, snapshot.pixels)))
   );
 };
-
-// ---- Steps ---------------------------------------------------------------------------------------------------
 
 /** Options shared by the in-place replace steps. */
 export interface ReplaceLayerStepOptions {
@@ -189,9 +182,8 @@ export const replaceLayerStep = (
 });
 
 /**
- * {@link replaceLayerStep} for several same-type leaves at once, as one `replaceCanvasLayers`. It rolls back to
- * `restore` (one contract per replaced layer) when its postconditions fail; without a complete restore set it has no
- * rollback.
+ * {@link replaceLayerStep} for several same-type leaves at once, as one `replaceCanvasLayers`. Failed postconditions
+ * roll back to `restore` (one contract per replaced layer); an incomplete restore set means no rollback.
  */
 export const replaceLayersStep = (
   ctx: Pick<CanvasMutationContext, 'installPrepared'>,
@@ -243,8 +235,6 @@ export const removeLayerStep = (layerId: string, selectedLayerId: string | null)
   mutation: removeLayerMutation(layerId, selectedLayerId),
 });
 
-// ---- New paint layers ----------------------------------------------------------------------------------------
-
 /** A raster paint layer placing pixels at `rect` with an identity transform. */
 export const paintLayerAt = (id: string, name: string, rect: Rect): CanvasLayerContract => ({
   blendMode: 'normal',
@@ -270,6 +260,8 @@ export interface AddedRasterLayerEdit {
   readonly anchor: CanvasNodeInsertionAnchor;
   /** The selection undo restores. */
   readonly selectedLayerId: string | null;
+  /** Keep the existing selection when inserting and replaying this edit. Defaults to selecting the new layer. */
+  readonly preserveSelection?: boolean;
   /** Enabled flags the edit sets on other layers, and the values undo restores. */
   readonly enabled?: { readonly before: EnabledUpdates; readonly after: EnabledUpdates };
   readonly heldAssetRefs?: HeldAssetRefs;
@@ -279,8 +271,8 @@ export interface AddedRasterLayerEdit {
 export const addedLayerHistoryBytes = (rect: Rect): number => rgbaBytes(rect) + HISTORY_ENTRY_OVERHEAD_BYTES;
 
 /**
- * Inserts the layer with its prepared pixels as one undo step. The cache replacement is reserved and prepared
- * before the document changes; replays prepare again under their own reservation.
+ * Inserts the layer with its prepared pixels as one undo step. The cache replacement is reserved and prepared before
+ * the document changes; replays prepare again under their own reservation.
  */
 export const publishAddedRasterLayer = (
   ctx: LayerStepContext,
@@ -288,12 +280,13 @@ export const publishAddedRasterLayer = (
   edit: AddedRasterLayerEdit
 ): EditPublishResult => {
   const { anchor, layer, pixels, rect, selectedLayerId } = edit;
+  const nextSelectedLayerId = edit.preserveSelection ? selectedLayerId : layer.id;
   const after = edit.enabled?.after ?? [];
   const before = edit.enabled?.before ?? [];
   const forward: CanvasProjectMutation = {
     add: [{ anchor, nodes: [layer] }],
     enabledUpdates: after,
-    selectedLayerId: layer.id,
+    selectedLayerId: nextSelectedLayerId,
     type: 'applyCanvasLayerStackMutation',
   };
   const inverse: CanvasProjectMutation = {
@@ -305,7 +298,7 @@ export const publishAddedRasterLayer = (
   const hasEnabled = (document: CanvasDocumentContractV3 | null, updates: EnabledUpdates): boolean =>
     updates.every((update) => getDocumentLayer(document, update.id)?.isEnabled === update.isEnabled);
   const added = (document: CanvasDocumentContractV3 | null): boolean =>
-    document?.selectedLayerId === layer.id &&
+    document?.selectedLayerId === nextSelectedLayerId &&
     getDocumentLayer(document, layer.id) === layer &&
     hasEnabled(document, after);
   const removed = (document: CanvasDocumentContractV3 | null): boolean =>
@@ -333,3 +326,24 @@ export const publishAddedRasterLayer = (
       ctx.applyStep({ accepted: removed, mutation: inverse, rollback: { mutation: forward, restored: added } }),
   });
 };
+
+/** Structural pair for a newly created vector layer. Callers choose whether insertion selects it. */
+export const addedVectorLayerMutations = (
+  layer: Extract<CanvasLayerContract, { type: 'vector' }>,
+  anchor: CanvasNodeInsertionAnchor,
+  selectedBefore: string | null,
+  selectNew = true
+): { forward: CanvasProjectMutation; inverse: CanvasProjectMutation } => ({
+  forward: {
+    type: 'applyCanvasLayerStackMutation',
+    enabledUpdates: [],
+    add: [{ anchor, nodes: [layer] }],
+    selectedLayerId: selectNew ? layer.id : selectedBefore,
+  },
+  inverse: {
+    type: 'applyCanvasLayerStackMutation',
+    enabledUpdates: [],
+    removeIds: [layer.id],
+    selectedLayerId: selectedBefore,
+  },
+});

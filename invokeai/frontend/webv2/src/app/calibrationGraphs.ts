@@ -1,7 +1,7 @@
 /**
- * The graphs a working-memory calibration queues, compiled exactly as `pnpm graphs:export` compiles its cases, which
- * is how Generate compiles them: over the model records the caller read and the capability table the server serves.
- * The Model Manager loads this module only once Calibrate is clicked, to check that the plan compiles before its
+ * The graphs a working-memory calibration queues, compiled exactly as `pnpm graphs:export` compiles its cases, which is
+ * how Generate compiles them: over the model records the caller read and the capability table the server serves. The
+ * Model Manager loads this module only once Calibrate is clicked, to check that the plan compiles before its
  * confirmation opens (`compileCalibrationGraphs` in `router.tsx`); the compiler itself runs in
  * `calibrationGraphs.worker.ts`.
  */
@@ -16,8 +16,8 @@ import type { GraphExportResponse } from './graphExport';
 const GRAPH_EXPORT_VERSION = 1;
 
 /**
- * A plan case in the export's snake_case case format. The plan adds what the case measures (`estimator`, `line`),
- * which the export reader rejects as unknown fields.
+ * A plan case in the export's snake_case case format. The plan adds what the case measures (`estimator`, `line`), which
+ * the export reader rejects as unknown fields.
  */
 export const toGraphExportCase = ({
   estimator: _estimator,

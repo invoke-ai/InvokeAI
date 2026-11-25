@@ -98,8 +98,8 @@ export const GraphPreviewFlow = ({
   const backgroundId = useId().replace(/:/g, '');
   const nodes = useMemo(() => toPreviewNodes(graph, t, positionHints), [graph, t, positionHints]);
   const edges = useMemo(() => toPreviewEdges(graph), [graph]);
-  // xyflow types `onInit` against this component's node/edge generics; the snapshot only calls generic instance
-  // methods (`fitView`), so the narrower instance is safe to widen back to the public, type-erased signature.
+  // xyflow types `onInit` against this component's node/edge generics; the snapshot only calls generic instance methods
+  // (`fitView`), so the narrower instance is safe to widen back to the public, type-erased signature.
   const handleInit = useCallback(
     (instance: ReactFlowInstance<PreviewFlowNode, FlowEdge>) => onInit(instance as unknown as ReactFlowInstance),
     [onInit]

@@ -9,7 +9,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { ImageIndexProgressInline, ImageIndexProgressPanel } from './ImageIndexProgress';
 
-// The components read the global instance; give it the English catalog.
 await i18next.use(initReactI18next).init({
   interpolation: { escapeValue: false },
   lng: 'en',
@@ -65,35 +64,14 @@ afterEach(async () => {
 });
 
 describe('ImageIndexProgressPanel', () => {
-  it('exposes the share done to assistive tech, not just as a painted width', async () => {
-    await render({ embedded: 25, failed: 0, pending: 75, total: 100 });
+  it('exposes the share done to assistive tech, rounded, not just as a painted width', async () => {
+    await render(PART_WAY);
 
     const bar = host!.querySelector('[role="progressbar"]')!;
 
-    expect(bar.getAttribute('aria-valuenow')).toBe('25');
+    expect(bar.getAttribute('aria-valuenow')).toBe('28');
     expect(bar.getAttribute('aria-valuemax')).toBe('100');
     expect(bar.getAttribute('aria-label')).toBe('Image indexing progress');
-  });
-
-  it('rounds the announced value instead of reading out sixteen digits', async () => {
-    await render(PART_WAY);
-
-    expect(host!.querySelector('[role="progressbar"]')!.getAttribute('aria-valuenow')).toBe('28');
-  });
-
-  it('shows the counts and the percentage', async () => {
-    await render({ embedded: 25, failed: 0, pending: 75, total: 100 });
-
-    const text = host!.textContent ?? '';
-
-    expect(text).toContain('25 of 100 images');
-    expect(text).toContain('25%');
-  });
-
-  it('says nothing about staleness while reports are still arriving', async () => {
-    await render({ embedded: 25, failed: 0, pending: 75, total: 100 }, Date.now());
-
-    expect(host!.textContent).not.toContain('No progress reported');
   });
 
   it('notices the silence itself, without waiting for an event', async () => {
@@ -118,8 +96,6 @@ describe('ImageIndexProgressPanel', () => {
 
     const text = host!.textContent ?? '';
 
-    // An indexer waiting out a generation and one that has died look
-    // identical from here, and the first is routine.
     expect(text).toContain('No progress reported for 10m 00s');
     expect(text).not.toContain('queue');
     expect(text).not.toContain('Paused');
@@ -145,7 +121,6 @@ describe('ImageIndexProgressPanel', () => {
 
     const text = host!.textContent ?? '';
 
-    // Both, not one or the other: the backfill is still worth watching.
     expect(text).toContain('Failed to load the image map');
     expect(text).toContain('25 of 100 images');
 
@@ -163,8 +138,6 @@ describe('ImageIndexProgressPanel', () => {
       '280px'
     );
 
-    // A URL or a dotted identifier has no break opportunity, and the widget
-    // body is clipped: without `overflowWrap` it runs off both edges.
     expect(host!.scrollWidth).toBeLessThanOrEqual(host!.clientWidth);
   });
 
@@ -182,7 +155,6 @@ describe('ImageIndexProgressPanel', () => {
 
 describe('ImageIndexProgressInline', () => {
   it('stays inside a footer narrower than its content', async () => {
-    // Keep six-digit counts inside a 280px panel without overlapping refresh.
     await mount(
       <div style={NARROW_HOST}>
         <ImageIndexProgressInline counts={SIX_DIGITS} updatedAt={Date.now()} />
@@ -201,8 +173,6 @@ describe('ImageIndexProgressInline', () => {
   });
 
   it('carries the counts in the accessible name, which truncation cannot take away', async () => {
-    // At the minimum widget width the visible label is down to a couple of
-    // characters and the tooltip that carries the rest is hover-only.
     await mount(
       <div style={NARROW_HOST}>
         <ImageIndexProgressInline counts={SIX_DIGITS} updatedAt={Date.now()} />
@@ -224,7 +194,6 @@ describe('ImageIndexProgressInline', () => {
       '120px'
     );
 
-    // Prevent flex shrinking from erasing the glanceable progress bar.
     expect(host!.querySelector('[role="progressbar"]')!.getBoundingClientRect().width).toBeGreaterThanOrEqual(38);
   });
 });

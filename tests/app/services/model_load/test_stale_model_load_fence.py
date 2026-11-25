@@ -16,6 +16,8 @@ from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.model_load.model_load_default import ModelLoadService
 from invokeai.app.services.model_records import ModelRecordChanges, ModelRecordServiceSQL
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
+from invokeai.backend.model_manager.configs.qwen3_5_encoder import Qwen35Encoder_Checkpoint_Config
+from invokeai.backend.model_manager.configs.roles import view_as
 from invokeai.backend.model_manager.configs.siglip import SigLIP_Diffusers_Config
 from invokeai.backend.model_manager.load import (
     LoadedModel,
@@ -25,8 +27,10 @@ from invokeai.backend.model_manager.load import (
     StaleModelConfigError,
 )
 from invokeai.backend.model_manager.load.model_cache.model_cache import MODEL_LOAD_LOCK
-from invokeai.backend.model_manager.taxonomy import AnyModel, SubModelType
+from invokeai.backend.model_manager.load.model_cache.shared_cpu_weights import SharedCpuWeightsStore
+from invokeai.backend.model_manager.taxonomy import AnyModel, ModelType, SubModelType
 from invokeai.backend.util.logging import InvokeAILogger
+from tests.fixtures.model_roles import text_llm_file
 from tests.fixtures.sqlite_database import create_mock_sqlite_database
 
 KEY = "siglip-key"
@@ -325,6 +329,90 @@ def _warm(service: ModelLoadService, store: ModelRecordServiceSQL) -> None:
     with service.load_model(store.get_model(KEY)):
         pass
     assert _is_cached(service.ram_cache)
+
+
+def test_service_drop_waits_for_cross_cache_adoption(harness, monkeypatch):
+    service, records, source, _ = harness
+    weights = SharedCpuWeightsStore()
+    source._shared_cpu_weights = weights
+    _warm(service, records)
+    canonical = weights.peek(KEY)
+    assert canonical is not None and weights.get_shell(KEY) is not None
+
+    dest = ModelCache(
+        execution_device_working_mem_gb=1,
+        enable_partial_loading=False,
+        keep_ram_copy_of_weights=True,
+        execution_device="cpu",
+        logger=InvokeAILogger.get_logger(),
+        shared_cpu_weights=weights,
+    )
+    service._ram_caches = {"source": source, "cpu": dest}
+    # Unmatched host devices must also load into the destination, not the warmed source.
+    service._default_ram_cache = dest
+    cloning, resume, waiting = threading.Event(), threading.Event(), threading.Event()
+    original_adopt = _RecordingLoader._try_adopt_shared_weights
+    original_wait = MODEL_LOAD_LOCK._cond.wait
+
+    def paused_adopt(loader, key, pin):
+        assert pin.state_dict is canonical
+        cloning.set()
+        assert resume.wait(30), "adoption was not released"
+        return original_adopt(loader, key, pin)
+
+    def observe_wait(timeout=None):
+        if threading.current_thread().name == "drop-model":
+            waiting.set()
+        return original_wait(timeout)
+
+    monkeypatch.setattr(_RecordingLoader, "_try_adopt_shared_weights", paused_adopt)
+    monkeypatch.setattr(MODEL_LOAD_LOCK._cond, "wait", observe_wait)
+    outcomes: list[object] = []
+    drops: list[object] = []
+
+    def run(result, operation):
+        try:
+            result.append(operation())
+        except BaseException as exc:
+            result.append(exc)
+
+    loader = threading.Thread(
+        target=run, args=(outcomes, lambda: service.load_model(records.get_model(KEY))), daemon=True
+    )
+    drop = threading.Thread(
+        name="drop-model", target=run, args=(drops, lambda: service.drop_cached_models([KEY])), daemon=True
+    )
+    try:
+        loader.start()
+        assert cloning.wait(10), f"loader did not reach adoption: {outcomes}"
+        drop.start()
+        assert waiting.wait(10), "drop did not wait for the model load lock"
+        with MODEL_LOAD_LOCK._cond:
+            assert MODEL_LOAD_LOCK._writer_active and MODEL_LOAD_LOCK._writers_waiting > 0
+        assert not drops
+        resume.set()
+        loader.join(10)
+        drop.join(10)
+        assert not loader.is_alive() and not drop.is_alive()
+        assert len(outcomes) == 1 and isinstance(outcomes[0], LoadedModel), outcomes
+        assert len(drops) == 1 and isinstance(drops[0], int), drops
+        assert _RecordingLoader.built_from == [None]
+        assert weights.peek(KEY) is None
+        assert dest._cached_models[KEY].is_stale
+        assert dest._cached_models[KEY].cached_model.get_cpu_state_dict() is canonical
+        with outcomes[0]:
+            pass
+        with service.load_model(records.get_model(KEY)):
+            pass
+        assert _RecordingLoader.built_from == [None, None]
+    finally:
+        resume.set()
+        loader.join(10)
+        if drop.ident is not None:
+            drop.join(10)
+        if not loader.is_alive() and not drop.is_alive():
+            dest.shutdown()
+            source.shutdown()
 
 
 def test_a_change_drops_the_model_before_it_ends(harness):
@@ -743,3 +831,36 @@ def test_loader_built_directly_on_the_base_is_refused_before_it_can_cache(harnes
         service.load_model(store.get_model(KEY))
     assert not _is_cached(cache)
     assert events.log == [("started", "siglip"), ("complete", "siglip")]
+
+
+# A role view is compared with the stored record in the same role: its type and class never equal the record's.
+
+ROLE_KEY = "llm-key"
+
+
+def _role_view(store: ModelRecordServiceSQL) -> AnyModelConfig:
+    store.add_model(text_llm_file(ROLE_KEY))
+    return view_as(store.get_model(ROLE_KEY), ModelType.Qwen35Encoder)
+
+
+def test_a_role_view_of_an_unchanged_record_is_current_and_a_moved_one_is_not(harness):
+    service, store, _, _ = harness
+    view = _role_view(store)
+
+    assert service._config_is_current(view)
+    assert service._moved_record(view) is None
+
+    store.update_model(ROLE_KEY, ModelRecordChanges(path="llm/other"))
+
+    assert not service._config_is_current(view)
+    moved = service._moved_record(view)
+    assert isinstance(moved, Qwen35Encoder_Checkpoint_Config) and moved.path == "llm/other"
+
+
+def test_a_role_view_of_a_record_that_lost_the_role_is_not_current_and_has_no_moved_record(harness):
+    service, store, _, _ = harness
+    view = _role_view(store)
+    store.replace_model(ROLE_KEY, text_llm_file(ROLE_KEY, serves_encoder=None))
+
+    assert not service._config_is_current(view)
+    assert service._moved_record(view) is None

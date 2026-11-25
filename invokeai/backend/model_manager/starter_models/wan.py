@@ -10,6 +10,7 @@ from invokeai.backend.model_manager.taxonomy import (
 )
 
 wan_22_a14b_vae = StarterModel(
+    source_urls=["https://huggingface.co/Wan-AI/Wan2.2-T2V-A14B-Diffusers"],
     name="Wan 2.2 A14B VAE",
     base=BaseModelType.Wan,
     source="Wan-AI/Wan2.2-T2V-A14B-Diffusers::vae/diffusion_pytorch_model.safetensors",
@@ -20,6 +21,7 @@ wan_22_a14b_vae = StarterModel(
 )
 
 wan_22_5b_vae = StarterModel(
+    source_urls=["https://huggingface.co/Wan-AI/Wan2.2-TI2V-5B-Diffusers"],
     name="Wan 2.2 TI2V-5B VAE",
     base=BaseModelType.Wan,
     source="Wan-AI/Wan2.2-TI2V-5B-Diffusers::vae/diffusion_pytorch_model.safetensors",
@@ -32,6 +34,7 @@ wan_22_5b_vae = StarterModel(
 # Filed under Wan, but a TAE serves every architecture denoising in its latent space: the Wan 2.1 VAE's
 # is also Qwen-Image's, Krea-2's and Anima's, so this one record previews all four.
 taew2_1 = StarterModel(
+    source_urls=["https://github.com/madebyollin/taehv"],
     name="TAEW2.1 (Wan 2.1 VAE preview decoder)",
     base=BaseModelType.Wan,
     source="https://github.com/madebyollin/taehv/raw/62f7591f59dfbb4c3c02b7a621d180a9eeaba26c/safetensors/taew2_1.safetensors",
@@ -42,6 +45,7 @@ taew2_1 = StarterModel(
 )
 
 taew2_2 = StarterModel(
+    source_urls=["https://github.com/madebyollin/taehv"],
     name="TAEW2.2 (Wan 2.2 TI2V-5B preview decoder)",
     base=BaseModelType.Wan,
     source="https://github.com/madebyollin/taehv/raw/62f7591f59dfbb4c3c02b7a621d180a9eeaba26c/safetensors/taew2_2.safetensors",
@@ -56,6 +60,7 @@ taew2_2 = StarterModel(
 # lists its low-noise partner plus the shared VAE/encoder as dependencies so
 # the bundle/dependency installer pulls everything together.
 wan_22_t2v_a14b_diffusers = StarterModel(
+    source_urls=["https://huggingface.co/Wan-AI/Wan2.2-T2V-A14B-Diffusers"],
     name="Wan 2.2 T2V A14B (Diffusers)",
     base=BaseModelType.Wan,
     source="Wan-AI/Wan2.2-T2V-A14B-Diffusers",
@@ -67,6 +72,7 @@ wan_22_t2v_a14b_diffusers = StarterModel(
 )
 
 wan_22_t2v_a14b_low_gguf_q4_k_m = StarterModel(
+    source_urls=["https://huggingface.co/QuantStack/Wan2.2-T2V-A14B-GGUF"],
     name="Wan 2.2 T2V A14B Low Noise (Q4_K_M)",
     base=BaseModelType.Wan,
     source="https://huggingface.co/QuantStack/Wan2.2-T2V-A14B-GGUF/resolve/main/LowNoise/Wan2.2-T2V-A14B-LowNoise-Q4_K_M.gguf",
@@ -78,6 +84,7 @@ wan_22_t2v_a14b_low_gguf_q4_k_m = StarterModel(
 )
 
 wan_22_t2v_a14b_gguf_q4_k_m = StarterModel(
+    source_urls=["https://huggingface.co/QuantStack/Wan2.2-T2V-A14B-GGUF"],
     name="Wan 2.2 T2V A14B High Noise (Q4_K_M)",
     base=BaseModelType.Wan,
     source="https://huggingface.co/QuantStack/Wan2.2-T2V-A14B-GGUF/resolve/main/HighNoise/Wan2.2-T2V-A14B-HighNoise-Q4_K_M.gguf",
@@ -90,6 +97,7 @@ wan_22_t2v_a14b_gguf_q4_k_m = StarterModel(
 )
 
 wan_22_t2v_a14b_low_gguf_q8_0 = StarterModel(
+    source_urls=["https://huggingface.co/QuantStack/Wan2.2-T2V-A14B-GGUF"],
     name="Wan 2.2 T2V A14B Low Noise (Q8_0)",
     base=BaseModelType.Wan,
     source="https://huggingface.co/QuantStack/Wan2.2-T2V-A14B-GGUF/resolve/main/LowNoise/Wan2.2-T2V-A14B-LowNoise-Q8_0.gguf",
@@ -100,6 +108,7 @@ wan_22_t2v_a14b_low_gguf_q8_0 = StarterModel(
 )
 
 wan_22_t2v_a14b_gguf_q8_0 = StarterModel(
+    source_urls=["https://huggingface.co/QuantStack/Wan2.2-T2V-A14B-GGUF"],
     name="Wan 2.2 T2V A14B High Noise (Q8_0)",
     base=BaseModelType.Wan,
     source="https://huggingface.co/QuantStack/Wan2.2-T2V-A14B-GGUF/resolve/main/HighNoise/Wan2.2-T2V-A14B-HighNoise-Q8_0.gguf",
@@ -113,6 +122,7 @@ wan_22_t2v_a14b_gguf_q8_0 = StarterModel(
 
 # T2V Lightning LoRAs — V1.1 Seko rank-64 pair (4-step inference).
 wan_22_t2v_lightning_high = StarterModel(
+    source_urls=["https://huggingface.co/lightx2v/Wan2.2-Lightning"],
     name="Wan 2.2 T2V Lightning High Noise (4-step, V1.1)",
     base=BaseModelType.Wan,
     source="https://huggingface.co/lightx2v/Wan2.2-Lightning/resolve/main/Wan2.2-T2V-A14B-4steps-lora-rank64-Seko-V1.1/high_noise_model.safetensors",
@@ -122,6 +132,7 @@ wan_22_t2v_lightning_high = StarterModel(
 )
 
 wan_22_t2v_lightning_low = StarterModel(
+    source_urls=["https://huggingface.co/lightx2v/Wan2.2-Lightning"],
     name="Wan 2.2 T2V Lightning Low Noise (4-step, V1.1)",
     base=BaseModelType.Wan,
     source="https://huggingface.co/lightx2v/Wan2.2-Lightning/resolve/main/Wan2.2-T2V-A14B-4steps-lora-rank64-Seko-V1.1/low_noise_model.safetensors",
@@ -132,6 +143,7 @@ wan_22_t2v_lightning_low = StarterModel(
 
 # I2V A14B — full Diffusers + GGUF expert pairs (Q4_K_M and Q8_0).
 wan_22_i2v_a14b_diffusers = StarterModel(
+    source_urls=["https://huggingface.co/Wan-AI/Wan2.2-I2V-A14B-Diffusers"],
     name="Wan 2.2 I2V A14B (Diffusers)",
     base=BaseModelType.Wan,
     source="Wan-AI/Wan2.2-I2V-A14B-Diffusers",
@@ -143,6 +155,7 @@ wan_22_i2v_a14b_diffusers = StarterModel(
 )
 
 wan_22_i2v_a14b_low_gguf_q4_k_m = StarterModel(
+    source_urls=["https://huggingface.co/QuantStack/Wan2.2-I2V-A14B-GGUF"],
     name="Wan 2.2 I2V A14B Low Noise (Q4_K_M)",
     base=BaseModelType.Wan,
     source="https://huggingface.co/QuantStack/Wan2.2-I2V-A14B-GGUF/resolve/main/LowNoise/Wan2.2-I2V-A14B-LowNoise-Q4_K_M.gguf",
@@ -153,6 +166,7 @@ wan_22_i2v_a14b_low_gguf_q4_k_m = StarterModel(
 )
 
 wan_22_i2v_a14b_gguf_q4_k_m = StarterModel(
+    source_urls=["https://huggingface.co/QuantStack/Wan2.2-I2V-A14B-GGUF"],
     name="Wan 2.2 I2V A14B High Noise (Q4_K_M)",
     base=BaseModelType.Wan,
     source="https://huggingface.co/QuantStack/Wan2.2-I2V-A14B-GGUF/resolve/main/HighNoise/Wan2.2-I2V-A14B-HighNoise-Q4_K_M.gguf",
@@ -165,6 +179,7 @@ wan_22_i2v_a14b_gguf_q4_k_m = StarterModel(
 )
 
 wan_22_i2v_a14b_low_gguf_q8_0 = StarterModel(
+    source_urls=["https://huggingface.co/QuantStack/Wan2.2-I2V-A14B-GGUF"],
     name="Wan 2.2 I2V A14B Low Noise (Q8_0)",
     base=BaseModelType.Wan,
     source="https://huggingface.co/QuantStack/Wan2.2-I2V-A14B-GGUF/resolve/main/LowNoise/Wan2.2-I2V-A14B-LowNoise-Q8_0.gguf",
@@ -175,6 +190,7 @@ wan_22_i2v_a14b_low_gguf_q8_0 = StarterModel(
 )
 
 wan_22_i2v_a14b_gguf_q8_0 = StarterModel(
+    source_urls=["https://huggingface.co/QuantStack/Wan2.2-I2V-A14B-GGUF"],
     name="Wan 2.2 I2V A14B High Noise (Q8_0)",
     base=BaseModelType.Wan,
     source="https://huggingface.co/QuantStack/Wan2.2-I2V-A14B-GGUF/resolve/main/HighNoise/Wan2.2-I2V-A14B-HighNoise-Q8_0.gguf",
@@ -187,6 +203,7 @@ wan_22_i2v_a14b_gguf_q8_0 = StarterModel(
 
 # I2V Lightning LoRAs — Seko rank-64 pair (4-step inference). Currently only V1.
 wan_22_i2v_lightning_high = StarterModel(
+    source_urls=["https://huggingface.co/lightx2v/Wan2.2-Lightning"],
     name="Wan 2.2 I2V Lightning High Noise (4-step, V1)",
     base=BaseModelType.Wan,
     source="https://huggingface.co/lightx2v/Wan2.2-Lightning/resolve/main/Wan2.2-I2V-A14B-4steps-lora-rank64-Seko-V1/high_noise_model.safetensors",
@@ -196,6 +213,7 @@ wan_22_i2v_lightning_high = StarterModel(
 )
 
 wan_22_i2v_lightning_low = StarterModel(
+    source_urls=["https://huggingface.co/lightx2v/Wan2.2-Lightning"],
     name="Wan 2.2 I2V Lightning Low Noise (4-step, V1)",
     base=BaseModelType.Wan,
     source="https://huggingface.co/lightx2v/Wan2.2-Lightning/resolve/main/Wan2.2-I2V-A14B-4steps-lora-rank64-Seko-V1/low_noise_model.safetensors",
@@ -206,6 +224,7 @@ wan_22_i2v_lightning_low = StarterModel(
 
 # TI2V-5B — single-transformer model (no expert pair). Uses its own 48-channel VAE.
 wan_22_ti2v_5b_diffusers = StarterModel(
+    source_urls=["https://huggingface.co/Wan-AI/Wan2.2-TI2V-5B-Diffusers"],
     name="Wan 2.2 TI2V-5B (Diffusers)",
     base=BaseModelType.Wan,
     source="Wan-AI/Wan2.2-TI2V-5B-Diffusers",
@@ -217,6 +236,7 @@ wan_22_ti2v_5b_diffusers = StarterModel(
 )
 
 wan_22_ti2v_5b_gguf_q4_k_m = StarterModel(
+    source_urls=["https://huggingface.co/QuantStack/Wan2.2-TI2V-5B-GGUF"],
     name="Wan 2.2 TI2V-5B (Q4_K_M)",
     base=BaseModelType.Wan,
     source="https://huggingface.co/QuantStack/Wan2.2-TI2V-5B-GGUF/resolve/main/Wan2.2-TI2V-5B-Q4_K_M.gguf",
@@ -228,6 +248,7 @@ wan_22_ti2v_5b_gguf_q4_k_m = StarterModel(
 )
 
 wan_22_ti2v_5b_gguf_q8_0 = StarterModel(
+    source_urls=["https://huggingface.co/QuantStack/Wan2.2-TI2V-5B-GGUF"],
     name="Wan 2.2 TI2V-5B (Q8_0)",
     base=BaseModelType.Wan,
     source="https://huggingface.co/QuantStack/Wan2.2-TI2V-5B-GGUF/resolve/main/Wan2.2-TI2V-5B-Q8_0.gguf",

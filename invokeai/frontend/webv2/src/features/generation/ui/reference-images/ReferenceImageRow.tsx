@@ -74,7 +74,6 @@ import {
 } from './ReferenceImageControls';
 import { ReferenceImageCropDialog } from './ReferenceImageCropDialog';
 
-/** Reference image config variants that carry a selectable model. */
 type ModelBackedConfig = Extract<
   GenerateReferenceImageConfig,
   { type: 'ip_adapter' | 'flux_redux' | 'flux_kontext_reference_image' }
@@ -88,7 +87,6 @@ const DEFAULT_MODEL_TYPES = ['ip_adapter'];
 export const getReferenceModelTypes = (base: string | undefined): string[] =>
   base === 'flux' ? FLUX_MODEL_TYPES : DEFAULT_MODEL_TYPES;
 const COVER_IMG_STYLE: CSSProperties = { display: 'block', height: '100%', objectFit: 'cover', width: '100%' };
-/** An off reference keeps its image recognizable but plainly not in use. */
 const OFF_IMG_STYLE: CSSProperties = { ...COVER_IMG_STYLE, filter: 'grayscale(1) brightness(0.75)' };
 const PROMPT_TAG_COPIED_MS = 1500;
 const CHEVRON_OPEN_CSS = { transform: 'rotate(180deg)' } as const;
@@ -101,11 +99,7 @@ const MODEL_ISSUE_KEYS = new Set(
 );
 const INDEX_PLACEHOLDER = '\u0000';
 
-/**
- * Whether a name reads as some position's default ("Reference image 7"), in the active language and any case; null
- * when the locale's template cannot be matched safely (only the number, or a number formatter that drops the
- * placeholder), and then only a row's own default is recognized.
- */
+/** Matches any position's default in any case; null when the locale template cannot be matched safely. */
 export const getPositionalDefaultNameTest = (t: TFunction): ((name: string) => boolean) | null => {
   const parts = t('widgets.generate.referenceImageNumbered', { index: INDEX_PLACEHOLDER }).split(INDEX_PLACEHOLDER);
   const [before = '', after = ''] = parts.map((part) => part.trim());
@@ -172,18 +166,11 @@ export const describeReferenceImage = (
 
 export interface ReferenceImageRowProps {
   count: number;
-  /**
-   * An installed model the row's picker could offer. Without one, an issue asking for a model offers the Model
-   * Manager instead of a picker with nothing in it.
-   */
+  /** Without one, a model issue offers the Model Manager instead of an empty picker. */
   hasModelChoice?: boolean;
-  /** Opens Add Models filtered to a model type, for an issue no installed model fixes. */
   onOpenModelManager?: (modelType: string) => void;
   index: number;
-  /**
-   * False lists the row dimmed, badged and inert: the selected model takes no references, and the list above it says
-   * so with its one way out.
-   */
+  /** False lists the row dimmed and inert: the selected model takes no references. */
   isSupported?: boolean;
   /** How the prompt names this reference, for models that address references by tag. */
   promptTag?: string;
@@ -198,12 +185,7 @@ export interface ReferenceImageRowProps {
   onUseSize: (image: GenerateReferenceImageAsset) => void;
 }
 
-/**
- * One reference image as a list row, the same construction as a concept row: its image tile, name and live summary,
- * a switch and a menu, with its one main control on the row and the rest of its settings under a disclosure. The
- * row's button opens the menu (Enter, Space, right-click); F2 or a double-click renames; Right and Left open and
- * close the settings; Alt+Up and Alt+Down move it; Delete removes it.
- */
+/** Enter/Space/right-click opens the menu; F2 renames; Right/Left toggle settings; Alt+Up/Down move; Delete removes. */
 const ReferenceImageRowBase = ({
   count,
   hasModelChoice = true,
@@ -228,7 +210,6 @@ const ReferenceImageRowBase = ({
   const defaultName = t('widgets.generate.referenceImageNumbered', { index: index + 1 });
   const name = referenceImage.name ?? defaultName;
   const hasSettings = isSupported && hasRowControl(config);
-  // Closed until asked for: the chevron, Right, or an issue's Choose model.
   const [isOpen, setIsOpen] = useState(false);
   const showSettings = hasSettings && isOpen;
   const [isRenaming, setIsRenaming] = useState(false);
@@ -268,8 +249,7 @@ const ReferenceImageRowBase = ({
     (nextConfig: GenerateReferenceImageConfig) => onPatch(id, { config: nextConfig }),
     [id, onPatch]
   );
-  // A Krea-2 mode switch moves the mode control between the row (Edit) and its settings (Style): the settings open so
-  // it stays in view, and keyboard focus follows it to its new place.
+  // A Krea-2 mode switch moves the mode control between row and settings; settings open and focus follows.
   const changeKrea2Mode = useCallback(
     (nextConfig: GenerateReferenceImageConfig) => {
       const group = document.activeElement?.closest('[data-scope="segment-group"]');
@@ -337,8 +317,7 @@ const ReferenceImageRowBase = ({
     },
     [focusRowSoon]
   );
-  // This row's default stores no name, so it keeps following the row's position. The default when editing began
-  // counts too: a reorder from another tab while the field is open must not store the untouched text as a name.
+  // The default when editing began counts too, so a reorder from another tab cannot store the untouched text.
   const isPositionalDefault = useMemo(() => getPositionalDefaultNameTest(t), [t]);
   const [renameError, setRenameError] = useState<string | null>(null);
   const renameErrorId = useId();
@@ -453,8 +432,7 @@ const ReferenceImageRowBase = ({
     [isRenaming, startRename]
   );
   const toggleSettings = useCallback(() => setIsOpen((open) => !open), []);
-  // An issue fixed by choosing a model: open the settings that hold the picker and focus it once it has rendered and
-  // the closing popover has handed focus back.
+  // Focus the picker once it has rendered and the closing popover has handed focus back.
   const chooseModel = useCallback(() => {
     setIsOpen(true);
     requestAnimationFrame(() =>
@@ -628,8 +606,7 @@ const ReferenceImageRowBase = ({
       onDoubleClick={handleDoubleClick}
       onKeyDown={handleKeyDown}
     >
-      {/* Naming the group gives the row's controls their reference's context ("Weight", "Hero pose"). An off row
-          stays at full opacity, so it is still readable; its text recedes and its tile greys. */}
+      {/* Naming the group gives its controls their reference's context; an off row stays readable at full opacity. */}
       <Box aria-label={name} color={isEnabled ? undefined : 'fg.subtle'} role="group">
         <ListItem
           actions={
@@ -810,7 +787,6 @@ const ReferenceImageRowBase = ({
 
 export const ReferenceImageRow = memo(ReferenceImageRowBase);
 
-/** The image as it will be used (the crop, if cropped), marked when cropped and greyed while the reference is off. */
 const ReferenceImageTile = ({
   image,
   isEnabled,
@@ -861,10 +837,7 @@ const ReferenceImageTile = ({
   );
 };
 
-/**
- * Renames in the title's place, as a layer row does: Enter or moving focus away commits, Escape cancels, and Enter or
- * Escape hand focus back to the row. A name left empty, or set to the default, clears the custom name.
- */
+/** Enter or blur commits, Escape cancels; Enter or Escape return focus to the row. */
 const ReferenceImageNameField = ({
   errorId,
   initialName,
@@ -873,7 +846,6 @@ const ReferenceImageNameField = ({
   onErrorChange,
   validate,
 }: {
-  /** The message saying why the name cannot be kept, shown in the row's second line while it applies. */
   errorId: string | undefined;
   initialName: string;
   onCancel: (refocus: boolean) => void;
@@ -945,7 +917,6 @@ const ReferenceImageNameField = ({
         event.preventDefault();
         const error = validate(event.currentTarget.value);
 
-        // A name that cannot be kept stays in the field with its reason, rather than changing on its own.
         if (error) {
           onErrorChange(error);
           return;
@@ -1045,7 +1016,6 @@ const ReferenceModelSelect = ({
           <ModelSelect
             disabled={disabled}
             filter={filterModel}
-            // A Kontext reference may switch to Redux on FLUX, as it always could.
             modelTypes={modelTypes}
             placeholder={t('widgets.generate.selectModel')}
             relatedTo={relatedTo}
@@ -1099,8 +1069,7 @@ const PromptTagButton = ({ tag }: { tag: string }) => {
   }, [t, tag]);
 
   const canCopy = canCopyText();
-  // Without a clipboard the button shows its own tooltip, the reason, so the explanation joins it there rather than
-  // opening a second tooltip; it leaves out the hint's "click to copy", which is untrue then.
+  // Without a clipboard the button's own tooltip gives the reason, so no second tooltip or untrue "click to copy".
   const unavailableReason = canCopy
     ? undefined
     : `${t('widgets.generate.referenceImagePromptTagExplanation', { tag })} ${t('common.copyUnavailable')}`;

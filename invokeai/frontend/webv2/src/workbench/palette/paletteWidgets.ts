@@ -3,11 +3,7 @@ import type { RegisteredWidget } from '@workbench/widgetContracts';
 
 import { canOpenWidget } from '@workbench/shell/widgetsListModel';
 
-/**
- * The widgets the palette offers to show: each enabled widget a placement open can show, once, without loading any of
- * them (the palette lists them on every open; only the entry chosen loads its widget). The Workflow editor has its own
- * command, which opens it in the center, so it is offered once, there.
- */
+/** Widgets the palette offers, listed without loading any; the Workflow editor has its own command. */
 export const listPaletteWidgets = (
   getWidgetsForRegion: (region: WidgetRegion) => RegisteredWidget[]
 ): RegisteredWidget[] => {
