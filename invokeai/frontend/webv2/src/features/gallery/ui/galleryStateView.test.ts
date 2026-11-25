@@ -63,7 +63,10 @@ const createImageItem = (name: string): GalleryImageItem => ({
   kind: 'image',
   name,
   sourceQueueItemId: 'queue-item-1',
+  colorLabel: null,
   starred: false,
+  rating: 0,
+  rejected: false,
   thumbnailUrl: `/api/v1/images/i/${name}/thumbnail`,
   width: 512,
 });
@@ -130,6 +133,7 @@ describe('gallery state view', () => {
       followSelectedBoard: false,
       imageDensityPercent: 50,
       imageOrderDir: 'DESC',
+      marksFilterRowOpen: false,
       mediaFilter: 'all',
       middleClickOpensInNewTab: false,
       paginationMode: 'infinite',

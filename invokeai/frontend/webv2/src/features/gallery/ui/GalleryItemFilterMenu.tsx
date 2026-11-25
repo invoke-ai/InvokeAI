@@ -21,7 +21,7 @@ const ORDER_LABEL_KEYS = {
   DESC: 'widgets.gallery.newest',
 } as const satisfies Record<GalleryOrderDir, string>;
 
-/** Which media kinds the listing shows and in which order. The starred filter stays its own toggle. */
+/** Which media kinds the listing shows and in which order. The marks filter has its own row. */
 export const GalleryItemFilterMenu = ({
   triggerRef,
 }: {

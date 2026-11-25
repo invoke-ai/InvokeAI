@@ -1,3 +1,4 @@
+import type { GalleryMarksPatch } from '@features/gallery/core/marks';
 import type { GalleryBoard } from '@features/gallery/core/types';
 
 import { HStack, Icon, Menu, Portal, Text } from '@chakra-ui/react';
@@ -10,18 +11,30 @@ import { parseGalleryItemKey, toGalleryItemKey } from '@features/gallery/core/it
 import { IconButton } from '@platform/ui/Button';
 import { ScrollableMenuContent } from '@platform/ui/ScrollableMenuContent';
 import { Tooltip } from '@platform/ui/Tooltip';
-import { DownloadIcon, FolderInputIcon, FolderMinusIcon, StarIcon, Trash2Icon, XIcon } from 'lucide-react';
+import { DownloadIcon, FolderInputIcon, FolderMinusIcon, Trash2Icon, XIcon } from 'lucide-react';
 import { useCallback, useMemo, type MouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { BoardCover, BoardCoverIcon } from './GalleryBoardCover';
 import { focusVisibleOperable } from './GalleryLoadError';
+import { GalleryMarksPopover } from './GalleryMarksControl';
 import { useMenuTriggerIds } from './galleryMenuIds';
 import { GALLERY_TAB_STOP_SELECTOR } from './GalleryThumbnail';
-import { useGallerySelectionStarred, useGalleryWidget } from './GalleryWidgetContext';
+import { useGallerySelectionMarks, useGalleryWidget } from './GalleryWidgetContext';
 
 const MOVE_MENU_POSITIONING = { placement: 'top-end' } as const;
 const GALLERY_TILE_SELECTOR = 'button[data-gallery-item-key]';
+
+/**
+ * Narrow bars keep every action reachable: the marks trigger drops its secondary glyphs, then its bookmark and rating
+ * digit. Measured on the bar's content box; names stay whole.
+ */
+const BAR_CSS = {
+  '@container (width < 18rem)': { '& [data-gallery-marks-trigger-detail]': { display: 'none' } },
+  '@container (width < 16rem)': {
+    '& [data-gallery-marks-trigger-rating], & [data-gallery-marks-trigger-bookmark]': { display: 'none' },
+  },
+} as const;
 
 export const GallerySelectionBar = () => {
   const { t } = useTranslation();
@@ -39,8 +52,9 @@ export const GallerySelectionBar = () => {
   }, [loadedItems, selectedItemKeys]);
   const hasUnloadedMembers = loadedSelection.length < selectionCount;
 
-  // Star acts on the whole selection: "unstar all" only when every selected item is starred, matching the `.` hotkey.
-  const shouldStar = useGallerySelectionStarred(selectedItemRefs, loadedItems);
+  // Marks act on the whole selection: a mark is on only while every selected item has it, as for the `.` hotkey.
+  const selectionMarks = useGallerySelectionMarks(selectedItemRefs, loadedItems);
+  const primaryMarks = selectionMarks[selectedItemKeys.findIndex((key) => key === gallery.primarySelectedItemKey)];
 
   const moveTargets = useMemo(
     () =>
@@ -56,9 +70,9 @@ export const GallerySelectionBar = () => {
     [moveTargets.boards, projectId, projectName, projectNames, t]
   );
 
-  const handleToggleStarred = useCallback(
-    () => void itemActions.setItemsStarred(selectedItemRefs, shouldStar),
-    [itemActions, selectedItemRefs, shouldStar]
+  const handleMarksChange = useCallback(
+    (patch: GalleryMarksPatch) => void itemActions.setItemsMarks(selectedItemRefs, patch),
+    [itemActions, selectedItemRefs]
   );
 
   const handleDownload = useCallback(
@@ -108,7 +122,6 @@ export const GallerySelectionBar = () => {
     return null;
   }
 
-  const starLabel = shouldStar ? t('widgets.gallery.starSelection') : t('widgets.gallery.unstarSelection');
   const canMove = moveTargets.canRemoveFromBoard || moveGroups.length > 0;
 
   return (
@@ -116,6 +129,8 @@ export const GallerySelectionBar = () => {
       bg="bg.subtle"
       borderColor="border.subtle"
       borderTopWidth="1px"
+      containerType="inline-size"
+      css={BAR_CSS}
       gap="1"
       flexShrink={0}
       minH="8"
@@ -135,14 +150,17 @@ export const GallerySelectionBar = () => {
           <Icon as={XIcon} boxSize="3.5" />
         </IconButton>
       </Tooltip>
-      <Text color="fg.muted" fontSize="md" fontVariantNumeric="tabular-nums" me="auto">
+      <Text color="fg.muted" fontSize="md" fontVariantNumeric="tabular-nums" me="auto" minW="0" truncate>
         {t('widgets.gallery.selectionCount', { count: selectionCount })}
       </Text>
-      <Tooltip content={starLabel}>
-        <IconButton aria-label={starLabel} size="sm" variant="ghost" onClick={handleToggleStarred}>
-          <Icon as={StarIcon} boxSize="3.5" fill={shouldStar ? 'none' : 'currentColor'} />
-        </IconButton>
-      </Tooltip>
+      <GalleryMarksPopover
+        placement="top-end"
+        primary={primaryMarks}
+        showsBookmark
+        size="sm"
+        targets={selectionMarks}
+        onChange={handleMarksChange}
+      />
       <Menu.Root ids={moveTriggerIds} positioning={MOVE_MENU_POSITIONING}>
         <Tooltip content={t('widgets.gallery.moveSelectionToBoard')} ids={moveTriggerIds}>
           <Menu.Trigger asChild>

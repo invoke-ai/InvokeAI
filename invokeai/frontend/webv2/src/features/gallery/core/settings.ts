@@ -66,6 +66,8 @@ export interface GallerySettings {
   followSelectedBoard: boolean;
   imageDensityPercent: number;
   imageOrderDir: GalleryOrderDir;
+  /** The toolbar's marks filter row is shown. */
+  marksFilterRowOpen: boolean;
   mediaFilter: GalleryMediaFilter;
   middleClickOpensInNewTab: boolean;
   paginationMode: GalleryPaginationMode;
@@ -94,6 +96,7 @@ export const DEFAULT_GALLERY_SETTINGS: GallerySettings = {
   followSelectedBoard: false,
   imageDensityPercent: 50,
   imageOrderDir: 'DESC',
+  marksFilterRowOpen: false,
   mediaFilter: 'all',
   middleClickOpensInNewTab: false,
   paginationMode: 'infinite',
@@ -218,6 +221,7 @@ export const getGallerySettings = (values: ResolvedValues): GallerySettings => {
         ? Math.min(100, Math.max(0, values.imageDensityPercent))
         : DEFAULT_GALLERY_SETTINGS.imageDensityPercent,
     imageOrderDir: isOrderDir(values.imageOrderDir) ? values.imageOrderDir : DEFAULT_GALLERY_SETTINGS.imageOrderDir,
+    marksFilterRowOpen: values.marksFilterRowOpen === true,
     mediaFilter: getGalleryMediaFilter(values),
     middleClickOpensInNewTab: values.middleClickOpensInNewTab === true,
     paginationMode,

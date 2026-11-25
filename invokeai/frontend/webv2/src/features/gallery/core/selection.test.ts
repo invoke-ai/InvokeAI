@@ -25,7 +25,10 @@ const imageItem: GalleryImageItem = {
   kind: 'image',
   name: 'shared',
   sourceQueueItemId: 'backend-gallery',
+  colorLabel: null,
   starred: true,
+  rating: 0,
+  rejected: false,
   thumbnailUrl: '/thumbnails/shared',
   width: 512,
 };
@@ -40,7 +43,10 @@ const videoItem: GalleryVideoItem = {
   isIntermediate: false,
   kind: 'video',
   name: 'shared',
+  colorLabel: null,
   starred: false,
+  rating: 0,
+  rejected: false,
   thumbnailUrl: '/video-thumbnails/shared',
   width: 512,
 };
@@ -58,6 +64,15 @@ const getPersistedSelectedGalleryItemKeys = (values: Record<string, unknown>): s
 describe('persisted Gallery selection readers', () => {
   it('returns a canonical selected image item unchanged', () => {
     expect(getSelectedGalleryItemFromValues({ selectedImage: imageItem })).toBe(imageItem);
+  });
+
+  it('reads an item persisted before marks existed as unmarked, keeping one identity and its other fields', () => {
+    const { colorLabel: _colorLabel, rating: _rating, rejected: _rejected, ...persisted } = imageItem;
+    const values = { selectedImage: { ...persisted, futureField: 'kept' } };
+    const item = getSelectedGalleryItemFromValues(values);
+
+    expect(item).toEqual({ ...imageItem, futureField: 'kept' });
+    expect(getSelectedGalleryItemFromValues(values)).toBe(item);
   });
 
   it('returns a canonical selected video while the image-only reader rejects it', () => {
@@ -82,6 +97,9 @@ describe('persisted Gallery selection readers', () => {
       isIntermediate: false,
       kind: 'image',
       name: legacyImage.imageName,
+      colorLabel: null,
+      rating: 0,
+      rejected: false,
       sourceQueueItemId: legacyImage.sourceQueueItemId,
       starred: false,
       thumbnailUrl: legacyImage.thumbnailUrl,
@@ -119,6 +137,9 @@ describe('persisted Gallery selection readers', () => {
       imageName: imageItem.name,
       imageUrl: imageItem.fullUrl,
       queuedAt: imageItem.createdAt,
+      colorLabel: null,
+      rating: 0,
+      rejected: false,
       sourceQueueItemId: imageItem.sourceQueueItemId,
       starred: imageItem.starred,
       thumbnailUrl: imageItem.thumbnailUrl,

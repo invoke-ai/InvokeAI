@@ -23,8 +23,10 @@ export interface ShortcutBinding {
   parts: string[];
 }
 
-export const useShortcutBinding = (commandId: string): ShortcutBinding | null => {
-  const customHotkeys = useWorkbenchPreferenceSelector((preferences) => preferences.customHotkeys);
+export const getShortcutBinding = (
+  commandId: string,
+  customHotkeys: Record<string, string[]>
+): ShortcutBinding | null => {
   const definition = findDefinition(commandId);
   const firstKey = definition ? applyCustomHotkeys(definition, customHotkeys).keys[0] : undefined;
 
@@ -35,4 +37,10 @@ export const useShortcutBinding = (commandId: string): ShortcutBinding | null =>
         parts: formatHotkeyForPlatform(firstKey),
       }
     : null;
+};
+
+export const useShortcutBinding = (commandId: string): ShortcutBinding | null => {
+  const customHotkeys = useWorkbenchPreferenceSelector((preferences) => preferences.customHotkeys);
+
+  return getShortcutBinding(commandId, customHotkeys);
 };

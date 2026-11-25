@@ -1,16 +1,18 @@
 import type { GalleryImageItem, GalleryItem, GalleryItemRef } from '@features/gallery/contracts';
+import type { GalleryKnownMarks, GalleryMarksFilter } from '@features/gallery/core/marks';
 import type { GalleryMediaUsageReport } from '@features/gallery/core/mediaUsage';
 import type { GallerySemanticReference } from '@features/gallery/core/semanticImageQuery';
 import type { GallerySearchScope, GallerySettings } from '@features/gallery/core/settings';
 import type { GalleryGeneralAccess, GalleryView } from '@features/gallery/core/types';
 import type { GalleryItemsFilter } from '@features/gallery/data/queries';
-import type { GalleryItemStarPatchEvent } from '@features/gallery/data/queryCache';
+import type { GalleryItemMarksPatchEvent } from '@features/gallery/data/queryCache';
 
 import { toGalleryItemKey } from '@features/gallery/core/items';
-import { subscribeGalleryItemStarPatches } from '@features/gallery/data/queryCache';
+import { galleryMarksFilterKey, getGalleryItemMarks } from '@features/gallery/core/marks';
+import { subscribeGalleryItemMarksPatches } from '@features/gallery/data/queryCache';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { useQueryClient } from '@tanstack/react-query';
-import { createContext, use, useEffect, useMemo, useSyncExternalStore } from 'react';
+import { createContext, use, useMemo, useState, useSyncExternalStore } from 'react';
 
 import type { GalleryReadState, GalleryStateView } from './galleryStateView';
 import type { GalleryItemActions, GalleryWidgetProps, GalleryWidgetRuntime } from './GalleryUiContext';
@@ -40,7 +42,7 @@ export interface GalleryActions {
   /** Resets the page like a search. */
   setSearchScope: (searchScope: GallerySearchScope) => void;
   /** Resets the page like a search. */
-  setStarredOnly: (starredOnly: boolean) => void;
+  setMarksFilter: (marksFilter: GalleryMarksFilter) => void;
   /** Clears text, ranking and semantic mode. */
   clearSearch: () => void;
   /** A no-op once the field has moved on. */
@@ -57,7 +59,7 @@ export interface GalleryActions {
   uploadFiles: (files: File[]) => Promise<GalleryItem[]>;
 }
 
-/** Empty whenever it does not apply. */
+/** The Bookmarked strip; empty whenever it does not apply. */
 export interface GalleryStarredStrip {
   items: GalleryItem[];
   state: GalleryReadState;
@@ -92,121 +94,160 @@ export interface GalleryWidgetContextValue {
   runtime: GalleryWidgetRuntime;
 }
 
-interface SelectionStarSnapshot {
-  identity: string;
-  starredByKey: ReadonlyMap<string, boolean>;
+/** Marks patched onto items no loaded page may hold, bounded: the oldest go first. */
+const GALLERY_MARKS_OVERLAY_LIMIT = 10_000;
+
+/** `version` is the patch that last set the entry, so a mark seen on a loaded item can tell which is newer. */
+interface MarksEntry {
+  marks: GalleryKnownMarks;
+  version: number;
 }
 
-interface SelectionStarStore {
-  getSnapshot: () => SelectionStarSnapshot;
-  reconcilePatch: (event: GalleryItemStarPatchEvent) => void;
+interface MarksOverlayStore {
+  getSnapshot: () => ReadonlyMap<string, MarksEntry>;
+  reconcilePatch: (event: GalleryItemMarksPatchEvent) => void;
   subscribe: (listener: () => void) => () => void;
-  sync: (identity: string, selectedKeys: readonly string[], loadedItems: readonly GalleryItem[]) => void;
 }
 
-const createSelectionStarStore = (): SelectionStarStore => {
-  let snapshot: SelectionStarSnapshot = { identity: '', starredByKey: new Map() };
-  let selectedKeySet: ReadonlySet<string> = new Set();
+const createMarksOverlayStore = (): MarksOverlayStore => {
+  let snapshot: ReadonlyMap<string, MarksEntry> = new Map();
   // Only the rollback of the latest patch that set a key restores it.
-  let patchedFrom = new Map<string, { patchId: number; starred: boolean | undefined }>();
+  const patchedFrom = new Map<string, { before: MarksEntry | undefined; patchId: number }>();
   const listeners = new Set<() => void>();
-  const publish = (identity: string, starredByKey: ReadonlyMap<string, boolean>) => {
-    if (
-      snapshot.identity === identity &&
-      starredByKey.size === snapshot.starredByKey.size &&
-      [...starredByKey].every(([key, starred]) => snapshot.starredByKey.get(key) === starred)
-    ) {
-      return;
-    }
-
-    snapshot = { identity, starredByKey };
-    listeners.forEach((listener) => listener());
-  };
 
   return {
     getSnapshot: () => snapshot,
     reconcilePatch: (event) => {
-      const starredByKey = new Map(snapshot.starredByKey);
+      const overlay = new Map(snapshot);
 
       if (event.kind === 'apply') {
         for (const key of event.itemKeys) {
-          if (selectedKeySet.has(key)) {
-            patchedFrom.set(key, { patchId: event.patchId, starred: starredByKey.get(key) });
-            starredByKey.set(key, event.starred);
+          const before = overlay.get(key);
+
+          patchedFrom.set(key, { before, patchId: event.patchId });
+          overlay.delete(key);
+          overlay.set(key, { marks: { ...before?.marks, ...event.patch }, version: event.patchId });
+        }
+        for (const key of overlay.keys()) {
+          if (overlay.size <= GALLERY_MARKS_OVERLAY_LIMIT) {
+            break;
           }
+          overlay.delete(key);
+          patchedFrom.delete(key);
         }
       } else {
-        for (const [key, { patchId, starred }] of patchedFrom) {
+        for (const [key, { before, patchId }] of patchedFrom) {
           if (patchId !== event.patchId) {
             continue;
           }
 
           patchedFrom.delete(key);
 
-          if (starred === undefined) {
-            starredByKey.delete(key);
+          if (before === undefined) {
+            overlay.delete(key);
           } else {
-            starredByKey.set(key, starred);
+            overlay.set(key, before);
           }
         }
       }
 
-      publish(snapshot.identity, starredByKey);
+      snapshot = overlay;
+      listeners.forEach((listener) => listener());
     },
     subscribe: (listener) => {
       listeners.add(listener);
 
       return () => listeners.delete(listener);
     },
-    sync: (identity, selectedKeys, loadedItems) => {
-      selectedKeySet = new Set(selectedKeys);
-
-      const isStillSelected = ([key]: [string, unknown]) => selectedKeySet.has(key);
-      const starredByKey = new Map([...snapshot.starredByKey].filter(isStillSelected));
-
-      if (snapshot.identity !== identity) {
-        patchedFrom = new Map([...patchedFrom].filter(isStillSelected));
-      }
-
-      for (const item of loadedItems) {
-        const key = toGalleryItemKey(item);
-
-        if (selectedKeySet.has(key)) {
-          starredByKey.set(key, item.starred);
-        }
-      }
-
-      publish(identity, starredByKey);
-    },
   };
 };
 
-/** Follows star patches for selected items no page holds. */
-export const useGallerySelectionStarred = (
+interface SeenMarks {
+  loadedItems: readonly GalleryItem[];
+  /** What selected items showed when a page last held them, for once it no longer does. */
+  marks: ReadonlyMap<string, MarksEntry>;
+  selectedKeys: readonly string[];
+}
+
+const EMPTY_SEEN_MARKS: SeenMarks = { loadedItems: [], marks: new Map(), selectedKeys: [] };
+
+const getSeenMarks = (
+  previous: SeenMarks,
+  selectedKeys: readonly string[],
+  loadedItems: readonly GalleryItem[],
+  overlay: ReadonlyMap<string, MarksEntry>
+): SeenMarks => {
+  const loaded = new Map<string, GalleryItem>(loadedItems.map((item) => [toGalleryItemKey(item), item]));
+  const marks = new Map<string, MarksEntry>();
+
+  for (const key of selectedKeys) {
+    const item = loaded.get(key);
+    const entry = item ? { marks: getGalleryItemMarks(item), version: overlay.get(key)?.version ?? 0 } : undefined;
+    const kept = entry ?? previous.marks.get(key);
+
+    if (kept) {
+      marks.set(key, kept);
+    }
+  }
+
+  return { loadedItems, marks, selectedKeys };
+};
+
+/**
+ * Each selected item's marks: a loaded item's own; else the newer of what a page last showed and what this Gallery's
+ * patches set; else what the listing it was selected in implies. A field none of these knows is left out.
+ */
+export const useGallerySelectionMarks = (
   selectedItems: readonly GalleryItemRef[],
   loadedItems: readonly GalleryItem[]
-): boolean => {
-  const { filter, gallery } = useGalleryWidget();
-  const selectedKeys = useMemo(() => selectedItems.map(toGalleryItemKey), [selectedItems]);
-  const identity = useMemo(() => JSON.stringify(selectedKeys), [selectedKeys]);
+): GalleryKnownMarks[] => {
+  const { gallery } = useGalleryWidget();
   const queryClient = useQueryClient();
-  const store = useMemo(() => createSelectionStarStore(), []);
-  const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
+  const [store] = useState(createMarksOverlayStore);
+  const overlay = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
+  const selectedKeys = useMemo(() => selectedItems.map(toGalleryItemKey), [selectedItems]);
+  const [seen, setSeen] = useState<SeenMarks>(() => getSeenMarks(EMPTY_SEEN_MARKS, selectedKeys, loadedItems, overlay));
 
-  useMountEffect(() => subscribeGalleryItemStarPatches(queryClient, store.reconcilePatch));
+  useMountEffect(() => subscribeGalleryItemMarksPatches(queryClient, store.reconcilePatch));
 
-  useEffect(() => {
-    store.sync(identity, selectedKeys, loadedItems);
-  }, [identity, loadedItems, selectedKeys, store]);
+  // Adjusted while rendering, as React documents for state that follows props: only a new listing or selection
+  // records what it shows, so a patch that re-renders the same listing stays the newer word.
+  if (seen.loadedItems !== loadedItems || seen.selectedKeys !== selectedKeys) {
+    setSeen(getSeenMarks(seen, selectedKeys, loadedItems, overlay));
+  }
 
-  const loadedStarred = useMemo(
-    () => new Map(loadedItems.map((item) => [toGalleryItemKey(item), item.starred])),
+  const loadedMarks = useMemo(
+    () => new Map(loadedItems.map((item) => [toGalleryItemKey(item), getGalleryItemMarks(item)])),
     [loadedItems]
   );
-  // Starred-only listings imply starred members only when the selection was made in one.
-  const unknownStarred = filter.starred === true && gallery.selectionStarredOnly;
+  // A selection made in a listing of one flag holds only that flag.
+  const [onlyFlag, ...otherFlags] = gallery.marksFilter.flags;
+  const impliedFlag =
+    onlyFlag !== undefined &&
+    otherFlags.length === 0 &&
+    galleryMarksFilterKey(gallery.selectionMarksFilter) === galleryMarksFilterKey(gallery.marksFilter)
+      ? onlyFlag
+      : undefined;
 
-  return selectedKeys.some((key) => !(loadedStarred.get(key) ?? snapshot.starredByKey.get(key) ?? unknownStarred));
+  return useMemo(
+    () =>
+      selectedKeys.map((key): GalleryKnownMarks => {
+        const loaded = loadedMarks.get(key);
+
+        if (loaded) {
+          return loaded;
+        }
+
+        const patched = overlay.get(key);
+        const shown = seen.marks.get(key);
+        const implied = impliedFlag ? { flag: impliedFlag } : {};
+
+        return patched && (!shown || patched.version > shown.version)
+          ? { ...implied, ...shown?.marks, ...patched.marks }
+          : { ...implied, ...shown?.marks };
+      }),
+    [impliedFlag, loadedMarks, overlay, seen, selectedKeys]
+  );
 };
 
 export const GalleryWidgetContext = createContext<GalleryWidgetContextValue | null>(null);

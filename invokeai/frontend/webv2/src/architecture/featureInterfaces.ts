@@ -6,7 +6,9 @@ export const FEATURE_PUBLIC_INTERFACES: Readonly<Record<string, readonly string[
   gallery: [
     'settingsContribution',
     'contracts',
+    'cull',
     'launchpad',
+    'marks',
     'mediaSlot',
     'mediaUsage',
     'paletteSearch',

@@ -53,7 +53,10 @@ const item: GalleryItem = {
   isIntermediate: false,
   kind: 'image',
   name: 'target.png',
+  colorLabel: null,
   starred: false,
+  rating: 0,
+  rejected: false,
   thumbnailUrl: '/images/target.webp',
   width: 64,
 };
@@ -174,13 +177,32 @@ describe('revealGalleryItem', () => {
     await revealGalleryItem(context, { kind: 'image', name: item.name }, ticket());
 
     expect(mocks.fetchVerifiedPage.mock.calls[0]?.[1]).not.toHaveProperty('semanticQuery');
-    expect(commands.widgets.patchValues).toHaveBeenCalledWith('gallery', {
-      searchTerm: '',
-      semanticImageQuery: null,
-      semanticSearchText: null,
-      starredOnly: false,
-    });
+    expect(commands.widgets.patchValues).toHaveBeenCalledWith(
+      'gallery',
+      expect.objectContaining({
+        searchTerm: '',
+        semanticImageQuery: null,
+        semanticSearchText: null,
+      })
+    );
     expect(commands.gallery.selectItem).toHaveBeenCalledOnce();
+  });
+
+  it('lands a bookmarked item under the bookmarked flag, keeping the rating filter it passes', async () => {
+    mocks.resolve.mockResolvedValue({ ...item, rating: 4, starred: true });
+    mocks.galleryValues = { marksFilter: { flags: ['reject'], rating: 3 } };
+    const { commands, context } = createContext();
+
+    await revealGalleryItem(context, { kind: 'image', name: item.name }, ticket());
+
+    expect(mocks.fetchVerifiedPage.mock.calls[0]?.[1]).toMatchObject({ flags: ['pick'], minRating: 3 });
+    expect(mocks.fetchVerifiedPage.mock.calls[0]?.[1]).not.toHaveProperty('starred');
+    expect(commands.widgets.patchValues).toHaveBeenCalledWith(
+      'gallery',
+      expect.objectContaining({
+        marksFilter: expect.objectContaining({ flags: ['pick'], rating: 3 }),
+      })
+    );
   });
 
   it('resets a media filter that hides the item and locates it in the listing of both kinds', async () => {
@@ -191,11 +213,11 @@ describe('revealGalleryItem', () => {
 
     expect(mocks.fetchVerifiedPage.mock.calls[0]?.[1]).not.toHaveProperty('mediaKind');
     expect(commands.widgets.patchValues).toHaveBeenCalledWith('gallery', {
+      marksFilter: { colorLabels: [], flags: [], rating: null, ratingOperator: 'atLeast' },
       mediaFilter: 'all',
       searchTerm: '',
       semanticImageQuery: null,
       semanticSearchText: null,
-      starredOnly: false,
     });
     expect(commands.gallery.selectItem).toHaveBeenCalledWith(item, 'project-1', 2);
   });

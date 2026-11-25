@@ -38,6 +38,7 @@ void i18n.use(initReactI18next).init({
             },
           },
           gallery: {
+            cull: { toggle: 'Cull mode' },
             itemActions: {
               recall: {
                 verbs: {
@@ -78,8 +79,6 @@ void i18n.use(initReactI18next).init({
             editThisImage: 'Edit this image',
             imageActions: 'Image actions',
             selectForCompare: 'Select for Compare',
-            starImage: 'Star image',
-            starVideo: 'Star video',
             use: 'Use',
             useInGenerate: 'Use this image in Generate',
             useThisVideo: 'Use this video',
@@ -119,7 +118,7 @@ const itemActions = vi.hoisted(() => ({
   selectForCompare: vi.fn(),
   sendImageAsControl: vi.fn(() => Promise.resolve()),
   sendToCanvas: vi.fn(() => Promise.resolve()),
-  setItemsStarred: vi.fn(),
+  setItemsMarks: vi.fn(),
 }));
 const updateProjectPreferences = vi.hoisted(() => vi.fn());
 const showAll = vi.hoisted(() => vi.fn());
@@ -319,14 +318,14 @@ describe('preview zoom menu', () => {
 });
 
 describe('preview header order', () => {
-  it('puts the item actions first, one divider, then zoom, auto-switch, and the Details toggle last', async () => {
+  it('puts the item actions first, one divider, then zoom, Cull mode, auto-switch, and the Details toggle last', async () => {
     state.actionItem = STILL_IMAGE;
     state.zoom = { fitPercent: 88, isZoomed: false, percent: 88, reset: vi.fn(), zoomTo: vi.fn() };
     await render();
 
     const labels = [...host!.querySelectorAll<HTMLButtonElement>('button')].map((b) => b.getAttribute('aria-label'));
     expect(labels[0]).toBe('Edit');
-    expect(labels.slice(-3)).toEqual(['Zoom 88%', 'Auto-switch: In progress', 'Details']);
+    expect(labels.slice(-4)).toEqual(['Zoom 88%', 'Cull mode', 'Auto-switch: In progress', 'Details']);
     expect(host!.querySelector('[aria-label="Hide filmstrip"], [aria-label="Show filmstrip"]')).toBeNull();
     const bar = host!.firstElementChild!;
     const dividers = [...bar.children].filter((child) => child.tagName === 'DIV' && child.childElementCount === 0);

@@ -91,7 +91,10 @@ const image = (name: string): GalleryItem => ({
   isIntermediate: false,
   kind: 'image',
   name,
+  colorLabel: null,
   starred: false,
+  rating: 0,
+  rejected: false,
   thumbnailUrl: `/thumb/${name}`,
   width: 128,
 });

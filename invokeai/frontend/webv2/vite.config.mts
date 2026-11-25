@@ -345,6 +345,7 @@ const GALLERY_BACKEND_MODULES = [
 const GALLERY_STATE_MODULES = [
   '/features/gallery/core/boardAccess.ts',
   '/features/gallery/core/items.ts',
+  '/features/gallery/core/marks.ts',
   '/features/gallery/core/recentImages.ts',
   '/features/gallery/core/selection.ts',
   '/features/gallery/core/semanticImageQuery.ts',
@@ -376,8 +377,16 @@ const WIDGET_HOST_MODULES = [
   '/workbench/widgets/image-map/ImageMapDataRuntime.tsx',
 ] as const;
 
-// Boot image menus the lazy queue recall chunks also import; ungrouped, Rolldown splits them into a boot request.
+// Boot image menus the lazy queue recall chunks also import; ungrouped, Rolldown splits them into a boot request. Cull
+// mode rides along: Preview and the Gallery both load this chunk, and Cull mode is in neither's startup graph.
 const IMAGE_ACTIONS_MODULES = [
+  '/features/gallery/core/cull.ts',
+  '/features/gallery/cull.ts',
+  '/features/gallery/marks.ts',
+  '/features/gallery/ui/GalleryCullCommands.tsx',
+  '/features/gallery/ui/galleryCullFeedback.ts',
+  '/features/gallery/ui/GalleryItemMarks.tsx',
+  '/features/gallery/ui/GalleryMarksControl.tsx',
   '/workbench/canvas-operations/canvasImportNotice.ts',
   '/workbench/image-actions/ContextSubMenu.tsx',
   '/workbench/image-actions/ImageContextMenu.tsx',
@@ -397,6 +406,13 @@ const IMAGE_ACTIONS_MODULES = [
   '/workbench/image-actions/useImageRecallCapabilities.ts',
   '/workbench/image-actions/videoRecall.ts',
 ] as const;
+
+// Only the marks control and filter, which load with this chunk, rate with stars; grouped by package, the rating machine
+// would load on the Launchpad too. Its anatomy stays behind: the theme's recipes read it on both routes.
+const isRatingGroupPackageModule = (id: string): boolean =>
+  /\/node_modules\/(?:@chakra-ui\/react\/dist\/[^/]+\/components\/rating-group\/|@ark-ui\/react\/dist\/components\/rating-group\/|@zag-js\/rating-group\/)/.test(
+    id
+  ) && !id.includes('.anatomy.');
 
 // The Gallery's lazy label cache also reaches the API; ungrouped, Rolldown splits it into a boot request.
 const IMAGE_MAP_DATA_MODULES = [
@@ -646,7 +662,7 @@ export default defineConfig({
               includeDependenciesRecursively: false,
               name: 'image-actions',
               priority: 30,
-              test: (id) => matchesAnySuffix(id, IMAGE_ACTIONS_MODULES),
+              test: (id) => matchesAnySuffix(id, IMAGE_ACTIONS_MODULES) || isRatingGroupPackageModule(id),
             },
             {
               includeDependenciesRecursively: false,

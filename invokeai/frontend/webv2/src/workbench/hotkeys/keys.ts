@@ -133,6 +133,23 @@ export const toTinykeysBinding = (hotkey: string): string => {
     .join('+');
 };
 
+/**
+ * The same binding with Shift held, for `acceptsShift`; empty when it already names Shift. Shift changes what a digit
+ * or bracket types (`!`, `{`), so those match by position.
+ */
+export const toShiftedTinykeysBinding = (hotkey: string): string => {
+  const parts = normalizeHotkeyString(hotkey).split('+').filter(Boolean);
+  const key = parts.at(-1);
+
+  if (key === undefined || parts.includes('shift')) {
+    return '';
+  }
+
+  const shiftedKey = /^[0-9]$/.test(key) ? `(${key}|Digit${key})` : (TINY_KEY_ALIASES[key] ?? key);
+
+  return ['Shift', ...parts.slice(0, -1).map((part) => TINY_MODIFIER_ALIASES[part] ?? part), shiftedKey].join('+');
+};
+
 /** A positional match also requires no typed Latin character and no AltGr, so other layouts keep their letters. */
 export const acceptsHotkeyPress = (event: KeyboardEvent, hotkey: string): boolean => {
   const parts = normalizeHotkeyString(hotkey).split('+').filter(Boolean);

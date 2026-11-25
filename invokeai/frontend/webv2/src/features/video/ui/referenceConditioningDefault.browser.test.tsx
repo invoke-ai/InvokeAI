@@ -43,7 +43,10 @@ const videoItem = (mediaOrigin?: string): GalleryVideoItem => ({
   kind: 'video',
   ...(mediaOrigin ? { mediaOrigin } : {}),
   name: 'clip.mp4',
+  colorLabel: null,
   starred: false,
+  rating: 0,
+  rejected: false,
   thumbnailUrl: '/thumbnails/clip.webp',
   width: 640,
 });

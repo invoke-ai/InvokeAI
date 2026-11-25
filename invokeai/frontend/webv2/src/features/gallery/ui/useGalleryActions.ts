@@ -419,7 +419,7 @@ export const useGalleryActions = ({
       setSearchScope: (scope) => widgets.patchGalleryValues({ galleryPage: 0, searchScope: scope }),
       // Clearing the search returns its scope to the selected board; the gallery values' writer keeps that rule.
       setSearchTerm: gallery.setSearchTerm,
-      setStarredOnly: gallery.setStarredOnly,
+      setMarksFilter: gallery.setMarksFilter,
       setSemanticSearchMode: gallery.setSemanticSearchMode,
       setSemanticSearchText: gallery.setSemanticSearchText,
       commitSemanticSearch: gallery.commitSemanticSearch,

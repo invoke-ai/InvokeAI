@@ -27,7 +27,10 @@ const image: GalleryItem = {
   isIntermediate: false,
   kind: 'image',
   name: 'a.png',
+  colorLabel: null,
   starred: false,
+  rating: 0,
+  rejected: false,
   thumbnailUrl: '/thumb/a.png',
   width: 128,
 };
@@ -42,7 +45,10 @@ const video: GalleryItem = {
   isIntermediate: false,
   kind: 'video',
   name: 'v.mp4',
+  colorLabel: null,
   starred: false,
+  rating: 0,
+  rejected: false,
   thumbnailUrl: '/video-thumb/v.mp4',
   width: 128,
 };

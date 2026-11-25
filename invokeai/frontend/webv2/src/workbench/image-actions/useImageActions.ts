@@ -19,12 +19,16 @@ import {
   type GalleryItemKey,
   type GalleryItemMutationResult,
   type GalleryItemRef,
+  type GalleryKnownMarks,
+  type GalleryMarks,
+  type GalleryMarksPatch,
   type GalleryVideoItem,
 } from '@features/gallery';
 import {
   getGalleryAutoAddBoardId,
   getGalleryBoardLabel,
   getGalleryDeletionSuccessor,
+  getGalleryItemMarkFieldsPatch,
   getPersistedSelectedGalleryItemKeys,
 } from '@features/gallery/contracts';
 import {
@@ -32,10 +36,11 @@ import {
   ensureGalleryBoardDestinations,
   fetchGalleryImageMetadata,
   getGalleryItemBoardIdsFromCaches,
-  getGalleryItemStarredFromCaches,
+  getGalleryItemMarksFromCaches,
   invalidateGallery,
   invalidateGalleryBoardDestinations,
   patchGalleryItemCaches,
+  writeGalleryItemMarks,
 } from '@features/gallery/queries';
 import { setPendingPromptTemplateDraft } from '@features/generation/react';
 import { getReferenceImageRoom, isVaeModelConfig, isSupportedGenerateModel } from '@features/generation/settings';
@@ -137,7 +142,6 @@ export interface ImageActions extends GalleryItemActions {
   sendToCanvas: (images: readonly GalleryImage[], destination: GalleryCanvasImportDestination) => Promise<void>;
   /** Fills the selected control layer when it has no image yet, else adds a control layer. */
   sendImageAsControl: (image: GalleryImage) => Promise<void>;
-  setImagesStarred: (imageNames: string[], starred: boolean) => Promise<void>;
   useAsReferenceImage: (image: GalleryImage) => void;
   useAsReferenceVideo: (item: GalleryVideoItem) => void;
   /** Clears the media the clip excludes. */
@@ -145,6 +149,49 @@ export interface ImageActions extends GalleryItemActions {
 }
 
 const EMPTY_WIDGET_VALUES: Record<string, unknown> = {};
+const GALLERY_MARK_FIELDS = ['flag', 'rating', 'colorLabel'] as const;
+
+type GalleryItemMutationAction = 'delete' | 'marks' | 'move';
+
+interface GalleryItemMutationReport {
+  boardId?: string;
+  onUndo?: (() => void) | null;
+  /** No success notice; failures are still reported. */
+  quiet?: boolean;
+  successTitle?: (count: number) => string;
+}
+/** A pause in cull keys this long ends the burst its listing refetch waits for. */
+const QUIET_MARKS_REFETCH_DELAY_MS = 1_000;
+
+/** Each account's last marks request per item: an item's marks reach the server in the order they were made. */
+const marksRequestTails = new WeakMap<AccountScope, Map<GalleryItemKey, Promise<void>>>();
+
+const queueMarksRequest = <Result>(
+  owner: AccountScope,
+  items: readonly GalleryItemRef[],
+  send: () => Promise<Result>
+): Promise<Result> => {
+  const tails = marksRequestTails.get(owner) ?? new Map<GalleryItemKey, Promise<void>>();
+  const keys = [...new Set(items.map(toGalleryItemKey))];
+  const request = Promise.all(keys.map((key) => tails.get(key))).then(send);
+  const tail = request.then(
+    () => undefined,
+    () => undefined
+  );
+
+  marksRequestTails.set(owner, tails);
+  keys.forEach((key) => tails.set(key, tail));
+  void tail.then(() => {
+    for (const key of keys) {
+      if (tails.get(key) === tail) {
+        tails.delete(key);
+      }
+    }
+  });
+
+  return request;
+};
+
 /** Per stage (server, then closed projects), before asking instead: the user is waiting on a click. */
 const UNCONFIRMED_DELETION_CHECK_TIMEOUT_MS = 3_000;
 const PENDING_CHECK_NOTICE_DELAY_MS = 400;
@@ -349,11 +396,10 @@ export const useImageActions = ({
       }
     };
     const reportMutationOutcome = (
-      action: 'delete' | 'move' | 'star' | 'unstar',
+      action: GalleryItemMutationAction,
       requestedCount: number,
       result: GalleryItemMutationResult,
-      boardId?: string,
-      onUndo?: (() => void) | null
+      { boardId, onUndo, quiet = false, successTitle }: GalleryItemMutationReport
     ) => {
       if (result.failed.length > 0) {
         recordError(
@@ -369,10 +415,16 @@ export const useImageActions = ({
         return;
       }
 
-      const title = t(`widgets.gallery.itemActions.${action}.success`, {
-        board: boardId ? getBoardName(boardId) : undefined,
-        count: result.succeeded.length,
-      });
+      if (quiet) {
+        return;
+      }
+
+      const title =
+        successTitle?.(result.succeeded.length) ??
+        t(`widgets.gallery.itemActions.${action}.success`, {
+          board: boardId ? getBoardName(boardId) : undefined,
+          count: result.succeeded.length,
+        });
 
       if (onUndo) {
         notify.undoable(title, { onUndo, projectId });
@@ -385,18 +437,25 @@ export const useImageActions = ({
       applyConfirmed,
       boardId,
       getUndo,
+      invalidates = true,
       mutate,
+      quiet,
       requested,
       rollback,
+      successTitle,
     }: {
-      action: 'delete' | 'move' | 'star' | 'unstar';
+      action: GalleryItemMutationAction;
       applyConfirmed: (result: GalleryItemMutationResult, signal: AbortSignal) => Promise<void> | void;
       boardId?: string;
       getUndo?: (succeeded: readonly GalleryItemRef[]) => (() => void) | null;
+      /** False when the caches own the trailing refetch. */
+      invalidates?: boolean;
       mutate: (signal: AbortSignal) => Promise<GalleryItemMutationResult>;
+      quiet?: boolean;
       requested: GalleryItemRef[];
       /** Runs once, only while the requesting account scope is current, before the trailing invalidation. */
       rollback?: () => void;
+      successTitle?: (count: number) => string;
     }): Promise<void> => {
       const owner = captureAccountScope();
       let error: unknown = null;
@@ -418,14 +477,16 @@ export const useImageActions = ({
         return;
       }
 
-      try {
-        await invalidateGallery(queryClient, owner);
-      } catch (caught: unknown) {
-        error ??= caught;
-      }
+      if (invalidates) {
+        try {
+          await invalidateGallery(queryClient, owner);
+        } catch (caught: unknown) {
+          error ??= caught;
+        }
 
-      if (!isAccountScopeCurrent(owner)) {
-        return;
+        if (!isAccountScopeCurrent(owner)) {
+          return;
+        }
       }
 
       if (error || !result) {
@@ -433,13 +494,12 @@ export const useImageActions = ({
         return;
       }
 
-      reportMutationOutcome(
-        action,
-        requested.length,
-        result,
+      reportMutationOutcome(action, requested.length, result, {
         boardId,
-        result.failed.length === 0 ? getUndo?.(result.succeeded) : null
-      );
+        onUndo: result.failed.length === 0 ? getUndo?.(result.succeeded) : null,
+        quiet,
+        successTitle,
+      });
     };
     const deleteItemsConfirmed = (items: GalleryItemRef[]): Promise<void> => {
       // Capture successor context before optimistic removal.
@@ -698,21 +758,21 @@ export const useImageActions = ({
 
       return boardIds;
     };
-    const readKnownStarred = (refs: readonly GalleryItemRef[]): Map<GalleryItemKey, boolean> => {
-      const starred = new Map<GalleryItemKey, boolean>(
+    const readKnownMarks = (refs: readonly GalleryItemRef[]): Map<GalleryItemKey, GalleryMarks> => {
+      const marks = new Map<GalleryItemKey, GalleryMarks>(
         [...collectGalleryStoreKnownItemFields(queries.getSnapshot().projects, refs)].map(([key, fields]) => [
           key,
-          fields.starred,
+          fields.marks,
         ])
       );
 
-      for (const [key, cachedStarred] of getGalleryItemStarredFromCaches(queryClient, refs)) {
-        starred.set(key, cachedStarred);
+      for (const [key, cachedMarks] of getGalleryItemMarksFromCaches(queryClient, refs)) {
+        marks.set(key, cachedMarks);
       }
 
-      return starred;
+      return marks;
     };
-    /** Undo reverts only items still holding this action's value, so a later move or star wins. */
+    /** Undo reverts only items still holding this action's value, so a later move or mark wins. */
     const getGalleryItemUndo = <Value>({
       getCurrent,
       painted,
@@ -846,85 +906,150 @@ export const useImageActions = ({
         },
       });
     };
-    const patchStarredStoreOnly = (keys: GalleryItemKey[], starred: boolean): void => {
-      if (keys.length === 0) {
-        return;
+    const getMarksSuccessTitle = (
+      patch: GalleryMarksPatch,
+      previous: ReadonlyMap<GalleryItemKey, GalleryMarks>
+    ): ((count: number) => string) => {
+      const fields = GALLERY_MARK_FIELDS.filter((field) => patch[field] !== undefined);
+
+      if (fields.length !== 1) {
+        return (count) => t('widgets.gallery.itemActions.marks.success', { count });
+      }
+      if (patch.flag !== undefined) {
+        const removesBookmarks =
+          patch.flag === 'none' && previous.size > 0 && [...previous.values()].every((marks) => marks.flag === 'pick');
+        const key =
+          patch.flag === 'pick'
+            ? 'bookmarked'
+            : patch.flag === 'reject'
+              ? 'rejected'
+              : removesBookmarks
+                ? 'bookmarkRemoved'
+                : 'flagCleared';
+
+        return (count) => t(`widgets.gallery.itemActions.marks.${key}`, { count });
+      }
+      if (patch.rating !== undefined) {
+        const { rating } = patch;
+
+        return (count) =>
+          rating === 0
+            ? t('widgets.gallery.itemActions.marks.ratingCleared', { count })
+            : t('widgets.gallery.itemActions.marks.rated', { count, rating });
       }
 
-      gallery.patchItems(keys, { starred });
-    };
-    const setItemsStarred = (items: GalleryItemRef[], starred: boolean, offerUndo = true): Promise<void> => {
-      // Star changes move items between listing partitions; restore each actual prior flag, never a blanket inversion.
-      const previousStarred = readKnownStarred(items);
+      const { colorLabel } = patch;
 
-      let rollbackCaches: (() => void) | null = patchGalleryItemCaches(queryClient, {
-        kind: 'star',
-        result: { failed: [], succeeded: items },
-        starred,
-      });
-      const rollbackCachesOnce = () => {
-        rollbackCaches?.();
-        rollbackCaches = null;
+      return (count) =>
+        colorLabel
+          ? t('widgets.gallery.itemActions.marks.labeled', {
+              count,
+              label: t(`widgets.gallery.marks.colorLabels.${colorLabel}`),
+            })
+          : t('widgets.gallery.itemActions.marks.labelCleared', { count });
+    };
+    const setMarks = (
+      items: GalleryItemRef[],
+      patch: GalleryMarksPatch,
+      { offerUndo, quiet = false }: { offerUndo: boolean; quiet?: boolean }
+    ): Promise<void> => {
+      const fields = GALLERY_MARK_FIELDS.filter((field) => patch[field] !== undefined);
+
+      if (items.length === 0 || fields.length === 0) {
+        return Promise.resolve();
+      }
+
+      // Rollback and Undo compare and restore only the marks this action sets, so a later change to another mark stays.
+      const pickSetMarks = (marks: GalleryKnownMarks): GalleryMarksPatch =>
+        Object.fromEntries(fields.map((field) => [field, marks[field]]));
+      const toSetMarksKey = (marks: GalleryKnownMarks): string =>
+        JSON.stringify(fields.map((field) => marks[field] ?? null));
+      const painted = toSetMarksKey(patch);
+      const previousMarks = readKnownMarks(items);
+      const previous = new Map([...previousMarks].map(([key, marks]) => [key, toSetMarksKey(marks)]));
+      const priorPatches = new Map(
+        [...previousMarks.values()].map((marks) => [toSetMarksKey(marks), pickSetMarks(marks)])
+      );
+      const readCurrent = (refs: readonly GalleryItemRef[]) =>
+        new Map([...readKnownMarks(refs)].map(([key, marks]) => [key, toSetMarksKey(marks)]));
+      // Items whose prior marks are not known group under an empty patch, which restores nothing.
+      const groupByPriorMarks = <Item>(items: readonly Item[], getKey: (item: Item) => GalleryItemKey) => {
+        const groups = new Map<string | undefined, Item[]>();
+
+        for (const item of items) {
+          const prior = previous.get(getKey(item));
+
+          groups.set(prior, [...(groups.get(prior) ?? []), item]);
+        }
+
+        return [...groups].map(([prior, members]) => ({
+          members,
+          patch: (prior === undefined ? undefined : priorPatches.get(prior)) ?? {},
+        }));
+      };
+      const restoreStoreMarks = (keys: readonly GalleryItemKey[]) => {
+        for (const { members, patch: prior } of groupByPriorMarks(keys, (key) => key)) {
+          if (Object.keys(prior).length > 0) {
+            gallery.patchItems(members, getGalleryItemMarkFieldsPatch(prior));
+          }
+        }
       };
 
-      patchStarredStoreOnly(items.map(toGalleryItemKey), starred);
+      // Only the bookmark is board data; a key burst refetches the listings once, after it.
+      const refetch = {
+        boards:
+          patch.flag !== undefined &&
+          items.some((item) => {
+            const prior = previousMarks.get(toGalleryItemKey(item));
+
+            return prior === undefined || (prior.flag === 'pick') !== (patch.flag === 'pick');
+          }),
+        refetchDelayMs: quiet ? QUIET_MARKS_REFETCH_DELAY_MS : 0,
+      };
+      const write = writeGalleryItemMarks(queryClient, items, patch, refetch);
+
+      gallery.patchItems(items.map(toGalleryItemKey), getGalleryItemMarkFieldsPatch(patch));
 
       return runItemMutation({
-        action: starred ? 'star' : 'unstar',
+        action: 'marks',
         applyConfirmed: (result) => {
-          if (result.failed.length === 0) {
-            return;
-          }
-
-          rollbackCachesOnce();
-          patchGalleryItemCaches(queryClient, {
-            kind: 'star',
-            result: { failed: [], succeeded: result.succeeded },
-            starred,
-          });
-          patchStarredStoreOnly(result.failed.map(toGalleryItemKey), !starred);
+          write.settle(
+            groupByPriorMarks(result.failed, toGalleryItemKey).map(({ members, patch: prior }) => ({
+              patch: prior,
+              refs: members,
+            }))
+          );
+          restoreStoreMarks(result.failed.map(toGalleryItemKey));
         },
         getUndo: (succeeded) =>
           offerUndo
             ? getGalleryItemUndo({
-                getCurrent: readKnownStarred,
-                painted: starred,
-                previous: previousStarred,
-                revert: (refs, prior) => void setItemsStarred(refs, prior, false),
+                getCurrent: readCurrent,
+                painted,
+                previous,
+                revert: (refs, prior) => void setMarks(refs, priorPatches.get(prior) ?? {}, { offerUndo: false }),
                 succeeded,
               })
             : null,
-        mutate: (signal) => galleryItemOrganization.setStarred(items, starred, signal),
+        invalidates: false,
+        mutate: (signal) =>
+          queueMarksRequest(captureAccountScope(), items, () => galleryItemOrganization.setMarks(items, patch, signal)),
+        quiet,
         requested: items,
-        // Restore prior flags only where this action's painted value remains.
+        // Restore prior marks only where this action's painted marks remain.
         rollback: () => {
-          rollbackCachesOnce();
+          write.rollback();
 
-          const requestedKeys = items.map(toGalleryItemKey);
           const currentStoreFields = collectGalleryStoreKnownItemFields(queries.getSnapshot().projects, items);
-          const safeStoreKeys = new Set(
-            selectItemKeysUnchangedSince(requestedKeys, starred, (key) => currentStoreFields.get(key)?.starred)
-          );
-          const restoreGroups = new Map<boolean, GalleryItemKey[]>();
+          const currentStoreMarks = (key: GalleryItemKey) => {
+            const marks = currentStoreFields.get(key)?.marks;
 
-          for (const item of items) {
-            const key = toGalleryItemKey(item);
-            const priorStarred = previousStarred.get(key);
+            return marks ? toSetMarksKey(marks) : undefined;
+          };
 
-            if (priorStarred === undefined || !safeStoreKeys.has(key)) {
-              continue;
-            }
-
-            const group = restoreGroups.get(priorStarred) ?? [];
-
-            group.push(key);
-            restoreGroups.set(priorStarred, group);
-          }
-
-          for (const [priorStarred, keys] of restoreGroups) {
-            patchStarredStoreOnly(keys, priorStarred);
-          }
+          restoreStoreMarks(selectItemKeysUnchangedSince(items.map(toGalleryItemKey), painted, currentStoreMarks));
         },
+        successTitle: getMarksSuccessTitle(patch, previousMarks),
       });
     };
     const fetchItemBlob = async (item: GalleryItem, signal: AbortSignal): Promise<Blob> => {
@@ -1069,7 +1194,7 @@ export const useImageActions = ({
         }
         openWorkbenchWidget('preview', { preferredRegions: ['center'], requireCenterView: true });
       },
-      setItemsStarred,
+      setItemsMarks: (items, patch, options) => setMarks(items, patch, { offerUndo: true, quiet: options?.quiet }),
       copyImage: async (image) => {
         const owner = captureAccountScope();
 
@@ -1412,11 +1537,6 @@ export const useImageActions = ({
           });
         }
       },
-      setImagesStarred: (imageNames, starred) =>
-        setItemsStarred(
-          imageNames.map((name) => ({ kind: 'image', name })),
-          starred
-        ),
       canUseAsConditioningClip,
       canUseAsReferenceImage,
       canUseAsReferenceVideo,

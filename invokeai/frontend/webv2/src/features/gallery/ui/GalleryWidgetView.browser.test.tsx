@@ -74,7 +74,10 @@ const createImageItem = (name: string): GalleryImageItem => ({
   isIntermediate: false,
   kind: 'image',
   name,
+  colorLabel: null,
   starred: false,
+  rating: 0,
+  rejected: false,
   thumbnailUrl: `/api/v1/images/i/${name}/thumbnail`,
   width: 512,
 });
@@ -86,7 +89,7 @@ const itemActions = {
   moveItemsToBoard: vi.fn(),
   openItemInNewTab: vi.fn(),
   openItemInPreview: vi.fn(),
-  setItemsStarred: vi.fn(),
+  setItemsMarks: vi.fn(),
 };
 const noop = vi.fn();
 
@@ -123,7 +126,7 @@ const adapter: GalleryUiAdapter = {
     setSearchTerm: noop,
     setSemanticSearchMode: noop,
     setSemanticSearchText: noop,
-    setStarredOnly: noop,
+    setMarksFilter: noop,
     setView: noop,
     toggleItemSelection: noop,
     updateSettings: noop,
@@ -142,7 +145,7 @@ const adapter: GalleryUiAdapter = {
   widgets: { openGallery: () => true, patchGalleryValues: noop },
 };
 const sharingAdapter: GalleryUiAdapter = { ...adapter, boardSharing: true };
-const runtime = { commands: { register: noop }, hotkeys: { register: noop } };
+const runtime = { commands: { register: noop }, hotkeys: { activateMode: noop, register: noop } };
 
 it('renders the compact gallery status through the localized status-chip key', async () => {
   await act(() =>

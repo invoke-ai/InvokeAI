@@ -50,7 +50,10 @@ const pickedItem: GalleryItem = {
   isIntermediate: false,
   kind: 'video',
   name: 'clip.mp4',
+  colorLabel: null,
   starred: false,
+  rating: 0,
+  rejected: false,
   thumbnailUrl: '/thumb/clip.mp4',
   width: 64,
 };
@@ -64,7 +67,10 @@ const previewedItem: GalleryItem = {
   isIntermediate: false,
   kind: 'image',
   name: 'image.png',
+  colorLabel: null,
   starred: false,
+  rating: 0,
+  rejected: false,
   thumbnailUrl: '/thumb/image.png',
   width: 64,
 };

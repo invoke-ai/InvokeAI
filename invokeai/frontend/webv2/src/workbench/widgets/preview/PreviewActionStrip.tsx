@@ -1,8 +1,14 @@
-import type { GalleryImage, GalleryItem } from '@features/gallery';
+import type { GalleryImage, GalleryItem, GalleryMarksPatch } from '@features/gallery';
 import type { ImageActions, ImageContextMenuVariant } from '@workbench/image-actions';
 
 import { Icon, HStack, Menu, Portal } from '@chakra-ui/react';
-import { galleryImageItemToGalleryImage, isGalleryImageItem, toGalleryItemRef } from '@features/gallery/contracts';
+import {
+  galleryImageItemToGalleryImage,
+  getGalleryItemMarks,
+  isGalleryImageItem,
+  toGalleryItemRef,
+} from '@features/gallery/contracts';
+import { GalleryMarksPopover } from '@features/gallery/marks';
 import { canCopyImage } from '@platform/browser/clipboard';
 import { Button, IconButton, ToggleIconButton } from '@platform/ui/Button';
 import { MenuContent } from '@platform/ui/Menu';
@@ -21,7 +27,6 @@ import {
   ImagesIcon,
   PencilIcon,
   SquareArrowOutUpRightIcon,
-  StarIcon,
   type LucideIcon,
 } from 'lucide-react';
 import { useCallback, useMemo, useState, type ComponentProps, type MouseEvent, type Ref } from 'react';
@@ -30,12 +35,8 @@ import { useTranslation } from 'react-i18next';
 import type { PreviewDensity } from './previewDensity';
 
 const MENU_POSITIONING = { placement: 'bottom-start' } as const;
-const STAR_LABEL_KEYS = {
-  image: { off: 'widgets.preview.starImage', on: 'widgets.preview.unstarImage' },
-  video: { off: 'widgets.preview.starVideo', on: 'widgets.preview.unstarVideo' },
-} as const;
 
-/** Header actions: Edit and Use for an image, Use for a video; ⋮ keeps housekeeping by density. */
+/** Header actions: Edit and Use for an image, Use for a video, then marks; ⋮ keeps housekeeping by density. */
 export const PreviewActionStrip = ({
   actions,
   density,
@@ -60,8 +61,9 @@ export const PreviewActionStrip = ({
 }) => {
   const { t } = useTranslation();
   const image = isGalleryImageItem(item) ? galleryImageItemToGalleryImage(item) : null;
-  const toggleStar = useCallback(
-    () => void actions.setItemsStarred([toGalleryItemRef(item)], !item.starred),
+  const marks = useMemo(() => [getGalleryItemMarks(item)], [item]);
+  const changeMarks = useCallback(
+    (patch: GalleryMarksPatch) => void actions.setItemsMarks([toGalleryItemRef(item)], patch),
     [actions, item]
   );
   const isCompareArmed = onCancelCompare !== undefined;
@@ -85,14 +87,7 @@ export const PreviewActionStrip = ({
     },
     [hasItemMenus, onOpenMenu]
   );
-  const starLabel = t(STAR_LABEL_KEYS[item.kind][item.starred ? 'on' : 'off']);
-  const starButton = (
-    <Tooltip content={starLabel}>
-      <IconButton aria-label={starLabel} color="fg.muted" size="sm" variant="ghost" onClick={toggleStar}>
-        <Icon as={StarIcon} boxSize="3.5" fill={item.starred ? 'currentColor' : 'none'} />
-      </IconButton>
-    </Tooltip>
-  );
+  const marksButton = <GalleryMarksPopover showsBookmark targets={marks} onChange={changeMarks} />;
   // Focus comes back to the ⋮ when its menu closes, and the strip goes with the selection.
   const menuButtonRef = useCallback(
     (node: HTMLButtonElement | null) => (node && getRegion ? releaseFocusOnRemoval(node, getRegion) : undefined),
@@ -112,16 +107,17 @@ export const PreviewActionStrip = ({
       <HStack flexShrink={0} gap="0.5">
         {image ? <EditMenu actions={actions} image={image} isIconOnly /> : null}
         <UseMenu actions={actions} isIconOnly item={item} />
-        {starButton}
+        {marksButton}
         {menuButton}
       </HStack>
     );
   }
 
+  // Minimal width keeps the marks alone; the ⋮ menu holds everything else.
   if (density !== 'full') {
     return (
       <HStack flexShrink={0} gap="0.5">
-        {starButton}
+        {marksButton}
         {menuButton}
       </HStack>
     );
@@ -145,7 +141,7 @@ export const PreviewActionStrip = ({
           onCheckedChange={toggleCompare}
         />
       ) : null}
-      {starButton}
+      {marksButton}
       {item.kind === 'video' && onCopyCurrentFrame ? (
         <StripIconButton
           // Without a clipboard (plain HTTP) the control says why; a frame still loading only disables it.

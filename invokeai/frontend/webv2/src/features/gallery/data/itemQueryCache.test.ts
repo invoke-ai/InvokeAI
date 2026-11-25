@@ -19,7 +19,10 @@ const createItem = (kind: 'image' | 'video', name: string, boardId = 'board-1'):
         isIntermediate: false,
         kind,
         name,
+        colorLabel: null,
         starred: false,
+        rating: 0,
+        rejected: false,
         thumbnailUrl: `/thumbnail/${name}`,
         width: 64,
       }
@@ -33,7 +36,10 @@ const createItem = (kind: 'image' | 'video', name: string, boardId = 'board-1'):
         isIntermediate: false,
         kind,
         name,
+        colorLabel: null,
         starred: false,
+        rating: 0,
+        rejected: false,
         thumbnailUrl: `/thumbnail/${name}`,
         width: 64,
       };

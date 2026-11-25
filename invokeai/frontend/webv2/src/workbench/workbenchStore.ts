@@ -6,6 +6,7 @@ import type { Project, WorkbenchState } from '@workbench/projectContracts';
 import {
   legacyGeneratedImageToGalleryItem,
   type GalleryImage,
+  type GalleryMarksFilter,
   type GeneratedImageContract,
 } from '@features/gallery/contracts';
 import { getGalleryBoardDestinationIds } from '@features/gallery/queries';
@@ -234,9 +235,9 @@ const createCommands = (
         projectId,
         searchTerm,
       })),
-      setStarredOnly: command('setGalleryStarredOnly', (starredOnly: boolean, projectId?: string) => ({
+      setMarksFilter: command('setGalleryMarksFilter', (marksFilter: GalleryMarksFilter, projectId?: string) => ({
+        marksFilter,
         projectId,
-        starredOnly,
       })),
       setSemanticSearchMode: command('setGallerySemanticSearchMode', (enabled: boolean, projectId?: string) => ({
         enabled,

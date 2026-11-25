@@ -6,7 +6,12 @@ import type { WorkbenchCommands, WorkbenchQueries } from '@workbench/workbenchSt
 
 import { galleryItems, toGalleryItemKey } from '@features/gallery';
 import {
+  getGalleryGridListingMarks,
+  getGalleryItemMarks,
   getGalleryItemView,
+  getGalleryMarksFilter,
+  getGalleryMarksFilterValues,
+  getGalleryRevealMarksFilter,
   getGallerySettings,
   isGalleryNavigationCurrent,
   requestGalleryItemReveal,
@@ -69,9 +74,14 @@ export const revealGalleryItem = (
       const snapshot = queries.getSnapshot();
       return getResolvedProjectWidgetValues(snapshot.activeProject, 'gallery', snapshot.scopedDefaults);
     };
-    const settings = getGallerySettings(getGalleryValues());
+    const initialValues = getGalleryValues();
+    const settings = getGallerySettings(initialValues);
     // Match the post-reveal filters so prefetched pages enter the gallery's cache.
-    const wantsStarredOnly = image.starred === true;
+    const revealMarksFilter = getGalleryRevealMarksFilter(
+      getGalleryMarksFilter(initialValues),
+      getGalleryItemMarks(image)
+    );
+    const revealMarksKey = JSON.stringify(getGalleryGridListingMarks(revealMarksFilter));
     // A media filter that hides the item's kind resets to both.
     const currentMediaKind = toGalleryMediaKind(settings.mediaFilter);
     const resetsMediaFilter = currentMediaKind !== undefined && currentMediaKind !== image.kind;
@@ -81,7 +91,7 @@ export const revealGalleryItem = (
       ...(currentMediaKind && !resetsMediaFilter ? { mediaKind: currentMediaKind } : {}),
       orderDir: settings.imageOrderDir,
       searchTerm: '',
-      starred: wantsStarredOnly,
+      ...getGalleryGridListingMarks(revealMarksFilter),
     };
     const boardsPromise = queryClient
       .fetchQuery(
@@ -128,7 +138,7 @@ export const revealGalleryItem = (
     if (
       hasSearch ||
       resetsMediaFilter ||
-      (values.starredOnly === true) !== wantsStarredOnly ||
+      JSON.stringify(getGalleryGridListingMarks(getGalleryMarksFilter(values))) !== revealMarksKey ||
       (values.semanticImageQuery !== null && values.semanticImageQuery !== undefined)
     ) {
       commands.widgets.patchValues('gallery', {
@@ -136,7 +146,7 @@ export const revealGalleryItem = (
         searchTerm: '',
         semanticImageQuery: null,
         semanticSearchText: null,
-        starredOnly: wantsStarredOnly,
+        ...getGalleryMarksFilterValues(values, revealMarksFilter),
       });
     }
 

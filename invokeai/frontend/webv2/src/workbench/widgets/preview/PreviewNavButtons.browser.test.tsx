@@ -41,7 +41,10 @@ const neighbor: GalleryItem = {
   isIntermediate: false,
   kind: 'image',
   name: 'neighbor',
+  colorLabel: null,
   starred: false,
+  rating: 0,
+  rejected: false,
   thumbnailUrl: '/neighbor.png',
   width: 64,
 };

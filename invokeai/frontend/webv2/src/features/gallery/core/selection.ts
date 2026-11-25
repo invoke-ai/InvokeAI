@@ -10,6 +10,7 @@ import {
   type GalleryItemKey,
   type GalleryItemRef,
 } from './items';
+import { toGalleryColorLabel, toGalleryRating } from './marks';
 
 const isRecord = (value: unknown): value is Record<string, unknown> => Boolean(value) && typeof value === 'object';
 
@@ -37,6 +38,33 @@ const isGalleryItem = (value: unknown): value is GalleryItem => {
   return value.kind === 'image' || typeof value.durationSeconds === 'number';
 };
 
+const markedPersistedItems = new WeakMap<object, GalleryItem>();
+
+/** Items persisted before marks existed read as unmarked; memoized so each persisted item keeps one identity. */
+const withPersistedMarks = (item: GalleryItem): GalleryItem => {
+  const raw = item as Partial<GalleryItem>;
+
+  if (typeof raw.rating === 'number' && typeof raw.rejected === 'boolean' && raw.colorLabel !== undefined) {
+    return item;
+  }
+
+  const cached = markedPersistedItems.get(item);
+
+  if (cached) {
+    return cached;
+  }
+
+  const marked: GalleryItem = {
+    ...item,
+    colorLabel: toGalleryColorLabel(raw.colorLabel),
+    rating: toGalleryRating(raw.rating),
+    rejected: !item.starred && raw.rejected === true,
+  };
+
+  markedPersistedItems.set(item, marked);
+  return marked;
+};
+
 const legacyImageToGalleryItem = (
   image: GeneratedImageContract & Partial<GalleryImage>,
   galleryValues: Record<string, unknown>
@@ -49,7 +77,7 @@ const legacyImageToGalleryItem = (
 
 export const getSelectedGalleryItemFromValues = (galleryValues: Record<string, unknown>): GalleryItem | null => {
   if (isGalleryItem(galleryValues.selectedImage)) {
-    return galleryValues.selectedImage;
+    return withPersistedMarks(galleryValues.selectedImage);
   }
 
   if (isGeneratedImage(galleryValues.selectedImage)) {
@@ -96,7 +124,7 @@ export const getPersistedSelectedGalleryItemKeys = (galleryValues: Record<string
   return selectedItem ? [toGalleryItemKey(selectedItem)] : [];
 };
 
-/** Later-first, so the successor stays out of the starred block. */
+/** Later-first, so the successor stays out of the Bookmarked block. */
 export const getGalleryDeletionSuccessor = (
   orderedRefs: readonly GalleryItemRef[],
   primaryKey: GalleryItemKey,
@@ -221,7 +249,7 @@ const NAVIGATION_VALUE_KEYS = [
   'selectedImageNames',
   'semanticImageQuery',
   'semanticSearchText',
-  'starredOnly',
+  'marksFilter',
 ] as const;
 
 export const captureGalleryNavigation = (values: Record<string, unknown>): GalleryNavigationSnapshot => ({

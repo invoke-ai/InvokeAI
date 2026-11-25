@@ -41,7 +41,10 @@ const image = (index: number): GalleryImageItem => ({
   isIntermediate: false,
   kind: 'image',
   name: `image-${String(index)}`,
+  colorLabel: null,
   starred: false,
+  rating: 0,
+  rejected: false,
   thumbnailUrl: `/images/${String(index)}/thumbnail`,
   width: 512,
 });

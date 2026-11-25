@@ -53,7 +53,10 @@ const makeItem = (name: string, kind: 'image' | 'video' = 'image'): GalleryItem 
     height: 128,
     isIntermediate: false,
     name,
+    colorLabel: null,
     starred: false,
+    rating: 0 as const,
+    rejected: false,
     thumbnailUrl: svg(name),
     width: 128,
   };

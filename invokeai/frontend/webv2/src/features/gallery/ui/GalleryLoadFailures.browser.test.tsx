@@ -85,7 +85,10 @@ const image = (name: string, boardId: string, day = 1): GalleryItem => ({
   isIntermediate: false,
   kind: 'image',
   name,
+  colorLabel: null,
   starred: false,
+  rating: 0,
+  rejected: false,
   thumbnailUrl: THUMBNAIL,
   width: 8,
 });
@@ -115,7 +118,10 @@ const DOG_ITEMS = [image('a.png', 'dogs', 3), image('b.png', 'dogs', 2), image('
 const CAT_ITEMS = [image('tabby.png', 'cats', 3)];
 
 const noop = () => undefined;
-const runtime = { commands: { register: () => noop }, hotkeys: { register: () => noop } };
+const runtime = {
+  commands: { register: () => noop },
+  hotkeys: { activateMode: () => noop, register: () => noop },
+};
 const itemActions = {
   deleteItems: vi.fn(),
   downloadItem: vi.fn(),
@@ -123,7 +129,7 @@ const itemActions = {
   moveItemsToBoard: vi.fn(),
   openItemInNewTab: vi.fn(),
   openItemInPreview: vi.fn(),
-  setItemsStarred: vi.fn(),
+  setItemsMarks: vi.fn(),
 };
 const ItemActionsProvider = ({ children }: { children: ReactNode }) => (
   <GalleryItemActionsProvider actions={itemActions}>{children}</GalleryItemActionsProvider>
@@ -166,7 +172,7 @@ const Harness = ({
         setSearchTerm: (searchTerm: string) => patch({ galleryPage: 0, searchTerm }),
         setSemanticSearchMode: noop,
         setSemanticSearchText: noop,
-        setStarredOnly: (starredOnly: boolean) => patch({ starredOnly }),
+        setMarksFilter: (marksFilter: unknown) => patch({ marksFilter }),
         setView: (galleryView: string) => patch({ galleryView }),
         toggleItemSelection: noop,
         updateSettings: (settings: Record<string, unknown>) => patch(settings),
@@ -673,7 +679,7 @@ describe('Gallery listing failures', () => {
         page(Array.from({ length: 4 }, (_, index) => ({ ...image(`fav-${index}.png`, 'dogs', 9), starred: true })))
       );
       await renderGallery({ imageDensityPercent }, 'center', [PROGRESS_SESSION]);
-      await waitFor(() => expect(host?.querySelector('[role="list"][aria-label="Starred"]')).not.toBeNull());
+      await waitFor(() => expect(host?.querySelector('[role="list"][aria-label="Bookmarked"]')).not.toBeNull());
       expect(host?.querySelector('[data-gallery-session-id]')).not.toBeNull();
 
       const notice = await scrollToLoadMoreFailure();
@@ -776,15 +782,15 @@ describe('Gallery side-section failures', () => {
     transport.listStarred.mockImplementationOnce(fail);
     await renderGallery();
 
-    await waitFor(() => expect(host?.textContent).toContain('Could not load starred items.'));
+    await waitFor(() => expect(host?.textContent).toContain('Could not load bookmarked items.'));
     expect(thumbnailNames()).toHaveLength(3);
 
     transport.listStarred.mockImplementation(() => page([{ ...image('fav.png', 'dogs', 9), starred: true }]));
-    await act(() => findButton('Retry loading starred items')?.click());
+    await act(() => findButton('Retry loading bookmarked items')?.click());
 
-    await waitFor(() => expect(host?.textContent).not.toContain('Could not load starred items.'));
+    await waitFor(() => expect(host?.textContent).not.toContain('Could not load bookmarked items.'));
     expect(
-      host?.querySelector('[role="list"][aria-label="Starred"] button[aria-label="Select fav.png for preview"]')
+      host?.querySelector('[role="list"][aria-label="Bookmarked"] button[aria-label="Select fav.png for preview"]')
     ).not.toBeNull();
   });
 
@@ -796,15 +802,15 @@ describe('Gallery side-section failures', () => {
     transport.listStarred.mockImplementation(fail);
     await act(() => queryClient!.invalidateQueries({ queryKey: ['gallery', 'items', 'list'] }));
 
-    await waitFor(() => expect(host?.textContent).toContain('Could not refresh starred items.'));
-    expect(findButton('Retry refreshing starred items')).not.toBeNull();
+    await waitFor(() => expect(host?.textContent).toContain('Could not refresh bookmarked items.'));
+    expect(findButton('Retry refreshing bookmarked items')).not.toBeNull();
     expect(host?.textContent).not.toContain('Drop media here or click to upload');
     expect(host?.textContent).not.toContain('No items match');
 
     transport.listStarred.mockImplementation(() => page([]));
-    await act(() => findButton('Retry refreshing starred items')?.click());
+    await act(() => findButton('Retry refreshing bookmarked items')?.click());
 
     await waitFor(() => expect(host?.textContent).toContain('Drop media here or click to upload'));
-    expect(host?.textContent).not.toContain('Could not refresh starred items.');
+    expect(host?.textContent).not.toContain('Could not refresh bookmarked items.');
   });
 });

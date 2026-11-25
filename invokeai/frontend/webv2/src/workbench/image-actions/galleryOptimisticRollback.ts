@@ -3,6 +3,7 @@ import type {
   GalleryItem,
   GalleryItemKey,
   GalleryItemRef,
+  GalleryMarks,
   GeneratedImageContract,
 } from '@features/gallery';
 import type { Project } from '@workbench/projectContracts';
@@ -12,6 +13,7 @@ import { legacyGeneratedImageToGalleryItem, toGalleryItemKey } from '@features/g
 import {
   getBoundedRecentImages,
   getGalleryCompareImage,
+  getGalleryItemMarks,
   getSelectedGalleryItemFromValues,
 } from '@features/gallery/contracts';
 import { isSlotUnclaimed, selectUnclaimedEntries } from '@platform/state/compareAndSwapRollback';
@@ -167,11 +169,11 @@ export const selectRestorableGalleryWidgetPatches = (
 
 export interface GalleryStoreKnownItemFields {
   boardId: string;
-  starred: boolean;
+  marks: GalleryMarks;
 }
 
 /**
- * Read board/star state from project selection, comparison, or recent generations; newly generated items may not exist
+ * Read board/marks state from project selection, comparison, or recent generations; newly generated items may not exist
  * in list caches yet.
  */
 export const collectGalleryStoreKnownItemFields = (
@@ -184,7 +186,7 @@ export const collectGalleryStoreKnownItemFields = (
     const key = toGalleryItemKey(item);
 
     if (wanted.has(key) && !found.has(key)) {
-      found.set(key, { boardId: item.boardId, starred: item.starred });
+      found.set(key, { boardId: item.boardId, marks: getGalleryItemMarks(item) });
     }
   };
 
@@ -218,7 +220,7 @@ export const collectGalleryStoreKnownItemFields = (
 /**
  * The per-item form of the shared compare-and-swap rule: a key rolls back only if its current value is still what
  * *this* mutation painted it to. A key a second, later mutation already moved on from (a subsequent drag to a different
- * board, another star toggle) is excluded.
+ * board, another mark) is excluded.
  *
  * Unknown counts as unclaimed here, unlike the widget-value case: `readCurrent` looks the item up in local state that
  * may simply not hold it, so `undefined` means "nothing here to protect" rather than "someone cleared it".

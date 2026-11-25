@@ -76,6 +76,20 @@ const PROJECT_BOARD_IMAGES = new Map([
 ]);
 const MEMBER_BOARD_IMAGES = new Set(PROJECT_FILE_BOARD.memberImages);
 
+// A believable spread for culling: most items unrated, a few labelled, a few rejected (never bookmarked ones).
+const FIXTURE_RATINGS = [0, 3, 0, 5, 1, 0, 4, 2, 0];
+const FIXTURE_COLOR_LABELS = [null, null, 'red', null, 'green', null, null, 'blue', null, 'yellow', null, 'purple'];
+
+const fixtureMarks = (index, starred) => ({
+  ...(FIXTURE_COLOR_LABELS[index % FIXTURE_COLOR_LABELS.length]
+    ? { color_label: FIXTURE_COLOR_LABELS[index % FIXTURE_COLOR_LABELS.length] }
+    : {}),
+  rating: FIXTURE_RATINGS[index % FIXTURE_RATINGS.length],
+  rejected: !starred && index % 13 === 5,
+});
+
+const UNMARKED = Object.freeze({ rating: 0, rejected: false });
+
 const createImages = (count) =>
   range(count, (index) => {
     const id = ordinal(index, 4);
@@ -93,6 +107,10 @@ const createImages = (count) =>
       image_url: `/api/v1/images/i/${imageName}/full`,
       is_intermediate: false,
       starred: index % 11 === 0,
+      // Project-file media stays unmarked: marks do not travel in project files.
+      ...(projectBoardMembership === undefined && !MEMBER_BOARD_IMAGES.has(imageName)
+        ? fixtureMarks(index, index % 11 === 0)
+        : UNMARKED),
       thumbnail_url: `/api/v1/images/i/${imageName}/thumbnail`,
       width: 512 + (index % 4) * 64,
       ...(projectBoardMembership === undefined
@@ -137,6 +155,8 @@ const createVideos = () => [
     metadata: wanT2vMetadata('wan fixture', 1234567),
     owner_user_id: 'fixture-user',
     starred: true,
+    rating: 4,
+    rejected: false,
     thumbnail_url: `/api/v1/videos/i/${MOCK_BACKEND_REPRESENTATIVE_VIDEO_NAME}/thumbnail`,
     video_category: 'general',
     video_name: MOCK_BACKEND_REPRESENTATIVE_VIDEO_NAME,
@@ -156,6 +176,8 @@ const createVideos = () => [
     metadata: wanT2vMetadata('board cover fixture', 2345678),
     owner_user_id: 'fixture-user',
     starred: true,
+    rating: 0,
+    rejected: false,
     thumbnail_url: '/api/v1/videos/i/fixture-video-board.mp4/thumbnail',
     video_category: 'control',
     video_name: 'fixture-video-board.mp4',
@@ -175,6 +197,8 @@ const createVideos = () => [
     metadata: { prompt: 'same-name collision fixture' },
     owner_user_id: 'fixture-user',
     starred: true,
+    rating: 0,
+    rejected: false,
     thumbnail_url: '/api/v1/videos/i/fixture-image-0012.png/thumbnail',
     video_category: 'general',
     video_name: 'fixture-image-0012.png',
@@ -194,6 +218,9 @@ const createVideos = () => [
     metadata: { prompt: 'asset category fixture' },
     owner_user_id: 'fixture-user',
     starred: false,
+    color_label: 'blue',
+    rating: 2,
+    rejected: false,
     thumbnail_url: '/api/v1/videos/i/fixture-video-asset.mp4/thumbnail',
     video_category: 'control',
     video_name: 'fixture-video-asset.mp4',
@@ -213,6 +240,8 @@ const createVideos = () => [
     metadata: { prompt: 'intermediate fixture' },
     owner_user_id: 'fixture-user',
     starred: false,
+    rating: 0,
+    rejected: false,
     thumbnail_url: '/api/v1/videos/i/fixture-video-intermediate.mp4/thumbnail',
     video_category: 'general',
     video_name: 'fixture-video-intermediate.mp4',
@@ -232,6 +261,8 @@ const createVideos = () => [
     metadata: wanT2vMetadata('project board fixture', 3456789),
     owner_user_id: 'fixture-user',
     starred: false,
+    rating: 0,
+    rejected: false,
     thumbnail_url: '/api/v1/videos/i/fixture-video-project.mp4/thumbnail',
     video_category: 'general',
     video_name: 'fixture-video-project.mp4',
@@ -251,6 +282,8 @@ const createVideos = () => [
     metadata: { prompt: 'foreign fixture' },
     owner_user_id: 'other-user',
     starred: false,
+    rating: 0,
+    rejected: false,
     thumbnail_url: '/api/v1/videos/i/fixture-video-foreign.mp4/thumbnail',
     video_category: 'general',
     video_name: 'fixture-video-foreign.mp4',
@@ -270,6 +303,8 @@ const createVideos = () => [
     metadata: wanT2vMetadata('previous-day fixture', 4567890),
     owner_user_id: 'fixture-user',
     starred: false,
+    rating: 0,
+    rejected: false,
     thumbnail_url: '/api/v1/videos/i/fixture-video-old.mp4/thumbnail',
     video_category: 'general',
     video_name: 'fixture-video-old.mp4',

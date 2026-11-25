@@ -9,6 +9,7 @@ import type { WorkbenchInternalStore } from '@workbench/workbenchStore';
 
 import { Box, ChakraProvider } from '@chakra-ui/react';
 import { toGalleryItemKey, toGalleryItemRef } from '@features/gallery/core/items';
+import { EMPTY_GALLERY_MARKS_FILTER, type GalleryMarksPatch } from '@features/gallery/core/marks';
 import { getGalleryDeletionSuccessor } from '@features/gallery/core/selection';
 import { getGallerySettings, type GallerySettings } from '@features/gallery/core/settings';
 import { GalleryUiProvider, type GalleryUiAdapter } from '@features/gallery/react';
@@ -94,9 +95,8 @@ void i18n.use(initReactI18next).init({
             itemsAriaLabel: 'Gallery items',
             loadingBackendGallery: 'Loading gallery',
             selectImageForPreview: 'Select {{name}} for preview',
-            starImage: 'Star {{name}}',
-            starredItems: 'Starred',
-            unstarImage: 'Unstar {{name}}',
+            bookmarkItem: 'Bookmark {{name}}',
+            bookmarkedItems: 'Bookmarked',
           },
         },
       },
@@ -167,12 +167,12 @@ const createGallery = (items: GalleryItem[], selected: GalleryItem | null): Gall
   searchTerm: '',
   selectedBoardId: 'board-a',
   ...selectionOf(selected),
-  selectionStarredOnly: false,
+  selectionMarksFilter: EMPTY_GALLERY_MARKS_FILTER,
   semanticImageQuery: null,
   semanticSearchText: null,
   // The harness shows three columns.
   settings: getGallerySettings(resolvedValues({ paginationMode: 'paginated' })),
-  starredOnly: false,
+  marksFilter: EMPTY_GALLERY_MARKS_FILTER,
 });
 
 interface HarnessState {
@@ -208,7 +208,7 @@ const actions = {
   selectItemRange: (refs: GalleryItemRef[], primary: GalleryItem) =>
     setGallery({ selectedItemKey: toGalleryItemKey(primary), selectedItemKeys: refs.map(toGalleryItemKey) }),
   setCompareItem: vi.fn(),
-  setStarredOnly: vi.fn(),
+  setMarksFilter: vi.fn(),
   toggleItemInSelection: (item: GalleryItem, nextPrimary: GalleryItem | null) => {
     const key = toGalleryItemKey(item);
     const { selectedItemKey, selectedItemKeys } = state.gallery;
@@ -252,7 +252,12 @@ const itemActions = {
     state.confirmDeletion
       ? confirmationRef.current!(refs, () => applyDeletion(refs), { returnFocus: options?.returnFocus })
       : applyDeletion(refs),
-  setItemsStarred: (refs: GalleryItemRef[], starred: boolean) => {
+  setItemsMarks: (refs: GalleryItemRef[], { flag }: GalleryMarksPatch) => {
+    if (flag === undefined) {
+      return Promise.resolve();
+    }
+
+    const starred = flag === 'pick';
     const keys = new Set(refs.map(toGalleryItemKey));
     const moved = [...state.strip, ...state.gallery.items]
       .filter((item) => keys.has(toGalleryItemKey(item)))
@@ -604,9 +609,9 @@ describe('Gallery grid keyboard focus', () => {
     expect(document.activeElement).toBe(document.body);
   });
 
-  it('keeps a starred tile focused as the star moves it into the strip', async () => {
+  it('keeps a tile focused as its bookmark moves it into the strip', async () => {
     await renderGrid(createItems(6), { strip: [createItem('starred-0.png', { starred: true })] });
-    const star = host!.querySelector<HTMLButtonElement>('button[aria-label="Star image-2.png"]')!;
+    const star = host!.querySelector<HTMLButtonElement>('button[aria-label="Bookmark image-2.png"]')!;
 
     await act(() => {
       star.focus();
@@ -651,7 +656,7 @@ describe('Gallery grid keyboard focus', () => {
           page: 0,
           paginationMode: 'paginated',
           searchTerm: '',
-          starredOnly: false,
+          marksFilter: EMPTY_GALLERY_MARKS_FILTER,
         },
       },
       selected: starredA,
@@ -882,7 +887,7 @@ describe('Gallery grid keyboard focus', () => {
     });
     await tabIntoGallery();
     expect(document.activeElement?.getAttribute('aria-expanded')).toBe('true');
-    expect(document.activeElement?.textContent).toMatch(/^Starred/);
+    expect(document.activeElement?.textContent).toMatch(/^Bookmarked/);
     await act(() => userEvent.tab());
     expect(focusedThumbnail()).toBe('starred-0.png');
 

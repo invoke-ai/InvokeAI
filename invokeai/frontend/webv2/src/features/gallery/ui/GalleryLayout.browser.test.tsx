@@ -4,6 +4,7 @@ import type { GalleryUiAdapter } from '@features/gallery/react';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { DndContext } from '@dnd-kit/core';
+import { EMPTY_GALLERY_MARKS_FILTER } from '@features/gallery/core/marks';
 import { DEFAULT_GALLERY_SETTINGS } from '@features/gallery/core/settings';
 import { GalleryUiProvider } from '@features/gallery/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -78,6 +79,9 @@ const createItem = (name: string) => ({
   isIntermediate: false,
   kind: 'image' as const,
   name,
+  colorLabel: null,
+  rating: 0 as const,
+  rejected: false,
   starred: false,
   thumbnailUrl: `data:image/svg+xml,${encodeURIComponent(
     '<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><rect width="64" height="64" fill="#547c83"/></svg>'
@@ -101,7 +105,8 @@ const createGallery = (overrides: Partial<GalleryStateView> = {}) =>
     selectedItemKeys: ['image:a.png', 'image:b.png'],
     semanticImageQuery: null,
     settings: DEFAULT_GALLERY_SETTINGS,
-    starredOnly: false,
+    marksFilter: EMPTY_GALLERY_MARKS_FILTER,
+    selectionMarksFilter: EMPTY_GALLERY_MARKS_FILTER,
     ...overrides,
   }) as unknown as GalleryStateView;
 
@@ -136,7 +141,7 @@ const contextBase = {
     selectBoard: vi.fn(),
     selectProjectBoard: vi.fn(),
     setSearchTerm: vi.fn(),
-    setStarredOnly: vi.fn(),
+    setMarksFilter: vi.fn(),
     setView: vi.fn(),
     updateSettings: vi.fn(),
     uploadFiles: vi.fn(),
@@ -150,7 +155,7 @@ const contextBase = {
     deleteItems: vi.fn(),
     downloadItems: vi.fn(),
     moveItemsToBoard: vi.fn(),
-    setItemsStarred: vi.fn(),
+    setItemsMarks: vi.fn(),
   },
   projectName: 'Project',
   runtime: {
@@ -428,47 +433,64 @@ describe('gallery layout shells', () => {
     }
   });
 
-  it('offers the starred-only filter in both shells, pressed while active and disabled under a ranked query', async () => {
+  it('offers the marks filter toggle in both shells, showing an active filter while its row is hidden', async () => {
+    const setMarksFilter = contextBase.actions.setMarksFilter as ReturnType<typeof vi.fn>;
+    const updateSettings = contextBase.actions.updateSettings as ReturnType<typeof vi.fn>;
+    const getToggle = () =>
+      host?.querySelector<HTMLButtonElement>('button[aria-label="widgets.gallery.marksFilter.toggle"]');
+    const rejected = { ...EMPTY_GALLERY_MARKS_FILTER, flags: ['reject' as const] };
+
     for (const Layout of [GalleryStackedLayout, GalleryWideLayout]) {
-      setGallery(createGallery({ starredOnly: false }));
+      updateSettings.mockClear();
+      setGallery(createGallery());
       await renderLayout(Layout);
 
-      const toggle = host?.querySelector<HTMLButtonElement>('button[aria-label="widgets.gallery.starredOnly"]');
-
-      expect(toggle, 'starred filter toggle did not render in the toolbar').not.toBeNull();
-      expect(toggle?.getAttribute('aria-pressed')).toBe('false');
-
+      expect(getToggle()?.getAttribute('aria-pressed')).toBe('false');
+      expect(host?.querySelector('[data-gallery-marks-filter-active]')).toBeNull();
       await act(() => {
-        toggle?.click();
+        getToggle()?.click();
       });
-      expect(contextBase.actions.setStarredOnly).toHaveBeenLastCalledWith(true);
+      expect(updateSettings).toHaveBeenLastCalledWith({ marksFilterRowOpen: true });
 
-      setGallery(createGallery({ starredOnly: true }));
+      setGallery(createGallery({ marksFilter: rejected }));
       await renderLayout(Layout);
-      expect(
-        host
-          ?.querySelector<HTMLButtonElement>('button[aria-label="widgets.gallery.starredOnly"]')
-          ?.getAttribute('aria-pressed')
-      ).toBe('true');
+      expect(host?.querySelector('[data-gallery-marks-filter-active]')).not.toBeNull();
 
-      setGallery(createGallery({ semanticImageQuery: { imageName: 'ref.png', kind: 'image' }, starredOnly: true }));
+      // The row's choices encode the filter they set.
+      setGallery(createGallery({ settings: { ...DEFAULT_GALLERY_SETTINGS, marksFilterRowOpen: true } }));
       await renderLayout(Layout);
-
-      const ranked = host?.querySelector<HTMLButtonElement>('button[aria-label="widgets.gallery.starredOnly"]');
-
-      // Inert but focusable, so the tooltip can say why it does not apply.
-      expect(ranked?.getAttribute('aria-disabled')).toBe('true');
-      expect(ranked?.disabled).toBe(false);
-      expect(ranked?.getAttribute('aria-pressed')).toBe('false');
-      (contextBase.actions.setStarredOnly as ReturnType<typeof vi.fn>).mockClear();
+      setMarksFilter.mockClear();
       await act(() => {
-        ranked?.click();
+        host?.querySelector<HTMLButtonElement>('[data-marks-filter-flag="reject"]')?.click();
       });
-      expect(contextBase.actions.setStarredOnly).not.toHaveBeenCalled();
+      // The rating group handles a click in a microtask, which this act flushes.
+      await act(async () => {
+        host?.querySelector<HTMLElement>('[data-gallery-marks-filter-row] [role="radio"][aria-posinset="3"]')?.click();
+        await Promise.resolve();
+      });
+      await act(() => {
+        host?.querySelector<HTMLButtonElement>('[data-marks-filter-operator]')?.click();
+        host?.querySelector<HTMLButtonElement>('[data-marks-filter-label="red"]')?.click();
+      });
+      expect(setMarksFilter.mock.calls).toEqual([
+        [rejected],
+        [{ ...EMPTY_GALLERY_MARKS_FILTER, rating: 3 }],
+        [{ ...EMPTY_GALLERY_MARKS_FILTER, ratingOperator: 'exactly' }],
+        [{ ...EMPTY_GALLERY_MARKS_FILTER, colorLabels: ['red'] }],
+      ]);
+
+      setGallery(createGallery({ marksFilter: rejected, semanticImageQuery: { imageName: 'ref.png', kind: 'image' } }));
+      await renderLayout(Layout);
+
+      // Inert but focusable, so the tooltip can say why it does not apply; the row and indicator go with it.
+      expect(getToggle()?.getAttribute('aria-disabled')).toBe('true');
+      expect(getToggle()?.disabled).toBe(false);
+      expect(host?.querySelector('[data-gallery-marks-filter-row]')).toBeNull();
+      expect(host?.querySelector('[data-gallery-marks-filter-active]')).toBeNull();
     }
   });
 
-  it('offers one media filter and sort menu beside the separate starred toggle in both shells', async () => {
+  it('offers one media filter and sort menu beside the separate marks filter toggle in both shells', async () => {
     const updateSettings = contextBase.actions.updateSettings as ReturnType<typeof vi.fn>;
 
     for (const Layout of [GalleryStackedLayout, GalleryWideLayout]) {
@@ -478,11 +500,11 @@ describe('gallery layout shells', () => {
 
       const toolbarButtons = [...(host?.querySelectorAll<HTMLButtonElement>('button') ?? [])];
       const starIndex = toolbarButtons.findIndex(
-        (button) => button.getAttribute('aria-label') === 'widgets.gallery.starredOnly'
+        (button) => button.getAttribute('aria-label') === 'widgets.gallery.marksFilter.toggle'
       );
       const trigger = toolbarButtons[starIndex + 1];
 
-      // The starred filter stays a toggle of its own; one menu trigger follows it, then upload.
+      // The marks filter stays a toggle of its own; one menu trigger follows it, then upload.
       expect(toolbarButtons[starIndex]?.getAttribute('aria-pressed')).toBe('false');
       expect(trigger?.getAttribute('aria-label')).toBe(
         'widgets.gallery.filterAndSortMediaValue: widgets.gallery.mediaFilterAll, widgets.gallery.newest'
@@ -577,10 +599,12 @@ describe('gallery layout shells', () => {
     const starredItem = { ...createItem('starred.png'), starred: true };
 
     contextBase.starredStrip = { items: [starredItem], state: READY, total: 9 };
-    setGallery(createGallery({ items: [createItem('a.png')], starredOnly: false }));
+    setGallery(createGallery({ items: [createItem('a.png')] }));
     await renderLayout(GalleryWideLayout);
 
-    const showAll = host?.querySelector<HTMLButtonElement>('button[aria-label="widgets.gallery.showAllStarredItems"]');
+    const showAll = host?.querySelector<HTMLButtonElement>(
+      'button[aria-label="widgets.gallery.showAllBookmarkedItems"]'
+    );
 
     expect(showAll, 'Show all did not render').not.toBeNull();
     showAll?.focus();
@@ -588,8 +612,11 @@ describe('gallery layout shells', () => {
       showAll?.click();
     });
 
-    expect(contextBase.actions.setStarredOnly).toHaveBeenLastCalledWith(true);
-    expect(document.activeElement?.getAttribute('aria-label')).toBe('widgets.gallery.starredOnly');
+    expect(contextBase.actions.setMarksFilter).toHaveBeenLastCalledWith({
+      ...EMPTY_GALLERY_MARKS_FILTER,
+      flags: ['pick'],
+    });
+    expect(document.activeElement?.getAttribute('aria-label')).toBe('widgets.gallery.marksFilter.toggle');
     contextBase.starredStrip = EMPTY_GALLERY_STARRED_STRIP;
   });
 

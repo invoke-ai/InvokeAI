@@ -14,7 +14,6 @@ import {
   isGalleryImageItem,
   legacyGeneratedImageToGalleryItem,
   parseGalleryItemKey,
-  shouldStarSelection,
   toGalleryItemKey,
   toGalleryItemRef,
   type GalleryImageItem,
@@ -23,12 +22,15 @@ import {
 const galleryItem = (name: string, starred: boolean): GalleryImageItem => ({
   boardId: 'none',
   category: 'general',
+  colorLabel: null,
   createdAt: '2026-07-30T12:00:00.000Z',
   fullUrl: `/images/${name}/full`,
   height: 512,
   isIntermediate: false,
   kind: 'image',
   name,
+  rating: 0,
+  rejected: false,
   starred,
   thumbnailUrl: `/images/${name}/thumbnail`,
   width: 768,
@@ -55,7 +57,10 @@ describe('gallery item keys', () => {
       isIntermediate: false,
       kind: 'image',
       name: 'folder:example.png',
+      colorLabel: null,
       starred: false,
+      rating: 0,
+      rejected: false,
       thumbnailUrl: '/images/example.png/thumbnail',
       width: 768,
     };
@@ -99,54 +104,20 @@ describe('gallery view membership', () => {
   });
 });
 
-describe('selection starring policy', () => {
-  const starred = galleryItem('starred.png', true);
-  const unstarred = galleryItem('unstarred.png', false);
-
-  it('does not star an empty selection', () => {
-    expect(shouldStarSelection([starred], [])).toBe(false);
-  });
-
-  it('unstars only when every selected item is loaded and starred', () => {
-    expect(shouldStarSelection([starred], [{ kind: 'image', name: starred.name }])).toBe(false);
-  });
-
-  it('stars when any selected item is loaded and unstarred', () => {
-    expect(
-      shouldStarSelection(
-        [starred, unstarred],
-        [
-          { kind: 'image', name: starred.name },
-          { kind: 'image', name: unstarred.name },
-        ]
-      )
-    ).toBe(true);
-  });
-
-  it('stars when any selected item has not been loaded', () => {
-    expect(
-      shouldStarSelection(
-        [starred],
-        [
-          { kind: 'image', name: starred.name },
-          { kind: 'video', name: 'not-loaded.mp4' },
-        ]
-      )
-    ).toBe(true);
-  });
-});
-
 describe('gallery item compatibility', () => {
-  it('normalizes missing legacy gallery context when adapting a generated image', () => {
+  it('normalizes missing legacy gallery context, marks included, when adapting a generated image', () => {
     expect(legacyGeneratedImageToGalleryItem(generatedImage)).toEqual({
       boardId: 'none',
       category: 'general',
+      colorLabel: null,
       createdAt: '2026-07-30T12:00:00.000Z',
       fullUrl: '/images/legacy.png/full',
       height: 512,
       isIntermediate: false,
       kind: 'image',
       name: 'legacy.png',
+      rating: 0,
+      rejected: false,
       sourceQueueItemId: 'queue-123',
       starred: false,
       thumbnailUrl: '/images/legacy.png/thumbnail',
@@ -174,19 +145,25 @@ describe('gallery item compatibility', () => {
       isIntermediate: false,
       kind: 'image',
       name: 'upload.png',
+      colorLabel: 'red',
       starred: true,
+      rating: 3,
+      rejected: false,
       thumbnailUrl: '/images/upload.png/thumbnail',
       width: 768,
     };
 
     const expected: GalleryImage = {
       boardId: 'board-1',
+      colorLabel: 'red',
       createdAt: '2026-07-30T12:00:00.000Z',
       height: 512,
       imageCategory: 'user',
       imageName: 'upload.png',
       imageUrl: '/images/upload.png/full',
       queuedAt: '2026-07-30T12:00:00.000Z',
+      rating: 3,
+      rejected: false,
       sourceQueueItemId: 'backend-gallery',
       starred: true,
       thumbnailUrl: '/images/upload.png/thumbnail',

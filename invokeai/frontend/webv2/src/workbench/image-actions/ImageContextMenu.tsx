@@ -1,4 +1,12 @@
-import type { GalleryBoard, GalleryImage, GalleryItem, GalleryItemKey, GalleryItemRef } from '@features/gallery';
+import type {
+  GalleryBoard,
+  GalleryImage,
+  GalleryItem,
+  GalleryItemKey,
+  GalleryItemRef,
+  GalleryKnownMarks,
+  GalleryMarksPatch,
+} from '@features/gallery';
 import type { GalleryItemContextMenuTarget } from '@features/gallery/react';
 
 import { HStack, Icon, Menu, Portal, Text } from '@chakra-ui/react';
@@ -11,9 +19,11 @@ import {
 } from '@features/gallery';
 import {
   getGalleryCompareImage,
+  getGalleryItemMarks,
   getGalleryMoveTargets,
   getSelectedGalleryItemFromValues,
 } from '@features/gallery/contracts';
+import { GalleryMarksControl } from '@features/gallery/marks';
 import { galleryKeys } from '@features/gallery/queries';
 import { canCopyImage } from '@platform/browser/clipboard';
 import { assertAccountScopeCurrent, captureAccountScope } from '@platform/state/accountLifecycle';
@@ -34,13 +44,12 @@ import {
   FileJsonIcon,
   FolderIcon,
   ImagesIcon,
-  StarIcon,
   Trash2Icon,
   WorkflowIcon,
   XIcon,
   type LucideIcon,
 } from 'lucide-react';
-import { useCallback, useMemo, useRef } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { ImageRecallCapabilities } from './imageRecall';
@@ -173,6 +182,7 @@ export const ImageContextMenu = ({
       boards={boards}
       image={images[0] ?? null}
       images={images}
+      primaryImageName={itemTarget.items[0]?.name}
       target={imageTarget}
       variant={variant}
       onClose={onClose}
@@ -254,11 +264,11 @@ const GalleryItemContextMenuContent = ({
             {isBulk ? (
               <BulkItemMenuItems
                 actions={actions}
-                allStarred={target.allStarred}
                 boards={boards}
                 itemRefs={target.itemRefs}
                 listingBoardId={target.listingBoardId}
                 loadedItems={target.items}
+                marks={target.marks}
                 primaryItem={item}
                 onRequestDeletion={onRequestDeletion}
               />
@@ -302,10 +312,8 @@ const SingleItemMenuItems = ({
   const handleOpenInNewTab = useCallback(() => actions.openItemInNewTab(item), [actions, item]);
   const handleDownload = useCallback(() => void actions.downloadItem(item), [actions, item]);
   const handleOpenPreview = useCallback(() => actions.openItemInPreview(item), [actions, item]);
-  const handleToggleStarred = useCallback(
-    () => void actions.setItemsStarred([itemRef], !item.starred),
-    [actions, item.starred, itemRef]
-  );
+  const itemRefs = useMemo(() => [itemRef], [itemRef]);
+  const itemMarks = useMemo(() => [getGalleryItemMarks(item)], [item]);
   const handleMove = useCallback(
     (boardId: string) => void actions.moveItemsToBoard([itemRef], boardId),
     [actions, itemRef]
@@ -373,22 +381,9 @@ const SingleItemMenuItems = ({
           value="open-in-preview"
           onSelect={handleOpenPreview}
         />
-        <MenuIconItem
-          icon={StarIcon}
-          iconFill={item.starred ? 'currentColor' : 'none'}
-          label={t(
-            isVideo
-              ? item.starred
-                ? 'widgets.preview.unstarVideo'
-                : 'widgets.preview.starVideo'
-              : item.starred
-                ? 'widgets.preview.unstarImage'
-                : 'widgets.preview.starImage'
-          )}
-          value="toggle-starred"
-          onSelect={handleToggleStarred}
-        />
       </HStack>
+      <Menu.Separator borderColor="border.subtle" />
+      <MarksMenuRow actions={actions} itemRefs={itemRefs} targets={itemMarks} />
       <Menu.Separator borderColor="border.subtle" />
       {item.kind === 'video' ? (
         <>
@@ -444,33 +439,37 @@ const SingleItemMenuItems = ({
 
 const BulkItemMenuItems = ({
   actions,
-  allStarred: knownAllStarred,
   boards,
   itemRefs,
   listingBoardId,
   loadedItems,
+  marks: knownMarks,
   primaryItem,
   onRequestDeletion,
 }: {
   actions: ImageActions;
-  allStarred: boolean | undefined;
   boards: GalleryBoard[];
   itemRefs: GalleryItemRef[];
   /** The board the listing the selection was made in reads, where items no page holds sit. */
   listingBoardId: string | undefined;
   loadedItems: GalleryItem[];
+  /** Aligned with `itemRefs`; read from `loadedItems` when the host knows no more. */
+  marks: readonly GalleryKnownMarks[] | undefined;
   primaryItem: GalleryItem;
   onRequestDeletion: (itemRefs: GalleryItemRef[]) => void;
 }) => {
   const { t } = useTranslation();
-  const allStarred =
-    knownAllStarred ?? (loadedItems.length === itemRefs.length && loadedItems.every((item) => item.starred));
+  const targets = useMemo(() => {
+    if (knownMarks) {
+      return knownMarks;
+    }
+
+    const loadedMarks = new Map(loadedItems.map((item) => [toGalleryItemKey(item), getGalleryItemMarks(item)]));
+
+    return itemRefs.map((ref): GalleryKnownMarks => loadedMarks.get(toGalleryItemKey(ref)) ?? {});
+  }, [itemRefs, knownMarks, loadedItems]);
   const handleOpenInNewTab = useCallback(() => actions.openItemInNewTab(primaryItem), [actions, primaryItem]);
   const handleOpenPreview = useCallback(() => actions.openItemInPreview(primaryItem), [actions, primaryItem]);
-  const handleToggleStarred = useCallback(
-    () => void actions.setItemsStarred(itemRefs, !allStarred),
-    [actions, allStarred, itemRefs]
-  );
   const handleDownload = useCallback(
     () => void actions.downloadItems(itemRefs, loadedItems),
     [actions, itemRefs, loadedItems]
@@ -503,13 +502,13 @@ const BulkItemMenuItems = ({
         />
       </HStack>
       <Menu.Separator borderColor="border.subtle" />
-      <ContextMenuItem
-        icon={StarIcon}
-        iconFill={allStarred ? 'currentColor' : 'none'}
-        label={t(allStarred ? 'widgets.gallery.unstarSelection' : 'widgets.gallery.starSelection')}
-        value="toggle-starred-all"
-        onClick={handleToggleStarred}
+      <MarksMenuRow
+        actions={actions}
+        itemRefs={itemRefs}
+        primaryItemKey={toGalleryItemKey(primaryItem)}
+        targets={targets}
       />
+      <Menu.Separator borderColor="border.subtle" />
       <ContextMenuItem
         icon={DownloadIcon}
         label={t('widgets.gallery.downloadSelection')}
@@ -540,6 +539,7 @@ const ImageContextMenuContent = ({
   boards,
   image,
   images,
+  primaryImageName,
   target,
   variant,
   onClose,
@@ -549,6 +549,8 @@ const ImageContextMenuContent = ({
   boards: GalleryBoard[];
   image: GalleryImage;
   images: GalleryImage[];
+  /** The selection's primary image, which `images` (in selection order) need not lead with. */
+  primaryImageName?: string;
   target: ImageContextMenuTarget;
   variant: ImageContextMenuVariant;
   onClose: () => void;
@@ -601,6 +603,7 @@ const ImageContextMenuContent = ({
                 boards={boards}
                 imageNames={imageNames}
                 images={images}
+                primaryImageName={primaryImageName}
                 onRequestDeletion={onRequestDeletion}
               />
             ) : (
@@ -659,8 +662,9 @@ const SingleImageMenuItems = ({
         <CopyQuickMenuItem actions={actions} image={image} />
         <DownloadQuickMenuItem actions={actions} image={image} />
         <OpenPreviewQuickMenuItem actions={actions} image={image} />
-        <ToggleStarQuickMenuItem actions={actions} image={image} />
       </HStack>
+      <Menu.Separator borderColor="border.subtle" />
+      <ImageMarksMenuRow actions={actions} images={images} />
       <Menu.Separator borderColor="border.subtle" />
       <ContextMenuItem
         disabled={isLoadingRecallCapabilities || !recallCapabilities.workflow}
@@ -763,20 +767,65 @@ const OpenPreviewQuickMenuItem = ({ actions, image }: { actions: ImageActions; i
   );
 };
 
-const ToggleStarQuickMenuItem = ({ actions, image }: { actions: ImageActions; image: GalleryImage }) => {
-  const { t } = useTranslation();
-  const handleClick = useCallback(
-    () => void actions.setImagesStarred([image.imageName], !image.starred),
-    [actions, image.imageName, image.starred]
+/**
+ * The marks row; the menu stays open, so the row shows the marks it set until the target's own marks catch up when it
+ * opens again.
+ */
+const MarksMenuRow = ({
+  actions,
+  itemRefs,
+  primaryItemKey,
+  targets,
+}: {
+  actions: ImageActions;
+  itemRefs: GalleryItemRef[];
+  /** Where rating steps start; the control's own rule applies without one. */
+  primaryItemKey?: GalleryItemKey;
+  targets: readonly GalleryKnownMarks[];
+}) => {
+  const [madeMarks, setMadeMarks] = useState<GalleryMarksPatch>({});
+  const shownTargets = useMemo(
+    () => targets.map((target): GalleryKnownMarks => ({ ...target, ...madeMarks })),
+    [madeMarks, targets]
+  );
+  const primary = shownTargets[itemRefs.findIndex((ref) => toGalleryItemKey(ref) === primaryItemKey)];
+  const handleChange = useCallback(
+    (patch: GalleryMarksPatch) => {
+      setMadeMarks((previous) => ({ ...previous, ...patch }));
+      void actions.setItemsMarks(itemRefs, patch);
+    },
+    [actions, itemRefs]
+  );
+
+  return <GalleryMarksControl presentation="menu" primary={primary} targets={shownTargets} onChange={handleChange} />;
+};
+
+const ImageMarksMenuRow = ({
+  actions,
+  images,
+  primaryImageName,
+}: {
+  actions: ImageActions;
+  images: GalleryImage[];
+  primaryImageName?: string;
+}) => {
+  const itemRefs = useMemo(
+    () => images.map((image): GalleryItemRef => ({ kind: 'image', name: image.imageName })),
+    [images]
+  );
+  const targets = useMemo(
+    () => images.map((image) => getGalleryItemMarks(legacyGeneratedImageToGalleryItem(image))),
+    [images]
   );
 
   return (
-    <MenuIconItem
-      icon={StarIcon}
-      iconFill={image.starred ? 'currentColor' : 'none'}
-      label={t(image.starred ? 'widgets.preview.unstarImage' : 'widgets.preview.starImage')}
-      value="toggle-starred"
-      onSelect={handleClick}
+    <MarksMenuRow
+      actions={actions}
+      itemRefs={itemRefs}
+      primaryItemKey={
+        primaryImageName === undefined ? undefined : toGalleryItemKey({ kind: 'image', name: primaryImageName })
+      }
+      targets={targets}
     />
   );
 };
@@ -786,21 +835,18 @@ const BulkMenuItems = ({
   boards,
   imageNames,
   images,
+  primaryImageName,
   onRequestDeletion,
 }: {
   actions: ImageActions;
   boards: GalleryBoard[];
   imageNames: string[];
   images: GalleryImage[];
+  primaryImageName?: string;
   onRequestDeletion: (imageNames: string[]) => void;
 }) => {
   const { t } = useTranslation();
-  const allStarred = images.every((image) => image.starred);
   const sourceBoardIds = useMemo(() => images.map((image) => image.boardId), [images]);
-  const handleToggleStarred = useCallback(
-    () => void actions.setImagesStarred(imageNames, !allStarred),
-    [actions, allStarred, imageNames]
-  );
   const handleDownload = useCallback(() => void actions.downloadImages(imageNames), [actions, imageNames]);
   const handleMove = useCallback(
     (boardId: string) => void actions.moveImagesToBoard(imageNames, boardId),
@@ -816,13 +862,8 @@ const BulkMenuItems = ({
       <Menu.Separator borderColor="border.subtle" />
       <ImageContinueGroup actions={actions} images={images} presentation="compact" />
       <Menu.Separator borderColor="border.subtle" />
-      <ContextMenuItem
-        icon={StarIcon}
-        iconFill={allStarred ? 'currentColor' : 'none'}
-        label={t(allStarred ? 'widgets.gallery.unstarSelection' : 'widgets.gallery.starSelection')}
-        value="toggle-starred-all"
-        onClick={handleToggleStarred}
-      />
+      <ImageMarksMenuRow actions={actions} images={images} primaryImageName={primaryImageName} />
+      <Menu.Separator borderColor="border.subtle" />
       <ContextMenuItem
         icon={DownloadIcon}
         label={t('widgets.gallery.downloadSelection')}

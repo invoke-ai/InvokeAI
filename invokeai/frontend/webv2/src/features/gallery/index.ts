@@ -31,6 +31,19 @@ export {
   type GalleryItemsPage,
   type GalleryVideoItem,
 } from './core/items';
+import type { GalleryMarksPatch } from './core/marks';
+
+export type {
+  GalleryColorLabel,
+  GalleryColorLabelFilter,
+  GalleryKnownMarks,
+  GalleryMarkFlag,
+  GalleryMarks,
+  GalleryMarksFilter,
+  GalleryMarksPatch,
+  GalleryRating,
+} from './core/marks';
+
 import {
   toGalleryItemKey as getGalleryItemKey,
   type GalleryItemKind as ItemKind,
@@ -57,11 +70,8 @@ import {
   removeGalleryImageItemsFromBoard,
   removeImagesFromGalleryBoard,
   saveImageToGallery,
-  setGalleryImageItemsStarred,
-  setGalleryVideoItemsStarred,
-  starGalleryImages,
+  setGalleryItemMarks,
   type GalleryItemOrganizationTransportResult,
-  unstarGalleryImages,
   uploadGalleryImage,
   uploadGalleryVideo,
 } from './data/backend';
@@ -107,8 +117,6 @@ export const galleryOrganization = {
   addToBoard: addImagesToGalleryBoard,
   deleteImages: deleteGalleryImages,
   removeFromBoard: removeImagesFromGalleryBoard,
-  setStarred: (imageNames: string[], starred: boolean, signal?: AbortSignal): Promise<string[]> =>
-    starred ? starGalleryImages(imageNames, signal) : unstarGalleryImages(imageNames, signal),
 } as const;
 
 type ConfirmedGalleryItemMutationResult = ItemMutationResult & { affectedBoardIds: string[] };
@@ -234,17 +242,22 @@ export const galleryItemOrganization = {
       (names, requestSignal) => moveGalleryVideoItemsToBoard(names, boardId, requestSignal),
       signal
     ),
-  setStarred: (
+  /** Both kinds in one request per batch. */
+  setMarks: async (
     refs: readonly ItemRef[],
-    starred: boolean,
+    patch: GalleryMarksPatch,
     signal?: AbortSignal
-  ): Promise<ConfirmedGalleryItemMutationResult> =>
-    mutateGalleryItems(
-      refs,
-      (names, requestSignal) => setGalleryImageItemsStarred(names, starred, requestSignal),
-      (names, requestSignal) => setGalleryVideoItemsStarred(names, starred, requestSignal),
-      signal
-    ),
+  ): Promise<ConfirmedGalleryItemMutationResult> => {
+    const requested = deduplicateGalleryItemRefs(refs);
+    const outcome = await setGalleryItemMarks(requested, patch, signal);
+    const confirmedKeys = new Set(outcome.succeededNames);
+
+    return {
+      affectedBoardIds: confirmedKeys.size > 0 ? [...new Set(outcome.affectedBoardIds)].sort() : [],
+      failed: requested.filter((ref) => !confirmedKeys.has(getGalleryItemKey(ref))),
+      succeeded: requested.filter((ref) => confirmedKeys.has(getGalleryItemKey(ref))),
+    };
+  },
 } as const;
 
 /** Virtual boards and none cannot receive attachments; organization transports no-op for these destinations. */

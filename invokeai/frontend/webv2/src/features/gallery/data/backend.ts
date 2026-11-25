@@ -8,6 +8,13 @@ import type {
   GalleryItemsPage,
   GalleryVideoItem,
 } from '@features/gallery/core/items';
+import type {
+  GalleryColorLabel,
+  GalleryColorLabelFilter,
+  GalleryListingMarks,
+  GalleryMarkFlag,
+  GalleryMarksPatch,
+} from '@features/gallery/core/marks';
 import type { GallerySemanticQuery } from '@features/gallery/core/semanticImageQuery';
 import type {
   GalleryBoard,
@@ -28,7 +35,9 @@ import {
   getGalleryViewCategories,
   isDateBoardId,
   parseGalleryItemKey,
+  toGalleryItemKey,
 } from '@features/gallery/core/items';
+import { toGalleryColorLabel, toGalleryRating } from '@features/gallery/core/marks';
 import { getExternalImageFile, getImageCluster } from '@features/gallery/core/semanticImageQuery';
 import { createLogger } from '@platform/logging/logger';
 import { isTimestampInRange } from '@platform/search/dateTokens';
@@ -85,6 +94,10 @@ interface BackendImageDTO {
   image_category: 'general' | 'control' | 'mask' | 'user' | 'other';
   is_intermediate: boolean;
   starred?: boolean;
+  /** Absent from servers older than marks, as on the fields below. */
+  rating?: number;
+  rejected?: boolean;
+  color_label?: GalleryColorLabel | null;
   board_id?: string | null;
   has_workflow?: boolean;
 }
@@ -102,6 +115,9 @@ export interface BackendGalleryItemDTO {
   media_origin?: string | null;
   name: string;
   starred: boolean;
+  rating?: number;
+  rejected?: boolean;
+  color_label?: GalleryColorLabel | null;
   thumbnail_url: string;
   width: number;
 }
@@ -116,6 +132,9 @@ interface BackendVideoDTO {
   is_intermediate: boolean;
   media_origin?: string | null;
   starred: boolean;
+  rating?: number;
+  rejected?: boolean;
+  color_label?: GalleryColorLabel | null;
   thumbnail_url: string;
   video_category: GalleryItemCategory;
   video_name: string;
@@ -230,6 +249,17 @@ const getGalleryVideoTotal = async ({
   return body.total;
 };
 
+const mapMarks = (dto: {
+  color_label?: GalleryColorLabel | null;
+  rating?: number;
+  rejected?: boolean;
+  starred?: boolean;
+}): { colorLabel: GalleryColorLabel | null; rating: ReturnType<typeof toGalleryRating>; rejected: boolean } => ({
+  colorLabel: toGalleryColorLabel(dto.color_label),
+  rating: toGalleryRating(dto.rating),
+  rejected: dto.starred !== true && dto.rejected === true,
+});
+
 const mapImage = (image: BackendImageDTO): GalleryImage => ({
   boardId: image.board_id ?? 'none',
   createdAt: image.created_at,
@@ -241,6 +271,7 @@ const mapImage = (image: BackendImageDTO): GalleryImage => ({
   queuedAt: image.created_at,
   sourceQueueItemId: 'backend-gallery',
   starred: image.starred ?? false,
+  ...mapMarks(image),
   thumbnailUrl: absolutizeApiUrl(image.thumbnail_url),
   width: image.width,
 });
@@ -259,6 +290,7 @@ const mapGalleryItemBase = (
   isIntermediate: item.is_intermediate,
   name: item.name,
   starred: item.starred,
+  ...mapMarks(item),
   thumbnailUrl: absolutizeApiUrl(item.thumbnail_url),
   width: item.width,
 });
@@ -294,6 +326,7 @@ const mapBackendImageToGalleryItem = (image: BackendImageDTO): GalleryImageItem 
   name: image.image_name,
   sourceQueueItemId: 'backend-gallery',
   starred: image.starred ?? false,
+  ...mapMarks(image),
   thumbnailUrl: absolutizeApiUrl(image.thumbnail_url),
   width: image.width,
 });
@@ -317,6 +350,7 @@ const mapVideo = (video: BackendVideoDTO): GalleryVideoItem => {
     ...mediaOriginOf(video.media_origin),
     name: video.video_name,
     starred: video.starred,
+    ...mapMarks(video),
     thumbnailUrl: absolutizeApiUrl(video.thumbnail_url),
     width: video.width,
   };
@@ -557,7 +591,22 @@ export interface GalleryItemNames {
 
 export type GalleryItemLocation = components['schemas']['GalleryItemLocation'];
 
-interface GalleryItemNamesRequest {
+/** The listing marks as query parameters; the backend reads repeated `flags` and `color_labels`. */
+const toMarksParams = ({
+  colorLabels,
+  flags,
+  maxRating,
+  minRating,
+  starred,
+}: GalleryListingMarks): Record<string, boolean | number | string[] | undefined> => ({
+  color_labels: colorLabels,
+  flags,
+  max_rating: maxRating,
+  min_rating: minRating,
+  starred,
+});
+
+interface GalleryItemNamesRequest extends GalleryListingMarks {
   boardId: string;
   createdFrom?: string;
   createdTo?: string;
@@ -566,7 +615,6 @@ interface GalleryItemNamesRequest {
   orderDir: GalleryOrderDir;
   searchTerm: string;
   signal?: AbortSignal;
-  starred?: boolean;
 }
 
 const mapGalleryItemNames = (body: { items: GalleryItemRef[]; total_count: number }): GalleryItemNames => ({
@@ -583,7 +631,7 @@ export const listGalleryItemNames = async ({
   orderDir,
   searchTerm,
   signal,
-  starred,
+  ...marks
 }: GalleryItemNamesRequest): Promise<GalleryItemNames> => {
   const query = toSearchParams({
     board_id: boardId,
@@ -594,7 +642,7 @@ export const listGalleryItemNames = async ({
     media_kind: mediaKind,
     order_dir: orderDir,
     search_term: searchTerm.trim() || undefined,
-    starred,
+    ...toMarksParams(marks),
     // The backend defaults to starred-first; the grid orders chronologically.
     starred_first: false,
   });
@@ -617,7 +665,7 @@ export const getGalleryItemLocation = ({
   orderDir,
   searchTerm,
   signal,
-  starred,
+  ...marks
 }: GalleryItemNamesRequest & GalleryItemRef): Promise<GalleryItemLocation> => {
   const query = toSearchParams({
     board_id: boardId,
@@ -630,7 +678,7 @@ export const getGalleryItemLocation = ({
     order_dir: orderDir,
     name,
     search_term: searchTerm.trim() || undefined,
-    starred,
+    ...toMarksParams(marks),
     starred_first: false,
   });
 
@@ -646,7 +694,7 @@ export const listGalleryDateBoardItemNames = async ({
   orderDir,
   searchTerm,
   signal,
-  starred,
+  ...marks
 }: GalleryItemNamesRequest): Promise<GalleryItemNames> => {
   if (
     (createdFrom !== undefined || createdTo !== undefined) &&
@@ -660,7 +708,7 @@ export const listGalleryDateBoardItemNames = async ({
     media_kind: mediaKind,
     order_dir: orderDir,
     search_term: searchTerm.trim() || undefined,
-    starred,
+    ...toMarksParams(marks),
     starred_first: false,
   });
   const body = await apiFetchJson<{ items: GalleryItemRef[]; total_count: number }>(
@@ -751,7 +799,7 @@ const hydratePaletteDateBoardImagePage = async ({
   total,
 });
 
-interface GalleryListRequest {
+interface GalleryListRequest extends GalleryListingMarks {
   boardId: string;
   createdFrom?: string;
   createdTo?: string;
@@ -763,7 +811,6 @@ interface GalleryListRequest {
   orderDir?: GalleryOrderDir;
   searchTerm: string;
   signal?: AbortSignal;
-  starred?: boolean;
 }
 
 interface GalleryItemsRequest extends GalleryListRequest {
@@ -782,7 +829,7 @@ export const listGalleryItems = async ({
   orderDir = 'DESC',
   searchTerm,
   signal,
-  starred,
+  ...marks
 }: GalleryItemsRequest): Promise<GalleryItemsPage> => {
   const query = toSearchParams({
     board_id: boardId,
@@ -795,7 +842,7 @@ export const listGalleryItems = async ({
     offset,
     order_dir: orderDir,
     search_term: searchTerm.trim() || undefined,
-    starred,
+    ...toMarksParams(marks),
     starred_first: false,
   });
   const body = await apiFetchJson<{
@@ -1297,27 +1344,49 @@ export const removeGalleryImageItemsFromBoard = (
 export const removeImagesFromGalleryBoard = async (imageNames: string[], signal?: AbortSignal): Promise<string[]> =>
   (await removeGalleryImageItemsFromBoard(imageNames, signal)).succeededNames;
 
-export const setGalleryImageItemsStarred = (
-  imageNames: string[],
-  starred: boolean,
+type GalleryMarksRequestBody = components['schemas']['GalleryItemMarksRequest'];
+
+const toMarksRequestBody = (
+  patch: GalleryMarksPatch
+): Omit<GalleryMarksRequestBody, 'image_names' | 'video_names'> => ({
+  ...(patch.flag === undefined ? {} : { flag: patch.flag satisfies GalleryMarkFlag }),
+  ...(patch.rating === undefined ? {} : { rating: patch.rating }),
+  ...(patch.colorLabel === undefined
+    ? {}
+    : { color_label: (patch.colorLabel ?? 'none') satisfies GalleryColorLabelFilter }),
+});
+
+/**
+ * One request marks both kinds. Batches hold at most 1,000 names of either kind, as item keys; names neither updated
+ * nor failed were skipped (gone, or not the caller's to mark) and count as not confirmed.
+ */
+export const setGalleryItemMarks = (
+  refs: readonly GalleryItemRef[],
+  patch: GalleryMarksPatch,
   signal?: AbortSignal
-): Promise<GalleryItemOrganizationTransportResult> =>
-  mutateInNameBatches(imageNames, signal, async (batch) => {
-    const body = await apiFetchJson<unknown>(`/api/v1/images/${starred ? 'star' : 'unstar'}`, {
-      body: JSON.stringify({ image_names: batch }),
+): Promise<GalleryNameBatchResult> =>
+  mutateInNameBatches(refs.map(toGalleryItemKey), signal, async (keys) => {
+    const batch = keys.map(parseGalleryItemKey);
+    const body = await apiFetchJson<unknown>('/api/v1/gallery/items/marks', {
+      body: JSON.stringify({
+        image_names: batch.filter((ref) => ref.kind === 'image').map((ref) => ref.name),
+        video_names: batch.filter((ref) => ref.kind === 'video').map((ref) => ref.name),
+        ...toMarksRequestBody(patch),
+      } satisfies GalleryMarksRequestBody),
       method: 'POST',
       signal,
     });
     signal?.throwIfAborted();
 
-    return mapGalleryItemOrganizationTransportResult(body, starred ? 'starred_images' : 'unstarred_images');
+    const toKeys = (kind: GalleryItemRef['kind'], field: string) =>
+      getRequiredStringArray(body, field).map((name) => toGalleryItemKey({ kind, name }));
+
+    return {
+      affectedBoardIds: getRequiredStringArray(body, 'affected_boards'),
+      failedNames: [...toKeys('image', 'failed_image_names'), ...toKeys('video', 'failed_video_names')],
+      succeededNames: [...toKeys('image', 'updated_image_names'), ...toKeys('video', 'updated_video_names')],
+    };
   });
-
-export const starGalleryImages = (imageNames: string[], signal?: AbortSignal): Promise<string[]> =>
-  setGalleryImageItemsStarred(imageNames, true, signal).then((result) => result.succeededNames);
-
-export const unstarGalleryImages = (imageNames: string[], signal?: AbortSignal): Promise<string[]> =>
-  setGalleryImageItemsStarred(imageNames, false, signal).then((result) => result.succeededNames);
 
 /** Names the server positively finds absent; storage errors and existing names are never listed. */
 const findGoneImageNames = async (names: string[], signal?: AbortSignal): Promise<Set<string>> => {
@@ -1404,8 +1473,8 @@ export const deleteGalleryImages = async (
 
 const mutateGalleryVideoItems = (
   videoNames: string[],
-  operation: 'delete' | 'star' | 'unstar',
-  succeededField: 'deleted_videos' | 'starred_videos' | 'unstarred_videos',
+  operation: 'delete',
+  succeededField: 'deleted_videos',
   signal?: AbortSignal
 ): Promise<GalleryItemOrganizationTransportResult> =>
   mutateInNameBatches(videoNames, signal, async (batch) => {
@@ -1424,18 +1493,6 @@ export const deleteGalleryVideoItems = (
   signal?: AbortSignal
 ): Promise<GalleryItemOrganizationTransportResult> =>
   mutateGalleryVideoItems(videoNames, 'delete', 'deleted_videos', signal);
-
-export const setGalleryVideoItemsStarred = (
-  videoNames: string[],
-  starred: boolean,
-  signal?: AbortSignal
-): Promise<GalleryItemOrganizationTransportResult> =>
-  mutateGalleryVideoItems(
-    videoNames,
-    starred ? 'star' : 'unstar',
-    starred ? 'starred_videos' : 'unstarred_videos',
-    signal
-  );
 
 const moveGalleryVideoItemToBoard = async (
   videoName: string,

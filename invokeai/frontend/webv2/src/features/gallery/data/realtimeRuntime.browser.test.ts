@@ -30,7 +30,10 @@ const item = (name: string, boardId: string): GalleryItem => ({
   isIntermediate: false,
   kind: 'image',
   name,
+  colorLabel: null,
   starred: false,
+  rating: 0,
+  rejected: false,
   thumbnailUrl: `/thumb/${name}`,
   width: 64,
 });

@@ -62,7 +62,10 @@ const createImageItem = (name: string, createdAt: string): GalleryImageItem => (
   kind: 'image',
   name,
   sourceQueueItemId: `queue-${name}`,
+  colorLabel: null,
   starred: false,
+  rating: 0,
+  rejected: false,
   thumbnailUrl: `/images/${name}/thumbnail`,
   width: 1280,
 });
@@ -84,7 +87,10 @@ const createVideoItem = (name: string, createdAt: string): GalleryVideoItem => (
   isIntermediate: false,
   kind: 'video',
   name,
+  colorLabel: null,
   starred: false,
+  rating: 0,
+  rejected: false,
   thumbnailUrl: `data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" data-name="${name}"/>`,
   width: 1920,
 });
@@ -533,7 +539,10 @@ await i18n.use(initReactI18next).init({
           },
         },
         widgets: {
-          gallery: { commands: { clearSelection: 'Clear gallery selection' } },
+          gallery: {
+            commands: { clearSelection: 'Clear gallery selection' },
+            marks: { ratingSummary_one: '{{count}} star', ratingSummary_other: '{{count}} stars' },
+          },
           preview: {
             cancelCompare: 'Cancel compare',
             commands: {
@@ -581,6 +590,8 @@ const runtime = {
     },
   },
   hotkeys: {
+    activateMode: (activation: { mode: string }) =>
+      mocks.extensions.hotkeys.activateMode({ ...activation, source: previewSource }),
     register: (hotkey: { commandId: string; defaultKeys: readonly string[]; id: string; title: string }) => {
       const { defaultKeys, id } = hotkey;
       const unregister = mocks.extensions.hotkeys.register({
@@ -879,7 +890,10 @@ beforeEach(() => {
         kind: 'image' as const,
         name: image.imageName,
         sourceQueueItemId: image.sourceQueueItemId,
+        colorLabel: null,
         starred: false,
+        rating: 0,
+        rejected: false,
         thumbnailUrl: image.thumbnailUrl,
         width: image.width,
       })),
@@ -1390,7 +1404,10 @@ describe('preview keyboard navigation boundary', () => {
             kind: 'image',
             name: newest.imageName,
             sourceQueueItemId: newest.sourceQueueItemId,
+            colorLabel: null,
             starred: newest.starred,
+            rating: 0,
+            rejected: false,
             thumbnailUrl: newest.thumbnailUrl,
             width: newest.width,
           },
@@ -1409,7 +1426,10 @@ describe('preview keyboard navigation boundary', () => {
             kind: 'image',
             name: oldest.imageName,
             sourceQueueItemId: oldest.sourceQueueItemId,
+            colorLabel: null,
             starred: oldest.starred,
+            rating: 0,
+            rejected: false,
             thumbnailUrl: oldest.thumbnailUrl,
             width: oldest.width,
           },
@@ -1474,7 +1494,10 @@ describe('preview keyboard navigation boundary', () => {
           kind: 'image' as const,
           name: image.imageName,
           sourceQueueItemId: image.sourceQueueItemId,
+          colorLabel: null,
           starred: image.starred,
+          rating: 0,
+          rejected: false,
           thumbnailUrl: image.thumbnailUrl,
           width: image.width,
         })),
@@ -1491,7 +1514,10 @@ describe('preview keyboard navigation boundary', () => {
           kind: 'image' as const,
           name: image.imageName,
           sourceQueueItemId: image.sourceQueueItemId,
+          colorLabel: null,
           starred: image.starred,
+          rating: 0,
+          rejected: false,
           thumbnailUrl: image.thumbnailUrl,
           width: image.width,
         })),
@@ -2071,8 +2097,7 @@ const createItemMenuActions = (overrides: Partial<ImageActions>): ImageActions =
   selectForCompare: vi.fn(),
   sendToCanvas: vi.fn(() => Promise.resolve()),
   sendImageAsControl: vi.fn(() => Promise.resolve()),
-  setItemsStarred: vi.fn(() => Promise.resolve()),
-  setImagesStarred: vi.fn(() => Promise.resolve()),
+  setItemsMarks: vi.fn(() => Promise.resolve()),
   savePromptAsTemplate: vi.fn(),
   sendToInitialVideo: vi.fn(),
   useAsReferenceImage: vi.fn(),
@@ -2326,5 +2351,72 @@ describe('preview select for compare', () => {
 
     expect(mocks.commands.gallery.setCompareItem).toHaveBeenCalledOnce();
     expect(press.defaultPrevented).toBe(false);
+  });
+});
+
+describe('Cull mode keys', () => {
+  it('marks the shown item, moves on unless Shift is held, and announces each mark; Esc leaves the mode on', async () => {
+    const setItemsMarks = vi.fn(async () => {});
+
+    mocks.imageActions = { setItemsMarks } as unknown as ImageActions;
+    setGalleryValues({ cullMode: true });
+    await render();
+
+    await act(async () => {
+      getBoundary().focus();
+      await userEvent.keyboard('{Shift>}3{/Shift}');
+    });
+    expect(setItemsMarks).toHaveBeenCalledExactlyOnceWith(
+      [{ kind: 'image', name: 'newest' }],
+      { rating: 3 },
+      {
+        quiet: true,
+      }
+    );
+    expect(mocks.commands.gallery.selectItem).not.toHaveBeenCalled();
+
+    const press = await pressKeyOn(getBoundary(), '1');
+
+    expect(press.defaultPrevented).toBe(true);
+    expect(setItemsMarks).toHaveBeenLastCalledWith([{ kind: 'image', name: 'newest' }], { rating: 1 }, { quiet: true });
+    expect(mocks.commands.gallery.selectItem).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ name: 'oldest' }),
+      undefined,
+      expect.any(Number),
+      true
+    );
+    expect(host!.querySelector('[data-preview-cull-hud]')?.textContent).toBe('★');
+    expect(
+      [...host!.querySelectorAll('[role="status"][aria-live="polite"]')].map((node) => node.textContent)
+    ).toContain('1 star');
+
+    await pressKeyOn(getBoundary(), 'Escape');
+    expect(mocks.commands.widgets.patchValues).not.toHaveBeenCalledWith('gallery', { cullMode: false });
+  });
+
+  it('advances from the last bookmarked item past a running session to the listing', async () => {
+    const starredTop = { ...createImageItem('starred-top', '2026-07-23T00:00:00.000Z'), starred: true };
+    const starredLast = { ...createImageItem('starred-last', '2026-07-22T00:00:00.000Z'), starred: true };
+
+    mocks.imageActions = { setItemsMarks: vi.fn(async () => {}) } as unknown as ImageActions;
+    mocks.galleryStripItems = [starredTop, starredLast];
+    mocks.project.queue.items = [queueItem];
+    mocks.runningProgressTargets = [{ itemIndex: 1, queueItemId: queueItem.id }];
+    setGalleryValues({
+      cullMode: true,
+      selectedImage: { ...legacyImage('starred-last', '2026-07-22T00:00:00.000Z'), starred: true },
+      selectedImageName: 'starred-last',
+    });
+    await render();
+    await expect.poll(() => host!.querySelectorAll('[data-preview-live-thumb]').length).toBe(1);
+
+    await pressKeyOn(getBoundary(), '4');
+
+    expect(mocks.commands.gallery.selectItem).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ name: 'newest' }),
+      undefined,
+      expect.any(Number),
+      true
+    );
   });
 });

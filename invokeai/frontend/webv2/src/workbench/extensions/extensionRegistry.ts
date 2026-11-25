@@ -6,6 +6,7 @@ import type {
   WidgetContributionSource,
   WidgetHotkeyApi,
   WidgetHotkeyContribution,
+  WidgetHotkeyModeActivation,
   WidgetSearchApi,
   WidgetSearchProvider,
 } from '@workbench/widgetContracts';
@@ -17,6 +18,7 @@ import { areWidgetContributionSourcesEqual, getWidgetContributionRegistrationKey
 export interface ExtensionContributionStores {
   commands: CollectionStore<WidgetCommandContribution>;
   hotkeys: CollectionStore<WidgetHotkeyContribution>;
+  hotkeyModes: CollectionStore<WidgetHotkeyModeActivation>;
   palette: CollectionStore<WidgetCommandPaletteContribution>;
   search: CollectionStore<WidgetSearchProvider>;
 }
@@ -35,6 +37,7 @@ export const createExtensionRegistry = (): ExtensionRegistry => {
   const stores: ExtensionContributionStores = {
     commands: createCollectionStore<WidgetCommandContribution>(),
     hotkeys: createCollectionStore<WidgetHotkeyContribution>(),
+    hotkeyModes: createCollectionStore<WidgetHotkeyModeActivation>(),
     palette: createCollectionStore<WidgetCommandPaletteContribution>(),
     search: createCollectionStore<WidgetSearchProvider>(),
   };
@@ -68,6 +71,12 @@ export const createExtensionRegistry = (): ExtensionRegistry => {
     hotkeys: {
       register(hotkey) {
         return stores.hotkeys.register(hotkey, getWidgetContributionRegistrationKey(hotkey.id, hotkey.source));
+      },
+      activateMode(activation) {
+        return stores.hotkeyModes.register(
+          activation,
+          getWidgetContributionRegistrationKey(activation.mode, activation.source)
+        );
       },
     },
     palette: {

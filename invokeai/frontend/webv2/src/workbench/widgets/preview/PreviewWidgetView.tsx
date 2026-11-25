@@ -11,8 +11,10 @@ import {
   type GalleryItem,
   type GalleryItemKey,
   type GalleryItemRef,
+  type GalleryMarksPatch,
 } from '@features/gallery';
 import {
+  getGalleryItemMarks,
   getGalleryCompareImage,
   getGalleryPage,
   getGallerySelectedImageQuery,
@@ -30,6 +32,13 @@ import {
   toGalleryMediaKind,
   toGalleryItemRef,
 } from '@features/gallery/contracts';
+import { getGalleryCullMode, getGalleryCullModeValues } from '@features/gallery/cull';
+import {
+  GalleryCullCommands,
+  type GalleryCullFeedback,
+  type GalleryCullStepper,
+  type GalleryCullTarget,
+} from '@features/gallery/marks';
 import { galleryBoardsOptions, getGalleryListingBoardsQuery } from '@features/gallery/queries';
 import { useGalleryImageRecovery, useHostGalleryBoards } from '@features/gallery/react';
 import { createGenerateFormValuesSelector } from '@features/generation/react';
@@ -79,6 +88,7 @@ import type { PreviewSwipeNavigation } from './usePreviewSwipe';
 import { useLivePreviewFollow } from './livePreviewFollow';
 import { PreviewCompare } from './PreviewCompare';
 import { resolvePreviewCompareDrop } from './previewCompareDnd';
+import { PreviewCullBar, PreviewCullHud, type PreviewCullBarProps, type PreviewCullHudState } from './PreviewCull';
 import { usePreviewDensity, type PreviewDensity } from './previewDensity';
 import { PreviewDropSurface } from './PreviewDropSurface';
 import { PreviewFilmstrip } from './PreviewFilmstrip';
@@ -98,7 +108,7 @@ import {
   type PreviewComparisonMode,
 } from './previewSettings';
 import { getPreviewStagePadding } from './PreviewStage';
-import { usePreviewNavigation } from './usePreviewNavigation';
+import { usePreviewNavigation, type PreviewNeighbor } from './usePreviewNavigation';
 
 /** For the live footer's Details slot, which renders disabled and never fires. */
 const VIDEO_FRAME_COPY_FAILURE_KEYS = {
@@ -273,6 +283,8 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
     getNavigatedPage,
     getSelectionPage,
     isLoadingBoard,
+    itemNeighbors,
+    listingMarksFilter,
     loadOrderedRefs,
     navigate,
     navigationQueryKey,
@@ -516,6 +528,56 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
     setContextMenuTarget(null);
   }, [getContextMenuReturnFocus]);
   const headerItemName = shouldFollowLive ? null : (selectedItem?.name ?? null);
+  const cullMode = getGalleryCullMode(galleryValues);
+  // The shown item, which Cull mode's keys and bar mark; a comparison or a live session shows no single item.
+  const cullTarget = shouldFollowLive || isComparing ? null : contextMenuItem;
+  const [cullHud, setCullHud] = useState<PreviewCullHudState | null>(null);
+  const toggleCullMode = useCallback(
+    () => widgets.patchValues('gallery', getGalleryCullModeValues({ enabled: !cullMode.enabled })),
+    [cullMode.enabled, widgets]
+  );
+  const cullCommandTarget = useMemo((): GalleryCullTarget | null => {
+    if (!cullTarget) {
+      return null;
+    }
+
+    const marks = getGalleryItemMarks(cullTarget);
+    const targetKey = toGalleryItemKey(cullTarget);
+
+    return {
+      // An item not located in the listing yet has nowhere to leave from.
+      item: boardItems.some((item) => toGalleryItemKey(item) === targetKey) ? cullTarget : null,
+      marks: [marks],
+      primary: marks,
+      refs: [toGalleryItemRef(cullTarget)],
+    };
+  }, [boardItems, cullTarget]);
+  const cullStepper = useMemo(
+    (): GalleryCullStepper<NonNullable<PreviewNeighbor>> => ({
+      go: (_entry, direction) => void navigate(direction === 'right' ? 1 : -1, { itemsOnly: true }),
+      peek: (fromKey, direction) =>
+        cullTarget && toGalleryItemKey(cullTarget) === fromKey
+          ? itemNeighbors[direction === 'right' ? 'next' : 'previous']
+          : null,
+    }),
+    [cullTarget, itemNeighbors, navigate]
+  );
+  const markCullTarget = useCallback(
+    (refs: GalleryItemRef[], patch: GalleryMarksPatch) => void imageActions.setItemsMarks(refs, patch, { quiet: true }),
+    [imageActions]
+  );
+  const showCullFeedback = useCallback(
+    (feedback: GalleryCullFeedback) => setCullHud((current) => ({ ...feedback, token: (current?.token ?? 0) + 1 })),
+    []
+  );
+  const cullBar = useMemo<PreviewCullBarProps | null>(
+    () =>
+      cullMode.enabled && cullTarget
+        ? { actions: imageActions, autoAdvance: cullMode.autoAdvance, item: cullTarget, position }
+        : null,
+    [cullMode.autoAdvance, cullMode.enabled, cullTarget, imageActions, position]
+  );
+  const shownCullHud = cullMode.enabled ? cullHud : null;
 
   // Publish selection/actions to hoisted chrome through an external store; clear on unmount to prevent stale headers.
   const filmstrip = useMemo<PreviewFilmstripProps | null>(
@@ -698,6 +760,18 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
         {isComparing || isCompareArmed ? (
           <PreviewExitCompareHotkey key={`${projectId}:${i18n.language}`} runtime={runtime} onExit={exitCompare} />
         ) : null}
+        <GalleryCullCommands
+          key={`${projectId}:${i18n.language}:${cullMode.enabled}`}
+          autoAdvance={cullMode.autoAdvance}
+          enabled={cullMode.enabled}
+          marksFilter={listingMarksFilter}
+          runtime={runtime}
+          stepper={cullStepper}
+          target={cullCommandTarget}
+          onFeedback={showCullFeedback}
+          onMark={markCullTarget}
+          onToggle={toggleCullMode}
+        />
         {shouldFollowLive && activeGalleryPlaceholder ? (
           <LivePreview
             density={density}
@@ -718,6 +792,8 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
             />
           ) : selectedItem.kind === 'image' ? (
             <SelectedImagePreview
+              cullBar={cullBar}
+              cullHud={shownCullHud}
               density={density}
               filmstrip={filmstrip}
               isItemCurrent={isItemCurrent}
@@ -731,6 +807,8 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
             />
           ) : (
             <SelectedVideoPreview
+              cullBar={cullBar}
+              cullHud={shownCullHud}
               density={density}
               filmstrip={filmstrip}
               isItemCurrent={isItemCurrent}
@@ -850,6 +928,9 @@ const SelectedVideoPreview = ({
 type PreviewFilmstripProps = Omit<Parameters<typeof PreviewFilmstrip>[0], 'density' | 'selectedItemKey'>;
 
 interface SelectedMediaPreviewProps {
+  /** Cull mode's bar, between the stage and the filmstrip; null outside the mode. */
+  cullBar: PreviewCullBarProps | null;
+  cullHud: PreviewCullHudState | null;
   density: PreviewDensity;
   filmstrip: PreviewFilmstripProps | null;
   isItemCurrent: (itemKey: GalleryItemKey) => boolean;
@@ -877,6 +958,8 @@ const PreviewMediaScaffold = ({ children }: { children: ReactNode }) => (
 const { setStageElement, setZoom: setZoomReadout } = previewStageStore;
 
 const SelectedMediaPreview = ({
+  cullBar,
+  cullHud,
   density,
   dragItem,
   filmstrip,
@@ -943,7 +1026,9 @@ const SelectedMediaPreview = ({
       ) : startingSession ? (
         <PreviewStartingCue density={density} session={startingSession} />
       ) : null}
+      <PreviewCullHud hud={cullHud} />
     </Flex>
+    {cullBar ? <PreviewCullBar {...cullBar} density={density} /> : null}
     {filmstrip ? <PreviewFilmstrip {...filmstrip} density={density} selectedItemKey={toGalleryItemKey(item)} /> : null}
   </PreviewMediaScaffold>
 );

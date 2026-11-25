@@ -92,7 +92,10 @@ const storedVideo = (file: { name: string }, createdAt: string): GalleryVideoIte
   isIntermediate: false,
   kind: 'video',
   name: `stored-${file.name}`,
+  colorLabel: null,
   starred: false,
+  rating: 0,
+  rejected: false,
   thumbnailUrl: `/thumbnails/stored-${file.name}`,
   width: 64,
 });

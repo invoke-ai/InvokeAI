@@ -63,6 +63,6 @@ The browser composes first-party widget manifests from its bundled registry. Ser
 
 ## Commands and hotkeys
 
-Each Workbench mount owns its extension registry. Commands, hotkeys, palette entries and search providers carry their widget instance/project source and release their registrations on unmount. The hotkey runtime resolves current focus and editable/modal eligibility; Settings owns customized bindings and conflict presentation. Widget header actions and menus render from the loaded implementation in shell-owned slots.
+Each Workbench mount owns its extension registry. Commands, hotkeys, hotkey mode activations, palette entries and search providers carry their widget instance/project source and release their registrations on unmount. The hotkey runtime resolves current focus and editable/modal eligibility; Settings owns customized bindings and conflict presentation. Widget header actions and menus render from the loaded implementation in shell-owned slots.
 
 There is no menu or toolbar contribution API. Shell layout controls and implementation header actions are the implemented surfaces; widget packs have no external compatibility contract.

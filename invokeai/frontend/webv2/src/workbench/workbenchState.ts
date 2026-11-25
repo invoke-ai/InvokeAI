@@ -96,7 +96,10 @@ import {
   generatedVideoToGalleryItem,
   getGalleryItemView,
   getGalleryView,
+  getGalleryMarksFilter,
+  getGalleryMarksFilterValues,
   settleGalleryValues,
+  type GalleryMarksFilter,
 } from '@features/gallery/contracts';
 import { areJsonValuesStructurallyEqual } from '@platform/core/json';
 import { describeError } from '@platform/logging/normalize';
@@ -552,13 +555,13 @@ type WorkbenchReducerAction =
   | { type: 'setGallerySemanticSearchText'; text: string; projectId?: string }
   | { type: 'commitGallerySemanticSearch'; text: string; projectId?: string }
   | { type: 'clearGallerySearch'; projectId?: string }
-  | { type: 'setGalleryStarredOnly'; starredOnly: boolean; projectId?: string }
+  | { type: 'setGalleryMarksFilter'; marksFilter: GalleryMarksFilter; projectId?: string }
   | { type: 'updateGallerySettings'; settings: Partial<GallerySettings>; projectId?: string }
   | { type: 'setGalleryPage'; page: number; projectId?: string }
   | { type: 'setGalleryPageInfo'; totalImages: number; projectId?: string }
   | {
       type: 'patchGalleryItems';
-      changes: Partial<Pick<GalleryItem, 'boardId' | 'starred'>>;
+      changes: Partial<Pick<GalleryItem, 'boardId' | 'colorLabel' | 'rating' | 'rejected' | 'starred'>>;
       itemKeys: GalleryItemKey[];
     }
   | {
@@ -3392,7 +3395,7 @@ const updateAllProjectGalleryValues = (
 const patchGalleryItemsAcrossProjects = (
   state: WorkbenchState,
   itemKeys: ReadonlySet<GalleryItemKey>,
-  changes: Partial<Pick<GalleryItem, 'boardId' | 'starred'>>
+  changes: Partial<Pick<GalleryItem, 'boardId' | 'colorLabel' | 'rating' | 'rejected' | 'starred'>>
 ): WorkbenchState => {
   if (itemKeys.size === 0) {
     return state;
@@ -3796,7 +3799,6 @@ const getGalleryResultSelectionValues = (
       page: 0,
       paginationMode: gallerySettings.paginationMode,
       searchTerm: '',
-      starredOnly: false,
     },
   };
 };
@@ -4390,7 +4392,7 @@ const getCurrentGallerySelectionQuery = (
     paginationMode: settings.paginationMode,
     searchTerm: typeof values.searchTerm === 'string' ? values.searchTerm : '',
     ...(semanticKey ? { semanticKey } : {}),
-    starredOnly: values.starredOnly === true,
+    ...getGalleryMarksFilterValues(values, getGalleryMarksFilter(values)),
   };
 };
 
@@ -5816,7 +5818,6 @@ const reduceWorkbenchAction = (
                 page: selectedImagePage,
                 paginationMode: settings.paginationMode,
                 searchTerm: '',
-                starredOnly: false,
               }
             : action.preserveNavigationQuery && existingNavigationQuery
               ? {
@@ -6006,13 +6007,13 @@ const reduceWorkbenchAction = (
         action.projectId
       );
     }
-    case 'setGalleryStarredOnly': {
+    case 'setGalleryMarksFilter': {
       return updateGalleryValues(
         state,
         (values) => ({
           ...values,
+          ...getGalleryMarksFilterValues(values, action.marksFilter),
           galleryPage: 0,
-          starredOnly: action.starredOnly,
         }),
         action.projectId
       );

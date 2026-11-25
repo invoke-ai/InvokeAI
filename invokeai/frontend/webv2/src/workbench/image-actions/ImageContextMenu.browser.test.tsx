@@ -13,6 +13,7 @@ import { system } from '@theme/system';
 import { act, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { userEvent } from 'vitest/browser';
 
 import type * as ModelOnlyUpscaleModule from './modelOnlyUpscale';
 import type { ImageActions } from './useImageActions';
@@ -90,13 +91,16 @@ vi.mock('@workbench/WorkbenchContext', () => ({
 // Keys stand in for copy; the one interpolated value a test reads, an upscale factor, is shown as the locale does.
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key: string, options?: { key?: string; scale?: number }) =>
+    t: (key: string, options?: { count?: number; key?: string; scale?: number; value?: string }) =>
       // The hint renders beside its label as written, short; a key there would widen the menu past the viewport.
       key === 'widgets.gallery.itemMenu.compareShortcut'
         ? `${String(options?.key)}+click`
-        : options?.scale === undefined
-          ? key
-          : `${options.scale}×${key.endsWith('.factorNative') ? ' (native)' : ''}`,
+        : options?.scale !== undefined
+          ? `${options.scale}×${key.endsWith('.factorNative') ? ' (native)' : ''}`
+          : // Marks names carry their value, which the rating row announces.
+            key.startsWith('widgets.gallery.marks.') && (options?.value ?? options?.count) !== undefined
+            ? `${key}(${String(options?.value ?? options?.count)})`
+            : key,
   }),
 }));
 
@@ -139,8 +143,7 @@ const createActions = (deleteItems: ImageActions['deleteItems']): ImageActions =
   selectForCompare: vi.fn(),
   sendToCanvas: vi.fn(() => Promise.resolve()),
   sendImageAsControl: vi.fn(() => Promise.resolve()),
-  setItemsStarred: vi.fn(() => Promise.resolve()),
-  setImagesStarred: vi.fn(() => Promise.resolve()),
+  setItemsMarks: vi.fn(() => Promise.resolve()),
   savePromptAsTemplate: vi.fn(),
   sendToInitialVideo: vi.fn(),
   useAsReferenceImage: vi.fn(),
@@ -262,7 +265,10 @@ const item = (kind: GalleryItem['kind'], name: string): GalleryItem => {
     height: 512,
     isIntermediate: false,
     name,
+    colorLabel: null,
     starred: false,
+    rating: 0 as const,
+    rejected: false,
     thumbnailUrl: `/thumb-${name}`,
     width: 512,
   };
@@ -471,7 +477,9 @@ describe('ImageContextMenu canvas destinations', () => {
       ADD,
       NEW_PROJECT,
       '—',
-      'widgets.gallery.starSelection',
+      // The marks row's one plain item; its flags and labels are checkbox items.
+      'widgets.gallery.marks.ratingMenuItem(widgets.gallery.marks.unrated)',
+      '—',
       'widgets.gallery.downloadSelection',
       'widgets.gallery.changeBoard',
       '—',
@@ -650,7 +658,7 @@ describe('ImageContextMenu mixed-media action visibility', () => {
     expect(document.querySelector('[aria-label="widgets.gallery.itemMenu.openInNewTab"]')).not.toBeNull();
     expect(document.querySelector('[aria-label="widgets.gallery.itemMenu.downloadVideo"]')).not.toBeNull();
     expect(document.querySelector('[aria-label="widgets.gallery.itemMenu.openInPreview"]')).not.toBeNull();
-    expect(document.querySelector('[aria-label="widgets.preview.starVideo"]')).not.toBeNull();
+    expect(document.querySelector('[data-gallery-marks-control] [data-mark-part="bookmark"]')).not.toBeNull();
     expect(document.body.textContent).toContain('widgets.gallery.changeBoard');
     expect(document.body.textContent).toContain('widgets.gallery.itemMenu.deleteVideo');
     expect(document.body.textContent).not.toContain('widgets.gallery.itemMenu.copyToClipboard');
@@ -678,7 +686,7 @@ describe('ImageContextMenu mixed-media action visibility', () => {
     });
 
     expect(document.body.textContent).toContain('widgets.gallery.itemMenu.itemsSelected');
-    expect(document.body.textContent).toContain('widgets.gallery.starSelection');
+    expect(document.querySelector('[data-gallery-marks-control]')).not.toBeNull();
     expect(document.body.textContent).toContain('widgets.gallery.downloadSelection');
     expect(document.body.textContent).toContain('widgets.gallery.changeBoard');
     expect(document.body.textContent).toContain('widgets.gallery.deleteSelection');
@@ -692,8 +700,93 @@ describe('ImageContextMenu mixed-media action visibility', () => {
     expect(actions.openItemInNewTab).toHaveBeenCalledWith(loadedImage);
     expect(actions.openItemInPreview).toHaveBeenCalledWith(loadedImage);
 
-    await interact(() => getMenuItem('widgets.gallery.starSelection').click());
-    expect(actions.setItemsStarred).toHaveBeenCalledWith(refs, true);
+    const bookmark = () => document.querySelector<HTMLElement>('[role="menuitemcheckbox"][data-mark-part="bookmark"]')!;
+
+    expect(bookmark().getAttribute('aria-checked')).toBe('false');
+    await interact(() => bookmark().click());
+    expect(actions.setItemsMarks).toHaveBeenCalledWith(refs, { flag: 'pick' });
+    // The menu stays open on the mark it set.
+    expect(bookmark().getAttribute('aria-checked')).toBe('true');
+  });
+});
+
+describe('ImageContextMenu marks row', () => {
+  it('rates and labels by pointer and keyboard while the menu stays open', async () => {
+    const actions = createActions(vi.fn());
+    const rated = { ...item('image', 'rated.png'), rating: 2 as const };
+    const refs = [{ kind: 'image' as const, name: rated.name }];
+    await renderItemMenu(actions, { itemRefs: refs, items: [rated], x: 20, y: 20 });
+    const star = (rating: number) =>
+      document.querySelector<HTMLElement>(`[data-mark-part="rating"] [aria-posinset="${String(rating)}"]`)!;
+    const label = (colorLabel: string) =>
+      document.querySelector<HTMLElement>(`[data-mark-part="label-${colorLabel}"]`)!;
+    const ratingRow = () => document.querySelector<HTMLElement>('[data-mark-part="rating-row"]')!;
+    const press = async (key: string) => {
+      await userEvent.keyboard(key);
+      await interact(() => {});
+    };
+
+    await userEvent.click(star(4));
+    expect(actions.setItemsMarks).toHaveBeenLastCalledWith(refs, { rating: 4 });
+    await userEvent.click(star(4));
+    await interact(() => {});
+    expect(actions.setItemsMarks).toHaveBeenLastCalledWith(refs, { rating: 0 });
+
+    // The menu keeps focus; the highlighted rating row takes Left/Right and digits.
+    await press('{Home}');
+    while (!ratingRow().hasAttribute('data-highlighted')) {
+      await press('{ArrowDown}');
+    }
+    await press('{ArrowRight}');
+    expect(actions.setItemsMarks).toHaveBeenLastCalledWith(refs, { rating: 1 });
+    await press('5');
+    expect(actions.setItemsMarks).toHaveBeenLastCalledWith(refs, { rating: 5 });
+
+    // Each label in the overlapping stack is its own item.
+    await userEvent.click(label('green'));
+    expect(actions.setItemsMarks).toHaveBeenLastCalledWith(refs, { colorLabel: 'green' });
+    while (!label('blue').hasAttribute('data-highlighted')) {
+      await press('{ArrowDown}');
+    }
+    await press('{Enter}');
+    expect(actions.setItemsMarks).toHaveBeenLastCalledWith(refs, { colorLabel: 'blue' });
+    expect(label('blue').getAttribute('aria-checked')).toBe('true');
+    expect(ratingRow().getAttribute('aria-label')).toBe(
+      'widgets.gallery.marks.ratingMenuItem(widgets.gallery.marks.ratingSummary(5))'
+    );
+  });
+
+  it('presents differing ratings as such, steps from the primary item, and clears them with 0', async () => {
+    const actions = createActions(vi.fn());
+    const lower = { ...item('image', 'lower.png'), rating: 4 as const };
+    const primary = { ...item('image', 'primary.png'), rating: 5 as const };
+    const refs = [lower, primary].map(({ kind, name }) => ({ kind, name }));
+    const ratingRow = () => document.querySelector<HTMLElement>('[data-mark-part="rating-row"]')!;
+    const press = async (key: string) => {
+      await userEvent.keyboard(key);
+      await interact(() => {});
+    };
+    const openOnRatingRow = async () => {
+      await renderItemMenu(actions, { itemRefs: refs, items: [primary, lower], x: 20, y: 20 });
+      await press('{Home}');
+      while (!ratingRow().hasAttribute('data-highlighted')) {
+        await press('{ArrowDown}');
+      }
+    };
+
+    await openOnRatingRow();
+    expect(ratingRow().getAttribute('aria-label')).toBe(
+      'widgets.gallery.marks.ratingMenuItem(widgets.gallery.marks.ratingsDiffer)'
+    );
+    expect(ratingRow().querySelectorAll('[aria-checked="true"]')).toHaveLength(0);
+    await press('{ArrowLeft}');
+    expect(actions.setItemsMarks).toHaveBeenLastCalledWith(refs, { rating: 4 });
+
+    await interact(() => root?.unmount());
+    host?.remove();
+    await openOnRatingRow();
+    await press('0');
+    expect(actions.setItemsMarks).toHaveBeenLastCalledWith(refs, { rating: 0 });
   });
 });
 

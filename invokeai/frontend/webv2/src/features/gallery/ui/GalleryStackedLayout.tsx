@@ -10,11 +10,12 @@ import { useCallback, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { GalleryBoardsPanel } from './GalleryBoardsPanel';
+import { GalleryCullRow } from './GalleryCull';
 import { GalleryImageGrid } from './GalleryImageGrid';
 import { GalleryItemFilterMenu } from './GalleryItemFilterMenu';
 import { GalleryItemSearch } from './GalleryItemSearch';
+import { GalleryMarksFilterRow, GalleryMarksFilterToggle } from './GalleryMarksFilter';
 import { GallerySelectionBar } from './GallerySelectionBar';
-import { GalleryStarredFilterToggle } from './GalleryStarredFilterToggle';
 import { GalleryUploadButton } from './GalleryUploadButton';
 import { GalleryViewTabs } from './GalleryViewTabs';
 import { useGalleryWidget } from './GalleryWidgetContext';
@@ -128,7 +129,7 @@ export const GalleryStackedLayout = () => {
           <HStack columnGap="1" flexWrap="wrap" minW="0" rowGap="2">
             <GalleryViewTabs idBase={viewTabsIdBase} />
             <HStack flexShrink={0} gap="1" ms="auto">
-              <GalleryStarredFilterToggle />
+              <GalleryMarksFilterToggle />
               <GalleryItemFilterMenu triggerRef={mediaFilterTriggerRef} />
               <GalleryUploadButton
                 boards={gallery.boards}
@@ -137,6 +138,8 @@ export const GalleryStackedLayout = () => {
               />
             </HStack>
           </HStack>
+          <GalleryMarksFilterRow />
+          <GalleryCullRow />
           <GalleryItemSearch />
         </Stack>
         <Flex

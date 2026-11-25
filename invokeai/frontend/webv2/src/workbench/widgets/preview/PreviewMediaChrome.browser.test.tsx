@@ -25,7 +25,10 @@ const sharedImage: GalleryImageItem = {
   isIntermediate: false,
   kind: 'image',
   name: 'shared',
+  colorLabel: null,
   starred: false,
+  rating: 0,
+  rejected: false,
   thumbnailUrl: '/images/shared/thumbnail',
   width: 1280,
 };
@@ -41,7 +44,10 @@ const sharedVideo: GalleryVideoItem = {
   isIntermediate: false,
   kind: 'video',
   name: 'shared',
+  colorLabel: null,
   starred: true,
+  rating: 0,
+  rejected: false,
   thumbnailUrl: '/videos/shared/thumbnail',
   width: 1920,
 };
@@ -115,10 +121,6 @@ void i18n.use(initReactI18next).init({
             itemCount_other: '{{count}} items',
             selectForCompare: 'Select for Compare',
             sendToCanvas: 'Send to Canvas',
-            starImage: 'Star image',
-            starVideo: 'Star video',
-            unstarImage: 'Unstar image',
-            unstarVideo: 'Unstar video',
             use: 'Use',
             videoDuration: 'Duration {{duration}}',
           },
@@ -366,7 +368,7 @@ describe('Preview mixed media actions', () => {
   it('keeps common video actions, adds the Preview-only frame copy, and hides image-only actions', async () => {
     const actions = {
       downloadItem: vi.fn(() => Promise.resolve()),
-      setItemsStarred: vi.fn(() => Promise.resolve()),
+      setItemsMarks: vi.fn(() => Promise.resolve()),
     } as unknown as ImageActions;
     const onCopyCurrentFrame = vi.fn();
 
@@ -385,16 +387,12 @@ describe('Preview mixed media actions', () => {
     expect(host?.querySelector('[aria-label="Edit"]')).toBeNull();
 
     const copyFrame = host?.querySelector<HTMLButtonElement>('[aria-label="Copy Current Frame"]');
-    const star = host?.querySelector<HTMLButtonElement>('[aria-label="Unstar video"]');
     expect(copyFrame).not.toBeNull();
     expect(copyFrame?.disabled).toBe(true);
     expect(host?.querySelector('[aria-label="Details"]')).toBeNull();
-    expect(star).not.toBeNull();
-
-    await interact(() => star?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true })));
-
+    // The marks trigger is the header's one bookmark control, and shows the bookmark.
+    expect(host?.querySelector('[data-gallery-marks-trigger] [data-gallery-marks-trigger-bookmark]')).not.toBeNull();
     expect(onCopyCurrentFrame).not.toHaveBeenCalled();
-    expect(actions.setItemsStarred).toHaveBeenCalledWith([{ kind: 'video', name: 'shared' }], false);
 
     await render(
       <PreviewActionStrip
@@ -421,7 +419,7 @@ describe('Preview mixed media actions', () => {
     try {
       await render(
         <PreviewActionStrip
-          actions={{ setItemsStarred: vi.fn() } as unknown as ImageActions}
+          actions={{ setItemsMarks: vi.fn() } as unknown as ImageActions}
           density="full"
           isVideoFrameCopyAvailable={false}
           item={sharedVideo}

@@ -183,6 +183,13 @@ export interface WidgetCommandContribution {
 
 export interface WidgetHotkeyApi {
   register: (hotkey: WidgetHotkeyContribution) => () => void;
+  /** Turns a hotkey mode on for presses aimed at the source widget (any, without a source) until the disposer runs. */
+  activateMode: (activation: WidgetHotkeyModeActivation) => () => void;
+}
+
+export interface WidgetHotkeyModeActivation {
+  mode: string;
+  source?: WidgetContributionSource;
 }
 
 export interface WidgetHotkeyContribution {

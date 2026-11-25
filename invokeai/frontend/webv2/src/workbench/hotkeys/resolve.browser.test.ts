@@ -111,3 +111,42 @@ describe('resolveHotkey inside an open popup', () => {
     expect(pressIn('<div data-target tabindex="-1"></div>', 'e', { key: 'e' })).toBe('eraser');
   });
 });
+
+describe('resolveHotkey for a mode binding', () => {
+  const host = document.createElement('div');
+
+  document.body.append(host);
+
+  afterEach(() => {
+    host.replaceChildren();
+  });
+
+  it('leaves presses inside a popover or dialog to it while the mode is on', () => {
+    const rate = applyCustomHotkeys(
+      firstPartyHotkeyCatalog.find((hotkey) => hotkey.id === 'cull.rate3')!,
+      {}
+    );
+    const pressIn = (html: string) => {
+      host.innerHTML = html;
+
+      return (
+        resolveHotkey({
+          context: {
+            activeInstanceId: 'preview-1',
+            activeModes: ['cull'],
+            activeWidgetTypeId: 'preview',
+            focusedRegion: 'center',
+            isModalPresent: false,
+            projectId: 'project-1',
+          },
+          event: { target: host.querySelector('[data-target]') } as unknown as KeyboardEvent,
+          hotkeys: [rate],
+          matchedKey: '3',
+        })?.commandId ?? null
+      );
+    };
+
+    expect(pressIn('<div role="dialog"><button data-target>Marks</button></div>')).toBeNull();
+    expect(pressIn('<div role="region"><button data-target>Next</button></div>')).toBe('cull.rate3');
+  });
+});

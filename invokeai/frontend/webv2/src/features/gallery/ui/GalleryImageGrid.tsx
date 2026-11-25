@@ -1,6 +1,19 @@
 import { Box, chakra, Flex, HStack, Icon, ScrollArea, Spinner, Stack, Text, VisuallyHidden } from '@chakra-ui/react';
 import { getGalleryBoardLabel } from '@features/gallery/core/boardLabels';
-import { toGalleryItemKey, type GalleryItem, type GalleryItemKey } from '@features/gallery/core/items';
+import { getGalleryCullMode, getGalleryCullModeValues } from '@features/gallery/core/cull';
+import {
+  toGalleryItemKey,
+  type GalleryItem,
+  type GalleryItemKey,
+  type GalleryItemRef,
+} from '@features/gallery/core/items';
+import {
+  EMPTY_GALLERY_MARKS_FILTER,
+  getGalleryItemMarks,
+  isGalleryMarksFilterActive,
+  toggleGalleryBookmark,
+  type GalleryMarksPatch,
+} from '@features/gallery/core/marks';
 import {
   getGalleryRevealRequest,
   getGallerySessionNavigationKey,
@@ -22,7 +35,7 @@ import { getApiErrorMessage } from '@platform/transport/http';
 import { Button, DropZone } from '@platform/ui';
 import { LoadError, RetryButton } from '@platform/ui/LoadError';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronRightIcon, StarIcon, UploadIcon } from 'lucide-react';
+import { BookmarkIcon, ChevronRightIcon, UploadIcon } from 'lucide-react';
 import {
   useCallback,
   useEffect,
@@ -44,6 +57,7 @@ import { useTranslation } from 'react-i18next';
 
 import type { GallerySparsePageState } from './useGalleryData';
 
+import { GalleryCullCommands, type GalleryCullTarget } from './GalleryCullCommands';
 import {
   buildGalleryGridRows,
   buildSparseGalleryNavigationEntries,
@@ -246,7 +260,7 @@ const GalleryStarredSectionHeader = ({
           transform={isOpen ? 'rotate(90deg)' : undefined}
           transition="transform var(--wb-motion-duration-medium) ease"
         />
-        <Icon as={StarIcon} boxSize="3" fill="currentColor" />
+        <Icon as={BookmarkIcon} boxSize="3" fill="currentColor" />
         <HStack gap="1" minW="0">
           <Text
             as="span"
@@ -257,7 +271,7 @@ const GalleryStarredSectionHeader = ({
             textTransform="uppercase"
             truncate
           >
-            {t('widgets.gallery.starredItems')}
+            {t('widgets.gallery.bookmarkedItems')}
           </Text>
           <Text as="span" color="currentColor" fontSize="xs" fontVariantNumeric="tabular-nums" lineHeight="1">
             {total}
@@ -266,7 +280,7 @@ const GalleryStarredSectionHeader = ({
       </chakra.button>
       {state.status === 'stale-error' ? (
         <RetryButton
-          aria-label={t('widgets.gallery.retryRefreshingStarredItems')}
+          aria-label={t('widgets.gallery.retryRefreshingBookmarkedItems')}
           color="fg.error"
           flagsFailure
           isRetrying={state.isRetrying}
@@ -278,7 +292,7 @@ const GalleryStarredSectionHeader = ({
       ) : null}
       {total > shownCount ? (
         <Button
-          aria-label={t('widgets.gallery.showAllStarredItems')}
+          aria-label={t('widgets.gallery.showAllBookmarkedItems')}
           color="fg.muted"
           flexShrink={0}
           size="sm"
@@ -331,7 +345,7 @@ const GalleryStarredSection = ({
         onToggle={onToggle}
       />
       {isOpen ? (
-        <Box aria-label={t('widgets.gallery.starredItems')} role="list">
+        <Box aria-label={t('widgets.gallery.bookmarkedItems')} role="list">
           {rows.map((row) => (
             <Box
               key={row.key}
@@ -434,6 +448,7 @@ export const GalleryImageGrid = ({
     pinRevealIndex,
     projectId,
     region,
+    runtime,
     setVisibleRange,
     sparseListing,
     starredStrip,
@@ -445,6 +460,7 @@ export const GalleryImageGrid = ({
     ImageContextMenu,
     followedProgressSessionId,
     progressSessions,
+    widgets,
   } = useGalleryUi();
   const { data: indexAvailability } = useQuery(imageIndexAvailabilityOptions());
   const getReadyItemLabel = indexAvailability?.state === 'ready' ? getItemLabel : null;
@@ -464,6 +480,7 @@ export const GalleryImageGrid = ({
     thumbnailFit,
   } = gallery.settings;
   const isStarredOpen = !starredSectionCollapsed;
+  const cullMode = getGalleryCullMode(galleryValues);
   const usesSparseListing = sparseListing !== undefined;
   const isSparsePaginated = usesSparseListing && paginationMode === 'paginated';
   const sparsePageOffset = isSparsePaginated ? gallery.page * GALLERY_PAGE_SIZE : 0;
@@ -502,8 +519,8 @@ export const GalleryImageGrid = ({
     handleThumbnailContextMenu,
     loadedItems,
     selectedItemKeys,
+    selectionMarks,
     selectItemRange,
-    shouldStarSelection,
     syncRangeInteractionContext,
     toggleItem,
   } = useGalleryGridSelection({ getItemReturnFocus, getSelectionPage });
@@ -527,7 +544,7 @@ export const GalleryImageGrid = ({
   const selectedBoardName = selectedBoard
     ? getGalleryBoardLabel(selectedBoard, t)
     : t('widgets.gallery.selectedBoardFallback');
-  // The listing is unstarred-only, so an all-starred board still has the strip to show.
+  // Without a flag filter the listing leaves bookmarked items out, so an all-bookmarked board still has the strip.
   const isEmpty =
     (usesSparseListing ? sparseBackendItemCount === 0 && sparseRecentItems.length === 0 : gallery.items.length === 0) &&
     starredStrip.items.length === 0;
@@ -545,10 +562,11 @@ export const GalleryImageGrid = ({
   );
   const isProgressOpen = showPendingItems && !progressSectionCollapsed;
   const shownStripItems = isStarredOpen ? starredCells : NO_ITEMS;
-  // A starred selection no tile shows still belongs to the strip, so arrows step from it, but only when made in this
-  // listing: a leftover would add a phantom entry. A starred-only listing, ranking or anchored window has none.
+  // A bookmarked selection no tile shows still belongs to the strip, so arrows step from it, but only when made in this
+  // listing: a leftover would add a phantom entry. A flag-filtered listing, ranking or anchored window has none.
   const isStripApplicable =
-    !gallery.starredOnly && gallery.semanticImageQuery === null && gallery.anchoredWindowPage === 0;
+    gallery.marksFilter.flags.length === 0 && gallery.semanticImageQuery === null && gallery.anchoredWindowPage === 0;
+  const hasMarksFilter = gallery.semanticImageQuery === null && isGalleryMarksFilterActive(gallery.marksFilter);
   const hiddenStripSelection = useMemo((): GalleryItem | null => {
     const selectedItem = getSelectedGalleryItemFromValues(galleryValues);
     const selectedKey = gallery.selectedItemKey ?? (selectedItem ? toGalleryItemKey(selectedItem) : null);
@@ -1059,12 +1077,15 @@ export const GalleryImageGrid = ({
   );
 
   // A tile that leaves the document holding focus takes it along: the same item takes it back where it now shows,
-  // else the Tab stop, first tile in view or the grid. A user who already went elsewhere keeps their focus.
+  // else the Tab stop, first tile in view or the grid. A user who already went elsewhere keeps their focus. A slot's
+  // tile that a shifted listing hands another item while focused loses it too: focus follows the item, not the slot.
   const restoreTileFocus = useCallback((itemKey: GalleryItemKey) => {
     const viewport = viewportRef.current;
     const active = document.activeElement;
+    const activeTileKey = getTileItemKey(active);
+    const isReusedTile = activeTileKey !== null && activeTileKey !== itemKey && viewport?.contains(active) === true;
 
-    if (!viewport || (active !== null && active !== document.body)) {
+    if (!viewport || (active !== null && active !== document.body && !isReusedTile)) {
       return;
     }
 
@@ -1164,7 +1185,7 @@ export const GalleryImageGrid = ({
       opener.isConnected ? opener : (viewport.querySelector<HTMLElement>(GALLERY_TAB_STOP_SELECTOR) ?? viewport);
   };
 
-  useGalleryGridHotkeys({
+  const { cullStepper } = useGalleryGridHotkeys({
     actionSelectionRefs,
     columnCount,
     getCursorCandidates,
@@ -1176,10 +1197,35 @@ export const GalleryImageGrid = ({
     navigateToUnloadedSlot: handleNavigateToUnloadedSlot,
     getSelectionPage,
     onNavigationStart: cancelPendingSparseNavigation,
+    selectionMarks,
     selectItemRange,
-    shouldStar: shouldStarSelection,
     toggleItem,
   });
+
+  // The selection a cull key marks; `[` and `]` step from its primary item, the one last added.
+  const cullTarget = useMemo((): GalleryCullTarget | null => {
+    if (actionSelectionRefs.length === 0) {
+      return null;
+    }
+
+    const primaryIndex = actionSelectionRefs.findIndex((ref) => toGalleryItemKey(ref) === gallery.selectedItemKey);
+    const singleKey = actionSelectionRefs.length === 1 ? toGalleryItemKey(actionSelectionRefs[0]!) : null;
+
+    return {
+      item: singleKey === null ? null : (loadedItems.find((item) => toGalleryItemKey(item) === singleKey) ?? null),
+      marks: selectionMarks,
+      primary: selectionMarks[Math.max(0, primaryIndex)],
+      refs: actionSelectionRefs,
+    };
+  }, [actionSelectionRefs, gallery.selectedItemKey, loadedItems, selectionMarks]);
+  const markCullTargets = useCallback(
+    (refs: GalleryItemRef[], patch: GalleryMarksPatch) => void itemActions.setItemsMarks(refs, patch, { quiet: true }),
+    [itemActions]
+  );
+  const toggleCullMode = useCallback(
+    () => widgets.patchGalleryValues(getGalleryCullModeValues({ enabled: !cullMode.enabled })),
+    [cullMode.enabled, widgets]
+  );
 
   const settlePendingSparseNavigation = useEffectEvent(() => {
     const pending = pendingSparseNavigationRef.current;
@@ -1642,9 +1688,17 @@ export const GalleryImageGrid = ({
   const handleShowAllStarred = useCallback(() => {
     viewportRef.current
       ?.closest('[role="tabpanel"]')
-      ?.parentElement?.querySelector<HTMLElement>('[data-gallery-starred-filter-toggle]')
+      ?.parentElement?.querySelector<HTMLElement>('[data-gallery-marks-filter-toggle]')
       ?.focus();
-    actions.setStarredOnly(true);
+    actions.setMarksFilter({ ...gallery.marksFilter, flags: ['pick'] });
+  }, [actions, gallery.marksFilter]);
+  // Clear filters removes itself, so focus moves to the toolbar filter control first, as Show all does.
+  const handleClearMarksFilter = useCallback(() => {
+    viewportRef.current
+      ?.closest('[role="tabpanel"]')
+      ?.parentElement?.querySelector<HTMLElement>('[data-gallery-marks-filter-toggle]')
+      ?.focus();
+    actions.setMarksFilter(EMPTY_GALLERY_MARKS_FILTER);
   }, [actions]);
 
   const handleShowAllMedia = useCallback(() => {
@@ -1652,8 +1706,12 @@ export const GalleryImageGrid = ({
     actions.updateSettings({ mediaFilter: 'all' });
   }, [actions, mediaFilterTriggerRef]);
 
-  const handleToggleStarred = useCallback(
-    (item: GalleryItem) => void itemActions.setItemsStarred([{ kind: item.kind, name: item.name }], !item.starred),
+  const handleToggleBookmark = useCallback(
+    (item: GalleryItem) =>
+      void itemActions.setItemsMarks(
+        [{ kind: item.kind, name: item.name }],
+        toggleGalleryBookmark([getGalleryItemMarks(item)])
+      ),
     [itemActions]
   );
   const handleOpenItem = useCallback((item: GalleryItem) => itemActions.openItemInPreview(item), [itemActions]);
@@ -1694,7 +1752,7 @@ export const GalleryImageGrid = ({
           onFocusLost={restoreTileFocus}
           onOpen={handleOpenItem}
           onOpenInNewTab={middleClickOpensInNewTab ? handleOpenItemInNewTab : null}
-          onToggleStarred={handleToggleStarred}
+          onToggleBookmark={handleToggleBookmark}
           selectionPage={selectionPage}
         />
       );
@@ -1708,7 +1766,7 @@ export const GalleryImageGrid = ({
       handleOpenItemInNewTab,
       handleThumbnailClick,
       handleThumbnailContextMenu,
-      handleToggleStarred,
+      handleToggleBookmark,
       isCompareArmed,
       isComparisonActive,
       isFollowingLive,
@@ -1728,6 +1786,17 @@ export const GalleryImageGrid = ({
   return (
     <Stack flex="1" gap="0" h="full" minH="0" minW="0" w="full">
       {isComparisonActive || isCompareArmed ? <GalleryExitCompareHotkey key={`${projectId}:${i18n.language}`} /> : null}
+      <GalleryCullCommands
+        key={`${projectId}:${i18n.language}:${cullMode.enabled}`}
+        autoAdvance={cullMode.autoAdvance}
+        enabled={cullMode.enabled}
+        marksFilter={gallery.semanticImageQuery === null ? gallery.marksFilter : null}
+        runtime={runtime}
+        stepper={cullStepper}
+        target={cullTarget}
+        onMark={markCullTargets}
+        onToggle={toggleCullMode}
+      />
       {listing.status === 'stale-error' &&
       (!usesSparseListing || (Boolean(sparseListing?.pageStates.get(0)?.error) && !sparsePageStatusOffsets.has(0))) ? (
         <GalleryLoadNotice
@@ -1822,15 +1891,15 @@ export const GalleryImageGrid = ({
                       h={`${GALLERY_STARRED_HEADER_HEIGHT_PX}px`}
                       message={t(
                         starredStrip.state.status === 'error'
-                          ? 'widgets.gallery.starredLoadFailed'
-                          : 'widgets.gallery.starredRefreshFailed'
+                          ? 'widgets.gallery.bookmarkedLoadFailed'
+                          : 'widgets.gallery.bookmarkedRefreshFailed'
                       )}
                       px="1"
                       read={starredStrip.state}
                       retryLabel={t(
                         starredStrip.state.status === 'error'
-                          ? 'widgets.gallery.retryLoadingStarredItems'
-                          : 'widgets.gallery.retryRefreshingStarredItems'
+                          ? 'widgets.gallery.retryLoadingBookmarkedItems'
+                          : 'widgets.gallery.retryRefreshingBookmarkedItems'
                       )}
                       onFocusLost={focusGridContent}
                     />
@@ -1881,15 +1950,28 @@ export const GalleryImageGrid = ({
                     {t('widgets.gallery.showAllMedia')}
                   </Button>
                 </Stack>
+              ) : isEmpty && hasMarksFilter && listing.status !== 'loading' ? (
+                <Stack
+                  align="center"
+                  color="fg.muted"
+                  data-gallery-marks-filter-empty
+                  flex="1"
+                  gap="2"
+                  justify="center"
+                  minH="8rem"
+                >
+                  <Text>{t('widgets.gallery.marksFilter.noMatches')}</Text>
+                  <Button size="sm" variant="outline" onClick={handleClearMarksFilter}>
+                    {t('widgets.gallery.marksFilter.clearFilters')}
+                  </Button>
+                </Stack>
               ) : isEmpty ? (
-                listing.status === 'loading' || hasActiveSearch || isVirtualBoard || gallery.starredOnly ? (
+                listing.status === 'loading' || hasActiveSearch || isVirtualBoard ? (
                   <Flex align="center" color="fg.muted" flex="1" justify="center" minH="8rem">
                     <Text>
                       {listing.status === 'loading'
                         ? t('widgets.gallery.loadingBackendGallery')
-                        : gallery.starredOnly && gallery.semanticImageQuery === null
-                          ? t('widgets.gallery.noStarredItemsMatch')
-                          : t('widgets.gallery.noImagesMatch')}
+                        : t('widgets.gallery.noImagesMatch')}
                     </Text>
                   </Flex>
                 ) : (

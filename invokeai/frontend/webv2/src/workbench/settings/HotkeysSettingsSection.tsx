@@ -1,7 +1,7 @@
 import type { ListRowProps } from '@platform/ui/list/List';
 import type { ListSection } from '@platform/ui/list/listRows';
 import type { SettingLayer } from '@platform/ui/settings/contracts';
-import type { HotkeyCategory, HotkeyDefinition } from '@workbench/hotkeys';
+import type { HotkeyCategory, HotkeyDefinition, HotkeyMode } from '@workbench/hotkeys';
 
 import { HStack, Icon, Input, InputGroup, Kbd, Stack, Text } from '@chakra-ui/react';
 import { Button, IconButton } from '@platform/ui';
@@ -12,6 +12,7 @@ import { SettingLayerIndicator } from '@platform/ui/settings/SettingLayerIndicat
 import {
   firstPartyHotkeyCatalog,
   formatHotkeyForPlatform,
+  formatHotkeyLabel,
   mergeHotkeyCatalog,
   normalizeHotkeyString,
   eventToHotkeyString,
@@ -23,7 +24,8 @@ import { CheckIcon, PlusIcon, RotateCcwIcon, SearchIcon, Trash2Icon, XIcon } fro
 import { Fragment, useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-type HotkeyConflict = { hotkey: HotkeyDefinition; title: string };
+/** `implicitShift`: the binding claims the key only as its own key with Shift added (`acceptsShift`). */
+type HotkeyConflict = { hotkey: HotkeyDefinition; implicitShift: boolean; title: string };
 
 /** A rebound hotkey; its row's own reset button changes it back, so the dot only marks it. */
 const CHANGED_LAYER: SettingLayer = { state: 'default' };
@@ -32,6 +34,7 @@ const CHANGED_LAYER: SettingLayer = { state: 'default' };
 const SCOPE_LABEL_KEYS: Record<HotkeyCategory, string> = {
   app: 'hotkeys.scopes.focusedPanel',
   canvas: 'hotkeys.categories.canvas',
+  cull: 'hotkeys.scopes.previewOrGallery',
   gallery: 'hotkeys.categories.gallery',
   queue: 'hotkeys.categories.queue',
   viewer: 'hotkeys.categories.viewer',
@@ -47,13 +50,22 @@ interface HotkeyEntry {
 const CATEGORY_LABEL_KEYS: Record<HotkeyCategory, string> = {
   app: 'hotkeys.categories.app',
   canvas: 'hotkeys.categories.canvas',
+  cull: 'hotkeys.categories.cull',
   gallery: 'hotkeys.categories.gallery',
   queue: 'hotkeys.categories.queue',
   viewer: 'hotkeys.categories.viewer',
   workflows: 'hotkeys.categories.workflows',
 };
 
-const CATEGORY_ORDER: HotkeyCategory[] = ['app', 'canvas', 'workflows', 'viewer', 'gallery', 'queue'];
+const CATEGORY_ORDER: HotkeyCategory[] = ['app', 'canvas', 'workflows', 'viewer', 'gallery', 'cull', 'queue'];
+
+const MODE_LABEL_KEYS: Partial<Record<HotkeyMode, string>> = { cull: 'hotkeys.modes.cull' };
+
+const getModeLabel = (t: (key: string) => string, mode: HotkeyMode): string => {
+  const key = MODE_LABEL_KEYS[mode];
+
+  return key ? t(key) : titleFromId(mode);
+};
 
 const SEARCH_START_ELEMENT = <Icon as={SearchIcon} boxSize="3.5" />;
 const NO_MATCHES_ICON = <Icon as={SearchIcon} />;
@@ -98,6 +110,13 @@ const shadows = (narrow: HotkeyDefinition, broad: HotkeyDefinition): boolean =>
   getScopeRank(narrow) > getScopeRank(broad) &&
   (broad.scope.kind === 'global' || broad.scope.kind === 'focused-region');
 
+/**
+ * While its mode is on, a mode binding takes the key from any other one that would answer the same press: one of the
+ * same scope priority whose scope overlaps, or a global or focused-region one. The resolver's mode rule; not a conflict.
+ */
+const takesInMode = (modal: HotkeyDefinition, other: HotkeyDefinition): boolean =>
+  modal.mode !== undefined && other.mode === undefined && (canScopesOverlap(modal, other) || shadows(modal, other));
+
 const canScopesOverlap = (left: HotkeyDefinition, right: HotkeyDefinition): boolean => {
   if (getScopeRank(left) !== getScopeRank(right)) {
     return false;
@@ -132,6 +151,16 @@ const canScopesOverlap = (left: HotkeyDefinition, right: HotkeyDefinition): bool
   return false;
 };
 
+/** A Shift-accepting binding also claims each key with Shift added, unless another binding names that combination. */
+const getClaimedKeys = (hotkey: HotkeyDefinition, keys: string[]): { implicitShift: boolean; key: string }[] => [
+  ...keys.map((key) => ({ implicitShift: false, key })),
+  ...(hotkey.acceptsShift
+    ? keys
+        .filter((key) => !key.split('+').includes('shift'))
+        .map((key) => ({ implicitShift: true, key: normalizeHotkeyString(`shift+${key}`) }))
+    : []),
+];
+
 const buildConflictMap = (
   catalog: HotkeyDefinition[],
   customHotkeys: Record<string, string[]>
@@ -141,10 +170,10 @@ const buildConflictMap = (
   for (const hotkey of catalog) {
     const effectiveKeys = normalizeKeys(customHotkeys[hotkey.id] ?? hotkey.defaultKeys);
 
-    for (const key of effectiveKeys) {
+    for (const { implicitShift, key } of getClaimedKeys(hotkey, effectiveKeys)) {
       const entries = conflicts.get(key) ?? [];
 
-      entries.push({ hotkey, title: getHotkeyTitle(hotkey) });
+      entries.push({ hotkey, implicitShift, title: getHotkeyTitle(hotkey) });
       conflicts.set(key, entries);
     }
   }
@@ -323,12 +352,26 @@ const HotkeyListRow = ({
   const isEditing = editingIndex !== null;
   const isDirty = draftKeys.join('\n') !== effectiveKeys.join('\n');
   const hasDuplicate = new Set(draftKeys).size !== draftKeys.length;
-  const sameKey = draftKeys
-    .flatMap((key) => conflictMap.get(key) ?? [])
-    .filter((entry) => entry.hotkey.id !== hotkey.id);
-  const conflict = sameKey.find((entry) => canScopesOverlap(hotkey, entry.hotkey));
-  const shadowed = sameKey.find((entry) => shadows(hotkey, entry.hotkey));
-  const shadowedBy = sameKey.find((entry) => shadows(entry.hotkey, hotkey));
+  const claims = getClaimedKeys(hotkey, draftKeys).flatMap((claim) =>
+    (conflictMap.get(claim.key) ?? [])
+      .filter((entry) => entry.hotkey.id !== hotkey.id)
+      .map((entry) => ({ entry, implicitShift: claim.implicitShift, key: claim.key }))
+  );
+  // A Shift variant yields to a binding that names the combination (the resolver's rule): neither takes from the other.
+  const sameKey = claims.filter((claim) => claim.implicitShift === claim.entry.implicitShift).map(({ entry }) => entry);
+  const shiftKeptBy = claims.find(
+    ({ entry, implicitShift }) =>
+      implicitShift &&
+      !entry.implicitShift &&
+      (canScopesOverlap(hotkey, entry.hotkey) || shadows(hotkey, entry.hotkey) || shadows(entry.hotkey, hotkey))
+  );
+  // A mode binding and an ordinary one never conflict: the mode's takes the key only while the mode is on.
+  const sameMode = sameKey.filter((entry) => entry.hotkey.mode === hotkey.mode);
+  const conflict = sameMode.find((entry) => canScopesOverlap(hotkey, entry.hotkey));
+  const takenInMode = sameKey.find((entry) => takesInMode(hotkey, entry.hotkey));
+  const takenFromInMode = sameKey.find((entry) => takesInMode(entry.hotkey, hotkey));
+  const shadowed = sameMode.find((entry) => shadows(hotkey, entry.hotkey));
+  const shadowedBy = sameMode.find((entry) => shadows(entry.hotkey, hotkey));
   const canSave = !hasDuplicate && !conflict && (isDirty || isEditing);
   const defaultKeys = normalizeKeys(hotkey.defaultKeys);
   const isModified =
@@ -399,6 +442,17 @@ const HotkeyListRow = ({
           <Text color="fg.error" fontSize="xs">
             {t('hotkeys.duplicateBinding')}
           </Text>
+        ) : takenInMode && hotkey.mode ? (
+          <Text color="fg.warning" fontSize="xs">
+            {t('hotkeys.takesInMode', { mode: getModeLabel(t, hotkey.mode), title: takenInMode.title })}
+          </Text>
+        ) : takenFromInMode?.hotkey.mode ? (
+          <Text color="fg.warning" fontSize="xs">
+            {t('hotkeys.takenInMode', {
+              mode: getModeLabel(t, takenFromInMode.hotkey.mode),
+              title: takenFromInMode.title,
+            })}
+          </Text>
         ) : shadowed ? (
           <Text color="fg.warning" fontSize="xs">
             {t('hotkeys.shadows', { scope: t(SCOPE_LABEL_KEYS[hotkey.category]), title: shadowed.title })}
@@ -409,6 +463,10 @@ const HotkeyListRow = ({
               scope: t(SCOPE_LABEL_KEYS[shadowedBy.hotkey.category]),
               title: shadowedBy.title,
             })}
+          </Text>
+        ) : shiftKeptBy ? (
+          <Text color="fg.muted" fontSize="xs">
+            {t('hotkeys.shiftKeptBy', { key: formatHotkeyLabel(shiftKeptBy.key), title: shiftKeptBy.entry.title })}
           </Text>
         ) : null}
       </Stack>
