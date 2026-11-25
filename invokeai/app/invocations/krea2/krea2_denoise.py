@@ -35,6 +35,7 @@ from invokeai.app.invocations.model import LoRAField, TransformerField
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.krea2.attention import (
     Krea2RegionalPromptingState,
+    block_receives_regional_mask,
     build_krea2_attention_processors,
     resolve_krea2_sdpa_backends,
 )
@@ -771,8 +772,14 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata):
                 pos_extension,
                 neg_extension,
                 inference_dtype,
-                # The reference is encoded at the target's size: its tokens join every injected block's keys.
-                style_reference_seq_len=image_seq_len if style_extension is not None else 0,
+                # The reference is encoded at the target's size: its tokens join every injected block's keys. Only a
+                # block that is both styled and masked pads a mask.
+                style_reference_seq_len=(
+                    image_seq_len
+                    if style_extension is not None
+                    and any(block_receives_regional_mask(index) for index in style_extension.block_indices)
+                    else 0
+                ),
             ),
             style_kv_bytes=style_extension.kv_cache_bytes(inference_dtype) if style_extension is not None else 0,
             device=device,
@@ -1075,17 +1082,17 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata):
     ) -> int:
         """Return final masks plus peak construction scratch and SDPA's transient additive bias.
 
-        With a style reference every injected block attends over the reference's keys too: `pad_attention_mask` widens
-        each boolean (S, S) mask to (S, S + R) and caches the copy (the positive's and the negative's at most), and
-        the additive bias SDPA builds from it is that wide.
+        With a style reference every injected block that also gets a regional mask attends over the reference's keys
+        too: `pad_attention_mask` widens each boolean (S, S) mask to (S, S + R) and caches the copy (the positive's
+        and the negative's at most), and the additive bias SDPA builds from it is that wide. The caller passes R as 0
+        when no styled block receives a mask.
         """
         extensions = [pos_extension] if neg_extension is None else [pos_extension, neg_extension]
         final_mask_bytes = sum(extension.attention_mask_numel for extension in extensions)
         peak_build_scratch_bytes = max(extension.attention_mask_build_scratch_numel for extension in extensions)
         attention_dtype_bytes = torch.empty((), dtype=attention_dtype).element_size()
-        # A mask is square over the whole sequence, so its row count is its root.
         key_numels = [
-            extension.attention_mask_numel + math.isqrt(extension.attention_mask_numel) * style_reference_seq_len
+            extension.attention_mask_numel + extension.attention_mask_rows * style_reference_seq_len
             for extension in extensions
         ]
         padded_mask_bytes = sum(key_numels) if style_reference_seq_len else 0

@@ -365,7 +365,15 @@ class _Transformer:
         processor = self.installed_processors["transformer_blocks.0.attn.processor"]
         attention_mask = processor.regional_prompting_state.attention_mask
         self.regional_attention_masks.append(attention_mask.clone() if attention_mask is not None else None)
-        style_state = processor.style_reference_state
+        # Whichever block is styled: the stub's two main blocks are 0 (masked) and 1 (not).
+        style_state = next(
+            (
+                block_processor.style_reference_state
+                for name, block_processor in self.installed_processors.items()
+                if name.startswith("transformer_blocks.") and block_processor.style_reference_state is not None
+            ),
+            None,
+        )
         self.style_modes.append(style_state.mode if style_state is not None else None)
         if style_state is not None and style_state.mode is Krea2StyleReferenceMode.CAPTURE:
             # Stand in for the styled block: the real processor stashes the reference's image-token K/V
@@ -1182,8 +1190,7 @@ def _style_reference_field(
         reference_latents_name=latents_name,
         width=width,
         height=height,
-        blocks="0-1",
-        **overrides,
+        **{"blocks": "0-1", **overrides},
     )
 
 
@@ -1379,20 +1386,21 @@ def test_the_lock_prices_the_style_references_captured_kv(monkeypatch, tmp_path)
 
 
 def test_regional_attention_memory_includes_masks_build_scratch_and_dtype_sized_attention_bias() -> None:
-    positive = SimpleNamespace(attention_mask_numel=120, attention_mask_build_scratch_numel=40)
-    negative = SimpleNamespace(attention_mask_numel=100, attention_mask_build_scratch_numel=40)
+    positive = SimpleNamespace(attention_mask_numel=144, attention_mask_rows=12, attention_mask_build_scratch_numel=40)
+    negative = SimpleNamespace(attention_mask_numel=100, attention_mask_rows=10, attention_mask_build_scratch_numel=40)
 
-    assert Krea2DenoiseInvocation._regional_attention_mask_bytes(positive, negative, torch.bfloat16) == 500
-    assert Krea2DenoiseInvocation._regional_attention_mask_bytes(positive, negative, torch.float32) == 740
-    assert Krea2DenoiseInvocation._regional_attention_mask_bytes(positive, None, torch.bfloat16) == 400
+    assert Krea2DenoiseInvocation._regional_attention_mask_bytes(positive, negative, torch.bfloat16) == 572
+    assert Krea2DenoiseInvocation._regional_attention_mask_bytes(positive, negative, torch.float32) == 860
+    assert Krea2DenoiseInvocation._regional_attention_mask_bytes(positive, None, torch.bfloat16) == 472
 
 
 def test_a_style_reference_widens_the_padded_regional_masks_and_the_attention_bias_to_the_reference_keys() -> None:
     """A 12-token sequence (mask 144) with 5 reference tokens: each mask is cached padded to 12 x 17 = 204 booleans,
-    and the bf16 bias is 204 elements. Without a reference nothing is padded."""
-    positive = SimpleNamespace(attention_mask_numel=144, attention_mask_build_scratch_numel=40)
-    negative = SimpleNamespace(attention_mask_numel=100, attention_mask_build_scratch_numel=40)
-    no_mask = SimpleNamespace(attention_mask_numel=0, attention_mask_build_scratch_numel=0)
+    and the bf16 bias is 204 elements. Without a reference nothing is padded. The row count comes from the mask, not
+    from its element count: a mask that is not square (the stand-in below) is widened by its own rows."""
+    positive = SimpleNamespace(attention_mask_numel=144, attention_mask_rows=12, attention_mask_build_scratch_numel=40)
+    negative = SimpleNamespace(attention_mask_numel=100, attention_mask_rows=10, attention_mask_build_scratch_numel=40)
+    no_mask = SimpleNamespace(attention_mask_numel=0, attention_mask_rows=0, attention_mask_build_scratch_numel=0)
     padded_positive, padded_negative = 12 * 17, 10 * 15
 
     both = Krea2DenoiseInvocation._regional_attention_mask_bytes(positive, negative, torch.bfloat16, 5)
@@ -1404,20 +1412,28 @@ def test_a_style_reference_widens_the_padded_regional_masks_and_the_attention_bi
     unstyled = Krea2DenoiseInvocation._regional_attention_mask_bytes(positive, negative, torch.bfloat16)
     assert unstyled == (144 + 100) + 40 + 144 * 2
     assert Krea2DenoiseInvocation._regional_attention_mask_bytes(positive, negative, torch.bfloat16, 0) == unstyled
+    non_square = SimpleNamespace(
+        attention_mask_numel=130, attention_mask_rows=10, attention_mask_build_scratch_numel=40
+    )
+    assert Krea2DenoiseInvocation._regional_attention_mask_bytes(non_square, None, torch.bfloat16, 5) == (
+        130 + (130 + 10 * 5) + 40 + (130 + 10 * 5) * 2
+    )
 
 
 @pytest.mark.parametrize(
-    ("styled", "expected"),
+    ("style_blocks", "expected"),
     [
         # Masks of 6 x 6 and 7 x 7 booleans (4 image tokens, a 2- and a 3-token caption), 4 B bias elements (fp32),
         # build scratch 4 x 4. Styled: the reference's 4 tokens widen each row, so the cached copies are 6 x 10 and
         # 7 x 11 and the bias is the larger, 77 elements.
-        pytest.param(True, (36 + 49) + (60 + 77) + 16 + 77 * 4, id="styled"),
-        pytest.param(False, (36 + 49) + 16 + 49 * 4, id="plain"),
+        pytest.param("0-1", (36 + 49) + (60 + 77) + 16 + 77 * 4, id="styled"),
+        pytest.param(None, (36 + 49) + 16 + 49 * 4, id="plain"),
+        # Regional masks reach only even blocks, so a reference injected into odd blocks alone pads nothing.
+        pytest.param("1", (36 + 49) + 16 + 49 * 4, id="styled-odd-blocks-only"),
     ],
 )
-def test_the_lock_prices_the_padded_regional_masks_and_their_bias_only_with_a_style_reference(
-    monkeypatch, tmp_path, styled, expected
+def test_the_lock_prices_the_padded_regional_masks_and_their_bias_only_where_a_styled_block_gets_a_mask(
+    monkeypatch, tmp_path, style_blocks, expected
 ) -> None:
     invocation = _runtime_invocation(cfg_scale=2.0)
     invocation.width = invocation.height = 32
@@ -1427,8 +1443,10 @@ def test_the_lock_prices_the_padded_regional_masks_and_their_bias_only_with_a_st
     invocation.negative_conditioning = Krea2ConditioningField(
         conditioning_name="negative", mask=TensorField(tensor_name="negative-region")
     )
-    if styled:
-        invocation.style_reference = _style_reference_field(latents_name="style-ref-4x4", width=32, height=32)
+    if style_blocks is not None:
+        invocation.style_reference = _style_reference_field(
+            latents_name="style-ref-4x4", width=32, height=32, blocks=style_blocks
+        )
     context = _runtime_context(tmp_path, _Transformer(), negative_text_seq_len=3)
 
     estimate = _working_memory(monkeypatch, tmp_path, invocation, context=context)

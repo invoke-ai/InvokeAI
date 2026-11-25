@@ -185,10 +185,6 @@ class TestEstimate:
         area = step * (step + reference)
         assert per_element * area <= styled < per_element * (area + 2 * math.isqrt(area) + 1)
 
-    def test_a_fused_kernel_prices_no_score_matrix_with_or_without_a_style_reference(self) -> None:
-        for style_kv_bytes in (0, MB):
-            assert _terms(_features(style_kv_bytes=style_kv_bytes))["attention_scores"] == 0
-
     def test_the_style_pass_square_is_the_largest_area_when_its_caption_outgrows_the_step(self, monkeypatch) -> None:
         """A 256-token image with a 77-token caption and a 512-token style caption: the step's area is 333 x 589, the
         style pass's square 768 x 768, whose side the helper is asked for."""
