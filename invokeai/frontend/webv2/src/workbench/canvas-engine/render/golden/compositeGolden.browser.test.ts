@@ -190,6 +190,25 @@ describe('compositor goldens', () => {
     });
   }
 
+  it.each(['horizontal', 'vertical', 'diagonal'] as const)('keeps %s hatching sharp at DPR 1', (style) => {
+    const mask = inpaintMask('mask', { color: '#e07575', style });
+    const { backend, caches } = scene([mask], {
+      mask: { paint: solid('#000000'), rect: { height: 30, width: 30, x: 4, y: 4 } },
+    });
+    const target = backend.createSurface(WIDTH, HEIGHT);
+    const scratch = backend.createSurface(WIDTH, HEIGHT);
+    const tile = createMaskPatternTile(backend, style, mask.mask.fill.color)!;
+    compositeDocument(target, doc([mask]), caches, identity(), {
+      backend,
+      maskPatternTile: () => tile,
+      screenMask: { dpr: 1, getScratch: () => scratch },
+    });
+    const alpha = (pixels: Uint8ClampedArray) => Array.from(pixels).filter((_, index) => index % 4 === 3);
+    const rendered = alpha(target.ctx.getImageData(12, 12, tile.width, tile.height).data);
+    const original = alpha(tile.ctx.getImageData(0, 0, tile.width, tile.height).data);
+    expect(rendered.sort((a, b) => a - b)).toEqual(original.sort((a, b) => a - b));
+  });
+
   it('keeps both colors visible where two opaque diagonal masks overlap', () => {
     const layers = [
       inpaintMask('upper', { color: '#ff0000', style: 'diagonal' }),

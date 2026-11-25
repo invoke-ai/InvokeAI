@@ -479,13 +479,13 @@ export const compositeDocument = (
 
       // Give each layer a stable phase in viewport CSS coordinates, independent of damage and transforms.
       const phase = maskPhaseHash(layerId);
-      const offsetX = ((phase & 0xffff) / 0x10000) * tile.width;
-      const offsetY = ((phase >>> 16) / 0x10000) * tile.height;
+      const offsetX = Math.round(((phase & 0xffff) / 0x10000) * tile.width * dpr);
+      const offsetY = Math.round(((phase >>> 16) / 0x10000) * tile.height * dpr);
       stencil.imageSmoothingEnabled = true;
-      stencil.setTransform(dpr, 0, 0, dpr, offsetX * dpr - area.x, offsetY * dpr - area.y);
+      stencil.setTransform(dpr, 0, 0, dpr, offsetX - area.x, offsetY - area.y);
       stencil.globalCompositeOperation = 'source-in';
       stencil.fillStyle = stencil.createPattern(tile.canvas, 'repeat') ?? fill.color;
-      stencil.fillRect(area.x / dpr - offsetX, area.y / dpr - offsetY, area.width / dpr, area.height / dpr);
+      stencil.fillRect((area.x - offsetX) / dpr, (area.y - offsetY) / dpr, area.width / dpr, area.height / dpr);
       stencil.restore();
 
       ctx.save();

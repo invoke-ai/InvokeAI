@@ -141,7 +141,7 @@ Frame's demanded layers form its working set. After drawing, `RasterController.e
 1. derived and group artifacts the frame did not read (obsolete parameter variants, inactive groups);
 2. least-recently-used base caches outside working set and unprotected.
 
-The main viewport fills patterned masks and regenerate regions in CSS space through a transformed alpha stencil. A phase offset derived from the layer ID separates overlapping hatch lines without moving the pattern during pan, zoom or partial repaint. The attached RenderController keeps one scratch surface sized to cover the largest patterned areas it has repainted within the current viewport backing bounds, and accounts it as detached working-set memory. A viewport shrink bounds the retained surface again. Detach, document replacement, cache clear and a full frame with no patterned overlay release it. A bounded frame can miss an overlay that is still visible, so it keeps the scratch. The color picker and its loupe omit inpaint and regional guidance stacks from their shared sample composite so they read the image beneath mask overlays.
+The main viewport fills patterned masks and regenerate regions in CSS space through a transformed alpha stencil. A phase offset derived from the layer ID and rounded to device pixels makes overlapping hatch lines more likely to remain distinguishable. The phase stays fixed during pan, zoom and partial repaint. The attached RenderController keeps one scratch surface sized to cover the largest patterned areas it has repainted within the current viewport backing bounds, and accounts it as detached working-set memory. A viewport shrink bounds the retained surface again. Detach, document replacement, cache clear and a full frame with no patterned overlay release it. A bounded frame can miss an overlay that is still visible, so it keeps the scratch. The color picker and its loupe omit inpaint and regional guidance stacks from their shared sample composite so they read the image beneath mask overlays.
 
 Layer is protected while an operation pins it (`RasterMemoryBudgetController.pin`, held by every read lease, snapshot capture, export and duplicate) or while it is held: its pixels not yet persisted (`BitmapStore.hasPendingWork`) or an edit session (transform, text, float, pixel edit, operation lock) owns them. Whatever working set and protected layers still need stays resident; bytes above budget are reported as overage and leave no room for background reservations. Export and thumbnail callers request and pin their own caches. Deterministic tests assert allocation counts and bytes for pan/reveal, rotated bounds, unflushed paint bounds, isolation, transient transforms, eviction, re-rasterization.
 
@@ -155,7 +155,7 @@ Raster soft limit is 512 MiB. Memory snapshot reports:
 - `derivedBytes`: derived and adjusted display surfaces;
 - `groupBytes`: group composites;
 - `decodedBytes`: leased `ImageBitmap` instances;
-- `detachedBytes`: caller-owned raster snapshot surfaces and retained operation pixels;
+- `detachedBytes`: caller-owned raster snapshot surfaces, retained operation pixels and the viewport hatch scratch;
 - `reservedBytes`: capacity promised to background work but not yet represented by another class;
 - `overageBytes`: amount the protected working set holds above the limit.
 
