@@ -164,6 +164,27 @@ _VALID_LAYER_PARAM_SETS = (
 )
 _PEFT_PREFIX_STRIP_RE = re.compile(_PEFT_PREFIX_RE)
 
+# Every released H3 checkpoint has 50 transformer and 2 refiner blocks (the loader derives the same
+# counts from the weights). The probe never sees the base model, so these bound the indices it admits.
+MINIMAX_H3_NUM_BLOCKS = 50
+MINIMAX_H3_NUM_REFINER_BLOCKS = 2
+
+
+def _minimax_h3_target_defect(layer: str) -> str | None:
+    """Why ``layer`` resolves to no H3 Linear, or None. Paths follow the kohya parsing tree's vocabulary."""
+    if not kohya_module_path_is_leaf(layer, _H3_KOHYA_PARSING_TREE):
+        return f"layer {layer!r} targets no MiniMax H3 transformer module"
+    parts = layer.split(".")
+    # Exact match against str(n): ``blocks.00`` or a non-ASCII digit passes the tree's isnumeric() but
+    # becomes ``transformer_blocks.00``, which no ModuleList resolves.
+    for stem, index_pos, count in (
+        ("blocks", 1, MINIMAX_H3_NUM_BLOCKS),
+        ("token_refiner", 2, MINIMAX_H3_NUM_REFINER_BLOCKS),
+    ):
+        if parts[0] == stem and parts[index_pos] not in {str(n) for n in range(count)}:
+            return f"layer {layer!r} has block index {parts[index_pos]!r}; expected 0-{count - 1}"
+    return None
+
 
 def group_minimax_h3_lora_keys(str_keys: Iterable[str]) -> dict[str, dict[str, str]]:
     """Group raw H3 LoRA keys as ``{layer path: {param name: raw key}}``, or raise ``ValueError``.
@@ -173,7 +194,9 @@ def group_minimax_h3_lora_keys(str_keys: Iterable[str]) -> dict[str, dict[str, s
     LoRA parameter name (DoRA ``lora_magnitude_vector``, full weights, ...), two raw keys naming
     the same tensor (e.g. a layer present both dotted and kohya-flattened), or a layer whose
     tensors are not exactly one ``lora_A``/``lora_B`` or ``lora_down``/``lora_up`` pair plus an
-    optional ``alpha``. Converting any of these would crash, or silently drop or overwrite tensors.
+    optional ``alpha``, or a layer that names no H3 Linear (foreign ``lora_te_*`` encoder keys,
+    zero-padded or out-of-range block indices). Converting any of these would crash, or silently
+    drop or overwrite tensors.
     """
     grouped: dict[str, dict[str, str]] = {}
     for raw_key in str_keys:
@@ -194,6 +217,8 @@ def group_minimax_h3_lora_keys(str_keys: Iterable[str]) -> dict[str, dict[str, s
                 f"layer {layer!r} carries {sorted(layer_params)}; expected exactly lora_A/lora_B or "
                 "lora_down/lora_up, optionally with alpha"
             )
+        if (target_defect := _minimax_h3_target_defect(layer)) is not None:
+            raise ValueError(target_defect)
     return grouped
 
 

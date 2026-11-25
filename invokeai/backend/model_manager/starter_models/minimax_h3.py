@@ -8,6 +8,7 @@ from invokeai.backend.model_manager.taxonomy import (
 )
 
 minimax_h3_components = StarterModel(
+    source_urls=["https://huggingface.co/MiniMaxAI/MiniMax-H3"],
     name="MiniMax H3 Components",
     base=BaseModelType.MiniMaxH3,
     source="MiniMaxAI/MiniMax-H3::modular_model_index.json+transformer/config.json+tokenizer+processor+vae+audio_vae",
@@ -20,6 +21,7 @@ minimax_h3_components = StarterModel(
 )
 
 minimax_h3_int8_text_encoder = StarterModel(
+    source_urls=["https://huggingface.co/Comfy-Org/MiniMax-H3"],
     name="MiniMax H3 Text Encoder (int8)",
     base=BaseModelType.MiniMaxH3,
     source="Comfy-Org/MiniMax-H3::text_encoders/qwen3vl_32b_minimax_h3_int8_convrot.safetensors",
@@ -32,6 +34,7 @@ minimax_h3_int8_text_encoder = StarterModel(
 )
 
 minimax_h3_int8_transformer = StarterModel(
+    source_urls=["https://huggingface.co/Comfy-Org/MiniMax-H3"],
     name="MiniMax H3 FL2VA Transformer (int8, pruned)",
     base=BaseModelType.MiniMaxH3,
     source="Comfy-Org/MiniMax-H3::diffusion_models/minimax_h3_fl2va_pruned_int8_convrot.safetensors",
@@ -45,6 +48,7 @@ minimax_h3_int8_transformer = StarterModel(
 )
 
 minimax_h3_ref2va_int8_transformer = StarterModel(
+    source_urls=["https://huggingface.co/Comfy-Org/MiniMax-H3"],
     name="MiniMax H3 Ref2VA Transformer (int8, pruned)",
     base=BaseModelType.MiniMaxH3,
     source="Comfy-Org/MiniMax-H3::diffusion_models/minimax_h3_ref2va_pruned_int8_convrot.safetensors",
@@ -59,6 +63,7 @@ minimax_h3_ref2va_int8_transformer = StarterModel(
 )
 
 minimax_h3_turbo_lora = StarterModel(
+    source_urls=["https://huggingface.co/larryvrh/MiniMax-H3-Turbo-Lora"],
     name="MiniMax H3 Turbo LoRA",
     base=BaseModelType.MiniMaxH3,
     source="larryvrh/MiniMax-H3-Turbo-Lora::minimax_h3_turbo_v4_step600_ema.safetensors",
@@ -74,6 +79,7 @@ minimax_h3_turbo_lora = StarterModel(
 # The non-comfyui files use already-diffusers keys (transformer_blocks.N.attn.to_q with
 # PEFT ".default" adapter names), which the probe rejects as a different architecture.
 minimax_h3_lightx2v_turbo_lora = StarterModel(
+    source_urls=["https://huggingface.co/lightx2v/Minimax-h3-Turbo"],
     name="MiniMax H3 LightX2V Turbo LoRA",
     base=BaseModelType.MiniMaxH3,
     source="lightx2v/Minimax-h3-Turbo::minimax_h3_fl2v_turbo_8step_v1.0_comfyui_bf16.safetensors",
@@ -90,6 +96,7 @@ minimax_h3_lightx2v_turbo_lora = StarterModel(
 # on, which neither the undistilled 30-step base nor this v1.0 release shows (verified
 # 2026-09-07). Same fused-key comfyui layout as the FL2VA LightX2V file above.
 minimax_h3_lightx2v_ref2v_turbo_lora = StarterModel(
+    source_urls=["https://huggingface.co/lightx2v/Minimax-h3-Turbo"],
     name="MiniMax H3 LightX2V Ref2V Turbo LoRA",
     base=BaseModelType.MiniMaxH3,
     source="lightx2v/Minimax-h3-Turbo::minimax_h3_ref2v_turbo_8step_v1.0_768p_comfyui_bf16.safetensors",
