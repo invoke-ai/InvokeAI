@@ -12,9 +12,10 @@ import {
   getDefaultGenerateSettings,
   getGenerationUiPolicy,
   getGuidanceBoundReason,
+  getGuidanceInputMax,
+  getGuidanceSliderMax,
   getSchedulerOptions,
 } from '@features/generation/core/baseGenerationPolicies';
-import { getGuidanceInputMax, getGuidanceSliderMax } from '@features/generation/core/guidanceSlider';
 import { getEffectivePrompts } from '@features/generation/core/promptTemplates';
 import {
   DEFAULT_FLUX_DYPE_EXPONENT,
