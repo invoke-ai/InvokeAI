@@ -11,6 +11,7 @@ from invokeai.backend.model_manager.taxonomy import (
 )
 
 anima_vae = StarterModel(
+    source_urls=["https://huggingface.co/circlestone-labs/Anima"],
     name="Anima QwenImage VAE",
     base=BaseModelType.Anima,
     source="https://huggingface.co/circlestone-labs/Anima/resolve/main/split_files/vae/qwen_image_vae.safetensors",
@@ -20,6 +21,7 @@ anima_vae = StarterModel(
 )
 
 anima_base = StarterModel(
+    source_urls=["https://huggingface.co/circlestone-labs/Anima"],
     name="Anima Base 1.0",
     base=BaseModelType.Anima,
     source="https://huggingface.co/circlestone-labs/Anima/resolve/main/split_files/diffusion_models/anima-base-v1.0.safetensors",
@@ -31,6 +33,7 @@ anima_base = StarterModel(
 )
 
 anima_base_int8 = StarterModel(
+    source_urls=["https://huggingface.co/Bedovyy/Anima-INT8"],
     name="Anima Base 1.0 (int8)",
     base=BaseModelType.Anima,
     source="https://huggingface.co/Bedovyy/Anima-INT8/resolve/d7ba6686f161e9a829373106eb4b881327247ba9/anima-base-v1.0-int8convrot.safetensors",
@@ -45,6 +48,7 @@ anima_base_int8 = StarterModel(
 _ANIMA_FP8 = "https://huggingface.co/Bedovyy/Anima-FP8/resolve/3be89fc9843df38b70c2a6be911368536ede31d3"
 
 anima_base_fp8 = StarterModel(
+    source_urls=["https://huggingface.co/Bedovyy/Anima-FP8"],
     name="Anima Base 1.0 (fp8)",
     base=BaseModelType.Anima,
     source=f"{_ANIMA_FP8}/anima-base-v1.0-fp8.safetensors",
@@ -62,6 +66,7 @@ _DERIVATIVE_LICENSE = (
 )
 
 anima_2_9b = StarterModel(
+    source_urls=["https://huggingface.co/Gazingstars123/Anima-2.9B"],
     name="Anima-2.9B (Preview v1)",
     base=BaseModelType.Anima,
     source="https://huggingface.co/Gazingstars123/Anima-2.9B/resolve/main/Anima-2.9B-preview-v1.safetensors",
@@ -75,6 +80,7 @@ anima_2_9b = StarterModel(
 )
 
 anima_2_9b_int8 = StarterModel(
+    source_urls=["https://huggingface.co/Gazingstars123/Anima-2.9B"],
     name="Anima-2.9B (Preview v1, int8)",
     base=BaseModelType.Anima,
     source="https://huggingface.co/Gazingstars123/Anima-2.9B/resolve/main/Anima-2.9B-preview-v1_int8_convrot.safetensors",
@@ -87,6 +93,7 @@ anima_2_9b_int8 = StarterModel(
 )
 
 anima_turbo_gguf_q8_0 = StarterModel(
+    source_urls=["https://huggingface.co/vanes430/Anima-Turbo-V1.1-GGUF"],
     name="Anima Turbo 1.1 (GGUF, Q8_0)",
     base=BaseModelType.Anima,
     source="https://huggingface.co/vanes430/Anima-Turbo-V1.1-GGUF/resolve/main/anima-turbo-v1.1-Q8_0.gguf",
@@ -100,6 +107,7 @@ anima_turbo_gguf_q8_0 = StarterModel(
 )
 
 anima_turbo_int8 = StarterModel(
+    source_urls=["https://huggingface.co/Bedovyy/Anima-INT8"],
     name="Anima Turbo 1.1 (int8)",
     base=BaseModelType.Anima,
     source="https://huggingface.co/Bedovyy/Anima-INT8/resolve/d7ba6686f161e9a829373106eb4b881327247ba9/anima-turbo-v1.1-int8convrot.safetensors",
@@ -113,6 +121,7 @@ anima_turbo_int8 = StarterModel(
 )
 
 anima_turbo_fp8 = StarterModel(
+    source_urls=["https://huggingface.co/Bedovyy/Anima-FP8"],
     name="Anima Turbo 1.1 (fp8)",
     base=BaseModelType.Anima,
     source=f"{_ANIMA_FP8}/anima-turbo-v1.1-fp8.safetensors",
@@ -126,6 +135,7 @@ anima_turbo_fp8 = StarterModel(
 )
 
 anima_qwen3_5_encoder = StarterModel(
+    source_urls=["https://huggingface.co/lylogummy/Anima-3.8B"],
     name="Anima-3.8B Qwen3.5 4B Encoder",
     base=BaseModelType.Any,
     source="https://huggingface.co/lylogummy/Anima-3.8B/resolve/main/text_encoders/qwen35_4b.safetensors",
@@ -136,6 +146,7 @@ anima_qwen3_5_encoder = StarterModel(
 )
 
 anima_3_8b = StarterModel(
+    source_urls=["https://huggingface.co/lylogummy/Anima-3.8B"],
     name="Anima-3.8B (v1.1)",
     base=BaseModelType.Anima,
     source="https://huggingface.co/lylogummy/Anima-3.8B/resolve/main/difussion_models/Anima-3.8B-v1.1.safetensors",
@@ -149,6 +160,7 @@ anima_3_8b = StarterModel(
 )
 
 anima_lllite_inpainting = StarterModel(
+    source_urls=["https://huggingface.co/kohya-ss/Anima-LLLite"],
     name="Anima LLLite Inpainting",
     base=BaseModelType.Anima,
     source="https://huggingface.co/kohya-ss/Anima-LLLite/resolve/main/anima-lllite-inpainting-v2.safetensors",
@@ -158,6 +170,7 @@ anima_lllite_inpainting = StarterModel(
 )
 
 anima_lllite_sketch = StarterModel(
+    source_urls=["https://huggingface.co/kohya-ss/Anima-LLLite"],
     name="Anima LLLite Sketch",
     base=BaseModelType.Anima,
     source="https://huggingface.co/kohya-ss/Anima-LLLite/resolve/main/anima-lllite-any-test-like-v2.safetensors",
@@ -167,6 +180,7 @@ anima_lllite_sketch = StarterModel(
 )
 
 anima_lllite_depth_preview3 = StarterModel(
+    source_urls=["https://huggingface.co/kohya-ss/Anima-LLLite"],
     name="Anima LLLite Depth (Preview3)",
     base=BaseModelType.Anima,
     source="https://huggingface.co/kohya-ss/Anima-LLLite/resolve/main/anima-lllite-depth-1.safetensors",
@@ -176,6 +190,7 @@ anima_lllite_depth_preview3 = StarterModel(
 )
 
 anima_lllite_scribble_preview3 = StarterModel(
+    source_urls=["https://huggingface.co/kohya-ss/Anima-LLLite"],
     name="Anima LLLite Scribble (Preview3)",
     base=BaseModelType.Anima,
     source="https://huggingface.co/kohya-ss/Anima-LLLite/resolve/main/anima-lllite-scribble-1.safetensors",
@@ -185,6 +200,7 @@ anima_lllite_scribble_preview3 = StarterModel(
 )
 
 anima_lllite_lineart_preview3 = StarterModel(
+    source_urls=["https://huggingface.co/kohya-ss/Anima-LLLite"],
     name="Anima LLLite Lineart (Preview3)",
     base=BaseModelType.Anima,
     source="https://huggingface.co/kohya-ss/Anima-LLLite/resolve/main/anima-lllite-lineart-1.safetensors",
@@ -194,6 +210,7 @@ anima_lllite_lineart_preview3 = StarterModel(
 )
 
 anima_lllite_pose_preview3 = StarterModel(
+    source_urls=["https://huggingface.co/kohya-ss/Anima-LLLite"],
     name="Anima LLLite Pose (Preview3)",
     base=BaseModelType.Anima,
     source="https://huggingface.co/kohya-ss/Anima-LLLite/resolve/main/anima-lllite-pose-1.safetensors",
@@ -203,6 +220,7 @@ anima_lllite_pose_preview3 = StarterModel(
 )
 
 anima_ip_adapter_character_reference = StarterModel(
+    source_urls=["https://huggingface.co/LuciferTC/Anima-IP-Adapter"],
     name="Anima IP-Adapter (Character Reference)",
     base=BaseModelType.Anima,
     source="https://huggingface.co/LuciferTC/Anima-IP-Adapter/resolve/main/ip_adapter-Character_Reference-10.safetensors",

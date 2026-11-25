@@ -257,6 +257,34 @@ const surfaces = [
     },
   },
   {
+    id: 'workbench-canvas-first-spline-focus',
+    path: representativeProjectPath,
+    ready: async (page) => {
+      await waitForWorkbench(page);
+      await selectLayoutPreset(page, 'Edit', 'Canvas');
+      await waitForRenderedMedia(page, { canvas: true });
+      const spline = page.getByRole('button', { exact: true, name: 'Spline Edit' });
+      await spline.waitFor();
+      assert.equal(await spline.getAttribute('aria-pressed'), 'false');
+
+      const surface = page.locator('[data-canvas-surface]');
+      await surface.focus();
+      const original = await surface.elementHandle();
+      try {
+        assert.equal(await original.evaluate((element) => document.activeElement === element), true);
+        await page.keyboard.press('s');
+        await page.getByRole('button', { exact: true, name: 'Spline Edit', pressed: true }).waitFor();
+        assert.equal(
+          await original.evaluate((element) => element.isConnected && document.activeElement === element),
+          true,
+          'The first Spline shortcut must preserve the original focused Canvas surface.'
+        );
+      } finally {
+        await original.dispose();
+      }
+    },
+  },
+  {
     id: 'workbench-canvas-control-layer',
     path: representativeProjectPath,
     ready: async (page) => {

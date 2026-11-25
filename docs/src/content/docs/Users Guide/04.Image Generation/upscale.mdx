@@ -142,7 +142,7 @@ Where a family has no Tile ControlNet, **Structure** is hidden. Where it ignores
     - **CFG scale**: set when you pick the model: 3.
     - **Steps**: kept as you set it, 30 by default, not the 50 the model uses for a full image. MOSS-Image runs all of **Steps** in the detail pass, so 30 steps really run 30 times, each at the enlarged size and, above CFG 1, as two network passes. Lower it if the pass is slow.
     - **Components**: a **Qwen3.5 Encoder** (9B, not the 4B Anima-3.8B uses) and a FLUX.2 **VAE**. A Diffusers install brings its own.
-    - **Not supported**: LoRAs, which MOSS-Image has no loader for.
+    - **LoRAs**: MOSS-Image LoRAs apply to the detail pass, on the transformer only.
   </TabItem>
 </Tabs>
 

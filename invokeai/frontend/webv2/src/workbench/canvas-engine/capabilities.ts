@@ -45,6 +45,7 @@ import type {
   LayerQuickSwitchState,
   LayerThumbnailStatus,
   MarqueeToolOptions,
+  ScrollInput,
   ShapeToolOptions,
   TextEditSession,
   TextToolOptions,
@@ -171,7 +172,6 @@ export type PsdExportStatus = 'idle' | 'preparing' | 'serializing' | 'downloadin
 
 export interface CanvasInteractionState {
   vectorEditSession: VectorEditSession | null;
-  vectorToolsStatus: 'idle' | 'loading' | 'ready' | 'failed';
   psdExportStatus: PsdExportStatus;
   activeTool: ToolId;
   bboxGrid: number;
@@ -204,6 +204,7 @@ export interface CanvasInteractionState {
   /** Advances after the engine reacted to the document change. */
   documentEpoch: number;
   ruleOfThirds: boolean;
+  scrollInput: ScrollInput;
   shapeOptions: ShapeToolOptions;
   showBbox: boolean;
   showGrid: boolean;
@@ -212,6 +213,8 @@ export interface CanvasInteractionState {
   stagingHidesOverlays: boolean;
   textEditSession: TextEditSession | null;
   textOptions: TextToolOptions;
+  /** Engine-set on trackpad proof; callers restore it. */
+  trackpadDetected: boolean;
   transformOptions: TransformOptions;
   transformSession: TransformSession | null;
   /** Waits for fresh pixels to persist; clears on tool switch, selection change, Escape, removal or failure. */
@@ -237,11 +240,13 @@ export type CanvasWritableInteractionKey = Extract<
   | 'layerQuickSwitch'
   | 'marqueeOptions'
   | 'ruleOfThirds'
+  | 'scrollInput'
   | 'shapeOptions'
   | 'showBbox'
   | 'showGrid'
   | 'snapToGrid'
   | 'textOptions'
+  | 'trackpadDetected'
   | 'transformOptions'
 >;
 
@@ -661,9 +666,7 @@ export type BeginTransformResult =
   | SubsetOf<CanvasTransactionOutcome, 'busy'>;
 
 export interface CanvasVectorEditCapability {
-  /** Loads vector support before exposing its synchronous editing commands. */
-  prepare(): Promise<boolean>;
-  createLayer(input: { id: string; name?: string }): Promise<CanvasVectorLayerContract | null>;
+  createLayer(input: { id: string; name?: string }): CanvasVectorLayerContract | null;
   transformPath(): void;
   extractPath(): void;
   targetContextMenu(screenPoint: Vec2): boolean;
@@ -819,6 +822,7 @@ export type {
   LayerQuickSwitchState,
   LayerThumbnailStatus,
   MarqueeToolOptions,
+  ScrollInput,
   ShapeToolKind,
   ShapeToolOptions,
   ShapeToolTarget,

@@ -446,9 +446,6 @@ describe('Canvas spline context menu', () => {
       selectedLayer: layer,
       staged: false,
     });
-    await act(async () => {
-      await harness.engine!.layers.vectorEdit.prepare();
-    });
     await act(() => {
       harness.engine!.tools.setTool('spline');
       if (selectPath) {
