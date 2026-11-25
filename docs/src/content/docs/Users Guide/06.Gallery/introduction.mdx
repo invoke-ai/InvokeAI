@@ -1,6 +1,6 @@
 ---
 title: Organizing your media
-description: Use the Gallery to organize images and videos into boards, choose where new results go, search by metadata or by content, upload media, and move, star, download or delete it.
+description: Use the Gallery to organize images and videos into boards, choose where new results go, search by metadata or by content, upload media, and move, mark, download or delete it.
 lastUpdated: 2026-10-19
 sidebar:
   order: 1
@@ -14,9 +14,9 @@ import searchHelp from '../assets/gallery-search-help.png';
 import semanticSearch from '../assets/gallery-semantic-search.png';
 import selection from '../assets/gallery-selection.webp';
 
-The **Gallery** holds every image and video you generate or upload. It is organized into **boards**. Every board belongs either to a project — each has an **Inbox** for new results, plus any boards you add to it — or to the **Library**, whose boards are available from every project and include the always-present **Uncategorized** board. From the Gallery you choose where new results go, find media by its prompt or by what it shows, and move, star, download or delete it.
+The **Gallery** holds every image and video you generate or upload. It is organized into **boards**. Every board belongs either to a project — each has an **Inbox** for new results, plus any boards you add to it — or to the **Library**, whose boards are available from every project and include the always-present **Uncategorized** board. From the Gallery you choose where new results go, find media by its prompt or by what it shows, and move, mark, download or delete it.
 
-<Image src={overview} alt="The Gallery with the Concept Art board selected: the board list at the top, the Media and Uploads tabs, the search field, and a grid of images with starred items pinned at the top." width={420} />
+<Image src={overview} alt="The Gallery with the Concept Art board selected: the board list at the top, the Media and Uploads tabs, the search field, and a grid of images with bookmarked items pinned at the top." width={420} />
 
 ## The Gallery at a glance
 
@@ -28,7 +28,7 @@ The Gallery has three parts:
   * **Media** — images and videos generated in InvokeAI.
   * **Uploads** — images, videos and audio you have uploaded.
 
-  Above the grid are the **Search items** field, the **Starred only** filter, the **Filter & sort media** button and the upload button.
+  Above the grid are the **Search items** field, the **Cull mode** button, the **Filter by marks** button, the **Filter & sort media** button and the upload button.
 
 When the Gallery is narrow, or docked in a side rail, the board list sits above the media grid. When it is wide, the board list becomes a column on the left. Drag the divider between them to resize the list.
 
@@ -42,7 +42,7 @@ Type a name into **Search or create boards**. If no board has that name, a **Cre
 
 <Image src={createBoard} alt="Typing Seascapes into the board search field shows a Create board &quot;Seascapes&quot; row." width={420} />
 
-The new board is selected straight away, so it also becomes the destination for new results. A board's cover is chosen automatically: its newest starred item, or its newest item if nothing is starred.
+The new board is selected straight away, so it also becomes the destination for new results. A board's cover is chosen automatically: its newest bookmarked item, or its newest item if nothing is bookmarked.
 
 ### Choosing where new media goes
 
@@ -78,7 +78,7 @@ Right-click a board, or hover over it and click its **⋯** button, to rename, m
 
 ## Finding media in a board
 
-Search, the starred filter and the sort order apply to the selected board and the current tab (Media or Uploads). A search can also look in every board; see [Searching all boards](#searching-all-boards).
+Search, the marks filter and the sort order apply to the selected board and the current tab (Media or Uploads). A search can also look in every board; see [Searching all boards](#searching-all-boards).
 
 ### Searching by metadata
 
@@ -103,19 +103,27 @@ When image indexing is turned on, the Gallery can also search by what media *sho
 * **Search by text.** Click the sparkle button at the right end of the search field (**Search semantically**). The field changes to **Describe what to find…**; describe what you are looking for. Any text already in the field is used straight away.
 * **Search by image.** Drag an image onto the search field: a thumbnail from the Gallery, an image from the Preview, an image file from your computer, or an image from another browser tab. The Gallery then shows the media most similar to it, labelled **Similar to …**.
 
-Results are ranked by similarity, most similar first, up to 500 items from the selected board, or from every board with [All boards](#searching-all-boards). Videos are included unless the media type filter hides them. The Media and Uploads tabs, the sort order, the starred filter and date tokens do not apply to ranked results.
+Results are ranked by similarity, most similar first, up to 500 items from the selected board, or from every board with [All boards](#searching-all-boards). Videos are included unless the media type filter hides them. The Media and Uploads tabs, the sort order, the marks filter and date tokens do not apply to ranked results.
 
 To leave semantic search, click the **✕** in the search field, click the sparkle button again (**Exit semantic search**), or switch tabs. If the index model is not installed, the Gallery says so when you try to search. Archived boards are not indexed.
 
 ### Searching all boards
 
-While a search is active, by metadata or by content, an **All boards** toggle appears inside the search field, beside the field's other buttons; its tooltip says where the search looks (**Search in: This board** or **Search in: All boards**). Turn it on to search everywhere you can see: your **Uncategorized** media and every board you can open that is not archived, including boards in other projects and boards others share with you. Everything else works as it does on one board: the tabs, the starred and media type filters, the sort order and date tokens apply to a metadata search as before. Selecting a result keeps you in the search: the arrow keys and the Preview step through its results.
+While a search is active, by metadata or by content, an **All boards** toggle appears inside the search field, beside the field's other buttons; its tooltip says where the search looks (**Search in: This board** or **Search in: All boards**). Turn it on to search everywhere you can see: your **Uncategorized** media and every board you can open that is not archived, including boards in other projects and boards others share with you. Everything else works as it does on one board: the tabs, the marks and media type filters, the sort order and date tokens apply to a metadata search as before. Selecting a result keeps you in the search: the arrow keys and the Preview step through its results.
 
 Searching all boards changes neither the selected board nor where new results go. You cannot upload while it is on, since the search has no board of its own. Clearing the search, or anything else that clears it, such as **Find in Gallery**, returns it to **This board**.
 
 ### Sorting and filtering
 
-The star button (**Starred only**) shows only starred items. The **Filter & sort media** button beside it opens a menu with two groups:
+The **Filter by marks** button shows a row of filters under the toolbar; a dot on the button says a filter applies while the row is hidden. The row combines:
+
+* **Flags**: **Bookmarked**, **Unflagged** and **Rejected**, in any combination.
+* **Rating**: choose a star, then click the word after the stars to switch between **and higher**, **only** and **and lower**. Choosing the active star again clears it.
+* **Labels**: the five colour labels, in any combination.
+
+**Clear** removes them all. Without a flag filter the Bookmarked section stays at the top and the rating and label filters apply to it too; with one, the grid shows exactly the matching items. If nothing matches, the Gallery says so and offers **Clear filters**.
+
+The **Filter & sort media** button beside it opens a menu with two groups:
 
 * **Show** chooses which kinds of media the Gallery shows: **Both** (the default), **Images only**, or **Videos only**. The button is highlighted while it hides one kind.
 * **Sort by** orders media by creation time, **Newest** first (the default) or **Oldest** first.
@@ -128,11 +136,35 @@ The media grid continues through the full listing as you scroll, including older
 
 While a part of the list loads, its tile positions stay in place. If one page cannot be loaded, the Gallery marks its first empty tile with an error and **Retry**, while keeping nearby loaded items available.
 
-## Starring favorites
+## Bookmarks, ratings and labels
 
-Star an item to keep it at hand. Hover over a thumbnail and click the star in its corner, choose **Star image** (or **Star video**) from its menu, or select items and press **.** (period). Starred thumbnails keep a yellow star.
+Bookmark an item to keep it at hand. Hover over a thumbnail and click the bookmark in its corner, use the marks button in the Preview's header or the selection bar, or select items and press **.** (period). Bookmarked thumbnails keep a filled bookmark.
 
-Starred items are gathered in a **Starred** section at the top of the board, above the rest of the media, which can be collapsed. If there are more than fit, **Show all** switches on the **Starred only** filter. Starring also affects the board's cover, which is its newest starred item.
+Bookmarked items are gathered in a **Bookmarked** section at the top of the board, above the rest of the media, which can be collapsed. If there are more than fit, **Show all** filters the Gallery to bookmarked items. Bookmarking also affects the board's cover, which is its newest bookmarked item.
+
+Each item can also be rejected (the opposite of a bookmark), rated from one to five stars, and given a colour label. Set these from the marks row in an item's menu, or from the marks button (a star) in the Preview's header and in the selection bar, which holds the bookmark too. Pointing at a star previews that rating; choosing the rating an item already has clears it. From the keyboard, highlight the menu's stars with <kbd>↓</kbd>, then press <kbd>←</kbd> or <kbd>→</kbd>, or a number from <kbd>0</kbd> to <kbd>5</kbd>. With several items selected, a mark shows as set only when every item has it. Thumbnails show a rating as a star and a number, a label as a coloured line along the bottom, and a rejected item dimmed with a coral flag. Rejected items stay in the Gallery until you delete them.
+
+## Culling with keys
+
+**Cull mode** marks items from the keyboard, to sort through a batch quickly. Turn it on with the **Cull mode** button in the Preview's header, or press <kbd>K</kbd> while the Preview or the Gallery has focus. It stays on for the project until you turn it off; <kbd>Esc</kbd> does not leave it.
+
+While it is on, these keys mark the item shown in the Preview, or the selection in the Gallery:
+
+| Keys | Mark |
+| --- | --- |
+| <kbd>1</kbd>–<kbd>5</kbd> | Rate one to five stars |
+| <kbd>0</kbd> | Clear the rating |
+| <kbd>[</kbd> / <kbd>]</kbd> | Lower / raise the rating by one |
+| <kbd>6</kbd> <kbd>7</kbd> <kbd>8</kbd> <kbd>9</kbd> | Red, yellow, green or blue label; the item's own label again clears it |
+| <kbd>P</kbd> | Bookmark |
+| <kbd>X</kbd> | Reject |
+| <kbd>U</kbd> | Clear the bookmark or rejection |
+
+In the Preview and the Gallery these keys replace their usual meanings, such as zooming to 100% with <kbd>1</kbd>, recalling prompts with <kbd>P</kbd> or opening panels with the number keys. Everywhere else, the Canvas included, keys keep their meanings. Purple is set with the pointer. Keys mark without a notice: the Preview shows each mark briefly over the image instead. You can change the keys in [Keyboard shortcuts](/users-guide/workbench/hotkeys/#cull-mode).
+
+In the Preview, a bar between the image and the filmstrip holds the marks, the keys, the item's position and an **Auto-advance** switch. With Auto-advance on, the default, a rating, label or flag key on a single item moves on to the next item; <kbd>[</kbd> and <kbd>]</kbd> never do. Hold <kbd>Shift</kbd> with a key to do the opposite for that press, except where the combination is already a shortcut: <kbd>Shift</kbd>+<kbd>X</kbd> still cancels the current queue item. When a mark takes the item out of what the Gallery lists, for example bookmarking while it shows only unflagged items, the item that takes its place is selected, even with Auto-advance off.
+
+While Cull mode is on and the board, tab or search holds rejected items, the Gallery shows **Delete N rejected…**. It deletes every rejected item there, loaded or not, and always asks first, showing what goes and anything that still uses it. The marks filters do not narrow it.
 
 ## Uploading media
 
@@ -150,9 +182,9 @@ You can also paste an image or video from the clipboard while no text field has 
 
 Click an item to select it, and double-click it (or press **Enter** while its thumbnail has keyboard focus) to open it in the Preview, in the center of the workbench. **Shift**-click selects a range, and **Ctrl**-click (**Cmd**-click on macOS) adds or removes single items. **Ctrl+A** selects everything loaded on the page. Hold **Alt** (**Option** on macOS) while clicking an image to compare it with the selected one.
 
-The selection belongs to what the Gallery shows: switching boards or tabs, typing or clearing a search, or changing the starred or media type filter clears it, while the item open in the Preview stays there. Keyboard actions such as **Delete** act only on items listed in the current view.
+The selection belongs to what the Gallery shows: switching boards or tabs, typing or clearing a search, or changing the marks or media type filter clears it, while the item open in the Preview stays there. Keyboard actions such as **Delete** act only on items listed in the current view.
 
-While anything is selected, a bar at the bottom of the Gallery shows how many items are selected, with buttons to clear the selection, star the items, move them to another board, download them, or delete them. You can also clear the selection with the **×** after the item's name in the Preview's title. Starring, moving and archiving report what they did with an **Undo** button, which puts each item back as it was before that action, even if you changed it again since.
+While anything is selected, a bar at the bottom of the Gallery shows how many items are selected, with buttons to clear the selection, mark the items, move them to another board, download them, or delete them. You can also clear the selection with the **×** after the item's name in the Preview's title. Marking, moving and archiving report what they did with an **Undo** button, which puts each item back as it was before that action. Items you changed again since are left as they are, and a notice says so.
 
 <Image src={selection} alt="Three selected images with the selection bar at the bottom of the Gallery showing 3 selected." width={420} />
 

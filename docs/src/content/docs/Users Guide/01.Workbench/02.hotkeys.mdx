@@ -15,8 +15,9 @@ In the tables, <kbd>Mod</kbd> means <kbd>Ctrl</kbd> on Windows and Linux and <kb
 - **App** shortcuts work anywhere in the workbench.
 - **Panel** shortcuts (Canvas, Workflows, Viewer, Gallery, Queue) work only while that panel has keyboard focus. Click in a panel, or move focus to it, to give its keys priority. The center panel has focus when a project opens, and gets it back when a focused window docks or closes. The Viewer shortcuts belong to the **Preview** panel.
 - When a panel shortcut uses the same key as an App shortcut, the panel's shortcut wins while that panel has focus, and the App shortcut works everywhere else. For example, <kbd>T</kbd> selects the Text tool on the Canvas and collapses the left panel elsewhere.
+- **Cull mode** shortcuts work only while [Cull mode](/users-guide/gallery/introduction/#culling-with-keys) is on, and only in the Preview and the Gallery. There they win over the Viewer's and the App's shortcuts on the same keys.
 - While you type in a text field, single-key shortcuts do nothing so your typing is never interrupted. Shortcuts that make sense while writing a prompt still work there: Invoke, Invoke Front, Invoke To Other Destination, Focus Prompt, the prompt history and prompt weight keys, Open Project Switcher, Open Settings, the command palette, and the region and widget focus keys.
-- While a dialog is open, only the command palette shortcut works.
+- While a dialog is open, only the command palette shortcut works. Cull mode keys also do nothing in a popover.
 - An open menu or list keeps its own arrow keys, <kbd>Enter</kbd>, <kbd>Esc</kbd>, <kbd>Space</kbd> and letter keys.
 - A bare <kbd>Space</kbd> or <kbd>Enter</kbd> on a focused button or tile always presses it, whatever the shortcut. A focused slider or radio group likewise keeps its arrow keys, <kbd>Home</kbd> and <kbd>End</kbd>.
 - Some shortcuts, such as the Canvas's <kbd>Mod</kbd>+<kbd>1</kbd> zoom, are also browser shortcuts. They work only when the browser passes the keys to the page.
@@ -27,7 +28,7 @@ The **Shortcuts** chip in the status bar lists the keys for whatever has focus, 
 
 Open **Settings** (<kbd>Mod</kbd>+<kbd>,</kbd>, or the app menu) and choose **Keyboard shortcuts**. You can also choose **Keyboard Shortcuts** in the [command palette](#app), or **Keyboard shortcut settings** in the status bar's **Shortcuts** chip.
 
-The **Hotkeys** list groups every shortcut under App, Canvas, Workflows, Viewer, Gallery and Queue, whether or not that panel is in your layout. **Search hotkeys** filters the list by command name or default key. Your shortcuts are saved with your account and apply in every project.
+The **Hotkeys** list groups every shortcut under App, Canvas, Workflows, Viewer, Gallery, Cull mode and Queue, whether or not that panel is in your layout. **Search hotkeys** filters the list by command name or default key. Your shortcuts are saved with your account and apply in every project.
 
 <Steps>
 1. Click a key chip on a row to change it. The chip reads **Press keys**: press the new combination. Press <kbd>Esc</kbd> to stop recording without changing the chip, or click the trash button to remove that key.
@@ -43,6 +44,7 @@ Invoke checks each change before you save it:
 - **Conflicts with …** (in red) means another command already uses that key where this one works, so the key would do two things at once. The check mark stays disabled until you choose another key or change the other command first.
 - **Duplicate binding in this hotkey** means the same key is listed twice on one row.
 - **Takes this key from … while … has focus** and **… takes this key while … has focus** (in yellow) mean a panel shortcut and an App shortcut share the key. This is allowed: each still works in its own place, as described in [Where shortcuts work](#where-shortcuts-work).
+- **Takes this key from … while Cull mode is on** and **… takes this key while Cull mode is on** (in yellow) mean a Cull mode shortcut shares the key with another one. This is allowed too: the other works whenever Cull mode is off.
 
 ## App
 
@@ -206,10 +208,27 @@ These work while the Gallery has focus. See [Gallery reference](/users-guide/gal
 | <kbd>Mod</kbd>+<kbd>A</kbd> | Select all gallery images on page | Selects every item on the page |
 | <kbd>Delete</kbd> or <kbd>Backspace</kbd> | Delete gallery selection | Deletes the selected items |
 | <kbd>R</kbd> | Remix | Recalls the selected image's settings, except the seed |
-| <kbd>.</kbd> | Toggle gallery image star | Stars or unstars the selected items |
+| <kbd>.</kbd> | Toggle gallery item bookmark | Bookmarks the selected items, or removes the bookmark when every one has it |
 | <kbd>Esc</kbd> | Cancel or exit compare | Cancels **Select for compare** while it waits for a second image, or closes the comparison |
 
-**Clear gallery selection**, **Add or remove the focused gallery item from the selection** and **Toggle gallery starred-only filter** have no default keys.
+**Clear gallery selection**, **Add or remove the focused gallery item from the selection** and **Toggle gallery bookmarked-only filter** have no default keys.
+
+## Cull mode
+
+<kbd>K</kbd> turns Cull mode on or off while the Preview or the Gallery has focus. The other keys work only while it is on, in the Preview and the Gallery, and mark the shown item or the selection. See [Culling with keys](/users-guide/gallery/introduction/#culling-with-keys).
+
+| Keys | Command | What it does |
+| --- | --- | --- |
+| <kbd>K</kbd> | Toggle Cull Mode | Turns Cull mode on or off |
+| <kbd>1</kbd> to <kbd>5</kbd> | Rate 1 Star to Rate 5 Stars | Sets the rating |
+| <kbd>0</kbd> | Clear Rating | Clears the rating |
+| <kbd>[</kbd> / <kbd>]</kbd> | Lower Rating / Raise Rating | Steps the rating by one; never moves on |
+| <kbd>6</kbd> <kbd>7</kbd> <kbd>8</kbd> <kbd>9</kbd> | Red, Yellow, Green, Blue Label | Sets the label, or clears it when the item already has it |
+| <kbd>P</kbd> | Bookmark | Bookmarks |
+| <kbd>X</kbd> | Reject | Rejects |
+| <kbd>U</kbd> | Clear Flag | Removes the bookmark or rejection |
+
+With <kbd>Shift</kbd>, a key other than <kbd>[</kbd> and <kbd>]</kbd> does the opposite of **Auto-advance** for that press, unless another shortcut already uses that combination. <kbd>Shift</kbd>+<kbd>X</kbd> keeps cancelling the current queue item, so you can cull while a batch generates.
 
 ## Queue
 
