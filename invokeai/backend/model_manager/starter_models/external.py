@@ -802,3 +802,80 @@ seedream_4_0 = StarterModel(
     default_settings=ExternalApiModelDefaultSettings(width=2048, height=2048, num_images=1),
     panel_schema=SEEDREAM_PANEL_SCHEMA,
 )
+
+
+# WorldRouter's gpt-image-2 route returns one 1536x1024 image whatever size or count is requested,
+# so it only offers that shape. The GPT Image 2.5/2.6 routes honor the requested size and batch.
+WORLDROUTER_GPT_IMAGE_2_ASPECT_RATIOS = ["3:2"]
+WORLDROUTER_GPT_IMAGE_2_SIZES = {"3:2": ExternalImageSize(width=1536, height=1024)}
+
+
+def _worldrouter_text_to_image(
+    name: str,
+    model_id: str,
+    summary: str,
+    max_images: int,
+    aspect_ratio_sizes: dict[str, ExternalImageSize],
+) -> StarterModel:
+    """WorldRouter serves its image models through one OpenAI Images API route that only generates
+    from text, so they share capabilities apart from the shapes and batch size each upstream accepts."""
+    default_size = next(iter(aspect_ratio_sizes.values()))
+    return StarterModel(
+        name=f"WorldRouter {name}",
+        base=BaseModelType.External,
+        source=f"external://worldrouter/{model_id}",
+        description=(
+            f"{summary} Text-to-image generation through WorldRouter's OpenAI-compatible Images API. "
+            "Requires a configured WorldRouter API key and may incur provider usage costs."
+        ),
+        type=ModelType.ExternalImageGenerator,
+        format=ModelFormat.ExternalApi,
+        capabilities=ExternalModelCapabilities(
+            modes=["txt2img"],
+            supports_negative_prompt=False,
+            max_images_per_request=max_images,
+            allowed_aspect_ratios=list(aspect_ratio_sizes),
+            aspect_ratio_sizes=aspect_ratio_sizes,
+        ),
+        default_settings=ExternalApiModelDefaultSettings(
+            width=default_size.width, height=default_size.height, num_images=1
+        ),
+        panel_schema=ExternalModelPanelSchema(image=[{"name": "dimensions"}]),
+    )
+
+
+worldrouter_gpt_image_2 = _worldrouter_text_to_image(
+    "GPT Image 2",
+    "gpt-image-2",
+    "OpenAI GPT Image 2, billed per token. Returns one 1536x1024 image per request.",
+    max_images=1,
+    aspect_ratio_sizes=WORLDROUTER_GPT_IMAGE_2_SIZES,
+)
+worldrouter_gpt_image_2_5_flare = _worldrouter_text_to_image(
+    "GPT Image 2.5 Flare",
+    "gpt-image-2.5-flare",
+    "GPT Image 2.5 Flare, billed per image.",
+    max_images=2,
+    aspect_ratio_sizes=OPENAI_GPT_IMAGE_ASPECT_RATIO_SIZES,
+)
+worldrouter_gpt_image_2_5_sunburst = _worldrouter_text_to_image(
+    "GPT Image 2.5 Sunburst",
+    "gpt-image-2.5-sunburst",
+    "GPT Image 2.5 Sunburst, billed per image.",
+    max_images=2,
+    aspect_ratio_sizes=OPENAI_GPT_IMAGE_ASPECT_RATIO_SIZES,
+)
+worldrouter_gpt_image_2_6_flare = _worldrouter_text_to_image(
+    "GPT Image 2.6 Flare",
+    "gpt-image-2.6-flare",
+    "GPT Image 2.6 Flare, billed per image.",
+    max_images=2,
+    aspect_ratio_sizes=OPENAI_GPT_IMAGE_ASPECT_RATIO_SIZES,
+)
+worldrouter_gpt_image_2_6_sunburst = _worldrouter_text_to_image(
+    "GPT Image 2.6 Sunburst",
+    "gpt-image-2.6-sunburst",
+    "GPT Image 2.6 Sunburst, billed per image.",
+    max_images=2,
+    aspect_ratio_sizes=OPENAI_GPT_IMAGE_ASPECT_RATIO_SIZES,
+)
