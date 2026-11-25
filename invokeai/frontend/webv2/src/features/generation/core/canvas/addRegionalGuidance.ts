@@ -139,7 +139,7 @@ export const getLayoutPromptRejectionReason = (params: {
   ) {
     return null;
   }
-  return `${support.label} needs a prompt to place regional guidance in its layout. Enter a prompt or disable the regional guidance layers.`;
+  return `${support.label} needs a prompt to place regional guidance in its layout. Enter a prompt or disable the regional guidance.`;
 };
 
 const LOOKS_LIKE_LAYOUT_DRAFT = /"bbox_coord_space"\s*:\s*"abs"/;

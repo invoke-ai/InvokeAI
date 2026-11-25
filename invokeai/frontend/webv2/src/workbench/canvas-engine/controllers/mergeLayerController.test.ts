@@ -359,6 +359,7 @@ describe('MergeLayerController: merge masks', () => {
   ) => {
     const settings = (noiseLevel = 0.2) => ({
       denoise: { isEnabled: true, limit: 0.4 },
+      guidance: { autoNegative: false, isEnabled: true, negativePrompt: null, positivePrompt: 'a red fox' },
       noise: { isEnabled: true, level: noiseLevel },
     });
     const top = layerContract('top', 'inpaint_mask', {
@@ -425,6 +426,7 @@ describe('MergeLayerController: merge masks', () => {
     expect(merged).toEqual({
       blendMode: 'normal',
       denoise: { isEnabled: true, limit: 0.4 },
+      guidance: { autoNegative: false, isEnabled: true, negativePrompt: null, positivePrompt: 'a red fox' },
       id: 'new-1',
       isEnabled: true,
       isLocked: false,

@@ -53,6 +53,10 @@ export const layerRowSummary = (layer: CanvasLayerContract, t: TFunction): strin
       if (layer.noise?.isEnabled && layer.noise.level > 0) {
         parts.push(t('widgets.layers.summary.noise', { value: Math.round(layer.noise.level * 100) }));
       }
+      const guidancePrompt = layer.guidance?.isEnabled ? layer.guidance.positivePrompt?.trim() : undefined;
+      if (guidancePrompt) {
+        parts.push(guidancePrompt);
+      }
       return parts.join(' · ');
     }
   }

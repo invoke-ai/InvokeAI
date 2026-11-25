@@ -2,6 +2,7 @@ import type { GenerateModelConfig } from '@features/generation/contracts';
 import type { ModelConfig } from '@features/models';
 import type {
   CanvasControlLayerContract,
+  CanvasInpaintMaskLayerContract,
   CanvasLayerContract,
   CanvasRegionalGuidanceLayerContract,
 } from '@workbench/canvas-engine/api';
@@ -57,6 +58,8 @@ export interface CanvasInputJudgeParams {
 export interface CanvasInputJudge {
   control(layer: CanvasControlLayerContract): ControlLayerVerdict;
   regional(layer: CanvasRegionalGuidanceLayerContract): RegionalLayerVerdict;
+  /** A mask's guidance as a region over its coverage; the caller asks only while the mask inpaints. */
+  maskGuidance(layer: CanvasInpaintMaskLayerContract): RegionalLayerVerdict;
 }
 
 /** Unlike Generation's `toModelIdentifier`: these graph inputs carry no `submodel_type`. */
@@ -126,6 +129,23 @@ export const createCanvasInputJudge = ({
     layerName: layer.name,
   });
 
+  const judgeRegion = (
+    layerName: string,
+    input: Extract<RegionalLayerVerdict, { status: 'contributes' }>['input']
+  ): RegionalLayerVerdict => {
+    const rejection = getRegionalGuidanceRejectionReason({
+      cfgScale,
+      hasContent: true,
+      layerName,
+      layout: input.layout,
+      mainBase: model.base,
+      negativePrompt: input.negativePrompt,
+      positivePrompt: input.positivePrompt,
+      referenceImageCount: input.referenceImages.length,
+    });
+    return rejection ? { status: 'skipped' } : { input, status: 'contributes' };
+  };
+
   return {
     control: (layer) => {
       if (isHosted) {
@@ -176,32 +196,29 @@ export const createCanvasInputJudge = ({
           status: 'blocked',
         };
       }
-      const referenceImages = resolveRegionalReferenceImages(layer, model.base);
-      const rejection = getRegionalGuidanceRejectionReason({
-        cfgScale,
-        hasContent: true,
-        layerName: layer.name,
-        layout: layer.layout,
-        mainBase: model.base,
+      return judgeRegion(layer.name, {
+        autoNegative: layer.autoNegative,
+        id: layer.id,
+        // Typed against Generation's layout roles: a persisted role the graph cannot send fails to compile here.
+        ...(layer.layout ? { layout: layer.layout } : {}),
         negativePrompt: layer.negativePrompt,
         positivePrompt: layer.positivePrompt,
-        referenceImageCount: referenceImages.length,
+        referenceImages: resolveRegionalReferenceImages(layer, model.base),
       });
-      if (rejection) {
+    },
+    maskGuidance: (layer) => {
+      const { guidance } = layer;
+      // Hosted inpainting is refused for the mask itself, so its guidance adds no refusal of its own.
+      if (isHosted || !guidance?.isEnabled) {
         return { status: 'skipped' };
       }
-      return {
-        input: {
-          autoNegative: layer.autoNegative,
-          id: layer.id,
-          // Typed against Generation's layout roles: a persisted role the graph cannot send fails to compile here.
-          ...(layer.layout ? { layout: layer.layout } : {}),
-          negativePrompt: layer.negativePrompt,
-          positivePrompt: layer.positivePrompt,
-          referenceImages,
-        },
-        status: 'contributes',
-      };
+      return judgeRegion(layer.name, {
+        autoNegative: guidance.autoNegative,
+        id: layer.id,
+        negativePrompt: guidance.negativePrompt,
+        positivePrompt: guidance.positivePrompt,
+        referenceImages: [],
+      });
     },
   };
 };

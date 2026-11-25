@@ -2,8 +2,9 @@ import type { SelectValueChangeDetails } from '@chakra-ui/react';
 import type { CanvasInpaintMaskLayerContract, CanvasMaskFillContract } from '@workbench/canvas-engine/api';
 import type { CanvasStructuralEngine } from '@workbench/widgets/layers/layerOps';
 
-import { createListCollection, HStack, Stack } from '@chakra-ui/react';
+import { createListCollection, HStack, Stack, Text } from '@chakra-ui/react';
 import { Button, ColorPicker, Field, IconButton, Select, Tooltip } from '@platform/ui';
+import { useCanvasProjectMutationDispatch } from '@workbench/useCanvasProjectMutationDispatch';
 import { useNotify } from '@workbench/useNotify';
 import { armMaskTintTarget } from '@workbench/widgets/canvas/color-system/maskTintTarget';
 import { type ColorSamplerEngine, useColorSampler } from '@workbench/widgets/canvas/useColorSampler';
@@ -13,9 +14,13 @@ import {
   reportMaskEdit,
   useStructuralPreview,
 } from '@workbench/widgets/canvas/useStructuralCommit';
-import { PaletteIcon } from 'lucide-react';
-import { useCallback, useMemo } from 'react';
+import { PaletteIcon, PlusIcon } from 'lucide-react';
+import { useCallback, useId, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+
+import { addMaskGuidance } from './layerChildSelection';
+import { focusMaskGuidancePromptOnMount } from './RegionalGuidanceSettings';
+import { revealLayerSection } from './revealLayerProperties';
 
 /** The six mask fill styles, matching `CanvasMaskFillContract['style']` / legacy `zFillStyle`. */
 const MASK_FILL_STYLES: readonly CanvasMaskFillContract['style'][] = [
@@ -28,7 +33,7 @@ const MASK_FILL_STYLES: readonly CanvasMaskFillContract['style'][] = [
 ];
 
 interface InpaintMaskSettingsProps {
-  engine: (CanvasStructuralEngine & CanvasPreparedEngine & ColorSamplerEngine) | null;
+  engine: (CanvasStructuralEngine & CanvasPreparedEngine & ColorSamplerEngine & { readonly projectId: string }) | null;
   layer: CanvasInpaintMaskLayerContract;
 }
 
@@ -93,6 +98,20 @@ export const InpaintMaskSettings = ({ engine, layer }: InpaintMaskSettingsProps)
     }
   }, [engine, layer.id, notify, t]);
 
+  const dispatch = useCanvasProjectMutationDispatch();
+  // The new row's editor takes this pane over, and takes focus with it.
+  const handleAddGuidance = useCallback(() => {
+    const label = t('widgets.layers.actions.addMaskGuidance');
+    if (
+      engine &&
+      addMaskGuidance({ commit: commitPrepared, dispatch, label, layerId: layer.id, projectId: engine.projectId })
+    ) {
+      focusMaskGuidancePromptOnMount();
+      revealLayerSection();
+    }
+  }, [commitPrepared, dispatch, engine, layer.id, t]);
+  const guidanceHelpId = useId();
+
   const styleValue = useMemo(() => [fill.style], [fill.style]);
   const colorAria = t('widgets.layers.maskFill.color');
 
@@ -134,6 +153,25 @@ export const InpaintMaskSettings = ({ engine, layer }: InpaintMaskSettingsProps)
       <Button disabled={!engine} variant="outline" onClick={handleInvert}>
         {t('widgets.layers.maskFill.invert')}
       </Button>
+      {layer.guidance ? null : (
+        <Stack gap="1.5">
+          <Button
+            aria-describedby={guidanceHelpId}
+            color="fg.muted"
+            disabled={!engine}
+            justifyContent="flex-start"
+            px="2"
+            variant="outline"
+            onClick={handleAddGuidance}
+          >
+            <PlusIcon />
+            {t('widgets.layers.actions.addMaskGuidance')}
+          </Button>
+          <Text color="fg.muted" fontSize="xs" id={guidanceHelpId}>
+            {t('widgets.layers.modifiers.guidanceHelp')}
+          </Text>
+        </Stack>
+      )}
     </Stack>
   );
 };

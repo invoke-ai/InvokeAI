@@ -442,6 +442,38 @@ describe('planRegionalMaskComposites', () => {
     expect(entries[0]!.entry.layers[0]!.opacity).toBe(1);
     expect(entries[0]!.entry.layers[0]!.blendMode).toBe('normal');
   });
+
+  it('adds a region for each inpaint mask with enabled guidance and pixels, after the regional layers', () => {
+    const guided = (id: string, isEnabled = true, overrides: Parameters<typeof inpaintMask>[1] = {}) => ({
+      ...inpaintMask(id, { offset: { x: 5, y: 7 }, ...overrides }),
+      guidance: { autoNegative: false, isEnabled, negativePrompt: null, positivePrompt: 'a fox' },
+      opacity: 0.4,
+    });
+    const entries = planRegionalMaskComposites(
+      makeDoc([
+        guided('guided'),
+        guided('disabled', false),
+        guided('empty', true, { bitmap: null }),
+        inpaintMask('plain'),
+        regionalLayer('region'),
+      ]),
+      BBOX
+    );
+
+    expect(entries.map((item) => item.layerId)).toEqual(['region', 'guided']);
+    expect(entries[1]!.entry).toMatchObject({ kind: 'regional-mask', layerId: 'guided' });
+    expect(entries[1]!.entry.layers).toEqual([
+      {
+        blendMode: 'normal',
+        contentOffset: { x: 5, y: 7 },
+        contentSize: { height: 80, width: 100 },
+        id: 'guided',
+        opacity: 1,
+        sourceRef: 'mask:guided-bmp',
+        transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+      },
+    ]);
+  });
 });
 
 describe('planComposites — raster adjustments in the base key', () => {

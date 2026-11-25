@@ -52,7 +52,7 @@ Each row shows, from left to right:
 * On raster layers, one eye button (**Show or hide layer**). A hidden raster layer is off the canvas and takes no part in generation.
 * A lock button (**Toggle lock**), which prevents editing. Painting, moving or transforming a locked layer is refused with a notice that says so.
 
-Rows can have child rows, shown with a chevron: adjustments and regenerate regions on raster layers, noise and denoise limits on inpaint masks, and reference images on regional guidance layers. A child row shows its icon (or the reference image), its name, its value where it has one, and its own eye button (**Enable/disable**), which turns it off without removing it. While its layer takes no part in generation, a child row's eye is dimmed and the child has no effect. Select a child row to edit it in Properties. Thin lines run from each expanded layer or group down to its child rows and the layers inside it, so you can see what belongs where.
+Rows can have child rows, shown with a chevron: adjustments and regenerate regions on raster layers, regional guidance, noise and denoise limits on inpaint masks, and reference images on regional guidance layers. A child row shows its icon (or the reference image), its name, its value where it has one (a mask's regional guidance shows its prompt), and its own eye button (**Enable/disable**), which turns it off without removing it. While its layer takes no part in generation, a child row's eye is dimmed and the child has no effect. Select a child row to edit it in Properties. Thin lines run from each expanded layer or group down to its child rows and the layers inside it, so you can see what belongs where.
 
 The eye buttons of layers and child rows line up in one column at the right edge of the list, with the lock buttons in a column beside them and the dots of mask, regional guidance and control rows in a column before them, however deeply a layer is nested in groups.
 
@@ -107,10 +107,10 @@ The icons at the top **Arrange** the layer (move it to the front, forward, backw
   * **Boolean operations** — combine the layer with the one below: intersect, cut out, cut away or exclude.
   * **Convert to** — make it a control layer, inpaint mask or regional guidance layer. Text, shape and gradient layers can also be rasterized into plain pixels. Control layers have no adjustments, so converting a layer with adjustments to a control layer, or using it as one, bakes them, with the layer's scaling and rotation, into its pixels; undo restores the raster layer with its adjustments.
 * **Control layers:** **Transform**, **Select object**, **Run workflow**, **Enable transparent preview**, **Convert to raster layer**, and **Hide on canvas**, as the row's eye. A control layer's map comes from its **Detection** row in Properties, so it has no **Filter**.
-* **Inpaint masks:** **Transform**, **Add noise**, **Add denoise limit**, **Extract masked area** (copy the masked part of the image to a new layer), and **Hide on canvas**.
+* **Inpaint masks:** **Transform**, **Add regional guidance**, **Add noise**, **Add denoise limit**, **Extract masked area** (copy the masked part of the image to a new layer), and **Hide on canvas**.
 * **Regional guidance:** **Transform**, **Enable auto-negative**, **Add reference image**, and **Hide on canvas**.
 
-When several layers are selected, the menu also offers **Merge selected layers**. When only inpaint masks are selected, it offers **Merge masks** instead: the masks are combined into one new inpaint mask, named after the topmost one with "merged" added. It covers everywhere any of the masks did, at full strength whatever each mask's opacity, and takes the topmost mask's fill color and style. The new mask is placed where the topmost one was, even when the masks are in different groups, and replaces them. Merge masks needs two or more enabled, unlocked inpaint masks with content, whose noise and denoise limit settings match, since the new mask applies one setting to all of its area. When the item is unavailable, highlighting it shows why. One undo brings the original masks back.
+When several layers are selected, the menu also offers **Merge selected layers**. When only inpaint masks are selected, it offers **Merge masks** instead: the masks are combined into one new inpaint mask, named after the topmost one with "merged" added. It covers everywhere any of the masks did, at full strength whatever each mask's opacity, and takes the topmost mask's fill color and style. The new mask is placed where the topmost one was, even when the masks are in different groups, and replaces them. Merge masks needs two or more enabled, unlocked inpaint masks with content, whose noise, denoise limit and regional guidance settings match, since the new mask applies one setting to all of its area. When the item is unavailable, highlighting it shows why. One undo brings the original masks back.
 
 ## Properties
 
@@ -202,8 +202,11 @@ A control layer made in an earlier version of Invoke keeps its model and works w
 
 * **Fill color** and **Fill style** (Solid, Grid, Crosshatch, Diagonal, Horizontal or Vertical) — how the mask is drawn on screen.
 * **Invert mask** — swap the masked and unmasked areas.
+* **Add regional guidance** — gives the masked area its own prompt. The button is shown until the mask has regional guidance.
 
-Its child rows, added from the layer menu, set **Noise** (noise added inside the mask before generating, 25% by default) and **Denoise limit** (the most the masked area may change, 80% by default).
+Its child rows, added from the layer menu, set **Regional guidance**, **Noise** (noise added inside the mask before generating, 25% by default) and **Denoise limit** (the most the masked area may change, 80% by default).
+
+The **Regional guidance** row has a **Positive prompt**, an optional **Negative prompt** and **Auto-Negative**, which work as on a [regional guidance layer](#regional-guidance). They apply inside the mask, and only while the mask takes part in an inpaint or outpaint. If the selected model does not support regional guidance, a message says that the prompts are ignored; the mask is otherwise unaffected. Once a project has had regional guidance on a mask, older versions of Invoke refuse to open it, even after you remove it.
 
 ### Regional guidance
 

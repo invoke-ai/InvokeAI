@@ -3,11 +3,12 @@ import type { ArchitectureCapabilitiesSnapshot } from '@features/models/architec
 import type {
   CanvasMaskContract,
   CanvasMaskFillContract,
+  CanvasMaskGuidanceContract,
   CanvasRegionalGuidanceLayerContract,
   CanvasRegionalLayoutContract,
 } from '@workbench/canvas-engine/api';
 import type { CanvasStructuralEngine } from '@workbench/widgets/layers/layerOps';
-import type { ChangeEvent } from 'react';
+import type { ChangeEvent, ComponentProps } from 'react';
 
 import {
   createListCollection,
@@ -45,6 +46,7 @@ import {
   type CanvasPreparedEngine,
   type PreparedCommitOutcome,
   reportMaskEdit,
+  usePreparedCommit,
   useStructuralPreview,
 } from '@workbench/widgets/canvas/useStructuralCommit';
 import { PaletteIcon } from 'lucide-react';
@@ -76,16 +78,40 @@ const SELECT_POSITIONING = { placement: 'bottom-end', sameWidth: true } as const
 
 const REGIONAL_PROMPT_HEIGHT_PX = 72;
 
-interface RegionalGuidanceSettingsProps {
-  engine: (CanvasStructuralEngine & CanvasPreparedEngine & ColorSamplerEngine) | null;
-  layer: CanvasRegionalGuidanceLayerContract;
+interface RegionalPromptValue {
+  positivePrompt: string | null;
+  negativePrompt: string | null;
+  autoNegative: boolean;
 }
 
-/** Prompts, toggles and fill use config patches; invert uses engine pixels. */
-export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSettingsProps) => {
+type RegionalPromptCommit = (label: string, patch: Partial<RegionalPromptValue>) => PreparedCommitOutcome;
+
+type PromptFieldProps = ComponentProps<typeof PromptTextarea>;
+
+interface RegionalNegativeControlsProps {
+  addRef: (element: HTMLElement | null) => void;
+  autoNegative: boolean;
+  disabled: boolean;
+  /** Null until the region has a negative prompt; its add button stands in. */
+  field: PromptFieldProps | null;
+  ignoredAtCfg: boolean;
+  onAdd: () => void;
+  onAutoNegativeChange: (details: { checked: boolean }) => void;
+  onRemove: () => void;
+}
+
+/** Prompt drafts, their commits and the selected model's regional support, for a guidance layer and a guided mask. */
+const useRegionalPromptEditor = ({
+  commit,
+  disabled,
+  value,
+}: {
+  /** One undo step; a refusal (already reported) keeps the typed text. */
+  commit: RegionalPromptCommit;
+  disabled: boolean;
+  value: RegionalPromptValue;
+}) => {
   const { t } = useTranslation();
-  const { commit: commitPrepared, preview: previewStructural } = useStructuralPreview(engine);
-  const sampleColor = useColorSampler(engine);
   const base = useSelectedModelBase();
   const cfgScale = useSelectedCfgScale();
   const showSyntaxHighlighting = useWorkbenchPreferenceSelector(
@@ -94,14 +120,8 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
   // Null while not editing, so undo and edits from elsewhere show through and only typed text is ever committed.
   const [positiveDraft, setPositiveDraft] = useState<string | null>(null);
   const [negativeDraft, setNegativeDraft] = useState<string | null>(null);
-  const positivePrompt = positiveDraft ?? layer.positivePrompt ?? '';
-  // A region has a negative prompt once one is added, even while it is empty; null means none, and generation reads an
-  // empty one as none too.
-  const hasNegativePrompt = layer.negativePrompt !== null;
-  const negativePrompt = negativeDraft ?? layer.negativePrompt ?? '';
+  const positivePrompt = positiveDraft ?? value.positivePrompt ?? '';
 
-  const attentionSyntax = supportsPromptAttentionSyntax(base) ? 'edit' : 'none';
-  const fill = layer.mask.fill;
   // Resolve support inside the capability selector to update memoized answers.
   const { hasCapabilities, support } = useExternalStoreSelector(
     subscribeArchitectureCapabilities,
@@ -121,44 +141,31 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
   // Controls stay editable so values carry over; the hint says why they do nothing at this CFG Scale.
   const negativesIgnoredAtCfg =
     support !== null && cfgScale !== null && support.negativePrompt && !areRegionalNegativesActive(support, cfgScale);
-  const negativeFieldId = useId();
-  const negativeHelpId = negativesIgnoredAtCfg ? `${negativeFieldId}-help` : undefined;
 
-  // A previewed fill records from where its preview started; any other change from the live layer.
-  const commitConfig = useCallback(
-    (label: string, next: RegionalConfigPatch): PreparedCommitOutcome => {
-      const config = { layerType: 'regional_guidance', ...next } as const;
-      return commitPrepared(label, (model, baseline) =>
-        model.prepare({ before: baselineConfig(baseline, config), config, id: layer.id, type: 'patch-config' })
-      );
-    },
-    [commitPrepared, layer.id]
-  );
-
-  // Commits typed prompt drafts that differ from the layer, on blur and when Invoke (Ctrl+Enter included) flushes.
+  // Commits typed prompt drafts that differ from the stored ones, on blur and when Invoke (Ctrl+Enter included) flushes.
   const commitPrompts = useCallback(() => {
     if (positiveDraft === null && negativeDraft === null) {
       return;
     }
-    const positive = positiveDraft === null ? layer.positivePrompt : positiveDraft || null;
+    const positive = positiveDraft === null ? value.positivePrompt : positiveDraft || null;
     // Clearing the text keeps the negative prompt; only its remove control takes it out.
-    const negative = negativeDraft === null || layer.negativePrompt === null ? layer.negativePrompt : negativeDraft;
-    const patch: RegionalConfigPatch = {
-      ...(positive === layer.positivePrompt ? {} : { positivePrompt: positive }),
-      ...(negative === layer.negativePrompt ? {} : { negativePrompt: negative }),
+    const negative = negativeDraft === null || value.negativePrompt === null ? value.negativePrompt : negativeDraft;
+    const patch: Partial<RegionalPromptValue> = {
+      ...(positive === value.positivePrompt ? {} : { positivePrompt: positive }),
+      ...(negative === value.negativePrompt ? {} : { negativePrompt: negative }),
     };
     const outcome =
       'positivePrompt' in patch
-        ? commitConfig(t('widgets.layers.regionalGuidance.positivePrompt'), patch)
+        ? commit(t('widgets.layers.regionalGuidance.positivePrompt'), patch)
         : 'negativePrompt' in patch
-          ? commitConfig(t('widgets.layers.regionalGuidance.negativePrompt'), patch)
+          ? commit(t('widgets.layers.regionalGuidance.negativePrompt'), patch)
           : null;
     // A refused edit (already reported) keeps the typed text in the field instead of discarding it.
     if (outcome === null || outcome.status === 'committed' || outcome.status === 'unchanged') {
       setPositiveDraft(null);
       setNegativeDraft(null);
     }
-  }, [commitConfig, layer.negativePrompt, layer.positivePrompt, negativeDraft, positiveDraft, t]);
+  }, [commit, negativeDraft, positiveDraft, t, value.negativePrompt, value.positivePrompt]);
   useRegisterDraftFlusher(commitPrompts);
 
   const handlePositiveChange = useCallback(
@@ -195,42 +202,167 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
 
   const handleAddNegative = useCallback(() => {
     requestNegativeFocus('field');
-    const outcome = commitConfig(t('widgets.layers.regionalGuidance.addNegativePrompt'), { negativePrompt: '' });
+    const outcome = commit(t('widgets.layers.regionalGuidance.addNegativePrompt'), { negativePrompt: '' });
     if (outcome.status === 'committed') {
       // Text left unsaved in a prompt that was undone away belongs to that prompt, not this new empty one.
       setNegativeDraft(null);
     } else {
       pendingNegativeFocus.current = null;
     }
-  }, [commitConfig, requestNegativeFocus, t]);
+  }, [commit, requestNegativeFocus, t]);
 
   const handleRemoveNegative = useCallback(() => {
     requestNegativeFocus('add');
-    const outcome = commitConfig(t('widgets.layers.regionalGuidance.removeNegativePrompt'), { negativePrompt: null });
+    const outcome = commit(t('widgets.layers.regionalGuidance.removeNegativePrompt'), { negativePrompt: null });
     if (outcome.status === 'committed') {
       setNegativeDraft(null);
     } else {
       pendingNegativeFocus.current = null;
     }
-  }, [commitConfig, requestNegativeFocus, t]);
-
-  const negativeLabelEnd = useMemo(
-    () => (
-      <RemoveNegativePromptButton
-        disabled={!engine}
-        label={t('widgets.layers.regionalGuidance.removeNegativePrompt')}
-        onClick={handleRemoveNegative}
-      />
-    ),
-    [engine, handleRemoveNegative, t]
-  );
+  }, [commit, requestNegativeFocus, t]);
 
   const handleAutoNegative = useCallback(
     (details: { checked: boolean }) => {
-      commitConfig(t('widgets.layers.regionalGuidance.autoNegative'), { autoNegative: details.checked });
+      commit(t('widgets.layers.regionalGuidance.autoNegative'), { autoNegative: details.checked });
     },
-    [commitConfig, t]
+    [commit, t]
   );
+
+  const fieldProps = {
+    attentionSyntax: supportsPromptAttentionSyntax(base) ? 'edit' : 'none',
+    defaultHeightPx: REGIONAL_PROMPT_HEIGHT_PX,
+    minHeightPx: REGIONAL_PROMPT_HEIGHT_PX,
+    showSyntaxHighlighting,
+    size: 'lg',
+    onBlur: commitPrompts,
+  } satisfies Partial<PromptFieldProps>;
+  const negative: RegionalNegativeControlsProps = {
+    addRef: addNegativeRef,
+    autoNegative: value.autoNegative,
+    disabled,
+    // A region has a negative prompt once one is added, even while it is empty; null means none, and generation reads
+    // an empty one as none too.
+    field:
+      value.negativePrompt === null
+        ? null
+        : {
+            ...fieldProps,
+            'aria-label': t('widgets.layers.regionalGuidance.negativePrompt'),
+            placeholder: t('widgets.layers.regionalGuidance.negativePromptPlaceholder'),
+            resizeHandleAriaLabel: t('widgets.layers.regionalGuidance.negativePrompt'),
+            textareaRef: negativeFieldRef,
+            value: negativeDraft ?? value.negativePrompt,
+            onChange: handleNegativeChange,
+          },
+    ignoredAtCfg: negativesIgnoredAtCfg,
+    onAdd: handleAddNegative,
+    onAutoNegativeChange: handleAutoNegative,
+    onRemove: handleRemoveNegative,
+  };
+  const positiveField: PromptFieldProps = {
+    ...fieldProps,
+    'aria-label': t('widgets.layers.regionalGuidance.positivePrompt'),
+    placeholder: t('widgets.layers.regionalGuidance.positivePromptPlaceholder'),
+    resizeHandleAriaLabel: t('widgets.layers.regionalGuidance.positivePrompt'),
+    value: positivePrompt,
+    onChange: handlePositiveChange,
+  };
+
+  return { negative, positiveField, positivePrompt, showNegativeControls, support, unsupportedModel };
+};
+
+/** The negative prompt, or its add button, then Auto-Negative: siblings of the caller's other fields. */
+const RegionalNegativeControls = ({
+  addRef,
+  autoNegative,
+  disabled,
+  field,
+  ignoredAtCfg,
+  onAdd,
+  onAutoNegativeChange,
+  onRemove,
+}: RegionalNegativeControlsProps) => {
+  const { t } = useTranslation();
+  const fieldId = useId();
+  const helpId = ignoredAtCfg ? `${fieldId}-help` : undefined;
+  const labelEnd = useMemo(
+    () => (
+      <RemoveNegativePromptButton
+        disabled={disabled}
+        label={t('widgets.layers.regionalGuidance.removeNegativePrompt')}
+        onClick={onRemove}
+      />
+    ),
+    [disabled, onRemove, t]
+  );
+
+  return (
+    <>
+      {field ? (
+        <Field
+          helpText={ignoredAtCfg ? t('widgets.layers.regionalGuidance.negativesNeedCfg') : undefined}
+          id={fieldId}
+          label={t('widgets.layers.regionalGuidance.negativePrompt')}
+          labelEnd={labelEnd}
+        >
+          <PromptTextarea aria-describedby={helpId} {...field} />
+        </Field>
+      ) : (
+        <Stack gap="1.5">
+          <AddNegativePromptButton
+            ref={addRef}
+            aria-describedby={helpId}
+            aria-label={t('widgets.layers.regionalGuidance.addNegativePrompt')}
+            disabled={disabled}
+            label={t('widgets.layers.regionalGuidance.negativePromptAdd')}
+            onClick={onAdd}
+          />
+          {/* The field's help line while there is no field, so Auto-Negative keeps its description. */}
+          {ignoredAtCfg ? (
+            <Text color="fg.muted" fontSize="xs" id={helpId}>
+              {t('widgets.layers.regionalGuidance.negativesNeedCfg')}
+            </Text>
+          ) : null}
+        </Stack>
+      )}
+      <Switch.Root checked={autoNegative} onCheckedChange={onAutoNegativeChange}>
+        <Switch.HiddenInput aria-describedby={helpId} />
+        <Switch.Control>
+          <Switch.Thumb />
+        </Switch.Control>
+        <Switch.Label>
+          <Text fontSize="md">{t('widgets.layers.regionalGuidance.autoNegative')}</Text>
+        </Switch.Label>
+      </Switch.Root>
+    </>
+  );
+};
+
+interface RegionalGuidanceSettingsProps {
+  engine: (CanvasStructuralEngine & CanvasPreparedEngine & ColorSamplerEngine) | null;
+  layer: CanvasRegionalGuidanceLayerContract;
+}
+
+/** Prompts, toggles and fill use config patches; invert uses engine pixels. */
+export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSettingsProps) => {
+  const { t } = useTranslation();
+  const { commit: commitPrepared, preview: previewStructural } = useStructuralPreview(engine);
+  const sampleColor = useColorSampler(engine);
+  const fill = layer.mask.fill;
+
+  // A previewed fill records from where its preview started; any other change from the live layer.
+  const commitConfig = useCallback(
+    (label: string, next: RegionalConfigPatch): PreparedCommitOutcome => {
+      const config = { layerType: 'regional_guidance', ...next } as const;
+      return commitPrepared(label, (model, baseline) =>
+        model.prepare({ before: baselineConfig(baseline, config), config, id: layer.id, type: 'patch-config' })
+      );
+    },
+    [commitPrepared, layer.id]
+  );
+
+  const prompts = useRegionalPromptEditor({ commit: commitConfig, disabled: !engine, value: layer });
+  const { positivePrompt, support } = prompts;
 
   // Layout bases read the region's role and, for text, its exact text; the stored role survives model switches, and a
   // base without it places the region as an object. A base with only one role offers no choice.
@@ -375,7 +507,7 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
 
   return (
     <Stack gap="2">
-      {unsupportedModel ? (
+      {prompts.unsupportedModel ? (
         <Text color="fg.warning" fontSize="xs" role="alert">
           {t('widgets.layers.regionalGuidance.unsupportedModel')}
         </Text>
@@ -396,20 +528,7 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
         </Field>
       ) : null}
       <Field helpText={promptHelp} id={promptFieldId} label={t('widgets.layers.regionalGuidance.positivePrompt')}>
-        <PromptTextarea
-          aria-describedby={promptDescription}
-          aria-label={t('widgets.layers.regionalGuidance.positivePrompt')}
-          attentionSyntax={attentionSyntax}
-          defaultHeightPx={REGIONAL_PROMPT_HEIGHT_PX}
-          minHeightPx={REGIONAL_PROMPT_HEIGHT_PX}
-          placeholder={t('widgets.layers.regionalGuidance.positivePromptPlaceholder')}
-          resizeHandleAriaLabel={t('widgets.layers.regionalGuidance.positivePrompt')}
-          showSyntaxHighlighting={showSyntaxHighlighting}
-          size="lg"
-          value={positivePrompt}
-          onBlur={commitPrompts}
-          onChange={handlePositiveChange}
-        />
+        <PromptTextarea aria-describedby={promptDescription} {...prompts.positiveField} />
       </Field>
       {layoutIssue === 'missing_prompt' ? (
         <Text color="fg.warning" fontSize="xs" id={promptIssueId}>
@@ -436,59 +555,7 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
         </Text>
       ) : null}
       {isLayout ? <VisuallyHidden role="status">{layoutIssueMessage}</VisuallyHidden> : null}
-      {showNegativeControls && hasNegativePrompt ? (
-        <Field
-          helpText={negativesIgnoredAtCfg ? t('widgets.layers.regionalGuidance.negativesNeedCfg') : undefined}
-          id={negativeFieldId}
-          label={t('widgets.layers.regionalGuidance.negativePrompt')}
-          labelEnd={negativeLabelEnd}
-        >
-          <PromptTextarea
-            aria-describedby={negativeHelpId}
-            aria-label={t('widgets.layers.regionalGuidance.negativePrompt')}
-            attentionSyntax={attentionSyntax}
-            defaultHeightPx={REGIONAL_PROMPT_HEIGHT_PX}
-            minHeightPx={REGIONAL_PROMPT_HEIGHT_PX}
-            placeholder={t('widgets.layers.regionalGuidance.negativePromptPlaceholder')}
-            resizeHandleAriaLabel={t('widgets.layers.regionalGuidance.negativePrompt')}
-            showSyntaxHighlighting={showSyntaxHighlighting}
-            size="lg"
-            textareaRef={negativeFieldRef}
-            value={negativePrompt}
-            onBlur={commitPrompts}
-            onChange={handleNegativeChange}
-          />
-        </Field>
-      ) : null}
-      {showNegativeControls && !hasNegativePrompt ? (
-        <Stack gap="1.5">
-          <AddNegativePromptButton
-            ref={addNegativeRef}
-            aria-describedby={negativeHelpId}
-            aria-label={t('widgets.layers.regionalGuidance.addNegativePrompt')}
-            disabled={!engine}
-            label={t('widgets.layers.regionalGuidance.negativePromptAdd')}
-            onClick={handleAddNegative}
-          />
-          {/* The field's help line while there is no field, so Auto-Negative keeps its description. */}
-          {negativesIgnoredAtCfg ? (
-            <Text color="fg.muted" fontSize="xs" id={negativeHelpId}>
-              {t('widgets.layers.regionalGuidance.negativesNeedCfg')}
-            </Text>
-          ) : null}
-        </Stack>
-      ) : null}
-      {showNegativeControls && (
-        <Switch.Root checked={layer.autoNegative} onCheckedChange={handleAutoNegative}>
-          <Switch.HiddenInput aria-describedby={negativeHelpId} />
-          <Switch.Control>
-            <Switch.Thumb />
-          </Switch.Control>
-          <Switch.Label>
-            <Text fontSize="md">{t('widgets.layers.regionalGuidance.autoNegative')}</Text>
-          </Switch.Label>
-        </Switch.Root>
-      )}
+      {prompts.showNegativeControls ? <RegionalNegativeControls {...prompts.negative} /> : null}
 
       <HStack gap="2">
         <Field flexShrink="0" label={t('widgets.layers.maskFill.color')}>
@@ -526,6 +593,101 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
       <Button disabled={!engine} variant="outline" onClick={handleInvert}>
         {t('widgets.layers.maskFill.invert')}
       </Button>
+    </Stack>
+  );
+};
+
+// The mask's Add button unmounts as this editor replaces its settings; focus follows to the prompt.
+let promptFocusPending = false;
+
+export const focusMaskGuidancePromptOnMount = (): void => {
+  promptFocusPending = true;
+  requestAnimationFrame(() => {
+    promptFocusPending = false;
+  });
+};
+
+const focusPendingPrompt = (element: HTMLElement | null): void => {
+  if (element && promptFocusPending) {
+    promptFocusPending = false;
+    element.focus();
+  }
+};
+
+/** An inpaint mask's regional prompts; its tree row owns enabling and removal. */
+export const MaskGuidanceSettings = ({
+  engine,
+  guidance,
+  layerId,
+}: {
+  engine: CanvasPreparedEngine | null;
+  guidance: CanvasMaskGuidanceContract;
+  layerId: string;
+}) => {
+  const { t } = useTranslation();
+  const commitPrepared = usePreparedCommit(engine);
+
+  const commit = useCallback<RegionalPromptCommit>(
+    (label, patch) =>
+      commitPrepared(label, (model) => {
+        const live = model.getLayer(layerId);
+        const current = live?.type === 'inpaint_mask' ? live.guidance : undefined;
+        // Removed since this editor rendered: committing would bring it back.
+        if (!current) {
+          return { ids: [layerId], status: 'missing' };
+        }
+        return model.prepare({
+          config: { guidance: { ...current, ...patch }, layerType: 'inpaint_mask' },
+          id: layerId,
+          type: 'patch-config',
+        });
+      }),
+    [commitPrepared, layerId]
+  );
+
+  const prompts = useRegionalPromptEditor({ commit, disabled: !engine, value: guidance });
+  const { support } = prompts;
+  const helpId = useId();
+  const promptFieldId = useId();
+  const promptIssueId = useId();
+
+  // A guided mask is always an object region: a layout base needs only its prompt.
+  const layoutLabel = support?.mode === 'layout' ? support.label : null;
+  const missingPrompt =
+    layoutLabel !== null && getLayoutRegionIssue({ positivePrompt: prompts.positivePrompt }, []) !== null;
+  const missingPromptMessage = missingPrompt
+    ? t('widgets.layers.modifiers.guidanceLayoutMissingPrompt', { model: layoutLabel })
+    : null;
+  const promptHelp =
+    layoutLabel !== null ? t('widgets.layers.modifiers.guidanceLayoutBoxHelp', { model: layoutLabel }) : undefined;
+  const promptDescription = [helpId, promptHelp ? `${promptFieldId}-help` : null, missingPrompt ? promptIssueId : null]
+    .filter(Boolean)
+    .join(' ');
+
+  return (
+    <Stack gap="2">
+      {prompts.unsupportedModel ? (
+        <Text color="fg.warning" fontSize="xs" role="alert">
+          {t('widgets.layers.modifiers.guidanceUnsupportedModel')}
+        </Text>
+      ) : null}
+      <Text color="fg.muted" fontSize="xs" id={helpId}>
+        {t('widgets.layers.modifiers.guidanceHelp')}
+      </Text>
+      <Field helpText={promptHelp} id={promptFieldId} label={t('widgets.layers.regionalGuidance.positivePrompt')}>
+        <PromptTextarea
+          aria-describedby={promptDescription}
+          textareaRef={focusPendingPrompt}
+          {...prompts.positiveField}
+        />
+      </Field>
+      {missingPrompt ? (
+        <Text color="fg.warning" fontSize="xs" id={promptIssueId}>
+          {missingPromptMessage}
+        </Text>
+      ) : null}
+      {layoutLabel !== null ? <VisuallyHidden role="status">{missingPromptMessage}</VisuallyHidden> : null}
+      {prompts.showNegativeControls ? <RegionalNegativeControls {...prompts.negative} /> : null}
     </Stack>
   );
 };

@@ -50,6 +50,7 @@ import {
   ImagePlusIcon,
   LockIcon,
   LockOpenIcon,
+  MapPinIcon,
   MergeIcon,
   PencilIcon,
   SaveIcon,
@@ -73,6 +74,7 @@ import { canAddRegionalReferenceImage, canConvertRasterControl, canMergeLayerDow
 
 export type LayerContextActionId =
   | 'add-reference-image'
+  | 'add-mask-guidance'
   | 'add-noise'
   | 'add-regenerate-region'
   | 'add-denoise-limit'
@@ -199,6 +201,7 @@ export interface LayerContextActionEffects {
   convertTo(target: LayerType): void | Promise<void>;
   patchConfig(kind: LayerConfigPatchKind): void;
   addReferenceImage(): void;
+  addMaskGuidance(): void;
   addMaskModifier(field: 'noise' | 'denoise'): void;
   addAdjustment(type: CanvasAdjustmentEntry['type']): void;
   addLayerRegion(): void;
@@ -813,6 +816,18 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
     order: 32,
     section: 'primary',
     supportedLayerTypes: RASTER_ONLY,
+  },
+  {
+    defaultLabel: 'Add regional guidance',
+    handler: ({ effects }) => effects.addMaskGuidance(),
+    icon: MapPinIcon,
+    id: 'add-mask-guidance',
+    isEnabled: isLayerMutable,
+    isVisible: (context) => context.layer.type === 'inpaint_mask' && context.layer.guidance === undefined,
+    labelKey: 'widgets.layers.actions.addMaskGuidance',
+    order: 54,
+    section: 'primary',
+    supportedLayerTypes: INPAINT_ONLY,
   },
   {
     defaultLabel: 'Add noise',

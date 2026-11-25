@@ -3,6 +3,7 @@
 import type {
   CanvasControlLayerContract,
   CanvasDocumentSnapshot,
+  CanvasInpaintMaskLayerContract,
   CanvasRegionalGuidanceLayerContract,
   CanvasStateContractV3,
   LayerUnreadable,
@@ -55,6 +56,8 @@ export interface ComposeForGenerationOptions {
   /** `false` skips the layer with no upload; a throw aborts the operation, dedupe uncommitted. */
   shouldCompositeControlLayer?(layer: CanvasControlLayerContract): boolean;
   shouldCompositeRegionalMask?(layer: CanvasRegionalGuidanceLayerContract): boolean;
+  /** Asked only while the mask inpaints; absent means its guidance never contributes. */
+  shouldCompositeMaskGuidance?(layer: CanvasInpaintMaskLayerContract): boolean;
 }
 
 export type GenerationCompositeExecutorDeps = Omit<ExecuteCompositePlanDeps, 'dedupe' | 'getLayerSurface'>;
@@ -226,14 +229,23 @@ export const composeForGeneration = async (
     const regionalMaskImages: GenerationComposites['regionalMaskImages'] = [];
     for (const { entry, layerId } of regionalPlan) {
       const layer = lookupDocumentLayer(document, layerId);
-      if (!layer || layer.type !== 'regional_guidance') {
-        continue;
+      if (layer?.type === 'regional_guidance') {
+        if (options.shouldCompositeRegionalMask && !options.shouldCompositeRegionalMask(layer)) {
+          continue;
+        }
+        const result = await executeRegionalMaskComposite(entry, deps);
+        regionalMaskImages.push({ bounds: result.bounds, imageName: result.imageName, layerId });
+      } else if (layer?.type === 'inpaint_mask') {
+        // A mask and its modifiers are inert unless it inpaints, like the noise mask above.
+        if ((mode !== 'inpaint' && mode !== 'outpaint') || !options.shouldCompositeMaskGuidance?.(layer)) {
+          continue;
+        }
+        const result = await executeRegionalMaskComposite(entry, deps);
+        // A region that misses the frame would still add conditioning and, with auto-negative, a whole-frame negative.
+        if (result.bounds.width > 0 && result.bounds.height > 0) {
+          regionalMaskImages.push({ bounds: result.bounds, imageName: result.imageName, layerId });
+        }
       }
-      if (options.shouldCompositeRegionalMask && !options.shouldCompositeRegionalMask(layer)) {
-        continue;
-      }
-      const result = await executeRegionalMaskComposite(entry, deps);
-      regionalMaskImages.push({ bounds: result.bounds, imageName: result.imageName, layerId });
     }
 
     let isCommitted = false;

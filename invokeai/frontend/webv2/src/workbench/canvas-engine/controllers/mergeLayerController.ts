@@ -81,7 +81,7 @@ export type MergeVisibleResult =
 
 /**
  * Every refusal leaves document, pixels and history alone. `settings-differ`: the masks are otherwise eligible, but
- * their enabled noise or denoise settings differ.
+ * their enabled noise, denoise or guidance settings differ.
  */
 export type MergeInpaintMasksResult =
   | { status: 'merged'; layerId: string }
@@ -114,7 +114,7 @@ const IDENTITY_TRANSFORM = { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 };
 
 /**
  * One inpaint mask carrying the union of the sources' coverage at `rect`, named after and configured like the topmost
- * source: its fill, and the noise and denoise every source shares.
+ * source: its fill, and the noise, denoise and guidance every source shares.
  */
 const mergedMaskLayer = (id: string, contributors: readonly CanvasLayerContract[], rect: Rect): CanvasLayerContract => {
   const top = contributors[0]!;
@@ -133,6 +133,7 @@ const mergedMaskLayer = (id: string, contributors: readonly CanvasLayerContract[
     type: 'inpaint_mask',
     ...(top.noise ? { noise: structuredClone(top.noise) } : {}),
     ...(top.denoise ? { denoise: structuredClone(top.denoise) } : {}),
+    ...(top.guidance ? { guidance: structuredClone(top.guidance) } : {}),
   };
 };
 

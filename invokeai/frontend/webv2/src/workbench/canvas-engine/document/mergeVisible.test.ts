@@ -117,6 +117,12 @@ describe('merge-selected eligibility', () => {
 });
 
 describe('merge-masks eligibility', () => {
+  const guidance = (positivePrompt: string) => ({
+    autoNegative: false,
+    isEnabled: true,
+    negativePrompt: null,
+    positivePrompt,
+  });
   const nodes = [
     mask('top'),
     groupContract('a', [mask('inA')]),
@@ -136,6 +142,11 @@ describe('merge-masks eligibility', () => {
     mask('quietNoise', { noise: { isEnabled: false, level: 0.6 } } as Partial<CanvasLayerContract>),
     mask('limited', { denoise: { isEnabled: true, limit: 0.4 } } as Partial<CanvasLayerContract>),
     mask('unlimited', { denoise: { isEnabled: false, limit: 0.4 } } as Partial<CanvasLayerContract>),
+    mask('fox', { guidance: guidance('a fox') } as Partial<CanvasLayerContract>),
+    mask('owl', { guidance: guidance('an owl') } as Partial<CanvasLayerContract>),
+    mask('blankGuidance', {
+      guidance: { ...guidance(''), autoNegative: true, negativePrompt: '' },
+    } as Partial<CanvasLayerContract>),
   ];
   const can = (ids: string[]) => canMergeInpaintMasks(leavesOf(nodes), new Set(ids), hasContent);
   const eligibility = (ids: string[]) => inpaintMaskMergeEligibility(leavesOf(nodes), new Set(ids), hasContent);
@@ -163,6 +174,7 @@ describe('merge-masks eligibility', () => {
   it('accepts masks whose enabled noise and denoise match, whatever their fill or disabled modifiers', () => {
     expect(can(['noisy', 'noisyToo'])).toBe(true);
     expect(can(['top', 'quietNoise', 'unlimited'])).toBe(true);
+    expect(can(['top', 'blankGuidance'])).toBe(true);
   });
 
   it.each([
@@ -170,6 +182,7 @@ describe('merge-masks eligibility', () => {
     ['enabled and absent noise', ['top', 'noisy']],
     ['enabled and disabled noise', ['noisier', 'quietNoise']],
     ['enabled and disabled denoise limits', ['limited', 'unlimited']],
+    ['guidance prompts', ['fox', 'owl']],
   ])('refuses different %s as a settings mismatch', (_, ids) => {
     expect(can(ids)).toBe(false);
     expect(eligibility(ids)).toBe('settings-differ');

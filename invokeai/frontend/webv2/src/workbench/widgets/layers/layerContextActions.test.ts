@@ -97,6 +97,7 @@ const makeState = (
 const makeEffects = (): LayerContextActionEffects => ({
   addAdjustment: vi.fn(),
   addLayerRegion: vi.fn(),
+  addMaskGuidance: vi.fn(),
   addMaskModifier: vi.fn(),
   addReferenceImage: vi.fn(),
   booleanMerge: vi.fn(() => Promise.resolve()),
@@ -313,6 +314,7 @@ describe('getLayerContextActions', () => {
       'control-transparency-effect',
       'regional-auto-negative',
       'add-reference-image',
+      'add-mask-guidance',
       'add-noise',
       'add-denoise-limit',
       'merge-down',

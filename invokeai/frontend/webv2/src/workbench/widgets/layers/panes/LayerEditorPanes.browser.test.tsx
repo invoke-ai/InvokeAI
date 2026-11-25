@@ -464,6 +464,24 @@ describe('Properties pane', () => {
     expect(layer.element().hasAttribute('inert')).toBe(false);
   });
 
+  it("adds a mask's regional guidance from its settings, opening the new row's editor with focus in its prompt", async () => {
+    harness.appliesMutations = true;
+    await mount(PropertiesPane, 'mask');
+    await act(() => engine!.tools.setTool('view'));
+    const add = page.getByRole('button', { exact: true, name: 'Add regional guidance' });
+
+    await act(() => userEvent.click(add));
+
+    await expect.element(page.getByRole('textbox', { exact: true, name: 'Positive prompt' })).toHaveFocus();
+    expect(host!.textContent).not.toContain('Invert mask');
+    expect(engine!.history.getEntries().past).toEqual(['Add regional guidance']);
+
+    await act(() => engine!.history.undo());
+    await settle();
+    await expect.element(add).toBeVisible();
+    expect(host!.textContent).toContain('Invert mask');
+  });
+
   it('remembers a group collapse per user across remounts', async () => {
     await mount(PropertiesPane);
     await act(() => engine!.tools.setTool('brush'));

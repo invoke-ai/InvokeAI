@@ -144,6 +144,7 @@ export const runCanvasInvocation = async (deps: RunCanvasInvocationDeps): Promis
       detectMode: (facts) =>
         model.type === 'external_image_generator' && !facts.bboxHasContent ? 'txt2img' : detectCanvasMode(facts),
       shouldCompositeControlLayer: (layer) => admitLayer(judge.control(layer), layer.id, controlInputs),
+      shouldCompositeMaskGuidance: (layer) => admitLayer(judge.maskGuidance(layer), layer.id, regionalInputs),
       shouldCompositeRegionalMask: (layer) => admitLayer(judge.regional(layer), layer.id, regionalInputs),
       signal: deps.signal,
     });

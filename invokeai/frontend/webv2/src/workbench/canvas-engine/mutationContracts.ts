@@ -12,6 +12,7 @@ import type {
   CanvasLayerSourceContract,
   CanvasMaskContract,
   CanvasMaskDenoiseContract,
+  CanvasMaskGuidanceContract,
   CanvasMaskNoiseContract,
   CanvasRasterLayerContractV2,
   CanvasRegionalGuidanceLayerContract,
@@ -94,6 +95,7 @@ export type CanvasLayerConfigPatch =
       /** `null` removes the modifier; absent leaves it untouched. */
       noise?: CanvasMaskNoiseContract | null;
       denoise?: CanvasMaskDenoiseContract | null;
+      guidance?: CanvasMaskGuidanceContract | null;
     };
 
 export type CanvasProjectMutation =

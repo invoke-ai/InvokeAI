@@ -150,10 +150,10 @@ const isControlLayerWithContent = (layer: CanvasLayerContract): layer is CanvasC
 const isRegionalGuidanceWithMask = (layer: CanvasLayerContract): layer is CanvasRegionalGuidanceLayerContract =>
   layer.type === 'regional_guidance' && hasRegionalGuidanceMaskContent(layer);
 
+type MaskBearingLayer = CanvasInpaintMaskLayerContract | CanvasRegionalGuidanceLayerContract;
+
 /** The native content rect of a mask layer's persisted bitmap (layer-local, at its offset). */
-const maskContentRect = (
-  layer: CanvasInpaintMaskLayerContract
-): { width: number; height: number; x: number; y: number } => {
+const maskContentRect = (layer: MaskBearingLayer): { width: number; height: number; x: number; y: number } => {
   const { bitmap, offset } = layer.mask;
   if (bitmap) {
     const o = offset ?? { x: 0, y: 0 };
@@ -301,21 +301,9 @@ export const planControlComposites = (document: CanvasDocumentContractV3, bbox: 
     };
   });
 
-/** The native content rect of a regional mask's persisted bitmap (layer-local, at its offset). */
-const regionalMaskContentRect = (
-  layer: CanvasRegionalGuidanceLayerContract
-): { width: number; height: number; x: number; y: number } => {
-  const { bitmap, offset } = layer.mask;
-  if (bitmap) {
-    const o = offset ?? { x: 0, y: 0 };
-    return { height: bitmap.height, width: bitmap.width, x: o.x, y: o.y };
-  }
-  return { height: 0, width: 0, x: 0, y: 0 };
-};
-
 /** Regional alpha masks take opacity 1 and normal blend: display settings must not reach alpha_mask_to_tensor input. */
-const toRegionalMaskRef = (layer: CanvasRegionalGuidanceLayerContract): CompositeLayerRef => {
-  const rect = regionalMaskContentRect(layer);
+const toRegionalMaskRef = (layer: MaskBearingLayer): CompositeLayerRef => {
+  const rect = maskContentRect(layer);
   return {
     blendMode: 'normal',
     contentOffset: { x: rect.x, y: rect.y },
@@ -339,12 +327,21 @@ export interface RegionalMaskCompositeEntry {
   entry: CompositeEntry;
 }
 
-/** Plan separate alpha masks for enabled regions with content, omitting empty ones; no region joins the base raster. */
+const isGuidedInpaintMaskWithContent = (layer: CanvasLayerContract): layer is CanvasInpaintMaskLayerContract =>
+  isInpaintMaskWithContent(layer) && layer.guidance?.isEnabled === true;
+
+/**
+ * Plan separate alpha masks for enabled regions with content, omitting empty ones; no region joins the base raster.
+ * Regional guidance layers come first, then every inpaint mask with enabled guidance, whose coverage is its region.
+ */
 export const planRegionalMaskComposites = (
   document: CanvasDocumentContractV3,
   bbox: Rect
 ): RegionalMaskCompositeEntry[] =>
-  contributingLayers(document, isRegionalGuidanceWithMask).map((layer) => {
+  [
+    ...contributingLayers(document, isRegionalGuidanceWithMask),
+    ...contributingLayers(document, isGuidedInpaintMaskWithContent),
+  ].map((layer) => {
     const ref = toRegionalMaskRef(layer);
     return {
       entry: {

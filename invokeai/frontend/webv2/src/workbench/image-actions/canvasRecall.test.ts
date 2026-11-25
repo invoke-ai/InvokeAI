@@ -3,7 +3,11 @@ import type { GalleryImage } from '@features/gallery';
 import type * as GalleryBackendModule from '@features/gallery/data/backend';
 import type { MainModelConfig } from '@features/generation/contracts';
 import type { ModelConfig } from '@features/models';
-import type { CanvasControlLayerContract, CanvasLayerContract } from '@workbench/canvas-engine/api';
+import type {
+  CanvasControlLayerContract,
+  CanvasDocumentContractV3,
+  CanvasLayerContract,
+} from '@workbench/canvas-engine/api';
 import type { TFunction } from 'i18next';
 
 import { compileCanvasGraph } from '@features/generation/canvasGraph';
@@ -16,9 +20,11 @@ import {
 import { accountLifecycle, captureAccountScope } from '@platform/state/accountLifecycle';
 import { ApiError } from '@platform/transport/http';
 import { QueryClient } from '@tanstack/react-query';
+import { createVectorLayer } from '@workbench/canvas-engine/api';
 import * as CanvasOperations from '@workbench/canvas-operations/api';
 import { recordCanvasMetadata } from '@workbench/canvas-operations/saveCanvasToGallery';
 import { createEmptyCanvasDocument } from '@workbench/canvasMigration';
+import { MAX_SUPPORTED_CANVAS_SCHEMA_VERSION } from '@workbench/canvasSchemaVersion';
 import { DEFAULT_CANVAS_COMPOSITING } from '@workbench/widgets/canvas/invoke/canvasCompositing';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import { createWorkbenchStore } from '@workbench/workbenchStore';
@@ -378,6 +384,77 @@ describe('canvas record to recall', () => {
       })
     ).toBe(true);
     expect(target.getProject()!.canvas.document.stacks.inpaint_mask).toEqual([]);
+  });
+
+  it('recalls a document at the newest canvas schema with its mask guidance intact', async () => {
+    const guidance = { autoNegative: true, isEnabled: true, negativePrompt: null, positivePrompt: 'a red fox' };
+    const saved = document();
+    const authored: CanvasDocumentContractV3 = {
+      ...saved,
+      stacks: { ...saved.stacks, inpaint_mask: [{ ...saved.stacks.inpaint_mask[0], guidance } as CanvasLayerContract] },
+      version: MAX_SUPPORTED_CANVAS_SCHEMA_VERSION,
+    };
+
+    const plan = await prepareCanvasRecall({
+      metadata: { canvas_v3_metadata: recordCanvasMetadata(authored) },
+      model: main,
+      models,
+      owner: captureAccountScope(),
+    });
+
+    expect(plan.problems).toEqual([]);
+    expect(plan.document?.stacks.inpaint_mask[0]).toMatchObject({ guidance });
+  });
+
+  it('recalls a vector layer with its geometry and appearance under fresh layer and path ids', async () => {
+    const vector = {
+      ...createVectorLayer({ id: 'vector', name: 'Outline' }),
+      paths: [
+        {
+          id: 'path',
+          isClosed: false,
+          name: null,
+          points: [
+            { anchor: { x: 0, y: 0 }, inHandle: null, outHandle: { x: 10, y: 0 }, type: 'smooth' as const },
+            { anchor: { x: 40, y: 30 }, inHandle: null, outHandle: null, type: 'corner' as const },
+          ],
+        },
+      ],
+      strokeColor: '#123456',
+      strokeWidth: 9,
+    };
+    const authored: CanvasDocumentContractV3 = {
+      ...createEmptyCanvasDocument(),
+      stacks: { ...createEmptyCanvasDocument().stacks, vector: [vector] },
+      version: 7,
+    };
+    const store = createWorkbenchStore(),
+      target = targetFor(store);
+
+    const plan = await prepareCanvasRecall({
+      metadata: { canvas_v3_metadata: recordCanvasMetadata(authored) },
+      model: main,
+      models,
+      owner: captureAccountScope(),
+    });
+    expect(plan.problems).toEqual([]);
+    expect(
+      commitCanvasRecall({
+        plan,
+        target,
+        expectedDocument: target.getProject()!.canvas.document,
+        restorePointName: 'Before recall',
+      })
+    ).toBe(true);
+
+    const recalled = target.getProject()!.canvas.document.stacks.vector?.[0] as typeof vector;
+    expect(recalled).toEqual({
+      ...vector,
+      id: recalled.id,
+      paths: [{ ...vector.paths[0], id: recalled.paths[0]?.id }],
+    });
+    // Appending the same record twice must not leave two layers sharing path ids.
+    expect(recalled.paths[0]?.id).not.toBe('path');
   });
 
   it.each(['all', 'remix'] as const)(

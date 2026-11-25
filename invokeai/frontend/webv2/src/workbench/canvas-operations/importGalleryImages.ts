@@ -415,6 +415,8 @@ export const commitCanvasRecall = ({
         node.id = newId;
         if (node.type === 'group') {
           remap(node.children);
+        } else if (node.type === 'vector') {
+          node.paths = node.paths.map((path) => ({ ...path, id: createItemId('recalled-path') }));
         }
       }
     };

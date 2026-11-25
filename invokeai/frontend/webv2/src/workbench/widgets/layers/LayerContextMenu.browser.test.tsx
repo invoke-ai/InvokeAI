@@ -252,7 +252,7 @@ describe('Layers context menu over a real engine', () => {
       [maskLayer('m1'), maskLayer('m2', { noise: { isEnabled: true, level: 0.5 } } as Partial<CanvasLayerContract>)],
       ['m1', 'm2']
     );
-    const reason = 'The masks have different noise or denoise settings. Match them to merge.';
+    const reason = 'The masks have different noise, denoise or regional guidance settings. Match them to merge.';
 
     await openMenu('m1');
     const merge = document.querySelector<HTMLElement>('[role="menuitem"][data-value="merge-masks"]')!;

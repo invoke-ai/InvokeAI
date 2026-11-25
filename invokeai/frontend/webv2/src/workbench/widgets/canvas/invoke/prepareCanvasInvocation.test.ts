@@ -1035,6 +1035,25 @@ describe('runCanvasInvocation — inpaint / outpaint dispatch', () => {
     expect(harness.surfaceIds).toEqual(['base', 'mask']);
   });
 
+  it("sends an inpainting mask's guidance to the graph as a region over the mask", async () => {
+    const guided = {
+      ...inpaintMaskLayer('mask'),
+      guidance: { autoNegative: false, isEnabled: true, negativePrompt: null, positivePrompt: 'a red fox' },
+    };
+    const harness = makeHarness({ document: docWithLayers([rasterLayer('base'), guided]) });
+
+    await runCanvasInvocation(harness.deps);
+
+    expect(harness.notices()).toHaveLength(0);
+    const submitted = harness.submittedGraphs()[0]?.graph;
+    expect(submitted?.label).toBe('SD 1.5 inpaint');
+    expect(submitted?.backendGraph?.nodes.rg_pos_cond_mask).toMatchObject({ prompt: 'a red fox' });
+    expect(submitted?.backendGraph?.nodes.rg_mask_to_tensor_mask).toMatchObject({
+      image: { image_name: expect.stringMatching(/^composite-\d+\.png$/) },
+      type: 'alpha_mask_to_tensor',
+    });
+  });
+
   it('dispatches an outpaint graph when content only partially covers the bbox', async () => {
     const harness = makeHarness({ document: makeDoc([rasterLayer('base')]), alpha: 200 });
 
