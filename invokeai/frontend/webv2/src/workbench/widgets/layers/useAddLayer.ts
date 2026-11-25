@@ -60,20 +60,10 @@ export const useAddLayer = (): ((id: AddLayerItemId) => void) => {
           if (!engine) {
             return;
           }
-          const document = engine.document.getDocument();
-          void engine.layers.vectorEdit
-            .createLayer({
-              id: createLayerId(),
-            })
-            .then((layer) => {
-              if (
-                layer &&
-                engine.lifecycle.getLifecycleState() === 'active' &&
-                engine.document.getDocument() === document
-              ) {
-                add(t('widgets.layers.actions.addVectorLayer'), layer);
-              }
-            });
+          const layer = engine.layers.vectorEdit.createLayer({ id: createLayerId() });
+          if (layer) {
+            add(t('widgets.layers.actions.addVectorLayer'), layer);
+          }
           return;
         }
         case 'group': {

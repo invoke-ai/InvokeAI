@@ -172,7 +172,6 @@ export type PsdExportStatus = 'idle' | 'preparing' | 'serializing' | 'downloadin
 
 export interface CanvasInteractionState {
   vectorEditSession: VectorEditSession | null;
-  vectorToolsStatus: 'idle' | 'loading' | 'ready' | 'failed';
   psdExportStatus: PsdExportStatus;
   activeTool: ToolId;
   bboxGrid: number;
@@ -666,9 +665,7 @@ export type BeginTransformResult =
   | SubsetOf<CanvasTransactionOutcome, 'busy'>;
 
 export interface CanvasVectorEditCapability {
-  /** Loads vector support before exposing its synchronous editing commands. */
-  prepare(): Promise<boolean>;
-  createLayer(input: { id: string; name?: string }): Promise<CanvasVectorLayerContract | null>;
+  createLayer(input: { id: string; name?: string }): CanvasVectorLayerContract | null;
   transformPath(): void;
   extractPath(): void;
   targetContextMenu(screenPoint: Vec2): boolean;

@@ -433,7 +433,6 @@ export interface EngineStores {
   /** Vector creation preview is guide geometry, never a rasterization source. */
   vectorShapePreview: ScalarStore<VectorShapePreview | null>;
   vectorEditSession: ScalarStore<VectorEditSession | null>;
-  vectorToolsStatus: ScalarStore<'idle' | 'loading' | 'ready' | 'failed'>;
   /** Document-space gradient drag vector; overlay shows a linear ramp or radial circle. Cleared on commit/cancel. */
   gradientPreview: ScalarStore<GradientPreview | null>;
   hasSelection: ScalarStore<boolean>;
@@ -671,7 +670,6 @@ export const createEngineStores = (initialTool: ToolId = 'view'): EngineStores =
   shapePreview: createScalarStore<{ rect: Rect; kind: ParametricShapeKind } | null>(null, rectShapePreviewEqual),
   vectorShapePreview: createScalarStore<VectorShapePreview | null>(null),
   vectorEditSession: createScalarStore<VectorEditSession | null>(null),
-  vectorToolsStatus: createScalarStore<'idle' | 'loading' | 'ready' | 'failed'>('idle'),
   showBbox: createScalarStore<boolean>(true),
   showGrid: createScalarStore<boolean>(false),
   snapToGrid: createScalarStore<boolean>(true),
