@@ -509,37 +509,7 @@ describe('node updates', () => {
       label: 'Resize workflow current image node',
     });
 
-    const oversizedPersisted = {
-      ...doc,
-      nodes: [
-        {
-          data: { height: 80, label: 'Oversized', width: 20_000 },
-          id: 'ci-oversized',
-          position: { x: 10, y: 20 },
-          type: 'current_image',
-        },
-        {
-          data: { height: 320, label: 'Default', width: 320 },
-          id: 'ci-default',
-          position: { x: 30, y: 40 },
-          type: 'current_image',
-        },
-      ],
-    };
-    const loaded = readPersistedProjectGraph(oversizedPersisted);
-    expect(loaded?.nodes).toEqual([
-      {
-        data: { height: 160, label: 'Oversized', width: 1600 },
-        id: 'ci-oversized',
-        position: { x: 10, y: 20 },
-        type: 'current_image',
-      },
-      {
-        data: { label: 'Default' },
-        id: 'ci-default',
-        position: { x: 30, y: 40 },
-        type: 'current_image',
-      },
-    ]);
+    // Persisted documents pass through without reallocating node arrays; sizes are validated on write and clamped on render.
+    expect(readPersistedProjectGraph(resized)).toBe(resized);
   });
 });

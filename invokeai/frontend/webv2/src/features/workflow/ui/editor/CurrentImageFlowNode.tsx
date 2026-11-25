@@ -1,14 +1,8 @@
-import type {
-  GalleryItem,
-  GalleryItemRef,
-  GalleryVideoItem,
-  GeneratedImageContract,
-} from '@features/gallery/contracts';
-import type { QueueActiveSession } from '@features/queue/contracts';
-import type * as VideoPlayerModule from '@platform/ui/video-player/VideoPlayer';
+import type { GalleryItem, GalleryItemRef, GeneratedImageContract } from '@features/gallery/contracts';
+import type { QueueActiveSession, QueueItemProgress } from '@features/queue/contracts';
 import type { NodeProps } from '@xyflow/react';
 
-import { Badge, Box, Flex, HStack, Icon, ProgressCircle, Spinner, Text } from '@chakra-ui/react';
+import { Box, Flex, HStack, Icon, ProgressCircle, Spinner, Text } from '@chakra-ui/react';
 import { useDraggable } from '@dnd-kit/core';
 import {
   getSelectedGalleryItemFromValues,
@@ -19,7 +13,6 @@ import {
 } from '@features/gallery/contracts';
 import { useGalleryItemContextMenu } from '@features/gallery/react';
 import { getGalleryItemDragData, getGalleryItemDragId } from '@features/gallery/utility';
-import { getAuthSession, refreshProtectedMediaCookie } from '@features/identity';
 import { getAutoSwitchFollowedLive, getQueueActiveSessions } from '@features/queue/contracts';
 import {
   useActiveProgressTargets,
@@ -32,6 +25,9 @@ import {
 import {
   CURRENT_IMAGE_DEFAULT_HEIGHT,
   CURRENT_IMAGE_DEFAULT_WIDTH,
+  CURRENT_IMAGE_MAX_SIZE,
+  CURRENT_IMAGE_MIN_HEIGHT,
+  CURRENT_IMAGE_MIN_WIDTH,
   clampCurrentImageHeight,
   clampCurrentImageWidth,
 } from '@features/workflow/core/types';
@@ -42,27 +38,29 @@ import {
   WorkflowNodeHeaderButton,
 } from '@features/workflow/ui/nodeChrome';
 import { useProjectGraphCommands } from '@features/workflow/ui/useProjectGraphCommands';
-import { useWorkflowNotifications, useWorkflowProjectSelector } from '@features/workflow/ui/WorkflowUiContext';
-import { canCopyImage, copyImage } from '@platform/browser/clipboard';
-import { Button, IconButton } from '@platform/ui/Button';
+import { useWorkflowProjectSelector } from '@features/workflow/ui/WorkflowUiContext';
+import { canCopyImage } from '@platform/browser/clipboard';
+import { Button } from '@platform/ui/Button';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
+import { ResizeCorner, trackResizeDrag, usePointerDrag } from '@platform/ui/ResizeHandle';
 import { StreamingImageFrame } from '@platform/ui/streaming-image/StreamingImageFrame';
 import {
   imageUrlToStreamingSource,
   progressImageToStreamingSource,
 } from '@platform/ui/streaming-image/streamingImageSource';
 import { Tooltip } from '@platform/ui/Tooltip';
-import { CopyIcon, EllipsisVerticalIcon, GripHorizontalIcon } from 'lucide-react';
+import { useStoreApi } from '@xyflow/react';
+import { CopyIcon, EllipsisVerticalIcon, RotateCcwIcon } from 'lucide-react';
 import {
   lazy,
   memo,
   Suspense,
   useCallback,
+  useEffect,
   useId,
   useMemo,
   useRef,
   useState,
-  type CSSProperties,
   type KeyboardEvent,
   type MouseEvent,
   type PointerEvent,
@@ -70,49 +68,19 @@ import {
 } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import type { CurrentImageVideoController } from './CurrentImageVideoSurface';
 import type { CurrentImageFlowNode as CurrentImageFlowNodeType } from './flowAdapters';
 
 const KEYBOARD_RESIZE_STEP_PX = 32;
+/** Ignore sub-3px pointer jitter (such as the first click of a double-click) before committing a resize. */
+const RESIZE_DRAG_THRESHOLD_PX = 3;
+/** Below this width, collapse the dimension pill to an icon so the node title keeps readable room at 200 px. */
+const COMPACT_HEADER_WIDTH = 280;
+/** Switch VideoPlayer to compact controls when the box is too tight for full transport + volume + fullscreen. */
+const COMPACT_VIDEO_MIN_WIDTH = 280;
+const COMPACT_VIDEO_MIN_HEIGHT = 220;
 
-const RESIZE_FOCUS_VISIBLE_STYLE = {
-  opacity: 1,
-  outline: '2px solid',
-  outlineColor: 'accent.solid',
-  outlineOffset: '-2px',
-} as const;
-const RESIZE_HOVER_STYLE = { opacity: 1 } as const;
-const VIDEO_FAILURE_POSTER_STYLE: CSSProperties = {
-  display: 'block',
-  height: '100%',
-  inset: 0,
-  objectFit: 'contain',
-  position: 'absolute',
-  width: '100%',
-};
-
-// Load VideoPlayer and its frame/recovery helpers together only when a video is displayed, keeping initial routes light.
-let loadedVideoPlayer: typeof VideoPlayerModule | null = null;
-const LazyVideoPlayer = lazy(() =>
-  import('@platform/ui/video-player/VideoPlayer').then((mod) => {
-    loadedVideoPlayer = mod;
-    return { default: mod.VideoPlayer };
-  })
-);
-
-// Keep VideoPlayer typed while still splitting the player chunk until a video is selected.
-const PlayerComponent: typeof VideoPlayerModule.VideoPlayer =
-  LazyVideoPlayer as unknown as typeof VideoPlayerModule.VideoPlayer;
-
-interface ResizeDragSession {
-  nodeId: string;
-  pointerId: number;
-  projectId: string;
-  startHeight: number;
-  startWidth: number;
-  startX: number;
-  startY: number;
-  zoom: number;
-}
+const LazyCurrentImageVideoSurface = lazy(() => import('./CurrentImageVideoSurface'));
 
 interface DisplayedGalleryMedia {
   item: GalleryItem;
@@ -120,70 +88,40 @@ interface DisplayedGalleryMedia {
   menuTarget: GalleryItem | GalleryItemRef;
 }
 
-export interface CurrentImageExecutionState {
-  dragRef: GalleryItemRef | null;
-  hasLiveFrame: boolean;
-  isGenerating: boolean;
-  isShowingVideo: boolean;
-  isWaiting: boolean;
-  progressPercent: number | null;
-}
-
 /**
- * Pick the displayed live session using the queue feature's shared start-order policy (`getAutoSwitchFollowedLive`),
- * avoiding per-frame flipping across concurrent multi-GPU slots while keeping a running unframed slot tracked for
- * progress before its first frame arrives.
+ * Pick the displayed live frame via the queue feature's shared auto-switch policy (`getAutoSwitchFollowedLive`), while
+ * tracking percentage only on an actively running session so a settling slot never shows stale progress under
+ * "Generating" while a sibling slot is starting.
  */
-export const resolveCurrentImageActiveSession = (
+const resolveCurrentImageActiveSession = (
   sessions: readonly QueueActiveSession[]
 ): { liveSession: QueueActiveSession | null; trackedSession: QueueActiveSession | null } => {
   const liveSession = getAutoSwitchFollowedLive('progress', sessions, null);
   const trackedSession =
-    liveSession ?? sessions.filter((session) => session.state === 'running').at(-1) ?? sessions[0] ?? null;
+    (liveSession?.state === 'running' ? liveSession : null) ??
+    sessions.filter((session) => session.state === 'running').at(-1) ??
+    null;
   return { liveSession, trackedSession };
 };
 
-// Prefer the coordinator's percentage when its active slot matches the displayed session; use per-slot lookup otherwise.
-export const resolveProgressPercentage = ({
+const resolveProgressPercentage = ({
   activeProgress,
   activeTarget,
   slotProgressPercentage,
 }: {
-  activeProgress: { activeItemIndex?: number; percentage: number | null } | null | undefined;
+  activeProgress: Pick<QueueItemProgress, 'activeItemIndex' | 'percentage' | 'slotPercentages'> | null | undefined;
   activeTarget: { itemIndex: number; queueItemId: string } | null;
   slotProgressPercentage?: number | null;
 }): number | null => {
-  if (activeTarget && activeProgress && activeProgress.activeItemIndex === activeTarget.itemIndex) {
-    return activeProgress.percentage;
+  if (activeTarget && activeProgress) {
+    if (activeProgress.slotPercentages && Object.hasOwn(activeProgress.slotPercentages, activeTarget.itemIndex)) {
+      return activeProgress.slotPercentages[activeTarget.itemIndex] ?? null;
+    }
+    if (activeProgress.activeItemIndex === activeTarget.itemIndex) {
+      return activeProgress.percentage;
+    }
   }
   return slotProgressPercentage ?? null;
-};
-
-// Keep queued workflow runs in Waiting until a session owned by this project is actively executing.
-export const resolveCurrentImageExecutionState = ({
-  displayedItem,
-  hasRunningSession,
-  isWorkflowRunning,
-  progressImage,
-  progressPercentage,
-}: {
-  displayedItem: GalleryItem | null;
-  hasRunningSession: boolean;
-  isWorkflowRunning: boolean;
-  progressImage: unknown;
-  progressPercentage: number | null | undefined;
-}): CurrentImageExecutionState => {
-  const hasLiveFrame = Boolean(progressImage);
-  const isGenerating = hasLiveFrame || hasRunningSession;
-  const isWaiting = !isGenerating && isWorkflowRunning;
-  const isShowingVideo = !hasLiveFrame && displayedItem?.kind === 'video';
-  const dragRef = !hasLiveFrame && displayedItem ? toGalleryItemRef(displayedItem) : null;
-  const progressPercent =
-    isGenerating && typeof progressPercentage === 'number' && progressPercentage > 0
-      ? Math.round(Math.min(100, Math.max(0, progressPercentage * 100)))
-      : null;
-
-  return { dragRef, hasLiveFrame, isGenerating, isShowingVideo, isWaiting, progressPercent };
 };
 
 const isFullGalleryItem = (media: GalleryItem | GalleryItemRef): media is GalleryItem => 'fullUrl' in media;
@@ -231,7 +169,9 @@ const isTargetInFullscreen = (target: EventTarget | null): boolean =>
 const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNodeType>) => {
   const { t } = useTranslation();
   const { editGraph } = useProjectGraphCommands();
-  const notifications = useWorkflowNotifications();
+  const flowStore = useStoreApi();
+  const startDrag = usePointerDrag();
+
   // Select only the shown media item so unrelated gallery changes (board filter, page, scroll) do not re-render.
   const displayedMedia = useWorkflowProjectSelector(
     (project) => resolveDisplayedGalleryMedia(project.galleryValues),
@@ -268,17 +208,15 @@ const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNo
   );
 
   const displayedItemKey = useMemo(() => (displayedItem ? toGalleryItemKey(displayedItem) : null), [displayedItem]);
-  const { hasLiveFrame, isGenerating, isShowingVideo, isWaiting, progressPercent } = useMemo(
-    () =>
-      resolveCurrentImageExecutionState({
-        displayedItem,
-        hasRunningSession,
-        isWorkflowRunning,
-        progressImage: projectProgressImage,
-        progressPercentage,
-      }),
-    [displayedItem, hasRunningSession, isWorkflowRunning, progressPercentage, projectProgressImage]
-  );
+  const hasLiveFrame = Boolean(projectProgressImage);
+  const isGenerating = hasLiveFrame || hasRunningSession;
+  const isWaiting = !isGenerating && isWorkflowRunning;
+  const isShowingVideo = !hasLiveFrame && displayedItem?.kind === 'video';
+  const progressPercent =
+    isGenerating && typeof progressPercentage === 'number' && progressPercentage > 0
+      ? Math.round(Math.min(100, Math.max(0, progressPercentage * 100)))
+      : null;
+
   const videoDragRef = useMemo<GalleryItemRef | null>(
     () => (!hasLiveFrame && displayedItem?.kind === 'video' ? toGalleryItemRef(displayedItem) : null),
     [displayedItem, hasLiveFrame]
@@ -300,98 +238,46 @@ const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNo
   const displayWidth = liveSize?.width ?? savedWidth;
   const displayHeight = liveSize?.height ?? savedHeight;
   const isCustomSize = displayWidth !== CURRENT_IMAGE_DEFAULT_WIDTH || displayHeight !== CURRENT_IMAGE_DEFAULT_HEIGHT;
+  const isCompactHeader = displayWidth < COMPACT_HEADER_WIDTH;
+  const videoPlayerSize =
+    displayWidth < COMPACT_VIDEO_MIN_WIDTH || displayHeight < COMPACT_VIDEO_MIN_HEIGHT ? 'compact' : 'full';
 
-  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const videoControllerRef = useRef<CurrentImageVideoController | null>(null);
   const resizeHandleRef = useRef<HTMLDivElement | null>(null);
+  const activeDragRef = useRef<AbortController | null>(null);
   const [copyReadyVideoKey, setCopyReadyVideoKey] = useState<string | null>(null);
   const canCopyVideoFrame = isShowingVideo && videoSurfaceKey !== null && copyReadyVideoKey === videoSurfaceKey;
-  const dragSessionRef = useRef<ResizeDragSession | null>(null);
 
-  const handleVideoElementChange = useCallback((element: HTMLVideoElement | null) => {
-    videoRef.current = element;
+  // Cancel any in-flight resize drag on unmount or if the node or active project changes underneath it.
+  useEffect(() => {
+    activeDragRef.current?.abort();
+    activeDragRef.current = null;
+    return () => {
+      activeDragRef.current?.abort();
+      activeDragRef.current = null;
+    };
+  }, [node.id, projectId]);
+
+  const handleVideoControllerChange = useCallback((controller: CurrentImageVideoController | null) => {
+    videoControllerRef.current = controller;
   }, []);
 
   const handleVideoCopyAvailabilityChange = useCallback((surfaceKey: string, isAvailable: boolean) => {
     setCopyReadyVideoKey((prev) => (isAvailable ? surfaceKey : prev === surfaceKey ? null : prev));
   }, []);
 
-  const handleCopyCurrentFrame = useCallback(
-    async (event: MouseEvent<HTMLButtonElement>) => {
-      event.preventDefault();
-      event.stopPropagation();
-      const video = videoRef.current;
-      const playerUtils = loadedVideoPlayer;
-      if (!canCopyImage()) {
-        notifications.error(t('widgets.preview.copyCurrentFrameUnsupported'));
-        return;
-      }
-      if (!playerUtils || !playerUtils.isVideoFrameReady(video)) {
-        notifications.error(t('widgets.preview.copyCurrentFrameNotReady'));
-        return;
-      }
-
-      const accountEpoch = getAuthSession().accountEpoch;
-      const canvas = document.createElement('canvas');
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) {
-        notifications.error(t('widgets.preview.copyCurrentFrameDrawFailed'));
-        return;
-      }
-
-      try {
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      } catch {
-        notifications.error(t('widgets.preview.copyCurrentFrameDrawFailed'));
-        return;
-      }
-
-      let blob: Blob | null;
-      try {
-        blob = await playerUtils.encodeCanvasPng(canvas);
-      } catch (error: unknown) {
-        notifications.error(
-          t(
-            playerUtils.isCanvasSecurityError(error)
-              ? 'widgets.preview.copyCurrentFrameDrawFailed'
-              : 'widgets.preview.copyCurrentFrameEncodeFailed'
-          )
-        );
-        return;
-      }
-      if (!blob) {
-        notifications.error(t('widgets.preview.copyCurrentFrameEncodeFailed'));
-        return;
-      }
-
-      const isCurrent = (): boolean => videoRef.current === video && getAuthSession().accountEpoch === accountEpoch;
-      if (!isCurrent()) {
-        notifications.error(t('widgets.preview.copyCurrentFrameStale'));
-        return;
-      }
-
-      try {
-        await copyImage(blob);
-      } catch {
-        notifications.error(t('widgets.preview.copyCurrentFrameWriteFailed'));
-        return;
-      }
-
-      if (!isCurrent()) {
-        notifications.error(t('widgets.preview.copyCurrentFrameStale'));
-        return;
-      }
-      notifications.success(t('widgets.preview.copyCurrentFrameSuccess'));
-    },
-    [notifications, t]
-  );
+  const handleCopyCurrentFrame = useCallback((event: MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    void videoControllerRef.current?.copyCurrentFrame();
+  }, []);
 
   const resetSize = useCallback(
     (event: MouseEvent<HTMLElement> | KeyboardEvent<HTMLElement>) => {
       event.preventDefault();
       event.stopPropagation();
-      dragSessionRef.current = null;
+      activeDragRef.current?.abort();
+      activeDragRef.current = null;
       setLiveSizeState(null);
       editGraph({ height: undefined, nodeId: node.id, type: 'setCurrentImageNodeSize', width: undefined });
       resizeHandleRef.current?.focus();
@@ -404,91 +290,84 @@ const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNo
       if (event.button !== 0) {
         return;
       }
-      event.preventDefault();
       event.stopPropagation();
-      event.currentTarget.setPointerCapture?.(event.pointerId);
-      const shell = event.currentTarget.closest<HTMLElement>('[data-workflow-node-shell="true"]');
-      const rect = shell?.getBoundingClientRect();
-      const zoom = rect && rect.width > 0 && savedWidth > 0 ? rect.width / savedWidth : 1;
-      dragSessionRef.current = {
-        nodeId: node.id,
-        pointerId: event.pointerId,
-        projectId,
-        startHeight: savedHeight,
-        startWidth: savedWidth,
-        startX: event.clientX,
-        startY: event.clientY,
-        zoom,
-      };
-    },
-    [node.id, projectId, savedHeight, savedWidth]
-  );
+      activeDragRef.current?.abort();
 
-  const handleResizePointerMove = useCallback(
-    (event: PointerEvent<HTMLDivElement>) => {
-      const session = dragSessionRef.current;
-      if (!session || session.pointerId !== event.pointerId) {
-        return;
-      }
-      if (session.nodeId !== node.id || session.projectId !== projectId) {
-        dragSessionRef.current = null;
-        setLiveSizeState(null);
-        return;
-      }
-      const nextWidth = clampCurrentImageWidth(session.startWidth + (event.clientX - session.startX) / session.zoom);
-      const nextHeight = clampCurrentImageHeight(session.startHeight + (event.clientY - session.startY) / session.zoom);
-      setLiveSizeState({ height: nextHeight, nodeId: node.id, projectId, width: nextWidth });
-    },
-    [node.id, projectId]
-  );
+      const handle = event.currentTarget;
+      const zoom = flowStore.getState().transform[2] || 1;
+      const startWidth = savedWidth;
+      const startHeight = savedHeight;
+      let hasCrossedThreshold = false;
+      let liveWidth = startWidth;
+      let liveHeight = startHeight;
 
-  const handleResizePointerUp = useCallback(
-    (event: PointerEvent<HTMLDivElement>) => {
-      const session = dragSessionRef.current;
-      if (!session || session.pointerId !== event.pointerId) {
-        return;
-      }
-      dragSessionRef.current = null;
-      setLiveSizeState(null);
-      if (session.nodeId !== node.id || session.projectId !== projectId) {
-        return;
-      }
-      const nextWidth = clampCurrentImageWidth(session.startWidth + (event.clientX - session.startX) / session.zoom);
-      const nextHeight = clampCurrentImageHeight(session.startHeight + (event.clientY - session.startY) / session.zoom);
-      if (nextWidth !== session.startWidth || nextHeight !== session.startHeight) {
-        editGraph({ height: nextHeight, nodeId: node.id, type: 'setCurrentImageNodeSize', width: nextWidth });
-      }
-    },
-    [editGraph, node.id, projectId]
-  );
+      const session = startDrag(event, {
+        cursor: 'nwse-resize',
+        onEnd: (reason) => {
+          if (activeDragRef.current !== session) {
+            return;
+          }
+          activeDragRef.current = null;
+          setLiveSizeState(null);
+          if (reason !== 'release' || !hasCrossedThreshold) {
+            return;
+          }
+          if (liveWidth !== startWidth || liveHeight !== startHeight) {
+            editGraph({ height: liveHeight, nodeId: node.id, type: 'setCurrentImageNodeSize', width: liveWidth });
+          }
+        },
+        onMove: (deltaX, deltaY) => {
+          if (activeDragRef.current !== session) {
+            return;
+          }
+          if (!hasCrossedThreshold && Math.hypot(deltaX, deltaY) < RESIZE_DRAG_THRESHOLD_PX) {
+            return;
+          }
+          hasCrossedThreshold = true;
+          liveWidth = clampCurrentImageWidth(startWidth + deltaX / zoom);
+          liveHeight = clampCurrentImageHeight(startHeight + deltaY / zoom);
+          setLiveSizeState({ height: liveHeight, nodeId: node.id, projectId, width: liveWidth });
+        },
+      });
 
-  const handleResizePointerCancel = useCallback(() => {
-    dragSessionRef.current = null;
-    setLiveSizeState(null);
-  }, []);
+      activeDragRef.current = session;
+      handle.setAttribute('data-dragging', '');
+      trackResizeDrag(session.signal);
+      session.signal.addEventListener('abort', () => {
+        handle.removeAttribute('data-dragging');
+        if (activeDragRef.current === session) {
+          activeDragRef.current = null;
+          setLiveSizeState(null);
+        }
+      });
+    },
+    [editGraph, flowStore, node.id, projectId, savedHeight, savedWidth, startDrag]
+  );
 
   const handleResizeKeyDown = useCallback(
     (event: KeyboardEvent<HTMLDivElement>) => {
-      if (event.key === 'Home' || event.key === 'Enter' || event.key === ' ') {
-        resetSize(event);
-        return;
-      }
-      const dx =
-        event.key === 'ArrowRight' ? KEYBOARD_RESIZE_STEP_PX : event.key === 'ArrowLeft' ? -KEYBOARD_RESIZE_STEP_PX : 0;
-      const dy =
-        event.key === 'ArrowDown' ? KEYBOARD_RESIZE_STEP_PX : event.key === 'ArrowUp' ? -KEYBOARD_RESIZE_STEP_PX : 0;
-      if (dx === 0 && dy === 0) {
+      const step = event.shiftKey ? KEYBOARD_RESIZE_STEP_PX * 2 : KEYBOARD_RESIZE_STEP_PX;
+      const targets: Partial<Record<string, [number, number]>> = {
+        ArrowDown: [savedWidth, savedHeight + step],
+        ArrowLeft: [savedWidth - step, savedHeight],
+        ArrowRight: [savedWidth + step, savedHeight],
+        ArrowUp: [savedWidth, savedHeight - step],
+        End: [CURRENT_IMAGE_MAX_SIZE, CURRENT_IMAGE_MAX_SIZE],
+        Home: [CURRENT_IMAGE_MIN_WIDTH, CURRENT_IMAGE_MIN_HEIGHT],
+      };
+      const target = targets[event.key];
+      if (!target) {
         return;
       }
       event.preventDefault();
       event.stopPropagation();
-      const nextWidth = clampCurrentImageWidth(savedWidth + dx);
-      const nextHeight = clampCurrentImageHeight(savedHeight + dy);
+      const nextWidth = clampCurrentImageWidth(target[0]);
+      const nextHeight = clampCurrentImageHeight(target[1]);
       if (nextWidth !== savedWidth || nextHeight !== savedHeight) {
         editGraph({ height: nextHeight, nodeId: node.id, type: 'setCurrentImageNodeSize', width: nextWidth });
       }
     },
-    [editGraph, node.id, resetSize, savedHeight, savedWidth]
+    [editGraph, node.id, savedHeight, savedWidth]
   );
 
   const title = node.data.label || t('widgets.workflow.addNodeDialog.currentImageTitle');
@@ -525,17 +404,36 @@ const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNo
         : null,
     [displayedItem, title]
   );
+  const videoPosterFallback = useMemo(() => {
+    if (!displayedItem || displayedItem.kind !== 'video') {
+      return null;
+    }
+    const posterSource = imageUrlToStreamingSource({
+      alt: displayedItem.name,
+      height: displayedItem.height,
+      kind: 'fallback',
+      src: displayedItem.thumbnailUrl,
+      width: displayedItem.width,
+    });
+    return (
+      <Box bg="black" className="nodrag nopan nowheel" h="full" position="relative" w="full">
+        <StreamingImageFrame fallbackImage={posterSource} fit="contain" h="full" liveImage={null} w="full" />
+      </Box>
+    );
+  }, [displayedItem]);
   const liveImage = useMemo(() => progressImageToStreamingSource(projectProgressImage), [projectProgressImage]);
 
-  const resizeLabel = t('widgets.workflow.currentImageResizeHandle', {
-    height: displayHeight,
-    width: displayWidth,
-  });
+  const copyUnavailableReason = !canCopyImage()
+    ? t('common.copyUnavailable')
+    : !canCopyVideoFrame
+      ? t('widgets.preview.copyCurrentFrameNotReady')
+      : undefined;
   const resetSizeLabel = t('widgets.workflow.currentImageResetSize', {
     height: displayHeight,
     width: displayWidth,
   });
   const showItemMenuButton = Boolean(openItemMenu);
+  const endsWithHeaderButton = showItemMenuButton || (isCustomSize ? isCompactHeader : isShowingVideo);
 
   return (
     <Box
@@ -549,8 +447,8 @@ const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNo
       w={`${displayWidth}px`}
       {...getWorkflowNodeShellProps({ selected })}
     >
-      <Flex {...getWorkflowNodeHeaderProps({ endsWithButton: showItemMenuButton })} flexShrink={0} gap="1.5">
-        <MiddleTruncate flex="1" fontWeight="600" minW="0" text={title} />
+      <Flex {...getWorkflowNodeHeaderProps({ endsWithButton: endsWithHeaderButton })} flexShrink={0} gap="1.5">
+        <MiddleTruncate data-testid="current-image-node-title" flex="1" fontWeight="600" minW="0" text={title} />
         <HStack className="nodrag nopan" flexShrink={0} gap="1" ms="auto">
           {isGenerating ? (
             // Keep header compact at 200 px min-width; exact percentage is already displayed in the progress badge.
@@ -563,38 +461,47 @@ const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNo
             </Text>
           ) : null}
           {isShowingVideo ? (
-            <Tooltip content={canCopyImage() ? t('widgets.preview.copyCurrentFrame') : t('common.copyUnavailable')}>
-              <IconButton
-                aria-label={t('widgets.preview.copyCurrentFrame')}
-                color="fg.muted"
-                data-testid="current-image-copy-video-frame"
-                disabled={!canCopyVideoFrame}
-                size="xs"
-                variant="ghost"
-                onClick={handleCopyCurrentFrame}
-              >
-                <Icon as={CopyIcon} boxSize="3.5" />
-              </IconButton>
-            </Tooltip>
+            <WorkflowNodeHeaderButton
+              aria-label={t('widgets.preview.copyCurrentFrame')}
+              color="fg.muted"
+              content={t('widgets.preview.copyCurrentFrame')}
+              data-testid="current-image-copy-video-frame"
+              unavailableReason={copyUnavailableReason}
+              onClick={handleCopyCurrentFrame}
+            >
+              <Icon as={CopyIcon} boxSize="3.5" />
+            </WorkflowNodeHeaderButton>
           ) : null}
           {isCustomSize ? (
-            <Tooltip content={resetSizeLabel}>
-              <Button
+            isCompactHeader ? (
+              <WorkflowNodeHeaderButton
                 aria-label={resetSizeLabel}
                 color="fg.muted"
+                content={resetSizeLabel}
                 data-testid="current-image-node-reset-size"
-                fontSize="xs"
-                fontVariantNumeric="tabular-nums"
-                h="5"
-                minW="0"
-                px="1.5"
-                size="xs"
-                variant="subtle"
                 onClick={resetSize}
               >
-                {`${displayWidth}×${displayHeight} ↺`}
-              </Button>
-            </Tooltip>
+                <Icon as={RotateCcwIcon} boxSize="3.5" />
+              </WorkflowNodeHeaderButton>
+            ) : (
+              <Tooltip content={resetSizeLabel}>
+                <Button
+                  aria-label={resetSizeLabel}
+                  color="fg.muted"
+                  data-testid="current-image-node-reset-size"
+                  fontSize="xs"
+                  fontVariantNumeric="tabular-nums"
+                  h="5"
+                  minW="0"
+                  px="1.5"
+                  size="xs"
+                  variant="subtle"
+                  onClick={resetSize}
+                >
+                  {`${displayWidth}×${displayHeight} ↺`}
+                </Button>
+              </Tooltip>
+            )
           ) : null}
           {showItemMenuButton ? (
             <WorkflowNodeHeaderButton
@@ -642,13 +549,18 @@ const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNo
         onContextMenu={openItemMenu || isShowingVideo ? handleMediaContextMenu : undefined}
       >
         {isShowingVideo && displayedItem?.kind === 'video' && videoSurfaceKey ? (
-          <CurrentImageVideoSurface
-            key={videoSurfaceKey}
-            item={displayedItem}
-            surfaceKey={videoSurfaceKey}
-            onCopyAvailabilityChange={handleVideoCopyAvailabilityChange}
-            onVideoElementChange={handleVideoElementChange}
-          />
+          <Suspense fallback={videoPosterFallback}>
+            <LazyCurrentImageVideoSurface
+              key={videoSurfaceKey}
+              item={displayedItem}
+              nodeId={node.id}
+              playerSize={videoPlayerSize}
+              surfaceKey={videoSurfaceKey}
+              videoDragRef={videoDragRef}
+              onControllerChange={handleVideoControllerChange}
+              onCopyAvailabilityChange={handleVideoCopyAvailabilityChange}
+            />
+          </Suspense>
         ) : (
           <DraggableCurrentImage itemRef={draggableImageRef}>
             <StreamingImageFrame fallbackImage={fallbackImage} fit="contain" h="full" liveImage={liveImage} w="full">
@@ -659,14 +571,12 @@ const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNo
           </DraggableCurrentImage>
         )}
 
-        {isShowingVideo && videoDragRef ? <CurrentMediaDragGrip itemRef={videoDragRef} nodeId={node.id} /> : null}
-
         {isGenerating ? (
           <Flex
             align="center"
             aria-hidden="true"
             bg="bg/85"
-            bottom="2"
+            bottom={isShowingVideo ? undefined : '2'}
             color="fg"
             data-testid="current-image-progress-badge"
             gap="1.5"
@@ -677,6 +587,7 @@ const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNo
             py="1"
             rounded="full"
             shadow="sm"
+            top={isShowingVideo ? '2' : undefined}
             zIndex="1"
           >
             {progressPercent === null ? (
@@ -698,40 +609,30 @@ const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNo
         ) : null}
       </Box>
 
-      {/* Dedicated footer strip keeps the resize grip clear of VideoPlayer's Fullscreen control. */}
-      <Flex align="center" bg="bg.subtle" borderTopWidth="1px" flexShrink={0} h="3.5" justify="end" px="1" w="full">
-        <Box
+      {/* Dedicated footer strip keeps the platform ResizeCorner clear of VideoPlayer's Fullscreen control. */}
+      <Flex
+        align="center"
+        bg="bg.subtle"
+        borderTopWidth="1px"
+        className="nodrag nopan"
+        flexShrink={0}
+        h="4"
+        position="relative"
+        w="full"
+      >
+        <ResizeCorner
           ref={resizeHandleRef}
-          _focusVisible={RESIZE_FOCUS_VISIBLE_STYLE}
-          _hover={RESIZE_HOVER_STYLE}
-          aria-label={resizeLabel}
-          boxSize="3.5"
           className="nodrag nopan"
-          cursor="nwse-resize"
           data-testid="current-image-node-resize-handle"
-          opacity={selected ? 0.9 : 0.55}
-          position="relative"
-          role="button"
-          tabIndex={0}
+          label={t('widgets.workflow.currentImageResizeHandle')}
+          valueMax={CURRENT_IMAGE_MAX_SIZE}
+          valueMin={CURRENT_IMAGE_MIN_WIDTH}
+          valueNow={displayWidth}
+          valueText={t('widgets.floating.resizeValue', { height: displayHeight, width: displayWidth })}
           onDoubleClick={resetSize}
           onKeyDown={handleResizeKeyDown}
-          onLostPointerCapture={handleResizePointerCancel}
-          onPointerCancel={handleResizePointerCancel}
           onPointerDown={handleResizePointerDown}
-          onPointerMove={handleResizePointerMove}
-          onPointerUp={handleResizePointerUp}
-        >
-          <Box
-            borderBottomWidth="2px"
-            borderColor="fg.subtle"
-            borderRightWidth="2px"
-            bottom="0.5"
-            boxSize="2"
-            pointerEvents="none"
-            position="absolute"
-            right="0.5"
-          />
-        </Box>
+        />
       </Flex>
     </Box>
   );
@@ -756,185 +657,6 @@ const DraggableCurrentImage = ({ children, itemRef }: { children: ReactNode; ite
     <Box ref={setNodeRef} className="nodrag" cursor={itemRef ? 'grab' : undefined} h="full" w="full" {...listeners}>
       {children}
     </Box>
-  );
-};
-
-const CurrentImageVideoSurface = ({
-  item,
-  onCopyAvailabilityChange,
-  onVideoElementChange,
-  surfaceKey,
-}: {
-  item: GalleryVideoItem;
-  onCopyAvailabilityChange: (surfaceKey: string, isAvailable: boolean) => void;
-  onVideoElementChange: (element: HTMLVideoElement | null) => void;
-  surfaceKey: string;
-}) => {
-  const { t } = useTranslation();
-  const localVideoRef = useRef<HTMLVideoElement | null>(null);
-  const [hasFailed, setHasFailed] = useState(false);
-
-  const publishCopyAvailability = useCallback(() => {
-    onCopyAvailabilityChange(surfaceKey, Boolean(loadedVideoPlayer?.isVideoFrameCopyAvailable(localVideoRef.current)));
-  }, [onCopyAvailabilityChange, surfaceKey]);
-
-  const setVideoElementRef = useCallback(
-    (element: HTMLVideoElement | null) => {
-      localVideoRef.current = element;
-      onVideoElementChange(element);
-      if (element) {
-        element.disablePictureInPicture = true;
-      }
-      onCopyAvailabilityChange(surfaceKey, Boolean(loadedVideoPlayer?.isVideoFrameCopyAvailable(element)));
-    },
-    [onCopyAvailabilityChange, onVideoElementChange, surfaceKey]
-  );
-
-  const recoveryRef = useRef<VideoPlayerModule.VideoErrorRecovery | null>(null);
-  const getRecovery = useCallback(() => {
-    if (!recoveryRef.current && loadedVideoPlayer) {
-      recoveryRef.current = loadedVideoPlayer.createVideoErrorRecovery({
-        getAccountEpoch: () => getAuthSession().accountEpoch,
-        onFailedChange: setHasFailed,
-        refreshCookie: refreshProtectedMediaCookie,
-      });
-    }
-    return recoveryRef.current;
-  }, []);
-
-  const handleVideoError = useCallback(() => {
-    publishCopyAvailability();
-    const video = localVideoRef.current;
-    getRecovery()?.handleError(video, () => localVideoRef.current === video);
-  }, [getRecovery, publishCopyAvailability]);
-
-  const handleLoadedMetadata = useCallback(() => {
-    publishCopyAvailability();
-    const video = localVideoRef.current;
-    if (video && video.paused && video.currentTime === 0 && loadedVideoPlayer) {
-      loadedVideoPlayer.seekVideo(video, loadedVideoPlayer.FIRST_FRAME_SEEK_SECONDS);
-    }
-  }, [publishCopyAvailability]);
-
-  const handleRetryClick = useCallback(
-    (event: MouseEvent<HTMLButtonElement>) => {
-      event.preventDefault();
-      event.stopPropagation();
-      getRecovery()?.retry(localVideoRef.current);
-      publishCopyAvailability();
-    },
-    [getRecovery, publishCopyAvailability]
-  );
-
-  const videoPosterImage = useMemo(
-    () =>
-      imageUrlToStreamingSource({
-        alt: item.name,
-        height: item.height,
-        kind: 'fallback',
-        src: item.thumbnailUrl,
-        width: item.width,
-      }),
-    [item.height, item.name, item.thumbnailUrl, item.width]
-  );
-  const videoPosterFallback = useMemo(
-    () => <StreamingImageFrame fallbackImage={videoPosterImage} fit="contain" h="full" liveImage={null} w="full" />,
-    [videoPosterImage]
-  );
-
-  const failureOverlay = useMemo(
-    () =>
-      hasFailed ? (
-        <>
-          <img
-            aria-hidden="true"
-            alt=""
-            draggable={false}
-            height={item.height}
-            src={item.thumbnailUrl}
-            style={VIDEO_FAILURE_POSTER_STYLE}
-            width={item.width}
-          />
-          <Flex
-            align="center"
-            bg="blackAlpha.700"
-            data-testid="current-image-video-failure"
-            direction="column"
-            gap="2.5"
-            inset="0"
-            justify="center"
-            position="absolute"
-            px="3"
-            textAlign="center"
-          >
-            <Text color="white" fontSize="sm" fontWeight="semibold">
-              {t('widgets.preview.videoFailed')}
-            </Text>
-            <Button aria-label={t('widgets.preview.videoRetry')} size="sm" onClick={handleRetryClick}>
-              {t('widgets.preview.videoRetry')}
-            </Button>
-          </Flex>
-        </>
-      ) : null,
-    [handleRetryClick, hasFailed, item.height, item.thumbnailUrl, item.width, t]
-  );
-
-  return (
-    <Box bg="black" className="nodrag nopan nowheel" h="full" position="relative" w="full">
-      <Suspense fallback={videoPosterFallback}>
-        <PlayerComponent
-          ref={setVideoElementRef}
-          aria-label={item.name}
-          defaultLoop
-          fps={item.fps}
-          overlay={failureOverlay}
-          poster={item.thumbnailUrl}
-          size="full"
-          src={item.fullUrl}
-          onCanPlay={publishCopyAvailability}
-          onEmptied={publishCopyAvailability}
-          onError={handleVideoError}
-          onLoadedData={publishCopyAvailability}
-          onLoadedMetadata={handleLoadedMetadata}
-          onPlaying={publishCopyAvailability}
-          onResize={publishCopyAvailability}
-          onSeeked={publishCopyAvailability}
-          onWaiting={publishCopyAvailability}
-        />
-      </Suspense>
-    </Box>
-  );
-};
-
-const CurrentMediaDragGrip = ({ itemRef, nodeId }: { itemRef: GalleryItemRef; nodeId: string }) => {
-  const { t } = useTranslation();
-  const dragData = useMemo(() => getGalleryItemDragData([itemRef]), [itemRef]);
-  const { isDragging, listeners, setNodeRef } = useDraggable({
-    data: dragData,
-    id: getGalleryItemDragId(itemRef, 'workflow-current-image', nodeId),
-  });
-  const label = t('widgets.preview.dragVideo');
-
-  return (
-    <Tooltip content={label}>
-      <Badge
-        ref={setNodeRef}
-        {...listeners}
-        className="nodrag nopan"
-        cursor={isDragging ? 'grabbing' : 'grab'}
-        data-testid="current-image-media-drag-grip"
-        insetInlineStart="50%"
-        opacity={isDragging ? 0.55 : 0.82}
-        position="absolute"
-        top="2"
-        touchAction="none"
-        transform="translateX(-50%)"
-        variant="solid"
-        zIndex="2"
-      >
-        <GripHorizontalIcon aria-hidden="true" size={12} />
-      </Badge>
-    </Tooltip>
   );
 };
 

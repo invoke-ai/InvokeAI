@@ -1,7 +1,17 @@
-import { canCopyImage } from '@platform/browser/clipboard';
+import { canCopyImage, copyImage } from '@platform/browser/clipboard';
 
 /** Seek far enough from zero to clear poster state and display native-resolution frame zero. */
 export const FIRST_FRAME_SEEK_SECONDS = 0.0001;
+
+export type VideoFrameCopyFailureReason =
+  | 'clipboard-failed'
+  | 'draw-failed'
+  | 'encode-failed'
+  | 'not-ready'
+  | 'stale'
+  | 'unsupported';
+
+export type VideoFrameCopyResult = { ok: true } | { ok: false; reason: VideoFrameCopyFailureReason };
 
 export const isVideoFrameReady = (video: HTMLVideoElement | null): video is HTMLVideoElement =>
   Boolean(
@@ -22,6 +32,60 @@ export const encodeCanvasPng = (canvas: HTMLCanvasElement): Promise<Blob | null>
       reject(error instanceof Error ? error : new Error(String(error)));
     }
   });
+
+export const copyVideoFrame = async (
+  video: HTMLVideoElement | null,
+  isCurrent: () => boolean
+): Promise<VideoFrameCopyResult> => {
+  if (!canCopyImage()) {
+    return { ok: false, reason: 'unsupported' };
+  }
+
+  if (!isVideoFrameReady(video)) {
+    return { ok: false, reason: 'not-ready' };
+  }
+
+  const width = video.videoWidth;
+  const height = video.videoHeight;
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext('2d');
+
+  if (!context) {
+    return { ok: false, reason: 'draw-failed' };
+  }
+
+  try {
+    context.drawImage(video, 0, 0, width, height);
+  } catch {
+    return { ok: false, reason: 'draw-failed' };
+  }
+
+  let blob: Blob | null;
+
+  try {
+    blob = await encodeCanvasPng(canvas);
+  } catch (error: unknown) {
+    return { ok: false, reason: isCanvasSecurityError(error) ? 'draw-failed' : 'encode-failed' };
+  }
+
+  if (!blob) {
+    return { ok: false, reason: 'encode-failed' };
+  }
+
+  if (!isCurrent()) {
+    return { ok: false, reason: 'stale' };
+  }
+
+  try {
+    await copyImage(blob);
+  } catch {
+    return { ok: false, reason: 'clipboard-failed' };
+  }
+
+  return isCurrent() ? { ok: true } : { ok: false, reason: 'stale' };
+};
 
 export const seekVideo = (video: HTMLVideoElement, seconds: number): void => {
   try {

@@ -1,4 +1,10 @@
-import type { KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent, RefObject } from 'react';
+import type {
+  KeyboardEvent as ReactKeyboardEvent,
+  MouseEvent as ReactMouseEvent,
+  PointerEvent as ReactPointerEvent,
+  Ref,
+  RefObject,
+} from 'react';
 
 import { chakra, useSlotRecipe } from '@chakra-ui/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
@@ -340,21 +346,29 @@ const toCssProperty = (property: NonNullable<ResizeHandleProps['sizeProperty']>)
 
 /** The caller owns the pointer gesture and marks the grip `data-dragging` while it runs. */
 export const ResizeCorner = ({
+  className,
+  'data-testid': dataTestId,
   label,
+  ref,
   valueMax,
   valueMin,
   valueNow,
   valueText,
+  onDoubleClick,
   onKeyDown,
   onPointerDown,
 }: {
+  className?: string;
+  'data-testid'?: string;
   label: string;
+  ref?: Ref<HTMLDivElement>;
   /** The widest the window can be; without it assistive tech assumes 100. */
   valueMax: number;
   valueMin: number;
   valueNow: number;
   /** The size in words: the grip resizes two dimensions, and a separator's value carries only one. */
   valueText: string;
+  onDoubleClick?: (event: ReactMouseEvent<HTMLDivElement>) => void;
   onKeyDown: (event: ReactKeyboardEvent<HTMLDivElement>) => void;
   onPointerDown: (event: ReactPointerEvent<HTMLDivElement>) => void;
 }) => {
@@ -362,14 +376,18 @@ export const ResizeCorner = ({
 
   return (
     <chakra.div
+      ref={ref}
       aria-label={label}
       aria-valuemax={valueMax}
       aria-valuemin={valueMin}
       aria-valuenow={valueNow}
       aria-valuetext={valueText}
+      className={className}
       css={styles.handle}
+      data-testid={dataTestId}
       role="separator"
       tabIndex={0}
+      onDoubleClick={onDoubleClick}
       onKeyDown={onKeyDown}
       onPointerDown={onPointerDown}
     />

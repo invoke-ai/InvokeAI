@@ -66,4 +66,32 @@ describe('layoutWorkflowSilhouette', () => {
     expect(getWorkflowSilhouetteImage(document)).toBe(image);
     expect(getWorkflowSilhouetteImage(createProjectGraph('empty'))).toBeNull();
   });
+
+  it('honors custom current_image dimensions and defensively clamps out-of-range sizes', () => {
+    const [noteRect, wideCurrentImage] = layoutWorkflowSilhouette([
+      notes('n', 0, 0),
+      {
+        data: { height: 640, label: 'Preview', width: 960 },
+        id: 'ci',
+        position: { x: 400, y: 0 },
+        type: 'current_image',
+      },
+    ]);
+
+    expect(wideCurrentImage!.width / noteRect!.width).toBeCloseTo(960 / 320, 2);
+    expect(wideCurrentImage!.height / noteRect!.height).toBeCloseTo(640 / 160, 2);
+
+    const [noteClamped, clampedCurrentImage] = layoutWorkflowSilhouette([
+      notes('n', 0, 0),
+      {
+        data: { height: 50, label: 'Preview', width: 5000 },
+        id: 'ci-clamped',
+        position: { x: 400, y: 0 },
+        type: 'current_image',
+      },
+    ]);
+
+    expect(clampedCurrentImage!.width / noteClamped!.width).toBeCloseTo(1600 / 320, 2);
+    expect(clampedCurrentImage!.height / noteClamped!.height).toBeCloseTo(160 / 160, 2);
+  });
 });

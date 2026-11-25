@@ -469,6 +469,7 @@ describe('queueCoordinator', () => {
       completedItemCount: 0,
       message: 'Denoising',
       percentage: 0.5,
+      slotPercentages: { 1: 0.5 },
       totalItemCount: 1,
     });
     expect(harness.activeProgressTarget.set).toHaveBeenCalledWith({ itemIndex: 1, queueItemId: 'local-1' });
@@ -541,6 +542,59 @@ describe('queueCoordinator', () => {
       harness.coordinator.dispose();
       vi.unstubAllGlobals();
     }
+  });
+
+  it('retains independent per-slot percentages for concurrent call_saved_workflow batch items', async () => {
+    harness.coordinator.connect();
+    harness.api.enqueueGenerate.mockResolvedValueOnce({
+      batchId: 'batch-wf',
+      enqueued: 2,
+      itemIds: [701, 702],
+      requested: 2,
+    });
+    await harness.coordinator.submitGenerate('local-wf', {
+      ...generateRequest,
+      graph: { edges: [], id: 'g', nodes: { call: { id: 'call', type: 'call_saved_workflow' } } },
+    });
+
+    harness.socket.fire('queue_item_status_changed', createStatusEvent({ item_id: 701, status: 'waiting' }));
+    harness.socket.fire('queue_item_status_changed', createStatusEvent({ item_id: 702, status: 'waiting' }));
+
+    harness.socket.fire('invocation_progress', {
+      ...createStatusEvent({ item_id: 801 }),
+      message: 'Slot 1 child',
+      percentage: 0.45,
+      root_item_id: 701,
+      workflow_call_parent_source_id: 'call',
+    });
+    harness.socket.fire('invocation_progress', {
+      ...createStatusEvent({ item_id: 802 }),
+      message: 'Slot 2 child',
+      percentage: 0.72,
+      root_item_id: 702,
+      workflow_call_parent_source_id: 'call',
+    });
+    // Sibling slot 1 ticks again while slot 2 is still running: slot 2 must retain 0.72 in slotPercentages.
+    harness.socket.fire('invocation_progress', {
+      ...createStatusEvent({ item_id: 801 }),
+      message: 'Slot 1 child',
+      percentage: 0.5,
+      root_item_id: 701,
+      workflow_call_parent_source_id: 'call',
+    });
+
+    expect(harness.progressEntries.get('local-wf')).toEqual({
+      activeItemIndex: 1,
+      completedItemCount: 0,
+      message: 'Slot 1 child',
+      percentage: 0.5,
+      slotPercentages: { 1: 0.5, 2: 0.72 },
+      totalItemCount: 2,
+    });
+
+    // Completing slot 2 removes its per-slot entry while keeping slot 1 intact.
+    harness.socket.fire('queue_item_status_changed', createStatusEvent({ item_id: 702, status: 'completed' }));
+    expect(harness.progressEntries.get('local-wf')?.slotPercentages).toEqual({ 1: 0.5 });
   });
 
   it("signals each slot's first frame of its own once, after the frame is stored", async () => {

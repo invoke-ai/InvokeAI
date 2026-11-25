@@ -46,7 +46,7 @@ await i18n.use(initReactI18next).init({
 
 // Preview loads the player with its first video. Loaded up front, it mounts in the render that asks for it, before the
 // element can load media the stubbed tests below stand in for.
-await import('@platform/ui/video-player/VideoPlayer');
+await Promise.all([import('./PreviewVideoFrame'), import('@platform/ui/video-player/VideoPlayer')]);
 
 const FIXTURE_VIDEO_URL = '/scripts/mock-assets/fixture-video.mp4';
 

@@ -129,40 +129,9 @@ const isFormLike = (value: unknown): boolean =>
 
 const METADATA_KEYS = ['author', 'contact', 'description', 'name', 'notes', 'tags', 'workflowVersion'] as const;
 
-const normalizePersistedNode = (node: unknown): unknown => {
-  if (!isRecord(node) || node.type !== 'current_image' || !isRecord(node.data)) {
-    return node;
-  }
-
-  const label = typeof node.data.label === 'string' ? node.data.label : 'Current Image';
-  const { height, width } = normalizeCurrentImageSize(node.data.width, node.data.height);
-
-  if (
-    node.data.label === label &&
-    node.data.width === width &&
-    node.data.height === height &&
-    (width !== undefined || !('width' in node.data)) &&
-    (height !== undefined || !('height' in node.data))
-  ) {
-    return node;
-  }
-
-  const { height: _prevHeight, width: _prevWidth, ...restData } = node.data;
-
-  return {
-    ...node,
-    data: {
-      ...restData,
-      label,
-      ...(height === undefined ? {} : { height }),
-      ...(width === undefined ? {} : { width }),
-    },
-  };
-};
-
 /**
  * Reads a persisted version-2 document. Authored content lacking the editor's structure is refused (`null`), never
- * replaced; missing metadata strings are filled in and persisted `current_image` node data is normalized.
+ * replaced; missing metadata strings are filled in.
  */
 export const readPersistedProjectGraph = (candidate: unknown): ProjectGraphState | null => {
   if (
@@ -179,29 +148,11 @@ export const readPersistedProjectGraph = (candidate: unknown): ProjectGraphState
     return null;
   }
 
-  let nodesChanged = false;
-  const normalizedNodes = candidate.nodes.map((node) => {
-    const next = normalizePersistedNode(node);
-
-    if (next !== node) {
-      nodesChanged = true;
-    }
-
-    return next;
-  });
-
-  if (
-    !nodesChanged &&
-    METADATA_KEYS.every((key) => typeof candidate[key] === 'string') &&
-    typeof candidate.updatedAt === 'string'
-  ) {
+  if (METADATA_KEYS.every((key) => typeof candidate[key] === 'string') && typeof candidate.updatedAt === 'string') {
     return candidate as unknown as ProjectGraphState;
   }
 
-  const filled: Record<string, unknown> = {
-    ...candidate,
-    ...(nodesChanged ? { nodes: normalizedNodes } : {}),
-  };
+  const filled: Record<string, unknown> = { ...candidate };
 
   for (const key of METADATA_KEYS) {
     if (typeof filled[key] !== 'string') {

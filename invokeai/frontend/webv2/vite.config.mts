@@ -168,6 +168,7 @@ const EDITOR_BOOT_SHARED_MODULES = [
   '/workbench/widgets/canvas/invoke/canvasStrength.ts',
   '/workbench/widgets/canvas/bboxGrid.ts',
   '/workbench/settings/aspectRatioPresets.ts',
+  '/workbench/widgets/preview/spanPlaybackRequest.ts',
   '/workbench/widgets/shared/AutoSwitchMenu.tsx',
   '/platform/ui/ProgressBadge.tsx',
   '/workbench/widgets/layers/layerPropertiesRequestStore.ts',
@@ -482,6 +483,12 @@ const CANVAS_PROCESSING_SIZE_MODULES = [
   '/features/generation/core/canvas/canvasProcessingSize.ts',
 ];
 
+/** Lazy video surfaces share VideoPlayer and its frame/recovery utilities in one on-demand chunk. */
+const VIDEO_PLAYER_MODULES = [
+  '/platform/ui/video-player/VideoPlayer.tsx',
+  '/platform/ui/video-player/videoFrameUtils.ts',
+] as const;
+
 const matchesAnySuffix = (id: string, suffixes: readonly string[]) => suffixes.some((suffix) => id.endsWith(suffix));
 
 const getLegacyChunkName = (id: string): string | null => {
@@ -581,6 +588,12 @@ export default defineConfig({
               name: 'canvasProcessingSize',
               priority: 30,
               test: (id) => matchesAnySuffix(id, CANVAS_PROCESSING_SIZE_MODULES),
+            },
+            {
+              includeDependenciesRecursively: false,
+              name: 'video-player',
+              priority: 30,
+              test: (id) => matchesAnySuffix(id, VIDEO_PLAYER_MODULES),
             },
             {
               includeDependenciesRecursively: false,

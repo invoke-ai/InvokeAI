@@ -195,6 +195,7 @@ interface RunProgressState {
   completedBackendItemIds: Set<number>;
   message: string;
   percentage: number | null;
+  slotPercentages: Map<number, number | null>;
 }
 
 interface WaitState {
@@ -370,12 +371,14 @@ export const createQueueCoordinator = (
       activeBackendItemId !== undefined
         ? Math.max(1, state.backendItemIds.indexOf(activeBackendItemId) + 1)
         : undefined;
+    const slotPercentages = state.slotPercentages.size > 0 ? Object.fromEntries(state.slotPercentages) : undefined;
 
     progress.set(localQueueItemId, {
       activeItemIndex,
       completedItemCount: terminalBackendItemIds.size,
       message: state.message,
       percentage: state.percentage,
+      ...(slotPercentages ? { slotPercentages } : {}),
       totalItemCount: state.backendItemIds.length,
     });
   };
@@ -572,6 +575,10 @@ export const createQueueCoordinator = (
     const state = runProgress.get(wait.localQueueItemId);
 
     if (state) {
+      const slotIndex = state.backendItemIds.indexOf(backendItemId) + 1;
+      if (slotIndex > 0) {
+        state.slotPercentages.delete(slotIndex);
+      }
       if (state.activeBackendItemId === backendItemId) {
         state.activeBackendItemId = undefined;
         state.message = '';
@@ -617,10 +624,21 @@ export const createQueueCoordinator = (
   const resetRequeuedSlotProgress = (localQueueItemId: string, backendItemId: number): void => {
     const state = runProgress.get(localQueueItemId);
 
-    if (state && state.activeBackendItemId === backendItemId) {
+    if (!state) {
+      return;
+    }
+
+    const slotIndex = state.backendItemIds.indexOf(backendItemId) + 1;
+    const removedSlotPercentage = slotIndex > 0 && state.slotPercentages.delete(slotIndex);
+    const clearedActive = state.activeBackendItemId === backendItemId;
+
+    if (clearedActive) {
       state.activeBackendItemId = undefined;
       state.message = '';
       state.percentage = null;
+    }
+
+    if (clearedActive || removedSlotPercentage) {
       publishRunProgress(localQueueItemId);
     }
   };
@@ -691,6 +709,7 @@ export const createQueueCoordinator = (
       completedBackendItemIds: new Set(),
       message: '',
       percentage: null,
+      slotPercentages: new Map(),
     });
     runs.set(localQueueItemId, {
       backendBatchId,
@@ -909,6 +928,7 @@ export const createQueueCoordinator = (
       state.activeBackendItemId = backendItemId;
       state.message = event.message;
       state.percentage = event.percentage;
+      state.slotPercentages.set(target.itemIndex, event.percentage);
       publishRunProgress(wait.localQueueItemId);
     } else {
       progress.set(wait.localQueueItemId, { message: event.message, percentage: event.percentage });
@@ -931,6 +951,12 @@ export const createQueueCoordinator = (
       return;
     }
 
+    for (const state of runProgress.values()) {
+      state.activeBackendItemId = undefined;
+      state.message = '';
+      state.percentage = null;
+      state.slotPercentages.clear();
+    }
     progress.clearAll?.();
     nodeExecution.clearAll();
     nodeExecutionRootItemId = null;

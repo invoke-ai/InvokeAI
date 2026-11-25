@@ -1109,14 +1109,3 @@ export const VideoPlayer = ({
     </Box>
   );
 };
-
-export {
-  createVideoErrorRecovery,
-  encodeCanvasPng,
-  FIRST_FRAME_SEEK_SECONDS,
-  isCanvasSecurityError,
-  isVideoFrameCopyAvailable,
-  isVideoFrameReady,
-  seekVideo,
-  type VideoErrorRecovery,
-} from './videoFrameUtils';
