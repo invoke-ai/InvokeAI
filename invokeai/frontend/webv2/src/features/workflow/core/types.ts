@@ -132,7 +132,8 @@ export interface WorkflowNotesNode {
 }
 
 export const CURRENT_IMAGE_DEFAULT_WIDTH = 320;
-export const CURRENT_IMAGE_DEFAULT_HEIGHT = 288;
+/** Matches main's ~318 px total node height (30 px header + 18 rem / 288 px image frame). */
+export const CURRENT_IMAGE_DEFAULT_HEIGHT = 320;
 export const CURRENT_IMAGE_MIN_WIDTH = 200;
 export const CURRENT_IMAGE_MIN_HEIGHT = 160;
 export const CURRENT_IMAGE_MAX_SIZE = 1600;

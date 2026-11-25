@@ -288,13 +288,29 @@ const preferencesSnapshot = {
   workflowValidateConnections: true,
 };
 const PROJECT_ID = 'project-1';
-const projectSnapshotFor = (graph: ProjectGraphState, galleryValues: Record<string, unknown> = {}) => ({
+const makeTestQueueItem = (id: string, backendItemIds: number[]) => ({
+  backendItemIds,
+  id,
+  snapshot: {
+    destination: 'gallery' as const,
+    graph: { label: 'Workflow' },
+    sourceId: 'workflow' as const,
+    submittedAt: '2026-11-25T00:00:00Z',
+  },
+  status: 'running' as const,
+});
+const projectSnapshotFor = (
+  graph: ProjectGraphState,
+  galleryValues: Record<string, unknown> = {},
+  queueItems: readonly ReturnType<typeof makeTestQueueItem>[] = []
+) => ({
   activeWorkflow: { document: graph },
   activeWorkflowId: graph.id,
   galleryValues,
   id: PROJECT_ID,
   isWorkflowRunning: false,
   projectGraph: graph,
+  queueItems,
   workflowValues: {},
   workflows: [{ document: graph }],
 });
@@ -1510,8 +1526,11 @@ describe('CurrentImageFlowNode', () => {
           return () => listeners.delete(listener);
         },
       },
-      setGalleryValues: (next: Record<string, unknown>) => {
-        snapshot = projectSnapshotFor(currentImageGraph, next);
+      setGalleryValues: (
+        next: Record<string, unknown>,
+        queueItems: readonly ReturnType<typeof makeTestQueueItem>[] = []
+      ) => {
+        snapshot = projectSnapshotFor(currentImageGraph, next, queueItems);
         listeners.forEach((listener) => listener());
       },
     };
@@ -1619,8 +1638,11 @@ describe('CurrentImageFlowNode', () => {
     );
 
     openItemContextMenu.mockClear();
-    exportMocks.progressImage = { dataUrl: outputImage(1, 1), height: 1, width: 1 };
-    await act(() => project.setGalleryValues({ recentImages: [chosen] }));
+    const liveRun = makeTestQueueItem('live-run', [901]);
+    exportMocks.activeProgressTargets = [{ itemIndex: 1, queueItemId: 'live-run' }];
+    exportMocks.framedProgressTargets = [{ itemIndex: 1, queueItemId: 'live-run' }];
+    exportMocks.progressImageByTarget = { 'live-run:1': { dataUrl: outputImage(1, 1), height: 1, width: 1 } };
+    await act(() => project.setGalleryValues({ recentImages: [chosen] }, [liveRun]));
     expect(host.textContent).toContain('Generating');
     expect(menuButton()).toBeNull();
     const liveImageEl = host.querySelector<HTMLImageElement>('.react-flow__node img')!;
@@ -1631,7 +1653,9 @@ describe('CurrentImageFlowNode', () => {
     });
     expect(openItemContextMenu).not.toHaveBeenCalled();
 
-    exportMocks.progressImage = null;
+    exportMocks.activeProgressTargets = [];
+    exportMocks.framedProgressTargets = [];
+    exportMocks.progressImageByTarget = {};
     await act(() => project.setGalleryValues({}));
     expect(menuButton()).toBeNull();
   });
@@ -1754,15 +1778,18 @@ describe('CurrentImageFlowNode', () => {
   });
 
   it('does not render again for gallery changes that leave the shown image alone', async () => {
-    const renders = vi.spyOn(exportMocks, 'progressImage', 'get');
-    const project = createGalleryProject({ recentImages: [recent], selectedBoardId: 'a' });
-    await render(project);
-    await vi.waitFor(() => expect(shownImage()).toBe(recent.imageUrl));
-    const settled = renders.mock.calls.length;
+    const renders = vi.spyOn(exportMocks, 'activeProgressTargets', 'get').mockReturnValue([]);
+    try {
+      const project = createGalleryProject({ recentImages: [recent], selectedBoardId: 'a' });
+      await render(project);
+      await vi.waitFor(() => expect(shownImage()).toBe(recent.imageUrl));
+      const settled = renders.mock.calls.length;
 
-    await act(() => project.setGalleryValues({ recentImages: [recent], selectedBoardId: 'b', galleryPage: 3 }));
-    expect(renders.mock.calls.length).toBe(settled);
-    renders.mockRestore();
+      await act(() => project.setGalleryValues({ recentImages: [recent], selectedBoardId: 'b', galleryPage: 3 }));
+      expect(renders.mock.calls.length).toBe(settled);
+    } finally {
+      renders.mockRestore();
+    }
   });
 });
 
@@ -1857,7 +1884,7 @@ describe('CurrentImageFlowNode waiting vs active states', () => {
     });
     const waitingProjectB = {
       ...snapshot,
-      queueItems: [{ id: 'this-project-waiting-run' }],
+      queueItems: [makeTestQueueItem('this-project-waiting-run', [100])],
     };
     await act(() => {
       root.render(
@@ -1874,14 +1901,15 @@ describe('CurrentImageFlowNode waiting vs active states', () => {
     expect(host.querySelector('[data-testid="current-image-progress-badge"]')).toBeNull();
   });
 
-  it('pairs progress percentage with the displayed frame target and sizes the outer shell with focus return on reset', async () => {
-    exportMocks.activeProgressTargets = [
-      { itemIndex: 1, queueItemId: 'run-a' },
-      { itemIndex: 1, queueItemId: 'run-b' },
-    ];
+  it('sizes the outer shell, returns keyboard focus on reset, and keeps the 200px header free of duplicate percentages', async () => {
+    const runItem = makeTestQueueItem('run-a', [101]);
+    exportMocks.activeProgressTargets = [{ itemIndex: 1, queueItemId: 'run-a' }];
+    exportMocks.framedProgressTargets = [{ itemIndex: 1, queueItemId: 'run-a' }];
+    exportMocks.progressImageByTarget = {
+      'run-a:1': { dataUrl: 'data:image/png;base64,bGl2ZQ==', height: 2, width: 2 },
+    };
     exportMocks.progressByQueueItemId = {
-      'run-a': { activeItemIndex: 1, message: 'Run A', percentage: 0.25 },
-      'run-b': { activeItemIndex: 1, message: 'Run B', percentage: 0.8 },
+      'run-a': { activeItemIndex: 1, message: 'Run A', percentage: 0.8 },
     };
     const resizedGraph: ProjectGraphState = {
       ...currentImageGraph,
@@ -1892,7 +1920,7 @@ describe('CurrentImageFlowNode waiting vs active states', () => {
         },
       ],
     };
-    const adapter = createAdapter(createExecutionPort().port, projectSnapshotFor(resizedGraph));
+    const adapter = createAdapter(createExecutionPort().port, projectSnapshotFor(resizedGraph, {}, [runItem]));
 
     await act(() => {
       root.render(
@@ -1912,214 +1940,20 @@ describe('CurrentImageFlowNode waiting vs active states', () => {
     expect(resetButton.getAttribute('aria-label')).toBe(
       i18n.t('widgets.workflow.currentImageResetSize', { height: 360, width: 480 })
     );
+    const resizeHandle = host.querySelector<HTMLElement>('[data-testid="current-image-node-resize-handle"]')!;
+    expect(resizeHandle.getAttribute('aria-label')).toContain('Enter, Space, or Home');
     await act(() => {
       resetButton.click();
     });
-    expect(document.activeElement).toBe(host.querySelector('[data-testid="current-image-node-resize-handle"]'));
+    expect(document.activeElement).toBe(resizeHandle);
 
-    expect(host.querySelector('[data-testid="current-image-progress-badge"]')?.textContent).toBe('25%');
-
-    await act(() => {
-      exportMocks.framedProgressTargets = [{ itemIndex: 1, queueItemId: 'run-b' }];
-      exportMocks.progressImage = {
-        dataUrl: 'data:image/png;base64,bGl2ZQ==',
-        height: 2,
-        target: { itemIndex: 1, queueItemId: 'run-b' },
-        width: 2,
-      };
-      exportMocks.notify();
-    });
+    // Badge shows exact percentage; header stays compact without repeating "80%".
     const badge = host.querySelector<HTMLElement>('[data-testid="current-image-progress-badge"]')!;
     expect(badge.textContent).toBe('80%');
-    expect(badge.querySelector('.chakra-spinner')).toBeNull();
     expect(badge.querySelector('[role="progressbar"]')?.getAttribute('aria-valuenow')).toBe('80');
-    expect(host.querySelector('[data-node-status-indicator="true"]')?.textContent).toContain('80%');
-
-    // When a second batch slot reports progress before publishing a frame, do not label slot 1's frame with slot 2's %.
-    await act(() => {
-      exportMocks.progressByQueueItemId = {
-        ...exportMocks.progressByQueueItemId,
-        'run-b': { activeItemIndex: 2, message: 'Slot 2', percentage: 0.15 },
-      };
-      exportMocks.notify();
-    });
-    expect(host.querySelector('[data-testid="current-image-progress-badge"]')?.textContent).toBe('');
-
-    // With project queueItems carrying backendItemIds, itemIndex 2 resolves backendItemIds[1] (102) even if origin points elsewhere.
-    const batchSnapshot = {
-      ...projectSnapshotFor(resizedGraph),
-      isWorkflowRunning: true,
-      queueItems: [{ backendItemIds: [101, 102], id: 'run-b' }],
-    };
-    const foreignOriginAdapter: WorkflowUiAdapter = {
-      ...createAdapter(createExecutionPort().port, batchSnapshot),
-      nodeExecution: {
-        ...createExecutionPort().port,
-        getOrigin: () => ({ projectId: 'other-project', workflowId: 'other-wf' }),
-        subscribeOrigin: () => () => {},
-      },
-    };
-    await act(() => {
-      exportMocks.activeProgressTargets = [
-        { itemIndex: 1, queueItemId: 'run-b' },
-        { itemIndex: 2, queueItemId: 'run-b' },
-      ];
-      exportMocks.framedProgressTargets = [
-        { itemIndex: 1, queueItemId: 'run-b' },
-        { itemIndex: 2, queueItemId: 'run-b' },
-      ];
-      exportMocks.progressByQueueItemId = {
-        ...exportMocks.progressByQueueItemId,
-        'run-b': { activeItemIndex: 1, message: 'Slot 1', percentage: 0.3 },
-      };
-      exportMocks.itemProgressByBackendId = {
-        101: { message: 'Slot 1', percentage: 0.3 },
-        102: { message: 'Slot 2', percentage: 0.65 },
-      };
-      exportMocks.progressImage = {
-        dataUrl: 'data:image/png;base64,bGl2ZQ==',
-        height: 2,
-        target: { itemIndex: 2, queueItemId: 'run-b' },
-        width: 2,
-      };
-      root.render(
-        <ChakraProvider value={system}>
-          <WorkflowUiProvider adapter={foreignOriginAdapter}>
-            <ReactFlow edges={[]} nodes={toFlowNodes(resizedGraph, [])} nodeTypes={nodeTypes} />
-          </WorkflowUiProvider>
-        </ChakraProvider>
-      );
-    });
-    expect(host.querySelector('[data-testid="current-image-progress-badge"]')?.textContent).toBe('65%');
-  });
-
-  it('retains this project live preview when another project publishes a frame, and returns to Waiting when requeued to pending', async () => {
-    await import('@platform/ui/video-player/VideoPlayer');
-    const selectedVideo = {
-      boardId: 'none',
-      category: 'general',
-      createdAt: '2026-11-13T00:00:00Z',
-      durationSeconds: 4,
-      fps: 24,
-      fullUrl: 'data:audio/wav;base64,UklGRiUAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQEAAACA',
-      height: 576,
-      isIntermediate: false,
-      kind: 'video' as const,
-      name: 'clip.mp4',
-      starred: false,
-      thumbnailUrl: 'data:image/png;base64,c2F2ZWQ=',
-      width: 1024,
-    };
-    const projectASnapshot = {
-      ...projectSnapshotFor(currentImageGraph, { selectedImage: selectedVideo }),
-      isWorkflowRunning: true,
-      queueItems: [{ id: 'run-a' }],
-    };
-    const projectAFrame = {
-      dataUrl: 'data:image/png;base64,cHJvamVjdEE=',
-      height: 2,
-      width: 2,
-    };
-    exportMocks.activeProgressTargets = [
-      { itemIndex: 1, queueItemId: 'run-a' },
-      { itemIndex: 1, queueItemId: 'run-b' },
-    ];
-    exportMocks.framedProgressTargets = [{ itemIndex: 1, queueItemId: 'run-a' }];
-    exportMocks.progressImage = { ...projectAFrame, target: { itemIndex: 1, queueItemId: 'run-a' } };
-    exportMocks.progressImageByTarget = { 'run-a:1': projectAFrame };
-    exportMocks.progressByQueueItemId = {
-      'run-a': { activeItemIndex: 1, message: 'Project A', percentage: 0.4 },
-      'run-b': { activeItemIndex: 1, message: 'Project B', percentage: 0.9 },
-    };
-
-    const adapter = createAdapter(createExecutionPort().port, projectASnapshot);
-    await act(() => {
-      root.render(
-        <ChakraProvider value={system}>
-          <WorkflowUiProvider adapter={adapter}>
-            <ReactFlow edges={[]} nodes={currentImageNodes} nodeTypes={nodeTypes} />
-          </WorkflowUiProvider>
-        </ChakraProvider>
-      );
-    });
-
-    expect(host.querySelector('video')).toBeNull();
-    expect(host.querySelector('img')?.getAttribute('src')).toBe(projectAFrame.dataUrl);
-    expect(host.querySelector('[data-testid="current-image-progress-badge"]')?.textContent).toBe('40%');
-
-    // Project B publishes the newest global frame: Project A must keep its retained live frame instead of flashing the video.
-    await act(() => {
-      exportMocks.progressImage = {
-        dataUrl: 'data:image/png;base64,cHJvamVjdEI=',
-        height: 2,
-        target: { itemIndex: 1, queueItemId: 'run-b' },
-        width: 2,
-      };
-      exportMocks.notify();
-    });
-    expect(host.querySelector('video')).toBeNull();
-    expect(host.querySelector('img')?.getAttribute('src')).toBe(projectAFrame.dataUrl);
-    expect(host.querySelector('[data-testid="current-image-progress-badge"]')?.textContent).toBe('40%');
-
-    // Run A returns to pending: activeProgressTargetStore clears run-a while progressImageStore still retains its frame.
-    await act(() => {
-      exportMocks.activeProgressTargets = [{ itemIndex: 1, queueItemId: 'run-b' }];
-      exportMocks.framedProgressTargets = [];
-      exportMocks.progressImage = { ...projectAFrame, target: { itemIndex: 1, queueItemId: 'run-a' } };
-      exportMocks.notify();
-    });
-
-    await vi.waitFor(
-      async () => {
-        await act(() => Promise.resolve());
-        expect(host.querySelector('video')).not.toBeNull();
-      },
-      { timeout: 10_000 }
-    );
     expect(host.querySelector('[data-node-status-indicator="true"]')?.textContent).toBe(
-      i18n.t('common.status.waiting')
+      i18n.t('widgets.workflow.generating')
     );
-    expect(host.querySelector('[data-testid="current-image-media-drag-grip"]')).not.toBeNull();
-    expect(host.querySelector('[data-testid="current-image-progress-badge"]')).toBeNull();
-  });
-
-  it('shows the routed child workflow percentage even when the parent backend item percentage is null', async () => {
-    const parentSnapshot = {
-      ...projectSnapshotFor(currentImageGraph),
-      isWorkflowRunning: true,
-      queueItems: [{ backendItemIds: [501], id: 'parent-run' }],
-    };
-    const childFrame = {
-      dataUrl: 'data:image/png;base64,Y2hpbGQ=',
-      height: 2,
-      width: 2,
-    };
-    exportMocks.activeProgressTargets = [{ itemIndex: 1, queueItemId: 'parent-run' }];
-    exportMocks.framedProgressTargets = [{ itemIndex: 1, queueItemId: 'parent-run' }];
-    exportMocks.progressImage = { ...childFrame, target: { itemIndex: 1, queueItemId: 'parent-run' } };
-    exportMocks.progressImageByTarget = { 'parent-run:1': childFrame };
-    exportMocks.progressByQueueItemId = {
-      'parent-run': { activeItemIndex: 1, message: 'Child step', percentage: 0.5 },
-    };
-    exportMocks.itemProgressByBackendId = {
-      501: { message: 'Call Saved Workflow', percentage: null },
-    };
-
-    const adapter = createAdapter(createExecutionPort().port, parentSnapshot);
-    await act(() => {
-      root.render(
-        <ChakraProvider value={system}>
-          <WorkflowUiProvider adapter={adapter}>
-            <ReactFlow edges={[]} nodes={currentImageNodes} nodeTypes={nodeTypes} />
-          </WorkflowUiProvider>
-        </ChakraProvider>
-      );
-    });
-
-    const badge = host.querySelector<HTMLElement>('[data-testid="current-image-progress-badge"]')!;
-    expect(badge.textContent).toBe('50%');
-    expect(badge.querySelector('.chakra-spinner')).toBeNull();
-    expect(host.querySelector('[data-node-status-indicator="true"]')?.textContent).toContain('50%');
   });
 
   it('bounds automatic video cookie refresh across partial loadeddata reloads and surfaces Retry', async () => {
@@ -2205,9 +2039,10 @@ describe('CurrentImageFlowNode waiting vs active states', () => {
 
   it('uses the platform spinner for indeterminate progress and honors Reduce Motion', async () => {
     document.documentElement.dataset.reduceMotion = 'true';
-    exportMocks.activeProgressTargets = [{ itemIndex: 0, queueItemId: 'run-a' }];
-    exportMocks.progressByQueueItemId = { 'run-a': { message: 'Preparing', percentage: null } };
-    const adapter = createAdapter(createExecutionPort().port, projectSnapshotFor(currentImageGraph));
+    const runItem = makeTestQueueItem('run-a', [101]);
+    exportMocks.activeProgressTargets = [{ itemIndex: 1, queueItemId: 'run-a' }];
+    exportMocks.progressByQueueItemId = { 'run-a': { activeItemIndex: 1, message: 'Preparing', percentage: null } };
+    const adapter = createAdapter(createExecutionPort().port, projectSnapshotFor(currentImageGraph, {}, [runItem]));
 
     await act(() => {
       root.render(

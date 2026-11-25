@@ -47,6 +47,10 @@ if TYPE_CHECKING:
 # Maximum number of bytes to download during each call to requests.iter_content()
 DOWNLOAD_CHUNK_SIZE = 100000
 
+# (connect, read) seconds for download GETs. The read timeout bounds each socket read, not the whole transfer, so a
+# server that stalls mid-body fails the job instead of holding the worker (and its cancel check) forever.
+DOWNLOAD_TIMEOUT = (15, 60)
+
 # How long an idle worker blocks on the queue before rechecking the stop event, which bounds how long stop() waits.
 _QUEUE_POLL_SECONDS = 1.0
 
@@ -461,6 +465,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
             str(url),
             headers=header,
             stream=True,
+            timeout=DOWNLOAD_TIMEOUT,
             hooks={"response": self._reject_unsafe_redirect},
             proxies=self._request_proxies,
         )

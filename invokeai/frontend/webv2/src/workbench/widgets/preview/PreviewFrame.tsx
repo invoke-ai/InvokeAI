@@ -477,11 +477,20 @@ const PreviewVideo = ({
     },
     [handleSwipePointerDown]
   );
-  const automaticRefreshUsedRef = useRef(false);
-  const pendingRefreshRef = useRef<Promise<boolean> | null>(null);
   const [hasFailed, setHasFailed] = useState(false);
+  const recoveryRef = useRef<VideoPlayerModule.VideoErrorRecovery | null>(null);
+  const getRecovery = useCallback(() => {
+    if (!recoveryRef.current && loadedVideoPlayer) {
+      recoveryRef.current = loadedVideoPlayer.createVideoErrorRecovery({
+        getAccountEpoch: () => getAuthSession().accountEpoch,
+        onFailedChange: setHasFailed,
+        refreshCookie: refreshProtectedMediaCookie,
+      });
+    }
+    return recoveryRef.current;
+  }, []);
   const publishCopyAvailability = useCallback(() => {
-    onCopyAvailabilityChange?.(source.itemKey, isVideoFrameCopyAvailable(videoRef.current));
+    onCopyAvailabilityChange?.(source.itemKey, Boolean(loadedVideoPlayer?.isVideoFrameCopyAvailable(videoRef.current)));
   }, [onCopyAvailabilityChange, source.itemKey]);
   // The video can hold focus (its native controls, and the context menu key opens Preview's menu from it), so it hands
   // focus on when a later render removes it.
@@ -494,7 +503,7 @@ const PreviewVideo = ({
       videoRef.current = video;
       video.muted = previewVideoAudio.muted;
       video.volume = previewVideoAudio.volume;
-      onCopyAvailabilityChange?.(source.itemKey, isVideoFrameCopyAvailable(video));
+      onCopyAvailabilityChange?.(source.itemKey, Boolean(loadedVideoPlayer?.isVideoFrameCopyAvailable(video)));
 
       const releaseFocus = releaseFocusOnRemoval(video);
 
@@ -508,12 +517,13 @@ const PreviewVideo = ({
   );
   const copyCurrentFrame = useCallback(async (): Promise<PreviewVideoFrameCopyResult> => {
     const video = videoRef.current;
+    const playerUtils = loadedVideoPlayer;
 
     if (!canCopyImage()) {
       return { ok: false, reason: 'unsupported' };
     }
 
-    if (!isVideoFrameReady(video)) {
+    if (!playerUtils || !playerUtils.isVideoFrameReady(video)) {
       return { ok: false, reason: 'not-ready' };
     }
 
@@ -539,9 +549,9 @@ const PreviewVideo = ({
     let blob: Blob | null;
 
     try {
-      blob = await encodeCanvasPng(canvas);
+      blob = await playerUtils.encodeCanvasPng(canvas);
     } catch (error: unknown) {
-      return { ok: false, reason: isCanvasSecurityError(error) ? 'draw-failed' : 'encode-failed' };
+      return { ok: false, reason: playerUtils.isCanvasSecurityError(error) ? 'draw-failed' : 'encode-failed' };
     }
 
     if (!blob) {
@@ -565,7 +575,10 @@ const PreviewVideo = ({
 
     return isCurrent() ? { ok: true } : { ok: false, reason: 'stale' };
   }, [isItemCurrent, source.itemKey]);
-  const isCopyAvailable = useCallback(() => isVideoFrameCopyAvailable(videoRef.current), []);
+  const isCopyAvailable = useCallback(
+    () => Boolean(loadedVideoPlayer?.isVideoFrameCopyAvailable(videoRef.current)),
+    []
+  );
   // The span a request armed, which the player plays as its playback window.
   const [span, setSpan] = useState<VideoSpan | null>(null);
   const spanRef = useRef<VideoSpan | null>(null);
@@ -654,7 +667,7 @@ const PreviewVideo = ({
       return;
     }
 
-    seekVideo(video, pending.startSeconds);
+    loadedVideoPlayer?.seekVideo(video, pending.startSeconds);
     // Autoplay policy can refuse an unmuted play().
     void video.play().catch(() => {});
     publishSpanState();
@@ -741,45 +754,11 @@ const PreviewVideo = ({
   const handleVideoError = useCallback(() => {
     publishCopyAvailability();
     const video = videoRef.current;
-
-    if (!video || pendingRefreshRef.current) {
-      return;
-    }
-
-    if (automaticRefreshUsedRef.current) {
-      setHasFailed(true);
-      return;
-    }
-
-    automaticRefreshUsedRef.current = true;
-    const accountEpoch = getAuthSession().accountEpoch;
-    const refresh = refreshProtectedMediaCookie();
-    pendingRefreshRef.current = refresh;
-
-    const finishRefresh = (refreshed: boolean): void => {
-      if (pendingRefreshRef.current !== refresh) {
-        return;
-      }
-
-      pendingRefreshRef.current = null;
-
-      if (
-        videoRef.current !== video ||
-        getAuthSession().accountEpoch !== accountEpoch ||
-        (isItemCurrent && !isItemCurrent(source.itemKey))
-      ) {
-        return;
-      }
-
-      if (refreshed) {
-        video.load();
-      } else {
-        setHasFailed(true);
-      }
-    };
-
-    void refresh.then(finishRefresh, () => finishRefresh(false));
-  }, [isItemCurrent, publishCopyAvailability, source.itemKey]);
+    getRecovery()?.handleError(
+      video,
+      () => videoRef.current === video && (!isItemCurrent || isItemCurrent(source.itemKey))
+    );
+  }, [getRecovery, isItemCurrent, publishCopyAvailability, source.itemKey]);
   // Seek slightly after metadata to clear the browser's show-poster flag and display native-resolution frame zero;
   // removing poster alone leaves black. This fetches extra media ranges. Skip when playback already began or the
   // playhead moved.
@@ -802,7 +781,7 @@ const PreviewVideo = ({
     // After load() recovery, restore the armed span's position without starting audio or running a nudge that would
     // retire it.
     if (spanRef.current) {
-      seekVideo(video, spanRef.current.startSeconds);
+      loadedVideoPlayer?.seekVideo(video, spanRef.current.startSeconds);
       return;
     }
 
@@ -811,21 +790,14 @@ const PreviewVideo = ({
     }
 
     // Some browsers throw if the seekable range is not populated yet; the poster stays up.
-    seekVideo(video, FIRST_FRAME_SEEK_SECONDS);
+    if (loadedVideoPlayer) {
+      loadedVideoPlayer.seekVideo(video, loadedVideoPlayer.FIRST_FRAME_SEEK_SECONDS);
+    }
   }, [playSpan]);
   const handleRetry = useCallback(() => {
-    const video = videoRef.current;
-
-    if (!video) {
-      return;
-    }
-
-    automaticRefreshUsedRef.current = false;
-    pendingRefreshRef.current = null;
-    setHasFailed(false);
-    video.load();
+    getRecovery()?.retry(videoRef.current);
     publishCopyAvailability();
-  }, [publishCopyAvailability]);
+  }, [getRecovery, publishCopyAvailability]);
   const handleContextMenu = useCallback(
     (event: MouseEvent<HTMLDivElement>) => {
       if (onContextMenu) {
@@ -978,34 +950,6 @@ export interface PreviewVideoFrameController {
   readonly itemKey: GalleryItemKey;
 }
 
-const isVideoFrameReady = (video: HTMLVideoElement | null): video is HTMLVideoElement =>
-  Boolean(
-    video && video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA && video.videoWidth > 0 && video.videoHeight > 0
-  );
-
-const isVideoFrameCopyAvailable = (video: HTMLVideoElement | null): boolean =>
-  canCopyImage() && isVideoFrameReady(video);
-
-const encodeCanvasPng = (canvas: HTMLCanvasElement): Promise<Blob | null> =>
-  new Promise((resolve, reject) => {
-    try {
-      canvas.toBlob(resolve, 'image/png');
-    } catch (error: unknown) {
-      reject(error instanceof Error ? error : new Error(String(error)));
-    }
-  });
-
-const isCanvasSecurityError = (error: unknown): boolean =>
-  error instanceof DOMException && error.name === 'SecurityError';
-
-const seekVideo = (video: HTMLVideoElement, seconds: number): void => {
-  try {
-    video.currentTime = seconds;
-  } catch {
-    // Some browsers throw while the seekable range is still empty; the element keeps its position.
-  }
-};
-
 /** Must stay a passive effect rendered after `VideoPlayer`, so it runs after the player binds its window. */
 const SpanPlaybackStart = ({ onStart }: { onStart: () => void }) => {
   useMountEffect(() => {
@@ -1036,9 +980,6 @@ const PLACEHOLDER_IMAGE_STYLE: CSSProperties = {
 
 /** How long a span waits for an element that could not act on it yet. */
 const PARKED_SPAN_TTL_MS = 15_000;
-
-// Seek far enough from zero to clear poster state while staying within frame zero.
-const FIRST_FRAME_SEEK_SECONDS = 0.0001;
 
 /** The poster stands in, as the player would show it, while the player loads. */
 const VIDEO_PLAYER_FALLBACK_STYLE: CSSProperties = {

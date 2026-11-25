@@ -640,7 +640,7 @@ describe('summarizeWorkflowLoadWarnings', () => {
           type: 'current_image',
         },
         {
-          data: { height: 288, id: 'ci-default', isOpen: true, label: 'Default', width: 320 },
+          data: { height: 320, id: 'ci-default', isOpen: true, label: 'Default', width: 320 },
           id: 'ci-default',
           position: { x: 40, y: 50 },
           type: 'current_image',

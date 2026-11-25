@@ -519,7 +519,7 @@ describe('node updates', () => {
           type: 'current_image',
         },
         {
-          data: { height: 288, label: 'Default', width: 320 },
+          data: { height: 320, label: 'Default', width: 320 },
           id: 'ci-default',
           position: { x: 30, y: 40 },
           type: 'current_image',
