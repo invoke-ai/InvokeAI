@@ -150,9 +150,10 @@ On the Canvas, a control layer can use either kind of FLUX.1 structural control:
 
 FLUX Fill regenerates a masked region of an image. On the Canvas it inpaints (paint an inpaint mask over
 the area to replace) and outpaints (move the frame past the image edge). It always regenerates the masked
-area from scratch, so the denoising strength and the coherence and infill settings do not apply. Without
+area from scratch, so the denoising strength, a mask layer's denoise limit and the coherence and infill
+settings do not apply: any painted area is regenerated fully. Without
 a mask or a transparent area in the frame, Invoke reports that FLUX Fill only inpaints and outpaints; the
-Generate tab refuses a Fill model for the same reason. A guidance of about 30 is recommended.
+Generate tab refuses a Fill model for the same reason. Guidance below 25 is refused; about 30 is recommended.
 
 In the workflow editor, connect a **FLUX Fill Conditioning** node (image plus inpainting mask) to the
 **Fill Conditioning** input of **FLUX Denoise**, and connect the VAE to its `controlnet_vae` input.

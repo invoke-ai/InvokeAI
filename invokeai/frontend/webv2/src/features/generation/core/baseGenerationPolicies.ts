@@ -11,7 +11,7 @@ import {
   SUPPORTED_GENERATE_BASES,
   type SupportedGenerateBase,
 } from '@features/generation/core/supportedBases';
-import { getArchitectureFeatures, hasArchitectureCapabilities } from '@features/models/architectures';
+import { getArchitectureFeatures, hasArchitectureCapabilities, isFluxFillModel } from '@features/models/architectures';
 import { areJsonValuesStructurallyEqual } from '@platform/core/json';
 import { SEED_MAX } from '@platform/core/seed';
 
@@ -3441,7 +3441,10 @@ const getComponentValidationIssues = (model: GenerateModelConfig, settings: Gene
 export type GenerationValidationMode = ExternalGenerationMode | 'outpaint' | 'canvasFrame';
 
 const FLUX_FILL_MODE_REASON =
-  'FLUX Fill models only inpaint and outpaint. Use them on the Canvas with an inpaint mask or a frame that extends past the image.';
+  'FLUX Fill only inpaints and outpaints: add an inpaint mask on the Canvas, or move the frame past the image edge.';
+
+/** `flux_denoise` warns below this: FLUX Fill was trained on guidance of about 30 and degrades at the FLUX dev default. */
+const FLUX_FILL_MIN_GUIDANCE = 25;
 
 export const getGenerationValidationIssues = (
   model: GenerateModelConfig,
@@ -3547,8 +3550,23 @@ export const getGenerationValidationIssues = (
     );
   }
 
-  if (model.variant === 'dev_fill' && model.base === 'flux' && (mode === 'txt2img' || mode === 'img2img')) {
-    issues.push(createUntranslatedGenerationIssue(FLUX_FILL_MODE_REASON, MODEL_TARGET));
+  if (isFluxFillModel(model) && (mode === 'txt2img' || mode === 'img2img')) {
+    issues.push(issue('model:fluxFillMode', 'fluxFillMode', FLUX_FILL_MODE_REASON, MODEL_TARGET));
+  }
+
+  if (isFluxFillModel(model) && settings.cfgScale < FLUX_FILL_MIN_GUIDANCE) {
+    const recommended = getBaseGenerationConfig(model).defaults.cfgScale;
+
+    issues.push(
+      issue(
+        'render:cfgScale:fluxFillGuidance',
+        'fluxFillGuidance',
+        `FLUX Fill needs a guidance of at least ${FLUX_FILL_MIN_GUIDANCE}; about ${recommended} is recommended.`,
+        { field: 'cfgScale', section: 'render' },
+        { min: FLUX_FILL_MIN_GUIDANCE, recommended },
+        { kind: 'clampGuidance', value: recommended }
+      )
+    );
   }
 
   issues.push(...getModelFamilyValidationIssues(model, settings));

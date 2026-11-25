@@ -637,7 +637,7 @@ describe('component policies', () => {
       vae: fluxVae,
     };
     const reasons = (mode?: Parameters<typeof getGenerationValidationReasons>[2]) =>
-      getGenerationValidationReasons(model, settings, mode).filter((reason) => reason.startsWith('FLUX Fill'));
+      getGenerationValidationReasons(model, settings, mode).filter((reason) => reason.startsWith('FLUX Fill only'));
 
     expect(reasons()).toHaveLength(1);
     expect(reasons('img2img')).toHaveLength(1);
@@ -649,6 +649,24 @@ describe('component policies', () => {
         ({ message }) => message
       )
     ).not.toContain(reasons()[0]);
+  });
+
+  it('blocks FLUX Fill below its guidance floor and offers the model default', () => {
+    const model = createModel('flux', { variant: 'dev_fill' });
+    const settings = { ...createSettings(model), clipEmbedModel: clipEmbed, t5EncoderModel: t5Encoder, vae: fluxVae };
+    const guidanceIssues = (cfgScale: number) =>
+      getGenerationValidationIssues(model, { ...settings, cfgScale }, 'inpaint').filter(
+        ({ target }) => target.field === 'cfgScale'
+      );
+
+    expect(guidanceIssues(3.5)).toEqual([
+      expect.objectContaining({
+        fix: { kind: 'clampGuidance', value: 30 },
+        messageKey: 'widgets.generate.issues.fluxFillGuidance',
+      }),
+    ]);
+    expect(guidanceIssues(25)).toEqual([]);
+    expect(guidanceIssues(30)).toEqual([]);
   });
 
   it('keeps concepts but clears incompatible selections when the selected model changes', () => {

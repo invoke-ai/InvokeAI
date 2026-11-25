@@ -668,7 +668,9 @@ describe('compileCanvasGraph — FLUX Fill', () => {
       image: { image_name: 'canvas-composite.png' },
       type: 'flux_fill',
     });
+    // Only a white pixel is kept, so a mask layer's gray denoise limit still regenerates.
     expect(backendGraph.nodes.flux_fill_mask_tensor).toMatchObject({
+      cutoff: 255,
       image: { image_name: 'canvas-mask.png' },
       type: 'image_mask_to_tensor',
     });
@@ -678,7 +680,11 @@ describe('compileCanvasGraph — FLUX Fill', () => {
       node_id: 'flux_fill',
     });
 
-    expect(backendGraph.nodes.expand_mask).toMatchObject({ fade_size_px: 16, mask: { image_name: 'canvas-mask.png' } });
+    expect(getEdge(backendGraph, 'flux_fill_keep_tensor', 'mask')?.source.node_id).toBe('flux_fill_mask_tensor');
+    expect(getEdge(backendGraph, 'flux_fill_keep_mask', 'mask')?.source.node_id).toBe('flux_fill_keep_tensor');
+    expect(backendGraph.nodes.expand_mask).toMatchObject({ fade_size_px: 16 });
+    expect(backendGraph.nodes.expand_mask?.mask).toBeUndefined();
+    expect(getEdge(backendGraph, 'expand_mask', 'mask')?.source.node_id).toBe('flux_fill_keep_mask');
     expect(backendGraph.nodes.canvas_output).toMatchObject({
       layer_base: { image_name: 'canvas-composite.png' },
       type: 'invokeai_img_blend',
@@ -696,7 +702,9 @@ describe('compileCanvasGraph — FLUX Fill', () => {
     expect(backendGraph.nodes.mask_combine).toMatchObject({ mask1: { image_name: 'canvas-mask.png' } });
     expect(getEdge(backendGraph, 'mask_combine', 'mask2')?.source.node_id).toBe('image_alpha_to_mask');
     expect(getEdge(backendGraph, 'flux_fill_mask_tensor', 'image')?.source.node_id).toBe('mask_combine');
-    expect(getEdge(backendGraph, 'expand_mask', 'mask')?.source.node_id).toBe('mask_combine');
+    expect(backendGraph.nodes.flux_fill_mask_tensor).toMatchObject({ cutoff: 255 });
+    expect(getEdge(backendGraph, 'flux_fill_keep_tensor', 'mask')?.source.node_id).toBe('flux_fill_mask_tensor');
+    expect(getEdge(backendGraph, 'expand_mask', 'mask')?.source.node_id).toBe('flux_fill_keep_mask');
     expect(backendGraph.nodes.flux_fill?.image).toEqual({ image_name: 'canvas-composite.png' });
     expect(getNodeByType(backendGraph, 'core_metadata')?.generation_mode).toBe('flux_outpaint');
   });
@@ -726,7 +734,7 @@ describe('compileCanvasGraph — FLUX Fill', () => {
 
   it('rejects the modes without an image to edit', () => {
     for (const mode of ['txt2img', 'img2img'] as const) {
-      expect(() => compile(fluxFillModel, mode)).toThrow('FLUX Fill models only inpaint and outpaint.');
+      expect(() => compile(fluxFillModel, mode)).toThrow('FLUX Fill only inpaints and outpaints');
     }
   });
 });

@@ -28,6 +28,7 @@ import { shouldUsePidDecode } from '@features/generation/core/pidGraph';
 import { getEffectivePrompts } from '@features/generation/core/promptTemplates';
 import { getBaseDenoisingRange } from '@features/generation/core/sdxlRefiner';
 import { MAX_ANIMA_INPAINT_ADAPTER_WEIGHT, MIN_ANIMA_INPAINT_ADAPTER_WEIGHT } from '@features/generation/core/settings';
+import { isFluxFillModel } from '@features/models/architectures';
 
 import type { CanvasInpaintSources } from './addControlLayers';
 import type {
@@ -54,11 +55,9 @@ import {
 import { type CanvasSize, resolveCanvasProcessingSize } from './canvasProcessingSize';
 import { isAnimaInpaintAdapterModel } from './controlValidation';
 
-const isFluxFill = (model: GenerateModelConfig): boolean => model.base === 'flux' && model.variant === 'dev_fill';
-
 /** SD-3, FLUX, FLUX.2, FLUX.3 and MOSS-Image start at 1 - strength^0.2; FLUX Fill at 0; others at 1 - strength. */
 const canvasDenoisingStart = (model: GenerateModelConfig, strength: number): number => {
-  if (isFluxFill(model)) {
+  if (isFluxFillModel(model)) {
     return 0;
   }
   const usesOptimizedCurve =
@@ -174,7 +173,7 @@ const getCanvasValidationReasons = (input: CompileCanvasGraphInput, processingSi
     // A provider edits at its own strength and FLUX Fill always denoises fully; only other local denoises read this.
     if (
       model.type !== 'external_image_generator' &&
-      !isFluxFill(model) &&
+      !isFluxFillModel(model) &&
       (!Number.isFinite(strength) || strength <= 0 || strength > 1)
     ) {
       reasons.push('Canvas denoising strength must be greater than 0 and at most 1.');
@@ -724,6 +723,10 @@ const addOutpaintMask = (
 /**
  * FLUX Fill is conditioned on the image and mask itself, so it takes no latents, noise or denoise mask; the backend
  * resizes the fill inputs to the denoise size, and only the result is restored to the bbox.
+ *
+ * Fill has no partial denoise, so a mask layer's denoise limit (a gray mask) does not apply: every pixel that is not
+ * white regenerates. The fill conditioning and the paste-back both read that binary mask, so the result is neither
+ * discarded nor blended by the gray level.
  */
 const graftFluxFill = (
   family: FamilyGraph,
@@ -737,21 +740,30 @@ const graftFluxFill = (
 
   setCanvasDenoisingRange(denoise, input.model, input.settings, input.strength);
 
-  const mask: CanvasInpaintSources['mask'] =
+  const canvasMask: CanvasInpaintSources['mask'] =
     mode === 'outpaint'
       ? addOutpaintMask(graph, initialImageName, input.maskImageName)
       : { image_name: input.maskImageName as string };
+  // Below white (cutoff 255) is True: regenerate.
   const maskTensor = addNode(graph, {
+    cutoff: 255,
     id: 'flux_fill_mask_tensor',
-    ...('node' in mask ? {} : { image: mask }),
+    ...('node' in canvasMask ? {} : { image: canvasMask }),
     type: 'image_mask_to_tensor',
   });
-  if ('node' in mask) {
-    addEdge(graph, mask.node, mask.field, maskTensor, 'image');
+  if ('node' in canvasMask) {
+    addEdge(graph, canvasMask.node, canvasMask.field, maskTensor, 'image');
   }
   const fill = addNode(graph, { id: 'flux_fill', image: { image_name: initialImageName }, type: 'flux_fill' });
   addEdge(graph, maskTensor, 'mask', fill, 'mask');
   addEdge(graph, fill, 'fill_cond', denoise, 'fill_conditioning');
+
+  // White = keep, black = regenerate, the convention of the paste-back and of the control adapters.
+  const keepTensor = addNode(graph, { id: 'flux_fill_keep_tensor', type: 'invert_tensor_mask' });
+  addEdge(graph, maskTensor, 'mask', keepTensor, 'mask');
+  const keepMask = addNode(graph, { id: 'flux_fill_keep_mask', type: 'tensor_mask_to_image' });
+  addEdge(graph, keepTensor, 'mask', keepMask, 'mask');
+  const mask: CanvasInpaintSources['mask'] = { field: 'image', node: keepMask };
 
   addCanvasPasteBack(family, {
     bbox: input.bbox,
@@ -1114,7 +1126,7 @@ export const compileCanvasGraph = (input: CompileCanvasGraphInput): CompiledCanv
   if (mode === 'img2img') {
     graftImageToImage(family, model, settings, compositeImageName as string, strength, bbox);
   } else if (mode === 'inpaint' || mode === 'outpaint') {
-    if (isFluxFill(model)) {
+    if (isFluxFillModel(model)) {
       inpaint = graftFluxFill(family, input, compositing, processingSize, mode);
     } else {
       inpaint = (mode === 'inpaint' ? graftInpaint : graftOutpaint)(family, input, compositing, processingSize);
