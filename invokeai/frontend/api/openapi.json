@@ -11192,6 +11192,98 @@
               "title": "Created To"
             },
             "description": "Inclusive end date (YYYY-MM-DD) to filter by created_at."
+          },
+          {
+            "name": "flags",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MarkFlag"
+                  },
+                  "maxItems": 3
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Keep items with any of these flags: 'pick' (starred), 'reject', or 'none' for neither.",
+              "title": "Flags"
+            },
+            "description": "Keep items with any of these flags: 'pick' (starred), 'reject', or 'none' for neither."
+          },
+          {
+            "name": "min_rating",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 5,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Keep items rated at least this (1-5).",
+              "title": "Min Rating"
+            },
+            "description": "Keep items rated at least this (1-5)."
+          },
+          {
+            "name": "max_rating",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 5,
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Keep items rated at most this (0-5); 0 keeps unrated items.",
+              "title": "Max Rating"
+            },
+            "description": "Keep items rated at most this (0-5); 0 keeps unrated items."
+          },
+          {
+            "name": "color_labels",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/components/schemas/ColorLabel"
+                      },
+                      {
+                        "const": "none",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "maxItems": 6
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Keep items with any of these color labels; 'none' keeps items without one.",
+              "title": "Color Labels"
+            },
+            "description": "Keep items with any of these color labels; 'none' keeps items without one."
           }
         ],
         "responses": {
@@ -11429,6 +11521,98 @@
               "title": "Created To"
             },
             "description": "Inclusive end date (YYYY-MM-DD) to filter by created_at."
+          },
+          {
+            "name": "flags",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MarkFlag"
+                  },
+                  "maxItems": 3
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Keep items with any of these flags: 'pick' (starred), 'reject', or 'none' for neither.",
+              "title": "Flags"
+            },
+            "description": "Keep items with any of these flags: 'pick' (starred), 'reject', or 'none' for neither."
+          },
+          {
+            "name": "min_rating",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 5,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Keep items rated at least this (1-5).",
+              "title": "Min Rating"
+            },
+            "description": "Keep items rated at least this (1-5)."
+          },
+          {
+            "name": "max_rating",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 5,
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Keep items rated at most this (0-5); 0 keeps unrated items.",
+              "title": "Max Rating"
+            },
+            "description": "Keep items rated at most this (0-5); 0 keeps unrated items."
+          },
+          {
+            "name": "color_labels",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/components/schemas/ColorLabel"
+                      },
+                      {
+                        "const": "none",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "maxItems": 6
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Keep items with any of these color labels; 'none' keeps items without one.",
+              "title": "Color Labels"
+            },
+            "description": "Keep items with any of these color labels; 'none' keeps items without one."
           }
         ],
         "responses": {
@@ -11675,6 +11859,98 @@
               "title": "Media Kind"
             },
             "description": "List only images ('image') or only videos ('video'). Omit to include both. Totals, positions and names cover only the listed kind."
+          },
+          {
+            "name": "flags",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MarkFlag"
+                  },
+                  "maxItems": 3
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Keep items with any of these flags: 'pick' (starred), 'reject', or 'none' for neither.",
+              "title": "Flags"
+            },
+            "description": "Keep items with any of these flags: 'pick' (starred), 'reject', or 'none' for neither."
+          },
+          {
+            "name": "min_rating",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 5,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Keep items rated at least this (1-5).",
+              "title": "Min Rating"
+            },
+            "description": "Keep items rated at least this (1-5)."
+          },
+          {
+            "name": "max_rating",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 5,
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Keep items rated at most this (0-5); 0 keeps unrated items.",
+              "title": "Max Rating"
+            },
+            "description": "Keep items rated at most this (0-5); 0 keeps unrated items."
+          },
+          {
+            "name": "color_labels",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/components/schemas/ColorLabel"
+                      },
+                      {
+                        "const": "none",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "maxItems": 6
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Keep items with any of these color labels; 'none' keeps items without one.",
+              "title": "Color Labels"
+            },
+            "description": "Keep items with any of these color labels; 'none' keeps items without one."
           }
         ],
         "responses": {
@@ -11904,6 +12180,98 @@
               "title": "Created To"
             },
             "description": "Inclusive end date (YYYY-MM-DD) to filter by created_at."
+          },
+          {
+            "name": "flags",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MarkFlag"
+                  },
+                  "maxItems": 3
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Keep items with any of these flags: 'pick' (starred), 'reject', or 'none' for neither.",
+              "title": "Flags"
+            },
+            "description": "Keep items with any of these flags: 'pick' (starred), 'reject', or 'none' for neither."
+          },
+          {
+            "name": "min_rating",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 5,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Keep items rated at least this (1-5).",
+              "title": "Min Rating"
+            },
+            "description": "Keep items rated at least this (1-5)."
+          },
+          {
+            "name": "max_rating",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 5,
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Keep items rated at most this (0-5); 0 keeps unrated items.",
+              "title": "Max Rating"
+            },
+            "description": "Keep items rated at most this (0-5); 0 keeps unrated items."
+          },
+          {
+            "name": "color_labels",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/components/schemas/ColorLabel"
+                      },
+                      {
+                        "const": "none",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "maxItems": 6
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Keep items with any of these color labels; 'none' keeps items without one.",
+              "title": "Color Labels"
+            },
+            "description": "Keep items with any of these color labels; 'none' keeps items without one."
           }
         ],
         "responses": {
@@ -11954,6 +12322,52 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/GalleryMediaUsage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/gallery/items/marks": {
+      "post": {
+        "tags": ["gallery"],
+        "summary": "Set Gallery Item Marks",
+        "description": "Sets a rating, a flag and a color label on images and videos. Marking someone else's item takes what starring\nit does: being an administrator or one of the managers of the board it is on.",
+        "operationId": "set_gallery_item_marks",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GalleryItemMarksRequest",
+                "description": "The items and the marks to set on them"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GalleryItemMarksResult"
                 }
               }
             }
@@ -13117,6 +13531,98 @@
               "title": "Media Kind"
             },
             "description": "List only images ('image') or only videos ('video'). Omit to include both. Totals, positions and names cover only the listed kind."
+          },
+          {
+            "name": "flags",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MarkFlag"
+                  },
+                  "maxItems": 3
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Keep items with any of these flags: 'pick' (starred), 'reject', or 'none' for neither.",
+              "title": "Flags"
+            },
+            "description": "Keep items with any of these flags: 'pick' (starred), 'reject', or 'none' for neither."
+          },
+          {
+            "name": "min_rating",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 5,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Keep items rated at least this (1-5).",
+              "title": "Min Rating"
+            },
+            "description": "Keep items rated at least this (1-5)."
+          },
+          {
+            "name": "max_rating",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 5,
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Keep items rated at most this (0-5); 0 keeps unrated items.",
+              "title": "Max Rating"
+            },
+            "description": "Keep items rated at most this (0-5); 0 keeps unrated items."
+          },
+          {
+            "name": "color_labels",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/components/schemas/ColorLabel"
+                      },
+                      {
+                        "const": "none",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "maxItems": 6
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Keep items with any of these color labels; 'none' keeps items without one.",
+              "title": "Color Labels"
+            },
+            "description": "Keep items with any of these color labels; 'none' keeps items without one."
           }
         ],
         "responses": {
@@ -28750,6 +29256,12 @@
         "output": {
           "$ref": "#/components/schemas/ColorOutput"
         }
+      },
+      "ColorLabel": {
+        "type": "string",
+        "enum": ["red", "yellow", "green", "blue", "purple"],
+        "title": "ColorLabel",
+        "description": "A color label on a gallery item."
       },
       "ColorMapInvocation": {
         "category": "controlnet_preprocessors",
@@ -46616,6 +47128,27 @@
             "title": "Starred",
             "description": "Whether the item is starred."
           },
+          "rating": {
+            "type": "integer",
+            "title": "Rating",
+            "description": "The item's rating, from 0 (unrated) to 5."
+          },
+          "rejected": {
+            "type": "boolean",
+            "title": "Rejected",
+            "description": "Whether the item is rejected. Never true together with `starred`."
+          },
+          "color_label": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ColorLabel"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The item's color label, if it has one."
+          },
           "is_intermediate": {
             "type": "boolean",
             "title": "Is Intermediate",
@@ -46693,6 +47226,8 @@
           "height",
           "category",
           "starred",
+          "rating",
+          "rejected",
           "is_intermediate",
           "created_at"
         ],
@@ -46731,6 +47266,131 @@
         "required": ["kind", "name", "index", "total"],
         "title": "GalleryItemLocation",
         "description": "A gallery item's position in a filtered, ordered listing."
+      },
+      "GalleryItemMarksRequest": {
+        "properties": {
+          "image_names": {
+            "items": {
+              "type": "string",
+              "maxLength": 255,
+              "minLength": 1
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "title": "Image Names",
+            "description": "The images to mark."
+          },
+          "video_names": {
+            "items": {
+              "type": "string",
+              "maxLength": 255,
+              "minLength": 1
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "title": "Video Names",
+            "description": "The videos to mark."
+          },
+          "rating": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 5.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rating",
+            "description": "The rating to set, from 0 (unrated) to 5."
+          },
+          "flag": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MarkFlag"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The flag to set: 'pick' stars the item, 'reject' rejects it, 'none' clears both. Either one clears the other."
+          },
+          "color_label": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ColorLabel"
+              },
+              {
+                "type": "string",
+                "const": "none"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Color Label",
+            "description": "The color label to set, or 'none' to remove it."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "GalleryItemMarksRequest",
+        "description": "Marks to set on images and videos. A mark left out stays as it is on each item."
+      },
+      "GalleryItemMarksResult": {
+        "properties": {
+          "updated_image_names": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Updated Image Names",
+            "description": "The images whose marks were set."
+          },
+          "updated_video_names": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Updated Video Names",
+            "description": "The videos whose marks were set."
+          },
+          "failed_image_names": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Failed Image Names",
+            "description": "Images the caller may mark whose marks could not be saved."
+          },
+          "failed_video_names": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Failed Video Names",
+            "description": "Videos the caller may mark whose marks could not be saved."
+          },
+          "affected_boards": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Affected Boards",
+            "description": "The boards of the updated items; 'none' for items on no board."
+          }
+        },
+        "type": "object",
+        "required": [
+          "updated_image_names",
+          "updated_video_names",
+          "failed_image_names",
+          "failed_video_names",
+          "affected_boards"
+        ],
+        "title": "GalleryItemMarksResult",
+        "description": "What setting marks changed. Names the caller may not mark, and names of items that do not exist, are in no\nlist."
       },
       "GalleryItemNames": {
         "properties": {
@@ -54698,6 +55358,27 @@
             "title": "File Size Bytes",
             "description": "Bytes the image and its thumbnail occupy on disk; null until measured."
           },
+          "rating": {
+            "type": "integer",
+            "title": "Rating",
+            "description": "The image's rating, from 0 (unrated) to 5."
+          },
+          "rejected": {
+            "type": "boolean",
+            "title": "Rejected",
+            "description": "Whether this image is rejected. Never true together with `starred`."
+          },
+          "color_label": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ColorLabel"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The image's color label, if it has one."
+          },
           "board_id": {
             "anyOf": [
               {
@@ -54724,7 +55405,9 @@
           "updated_at",
           "is_intermediate",
           "starred",
-          "has_workflow"
+          "has_workflow",
+          "rating",
+          "rejected"
         ],
         "title": "ImageDTO",
         "description": "Deserialized image record, enriched for the frontend."
@@ -91416,6 +92099,12 @@
         ],
         "title": "Main_SDNQ_ZImage_Config",
         "description": "Model config for SDNQ-quantized Z-Image transformer models."
+      },
+      "MarkFlag": {
+        "type": "string",
+        "enum": ["pick", "none", "reject"],
+        "title": "MarkFlag",
+        "description": "A gallery item's flag: picked (stored as `starred`), rejected, or neither."
       },
       "MaskCombineInvocation": {
         "category": "mask",
@@ -129631,6 +130320,27 @@
             "title": "File Size Bytes",
             "description": "Bytes the video, its thumbnail and sidecar occupy on disk; null until measured."
           },
+          "rating": {
+            "type": "integer",
+            "title": "Rating",
+            "description": "The video's rating, from 0 (unrated) to 5."
+          },
+          "rejected": {
+            "type": "boolean",
+            "title": "Rejected",
+            "description": "Whether this video is rejected. Never true together with `starred`."
+          },
+          "color_label": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ColorLabel"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The video's color label, if it has one."
+          },
           "media_origin": {
             "anyOf": [
               {
@@ -129670,7 +130380,9 @@
           "updated_at",
           "is_intermediate",
           "starred",
-          "has_workflow"
+          "has_workflow",
+          "rating",
+          "rejected"
         ],
         "title": "VideoDTO",
         "description": "Deserialized video record, enriched for the frontend."

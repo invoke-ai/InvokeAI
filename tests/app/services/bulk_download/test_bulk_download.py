@@ -44,6 +44,8 @@ def mock_image_dto() -> ImageDTO:
         created_at="None",
         updated_at="None",
         starred=False,
+        rating=0,
+        rejected=False,
         has_workflow=False,
         is_intermediate=False,
     )

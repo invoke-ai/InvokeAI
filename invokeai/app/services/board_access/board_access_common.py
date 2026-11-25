@@ -49,7 +49,8 @@ class ItemAction(str, Enum):
     Read = "read"
     RemoveFromBoard = "remove_from_board"
     Star = "star"
-    """Star or unstar: a flag every viewer of the item sees."""
+    """Set the item's marks (`services/shared/media_marks.py`): star (pick) or unstar, reject, rating and color label,
+    which every viewer of the item sees."""
     Edit = "edit"
     """Change the item's record otherwise (its category, whether it is an intermediate)."""
     Delete = "delete"

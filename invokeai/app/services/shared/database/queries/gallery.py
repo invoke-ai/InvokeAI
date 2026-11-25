@@ -9,10 +9,11 @@ from page to page.
 import functools
 import itertools
 import operator
-from collections.abc import Collection, Sequence
+from collections.abc import Callable, Collection, Sequence
 from typing import Any, Literal, NamedTuple, Optional
 
 from sqlalchemy import (
+    Boolean,
     ColumnElement,
     Connection,
     FromClause,
@@ -21,6 +22,7 @@ from sqlalchemy import (
     String,
     Subquery,
     Table,
+    Update,
     and_,
     bindparam,
     case,
@@ -31,7 +33,9 @@ from sqlalchemy import (
     null,
     or_,
     select,
+    true,
     union_all,
+    update,
 )
 
 from invokeai.app.services.image_records.image_records_common import (
@@ -49,11 +53,20 @@ from invokeai.app.services.shared.database.dialect import (
     fixed_limit,
     like_contains,
 )
-from invokeai.app.services.shared.database.queries.base import IN_CHUNK, QueryModule, day_after, read
+from invokeai.app.services.shared.database.queries.base import IN_CHUNK, QueryModule, day_after, read, write
 from invokeai.app.services.shared.database.queries.board_access import listed_board
 from invokeai.app.services.shared.database.schema.boards import board_images, board_videos, boards
 from invokeai.app.services.shared.database.schema.images import images
 from invokeai.app.services.shared.database.schema.videos import videos
+from invokeai.app.services.shared.media_marks import (
+    MAX_RATING,
+    NO_COLOR_LABEL,
+    ColorLabel,
+    ColorLabelChoice,
+    MarkChanges,
+    MarkFilters,
+    MarkFlag,
+)
 
 
 class _Half(NamedTuple):
@@ -69,11 +82,11 @@ _HALVES = {
     "video": _Half(videos, board_videos, "video_name", "video_category", "video_origin"),
 }
 
+_IN_NAMES = {
+    kind: InBoundSet(half.media.c[half.name], bindparam("names", type_=String())) for kind, half in _HALVES.items()
+}
 _ITEM_OWNERS = {
-    kind: select(half.media.c[half.name], half.media.c.user_id).where(
-        InBoundSet(half.media.c[half.name], bindparam("names", type_=String()))
-    )
-    for kind, half in _HALVES.items()
+    kind: select(half.media.c[half.name], half.media.c.user_id).where(_IN_NAMES[kind]) for kind, half in _HALVES.items()
 }
 
 
@@ -95,6 +108,32 @@ class _Shape(NamedTuple):
     created_date: bool
     created_from: bool
     created_to: bool
+    # Whether each mark filter applies; their values are bound. A list of every value does not filter.
+    flags: bool
+    rating: bool
+    color_labels: bool
+
+
+def _value_set(values: Optional[Collection[Any]], of: Callable[[Any], str], every: int) -> frozenset[str]:
+    """The distinct values, or none when they are every value, which does not filter."""
+    normalized = frozenset(of(value) for value in values or ())
+    return normalized if len(normalized) < every else frozenset()
+
+
+def _color_label_value(label: ColorLabelChoice) -> str:
+    return NO_COLOR_LABEL if label == NO_COLOR_LABEL else ColorLabel(label).value
+
+
+def _flag_set(marks: MarkFilters) -> frozenset[str]:
+    return _value_set(marks.flags, lambda flag: MarkFlag(flag).value, len(MarkFlag))
+
+
+def _color_label_set(marks: MarkFilters) -> frozenset[str]:
+    return _value_set(marks.color_labels, _color_label_value, len(ColorLabel) + 1)
+
+
+# One parameter per color, in a fixed order: a filter binds the colors it keeps and NULL for the rest.
+_COLOR_LABEL_PARAMETERS = tuple(f"color_label_{label.value}" for label in ColorLabel)
 
 
 class Filters(NamedTuple):
@@ -113,6 +152,7 @@ class Filters(NamedTuple):
     starred: Optional[bool] = None
     # One kind's items only; None for both.
     media_kind: Optional[Literal["image", "video"]] = None
+    marks: MarkFilters = MarkFilters()
 
     def shape(self) -> _Shape:
         return _Shape(
@@ -129,9 +169,15 @@ class Filters(NamedTuple):
             created_date=self.created_date is not None,
             created_from=self.created_from is not None,
             created_to=self.created_to is not None,
+            flags=bool(_flag_set(self.marks)),
+            rating=self.marks.min_rating is not None or self.marks.max_rating is not None,
+            color_labels=bool(_color_label_set(self.marks)),
         )
 
     def parameters(self) -> dict[str, Any]:
+        flags = _flag_set(self.marks)
+        labels = _color_label_set(self.marks)
+        min_rating, max_rating = self.marks.min_rating, self.marks.max_rating
         return {
             "origin": self.origin.value if self.origin is not None else None,
             "is_intermediate": self.is_intermediate,
@@ -144,7 +190,33 @@ class Filters(NamedTuple):
             "created_date_before": day_after(self.created_date) if self.created_date is not None else None,
             "created_from": self.created_from,
             "created_before": day_after(self.created_to) if self.created_to is not None else None,
+            "flag_pick": MarkFlag.PICK.value in flags,
+            "flag_reject": MarkFlag.REJECT.value in flags,
+            "flag_none": MarkFlag.NONE.value in flags,
+            "min_rating": 0 if min_rating is None else min_rating,
+            "max_rating": MAX_RATING if max_rating is None else max_rating,
+            **{
+                parameter: label.value if label.value in labels else None
+                for parameter, label in zip(_COLOR_LABEL_PARAMETERS, ColorLabel, strict=True)
+            },
+            "color_label_none": NO_COLOR_LABEL in labels,
         }
+
+
+def _flag_condition(media: Table) -> ColumnElement[bool]:
+    unflagged = and_(or_(media.c.starred.is_(None), media.c.starred == false()), media.c.rejected == false())
+    return or_(
+        and_(bindparam("flag_pick", type_=Boolean()), media.c.starred == true()),
+        and_(bindparam("flag_reject", type_=Boolean()), media.c.rejected == true()),
+        and_(bindparam("flag_none", type_=Boolean()), unflagged),
+    )
+
+
+def _color_label_condition(media: Table) -> ColumnElement[bool]:
+    return or_(
+        media.c.color_label.in_([bindparam(parameter, type_=String()) for parameter in _COLOR_LABEL_PARAMETERS]),
+        and_(bindparam("color_label_none", type_=Boolean()), media.c.color_label.is_(None)),
+    )
 
 
 def _from(kind: str, shape: _Shape, with_board: bool) -> tuple[FromClause, ColumnElement[Any]]:
@@ -181,6 +253,12 @@ def _conditions(kind: str, shape: _Shape, joined: bool) -> list[ColumnElement[bo
         conditions.append(media.c.created_at >= bindparam("created_from"))
     if shape.created_to:
         conditions.append(media.c.created_at < bindparam("created_before"))
+    if shape.flags:
+        conditions.append(_flag_condition(media))
+    if shape.rating:
+        conditions.append(media.c.rating.between(bindparam("min_rating"), bindparam("max_rating")))
+    if shape.color_labels:
+        conditions.append(_color_label_condition(media))
     own = media.c.user_id == bindparam("user_id")
     if shape.board == "none":
         conditions.append(~exists(select(literal(1)).where(membership.c[half.name] == media.c[half.name])))
@@ -240,6 +318,9 @@ def _half(kind: str, shape: _Shape, names_only: bool) -> Select[Any]:
             media.c.created_at.label("created_at"),
             (media.c.duration if kind == "video" else null()).label("duration"),
             (media.c.fps if kind == "video" else null()).label("fps"),
+            media.c.rating.label("rating"),
+            media.c.rejected.label("rejected"),
+            media.c.color_label.label("color_label"),
         ]
     return select(*columns).select_from(source).where(*_conditions(kind, shape, joined))
 
@@ -422,6 +503,40 @@ def _location(shape: _Shape, descending: bool) -> Select[Any]:
     )
 
 
+# Each named item's board, for the items that exist.
+_BOARDS_OF = {
+    kind: select(half.media.c[half.name], half.membership.c.board_id)
+    .select_from(half.media.outerjoin(half.membership, half.membership.c[half.name] == half.media.c[half.name]))
+    .where(_IN_NAMES[kind])
+    for kind, half in _HALVES.items()
+}
+
+
+@functools.cache
+def _set_marks(kind: str, columns: tuple[str, ...]) -> Update:
+    """Sets these mark columns of the named items; one statement per kind and set of columns, of which there are
+    few. An `IN` list rather than an `InBoundSet`, so that every backend finds the rows by primary key."""
+    half = _HALVES[kind]
+    return (
+        update(half.media)
+        .where(half.media.c[half.name].in_(bindparam("target_names", expanding=True)))
+        .values({c: bindparam(f"new_{c}") for c in columns})
+    )
+
+
+def _mark_values(changes: MarkChanges) -> dict[str, Any]:
+    values: dict[str, Any] = {}
+    if changes.rating is not None:
+        values["rating"] = int(changes.rating)
+    if changes.flag is not None:
+        values["starred"] = changes.flag == MarkFlag.PICK
+        values["rejected"] = changes.flag == MarkFlag.REJECT
+    if changes.color_label is not None:
+        label = _color_label_value(changes.color_label)
+        values["color_label"] = None if label == NO_COLOR_LABEL else label
+    return values
+
+
 class GalleryQueries(QueryModule):
     @read
     def page(
@@ -473,6 +588,22 @@ class GalleryQueries(QueryModule):
                     BoardSummary(str(r[0]), int(r[1] or 0), int(r[2] or 0), int(r[3] or 0), int(r[4] or 0), r[5], r[6])
                 )
         return summaries
+
+    @write
+    def set_marks(
+        self, conn: Connection, kind: Literal["image", "video"], names: Collection[str], changes: MarkChanges
+    ) -> dict[str, Optional[str]]:
+        """Sets the marks on each named item of `kind` that exists, in name order; the board of each of those items,
+        None for none."""
+        values = _mark_values(changes)
+        if not names or not values:
+            return {}
+        statement = _set_marks(kind, tuple(sorted(values)))
+        new_values = {f"new_{c}": v for c, v in values.items()}
+        # In name order, so that two concurrent calls lock their common rows in the same order.
+        for chunk in itertools.batched(sorted(set(names)), IN_CHUNK):
+            conn.execute(statement, {"target_names": list(chunk), **new_values})
+        return {str(row[0]): row[1] for row in conn.execute(_BOARDS_OF[kind], {"names": bound_set(names)}).all()}
 
     @read
     def item_owners(

@@ -20,6 +20,7 @@ from invokeai.app.services.image_records.image_records_common import ImageCatego
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.shared.database.schema.images import images
 from invokeai.app.services.shared.database.schema.videos import videos
+from invokeai.app.services.shared.media_marks import MarkFilters
 from invokeai.app.services.shared.pagination import SQLiteDirection
 from invokeai.app.services.video_records.video_records_common import VideoRecordChanges
 
@@ -78,6 +79,7 @@ def _locate(
         created_from=filters.get("created_from"),
         created_to=filters.get("created_to"),
         media_kind=filters.get("media_kind"),
+        marks=filters.get("marks", MarkFilters()),
     )
 
 

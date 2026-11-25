@@ -3,7 +3,7 @@ from fastapi.routing import APIRouter
 
 from invokeai.app.api.auth_dependencies import CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
-from invokeai.app.api.routers.gallery import MediaKindQuery
+from invokeai.app.api.routers.gallery import MarkFiltersQuery, MediaKindQuery
 from invokeai.app.services.gallery.gallery_base import GalleryMediaKind
 from invokeai.app.services.gallery.gallery_common import GalleryItemNamesResult
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ImageNamesResult
@@ -72,6 +72,7 @@ def list_virtual_board_image_names_by_date(
 )
 def list_virtual_board_item_names_by_date(
     current_user: CurrentUserOrDefault,
+    marks: MarkFiltersQuery,
     date: str = Path(description="The ISO date string, e.g. '2026-03-18'"),
     starred_first: bool = Query(default=True, description="Whether to sort starred items first"),
     starred: bool | None = Query(
@@ -100,6 +101,7 @@ def list_virtual_board_item_names_by_date(
             created_date=date,
             starred=starred,
             media_kind=media_kind,
+            marks=marks,
         )
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to get gallery item names for date")

@@ -1,26 +1,37 @@
+from collections.abc import Callable
 from datetime import date
 from typing import Annotated, Optional, Self
 
-from fastapi import Body, HTTPException, Query
+from fastapi import Body, Depends, HTTPException, Query
 from fastapi.routing import APIRouter
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, StrictInt, model_validator
 
 from invokeai.app.api.auth_dependencies import CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
-from invokeai.app.api.routers._access import assert_board_changes
+from invokeai.app.api.routers._access import assert_board_changes, assert_image_action, assert_video_action
 from invokeai.app.api.routers._limits import MAX_IMAGE_BATCH_SIZE, MAX_VIDEO_BATCH_SIZE
+from invokeai.app.api.routers.image_move_maintenance import assert_image_move_maintenance_inactive
 from invokeai.app.api.routers.images import _assert_board_read_access
-from invokeai.app.services.board_access.board_access_common import BoardAction
+from invokeai.app.services.board_access.board_access_common import BoardAction, ItemAction
 from invokeai.app.services.gallery.gallery_base import GalleryMediaKind
 from invokeai.app.services.gallery.gallery_common import (
     GalleryItem,
     GalleryItemKind,
     GalleryItemLocation,
+    GalleryItemMarksResult,
     GalleryItemNames,
     GalleryItemNamesResult,
     GalleryMediaUsage,
 )
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
+from invokeai.app.services.shared.media_marks import (
+    MAX_RATING,
+    ColorLabel,
+    ColorLabelChoice,
+    MarkChanges,
+    MarkFilters,
+    MarkFlag,
+)
 from invokeai.app.services.shared.pagination import MAX_PAGE_SIZE, OffsetPaginatedResults, SQLiteDirection
 
 gallery_router = APIRouter(prefix="/v1/gallery", tags=["gallery"])
@@ -34,19 +45,19 @@ BoardIdQuery = Query(
     "administrator), or 'all' for those items plus the items on every non-archived board the current user may read.",
 )
 
-UsageMediaName = Annotated[str, Field(min_length=1, max_length=255)]
+MediaName = Annotated[str, Field(min_length=1, max_length=255)]
 
 
 class GalleryMediaUsageRequest(BaseModel):
     """The media to check: named images and videos, or every item on one board."""
 
-    image_names: list[UsageMediaName] = Field(
+    image_names: list[MediaName] = Field(
         default_factory=list,
         max_length=MAX_IMAGE_BATCH_SIZE,
         description="Images to check. Those the caller may not delete, and unknown ones, are ignored, as "
         "`POST /images/delete` skips them.",
     )
-    video_names: list[UsageMediaName] = Field(
+    video_names: list[MediaName] = Field(
         default_factory=list,
         max_length=MAX_VIDEO_BATCH_SIZE,
         description="Videos to check. Those the caller may not delete, and unknown ones, are ignored, as "
@@ -72,6 +83,33 @@ MediaKindQuery = Query(
 )
 
 
+def _mark_filters(
+    flags: Optional[list[MarkFlag]] = Query(
+        default=None,
+        max_length=len(MarkFlag),
+        description="Keep items with any of these flags: 'pick' (starred), 'reject', or 'none' for neither.",
+    ),
+    min_rating: Optional[int] = Query(
+        default=None, ge=1, le=MAX_RATING, description="Keep items rated at least this (1-5)."
+    ),
+    max_rating: Optional[int] = Query(
+        default=None, ge=0, le=MAX_RATING, description="Keep items rated at most this (0-5); 0 keeps unrated items."
+    ),
+    color_labels: Optional[list[ColorLabelChoice]] = Query(
+        default=None,
+        max_length=len(ColorLabel) + 1,
+        description="Keep items with any of these color labels; 'none' keeps items without one.",
+    ),
+) -> MarkFilters:
+    """A listing's mark filters, combined with each other and the listing's other filters by AND."""
+    if min_rating is not None and max_rating is not None and min_rating > max_rating:
+        raise HTTPException(status_code=422, detail="min_rating is above max_rating")
+    return MarkFilters(flags=flags, min_rating=min_rating, max_rating=max_rating, color_labels=color_labels)
+
+
+MarkFiltersQuery = Annotated[MarkFilters, Depends(_mark_filters)]
+
+
 @gallery_router.get(
     "/items/",
     operation_id="list_gallery_items",
@@ -79,6 +117,7 @@ MediaKindQuery = Query(
 )
 def list_gallery_items(
     current_user: CurrentUserOrDefault,
+    marks: MarkFiltersQuery,
     origin: Optional[ResourceOrigin] = Query(default=None, description="The origin of items to list."),
     categories: Optional[list[ImageCategory]] = Query(
         default=None,
@@ -125,6 +164,7 @@ def list_gallery_items(
         created_to=created_to.isoformat() if created_to else None,
         starred=starred,
         media_kind=media_kind,
+        marks=marks,
     )
 
 
@@ -135,6 +175,7 @@ def list_gallery_items(
 )
 def get_gallery_item_location(
     current_user: CurrentUserOrDefault,
+    marks: MarkFiltersQuery,
     kind: GalleryItemKind = Query(description="Whether the target is an image or video."),
     name: str = Query(description="The target image or video name."),
     origin: Optional[ResourceOrigin] = Query(default=None, description="The origin of items to list."),
@@ -177,6 +218,7 @@ def get_gallery_item_location(
         created_to=created_to.isoformat() if created_to else None,
         starred=starred,
         media_kind=media_kind,
+        marks=marks,
     )
     if location is None:
         raise HTTPException(status_code=404, detail="Gallery item not found")
@@ -190,6 +232,7 @@ def get_gallery_item_location(
 )
 def list_gallery_item_names(
     current_user: CurrentUserOrDefault,
+    marks: MarkFiltersQuery,
     origin: Optional[ResourceOrigin] = Query(default=None, description="The origin of items to list."),
     categories: Optional[list[ImageCategory]] = Query(
         default=None,
@@ -240,6 +283,7 @@ def list_gallery_item_names(
             created_to=created_to.isoformat() if created_to else None,
             starred=starred,
             media_kind=media_kind,
+            marks=marks,
         )
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to get gallery item names")
@@ -253,6 +297,7 @@ def list_gallery_item_names(
 )
 def get_gallery_item_names(
     current_user: CurrentUserOrDefault,
+    marks: MarkFiltersQuery,
     origin: Optional[ResourceOrigin] = Query(default=None, description="The origin of items to list."),
     categories: Optional[list[ImageCategory]] = Query(
         default=None,
@@ -299,6 +344,7 @@ def get_gallery_item_names(
             created_to=created_to.isoformat() if created_to else None,
             starred=starred,
             media_kind=media_kind,
+            marks=marks,
         )
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to get gallery item names")
@@ -321,4 +367,102 @@ def get_gallery_media_usage(
         raise HTTPException(status_code=409, detail="This board is the project's inbox; delete the project instead")
     return gallery.get_board_media_usage(
         request.board_id, current_user.user_id, access.media_deleted_with_board(current_user.user_id)
+    )
+
+
+class GalleryItemMarksRequest(BaseModel):
+    """Marks to set on images and videos. A mark left out stays as it is on each item."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    image_names: list[MediaName] = Field(
+        default_factory=list, max_length=MAX_IMAGE_BATCH_SIZE, description="The images to mark."
+    )
+    video_names: list[MediaName] = Field(
+        default_factory=list, max_length=MAX_VIDEO_BATCH_SIZE, description="The videos to mark."
+    )
+    rating: Optional[StrictInt] = Field(
+        default=None, ge=0, le=MAX_RATING, description="The rating to set, from 0 (unrated) to 5."
+    )
+    flag: Optional[MarkFlag] = Field(
+        default=None,
+        description="The flag to set: 'pick' stars the item, 'reject' rejects it, 'none' clears both. Either one "
+        "clears the other.",
+    )
+    color_label: Optional[ColorLabelChoice] = Field(
+        default=None, description="The color label to set, or 'none' to remove it."
+    )
+
+    @model_validator(mode="after")
+    def _something_to_mark(self) -> Self:
+        if not self.image_names and not self.video_names:
+            raise ValueError("Name at least one image or video")
+        if self.rating is None and self.flag is None and self.color_label is None:
+            raise ValueError("Give at least one mark to set")
+        return self
+
+
+def _markable(names: list[str], may_mark: Callable[[str], None], failed: list[str]) -> list[str]:
+    """The names the caller may mark, once each, in order. Names they may not mark, and names of items that do not
+    exist, are skipped as the star routes skip them; a name whose check failed otherwise goes to `failed`."""
+    markable: list[str] = []
+    for name in dict.fromkeys(names):
+        try:
+            may_mark(name)
+        except HTTPException:
+            continue
+        except Exception:
+            failed.append(name)
+            continue
+        markable.append(name)
+    return markable
+
+
+@gallery_router.post("/items/marks", operation_id="set_gallery_item_marks", response_model=GalleryItemMarksResult)
+def set_gallery_item_marks(
+    current_user: CurrentUserOrDefault,
+    request: GalleryItemMarksRequest = Body(description="The items and the marks to set on them"),
+) -> GalleryItemMarksResult:
+    """Sets a rating, a flag and a color label on images and videos. Marking someone else's item takes what starring
+    it does: being an administrator or one of the managers of the board it is on."""
+
+    def may_mark_image(name: str) -> None:
+        assert_image_action(name, current_user, ItemAction.Star)
+
+    def may_mark_video(name: str) -> None:
+        assert_video_action(name, current_user, ItemAction.Star)
+
+    if request.image_names:
+        try:
+            assert_image_move_maintenance_inactive()
+        except HTTPException:
+            # As `POST /images/star`: a caller that may not mark an image learns that, not about the maintenance.
+            for name in request.image_names:
+                may_mark_image(name)
+            raise
+
+    failed_images: list[str] = []
+    failed_videos: list[str] = []
+    images = _markable(request.image_names, may_mark_image, failed_images)
+    videos = _markable(request.video_names, may_mark_video, failed_videos)
+    changes = MarkChanges(rating=request.rating, flag=request.flag, color_label=request.color_label)
+    try:
+        marked_images, marked_videos = ApiDependencies.invoker.services.gallery.set_marks(images, videos, changes)
+    except Exception:
+        # One transaction for every item: none of them was marked.
+        ApiDependencies.invoker.services.logger.error("Failed to set gallery item marks", exc_info=True)
+        return GalleryItemMarksResult(
+            updated_image_names=[],
+            updated_video_names=[],
+            failed_image_names=failed_images + images,
+            failed_video_names=failed_videos + videos,
+            affected_boards=[],
+        )
+    boards = {board_id or "none" for board_id in (*marked_images.values(), *marked_videos.values())}
+    return GalleryItemMarksResult(
+        updated_image_names=[name for name in images if name in marked_images],
+        updated_video_names=[name for name in videos if name in marked_videos],
+        failed_image_names=failed_images,
+        failed_video_names=failed_videos,
+        affected_boards=sorted(boards),
     )

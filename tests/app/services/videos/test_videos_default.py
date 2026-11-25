@@ -29,6 +29,8 @@ def _make_record(video_name: str = "abc.mp4", video_subfolder: str = "") -> Vide
         updated_at=now,
         is_intermediate=False,
         starred=False,
+        rating=0,
+        rejected=False,
         has_workflow=False,
         video_subfolder=video_subfolder,
     )

@@ -1,6 +1,6 @@
 """Image records; the files themselves are on disk."""
 
-from sqlalchemy import Boolean, Column, Index, text
+from sqlalchemy import Boolean, CheckConstraint, Column, Index, text
 
 from invokeai.app.services.shared.database.schema.metadata import (
     ENUM_LENGTH,
@@ -33,6 +33,12 @@ images = table(
     Column("image_subfolder", LongText(), nullable=False, server_default=default("")),
     Column("project_id", Key()),
     Column("file_size_bytes", BigInt()),
+    # Marks for culling (`services/shared/media_marks.py`): `starred` is the pick, `rejected` its opposite.
+    Column("rating", BigInt(), nullable=False, server_default=default(0)),
+    Column("rejected", Boolean(), nullable=False, server_default=default(False)),
+    Column("color_label", LongText()),
+    CheckConstraint("rating >= 0 AND rating <= 5", name="rating"),
+    CheckConstraint("NOT (starred AND rejected)", name="flag"),
 )
 
 Index("idx_images_created_at", images.c.created_at)

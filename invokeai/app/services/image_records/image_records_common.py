@@ -5,6 +5,7 @@ from typing import Optional, Union
 
 from pydantic import BaseModel, Field, StrictBool, StrictStr
 
+from invokeai.app.services.shared.media_marks import ColorLabel
 from invokeai.app.util.metaenum import MetaEnum
 from invokeai.app.util.misc import get_iso_timestamp
 from invokeai.app.util.model_exclude_null import BaseModelExcludeNull
@@ -147,6 +148,9 @@ class ImageRecord(BaseModelExcludeNull):
     file_size_bytes: Optional[int] = Field(
         default=None, description="Bytes the image and its thumbnail occupy on disk; null until measured."
     )
+    rating: int = Field(description="The image's rating, from 0 (unrated) to 5.")
+    rejected: bool = Field(description="Whether this image is rejected. Never true together with `starred`.")
+    color_label: Optional[ColorLabel] = Field(default=None, description="The image's color label, if it has one.")
 
 
 class ImageRecordChanges(BaseModelExcludeNull, extra="allow"):
@@ -194,6 +198,9 @@ def deserialize_image_record(image_dict: dict) -> ImageRecord:
     image_subfolder = image_dict.get("image_subfolder", "")
     project_id = image_dict.get("project_id", None)
     file_size_bytes = image_dict.get("file_size_bytes", None)
+    rating = image_dict.get("rating", 0)
+    rejected = image_dict.get("rejected", False)
+    color_label = image_dict.get("color_label", None)
 
     return ImageRecord(
         image_name=image_name,
@@ -212,6 +219,9 @@ def deserialize_image_record(image_dict: dict) -> ImageRecord:
         image_subfolder=image_subfolder,
         project_id=project_id,
         file_size_bytes=file_size_bytes,
+        rating=rating,
+        rejected=rejected,
+        color_label=color_label,
     )
 
 

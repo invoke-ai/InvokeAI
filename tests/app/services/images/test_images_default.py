@@ -89,6 +89,8 @@ def _make_record(
         updated_at=now,
         is_intermediate=is_intermediate,
         starred=False,
+        rating=0,
+        rejected=False,
         has_workflow=False,
         image_subfolder=image_subfolder,
     )

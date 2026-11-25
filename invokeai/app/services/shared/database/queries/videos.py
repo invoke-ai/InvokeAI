@@ -63,6 +63,9 @@ _RECORD = (
     _V.video_subfolder,
     _V.project_id,
     _V.file_size_bytes,
+    _V.rating,
+    _V.rejected,
+    _V.color_label,
     JsonString(_V.metadata, "$.media_origin").label("media_origin"),
 )
 _RECORD_NAMES = tuple(column.name for column in _RECORD)
@@ -419,7 +422,8 @@ class VideoQueries(QueryModule):
 
     @write
     def update(self, conn: Connection, video_name: str, changes: VideoRecordChanges) -> None:
-        """Applies the changes to the video's category, session, intermediate flag and star."""
+        """Applies the changes to the video's category, session, intermediate flag and star; starring it clears
+        its rejection."""
         fields: dict[str, Any] = {}
         if changes.video_category is not None:
             fields["video_category"] = ImageCategory(changes.video_category).value
@@ -429,6 +433,8 @@ class VideoQueries(QueryModule):
             fields["is_intermediate"] = changes.is_intermediate
         if changes.starred is not None:
             fields["starred"] = changes.starred
+            if changes.starred:
+                fields["rejected"] = False
         if fields:
             values = {f"new_{field}": value for field, value in fields.items()}
             conn.execute(_update(tuple(sorted(fields))), {"target_video_name": video_name, **values})
