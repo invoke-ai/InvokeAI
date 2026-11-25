@@ -17,7 +17,8 @@ FL2VA quality and reference adherence - keeping FL2VA's attention, MLPs and outp
 swap happens at denoise time on the cached FL2VA transformer, the same shape as LoRA patching:
 no merged checkpoint is written, and the base model stays shared in the model cache.
 
-Only the selected AdaLN tensors are read from the overlay checkpoint (mmap): ~1.7 MB per block
+Only the selected AdaLN tensors are read from the overlay checkpoint, with pread into owned
+buffers rather than mmap, so the cached overlay holds no view of the file: ~1.7 MB per block
 on the AdaLN-pruned repacks, ~520 MB per block on a full bf16 checkpoint. The model cache keys
 local models by path alone, so the selection rides on the path as a fragment and each distinct
 selection is its own cache record.
