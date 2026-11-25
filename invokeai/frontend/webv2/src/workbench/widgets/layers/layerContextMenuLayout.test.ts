@@ -135,6 +135,7 @@ describe('getLayerContextMenuLayout', () => {
         'rename',
         'fit-to-bbox',
         'flip(flip-horizontal,flip-vertical)',
+        'add-mask-guidance',
         'add-noise',
         'add-denoise-limit',
         'extract-masked-area',

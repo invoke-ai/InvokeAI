@@ -17,6 +17,7 @@ export { layerChildRowKey };
 
 export type LayerChildRowKind =
   | 'reference-image'
+  | 'mask-guidance'
   | 'mask-noise'
   | 'mask-denoise'
   | 'layer-region'
@@ -65,6 +66,7 @@ const CHILD_ROW_NAME_KEYS: Record<Exclude<LayerChildRowKind, 'reference-image'>,
   'adjustment-texture': 'widgets.layers.adjustments.texture',
   'layer-region': 'widgets.layers.modifiers.regenerateRegion',
   'mask-denoise': 'widgets.layers.modifiers.denoise',
+  'mask-guidance': 'widgets.layers.modifiers.guidance',
   'mask-noise': 'widgets.layers.modifiers.noise',
 };
 
@@ -111,6 +113,7 @@ const adjustmentDetailLabel = (entry: CanvasAdjustmentEntry): { detailLabelKey?:
 export const isOrderedChildKind = (kind: LayerChildRowKind): boolean => kind.startsWith('adjustment-');
 
 /** The synthetic item ids of a mask's singleton modifiers. */
+export const MASK_GUIDANCE_ITEM_ID = 'guidance';
 export const MASK_NOISE_ITEM_ID = 'noise';
 export const MASK_DENOISE_ITEM_ID = 'denoise';
 /** The synthetic item id of a raster layer's singleton regenerate region. */
@@ -138,6 +141,8 @@ export interface ProjectedChildRow {
   readonly detail: string | null;
   /** The i18n key of a localized fact shown after `detail` (noise's grain); absent when the kind has none. */
   readonly detailLabelKey?: string;
+  /** The item's own free text (a guidance prompt): any length, so the row truncates it. Absent when there is none. */
+  readonly text?: string;
   /** The user-given name of a renameable item (adjustment entries), or `null`. */
   readonly customName: string | null;
 }
@@ -196,7 +201,17 @@ const baseRow = (vm: SemanticNode) => ({
 });
 
 const maskModifierRows = (vm: SemanticNode, layer: CanvasInpaintMaskLayerContract): ProjectedChildRow[] => {
+  const prompt = layer.guidance?.positivePrompt?.trim();
   const items = [
+    layer.guidance
+      ? {
+          detail: null,
+          isEnabled: layer.guidance.isEnabled,
+          itemId: MASK_GUIDANCE_ITEM_ID,
+          kind: 'mask-guidance' as const,
+          ...(prompt ? { text: prompt } : {}),
+        }
+      : null,
     layer.noise
       ? {
           detail: `${Math.round(layer.noise.level * 100)}%`,
@@ -249,7 +264,7 @@ export const projectLayerChildRows = (vm: SemanticNode): readonly ProjectedChild
       posInSet: index + 1,
       setSize,
     }));
-  } else if (node.type === 'inpaint_mask' && (node.noise || node.denoise)) {
+  } else if (node.type === 'inpaint_mask' && (node.guidance || node.noise || node.denoise)) {
     rows = maskModifierRows(vm, node);
   } else if (
     (node.type === 'raster' || node.type === 'group') &&
@@ -312,6 +327,9 @@ export const getLayerChildItem = (
     return ref ? { isEnabled: ref.isEnabled, kind: 'reference-image' } : null;
   }
   if (layer?.type === 'inpaint_mask') {
+    if (itemId === MASK_GUIDANCE_ITEM_ID && layer.guidance) {
+      return { isEnabled: layer.guidance.isEnabled, kind: 'mask-guidance' };
+    }
     if (itemId === MASK_NOISE_ITEM_ID && layer.noise) {
       return { isEnabled: layer.noise.isEnabled, kind: 'mask-noise' };
     }
@@ -347,6 +365,8 @@ export const layerChildRemoveLabelKey = (kind: LayerChildRowKind): string => {
   switch (kind) {
     case 'reference-image':
       return 'widgets.layers.regionalGuidance.removeReferenceImage';
+    case 'mask-guidance':
+      return 'widgets.layers.modifiers.removeGuidance';
     case 'mask-noise':
       return 'widgets.layers.modifiers.removeNoise';
     case 'mask-denoise':
@@ -522,6 +542,12 @@ export const layerChildMoveTargets = (
     return command ? [{ command, id: node.id, name: node.name }] : [];
   });
 
+const MASK_MODIFIER_FIELDS: Partial<Record<string, 'guidance' | 'noise' | 'denoise'>> = {
+  [MASK_DENOISE_ITEM_ID]: 'denoise',
+  [MASK_GUIDANCE_ITEM_ID]: 'guidance',
+  [MASK_NOISE_ITEM_ID]: 'noise',
+};
+
 /** Resolve child actions to whole-value patches, or null for missing/no-op targets. */
 export const layerChildRowCommand = (
   document: CanvasDocumentContractV3,
@@ -555,8 +581,7 @@ export const layerChildRowCommand = (
     if (action.type === 'move' || action.type === 'duplicate' || action.type === 'rename') {
       return null;
     }
-    const field =
-      target.itemId === MASK_NOISE_ITEM_ID ? 'noise' : target.itemId === MASK_DENOISE_ITEM_ID ? 'denoise' : null;
+    const field = MASK_MODIFIER_FIELDS[target.itemId];
     const current = field ? layer[field] : undefined;
     if (!field || !current) {
       return null;

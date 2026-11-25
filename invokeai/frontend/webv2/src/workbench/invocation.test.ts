@@ -429,7 +429,7 @@ describe('resolveInvocationRoute — canvas source', () => {
         canvasRoute
       ).validationReasons.map(reasonText);
     const blankPromptReason = (label: string) =>
-      `${label} needs a prompt to place regional guidance in its layout. Enter a prompt or disable the regional guidance layers.`;
+      `${label} needs a prompt to place regional guidance in its layout. Enter a prompt or disable the regional guidance.`;
 
     it.each([
       [mossModel, 'MOSS-Image'],

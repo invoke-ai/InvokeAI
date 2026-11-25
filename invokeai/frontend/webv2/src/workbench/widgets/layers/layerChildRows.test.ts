@@ -109,36 +109,41 @@ describe('mask modifier rows', () => {
   const maskRow = (document: ReturnType<typeof documentFrom>) =>
     buildLayerStackRows(document.stacks, new Set()).inpaint_mask.rows.find((row) => row.id === 'm1')!;
 
-  it('projects noise then denoise rows with their values and enablement', () => {
+  const guidance = { autoNegative: false, isEnabled: true, negativePrompt: null, positivePrompt: ' a red door ' };
+
+  it('projects guidance, noise, then denoise rows with their values and enablement', () => {
     const document = documentFrom([
-      maskWith({ denoise: { isEnabled: false, limit: 0.8 }, noise: { isEnabled: true, level: 0.25 } }),
+      maskWith({ denoise: { isEnabled: false, limit: 0.8 }, guidance, noise: { isEnabled: true, level: 0.25 } }),
     ]);
     const rows = projectLayerChildRows(maskRow(document).vm);
-    expect(rows.map((row) => [row.kind, row.itemId, row.isEnabled, row.detail, row.posInSet, row.setSize])).toEqual([
-      ['mask-noise', 'noise', true, '25%', 1, 2],
-      ['mask-denoise', 'denoise', false, '80%', 2, 2],
+    expect(
+      rows.map((row) => [row.kind, row.itemId, row.isEnabled, row.detail, row.text, row.posInSet, row.setSize])
+    ).toEqual([
+      ['mask-guidance', 'guidance', true, null, 'a red door', 1, 3],
+      ['mask-noise', 'noise', true, '25%', undefined, 2, 3],
+      ['mask-denoise', 'denoise', false, '80%', undefined, 3, 3],
     ]);
     expect(projectLayerChildRows(maskRow(documentFrom([maskWith()])).vm)).toEqual([]);
   });
 
-  it('toggles and removes a modifier through null-clearing patches', () => {
-    const document = documentFrom([maskWith({ noise: { isEnabled: true, level: 0.25 } })]);
-    const toggle = layerChildRowCommand(
-      document,
-      { itemId: 'noise', layerId: 'm1' },
-      { isEnabled: false, type: 'set-enabled' }
-    );
-    expect(toggle).toMatchObject({
-      before: { layerType: 'inpaint_mask', noise: { isEnabled: true, level: 0.25 } },
-      config: { layerType: 'inpaint_mask', noise: { isEnabled: false, level: 0.25 } },
+  it.each([
+    ['noise', 'mask-noise', { isEnabled: true, level: 0.25 }],
+    ['guidance', 'mask-guidance', guidance],
+  ] as const)('toggles and removes %s as a whole value, and refuses a rename', (field, kind, value) => {
+    const document = documentFrom([maskWith({ [field]: value })]);
+    const target = { itemId: field, layerId: 'm1' };
+    expect(getLayerChildItem(document, 'm1', field)).toEqual({ isEnabled: true, kind });
+    expect(layerChildRowCommand(document, target, { isEnabled: false, type: 'set-enabled' })).toMatchObject({
+      before: { layerType: 'inpaint_mask', [field]: value },
+      config: { layerType: 'inpaint_mask', [field]: { ...value, isEnabled: false } },
       id: 'm1',
     });
-    const remove = layerChildRowCommand(document, { itemId: 'noise', layerId: 'm1' }, { type: 'remove' });
-    expect(remove).toMatchObject({ config: { layerType: 'inpaint_mask', noise: null } });
+    expect(layerChildRowCommand(document, target, { type: 'remove' })).toMatchObject({
+      config: { layerType: 'inpaint_mask', [field]: null },
+    });
+    expect(layerChildRowCommand(document, target, { isEnabled: true, type: 'set-enabled' })).toBeNull();
+    expect(layerChildRowCommand(document, target, { name: 'Door', type: 'rename' })).toBeNull();
     expect(layerChildRowCommand(document, { itemId: 'denoise', layerId: 'm1' }, { type: 'remove' })).toBeNull();
-    expect(
-      layerChildRowCommand(document, { itemId: 'noise', layerId: 'm1' }, { isEnabled: true, type: 'set-enabled' })
-    ).toBeNull();
   });
 });
 

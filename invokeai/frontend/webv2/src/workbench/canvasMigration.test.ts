@@ -527,6 +527,45 @@ describe('loadCanvasState', () => {
     });
   });
 
+  describe('inpaint mask guidance', () => {
+    const plain = {
+      ...createInpaintMaskLayer('Inpaint Mask 1', 'mask'),
+      denoise: { isEnabled: true, limit: 0.6 },
+      noise: { isEnabled: true, level: 0.3 },
+    };
+    const guided = (isEnabled = true) => ({
+      ...plain,
+      guidance: { autoNegative: true, isEnabled, negativePrompt: null, positivePrompt: 'a red fox' },
+    });
+
+    it('round-trips the guidance of a mask in the live document', () => {
+      const loaded = load(withNodes([guided()], 'inpaint_mask'));
+      expect(load(JSON.parse(JSON.stringify(loaded))).document.stacks.inpaint_mask).toEqual([guided()]);
+    });
+
+    it.each([true, false])('writes a canvas holding a guided mask (enabled: %s) as version 8', (isEnabled) => {
+      const loaded = load(withNodes([groupContract('masks', [guided(isEnabled) as never])], 'inpaint_mask'));
+      expect(loaded.version).toBe(8);
+      expect(loaded.document.version).toBe(8);
+    });
+
+    it('writes version 8 when only a snapshot holds a guided mask', () => {
+      const loaded = load({
+        ...createEmptyCanvasState(),
+        snapshots: [{ createdAt: 'now', document: withNodes([guided()], 'inpaint_mask').document, id: 's', name: 'S' }],
+      });
+      expect(loaded.version).toBe(8);
+      expect(loaded.document.version).toBe(3);
+      expect(loaded.snapshots[0]?.document.version).toBe(8);
+    });
+
+    it('keeps the version of a canvas whose masks carry no guidance', () => {
+      const loaded = load(withNodes([plain], 'inpaint_mask'));
+      expect(loaded.version).toBe(3);
+      expect(loaded.document.version).toBe(3);
+    });
+  });
+
   it('passes a valid state through normalized, keeping every persisted field', () => {
     const canvas = {
       ...withNodes([

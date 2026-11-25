@@ -784,7 +784,7 @@ export const LayersTree = ({
     }
   }, [onRevealProperties, panelRows, rowIndexByKey, virtualItems]);
 
-  // Repair focus after row unmount only if the actual tree DOM owned it; portaled focus does not count.
+  // Repair focus lost to a row unmount only if the actual tree DOM owned it; portaled focus does not count.
   const handleFocusCapture = useCallback((event: FocusEvent<HTMLElement>) => {
     if (event.currentTarget.contains(event.target as Node)) {
       treeOwnsFocus.current = true;
@@ -804,7 +804,9 @@ export const LayersTree = ({
     if (!host || !focusKey || !treeOwnsFocus.current || renamingId !== null) {
       return;
     }
-    if (host.contains(window.document.activeElement) && window.document.activeElement !== window.document.body) {
+    // The flag can be stale (a row blurred to nothing as focus moved elsewhere), so never take focus from an element.
+    const active = window.document.activeElement;
+    if (active && active !== window.document.body) {
       return;
     }
     host.querySelector<HTMLElement>(`[data-layer-row-id="${CSS.escape(focusKey)}"]`)?.focus();

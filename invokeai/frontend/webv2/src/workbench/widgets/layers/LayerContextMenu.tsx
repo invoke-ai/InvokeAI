@@ -40,6 +40,7 @@ import { useWorkbenchFocus } from '@workbench/focusRegions';
 import { ShortcutKeycaps } from '@workbench/hotkeys/keyGlyphs';
 import { formatHotkeyForPlatform } from '@workbench/hotkeys/keys';
 import { useLayerPanelState } from '@workbench/layerPanelState';
+import { useCanvasProjectMutationDispatch } from '@workbench/useCanvasProjectMutationDispatch';
 import { useNotify } from '@workbench/useNotify';
 import { reportTransformRefusal, showCanvasRefusalNotice } from '@workbench/widgets/canvas/canvasToolCommands';
 import {
@@ -81,7 +82,7 @@ import type {
 } from './layerContextMenuLayout';
 import type { LayerMenuDialogKind, LayerMenuDialogState } from './layerMenuState';
 
-import { clearLayerChildSelection } from './layerChildSelection';
+import { addMaskGuidance, clearLayerChildSelection } from './layerChildSelection';
 import {
   deleteLayers,
   duplicateLayers,
@@ -840,6 +841,15 @@ const LayerMenu = ({
     [commitPrepared, layer, t]
   );
 
+  const dispatch = useCanvasProjectMutationDispatch();
+  const handleAddMaskGuidance = useCallback(() => {
+    const label = t('widgets.layers.actions.addMaskGuidance');
+    if (addMaskGuidance({ commit: commitPrepared, dispatch, label, layerId: layer.id, projectId })) {
+      revealProperties(layer.id);
+      revealLayerSection();
+    }
+  }, [commitPrepared, dispatch, layer.id, projectId, revealProperties, t]);
+
   const handleAddLayerRegion = useCallback(() => {
     if (layer.type !== 'raster' || layer.inpaint) {
       return;
@@ -907,6 +917,7 @@ const LayerMenu = ({
     () => ({
       addAdjustment: handleAddAdjustment,
       addLayerRegion: handleAddLayerRegion,
+      addMaskGuidance: handleAddMaskGuidance,
       addMaskModifier: handleAddMaskModifier,
       addReferenceImage: handleAddReferenceImage,
       booleanMerge: handleBooleanRaster,
@@ -955,6 +966,7 @@ const LayerMenu = ({
       getActionLabel,
       handleAddAdjustment,
       handleAddLayerRegion,
+      handleAddMaskGuidance,
       handleAddMaskModifier,
       handleAddReferenceImage,
       handleBooleanRaster,

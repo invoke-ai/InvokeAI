@@ -60,4 +60,15 @@ describe('layerRowSummary', () => {
       'widgets.layers.types.inpaint_mask · widgets.layers.summary.denoiseLimit:60 · widgets.layers.summary.noise:20'
     );
   });
+
+  it("appends an enabled mask guidance's prompt and leaves a disabled one out", () => {
+    const mask = layerContract('m', 'inpaint_mask');
+    const guidance = { autoNegative: false, isEnabled: true, negativePrompt: null, positivePrompt: ' a red door ' };
+    expect(layerRowSummary({ ...mask, guidance } as typeof mask, t)).toBe(
+      'widgets.layers.types.inpaint_mask · a red door'
+    );
+    expect(layerRowSummary({ ...mask, guidance: { ...guidance, isEnabled: false } } as typeof mask, t)).toBe(
+      'widgets.layers.types.inpaint_mask'
+    );
+  });
 });

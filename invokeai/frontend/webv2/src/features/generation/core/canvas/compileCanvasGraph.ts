@@ -155,7 +155,7 @@ const getCanvasValidationReasons = (input: CompileCanvasGraphInput, processingSi
     hasEnabledKrea2EditReferences(settings.referenceImages)
   ) {
     reasons.push(
-      'Krea-2 edit references cannot be combined with regional guidance. Turn off the edit references or disable the regional guidance layers.'
+      'Krea-2 edit references cannot be combined with regional guidance. Turn off the edit references or disable the regional guidance.'
     );
   }
 

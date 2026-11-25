@@ -21,6 +21,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const notify = vi.hoisted(() => ({ error: vi.fn(), info: vi.fn(), success: vi.fn() }));
 vi.mock('@workbench/useNotify', () => ({ useNotify: () => notify }));
+vi.mock('@workbench/useCanvasProjectMutationDispatch', () => ({
+  useCanvasProjectMutationDispatch: () => () => true,
+}));
 
 import { InpaintMaskSettings } from './InpaintMaskSettings';
 

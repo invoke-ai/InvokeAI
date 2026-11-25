@@ -202,6 +202,25 @@ describe('layers panel context menus', () => {
   });
 });
 
+describe('layers panel focus', () => {
+  it("leaves focus in the prompt of a mask's regional guidance added from Properties after the tree held it", async () => {
+    await mountPanel({
+      layers: [layerContract('art', 'raster', { name: 'Art' }), layerContract('m1', 'inpaint_mask', { name: 'Mask' })],
+    });
+    const mask = page.getByRole('treeitem', { name: /^Mask/ });
+    await userEvent.click(mask);
+    // As in Safari, where a clicked button takes no focus: the row blurs to nothing.
+    await act(() => (mask.element() as HTMLElement).blur());
+
+    await userEvent.click(page.getByRole('button', { name: 'Add regional guidance', exact: true }));
+
+    await expect
+      .element(page.getByRole('treeitem', { name: 'Regional guidance' }))
+      .toHaveAttribute('aria-selected', 'true');
+    await expect.element(page.getByRole('textbox', { name: 'Positive prompt' })).toHaveFocus();
+  });
+});
+
 describe('layers panel in a docked widget body', () => {
   const manyLayers = Array.from({ length: 65 }, (_, index) =>
     layerContract(`layer-${index}`, 'raster', { name: index === 0 ? 'Art' : `Layer ${index}` })

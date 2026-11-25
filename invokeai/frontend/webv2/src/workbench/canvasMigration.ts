@@ -327,6 +327,14 @@ const zCanvasLayer = z.discriminatedUnion('type', [
   }),
   zLayerBase.extend({
     denoise: z.object({ isEnabled: z.boolean(), limit: zFiniteNumber }).optional(),
+    guidance: z
+      .object({
+        autoNegative: z.boolean(),
+        isEnabled: z.boolean(),
+        negativePrompt: z.string().nullable(),
+        positivePrompt: z.string().nullable(),
+      })
+      .optional(),
     isHidden: z.boolean().optional(),
     mask: zMask,
     noise: z.object({ isEnabled: z.boolean(), level: zFiniteNumber }).optional(),
@@ -462,7 +470,14 @@ const CONTROL_DERIVATION_KEYS = ['controlType', 'detection', 'original', 'origin
 const controlLayerRequiresV6 = (node: Record<string, unknown>): boolean =>
   node.type === 'control' && CONTROL_DERIVATION_KEYS.some((key) => node[key] !== undefined);
 
+/** A v7 reader would strip the guidance on load, generate without its prompts and lose it on its next save. */
+const inpaintMaskRequiresV8 = (node: Record<string, unknown>): boolean =>
+  node.type === 'inpaint_mask' && node.guidance !== undefined;
+
 const ownSchemaRequirement = (node: Record<string, unknown>): CanvasSchemaVersion => {
+  if (inpaintMaskRequiresV8(node)) {
+    return 8;
+  }
   if (controlLayerRequiresV6(node)) {
     return 6;
   }
@@ -474,7 +489,8 @@ const ownSchemaRequirement = (node: Record<string, unknown>): CanvasSchemaVersio
 
 /**
  * The newest schema a node or any descendant needs. v4: custom-font typography. v5: a noise or spatial adjustment,
- * enabled or not, which a v4 reader would drop. v6: control derivation fields.
+ * enabled or not, which a v4 reader would drop. v6: control derivation fields. v8: inpaint mask guidance, enabled or
+ * not.
  */
 const nodeSchemaRequirement = (node: unknown): CanvasSchemaVersion => {
   if (!isRecord(node)) {

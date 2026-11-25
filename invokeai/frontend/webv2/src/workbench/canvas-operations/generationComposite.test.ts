@@ -104,6 +104,12 @@ const inpaintMaskLayer = (id: string, noiseLevel?: number): CanvasLayerContract 
   type: 'inpaint_mask',
 });
 
+const guidedMaskLayer = (id: string) =>
+  ({
+    ...inpaintMaskLayer(id),
+    guidance: { autoNegative: false, isEnabled: true, negativePrompt: null, positivePrompt: 'a fox' },
+  }) as CanvasLayerContract;
+
 const makeDoc = (layers: CanvasLayerContract[], size = 64): CanvasDocumentContractV3 => ({
   background: 'transparent',
   bbox: { height: size, width: size, x: 0, y: 0 },
@@ -531,6 +537,34 @@ describe('composeForGeneration', () => {
       { bounds: { height: 64, width: 64, x: 0, y: 0 }, imageName: 'composite-1.png', layerId: 'region-b' },
     ]);
     expect(harness.uploadImage).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    { expected: [], mode: 'txt2img' as const },
+    { expected: [], mode: 'img2img' as const },
+    { expected: ['mask'], mode: 'inpaint' as const },
+    { expected: ['mask'], mode: 'outpaint' as const },
+  ])("composites a guided mask's region only while the mask inpaints ($mode)", async ({ expected, mode }) => {
+    const harness = makeHost(makeDoc([rasterLayer('base'), guidedMaskLayer('mask')]));
+
+    const result = await compose(harness.host, { detectMode: () => mode, shouldCompositeMaskGuidance: () => true });
+
+    expect(result.status === 'ok' ? result.composites.regionalMaskImages.map((image) => image.layerId) : null).toEqual(
+      expected
+    );
+  });
+
+  it("drops a guided mask's region when its coverage misses the frame", async () => {
+    const harness = makeHost(makeDoc([rasterLayer('base'), guidedMaskLayer('mask')]), {
+      readImageData: (width, height) => uniformImageData(width, height, 0),
+    });
+
+    const result = await compose(harness.host, {
+      detectMode: () => 'outpaint',
+      shouldCompositeMaskGuidance: () => true,
+    });
+
+    expect(result.status === 'ok' ? result.composites.regionalMaskImages : null).toEqual([]);
   });
 
   it("reports each regional mask's alpha bounds in bbox space and keeps them on a committed cache hit", async () => {

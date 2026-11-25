@@ -15,6 +15,7 @@ import {
   adjustmentChildKind,
   childRowNameKey,
   MASK_DENOISE_ITEM_ID,
+  MASK_GUIDANCE_ITEM_ID,
   MASK_NOISE_ITEM_ID,
   type LayerChildRowKind,
 } from '@workbench/widgets/layers/layerChildRows';
@@ -23,7 +24,7 @@ import { LayerRegionSettings } from '@workbench/widgets/layers/LayerRegionSettin
 import { MaskModifierSettings } from '@workbench/widgets/layers/MaskModifierSettings';
 import { RasterLayerFilterSection } from '@workbench/widgets/layers/RasterLayerFilterSection';
 import { ReferenceImageSettings } from '@workbench/widgets/layers/ReferenceImageSettings';
-import { RegionalGuidanceSettings } from '@workbench/widgets/layers/RegionalGuidanceSettings';
+import { MaskGuidanceSettings, RegionalGuidanceSettings } from '@workbench/widgets/layers/RegionalGuidanceSettings';
 import { VectorLayerSettings } from '@workbench/widgets/layers/VectorLayerSettings';
 import { useActiveProjectId, useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import { useCallback } from 'react';
@@ -97,6 +98,9 @@ const resolveChildEditor = (
       : null;
   }
   if (layer.type === 'inpaint_mask') {
+    if (selection.itemId === MASK_GUIDANCE_ITEM_ID && layer.guidance) {
+      return { itemId: selection.itemId, kind: 'mask-guidance', subtitle: t(childRowNameKey('mask-guidance')) };
+    }
     if (selection.itemId === MASK_NOISE_ITEM_ID && layer.noise) {
       return { itemId: selection.itemId, kind: 'mask-noise', subtitle: t('widgets.layers.modifiers.noise') };
     }
@@ -132,6 +136,9 @@ const ChildEditor = ({
 }) => {
   if (child.kind === 'reference-image' && node.type === 'regional_guidance') {
     return <ReferenceImageSettings engine={engine} layer={node} refId={child.itemId} />;
+  }
+  if (child.kind === 'mask-guidance' && node.type === 'inpaint_mask' && node.guidance) {
+    return <MaskGuidanceSettings engine={engine} guidance={node.guidance} layerId={node.id} />;
   }
   if ((child.kind === 'mask-noise' || child.kind === 'mask-denoise') && node.type === 'inpaint_mask') {
     return <MaskModifierSettings engine={engine} kind={child.kind} layer={node} />;

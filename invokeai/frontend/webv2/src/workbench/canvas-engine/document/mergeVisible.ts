@@ -2,6 +2,7 @@ import type {
   CanvasDocumentContractV3,
   CanvasInpaintMaskLayerContract,
   CanvasLayerContract,
+  CanvasMaskGuidanceContract,
 } from '@workbench/canvas-engine/contracts';
 import type { SemanticLeaf } from '@workbench/canvas-engine/document-model/semanticLeaf';
 
@@ -85,12 +86,27 @@ export const canMergeSelectedRasters = (
         hasContent(leaf.id)
     );
 
+/** Guidance without a prompt adds no region; auto-negative only re-encodes a positive prompt. */
+const appliedGuidance = (guidance: CanvasMaskGuidanceContract | undefined): unknown => {
+  if (!guidance?.isEnabled) {
+    return null;
+  }
+  const positive = guidance.positivePrompt || null;
+  const negative = guidance.negativePrompt || null;
+  return positive || negative ? [positive, negative, positive !== null && guidance.autoNegative] : null;
+};
+
 /**
- * What generation applies across an inpaint mask's area besides its coverage: the enabled noise level and denoise limit
- * (a disabled modifier keeps its tuned value out of generation). Fill and opacity are display-only.
+ * What generation applies across an inpaint mask's area besides its coverage: the enabled noise level, denoise limit
+ * and guidance prompts (a disabled modifier keeps its tuned value out of generation). Fill and opacity are
+ * display-only.
  */
-const maskGenerationSettings = (layer: CanvasInpaintMaskLayerContract): string =>
-  `${layer.noise?.isEnabled ? layer.noise.level : '-'}|${layer.denoise?.isEnabled ? layer.denoise.limit : '-'}`;
+const maskGenerationSettings = ({ denoise, guidance, noise }: CanvasInpaintMaskLayerContract): string =>
+  JSON.stringify([
+    noise?.isEnabled ? noise.level : null,
+    denoise?.isEnabled ? denoise.limit : null,
+    appliedGuidance(guidance),
+  ]);
 
 /**
  * Whether merge-masks can take the exact selection: two or more inpaint masks, each contributing, unlocked and holding

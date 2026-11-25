@@ -25,7 +25,7 @@ import {
   WavesIcon,
   type LucideIcon,
 } from 'lucide-react';
-import { memo, useCallback, useLayoutEffect, useMemo, useRef } from 'react';
+import { memo, useCallback, useId, useLayoutEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { LayerRowCommands } from './layerRowCommands';
@@ -34,6 +34,7 @@ import { childRowNameKey, isOrderedChildKind, type LayerChildRowKind, type Proje
 import { recordLayerRowCommit } from './layerPanelDiagnostics';
 import { anchorFromPoint } from './layerRowCommands';
 import { LAYER_PANEL_CONTROL_GAP, LayerRowSurface, TREE_ROW_FOCUS } from './LayerRowSurface';
+import { LAYER_KIND_ICONS } from './layerTypeIcon';
 
 const THUMBNAIL_IMG_STYLE: CSSProperties = { height: '100%', objectFit: 'cover', width: '100%' };
 
@@ -53,6 +54,7 @@ const CHILD_ROW_GLYPHS: Record<LayerChildRowKind, LucideIcon> = {
   'adjustment-texture': FingerprintPatternIcon,
   'layer-region': WandSparklesIcon,
   'mask-denoise': GaugeIcon,
+  'mask-guidance': LAYER_KIND_ICONS.regional_guidance,
   'mask-noise': WavesIcon,
   'reference-image': ImageIcon,
 };
@@ -101,6 +103,7 @@ const LayerChildRowComponent = ({
   const rowElement = useRef<HTMLDivElement | null>(null);
   const nameInput = useRef<HTMLInputElement | null>(null);
   const renameCancelled = useRef(false);
+  const textId = useId();
 
   useLayoutEffect(() => {
     recordLayerRowCommit(child.key);
@@ -245,6 +248,7 @@ const LayerChildRowComponent = ({
     <Box
       ref={setRowRef}
       {...dragListeners}
+      aria-describedby={child.text && !renaming ? textId : undefined}
       aria-label={name}
       aria-level={child.depth + 2}
       aria-posinset={child.posInSet}
@@ -299,10 +303,23 @@ const LayerChildRowComponent = ({
             onPointerDown={stopPropagation}
           />
         ) : (
-          <Text color={muted ? 'fg.muted' : undefined} flex="1" fontSize="xs" fontWeight="600" minW="0" truncate>
+          // Beside free text the name keeps its own width and the text takes only what is left over.
+          <Text
+            color={muted ? 'fg.muted' : undefined}
+            flex={child.text ? '0 1 auto' : '1'}
+            fontSize="xs"
+            fontWeight="600"
+            minW="0"
+            truncate
+          >
             {name}
           </Text>
         )}
+        {child.text && !renaming ? (
+          <Text color="fg.subtle" flex="1 1 0" fontSize="xs" id={textId} minW="0" truncate>
+            {child.text}
+          </Text>
+        ) : null}
         {detail !== null && !renaming ? (
           <Text color="fg.subtle" flexShrink={0} fontSize="xs" fontVariantNumeric="tabular-nums">
             {detail}

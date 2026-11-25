@@ -738,7 +738,7 @@ describe('getLayoutPromptRejectionReason', () => {
 
   it('refuses placeable regions around a blank prompt on a layout base', () => {
     expect(getLayoutPromptRejectionReason({ base: 'moss-image', prompt: ' \n', regions: [placeable] })).toBe(
-      'MOSS-Image needs a prompt to place regional guidance in its layout. Enter a prompt or disable the regional guidance layers.'
+      'MOSS-Image needs a prompt to place regional guidance in its layout. Enter a prompt or disable the regional guidance.'
     );
   });
 
@@ -750,7 +750,7 @@ describe('getLayoutPromptRejectionReason', () => {
         regions: [{ layout: { kind: 'text' }, positivePrompt: 'a sign' }],
       })
     ).toBe(
-      'Ideogram 4 needs a prompt to place regional guidance in its layout. Enter a prompt or disable the regional guidance layers.'
+      'Ideogram 4 needs a prompt to place regional guidance in its layout. Enter a prompt or disable the regional guidance.'
     );
   });
 

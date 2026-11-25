@@ -2,7 +2,9 @@ import type { GenerateModelConfig, MainModelConfig } from '@features/generation/
 import type { ModelConfig } from '@features/models';
 import type {
   CanvasControlLayerContract,
+  CanvasInpaintMaskLayerContract,
   CanvasLayerContract,
+  CanvasMaskGuidanceContract,
   CanvasRegionalGuidanceLayerContract,
   RegionalGuidanceReferenceImage,
   RegionalGuidanceReferenceImageAsset,
@@ -203,7 +205,7 @@ describe('readiness and the invocation judge layers alike', () => {
       {
         kind: 'layout_prompt',
         message:
-          'MOSS-Image needs a prompt to place regional guidance in its layout. Enter a prompt or disable the regional guidance layers.',
+          'MOSS-Image needs a prompt to place regional guidance in its layout. Enter a prompt or disable the regional guidance.',
       },
     ]);
   });
@@ -360,6 +362,44 @@ describe('createCanvasInputJudge', () => {
         weight: 0.6,
       },
       status: 'contributes',
+    });
+  });
+
+  describe('inpaint mask guidance', () => {
+    const guidedMask = (guidance: Partial<CanvasMaskGuidanceContract> = {}): CanvasInpaintMaskLayerContract => ({
+      blendMode: 'normal',
+      guidance: { autoNegative: true, isEnabled: true, negativePrompt: 'blurry', positivePrompt: 'a fox', ...guidance },
+      id: 'mask',
+      isEnabled: true,
+      isLocked: false,
+      mask: { bitmap: { height: 64, imageName: 'mask.png', width: 64 }, fill: { color: '#ff0000', style: 'solid' } },
+      name: 'Mask',
+      opacity: 1,
+      transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+      type: 'inpaint_mask',
+    });
+
+    it('contributes the prompts as a region keyed by the mask layer', () => {
+      expect(createCanvasInputJudge(judgeParams(main('sdxl'), [])).maskGuidance(guidedMask())).toEqual({
+        input: {
+          autoNegative: true,
+          id: 'mask',
+          negativePrompt: 'blurry',
+          positivePrompt: 'a fox',
+          referenceImages: [],
+        },
+        status: 'contributes',
+      });
+    });
+
+    it.each<[string, GenerateModelConfig, Partial<CanvasMaskGuidanceContract>]>([
+      ['a hosted model', hostedModel, {}],
+      ['prompts the base cannot use', main('sdxl'), { negativePrompt: null, positivePrompt: '' }],
+      ['disabled guidance', main('sdxl'), { isEnabled: false }],
+    ])('skips %s without refusing', (_, mainModel, guidance) => {
+      expect(createCanvasInputJudge(judgeParams(mainModel, [])).maskGuidance(guidedMask(guidance))).toEqual({
+        status: 'skipped',
+      });
     });
   });
 

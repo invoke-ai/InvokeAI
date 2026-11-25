@@ -689,6 +689,13 @@ const patchLayerConfig = (layer: CanvasNodeContract, config: CanvasLayerConfigPa
         delete next.denoise;
       }
     }
+    if (Object.hasOwn(config, 'guidance')) {
+      if (config.guidance) {
+        next.guidance = config.guidance;
+      } else {
+        delete next.guidance;
+      }
+    }
     return next;
   }
   return layer;

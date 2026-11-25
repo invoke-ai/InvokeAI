@@ -9,6 +9,7 @@ import type {
   CanvasLayerContract,
   CanvasMaskContract,
   CanvasMaskFillContract,
+  CanvasMaskGuidanceContract,
   CanvasPixelSourceContract,
   CanvasRasterLayerContractV2,
   CanvasRegionalGuidanceLayerContract,
@@ -354,6 +355,14 @@ export const DEFAULT_CONTROL_ADAPTER = CONTROL_ADAPTER_DEFAULTS.controlnet;
 
 /** A new mask modifier's magnitude (legacy defaults): noise level and denoise limit. */
 export const MASK_MODIFIER_DEFAULTS = { denoise: 0.8, noise: 0.25 } as const;
+
+/** A new mask guidance: enabled, with no prompts yet. */
+export const DEFAULT_MASK_GUIDANCE: Readonly<CanvasMaskGuidanceContract> = {
+  autoNegative: false,
+  isEnabled: true,
+  negativePrompt: null,
+  positivePrompt: null,
+};
 
 /** Returns the transform that fits the layer's unrotated local content into the bbox. */
 export const fitLayerTransformToBbox = (
