@@ -21,6 +21,7 @@ from invokeai.backend.model_manager.configs.gemma2_encoder import (
 )
 from invokeai.backend.model_manager.load.load_default import ModelLoader
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
+from invokeai.backend.model_manager.load.model_util import calc_tokenizer_size_by_fs
 from invokeai.backend.model_manager.taxonomy import AnyModel, BaseModelType, ModelFormat, ModelType, SubModelType
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.state_dict_loading import log_unexpected_keys
@@ -76,6 +77,13 @@ def _convert_gemma_llamacpp_to_pytorch(sd: dict[str, Any]) -> dict[str, Any]:
 class Gemma2EncoderLoader(ModelLoader):
     """Loads a Gemma-2 causal LM directory and exposes its decoder + tokenizer."""
 
+    def get_size_fs(
+        self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
+    ) -> int:
+        if submodel_type is SubModelType.Tokenizer:
+            return calc_tokenizer_size_by_fs(model_path)
+        return super().get_size_fs(config, model_path, submodel_type)
+
     def _load_model(
         self,
         config: AnyModelConfig,
@@ -123,6 +131,14 @@ class Gemma2EncoderGGUFLoader(ModelLoader):
     embedding and the RMSNorm weights are materialized eagerly. The tokenizer is still read from the GGUF
     metadata. Mirrors the Qwen3 GGUF encoder loader in ``z_image.py``.
     """
+
+    def get_size_fs(
+        self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
+    ) -> int:
+        if submodel_type is SubModelType.Tokenizer:
+            # The tokenizer is serialized in the GGUF metadata; it does not read the weight payload.
+            return 0
+        return super().get_size_fs(config, model_path, submodel_type)
 
     def _load_model(
         self,

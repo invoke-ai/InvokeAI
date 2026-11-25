@@ -121,10 +121,15 @@ def test_lock_paced_yields_global_lock_to_waiting_writer():
     cache.release_first_use_grace = None
 
     in_stream = threading.Event()
+    writer_waiting = threading.Event()
     writer_ran = threading.Event()
     stream_done = threading.Event()
 
-    cache.lock.return_value = False
+    def initial_lock(*args, **kwargs):
+        in_stream.set()
+        return False
+
+    cache.lock.side_effect = initial_lock
 
     def continue_side_effect(*args, **kwargs):
         in_stream.set()
@@ -132,6 +137,7 @@ def test_lock_paced_yields_global_lock_to_waiting_writer():
         if kwargs.get("max_move_bytes") is None:
             return True
         # Emulate a pass doing real work so the loop doesn't spin unrealistically fast.
+        assert writer_waiting.wait(timeout=10), "writer did not reach the lock boundary"
         time.sleep(0.001)
         return writer_ran.is_set()
 
@@ -157,10 +163,53 @@ def test_lock_paced_yields_global_lock_to_waiting_writer():
     writer_thread = threading.Thread(target=writer, daemon=True)
     writer_thread.start()
 
+    deadline = time.monotonic() + 10
+    with MODEL_LOAD_LOCK._cond:
+        while MODEL_LOAD_LOCK._writers_waiting == 0:
+            remaining = deadline - time.monotonic()
+            assert remaining > 0, "writer did not enter the lock wait queue"
+            MODEL_LOAD_LOCK._cond.wait(timeout=remaining)
+    writer_waiting.set()
+
     assert writer_done.wait(timeout=10), "writer never acquired between paced passes"
     assert stream_done.wait(timeout=10), "paced stream did not settle after the writer finished"
     stream_thread.join(timeout=10)
     writer_thread.join(timeout=10)
+
+
+def test_integrated_cuda_paced_passes_acquire_admission_after_model_read(monkeypatch: pytest.MonkeyPatch):
+    """Each transfer pass takes the model read lock before integrated-CUDA admission, including continuations."""
+    monkeypatch.setattr(model_cache_module, "_is_integrated_cuda", lambda _device: True)
+    admission = threading.RLock()
+    admission_readers: list[int] = []
+
+    class TrackedAdmissionLock:
+        def __enter__(self):
+            assert MODEL_LOAD_LOCK._readers > 0
+            admission_readers.append(MODEL_LOAD_LOCK._readers)
+            admission.__enter__()
+            return self
+
+        def __exit__(self, *args):
+            return admission.__exit__(*args)
+
+    monkeypatch.setattr(model_cache_module, "_INTEGRATED_CUDA_ADMISSION_LOCK", TrackedAdmissionLock())
+
+    record = MagicMock()
+    record.awaiting_first_use = False
+    record.cached_model.total_bytes.return_value = 1 << 20
+    record.cached_model.compute_device = torch.device("cuda:0")
+    cache = MagicMock()
+    cache.release_first_use_grace = None
+    cache.register_first_use_hold = None
+    cache.lock.return_value = False
+    cache.continue_lock.side_effect = [False, True]
+    loaded = LoadedModelWithoutConfig(cache_record=record, cache=cache)
+
+    loaded._lock_paced(None)
+
+    assert len(admission_readers) == 3
+    assert all(readers > 0 for readers in admission_readers)
 
 
 def _paced_wrapper(claim: MagicMock, cache: MagicMock, device: torch.device | None = None) -> LoadedModelWithoutConfig:

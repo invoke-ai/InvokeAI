@@ -51,7 +51,7 @@ import functools
 import inspect
 import json
 import struct
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Collection, Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, TypeVar
@@ -75,7 +75,7 @@ from invokeai.backend.quantization.int8_matmul import (
     is_int8_compute_enabled,
 )
 from invokeai.backend.util.logging import InvokeAILogger
-from invokeai.backend.util.ram import require_ram_headroom, state_dict_cast_bytes
+from invokeai.backend.util.ram import _source_is_mapped, require_ram_headroom, state_dict_cast_bytes
 
 logger = InvokeAILogger.get_logger(__name__)
 
@@ -1187,7 +1187,7 @@ def install_int8_convrot_layers(
     extra_reserved_bytes: int = 0,
     extra_host_bytes: int = 0,
     read: Callable[[str], torch.Tensor] | None = None,
-    source_tensors_mapped: bool = False,
+    source_tensors_mapped: bool | Collection[int] = False,
 ) -> dict[str, dict[str, Any]]:
     """Take a marked int8 or int4 checkpoint from state dict to installed ``Int8ConvrotLinear`` and
     ``Int4ConvrotLinear`` modules.
@@ -1259,23 +1259,78 @@ def install_int8_convrot_layers(
     if has_meta:
         cast_peak = 0
         mapped_cast_bytes = 0
-    elif source_tensors_mapped:
+    elif source_tensors_mapped is True:
         # Dense cast destinations remain live after the split; mapped source pages do not count as allocated RAM.
         mapped_cast_bytes = sum(
             tensor.nelement() * dtype.itemsize for tensor in cast_sd.values() if tensor.dtype != dtype
         )
         cast_peak = 0
     else:
-        _, cast_peak = state_dict_cast_bytes(cast_sd, dtype, in_place=True)
-        cast_peak = materialized_source_bytes + dequant_delta + cast_peak
+        _, cast_peak = state_dict_cast_bytes(cast_sd, dtype, in_place=True, source_tensors_mapped=source_tensors_mapped)
+        if isinstance(source_tensors_mapped, Collection):
+            mapped_source_bytes = sum(
+                tensor.nelement() * tensor.element_size()
+                for tensor in sd.values()
+                if isinstance(tensor, torch.Tensor) and _source_is_mapped(tensor, source_tensors_mapped)
+            )
+            mapped_dequant_source_bytes = 0
+            for path in quantized:
+                if path in surviving:
+                    continue
+                for suffix in ("weight", "weight_scale"):
+                    tensor = sd.get(f"{path}.{suffix}")
+                    if isinstance(tensor, torch.Tensor) and _source_is_mapped(tensor, source_tensors_mapped):
+                        mapped_dequant_source_bytes += tensor.nelement() * tensor.element_size()
+            # `dequant_delta` replaces each marked source with its decoded output. Mapped source pages are
+            # reclaimable and therefore removed from the anonymous baseline; add back mapped inputs here because
+            # their old bytes were never part of that baseline and must not be subtracted from their outputs.
+            cast_peak = (
+                max(0, source_bytes - mapped_source_bytes + dequant_delta + mapped_dequant_source_bytes) + cast_peak
+            )
+        else:
+            cast_peak = materialized_source_bytes + dequant_delta + cast_peak
         mapped_cast_bytes = 0
     del cast_sd
     int8_target_bytes = reserved_bytes - extra_reserved_bytes
-    if source_tensors_mapped:
+    if source_tensors_mapped is True:
         # Mapped source pages remain retained while the split and cast replace their state-dict entries. Count the
         # complete decoded outputs and cast destinations, rather than crediting their source bytes as reclaimed.
         mapped_peak = max(dequant_peak, dequant_output_bytes + mapped_cast_bytes + extra_host_bytes)
         host_bytes_needed = max(0, mapped_peak, read_peak - source_bytes)
+    elif isinstance(source_tensors_mapped, Collection):
+        mapped_source_bytes = sum(
+            tensor.nelement() * tensor.element_size()
+            for tensor in sd.values()
+            if isinstance(tensor, torch.Tensor) and _source_is_mapped(tensor, source_tensors_mapped)
+        )
+        anonymous_source_bytes = source_bytes - mapped_source_bytes
+        mapped_dequant_source_bytes = 0
+        for path in quantized:
+            if path in surviving:
+                continue
+            for suffix in ("weight", "weight_scale"):
+                tensor = sd.get(f"{path}.{suffix}")
+                if isinstance(tensor, torch.Tensor) and _source_is_mapped(tensor, source_tensors_mapped):
+                    mapped_dequant_source_bytes += tensor.nelement() * tensor.element_size()
+        cast_final_delta = 0
+        for key, tensor in sd.items():
+            if key not in pinned and isinstance(tensor, torch.Tensor) and is_castable_float(tensor):
+                target_bytes = tensor.nelement() * dtype.itemsize
+                if _source_is_mapped(tensor, source_tensors_mapped):
+                    if tensor.dtype != dtype:
+                        cast_final_delta += target_bytes
+                else:
+                    cast_final_delta += target_bytes - tensor.nelement() * tensor.element_size()
+            del tensor
+        post_cast_live_bytes = (
+            anonymous_source_bytes + cast_final_delta + dequant_delta + mapped_dequant_source_bytes + extra_host_bytes
+        )
+        mixed_peak = max(
+            dequant_peak,
+            cast_peak,
+            post_cast_live_bytes,
+        )
+        host_bytes_needed = max(0, mixed_peak - anonymous_source_bytes, int8_target_bytes - anonymous_source_bytes)
     else:
         host_peak = max(int8_target_bytes, dequant_peak, cast_peak)
         host_peak = max(host_peak, read_peak)
@@ -1314,12 +1369,24 @@ def _predict_int8_dequant_peak(
     dtype: torch.dtype,
     materialized_source_bytes: int,
     *,
-    source_tensors_mapped: bool = False,
+    source_tensors_mapped: bool | Collection[int] = False,
 ) -> tuple[int, int, int]:
     """Return net split growth, peak bytes and total decoded outputs, keeping decode locals out of later casts."""
     dequant_delta = 0
     dequant_peak = 0
     completed_outputs = 0
+    if isinstance(source_tensors_mapped, Collection):
+        mapped_source_bytes = sum(
+            tensor.nelement() * tensor.element_size()
+            for tensor in sd.values()
+            if isinstance(tensor, torch.Tensor) and _source_is_mapped(tensor, source_tensors_mapped)
+        )
+        # Mapped pages are reclaimable, but every other source tensor remains live while decode allocates.
+        anonymous_source_bytes = materialized_source_bytes - mapped_source_bytes
+        remaining_anonymous_source_bytes = anonymous_source_bytes
+    else:
+        anonymous_source_bytes = 0
+        remaining_anonymous_source_bytes = 0
     for path, marker in quantized.items():
         if path in surviving:
             continue
@@ -1348,12 +1415,35 @@ def _predict_int8_dequant_peak(
                 )
         else:
             transient_peak = output_bytes
-        if source_tensors_mapped:
+        sources_mapped = source_tensors_mapped is True or (
+            _source_is_mapped(weight, source_tensors_mapped)
+            and (scale is None or _source_is_mapped(scale, source_tensors_mapped))
+        )
+        if isinstance(source_tensors_mapped, Collection):
+            mapped_layer_bytes = 0
+            if not sources_mapped:
+                if _source_is_mapped(weight, source_tensors_mapped):
+                    mapped_layer_bytes += weight.nelement() * weight.element_size()
+                if isinstance(scale, torch.Tensor) and _source_is_mapped(scale, source_tensors_mapped):
+                    mapped_layer_bytes += scale.nelement() * scale.element_size()
+            owned_layer_bytes = 0
+            if not _source_is_mapped(weight, source_tensors_mapped):
+                owned_layer_bytes += weight.nelement() * weight.element_size()
+            if isinstance(scale, torch.Tensor) and not _source_is_mapped(scale, source_tensors_mapped):
+                owned_layer_bytes += scale.nelement() * scale.element_size()
+            dequant_peak = max(
+                dequant_peak,
+                remaining_anonymous_source_bytes + completed_outputs + transient_peak + mapped_layer_bytes,
+            )
+        elif sources_mapped:
             dequant_peak = max(dequant_peak, completed_outputs + transient_peak)
         else:
             dequant_peak = max(dequant_peak, materialized_source_bytes + dequant_delta + transient_peak)
         dequant_delta += output_bytes - old_bytes
         completed_outputs += output_bytes
+        if isinstance(source_tensors_mapped, Collection):
+            # Decoded layers release their owned inputs before the next layer's peak.
+            remaining_anonymous_source_bytes -= owned_layer_bytes
     return dequant_delta, dequant_peak, completed_outputs
 
 

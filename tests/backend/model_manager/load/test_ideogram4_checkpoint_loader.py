@@ -12,6 +12,7 @@ of 458.
 
 import pytest
 import torch
+from safetensors.torch import save_file
 
 from invokeai.backend.ideogram4.modeling_ideogram4 import Ideogram4Config, Ideogram4Transformer
 from invokeai.backend.ideogram4.quantized_loading import quantize_weight_to_fp8
@@ -108,7 +109,9 @@ def _driver(
     geometry: Ideogram4Config = TINY_CONFIG,
 ):
     checkpoint = tmp_path / "ideogram4_fp8_scaled.safetensors"
-    checkpoint.touch()
+    # The loader probes the real file header to choose mmap vs pread; keep the checkpoint tiny because
+    # the seam supplies the actual state dict used by the test.
+    save_file({"probe.weight": torch.zeros(1, dtype=FP8)}, str(checkpoint))
     config = Main_Checkpoint_Ideogram4_Config.model_construct(
         path=str(checkpoint),
         name="ideogram4",
@@ -220,7 +223,8 @@ def test_fp8_storage_alone_keeps_the_checkpoint_in_its_own_scaled_form(monkeypat
 
     model, run = _load(monkeypatch, tmp_path, state_dict, keep_fp8=False, fp8_storage=True)
 
-    assert run.reservation_kwargs[-1]["source_tensors_mapped"] is True
+    # The real header contains an FP8 weight, so the loader selects pread and does not retain mapped source pages.
+    assert run.reservation_kwargs[-1]["source_tensors_mapped"] is False
 
     kept = model.get_submodule(KEPT)
     assert kept.weight.dtype is FP8

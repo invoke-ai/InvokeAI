@@ -219,7 +219,8 @@ FOLDER_SEAM = _seam(TextLLMModelLoader, torch.float32)
 
 def _config(tmp_path: Path, cpu_only: bool | None = None) -> TextLLM_Checkpoint_Config:
     path = tmp_path / "qwen3.5_9b_flux3_prompt_upsampler_int8_convrot.safetensors"
-    path.write_bytes(b"\0" * 64)
+    # The loader seam replaces the checkpoint payload, but ownership selection still reads the real header.
+    save_file({"_fixture": torch.zeros(1)}, path)
     return TextLLM_Checkpoint_Config.model_construct(path=str(path), name=path.stem, cpu_only=cpu_only)
 
 

@@ -4,6 +4,7 @@ from unittest.mock import MagicMock
 
 import pytest
 import torch
+from safetensors.torch import save_file
 
 import invokeai.backend.model_manager.load.model_loaders.krea2 as krea2_module
 from invokeai.backend.model_manager.configs.main import (
@@ -49,11 +50,16 @@ class _TinyKrea2Transformer(torch.nn.Module):
         self.weight = torch.nn.Parameter(torch.empty(2, 2))
 
 
+def _write_safetensors_header(path) -> None:
+    """The loader seam serves the payload, but ownership selection still reads the checkpoint header."""
+    save_file({"_fixture": torch.zeros(1)}, str(path))
+
+
 def test_single_file_loader_constructs_and_materializes_model(monkeypatch, tmp_path) -> None:
     import diffusers
 
     checkpoint_path = tmp_path / "krea2.safetensors"
-    checkpoint_path.touch()
+    _write_safetensors_header(checkpoint_path)
     config = Main_Checkpoint_Krea2_Config.model_construct(
         path=str(checkpoint_path), variant=Krea2VariantType.Turbo, fp8_storage=None
     )
@@ -128,7 +134,7 @@ def test_single_file_loader_decodes_an_int8_convrot_checkpoint(monkeypatch, tmp_
     state_dict["dense.weight"] = torch.ones(4, 8, dtype=torch.float16)
 
     checkpoint_path = tmp_path / "krea2_int8_convrot.safetensors"
-    checkpoint_path.touch()
+    _write_safetensors_header(checkpoint_path)
     config = Main_Checkpoint_Krea2_Config.model_construct(
         path=str(checkpoint_path), variant=Krea2VariantType.Turbo, fp8_storage=None
     )
@@ -219,7 +225,7 @@ def test_single_file_loader_keeps_a_mixed_int4_build_named_only_in_its_header_pa
             self.wide = torch.nn.Linear(CONVROT_GROUP_SIZE, 4, bias=False)
 
     checkpoint_path = tmp_path / "krea2Int4Convrot_v10Turbo.safetensors"
-    checkpoint_path.touch()
+    _write_safetensors_header(checkpoint_path)
     config = Main_Checkpoint_Krea2_Config.model_construct(
         path=str(checkpoint_path), variant=Krea2VariantType.Turbo, fp8_storage=None
     )
@@ -588,7 +594,7 @@ def test_an_int8_weight_without_a_marker_is_refused(monkeypatch, tmp_path) -> No
     }
 
     checkpoint_path = tmp_path / "krea2_int8_convrot.safetensors"
-    checkpoint_path.touch()
+    _write_safetensors_header(checkpoint_path)
     config = Main_Checkpoint_Krea2_Config.model_construct(
         path=str(checkpoint_path), variant=Krea2VariantType.Turbo, fp8_storage=None
     )
@@ -644,7 +650,7 @@ def _int8_transformer_driver(monkeypatch, tmp_path, model_class, state_dict, *, 
     from safetensors import torch as safetensors_torch
 
     checkpoint_path = tmp_path / "krea2_int8_convrot.safetensors"
-    checkpoint_path.touch()
+    _write_safetensors_header(checkpoint_path)
     config = Main_Checkpoint_Krea2_Config.model_construct(
         path=str(checkpoint_path), variant=Krea2VariantType.Turbo, fp8_storage=None
     )
@@ -937,7 +943,7 @@ def _native_fp8_driver(monkeypatch, tmp_path, state_dict, observe: tuple[str, ..
     from tests.fixtures.loader_seams import Seam, prepare
 
     checkpoint = tmp_path / "krea2_fp8_scaled_everything.safetensors"
-    checkpoint.touch()
+    _write_safetensors_header(checkpoint)
     config = Main_Checkpoint_Krea2_Config.model_construct(
         path=str(checkpoint), variant=Krea2VariantType.Turbo, fp8_storage=None
     )
@@ -1103,7 +1109,7 @@ def test_qwen3vl_tower_releases_folded_scale_before_nvfp4_install(monkeypatch) -
     monkeypatch.setattr(
         krea2_module,
         "read_qwen3vl_visual_tower_tensors",
-        lambda _files: {
+        lambda _files, _mapped_storage_ids=None: {
             "proj.weight": payload.codes,
             "proj.weight_scale": payload.scale,
         },

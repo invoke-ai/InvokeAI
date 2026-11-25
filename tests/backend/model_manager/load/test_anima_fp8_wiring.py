@@ -115,7 +115,8 @@ def test_single_file_loader_applies_fp8_layerwise_casting(monkeypatch, tmp_path)
     import invokeai.backend.model_manager.load.model_loaders.anima as loader_module
 
     checkpoint_path = tmp_path / "anima.safetensors"
-    checkpoint_path.touch()
+    # The loader seam replaces the payload, but ownership selection still reads the real header.
+    safetensors.torch.save_file({"_fixture": torch.ones(1)}, checkpoint_path)
     # `fp8_storage` lives under `default_settings` -- passing it as a top-level kwarg to
     # `model_construct` would be silently discarded (the config has no such field and no extra="allow"),
     # leaving the toggle off in a test whose whole point is that the toggle is wired up.

@@ -65,14 +65,16 @@ def _reject_float8_weights(sd: dict[str, Any], what: str, model_path: Path) -> N
     reject_float8_weights(sd, what, model_path, _H3_SUPPORTED_NOTE)
 
 
-def _pruned_cast_host_bytes(sd: dict[str, torch.Tensor], pruned: bool) -> int:
+def _pruned_cast_host_bytes(sd: dict[str, torch.Tensor], pruned: bool, *, source_tensors_mapped: bool = False) -> int:
     """Estimate pruned AdaLN cast demand without retaining a shallow source mapping."""
     if not pruned:
         return 0
     cast_sd = {
         key: tensor for key, tensor in sd.items() if ".adaln_proj.linear." in key or key.startswith("norm_out.linear.")
     }
-    _, additional_bytes = state_dict_cast_bytes(cast_sd, torch.float32, in_place=True)
+    _, additional_bytes = state_dict_cast_bytes(
+        cast_sd, torch.float32, in_place=True, source_tensors_mapped=source_tensors_mapped
+    )
     del cast_sd
     return additional_bytes
 
@@ -246,7 +248,7 @@ class MiniMaxH3CheckpointModel(ModelLoader):
         sd, quant_markers = convert_minimax_h3_checkpoint_to_diffusers(sd)
 
         reserved_bytes = sum(t.nelement() * t.element_size() for t in sd.values())
-        additional_bytes = _pruned_cast_host_bytes(sd, config.pruned)
+        additional_bytes = _pruned_cast_host_bytes(sd, config.pruned, source_tensors_mapped=True)
         require_ram_headroom(
             self._ram_cache.make_room(reserved_bytes, host_bytes_needed=additional_bytes), additional_bytes
         )

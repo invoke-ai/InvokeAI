@@ -145,7 +145,10 @@ def test_a_multimodal_export_loads_its_language_model_and_never_reads_the_vision
     assert [key for key in tensors_read if not key.startswith("language_model.")] == []
     loader._ram_cache.make_room.assert_called_once()
     assert loader._ram_cache.make_room.call_args.args == (_bytes(weights),)
-    assert reservations[0]["source_tensors_mapped"] is True
+    # The reader reports the actual mmap-backed storages, rather than claiming that every selected tensor is mapped.
+    mapped_storage_ids = reservations[0]["source_tensors_mapped"]
+    assert isinstance(mapped_storage_ids, set)
+    assert mapped_storage_ids
 
 
 def test_shards_load_as_one_checkpoint(tmp_path: Path, loader, tensors_read: list[str]) -> None:

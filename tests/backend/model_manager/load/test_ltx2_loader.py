@@ -8,6 +8,7 @@ contract the loader-seam driver records as ``order`` (reservations made before e
 and ``dtypes_at_make_room`` (the working dict's dtypes when room was first made).
 """
 
+import builtins
 import json
 import logging
 from pathlib import Path
@@ -265,7 +266,7 @@ def test_connector_header_is_validated_before_filtered_payload_read(
     path = tmp_path / "connectors.safetensors"
     path.write_bytes((declared_length or len(header)).to_bytes(8, "little") + header + b"\0" * 2)
     reads: list[int] = []
-    original_open = Path.open
+    original_open = builtins.open
 
     class _TrackedFile:
         def __init__(self, file):
@@ -278,14 +279,17 @@ def test_connector_header_is_validated_before_filtered_payload_read(
         def __exit__(self, *args):
             return self.file.__exit__(*args)
 
+        def __getattr__(self, name):
+            return getattr(self.file, name)
+
         def read(self, size=-1):
             reads.append(size)
             return self.file.read(size)
 
-    def tracked_open(self: Path, *args, **kwargs):
-        return _TrackedFile(original_open(self, *args, **kwargs))
+    def tracked_open(*args, **kwargs):
+        return _TrackedFile(original_open(*args, **kwargs))
 
-    monkeypatch.setattr(Path, "open", tracked_open)
+    monkeypatch.setattr(builtins, "open", tracked_open)
     components = {
         "text_projection": path.name,
         "video_connector": path.name,

@@ -18,7 +18,11 @@ from invokeai.backend.model_manager.taxonomy import (
     ModelType,
     SubModelType,
 )
-from invokeai.backend.quantization.fp8_scaled import load_safetensors_checkpoint, reject_quantized_side_channel
+from invokeai.backend.quantization.fp8_scaled import (
+    load_safetensors_checkpoint,
+    reject_quantized_side_channel,
+    safetensors_backend,
+)
 from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader, unpack_ggml_at_load
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.ram import require_ram_headroom, state_dict_cast_bytes
@@ -113,9 +117,13 @@ class ErnieImageCheckpointModel(ModelLoader):
         target_device = TorchDevice.choose_torch_device()
         model_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
 
-        sd = load_safetensors_checkpoint(Path(config.path))
+        model_path = Path(config.path)
+        source_tensors_mapped = safetensors_backend(model_path) == "mmap"
+        sd = load_safetensors_checkpoint(model_path)
         reject_quantized_side_channel(sd, f"ERNIE-Image checkpoint {Path(config.path).name}")
-        reserved_bytes, additional_bytes = state_dict_cast_bytes(sd, model_dtype, in_place=True)
+        reserved_bytes, additional_bytes = state_dict_cast_bytes(
+            sd, model_dtype, in_place=True, source_tensors_mapped=source_tensors_mapped
+        )
         require_ram_headroom(
             self._ram_cache.make_room(reserved_bytes, host_bytes_needed=additional_bytes), additional_bytes
         )

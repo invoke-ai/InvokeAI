@@ -16,6 +16,7 @@ from unittest.mock import MagicMock
 
 import pytest
 import torch
+from safetensors.torch import save_file
 
 from invokeai.backend.model_manager.configs.main import Main_Checkpoint_QwenImage_Config
 from invokeai.backend.model_manager.configs.qwen_vl_encoder import QwenVLEncoder_Checkpoint_Config
@@ -50,6 +51,11 @@ def _packed_bytes(rows: int, columns: int) -> int:
 
 def _marker(fmt: str) -> torch.Tensor:
     return comfy_quant_marker({"format": fmt})
+
+
+def _write_mmap_probe(path) -> None:
+    """Give ownership detection a valid mmap-backed checkpoint without loading the synthetic state."""
+    save_file({"probe.weight": torch.zeros(1, dtype=torch.int8)}, str(path))
 
 
 #: Both single-file encoder cells drive the same entry, so the driver is declared once.
@@ -160,7 +166,7 @@ def test_the_transformer_keeps_nvfp4_packed_and_scaled_fp8_only_where_something_
     monkeypatch.setattr(qwen_image, "should_keep_fp8_weights", lambda _device: mode == "fp8_compute")
     monkeypatch.setattr(load_default, "_device_supports_fp8_storage", lambda *_args: True)
     checkpoint = tmp_path / "qwen_image_nvfp4.safetensors"
-    checkpoint.touch()
+    _write_mmap_probe(checkpoint)
     loader = object.__new__(QwenImageCheckpointModel)
     loader._ram_cache = SimpleNamespace(make_room=MagicMock())
     loader._torch_device = torch.device("cpu")
@@ -281,7 +287,7 @@ def test_the_encoder_keeps_marker_named_nvfp4_layers_packed_under_their_transfor
         lambda *_args, **_kwargs: SimpleNamespace(torch_dtype=None, tie_word_embeddings=False),
     )
     checkpoint = tmp_path / "qwen_2.5_vl_7b_nvfp4.safetensors"
-    checkpoint.touch()
+    _write_mmap_probe(checkpoint)
     loader = object.__new__(QwenVLEncoderCheckpointLoader)
     loader._ram_cache = SimpleNamespace(make_room=MagicMock())
     loader._torch_device, loader._logger = torch.device("cpu"), MagicMock()
@@ -375,7 +381,7 @@ def test_the_encoder_keeps_int8_layers_int8_under_their_transformers_paths(monke
     are claimed first. Their markers sit under the legacy names and follow the remap with their weights."""
     state_dict, expected = _int8_encoder_state_dict(rotated)
     checkpoint = tmp_path / "qwen_2.5_vl_7b_int8.safetensors"
-    checkpoint.touch()
+    _write_mmap_probe(checkpoint)
     run = prepare(BF16_ENCODER_SEAM, monkeypatch, state_dict=state_dict, metadata=None, geometry=_tiny_encoder)
 
     model = run.load(QwenVLEncoder_Checkpoint_Config.model_construct(path=str(checkpoint)))
@@ -413,7 +419,7 @@ def test_an_encoder_build_that_names_its_layers_only_in_the_header_loads_under_t
     entry = {"format": "int8_tensorwise", "convrot": rotated, **({"convrot_groupsize": 64} if rotated else {})}
     metadata = {"_quantization_metadata": json.dumps({"layers": dict.fromkeys(legacy, entry)})}
     checkpoint = tmp_path / "qwen_2.5_vl_7b_int8_header.safetensors"
-    checkpoint.touch()
+    _write_mmap_probe(checkpoint)
     run = prepare(BF16_ENCODER_SEAM, monkeypatch, state_dict=state_dict, metadata=metadata, geometry=_tiny_encoder)
 
     model = run.load(QwenVLEncoder_Checkpoint_Config.model_construct(path=str(checkpoint)))
@@ -437,7 +443,7 @@ def test_an_encoder_header_entry_that_does_not_say_whether_the_weight_was_rotate
         for path in ("model.layers.0.self_attn.q_proj", "model.layers.0.mlp.down_proj")
     }
     checkpoint = tmp_path / "qwen_2.5_vl_7b_int8_ambiguous.safetensors"
-    checkpoint.touch()
+    _write_mmap_probe(checkpoint)
     run = prepare(
         BF16_ENCODER_SEAM,
         monkeypatch,
@@ -461,7 +467,7 @@ def test_an_encoder_file_mixing_int8_and_nvfp4_layers_loads_both_under_one_reser
     state_dict.update(tensors)
     state_dict[f"{nvfp4_legacy}.comfy_quant"] = _marker("nvfp4")
     checkpoint = tmp_path / "qwen_2.5_vl_7b_int8_nvfp4.safetensors"
-    checkpoint.touch()
+    _write_mmap_probe(checkpoint)
     run = prepare(BF16_ENCODER_SEAM, monkeypatch, state_dict=state_dict, metadata=None, geometry=_tiny_encoder)
 
     model = run.load(QwenVLEncoder_Checkpoint_Config.model_construct(path=str(checkpoint)))
@@ -485,7 +491,7 @@ def test_an_encoder_int8_weight_without_a_marker_is_refused_before_the_cache_is_
     state_dict, _ = _int8_encoder_state_dict(rotated=True)
     del state_dict["model.layers.0.mlp.down_proj.comfy_quant"]
     checkpoint = tmp_path / "qwen_2.5_vl_7b_int8_convrot.safetensors"
-    checkpoint.touch()
+    _write_mmap_probe(checkpoint)
     run = prepare(ENCODER_SEAM, monkeypatch, state_dict=state_dict, metadata=None)
 
     with pytest.raises(ValueError, match="no readable int8_tensorwise marker"):
@@ -500,7 +506,7 @@ def test_an_encoder_marked_only_convrot_is_refused(monkeypatch, tmp_path) -> Non
     for legacy in ("model.layers.0.self_attn.q_proj", "model.layers.0.mlp.down_proj"):
         state_dict[f"{legacy}.comfy_quant"] = comfy_quant_marker({"convrot": True})
     checkpoint = tmp_path / "qwen_2.5_vl_7b_convrot_only.safetensors"
-    checkpoint.touch()
+    _write_mmap_probe(checkpoint)
     run = prepare(ENCODER_SEAM, monkeypatch, state_dict=state_dict, metadata=None)
 
     with pytest.raises(ValueError, match=r"int8 weight\(s\) with no readable int8_tensorwise marker"):
@@ -526,7 +532,7 @@ def test_an_nvfp4_layer_missing_its_global_scale_is_refused_before_the_cache_is_
         "model.layers.0.self_attn.q_proj.weight_scale": torch.zeros(128, 16).to(torch.float8_e4m3fn),
     }
     checkpoint = tmp_path / "qwen_2.5_vl_7b_nvfp4_half.safetensors"
-    checkpoint.touch()
+    _write_mmap_probe(checkpoint)
     run = prepare(ENCODER_SEAM, monkeypatch, state_dict=state_dict, metadata=None)
 
     with pytest.raises(ValueError, match="with a weight_scale but no weight_scale_2"):
@@ -554,7 +560,7 @@ def test_the_transformer_refuses_an_nvfp4_layer_missing_its_global_scale_before_
         "transformer_blocks.0.attn.to_q.weight_scale": torch.zeros(128, 4).to(torch.float8_e4m3fn),
     }
     checkpoint = tmp_path / "qwen_image_nvfp4_half.safetensors"
-    checkpoint.touch()
+    _write_mmap_probe(checkpoint)
     seam = Seam(
         loader=QwenImageCheckpointModel,
         module=qwen_image,

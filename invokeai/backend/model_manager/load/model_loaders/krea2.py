@@ -62,6 +62,7 @@ from invokeai.backend.quantization.fp8_scaled import (
     parse_quantization_metadata,
     read_safetensors_metadata,
     reattach_layer_sidechannel,
+    safetensors_backend,
     should_keep_fp8_weights,
     split_fp8_scaled_layers,
     strip_layer_path_prefix,
@@ -344,7 +345,8 @@ def _load_qwen3vl_visual_tower(
     from transformers.models.qwen3_vl.modeling_qwen3_vl import Qwen3VLVisionModel
 
     what = "Qwen3-VL vision tower"
-    sd: dict[str, Any] = dict(read_qwen3vl_visual_tower_tensors(files))
+    mapped_storage_ids: set[int] = set()
+    sd: dict[str, Any] = dict(read_qwen3vl_visual_tower_tensors(files, mapped_storage_ids))
     if not sd:
         raise RuntimeError(
             f"{', '.join(str(f) for f in files) or 'This encoder'} carries no Qwen3-VL vision tower weights, so it "
@@ -385,7 +387,7 @@ def _load_qwen3vl_visual_tower(
             # The branch's only reservation, and the nvfp4 layers are no longer in `sd`.
             extra_reserved_bytes=predict_nvfp4_install_size(tower, nvfp4_payloads, dtype, skip_patterns),
             extra_host_bytes=predict_nvfp4_install_host_size(tower, nvfp4_payloads, dtype, skip_patterns),
-            source_tensors_mapped=True,
+            source_tensors_mapped=mapped_storage_ids,
         )
     else:
         # Whole keys were renamed, so each `.weight_scale` still sits beside its `.weight`.
@@ -399,7 +401,7 @@ def _load_qwen3vl_visual_tower(
             fp8_layers=fp8_layers,
             nvfp4_payloads=nvfp4_payloads,
             skip_patterns=skip_patterns,
-            source_tensors_mapped=True,
+            source_tensors_mapped=mapped_storage_ids,
         )
         dequantize_fp8_scaled(sd, fp8_layers, dtype)
         fp8_layers = {}
@@ -552,6 +554,7 @@ class Krea2CheckpointModel(ModelLoader):
         if not isinstance(config, Main_Checkpoint_Krea2_Config):
             raise TypeError(f"Expected Main_Checkpoint_Krea2_Config, got {type(config).__name__}.")
         model_path = Path(config.path)
+        source_tensors_mapped = safetensors_backend(model_path) == "mmap"
 
         target_device = TorchDevice.choose_torch_device()
         model_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
@@ -675,7 +678,7 @@ class Krea2CheckpointModel(ModelLoader):
                 skip_patterns=skip_patterns,
                 extra_reserved_bytes=nvfp4_bytes,
                 extra_host_bytes=predict_nvfp4_install_host_size(model, nvfp4_payloads, model_dtype, skip_patterns),
-                source_tensors_mapped=True,
+                source_tensors_mapped=source_tensors_mapped,
             )
             self._logger.info(
                 f"Krea-2: kept {len(quantized)} of {len(int8_markers)} layer(s) quantized "
@@ -702,7 +705,7 @@ class Krea2CheckpointModel(ModelLoader):
                 skip_patterns=skip_patterns,
                 fp8_layers=fp8_layers,
                 nvfp4_payloads=nvfp4_payloads,
-                source_tensors_mapped=True,
+                source_tensors_mapped=source_tensors_mapped,
             )
 
             if fp8_layers and not keep_fp8:
@@ -1096,6 +1099,7 @@ class Qwen3VLEncoderCheckpointLoader(_Qwen3VLEncoderSingleFileLoader[Qwen3VLEnco
         from transformers import Qwen3VLModel
 
         model_path = Path(config.path)
+        source_tensors_mapped = safetensors_backend(model_path) == "mmap"
         target_device = TorchDevice.choose_torch_device()
         model_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
 
@@ -1197,7 +1201,7 @@ class Qwen3VLEncoderCheckpointLoader(_Qwen3VLEncoderSingleFileLoader[Qwen3VLEnco
                 # branch's only reservation.
                 extra_reserved_bytes=predict_nvfp4_install_size(model, nvfp4_payloads, model_dtype, skip_patterns),
                 extra_host_bytes=predict_nvfp4_install_host_size(model, nvfp4_payloads, model_dtype, skip_patterns),
-                source_tensors_mapped=True,
+                source_tensors_mapped=source_tensors_mapped,
             )
             self._logger.info(
                 f"Qwen3-VL encoder: kept {len(quantized)} of {len(int8_markers)} layer(s) in int8 "
@@ -1236,7 +1240,7 @@ class Qwen3VLEncoderCheckpointLoader(_Qwen3VLEncoderSingleFileLoader[Qwen3VLEnco
                 fp8_layers=fp8_layers,
                 nvfp4_payloads=nvfp4_payloads,
                 skip_patterns=skip_patterns,
-                source_tensors_mapped=True,
+                source_tensors_mapped=source_tensors_mapped,
             )
             if fp8_layers and not keep_fp8:
                 # Neither consumer wants them packed: fold the scales into the weights. Both consumers

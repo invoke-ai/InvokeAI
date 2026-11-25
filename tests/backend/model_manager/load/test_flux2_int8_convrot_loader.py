@@ -14,6 +14,7 @@ import json
 
 import pytest
 import torch
+from safetensors.torch import save_file
 
 from invokeai.backend.model_manager.configs.main import Main_Checkpoint_Flux2_Config
 from invokeai.backend.model_manager.load.model_loaders import flux
@@ -138,7 +139,9 @@ SEAM = Seam(
 
 def _driver(monkeypatch, tmp_path, state_dict: dict, header: dict | None = None, observe: tuple[str, ...] = ()):
     checkpoint = tmp_path / "flux-2-klein-9b-int8-convrot.safetensors"
-    checkpoint.touch()
+    # The loader probes the real header to choose mmap vs pread; keep the probe tiny because the seam supplies the
+    # state dict used by the test. An int8 weight selects the mmap backend without exercising FP8 behavior.
+    save_file({"probe.weight": torch.zeros(1, dtype=torch.int8)}, str(checkpoint))
     config = Main_Checkpoint_Flux2_Config.model_construct(
         path=str(checkpoint), name="klein-9b-int8", variant=Flux2VariantType.Klein9B
     )

@@ -689,7 +689,7 @@ class LTX2Gemma4EncoderModel(ModelLoader):
             )
         else:
             reserved_bytes = predict_cast_state_dict_size(sd, model_dtype, keep_fp8=False)
-            _, additional_bytes = state_dict_cast_bytes(sd, model_dtype, in_place=True)
+            _, additional_bytes = state_dict_cast_bytes(sd, model_dtype, in_place=True, source_tensors_mapped=True)
             require_ram_headroom(
                 self._ram_cache.make_room(reserved_bytes, host_bytes_needed=additional_bytes), additional_bytes
             )

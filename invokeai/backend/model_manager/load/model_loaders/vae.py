@@ -397,7 +397,9 @@ class VAELoader(GenericDiffusersLoader):
         sd = _read_checkpoint(config.path)
         reject_quantized_side_channel(sd, f"Wan VAE checkpoint {Path(config.path).name}")
 
-        new_sd_size, additional_bytes = state_dict_cast_bytes(sd, dtype, in_place=True)
+        new_sd_size, additional_bytes = state_dict_cast_bytes(
+            sd, dtype, in_place=True, source_tensors_mapped=Path(config.path).suffix == ".safetensors"
+        )
         require_ram_headroom(
             self._ram_cache.make_room(new_sd_size, host_bytes_needed=additional_bytes), additional_bytes
         )
@@ -467,7 +469,9 @@ class VAELoader(GenericDiffusersLoader):
         sd = _read_checkpoint(path)
         reject_quantized_side_channel(sd, f"Wan VAE checkpoint {Path(path).name}")
         sd = convert_wan_vae_to_diffusers(sd)
-        reserved_bytes, additional_bytes = state_dict_cast_bytes(sd, dtype, in_place=True)
+        reserved_bytes, additional_bytes = state_dict_cast_bytes(
+            sd, dtype, in_place=True, source_tensors_mapped=Path(path).suffix == ".safetensors"
+        )
         require_ram_headroom(
             self._ram_cache.make_room(reserved_bytes, host_bytes_needed=additional_bytes), additional_bytes
         )
@@ -524,7 +528,9 @@ class VAELoader(GenericDiffusersLoader):
 
         # The same autoencoder as the Wan-family layout above, so the same precision policy.
         dtype = _wan_family_dtype(self._torch_dtype)
-        new_sd_size, additional_bytes = state_dict_cast_bytes(sd, dtype, in_place=True)
+        new_sd_size, additional_bytes = state_dict_cast_bytes(
+            sd, dtype, in_place=True, source_tensors_mapped=Path(config.path).suffix == ".safetensors"
+        )
         require_ram_headroom(
             self._ram_cache.make_room(new_sd_size, host_bytes_needed=additional_bytes), additional_bytes
         )

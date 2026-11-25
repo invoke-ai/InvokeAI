@@ -194,3 +194,24 @@ def calc_model_size_by_fs(model_path: Path, subfolder: Optional[str] = None, var
         return model_size
 
     return 0  # scheduler/feature_extractor/tokenizer - models without loading to gpu
+
+
+def calc_tokenizer_size_by_fs(model_path: Path, subfolder: Optional[str] = None) -> int:
+    """Estimate only the local files a Hugging Face tokenizer loads."""
+    path = model_path / subfolder if subfolder is not None else model_path
+    if not path.is_dir():
+        return 0
+    tokenizer_names = {
+        "tokenizer.json",
+        "tokenizer.json.gz",
+        "tokenizer.model",
+        "spiece.model",
+        "tekken.json",
+        "tokenizer_config.json",
+        "special_tokens_map.json",
+        "added_tokens.json",
+        "chat_template.json",
+        "vocab.json",
+        "merges.txt",
+    }
+    return sum(file.stat().st_size for file in path.iterdir() if file.is_file() and file.name in tokenizer_names)

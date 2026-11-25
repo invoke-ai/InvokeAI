@@ -1,5 +1,6 @@
 """The header readers identification and loaders use instead of reading a model's tensors."""
 
+import builtins
 import json
 from pathlib import Path
 
@@ -108,4 +109,65 @@ def test_a_file_shorter_than_a_header_length_is_refused(tmp_path: Path) -> None:
     path.write_bytes(b"\x01\x02")
 
     with pytest.raises(ValueError, match="is not a safetensors file"):
+        read_safetensors_header(path)
+
+
+def test_a_header_cannot_request_more_than_the_safetensors_limit(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """A sparse file must not make header parsing request a 100 MB allocation."""
+    max_header_length = 100_000_000
+    path = tmp_path / "huge.safetensors"
+    with path.open("wb") as file:
+        file.write((max_header_length + 1).to_bytes(8, "little"))
+        file.truncate(8 + max_header_length + 1)
+
+    reads: list[int] = []
+    original_open = builtins.open
+
+    class _TrackedFile:
+        def __init__(self, file):
+            self.file = file
+
+        def __enter__(self):
+            self.file.__enter__()
+            return self
+
+        def __exit__(self, *args):
+            return self.file.__exit__(*args)
+
+        def __getattr__(self, name):
+            return getattr(self.file, name)
+
+        def read(self, size=-1):
+            reads.append(size)
+            if size > 8:
+                return b""
+            return self.file.read(size)
+
+    def tracked_open(*args, **kwargs):
+        return _TrackedFile(original_open(*args, **kwargs))
+
+    monkeypatch.setattr(builtins, "open", tracked_open)
+    with pytest.raises(ValueError, match="header length exceeds the 100000000-byte limit"):
+        read_safetensors_header(path)
+    assert reads == [8]
+
+
+@pytest.mark.parametrize(
+    "offsets",
+    [
+        ["0", 1],
+        [-1, 1],
+        [2, 1],
+        [0, 3],
+    ],
+    ids=["noninteger", "negative", "reversed", "payload-overrun"],
+)
+def test_invalid_tensor_offsets_are_refused(tmp_path: Path, offsets: list[object]) -> None:
+    header = json.dumps({"tensor": {"dtype": "U8", "shape": [1], "data_offsets": offsets}}).encode()
+    path = tmp_path / "invalid_offsets.safetensors"
+    path.write_bytes(len(header).to_bytes(8, "little") + header + b"\0")
+
+    with pytest.raises(ValueError, match="tensor.*offsets"):
         read_safetensors_header(path)

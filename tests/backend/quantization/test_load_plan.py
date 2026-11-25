@@ -175,6 +175,34 @@ class TestTheDictAndThePayloads:
         assert needed == 4 * 1024 * torch.bfloat16.itemsize
         assert asked == [(needed, {"host_bytes_needed": 2 * 1024 * torch.bfloat16.itemsize})]
 
+    def test_mapped_cast_output_stays_live_through_nvfp4_install(self) -> None:
+        mapped = torch.zeros(1024, dtype=torch.float16)
+        sd = {"mapped": mapped, "owned": torch.zeros(1, dtype=torch.float32)}
+        tensors, _ = nvfp4_signed_tensors("lin", torch.ones(128, 64, dtype=torch.bool))
+        sd.update(tensors)
+        payloads = pop_nvfp4_layers(sd, {"lin": {"format": "nvfp4"}})
+        model = _linear_model(64, 128)
+        mapped_storage_ids = {mapped.untyped_storage().data_ptr()}
+        asked: list[tuple[int, dict[str, int]]] = []
+
+        def reserve(bytes_needed: int, **kwargs: int) -> None:
+            asked.append((bytes_needed, kwargs))
+
+        needed = reserve_for_load(
+            reserve,
+            sd,
+            torch.float32,
+            keep_fp8=False,
+            model=model,
+            fp8_layers={},
+            nvfp4_payloads=payloads,
+            skip_patterns=("lin",),
+            source_tensors_mapped=mapped_storage_ids,
+        )
+
+        assert needed == 1024 * torch.float32.itemsize + torch.float32.itemsize + 128 * 64 * torch.float32.itemsize
+        assert asked == [(needed, {"host_bytes_needed": 55_296})]
+
     def test_mapped_accounting_takes_precedence_over_retained_only_for_mixed_sources(self) -> None:
         sd = {
             **{f"fp8_{index}": torch.zeros(1024, dtype=torch.float8_e4m3fn) for index in range(2)},

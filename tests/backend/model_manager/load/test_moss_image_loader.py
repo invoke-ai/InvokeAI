@@ -727,7 +727,10 @@ class TestTorchaoFp8Checkpoint:
 
         model, _, _ = self._load(monkeypatch, path, keep_fp8=False)
 
-        assert reservations[0]["source_tensors_cloned"] is True
+        # FP8 files are read with safetensors' pread backend, so the source storage is owned and
+        # the fallback fold does not clone or retain a mapped source.
+        assert reservations[0].get("source_tensors_cloned", False) is False
+        assert reservations[0].get("source_tensors_retained", False) is False
         assert [name for name, p in model.named_parameters() if p.dtype is not torch.float32] == []
         for layer, (codes, scale) in quantized.items():
             assert torch.equal(model.get_submodule(layer).weight, codes.float() * scale), layer

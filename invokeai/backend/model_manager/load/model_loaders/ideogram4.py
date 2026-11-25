@@ -55,6 +55,7 @@ from invokeai.backend.quantization.fp8_scaled import (
     parse_quantization_metadata,
     read_safetensors_metadata,
     reject_quantized_side_channel,
+    safetensors_backend,
     should_keep_fp8_weights,
     split_fp8_scaled_layers,
     warn_on_unattached_scales,
@@ -132,7 +133,6 @@ class Ideogram4DiffusersModel(ModelLoader):
             raise Exception("A submodel type must be provided when loading Ideogram 4 main pipelines.")
 
         model_path = Path(config.path)
-
         match submodel_type:
             case SubModelType.Transformer:
                 return self._load_transformer_pair(model_path)
@@ -433,6 +433,7 @@ class Ideogram4CheckpointModel(ModelLoader):
         from invokeai.backend.ideogram4.modeling_ideogram4 import Ideogram4Config, Ideogram4Transformer
 
         model_path = Path(config.path)
+        source_tensors_mapped = safetensors_backend(model_path) == "mmap"
         target_device = TorchDevice.choose_torch_device()
         model_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
 
@@ -496,7 +497,7 @@ class Ideogram4CheckpointModel(ModelLoader):
                 architecture="Ideogram 4",
                 reserve=self._ram_cache.make_room,
                 skip_patterns=skip_patterns,
-                source_tensors_mapped=True,
+                source_tensors_mapped=source_tensors_mapped,
             )
             kept = 0
         else:
@@ -515,7 +516,7 @@ class Ideogram4CheckpointModel(ModelLoader):
                 skip_patterns=skip_patterns,
                 fp8_layers=fp8_layers,
                 nvfp4_payloads={},
-                source_tensors_mapped=True,
+                source_tensors_mapped=source_tensors_mapped,
             )
             if fp8_layers and not keep_fp8:
                 # Neither consumer asked. Fold the scales in: staying quantized would halve VRAM but

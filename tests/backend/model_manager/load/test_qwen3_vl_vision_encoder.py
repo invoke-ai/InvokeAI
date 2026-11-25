@@ -125,6 +125,28 @@ def test_only_the_tower_tensors_are_read(tmp_path: Path) -> None:
     assert set(tensors) == {k for k in state_dict if k.startswith("model.visual.")}
 
 
+def test_mixed_shards_report_only_mmap_tower_storages(tmp_path: Path) -> None:
+    """A pread FP8 shard and mmap dense shard must not be collapsed into one ownership flag."""
+    mmap_path = tmp_path / "model-00001-of-00002.safetensors"
+    pread_path = tmp_path / "model-00002-of-00002.safetensors"
+    mmap_tensor = torch.ones(2, dtype=torch.bfloat16)
+    pread_tensor = torch.zeros(2, dtype=torch.bfloat16)
+    save_file({"model.visual.blocks.0.norm1.weight": mmap_tensor}, str(mmap_path))
+    save_file(
+        {
+            "model.visual.blocks.0.norm2.weight": pread_tensor,
+            "model.language_model.layers.0.mlp.weight": torch.ones(4, 4, dtype=torch.float8_e4m3fn),
+        },
+        str(pread_path),
+    )
+
+    mapped_storage_ids: set[int] = set()
+    tensors = read_qwen3vl_visual_tower_tensors([mmap_path, pread_path], mapped_storage_ids)
+
+    assert mapped_storage_ids == {tensors["model.visual.blocks.0.norm1.weight"].untyped_storage().data_ptr()}
+    assert tensors["model.visual.blocks.0.norm2.weight"].untyped_storage().data_ptr() not in mapped_storage_ids
+
+
 def test_the_cache_reserves_the_tower_not_the_file(tmp_path: Path) -> None:
     """`_load_and_cache` reserves `get_size_fs` before the load. Sized by the file, a tower load would evict
     ten times what it needs on the real 4B (0.77 of 8.27 GiB)."""

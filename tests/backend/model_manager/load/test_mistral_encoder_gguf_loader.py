@@ -19,7 +19,7 @@ wrappers the loader has to cope with.
 
 import gc
 from pathlib import Path
-from unittest.mock import MagicMock, call, create_autospec
+from unittest.mock import MagicMock, create_autospec
 
 import gguf
 import numpy as np
@@ -292,9 +292,9 @@ def test_embedding_reservation_covers_live_model_and_checkpoint(tmp_path, monkey
 
     output_bytes = _VOCAB * _HIDDEN * torch.float32.itemsize
     chunk_bytes = 3 * _HIDDEN * torch.float32.itemsize
-    assert ram_cache.make_room.call_args_list == [
-        call(packed_bytes + model_buffer_bytes[0] + output_bytes + PEAK_COPIES * chunk_bytes)
-    ]
+    reservation = ram_cache.make_room.call_args
+    assert reservation.args == (packed_bytes + model_buffer_bytes[0] + output_bytes + PEAK_COPIES * chunk_bytes,)
+    assert reservation.kwargs["host_bytes_needed"] == output_bytes + PEAK_COPIES * chunk_bytes
     assert torch.allclose(model.embed_tokens(torch.tensor([[0, 63]])), torch.full((1, 2, _HIDDEN), _FILL), atol=1e-3)
 
 

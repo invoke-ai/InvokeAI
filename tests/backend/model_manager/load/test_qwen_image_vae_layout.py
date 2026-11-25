@@ -106,7 +106,8 @@ def test_the_original_layout_is_converted_and_float16_is_raised_to_bfloat16() ->
 
     loader._ram_cache.make_room.assert_called_once_with(  # type: ignore[attr-defined]
         sum(tensor.nelement() * tensor.element_size() for tensor in loaded.values()),
-        host_bytes_needed=4,
+        # Safetensors uses mmap-backed source storage, so the widened output is charged while those pages remain live.
+        host_bytes_needed=sum(tensor.nelement() * tensor.element_size() for tensor in loaded.values()),
     )
     assert result is wan.return_value
 

@@ -208,7 +208,7 @@ def test_keeping_fp8_reserves_less_than_folding(
     assert 0 < reserved[True] < reserved[False]
 
 
-def test_the_tokenizer_is_the_bundled_one_and_reserves_nothing(
+def test_the_tokenizer_is_the_bundled_one_and_sizes_its_assets(
     loader: T5EncoderSingleFileLoader, tmp_path: Path
 ) -> None:
     from invokeai.backend.t5.t5_tokenizer import load_bundled_t5_tokenizer
@@ -217,7 +217,10 @@ def test_the_tokenizer_is_the_bundled_one_and_reserves_nothing(
     config = _config(path)
 
     assert loader._load_model(config, SubModelType.Tokenizer2) is load_bundled_t5_tokenizer()
-    assert loader.get_size_fs(config, path, SubModelType.Tokenizer3) == 0
+    from invokeai.backend.model_manager.load.model_util import calc_tokenizer_size_by_fs
+    from invokeai.backend.t5.t5_tokenizer import _TOKENIZER_DIR
+
+    assert loader.get_size_fs(config, path, SubModelType.Tokenizer3) == calc_tokenizer_size_by_fs(_TOKENIZER_DIR)
 
 
 def _device_loader(store, budget, device: str, tmp_path: Path) -> T5EncoderSingleFileLoader:

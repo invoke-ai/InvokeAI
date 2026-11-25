@@ -19,6 +19,7 @@ from invokeai.backend.quantization.int8_convrot import (
     DEQUANTIZE_ROWS_PER_PASS,
     Int4ConvrotLinear,
     Int8ConvrotLinear,
+    _predict_int8_dequant_peak,
     cast_unquantized,
     check_int8_scale_layout,
     drop_unconsumed_quantization_sidecars,
@@ -424,6 +425,40 @@ class TestTheSharedInstall:
             f"{path}.weight_scale": torch.ones(4, 1),
         }
 
+    def test_empty_mapped_storage_collection_matches_owned_source_accounting(self) -> None:
+        sd = {
+            f"layer_{index}.{suffix}": tensor
+            for index in range(3)
+            for suffix, tensor in (
+                ("weight", torch.empty(100, dtype=torch.int8)),
+                ("weight_scale", torch.empty(100, dtype=torch.float32)),
+            )
+        }
+        quantized = {f"layer_{index}": {"format": "int8_tensorwise"} for index in range(3)}
+
+        owned = _predict_int8_dequant_peak(sd, quantized, {}, torch.float32, 3 * 500)
+        empty_collection = _predict_int8_dequant_peak(
+            sd, quantized, {}, torch.float32, 3 * 500, source_tensors_mapped=set()
+        )
+
+        assert empty_collection == owned
+
+    def test_mixed_mapped_storage_releases_owned_sources_after_each_decode(self) -> None:
+        sd = {
+            f"layer_{index}.{suffix}": tensor
+            for index in range(3)
+            for suffix, tensor in (
+                ("weight", torch.empty(100, dtype=torch.int8)),
+                ("weight_scale", torch.empty(100, dtype=torch.float32)),
+            )
+        }
+        quantized = {f"layer_{index}": {"format": "int8_tensorwise"} for index in range(3)}
+        mapped = {sd["layer_0.weight"].untyped_storage().data_ptr()}
+
+        peak = _predict_int8_dequant_peak(sd, quantized, {}, torch.float32, 3 * 500, source_tensors_mapped=mapped)
+
+        assert peak == (3 * -100, 2300, 3 * 400)
+
     def test_a_foreign_scale_is_refused_before_a_single_byte_is_reserved(self) -> None:
         """The reservation is the expensive step -- it evicts other models to make room. A load that
         is about to be refused must not first ask the cache to free memory for it."""
@@ -742,6 +777,226 @@ class TestTheSharedInstall:
         dense_cast = dense_elements * torch.bfloat16.itemsize
         expected_host = max(2 * output_bytes + decode_scratch, decoded_outputs + dense_cast + 2048)
         assert asked == [(decoded_outputs + dense_cast, {"host_bytes_needed": expected_host})]
+
+    def test_mixed_mapped_sources_keep_mapped_decode_output_in_cast_peak(self) -> None:
+        """A mapped decode and an owned decode share one admission; mapped source bytes are not an owned baseline."""
+        model = self._model()
+        model.dense = torch.nn.Linear(100_000, 1, bias=False)
+        sd = {
+            **self._int8_layer("keeps"),
+            **self._int8_layer("widens"),
+            "dense.weight": torch.ones(1, 100_000, dtype=torch.float32),
+        }
+        mapped_storage_ids = {
+            sd["keeps.weight"].untyped_storage().data_ptr(),
+            sd["keeps.weight_scale"].untyped_storage().data_ptr(),
+        }
+        asked: list[tuple[int, dict[str, int]]] = []
+
+        def reserve(bytes_needed: int, **kwargs: int) -> None:
+            asked.append((bytes_needed, kwargs))
+
+        install_int8_convrot_layers(
+            model,
+            sd,
+            {"keeps": MARKER, "widens": MARKER},
+            torch.bfloat16,
+            architecture="mixed-storage",
+            reserve=reserve,
+            skip_patterns=("keeps", "widens"),
+            source_tensors_mapped=mapped_storage_ids,
+        )
+
+        # Anonymous input is the owned widens payload (1040 B) plus dense fp32 (400000 B). The mapped
+        # keeps decode contributes 2048 B to the live output, so the dense cast peak needs 203056 B headroom.
+        assert asked == [(204096, {"host_bytes_needed": 203056})]
+
+    def test_mapped_int8_weight_with_owned_scale_keeps_scale_in_decode_peak(self) -> None:
+        model = self._model()
+        sd = self._int8_layer("widens")
+        mapped_storage_ids = {sd["widens.weight"].untyped_storage().data_ptr()}
+        asked: list[tuple[int, dict[str, int]]] = []
+
+        def reserve(bytes_needed: int, **kwargs: int) -> None:
+            asked.append((bytes_needed, kwargs))
+
+        install_int8_convrot_layers(
+            model,
+            sd,
+            {"widens": MARKER},
+            torch.float32,
+            architecture="mixed-storage",
+            reserve=reserve,
+            skip_patterns=("widens",),
+            source_tensors_mapped=mapped_storage_ids,
+        )
+
+        # The mapped code bytes are reclaimable, but the owned scale remains live throughout decode.
+        assert asked == [(4 * CONVROT_GROUP_SIZE * 4, {"host_bytes_needed": 9216})]
+
+    def test_owned_int8_weight_with_mapped_scale_keeps_mapped_sidecar_in_decode_peak(self) -> None:
+        model = self._model()
+        sd = self._int8_layer("widens")
+        mapped_storage_ids = {sd["widens.weight_scale"].untyped_storage().data_ptr()}
+        asked: list[tuple[int, dict[str, int]]] = []
+
+        def reserve(bytes_needed: int, **kwargs: int) -> None:
+            asked.append((bytes_needed, kwargs))
+
+        install_int8_convrot_layers(
+            model,
+            sd,
+            {"widens": MARKER},
+            torch.float32,
+            architecture="mixed-storage",
+            reserve=reserve,
+            skip_patterns=("widens",),
+            source_tensors_mapped=mapped_storage_ids,
+        )
+
+        # The mapped scale remains resident while the owned int8 weight is decoded.
+        assert asked == [(4 * CONVROT_GROUP_SIZE * 4, {"host_bytes_needed": 8208})]
+
+    def test_owned_int8_source_is_released_before_dense_cast(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        import weakref
+
+        import invokeai.backend.quantization.int8_convrot as int8_module
+
+        model = self._model()
+        model.dense = torch.nn.Linear(100_000, 1, bias=False)
+        sd = {**self._int8_layer("widens"), "dense.weight": torch.ones(1, 100_000, dtype=torch.float32)}
+        # Leave the owned weight last; the accounting loop must not retain its local reference.
+        sd["widens.weight"] = sd.pop("widens.weight")
+        source_ref = weakref.ref(sd["widens.weight"])
+        mapped_storage_ids = {sd["widens.weight_scale"].untyped_storage().data_ptr()}
+        asked: list[tuple[int, dict[str, int]]] = []
+
+        def reserve(bytes_needed: int, **kwargs: int) -> None:
+            asked.append((bytes_needed, kwargs))
+
+        original_cast = int8_module.cast_unquantized
+
+        def cast_and_check(state_dict: dict[str, torch.Tensor], dtype: torch.dtype, quantized: dict) -> None:
+            assert source_ref() is None
+            original_cast(state_dict, dtype, quantized)
+
+        monkeypatch.setattr(int8_module, "cast_unquantized", cast_and_check)
+
+        install_int8_convrot_layers(
+            model,
+            sd,
+            {"widens": MARKER},
+            torch.bfloat16,
+            architecture="mixed-storage",
+            reserve=reserve,
+            skip_patterns=("widens",),
+            source_tensors_mapped=mapped_storage_ids,
+        )
+
+        # Dense cast and int8 decode overlap; the mapped scale is still live in the output phase.
+        assert asked == [(202_048, {"host_bytes_needed": 201_024})]
+
+    def test_mapped_decode_keeps_follow_on_install_outputs_live(self) -> None:
+        model = self._model()
+        sd = self._int8_layer("widens")
+        mapped_storage_ids = {tensor.untyped_storage().data_ptr() for tensor in sd.values()}
+        asked: list[tuple[int, dict[str, int]]] = []
+
+        def reserve(bytes_needed: int, **kwargs: int) -> None:
+            asked.append((bytes_needed, kwargs))
+
+        install_int8_convrot_layers(
+            model,
+            sd,
+            {"widens": MARKER},
+            torch.bfloat16,
+            architecture="mixed-storage",
+            reserve=reserve,
+            skip_patterns=("widens",),
+            source_tensors_mapped=mapped_storage_ids,
+            extra_host_bytes=100_000,
+        )
+
+        # The decoded bf16 output remains live while the next quantized family installs its payloads.
+        assert asked == [(2_048, {"host_bytes_needed": 102_048})]
+
+    def test_dense_cast_outputs_overlap_follow_on_install(self) -> None:
+        model = self._model()
+        model.dense = torch.nn.Linear(100_000, 1, bias=False)
+        sd = {**self._int8_layer("widens"), "dense.weight": torch.ones(1, 100_000, dtype=torch.float32)}
+        mapped_storage_ids = {sd["widens.weight_scale"].untyped_storage().data_ptr()}
+        asked: list[tuple[int, dict[str, int]]] = []
+
+        def reserve(bytes_needed: int, **kwargs: int) -> None:
+            asked.append((bytes_needed, kwargs))
+
+        install_int8_convrot_layers(
+            model,
+            sd,
+            {"widens": MARKER},
+            torch.bfloat16,
+            architecture="mixed-storage",
+            reserve=reserve,
+            skip_patterns=("widens",),
+            source_tensors_mapped=mapped_storage_ids,
+            extra_host_bytes=100_000,
+        )
+
+        # The owned dense source is released before the follow-on phase; the earlier cast peak still dominates.
+        assert asked == [(202_048, {"host_bytes_needed": 201_024})]
+
+    def test_mapped_dense_cast_output_overlaps_follow_on_install(self) -> None:
+        model = self._model()
+        model.dense = torch.nn.Linear(100_000, 1, bias=False)
+        sd = {**self._int8_layer("widens"), "dense.weight": torch.ones(1, 100_000, dtype=torch.float32)}
+        mapped_storage_ids = {tensor.untyped_storage().data_ptr() for tensor in sd.values()}
+        asked: list[tuple[int, dict[str, int]]] = []
+
+        def reserve(bytes_needed: int, **kwargs: int) -> None:
+            asked.append((bytes_needed, kwargs))
+
+        install_int8_convrot_layers(
+            model,
+            sd,
+            {"widens": MARKER},
+            torch.bfloat16,
+            architecture="mixed-storage",
+            reserve=reserve,
+            skip_patterns=("widens",),
+            source_tensors_mapped=mapped_storage_ids,
+            extra_host_bytes=100_000,
+        )
+
+        # Mapped dense input is reclaimable, so its private bf16 output remains live with decode output and scratch.
+        assert asked == [(202_048, {"host_bytes_needed": 302_048})]
+
+    def test_mapped_decode_peak_keeps_owned_dense_sources_live(self) -> None:
+        """Mapped int8 decode scratch is additional to unrelated pread tensors still held by the state dict."""
+        model = self._model()
+        model.dense = torch.nn.Linear(CONVROT_GROUP_SIZE * 16, 1, bias=False)
+        sd = {**self._int8_layer("widens"), "dense.weight": torch.ones(1, CONVROT_GROUP_SIZE * 16)}
+        mapped_storage_ids = {
+            sd["widens.weight"].untyped_storage().data_ptr(),
+            sd["widens.weight_scale"].untyped_storage().data_ptr(),
+        }
+        asked: list[tuple[int, dict[str, int]]] = []
+
+        def reserve(bytes_needed: int, **kwargs: int) -> None:
+            asked.append((bytes_needed, kwargs))
+
+        install_int8_convrot_layers(
+            model,
+            sd,
+            {"widens": MARKER},
+            torch.float32,
+            architecture="mixed-storage",
+            reserve=reserve,
+            skip_patterns=("widens",),
+            source_tensors_mapped=mapped_storage_ids,
+        )
+
+        # The dense fp32 source remains live while the mapped layer allocates its 8192-byte fp32 decode peak.
+        assert asked == [(4 * CONVROT_GROUP_SIZE * 4 + 16 * CONVROT_GROUP_SIZE * 4, {"host_bytes_needed": 8192})]
 
     def test_a_mixed_int8_and_int4_file_installs_each_layer_in_its_own_storage(self) -> None:
         """The published int4 builds are all mixed: some layers int8, the sensitive ones kept wider. Each layer is

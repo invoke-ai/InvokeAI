@@ -2,7 +2,7 @@
 
 import logging
 from contextlib import contextmanager
-from threading import Event, RLock, Thread, get_ident
+from threading import Event, RLock, Thread
 from types import SimpleNamespace
 
 import numpy as np
@@ -386,46 +386,30 @@ def test_the_fit_check_offloads_under_the_model_load_read_lock_and_loads_and_loc
     assert _model_load_lock_state() is None
 
 
-def test_fit_check_completes_when_qwen_holds_admission_during_checkpoint_read(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Preview admission must precede MODEL_LOAD_LOCK, so Qwen's checkpoint/read-to-write transition cannot cycle."""
+def test_fit_check_and_writer_use_one_lock_order(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A preview read lock must be acquired before integrated-CUDA admission, matching model construction."""
     admission = RLock()
     timeout = 1.0
-    checkpoint_reading = Event()
-    preview_started = Event()
-    preview_waiting_for_admission = Event()
+    preview_admission_acquired = Event()
     qwen_write_acquired = Event()
     preview_done = Event()
     errors: list[BaseException] = []
-    admission_owner: int | None = None
 
     @contextmanager
     def bounded_admission(_device: torch.device):
-        nonlocal admission_owner
-        if admission_owner is not None and admission_owner != get_ident():
-            preview_waiting_for_admission.set()
         if not admission.acquire(timeout=timeout):
             raise TimeoutError("integrated CUDA admission lock did not become available")
-        previous_owner = admission_owner
-        admission_owner = get_ident()
+        preview_admission_acquired.set()
         try:
+            # Under the old admission -> read order, let the writer acquire its lock first. The writer's
+            # bounded admission then times out, so this regression fails without leaving a global lock held.
+            if _model_load_lock_state() is None:
+                assert qwen_write_acquired.wait(timeout=timeout), "writer did not reach the lock boundary"
             yield
         finally:
-            admission_owner = previous_owner
             admission.release()
 
     monkeypatch.setattr(tiny_autoencoder_previews, "integrated_cuda_admission_lock", bounded_admission)
-
-    original_read_lock = MODEL_LOAD_LOCK.read_lock
-
-    @contextmanager
-    def tracked_read_lock():
-        assert admission_owner == get_ident(), "preview entered MODEL_LOAD_LOCK before integrated CUDA admission"
-        with original_read_lock():
-            yield
-
-    monkeypatch.setattr(MODEL_LOAD_LOCK, "read_lock", tracked_read_lock)
 
     loaded = _LoadedModel(_decoder(), device="cuda")
     load = _Load(loaded, vram_available=loaded.weight_bytes)
@@ -440,18 +424,16 @@ def test_fit_check_completes_when_qwen_holds_admission_during_checkpoint_read(
 
     def qwen_checkpoint_and_load() -> None:
         try:
-            with tiny_autoencoder_previews.integrated_cuda_admission_lock(torch.device("cuda")):
-                checkpoint_reading.set()
-                assert preview_started.wait(timeout=timeout)
-                preview_waiting_for_admission.wait(timeout=timeout)
-                with MODEL_LOAD_LOCK.write_lock():
-                    qwen_write_acquired.set()
+            assert preview_admission_acquired.wait(timeout=timeout), "preview did not reach admission"
+            with MODEL_LOAD_LOCK.write_lock():
+                qwen_write_acquired.set()
+                with tiny_autoencoder_previews.integrated_cuda_admission_lock(torch.device("cuda")):
+                    pass
         except BaseException as error:
             errors.append(error)
 
     def render_preview() -> None:
         try:
-            preview_started.set()
             assert previews._fits_in_vram(loaded, 0)
         except BaseException as error:
             errors.append(error)
@@ -461,7 +443,6 @@ def test_fit_check_completes_when_qwen_holds_admission_during_checkpoint_read(
     qwen = Thread(target=qwen_checkpoint_and_load, daemon=True)
     preview = Thread(target=render_preview, daemon=True)
     qwen.start()
-    assert checkpoint_reading.wait(timeout=timeout)
     preview.start()
     preview.join(timeout=timeout * 3)
     qwen.join(timeout=timeout * 3)

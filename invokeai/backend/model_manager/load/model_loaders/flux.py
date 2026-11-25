@@ -82,6 +82,7 @@ from invokeai.backend.model_manager.load.model_loaders.flux2_state_dict_utils im
     convert_flux2_vae_bfl_to_diffusers,
 )
 from invokeai.backend.model_manager.load.model_loaders.generic_diffusers import GenericDiffusersLoader
+from invokeai.backend.model_manager.load.model_util import calc_tokenizer_size_by_fs
 from invokeai.backend.model_manager.model_on_disk import read_safetensors_header
 from invokeai.backend.model_manager.taxonomy import (
     AnyModel,
@@ -118,6 +119,7 @@ from invokeai.backend.quantization.fp8_scaled import (
     parse_quantization_metadata,
     read_safetensors_metadata,
     reject_quantized_side_channel,
+    safetensors_backend,
     should_keep_fp8_weights,
     split_fp8_scaled_layers,
     strip_layer_path_prefix,
@@ -141,6 +143,7 @@ from invokeai.backend.t5.t5_encoder import (
     make_t5_feed_forward_safe,
     t5_dtype_for_device,
 )
+from invokeai.backend.t5.t5_tokenizer import _TOKENIZER_DIR as _T5_TOKENIZER_DIR
 from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.backend.util.silence_warnings import SilenceWarnings
 from invokeai.backend.util.state_dict_loading import load_state_dict_ignoring_extras
@@ -434,7 +437,9 @@ class CLIPSingleFileLoader(ModelLoader):
         )
 
     def _load_text_encoder(self, config: CLIPEmbed_Checkpoint_Config_Base) -> AnyModel:
-        sd = load_safetensors_checkpoint(Path(config.path))
+        model_path = Path(config.path)
+        source_tensors_mapped = safetensors_backend(model_path) == "mmap"
+        sd = load_safetensors_checkpoint(model_path)
         text_config = clip_text_config(config.variant)
         model: CLIPTextModel | CLIPTextModelWithProjection
         with accelerate.init_empty_weights():
@@ -453,7 +458,7 @@ class CLIPSingleFileLoader(ModelLoader):
             model=model,
             fp8_layers={},
             nvfp4_payloads={},
-            source_tensors_mapped=True,
+            source_tensors_mapped=source_tensors_mapped,
         )
         cast_state_dict(sd, self._torch_dtype, keep_fp8=False)
         # Ignored: `logit_scale` and a CLIP-L projection, which belong to the full CLIP model, and the persistent
@@ -465,6 +470,13 @@ class CLIPSingleFileLoader(ModelLoader):
 @ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.T5Encoder, format=ModelFormat.BnbQuantizedLlmInt8b)
 class BnbQuantizedLlmInt8bCheckpointModel(ModelLoader):
     """Class to load main models."""
+
+    def get_size_fs(
+        self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
+    ) -> int:
+        if submodel_type in (SubModelType.Tokenizer2, SubModelType.Tokenizer3):
+            return _local_t5_tokenizer_size(model_path)
+        return super().get_size_fs(config, model_path, submodel_type)
 
     def _load_model(
         self,
@@ -537,6 +549,14 @@ class _T5DtypeByDevice(ModelLoader):
         return ""
 
 
+def _bundled_t5_tokenizer_size() -> int:
+    return calc_tokenizer_size_by_fs(_T5_TOKENIZER_DIR)
+
+
+def _local_t5_tokenizer_size(path: Path) -> int:
+    return calc_tokenizer_size_by_fs(path, "tokenizer_2")
+
+
 @ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.T5Encoder, format=ModelFormat.T5Encoder)
 class T5EncoderCheckpointModel(_T5DtypeByDevice):
     """Load a T5 encoder from a Diffusers folder, in float32 on the CPU and `choose_bfloat16_safe_dtype`'s dtype
@@ -545,6 +565,8 @@ class T5EncoderCheckpointModel(_T5DtypeByDevice):
     def get_size_fs(
         self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
     ) -> int:
+        if submodel_type in (SubModelType.Tokenizer2, SubModelType.Tokenizer3):
+            return _local_t5_tokenizer_size(model_path)
         if submodel_type in (SubModelType.TextEncoder2, SubModelType.TextEncoder3):
             # The cache makes room for this size before the build, so it is sized at the dtype the encoder is built in
             # (`_t5_dtype`), whatever the folder stores: a bf16 folder built in float32 on the CPU is twice its size on
@@ -593,6 +615,14 @@ class T5EncoderCheckpointModel(_T5DtypeByDevice):
 @ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.T5Encoder, format=ModelFormat.SDNQQuantized)
 class T5EncoderSDNQLoader(ModelLoader):
     """Class to load SDNQ-quantized T5 Encoder models."""
+
+    def get_size_fs(
+        self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
+    ) -> int:
+        if submodel_type in (SubModelType.Tokenizer2, SubModelType.Tokenizer3):
+            tokenizer_dir = T5Encoder_SDNQ_Config.resolve_tokenizer_dir(model_path)
+            return calc_tokenizer_size_by_fs(tokenizer_dir) if tokenizer_dir is not None else 0
+        return super().get_size_fs(config, model_path, submodel_type)
 
     def _load_model(
         self,
@@ -658,8 +688,7 @@ class T5EncoderGGUFModel(_T5DtypeByDevice):
     ) -> int:
         # GGUF files use the vendored tokenizer, so size the assets that the tokenizer actually reads.
         if submodel_type in (SubModelType.Tokenizer2, SubModelType.Tokenizer3):
-            tokenizer_path = Path(__file__).parents[3] / "t5" / "tokenizer"
-            return sum(file.stat().st_size for file in tokenizer_path.iterdir() if file.is_file())
+            return _bundled_t5_tokenizer_size()
         return super().get_size_fs(config, model_path, submodel_type)
 
     def _load_model(
@@ -771,7 +800,7 @@ class T5EncoderSingleFileLoader(ModelLoader):
         # The tokenizer is bundled, not read from the file: sizing it as the file would make room for the
         # whole encoder and evict models to load a few hundred kilobytes.
         if submodel_type in (SubModelType.Tokenizer2, SubModelType.Tokenizer3):
-            return 0
+            return _bundled_t5_tokenizer_size()
         return super().get_size_fs(config, model_path, submodel_type)
 
     def _storage_format(
@@ -820,6 +849,7 @@ class T5EncoderSingleFileLoader(ModelLoader):
     def _load_text_encoder(self, config: T5Encoder_Checkpoint_Config, submodel_type: SubModelType) -> T5EncoderModel:
         model_path = Path(config.path)
         keep_fp8, model_dtype = self._storage_format(config, submodel_type)
+        source_tensors_mapped = safetensors_backend(model_path) == "mmap"
 
         # The duplicate embedding is never read when `shared` is there to keep.
         sd = load_safetensors_checkpoint(model_path, select=_without_duplicate_t5_embedding)
@@ -848,7 +878,7 @@ class T5EncoderSingleFileLoader(ModelLoader):
             model=model,
             fp8_layers=fp8_layers,
             nvfp4_payloads={},
-            source_tensors_mapped=True,
+            source_tensors_mapped=source_tensors_mapped,
         )
         if keep_fp8:
             # Folds the layers that cannot stay fp8, so the cast below never drops a scale.
@@ -940,6 +970,7 @@ class FluxCheckpointModel(ModelLoader):
     ) -> AnyModel:
         assert isinstance(config, Main_Checkpoint_FLUX_Config)
         model_path = Path(config.path)
+        source_tensors_mapped = safetensors_backend(model_path) == "mmap"
 
         with accelerate.init_empty_weights():
             model = Flux(get_flux_transformers_params(config.variant))
@@ -1021,7 +1052,7 @@ class FluxCheckpointModel(ModelLoader):
                 architecture="FLUX",
                 reserve=self._ram_cache.make_room,
                 skip_patterns=skip_patterns,
-                source_tensors_mapped=True,
+                source_tensors_mapped=source_tensors_mapped,
             )
             load_state_dict_ignoring_extras(model, sd, source="FLUX transformer checkpoint", assign=True)
 
@@ -1048,7 +1079,7 @@ class FluxCheckpointModel(ModelLoader):
             skip_patterns=skip_patterns,
             fp8_layers=fp8_layers,
             nvfp4_payloads={},
-            source_tensors_mapped=True,
+            source_tensors_mapped=source_tensors_mapped,
         )
 
         if fp8_layers and not keep_fp8:
@@ -1341,6 +1372,7 @@ class Flux2CheckpointModel(ModelLoader):
                 "Model configuration type mismatch."
             )
         model_path = Path(config.path)
+        source_tensors_mapped = safetensors_backend(model_path) == "mmap"
 
         # Load state dict
         sd = load_safetensors_checkpoint(model_path)
@@ -1444,7 +1476,7 @@ class Flux2CheckpointModel(ModelLoader):
                     model=None,
                     fp8_layers=fp8_layers,
                     nvfp4_payloads={},
-                    source_tensors_mapped=True,
+                    source_tensors_mapped=source_tensors_mapped,
                 )
 
             if fp8_layers and not keep_fp8:
@@ -1562,7 +1594,7 @@ class Flux2CheckpointModel(ModelLoader):
                 architecture="FLUX.2",
                 reserve=self._ram_cache.make_room,
                 skip_patterns=skip_patterns,
-                source_tensors_mapped=True,
+                source_tensors_mapped=source_tensors_mapped,
             )
         else:
             # The same reservation FLUX.1 makes above, and for the same reason: the split
@@ -1579,7 +1611,7 @@ class Flux2CheckpointModel(ModelLoader):
                 skip_patterns=skip_patterns,
                 fp8_layers=fp8_layers,
                 nvfp4_payloads={},
-                source_tensors_mapped=True,
+                source_tensors_mapped=source_tensors_mapped,
             )
 
             # Scaled layers the cast would dequantize anyway are folded here, scale applied, so

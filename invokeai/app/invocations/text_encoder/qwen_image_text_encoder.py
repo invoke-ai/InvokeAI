@@ -580,6 +580,15 @@ class QwenImageTextEncoderInvocation(BaseInvocation):
 
             with MODEL_LOAD_LOCK.write_lock():
                 with integrated_cuda_admission_lock(device):
+                    if integrated_cuda and quantized_bytes > 0:
+                        vram_available = context.models.make_room_in_vram_with_write_lock(quantized_bytes)
+                        if vram_available < quantized_bytes:
+                            raise torch.OutOfMemoryError(
+                                f"Only {max(vram_available, 0) / MB:.0f} MB of shared memory could be made available "
+                                f"on {device} for the {self.quantization}-quantized Qwen2.5-VL encoder (~"
+                                f"{quantized_bytes / MB:.0f} MB); refusing construction while shared memory is below "
+                                "the estimated allocation."
+                            )
                     text_encoder = Qwen2_5_VLForConditionalGeneration.from_pretrained(
                         None if state_dict is not None else str(encoder_path),
                         config=model_config,

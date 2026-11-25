@@ -14,6 +14,7 @@ from unittest.mock import MagicMock
 
 import pytest
 import torch
+from safetensors.torch import save_file
 
 from invokeai.backend.model_manager.configs.main import Main_Checkpoint_Krea2_Config, MainModelDefaultSettings
 from invokeai.backend.model_manager.load import load_default
@@ -110,7 +111,7 @@ def _load(monkeypatch: pytest.MonkeyPatch, tmp_path, neighbour: str, fp8_storage
     }
 
     checkpoint_path = tmp_path / "krea2_turbo_nvfp4.safetensors"
-    checkpoint_path.touch()
+    save_file({"_fixture": torch.zeros(1)}, str(checkpoint_path))
     config = Main_Checkpoint_Krea2_Config.model_construct(
         path=str(checkpoint_path),
         name="krea2_turbo_nvfp4",
@@ -201,7 +202,13 @@ def test_one_reservation_counts_the_nvfp4_layers_as_they_are_held(loaded) -> Non
     loaded.loader._ram_cache.make_room.assert_called_once()
     call = loaded.loader._ram_cache.make_room.call_args
     assert call.args == (packed + decoded + dense + neighbour,)
-    assert 0 < call.kwargs["host_bytes_needed"] < call.args[0]
+    # With a dense neighbour every source widens or installs, so mmap pages are reclaimable and the complete
+    # destination total is the host peak. The int8 neighbour remains packed in-place, so its smaller decode peak is
+    # intentionally below the final reservation while still requiring nonzero headroom.
+    if loaded.neighbour == "dense":
+        assert call.kwargs["host_bytes_needed"] == packed + decoded + dense + neighbour
+    else:
+        assert 0 < call.kwargs["host_bytes_needed"] < call.args[0]
 
 
 def test_fp8_storage_casts_the_dense_layers_of_an_nvfp4_build_and_leaves_its_nvfp4_buffers(

@@ -34,6 +34,7 @@ from invokeai.backend.quantization.fp8_scaled import (
     cast_state_dict,
     load_safetensors_checkpoint,
     reject_quantized_side_channel,
+    safetensors_backend,
 )
 from invokeai.backend.quantization.int8_convrot import (
     drop_unconsumed_quantization_sidecars,
@@ -156,7 +157,7 @@ class TextLLMCheckpointLoader(_TextLLMLoader):
                     reserve=self._ram_cache.make_room,
                     what=what,
                     logger=self._logger,
-                    source_tensors_mapped=True,
+                    source_tensors_mapped=safetensors_backend(path) == "mmap",
                 )
                 reject_incomplete_load(model, what=what)
                 return model

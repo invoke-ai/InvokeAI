@@ -165,9 +165,7 @@ def reserve_for_load(
             fold_delta + output_bytes + fold_transient_bytes(tensor, layer.weight_scale),
         )
         fold_delta += output_bytes - (
-            0
-            if source_tensors_retained or _source_is_mapped(tensor, source_tensors_mapped)
-            else tensor.nelement() * tensor.element_size()
+            0 if _source_is_mapped(tensor, source_tensors_mapped) else tensor.nelement() * tensor.element_size()
         )
         fold_output_total += output_bytes
     cast_sd = {
@@ -213,7 +211,7 @@ def reserve_for_load(
         for tensor in cast_sd.values()
         if is_castable_float(tensor)
         and getattr(tensor, "dtype", None) != dtype
-        and (source_tensors_retained or _source_is_mapped(tensor, source_tensors_mapped))
+        and _source_is_mapped(tensor, source_tensors_mapped)
     )
     cloned_mapped_bytes = (
         sum(
@@ -264,10 +262,10 @@ def reserve_for_load(
             for tensor in cast_sd.values()
             if is_castable_float(tensor)
             and getattr(tensor, "dtype", None) != dtype
-            and not (source_tensors_retained or _source_is_mapped(tensor, source_tensors_mapped))
+            and not _source_is_mapped(tensor, source_tensors_mapped)
         )
         cast_phase_peak = max(fold_peak, fold_delta + cast_peak)
-        cast_phase_delta = fold_delta + cast_delta - released_side_channel_bytes
+        cast_phase_delta = fold_delta + cast_delta + mapped_cast_bytes - released_side_channel_bytes
     else:
         cast_phase_peak = fold_delta + cast_peak
         cast_phase_delta = fold_delta + cast_delta - released_side_channel_bytes
@@ -284,5 +282,14 @@ def reserve_for_load(
         cast_phase_peak,
         cast_phase_delta + later_install_peak,
     )
+    if source_tensors_retained and not bool(source_tensors_mapped):
+        # Pread-backed source tensors stay live while the model receives its assigned tensors. The final state dict
+        # therefore has to coexist with the retained source, including values already at the destination dtype.
+        retained_output_bytes = sum(
+            tensor.nelement() * (dtype.itemsize if is_castable_float(tensor) else tensor.element_size())
+            for tensor in state_dict.values()
+            if isinstance(tensor, torch.Tensor) and not tensor.is_meta
+        )
+        host_bytes_needed = max(host_bytes_needed, retained_output_bytes)
     require_ram_headroom(_reserve(reserve, needed, host_bytes_needed), host_bytes_needed)
     return needed

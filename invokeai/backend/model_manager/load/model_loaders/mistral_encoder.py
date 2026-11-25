@@ -50,6 +50,7 @@ from invokeai.backend.model_manager.load.load_default import (
     _model_declared_skip_patterns,
 )
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
+from invokeai.backend.model_manager.load.model_util import calc_tokenizer_size_by_fs
 from invokeai.backend.model_manager.load.quantized_embedding import materialize_quantized_embedding
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.model_manager.taxonomy import (
@@ -79,6 +80,7 @@ from invokeai.backend.quantization.fp8_scaled import (
     parse_quantization_metadata,
     read_safetensors_metadata,
     reject_undecoded_mx_scale,
+    safetensors_backend,
     should_keep_fp8_weights,
     split_fp8_scaled_layers,
     strip_layer_path_prefix,
@@ -743,6 +745,75 @@ def _extract_tekken_bytes(model_path: Path) -> Optional[bytes]:
     return None
 
 
+def _embedded_tekken_size(model_path: Path) -> int:
+    """Return the decoded Tekken byte count from container metadata without reading tensor payloads."""
+    suffix = model_path.suffix.lower()
+    try:
+        if suffix == ".safetensors":
+            from safetensors import safe_open
+
+            with safe_open(str(model_path), framework="pt") as f:
+                if "tekken_model" not in f.keys():
+                    return 0
+                tensor = f.get_slice("tekken_model")
+                if tensor.get_dtype() != "U8":
+                    return 0
+                size = 1
+                for dimension in tensor.get_shape():
+                    size *= dimension
+                return size
+        if suffix == ".gguf":
+            import gguf
+
+            for tensor in gguf.GGUFReader(str(model_path)).tensors:
+                if tensor.name == "tekken_model":
+                    # Embedded GGUF variants store one value per original tokenizer byte; the loader
+                    # converts the payload to one byte per element regardless of its source dtype.
+                    return int(tensor.n_elements)
+    except Exception:
+        return 0
+    return 0
+
+
+_HF_TOKENIZER_VOCABULARY_FILES = (
+    "tokenizer.json",
+    "tokenizer.model",
+    "spiece.model",
+)
+
+
+def _has_hf_tokenizer_vocabulary(tokenizer_dir: Path) -> bool:
+    """Metadata such as ``chat_template.json`` cannot make a local HF probe succeed by itself."""
+    # shortcut: malformed vocabulary files may fall through to a larger candidate; replace with bounded
+    # metadata validation when one exists that does not instantiate the tokenizer before admission.
+    return any((tokenizer_dir / filename).is_file() for filename in _HF_TOKENIZER_VOCABULARY_FILES) or (
+        (tokenizer_dir / "vocab.json").is_file() and (tokenizer_dir / "merges.txt").is_file()
+    )
+
+
+def _mistral_tokenizer_size(model_path: Path) -> int:
+    """Size only the tokenizer asset selected by the loader's local probes."""
+    if model_path.is_file():
+        return _embedded_tekken_size(model_path)
+    tokenizer_dir = model_path / "tokenizer"
+    if tokenizer_dir.is_dir():
+        sibling_tekken = tokenizer_dir / _TEKKEN_FILENAME
+        if sibling_tekken.is_file():
+            return sibling_tekken.stat().st_size
+    root_tekken = model_path / _TEKKEN_FILENAME
+    if root_tekken.is_file():
+        return root_tekken.stat().st_size
+    if tokenizer_dir.is_dir() and _has_hf_tokenizer_vocabulary(tokenizer_dir):
+        tokenizer_size = calc_tokenizer_size_by_fs(tokenizer_dir)
+        if tokenizer_size:
+            return tokenizer_size
+    for checkpoint in sorted((model_path / "text_encoder").glob("*.safetensors")):
+        embedded = _embedded_tekken_size(checkpoint)
+        if embedded:
+            return embedded
+    return calc_tokenizer_size_by_fs(model_path)
+
+
 def _try_load_embedded_tekken(model_path: Path, logger: Any, *, flux2_template: bool) -> Optional[AnyModel]:
     """Extract the embedded Tekken tokenizer in the form this encoder family needs.
 
@@ -1060,6 +1131,13 @@ class MistralEncoderDiffusersLoader(ModelLoader):
     and a standalone download where ``text_encoder/`` files live at the root.
     """
 
+    def get_size_fs(
+        self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
+    ) -> int:
+        if submodel_type is SubModelType.Tokenizer:
+            return _mistral_tokenizer_size(model_path)
+        return super().get_size_fs(config, model_path, submodel_type)
+
     def _load_model(
         self,
         config: AnyModelConfig,
@@ -1126,6 +1204,13 @@ class MistralEncoderDiffusersLoader(ModelLoader):
 )
 class MistralEncoderCheckpointLoader(ModelLoader):
     """Load a Mistral encoder from a single safetensors file (text-only)."""
+
+    def get_size_fs(
+        self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
+    ) -> int:
+        if submodel_type is SubModelType.Tokenizer:
+            return _mistral_tokenizer_size(model_path)
+        return super().get_size_fs(config, model_path, submodel_type)
 
     def _load_model(
         self,
@@ -1274,7 +1359,7 @@ class MistralEncoderCheckpointLoader(ModelLoader):
             skip_patterns=skip_patterns,
             fp8_layers=fp8_layers,
             nvfp4_payloads=nvfp4_payloads,
-            source_tensors_mapped=True,
+            source_tensors_mapped=safetensors_backend(model_path) == "mmap",
         )
 
         if not fp8_layers:
@@ -1345,6 +1430,13 @@ class MistralEncoderCheckpointLoader(ModelLoader):
 )
 class MistralEncoderGGUFLoader(ModelLoader):
     """Load a GGUF-quantized Mistral encoder (text-only)."""
+
+    def get_size_fs(
+        self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
+    ) -> int:
+        if submodel_type is SubModelType.Tokenizer:
+            return _mistral_tokenizer_size(model_path)
+        return super().get_size_fs(config, model_path, submodel_type)
 
     def _load_model(
         self,

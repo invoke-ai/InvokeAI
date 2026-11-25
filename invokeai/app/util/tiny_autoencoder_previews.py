@@ -257,9 +257,9 @@ class TinyAutoencoderPreviews:
         so `_resolve` checks residency again after locking.
 
         The offload is a VRAM move, so it holds MODEL_LOAD_LOCK's read lock like every other: a construction on
-        another worker would otherwise strand the offloaded weights on `meta`. Integrated-CUDA admission wraps
-        MODEL_LOAD_LOCK and the cache's own lock, matching the cache and quantized-loader entry points; only the
-        offload is inside these locks -- `load_model` and the lock take them themselves.
+        another worker would otherwise strand the offloaded weights on `meta`. MODEL_LOAD_LOCK is acquired before
+        integrated-CUDA admission and the cache's own lock, matching the cache and quantized-loader entry points;
+        only the offload is inside these locks -- `load_model` and the lock take them themselves.
         """
         if loaded.compute_device.type == "cpu":
             return True
@@ -267,8 +267,8 @@ class TinyAutoencoderPreviews:
         if missing <= 0:
             return True
         ram_cache = self._services.model_manager.load.ram_cache
-        with integrated_cuda_admission_lock(loaded.compute_device):
-            with MODEL_LOAD_LOCK.read_lock():
+        with MODEL_LOAD_LOCK.read_lock():
+            with integrated_cuda_admission_lock(loaded.compute_device):
                 available = ram_cache.make_room_in_vram(missing, working_mem_bytes=working_mem_bytes)
         return available >= missing
 
