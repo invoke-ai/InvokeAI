@@ -1,13 +1,16 @@
 import re
+from collections import Counter
 from contextlib import AbstractContextManager, ExitStack, contextmanager
-from typing import Dict, Iterable, Optional, Tuple
+from itertools import chain
+from typing import Dict, Iterable, Iterator, Optional, Tuple
 
 import torch
 from transformers import CLIPTextModel
 
 from invokeai.backend.model_manager.load.model_cache.model_cache import MODEL_LOAD_LOCK
-from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch
+from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch, sub_patches
 from invokeai.backend.patches.layers.flux_control_lora_layer import FluxControlLoRALayer
+from invokeai.backend.patches.layers.fused_input_dora_layer import FusedInputDoRALayer, UnsupportedFusedInputDoRABase
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.patches.pad_with_zeros import pad_with_zeros
 from invokeai.backend.util import InvokeAILogger
@@ -46,6 +49,8 @@ class LayerPatcher:
         # modules, and only its first, pre-move placement is the one to restore.
         patch_placements: dict[int, tuple[BaseLayerPatch, torch.device, torch.dtype]] = {}
         cache_pins = ExitStack()
+        # Storage shared with another parameter or buffer, as of before the first patch of this scope.
+        shared_storage: set[int] = set()
         try:
             # Materialize the patch iterable BEFORE acquiring the read lock. Callers pass a lazy
             # generator (e.g. flux_text_encoder._t5_lora_iterator) that constructs each LoRA via
@@ -63,6 +68,8 @@ class LayerPatcher:
                     cache_pins.enter_context(patch_spec[2])
                 materialized_patches.append(patch_spec)
             patches = materialized_patches
+            if patches and not force_sidecar_patching:
+                shared_storage = LayerPatcher._shared_storage_ptrs(model)
             # Patching can register new parameters (FLUX Control LoRA shape expansion routes
             # through nn.Module.register_parameter via setattr). Model construction on another
             # worker thread monkey-patches register_parameter process-wide (accelerate's
@@ -85,6 +92,7 @@ class LayerPatcher:
                         force_direct_patching=force_direct_patching,
                         force_sidecar_patching=force_sidecar_patching,
                         suppress_warning_layers=suppress_warning_layers,
+                        shared_storage=shared_storage,
                     )
 
             yield
@@ -93,7 +101,13 @@ class LayerPatcher:
                 # Restore directly patched layers.
                 for param_key, weight in original_weights.get_changed_weights():
                     cur_param = model.get_parameter(param_key)
-                    cur_param.data = weight.to(dtype=cur_param.dtype, device=cur_param.device, copy=True)
+                    # In place for the same reason as the patch step; a shape-expanded parameter is replaced.
+                    if cur_param.shape == weight.shape and LayerPatcher._can_update_in_place(
+                        cur_param, shared_storage, weight
+                    ):
+                        cur_param.data.copy_(weight)
+                    else:
+                        cur_param.data = weight.to(dtype=cur_param.dtype, device=cur_param.device, copy=True)
 
                 # Clear patches from all patched modules.
                 # Note: This logic assumes no nested modules in original_modules.
@@ -122,12 +136,18 @@ class LayerPatcher:
         force_direct_patching: bool,
         force_sidecar_patching: bool,
         suppress_warning_layers: Optional[re.Pattern] = None,
+        shared_storage: Optional[set[int]] = None,
     ):
         """Apply a single LoRA patch to a model using the 'smart' patching strategy that chooses whether to use direct
         patching or a sidecar wrapper for each module.
         """
         if patch_weight == 0:
             return
+
+        # `shared_storage` is a snapshot taken before the first patch of the scope; it is computed here when the
+        # caller has none. Sidecar patching never writes into a weight.
+        if shared_storage is None:
+            shared_storage = set() if force_sidecar_patching else LayerPatcher._shared_storage_ptrs(model)
 
         # If the layer keys contain a dot, then they are not flattened, and can be directly used to access model
         # submodules. If the layer keys do not contain a dot, then they are flattened, meaning that all '.' have been
@@ -143,7 +163,45 @@ class LayerPatcher:
 
         prefix_len = len(prefix)
 
+        # Bind all projections before changing any of this adapter's weights. The temporary split
+        # patches own the norm; the CPU-cached adapter remains independent of model and generation.
+        layers: dict[str, BaseLayerPatch] = {}
         for layer_key, layer in patch.layers.items():
+            if layer_key.startswith(prefix) and isinstance(layer, FusedInputDoRALayer):
+                # A fused input-axis norm cannot be calculated from a partial group. Check lookup separately
+                # from bind so an AttributeError in the numerical code is not mistaken for a missing target.
+                missing_key = None
+                for key in layer.keys:
+                    try:
+                        model.get_submodule(key)
+                    except AttributeError:
+                        missing_key = f"{prefix}{key}"
+                        break
+                if missing_key is not None:
+                    if not (suppress_warning_layers and suppress_warning_layers.search(missing_key)):
+                        logger = InvokeAILogger.get_logger(LayerPatcher.__name__)
+                        logger.warning("Failed to find module for LoRA layer key: %s", missing_key)
+                    continue
+                base_dtypes = tuple(
+                    dtype
+                    if LayerPatcher._uses_sidecar(
+                        model.get_submodule(key), force_direct_patching, force_sidecar_patching
+                    )
+                    else None
+                    for key in layer.keys
+                )
+                try:
+                    bound = layer.bind(model, base_dtypes)
+                except UnsupportedFusedInputDoRABase as error:
+                    logger = InvokeAILogger.get_logger(LayerPatcher.__name__)
+                    logger.warning("Skipping fused input-axis DoRA group '%s': %s", layer_key, error)
+                    continue
+                for key, split_layer in bound:
+                    layers[f"{prefix}{key}"] = split_layer
+            else:
+                layers[layer_key] = layer
+
+        for layer_key, layer in layers.items():
             if not layer_key.startswith(prefix):
                 continue
 
@@ -170,25 +228,7 @@ class LayerPatcher:
             # and that the caller will set force_sidecar_patching=True if the layer is quantized.
             # TODO(ryand): Handle the case where we are running without a GPU. Should we set a config flag that allows
             # forcing full patching even on the CPU?
-            use_sidecar_patching = False
-            if force_direct_patching and force_sidecar_patching:
-                raise ValueError("Cannot force both direct and sidecar patching.")
-            elif force_sidecar_patching:
-                use_sidecar_patching = True
-            elif LayerPatcher._is_any_part_of_layer_fp8(module):
-                # FP8 weights (e.g. a model loaded with fp8_storage layerwise casting) cannot be
-                # directly patched: _apply_model_layer_patch does an in-place add on the model weight,
-                # and CUDA has no add kernel for float8 ("ufunc_add_CUDA not implemented for
-                # Float8_e4m3fn"). Sidecar patching dequantizes to the compute dtype before any math,
-                # so it works regardless of the storage dtype. This takes precedence over
-                # force_direct_patching, since direct patching is simply not possible on fp8 weights.
-                use_sidecar_patching = True
-            elif force_direct_patching:
-                use_sidecar_patching = False
-            elif module.get_num_patches() > 0:
-                use_sidecar_patching = True
-            elif LayerPatcher._is_any_part_of_layer_on_cpu(module):
-                use_sidecar_patching = True
+            use_sidecar_patching = LayerPatcher._uses_sidecar(module, force_direct_patching, force_sidecar_patching)
 
             if use_sidecar_patching:
                 LayerPatcher._apply_model_layer_wrapper_patch(
@@ -207,7 +247,64 @@ class LayerPatcher:
                     patch=layer,
                     patch_weight=patch_weight,
                     original_weights=original_weights,
+                    shared_storage=shared_storage,
                 )
+
+    @staticmethod
+    def _uses_sidecar(module: torch.nn.Module, force_direct: bool, force_sidecar: bool) -> bool:
+        if force_direct and force_sidecar:
+            raise ValueError("Cannot force both direct and sidecar patching.")
+        if force_sidecar or LayerPatcher._is_any_part_of_layer_fp8(module):
+            return True
+        if force_direct:
+            return False
+        return module.get_num_patches() > 0 or LayerPatcher._is_any_part_of_layer_on_cpu(module)
+
+    @staticmethod
+    def _storage_ptr(tensor: torch.Tensor) -> int:
+        """The address of the tensor's storage, or 0 when it has none to read (meta, sparse, quantized subclasses)."""
+        if tensor.layout is not torch.strided:
+            return 0
+        try:
+            return tensor.untyped_storage().data_ptr()
+        except (NotImplementedError, RuntimeError, AttributeError):
+            return 0
+
+    @staticmethod
+    def _shared_storage_ptrs(model: torch.nn.Module) -> set[int]:
+        """Storage addresses that more than one parameter or buffer of the model points into.
+
+        `parameters()` and `buffers()` list a tensor registered in several modules once, so a weight tied by
+        sharing one `Parameter` is not reported: patching it in place has the same effect as patching it
+        out of place, because both reach every module that holds it. Distinct tensors or views over one
+        storage are reported. `tensor_aliases.storage_key` does not fit: it also keys on offset, dtype and
+        shape, so two different views of one storage get different keys, and those must count as shared.
+        """
+        counts = Counter(LayerPatcher._storage_ptr(t) for t in chain(model.parameters(), model.buffers()))
+        # Address 0 stands for "no storage to read", not for one shared allocation.
+        counts.pop(0, None)
+        return {ptr for ptr, count in counts.items() if count > 1}
+
+    @staticmethod
+    def _can_update_in_place(param: torch.nn.Parameter, shared_storage: set[int], original: torch.Tensor) -> bool:
+        """Whether a directly patched weight may be changed in place and restored in place from `original`.
+
+        A weight on a device is a private copy of the model: the model cache always copies to the device. A CPU
+        weight is the cache's canonical copy (shared across devices, and the keep_ram_copy used to restore the
+        model), so it is replaced instead. Aliases outside `model` are not visible to the scan.
+
+        Storage shared within the model is real: the cache binds tied weights with `load_state_dict(assign=True)`
+        as separate parameters over one tensor (`lm_head` and `embed_tokens` of the Qwen3 encoders, see
+        `tensor_aliases.move_shared`), and an in-place change would also reach the other. Tensor subclasses
+        (GGUF, SDNQ) have no readable memory and are sidecar-patched. A non-contiguous weight is replaced
+        because `add_` rejects overlapping views and `copy_` stages a non-contiguous host-to-device copy in a
+        temporary. `original` must not share memory with the weight, or the patch would change the original too.
+        """
+        data = param.data
+        if data.device.type == "cpu" or type(data) is not torch.Tensor or not data.is_contiguous():
+            return False
+        ptr = LayerPatcher._storage_ptr(data)
+        return ptr not in shared_storage and ptr != LayerPatcher._storage_ptr(original)
 
     @staticmethod
     def _is_any_part_of_layer_on_cpu(layer: torch.nn.Module) -> bool:
@@ -227,6 +324,7 @@ class LayerPatcher:
         patch: BaseLayerPatch,
         patch_weight: float,
         original_weights: OriginalWeightsStorage,
+        shared_storage: set[int],
     ):
         # All of the LoRA weight calculations will be done on the same device as the module weight.
         # (Performance will be best if this is a CUDA device.)
@@ -238,11 +336,12 @@ class LayerPatcher:
         # be significantly faster for 16-bit CPU tensors being moved to a CUDA device than doing the
         # same thing in a single call to '.to(...)'.
         #
-        # `patch` is the model cache's own object, not a copy, and `BaseLayerPatch.to()` rebinds its
-        # tensors in place -- so whatever is done here outlives the patch and is what the cache is
-        # left holding. Both moves are undone in the `finally` below, also on the early return and
-        # when a move, `get_parameters` or the weight update raises.
-        leaf_placements = LayerPatcher._leaf_placements(patch)
+        # to() rebinds a leaf's tensors. Keep the original references so that restoring a
+        # cache-owned patch or a shallow application copy needs no transfers or new buffers.
+        original_tensors = [
+            (leaf, {name: value for name, value in vars(leaf).items() if isinstance(value, torch.Tensor)})
+            for leaf in LayerPatcher._patch_leaves(patch)
+        ]
         try:
             patch.to(device=device)
             patch.to(dtype=torch.float32)
@@ -276,7 +375,7 @@ class LayerPatcher:
                             param_name,
                             torch.nn.Parameter(expanded_weight, requires_grad=module_param.requires_grad),
                         )
-                        # Point at the module's live (expanded) parameter so the out-of-place weight
+                        # Point at the module's live (expanded) parameter so the weight
                         # update below lands on the module. `expanded_weight` is a detached raw tensor;
                         # reassigning its `.data` would not propagate to the newly-set Parameter.
                         module_param = module_to_patch.get_parameter(param_name)
@@ -292,21 +391,26 @@ class LayerPatcher:
 
                 # Convert param_weight to the correct device and dtype, then apply to model weights.
                 param_weight_converted = param_weight.to(device=device, dtype=dtype)
-                # Apply out-of-place (assign a new tensor) rather than an in-place `copy_`. The weight we
-                # are patching may be the model's canonical CPU copy, which is shared across the
-                # per-device model caches in multi-GPU mode (see SharedCpuWeightsStore) and is also the
-                # cache's keep_ram_copy used to restore the model after unpatching. An in-place mutation
-                # here would corrupt that shared/cached tensor — and every other device's view of it.
-                # Reassigning `.data` leaves the original tensor untouched while giving this module the
-                # patched weights, and is memory-equivalent (the in-place form already allocated the
-                # `module_param.data + param_weight_converted` temporary).
-                module_param.data = module_param.data + param_weight_converted
+                # In place on a device, out-of-place otherwise (see `_can_update_in_place`). Bit-identical when the
+                # weight has the compute dtype. A weight of another dtype in a mixed module (an fp32 weight next to
+                # a bf16 bias) is rounded to its own dtype in place, where the sum used to be promoted and stay so.
+                original = original_weights.get(param_key)
+                assert original is not None
+                if LayerPatcher._can_update_in_place(module_param, shared_storage, original):
+                    module_param.data.add_(param_weight_converted)
+                else:
+                    module_param.data = module_param.data + param_weight_converted
         finally:
-            # Back exactly as it came: returning the device but leaving the float32 promotion doubled the
-            # cached record's size for the rest of the process, while the cache went on billing the size
-            # it measured at `put()`.
-            for leaf, leaf_device, leaf_dtype in leaf_placements:
-                leaf.to(device=leaf_device, dtype=leaf_dtype)
+            for leaf, tensors in original_tensors:
+                vars(leaf).update(tensors)
+
+    @staticmethod
+    def _patch_leaves(patch: BaseLayerPatch) -> Iterator[BaseLayerPatch]:
+        children = sub_patches(patch)
+        if not children:
+            yield patch
+        for child in children:
+            yield from LayerPatcher._patch_leaves(child)
 
     @staticmethod
     def _leaf_placements(patch: BaseLayerPatch) -> list[tuple[BaseLayerPatch, torch.device, torch.dtype]]:
@@ -318,16 +422,12 @@ class LayerPatcher:
         sub-patches, alone or in a list or tuple, and those need not share a dtype; so the leaves
         under them are recorded and restored one by one. Leaves without tensors have nothing to restore.
         """
-        sub_patches = [
-            item
-            for value in vars(patch).values()
-            for item in (value if isinstance(value, (list, tuple)) else (value,))
-            if isinstance(item, BaseLayerPatch)
-        ]
-        if sub_patches:
-            return [leaf for sub_patch in sub_patches for leaf in LayerPatcher._leaf_placements(sub_patch)]
-        tensor = next((value for value in vars(patch).values() if isinstance(value, torch.Tensor)), None)
-        return [] if tensor is None else [(patch, tensor.device, tensor.dtype)]
+        placements = []
+        for leaf in LayerPatcher._patch_leaves(patch):
+            tensor = next((value for value in vars(leaf).values() if isinstance(value, torch.Tensor)), None)
+            if tensor is not None:
+                placements.append((leaf, tensor.device, tensor.dtype))
+        return placements
 
     @staticmethod
     @torch.no_grad()

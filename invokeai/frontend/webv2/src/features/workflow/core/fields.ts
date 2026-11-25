@@ -22,14 +22,14 @@ const STATEFUL_FIELD_TYPE_NAMES = new Set([
   'BooleanField',
   'ColorField',
   'EnumField',
+  'FileField',
   'FloatField',
   'FloatGeneratorField',
   'ImageField',
   'ImageGeneratorField',
   'IntegerField',
   'IntegerGeneratorField',
-  // Collection loaders accept scalar or list LoRA fields; edit lists inline without extra selector/collector
-  // nodes.
+  // Collection loaders accept scalar or list LoRA fields; edit lists inline without extra selector/collector nodes.
   'LoRAField',
   'ModelIdentifierField',
   'SchedulerField',
@@ -55,20 +55,16 @@ const MODEL_FIELD_TYPE_NAMES = new Set([
 
 export const isModelFieldType = (type: FieldType): boolean => MODEL_FIELD_TYPE_NAMES.has(type.name);
 
-/** Collection field types with a direct-input list widget; other collections are connection-only. */
 const DIRECT_COLLECTION_FIELD_TYPE_NAMES = new Set(['FloatField', 'ImageField', 'IntegerField', 'StringField']);
 
-/** A list the editor can author item by item. */
 export const isEditableCollectionFieldType = (type: FieldType): boolean =>
   type.cardinality === 'COLLECTION' && DIRECT_COLLECTION_FIELD_TYPE_NAMES.has(type.name);
 
-/** True when the field renders an editable control on the node / linear form. */
 export const isDirectInputField = (template: FieldInputTemplate): boolean =>
   template.input !== 'connection' &&
   isStatefulFieldType(template.type) &&
   (template.type.cardinality !== 'COLLECTION' || isEditableCollectionFieldType(template.type));
 
-/** A field can be exposed to the Linear UI when it can be edited directly. */
 export const isExposableField = (template: FieldInputTemplate): boolean => isDirectInputField(template);
 
 /** Direct numeric fields whose bounds admit at least one value; shuffling any other would write an invalid one. */
@@ -94,10 +90,8 @@ export const finiteNumberOrNull = (value: number | null | undefined): number | n
 const exactStepIndex = (value: number, step: number): number | null => {
   const quotient = value / step;
   const nearest = Math.round(quotient);
-  // How far the quotient may sit from an integer and still count, relative to its size so float noise scales with
-  // it: 0.3 / 0.1 is 2.9999…, and 1.001 / 0.001 is 1000.9999…; both are multiples. Evaluated here rather than at
-  // module scope: a top-level global member access marks this module side-effectful, which keeps the workflow
-  // barrels that re-export through it from being tree-shaken and pulls their other chunks into the Launchpad.
+  // Relative tolerance: 0.3 / 0.1 is 2.9999…, still a multiple. Not at module scope: a top-level global member access
+  // marks the module side-effectful, which stops barrel tree-shaking and pulls workflow chunks into the Launchpad.
   const tolerance = Number.EPSILON * 100 * Math.max(1, Math.abs(quotient));
 
   return Math.abs(quotient - nearest) <= tolerance ? nearest : null;
@@ -113,12 +107,7 @@ export interface WorkflowFieldStepIndexBounds {
   last: number | null;
 }
 
-/**
- * Which multiples of `step` (counted from zero, as validation counts them) lie inside the template's bounds, as the
- * indices of the first and last. Shuffle and the slider track both read this, so neither offers a value the node
- * would reject: a field stepping by 8 between 1 and 100 admits 8…96, and one stepping by 8 between 1 and 7 none
- * (`first` exceeds `last`).
- */
+/** First and last step multiples (counted from zero) inside the bounds; `first` exceeds `last` when none fit. */
 export const getWorkflowFieldStepIndexBounds = (
   template: FieldInputTemplate,
   step: number
@@ -144,10 +133,7 @@ export const getWorkflowFieldStepIndexBounds = (
   };
 };
 
-/**
- * False when the bounds admit no multiple of the field's step (every integer, for an integer field without one), so
- * no value passes validation: a field stepping by 8 between 1 and 7. Fields without a step admit any value in range.
- */
+/** False when the bounds admit no multiple of the field's step (every integer for an integer field without one). */
 export const admitsWorkflowFieldStepValue = (template: FieldInputTemplate): boolean => {
   const multipleOf = finiteNumberOrNull(template.multipleOf);
   const step = multipleOf !== null && multipleOf > 0 ? multipleOf : template.type.name === 'IntegerField' ? 1 : null;
@@ -178,8 +164,6 @@ export const getRandomWorkflowFieldValue = (template: FieldInputTemplate, random
     return min + random() * (max - min);
   }
 
-  // Draw among the step multiples that lie inside the bounds (exclusive ends excluded), so the
-  // result is always valid.
   const bounds = getWorkflowFieldStepIndexBounds(template, step);
   const first = bounds.first ?? 0;
   const last = bounds.last ?? Math.floor(SEED_MAX / step);
@@ -212,7 +196,6 @@ const isNonEmptyString = (value: unknown): value is string => typeof value === '
 const hasNonEmptyStringProp = (value: unknown, prop: string): boolean =>
   typeof value === 'object' && value !== null && isNonEmptyString((value as Record<string, unknown>)[prop]);
 
-/** The id inside a record-reference value such as `{ style_preset_id }`, or null when absent. */
 export const getFieldRecordId = (value: unknown, prop: string): string | null =>
   hasNonEmptyStringProp(value, prop) ? ((value as Record<string, string>)[prop] as string) : null;
 
@@ -223,8 +206,8 @@ export interface LoraFieldCollectionEntry {
 }
 
 /**
- * The Generate LoRA weight bounds, restated: `@features/generation/settings` is side-effectful and would pull the
- * Generate settings core into the workflow boot graph. A core test pins the two together.
+ * Restates Generate's LoRA weight bounds: importing `@features/generation/settings` would pull it into the workflow
+ * boot graph. A core test pins the two together.
  */
 export const LORA_FIELD_WEIGHT_RANGE = { max: 10, min: -10 } as const;
 
@@ -266,10 +249,7 @@ const getLoraCollectionInvalidReason = (items: readonly unknown[]): string | nul
   return null;
 };
 
-/**
- * Normalize absent/scalar/list values into lists without discarding unreadable entries, which subsequent edits
- * must preserve.
- */
+/** Normalizes to a list without discarding unreadable entries, which later edits must preserve. */
 export const toLoraFieldCollectionList = (value: unknown): unknown[] => {
   if (Array.isArray(value)) {
     return value;
@@ -324,7 +304,6 @@ const isStringFieldValueValid = (template: FieldInputTemplate, value: unknown): 
   return (minLength === null || value.length >= minLength) && (maxLength === null || value.length <= maxLength);
 };
 
-/** One entry of an editable list, judged by the template's per-item rules. */
 export const isWorkflowCollectionItemValid = (template: FieldInputTemplate, item: unknown): boolean => {
   switch (template.type.name) {
     case 'StringField':
@@ -423,8 +402,7 @@ export const isWorkflowFieldValueValid = (template: FieldInputTemplate, value: u
     case 'ModelIdentifierField':
       return hasNonEmptyStringProp(value, 'key');
     case 'LoRAField':
-      // An empty list is a legitimate value: a collection loader with no LoRAs passes its
-      // models through untouched.
+      // An empty list is a legitimate value: a collection loader with no LoRAs passes its models through untouched.
       return (
         (Array.isArray(value) || isLoraFieldCollectionEntry(value)) &&
         getLoraCollectionInvalidReason(toLoraFieldCollectionList(value)) === null
@@ -443,11 +421,12 @@ export const isWorkflowFieldValueValid = (template: FieldInputTemplate, value: u
         value === 'none' ||
         hasNonEmptyStringProp(value, 'board_id')
       );
+    case 'FileField':
+      return hasNonEmptyStringProp(value, 'file_id');
     case 'ImageField':
       return hasNonEmptyStringProp(value, 'image_name');
     case 'VideoField':
-      // COLLECTION video values are arrays no direct-input widget authors; keep the
-      // generic non-null check so persisted values (imported workflows) stay valid.
+      // No widget authors COLLECTION video values; the generic non-null check keeps imported ones valid.
       if (template.type.cardinality === 'COLLECTION') {
         return value !== undefined && value !== null;
       }
@@ -462,7 +441,20 @@ export const isWorkflowFieldValueValid = (template: FieldInputTemplate, value: u
 
 const isEmptyOptionalValue = (value: unknown): boolean => value === undefined || value === null || value === '';
 
-export const getWorkflowFieldInvalidReason = ({
+export type WorkflowFieldIssueKind = 'invalidValue' | 'missingConnection' | 'missingValue';
+
+export interface WorkflowFieldIssue {
+  kind: WorkflowFieldIssueKind;
+  reason: string;
+}
+
+const MISSING_CONNECTION: WorkflowFieldIssue = { kind: 'missingConnection', reason: 'Required connection.' };
+const MISSING_VALUE: WorkflowFieldIssue = { kind: 'missingValue', reason: 'Required value.' };
+
+const toInvalidValueIssue = (reason: string | null): WorkflowFieldIssue | null =>
+  reason === null ? null : { kind: 'invalidValue', reason };
+
+export const getWorkflowFieldIssue = ({
   isConnected,
   template,
   value,
@@ -470,7 +462,7 @@ export const getWorkflowFieldInvalidReason = ({
   isConnected: boolean;
   template: FieldInputTemplate;
   value: unknown;
-}): string | null => {
+}): WorkflowFieldIssue | null => {
   if (isConnected) {
     return null;
   }
@@ -481,11 +473,11 @@ export const getWorkflowFieldInvalidReason = ({
 
   // An editable list reports which count or entry rule it breaks; the generic reasons cannot say.
   if (template.type.cardinality === 'COLLECTION' && Array.isArray(value) && isDirectInputField(template)) {
-    return getCollectionInvalidReason(template, value);
+    return toInvalidValueIssue(getCollectionInvalidReason(template, value));
   }
 
   if (template.type.name === 'LoRAField' && isDirectInputField(template) && !isEmptyOptionalValue(value)) {
-    return getLoraCollectionInvalidReason(toLoraFieldCollectionList(value));
+    return toInvalidValueIssue(getLoraCollectionInvalidReason(toLoraFieldCollectionList(value)));
   }
 
   if (
@@ -495,15 +487,17 @@ export const getWorkflowFieldInvalidReason = ({
   ) {
     const generator = parseWorkflowGeneratorValue(template.type.name, value);
 
-    return generator === null ? 'Invalid value.' : getWorkflowGeneratorInvalidReason(generator);
+    return toInvalidValueIssue(generator === null ? 'Invalid value.' : getWorkflowGeneratorInvalidReason(generator));
   }
 
   if (!template.required) {
-    return isDirectInputField(template) && !isWorkflowFieldValueValid(template, value) ? 'Invalid value.' : null;
+    return isDirectInputField(template) && !isWorkflowFieldValueValid(template, value)
+      ? toInvalidValueIssue('Invalid value.')
+      : null;
   }
 
   if (template.input === 'connection') {
-    return 'Required connection.';
+    return MISSING_CONNECTION;
   }
 
   if (isWorkflowFieldValueValid(template, value)) {
@@ -511,11 +505,14 @@ export const getWorkflowFieldInvalidReason = ({
   }
 
   if (!isDirectInputField(template)) {
-    return 'Required connection.';
+    return MISSING_CONNECTION;
   }
 
-  return isEmptyOptionalValue(value) ? 'Required value.' : 'Invalid value.';
+  return isEmptyOptionalValue(value) ? MISSING_VALUE : toInvalidValueIssue('Invalid value.');
 };
+
+export const getWorkflowFieldInvalidReason = (field: Parameters<typeof getWorkflowFieldIssue>[0]): string | null =>
+  getWorkflowFieldIssue(field)?.reason ?? null;
 
 // Raw hex (not Chakra tokens) because xyflow handles are styled inline.
 const FIELD_TYPE_COLORS: Record<string, string> = {
@@ -528,6 +525,7 @@ const FIELD_TYPE_COLORS: Record<string, string> = {
   ControlField: '#5eead4',
   DenoiseMaskField: '#93c5fd',
   EnumField: '#60a5fa',
+  FileField: '#22d3ee',
   FloatField: '#fb923c',
   ImageField: '#c4b5fd',
   IntegerField: '#f87171',
@@ -543,7 +541,6 @@ const FIELD_TYPE_COLORS: Record<string, string> = {
 
 const FALLBACK_COLORS = ['#06b6d4', '#a855f7', '#22c55e', '#f97316', '#ec4899', '#0d9488'];
 
-/** Stable tint for a field type: known types get fixed colors, the rest hash into a small palette. */
 export const getFieldTypeColor = (type: FieldType): string => {
   const known = FIELD_TYPE_COLORS[type.name];
 
@@ -560,7 +557,6 @@ export const getFieldTypeColor = (type: FieldType): string => {
   return FALLBACK_COLORS[hash] as string;
 };
 
-/** Display label for a field type, e.g. `ImageField (Collection)`. */
 export const getFieldTypeLabel = (type: FieldType): string => {
   const base = type.name.replace(/Field$/, '');
 

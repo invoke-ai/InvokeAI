@@ -11,7 +11,8 @@ Submodel map of a Diffusers folder (subfolder == ``SubModelType`` value, except 
 
 Single-file and GGUF builds are only the transformer, in Black Forest Labs' key layout. The single-file loader
 also takes the published quantized builds: BFL's per-row scaled fp8 (`variants/fp8r`) and ModelOpt nvfp4
-(`variants/nvfp4`), and Comfy-Org's `int8_convrot` and nvfp4. The file says which it is.
+(`variants/nvfp4`), Comfy-Org's `int8_convrot` and nvfp4, and unsloth's torchao FP8, which is saved under diffusers'
+key names. The file says which it is.
 """
 
 from collections.abc import Callable, Mapping
@@ -29,6 +30,7 @@ from invokeai.backend.flux3.conversion import (
     convert_flux3_native_to_diffusers,
     convert_flux3_nvfp4_payloads,
     flux3_transformer_config,
+    is_flux3_diffusers_layout,
 )
 from invokeai.backend.model_manager.checkpoint_prefix import CheckpointPrefix
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
@@ -51,8 +53,10 @@ from invokeai.backend.quantization.fp8_scaled import (
     dequantize_fp8_scaled,
     extract_comfy_quant_hints,
     extract_fp8_scaled_layers,
+    load_safetensors_checkpoint,
     read_safetensors_metadata,
     split_fp8_scaled_layers,
+    translate_torchao_fp8_layers,
     warn_on_unattached_scales,
 )
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
@@ -104,7 +108,7 @@ def _reserve_nothing(_bytes: int) -> None:
     """The reservation of a load that happens outside the RAM cache."""
 
 
-def flux3_transformer_from_native(
+def flux3_transformer_from_single_file(
     sd: dict,
     dtype: torch.dtype,
     reserve: Optional[Callable[[int], None]] = None,
@@ -113,7 +117,8 @@ def flux3_transformer_from_native(
     keep_fp8: bool = False,
     logger: Optional[Logger] = None,
 ) -> torch.nn.Module:
-    """The transformer of a native single-file FLUX.3 state dict in `dtype`, on the device its tensors are on, the QK
+    """The transformer of a single-file FLUX.3 state dict (Black Forest Labs' names, or diffusers' for the torchao
+    build) in `dtype`, on the device its tensors are on, the QK
     norms in float32. Empties `sd`.
 
     `reserve` asks the RAM cache for room once, before anything widens a weight, as `reserve_for_load` does; None asks
@@ -130,7 +135,11 @@ def flux3_transformer_from_native(
     """
     log = logger or _logger
     make_room = reserve or _reserve_nothing
-    sd = CheckpointPrefix.detect(sd).strip(sd)
+    stripped = CheckpointPrefix.detect(sd).strip(sd)
+    if stripped is not sd:
+        # The caller still holds `sd`; emptied, it cannot keep the sources alive through the cast.
+        sd.clear()
+    sd = stripped
     header_layers = flux3_header_layers(metadata, sd)
     markers = {
         key[: -len(COMFY_QUANT_SUFFIX)]: parse_comfy_quant_marker(value)
@@ -138,6 +147,8 @@ def flux3_transformer_from_native(
         if key.endswith(COMFY_QUANT_SUFFIX)
     }
     reject_unloadable_quantization(sd, header_layers, markers)
+    # unsloth's torchao FP8 build, renamed to the scaled-fp8 form everything below reads.
+    translate_torchao_fp8_layers(sd)
     # BFL's nvfp4 build: its layers are named in `header_layers` now and re-laid out once room is reserved for them.
     modelopt = is_modelopt_nvfp4(metadata, sd)
 
@@ -151,9 +162,12 @@ def flux3_transformer_from_native(
         sd = drop_unconsumed_quantization_sidecars(sd)
     else:
         layer_hints = {**extract_comfy_quant_hints(sd), **header_layers}
-    sd = convert_flux3_native_to_diffusers(sd)
-    int8_markers = convert_flux3_layer_entries(int8_markers)
-    layer_hints = convert_flux3_layer_entries(layer_hints)
+    if not is_flux3_diffusers_layout(sd):
+        # A file in diffusers' names (the torchao build) is left alone: its rows are in diffusers' order, and the
+        # native conversion would act on names it does not have.
+        sd = convert_flux3_native_to_diffusers(sd)
+        int8_markers = convert_flux3_layer_entries(int8_markers)
+        layer_hints = convert_flux3_layer_entries(layer_hints)
 
     skip_patterns = _model_declared_skip_patterns(model)
     fp8_layers: dict[str, Fp8ScaledLayer] = {}
@@ -266,7 +280,7 @@ class Flux3DiffusersModel(ModelLoader):
 @ModelLoaderRegistry.register(base=BaseModelType.Flux3, type=ModelType.Main, format=ModelFormat.Checkpoint)
 class Flux3CheckpointModel(ModelLoader):
     """Loads a FLUX.3 transformer from a single file: bf16 (BFL `model.safetensors`, or its ComfyUI repackage), or one
-    of the quantized builds `flux3_transformer_from_native` reads."""
+    of the quantized builds `flux3_transformer_from_single_file` reads."""
 
     def _load_model(self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> AnyModel:
         if not isinstance(config, Main_Checkpoint_Flux3_Config):
@@ -274,12 +288,10 @@ class Flux3CheckpointModel(ModelLoader):
         if submodel_type is not SubModelType.Transformer:
             raise ValueError("A single-file FLUX.3 model holds only the transformer.")
 
-        from safetensors.torch import load_file
-
         model_path = Path(config.path)
         model_dtype = TorchDevice.choose_bfloat16_safe_dtype(TorchDevice.choose_torch_device())
-        model = flux3_transformer_from_native(
-            load_file(model_path),
+        model = flux3_transformer_from_single_file(
+            load_safetensors_checkpoint(model_path),
             model_dtype,
             self._ram_cache.make_room,
             metadata=read_safetensors_metadata(model_path, self._logger),

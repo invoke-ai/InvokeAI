@@ -2,7 +2,7 @@ from contextlib import ExitStack
 from copy import deepcopy
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Optional, Union
+from typing import IO, TYPE_CHECKING, Any, Callable, Optional, Union
 
 from dynamicprompts.wildcards import WildcardManager
 from PIL.Image import Image
@@ -22,6 +22,7 @@ from invokeai.app.services.board_access.board_access_common import (
 from invokeai.app.services.board_records.board_records_common import BoardRecordNotFoundException, BoardRecordOrderBy
 from invokeai.app.services.boards.boards_common import BoardDTO
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
+from invokeai.app.services.files.files_common import FileDTO
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
 from invokeai.app.services.images.images_common import ImageDTO
 from invokeai.app.services.invocation_services import InvocationServices
@@ -35,7 +36,9 @@ from invokeai.app.util.step_callback import PreviewRender, diffusion_step_callba
 from invokeai.app.util.tiny_autoencoder_previews import TinyAutoencoderPreviews
 from invokeai.backend.model_manager.configs.base import Config_Base
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
+from invokeai.backend.model_manager.configs.roles import serves_as, view_as
 from invokeai.backend.model_manager.load.load_base import LoadedModel, LoadedModelWithoutConfig
+from invokeai.backend.model_manager.load.model_cache.model_cache import MODEL_LOAD_LOCK
 from invokeai.backend.model_manager.taxonomy import AnyModel, BaseModelType, ModelFormat, ModelType, SubModelType
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData
@@ -44,6 +47,7 @@ from invokeai.backend.util.devices import TorchDevice
 if TYPE_CHECKING:
     from invokeai.app.invocations.baseinvocation import BaseInvocation
     from invokeai.app.invocations.model import ModelIdentifierField
+    from invokeai.app.services.files.files_base import FileServiceBase
     from invokeai.app.services.session_queue.session_queue_common import SessionQueueItem
     from invokeai.app.services.shared.execution_engine.child import ChildExecutionCapability
 
@@ -252,6 +256,47 @@ class LoggerInterface(InvocationContextInterface):
             message: The message to log.
         """
         self._services.logger.error(message)
+
+
+class FilesInterface(InvocationContextInterface):
+    def get_dto(self, file_id: str) -> FileDTO:
+        """Gets metadata for a managed file.
+
+        Args:
+            file_id: The managed file ID.
+
+        Returns:
+            The file DTO.
+        """
+        return self._get_files_service().get_dto(file_id, user_id=self._data.queue_item.user_id)
+
+    def get_path(self, file_id: str) -> Path:
+        """Gets the server-side path to a managed file.
+
+        Args:
+            file_id: The managed file ID.
+
+        Returns:
+            The path to the managed file on the InvokeAI server.
+        """
+        return self._get_files_service().get_path(file_id, user_id=self._data.queue_item.user_id)
+
+    def open(self, file_id: str, mode: str = "rb") -> IO[Any]:
+        """Opens a managed file for reading.
+
+        Args:
+            file_id: The managed file ID.
+            mode: The read mode to use. Supported values are "rb" and "r".
+
+        Returns:
+            A readable file object.
+        """
+        return self._get_files_service().open(file_id, mode=mode, user_id=self._data.queue_item.user_id)
+
+    def _get_files_service(self) -> "FileServiceBase":
+        if self._services.files is None:
+            raise RuntimeError("The managed files service is not available.")
+        return self._services.files
 
 
 class ImagesInterface(InvocationContextInterface):
@@ -585,6 +630,20 @@ class ModelsInterface(InvocationContextInterface):
         super().__init__(services, data)
         self._util = util
 
+    def _resolve(self, identifier: Union[str, "ModelIdentifierField"]) -> AnyModelConfig:
+        """The record an identifier names, or its view in the role the identifier asks for.
+
+        A key names the stored record. A field names the type the model is asked for in: when that is not the record's
+        own type but one it serves as, the result is the record's view in that role. Any other type returns the record
+        unchanged, so the node's own validation sees a mismatch.
+        """
+        if isinstance(identifier, str):
+            return self._services.model_manager.store.get_model(identifier)
+        config = self._services.model_manager.store.get_model(identifier.key)
+        if identifier.type != config.type and serves_as(config, identifier.type):
+            return view_as(config, identifier.type)
+        return config
+
     def exists(self, identifier: Union[str, "ModelIdentifierField"]) -> bool:
         """Check if a model exists.
 
@@ -605,7 +664,8 @@ class ModelsInterface(InvocationContextInterface):
         """Load a model.
 
         Args:
-            identifier: The key or ModelField representing the model.
+            identifier: The key or ModelField representing the model. A ModelField's `type` is the type the model is
+                loaded as, its own type or a role it serves as (see `Config_Base.roles`).
             submodel_type: The submodel of the model to get.
 
         Returns:
@@ -615,11 +675,9 @@ class ModelsInterface(InvocationContextInterface):
         # The model manager emits events as it loads the model. It needs the context data to build
         # the event payloads.
 
-        if isinstance(identifier, str):
-            model = self._services.model_manager.store.get_model(identifier)
-        else:
+        if not isinstance(identifier, str):
             submodel_type = submodel_type or identifier.submodel_type
-            model = self._services.model_manager.store.get_model(identifier.key)
+        model = self._resolve(identifier)
 
         self._raise_if_external(model)
 
@@ -668,6 +726,8 @@ class ModelsInterface(InvocationContextInterface):
         so the next, larger load does not have to compete with it for VRAM. The model stays in the RAM cache, so
         a subsequent load only re-streams it back to VRAM rather than rebuilding it from disk.
 
+        The caller must not hold `MODEL_LOAD_LOCK`; this method acquires its read lock.
+
         Args:
             identifier: The key or ModelField representing the model to offload.
 
@@ -675,7 +735,8 @@ class ModelsInterface(InvocationContextInterface):
             The number of VRAM bytes freed.
         """
         key = identifier if isinstance(identifier, str) else identifier.key
-        return self._services.model_manager.load.ram_cache.offload_model_from_vram(key)
+        with MODEL_LOAD_LOCK.read_lock():
+            return self._services.model_manager.load.ram_cache.offload_model_from_vram(key)
 
     def make_room_in_vram(self, vram_bytes_needed: int) -> int:
         """Offload unlocked cached models from VRAM until `vram_bytes_needed` bytes are free on this thread's
@@ -687,6 +748,8 @@ class ModelsInterface(InvocationContextInterface):
         and would otherwise only get whatever they happened to leave free. The configured working-memory reserve
         is kept free on top of the request.
 
+        The caller must not hold `MODEL_LOAD_LOCK`; this method acquires its read lock.
+
         Args:
             vram_bytes_needed: The VRAM footprint the caller is about to allocate.
 
@@ -695,7 +758,8 @@ class ModelsInterface(InvocationContextInterface):
             (in-use) models are never offloaded, so the request is not guaranteed: compare the result with
             `vram_bytes_needed` before allocating.
         """
-        return self._services.model_manager.load.ram_cache.make_room_in_vram(vram_bytes_needed)
+        with MODEL_LOAD_LOCK.read_lock():
+            return self._services.model_manager.load.ram_cache.make_room_in_vram(vram_bytes_needed)
 
     @staticmethod
     def _raise_if_external(model: AnyModelConfig) -> None:
@@ -706,15 +770,14 @@ class ModelsInterface(InvocationContextInterface):
         """Get a model's config.
 
         Args:
-            identifier: The key or ModelField representing the model.
+            identifier: The key or ModelField representing the model. A ModelField's `type` selects the role. The
+                config is the record's view in that type when it serves as it (see `Config_Base.roles`), else the
+                stored record.
 
         Returns:
             The model's config.
         """
-        if isinstance(identifier, str):
-            return self._services.model_manager.store.get_model(identifier)
-        else:
-            return self._services.model_manager.store.get_model(identifier.key)
+        return self._resolve(identifier)
 
     def search_by_path(self, path: Path) -> list[AnyModelConfig]:
         """Search for models by path.
@@ -1071,6 +1134,7 @@ class InvocationContext:
         config (ConfigInterface): The app config.
         util (UtilInterface): Utility methods, including a method to check if an invocation was canceled and step callbacks.
         boards (BoardsInterface): Methods to interact with boards.
+        files (FilesInterface): Methods to read managed files uploaded for node inputs.
         wildcards (WildcardsInterface): Access to the queueing user's wildcards.
     """
 
@@ -1085,6 +1149,7 @@ class InvocationContext:
         config: ConfigInterface,
         util: UtilInterface,
         boards: BoardsInterface,
+        files: FilesInterface,
         wildcards: WildcardsInterface,
         data: InvocationContextData,
         services: InvocationServices,
@@ -1108,6 +1173,8 @@ class InvocationContext:
         """Utility methods, including a method to check if an invocation was canceled and step callbacks."""
         self.boards = boards
         """Methods to interact with boards."""
+        self.files = files
+        """Methods to read managed files uploaded for node inputs."""
         self.wildcards = wildcards
         """Access to the queueing user's wildcards."""
         self._data = data
@@ -1151,6 +1218,7 @@ def build_invocation_context(
     images = ImagesInterface(services=services, data=data, util=util)
     videos = VideosInterface(services=services, data=data, util=util)
     boards = BoardsInterface(services=services, data=data)
+    files = FilesInterface(services=services, data=data)
     wildcards = WildcardsInterface(services=services, data=data)
 
     if execution_effects is None:
@@ -1168,6 +1236,7 @@ def build_invocation_context(
         conditioning=conditioning,
         services=services,
         boards=boards,
+        files=files,
         wildcards=wildcards,
         execution_effects=execution_effects,
     )

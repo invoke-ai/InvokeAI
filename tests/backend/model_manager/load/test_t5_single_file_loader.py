@@ -24,7 +24,9 @@ from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch
 )
 from invokeai.backend.model_manager.load.model_loaders.flux import T5EncoderSingleFileLoader
 from invokeai.backend.model_manager.taxonomy import SubModelType
+from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
+from tests.fixtures.safetensors_files import record_reads
 
 FP8 = torch.float8_e4m3fn
 LINEAR_SUFFIXES = (
@@ -251,7 +253,7 @@ def test_device_caches_share_weights_only_with_a_device_that_builds_the_same_for
     from invokeai.backend.model_manager.load.model_cache.shared_cpu_weights import SharedCpuWeightsStore
     from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
 
-    monkeypatch.setattr(loader_module.TorchDevice, "choose_bfloat16_safe_dtype", staticmethod(lambda _: torch.float32))
+    monkeypatch.setattr(TorchDevice, "choose_bfloat16_safe_dtype", staticmethod(lambda _: torch.float32))
     monkeypatch.setattr(loader_module, "should_keep_fp8_weights", lambda device: device.type == "cuda")
     monkeypatch.setattr(loader_module, "_device_supports_fp8_storage", lambda device, _logger=None: False)
     path = tmp_path / "t5xxl.safetensors"
@@ -305,7 +307,7 @@ def test_a_cpu_only_t5_on_a_gpu_box_holds_float32(
 ) -> None:
     # `cpu_only` runs the encoder on the CPU while the loader's own device is the GPU; the dtype follows the
     # execution device, not `_torch_device`. The dtype choice is patched to float16 so a GPU decision shows.
-    monkeypatch.setattr(loader_module.TorchDevice, "choose_bfloat16_safe_dtype", staticmethod(lambda _: torch.float16))
+    monkeypatch.setattr(TorchDevice, "choose_bfloat16_safe_dtype", staticmethod(lambda _: torch.float16))
     _keep_fp8(monkeypatch, False)
     path = tmp_path / "t5xxl.safetensors"
     _write_fp16(_tiny_reference(), path)
@@ -327,7 +329,7 @@ def test_device_caches_do_not_share_folded_weights_of_different_dtypes(
     from invokeai.backend.model_manager.load.model_cache.shared_cpu_weights import SharedCpuWeightsStore
     from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
 
-    monkeypatch.setattr(loader_module.TorchDevice, "choose_bfloat16_safe_dtype", staticmethod(lambda _: torch.float16))
+    monkeypatch.setattr(TorchDevice, "choose_bfloat16_safe_dtype", staticmethod(lambda _: torch.float16))
     _keep_fp8(monkeypatch, False)
     path = tmp_path / "t5xxl.safetensors"
     _write_scaled_fp8(_tiny_reference(), path)
@@ -349,3 +351,26 @@ def test_device_caches_do_not_share_folded_weights_of_different_dtypes(
         dtypes[name] = weight_dtype(device)
 
     assert dtypes == {"cpu": torch.float32, "cuda": torch.float16}
+
+
+def test_the_duplicate_embedding_of_a_comfyui_file_is_never_read(
+    loader: T5EncoderSingleFileLoader, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """`shared` and `encoder.embed_tokens` are one tied parameter. Read through ``pread``, the second copy would cost
+    the embedding's size in process memory only to be dropped; a file with only the encoder's copy still reads it."""
+    _keep_fp8(monkeypatch, False)
+    reference = _tiny_reference()
+    both = tmp_path / "both.safetensors"
+    only_encoder = tmp_path / "only_encoder.safetensors"
+    _write_raw_fp8(reference, both)
+    _write_fp16_embed_tokens_only(reference, only_encoder)
+    log = record_reads(monkeypatch)
+
+    _load_encoder(loader, both)
+    read_from_both = set(log.tensors)
+    log.tensors.clear()
+    _load_encoder(loader, only_encoder)
+
+    assert "shared.weight" in read_from_both
+    assert not {key for key in read_from_both if key.startswith("encoder.embed_tokens.")}
+    assert "encoder.embed_tokens.weight" in log.tensors

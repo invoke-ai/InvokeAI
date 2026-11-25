@@ -29,7 +29,6 @@ import { useTranslation } from 'react-i18next';
 
 export type ControlSourceAction = 'upload' | 'frame' | 'draw';
 
-/** The engine surface the Image row's actions need. */
 export type ControlSourceEngine = CanvasCompositeExportEngine & {
   readonly document: CanvasDocumentCapability;
   readonly exports: Pick<CanvasExportCapability, 'hasExportableLayerContent'>;
@@ -42,7 +41,6 @@ const NO_ENGINE = {};
 const noSubscription = (): (() => void) => () => undefined;
 const selectSnapshot = (snapshot: ControlSourceSnapshot) => snapshot;
 
-/** Shows a control source notice through the workbench notices. */
 const useControlNoticeReporter = (): ((notice: ControlSourceNotice | null) => void) => {
   const { t } = useTranslation();
   const notify = useNotify();
@@ -62,17 +60,12 @@ export const useControlIntentReporter = (): ((result: ControlLayerIntentResult) 
   return useCallback((result: ControlLayerIntentResult) => report(getControlIntentNotice(result)), [report]);
 };
 
-/**
- * The Image row's three ways to fill a control layer. Each ends in one Properties intent (`replace-image` or `draw`),
- * so the coordinator detects the map, and reports a refusal. An action outlives the panel: its result still lands on
- * the layer by id. An upload started from the canvas shows here as busy too.
- */
+/** Each ends in one Properties intent; an action outlives the panel and lands on the layer by id. */
 export const useControlSourceActions = ({
   applyIntent,
   engine,
   layerId,
 }: {
-  /** Applies an intent and reports a refusal. */
   applyIntent: (intent: ControlLayerIntent) => ControlLayerIntentResult | null;
   engine: ControlSourceEngine | null;
   layerId: string;

@@ -20,6 +20,7 @@ const buildStarterConfig = (model: StarterModel | Omit<StarterModel, 'dependenci
   description: model.description,
   name: model.name,
   type: model.type,
+  ...(model.source_urls?.length ? { source_urls: model.source_urls } : {}),
   ...(model.format ? { format: model.format } : {}),
   ...(model.variant ? { variant: model.variant } : {}),
 });

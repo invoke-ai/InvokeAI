@@ -46,6 +46,8 @@ const selectComponentSettings = pickGenerateSettings([
   'clipGEmbedModel',
   'clipLEmbedModel',
   'componentSourceModel',
+  'flux3PromptUpsamplerEnabled',
+  'flux3PromptUpsamplerModel',
   'gemma2EncoderModel',
   'ideogram4UnconditionalModel',
   'mistralEncoderModel',
@@ -82,6 +84,7 @@ const getComponentPolicyContext = (
     qwen3VLVisionTowerModel: settings.qwen3VLVisionTowerModel,
     qwen35EncoderModel: settings.qwen35EncoderModel,
     animaInpaintAdapterModel: settings.animaInpaintAdapterModel,
+    flux3PromptUpsamplerModel: settings.flux3PromptUpsamplerModel,
     wanT5EncoderModel: settings.wanT5EncoderModel,
     wanLowNoiseModel: settings.wanLowNoiseModel,
     ideogram4UnconditionalModel: settings.ideogram4UnconditionalModel,
@@ -122,16 +125,18 @@ const ComponentPicker = ({
   return (
     // A fix button carries the issue id itself; without one this wrapper does, so a reveal lands on the slot.
     <Box data-issue-id={shownIssue && !shownIssue.fix ? shownIssue.id : undefined}>
-      <Field label={slot.label} helpText={slot.helpText} error={error}>
+      <Field label={slot.label} labelPlacement="inside" helpText={slot.helpText} error={error}>
         <ModelSelect
           filter={slot.filter ? filter : undefined}
           invalid={Boolean(error)}
           isClearable
           modelTypes={modelTypes}
           placeholder={
-            slot.placeholder ??
-            (isRequired ? t('widgets.generate.selectComponent') : t('widgets.generate.modelDefault'))
+            isRequired
+              ? t('widgets.generate.selectComponent')
+              : (slot.placeholder ?? t('widgets.generate.modelDefault'))
           }
+          relatedTo={ctx.model.key}
           value={selectedValue}
           onChange={onChange}
         />
@@ -182,7 +187,7 @@ export const GenerateComponentsSection = ({ draft, onCommit, selectedModel }: Ge
       defaultOpen={policy.defaultOpen}
       sectionId="components"
     >
-      <Stack gap="2" p="2">
+      <Stack gap="2.5">
         {policy.slots.map((slot) => (
           <ComponentPickerRow key={slot.key} commitSlotValue={commitSlotValue} ctx={ctx!} slot={slot} />
         ))}

@@ -8,9 +8,15 @@ import {
   supportsExternalModelSettings,
   type ExternalModelSettingsModel,
 } from '@features/models/core/externalModelFields';
-import { isLinkableType } from '@features/models/core/relationships';
+import { isSafeUrl } from '@features/models/core/modelSettingsIO';
+import { isLinkableModel } from '@features/models/core/relationships';
 import { isAbsoluteModelPath, resolveModelAbsolutePath } from '@features/models/core/schemas';
-import { getModelSourceHref, getUnrecordedModelFact } from '@features/models/core/taxonomy';
+import {
+  getModelSourceHref,
+  getModelTypeLabel,
+  getModelVariantLabel,
+  getUnrecordedModelFact,
+} from '@features/models/core/taxonomy';
 import { supportsWorkingMemoryCalibration } from '@features/models/core/workingMemory';
 import { useModelsSelector, type ModelsSnapshot } from '@features/models/data/modelsStore';
 import {
@@ -47,7 +53,7 @@ import { WorkingMemorySection } from './WorkingMemorySection';
 
 const EMPTY_TRIGGER_PHRASES: readonly string[] = [];
 
-type ModelDetailShellModel = Pick<ModelConfig, 'key' | 'type'> & {
+type ModelDetailShellModel = Pick<ModelConfig, 'key' | 'roles' | 'type'> & {
   hasCpuOnlySetting: boolean;
   hasTriggerPhrases: boolean;
 };
@@ -71,10 +77,12 @@ type ModelIdentityModel = Pick<
   | 'provider_id'
   | 'provider_model_id'
   | 'repo_variant'
+  | 'roles'
   | 'scale'
   | 'source'
   | 'source_type'
   | 'source_url'
+  | 'source_urls'
   | 'type'
   | 'variant'
 >;
@@ -95,6 +103,7 @@ const selectModelShell = (snapshot: ModelsSnapshot, modelKey: string): ModelDeta
         hasCpuOnlySetting: supportsCpuOnlySetting(model),
         hasTriggerPhrases: model.trigger_phrases !== undefined && model.type !== 'control_lora',
         key: model.key,
+        roles: model.roles,
         type: model.type,
       }
     : null;
@@ -121,10 +130,12 @@ const selectModelIdentity = (snapshot: ModelsSnapshot, modelKey: string): ModelI
         provider_id: model.provider_id,
         provider_model_id: model.provider_model_id,
         repo_variant: model.repo_variant,
+        roles: model.roles,
         scale: model.scale,
         source: model.source,
         source_type: model.source_type,
         source_url: model.source_url,
+        source_urls: model.source_urls,
         type: model.type,
         variant: model.variant,
       }
@@ -134,15 +145,17 @@ const selectModelIdentity = (snapshot: ModelsSnapshot, modelKey: string): ModelI
 const selectDefaultSettingsModel = (snapshot: ModelsSnapshot, modelKey: string): DefaultSettingsModel | null => {
   const model = findModel(snapshot, modelKey);
 
-  // `base` and `format` are projected too: together with the type they are the loader key the backend
-  // answers the FP8 Storage question on, and all three parts change the answer. `variant` joins them
-  // for Generate's scheduler rules, which differ by variant within a base.
+  // `base` and `format` are projected too: together with the type they are the loader key the backend answers the FP8
+  // Storage question on, and all three parts change the answer. `variant` joins them for Generate's scheduler rules,
+  // which differ by variant within a base; `name` and `submodels` join them for its component rules.
   return model
     ? {
         base: model.base,
         default_settings: model.default_settings,
         format: model.format,
         key: model.key,
+        name: model.name,
+        submodels: model.submodels,
         type: model.type,
         variant: model.variant,
       }
@@ -233,7 +246,7 @@ export const ModelDetail = ({
         </>
       ) : null}
 
-      {isLinkableType(model.type) ? (
+      {isLinkableModel(model) ? (
         <>
           <Separator borderColor="border.subtle" />
           <RelatedModelsSectionContainer modelKey={model.key} />
@@ -497,9 +510,24 @@ const RelatedModelsSectionContainer = memo(function RelatedModelsSectionContaine
     (snapshot) => {
       const candidate = snapshot.modelsByKey.get(modelKey);
 
-      return candidate ? { base: candidate.base, key: candidate.key, type: candidate.type } : null;
+      return candidate
+        ? {
+            base: candidate.base,
+            key: candidate.key,
+            latent_channels: candidate.latent_channels,
+            roles: candidate.roles,
+            type: candidate.type,
+            variant: candidate.variant,
+          }
+        : null;
     },
-    (left, right) => left?.key === right?.key && left?.base === right?.base && left?.type === right?.type
+    (left, right) =>
+      left?.key === right?.key &&
+      left?.base === right?.base &&
+      left?.type === right?.type &&
+      left?.variant === right?.variant &&
+      left?.latent_channels === right?.latent_channels &&
+      left?.roles === right?.roles
   );
   const handleSectionError = useCallback(
     (message: string) => notify.error(t('models.modelManager'), message),
@@ -513,21 +541,63 @@ const RelatedModelsSectionContainer = memo(function RelatedModelsSectionContaine
   return <RelatedModelsSection model={model} onError={handleSectionError} />;
 });
 
+const AttributeValue = ({ href, value }: { href: string | undefined; value: string }) =>
+  href ? (
+    <chakra.a
+      alignItems="center"
+      display="inline-flex"
+      gap="1"
+      href={href}
+      minW="0"
+      rel="noreferrer"
+      target="_blank"
+      wordBreak="break-all"
+      _hover={{ textDecoration: 'underline' }}
+    >
+      {value}
+      <Icon as={ExternalLinkIcon} boxSize="3" color="fg.subtle" flexShrink={0} />
+    </chakra.a>
+  ) : (
+    value
+  );
+
 const ModelAttributes = ({ isMissing, model }: { isMissing: boolean; model: ModelIdentityModel }) => {
-  const { t } = useTranslation();
+  const { i18n, t } = useTranslation();
   const modelsDir = useModelsSelector((snapshot) => snapshot.modelsDir);
   const [isPathDialogOpen, setIsPathDialogOpen] = useState(false);
   const pathDialog = useExitPresence(isPathDialogOpen);
-  // Managed models store paths relative to the models directory; show the
-  // resolved absolute path so it can be found on disk.
+  // Managed models store paths relative to the models directory; show the resolved absolute path so it can be found on
+  // disk.
   const fullPath = resolveModelAbsolutePath(model.path, modelsDir);
   // Allow repointing absolute-path installs, including missing files.
   const canUpdatePath = isAbsoluteModelPath(model.path) || isMissing;
 
-  const attributes: { action?: ReactNode; href?: string; label: string; value: string }[] = [
+  const sourceHref = getModelSourceHref(model.source, model.source_type);
+  const modelPages = [...new Set(model.source_urls ?? [])].filter(
+    (url) => url !== model.source_url && url !== sourceHref
+  );
+
+  const attributes: ({ action?: ReactNode; label: string } & (
+    | { href?: string; value: string }
+    | { links: readonly string[] }
+  ))[] = [
     { label: t('models.fileSize'), value: formatBytes(model.file_size) },
     { label: t('models.variant'), value: model.variant ?? '—' },
     { label: t('models.predictionType'), value: model.prediction_type ?? '—' },
+    ...(model.roles?.length
+      ? [
+          {
+            label: t('models.alsoUsableAs'),
+            value: new Intl.ListFormat(i18n.resolvedLanguage, { style: 'long', type: 'conjunction' }).format(
+              model.roles.map((role) =>
+                role.variant
+                  ? `${getModelTypeLabel(role.type)} · ${getModelVariantLabel(role.variant)}`
+                  : getModelTypeLabel(role.type)
+              )
+            ),
+          },
+        ]
+      : []),
     // Recorded by the probe for upscalers; an unrecorded one is explained by the notice above instead.
     ...(typeof model.scale === 'number'
       ? [{ label: t('models.nativeScale'), value: t('models.nativeScaleValue', { scale: model.scale }) }]
@@ -548,20 +618,20 @@ const ModelAttributes = ({ isMissing, model }: { isMissing: boolean; model: Mode
       value: fullPath,
     },
     {
-      href: getModelSourceHref(model.source, model.source_type) ?? undefined,
+      href: sourceHref ?? undefined,
       label: t('models.source'),
       value: model.source,
     },
-    // Render legacy non-HTTP(S) source links as text rather than unsafe anchors.
     ...(model.source_url
       ? [
           {
-            href: model.source_url.startsWith('http') ? model.source_url : undefined,
+            href: isSafeUrl(model.source_url) ? model.source_url : undefined,
             label: t('models.sourceUrl'),
             value: model.source_url,
           },
         ]
       : []),
+    ...(modelPages.length ? [{ label: t('models.modelPage', { count: modelPages.length }), links: modelPages }] : []),
     // Format-specific attrs; truthiness also skips repo_variant's '' default.
     ...(model.format === 'diffusers' && model.repo_variant
       ? [{ label: t('models.repoVariant'), value: model.repo_variant }]
@@ -585,23 +655,14 @@ const ModelAttributes = ({ isMissing, model }: { isMissing: boolean; model: Mode
               {attribute.label}
             </DataList.ItemLabel>
             <DataList.ItemValue alignItems="center" display="flex" fontSize="xs" gap="1" overflowWrap="anywhere">
-              {attribute.href ? (
-                <chakra.a
-                  alignItems="center"
-                  display="inline-flex"
-                  gap="1"
-                  href={attribute.href}
-                  minW="0"
-                  rel="noreferrer"
-                  target="_blank"
-                  wordBreak="break-all"
-                  _hover={{ textDecoration: 'underline' }}
-                >
-                  {attribute.value}
-                  <Icon as={ExternalLinkIcon} boxSize="3" color="fg.subtle" flexShrink={0} />
-                </chakra.a>
+              {'links' in attribute ? (
+                <Stack alignItems="flex-start" gap="1" minW="0">
+                  {attribute.links.map((url) => (
+                    <AttributeValue key={url} href={isSafeUrl(url) ? url : undefined} value={url} />
+                  ))}
+                </Stack>
               ) : (
-                attribute.value
+                <AttributeValue href={attribute.href} value={attribute.value} />
               )}
               {attribute.action ?? null}
             </DataList.ItemValue>

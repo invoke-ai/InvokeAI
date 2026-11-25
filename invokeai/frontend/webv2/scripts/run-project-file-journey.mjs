@@ -8,6 +8,7 @@ import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 
+import { observeBrowserDiagnostics, waitForRenderedMedia, withBrowserNavigation } from './browser-validation.mjs';
 import {
   collectCanvasLeaves,
   MOCK_BACKEND_PROFILE_COUNTS,
@@ -79,36 +80,23 @@ const waitForPreview = async (getPreviewExit) => {
   throw new Error(`Vite preview did not become ready at ${origin}.`);
 };
 
-const observeBrowserErrors = (page, phase, errors) => {
-  page.on('pageerror', (error) => {
-    errors.push(new Error(`${phase} page error: ${error.stack ?? error.message}`));
-  });
-  page.on('console', (message) => {
-    if (message.type() === 'error') {
-      const location = message.location();
-
-      // The HTTP-only mock has no Socket.IO; ignore only its expected transport 404.
-      if (
-        location.url.includes('/ws/socket.io/') &&
-        message.text().includes('the server responded with a status of 404')
-      ) {
-        return;
-      }
-
-      // Import probes archived video names; this 404 triggers restoration.
-      if (
+export const observeBrowserErrors = async (page, phase, errors) => {
+  await observeBrowserDiagnostics(page, {
+    onError: (event) => errors.push(new Error(`${phase}: ${JSON.stringify(event)}`)),
+    expected: (event) => {
+      // Import probes an archived video DTO before restoring its binary under a new identity.
+      return (
         phase.endsWith('import') &&
-        location.url &&
-        new URL(location.url).pathname === `/api/v1/videos/i/${MOCK_BACKEND_REPRESENTATIVE_VIDEO_NAME}` &&
-        message.text().includes('the server responded with a status of 404')
-      ) {
-        return;
-      }
-
-      const where = location.url ? ` (${location.url}:${String(location.lineNumber)})` : '';
-
-      errors.push(new Error(`${phase} console error${where}: ${message.text()}`));
-    }
+        event.url &&
+        new URL(event.url).pathname === `/api/v1/videos/i/${MOCK_BACKEND_REPRESENTATIVE_VIDEO_NAME}` &&
+        (event.status === 404 ||
+          (event.kind === 'console' && /404/.test(event.message)) ||
+          // The existence probe explicitly cancels an unread missing-response body before restoring the archive.
+          (event.kind === 'requestfailed' &&
+            [403, 404].includes(event.responseStatus) &&
+            /^(?:net::)?ERR_ABORTED$/.test(event.message)))
+      );
+    },
   });
 };
 
@@ -165,10 +153,8 @@ const EXPECTED_BOARD_SHAPE = [
   'video:general:false',
 ].sort();
 
-/** The source's other board, as it must travel: two plain generated images. */
 const EXPECTED_MEMBER_BOARD_SHAPE = ['image:general:false', 'image:general:false'];
 
-/** The archived names of everything on the source's boards, for proving none of them is reused. */
 const ARCHIVED_BOARD_NAMES = [
   PROJECT_FILE_BOARD.referencedImage,
   PROJECT_FILE_BOARD.unreferencedImage,
@@ -179,7 +165,6 @@ const ARCHIVED_BOARD_NAMES = [
   ...PROJECT_FILE_BOARD.memberImages,
 ];
 
-/** Every item of every board of a snapshot, with the board each came from. */
 const snapshotItems = (snapshot) => snapshot.boards.flatMap((board) => board.items);
 
 const readArchiveEntries = async (archivePath) => unzipSync(new Uint8Array(await readFile(archivePath)));
@@ -190,7 +175,6 @@ const readEntryJson = (entries, name) => {
   return JSON.parse(new TextDecoder().decode(entries[name]));
 };
 
-/** Rewrite an archive without the named entries, to exercise what a damaged one reports. */
 const writeArchiveWithout = async (entries, omitted, targetPath) => {
   for (const name of omitted) {
     assert.ok(entries[name], `Cannot omit ${name}: the archive does not carry it.`);
@@ -204,7 +188,6 @@ const writeArchiveWithout = async (entries, omitted, targetPath) => {
 };
 
 const getBoardSnapshot = (projectId) => fetchJson(`/api/v1/projects/${encodeURIComponent(projectId)}/board-snapshot`);
-/** A project as this build reads it: content and the caller's workspace. */
 const getProjectRecord = (projectId) =>
   fetchJson(
     `/api/v1/projects/${encodeURIComponent(projectId)}?max_canvas_schema_version=4&max_document_schema_version=4`
@@ -213,7 +196,6 @@ const getProjectRecord = (projectId) =>
 const getLayerImageNames = (project) =>
   collectCanvasLeaves(project.data.canvas.document).map((layer) => layer.source.image.imageName);
 
-/** The first workflow document of a project record, whichever document schema the record carries. */
 const getWorkflowDocuments = (project) =>
   project.data.workflows?.entries?.map((entry) => entry.document) ?? [project.data.projectGraph].filter(Boolean);
 
@@ -226,7 +208,6 @@ const presetStrip = (page) => page.getByRole('tablist', { exact: true, name: 'La
 
 const centerViewTrigger = (page, label) => page.getByRole('button', { exact: true, name: `Center view: ${label}` });
 
-/** Preset names need not match their center views; pass the expected view explicitly. */
 const selectLayoutPreset = async (page, preset, centerView) => {
   const name = new RegExp(`^${preset}(, unsaved changes)?$`);
   const strip = presetStrip(page);
@@ -240,7 +221,6 @@ const selectLayoutPreset = async (page, preset, centerView) => {
   await centerViewTrigger(page, centerView).waitFor();
 };
 
-/** Poll the server record until the project's saved workflows satisfy `predicate`. */
 const waitForSavedWorkflows = async (projectId, predicate, label) => {
   const deadline = Date.now() + 15_000;
 
@@ -257,13 +237,21 @@ const waitForSavedWorkflows = async (projectId, predicate, label) => {
   throw new Error(`The project record never reached the expected state: ${label}.`);
 };
 
-/** Rename the active workflow through the Workflows dialog. */
+const WORKFLOW_SWITCHER_PREFIX = 'Switch workflow. Current workflow: ';
+const workflowSwitcher = (page) => page.getByRole('button', { name: /^Switch workflow\. Current workflow: / });
+const currentWorkflowNameOf = async (page) =>
+  (await workflowSwitcher(page).getAttribute('aria-label')).replace(WORKFLOW_SWITCHER_PREFIX, '');
+const openWorkflowLibraryFromName = async (page) => {
+  await workflowSwitcher(page).click();
+  await page.getByRole('menuitem', { exact: true, name: 'Workflow library…' }).click();
+  await page.getByRole('dialog', { exact: true, name: 'Workflows' }).locator('[data-library-tab="project"]').waitFor();
+};
+
 const renameActiveWorkflow = async (page, name) => {
   const dialog = page.getByRole('dialog', { exact: true, name: 'Workflows' });
   const renameDialog = page.getByRole('dialog', { exact: true, name: 'Rename workflow' });
 
-  await page.getByRole('button', { name: /^Open this project's workflows\. Current workflow: / }).click();
-  await dialog.locator('[data-library-tab="project"]').waitFor();
+  await openWorkflowLibraryFromName(page);
   await dialog
     .locator('[data-project-workflow-detail]')
     .getByRole('button', { exact: true, name: 'More actions' })
@@ -273,14 +261,13 @@ const renameActiveWorkflow = async (page, name) => {
   await renameDialog.getByRole('button', { exact: true, name: 'Rename' }).click();
 };
 
-/** Import the archive at `archivePath` through the Launchpad, exactly as a person would. */
 const importArchive = async ({ archivePath, browser, contexts, errors, phase }) => {
   const context = await browser.newContext();
 
   contexts.add(context);
   const page = await context.newPage();
 
-  observeBrowserErrors(page, phase, errors);
+  await observeBrowserErrors(page, phase, errors);
   await page.goto(`${origin}/#/`, { waitUntil: 'domcontentloaded' });
   await page.getByRole('heading', { exact: true, name: 'Welcome to Invoke' }).waitFor();
 
@@ -290,14 +277,11 @@ const importArchive = async ({ archivePath, browser, contexts, errors, phase }) 
   await (await chooserPromise).setFiles(archivePath);
   await page.waitForURL(/#\/app$/);
   await page.getByRole('main', { exact: true, name: sourceProjectName }).waitFor();
+  await waitForRenderedMedia(page);
 
   return { context, page };
 };
 
-/**
- * Verify imports copy board media despite name collisions, reuse external references, and exclude
- * intermediate/other items.
- */
 const runRoundTrip = async ({ backend, browser, contexts, errors, tempDirectory }) => {
   const sourceBoard = await getBoardSnapshot(sourceProjectId);
 
@@ -309,11 +293,10 @@ const runRoundTrip = async ({ backend, browser, contexts, errors, tempDirectory 
   contexts.add(exportContext);
   const exportPage = await exportContext.newPage();
 
-  observeBrowserErrors(exportPage, 'export', errors);
+  await observeBrowserErrors(exportPage, 'export', errors);
   await exportPage.goto(`${origin}${sourceProjectPath}`, { waitUntil: 'domcontentloaded' });
   await exportPage.getByRole('main', { exact: true, name: sourceProjectName }).waitFor();
 
-  // The project's inbox is selected and shown as "Inbox" under the project's own heading.
   const selectedBoardRow = exportPage.locator('button[aria-current="true"]').filter({ hasText: 'Inbox' });
 
   await selectedBoardRow.first().waitFor();
@@ -355,7 +338,6 @@ const runRoundTrip = async ({ backend, browser, contexts, errors, tempDirectory 
   assert.equal(manifest.version, 3);
   assert.equal(manifest.documentSchemaVersion, 4);
   assert.equal(manifest.contents, 'workbench-project');
-  // The content, and beside it the exporter's workspace: which workflow they had open.
   const archivedContent = readEntryJson(entries, 'project.json');
   const archivedWorkspace = readEntryJson(entries, 'workspace.json');
   assert.equal(archivedContent.documentSchemaVersion, 4);
@@ -366,7 +348,6 @@ const runRoundTrip = async ({ backend, browser, contexts, errors, tempDirectory 
     )
   );
   assert.equal(archivedBoard.version, 2);
-  // The inbox leads, then the project's other board, each with its own media.
   assert.deepEqual(
     archivedBoard.boards.map((board) => [board.name, board.isInbox, board.archived]),
     [
@@ -380,7 +361,6 @@ const runRoundTrip = async ({ backend, browser, contexts, errors, tempDirectory 
     archivedBoard.boards.flatMap((board) => board.items.map((item) => item.name)).sort(),
     [...ARCHIVED_BOARD_NAMES].sort()
   );
-  // Expect the board items plus three external images and one external video, deduplicated across references.
   assert.deepEqual(
     bundledImages.sort(),
     [...ARCHIVED_BOARD_NAMES.filter((name) => name.endsWith('.png')), ...PROJECT_FILE_BOARD.externalImages]
@@ -391,7 +371,6 @@ const runRoundTrip = async ({ backend, browser, contexts, errors, tempDirectory 
     bundledVideos.sort(),
     [`videos/${PROJECT_FILE_BOARD.video}`, `videos/${MOCK_BACKEND_REPRESENTATIVE_VIDEO_NAME}`].sort()
   );
-  // Hidden from every gallery view and from the archive with it.
   assert.equal(entries[`images/${PROJECT_FILE_BOARD.intermediateImage}`], undefined);
   assert.equal(entries[`images/${PROJECT_FILE_BOARD.canvasOwnedImage}`], undefined);
 
@@ -402,7 +381,6 @@ const runRoundTrip = async ({ backend, browser, contexts, errors, tempDirectory 
   });
 
   assert.equal(reset.profile, 'empty');
-  // Nothing survives the reset except the deliberate collisions, and the profile says so.
   assert.deepEqual(reset.counts, { ...MOCK_BACKEND_PROFILE_COUNTS.empty, images: 2 });
   assert.equal(backend.profile(), 'empty');
 
@@ -421,18 +399,15 @@ const runRoundTrip = async ({ backend, browser, contexts, errors, tempDirectory 
 
   assert.ok(summary);
   assert.notEqual(summary.project_id, sourceProjectId);
-  // The project's board is the server's to mint; the archived one meant nothing here.
   assert.notEqual(summary.board_id, PROJECT_FILE_BOARD_ID);
   await importPage.getByRole('main', { exact: true, name: summary.name }).waitFor();
   assert.equal(new URL(importPage.url()).hash, '#/app');
 
-  // Import saves the content and then the importer's workspace before it opens the project.
   const imported = await getProjectRecord(summary.project_id);
   const importedBoard = await getBoardSnapshot(summary.project_id);
   const importedBoardNames = snapshotItems(importedBoard).map((item) => item.name);
 
   assert.equal(imported.data.id, summary.project_id);
-  // The project's other board came across as a board of its own, under its name, with its media.
   assert.deepEqual(
     importedBoard.boards.map((board) => [board.is_inbox, board.name]),
     [
@@ -474,7 +449,6 @@ const runRoundTrip = async ({ backend, browser, contexts, errors, tempDirectory 
   assert.equal(collidedVideo.board_id, null);
   assert.equal(collidedImage.board_id, null);
 
-  // Nothing the source hid came across.
   for (const hidden of [PROJECT_FILE_BOARD.intermediateImage, PROJECT_FILE_BOARD.canvasOwnedImage]) {
     const response = await fetch(`${backendOrigin}/api/v1/images/i/${encodeURIComponent(hidden)}`);
 
@@ -496,9 +470,7 @@ const runRoundTrip = async ({ backend, browser, contexts, errors, tempDirectory 
   contexts.delete(importContext);
   assertNoBrowserErrors(errors);
 
-  // The fixture was a schema-2 document with one `projectGraph`; export canonicalized it with that graph as the only
-  // workflow and no library write target, and import created it split, with the exporter's workspace as the
-  // importer's own.
+  // The schema-2 fixture's `projectGraph` becomes the only workflow; import stores it split (schema 4).
   assert.equal(imported.data.documentSchemaVersion, 4);
   assert.equal(imported.minimum_document_schema_version, 4);
   assert.equal(imported.data.workflows.entries.length, 1);
@@ -521,14 +493,13 @@ const runRoundTrip = async ({ backend, browser, contexts, errors, tempDirectory 
   };
 };
 
-/** Duplication copies board media but reuses external references on the same server. */
 const runDuplication = async ({ browser, contexts, errors, imported, importedBoardNames }) => {
   const context = await browser.newContext();
 
   contexts.add(context);
   const page = await context.newPage();
 
-  observeBrowserErrors(page, 'duplicate', errors);
+  await observeBrowserErrors(page, 'duplicate', errors);
   // Enter through Home so authentication settles before opening the library.
   await page.goto(`${origin}/#/`, { waitUntil: 'domcontentloaded' });
   await page.getByRole('heading', { exact: true, name: 'Welcome to Invoke' }).waitFor();
@@ -555,7 +526,6 @@ const runDuplication = async ({ browser, contexts, errors, imported, importedBoa
   const copiedBoard = await getBoardSnapshot(copy.project_id);
   const copiedBoardNames = snapshotItems(copiedBoard).map((item) => item.name);
 
-  // The copy has the same boards, each copied with its own media.
   assert.deepEqual(
     copiedBoard.boards.map((board) => [board.is_inbox, board.name]),
     [
@@ -575,7 +545,6 @@ const runDuplication = async ({ browser, contexts, errors, imported, importedBoa
   const importedLayers = getLayerImageNames(imported);
 
   assert.equal(copiedLayers.filter((name) => copiedBoardNames.includes(name)).length, 1);
-  // Everything outside the board is a pointer, and the pointer is still good.
   assert.deepEqual(
     copiedLayers.filter((name) => !copiedBoardNames.includes(name)).sort(),
     importedLayers.filter((name) => !importedBoardNames.includes(name)).sort()
@@ -587,11 +556,7 @@ const runDuplication = async ({ browser, contexts, errors, imported, importedBoa
   assertNoBrowserErrors(errors);
 };
 
-/**
- * The primary workflow journey: open a template into the project, edit it, switch away and back, save it to the
- * library under a new name, restart, and find both workflows intact. Project edits and runs issue no library writes;
- * the This-project view fetches no templates.
- */
+/** Project edits and runs issue no library writes; In this project reads no library pages or records. */
 const runWorkflowCollection = async ({ browser, contexts, errors, imported }) => {
   const projectId = imported.project_id;
   const template = await fetchJson('/api/v1/workflows/', {
@@ -624,35 +589,45 @@ const runWorkflowCollection = async ({ browser, contexts, errors, imported }) =>
   contexts.add(context);
   const page = await context.newPage();
 
-  observeBrowserErrors(page, 'workflow-collection', errors);
+  await observeBrowserErrors(page, 'workflow-collection', errors);
+  // The browser's own library reads, with their queries: the mock's request log keeps paths only.
+  const libraryReads = [];
+  page.on('request', (request) => {
+    const url = new URL(request.url());
+
+    if (request.method() === 'GET' && url.pathname.startsWith('/api/v1/workflows')) {
+      libraryReads.push(url);
+    }
+  });
   await page.goto(`${origin}/#/`, { waitUntil: 'domcontentloaded' });
   await page.getByRole('heading', { exact: true, name: 'Welcome to Invoke' }).waitFor();
   await page.goto(`${origin}/#/app?project=${encodeURIComponent(projectId)}`, { waitUntil: 'domcontentloaded' });
   await page.getByRole('main', { exact: true, name: imported.name }).waitFor();
   await selectLayoutPreset(page, 'Workflow', 'Workflow');
 
-  const workflowName = () => page.getByRole('button', { name: /^Open this project's workflows\. Current workflow: / });
   const dialog = page.getByRole('dialog', { exact: true, name: 'Workflows' });
   const cards = dialog.locator('[data-workflow-card]');
-  const openProjectWorkflows = async () => {
-    await workflowName().click();
-    await dialog.waitFor();
-    await dialog.locator('[data-library-tab="project"]').waitFor();
-  };
-  const currentWorkflowName = async () =>
-    (await workflowName().getAttribute('aria-label')).replace("Open this project's workflows. Current workflow: ", '');
+  const openProjectWorkflows = () => openWorkflowLibraryFromName(page);
+  const currentWorkflowName = () => currentWorkflowNameOf(page);
 
-  // The migrated project owns exactly its old graph, marked active; opening the local view fetched nothing.
   await openProjectWorkflows();
   assert.equal(await cards.count(), 1);
   await cards.first().locator('[data-active-workflow]').waitFor();
-  assert.equal(
-    (await workflowRequests()).slice(requestsBefore).some((entry) => entry.method === 'GET'),
-    false
+  const libraryPageOrRecordReads = libraryReads.filter(
+    (url) =>
+      /^\/api\/v1\/workflows\/i\/[^/]+$/.test(url.pathname) ||
+      (url.pathname === '/api/v1/workflows/' && Number(url.searchParams.get('per_page') ?? 'Infinity') > 1)
+  );
+  assert.deepEqual(
+    libraryPageOrRecordReads.map((url) => `${url.pathname}${url.search}`),
+    [],
+    'opening In this project must read no library pages or records'
   );
 
-  // A template opened from the library tabs becomes an independent copy in this project.
-  await dialog.getByText('Yours', { exact: true }).click();
+  await dialog
+    .getByRole('navigation', { name: 'Places' })
+    .getByRole('button', { name: /^My library/ })
+    .click();
   await dialog.locator('[data-library-tab="user"]').waitFor();
   await dialog.locator(`[data-workflow-card="${template.workflow_id}"]`).click();
   await dialog
@@ -662,7 +637,6 @@ const runWorkflowCollection = async ({ browser, contexts, errors, imported }) =>
   await dialog.waitFor({ state: 'hidden' });
   assert.equal(await currentWorkflowName(), 'Journey Template');
 
-  // Editing the copy: rename it through the local view. The library is not written.
   await openProjectWorkflows();
   assert.equal(await cards.count(), 2);
   // The rail's menu, not a tile's: every tile now carries its own More-actions button.
@@ -680,11 +654,9 @@ const runWorkflowCollection = async ({ browser, contexts, errors, imported }) =>
   await dialog.waitFor({ state: 'hidden' });
   assert.equal(await currentWorkflowName(), 'Journey Template edited');
 
-  // Switching to the other workflow and back keeps both documents.
-  await openProjectWorkflows();
-  await cards.filter({ hasText: 'Empty Workflow' }).dblclick();
-  await dialog.waitFor({ state: 'hidden' });
-  assert.equal(await currentWorkflowName(), 'Empty Workflow');
+  await workflowSwitcher(page).click();
+  await page.getByRole('menuitemradio', { exact: true, name: 'Empty Workflow' }).click();
+  await page.getByRole('button', { exact: true, name: `${WORKFLOW_SWITCHER_PREFIX}Empty Workflow` }).waitFor();
   await openProjectWorkflows();
   await cards.filter({ hasText: 'Journey Template edited' }).dblclick();
   await dialog.waitFor({ state: 'hidden' });
@@ -696,7 +668,6 @@ const runWorkflowCollection = async ({ browser, contexts, errors, imported }) =>
 
   assert.deepEqual(libraryWritesSoFar, [], 'project edits must not write to the workflow library');
 
-  // Save the edited copy under a new library name, without duplicating it beforehand.
   await page.getByRole('button', { exact: true, name: 'Save to library…' }).click();
   const saveDialog = page.getByRole('dialog', { exact: true, name: 'Save to library' });
   await saveDialog.waitFor();
@@ -718,7 +689,6 @@ const runWorkflowCollection = async ({ browser, contexts, errors, imported }) =>
   assert.equal(saved.revision, 1);
   assert.equal(library.items.find((item) => item.workflow_id === template.workflow_id)?.name, 'Journey Template');
 
-  // The project keeps both workflows; the saved copy now targets the new template and takes its name.
   const record = await waitForSavedWorkflows(
     projectId,
     (candidate) =>
@@ -727,7 +697,6 @@ const runWorkflowCollection = async ({ browser, contexts, errors, imported }) =>
     'two workflows with the saved copy linked to its new template'
   );
 
-  // Saved split: the content holds the workflows, and the workspace which one this account has open.
   assert.equal(record.data.documentSchemaVersion, 4);
   assert.deepEqual(
     record.data.workflows.entries.map((entry) => entry.document.name),
@@ -740,8 +709,7 @@ const runWorkflowCollection = async ({ browser, contexts, errors, imported }) =>
   });
   assert.equal(record.workspace.data.workflows.activeWorkflowId, record.data.workflows.entries[1].document.id);
 
-  // Restart: both workflows and the active selection come back from the server.
-  await page.reload({ waitUntil: 'domcontentloaded' });
+  await withBrowserNavigation(page, () => page.reload({ waitUntil: 'domcontentloaded' }));
   await page.getByRole('main', { exact: true, name: imported.name }).waitFor();
   await selectLayoutPreset(page, 'Workflow', 'Workflow');
   assert.equal(await currentWorkflowName(), 'Journey Saved');
@@ -755,10 +723,7 @@ const runWorkflowCollection = async ({ browser, contexts, errors, imported }) =>
   assertNoBrowserErrors(errors);
 };
 
-/**
- * Whether browser recovery holds `marker`, in the unload journal or in a staged draft, read from a same-origin page no
- * editor has reconciled it from. A draft staged by an autosave that beat the navigation retires the journal entry.
- */
+/** A draft staged by an autosave that beat the navigation retires the journal entry. */
 const isRecoverable = (page, marker) =>
   page.evaluate(async (needle) => {
     const read = async (name, storeName) => {
@@ -793,21 +758,16 @@ const isRecoverable = (page, marker) =>
     return false;
   }, marker);
 
-/**
- * Edits made just before the page goes away survive a real unload. A rename commits at once and each navigation
- * follows its click immediately, normally well inside the autosave debounce, so the edit crosses in the unload journal.
- */
+/** Each navigation follows its click well inside the autosave debounce, so the edit crosses in the unload journal. */
 const runUnloadRecovery = async ({ browser, contexts, errors, imported }) => {
   const context = await browser.newContext();
   contexts.add(context);
   const page = await context.newPage();
-  observeBrowserErrors(page, 'unload recovery', errors);
+  await observeBrowserErrors(page, 'unload recovery', errors);
   const main = page.getByRole('main', { exact: true, name: imported.name });
-  const workflowName = page.getByRole('button', { name: /^Open this project's workflows\. Current workflow: / });
   const dialog = page.getByRole('dialog', { exact: true, name: 'Workflows' });
   const renameDialog = page.getByRole('dialog', { exact: true, name: 'Rename workflow' });
-  const currentWorkflowName = async () =>
-    (await workflowName.getAttribute('aria-label')).replace("Open this project's workflows. Current workflow: ", '');
+  const currentWorkflowName = () => currentWorkflowNameOf(page);
   const openEditor = async () => {
     await page.goto(`${origin}/#/app?project=${encodeURIComponent(imported.project_id)}`, {
       waitUntil: 'domcontentloaded',
@@ -817,26 +777,24 @@ const runUnloadRecovery = async ({ browser, contexts, errors, imported }) => {
   };
   const rename = (name) => renameActiveWorkflow(page, name);
 
-  // Navigating away: browser recovery holds the edit before any editor loads again. Saves to the server are held,
-  // so it is there only through the journal written while the page unloaded, or through an autosave's local stage.
   await openEditor();
   // Never answered: the page goes away with the request still open, so nothing is logged.
   const holdProjectSaves = (route) => (route.request().method() === 'PUT' ? new Promise(() => {}) : route.fallback());
   await page.route('**/api/v1/projects/**', holdProjectSaves);
   await rename('Unload navigate');
-  await page.goto(`${origin}/manifest.webmanifest`, { waitUntil: 'domcontentloaded' });
+  await withBrowserNavigation(page, () =>
+    page.goto(`${origin}/manifest.webmanifest`, { waitUntil: 'domcontentloaded' })
+  );
   assert.equal(await isRecoverable(page, 'Unload navigate'), true, 'browser recovery holds the rename after unload');
   await page.unroute('**/api/v1/projects/**', holdProjectSaves);
   await openEditor();
   assert.equal(await currentWorkflowName(), 'Unload navigate');
 
-  // Reloading the editor.
   await rename('Unload reload');
-  await page.reload({ waitUntil: 'domcontentloaded' });
+  await withBrowserNavigation(page, () => page.reload({ waitUntil: 'domcontentloaded' }));
   await main.waitFor();
   assert.equal(await currentWorkflowName(), 'Unload reload');
 
-  // Leaving the editor and reloading at once, while its exit checkpoint may still be saving.
   await rename('Unload home');
   await renameDialog.waitFor({ state: 'hidden' });
   await page.keyboard.press('Escape');
@@ -844,7 +802,7 @@ const runUnloadRecovery = async ({ browser, contexts, errors, imported }) => {
   await page.getByRole('button', { exact: true, name: 'Open menu' }).click();
   await page.getByRole('menuitem', { exact: true, name: 'Launchpad' }).click();
   await page.waitForURL(/#\/$/);
-  await page.reload({ waitUntil: 'domcontentloaded' });
+  await withBrowserNavigation(page, () => page.reload({ waitUntil: 'domcontentloaded' }));
   await page.getByRole('heading', { exact: true, name: 'Welcome to Invoke' }).waitFor();
   await openEditor();
   assert.equal(await currentWorkflowName(), 'Unload home');
@@ -899,10 +857,6 @@ const regionalLayerWithReference = (image) => ({
   type: 'regional_guidance',
 });
 
-/**
- * Store a media URL everywhere a project keeps one (gallery selection, compare and recents; a staging candidate; a
- * regional reference image), each naming `base`, exactly as a page at `base` saves them.
- */
 const seedMediaUrls = async (projectId, base, [selected, compare, recent, staged, reference]) => {
   const record = await getProjectRecord(projectId);
   const data = structuredClone(record.data);
@@ -948,11 +902,7 @@ const seedMediaUrls = async (projectId, base, [selected, compare, recent, staged
   });
 };
 
-/**
- * A project saved at one origin opens at another (another computer, or `localhost` after `127.0.0.1`) with every
- * stored media URL rebuilt for the origin it opens at: nothing is requested from the first, which is out of reach, and
- * opening saves nothing. The next edits save the second origin's URLs.
- */
+/** Opening at another origin rebuilds every stored media URL and saves nothing; nothing is requested from the first. */
 const runSecondOrigin = async ({ browser, contexts, errors, imported, importedBoardNames }) => {
   const imageNames = importedBoardNames.filter((name) => name.endsWith('.png'));
   const seeded = Array.from({ length: 5 }, (_, index) => imageNames[index % imageNames.length]);
@@ -962,13 +912,12 @@ const runSecondOrigin = async ({ browser, contexts, errors, imported, importedBo
   const context = await browser.newContext();
 
   contexts.add(context);
-  // The origin that saved the project is another machine as far as this page is concerned.
   await context.route(`${origin}/**`, (route) => route.abort());
   const page = await context.newPage();
   const requests = [];
 
   page.on('request', (request) => requests.push({ method: request.method(), url: request.url() }));
-  observeBrowserErrors(page, 'second origin', errors);
+  await observeBrowserErrors(page, 'second origin', errors);
   await page.goto(`${secondOrigin}/#/app?project=${encodeURIComponent(imported.project_id)}`, {
     waitUntil: 'domcontentloaded',
   });
@@ -984,12 +933,10 @@ const runSecondOrigin = async ({ browser, contexts, errors, imported, importedBo
   assert.equal(unchanged.revision, opened.revision);
   assert.equal(unchanged.workspace.revision, opened.workspace.revision);
 
-  // One edit in each half: the workflow's name is content, the layout preset is the caller's workspace.
   await selectLayoutPreset(page, 'Workflow', 'Workflow');
   await renameActiveWorkflow(page, 'Second origin');
   await page.keyboard.press('Escape');
   await selectLayoutPreset(page, 'Compose', 'Preview');
-  // Preview shows the selection, from this origin.
   const selectedUrl = imageUrls(secondOrigin, seeded[0]).full;
   const deadline = Date.now() + 10_000;
 
@@ -1025,17 +972,14 @@ const runSecondOrigin = async ({ browser, contexts, errors, imported, importedBo
   assertNoBrowserErrors(errors);
 };
 
-/**
- * Over plain HTTP from a network address the page is not a secure context: no Web Locks, no clipboard. The Launchpad
- * says so until dismissed, delete still works in this tab, and copy controls stay visible but disabled with a reason.
- */
+/** Plain HTTP from a network address is not a secure context: no Web Locks, no clipboard. */
 const runPlainHttp = async ({ browser, contexts, errors }) => {
   const context = await browser.newContext();
 
   contexts.add(context);
   const page = await context.newPage();
 
-  observeBrowserErrors(page, 'plain HTTP', errors);
+  await observeBrowserErrors(page, 'plain HTTP', errors);
   await page.goto(`${plainHttpOrigin}/#/projects`, { waitUntil: 'domcontentloaded' });
   assert.equal(await page.evaluate(() => window.isSecureContext), false);
 
@@ -1062,17 +1006,15 @@ const runPlainHttp = async ({ browser, contexts, errors }) => {
     false
   );
 
-  // Dismissed, the notice stays dismissed on this origin.
   await notice.getByRole('button', { exact: true, name: 'Dismiss' }).click();
   await notice.waitFor({ state: 'detached' });
-  await page.reload({ waitUntil: 'domcontentloaded' });
+  await withBrowserNavigation(page, () => page.reload({ waitUntil: 'domcontentloaded' }));
   await page
     .getByRole('link', { exact: true, name: `Open ${sourceProjectName}` })
     .first()
     .waitFor();
   assert.equal(await notice.count(), 0, 'the dismissed notice came back after a reload');
 
-  // Copy controls stay, disabled, and say why.
   await page.getByRole('link', { exact: true, name: 'Nodes' }).click();
   const copyPath = page.getByRole('button', { exact: true, name: 'Copy path' });
 
@@ -1086,7 +1028,6 @@ const runPlainHttp = async ({ browser, contexts, errors }) => {
   assertNoBrowserErrors(errors);
 };
 
-/** Count missing board media separately from missing document references. */
 const runMissingBinaryImport = async ({ browser, contexts, entries, errors, tempDirectory }) => {
   const damagedPath = await writeArchiveWithout(
     entries,
@@ -1135,8 +1076,7 @@ const getDefaultDependencies = () => ({
   killPreview,
   launchBrowser: ({ timeoutMs }) =>
     chromium.launch({
-      // `lan.test` reaches the preview without being a secure context; `localhost` is pinned to the address the
-      // preview binds, where a runner resolving it to `::1` first would find nothing.
+      // `localhost` is pinned to the preview's address, where a runner resolving `::1` first would find nothing.
       args: [`--host-resolver-rules=MAP ${plainHttpHost} 127.0.0.1, MAP localhost 127.0.0.1`],
       headless: true,
       timeout: timeoutMs,

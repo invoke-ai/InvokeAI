@@ -2,6 +2,7 @@ import type { Project, WorkbenchState } from '@workbench/projectContracts';
 
 import { createUuid } from '@platform/browser/randomUuid';
 import { accountLifecycle, captureAccountScope } from '@platform/state/accountLifecycle';
+import { RequestDeadlineError } from '@platform/transport/http';
 import {
   createDraftProject,
   createInitialWorkbenchState,
@@ -21,13 +22,11 @@ import { getProjectSyncSnapshot } from './syncStore';
 
 const now = '2026-10-05T00:00:00.000Z';
 
-/** An in-memory project server; `offline` fails writes as an unreachable server does, and `gate` holds updates. */
 export const createUnloadJournalServer = () => {
   const records = new Map<string, ProjectWithWorkspaceDTO>();
   let session: WorkbenchSessionBlob | null = null;
   const server = {
     creates: 0,
-    /** Applies a create or an update but never answers it, as when the response is lost. */
     dropNextCreateResponse: false,
     dropNextUpdateResponse: false,
     dropNextWorkspaceResponse: false,
@@ -44,8 +43,6 @@ export const createUnloadJournalServer = () => {
     server.offline ? Promise.reject(new TypeError('Failed to fetch')) : Promise.resolve(apply());
   const notFound = () => Object.assign(new Error('not found'), { status: 404 });
   const api: DurableProjectPersistenceApi = {
-    // As the settled create: a retry that finds its first attempt committed answers with that project, whichever
-    // halves it stored; an id another project holds is a conflict.
     createProject: (request) =>
       write(() => {
         server.creates += 1;
@@ -56,7 +53,6 @@ export const createUnloadJournalServer = () => {
           }
           return structuredClone(existing);
         }
-        // The caller's first workspace is stored with the content, in the same step.
         const workspace = request.workspace
           ? { data: structuredClone(request.workspace), revision: 1, updated_at: now }
           : null;
@@ -134,7 +130,6 @@ export const createUnloadJournalServer = () => {
       if (current.revision !== request.expected_revision) {
         throw Object.assign(new Error('conflict'), { status: 409 });
       }
-      // A workspace sent with the content is stored in the same step, or refuses the content with it.
       if (request.workspace && (current.workspace?.revision ?? null) !== request.workspace.expected_revision) {
         throw Object.assign(new Error('conflict'), { status: 409 });
       }
@@ -180,29 +175,21 @@ const emptyQueueRunJournal = (() =>
     listProjectIds: () => Promise.resolve({ kind: 'available', projectIds: [] }),
   })) as unknown as NonNullable<Parameters<typeof createDurableSyncedWorkbenchPersistence>[1]>['queueRunJournal'];
 
-/**
- * Unload journal journeys through the persistence service, against a draft store the caller provides (in memory or
- * real IndexedDB). A "reload" is a new service for the same editor session and store, which never ran the old page's
- * pending work; every write the old page could still make is made explicitly.
- */
+/** A "reload" is a new service for the same session and store; the old page's pending writes are made explicitly. */
 export const testUnloadJournalScenarios = (createStore: () => Promise<ProjectDraftStore>): void => {
   let api: DurableProjectPersistenceApi;
   let server: ReturnType<typeof createUnloadJournalServer>['server'];
   let store: ProjectDraftStore;
   let project: Project;
-  /** Every journal write, so a test can write one again as if its deletion had failed. */
   let written: ProjectUnloadJournalEntry[];
   let writer = 0;
-  /** Holds the writer's settlement of its journal, and the server's creation of a save-as-new copy. */
   let settleGate: Promise<void> | null;
   let settlesStarted: number;
   let copyGate: Promise<void> | null;
   let copiesStarted: number;
 
-  /** The editor sessions of pages that are still running, as the Web Lock each page holds would show. */
   let liveEditorSessionIds: Set<string>;
 
-  /** A page of the tab `editorSessionId`; it stays live until `unloadTab`, and a reload reuses the same id. */
   const openTab = (editorSessionId = 'tab-a') => {
     writer += 1;
     liveEditorSessionIds.add(editorSessionId);
@@ -228,7 +215,6 @@ export const testUnloadJournalScenarios = (createStore: () => Promise<ProjectDra
             },
             input.owner
           )),
-          // A copy of a whole document: no workspace until its first save splits it.
           workspace: null,
         };
       },
@@ -240,7 +226,6 @@ export const testUnloadJournalScenarios = (createStore: () => Promise<ProjectDra
   };
   const named = (state: WorkbenchState, name: string): WorkbenchState =>
     stateWith(state.projects.map((candidate) => (candidate.id === project.id ? { ...candidate, name } : candidate)));
-  /** A change to how one works on the project: its workspace alone. */
   const prompted = (state: WorkbenchState, prompt: string, projectId = project.id): WorkbenchState =>
     stateWith(
       state.projects.map((candidate) =>
@@ -250,12 +235,10 @@ export const testUnloadJournalScenarios = (createStore: () => Promise<ProjectDra
       )
     );
   const serverName = () => server.records.get(project.id)?.name;
-  /** Another tab's save, as the server sees it. */
   const saveElsewhere = (name: string, revision: number) => {
     const current = server.records.get(project.id)!;
     server.records.set(project.id, { ...current, data: { ...current.data, name }, name, revision });
   };
-  /** What the deletion of each journal entry would have removed, written back. */
   const failEveryJournalDeletion = () => {
     store.journalBeforeUnload({ entries: written, retired: [] });
   };
@@ -286,7 +269,6 @@ export const testUnloadJournalScenarios = (createStore: () => Promise<ProjectDra
       },
     };
     project = createDraftProject([]);
-    // A project as this build saves it: content, with the caller's workspace beside it.
     const halves = splitProjectDocument(serializeProjectDocumentV3(project));
     server.records.set(project.id, {
       board_id: `board-${project.id}`,
@@ -313,7 +295,6 @@ export const testUnloadJournalScenarios = (createStore: () => Promise<ProjectDra
     const tab = openTab();
     const loaded = await tab.loadWorkbench();
     expect(tab.journalBeforeUnload(named(loaded.state, 'Typed, then undone'))).toMatchObject({ kind: 'journaled' });
-    // Shown again and undone: the save finds nothing to stage or push.
     await tab.saveWorkbench(loaded.state);
     failEveryJournalDeletion();
 
@@ -338,7 +319,6 @@ export const testUnloadJournalScenarios = (createStore: () => Promise<ProjectDra
 
       expect(other.state.projects).toMatchObject([{ id: project.id, name: project.name }]);
       expect(other.conflicts).toEqual([]);
-      // Shown again and undone: the save settles the journal, and nothing holds the undone edit any more.
       await tab.saveWorkbench(loaded.state);
       const recovered = await openTab().loadWorkbench();
 
@@ -394,7 +374,6 @@ export const testUnloadJournalScenarios = (createStore: () => Promise<ProjectDra
     });
 
     describe('under a lineage named after another tab, which the session blob handed on', () => {
-      // Tab A isolated the project's lineage (an unopenable draft, say); every tab that loads the session inherits it.
       const inheritedLineage = `tab-a:writer:writer-1`;
       beforeEach(async () => {
         await api.saveSession(stateWith([project]), 'tab-a', { [project.id]: inheritedLineage });
@@ -427,7 +406,6 @@ export const testUnloadJournalScenarios = (createStore: () => Promise<ProjectDra
           kind: 'available',
           projectIds: [project.id],
         });
-        // Gone now: the next load takes the entry.
         unloadTab('tab-a');
         const recovered = await openTab('tab-b').loadWorkbench();
         expect(recovered.state.projects).toMatchObject([{ id: project.id, name: "Typed in the lineage's own tab" }]);
@@ -436,7 +414,6 @@ export const testUnloadJournalScenarios = (createStore: () => Promise<ProjectDra
   });
 
   describe('a staged draft of a tab that is still running', () => {
-    /** Tab A stages an edit the server has not acknowledged (it is unreachable), then keeps running. */
     const stageInTab = async (name: string) => {
       const tab = openTab();
       const loaded = await tab.loadWorkbench();
@@ -462,7 +439,6 @@ export const testUnloadJournalScenarios = (createStore: () => Promise<ProjectDra
         draft: { documentJson: expect.stringContaining('Staged in tab A') as unknown },
         kind: 'found',
       });
-      // Undone in tab A: its own save retires the edit, which no other tab holds.
       await tab.saveWorkbench(loaded.state);
       await expect(store.listForProject(project.id)).resolves.toMatchObject({ items: [] });
     });
@@ -470,7 +446,6 @@ export const testUnloadJournalScenarios = (createStore: () => Promise<ProjectDra
     it('is still taken by a reload of that tab, which holds the same editor session', async () => {
       const tab = openTab();
       const loaded = await tab.loadWorkbench();
-      // Never reached the server or the session: only its draft makes the reload open it.
       const fresh = { ...createDraftProject(loaded.state.projects), name: 'Created offline' };
       server.offline = true;
       await tab.saveWorkbench(stateWith([...loaded.state.projects, fresh]));
@@ -498,7 +473,6 @@ export const testUnloadJournalScenarios = (createStore: () => Promise<ProjectDra
     const tab = openTab();
     const loaded = await tab.loadWorkbench();
     tab.journalBeforeUnload(named(loaded.state, 'Typed, then undone'));
-    // Undone and hidden again at once: the journal of the undone state is retired in the same blind write.
     expect(tab.journalBeforeUnload(loaded.state)).toMatchObject({ kind: 'journaled', projectIds: [] });
 
     const recovered = await openTab().loadWorkbench();
@@ -512,7 +486,6 @@ export const testUnloadJournalScenarios = (createStore: () => Promise<ProjectDra
     const loaded = await tab.loadWorkbench();
     tab.journalBeforeUnload(named(loaded.state, 'Typed, then undone'));
     tab.journalBeforeUnload(loaded.state);
-    // The blind retirement never reached storage, but the page lived on and saved.
     failEveryJournalDeletion();
     await tab.saveWorkbench(loaded.state);
     failEveryJournalDeletion();
@@ -536,6 +509,265 @@ export const testUnloadJournalScenarios = (createStore: () => Promise<ProjectDra
     expect(recovered.state.projects).toMatchObject([{ id: project.id, name: 'Typed, undone, redone' }]);
   });
 
+  it('keeps a redo journal distinct from the undo queued while its original stage is in flight', async () => {
+    const tab = openTab();
+    const loaded = await tab.loadWorkbench();
+    const redone = named(loaded.state, 'Typed, undone, redone during stage');
+    const stage = store.stage;
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let started!: () => void;
+    const staging = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    store.stage = async (input) => {
+      const result = await stage(input);
+      started();
+      await gate;
+      return result;
+    };
+    const saving = tab.saveWorkbench(redone);
+    await staging;
+    tab.journalBeforeUnload(redone);
+    tab.journalBeforeUnload(loaded.state);
+    const undoing = tab.saveWorkbench(loaded.state);
+    tab.journalBeforeUnload(redone);
+    store.stage = stage;
+    release();
+    await Promise.all([saving, undoing]);
+    expect(serverName()).toBe(redone.projects[0]!.name);
+
+    await expect(tab.saveWorkbench(redone)).resolves.toMatchObject({ hasPendingChanges: false, shouldRetry: false });
+    await expect(tab.saveWorkbench(loaded.state)).resolves.toMatchObject({
+      hasPendingChanges: false,
+      shouldRetry: false,
+    });
+    expect(serverName()).toBe(project.name);
+    await expect(tab.saveWorkbench(redone)).resolves.toMatchObject({ hasPendingChanges: false, shouldRetry: false });
+    const reloaded = openTab();
+    const recovered = await reloaded.loadWorkbench();
+    expect(recovered.conflicts).toEqual([]);
+    expect(recovered.state.projects).toMatchObject([{ id: project.id, name: redone.projects[0]!.name }]);
+  });
+
+  it('fences a queued undo flush when redo retires its journal into an already staged document', async () => {
+    const tab = openTab();
+    const loaded = await tab.loadWorkbench();
+    const redone = named(loaded.state, 'Durably staged redo');
+    const undone = named(loaded.state, 'Undo queued before redo');
+    let release!: () => void;
+    server.gate = new Promise((resolve) => {
+      release = resolve;
+    });
+    const saving = tab.saveWorkbench(redone);
+    await vi.waitFor(() => expect(server.updates).toBe(1));
+    const staged = await store.get(project.id, 'tab-a');
+    expect(staged.kind).toBe('found');
+    if (staged.kind === 'found') {
+      expect(JSON.parse(staged.draft.documentJson)).toMatchObject({ name: 'Durably staged redo' });
+    }
+    tab.journalBeforeUnload(undone);
+    const staleFlush = tab.flushProjectToServer(undone.projects[0]!);
+    tab.journalBeforeUnload(redone);
+    server.gate = null;
+    release();
+    await saving;
+    await expect(staleFlush).resolves.toMatchObject({ kind: 'unsynced' });
+    expect(serverName()).toBe('Durably staged redo');
+    expect(server.updates).toBe(1);
+    await expect(store.listForProject(project.id)).resolves.toMatchObject({ items: [] });
+
+    failEveryJournalDeletion();
+    await expect(tab.saveWorkbench(redone)).resolves.toMatchObject({ hasPendingChanges: false, shouldRetry: false });
+    failEveryJournalDeletion();
+    const reloaded = openTab();
+    const recovered = await reloaded.loadWorkbench();
+    expect(recovered.conflicts).toEqual([]);
+    expect(recovered.state.projects).toMatchObject([{ id: project.id, name: 'Durably staged redo' }]);
+    await expect(reloaded.saveWorkbench(undone)).resolves.toMatchObject({ hasPendingChanges: false });
+    expect(serverName()).toBe('Undo queued before redo');
+    await expect(reloaded.saveWorkbench(redone)).resolves.toMatchObject({ hasPendingChanges: false });
+    expect(serverName()).toBe('Durably staged redo');
+  });
+
+  it.each(['unavailable', 'aborted'] as const)(
+    'renews a checkpoint matching the physical journal after its retirement was %s',
+    async (failure) => {
+      const tab = openTab();
+      const loaded = await tab.loadWorkbench();
+      const staged = named(loaded.state, 'Staged before retirement');
+      const latest = named(loaded.state, 'Latest after storage recovered');
+      let release!: () => void;
+      server.gate = new Promise((resolve) => {
+        release = resolve;
+      });
+      const saving = tab.saveWorkbench(staged);
+      await vi.waitFor(() => expect(server.updates).toBe(1));
+      const firstJournal = tab.journalBeforeUnload(latest);
+      expect(firstJournal.kind).toBe('journaled');
+      if (firstJournal.kind === 'journaled') {
+        expect(await firstJournal.written).toBe(true);
+      }
+      const journal = store.journalBeforeUnload;
+      store.journalBeforeUnload = () =>
+        failure === 'unavailable' ? { kind: 'unavailable' } : { kind: 'started', written: Promise.resolve(false) };
+      const retirement = tab.journalBeforeUnload(staged);
+      expect(retirement.kind).toBe(failure === 'unavailable' ? 'unavailable' : 'journaled');
+      if (retirement.kind === 'journaled') {
+        expect(await retirement.written).toBe(false);
+      }
+      store.journalBeforeUnload = journal;
+      const staleFlush = tab.flushProjectToServer(staged.projects[0]!);
+      const checkpoint = tab.journalBeforeUnload(latest);
+      server.gate = null;
+      release();
+      await saving;
+      await expect(staleFlush).resolves.toMatchObject({ kind: 'unsynced' });
+      expect(checkpoint).toMatchObject({ kind: 'journaled', projectIds: [project.id] });
+      if (checkpoint.kind === 'journaled') {
+        expect(await checkpoint.written).toBe(true);
+      }
+      expect(server.updates).toBe(1);
+      const reloaded = openTab();
+      const recovered = await reloaded.loadWorkbench();
+      expect(recovered.conflicts).toEqual([]);
+      expect(recovered.state.projects).toMatchObject([{ id: project.id, name: 'Latest after storage recovered' }]);
+      await expect(reloaded.saveWorkbench(recovered.state)).resolves.toMatchObject({ hasPendingChanges: false });
+      expect(serverName()).toBe('Latest after storage recovered');
+    }
+  );
+
+  it('journals the latest checkpoint above an older same-document stage and intervening journal', async () => {
+    const tab = openTab();
+    const loaded = await tab.loadWorkbench();
+    const latest = named(loaded.state, 'Latest matches the pending stage');
+    const intervening = named(loaded.state, 'Intervening checkpoint');
+    const stage = store.stage;
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let started!: () => void;
+    const staging = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    store.stage = async (input) => {
+      const result = await stage(input);
+      started();
+      await gate;
+      return result;
+    };
+    const saving = tab.flushProjectToServer(latest.projects[0]!);
+    await staging;
+    tab.journalBeforeUnload(intervening);
+    const checkpoint = tab.journalBeforeUnload(latest);
+    store.stage = stage;
+    release();
+    await saving;
+    expect(checkpoint).toMatchObject({ kind: 'journaled', projectIds: [project.id] });
+    if (checkpoint.kind === 'journaled') {
+      expect(await checkpoint.written).toBe(true);
+    }
+    const reloaded = openTab();
+    const recovered = await reloaded.loadWorkbench();
+    expect(recovered.conflicts).toEqual([]);
+    expect(recovered.state.projects).toMatchObject([{ id: project.id, name: 'Latest matches the pending stage' }]);
+    await expect(reloaded.saveWorkbench(recovered.state)).resolves.toMatchObject({ hasPendingChanges: false });
+    expect(serverName()).toBe('Latest matches the pending stage');
+  });
+
+  it('keeps a redo in recovery while a different document finishes staging', async () => {
+    const tab = openTab();
+    const loaded = await tab.loadWorkbench();
+    const redone = named(loaded.state, 'Acknowledged redo');
+    const undone = named(loaded.state, 'Undo staging during redo');
+    await tab.saveWorkbench(redone);
+    tab.journalBeforeUnload(undone);
+    const stage = store.stage;
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let started!: () => void;
+    const staging = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    store.stage = async (input) => {
+      const result = await stage(input);
+      started();
+      await gate;
+      return result;
+    };
+    const undoing = tab.flushProjectToServer(undone.projects[0]!);
+    await staging;
+    tab.journalBeforeUnload(redone);
+    store.stage = stage;
+    release();
+    await undoing;
+
+    const reloaded = openTab();
+    const recovered = await reloaded.loadWorkbench();
+    expect(recovered.conflicts).toEqual([]);
+    expect(recovered.state.projects).toMatchObject([{ id: project.id, name: 'Acknowledged redo' }]);
+    await expect(reloaded.saveWorkbench(recovered.state)).resolves.toMatchObject({ hasPendingChanges: false });
+    expect(serverName()).toBe('Acknowledged redo');
+  });
+
+  it('fences a queued undo flush while a recovery-only redo settles its old journal', async () => {
+    const tab = openTab();
+    const loaded = await tab.loadWorkbench();
+    const redone = named(loaded.state, 'Already saved redo');
+    const undone = named(loaded.state, 'Undo captured before settlement');
+    await tab.saveWorkbench(redone);
+    tab.journalBeforeUnload(undone);
+    let release!: () => void;
+    settleGate = new Promise((resolve) => {
+      release = resolve;
+    });
+    const settling = tab.flushProjectToServer(redone.projects[0]!);
+    await vi.waitFor(() => expect(settlesStarted).toBe(1));
+    const staleFlush = tab.flushProjectToServer(undone.projects[0]!);
+    tab.journalBeforeUnload(redone);
+    settleGate = null;
+    release();
+    await expect(settling).resolves.toMatchObject({ kind: 'acknowledged' });
+    await expect(staleFlush).resolves.toMatchObject({ kind: 'unsynced' });
+    expect(serverName()).toBe('Already saved redo');
+    expect(server.updates).toBe(1);
+    const recovered = await openTab().loadWorkbench();
+    expect(recovered.conflicts).toEqual([]);
+    expect(recovered.state.projects).toMatchObject([{ id: project.id, name: 'Already saved redo' }]);
+  });
+
+  it.each(['content', 'content and workspace'] as const)(
+    'does not rewrite an undo-retired journal when older %s acknowledges',
+    async (halves) => {
+      const tab = openTab();
+      const loaded = await tab.loadWorkbench();
+      const content = named(loaded.state, 'Saved before the undo');
+      const saved = halves === 'content' ? content : prompted(content, 'Saved workspace before the undo');
+      let release!: () => void;
+      server.gate = new Promise((resolve) => {
+        release = resolve;
+      });
+      const saving = tab.saveWorkbench(saved);
+      await vi.waitFor(() => expect(server.updates).toBe(1));
+      tab.journalBeforeUnload(named(loaded.state, 'Typed, then undone'));
+      tab.journalBeforeUnload(saved);
+      server.gate = null;
+      release();
+      await saving;
+
+      const recovered = await openTab().loadWorkbench();
+      expect(recovered.conflicts).toEqual([]);
+      expect(serializeProjectDocumentV3(recovered.state.projects[0]!)).toEqual(
+        serializeProjectDocumentV3(saved.projects[0]!)
+      );
+    }
+  );
+
   it('journals an edit redone while its earlier journal was being settled', async () => {
     const tab = openTab();
     const loaded = await tab.loadWorkbench();
@@ -555,6 +787,129 @@ export const testUnloadJournalScenarios = (createStore: () => Promise<ProjectDra
     const recovered = await openTab().loadWorkbench();
 
     expect(recovered.state.projects).toMatchObject([{ id: project.id, name: 'Typed, undone, redone' }]);
+  });
+
+  it('keeps the latest journal and workspace conflict when the recovered merge cannot be staged', async () => {
+    const tab = openTab();
+    const loaded = await tab.loadWorkbench();
+    const remote = prompted(loaded.state, 'Workspace saved elsewhere');
+    const record = server.records.get(project.id)!;
+    const workspace = splitProjectDocument(serializeProjectDocumentV3(remote.projects[0]!)).workspace;
+    server.records.set(project.id, {
+      ...record,
+      workspace: { data: workspace as unknown as Record<string, unknown>, revision: 2, updated_at: now },
+    });
+    const local = prompted(loaded.state, 'Workspace edited here');
+    await expect(tab.saveWorkbench(local)).resolves.toMatchObject({ conflicts: [{ half: 'workspace' }] });
+    const stage = store.stage;
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let started!: () => void;
+    const staging = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    store.stage = async () => {
+      started();
+      await gate;
+      return { kind: 'fenced' };
+    };
+    const resolving = tab.resolveConflictUseServer(project.id);
+    const rejected = expect(resolving).rejects.toMatchObject({
+      name: 'ProjectDraftWriteRejectedError',
+      reason: 'fenced',
+    });
+    await staging;
+    await expect(store.get(project.id, 'tab-a')).resolves.toMatchObject({ draft: { state: 'dirty' } });
+    const latest = named(local, 'Typed while workspace recovery waited');
+    const journal = tab.journalBeforeUnload(latest);
+    expect(journal.kind).toBe('journaled');
+    if (journal.kind === 'journaled') {
+      expect(await journal.written).toBe(true);
+    }
+    store.stage = stage;
+    release();
+    await rejected;
+    expect(server.updates).toBe(0);
+    expect(server.workspaceUpdates).toBe(1);
+    expect(server.creates).toBe(0);
+    expect(server.records.get(project.id)?.workspace).toMatchObject({
+      data: { promptHistory: [{ positivePrompt: 'Workspace saved elsewhere' }] },
+      revision: 2,
+    });
+    await expect(store.get(project.id, 'tab-a')).resolves.toMatchObject({ draft: { state: 'conflict' } });
+    expect(getProjectSyncSnapshot().projects[project.id]?.conflict).toMatchObject({ half: 'workspace' });
+
+    const reloaded = openTab();
+    const recovered = await reloaded.loadWorkbench();
+    expect(recovered.conflicts).toMatchObject([{ half: 'workspace' }]);
+    expect(recovered.state.projects).toMatchObject([{ name: 'Typed while workspace recovery waited' }]);
+    const retried = await reloaded.resolveConflictUseServer(project.id);
+    expect(retried.status).toBe('loaded');
+    if (retried.status !== 'loaded') {
+      throw new Error('Expected workspace recovery to remain available.');
+    }
+    reloaded.acknowledgeProjectResolution(project.id);
+    await expect(reloaded.saveWorkbench(stateWith([retried.project]))).resolves.toMatchObject({
+      conflicts: [],
+      hasPendingChanges: false,
+    });
+    expect(serverName()).toBe('Typed while workspace recovery waited');
+    expect(retried.project.promptHistory).toEqual(remote.projects[0]!.promptHistory);
+  });
+
+  it('keeps the latest journal and source conflict when preparing a copy is fenced', async () => {
+    const tab = openTab();
+    const loaded = await tab.loadWorkbench();
+    saveElsewhere('Saved elsewhere', 2);
+    const local = named(loaded.state, 'Conflicted local edit');
+    await expect(tab.saveWorkbench(local)).resolves.toMatchObject({ conflicts: [{ kind: 'revision' }] });
+    const stage = store.stage;
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let started!: () => void;
+    const staging = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    store.stage = async () => {
+      started();
+      await gate;
+      return { kind: 'fenced' };
+    };
+    const copying = tab.resolveConflictSaveAsNew(named(local, 'Edit selected for copying').projects[0]!);
+    const rejected = expect(copying).rejects.toMatchObject({
+      name: 'ProjectDraftWriteRejectedError',
+      reason: 'fenced',
+    });
+    await staging;
+    const latest = named(local, 'Typed while copy preparation waited');
+    const journal = tab.journalBeforeUnload(latest);
+    expect(journal.kind).toBe('journaled');
+    if (journal.kind === 'journaled') {
+      expect(await journal.written).toBe(true);
+    }
+    store.stage = stage;
+    release();
+    await rejected;
+    expect(copiesStarted).toBe(0);
+    expect(server.creates).toBe(0);
+    expect(serverName()).toBe('Saved elsewhere');
+    expect(server.updates).toBe(1);
+    await expect(store.get(project.id, 'tab-a')).resolves.toMatchObject({ draft: { state: 'conflict' } });
+    expect(getProjectSyncSnapshot().projects[project.id]?.conflict).toMatchObject({ kind: 'revision' });
+
+    const reloaded = openTab();
+    const recovered = await reloaded.loadWorkbench();
+    expect(recovered.conflicts).toMatchObject([{ kind: 'revision' }]);
+    expect(recovered.state.projects).toMatchObject([{ name: 'Typed while copy preparation waited' }]);
+    const retried = await reloaded.resolveConflictSaveAsNew(recovered.state.projects[0]!);
+    expect(copiesStarted).toBe(1);
+    expect(server.creates).toBe(1);
+    expect(server.records.get(retried.targetProjectId)?.data.name).toBe('Typed while copy preparation waited (copy)');
+    expect(serverName()).toBe('Saved elsewhere');
   });
 
   describe('a hidden event during save-as-new', () => {
@@ -597,7 +952,6 @@ export const testUnloadJournalScenarios = (createStore: () => Promise<ProjectDra
       const copyRecord = server.records.get(copy.targetProjectId);
       expect(copyRecord?.data.name).toBe('Local (copy)');
       expect(JSON.stringify(copyRecord?.data)).not.toContain('Typed during the copy');
-      // The source lineage moved to the copy, so the entry written for the source is discarded rather than revived.
       await openTab().loadWorkbench();
       expect(serverName()).toBe('Remote');
       await expect(store.listForProject(project.id)).resolves.toMatchObject({ items: [] });
@@ -655,6 +1009,264 @@ export const testUnloadJournalScenarios = (createStore: () => Promise<ProjectDra
     expect(server.records.get(project.id)).toMatchObject({ name: 'Saved', revision: 2 });
   });
 
+  it('keeps an edit journaled while an older save is still staging before its push begins', async () => {
+    const tab = openTab();
+    const loaded = await tab.loadWorkbench();
+    const stage = store.stage;
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let started!: () => void;
+    const staged = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    store.stage = async (input) => {
+      const result = await stage(input);
+      started();
+      await gate;
+      return result;
+    };
+    const saving = tab.saveWorkbench(prompted(loaded.state, 'Captured before the edit'));
+    await staged;
+    try {
+      const journal = tab.journalBeforeUnload(prompted(loaded.state, 'Held edit during stage'));
+      expect(journal.kind).toBe('journaled');
+      if (journal.kind === 'journaled') {
+        expect(await journal.written).toBe(true);
+      }
+    } finally {
+      store.stage = stage;
+      release();
+    }
+    await saving;
+
+    const recovered = await openTab().loadWorkbench();
+    expect(recovered.conflicts).toEqual([]);
+    expect(recovered.state.projects).toMatchObject([
+      { id: project.id, promptHistory: [{ positivePrompt: 'Held edit during stage' }] },
+    ]);
+  });
+
+  it.each(['workbench save', 'project flush'] as const)(
+    'keeps a newer held edit when an older %s was queued before its journal',
+    async (request) => {
+      const tab = openTab();
+      const loaded = await tab.loadWorkbench();
+      let release!: () => void;
+      server.gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const first = tab.saveWorkbench(prompted(loaded.state, 'First save'));
+      await vi.waitFor(() => expect(server.workspaceUpdates).toBe(1));
+      const queuedState = prompted(loaded.state, 'Queued before the edit');
+      const queued =
+        request === 'workbench save'
+          ? tab.saveWorkbench(queuedState)
+          : tab.flushProjectToServer(queuedState.projects[0]!);
+      try {
+        const journal = tab.journalBeforeUnload(prompted(loaded.state, 'Held edit after queueing'));
+        expect(journal.kind).toBe('journaled');
+        if (journal.kind === 'journaled') {
+          expect(await journal.written).toBe(true);
+        }
+      } finally {
+        server.gate = null;
+        release();
+      }
+      await Promise.all([first, queued]);
+
+      const recovered = await openTab().loadWorkbench();
+      expect(recovered.conflicts).toEqual([]);
+      expect(recovered.state.projects).toMatchObject([
+        { id: project.id, promptHistory: [{ positivePrompt: 'Held edit after queueing' }] },
+      ]);
+    }
+  );
+
+  it.each(['workbench save', 'project flush'] as const)(
+    'acknowledges an undo after a journal superseded an older %s before staging',
+    async (request) => {
+      const tab = openTab();
+      const loaded = await tab.loadWorkbench();
+      const older = prompted(loaded.state, 'Captured before the held edit');
+      const saving =
+        request === 'workbench save' ? tab.saveWorkbench(older) : tab.flushProjectToServer(older.projects[0]!);
+      const journal = tab.journalBeforeUnload(prompted(loaded.state, 'Held edit, then undone'));
+      expect(journal.kind).toBe('journaled');
+      if (journal.kind === 'journaled') {
+        expect(await journal.written).toBe(true);
+      }
+      await expect(saving).resolves.toMatchObject(
+        request === 'project flush' ? { kind: 'unsynced' } : { shouldRetry: true }
+      );
+      await expect(store.listForProject(project.id)).resolves.toMatchObject({ items: [] });
+
+      await expect(tab.saveWorkbench(loaded.state)).resolves.toMatchObject({
+        hasPendingChanges: false,
+        shouldRetry: false,
+      });
+      await expect(tab.flushProjectToServer(loaded.state.projects[0]!)).resolves.toMatchObject({
+        kind: 'acknowledged',
+      });
+      await tab.persistEmptySession(loaded.state);
+      failEveryJournalDeletion();
+      const recovered = await openTab().loadWorkbench();
+      expect(recovered.state.projects.map(({ id }) => id)).not.toContain(project.id);
+      expect(server.workspaceUpdates).toBe(0);
+    }
+  );
+
+  it('does not create an upload identity from a snapshot superseded by a held edit', async () => {
+    const tab = openTab();
+    await tab.loadWorkbench();
+    const draft = createDraftProject([project]);
+    const ensuring = tab.ensureProjectOnServer(draft);
+    const rejected = expect(ensuring).rejects.toMatchObject({ reason: 'unsynced' });
+    const newer = stateWith([{ ...draft, name: 'Held before creation' }]);
+    const journal = tab.journalBeforeUnload(newer);
+    expect(journal.kind).toBe('journaled');
+    if (journal.kind === 'journaled') {
+      expect(await journal.written).toBe(true);
+    }
+    await rejected;
+    expect(server.creates).toBe(0);
+    expect(server.records.has(draft.id)).toBe(false);
+
+    await expect(tab.saveWorkbench(newer)).resolves.toMatchObject({ hasPendingChanges: false });
+    await expect(tab.ensureProjectOnServer(draft)).resolves.toBeUndefined();
+    failEveryJournalDeletion();
+    const recovered = await openTab().loadWorkbench();
+    expect(recovered.conflicts).toEqual([]);
+    expect(recovered.state.projects).toMatchObject([{ id: draft.id, name: 'Held before creation' }]);
+    expect(server.creates).toBe(1);
+  });
+
+  it.each(['content', 'workspace'] as const)(
+    'saves a newer journaled %s after an older save acknowledges without reviving either journal',
+    async (half) => {
+      const tab = openTab();
+      const loaded = await tab.loadWorkbench();
+      const edit = half === 'content' ? named : prompted;
+      let release!: () => void;
+      server.gate = new Promise((resolve) => {
+        release = resolve;
+      });
+      const older = tab.saveWorkbench(edit(loaded.state, 'Older save'));
+      await vi.waitFor(() => expect(half === 'content' ? server.updates : server.workspaceUpdates).toBe(1));
+      const latest = edit(loaded.state, 'Newer held edit');
+      tab.journalBeforeUnload(latest);
+      const newer = tab.saveWorkbench(latest);
+      server.gate = null;
+      release();
+      await older;
+      await expect(newer).resolves.toMatchObject({ hasPendingChanges: false, shouldRetry: false });
+      const record = server.records.get(project.id)!;
+      expect(half === 'content' ? record.name : record.workspace?.data.promptHistory).toEqual(
+        half === 'content' ? 'Newer held edit' : [{ negativePrompt: null, positivePrompt: 'Newer held edit' }]
+      );
+      expect(half === 'content' ? record.revision : record.workspace?.revision).toBe(3);
+      failEveryJournalDeletion();
+      const recovered = await openTab().loadWorkbench();
+      expect(recovered.conflicts).toEqual([]);
+      expect(serializeProjectDocumentV3(recovered.state.projects[0]!)).toEqual(
+        serializeProjectDocumentV3(latest.projects[0]!)
+      );
+      await expect(store.listForProject(project.id)).resolves.toMatchObject({ items: [] });
+    }
+  );
+
+  it('finishes a save when the same document is journaled during its asynchronous setup', async () => {
+    const tab = openTab();
+    const loaded = await tab.loadWorkbench();
+    const edited = prompted(loaded.state, 'The same held edit');
+    const saving = tab.saveWorkbench(edited);
+    const journal = tab.journalBeforeUnload(edited);
+    expect(journal.kind).toBe('journaled');
+    if (journal.kind === 'journaled') {
+      expect(await journal.written).toBe(true);
+    }
+    const result = await saving;
+    expect(result.hasPendingChanges).toBe(false);
+    expect(result.shouldRetry).toBe(false);
+    expect(await store.peekUnloadJournalProjectIds(1)).toMatchObject({ kind: 'available', projectIds: [] });
+    const recovered = await openTab().loadWorkbench();
+    expect(recovered.state.projects).toMatchObject([
+      { id: project.id, promptHistory: [{ positivePrompt: 'The same held edit' }] },
+    ]);
+  });
+
+  it.each(['content', 'workspace'] as const)(
+    'keeps a newer journal across timeout reconciliation of older %s and fences its queued undo',
+    async (half) => {
+      const tab = openTab();
+      const loaded = await tab.loadWorkbench();
+      const edit = half === 'content' ? named : prompted;
+      let release!: () => void;
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      let started!: () => void;
+      const committed = new Promise<void>((resolve) => {
+        started = resolve;
+      });
+      const timeOutAfterCommit = async (): Promise<never> => {
+        started();
+        await gate;
+        throw new RequestDeadlineError();
+      };
+      let restore: () => void;
+      if (half === 'content') {
+        const update = api.updateProject;
+        api.updateProject = async (...args) => {
+          await update(...args);
+          return timeOutAfterCommit();
+        };
+        restore = () => {
+          api.updateProject = update;
+        };
+      } else {
+        const update = api.saveProjectWorkspace;
+        api.saveProjectWorkspace = async (...args) => {
+          await update(...args);
+          return timeOutAfterCommit();
+        };
+        restore = () => {
+          api.saveProjectWorkspace = update;
+        };
+      }
+      const saving = tab.saveWorkbench(edit(loaded.state, 'Committed before its response timed out'));
+      await committed;
+      const undoing = tab.flushProjectToServer(loaded.state.projects[0]!);
+      const latest = edit(loaded.state, 'Newer held edit during timeout');
+      const journal = tab.journalBeforeUnload(latest);
+      expect(journal.kind).toBe('journaled');
+      if (journal.kind === 'journaled') {
+        expect(await journal.written).toBe(true);
+      }
+      restore();
+      release();
+      await expect(saving).resolves.toMatchObject({ conflicts: [], shouldRetry: false });
+      await expect(undoing).resolves.toMatchObject({ kind: 'unsynced' });
+      expect(half === 'content' ? server.updates : server.workspaceUpdates).toBe(1);
+
+      const reloaded = openTab();
+      const recovered = await reloaded.loadWorkbench();
+      expect(recovered.conflicts).toEqual([]);
+      expect(serializeProjectDocumentV3(recovered.state.projects[0]!)).toEqual(
+        serializeProjectDocumentV3(latest.projects[0]!)
+      );
+      await expect(reloaded.saveWorkbench(recovered.state)).resolves.toMatchObject({ hasPendingChanges: false });
+      const saved = server.records.get(project.id)!;
+      expect(half === 'content' ? saved.name : saved.workspace?.data.promptHistory).toEqual(
+        half === 'content'
+          ? 'Newer held edit during timeout'
+          : [{ negativePrompt: null, positivePrompt: 'Newer held edit during timeout' }]
+      );
+      expect(half === 'content' ? saved.revision : saved.workspace?.revision).toBe(3);
+    }
+  );
+
   it('keeps a newer journal across an older acknowledgement, rebased onto it', async () => {
     const tab = openTab();
     const loaded = await tab.loadWorkbench();
@@ -668,7 +1280,6 @@ export const testUnloadJournalScenarios = (createStore: () => Promise<ProjectDra
     server.gate = null;
     release();
     await saving;
-    // The page unloads before another save.
 
     const reloaded = openTab();
     const recovered = await reloaded.loadWorkbench();
@@ -692,7 +1303,6 @@ export const testUnloadJournalScenarios = (createStore: () => Promise<ProjectDra
     server.gate = null;
     release();
     await saving;
-    // The page unloads before another save.
 
     const reloaded = openTab();
     const recovered = await reloaded.loadWorkbench();
@@ -770,10 +1380,6 @@ export const testUnloadJournalScenarios = (createStore: () => Promise<ProjectDra
   });
 
   describe('a new project whose first save reached the server unanswered', () => {
-    /**
-     * The project is staged while the server is unreachable and recovered by a reload, as the editor would hold it;
-     * its first save then sends content and workspace in one create, which the server stores and never answers.
-     */
     const createUnanswered = async (shape: (project: Project) => Project = (project) => project) => {
       const first = openTab();
       const loaded = await first.loadWorkbench();
@@ -791,7 +1397,6 @@ export const testUnloadJournalScenarios = (createStore: () => Promise<ProjectDra
       expect(server.workspaceUpdates).toBe(0);
       return { fresh, state, tab };
     };
-    /** A workflow repeating an item id, which only a build before the split could write: created and kept whole. */
     const withRepeatedNode = (base: Project): Project => {
       const [entry, ...rest] = base.workflows.entries;
       const node = { data: { label: '', notes: '' }, id: 'node-1', position: { x: 0, y: 0 }, type: 'notes' };
@@ -813,7 +1418,6 @@ export const testUnloadJournalScenarios = (createStore: () => Promise<ProjectDra
       expect(server.updates).toBe(0);
       expect(server.workspaceUpdates).toBe(0);
       expect(tab.hasPendingChanges()).toBe(false);
-      // A later edit to the workspace alone builds on the revision the create stored.
       await tab.saveWorkbench(prompted(state, 'Typed after it', fresh.id));
       expect(server.updates).toBe(0);
       expect(server.records.get(fresh.id)).toMatchObject({ revision: 1, workspace: { revision: 2 } });
@@ -822,7 +1426,6 @@ export const testUnloadJournalScenarios = (createStore: () => Promise<ProjectDra
     it('saves a workspace edited before the retry on top of the one the create stored, not under it', async () => {
       const { fresh, state, tab } = await createUnanswered();
 
-      // The retry carries the newer workspace; the settled create answers with the stored one, which it is not.
       await tab.saveWorkbench(prompted(state, 'Typed before the retry', fresh.id));
 
       expect(server.creates).toBe(2);
@@ -882,7 +1485,6 @@ export const testUnloadJournalScenarios = (createStore: () => Promise<ProjectDra
       expect(server.creates).toBe(1);
       expect(server.updates).toBe(1);
       expect(server.workspaceUpdates).toBe(0);
-      // Still whole, and exactly the page's document with the board the create minted applied.
       const record = server.records.get(fresh.id)!;
       expect(record).toMatchObject({ minimum_document_schema_version: 3, revision: 2, workspace: null });
       expect(record.data).toEqual(serializeProjectDocumentV3(withAuthoritativeProjectBoard(page, `board-${fresh.id}`)));

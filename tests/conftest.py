@@ -1,10 +1,12 @@
 # conftest.py is a special pytest file. Fixtures defined in this file will be accessible to all tests in this directory
 # without needing to explicitly import them. (https://docs.pytest.org/en/6.2.x/fixture.html)
-
-
-# We import the model_installer and torch_device fixtures here so that they can be used by all tests. Flake8 does not
-# play well with fixtures (F401 and F811), so this is cleaner than importing in all files that use these fixtures.
 import logging
+import os
+
+# Multiuser is the app's default; the suite tests single-user behavior unless a test passes `multiuser=True`, which
+# beats this environment value. Set before the imports below: some read `get_config()` at import time, which caches it.
+os.environ.setdefault("INVOKEAI_MULTIUSER", "false")
+
 import shutil
 import sys
 import warnings
@@ -59,6 +61,7 @@ from tests.fixtures.database import (  # noqa: F401
     empty_database,
     external_test_db_url,
 )
+from tests.fixtures.model_offload import offload_race  # noqa: F401
 from tests.fixtures.races import lost_races  # noqa: F401
 from tests.fixtures.sqlite_database import create_mock_sqlite_database  # noqa: F401
 from tests.test_nodes import TestEventService
@@ -110,6 +113,22 @@ _PINNED_SDPA_ORDERS_BY_TORCH_ORDER = {
         _MATH: (_MATH, _FLASH, _CUDNN, _EFFICIENT, _MATH),
     },
 }
+
+
+def pytest_configure(config: pytest.Config) -> None:
+    # INVOKEAI_TEST_WITHOUT_FFMPEG=1 reproduces the windows-cpu runner, where no ffmpeg build can load, so a test that
+    # needs ffmpeg without the `ffmpeg` mark fails here too. Runs in every xdist worker, before any test decodes video.
+    if os.environ.get("INVOKEAI_TEST_WITHOUT_FFMPEG") != "1":
+        return
+    import imageio_ffmpeg._utils
+
+    # get_ffmpeg_exe() returns IMAGEIO_FFMPEG_EXE untested, then auto-detects; finding nothing makes it raise.
+    os.environ.pop("IMAGEIO_FFMPEG_EXE", None)
+    assert hasattr(imageio_ffmpeg._utils, "_get_ffmpeg_exe"), "imageio-ffmpeg changed its lookup; update this hook"
+    imageio_ffmpeg._utils._get_ffmpeg_exe = lambda: None
+    # OpenCV reads backend priorities on first use; 0 disables its bundled ffmpeg backend.
+    os.environ["OPENCV_VIDEOIO_PRIORITY_FFMPEG"] = "0"
+
 
 # Fixtures that put a test on the backend under test, which `-m uses_database` selects.
 _DATABASE_FIXTURES = {"empty_database", "database"}

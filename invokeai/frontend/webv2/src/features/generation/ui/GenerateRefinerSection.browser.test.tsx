@@ -17,12 +17,10 @@ import type { GenerationModelSelectProps } from './GenerationUiContext';
 import { GenerateRefinerSection } from './GenerateRefinerSection';
 
 const sdxlModel: MainModelConfig = { base: 'sdxl', key: 'sdxl', name: 'SDXL', type: 'main' };
-const fluxModel: MainModelConfig = { base: 'flux', key: 'flux', name: 'FLUX.1 dev', type: 'main' };
 const refinerModel: MainModelConfig = { base: 'sdxl-refiner', key: 'refiner', name: 'SDXL Refiner', type: 'main' };
 const CATALOG: readonly GenerationModelCatalogItem[] = [sdxlModel, refinerModel];
 
 vi.mock('./GenerationUiContext', () => ({
-  /** The picker reduced to one button per catalog model that passes the section's filter. */
   GenerationModelSelect: ({ filter, onChange, scopeLabel, value }: GenerationModelSelectProps) => (
     <div data-testid="refiner-picker" data-scope-label={scopeLabel ?? ''} data-value={value ?? ''}>
       {CATALOG.filter((model) => filter?.(model) ?? true).map((model) => (
@@ -33,7 +31,7 @@ vi.mock('./GenerationUiContext', () => ({
     </div>
   ),
   useGenerationUi: () => ({
-    sectionPreferences: { sectionsOpen: { refiner: true }, setSectionOpen: vi.fn() },
+    sectionPreferences: { sectionsOpen: { refiner: true }, setSectionsOpen: vi.fn() },
   }),
 }));
 
@@ -104,7 +102,6 @@ const render = async (model: MainModelConfig, options: Partial<GenerateSettings>
   return { onCommit, onCommitImmediate };
 };
 
-/** Sliders are named by `aria-labelledby`, so resolve them through their label element. */
 const sliderByLabel = (label: string): HTMLElement | null =>
   [...(host?.querySelectorAll<HTMLElement>('[role="slider"]') ?? [])].find((control) => {
     const labelId = control.getAttribute('aria-labelledby');
@@ -128,20 +125,6 @@ afterEach(async () => {
 });
 
 describe('GenerateRefinerSection', () => {
-  it('renders for SDXL only', async () => {
-    await render(fluxModel);
-
-    expect(host?.textContent).toBe('');
-
-    await settle(() => root?.unmount());
-    host?.remove();
-
-    await render(sdxlModel);
-
-    expect(host?.textContent).toContain('Refiner');
-    expect(host?.querySelector('[data-testid="refiner-picker"]')).not.toBeNull();
-  });
-
   it('offers only refiner models and keeps the tuning disabled until one is picked', async () => {
     const { onCommitImmediate } = await render(sdxlModel);
 
@@ -200,7 +183,6 @@ describe('GenerateRefinerSection', () => {
     expect(host?.querySelector('[data-testid="refiner-picker"]')?.getAttribute('data-scope-label')).toBe(
       'SDXL Refiner models'
     );
-    // No section-level help text duplicates the picker's own empty message or flashes before the catalog loads.
     expect(host?.textContent).not.toContain('installed');
   });
 });

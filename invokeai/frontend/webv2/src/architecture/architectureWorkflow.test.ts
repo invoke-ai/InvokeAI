@@ -1,5 +1,57 @@
-import { describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
+
+import { collectImportReferences, isProductionSourcePath } from './dependencyPolicy';
+import { closeSourceAnalysis } from './tsSourceAnalysis';
+
+interface Step {
+  'continue-on-error'?: unknown;
+  env?: Record<string, string>;
+  id?: string;
+  if?: string;
+  name?: string;
+  run?: string;
+  uses?: string;
+  with?: Record<string, unknown>;
+  'working-directory'?: string;
+}
+
+interface Job {
+  'continue-on-error'?: unknown;
+  if?: string;
+  needs?: string | string[];
+  steps: Step[];
+  strategy?: { matrix?: Record<string, unknown> };
+}
+
+const sources = import.meta.glob(
+  ['../../package.json', '../../../../../.github/workflows/{frontend-checks,frontend-tests}.yml'],
+  { eager: true, import: 'default', query: '?raw' }
+) as Record<string, string>;
+const packageSource = sources['../../package.json']!;
+const parseWorkflow = (name: 'frontend-checks' | 'frontend-tests') =>
+  parse(sources[`../../../../../.github/workflows/${name}.yml`]!) as {
+    jobs: unknown;
+    on: unknown;
+    permissions: unknown;
+  };
+
+const ownFilterPatterns = (job: Job): string[] => {
+  const filter = job.steps.find((step) => step.with?.files_yaml)?.with?.files_yaml;
+  return typeof filter === 'string' ? Object.values(parse(filter) as Record<string, string[]>).flat() : [];
+};
+
+/** The change filter that gates a job: its own, or that of the jobs it needs. */
+const changeFilterPatterns = (jobs: Record<string, Job>, name: string): string[] => {
+  const job = jobs[name]!;
+  const needs = typeof job.needs === 'string' ? [job.needs] : (job.needs ?? []);
+  return [...ownFilterPatterns(job), ...needs.flatMap((need) => ownFilterPatterns(jobs[need]!))];
+};
+
+/** A GitHub Actions expression, `${{ body }}`. */
+const expression = (body: string): string => `\${{ ${body} }}`;
+
+afterAll(closeSourceAnalysis);
 
 describe('architecture workflow', () => {
   it('confines unstable TypeScript imports to the source-analysis adapter', () => {
@@ -20,126 +72,177 @@ describe('architecture workflow', () => {
     expect(offenders).toEqual([]);
   });
 
-  it('runs the release gates with base comparisons and retains diagnostics even on failure', () => {
-    const workflows = import.meta.glob('../../../../../.github/workflows/frontend-tests.yml', {
-      eager: true,
-      import: 'default',
-      query: '?raw',
-    }) as Record<string, string>;
-    const workflow = Object.values(workflows)[0] ?? '';
-
-    expect(workflow).toContain('name: webv2-architecture-review');
-    expect(workflow).toContain('invokeai/frontend/webv2/artifacts/architecture');
-    expect(workflow).toContain('invokeai/frontend/webv2/artifacts/architecture-performance');
-    expect(workflow).toContain('invokeai/frontend/webv2/artifacts/accessibility');
-    expect(workflow).toContain('if: ${{ always()');
-
-    const jobs = parse(workflow).jobs;
-    const completion = jobs['frontend-webv2-tests'].steps.find((step: { run?: string }) =>
-      step.run?.startsWith('pnpm check:')
+  it('requires every test job through the always-running status check and keeps their diagnostics', () => {
+    const jobs = parseWorkflow('frontend-tests').jobs as Record<string, Job>;
+    const required = jobs['frontend-webv2-tests']!;
+    // A skipped job satisfies a required check: the check must run after failures and cancellations too.
+    expect(required.if).toBe(expression('always()'));
+    expect([...(required.needs ?? [])].sort()).toEqual(
+      Object.keys(jobs)
+        .filter((name) => name !== 'frontend-webv2-tests')
+        .sort()
     );
-    expect(completion.run).toBe('pnpm check:release:tests');
-    expect(completion.env.WEBV2_PERF_REFERENCE_DIR).toContain('steps.perf-ref.outcome');
-    expect(completion['continue-on-error']).toBeUndefined();
+    // A job that continues on error reports success to the required check.
+    expect(Object.entries(jobs).filter(([, job]) => job['continue-on-error'] !== undefined)).toEqual([]);
+    const steps = Object.values(jobs).flatMap((job) => job.steps);
+    expect(steps.filter((step) => step['continue-on-error'] !== undefined)).toEqual([]);
+    const uploads = steps.filter((step) => step.uses?.startsWith('actions/upload-artifact@'));
+    for (const upload of uploads) {
+      expect(upload.if).toContain('always()');
+    }
+    const uploaded = uploads.flatMap((upload) => String(upload.with?.path).trim().split('\n'));
+    for (const output of ['architecture-performance', 'accessibility', 'browser-smoke']) {
+      expect(uploaded).toContain(`invokeai/frontend/webv2/artifacts/${output}`);
+    }
   });
 
-  it('measures only a missing exact main base, with isolated credentials, dependencies and runtime', () => {
-    const sources = import.meta.glob('../../../../../.github/workflows/frontend-tests.yml', {
-      eager: true,
-      import: 'default',
-      query: '?raw',
-    }) as Record<string, string>;
-    const workflow = parse(Object.values(sources)[0] ?? '');
-    const steps = workflow.jobs['frontend-webv2-tests'].steps;
-    const restore = steps.find((step: { id?: string }) => step.id === 'perf-ref');
-    expect(restore.if).toContain("github.event_name == 'pull_request' && github.base_ref == 'main'");
-    expect(restore.if).toContain("github.event_name == 'merge_group'");
-    expect(restore.if).toContain("github.event.merge_group.base_ref == 'refs/heads/main'");
-    expect(restore.if).toContain(
-      "steps.changed-files.outputs.webv2_any_changed == 'true' || inputs.always_run == true"
+  it('compares with a reference keyed on every input of the exact base measurement', () => {
+    const workflow = parseWorkflow('frontend-tests');
+    const jobs = workflow.jobs as Record<string, Job>;
+    const steps = Object.values(jobs).find((job) =>
+      job.steps.some((step) => step.run === 'pnpm test:performance:architecture')
+    )!.steps;
+    const byId = (id: string) => steps.find((step) => step.id === id)!;
+    const byName = (name: string) => steps.find((step) => step.name === name)!;
+
+    const key = byId('perf-key');
+    expect(key.env?.REFERENCE_COMMIT).toBe(
+      expression('github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.sha')
     );
-    expect(restore.with.key).toContain('github.event.pull_request.base.sha || github.event.merge_group.base_sha');
-    expect(restore.with['restore-keys']).toBeUndefined();
-    const checkout = steps.find((step: { id?: string }) => step.id === 'perf-base');
-    expect(checkout.if).toContain("steps.perf-ref.outcome == 'success'");
-    expect(checkout.if).toContain("steps.perf-ref.outputs.cache-hit != 'true'");
-    expect(checkout.uses).toBe(steps[0].uses);
-    expect(checkout.with.ref).toMatch(
-      /^\$\{\{ github.event.pull_request.base.sha \|\| github.event.merge_group.base_sha \}\}$/
-    );
-    expect(checkout.with['persist-credentials']).toBe(false);
-    const install = steps.find((step: { name?: string }) => step.name === 'install performance base dependencies');
-    expect(install.uses).toBe('./.github/actions/install-frontend-deps');
-    expect(install.with['working-directory']).toBe(`${checkout.with.path}/invokeai/frontend/webv2`);
-    expect(install.with['node-version-file']).toBe(`${checkout.with.path}/.nvmrc`);
-    const measure = steps.find((step: { name?: string }) => step.name === 'measure missing performance base');
-    expect(measure['working-directory']).toBe(install.with['working-directory']);
-    expect(measure.env.WEBV2_PERF_REFERENCE_DIR).toBe('');
-    expect(measure.run).toContain('node --experimental-strip-types scripts/check-architecture-performance.mjs');
-    const candidateNode = steps.find((step: { name?: string }) => step.name === 'restore candidate Node version');
-    expect(candidateNode.with['node-version-file']).toBe('.nvmrc');
+    const inputs = /inputs=\(([^)]*)\)/
+      .exec(key.run ?? '')![1]!
+      .trim()
+      .split(/\s+/);
+    expect(inputs).toEqual([
+      'invokeai/frontend/webv2',
+      'invokeai/version/invokeai_version.py',
+      '.nvmrc',
+      '.github/actions/install-frontend-deps',
+      '.github/workflows/frontend-tests.yml',
+    ]);
+    // Commits that change an input must record a reference, so each input has to trigger this workflow.
+    const patterns = changeFilterPatterns(jobs, 'performance');
+    for (const input of inputs) {
+      expect(patterns, input).toSatisfy((list: string[]) => list.includes(input) || list.includes(`${input}/**`));
+    }
+    // A prefix fallback could compare with another base's measurements.
+    const cacheSteps = steps.filter((step) => step.uses?.startsWith('actions/cache/'));
+    expect(cacheSteps.length).toBeGreaterThanOrEqual(3);
+    for (const step of cacheSteps) {
+      expect(step.with?.key).toBe(expression('steps.perf-key.outputs.key'));
+      expect(step.with?.['restore-keys']).toBeUndefined();
+    }
+    expect(byName('performance gates').env?.WEBV2_PERF_REFERENCE_DIR).toContain("steps.perf-ref.outcome == 'success'");
+
+    const checkout = byId('perf-base');
+    expect(checkout.with?.['persist-credentials']).toBe(false);
+    const install = byName('install performance base dependencies');
+    expect(install.with?.['working-directory']).toBe(`${String(checkout.with?.path)}/invokeai/frontend/webv2`);
+    expect(install.with?.['node-version-file']).toBe(`${String(checkout.with?.path)}/.nvmrc`);
+    const measure = byId('perf-base-measure');
+    expect(measure['working-directory']).toBe(install.with?.['working-directory']);
+    expect(measure.env?.WEBV2_PERF_REFERENCE_DIR).toBe('');
+    const candidateNode = byName('restore candidate Node version');
+    expect(candidateNode.with?.['node-version-file']).toBe('.nvmrc');
     expect(steps.indexOf(candidateNode)).toBeGreaterThan(steps.indexOf(measure));
-    expect(steps.indexOf(candidateNode)).toBeLessThan(
-      steps.findIndex((step: { run?: string }) => step.run === 'pnpm check:release:tests')
-    );
+    expect(steps.indexOf(candidateNode)).toBeLessThan(steps.indexOf(byName('performance gates')));
+
     expect(workflow.permissions).toEqual({ contents: 'read' });
     for (const event of ['push', 'pull_request', 'merge_group', 'workflow_dispatch', 'workflow_call']) {
       expect(workflow.on).toHaveProperty(event);
     }
   });
 
+  it('builds production code from type-only API imports, so the API package is no reference input', () => {
+    const sources = import.meta.glob('../**/*.{ts,tsx}', { eager: true, import: 'default', query: '?raw' }) as Record<
+      string,
+      string
+    >;
+    const offenders = Object.entries(sources)
+      .filter(([path, source]) => isProductionSourcePath(path) && /['"]@api[/'"]/.test(source))
+      .flatMap(([path, source]) =>
+        collectImportReferences(source, path)
+          .filter(({ kind, specifier }) => /^@api(?:\/|$)/.test(specifier) && kind !== 'import-type')
+          .map(({ specifier }) => `${path} imports ${specifier} as a value`)
+      );
+    expect(offenders).toEqual([]);
+  });
+
   it('runs each completion gate once locally and across the frontend CI jobs', () => {
-    const sources = import.meta.glob(
-      ['../../package.json', '../../../../../.github/workflows/{frontend-checks,frontend-tests}.yml'],
-      { eager: true, import: 'default', query: '?raw' }
-    ) as Record<string, string>;
-    const scripts = JSON.parse(sources['../../package.json']!).scripts as Record<string, string>;
+    const scripts = JSON.parse(packageSource).scripts as Record<string, string>;
     const expand = (command: string): string[] =>
       command.split(' && ').flatMap((part) => {
-        const script = /^pnpm (?:run )?([\w:-]+)$/.exec(part)?.[1];
-        return script ? expand(scripts[script]!) : [part];
+        const [, script, args] = /^pnpm (?:run )?([\w:-]+)((?: .+)?)$/.exec(part) ?? [];
+        if (!script || !scripts[script]) {
+          return [part];
+        }
+        // pnpm appends arguments to the script, so they reach its last command.
+        const commands = expand(scripts[script]);
+        return [...commands.slice(0, -1), `${commands.at(-1)!}${args}`];
       });
-    const workflows = Object.entries(sources).filter(([path]) => path.endsWith('.yml'));
-    const ci = workflows.flatMap(([, source]) => {
-      const jobs = parse(source).jobs as Record<string, { steps: { run?: string }[] }>;
-      return Object.values(jobs).flatMap((job) => job.steps.flatMap((step) => (step.run ? expand(step.run) : [])));
-    });
-    const gates = [
-      /^oxfmt --check /,
-      /^oxlint /,
-      /^tsc --noEmit$/,
-      /^vitest run --config vitest.config.mts$/,
-      /^vitest run --config vitest.browser.config.mts$/,
-      /^node --test scripts\/mock-backend-fixtures.test.mjs/,
-      /^node --test scripts\/performance-budgets.test.mjs$/,
-      /^vite build$/,
-      /scripts\/write-workbench-ownership-inventory.mjs$/,
-      /scripts\/write-contract-caller-matrix.mjs$/,
-      /scripts\/write-canvas-import-matrix.mjs$/,
-      /scripts\/check-architecture-performance.mjs$/,
-      /scripts\/measure-architecture-performance.mjs$/,
-      /scripts\/run-project-file-journey.mjs$/,
-      /scripts\/run-accessibility-journeys.mjs$/,
-    ];
-    for (const [name, commands] of [
-      ['local release', expand('pnpm check:release')],
-      ['CI', ci],
-    ] as const) {
-      for (const gate of gates) {
-        expect(
-          commands.filter((command) => gate.test(command)),
-          `${name}: ${String(gate)}`
-        ).toHaveLength(1);
-      }
-      // Architecture tests are part of the complete unit run, not a second targeted invocation.
+    const workflows = (['frontend-checks', 'frontend-tests'] as const).map(
+      (name) => [name, parseWorkflow(name)] as const
+    );
+    const ciJobs = workflows.flatMap(([, workflow]) =>
+      Object.values(workflow.jobs as Record<string, Job>).map((job) => ({
+        job,
+        commands: job.steps.flatMap((step) => (step.run ? expand(step.run) : [])),
+      }))
+    );
+    const ci = ciJobs.flatMap(({ commands }) => commands);
+    const local = expand('pnpm check:release');
+    // CI must follow the package chain: every local gate runs in CI exactly as often as locally, which is once. The
+    // build is the exception: each CI job that reads `dist` builds for itself (checked below).
+    const localGates = local.filter((command) => command !== 'vite build');
+    expect(new Set(localGates).size, 'local release repeats a gate').toBe(localGates.length);
+    const sharded = / --shard=.+$/;
+    const unsharded = (command: string) => command.replace(sharded, '');
+    for (const gate of localGates) {
+      expect(
+        ci.filter((command) => unsharded(command) === gate),
+        `CI runs ${gate}`
+      ).toHaveLength(1);
+    }
+    // Architecture tests are part of the complete unit run, not a second targeted invocation.
+    for (const commands of [local, ci]) {
       expect(commands.filter((command) => command.startsWith('vitest run --config vitest.config.mts'))).toHaveLength(1);
     }
-    for (const [path, source] of workflows) {
-      const job = Object.values(parse(source).jobs)[0] as { steps: { with?: { files_yaml?: string } }[] };
-      const filter = job.steps.find((step) => step.with?.files_yaml)?.with?.files_yaml ?? '';
-      const patterns = Object.values(parse(filter) as Record<string, string[]>).flat();
-      for (const [workflowPath] of workflows) {
-        expect(patterns, path).toContain(workflowPath.replace('../../../../../', ''));
+    // A matrix repeats its gates once per leg; only the sharded browser suite may run in one.
+    for (const { job, commands } of ciJobs) {
+      if (job.strategy?.matrix && commands.some((command) => localGates.includes(unsharded(command)))) {
+        expect(commands.filter((command) => localGates.includes(unsharded(command)))).toSatisfy((gates: string[]) =>
+          gates.every((command) => sharded.test(command))
+        );
+      }
+    }
+    // Locally the performance build serves every later journey; each CI job that runs one builds first.
+    expect(local.filter((command) => command === 'vite build')).toHaveLength(1);
+    const builtOutput = /scripts\/(?:check-architecture-performance|measure-architecture-performance|run-[\w-]+)\.mjs$/;
+    for (const { commands } of ciJobs) {
+      const firstReader = commands.findIndex((command) => builtOutput.test(command));
+      if (firstReader !== -1) {
+        expect(commands.slice(0, firstReader)).toContain('vite build');
+      }
+    }
+    // A sharded suite runs every file only if the shards are 1..N of N jobs with no other matrix dimension.
+    for (const { job, commands } of ciJobs) {
+      const shard = commands.map((command) => / --shard=(.+)$/.exec(command)?.[1]).find(Boolean);
+      if (shard === undefined) {
+        continue;
+      }
+      expect(shard).toBe(`${expression('matrix.shard')}/${expression('strategy.job-total')}`);
+      const matrix = job.strategy?.matrix ?? {};
+      expect(Object.keys(matrix)).toEqual(['shard']);
+      expect(matrix.shard).toEqual(Array.from({ length: (matrix.shard as unknown[]).length }, (_, index) => index + 1));
+    }
+    for (const [name, workflow] of workflows) {
+      const patterns = Object.values(workflow.jobs as Record<string, Job>).flatMap((job) => ownFilterPatterns(job));
+      for (const [other] of workflows) {
+        expect(patterns, name).toContain(`.github/workflows/${other}.yml`);
+      }
+      // A backend change regenerates the API types the type check reads, so it has to run the check too.
+      if (name === 'frontend-checks') {
+        expect(patterns, name).toContain('invokeai/frontend/api/schema.ts');
       }
     }
   });
@@ -194,14 +297,12 @@ describe('architecture workflow', () => {
     const workflows = Object.entries(sources).filter(([path]) => path.includes('/workflows/'));
     expect(workflows).toHaveLength(4);
     for (const [path, source] of workflows) {
-      const jobs = parse(source).jobs as Record<string, { steps: { uses?: string; with?: { files_yaml?: string } }[] }>;
-      for (const job of Object.values(jobs)) {
+      const jobs = parse(source).jobs as Record<string, Job>;
+      for (const [name, job] of Object.entries(jobs)) {
         if (!job.steps.some((step) => step.uses === './.github/actions/install-frontend-deps')) {
           continue;
         }
-        const filter = job.steps.find((step) => step.with?.files_yaml)?.with?.files_yaml ?? '';
-        const patterns = Object.values(parse(filter) as Record<string, string[]>).flat();
-        expect(patterns, path).toContain(nodeVersionFile);
+        expect(changeFilterPatterns(jobs, name), `${path} ${name}`).toContain(nodeVersionFile);
       }
     }
   });

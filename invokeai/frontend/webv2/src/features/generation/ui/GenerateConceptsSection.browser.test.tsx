@@ -7,9 +7,9 @@ import type {
 } from '@features/generation/core/types';
 
 import { ChakraProvider } from '@chakra-ui/react';
-import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
 import { getDefaultGenerateSettings } from '@features/generation/core/baseGenerationPolicies';
 import { flushGenerateDrafts } from '@features/generation/react';
+import { seedArchitectureCapabilities } from '@features/models/core/architectureCapabilities.testing';
 import { system } from '@theme/system';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -79,7 +79,6 @@ const render = async (selectedModel: GenerateModelConfig = MAIN_MODEL, settings 
   return { onCommit, renderProject, row: host };
 };
 
-/** The settings a recorded commit produces from the rendered ones. */
 const applied = (update: GenerateSettingsUpdate | undefined): GenerateLora | undefined =>
   (typeof update === 'function' ? update(SETTINGS) : { ...SETTINGS, ...update }).loras[0];
 
@@ -128,7 +127,6 @@ describe('GenerateConceptsContent', () => {
     expect(onCommit).toHaveBeenCalledTimes(1);
     const update = onCommit.mock.calls[0]?.[0];
     expect(typeof update).toBe('function');
-    // A weight that landed after this render must survive the add.
     const latest = { ...SETTINGS, loras: [{ ...LORA, weight: 0.9 }] };
     expect((update as (settings: GenerateSettings) => GenerateSettings)(latest).loras).toEqual([
       { ...LORA, weight: 0.9 },
@@ -223,7 +221,7 @@ describe('GenerateConceptsContent', () => {
 });
 
 describe('a concept that is not installed', () => {
-  it('reads as blocked: its saved state, a locked switch, an error badge, and the issue with its Remove fix', async () => {
+  it('reads as blocked: its saved state, a locked switch, an error badge, and an issue icon with its Remove fix', async () => {
     const missing: LoraModelConfig = { base: 'sdxl', key: 'gone', name: 'Gone', type: 'lora' };
     const applyFix = vi.fn();
     const issue = {
@@ -262,10 +260,17 @@ describe('a concept that is not installed', () => {
     expect(missingRow.textContent).toContain('widgets.generate.notInstalled');
     expect(toggle.matches(':checked') || toggle.getAttribute('aria-checked') === 'true').toBe(true);
     expect(toggle.matches(':disabled') || toggle.getAttribute('aria-disabled') === 'true').toBe(true);
-    expect(missingRow.textContent).toContain('widgets.generate.issues.conceptNotInstalled');
-    expect(installedRow.querySelector('[data-issue-fix]')).toBeNull();
+    const icon = missingRow.querySelector<HTMLButtonElement>('button[data-issue-ids]')!;
+    expect(icon.getAttribute('data-issue-ids')).toBe(issue.id);
+    expect(icon.getAttribute('aria-label')).toBe('widgets.generate.issuesNamed');
+    expect(installedRow.querySelector('[data-issue-ids]')).toBeNull();
 
-    await act(() => missingRow.querySelector<HTMLButtonElement>('[data-issue-fix]')!.click());
+    await act(() => icon.click());
+    await expect.poll(() => document.querySelector('[data-issue-id] [data-issue-fix]')).not.toBeNull();
+    expect(document.querySelector('[data-issue-id]')?.textContent).toContain(
+      'widgets.generate.issues.conceptNotInstalled'
+    );
+    await act(() => document.querySelector<HTMLButtonElement>('[data-issue-id] [data-issue-fix]')!.click());
 
     expect(applyFix).toHaveBeenCalledExactlyOnceWith(issue.fix);
   });

@@ -77,9 +77,8 @@ export const createExtensionRegistry = (): ExtensionRegistry => {
     },
     search: {
       registerProvider(provider) {
-        // Each registration gets a fresh identity. Consumers can distinguish a
-        // replacement even when an extension reuses its id/source and omits a
-        // contextKey.
+        // Each registration gets a fresh identity. Consumers can distinguish a replacement even when an extension
+        // reuses its id/source and omits a contextKey.
         const registration = { ...provider };
 
         return stores.search.register(

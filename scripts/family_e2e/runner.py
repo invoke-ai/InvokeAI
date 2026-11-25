@@ -60,6 +60,7 @@ from scripts.family_e2e.detach import RUNNER_LOG
 from scripts.family_e2e.graphs import (
     PreparedGraph,
     build_export_request,
+    flag_missing_models,
     output_image_name,
     prepare_batch,
     run_pnpm_exporter,
@@ -572,7 +573,7 @@ def preflight(manifest: Manifest, gpu: Gpu) -> None:
         if not path.is_file():
             raise RunnerError(f"{path} does not exist")
     template_root = spec.template_root
-    settings = read_template_settings(template_root)
+    settings = read_template_settings(spec)
     pending = pending_installs(template_root, settings)
     if pending:
         raise RunnerError(
@@ -882,7 +883,7 @@ class _Session:
         survivors = "its stop did not finish"
         try:
             pin = device_env(self.gpu.adapter, self.manifest.server.env)
-            build_scratch_root(self.manifest.server.template_root, root, log_path, free_port(), bool(pin))
+            build_scratch_root(self.manifest.server, root, log_path, free_port(), bool(pin))
             self.heartbeat("starting the server")
             try:
                 self.server = launch_server(
@@ -968,7 +969,9 @@ class _Session:
             runtime_config = self.record_environment(server, client)
             if self.info.calibrate:
                 calibration.check_available(client)
-            models = client.get("/api/v2/models/")["models"]
+            models = flag_missing_models(
+                client.get("/api/v2/models/")["models"], client.get("/api/v2/models/missing")["models"]
+            )
             capabilities = client.get("/api/v2/models/capabilities")
             configs = {model["key"]: model for model in models}
             todo_cases = [self.cases[key] for key in dict.fromkeys(step.case_key for step in todo)]

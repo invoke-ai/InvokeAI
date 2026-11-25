@@ -108,7 +108,6 @@ describe('rasterizeTextSource — line breaks', () => {
     // step = 10 × 2 = 20; y anchors at 0, 20, 40.
     expect(fills.map((e) => e.args[2])).toEqual([0, 20, 40]);
     expect(fills.map((e) => e.args[0])).toEqual(['a', 'bb', 'ccc']);
-    // Height covers all three lines.
     expect(surface.height).toBe(60);
   });
 });

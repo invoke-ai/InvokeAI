@@ -1,27 +1,26 @@
 // SPDX-License-Identifier: Apache-2.0 AND MIT
 /**
  * Scalar ports of the backend's sRGB, Oklab and gamut-clip conversions
- * (`invokeai/backend/image_util/color_conversion.py`, `color.py`), with its constants, so canvas previews match
- * the nodes.
+ * (`invokeai/backend/image_util/color_conversion.py`, `color.py`), with its constants, so canvas previews match the
+ * nodes.
  *
- * The gamut clip (maximum-saturation polynomial, cusp, gamut intersection and adaptive lightness anchor) ports
- * Björn Ottosson's reference implementation, https://bottosson.github.io/posts/gamutclipping/, under this notice:
+ * The gamut clip (maximum-saturation polynomial, cusp, gamut intersection and adaptive lightness anchor) ports Björn
+ * Ottosson's reference implementation, https://bottosson.github.io/posts/gamutclipping/, under this notice:
  *
  * Copyright (c) 2021 Björn Ottosson
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
- * documentation files (the "Software"), to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and
- * to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+ * documentation files (the "Software"), to deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to
+ * permit persons to whom the Software is furnished to do so, subject to the following conditions:
  *
- * The above copyright notice and this permission notice shall be included in all copies or substantial portions of
- * the Software.
+ * The above copyright notice and this permission notice shall be included in all copies or substantial portions of the
+ * Software.
  *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
- * THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF
- * CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
- * IN THE SOFTWARE.
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE
+ * WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+ * COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+ * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
 const SRGB_TO_LINEAR_THRESHOLD = 0.0404482362771082;
@@ -60,9 +59,9 @@ const srgb8FromLinearDirect = (linear: number): number => {
 const SRGB8_BUCKETS = 4096;
 
 /**
- * Exact replacement for the per-channel power in {@link srgb8FromLinearDirect}: `thresholds[k]` is the smallest
- * double that encodes to byte k or above (found by bisection over the direct encoding, which is monotone), and each
- * of the uniform buckets records the byte at its lower edge, leaving at most a couple of threshold steps per lookup.
+ * Exact replacement for the per-channel power in {@link srgb8FromLinearDirect}: `thresholds[k]` is the smallest double
+ * that encodes to byte k or above (found by bisection over the direct encoding, which is monotone), and each of the
+ * uniform buckets records the byte at its lower edge, leaving at most a couple of threshold steps per lookup.
  */
 const buildSrgb8Encoding = (): { readonly thresholds: Float64Array; readonly bucketBytes: Uint8Array } => {
   const thresholds = new Float64Array(257);
@@ -187,9 +186,9 @@ const scratch = new Float64Array(3);
 
 /**
  * Projects out-of-gamut linear sRGB in `rgb` towards an adaptive lightness anchor, as the backend's restore does:
- * `gamut_clip_tensor` (alpha 0.05, one refinement step) in float64, applied only to colors more than
- * {@link GAMUT_TOLERANCE} outside [0, 1]. The clip moves colors that sit on the gamut boundary, so the tolerance
- * keeps float32 round-trip noise on an in-gamut color from reaching it. Other colors are left unchanged.
+ * `gamut_clip_tensor` (alpha 0.05, one refinement step) in float64, applied only to colors more than {@link
+ * GAMUT_TOLERANCE} outside [0, 1]. The clip moves colors that sit on the gamut boundary, so the tolerance keeps float32
+ * round-trip noise on an in-gamut color from reaching it. Other colors are left unchanged.
  */
 export const clipToSrgbGamut = (rgb: Float64Array): void => {
   const red = rgb[0];

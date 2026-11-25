@@ -17,6 +17,7 @@ import { WidgetIcon } from '@workbench/iconResolver';
 import { PROJECT_CONTENT_PANEL_ID } from '@workbench/projects/projectTabsA11y';
 import { WidgetBar, type WidgetBarGroup } from '@workbench/widget-frame';
 import { FloatingWidgetLayer } from '@workbench/widget-frame/FloatingWidgetLayer';
+import { GraphPreviewInvokeScopeContext } from '@workbench/widget-frame/graphPreviewInvoke';
 import {
   getRegionDropState,
   isWidgetDndData,
@@ -58,7 +59,7 @@ import { PasteMediaRuntime } from './PasteMediaRuntime';
 import { ProjectConflictBanner } from './ProjectConflictBanner';
 import { QueueRecoveryBanner } from './QueueRecoveryBanner';
 import { StatusBar } from './StatusBar';
-import { TopBar } from './topbar';
+import { GraphPreviewInvokeScope, TopBar } from './topbar';
 
 const DND_MODIFIERS = [restrictToWindowEdges];
 
@@ -191,9 +192,9 @@ export const WorkbenchShell = () => {
     [placementProject, widgets]
   );
   const handleDragCancel = useCallback(() => setActiveDrag(null), []);
-  // Focus follows each of these: into the window a marker shows or the region a tab shows in, into the region a
-  // window docks to, and into a center that gets its view back when the window is removed. A tab that collapses
-  // its region shows nothing, and the move gives up.
+  // Focus follows each of these: into the window a marker shows or the region a tab shows in, into the region a window
+  // docks to, and into a center that gets its view back when the window is removed. A tab that collapses its region
+  // shows nothing, and the move gives up.
   const handleSelect = useCallback(
     (region: WidgetBarGroup['region'], instanceId: string) => {
       const activated = activateRailPlacement({ instanceId, project: placementProject, region, widgets });
@@ -226,9 +227,7 @@ export const WorkbenchShell = () => {
         return;
       }
 
-      // The marker's menu that asked and the marker itself are both gone. Focus goes to the center when it gets
-      // its view back, otherwise to the panel the window's own rail is showing. Removing leaves that rail as it
-      // was, so a rail showing no panel — emptied by the float, or collapsed — hands focus to the center instead.
+      // The marker's menu that asked and the marker itself are both gone.
       if (removed.restoresCenter) {
         focusRegion('center', typeId);
         return;
@@ -298,68 +297,68 @@ export const WorkbenchShell = () => {
       onDragStart={handleDragStart}
     >
       <GalleryDragScope value>
-        <Flex direction="column" h="100vh" w="100vw">
-          <WorkbenchNotificationToaster />
-          <LayoutUndoNotices />
-          <DocumentTitleProgress />
-          <TopBar />
-          <ProjectConflictBanner />
-          <QueueRecoveryBanner />
+        <GraphPreviewInvokeScopeContext value={GraphPreviewInvokeScope}>
+          <Flex direction="column" h="100vh" w="100vw">
+            <WorkbenchNotificationToaster />
+            <LayoutUndoNotices />
+            <DocumentTitleProgress />
+            <TopBar />
+            <ProjectConflictBanner />
+            <QueueRecoveryBanner />
 
-          <Flex aria-labelledby="workbench-project-heading" as="main" flex="1" minH="0" overflow="hidden">
-            <VisuallyHidden as="h1" id="workbench-project-heading">
-              {projectName}
-            </VisuallyHidden>
-            {/* Use a named content region: the project switcher is no longer a tablist. */}
-            <Flex
-              aria-labelledby="workbench-project-heading"
-              flex="1"
-              id={PROJECT_CONTENT_PANEL_ID}
-              minH="0"
-              overflow="hidden"
-              role="region"
-            >
-              <WidgetBar
-                edgeRegion={isLeftPanelShown ? 'left' : 'center'}
-                groups={leftRailGroups}
-                menuItems={leftMenuItems}
-                projectId={projectId}
-                side="left"
-                onDock={handleDock}
-                onRemoveFloating={handleRemoveFloating}
-                onSelect={handleSelect}
-                onToggle={handleToggleLeft}
-              />
-              {isLeftPanelShown ? <LeftPanel instanceId={leftRegion.activeInstanceId} /> : null}
-              <CenterArea />
-              {isRightPanelShown ? <RightPanel instanceId={rightRegion.activeInstanceId} /> : null}
-              <WidgetBar
-                edgeRegion={isRightPanelShown ? 'right' : 'center'}
-                groups={rightRailGroups}
-                menuItems={rightMenuItems}
-                projectId={projectId}
-                side="right"
-                onDock={handleDock}
-                onRemoveFloating={handleRemoveFloating}
-                onSelect={handleSelect}
-                onToggle={handleToggleRight}
-              />
+            <Flex aria-labelledby="workbench-project-heading" as="main" flex="1" minH="0" overflow="hidden">
+              <VisuallyHidden as="h1" id="workbench-project-heading">
+                {projectName}
+              </VisuallyHidden>
+              {/* Use a named content region: the project switcher is no longer a tablist. */}
+              <Flex
+                aria-labelledby="workbench-project-heading"
+                flex="1"
+                id={PROJECT_CONTENT_PANEL_ID}
+                minH="0"
+                overflow="hidden"
+                role="region"
+              >
+                <WidgetBar
+                  edgeRegion={isLeftPanelShown ? 'left' : 'center'}
+                  groups={leftRailGroups}
+                  menuItems={leftMenuItems}
+                  projectId={projectId}
+                  side="left"
+                  onDock={handleDock}
+                  onRemoveFloating={handleRemoveFloating}
+                  onSelect={handleSelect}
+                  onToggle={handleToggleLeft}
+                />
+                {isLeftPanelShown ? <LeftPanel instanceId={leftRegion.activeInstanceId} /> : null}
+                <CenterArea />
+                {isRightPanelShown ? <RightPanel instanceId={rightRegion.activeInstanceId} /> : null}
+                <WidgetBar
+                  edgeRegion={isRightPanelShown ? 'right' : 'center'}
+                  groups={rightRailGroups}
+                  menuItems={rightMenuItems}
+                  projectId={projectId}
+                  side="right"
+                  onDock={handleDock}
+                  onRemoveFloating={handleRemoveFloating}
+                  onSelect={handleSelect}
+                  onToggle={handleToggleRight}
+                />
+              </Flex>
             </Flex>
-          </Flex>
 
-          <BottomPanel />
-          <StatusBar dropState={bottomDropState} />
-        </Flex>
-        <FloatingWidgetLayer />
-        <GalleryDragCursor />
-        <PasteMediaRuntime />
-        {/*
-         * Allow pointer events through the full-size drag overlay so another finger can reach Preview pinch
-         * handlers.
-         */}
-        <DragOverlay style={DRAG_OVERLAY_STYLE}>
-          {activeDrag ? <WidgetDragPreview activeDrag={activeDrag} /> : null}
-        </DragOverlay>
+            <BottomPanel />
+            <StatusBar dropState={bottomDropState} />
+          </Flex>
+          <FloatingWidgetLayer />
+          <GalleryDragCursor />
+          <PasteMediaRuntime />
+          {/* Allow pointer events through the full-size drag overlay so another finger can reach Preview pinch
+              handlers. */}
+          <DragOverlay style={DRAG_OVERLAY_STYLE}>
+            {activeDrag ? <WidgetDragPreview activeDrag={activeDrag} /> : null}
+          </DragOverlay>
+        </GraphPreviewInvokeScopeContext>
       </GalleryDragScope>
     </DndContext>
   );

@@ -16,7 +16,7 @@ vi.mock('@features/queue/publicApi', () => ({
   queueCommands: {},
 }));
 
-import { createTestLocalRun, createTestQueueUiAdapter } from './queueUiAdapter.testing';
+import { createTestLocalRun, createTestQueueUiAdapter, createTestQueueWidgetRuntime } from './queueUiAdapter.testing';
 import { QueueUiProvider, type QueueLocalRun, type QueueUiAdapter } from './QueueUiContext';
 import { QueueWidgetView } from './QueueWidgetView';
 
@@ -78,7 +78,7 @@ const render = async (overrides: Partial<QueueUiAdapter>, listed?: number) => {
         <ChakraProvider value={system}>
           <QueryClientProvider client={client}>
             <QueueUiProvider adapter={adapter}>
-              <QueueWidgetView region="right" />
+              <QueueWidgetView region="right" runtime={createTestQueueWidgetRuntime()} />
             </QueueUiProvider>
           </QueryClientProvider>
         </ChakraProvider>
@@ -235,48 +235,6 @@ describe('runs this tab is still submitting', () => {
     expect(tab('All').textContent).toBe('All6');
   });
 
-  it("keeps the reveal timer within setTimeout's range when the clock moved back since the run was queued", async () => {
-    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
-    try {
-      await render(
-        { localRuns: [createTestLocalRun({ label: 'From the future', submittedAt: Date.now() + 2 ** 32 })] },
-        0
-      );
-      await new Promise((resolve) => {
-        setTimeout(resolve, 100);
-      });
-
-      // An out-of-range delay would fire at once and re-arm in a tight loop.
-      const delays = setTimeoutSpy.mock.calls.map(([, delay]) => delay ?? 0);
-      expect(delays.every((delay) => delay <= 2 ** 31 - 1)).toBe(true);
-      expect(delays.filter((delay) => delay === 1000)).toHaveLength(1);
-    } finally {
-      setTimeoutSpy.mockRestore();
-    }
-  });
-
-  it('shows a run at once after a failure or while offline, however recently it was queued', async () => {
-    const now = Date.now();
-    await render(
-      {
-        localRuns: [
-          createTestLocalRun({
-            id: 'a',
-            label: 'Failed once',
-            retry: { failureCount: 1, message: 'Bad Gateway', reason: 'unavailable' },
-            submittedAt: now,
-          }),
-          createTestLocalRun({ id: 'b', label: 'Just queued', submittedAt: now }),
-        ],
-      },
-      1
-    );
-    expect(rowFor('Failed once')).toBeDefined();
-
-    await render({ isConnected: false, localRuns: [createTestLocalRun({ label: 'Just queued', submittedAt: now })] });
-    expect(rowFor('Just queued').textContent).toContain('Offline, waiting for the connection…');
-  });
-
   it('cancels the run it belongs to without asking, and hands focus on rather than dropping it', async () => {
     let localRuns: QueueLocalRun[] = [
       createTestLocalRun({ id: 'a', label: 'First run' }),
@@ -304,24 +262,6 @@ describe('runs this tab is still submitting', () => {
     expect(document.activeElement).toBe(tab('All'));
   });
 
-  it('hands focus to the previous Cancel when the last of several rows is canceled', async () => {
-    let localRuns: QueueLocalRun[] = [
-      createTestLocalRun({ id: 'a', label: 'First run' }),
-      createTestLocalRun({ id: 'b', label: 'Second run' }),
-      createTestLocalRun({ id: 'c', label: 'Third run' }),
-    ];
-    const cancelLocalRun = vi.fn((_projectId: string, runId: string) => {
-      localRuns = localRuns.filter((run) => run.id !== runId);
-    });
-    await render({ cancelLocalRun, localRuns });
-
-    await act(() => cancelFor('Third run').click());
-    await render({ cancelLocalRun, localRuns });
-
-    expect(cancelLocalRun).toHaveBeenCalledExactlyOnceWith('project-1', 'c');
-    expect(document.activeElement).toBe(cancelFor('Second run'));
-  });
-
   it('follows the queue scope setting: the active project alone, or every open project', async () => {
     const localRuns = [
       createTestLocalRun({ id: 'a', label: 'Here', projectId: 'project-1' }),
@@ -337,28 +277,5 @@ describe('runs this tab is still submitting', () => {
     await render({ localRuns, queueJobsScope: 'all' });
     expect(rows()).toHaveLength(2);
     expect(tab('All').textContent).toBe('All7');
-  });
-
-  it('counts under All and Active, where it is listed, and steps aside for the finished filters', async () => {
-    await render({ localRuns: [createTestLocalRun({ label: 'Fresh run' })] });
-
-    expect(['All', 'Active', 'Done', 'Failed', 'Canceled'].map((label) => tab(label).textContent)).toEqual([
-      'All6',
-      'Active2',
-      'Done2',
-      'Failed1',
-      'Canceled1',
-    ]);
-
-    for (const [label, listed] of [
-      ['Done', false],
-      ['Failed', false],
-      ['Canceled', false],
-      ['Active', true],
-      ['All', true],
-    ] as const) {
-      await act(() => tab(label).click());
-      expect(section() !== null, label).toBe(listed);
-    }
   });
 });

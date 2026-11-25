@@ -17,6 +17,7 @@ _GGUF_LICENSE = "FLUX Kommunity License (non-commercial, or commercial under US$
 # The Hub repositories also carry BFL's own single-file package and quantized variants at their root; the
 # Diffusers install takes only the pipeline's folders.
 flux3_klein = StarterModel(
+    source_urls=["https://huggingface.co/black-forest-labs/flux-3-image-klein"],
     name="FLUX.3 Klein",
     base=BaseModelType.Flux3,
     source="black-forest-labs/flux-3-image-klein::modular_model_index.json+transformer+vae+text_encoder",
@@ -28,6 +29,7 @@ flux3_klein = StarterModel(
 )
 
 flux3_klein_base = StarterModel(
+    source_urls=["https://huggingface.co/black-forest-labs/flux-3-image-klein-base"],
     name="FLUX.3 Klein Base",
     base=BaseModelType.Flux3,
     source="black-forest-labs/flux-3-image-klein-base::modular_model_index.json+transformer+vae+text_encoder",
@@ -40,6 +42,7 @@ flux3_klein_base = StarterModel(
 
 # Both single-file builds are pinned to a commit: the repository renamed their files once, which broke the `main` URLs.
 flux3_klein_single_file = StarterModel(
+    source_urls=["https://huggingface.co/black-forest-labs/flux-3-image-klein-comfy"],
     name="FLUX.3 Klein (single file)",
     base=BaseModelType.Flux3,
     source="https://huggingface.co/black-forest-labs/flux-3-image-klein-comfy/resolve/feef60b0aaf63a4773ace96636ebbcf43b881312/diffusion_models/flux3-image-klein-bf16.safetensors",
@@ -55,6 +58,7 @@ flux3_klein_single_file = StarterModel(
 )
 
 flux3_klein_base_single_file = StarterModel(
+    source_urls=["https://huggingface.co/black-forest-labs/flux-3-image-klein-comfy"],
     name="FLUX.3 Klein Base (single file)",
     base=BaseModelType.Flux3,
     source="https://huggingface.co/black-forest-labs/flux-3-image-klein-comfy/resolve/feef60b0aaf63a4773ace96636ebbcf43b881312/diffusion_models/flux3-image-klein-base-bf16.safetensors",
@@ -85,6 +89,7 @@ _INT8_NOTE = (
 _NVFP4_NOTE = "Its 4-bit weights are decoded on every step."
 
 flux3_klein_int8 = StarterModel(
+    source_urls=["https://huggingface.co/black-forest-labs/flux-3-image-klein-comfy"],
     name="FLUX.3 Klein (int8)",
     base=BaseModelType.Flux3,
     source=f"{_COMFY_QUANTIZED}/flux3-image-klein-int8-convrot.safetensors",
@@ -97,6 +102,7 @@ flux3_klein_int8 = StarterModel(
 )
 
 flux3_klein_nvfp4 = StarterModel(
+    source_urls=["https://huggingface.co/black-forest-labs/flux-3-image-klein-comfy"],
     name="FLUX.3 Klein (NVFP4)",
     base=BaseModelType.Flux3,
     source=f"{_COMFY_QUANTIZED}/flux3-image-klein-nvfp4.safetensors",
@@ -109,6 +115,7 @@ flux3_klein_nvfp4 = StarterModel(
 )
 
 flux3_klein_base_int8 = StarterModel(
+    source_urls=["https://huggingface.co/black-forest-labs/flux-3-image-klein-comfy"],
     name="FLUX.3 Klein Base (int8)",
     base=BaseModelType.Flux3,
     source=f"{_COMFY_QUANTIZED}/flux3-image-klein-base-int8-convrot.safetensors",
@@ -121,6 +128,7 @@ flux3_klein_base_int8 = StarterModel(
 )
 
 flux3_klein_base_nvfp4 = StarterModel(
+    source_urls=["https://huggingface.co/black-forest-labs/flux-3-image-klein-comfy"],
     name="FLUX.3 Klein Base (NVFP4)",
     base=BaseModelType.Flux3,
     source=f"{_COMFY_QUANTIZED}/flux3-image-klein-base-nvfp4.safetensors",
@@ -134,6 +142,7 @@ flux3_klein_base_nvfp4 = StarterModel(
 )
 
 flux3_klein_gguf_q4_k_m = StarterModel(
+    source_urls=["https://huggingface.co/Abiray/flux-3-image-klein-sd-GGUF"],
     name="FLUX.3 Klein (GGUF Q4_K_M)",
     base=BaseModelType.Flux3,
     source="https://huggingface.co/Abiray/flux-3-image-klein-sd-GGUF/resolve/main/flux3_image_klein_sd_Q4_K_M.gguf",
@@ -146,6 +155,7 @@ flux3_klein_gguf_q4_k_m = StarterModel(
 )
 
 flux3_klein_gguf_q8_0 = StarterModel(
+    source_urls=["https://huggingface.co/Abiray/flux-3-image-klein-sd-GGUF"],
     name="FLUX.3 Klein (GGUF Q8_0)",
     base=BaseModelType.Flux3,
     source="https://huggingface.co/Abiray/flux-3-image-klein-sd-GGUF/resolve/main/flux3_image_klein_sd_Q8_0.gguf",
@@ -158,17 +168,22 @@ flux3_klein_gguf_q8_0 = StarterModel(
 )
 
 # The prompt upsampler: a Qwen3.5-9B vision-language fine-tune that rewrites a short request into the caption FLUX.3 is
-# trained on. A Text LLM, so it serves Expand Prompt, which sends it the system prompt the user picks. Its own
+# trained on. A Text LLM, so it serves Expand Prompt (with the seeded "FLUX.3 Prompt Upsampler" system prompt) and the
+# FLUX.3 prompt upsampler switch in generation. Its own
 # repository is Apache-2.0 and not gated; the int8 file comes from the gated Comfy repository, under that repository's
 # license.
-_UPSAMPLER_SYSTEM_PROMPT = "Use it with the 't2i' system prompt from the model's system_prompts.json."
+_UPSAMPLER_USE = (
+    'Serves Expand Prompt with the built-in "FLUX.3 Prompt Upsampler" system prompt, and the FLUX.3 prompt upsampler '
+    "switch in generation."
+)
 
 flux3_prompt_upsampler = StarterModel(
+    source_urls=["https://huggingface.co/black-forest-labs/flux-3-image-klein-pup"],
     name="FLUX.3 Prompt Upsampler",
     base=BaseModelType.Any,
     source="black-forest-labs/flux-3-image-klein-pup",
-    description="FLUX.3 Image Klein's prompt upsampler (Qwen3.5-9B): a Text LLM for Expand Prompt that rewrites a "
-    f"short prompt into a detailed FLUX.3 caption. {_UPSAMPLER_SYSTEM_PROMPT} bf16, ~17.5GB. Apache-2.0.",
+    description="FLUX.3 Image Klein's prompt upsampler (Qwen3.5-9B): a Text LLM that rewrites a "
+    f"short prompt into a detailed FLUX.3 caption. {_UPSAMPLER_USE} bf16, ~17.5GB. Apache-2.0.",
     type=ModelType.TextLLM,
 )
 
@@ -176,14 +191,15 @@ flux3_prompt_upsampler = StarterModel(
 # within this repository once already). The file's `comfy_quant` markers drive the decode, so a re-upload at the same
 # path could change how it loads.
 flux3_prompt_upsampler_int8 = StarterModel(
+    source_urls=["https://huggingface.co/black-forest-labs/flux-3-image-klein-comfy"],
     name="FLUX.3 Prompt Upsampler (int8)",
     base=BaseModelType.Any,
     source="https://huggingface.co/black-forest-labs/flux-3-image-klein-comfy/resolve/"
     "feef60b0aaf63a4773ace96636ebbcf43b881312/text_encoders/qwen3.5_9b_flux3_prompt_upsampler_int8_convrot.safetensors",
-    description="The FLUX.3 prompt upsampler as one ComfyUI int8_convrot file, a Text LLM for Expand Prompt. It "
+    description="The FLUX.3 prompt upsampler as one ComfyUI int8_convrot file, a Text LLM. It "
     "needs about 10.7GB of memory instead of 17.5GB, but dequantizes its int8 language-model weights for every generated "
     "token unless int8 Compute runs them on int8 kernels; use the bf16 model where it fits. "
-    f"{_UPSAMPLER_SYSTEM_PROMPT} ~9.1GB. The Comfy repository is gated under the FLUX Kommunity License: accept it on "
+    f"{_UPSAMPLER_USE} ~9.1GB. The Comfy repository is gated under the FLUX Kommunity License: accept it on "
     "Hugging Face first.",
     type=ModelType.TextLLM,
     format=ModelFormat.Checkpoint,

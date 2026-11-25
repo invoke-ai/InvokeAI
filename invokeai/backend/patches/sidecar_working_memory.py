@@ -11,6 +11,7 @@ from invokeai.backend.patches.layers.full_layer import FullLayer
 from invokeai.backend.patches.layers.loha_layer import LoHALayer
 from invokeai.backend.patches.layers.lokr_layer import LoKRLayer
 from invokeai.backend.patches.layers.lora_layer import LoRALayer
+from invokeai.backend.patches.layers.merged_layer_patch import MergedLayerPatch
 from invokeai.backend.patches.layers.swapped_halves_layer_patch import SwappedHalvesLayerPatch
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.quantization.dequantizing_linear import requires_sidecar_patching
@@ -21,7 +22,8 @@ from invokeai.backend.quantization.fp8_scaled import count_fp8_weights
 # layer's own. A full layer scales its diff into a new tensor; LoKR builds kron(w1, w2), then scales it; LoHA holds
 # its two products and theirs. DoRA holds its scaled delta, the updated weight and their difference, 4 in all; the
 # input-dim (LyCORIS) magnitude's column norm, over a transposed view, measured another third of a copy on CUDA
-# (gate_layer, bf16), so DoRA is priced at 5. A low-rank layer forms none: it adds its output only.
+# (gate_layer, bf16), so DoRA is priced at 5 before accounting for FP32 promotion. A low-rank layer
+# forms none: it adds its output only.
 _SIDECAR_WEIGHT_COPIES: dict[type[BaseLayerPatch], int] = {
     FullLayer: 2,
     LoKRLayer: 3,
@@ -45,13 +47,40 @@ def _elements(layer: BaseLayerPatch) -> int:
     """Elements of a patch layer's tensors, which a sidecar holds in the compute dtype whatever it was loaded in."""
     if isinstance(layer, SwappedHalvesLayerPatch):
         layer = layer.layer
+    if isinstance(layer, MergedLayerPatch):
+        return sum(_elements(sub_layer) for sub_layer in layer.lora_layers)
     return sum(value.numel() for value in vars(layer).values() if isinstance(value, torch.Tensor))
 
 
 def _weight_copies(layer: BaseLayerPatch) -> int:
     if isinstance(layer, SwappedHalvesLayerPatch):
         return _SWAPPED_SIDECAR_WEIGHT_COPIES[type(layer.layer)]
+    if isinstance(layer, MergedLayerPatch):
+        # The merge adds each sub-layer's update to a zero tensor of the whole weight, beside the largest sub-layer's
+        # own tensors; only MOSS-Image's LoKr on a fused qkv makes one, of LoKR pieces. Measured on the CPU with an
+        # fp8 weight, in copies of the weight, for two to four row ranges: a merge of LoKR pieces peaks at 2.5-3.5,
+        # the lower for more, smaller ranges. One copy for the merge plus a piece's 3 is a copy over the highest
+        # measure and over-reserves by up to two copies where the rows are cut small.
+        return 1 + max(_weight_copies(sub_layer) for sub_layer in layer.lora_layers)
     return _SIDECAR_WEIGHT_COPIES[type(layer)]
+
+
+def _weight_workspace_bytes(layer: BaseLayerPatch, weight_elements: int, dtype: torch.dtype) -> tuple[int, int]:
+    """Dense update workspace in bytes and the residual's bytes per element."""
+    copies = _weight_copies(layer)
+    wrapped = isinstance(layer, SwappedHalvesLayerPatch)
+    leaf = layer.layer if wrapped else layer
+    if not isinstance(leaf, DoRALayer) or dtype not in (torch.bfloat16, torch.float16):
+        return copies * weight_elements * dtype.itemsize, dtype.itemsize
+
+    # The sidecar's original base and any swapped input are still in the inference dtype.
+    # DoRA widens the base, up and down, and computes the delta, direction, norm workspace
+    # and residual in FP32. A subsequent layer may run while an FP32 residual is still live.
+    base_copies = 1 + wrapped
+    fp32 = torch.float32.itemsize
+    matrix_bytes = weight_elements * (base_copies * dtype.itemsize + (copies - base_copies + 1) * fp32)
+    factor_bytes = (leaf.up.numel() + leaf.down.numel()) * fp32
+    return matrix_bytes + factor_bytes, fp32
 
 
 def lora_sidecar_bytes(
@@ -72,10 +101,9 @@ def lora_sidecar_bytes(
 
     - an update of the module's output, `rows` rows (those `per_sample_rows` names: its own count, for a Linear that
       reads the timestep embedding), with a low-rank layer's `rank` columns beside it;
-    - for any layer but a low-rank one, the `out_features x in_features` tensors `_SIDECAR_WEIGHT_COPIES` counts for
-      its kind, one more from the second such layer on the module (the running sum) and two from the third (the
-      previous layer's result as well). An int8 Linear hands over only its weight's shape, so there one copy is
-      counted that is not made.
+    - for any layer but a low-rank one, the largest dense update workspace in bytes. For DoRA this includes
+      the FP32 promotion of a half-precision base and factors. A running sum stays live from the second dense
+      patch on the module, and the previous layer's residual can also stay live from the third.
 
     Modules run one after another, so only the largest such update counts. On GGUF, int8 and fp8 weights every layer
     is a sidecar, kept on the device: all the sidecars' tensors are counted, plus that update. Other formats merge, but
@@ -88,11 +116,10 @@ def lora_sidecar_bytes(
     if not patches:
         return 0
     modules = dict(transformer.named_modules())
-    # Per patched module: its layers' elements, the largest rank among its low-rank layers, and the weight copies of
-    # each of its other layers.
+    # Per patched module: its resident patch elements, largest low rank, and dense workspaces.
     elements: dict[str, int] = {}
     ranks: dict[str, int] = {}
-    copies: dict[str, list[int]] = {}
+    workspaces: dict[str, list[tuple[int, int]]] = {}
     for patch in patches:
         for key, layer in patch.layers.items():
             if not key.startswith(prefix):
@@ -104,16 +131,22 @@ def lora_sidecar_bytes(
             if isinstance(layer, LoRALayer):
                 ranks[path] = max(ranks.get(path, 0), layer.down.shape[0])
             else:
-                copies.setdefault(path, []).append(_weight_copies(layer))
+                module = modules[path]
+                weight_elements = module.out_features * module.in_features
+                workspaces.setdefault(path, []).append(_weight_workspace_bytes(layer, weight_elements, dtype))
     updates: dict[str, int] = {}
     for path in elements:
         module = modules[path]
-        summed = copies.get(path, [])
-        weight_copies = max(summed) + min(len(summed) - 1, 2) if summed else 0
-        updates[path] = (
-            per_sample_rows.get(path, rows) * (module.out_features + ranks.get(path, 0))
-            + weight_copies * module.out_features * module.in_features
-        )
+        dense = workspaces.get(path, [])
+        output_elements = per_sample_rows.get(path, rows) * (module.out_features + ranks.get(path, 0))
+        update_bytes = output_elements * dtype.itemsize
+        if dense:
+            update_bytes += max(workspace for workspace, _ in dense)
+            residuals = min(len(dense) - 1, 2)
+            if residuals:
+                residual_size = max(itemsize for _, itemsize in dense)
+                update_bytes += residuals * module.out_features * module.in_features * residual_size
+        updates[path] = update_bytes
     if requires_sidecar_patching(transformer, model_format) or count_fp8_weights(transformer):
-        return (sum(elements.values()) + max(updates.values(), default=0)) * dtype.itemsize
-    return max((elements[path] + updates[path] for path in elements), default=0) * dtype.itemsize
+        return sum(elements.values()) * dtype.itemsize + max(updates.values(), default=0)
+    return max((elements[path] * dtype.itemsize + updates[path] for path in elements), default=0)

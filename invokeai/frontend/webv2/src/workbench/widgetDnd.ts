@@ -22,8 +22,8 @@ export const workbenchAutoScroll = {
 const clipsOverflow = (value: string): boolean => value !== 'visible';
 
 /**
- * Clip against live overflow ancestors at collision time, never in dnd-kit's cached droppable measurement: hidden
- * rows must become hittable when scrolling reveals them.
+ * Clip against live overflow ancestors at collision time, never in dnd-kit's cached droppable measurement: hidden rows
+ * must become hittable when scrolling reveals them.
  */
 export const measureDroppableVisibleRect = (element: HTMLElement): ClientRect => {
   const rect = { ...getClientRect(element) };
@@ -318,8 +318,8 @@ export const resolveWidgetDragEnd = (
 };
 
 /**
- * Recheck cached pointer hits against live clipped rects so scrolled-out rows cannot intercept drops over
- * neighboring content.
+ * Recheck cached pointer hits against live clipped rects so scrolled-out rows cannot intercept drops over neighboring
+ * content.
  */
 const dropOccludedPointerCollisions = (
   collisions: Collision[],

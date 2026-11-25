@@ -79,11 +79,9 @@ describe('prompt highlight segments', () => {
       expect(dynamicKindForText('{~red|green}', '~')).toBe('variantSampler');
       expect(dynamicKindForText('{@red|green}', '@')).toBe('variantSampler');
       expect(dynamicKindForText(`\${lens=85mm}`, '=')).toBe('promptVariableOperator');
-      // A bare reference has no operator to mark, and stays one flat span.
       expect(dynamicKindForText(`\${lens}`, `\${lens}`)).toBe('promptVariable');
     });
 
-    // Strip comments before wildcard lookup.
     it('dims a comment over everything inside it', () => {
       const known = new Set(['colors']);
       const segments = buildPromptHighlightSegments('a cat # __nope__ {unclosed', {
@@ -105,10 +103,8 @@ describe('prompt highlight segments', () => {
 
       expect(kindWithCatalog('a __colors__ ball', '__colors__')).toBe('wildcard');
       expect(kindWithCatalog('a __nope__ ball', '__nope__')).toBe('error');
-      // Resolve globs against catalog matches, not literal wildcard names.
       expect(kindWithCatalog('a __colo*__ ball', '__colo*__')).toBe('wildcard');
       expect(kindWithCatalog('a __nope/*__ ball', '__nope/*__')).toBe('error');
-      // Without a catalog nothing is known to be missing, so neither is an error.
       expect(dynamicKindForText('a __nope__ ball', '__nope__')).toBe('wildcard');
     });
 
@@ -222,7 +218,6 @@ describe('prompt highlight segments', () => {
   });
 });
 
-// A variant-heavy fixture exposes quadratic annotation lookup.
 describe('buildPromptHighlightSegments on a large prompt', () => {
   // eslint-disable-next-line no-template-curly-in-string -- `${v=1}` is dynamic-prompts syntax, not interpolation
   const prompt = '{a|b|c} __colours__ ${v=1} '.repeat(700);

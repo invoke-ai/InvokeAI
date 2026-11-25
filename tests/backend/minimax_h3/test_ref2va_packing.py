@@ -312,6 +312,15 @@ class TestRef2VADenoiseState:
         assert state.layout.num_condition_audio_rows == 6
         assert torch.equal(state.audio_rows[:6], torch.full((6, 32), 0.5))
 
+        # The 16 generated audio rows (8 latents x 2 channels) follow the reference rows, as
+        # seeded noise, and the layout addresses both blocks in order: reference rows right
+        # after the text, target rows right before the target video.
+        assert state.audio_rows.shape == (6 + 16, 32)
+        assert not torch.any(state.audio_rows[6:] == 0.5)
+        assert state.audio_indices.tolist() == list(range(3, 9)) + list(
+            range(sequence_length - 8 - 16, sequence_length - 8)
+        )
+
     def test_rejects_row_shape_mismatch(self):
         refs = [MiniMaxH3EncodedReference(kind="image", video_rows=torch.zeros(5, 96), latent_shape=(1, 6, 2))]
         with pytest.raises(ValueError, match="packs into 3"):

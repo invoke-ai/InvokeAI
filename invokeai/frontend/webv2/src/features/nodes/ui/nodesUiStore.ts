@@ -10,8 +10,8 @@ export interface NodesUiSnapshot {
   activeTab: NodesManagerTab;
   activePackName: string | null;
   /**
-   * Whether the detail, not the library, is the pane shown when the manager is too narrow for both; null until the
-   * user opens or leaves one, when the manager decides from whether the library is empty.
+   * Whether the detail, not the library, is the pane shown when the manager is too narrow for both; null until the user
+   * opens or leaves one, when the manager decides from whether the library is empty.
    */
   detailOpen: boolean | null;
   filters: NodePackFilters;
@@ -42,9 +42,9 @@ registerAccountOwnedResource({
 });
 
 /**
- * Every opener reveals the detail and every clear returns to the library, so no caller has to remember the
- * single-pane state: setting a tab or a different pack opens the detail; clearing the open pack while its Details
- * tab shows closes it. An explicit `detailOpen` wins.
+ * Every opener reveals the detail and every clear returns to the library, so no caller has to remember the single-pane
+ * state: setting a tab or a different pack opens the detail; clearing the open pack while its Details tab shows closes
+ * it. An explicit `detailOpen` wins.
  */
 const withDetailOpen = (current: NodesUiSnapshot, next: Partial<NodesUiSnapshot>): Partial<NodesUiSnapshot> => {
   if (next.detailOpen !== undefined) {
@@ -84,8 +84,8 @@ export const closeNodePackDetail = (): void => {
 };
 
 /**
- * Decide the starting pane once, when the library first loads: an empty library opens on Add Nodes, any other on
- * the list. Later installs and uninstalls never move the user; only openers and Back do.
+ * Decide the starting pane once, when the library first loads: an empty library opens on Add Nodes, any other on the
+ * list. Later installs and uninstalls never move the user; only openers and Back do.
  */
 export const settleInitialNodesPane = (isLibraryEmpty: boolean): void => {
   if (store.getSnapshot().detailOpen === null) {

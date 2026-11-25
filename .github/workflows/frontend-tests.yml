@@ -2,6 +2,10 @@
 #
 # Checks for changes to frontend files before running the tests.
 # If always_run is true, always runs the tests.
+#
+# `pnpm check:release:tests` split into parallel jobs, each gate in exactly one of them: unit and fixtures,
+# the Chromium browser suite in shards, the performance gates, and the production-build journeys. The
+# `frontend-webv2-tests` job is the required status check and fails unless every job it needs succeeded.
 
 name: 'frontend tests'
 
@@ -43,14 +47,15 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  frontend-webv2-tests:
+  changes:
+    name: 'webv2 tests: change detection'
     runs-on: blacksmith-4vcpu-ubuntu-2404
-    timeout-minutes: 20 # Includes browser suites, performance sampling, project files, and accessibility.
-    defaults:
-      run:
-        working-directory: invokeai/frontend/webv2
+    timeout-minutes: 5
+    outputs:
+      run: ${{ steps.changed-files.outputs.webv2_any_changed == 'true' || inputs.always_run == true }}
     steps:
       - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
+        if: ${{ inputs.always_run != true }}
 
       - name: check for changed webv2 files
         if: ${{ inputs.always_run != true }}
@@ -64,29 +69,131 @@ jobs:
               - '.nvmrc'
               - '.github/actions/install-frontend-deps/**'
               - 'invokeai/frontend/webv2/**'
+              # The production build embeds the release version, and fails when this file's format changes.
+              - 'invokeai/version/invokeai_version.py'
+
+  unit:
+    name: 'webv2 tests: unit and fixtures'
+    needs: changes
+    if: ${{ needs.changes.outputs.run == 'true' }}
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 15 # expected run time: ~4 min
+    defaults:
+      run:
+        working-directory: invokeai/frontend/webv2
+    steps:
+      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
 
       - name: install dependencies
-        if: ${{ steps.changed-files.outputs.webv2_any_changed == 'true' || inputs.always_run == true }}
+        uses: ./.github/actions/install-frontend-deps
+        with:
+          working-directory: invokeai/frontend/webv2
+
+      - name: unit tests
+        run: 'pnpm test'
+        shell: bash
+
+      - name: mock-backend and script fixtures
+        run: 'pnpm test:fixtures'
+        shell: bash
+
+  browser:
+    name: 'webv2 tests: browser ${{ matrix.shard }}/${{ strategy.job-total }}'
+    needs: changes
+    if: ${{ needs.changes.outputs.run == 'true' }}
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 20 # expected run time: ~7 min per shard
+    strategy:
+      # A rerun repeats only the failed shard, and a flake in one shard still reports the other's results.
+      fail-fast: false
+      matrix:
+        # Vitest assigns every test file to exactly one of `job-total` shards. Shards are numbered 1..job-total, and
+        # this is the matrix's only dimension, so the jobs together run every file once.
+        shard: [1, 2]
+    defaults:
+      run:
+        working-directory: invokeai/frontend/webv2
+    steps:
+      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
+
+      - name: install dependencies
         uses: ./.github/actions/install-frontend-deps
         with:
           working-directory: invokeai/frontend/webv2
 
       - name: install Chromium
-        if: ${{ steps.changed-files.outputs.webv2_any_changed == 'true' || inputs.always_run == true }}
         run: 'pnpm exec playwright install --with-deps chromium'
         shell: bash
 
-      # A pull request into main, or a merge group, is compared with the base branch's
-      # own measurements at the exact base commit. A skipped or failed main run may leave no cache
-      # entry; measure that base in isolation rather than compare with an older main's smaller payload.
-      # Other events compare against the committed baseline. Candidate gates remain strict in every case.
+      - name: browser tests
+        run: 'pnpm test:browser --shard=${{ matrix.shard }}/${{ strategy.job-total }}'
+        shell: bash
+
+  performance:
+    name: 'webv2 tests: performance'
+    needs: changes
+    if: ${{ needs.changes.outputs.run == 'true' }}
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 20 # expected run time: ~4 min, ~6 min when the exact base has to be measured
+    defaults:
+      run:
+        working-directory: invokeai/frontend/webv2
+    steps:
+      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
+
+      - name: install dependencies
+        uses: ./.github/actions/install-frontend-deps
+        with:
+          working-directory: invokeai/frontend/webv2
+
+      - name: install Chromium
+        run: 'pnpm exec playwright install --with-deps chromium'
+        shell: bash
+
+      # A reference records what a commit's build and browser routes measure, so it is keyed on every input of that
+      # measurement rather than on the commit: the webv2 package tree (sources, lockfile, scripts, budgets), the
+      # release version the build embeds, the Node version, the install action and this workflow. Git tree and blob
+      # hashes are content hashes, so any change to an input changes the key, and commits that leave them all alone
+      # (Python-only ones, for instance) share the reference. Every input is in the change filter above, so the last
+      # main commit that changed one ran this job. The production build imports `invokeai/frontend/api` only for
+      # types, which architectureWorkflow.test.ts enforces, so it is not an input.
+      - name: performance reference key
+        id: perf-key
+        if: ${{ (github.event_name == 'pull_request' && github.base_ref == 'main') || (github.event_name == 'merge_group' && github.event.merge_group.base_ref == 'refs/heads/main') || (github.event_name == 'push' && github.ref == 'refs/heads/main') }}
+        env:
+          REFERENCE_COMMIT: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.sha }}
+        run: |
+          git cat-file -e "$REFERENCE_COMMIT^{commit}" 2>/dev/null || git fetch --no-tags --depth=1 origin "$REFERENCE_COMMIT"
+          inputs=(
+            invokeai/frontend/webv2
+            invokeai/version/invokeai_version.py
+            .nvmrc
+            .github/actions/install-frontend-deps
+            .github/workflows/frontend-tests.yml
+          )
+          hashes=$(git rev-parse "${inputs[@]/#/$REFERENCE_COMMIT:}")
+          digest=$(printf '%s\n' "${inputs[@]}" "$hashes" | git hash-object --stdin)
+          echo "key=webv2-perf-reference-inputs-$digest" >> "$GITHUB_OUTPUT"
+          echo "Performance reference inputs at $REFERENCE_COMMIT: $digest"
+          # A missed base is measured with this checkout's workflow and install action, so only a candidate whose
+          # plumbing matches the base's may store that measurement under the base's key.
+          plumbing=(.github/actions/install-frontend-deps .github/workflows/frontend-tests.yml)
+          if [ "$(git rev-parse "${plumbing[@]/#/HEAD:}")" = "$(git rev-parse "${plumbing[@]/#/$REFERENCE_COMMIT:}")" ]; then
+            echo "base-plumbing=true" >> "$GITHUB_OUTPUT"
+          fi
+        shell: bash
+
+      # A pull request into main, or a merge group, is compared with measurements of its exact base's inputs.
+      # A missing cache entry means no main run recorded them; measure that base in isolation rather than
+      # compare with an older main's smaller payload. Other events compare against the committed baseline.
+      # Candidate gates remain strict in every case.
       - name: restore performance reference
         id: perf-ref
-        if: ${{ (steps.changed-files.outputs.webv2_any_changed == 'true' || inputs.always_run == true) && ((github.event_name == 'pull_request' && github.base_ref == 'main') || (github.event_name == 'merge_group' && github.event.merge_group.base_ref == 'refs/heads/main')) }}
+        if: ${{ steps.perf-key.outcome == 'success' && github.event_name != 'push' }}
         uses: actions/cache/restore@v5
         with:
           path: invokeai/frontend/webv2/artifacts/perf-reference
-          key: webv2-perf-reference-${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+          key: ${{ steps.perf-key.outputs.key }}
 
       - name: check out missing performance base
         id: perf-base
@@ -105,6 +212,7 @@ jobs:
           node-version-file: .perf-base/.nvmrc
 
       - name: measure missing performance base
+        id: perf-base-measure
         if: ${{ steps.perf-base.outcome == 'success' }}
         working-directory: .perf-base/invokeai/frontend/webv2
         env:
@@ -151,22 +259,29 @@ jobs:
         with:
           node-version-file: .nvmrc
 
-      - name: release completion gates
-        if: ${{ steps.changed-files.outputs.webv2_any_changed == 'true' || inputs.always_run == true }}
-        run: 'pnpm check:release:tests'
+      - name: performance gates
+        run: 'pnpm test:performance:architecture'
         shell: bash
         env:
           WEBV2_PERF_REFERENCE_DIR: ${{ steps.perf-ref.outcome == 'success' && 'artifacts/perf-reference' || '' }}
-          WEBV2_PERF_REFERENCE_LABEL: ${{ steps.perf-ref.outcome == 'success' && format('webv2-perf-reference-{0}', github.event.pull_request.base.sha || github.event.merge_group.base_sha) || '' }}
+          WEBV2_PERF_REFERENCE_LABEL: ${{ steps.perf-ref.outcome == 'success' && format('{0} at base {1}', steps.perf-key.outputs.key, github.event.pull_request.base.sha || github.event.merge_group.base_sha) || '' }}
 
-      # Recorded even when the gate failed: a main that has outgrown the committed baseline is
-      # still the right thing for a pull request to be compared with. A main job that ran the gate
-      # but produced no reference (a failure before the browser stage) records nothing and says so;
-      # one that left webv2 untouched has nothing to record. Pull requests based on either measure
-      # that exact base instead.
+      # Main records its own measurements even when the gate failed: a main that has outgrown the committed
+      # baseline is still the right thing for a pull request to be compared with. A main job that produced no
+      # reference (a failure before the browser stage) records nothing and says so; pull requests based on it
+      # measure that exact base instead. An entry for the same inputs already exists when this commit changed none.
+      - name: look up recorded performance reference
+        id: perf-ref-lookup
+        if: ${{ always() && steps.perf-key.outcome == 'success' && github.event_name == 'push' }}
+        uses: actions/cache/restore@v5
+        with:
+          path: invokeai/frontend/webv2/artifacts/perf-reference
+          key: ${{ steps.perf-key.outputs.key }}
+          lookup-only: true
+
       - name: stage performance reference
         id: perf-ref-stage
-        if: ${{ always() && github.event_name == 'push' && github.ref == 'refs/heads/main' && (steps.changed-files.outputs.webv2_any_changed == 'true' || inputs.always_run == true) }}
+        if: ${{ always() && steps.perf-ref-lookup.outcome == 'success' && steps.perf-ref-lookup.outputs.cache-hit != 'true' }}
         env:
           REFERENCE_SHA: ${{ github.sha }}
         run: |
@@ -180,20 +295,78 @@ jobs:
           fi
         shell: bash
 
+      # A pull request also keeps the base it measured, so its next push onto the same base reuses it, unless it
+      # changed the plumbing that measured it. Caches a pull request saves are visible only to that pull request,
+      # so they cannot stand in for main's references.
       - name: save performance reference
-        if: ${{ always() && github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.perf-ref-stage.outputs.ready == 'true' }}
+        if: ${{ always() && (steps.perf-ref-stage.outputs.ready == 'true' || (github.event_name == 'pull_request' && steps.perf-base-measure.outcome == 'success' && steps.perf-key.outputs.base-plumbing == 'true')) }}
         uses: actions/cache/save@v5
         with:
           path: invokeai/frontend/webv2/artifacts/perf-reference
-          key: webv2-perf-reference-${{ github.sha }}
+          key: ${{ steps.perf-key.outputs.key }}
 
-      - name: upload architecture review artifacts
-        if: ${{ always() && (steps.changed-files.outputs.webv2_any_changed == 'true' || inputs.always_run == true) }}
+      - name: upload performance review artifacts
+        if: ${{ always() }}
         uses: actions/upload-artifact@v6
         with:
-          name: webv2-architecture-review
-          path: |
-            invokeai/frontend/webv2/artifacts/architecture
-            invokeai/frontend/webv2/artifacts/architecture-performance
-            invokeai/frontend/webv2/artifacts/accessibility
+          name: webv2-performance-review
+          path: invokeai/frontend/webv2/artifacts/architecture-performance
           if-no-files-found: ignore
+
+  journeys:
+    name: 'webv2 tests: production-build journeys'
+    needs: changes
+    if: ${{ needs.changes.outputs.run == 'true' }}
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 20 # expected run time: ~8 min
+    defaults:
+      run:
+        working-directory: invokeai/frontend/webv2
+    steps:
+      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
+
+      - name: install dependencies
+        uses: ./.github/actions/install-frontend-deps
+        with:
+          working-directory: invokeai/frontend/webv2
+
+      - name: install smoke browsers
+        run: 'pnpm exec playwright install --with-deps chromium firefox webkit'
+        shell: bash
+
+      - name: project-file, accessibility and lifecycle journeys
+        run: 'pnpm test:journeys'
+        shell: bash
+
+      - name: upload journey review artifacts
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: webv2-journeys-review
+          path: |
+            invokeai/frontend/webv2/artifacts/accessibility
+            invokeai/frontend/webv2/artifacts/browser-smoke
+          if-no-files-found: ignore
+
+  # The required status check. A skipped job passes a required check, so this one always runs and passes only
+  # when change detection succeeded and every test job succeeded, or was skipped because nothing changed.
+  frontend-webv2-tests:
+    if: ${{ always() }}
+    needs: [changes, unit, browser, performance, journeys]
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 5
+    steps:
+      - name: require every webv2 test job
+        env:
+          CHANGES: ${{ needs.changes.result }}
+          RUN: ${{ needs.changes.outputs.run }}
+          RESULTS: ${{ needs.unit.result }} ${{ needs.browser.result }} ${{ needs.performance.result }} ${{ needs.journeys.result }}
+        run: |
+          expected=skipped
+          if [ "$RUN" = true ]; then expected=success; fi
+          echo "change detection: $CHANGES, tests needed: ${RUN:-unknown}; unit, browser, performance, journeys: $RESULTS"
+          [ "$CHANGES" = success ] || exit 1
+          for result in $RESULTS; do
+            [ "$result" = "$expected" ] || exit 1
+          done
+        shell: bash

@@ -6,8 +6,8 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type * as sessionModule from './session';
 
 /**
- * Two documents sharing real browser storage: this page is the tab under test, and a same-origin frame stands in for
- * a second tab. The frame's writes reach this page as genuine `storage` events.
+ * Two documents sharing real browser storage: this page is the tab under test, and a same-origin frame stands in for a
+ * second tab. The frame's writes reach this page as genuine `storage` events.
  */
 
 const TOKEN_KEY = 'auth_token';
@@ -73,6 +73,7 @@ const backend = (request: SentRequest): Response | Promise<Response> => {
     case '/api/v1/auth/status':
       return json({
         admin_email: null,
+        has_single_user_work: false,
         multiuser_enabled: true,
         setup_required: false,
         strict_password_checking: false,

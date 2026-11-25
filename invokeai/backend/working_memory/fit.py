@@ -13,7 +13,8 @@ when it is `in_fit` (not measured out of regime) and its line admits it.
 A line is fitted on its points' demand above what the estimate's other fitted lines price them at. Most lines sit on
 none, so their points' demand is fitted as measured. A line that sits on another (`Line.sits_on`) is a tiled VAE
 operation's: the estimate prices its tile on the untiled convolution line at the tile area, and its tiled line
-(`tiled_<operation>_<dtype>`, in the image's pixels) what tiling adds on top. The tiled line covers each point above
+(`tiled_<operation>_<dtype>`, in the image's pixels unless the estimator's `line` sizes it otherwise, as
+Qwen-Image-2.1's does by the tile's area on MIOpen) what tiling adds on top. The tiled line covers each point above
 the untiled demand the point's own estimator measured at that area, on the same platform, operation and dtype: the
 highest of its in-fit, fresh-process points of the untiled line there (`FitPoint.reference`, the untiled references a
 tiling run measures at each tile's side). Only where no such point exists does the untiled line's fitted price there
@@ -193,7 +194,8 @@ def convolution_line(features: Mapping[str, FeatureValue]) -> Optional[Line]:
     """The AutoencoderKL convolution line of an operation: every VAE estimator's.
 
     An untiled operation prices on ``<operation>_<dtype>`` in output pixels. A tiled one prices on
-    ``tiled_<operation>_<dtype>`` in the image's pixels, all samples' together, and sits on the untiled line at the
+    ``tiled_<operation>_<dtype>`` in the image's pixels, all samples' together (an estimator's `line` may size it
+    otherwise, as Qwen-Image-2.1's does by the tile's area on MIOpen), and sits on the untiled line at the
     area of its tile clamped to the image per axis: an estimator records a covering tile as no tile, since the VAE
     runs the single pass then. A tiled decode has a second phase, after its last tile: the decoded tiles, the rows
     blended from them and the image concatenated from those, all live at once, and the node's post-processing. It

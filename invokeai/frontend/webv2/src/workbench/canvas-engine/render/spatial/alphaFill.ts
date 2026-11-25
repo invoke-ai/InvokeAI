@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * Nearest-visible-pixel labels with the exact assignment the backend gets from
- * `cv2.distanceTransformWithLabels(hidden, DIST_L2, 5, labelType=DIST_LABEL_PIXEL)`. With labels OpenCV runs its
- * two-pass 5x5 chamfer transform in 16.16 fixed point rather than an exact Euclidean transform, so ties and the
- * chamfer's approximation decide which visible color a hidden pixel borrows; matching them keeps the band filters'
- * input, and so the visible result, identical to the node's.
+ * Nearest-visible-pixel labels with the exact assignment the backend gets from `cv2.distanceTransformWithLabels(hidden,
+ * DIST_L2, 5, labelType=DIST_LABEL_PIXEL)`. With labels OpenCV runs its two-pass 5x5 chamfer transform in 16.16 fixed
+ * point rather than an exact Euclidean transform, so ties and the chamfer's approximation decide which visible color a
+ * hidden pixel borrows; matching them keeps the band filters' input, and so the visible result, identical to the
+ * node's.
  */
 
 // OpenCV's L2 5x5 mask weights 1, 1.4 and 2.1969, rounded to 16.16 fixed point.
@@ -14,8 +14,8 @@ const KNIGHT = 143976;
 /** OpenCV's initial and out-of-image distance; adding any weight to it can never win a strict comparison. */
 const UNREACHED = 0xffffffff - KNIGHT;
 
-// Forward-pass neighbours in OpenCV's comparison order. The backward pass visits their mirror images in the same
-// order. A neighbour replaces the current best only when strictly closer, so ties keep the earlier one.
+// Forward-pass neighbours in OpenCV's comparison order. The backward pass visits their mirror images in the same order.
+// A neighbour replaces the current best only when strictly closer, so ties keep the earlier one.
 const NEIGHBOUR_DY = [-2, -2, -1, -1, -1, -1, -1, 0] as const;
 const NEIGHBOUR_DX = [-1, 1, -2, -1, 0, 1, 2, -1] as const;
 const NEIGHBOUR_WEIGHT = [KNIGHT, KNIGHT, KNIGHT, DIAGONAL, ORTHOGONAL, DIAGONAL, KNIGHT, ORTHOGONAL] as const;

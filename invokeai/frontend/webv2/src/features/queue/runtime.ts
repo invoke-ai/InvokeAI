@@ -47,11 +47,12 @@ import {
   type ReconcileInput,
   type ReconcileOutcome,
 } from '@features/queue/runtime/coordinator';
+import { createDeliveryConfirmations } from '@features/queue/runtime/deliveryClaims';
 import { createUuid } from '@platform/browser/randomUuid';
 import { mapWithConcurrency } from '@platform/core/concurrency';
 import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { normalizeServerTimestamp } from '@platform/time/serverTimestamp';
-import { ApiError, getApiErrorMessage } from '@platform/transport/http';
+import { ApiError, getApiErrorMessage, sleep } from '@platform/transport/http';
 
 export interface QueueResultDestinationPort {
   addImagesToGalleryBoard(boardId: string, imageNames: string[]): Promise<void>;
@@ -81,7 +82,6 @@ export type QueueRunLock = { kind: 'acquired'; release(): Promise<void> } | { ki
 
 export interface QueueRunLockPort {
   acquire(projectId: string, queueItemId: string): Promise<QueueRunLock>;
-  /** Settle once no tab holds the run, or the signal aborts. */
   waitForRunRelease(projectId: string, queueItemId: string, signal: AbortSignal): Promise<void>;
   /** Whether any tab holds the run, asked without requesting it; null when the browser cannot tell. */
   isHeld(projectId: string, queueItemId: string): Promise<boolean | null>;
@@ -100,7 +100,8 @@ export interface QueueHistoryCommands {
     projectId: string;
     queueItemId: string;
   }): void;
-  /** Record the latest failed submission of a run the backend has not accepted; acceptance or an ending clears it. */
+  noteFirstProgressFrame(payload: { itemIndex: number; projectId: string; queueItemId: string }): void;
+  /** Acceptance by the backend or the run ending clears it. */
   recordSubmissionRetry(payload: { projectId: string; queueItemId: string; retry: QueueSubmissionRetry }): void;
   setCancellationPending(payload: { pending: boolean; projectId: string; queueItemId: string }): void;
   setLocalRecoveryState(payload: {
@@ -110,9 +111,7 @@ export interface QueueHistoryCommands {
   }): void;
   recordError(payload: { area: string; message: string; namespace: 'queue'; projectId?: string }): void;
   refreshBackendData(): void;
-  /** A board may have refused a run: read the listing results are routed by again, at once. */
   refreshBoardDestinations(): void;
-  /** Reopen a finished run around the backend items re-running its failed or canceled ones; refused runs stay. */
   reopenForRetry(payload: {
     projectId: string;
     queueItemId: string;
@@ -133,7 +132,6 @@ export interface QueueHistoryCommands {
     videos: QueueResultVideo[];
   }): void;
   setConnectionStatus(payload: { error?: string; status: BackendConnectionStatus }): void;
-  /** Stage a retried Canvas run's results at the current bbox when no open run could adopt it. */
   stageRetriedCanvasResults(payload: {
     backendItemId: number;
     images: QueueResultImage[];
@@ -144,7 +142,6 @@ export interface QueueHistoryCommands {
     error?: string;
     /** Set when the notice words the failure itself, in the user's language; `error` stays as English detail. */
     errorCode?: QueueRunErrorCode;
-    /** The backend items whose failure ended the run, so the failure notice can show and retry them. */
     failedBackendItemIds?: readonly number[];
     notify?: boolean;
     projectId: string;
@@ -165,7 +162,7 @@ export const getQueueItemResultImageOptions = (queueItem: QueueItem): QueueResul
   return queueItem.snapshot.resultNodeIds ? { resultNodeIds: queueItem.snapshot.resultNodeIds } : undefined;
 };
 
-/** Where a run's node progress belongs; records queued before projects owned several workflows have none. */
+/** Records queued before projects owned several workflows have none. */
 const getQueueRunOrigin = (projectId: string, queueItem: QueueItem): QueueRunOrigin | undefined => {
   const submission = (queueItem.snapshot as Partial<QueueItem['snapshot']>).backendSubmission;
 
@@ -230,10 +227,7 @@ const areQueueWorkflowSeedsValid = (seeds: unknown, graph: { nodes?: Record<stri
   });
 };
 
-/**
- * Every group zips datums of one length onto fields of nodes the graph still has, no field is fed twice (by
- * another group or by a seed), and the product stays within what the queue accepts.
- */
+/** No field is fed twice (by another group or by a seed), and the product stays within what the queue accepts. */
 const areQueueWorkflowBatchGroupsValid = (
   batchData: unknown,
   graph: { nodes?: Record<string, unknown> },
@@ -353,11 +347,11 @@ export const createQueueItemBackendSubmission = (
     return { error: 'Queue item has malformed workflow batch metadata.', kind: 'invalid' };
   }
 
-  // Workflow provenance stays on the snapshot: the backend enqueue accepts neither the originating project
-  // workflow nor the library binding older records still carry.
+  // The backend enqueue accepts neither the originating project workflow nor older library bindings.
   const {
     kind: _,
     projectWorkflowId: _projectWorkflowId,
+    libraryWorkflowSource: _libraryWorkflowSource,
     ...compiled
   } = submission as typeof submission & {
     libraryWorkflowId?: string;
@@ -382,6 +376,7 @@ export interface QueueHistoryPort {
     isHydrated: boolean;
     projects: QueueHistoryProject[];
   };
+  listStagedResults(): Array<{ backendItemId: number; projectId: string; queueItemId: string }>;
   subscribe(listener: () => void): () => void;
 }
 
@@ -397,18 +392,16 @@ const getRouteTarget = (history: QueueHistoryPort, localQueueItemId: string) =>
 const getRunKey = (projectId: string, queueItemId: string): string => JSON.stringify([projectId, queueItemId]);
 
 const QUEUE_RUNTIME_CONCURRENCY = 16;
-/**
- * Reruns no open run adopted, remembered until they finish so their results still reach the Gallery or Canvas; one
- * retry can re-run up to the backend's default `max_queue_size`.
- */
+/** Reruns no open run adopted, kept until they finish; bounded by the backend's default `max_queue_size`. */
 const UNADOPTED_RERUN_LIMIT = 10_000;
-/** How long a claimant turned away from a rerun waits at most before asking again whether its holder confirmed. */
 const RERUN_CLAIM_POLL_MS = 3_000;
-/** How long the server keeps an unconfirmed delivery claim (its contract), and how often a run renews its claims. */
+/** The server's lifetime for an unconfirmed delivery claim; runs renew their claims at this pace. */
 const RERUN_CLAIM_TTL_MS = 120_000;
 const RERUN_CLAIM_RENEW_MS = 40_000;
 
 interface RunAttempt {
+  /** Only fresh admissions observed here are known ordinary; restored runs still need metadata validation. */
+  ordinaryBackendItemIds?: ReadonlySet<number>;
   generation: number;
   key: string;
   projectId: string;
@@ -423,45 +416,22 @@ const getJournalSignature = (item: QueueItem): string =>
     item.backendItemIds,
     item.completedBackendItemIds,
     item.cancelledBackendItemIds,
-    // The failure budget and the wait before the next attempt survive a reload, so every failed attempt writes the run
-    // once more; the retry pace bounds those writes.
+    // Each failed attempt persists the run, so the retry pace bounds those writes.
     item.submissionRetry,
   ]);
 
 /**
- * A 5xx answer to an enqueue is usually caused by the request itself (e.g. a graph that
- * crashes server-side validation), so retrying the same submission forever never succeeds.
- * Gateway and availability errors (502/503/504, and 408/429) stay transient and keep retrying.
- * A run only gives up after at least MAX_SERVER_ERROR_SUBMISSIONS consecutive 500s spread over at least
- * MIN_SERVER_ERROR_WINDOW_MS, so a short-lived internal error can still recover.
- * After the last allowed 500 the run is reconciled once more, and only fails if the
- * backend queue really has nothing for it. The count lives on the run (`submissionRetry`), so a reload continues it.
+ * Enqueue 5xx usually means a bad request: fail after this many consecutive 500s spanning MIN_SERVER_ERROR_WINDOW_MS.
+ * 502/503/504/408/429 stay transient.
  */
 const MAX_SERVER_ERROR_SUBMISSIONS = 3;
 const MIN_SERVER_ERROR_WINDOW_MS = 10_000;
-/**
- * An attempt starting this long after the run's previous failure begins a new 500 streak, so 500s from an earlier
- * session do not spend the budget of a later one. Minutes rather than a few retry delays: a hidden tab's timers can
- * fire only about once a minute, and that must not reset a streak.
- */
+/** Minutes, not retry delays: a hidden tab's timers may fire only once a minute and must not reset a 500 streak. */
 const SERVER_ERROR_STREAK_GAP_MS = 5 * 60_000;
 const UNAVAILABLE_STATUSES = [408, 429, 502, 503, 504];
 /**
- * A run waits before each resubmission, 1 s after its first failed submission and doubling up to 15 s, whatever the
- * reason; its 500 budget is then spent after five attempts over about 15 s. When the connection comes back, each run
- * waiting then submits within a random RECONNECT_SPREAD_MS instead (never later than its own wait), so a restarting
- * server, and every tab, does not get all of them at once.
- *
- * Clock rules, for the wall clock the recorded times use:
- * - A wait runs from the recorded failure (`failedAt`), so a reload keeps it.
- * - A wait is never longer than the run's delay: a failure recorded ahead of the clock (set back since) waits the
- *   delay from now (`getSubmissionWaitMs`), and a due time the clock has since moved more than a delay away is fixed
- *   again (`getRemainingSubmissionWaitMs`). A clock set back delays a run once by at most its delay.
- * - A 500 streak whose start reads after now restarts its window at now and keeps its count, so the run neither waits
- *   for the clock to catch up nor fails at once; a clock set forward can only shorten the window, and the run still
- *   takes MAX_SERVER_ERROR_SUBMISSIONS 500s to fail (`getSubmissionRetry`). A clock set back never starts a new streak
- *   by SERVER_ERROR_STREAK_GAP_MS; one set forward past it does, which only gives the run a fresh budget.
- * - Whether the budget is spent is judged from the recorded times alone (`isSubmissionRetryExhausted`).
+ * Backoff from `failedAt`: 1 s doubling to 15 s; on reconnect waits shrink to a random share of RECONNECT_SPREAD_MS.
+ * A wait never exceeds its delay, so a clock change delays a run at most once; exhaustion reads recorded times only.
  */
 const SUBMISSION_RETRY_BASE_MS = 1_000;
 const SUBMISSION_RETRY_MAX_MS = 15_000;
@@ -486,11 +456,7 @@ const getRetryReason = (error: unknown): Exclude<QueueSubmissionRetry['reason'],
   return isTransportFailure(error) ? 'unreachable' : 'error';
 };
 
-/**
- * The retry a failed submission leaves, continuing the run's consecutive server errors unless the attempt started
- * more than SERVER_ERROR_STREAK_GAP_MS after the previous failure. The gap is measured from the attempt's start, so
- * a slow answer cannot reset its own streak.
- */
+/** The streak gap is measured from the attempt's start, so a slow answer cannot reset its own streak. */
 const getSubmissionRetry = (
   error: unknown,
   previous: QueueSubmissionRetry | undefined,
@@ -540,7 +506,6 @@ export const createQueueRuntime = ({
   viewerUserId = null,
 }: {
   backend: QueueBackendPort;
-  /** Cancels this tab already announced; a run they end reports no outcome of its own. */
   cancelRequests?: QueueCancelRequestPort;
   destinations: QueueResultDestinationPort;
   ensureProjectPersisted?(projectId: string): Promise<'ready' | 'refused' | 'retry'>;
@@ -558,9 +523,7 @@ export const createQueueRuntime = ({
     ...history.commands,
     setStatus: (payload) => {
       history.commands.setStatus(payload);
-      // A run bound for the gallery, or a workflow run, whose nodes name boards whatever its destination, may have
-      // failed on a board: deleted, archived, or no longer the caller's to add to. The listing is read again at once;
-      // a run submitted after that read lands is routed by it, one submitted before still goes by the old listing.
+      // A board may have refused the run (deleted, archived, or no longer writable): reread the listing at once.
       const failedSnapshot =
         payload.status === 'failed' ? getRouteTarget(history, payload.queueItemId)?.queueItem?.snapshot : undefined;
       if (failedSnapshot && (failedSnapshot.destination === 'gallery' || failedSnapshot.sourceId === 'workflow')) {
@@ -585,7 +548,6 @@ export const createQueueRuntime = ({
   const pendingJournalSettles = new Map<string, { ownershipEpoch: number; projectId: string; queueItemId: string }>();
   const durableJournalSignatures = new Map<string, string>();
   const reportedJournalFailures = new Set<string>();
-  /** Runs whose failed cancellation was already reported; retries stay quiet until the run settles. */
   const reportedCancelFailures = new Set<string>();
   const ownedLocks = new Map<string, Extract<QueueRunLock, { kind: 'acquired' }>>();
   const lockRequests = new Map<string, Promise<boolean>>();
@@ -604,12 +566,8 @@ export const createQueueRuntime = ({
   const cancelRequestedRunKeys = new Set<string>();
   let reconcileRetryDelayMs = 100;
   let retryTimer: ReturnType<typeof setTimeout> | undefined;
-  /** Wakes the runtime when the earliest waiting run may submit again. */
   let submissionTimer: { dueAt: number; timer: ReturnType<typeof setTimeout> } | undefined;
-  /**
-   * When each waiting run may submit again, by the failure it waits on; fixed when that failure is first seen and
-   * shortened on reconnect. See the clock rules at SUBMISSION_RETRY_BASE_MS.
-   */
+  /** Fixed when the failure is first seen and shortened on reconnect; see SUBMISSION_RETRY_BASE_MS. */
   const submissionDueTimes = new Map<string, { dueAt: number; failedAt: number }>();
   let sawDisconnect = false;
   let renewTimer: ReturnType<typeof setInterval> | undefined;
@@ -622,6 +580,7 @@ export const createQueueRuntime = ({
   const beginAttempt = (projectId: string, queueItemId: string): RunAttempt => {
     const key = getRunKey(projectId, queueItemId);
     const attempt = {
+      ordinaryBackendItemIds: activeAttempts.get(key)?.ordinaryBackendItemIds,
       generation: ++nextAttemptGeneration,
       key,
       projectId,
@@ -1065,18 +1024,14 @@ export const createQueueRuntime = ({
       scheduleResultReadFlush();
     });
 
-  /**
-   * The board that result images and videos unassigned on the backend land on. A result already on a board keeps it,
-   * whether a node saved it there or an earlier settlement or the user put it there.
-   */
+  /** A result already on a board keeps it. */
   const getResultDestinationBoardId = (queueItem: QueueItem): string | null => {
     const boardId = queueItem.snapshot.galleryBoardId;
 
     return queueItem.snapshot.destination === 'gallery' && boardId && boardId !== 'none' ? boardId : null;
   };
 
-  // Submissions are immutable once enqueued, so a batch's input media is collected once and reused by every partial
-  // and final result route; scanning batch data per route would repeat a walk over every batch item.
+  // Submissions are immutable once enqueued, so a batch's input media is collected once.
   const submissionInputMedia = new WeakMap<object, SubmissionInputMediaNames>();
   const getSubmissionInputMediaNames = (queueItem: QueueItem): SubmissionInputMediaNames => {
     const submission: unknown = queueItem.snapshot.backendSubmission;
@@ -1101,17 +1056,13 @@ export const createQueueRuntime = ({
     }
   };
 
-  /**
-   * Hydrate generated videos for display and attach the unassigned ones to the destination board. Failures are
-   * recorded but never turn successful generation into failure.
-   */
+  /** Failures are recorded but never turn a successful generation into a failure. */
   const deliverResultVideos = async (
     projectId: string,
     queueItem: QueueItem,
     backendItemIds: number[]
   ): Promise<QueueResultVideo[]> => {
-    // Skip known cancelled backend items. Resumed cancellation records can be incomplete, so remaining attachments
-    // are best-effort.
+    // Resumed cancellation records can be incomplete, so attachments stay best-effort.
     const deliverableItemIds = backendItemIds.filter(
       (backendItemId) => !queueItem.cancelledBackendItemIds?.includes(backendItemId)
     );
@@ -1193,8 +1144,7 @@ export const createQueueRuntime = ({
       return [];
     }
 
-    // Re-read only the attach candidates so each reports the board it reached: the destination port skips virtual
-    // boards, and a partial failure attaches only some videos.
+    // Re-read the attach candidates: the port skips virtual boards and partial failures attach only some.
     try {
       const attached = new Map((await readVideos(unassignedNames)).map((video) => [video.videoName, video]));
 
@@ -1230,8 +1180,7 @@ export const createQueueRuntime = ({
     coordinator: QueueCoordinator,
     projectId: string,
     queueItem: QueueItem,
-    // Pass actual backend IDs explicitly; the immutable pre-submit queueItem closure cannot contain newly assigned
-    // IDs.
+    // Pass actual backend IDs explicitly; the immutable pre-submit queueItem closure cannot contain newly assigned IDs.
     backendItemIds: number[],
     attempt: RunAttempt
   ): Promise<void> => {
@@ -1262,8 +1211,32 @@ export const createQueueRuntime = ({
         return;
       }
 
+      if (images.length > 0) {
+        markAdoptedRerunsStaged(
+          projectId,
+          queueItem,
+          images.flatMap((image) => (image.sourceBackendItemId === undefined ? [] : [image.sourceBackendItemId]))
+        );
+      }
+      try {
+        deliveryConfirmations.routeOrdinaryResults(
+          backendItemIds.filter((id) => attempt.ordinaryBackendItemIds?.has(id)),
+          () => commands.routeResults({ images, projectId, queueItemId: queueItem.id, videos })
+        );
+      } catch (error) {
+        let stagedBackendItemIds: Set<number> | undefined;
+        for (const backendItemId of backendItemIds) {
+          const claim = adoptedRerunClaims.get(getAdoptedRerunKey(projectId, queueItem.id, backendItemId));
+          if (claim) {
+            stagedBackendItemIds ??= getStagedBackendItemIds(projectId, queueItem.id);
+            claim.isStaged = stagedBackendItemIds.has(backendItemId);
+          }
+        }
+        confirmAdoptedReruns(projectId, queueItem, backendItemIds);
+        releaseAdoptedReruns(projectId, queueItem.id);
+        throw error;
+      }
       confirmAdoptedReruns(projectId, queueItem, backendItemIds);
-      commands.routeResults({ images, projectId, queueItemId: queueItem.id, videos });
       if (queueItem.snapshot.destination === 'gallery') {
         commands.refreshBackendData();
       }
@@ -1272,7 +1245,6 @@ export const createQueueRuntime = ({
         return;
       }
 
-      // A cancel or clear this tab asked for already said so; the run ending is no news.
       const wasRequestedHere = () =>
         cancelRequests.wasRequestedHere({
           backendBatchId: getRouteTarget(history, queueItem.id)?.queueItem?.backendBatchId,
@@ -1286,8 +1258,7 @@ export const createQueueRuntime = ({
         return;
       }
 
-      // A clear deletes rows without a terminal event; the run vanished rather than failed, and there is nothing left
-      // to show or retry.
+      // A clear deletes rows without a terminal event; there is nothing to show or retry.
       if (error instanceof QueueItemFailedError && error.failure === 'removed') {
         if (wasRequestedHere()) {
           commands.setStatus({ notify: false, projectId, queueItemId: queueItem.id, status: 'cancelled' });
@@ -1349,30 +1320,52 @@ export const createQueueRuntime = ({
       }
 
       // A renewal may have found the claim lost while the results loaded; another claimant stages the rerun then.
-      const visibleImages = isAdoptedRerunDecidedHere(projectId, queueItem, backendItemId)
+      const visibleImages = (await isAdoptedRerunStagedHere(projectId, queueItem, backendItemId))
         ? await deliverVisibleImages(queueItem, images)
         : [];
-      // Never throws — a board-attach hiccup must not block routePartialResults below.
       const videos = await deliverResultVideos(projectId, queueItem, [backendItemId]);
 
       if (!isAttemptCurrent(attempt)) {
         return;
       }
 
-      // The held denoise frame may be painted over exactly these images while
-      // they decode — not over an earlier image of the same batch.
+      // The held denoise frame may be painted over exactly these images while they decode.
       progressImageStore.bindSwapImages(
         queueItem.id,
         visibleImages.map((image) => image.imageName)
       );
+      if (visibleImages.length > 0) {
+        markAdoptedRerunsStaged(projectId, queueItem, [backendItemId]);
+      }
+      try {
+        deliveryConfirmations.routeOrdinaryResults(
+          attempt.ordinaryBackendItemIds?.has(backendItemId) ? [backendItemId] : [],
+          () =>
+            commands.routePartialResults({
+              backendItemId,
+              images: visibleImages,
+              projectId,
+              queueItemId: queueItem.id,
+              videos,
+            })
+        );
+      } catch (error) {
+        const claim = adoptedRerunClaims.get(getAdoptedRerunKey(projectId, queueItem.id, backendItemId));
+        if (claim) {
+          claim.isStaged = history
+            .listStagedResults()
+            .some(
+              (result) =>
+                result.backendItemId === backendItemId &&
+                result.projectId === projectId &&
+                result.queueItemId === queueItem.id
+            );
+        }
+        confirmAdoptedReruns(projectId, queueItem, [backendItemId]);
+        releaseAdoptedReruns(projectId, queueItem.id);
+        throw error;
+      }
       confirmAdoptedReruns(projectId, queueItem, [backendItemId]);
-      commands.routePartialResults({
-        backendItemId,
-        images: visibleImages,
-        projectId,
-        queueItemId: queueItem.id,
-        videos,
-      });
       if (queueItem.snapshot.destination === 'gallery') {
         commands.refreshBackendData();
       }
@@ -1432,8 +1425,7 @@ export const createQueueRuntime = ({
             )
           );
         }
-        // Inactive: whatever is left will never run. Release its awaiters — a
-        // followed slot must not hang on a route that is never coming.
+        // Inactive routes never run; release their awaiters so a followed slot does not hang.
         for (const route of pendingResultRoutes.values()) {
           route.settle();
         }
@@ -1453,7 +1445,11 @@ export const createQueueRuntime = ({
       if (target?.queueItem && !(await isAdoptedRerunStagedHere(target.project.id, target.queueItem, itemId))) {
         return [];
       }
-      return runResultRead(() => backend.getResultImages(itemId, localQueueItemId, ...rest));
+      const images = await runResultRead(() => backend.getResultImages(itemId, localQueueItemId, ...rest));
+      if (target?.queueItem && !(await isAdoptedRerunStagedHere(target.project.id, target.queueItem, itemId))) {
+        return [];
+      }
+      return images;
     },
   };
   const coordinator = createQueueCoordinator(
@@ -1497,6 +1493,17 @@ export const createQueueRuntime = ({
           return scheduleResultRoute(target.project.id, target.queueItem, backendItemId, attempt);
         }
       },
+      onFirstProgressFrame: ({ itemIndex, queueItemId }) => {
+        if (!isActive()) {
+          return;
+        }
+
+        const target = getRouteTarget(history, queueItemId);
+
+        if (target?.queueItem?.snapshot.destination === 'canvas') {
+          commands.noteFirstProgressFrame({ itemIndex, projectId: target.project.id, queueItemId });
+        }
+      },
       onGalleryRefresh: () => {
         if (isActive()) {
           commands.refreshBackendData();
@@ -1506,8 +1513,8 @@ export const createQueueRuntime = ({
     { backend: coordinatorBackend, modelLoads, nodeExecution }
   );
 
-  /** Backend ids of reruns no run in this tab adopted. */
   const unadoptedReruns = new Set<number>();
+  const ownedUnadoptedClaims = new Map<number, string>();
   const rememberUnadoptedRerun = (itemId: number): void => {
     unadoptedReruns.add(itemId);
     for (const oldest of unadoptedReruns) {
@@ -1518,33 +1525,24 @@ export const createQueueRuntime = ({
     }
   };
 
-  /** Ends every wait on another tab's run, or on a rerun another claimant holds, once this runtime stops. */
   const rerunWaits = new AbortController();
   const waitForRerunRetry = (delayMs: number): Promise<void> =>
-    new Promise((resolve) => {
-      const timer = setTimeout(resolve, delayMs);
-      rerunWaits.signal.addEventListener(
-        'abort',
-        () => {
-          clearTimeout(timer);
-          resolve();
-        },
-        { once: true }
-      );
-    });
-  /** This tab, as the claimant of the reruns it stages outside any run. */
+    sleep(delayMs, rerunWaits.signal).catch(() => undefined);
   const tabClaimant = `tab:${createUuid()}`;
-  /** A run, as the claimant of the reruns it was reopened around; the run restored by a reload claims as it did. */
+  /** A run restored by a reload claims as it did before. */
   const getRunClaimant = (projectId: string, queueItemId: string): string => `run:${getRunKey(projectId, queueItemId)}`;
 
-  /**
-   * Whether this claimant stages a retried Canvas item, as the server agrees it for every browser and tab of the
-   * account. While another claimant holds the item it asks again, until that one confirms or its claim expires; a
-   * request that fails is asked again for as long as a claim could last. A server without claims (a 404) lets every
-   * claimant stage it, as before claims existed.
-   */
-  const claimRerunDelivery = async (itemId: number, claimant: string, canDeliver: () => boolean): Promise<boolean> => {
+  /** Account-wide server claim, so one tab stages each retried Canvas item; a 404 lets every claimant stage. */
+  const claimRerunDelivery = async (
+    itemId: number,
+    claimant: string,
+    canDeliver: () => boolean,
+    onClaim: () => void
+  ): Promise<boolean> => {
     for (let failures = 0; ;) {
+      if (!isActive()) {
+        return false;
+      }
       let claim: QueueItemDeliveryClaim;
       try {
         claim = await backend.claimItemDelivery(itemId, 'claim', claimant);
@@ -1559,7 +1557,14 @@ export const createQueueRuntime = ({
         claim = { kind: 'held', retryInMs: RERUN_CLAIM_POLL_MS };
       }
       if (claim.kind !== 'held') {
-        return claim.kind === 'claimed';
+        if (claim.kind === 'claimed' && !canDeliver()) {
+          settleRerunClaim(itemId, 'release', claimant);
+          return false;
+        }
+        if (claim.kind === 'claimed') {
+          onClaim();
+        }
+        return canDeliver() && claim.kind === 'claimed';
       }
       // Soon enough to see the holder confirm, and spread out so claimants turned away together do not ask together.
       await waitForRerunRetry(Math.min(claim.retryInMs, RERUN_CLAIM_POLL_MS) * (1 + Math.random() / 2));
@@ -1568,26 +1573,60 @@ export const createQueueRuntime = ({
       }
     }
   };
-  /** Whether this claimant still holds an item it claimed, renewing the claim; a server that cannot answer keeps it. */
-  const isRerunClaimHeld = async (itemId: number, claimant: string): Promise<boolean> => {
+  /** Renews the claim; a server that cannot answer keeps it. */
+  const isRerunClaimHeld = async (
+    itemId: number,
+    claimant: string,
+    canDeliver: () => boolean,
+    onClaim: () => void
+  ): Promise<boolean> => {
+    if (!isActive()) {
+      return false;
+    }
     try {
-      return (await backend.claimItemDelivery(itemId, 'claim', claimant)).kind === 'claimed';
+      const result = await backend.claimItemDelivery(itemId, 'claim', claimant);
+      if (result.kind === 'claimed' && !canDeliver()) {
+        settleRerunClaim(itemId, 'release', claimant);
+        return false;
+      }
+      if (result.kind === 'claimed') {
+        onClaim();
+      }
+      return result.kind === 'claimed' && canDeliver();
     } catch {
-      return true;
+      return canDeliver();
     }
   };
-  const settleRerunClaim = (itemId: number, action: 'confirm' | 'release', claimant: string): void => {
-    void backend.claimItemDelivery(itemId, action, claimant).catch(() => undefined);
+  const deliveryConfirmations = createDeliveryConfirmations({
+    backend,
+    isActive,
+    signal: owner.signal,
+    reportError: (message) => commands.recordError({ area: 'queue-results', message, namespace: 'queue' }),
+  });
+  const settleRerunClaim = (
+    itemId: number,
+    action: 'confirm' | 'release',
+    claimant: string,
+    ownsClaim = false
+  ): void => {
+    if (action === 'confirm') {
+      deliveryConfirmations.confirm(itemId, claimant, ownsClaim);
+    } else if (
+      isAccountScopeCurrent(owner) &&
+      !deliveryConfirmations.isStaged(itemId) &&
+      !history.listStagedResults().some((result) => result.backendItemId === itemId)
+    ) {
+      // Same-account teardown may release unstaged work; an account change must never send with new credentials.
+      void backend.claimItemDelivery(itemId, action, claimant).catch(() => undefined);
+    }
   };
 
-  /**
-   * The Canvas reruns the runs of this tab were reopened around, each claimed by its run as soon as the tab holds the
-   * run and renewed while the run lasts, so a tab or browser that sees the rerun finish first leaves it to the run.
-   */
+  /** Claimed by its run once this tab holds it, so a tab seeing the rerun finish first leaves it to the run. */
   interface AdoptedRerunClaim {
     decision: Promise<boolean>;
     isClaimed: boolean;
-    isConfirmed: boolean;
+    isStaged: boolean;
+    ownsClaim: boolean;
   }
   const adoptedRerunClaims = new Map<string, AdoptedRerunClaim>();
   const getAdoptedRerunKey = (projectId: string, queueItemId: string, backendItemId: number): string =>
@@ -1603,94 +1642,138 @@ export const createQueueRuntime = ({
       return existing;
     }
     const claim: AdoptedRerunClaim = {
-      // A claim the run let go of meanwhile stops asking.
       decision: claimRerunDelivery(
         backendItemId,
         getRunClaimant(projectId, queueItemId),
-        () => isActive() && adoptedRerunClaims.get(key) === claim
+        () => isActive() && adoptedRerunClaims.get(key) === claim,
+        () => {
+          claim.ownsClaim = true;
+        }
       ).then((isClaimed) => {
         claim.isClaimed = isClaimed;
         return isClaimed;
       }),
       isClaimed: false,
-      isConfirmed: false,
+      isStaged: deliveryConfirmations.isStaged(backendItemId),
+      ownsClaim: false,
     };
     adoptedRerunClaims.set(key, claim);
     return claim;
   };
-  /** Claim the Canvas reruns of a run this tab holds that it has yet to stage. */
   const claimAdoptedReruns = (projectId: string, queueItem: QueueItem): void => {
     for (const backendItemId of queueItem.backendItemIds ?? []) {
-      if (isAdoptedRerun(queueItem, backendItemId) && !queueItem.completedBackendItemIds?.includes(backendItemId)) {
+      if (
+        isAdoptedRerun(queueItem, backendItemId) &&
+        !deliveryConfirmations.isStaged(backendItemId) &&
+        !queueItem.completedBackendItemIds?.includes(backendItemId)
+      ) {
         claimAdoptedRerun(projectId, queueItem.id, backendItemId);
       }
     }
   };
-  /** Keep the claims of runs still going from lapsing; a claim lost meanwhile leaves its rerun out of the run. */
   const renewAdoptedRerunClaims = (): void => {
+    if (!isActive()) {
+      return;
+    }
+    deliveryConfirmations.renewOwned();
     for (const [key, claim] of adoptedRerunClaims) {
-      if (!claim.isClaimed || claim.isConfirmed) {
+      if (!claim.isClaimed || !claim.ownsClaim || claim.isStaged) {
         continue;
       }
       const [projectId, queueItemId, backendItemId] = JSON.parse(key) as [string, string, number];
       void backend
         .claimItemDelivery(backendItemId, 'claim', getRunClaimant(projectId, queueItemId))
         .then((renewal) => {
-          if (renewal.kind !== 'claimed' && adoptedRerunClaims.get(key) === claim && !claim.isConfirmed) {
+          if (renewal.kind === 'claimed' && adoptedRerunClaims.get(key) !== claim && !claim.isStaged) {
+            settleRerunClaim(backendItemId, 'release', getRunClaimant(projectId, queueItemId));
+          }
+          if (renewal.kind !== 'claimed' && adoptedRerunClaims.get(key) === claim && !claim.isStaged) {
             claim.isClaimed = false;
           }
         })
         .catch(() => undefined);
     }
   };
-  /**
-   * Whether a run stages a rerun it was reopened around. A rerun another tab or browser staged first, as when the run's
-   * tab had closed, is left out of the run's results, so a run restored after that never stages it again.
-   */
+  /** A rerun another tab or browser staged first is left out, so a restored run never stages it again. */
   const isAdoptedRerunStagedHere = async (
     projectId: string,
     queueItem: QueueItem,
     backendItemId: number
   ): Promise<boolean> => {
+    if (!isActive()) {
+      return false;
+    }
     if (!isAdoptedRerun(queueItem, backendItemId)) {
       return true;
     }
+    if (deliveryConfirmations.isStaged(backendItemId)) {
+      return false;
+    }
     const claim = claimAdoptedRerun(projectId, queueItem.id, backendItemId);
     await claim.decision;
+    if (claim.isClaimed && !claim.isStaged) {
+      claim.isClaimed = await isRerunClaimHeld(
+        backendItemId,
+        getRunClaimant(projectId, queueItem.id),
+        () =>
+          isActive() && adoptedRerunClaims.get(getAdoptedRerunKey(projectId, queueItem.id, backendItemId)) === claim,
+        () => {
+          claim.ownsClaim = true;
+        }
+      );
+    }
     return claim.isClaimed;
   };
-  /**
-   * Whether a run stages a rerun now, without waiting on a claim still undecided; the run's end stages it once decided.
-   * Result routing is shared by every run of the tab, so one claim must not hold the others up.
-   */
+  /** Routing is shared by every run of the tab, so one undecided claim must not hold the others up. */
   const isAdoptedRerunDecidedHere = (projectId: string, queueItem: QueueItem, backendItemId: number): boolean =>
     !isAdoptedRerun(queueItem, backendItemId) ||
-    adoptedRerunClaims.get(getAdoptedRerunKey(projectId, queueItem.id, backendItemId))?.isClaimed === true;
-  /**
-   * Confirm the reruns a run is about to stage. Called just before their results are routed, since routing them can
-   * finish the run, and a finished run gives back the claims it did not confirm.
-   */
-  const confirmAdoptedReruns = (projectId: string, queueItem: QueueItem, backendItemIds: number[]): void => {
+    (!deliveryConfirmations.isStaged(backendItemId) &&
+      adoptedRerunClaims.get(getAdoptedRerunKey(projectId, queueItem.id, backendItemId))?.isClaimed === true);
+  /** Routing may finish the run and release its unstaged claims; a routing failure releases only unstaged work. */
+  const markAdoptedRerunsStaged = (projectId: string, queueItem: QueueItem, backendItemIds: number[]): void => {
     for (const backendItemId of backendItemIds) {
       const claim = adoptedRerunClaims.get(getAdoptedRerunKey(projectId, queueItem.id, backendItemId));
-      if (claim?.isClaimed && !claim.isConfirmed) {
-        claim.isConfirmed = true;
-        settleRerunClaim(backendItemId, 'confirm', getRunClaimant(projectId, queueItem.id));
+      if (claim?.isClaimed && !claim.isStaged) {
+        claim.isStaged = true;
       }
     }
   };
-  /**
-   * A run this tab lets go of, whether it ended or its project closed, gives back the claims it did not confirm, so
-   * another tab stages those reruns at once; a later hold of the run claims again.
-   */
+  const getStagedBackendItemIds = (projectId: string, queueItemId: string): Set<number> => {
+    const backendItemIds = new Set<number>();
+    for (const result of history.listStagedResults()) {
+      if (result.projectId === projectId && result.queueItemId === queueItemId) {
+        backendItemIds.add(result.backendItemId);
+      }
+    }
+    return backendItemIds;
+  };
+  const confirmAdoptedReruns = (projectId: string, queueItem: QueueItem, backendItemIds: number[]): void => {
+    let stagedBackendItemIds: Set<number> | undefined;
+    for (const backendItemId of backendItemIds) {
+      const key = getAdoptedRerunKey(projectId, queueItem.id, backendItemId);
+      const claim = adoptedRerunClaims.get(key);
+      if (!claim?.isStaged) {
+        continue;
+      }
+      stagedBackendItemIds ??= getStagedBackendItemIds(projectId, queueItem.id);
+      if (!stagedBackendItemIds.has(backendItemId)) {
+        claim.isStaged = false;
+        releaseAdoptedReruns(projectId, queueItem.id);
+        continue;
+      }
+      settleRerunClaim(backendItemId, 'confirm', getRunClaimant(projectId, queueItem.id), claim.ownsClaim);
+      adoptedRerunClaims.delete(key);
+    }
+  };
+  /** Unconfirmed claims go back so another tab stages those reruns at once. */
   const releaseAdoptedReruns = (projectId: string, queueItemId: string): void => {
     for (const [key, claim] of adoptedRerunClaims) {
       const [keyProjectId, keyQueueItemId, backendItemId] = JSON.parse(key) as [string, string, number];
       if (keyProjectId !== projectId || keyQueueItemId !== queueItemId) {
         continue;
       }
-      adoptedRerunClaims.delete(key);
-      if (!claim.isConfirmed) {
+      if (!claim.isStaged) {
+        adoptedRerunClaims.delete(key);
         void claim.decision.then((isClaimed) => {
           if (isClaimed) {
             settleRerunClaim(backendItemId, 'release', getRunClaimant(projectId, queueItemId));
@@ -1700,11 +1783,7 @@ export const createQueueRuntime = ({
     }
   };
 
-  /**
-   * A retry, from any tab or client, re-runs failed or canceled backend items under new ids. The open run that owns
-   * the retried items, or once owned them before an earlier retry, reopens around the reruns, so its captured
-   * destination receives their results; reconciliation then tracks them like any resumed run.
-   */
+  /** Retries re-run backend items under new ids; the run that owns (or owned) them reopens around the reruns. */
   const handleItemsRetried = (event: QueueItemsRetriedEvent): void => {
     if (!isActive() || !event.retried_items?.length) {
       return;
@@ -1772,10 +1851,7 @@ export const createQueueRuntime = ({
     synchronize();
   };
 
-  /**
-   * The images a rerun no run adopted produced. Its run, when this tab still holds it, says which nodes are results;
-   * otherwise the product sources' result nodes are tried before every image the rerun created, as for a Workflow.
-   */
+  /** Without the run in this tab, the product sources' result nodes are tried before every image the rerun created. */
   const readUnadoptedRerunImages = async (
     event: QueueItemStatusChangedEvent,
     queueItemId: string,
@@ -1804,11 +1880,7 @@ export const createQueueRuntime = ({
     );
   };
 
-  /**
-   * Whether another tab tracks the run behind a Canvas rerun no run adopted. That tab knows the run's result nodes, so
-   * it stages the rerun and this one waits for it; the lock is only looked at here, so that tab is never turned away.
-   * Tabs that do not track the run, and other browsers, are kept apart by the server's delivery claim instead.
-   */
+  /** The lock is only inspected, so the tracking tab is never turned away; other browsers rely on the server claim. */
   const isRunTrackedElsewhere = async (projectId: string, queueItemId: string): Promise<boolean> => {
     const key = getRunKey(projectId, queueItemId);
     if (!locks || ownedLocks.has(key) || lockRequests.has(key) || releasingRuns.has(key)) {
@@ -1821,10 +1893,6 @@ export const createQueueRuntime = ({
     }
   };
 
-  /**
-   * Deliver a rerun no open run adopted the way its destination would see any untracked result: the Gallery refreshes
-   * (onto its run's board when this tab still holds that run), and one tab with its Canvas project open stages it.
-   */
   const handleUnadoptedRerunSettled = (event: QueueItemStatusChangedEvent): void => {
     if (!isActive() || !isTerminalBackendStatus(event.status) || !unadoptedReruns.delete(event.item_id)) {
       return;
@@ -1874,25 +1942,58 @@ export const createQueueRuntime = ({
     const canStage = (): boolean =>
       isActive() && history.getSnapshot().projects.some((project) => project.id === projectId);
     const stage = async (): Promise<void> => {
-      // A tab that tracks the run knows its result nodes and stages the rerun itself; this one waits until that tab lets
-      // the run go, and then stages only a rerun it left.
       if (await isRunTrackedElsewhere(projectId, queueItemId)) {
         await locks?.waitForRunRelease(projectId, queueItemId, rerunWaits.signal);
       }
-      if (!canStage() || !(await claimRerunDelivery(event.item_id, tabClaimant, canStage))) {
+      let ownsClaim = false;
+      if (
+        !canStage() ||
+        !(await claimRerunDelivery(event.item_id, tabClaimant, canStage, () => {
+          ownsClaim = true;
+        }))
+      ) {
         return;
       }
-      // Confirmed only once staged, so a tab that cannot stage it, or closes first, leaves the rerun to the next.
+      if (!canStage()) {
+        settleRerunClaim(event.item_id, 'release', tabClaimant);
+        return;
+      }
+      ownedUnadoptedClaims.set(event.item_id, projectId);
+      // The candidate read model remains authoritative even if a routing callback stages and then throws.
       let isStaged = false;
       try {
         const images = await readUnadoptedRerunImages(event, queueItemId, run);
         // A read slower than the claim lasts may have let another claimant stage it meanwhile.
-        if (images.length > 0 && canStage() && (await isRerunClaimHeld(event.item_id, tabClaimant)) && canStage()) {
+        if (
+          images.length > 0 &&
+          canStage() &&
+          (await isRerunClaimHeld(event.item_id, tabClaimant, canStage, () => {
+            ownsClaim = true;
+          })) &&
+          canStage()
+        ) {
           commands.stageRetriedCanvasResults({ backendItemId: event.item_id, images, projectId, queueItemId });
-          isStaged = true;
+          isStaged = history
+            .listStagedResults()
+            .some(
+              (result) =>
+                result.backendItemId === event.item_id &&
+                result.projectId === projectId &&
+                result.queueItemId === queueItemId
+            );
         }
       } finally {
-        settleRerunClaim(event.item_id, isStaged ? 'confirm' : 'release', tabClaimant);
+        isStaged ||= history
+          .listStagedResults()
+          .some(
+            (result) =>
+              result.backendItemId === event.item_id &&
+              result.projectId === projectId &&
+              result.queueItemId === queueItemId
+          );
+        if (ownedUnadoptedClaims.delete(event.item_id)) {
+          settleRerunClaim(event.item_id, isStaged ? 'confirm' : 'release', tabClaimant, ownsClaim);
+        }
       }
     };
     void stage().catch(recordError);
@@ -2004,6 +2105,9 @@ export const createQueueRuntime = ({
           });
         }
 
+        if (currentQueueItem.snapshot.destination === 'canvas') {
+          attempt.ordinaryBackendItemIds = new Set(itemIds);
+        }
         commands.markBackendSubmitted({
           backendBatchId: batchId,
           backendItemIds: itemIds,
@@ -2053,8 +2157,7 @@ export const createQueueRuntime = ({
           });
           return;
         }
-        // Even a run past its server-error budget is reconciled first: the server may have accepted the batch before
-        // answering 500.
+        // Reconciled even past the 500 budget: the server may have accepted the batch before answering 500.
         const failedTarget = getRouteTarget(history, currentQueueItem.id);
         commands.recordSubmissionRetry({
           projectId: project.id,
@@ -2080,9 +2183,16 @@ export const createQueueRuntime = ({
     if (!hasInitialized || !isActive()) {
       return;
     }
-    const activeKeys = new Set<string>();
     const projects = history.getSnapshot().projects;
+    deliveryConfirmations.recover(history.listStagedResults());
+    const activeKeys = new Set<string>();
     const openProjectIds = new Set(projects.map((project) => project.id));
+    for (const [itemId, projectId] of ownedUnadoptedClaims) {
+      if (!openProjectIds.has(projectId)) {
+        settleRerunClaim(itemId, 'release', tabClaimant);
+        ownedUnadoptedClaims.delete(itemId);
+      }
+    }
     for (const project of projects) {
       for (const item of project.queue.items) {
         const key = getRunKey(project.id, item.id);
@@ -2212,7 +2322,6 @@ export const createQueueRuntime = ({
     return Math.max(due.dueAt - now, 0);
   };
 
-  /** Each waiting run's remaining wait becomes a random share of RECONNECT_SPREAD_MS, never longer than it was. */
   const spreadSubmissionWaits = (): void => {
     const now = Date.now();
     for (const project of history.getSnapshot().projects) {
@@ -2689,7 +2798,6 @@ export const createQueueRuntime = ({
         if (status === 'disconnected') {
           sawDisconnect = true;
         } else if (status === 'connected' && sawDisconnect) {
-          // The server is likely back: the runs this tab is waiting to submit go soon, spread out.
           sawDisconnect = false;
           spreadSubmissionWaits();
         }
@@ -2712,6 +2820,21 @@ export const createQueueRuntime = ({
   const dispose = async (): Promise<void> => {
     isDisposed = true;
     rerunWaits.abort();
+    for (const key of adoptedRerunClaims.keys()) {
+      const [projectId, queueItemId] = JSON.parse(key) as [string, string];
+      releaseAdoptedReruns(projectId, queueItemId);
+    }
+    adoptedRerunClaims.clear();
+    for (const itemId of ownedUnadoptedClaims.keys()) {
+      settleRerunClaim(itemId, 'release', tabClaimant);
+    }
+    ownedUnadoptedClaims.clear();
+    unadoptedReruns.clear();
+    deliveryConfirmations.dispose();
+    if (renewTimer !== undefined) {
+      clearInterval(renewTimer);
+      renewTimer = undefined;
+    }
     if (retryTimer !== undefined) {
       clearTimeout(retryTimer);
       retryTimer = undefined;
@@ -2746,15 +2869,6 @@ export const createQueueRuntime = ({
           operation.catch(() => undefined)
         )
       );
-    }
-    if (renewTimer !== undefined) {
-      clearInterval(renewTimer);
-      renewTimer = undefined;
-    }
-    // A run restored by the next hold claims again as the same claimant; meanwhile another tab may stage the rerun.
-    for (const key of adoptedRerunClaims.keys()) {
-      const [projectId, queueItemId] = JSON.parse(key) as [string, string];
-      releaseAdoptedReruns(projectId, queueItemId);
     }
     startedRunKeys.clear();
     preparingRunKeys.clear();

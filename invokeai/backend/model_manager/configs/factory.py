@@ -62,10 +62,12 @@ from invokeai.backend.model_manager.configs.ip_adapter import (
 from invokeai.backend.model_manager.configs.llava_onevision import LlavaOnevision_Diffusers_Config
 from invokeai.backend.model_manager.configs.lora import (
     ControlLoRA_LyCORIS_FLUX_Config,
+    ControlLoRA_LyCORIS_Krea2_Config,
     LoRA_Diffusers_Flux2_Config,
     LoRA_Diffusers_Flux3_Config,
     LoRA_Diffusers_FLUX_Config,
     LoRA_Diffusers_Ideogram4_Config,
+    LoRA_Diffusers_MossImage_Config,
     LoRA_Diffusers_SD1_Config,
     LoRA_Diffusers_SD2_Config,
     LoRA_Diffusers_SD3_Config,
@@ -80,6 +82,7 @@ from invokeai.backend.model_manager.configs.lora import (
     LoRA_LyCORIS_Krea2_Config,
     LoRA_LyCORIS_LTX2_Config,
     LoRA_LyCORIS_MiniMaxH3_Config,
+    LoRA_LyCORIS_MossImage_Config,
     LoRA_LyCORIS_QwenImage21_Config,
     LoRA_LyCORIS_QwenImage_Config,
     LoRA_LyCORIS_SD1_Config,
@@ -143,6 +146,7 @@ from invokeai.backend.model_manager.configs.main import (
     Main_GGUF_MossImage_Config,
     Main_GGUF_QwenImage21_Config,
     Main_GGUF_QwenImage_Config,
+    Main_GGUF_SD3_Config,
     Main_GGUF_Wan_Config,
     Main_GGUF_ZImage_Config,
     Main_SDNQ_Diffusers_Flux2_Config,
@@ -274,6 +278,12 @@ def _denoiser_stores_float8_weights(mod: ModelOnDisk) -> bool:
     let the layerwise cast re-encode the result as *unscaled* fp8, which on `flux-2-klein-4b-fp8` flushed 3.4% of the
     weights to zero for the byte count the file already had. The loaders now keep such a file in its own scaled form
     instead, so switching the setting on is lossless and worth doing by default.
+
+    A float8 tensor named as a scale (`<layer>.weight_scale`) is not evidence: nvfp4 stores its block scales in
+    F8_E4M3 beside a packed U8 weight, and they are not fp8 weights. For such a build FP8 Storage would store only the
+    layers the file ships in full precision, a lossy trade rather than the lossless keep a scaled-fp8 file gets, so
+    it is left to the user instead of switched on. An nvfp4 file that also stores scaled fp8 weights (Qwen-Image's
+    nvfp4 build) still counts.
     """
     if mod.path.is_file():
         candidates = [mod.path]
@@ -295,7 +305,9 @@ def _denoiser_stores_float8_weights(mod: ModelOnDisk) -> bool:
             continue
         denoiser = {key: info for key, info in header.items() if not key.startswith(_BUNDLED_COMPONENT_KEY_PREFIXES)}
         stores_float8 = stores_float8 or any(
-            isinstance(info, dict) and info.get("dtype") in _FP8_SAFETENSORS_DTYPES for info in denoiser.values()
+            isinstance(info, dict) and info.get("dtype") in _FP8_SAFETENSORS_DTYPES
+            for key, info in denoiser.items()
+            if not key.endswith("_scale")
         )
     return stores_float8
 
@@ -499,6 +511,7 @@ AnyModelConfig = Annotated[
         Annotated[Main_GGUF_LTX2_Config, Main_GGUF_LTX2_Config.get_tag()],
         Annotated[Main_GGUF_MossImage_Config, Main_GGUF_MossImage_Config.get_tag()],
         Annotated[Main_GGUF_Anima_Config, Main_GGUF_Anima_Config.get_tag()],
+        Annotated[Main_GGUF_SD3_Config, Main_GGUF_SD3_Config.get_tag()],
         # IMPORTANT: FLUX.2 must be listed BEFORE FLUX.1 here. An ambiguous SDNQ transformer
         # checkpoint (prefixed FLUX.2 keys) can look like a FLUX.1 main model, so FLUX.2 must get
         # first refusal. Main_SDNQ_FLUX_Config additionally rejects FLUX.2 state dicts to keep the
@@ -583,6 +596,10 @@ AnyModelConfig = Annotated[
         # ``test_minimax_h3_lora_probe_independence.py``).
         Annotated[LoRA_LyCORIS_LTX2_Config, LoRA_LyCORIS_LTX2_Config.get_tag()],
         Annotated[LoRA_LyCORIS_MiniMaxH3_Config, LoRA_LyCORIS_MiniMaxH3_Config.get_tag()],
+        # MOSS-Image keys on its blocks' `proj.q`..`ffn_down` and its embedder and modulation modules, which no other
+        # supported transformer has; Z-Image's probe, whose block prefixes admit its files, rejects them, so the two are
+        # mutually exclusive regardless of order (locked in by `test_moss_image_lora_probe_independence.py`).
+        Annotated[LoRA_LyCORIS_MossImage_Config, LoRA_LyCORIS_MossImage_Config.get_tag()],
         # ERNIE-Image keys on its `self_attention` / `mlp` block names and top-level modules, which Z-Image's probe now
         # rejects, so the two are mutually exclusive regardless of order (locked in by
         # `test_ernie_image_lora_probe_independence.py`).
@@ -616,10 +633,12 @@ AnyModelConfig = Annotated[
         Annotated[LoRA_Diffusers_Flux2_Config, LoRA_Diffusers_Flux2_Config.get_tag()],
         Annotated[LoRA_Diffusers_FLUX_Config, LoRA_Diffusers_FLUX_Config.get_tag()],
         Annotated[LoRA_Diffusers_Flux3_Config, LoRA_Diffusers_Flux3_Config.get_tag()],
+        Annotated[LoRA_Diffusers_MossImage_Config, LoRA_Diffusers_MossImage_Config.get_tag()],
         Annotated[LoRA_Diffusers_Ideogram4_Config, LoRA_Diffusers_Ideogram4_Config.get_tag()],
         Annotated[LoRA_Diffusers_ZImage_Config, LoRA_Diffusers_ZImage_Config.get_tag()],
         # ControlLoRA - diffusers format
         Annotated[ControlLoRA_LyCORIS_FLUX_Config, ControlLoRA_LyCORIS_FLUX_Config.get_tag()],
+        Annotated[ControlLoRA_LyCORIS_Krea2_Config, ControlLoRA_LyCORIS_Krea2_Config.get_tag()],
         # T5 Encoder - all formats
         Annotated[T5Encoder_T5Encoder_Config, T5Encoder_T5Encoder_Config.get_tag()],
         Annotated[T5Encoder_BnBLLMint8_Config, T5Encoder_BnBLLMint8_Config.get_tag()],
@@ -886,6 +905,7 @@ class ModelConfigFactory:
         fields["hash"] = _overrides.get("hash") or mod.hash()
         fields["key"] = _overrides.get("key") or uuid_string()
         fields["description"] = _overrides.get("description")
+        fields["source_urls"] = _overrides.get("source_urls") or []
         fields["file_size"] = _overrides.get("file_size") or mod.size()
 
         return fields

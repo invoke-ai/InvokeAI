@@ -5,6 +5,7 @@ import type { PlacedWidgetRegionItem, WidgetPlacementInstanceMeta } from '@workb
 import { Box, Flex, Icon, Popover, Portal } from '@chakra-ui/react';
 import { useDndContext, useDroppable } from '@dnd-kit/core';
 import { horizontalListSortingStrategy } from '@dnd-kit/sortable';
+import { isEventFromOwnDom } from '@platform/react/isEventFromOwnDom';
 import { PopoverContent, Row, Tooltip } from '@platform/ui';
 import { Button } from '@platform/ui/Button';
 import { isModalPresent, subscribeModalPresence } from '@platform/ui/modalPresence';
@@ -70,6 +71,8 @@ const WIDGET_POPOVER_POSITIONING = { placement: 'top-end' } as const;
 const BOTTOM_MENU_TRIGGER = { kind: 'bottom' } as const;
 /** Use content color for active brand accents; background tint is indistinguishable on the light theme. */
 const COMPACT_ROW_HOVER_PROPS = { bg: 'bg.hover', color: 'fg' };
+/** Chips read as SegmentTabs segments; gaps sit inside clusters, so capacity already excludes them. */
+const CHIP_GAP = '0.5';
 
 /** Size drop overlays per cluster so one strip-wide curtain cannot cover the other target. */
 const ClusterDropRing = ({ dropState, isOver }: { dropState: WidgetRegionDropState; isOver: boolean }) => (
@@ -98,6 +101,7 @@ const BottomEndCluster = ({
       align="center"
       alignSelf="stretch"
       flexShrink={0}
+      gap={CHIP_GAP}
       position="relative"
     >
       {children}
@@ -144,8 +148,7 @@ export const StatusBar = ({ dropState }: { dropState: WidgetRegionDropState }) =
 
     return [{ ...item, isExpandable: isExpandableBottomItem(item), isPopover: isPopoverBottomItem(item) }];
   });
-  // Preserve instance order within clusters; only rendering splits them. Context menus, spacer drops, or
-  // neighboring widgets move membership.
+  // Preserve instance order within clusters; only rendering splits them.
   const alignEndIds = useMemo(
     () => new Set(bottomRegion.alignEndInstanceIds ?? []),
     [bottomRegion.alignEndInstanceIds]
@@ -157,6 +160,10 @@ export const StatusBar = ({ dropState }: { dropState: WidgetRegionDropState }) =
     [startItems, endItems]
   );
   const openEnableMenu = useCallback((event: MouseEvent) => {
+    // Chips' popovers, tooltips and the bar's own menus are portalled; a right-click in them is theirs.
+    if (!isEventFromOwnDom(event)) {
+      return;
+    }
     event.preventDefault();
     setEnableMenuTarget({ x: event.clientX, y: event.clientY });
   }, []);
@@ -203,11 +210,14 @@ export const StatusBar = ({ dropState }: { dropState: WidgetRegionDropState }) =
   const handleInstanceClose = useCallback(() => setInstanceMenuTarget(null), []);
   // The bottom panel's outline is drawn over this border.
   const isBottomOutlined = useHighlightedRegion() === 'bottom';
+  const bottomWidgetsLabel = t('widgets.regionWidgets.bottom');
 
   return (
     <CompactWidgetCapacityProvider capacity={capacity}>
       <WidgetStrip
         align="center"
+        // The status bar's landmark, named like the rails beside it ("Left rail", "Right rail").
+        aria-label={t('shell.widgets.placement.bottom')}
         as="footer"
         bg="bg.subtle"
         borderTopWidth="1px"
@@ -217,14 +227,22 @@ export const StatusBar = ({ dropState }: { dropState: WidgetRegionDropState }) =
         flexShrink={0}
         h="6"
         overlay="none"
-        px="2"
+        // The same inset on every side, so the end chips sit as close to the bar's edges as to its top and bottom.
+        p={CHIP_GAP}
         region="bottom"
         sortableInstanceIds={sortableInstanceIds}
         strategy={horizontalListSortingStrategy}
         w="full"
         onContextMenu={openEnableMenu}
       >
-        <Flex data-status-bar-cluster align="center" alignSelf="stretch" flexShrink={0} position="relative">
+        <Flex
+          data-status-bar-cluster
+          align="center"
+          alignSelf="stretch"
+          flexShrink={0}
+          gap={CHIP_GAP}
+          position="relative"
+        >
           {startItems.map((item) => (
             <CompactBottomWidget
               key={item.id}
@@ -237,11 +255,11 @@ export const StatusBar = ({ dropState }: { dropState: WidgetRegionDropState }) =
 
           <WidgetEnableMenu
             contextTarget={enableMenuTarget}
-            groupLabel="Bottom Widgets"
+            groupLabel={bottomWidgetsLabel}
             items={items}
             positioning={BOTTOM_MENU_POSITIONING}
             trigger={BOTTOM_MENU_TRIGGER}
-            triggerLabel="Bottom widget visibility"
+            triggerLabel={bottomWidgetsLabel}
             onContextClose={handleContextClose}
             onToggle={toggleBottomWidget}
           />
@@ -339,8 +357,8 @@ const CompactBottomWidget = ({
 
       event.preventDefault();
 
-      // A popover chip is a real Popover.Trigger; a div gets no native
-      // Enter/Space click, so synthesize one for the trigger's own handling.
+      // A popover chip is a real Popover.Trigger; a div gets no native Enter/Space click, so synthesize one for the
+      // trigger's own handling.
       if (item.isPopover) {
         event.currentTarget.click();
         return;
@@ -406,16 +424,17 @@ const CompactBottomWidget = ({
     return null;
   }
 
-  // Named by its compact content, which shows (or visually hides) the widget's name: an aria-label would
-  // replace the visible status text that speech-input users read off the chip (WCAG 2.5.3).
+  // Named by its compact content, which shows (or visually hides) the widget's name: an aria-label would replace the
+  // visible status text that speech-input users read off the chip (WCAG 2.5.3).
   const row = (
     <Row
       {...rowDragHandleProps}
       aria-pressed={item.isPopover || recovery.error ? undefined : isRowActive}
       color={isRowActive ? undefined : 'fg.muted'}
       cursor={isDragging ? 'grabbing' : 'default'}
-      px={item.widget.manifest.compactSizing === 'remaining-space' ? '1.5' : undefined}
+      px={item.widget.manifest.compactSizing === 'remaining-space' ? '2' : undefined}
       h="full"
+      rounded="control"
       w="auto"
       {...(isRowActive ? COMPACT_ROW_ACTIVE_PROPS : null)}
       _hover={isRowActive ? COMPACT_ROW_ACTIVE_HOVER_PROPS : COMPACT_ROW_HOVER_PROPS}
@@ -428,9 +447,8 @@ const CompactBottomWidget = ({
       ) : null}
     </Row>
   );
-  // The Row is the popover's actual trigger (toggle, dismissal exemption,
-  // focus restore, aria) while the outer Box keeps the tooltip's trigger id —
-  // two elements, so the two machines never fight over one `id`.
+  // The Row is the popover's actual trigger (toggle, dismissal exemption, focus restore, aria) while the outer Box
+  // keeps the tooltip's trigger id — two elements, so the two machines never fight over one `id`.
   const content = (
     <Box
       ref={bindWrapper}

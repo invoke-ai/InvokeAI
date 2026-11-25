@@ -135,7 +135,9 @@ def setup(tmp_path: Path) -> tuple[Path, Path]:
     template = tmp_path / "template"
     (template / "databases").mkdir(parents=True)
     sqlite3.connect(template / "databases" / "invokeai.db").close()
-    (template / "invokeai.yaml").write_text(yaml.safe_dump({"schema_version": "4.0.3", "port": template_port}))
+    (template / "invokeai.yaml").write_text(
+        yaml.safe_dump({"schema_version": "4.0.3", "multiuser": False, "port": template_port})
+    )
 
     data_dir = tmp_path / "data"
     (data_dir / "inputs").mkdir(parents=True)

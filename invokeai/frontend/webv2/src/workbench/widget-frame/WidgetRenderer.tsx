@@ -1,6 +1,7 @@
 import type { WidgetRegion } from '@workbench/layoutContracts';
 import type {
   RegisteredWidget,
+  WidgetBodySizing,
   WidgetImplementation,
   WidgetInstanceContract,
   WidgetInstanceId,
@@ -42,20 +43,12 @@ interface WidgetRendererByIdProps extends Omit<WidgetViewProps, 'instance' | 'ma
   widget: RegisteredWidget;
 }
 
-/**
- * The chrome slots a region can hoist out of the widget frame. `actions` is the
- * full trailing cluster (widget actions, settings, float, overflow menu);
- * `viewActions` contains widget actions and settings, for chrome that already
- * carries its own layout controls.
- */
+/** Hoistable chrome slots; `viewActions` omits float and overflow for chrome with its own layout controls. */
 type WidgetChromeSlotName = 'actions' | 'label' | 'viewActions' | 'icon';
 
 interface WidgetChromeSlotByIdProps {
   instanceId: string;
-  /**
-   * Specify the runtime region for hoisted chrome outside center so close/reveal commands target the correct
-   * placement.
-   */
+  /** The runtime region for chrome hoisted outside center, so close/reveal target the right placement. */
   region?: WorkbenchRegion;
   slot: WidgetChromeSlotName;
   widget: RegisteredWidget;
@@ -70,10 +63,7 @@ export const WidgetRendererById = ({ instanceId, widget, ...props }: WidgetRende
   return selection.instance ? <WidgetRenderer instance={selection.instance} widget={widget} {...props} /> : null;
 };
 
-/**
- * Resolve widget chrome with the view's implementation/runtime for center and floating hosts. Callers supply
- * Suspense so other chrome paints during chunk loading.
- */
+/** Resolve widget chrome with the view's implementation/runtime for center and floating hosts. */
 export const WidgetChromeSlotById = ({ instanceId, region = 'center', slot, widget }: WidgetChromeSlotByIdProps) => {
   const selection = useActiveProjectSelector(
     (project) => ({ instance: project.widgetInstances[instanceId], projectId: project.id }),
@@ -400,8 +390,8 @@ const WidgetShellFrame = ({
     return <WidgetTooltipFrame icon={widget.manifest.icon}>{children}</WidgetTooltipFrame>;
   }
 
-  // Floating windows provide their own chrome (FloatingWidgetWindow), so the
-  // view renders bare, like popovers and dialogs.
+  // Floating windows provide their own chrome (FloatingWidgetWindow), so the view renders bare, like popovers and
+  // dialogs.
   if (region === 'popover' || region === 'dialog' || region === 'floating' || presentation === 'compact') {
     return children;
   }
@@ -445,7 +435,7 @@ const WidgetShellFrame = ({
             />
           </WidgetRecoveryBoundary>
         )}
-        <PanelBodySlot>{children}</PanelBodySlot>
+        <PanelBodySlot body={widget.manifest.chrome?.body}>{children}</PanelBodySlot>
         {footer}
       </WidgetPanelFrame>
     );
@@ -548,18 +538,29 @@ const HeaderSlot = memo(function HeaderSlot({
   );
 }, areSlotPropsEqual);
 
-// Stretch fill-height views while allowing flowing content to scroll vertically. minmax(0,1fr) prevents long
-// content from widening and clipping panels.
+// minmax(0,1fr) prevents long content from widening and clipping panels.
 const panelBodyContentProps = {
   display: 'grid',
+  flexShrink: 0,
   gridTemplateColumns: 'minmax(0, 1fr)',
   maxW: 'full',
   minH: 'full',
 } as const;
 
-export const PanelBodySlot = ({ children }: { children: React.ReactNode }) => (
+// Size containment drops the view's own height from the grid row, which then stretches to the body's height alone:
+// lists and panes inside stay bounded instead of pushing the content as tall as all their rows. Overflow past the
+// view's own minimums still spills, so a very short dock scrolls rather than crushing them.
+const FILL_BODY_CSS = { contain: 'size' } as const;
+
+export const PanelBodySlot = ({ body = 'flow', children }: { body?: WidgetBodySizing; children: React.ReactNode }) => (
   <Scrollable contentProps={panelBodyContentProps} flex="1" minH="0" minW="0" overflowX="hidden">
-    {children}
+    {body === 'fill' ? (
+      <Flex css={FILL_BODY_CSS} direction="column">
+        {children}
+      </Flex>
+    ) : (
+      children
+    )}
   </Scrollable>
 );
 
@@ -598,10 +599,7 @@ const FooterSlot = memo(function FooterSlot({
   );
 }, areSlotPropsEqual);
 
-/**
- * Stands in for a widget whose view cannot render. It carries the instance's identity like any other frame, so focus
- * moves and hotkeys that look for the instance find it here.
- */
+/** Stands in for a view that cannot render, keeping the instance's identity for focus and hotkeys. */
 export const MissingWidgetFrame = ({
   instanceId,
   label,

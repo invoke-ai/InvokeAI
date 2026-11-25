@@ -20,6 +20,7 @@ export interface AuthStatus {
   multiuser_enabled: boolean;
   strict_password_checking: boolean;
   admin_email: string | null;
+  has_single_user_work: boolean;
 }
 
 export interface LoginRequest {
@@ -69,8 +70,8 @@ export const logout = (): Promise<{ success: boolean }> =>
   apiFetchJson<{ success: boolean }>(`${AUTH_BASE}/logout`, { method: 'POST' });
 
 /**
- * Restore the media cookie for stored-token sessions before elements load; they cannot send bearer headers.
- * Single-user backends safely no-op.
+ * Restore the media cookie for stored-token sessions before elements load; they cannot send bearer headers. Single-user
+ * backends safely no-op.
  */
 export const refreshMediaCookie = (signal?: AbortSignal): Promise<{ success: boolean }> =>
   apiFetchJson<{ success: boolean }>(`${AUTH_BASE}/media-cookie`, { method: 'POST', signal });

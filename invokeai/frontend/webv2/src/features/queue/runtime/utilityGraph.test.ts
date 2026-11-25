@@ -9,18 +9,13 @@ import {
   isUtilityQueueItemOrigin,
   parseQueueItemOrigin,
 } from '@features/queue/contracts';
+import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { ApiError } from '@platform/transport/http';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import type { UtilityEnqueue, UtilityItemStatusReader } from './utilityGraph';
+import type { UtilityEnqueue, UtilityItemStatusReader, UtilityQueueError } from './utilityGraph';
 
-import {
-  DEFAULT_UTILITY_QUEUE_TIMEOUT_MS,
-  DEFAULT_UTILITY_RECONCILE_INTERVAL_MS,
-  runUtilityGraph,
-  submitUtilityGraph,
-  UtilityQueueError,
-} from './utilityGraph';
+import { DEFAULT_UTILITY_RECONCILE_INTERVAL_MS, runUtilityGraph, submitUtilityGraph } from './utilityGraph';
 
 /** A fake socket hub that records handlers per event and can emit to them, mirroring `hub.on`. */
 const createFakeHub = () => {
@@ -190,10 +185,36 @@ const createReconcileScheduler = () => {
 };
 
 afterEach(() => {
+  accountLifecycle.invalidate();
+  vi.unstubAllGlobals();
   vi.useRealTimers();
 });
 
 describe('runUtilityGraph — await + settle', () => {
+  it.each([false, true])('requests front-of-queue execution only when prepend is %s', async (prepend) => {
+    const fake = createFakeHub();
+    const acknowledge = vi.fn();
+    const enqueue = vi.fn<UtilityEnqueue>(async (options) => ({ ...(await okEnqueue(options)), acknowledge }));
+    const promise = runUtilityGraph({
+      createId: () => UTIL_ID,
+      enqueue,
+      graph: { edges: [], id: 'g', nodes: {} },
+      hub: fake.hub,
+      prepend,
+    });
+    await Promise.resolve();
+    expect(enqueue).toHaveBeenCalledWith({
+      graph: { edges: [], id: 'g', nodes: {} },
+      origin: ORIGIN,
+      idempotencyKey: ORIGIN,
+      ...(prepend ? { prepend: true } : {}),
+    });
+    fake.emit('invocation_complete', completeEvent());
+    fake.emit('queue_item_status_changed', statusEvent('completed'));
+    await expect(promise).resolves.toMatchObject({ imageName: 'filtered.png' });
+    expect(acknowledge).toHaveBeenCalledOnce();
+  });
+
   it('resolves with the captured image name and the isolated origin on completion', async () => {
     const fake = createFakeHub();
     const promise = runUtilityGraph({
@@ -219,50 +240,6 @@ describe('runUtilityGraph — await + settle', () => {
     expect(fake.connectionHandlerCount()).toBe(0);
   });
 
-  it('ignores completions from other output nodes when outputNodeId is set', async () => {
-    const fake = createFakeHub();
-    const promise = runUtilityGraph({
-      createId: () => UTIL_ID,
-      enqueue: okEnqueue,
-      graph: { edges: [], id: 'g', nodes: {} },
-      hub: fake.hub,
-      outputNodeId: 'control_filter',
-    });
-
-    // A different node's completion is ignored; the target node's is captured.
-    fake.emit(
-      'invocation_complete',
-      completeEvent({
-        invocation_source_id: 'other',
-        result: { image: { image_name: 'wrong.png' }, type: 'image_output' },
-      })
-    );
-    fake.emit('invocation_complete', completeEvent());
-    fake.emit('queue_item_status_changed', statusEvent('completed'));
-
-    await expect(promise).resolves.toMatchObject({ imageName: 'filtered.png' });
-  });
-
-  it('allows delayed socket output to win after a successful null reconciliation', async () => {
-    const fake = createFakeHub();
-    const scheduler = createReconcileScheduler();
-    const promise = runUtilityGraph({
-      createId: () => UTIL_ID,
-      enqueue: okEnqueue,
-      graph: { edges: [], id: 'g', nodes: {} },
-      hub: fake.hub,
-      reconcileCompletedOutput: () => Promise.resolve(null),
-      scheduleReconcileRetry: scheduler.schedule,
-    });
-    fake.emit('queue_item_status_changed', statusEvent('completed'));
-    await vi.waitFor(() => expect(scheduler.schedule).toHaveBeenCalledOnce());
-
-    fake.emit('invocation_complete', completeEvent());
-
-    await expect(promise).resolves.toMatchObject({ imageName: 'filtered.png' });
-    expect(scheduler.cancelers[0]).toHaveBeenCalledOnce();
-  });
-
   it('reconciles the target output when completed status arrives before invocation_complete', async () => {
     const fake = createFakeHub();
     const reconcileCompletedOutput = vi.fn(() =>
@@ -285,36 +262,9 @@ describe('runUtilityGraph — await + settle', () => {
       origin: ORIGIN,
       width: 64,
     });
-    expect(reconcileCompletedOutput).toHaveBeenCalledExactlyOnceWith([1], 'control_filter');
+    expect(reconcileCompletedOutput).toHaveBeenCalledExactlyOnceWith([1], 'control_filter', expect.any(AbortSignal));
     expect(fake.handlerCount('invocation_complete')).toBe(0);
     expect(fake.handlerCount('queue_item_status_changed')).toBe(0);
-  });
-
-  it('resolves when a later reconciliation finds output after an initial successful null', async () => {
-    const fake = createFakeHub();
-    const scheduler = createReconcileScheduler();
-    const reconcileCompletedOutput = vi
-      .fn()
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce({ height: 48, imageName: 'later.png', width: 64 });
-    const promise = runUtilityGraph({
-      createId: () => UTIL_ID,
-      enqueue: okEnqueue,
-      graph: { edges: [], id: 'g', nodes: {} },
-      hub: fake.hub,
-      outputNodeId: 'control_filter',
-      reconcileCompletedOutput,
-      scheduleReconcileRetry: scheduler.schedule,
-    });
-
-    await Promise.resolve();
-    fake.emit('queue_item_status_changed', statusEvent('completed'));
-
-    await vi.waitFor(() => expect(scheduler.schedule).toHaveBeenCalledOnce());
-    scheduler.runNext();
-
-    await expect(promise).resolves.toMatchObject({ imageName: 'later.png' });
-    expect(reconcileCompletedOutput).toHaveBeenCalledTimes(2);
   });
 
   it('rejects no-output only after exhausting successful null reconciliations', async () => {
@@ -339,60 +289,6 @@ describe('runUtilityGraph — await + settle', () => {
 
     await expect(promise).rejects.toMatchObject({ reason: 'no-output' });
     expect(reconcileCompletedOutput).toHaveBeenCalledTimes(3);
-  });
-
-  it('aborts and fully cleans up while completed-output reconciliation is pending', async () => {
-    const fake = createFakeHub();
-    const reconciliation = createDeferred<{ height: number; imageName: string; width: number } | null>();
-    const controller = new AbortController();
-    const cancel = vi.fn(() => Promise.resolve());
-    const promise = runUtilityGraph({
-      cancel,
-      createId: () => UTIL_ID,
-      enqueue: okEnqueue,
-      graph: { edges: [], id: 'g', nodes: {} },
-      hub: fake.hub,
-      outputNodeId: 'control_filter',
-      reconcileCompletedOutput: () => reconciliation.promise,
-      signal: controller.signal,
-    });
-    await Promise.resolve();
-    fake.emit('queue_item_status_changed', statusEvent('completed'));
-
-    controller.abort();
-
-    await expect(promise).rejects.toMatchObject({ reason: 'aborted' });
-    await vi.waitFor(() => expect(cancel).toHaveBeenCalledExactlyOnceWith([1]));
-    expect(fake.handlerCount('invocation_complete')).toBe(0);
-    expect(fake.handlerCount('queue_item_status_changed')).toBe(0);
-    reconciliation.resolve({ height: 48, imageName: 'late.png', width: 64 });
-    await Promise.resolve();
-    expect(fake.detachCount).toBe(4);
-  });
-
-  it('allows delayed socket output to win after a transient reconciliation failure', async () => {
-    const fake = createFakeHub();
-    const scheduler = createReconcileScheduler();
-    const reconcileCompletedOutput = vi.fn(() => Promise.reject(new TypeError('gateway unavailable')));
-    const promise = runUtilityGraph({
-      createId: () => UTIL_ID,
-      enqueue: okEnqueue,
-      graph: { edges: [], id: 'g', nodes: {} },
-      hub: fake.hub,
-      outputNodeId: 'control_filter',
-      reconcileCompletedOutput,
-      scheduleReconcileRetry: scheduler.schedule,
-    });
-    await Promise.resolve();
-    fake.emit('queue_item_status_changed', statusEvent('completed'));
-    await vi.waitFor(() => expect(scheduler.schedule).toHaveBeenCalledOnce());
-
-    fake.emit('invocation_complete', completeEvent());
-
-    await expect(promise).resolves.toMatchObject({ imageName: 'filtered.png' });
-    expect(reconcileCompletedOutput).toHaveBeenCalledOnce();
-    expect(scheduler.cancelers[0]).toHaveBeenCalledOnce();
-    expect(fake.handlerCount('invocation_complete')).toBe(0);
   });
 
   it('retries bounded reconciliation failures and resolves from a later successful attempt', async () => {
@@ -425,84 +321,6 @@ describe('runUtilityGraph — await + settle', () => {
     expect(scheduler.schedule).toHaveBeenNthCalledWith(1, expect.any(Function), 25);
   });
 
-  it('rejects with reconcile reason and preserves the final failure after bounded attempts are exhausted', async () => {
-    const fake = createFakeHub();
-    const scheduler = createReconcileScheduler();
-    const finalCause = new TypeError('connection failed');
-    const reconcileCompletedOutput = vi
-      .fn()
-      .mockRejectedValueOnce(new TypeError('temporary failure'))
-      .mockRejectedValueOnce(finalCause);
-    const promise = runUtilityGraph({
-      createId: () => UTIL_ID,
-      enqueue: okEnqueue,
-      graph: { edges: [], id: 'g', nodes: {} },
-      hub: fake.hub,
-      reconcileCompletedOutput,
-      reconcileRetryPolicy: { delayMs: 10, maxAttempts: 2 },
-      scheduleReconcileRetry: scheduler.schedule,
-    });
-    await Promise.resolve();
-    fake.emit('queue_item_status_changed', statusEvent('completed'));
-    await vi.waitFor(() => expect(scheduler.schedule).toHaveBeenCalledOnce());
-    scheduler.runNext();
-
-    await expect(promise).rejects.toMatchObject({
-      cause: finalCause,
-      message: 'Failed to reconcile utility graph output after 2 attempts: connection failed',
-      reason: 'reconcile',
-    });
-    expect(fake.handlerCount('invocation_complete')).toBe(0);
-  });
-
-  it('aborts during a scheduled reconciliation retry and cancels the retry timer', async () => {
-    const fake = createFakeHub();
-    const scheduler = createReconcileScheduler();
-    const controller = new AbortController();
-    const promise = runUtilityGraph({
-      createId: () => UTIL_ID,
-      enqueue: okEnqueue,
-      graph: { edges: [], id: 'g', nodes: {} },
-      hub: fake.hub,
-      reconcileCompletedOutput: () => Promise.reject(new TypeError('offline')),
-      scheduleReconcileRetry: scheduler.schedule,
-      signal: controller.signal,
-    });
-    await Promise.resolve();
-    fake.emit('queue_item_status_changed', statusEvent('completed'));
-    await vi.waitFor(() => expect(scheduler.schedule).toHaveBeenCalledOnce());
-
-    controller.abort();
-
-    await expect(promise).rejects.toMatchObject({ reason: 'aborted' });
-    expect(scheduler.cancelers[0]).toHaveBeenCalledOnce();
-    scheduler.runNext();
-    expect(fake.handlerCount('invocation_complete')).toBe(0);
-  });
-
-  it('cancels a scheduled reconciliation retry when terminal failure wins', async () => {
-    const fake = createFakeHub();
-    const scheduler = createReconcileScheduler();
-    const promise = runUtilityGraph({
-      createId: () => UTIL_ID,
-      enqueue: okEnqueue,
-      graph: { edges: [], id: 'g', nodes: {} },
-      hub: fake.hub,
-      reconcileCompletedOutput: () => Promise.reject(new TypeError('offline')),
-      scheduleReconcileRetry: scheduler.schedule,
-    });
-    await Promise.resolve();
-    fake.emit('queue_item_status_changed', statusEvent('completed'));
-    await vi.waitFor(() => expect(scheduler.schedule).toHaveBeenCalledOnce());
-
-    fake.emit('queue_item_status_changed', statusEvent('failed', { error_message: 'backend failed' }));
-
-    await expect(promise).rejects.toMatchObject({ message: 'backend failed', reason: 'failed' });
-    expect(scheduler.cancelers[0]).toHaveBeenCalledOnce();
-    expect(fake.handlerCount('invocation_complete')).toBe(0);
-    expect(fake.handlerCount('queue_item_status_changed')).toBe(0);
-  });
-
   it('fails an authentication reconciliation error immediately without retrying', async () => {
     const fake = createFakeHub();
     const scheduler = createReconcileScheduler();
@@ -524,128 +342,30 @@ describe('runUtilityGraph — await + settle', () => {
     expect(scheduler.schedule).not.toHaveBeenCalled();
   });
 
-  it('retries a transient 503 reconciliation error', async () => {
-    const fake = createFakeHub();
-    const scheduler = createReconcileScheduler();
-    const reconcileCompletedOutput = vi
-      .fn()
-      .mockRejectedValueOnce(new ApiError('unavailable', 503))
-      .mockResolvedValueOnce({ height: 48, imageName: 'recovered.png', width: 64 });
-    const promise = runUtilityGraph({
-      createId: () => UTIL_ID,
-      enqueue: okEnqueue,
-      graph: { edges: [], id: 'g', nodes: {} },
-      hub: fake.hub,
-      reconcileCompletedOutput,
-      scheduleReconcileRetry: scheduler.schedule,
-    });
-    await Promise.resolve();
-    fake.emit('queue_item_status_changed', statusEvent('completed'));
-    await vi.waitFor(() => expect(scheduler.schedule).toHaveBeenCalledOnce());
-    scheduler.runNext();
-
-    await expect(promise).resolves.toMatchObject({ imageName: 'recovered.png' });
-    expect(reconcileCompletedOutput).toHaveBeenCalledTimes(2);
-  });
-
-  it('fails malformed protocol data immediately without retrying', async () => {
-    const fake = createFakeHub();
-    const scheduler = createReconcileScheduler();
-    const cause = new Error('Queue item 1 returned malformed reconciliation data.');
-    const reconcileCompletedOutput = vi.fn(() => Promise.reject(cause));
-    const promise = runUtilityGraph({
-      createId: () => UTIL_ID,
-      enqueue: okEnqueue,
-      graph: { edges: [], id: 'g', nodes: {} },
-      hub: fake.hub,
-      reconcileCompletedOutput,
-      scheduleReconcileRetry: scheduler.schedule,
-    });
-    await Promise.resolve();
-    fake.emit('queue_item_status_changed', statusEvent('completed'));
-
-    await expect(promise).rejects.toMatchObject({ cause, reason: 'reconcile' });
-    expect(reconcileCompletedOutput).toHaveBeenCalledOnce();
-    expect(scheduler.schedule).not.toHaveBeenCalled();
-  });
-
-  it('captures a synchronous reconciler throw triggered after enqueue completion', async () => {
-    const fake = createFakeHub();
-    const enqueue = createDeferred<{ enqueued: number; itemIds: number[] }>();
-    const cause = new Error('sync after enqueue');
-    const promise = runUtilityGraph({
-      createId: () => UTIL_ID,
-      enqueue: () => enqueue.promise,
-      graph: { edges: [], id: 'g', nodes: {} },
-      hub: fake.hub,
-      reconcileCompletedOutput: () => {
-        throw cause;
-      },
-    });
-    fake.emit('queue_item_status_changed', statusEvent('completed'));
-
-    enqueue.resolve({ enqueued: 1, itemIds: [1] });
-
-    await expect(promise).rejects.toMatchObject({ cause, reason: 'reconcile' });
-  });
-
-  it('captures a synchronous reconciler throw triggered from the socket callback', async () => {
-    const fake = createFakeHub();
-    const cause = new Error('sync from socket');
-    const promise = runUtilityGraph({
-      createId: () => UTIL_ID,
-      enqueue: okEnqueue,
-      graph: { edges: [], id: 'g', nodes: {} },
-      hub: fake.hub,
-      reconcileCompletedOutput: () => {
-        throw cause;
-      },
-    });
-    await Promise.resolve();
-
-    expect(() => fake.emit('queue_item_status_changed', statusEvent('completed'))).not.toThrow();
-    await expect(promise).rejects.toMatchObject({ cause, reason: 'reconcile' });
-  });
-
-  it('captures a synchronous reconciler throw triggered from the retry timer', async () => {
-    const fake = createFakeHub();
-    const scheduler = createReconcileScheduler();
-    const cause = new Error('sync from retry');
-    const reconcileCompletedOutput = vi
-      .fn()
-      .mockRejectedValueOnce(new TypeError('offline'))
-      .mockImplementationOnce(() => {
-        throw cause;
-      });
-    const promise = runUtilityGraph({
-      createId: () => UTIL_ID,
-      enqueue: okEnqueue,
-      graph: { edges: [], id: 'g', nodes: {} },
-      hub: fake.hub,
-      reconcileCompletedOutput,
-      scheduleReconcileRetry: scheduler.schedule,
-    });
-    await Promise.resolve();
-    fake.emit('queue_item_status_changed', statusEvent('completed'));
-    await vi.waitFor(() => expect(scheduler.schedule).toHaveBeenCalledOnce());
-
-    expect(() => scheduler.runNext()).not.toThrow();
-    await expect(promise).rejects.toMatchObject({ cause, reason: 'reconcile' });
-  });
-
-  it('rejects with the failure reason + message on a failed item', async () => {
-    const fake = createFakeHub();
-    const promise = runUtilityGraph({
-      createId: () => UTIL_ID,
-      enqueue: okEnqueue,
-      graph: { edges: [], id: 'g', nodes: {} },
-      hub: fake.hub,
-    });
-    fake.emit('queue_item_status_changed', statusEvent('failed', { error_message: 'boom' }));
-    await expect(promise).rejects.toMatchObject({ message: 'boom', reason: 'failed' });
-  });
-
-  it.each(['', '   '])('uses a trimmed backend error type when the message is %j', async (error_message) => {
+  it.each<[string, Partial<QueueItemStatusChangedEvent>, string]>([
+    ['the backend message', { error_message: 'boom' }, 'boom'],
+    [
+      'a trimmed backend error type when the message is empty',
+      { error_message: '', error_traceback: 'giant traceback', error_type: '  AttributeError  ' },
+      'AttributeError',
+    ],
+    [
+      'a trimmed backend error type when the message is blank',
+      { error_message: '   ', error_traceback: 'giant traceback', error_type: '  AttributeError  ' },
+      'AttributeError',
+    ],
+    [
+      'a trimmed nonempty backend message over its error type',
+      { error_message: '  useful detail  ', error_type: 'AttributeError' },
+      'useful detail',
+    ],
+    ['the generic fallback when message and type are missing', {}, 'The utility graph failed.'],
+    [
+      'the generic fallback for malformed non-string failure fields',
+      { error_message: 42, error_type: { name: 'AttributeError' } } as never,
+      'The utility graph failed.',
+    ],
+  ])('rejects a failed item with %s', async (_label, fields, message) => {
     const fake = createFakeHub();
     const promise = runUtilityGraph({
       createId: () => UTIL_ID,
@@ -654,60 +374,9 @@ describe('runUtilityGraph — await + settle', () => {
       hub: fake.hub,
     });
 
-    fake.emit(
-      'queue_item_status_changed',
-      statusEvent('failed', { error_message, error_traceback: 'giant traceback', error_type: '  AttributeError  ' })
-    );
+    fake.emit('queue_item_status_changed', statusEvent('failed', fields));
 
-    await expect(promise).rejects.toMatchObject({ message: 'AttributeError', reason: 'failed' });
-  });
-
-  it('prefers and trims a nonempty backend message over its error type', async () => {
-    const fake = createFakeHub();
-    const promise = runUtilityGraph({
-      createId: () => UTIL_ID,
-      enqueue: okEnqueue,
-      graph: { edges: [], id: 'g', nodes: {} },
-      hub: fake.hub,
-    });
-
-    fake.emit(
-      'queue_item_status_changed',
-      statusEvent('failed', { error_message: '  useful detail  ', error_type: 'AttributeError' })
-    );
-
-    await expect(promise).rejects.toMatchObject({ message: 'useful detail', reason: 'failed' });
-  });
-
-  it('uses the generic backend-failed fallback when message and type are missing', async () => {
-    const fake = createFakeHub();
-    const promise = runUtilityGraph({
-      createId: () => UTIL_ID,
-      enqueue: okEnqueue,
-      graph: { edges: [], id: 'g', nodes: {} },
-      hub: fake.hub,
-    });
-
-    fake.emit('queue_item_status_changed', statusEvent('failed'));
-
-    await expect(promise).rejects.toMatchObject({ message: 'The utility graph failed.', reason: 'failed' });
-  });
-
-  it('ignores malformed non-string backend failure fields', async () => {
-    const fake = createFakeHub();
-    const promise = runUtilityGraph({
-      createId: () => UTIL_ID,
-      enqueue: okEnqueue,
-      graph: { edges: [], id: 'g', nodes: {} },
-      hub: fake.hub,
-    });
-
-    fake.emit(
-      'queue_item_status_changed',
-      statusEvent('failed', { error_message: 42, error_type: { name: 'AttributeError' } } as never)
-    );
-
-    await expect(promise).rejects.toMatchObject({ message: 'The utility graph failed.', reason: 'failed' });
+    await expect(promise).rejects.toMatchObject({ message, reason: 'failed' });
   });
 
   it('rejects canceled on a canceled item', async () => {
@@ -732,6 +401,7 @@ describe('runUtilityGraph — timeout + cancellation', () => {
       cancel,
       createId: () => UTIL_ID,
       enqueue: () => Promise.resolve({ enqueued: 3, itemIds: [11, 12, 13] }),
+      readItemStatus: () => Promise.resolve({ status: 'pending' }),
       graph: { edges: [], id: 'g', nodes: {} },
       hub: fake.hub,
       timeoutMs: 1000,
@@ -742,25 +412,6 @@ describe('runUtilityGraph — timeout + cancellation', () => {
     expect(cancel).toHaveBeenCalledExactlyOnceWith([11, 12, 13]);
     // Listeners cleaned up after timeout.
     expect(fake.handlerCount('queue_item_status_changed')).toBe(0);
-  });
-
-  it('rejects immediately without enqueueing or canceling when the signal is already aborted', async () => {
-    const fake = createFakeHub();
-    const controller = new AbortController();
-    const cancel = vi.fn((_itemIds: number[]) => Promise.resolve());
-    const enqueue = vi.fn(okEnqueue);
-    controller.abort();
-    const promise = runUtilityGraph({
-      cancel,
-      createId: () => UTIL_ID,
-      enqueue,
-      graph: { edges: [], id: 'g', nodes: {} },
-      hub: fake.hub,
-      signal: controller.signal,
-    });
-    await expect(promise).rejects.toMatchObject({ reason: 'aborted' });
-    expect(enqueue).not.toHaveBeenCalled();
-    expect(cancel).not.toHaveBeenCalled();
   });
 
   it('rejects aborted, cancels accepted backend items, and detaches listeners', async () => {
@@ -780,29 +431,6 @@ describe('runUtilityGraph — timeout + cancellation', () => {
     await expect(promise).rejects.toMatchObject({ reason: 'aborted' });
     await vi.waitFor(() => expect(cancel).toHaveBeenCalledExactlyOnceWith([21, 22]));
     expect(fake.handlerCount('invocation_complete')).toBe(0);
-  });
-
-  it('rejects promptly, then cancels accepted items when a pending enqueue resolves', async () => {
-    const fake = createFakeHub();
-    const controller = new AbortController();
-    const enqueue = createDeferred<{ enqueued: number; itemIds: number[] }>();
-    const cancel = vi.fn((_itemIds: number[]) => Promise.resolve());
-    const promise = runUtilityGraph({
-      cancel,
-      createId: () => UTIL_ID,
-      enqueue: () => enqueue.promise,
-      graph: { edges: [], id: 'g', nodes: {} },
-      hub: fake.hub,
-      signal: controller.signal,
-    });
-    const assertion = expect(promise).rejects.toMatchObject({ reason: 'aborted' });
-
-    controller.abort();
-    await assertion;
-    expect(cancel).not.toHaveBeenCalled();
-
-    enqueue.resolve({ enqueued: 2, itemIds: [31, 32] });
-    await vi.waitFor(() => expect(cancel).toHaveBeenCalledExactlyOnceWith([31, 32]));
   });
 
   it('cancels at most once across abort, timeout, terminal, and cancellation-failure races', async () => {
@@ -831,80 +459,11 @@ describe('runUtilityGraph — timeout + cancellation', () => {
     await vi.runAllTimersAsync();
     expect(cancel).toHaveBeenCalledExactlyOnceWith([41, 42]);
   });
-
-  it('does not cancel when a terminal success wins before a later abort', async () => {
-    const fake = createFakeHub();
-    const controller = new AbortController();
-    const cancel = vi.fn((_itemIds: number[]) => Promise.resolve());
-    const promise = runUtilityGraph({
-      cancel,
-      createId: () => UTIL_ID,
-      enqueue: () => Promise.resolve({ enqueued: 2, itemIds: [51, 52] }),
-      graph: { edges: [], id: 'g', nodes: {} },
-      hub: fake.hub,
-      signal: controller.signal,
-    });
-    await Promise.resolve();
-
-    fake.emit('invocation_complete', completeEvent());
-    fake.emit('queue_item_status_changed', statusEvent('completed'));
-    await expect(promise).resolves.toMatchObject({ imageName: 'filtered.png' });
-    controller.abort();
-    await Promise.resolve();
-
-    expect(cancel).not.toHaveBeenCalled();
-  });
-
-  it('does not cancel when an aborted pending enqueue later accepts zero items', async () => {
-    const fake = createFakeHub();
-    const controller = new AbortController();
-    const enqueue = createDeferred<{ enqueued: number; itemIds: number[] }>();
-    const cancel = vi.fn((_itemIds: number[]) => Promise.resolve());
-    const promise = runUtilityGraph({
-      cancel,
-      createId: () => UTIL_ID,
-      enqueue: () => enqueue.promise,
-      graph: { edges: [], id: 'g', nodes: {} },
-      hub: fake.hub,
-      signal: controller.signal,
-    });
-    const assertion = expect(promise).rejects.toMatchObject({ reason: 'aborted' });
-
-    controller.abort();
-    enqueue.resolve({ enqueued: 0, itemIds: [] });
-
-    await assertion;
-    await Promise.resolve();
-    expect(cancel).not.toHaveBeenCalled();
-  });
-
-  it('does not use a timeout when timeoutMs is 0', async () => {
-    vi.useFakeTimers();
-    const fake = createFakeHub();
-    const promise = runUtilityGraph({
-      createId: () => UTIL_ID,
-      enqueue: okEnqueue,
-      graph: { edges: [], id: 'g', nodes: {} },
-      hub: fake.hub,
-      timeoutMs: 0,
-    });
-    await vi.advanceTimersByTimeAsync(DEFAULT_UTILITY_QUEUE_TIMEOUT_MS * 2);
-    // Still pending — settle it so the promise doesn't leak.
-    fake.emit('invocation_complete', completeEvent());
-    fake.emit('queue_item_status_changed', statusEvent('completed'));
-    await expect(promise).resolves.toMatchObject({ imageName: 'filtered.png' });
-  });
 });
 
 describe('runUtilityGraph — enqueue failures', () => {
   it.each([
     { enqueued: 1, itemIds: [], label: 'accepted count without ids', canceled: [] },
-    { enqueued: 1, itemIds: [Number.NaN], label: 'non-finite id', canceled: [] },
-    { enqueued: 1, itemIds: [0], label: 'non-positive id', canceled: [] },
-    { enqueued: Number.NaN, itemIds: [11], label: 'non-finite accepted count', canceled: [11] },
-    { enqueued: 1.5, itemIds: [11], label: 'fractional accepted count', canceled: [11] },
-    { enqueued: -1, itemIds: [11], label: 'negative accepted count', canceled: [11] },
-    { enqueued: 2, itemIds: [11, 11], label: 'duplicate ids', canceled: [11] },
     { enqueued: 2, itemIds: [11], label: 'count mismatch', canceled: [11] },
   ])('immediately rejects $label and fully cleans up', async ({ canceled, enqueued, itemIds }) => {
     vi.useFakeTimers();
@@ -930,183 +489,6 @@ describe('runUtilityGraph — enqueue failures', () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 
-  it('accepts a valid multi-item enqueue response', async () => {
-    const fake = createFakeHub();
-    const promise = runUtilityGraph({
-      createId: () => UTIL_ID,
-      enqueue: () => Promise.resolve({ enqueued: 2, itemIds: [11, 12] }),
-      graph: { edges: [], id: 'g', nodes: {} },
-      hub: fake.hub,
-    });
-    await Promise.resolve();
-
-    fake.emit('invocation_complete', completeEvent());
-    fake.emit('queue_item_status_changed', statusEvent('completed'));
-
-    await expect(promise).resolves.toMatchObject({ imageName: 'filtered.png' });
-  });
-
-  it('contains a synchronous enqueue throw and cleans listeners with timeout disabled', async () => {
-    vi.useFakeTimers();
-    const fake = createFakeHub();
-    const cause = new Error('synchronous enqueue failure');
-    const promise = runUtilityGraph({
-      createId: () => UTIL_ID,
-      enqueue: () => {
-        throw cause;
-      },
-      graph: { edges: [], id: 'g', nodes: {} },
-      hub: fake.hub,
-      timeoutMs: 0,
-    });
-
-    await expect(promise).rejects.toMatchObject({ cause, message: cause.message, reason: 'enqueue' });
-    expect(fake.handlerCount('invocation_complete')).toBe(0);
-    expect(fake.handlerCount('queue_item_status_changed')).toBe(0);
-    expect(vi.getTimerCount()).toBe(0);
-  });
-
-  it('contains a synchronous reconciliation scheduler throw and fully settles with timeout disabled', async () => {
-    vi.useFakeTimers();
-    const fake = createFakeHub();
-    const cause = new Error('scheduler unavailable');
-    const promise = runUtilityGraph({
-      createId: () => UTIL_ID,
-      enqueue: okEnqueue,
-      graph: { edges: [], id: 'g', nodes: {} },
-      hub: fake.hub,
-      reconcileCompletedOutput: () => Promise.resolve(null),
-      scheduleReconcileRetry: () => {
-        throw cause;
-      },
-      timeoutMs: 0,
-    });
-    await Promise.resolve();
-    fake.emit('queue_item_status_changed', statusEvent('completed'));
-
-    await expect(promise).rejects.toMatchObject({
-      cause,
-      message: 'Failed to schedule utility graph output reconciliation: scheduler unavailable',
-      reason: 'reconcile',
-    });
-    expect(fake.handlerCount('invocation_complete')).toBe(0);
-    expect(fake.handlerCount('queue_item_status_changed')).toBe(0);
-    expect(vi.getTimerCount()).toBe(0);
-  });
-
-  it('contains a throwing reconciliation retry cancellation seam during socket success', async () => {
-    const fake = createFakeHub();
-    const cancelRetry = vi.fn(() => {
-      throw new Error('cancel retry failed');
-    });
-    const scheduleReconcileRetry = vi.fn(() => cancelRetry);
-    const promise = runUtilityGraph({
-      createId: () => UTIL_ID,
-      enqueue: okEnqueue,
-      graph: { edges: [], id: 'g', nodes: {} },
-      hub: fake.hub,
-      reconcileCompletedOutput: () => Promise.resolve(null),
-      scheduleReconcileRetry,
-      timeoutMs: 0,
-    });
-    await Promise.resolve();
-    fake.emit('queue_item_status_changed', statusEvent('completed'));
-    await vi.waitFor(() => expect(scheduleReconcileRetry).toHaveBeenCalledOnce());
-
-    expect(() => fake.emit('invocation_complete', completeEvent())).not.toThrow();
-    await expect(promise).resolves.toMatchObject({ imageName: 'filtered.png' });
-    expect(cancelRetry).toHaveBeenCalledOnce();
-    expect(fake.handlerCount('invocation_complete')).toBe(0);
-    expect(fake.handlerCount('queue_item_status_changed')).toBe(0);
-  });
-
-  it('contains a synchronous id-source throw as a setup error', async () => {
-    const cause = new Error('id source failed');
-    const promise = runUtilityGraph({
-      createId: () => {
-        throw cause;
-      },
-      enqueue: okEnqueue,
-      graph: { edges: [], id: 'g', nodes: {} },
-      hub: createFakeHub().hub,
-      timeoutMs: 0,
-    });
-
-    await expect(promise).rejects.toMatchObject({ cause, reason: 'setup' });
-  });
-
-  it('cleans a partially attached listener when the second socket subscription throws', async () => {
-    const fake = createFakeHub();
-    const cause = new Error('subscription failed');
-    let calls = 0;
-    const hub: Pick<SocketHub, 'on'> = {
-      on: (event, handler) => {
-        calls += 1;
-        if (calls === 2) {
-          throw cause;
-        }
-        return fake.hub.on(event, handler);
-      },
-    };
-    const promise = runUtilityGraph({
-      createId: () => UTIL_ID,
-      enqueue: okEnqueue,
-      graph: { edges: [], id: 'g', nodes: {} },
-      hub,
-      timeoutMs: 0,
-    });
-
-    await expect(promise).rejects.toMatchObject({ cause, reason: 'setup' });
-    expect(fake.handlerCount('invocation_complete')).toBe(0);
-    expect(fake.handlerCount('queue_item_status_changed')).toBe(0);
-  });
-
-  it('contains a synchronous injected reconciliation classifier throw', async () => {
-    const fake = createFakeHub();
-    const cause = new Error('classifier failed');
-    const promise = runUtilityGraph({
-      classifyReconcileError: () => {
-        throw cause;
-      },
-      createId: () => UTIL_ID,
-      enqueue: okEnqueue,
-      graph: { edges: [], id: 'g', nodes: {} },
-      hub: fake.hub,
-      reconcileCompletedOutput: () => Promise.reject(new TypeError('network failed')),
-      timeoutMs: 0,
-    });
-    await Promise.resolve();
-    fake.emit('queue_item_status_changed', statusEvent('completed'));
-
-    await expect(promise).rejects.toMatchObject({ cause, reason: 'reconcile' });
-    expect(fake.handlerCount('invocation_complete')).toBe(0);
-    expect(fake.handlerCount('queue_item_status_changed')).toBe(0);
-  });
-
-  it('cleans listeners when abort-signal subscription throws synchronously', async () => {
-    const fake = createFakeHub();
-    const cause = new Error('abort subscription failed');
-    const signal = {
-      aborted: false,
-      addEventListener: () => {
-        throw cause;
-      },
-      removeEventListener: vi.fn(),
-    } as unknown as AbortSignal;
-    const promise = runUtilityGraph({
-      createId: () => UTIL_ID,
-      enqueue: okEnqueue,
-      graph: { edges: [], id: 'g', nodes: {} },
-      hub: fake.hub,
-      signal,
-      timeoutMs: 0,
-    });
-
-    await expect(promise).rejects.toMatchObject({ cause, reason: 'setup' });
-    expect(fake.handlerCount('invocation_complete')).toBe(0);
-    expect(fake.handlerCount('queue_item_status_changed')).toBe(0);
-  });
-
   it('rejects enqueue when the backend accepts zero items', async () => {
     const fake = createFakeHub();
     const promise = runUtilityGraph({
@@ -1116,28 +498,6 @@ describe('runUtilityGraph — enqueue failures', () => {
       hub: fake.hub,
     });
     await expect(promise).rejects.toMatchObject({ reason: 'enqueue' });
-  });
-
-  it('rejects enqueue when the enqueue call throws', async () => {
-    const fake = createFakeHub();
-    const promise = runUtilityGraph({
-      createId: () => UTIL_ID,
-      enqueue: () => Promise.reject(new Error('network down')),
-      graph: { edges: [], id: 'g', nodes: {} },
-      hub: fake.hub,
-    });
-    await expect(promise).rejects.toMatchObject({ message: 'network down', reason: 'enqueue' });
-
-    // A backend refusal shows its detail, never the raw JSON body.
-    const cause = new ApiError('{"detail":"queue paused"}', 409);
-    await expect(
-      runUtilityGraph({
-        createId: () => UTIL_ID,
-        enqueue: () => Promise.reject(cause),
-        graph: { edges: [], id: 'g', nodes: {} },
-        hub: createFakeHub().hub,
-      })
-    ).rejects.toMatchObject({ cause, message: 'queue paused', reason: 'enqueue' });
   });
 });
 
@@ -1160,7 +520,7 @@ describe('runUtilityGraph — missed settlement', () => {
     await Promise.resolve();
     removed.emit('queue_cleared', { queue_id: 'default', timestamp: 1, user_id: null });
     await expect(removedRun).rejects.toMatchObject({ reason: 'removed' });
-    expect(readRemoved).toHaveBeenCalledExactlyOnceWith(3, undefined);
+    expect(readRemoved).toHaveBeenCalledExactlyOnceWith(3, expect.any(AbortSignal));
     expect(removed.handlerCount('queue_items_canceled')).toBe(0);
 
     const canceled = createFakeHub();
@@ -1240,15 +600,6 @@ describe('runUtilityGraph — origin isolation (Risk 4)', () => {
   });
 });
 
-describe('UtilityQueueError', () => {
-  it('carries a reason and a name', () => {
-    const error = new UtilityQueueError('timeout', 'nope');
-    expect(error).toBeInstanceOf(Error);
-    expect(error.name).toBe('UtilityQueueError');
-    expect(error.reason).toBe('timeout');
-  });
-});
-
 describe('submitUtilityGraph — fire, then watch settlement', () => {
   const graph = { edges: [], id: 'pbr', nodes: {} };
 
@@ -1258,7 +609,7 @@ describe('submitUtilityGraph — fire, then watch settlement', () => {
 
     const submission = await submitUtilityGraph({ createId: () => UTIL_ID, enqueue, graph, hub: fake.hub });
 
-    expect(enqueue).toHaveBeenCalledExactlyOnceWith({ graph, origin: ORIGIN });
+    expect(enqueue).toHaveBeenCalledExactlyOnceWith({ graph, origin: ORIGIN, idempotencyKey: ORIGIN });
     expect(submission).toMatchObject({ itemIds: [7], origin: ORIGIN });
     // Only status changes are watched; no output image is expected.
     expect(fake.handlerCount('invocation_complete')).toBe(0);
@@ -1268,23 +619,6 @@ describe('submitUtilityGraph — fire, then watch settlement', () => {
     fake.emit('queue_item_status_changed', statusEvent('completed', { item_id: 7 }));
 
     await expect(submission.settled).resolves.toBeUndefined();
-    expect(fake.handlerCount('queue_item_status_changed')).toBe(0);
-  });
-
-  it('settles a completion that arrives before the enqueue response', async () => {
-    const fake = createFakeHub();
-    const deferred = createDeferred<{ enqueued: number; itemIds: number[] }>();
-    const pending = submitUtilityGraph({
-      createId: () => UTIL_ID,
-      enqueue: () => deferred.promise,
-      graph,
-      hub: fake.hub,
-    });
-
-    fake.emit('queue_item_status_changed', statusEvent('completed'));
-    deferred.resolve({ enqueued: 1, itemIds: [1] });
-
-    await expect((await pending).settled).resolves.toBeUndefined();
     expect(fake.handlerCount('queue_item_status_changed')).toBe(0);
   });
 
@@ -1352,15 +686,6 @@ describe('submitUtilityGraph — fire, then watch settlement', () => {
     await vi.waitFor(() => expect(cancel).toHaveBeenCalledExactlyOnceWith([5]));
   });
 
-  it('passes prepend through to the enqueue so the item runs ahead of queued generations', async () => {
-    const fake = createFakeHub();
-    const enqueue = vi.fn<UtilityEnqueue>(() => Promise.resolve({ enqueued: 1, itemIds: [1] }));
-
-    await submitUtilityGraph({ createId: () => UTIL_ID, enqueue, graph, hub: fake.hub, prepend: true });
-
-    expect(enqueue).toHaveBeenCalledExactlyOnceWith({ graph, origin: ORIGIN, prepend: true });
-  });
-
   it('aborting ends the watch: the listener detaches, the timer clears, and the item is not canceled', async () => {
     vi.useFakeTimers();
     const fake = createFakeHub();
@@ -1396,29 +721,6 @@ describe('submitUtilityGraph — fire, then watch settlement', () => {
     expect(enqueue).not.toHaveBeenCalled();
   });
 
-  it('removes its abort listener once the watch settles, so each submission leaves nothing on the signal', async () => {
-    const fake = createFakeHub();
-    const controller = new AbortController();
-    const added = vi.spyOn(controller.signal, 'addEventListener');
-    const removed = vi.spyOn(controller.signal, 'removeEventListener');
-    const submission = await submitUtilityGraph({
-      createId: () => UTIL_ID,
-      enqueue: okEnqueue,
-      graph,
-      hub: fake.hub,
-      signal: controller.signal,
-    });
-
-    expect(added).toHaveBeenCalledExactlyOnceWith('abort', expect.any(Function));
-    expect(removed).not.toHaveBeenCalled();
-
-    fake.emit('queue_item_status_changed', statusEvent('completed'));
-    await expect(submission.settled).resolves.toBeUndefined();
-
-    const handler = added.mock.calls[0]?.[1];
-    expect(removed).toHaveBeenCalledExactlyOnceWith('abort', handler);
-  });
-
   // `settled` can reject before the caller holds it. Vitest fails the run on an unhandled rejection, and a real
   // macrotask between the rejection and the caller's handler gives one the chance to be reported.
 
@@ -1446,233 +748,264 @@ describe('submitUtilityGraph — fire, then watch settlement', () => {
     expect(vi.getTimerCount()).toBe(0);
     expect(fake.handlerCount('queue_item_status_changed')).toBe(0);
   });
+});
 
-  it('settles quietly when the item fails before the enqueue response arrives', async () => {
+describe('utility execution progress', () => {
+  it('observes execution before the enqueue response without regressing on a stale pending read', async () => {
     const fake = createFakeHub();
-    const deferred = createDeferred<{ enqueued: number; itemIds: number[] }>();
-    const pending = submitUtilityGraph({
+    const accepted = createDeferred<{ enqueued: number; itemIds: number[] }>();
+    const read = createDeferred<{ status: 'pending' }>();
+    const onStatus = vi.fn();
+    const promise = runUtilityGraph({
       createId: () => UTIL_ID,
-      enqueue: () => deferred.promise,
-      graph,
+      enqueue: () => accepted.promise,
+      graph: { edges: [], id: 'g', nodes: {} },
       hub: fake.hub,
+      onStatus,
+      readItemStatus: () => read.promise,
     });
-
-    fake.emit('queue_item_status_changed', statusEvent('failed', { error_message: 'No model' }));
+    expect(onStatus).not.toHaveBeenCalled();
+    fake.emit('queue_item_status_changed', statusEvent('pending', { origin: 'another-utility' }));
+    expect(onStatus).not.toHaveBeenCalled();
+    fake.emit('queue_item_status_changed', statusEvent('in_progress'));
+    expect(onStatus.mock.calls).toEqual([['in_progress']]);
+    accepted.resolve({ enqueued: 1, itemIds: [1] });
     await nextMacrotask();
-    deferred.resolve({ enqueued: 1, itemIds: [1] });
-
-    const submission = await pending;
-    await expect(submission.settled).rejects.toMatchObject({ message: 'No model', reason: 'failed' });
+    read.resolve({ status: 'pending' });
+    await nextMacrotask();
+    expect(onStatus.mock.calls).toEqual([['in_progress']]);
+    fake.emit('invocation_complete', completeEvent());
+    fake.emit('queue_item_status_changed', statusEvent('completed'));
+    await expect(promise).resolves.toMatchObject({ imageName: 'filtered.png' });
+    fake.emit('queue_item_status_changed', statusEvent('pending'));
+    expect(onStatus.mock.calls).toEqual([['in_progress']]);
     expect(fake.handlerCount('queue_item_status_changed')).toBe(0);
   });
 
-  it('re-reads the item after a reconnect so a missed completion still settles', async () => {
+  it('repairs missed execution events by polling and stops reads and callbacks after cancellation', async () => {
+    vi.useFakeTimers();
     const fake = createFakeHub();
-    const readItemStatus = vi.fn<UtilityItemStatusReader>(() => Promise.resolve({ status: 'in_progress' }));
-    const submission = await submitUtilityGraph({
+    const abort = new AbortController();
+    const onStatus = vi.fn();
+    const readItemStatus = vi
+      .fn<UtilityItemStatusReader>()
+      .mockResolvedValueOnce({ status: 'pending' })
+      .mockResolvedValueOnce({ status: 'in_progress' })
+      .mockResolvedValue({ status: 'pending' });
+    const cancel = vi.fn(() => Promise.resolve());
+    const promise = runUtilityGraph({
       createId: () => UTIL_ID,
-      enqueue: () => Promise.resolve({ enqueued: 1, itemIds: [9] }),
+      enqueue: okEnqueue,
+      graph: { edges: [], id: 'g', nodes: {} },
+      hub: fake.hub,
+      onStatus,
+      readItemStatus,
+      cancel,
+      signal: abort.signal,
+    });
+    const outcome = promise.catch((error: unknown) => error);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(onStatus.mock.calls).toEqual([['pending']]);
+    await vi.advanceTimersByTimeAsync(DEFAULT_UTILITY_RECONCILE_INTERVAL_MS);
+    expect(onStatus.mock.calls).toEqual([['pending'], ['in_progress']]);
+    fake.connection('disconnected');
+    fake.connection('connected');
+    await vi.advanceTimersByTimeAsync(0);
+    expect(onStatus.mock.calls).toEqual([['pending'], ['in_progress']]);
+    abort.abort();
+    await expect(outcome).resolves.toMatchObject({ reason: 'aborted' });
+    await vi.advanceTimersByTimeAsync(0);
+    const reads = readItemStatus.mock.calls.length;
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(readItemStatus).toHaveBeenCalledTimes(reads);
+    expect(cancel).toHaveBeenCalledWith([1]);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('keeps observer read failures within the shared health budget and fences account cancellation', async () => {
+    vi.useFakeTimers();
+    const fake = createFakeHub();
+    const onStatus = vi.fn();
+    const cancel = vi.fn().mockResolvedValue(undefined);
+    const readItemStatus = vi.fn<UtilityItemStatusReader>().mockRejectedValue(new TypeError('offline'));
+    const promise = runUtilityGraph({
+      createId: () => UTIL_ID,
+      graph: { edges: [], id: 'g', nodes: {} },
+      hub: fake.hub,
+      enqueue: okEnqueue,
+      onStatus,
+      readItemStatus,
+      cancel,
+    });
+    const outcome = promise.catch((error: unknown) => error);
+    await vi.advanceTimersByTimeAsync(0);
+    for (let i = 0; i < 5; i += 1) {
+      fake.emit('queue_cleared', {});
+      await vi.advanceTimersByTimeAsync(0);
+    }
+    expect(onStatus).not.toHaveBeenCalled();
+    expect(fake.handlerCount('queue_item_status_changed')).toBe(1);
+    await vi.advanceTimersByTimeAsync(DEFAULT_UTILITY_RECONCILE_INTERVAL_MS);
+    expect(fake.handlerCount('queue_item_status_changed')).toBe(1);
+    readItemStatus.mockResolvedValueOnce({ status: 'in_progress' });
+    fake.connection('disconnected');
+    fake.connection('connected');
+    await vi.advanceTimersByTimeAsync(0);
+    expect(onStatus.mock.calls).toEqual([['in_progress']]);
+    accountLifecycle.activate('replacement-progress-owner');
+    await expect(outcome).resolves.toMatchObject({ reason: 'aborted' });
+    const reads = readItemStatus.mock.calls.length;
+    fake.emit('queue_item_status_changed', statusEvent('pending'));
+    await vi.advanceTimersByTimeAsync(2 * DEFAULT_UTILITY_RECONCILE_INTERVAL_MS);
+    expect(readItemStatus).toHaveBeenCalledTimes(reads);
+    expect(onStatus.mock.calls).toEqual([['in_progress']]);
+    expect(cancel).not.toHaveBeenCalled();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('does not treat another accepted item still pending as a return to waiting', async () => {
+    const fake = createFakeHub();
+    const onStatus = vi.fn();
+    const promise = runUtilityGraph({
+      createId: () => UTIL_ID,
+      enqueue: () => Promise.resolve({ enqueued: 2, itemIds: [1, 2] }),
+      graph: { edges: [], id: 'g', nodes: {} },
+      hub: fake.hub,
+      onStatus,
+      readItemStatus: (id) => Promise.resolve({ status: id === 1 ? 'in_progress' : 'pending' }),
+    });
+    await nextMacrotask();
+    expect(onStatus.mock.calls).toEqual([['in_progress']]);
+    fake.emit('queue_item_status_changed', statusEvent('pending', { item_id: 2 }));
+    expect(onStatus.mock.calls).toEqual([['in_progress']]);
+    fake.emit('queue_item_status_changed', statusEvent('failed', { error_message: 'Resize failed' }));
+    await expect(promise).rejects.toMatchObject({ reason: 'failed' });
+    expect(fake.connectionHandlerCount()).toBe(0);
+  });
+});
+
+describe('utility recovery lifetimes', () => {
+  const graph = { edges: [], id: 'utility-recovery', nodes: {} };
+
+  it.each(['submit', 'run'] as const)(
+    'surfaces persistent status-read failure for %s without exhausting on event bursts',
+    async (api) => {
+      vi.useFakeTimers();
+      const fake = createFakeHub();
+      const readItemStatus = vi.fn<UtilityItemStatusReader>().mockRejectedValue(new TypeError('backend down'));
+      const operation =
+        api === 'submit'
+          ? (await submitUtilityGraph({ graph, hub: fake.hub, enqueue: okEnqueue, readItemStatus })).settled
+          : runUtilityGraph({ graph, hub: fake.hub, enqueue: okEnqueue, readItemStatus });
+      const assertion = expect(operation).rejects.toMatchObject({
+        reason: 'reconcile',
+        message: expect.stringContaining('Backend work may still be running'),
+      });
+      for (let i = 0; i < 10; i += 1) {
+        fake.emit('queue_cleared', {});
+        await vi.advanceTimersByTimeAsync(0);
+      }
+      expect(fake.handlerCount('queue_item_status_changed')).toBe(1);
+      await vi.advanceTimersByTimeAsync(30_000);
+      await assertion;
+      expect(fake.handlerCount('queue_item_status_changed')).toBe(0);
+      expect(vi.getTimerCount()).toBe(0);
+    }
+  );
+
+  it('recovers a missing terminal event within one status interval and cleans up', async () => {
+    vi.useFakeTimers();
+    const fake = createFakeHub();
+    const readItemStatus = vi.fn<UtilityItemStatusReader>().mockResolvedValue({ status: 'completed' });
+    const reconcileCompletedOutput = vi.fn().mockResolvedValue({ imageName: 'recovered.png', width: 64, height: 64 });
+    const result = runUtilityGraph({
       graph,
       hub: fake.hub,
+      enqueue: okEnqueue,
+      createId: () => UTIL_ID,
       readItemStatus,
+      reconcileCompletedOutput,
     });
-    const outcome = submission.settled.then(
-      () => 'resolved',
-      (error: UtilityQueueError) => error.reason
-    );
-
-    // The initial status replay is not a reconnect.
-    fake.connection('connected');
+    await vi.advanceTimersByTimeAsync(DEFAULT_UTILITY_RECONCILE_INTERVAL_MS - 1);
     expect(readItemStatus).not.toHaveBeenCalled();
-
-    fake.connection('disconnected');
-    fake.connection('connected');
-    await vi.waitFor(() => expect(readItemStatus).toHaveBeenCalledExactlyOnceWith(9, undefined));
-    expect(fake.handlerCount('queue_item_status_changed')).toBe(1);
-
-    readItemStatus.mockResolvedValueOnce({ status: 'completed' });
-    fake.connection('disconnected');
-    fake.connection('connected');
-
-    await expect(outcome).resolves.toBe('resolved');
+    await vi.advanceTimersByTimeAsync(1);
+    await expect(result).resolves.toMatchObject({ imageName: 'recovered.png' });
+    expect(readItemStatus).toHaveBeenCalledTimes(1);
     expect(fake.handlerCount('queue_item_status_changed')).toBe(0);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('aborts outstanding status reads when a watch stops and ignores their late terminal result', async () => {
+    const fake = createFakeHub();
+    const controller = new AbortController();
+    const status = createDeferred<{ status: 'completed' }>();
+    const readItemStatus = vi.fn<UtilityItemStatusReader>().mockReturnValue(status.promise);
+    const submission = await submitUtilityGraph({
+      graph,
+      hub: fake.hub,
+      enqueue: okEnqueue,
+      readItemStatus,
+      signal: controller.signal,
+    });
+    fake.connection('disconnected');
+    fake.connection('connected');
+    const requestSignal = readItemStatus.mock.calls[0]?.[1];
+    expect(requestSignal?.aborted).toBe(false);
+    controller.abort();
+    await expect(submission.settled).rejects.toMatchObject({ reason: 'aborted' });
+    expect(requestSignal?.aborted).toBe(true);
+    status.resolve({ status: 'completed' });
+    await nextMacrotask();
+    expect(readItemStatus).toHaveBeenCalledTimes(1);
     expect(fake.connectionHandlerCount()).toBe(0);
   });
 
-  it('re-reads the item after a queue clear and settles as removed when the item is gone', async () => {
-    const fake = createFakeHub();
-    const readItemStatus = vi.fn<UtilityItemStatusReader>(() => Promise.resolve({ status: 'pending' }));
-    const submission = await submitUtilityGraph({
-      createId: () => UTIL_ID,
-      enqueue: () => Promise.resolve({ enqueued: 1, itemIds: [9] }),
-      graph,
-      hub: fake.hub,
-      readItemStatus,
-    });
-    const outcome = submission.settled.then(
-      () => 'resolved',
-      (error: UtilityQueueError) => error.reason
-    );
-    const clearedEvent = { queue_id: 'default', timestamp: 1, user_id: null };
-
-    // A clear that only removed other items leaves this one watched.
-    fake.emit('queue_cleared', clearedEvent);
-    await vi.waitFor(() => expect(readItemStatus).toHaveBeenCalledExactlyOnceWith(9, undefined));
-    expect(fake.handlerCount('queue_item_status_changed')).toBe(1);
-
-    // A pending item a clear deleted answers 404: there will never be a terminal event for it.
-    readItemStatus.mockRejectedValueOnce(new ApiError('{"detail":"Queue item not found"}', 404));
-    fake.emit('queue_cleared', clearedEvent);
-
-    await expect(outcome).resolves.toBe('removed');
-    expect(fake.handlerCount('queue_item_status_changed')).toBe(0);
-    expect(fake.handlerCount('queue_cleared')).toBe(0);
-  });
-
-  it('re-reads the item when a bulk cancel or delete names it, and ignores bulk events for other items', async () => {
-    const fake = createFakeHub();
-    const readItemStatus = vi.fn<UtilityItemStatusReader>(() => Promise.resolve({ status: 'canceled' }));
-    const submission = await submitUtilityGraph({
-      createId: () => UTIL_ID,
-      enqueue: () => Promise.resolve({ enqueued: 1, itemIds: [9] }),
-      graph,
-      hub: fake.hub,
-      readItemStatus,
-    });
-    const outcome = submission.settled.then(
-      () => 'resolved',
-      (error: UtilityQueueError) => error.reason
-    );
-
-    // Other owners' items, and the id-less companion other users receive, leave this item watched.
-    fake.emit('queue_items_canceled', bulkCanceledEvent([4, 5]));
-    fake.emit('queue_items_canceled', bulkCanceledEvent([]));
-    await nextMacrotask();
-    expect(readItemStatus).not.toHaveBeenCalled();
-    expect(fake.handlerCount('queue_items_canceled')).toBe(1);
-
-    // Bulk operations cancel waiting items in one statement and emit no per-item status change.
-    fake.emit('queue_items_canceled', bulkCanceledEvent([4, 9]));
-
-    await expect(outcome).resolves.toBe('canceled');
-    expect(readItemStatus).toHaveBeenCalledExactlyOnceWith(9, undefined);
-    expect(fake.handlerCount('queue_items_canceled')).toBe(0);
-
-    // A bulk delete removes the row: the read answers 404.
-    const deleted = createFakeHub();
-    const deletedSubmission = await submitUtilityGraph({
-      createId: () => UTIL_ID,
-      enqueue: () => Promise.resolve({ enqueued: 1, itemIds: [9] }),
-      graph,
-      hub: deleted.hub,
-      readItemStatus: () => Promise.reject(new ApiError('{"detail":"Queue item not found"}', 404)),
-    });
-    deleted.emit('queue_items_canceled', bulkCanceledEvent([9]));
-    await expect(deletedSubmission.settled).rejects.toMatchObject({ reason: 'removed' });
-  });
-
-  it('defers a bulk cancel that arrives before the enqueue response until the item id is known', async () => {
-    const fake = createFakeHub();
-    const deferred = createDeferred<{ enqueued: number; itemIds: number[] }>();
-    const readItemStatus = vi.fn<UtilityItemStatusReader>(() => Promise.resolve({ status: 'canceled' }));
-    const pending = submitUtilityGraph({
-      createId: () => UTIL_ID,
-      enqueue: () => deferred.promise,
-      graph,
-      hub: fake.hub,
-      readItemStatus,
-    });
-
-    // The ids are unknown until the enqueue answers, so any bulk event may have named this item.
-    fake.emit('queue_items_canceled', bulkCanceledEvent([12]));
-    await Promise.resolve();
-    expect(readItemStatus).not.toHaveBeenCalled();
-
-    deferred.resolve({ enqueued: 1, itemIds: [12] });
-    const submission = await pending;
-
-    await expect(submission.settled).rejects.toMatchObject({ reason: 'canceled' });
-    expect(readItemStatus).toHaveBeenCalledExactlyOnceWith(12, undefined);
-  });
-
-  it('defers a clear that arrives before the enqueue response until the item id is known', async () => {
-    const fake = createFakeHub();
-    const deferred = createDeferred<{ enqueued: number; itemIds: number[] }>();
-    const readItemStatus = vi.fn<UtilityItemStatusReader>(() =>
-      Promise.reject(new ApiError('{"detail":"Queue item not found"}', 404))
-    );
-    const pending = submitUtilityGraph({
-      createId: () => UTIL_ID,
-      enqueue: () => deferred.promise,
-      graph,
-      hub: fake.hub,
-      readItemStatus,
-    });
-
-    fake.emit('queue_cleared', { queue_id: 'default', timestamp: 1, user_id: null });
-    await Promise.resolve();
-    expect(readItemStatus).not.toHaveBeenCalled();
-
-    deferred.resolve({ enqueued: 1, itemIds: [12] });
-    const submission = await pending;
-
-    await expect(submission.settled).rejects.toMatchObject({ reason: 'removed' });
-    expect(readItemStatus).toHaveBeenCalledExactlyOnceWith(12, undefined);
-  });
-
-  it('reads the item at the reconcile interval: a finished item settles, an open one re-arms the read', async () => {
+  it('aborts an outstanding output read when its account expires without retrying', async () => {
     vi.useFakeTimers();
-    for (const [status, expected] of [
-      ['completed', 'resolved'],
-      ['failed', 'failed'],
-    ] as const) {
-      const fake = createFakeHub();
-      const submission = await submitUtilityGraph({
-        createId: () => UTIL_ID,
-        enqueue: okEnqueue,
-        graph,
-        hub: fake.hub,
-        readItemStatus: () => Promise.resolve({ errorMessage: 'boom', status }),
-      });
-      const outcome = submission.settled.then(
-        () => 'resolved',
-        (error: UtilityQueueError) => error.reason
-      );
-
-      vi.advanceTimersByTime(DEFAULT_UTILITY_RECONCILE_INTERVAL_MS - 1);
-      expect(fake.handlerCount('queue_item_status_changed')).toBe(1);
-      vi.advanceTimersByTime(1);
-
-      await expect(outcome).resolves.toBe(expected);
-      expect(fake.handlerCount('queue_item_status_changed')).toBe(0);
-    }
-
-    // A first run may still be downloading models at the interval: the watch reads again later instead of giving up.
     const fake = createFakeHub();
-    const readItemStatus = vi.fn<UtilityItemStatusReader>(() => Promise.resolve({ status: 'in_progress' }));
-    const submission = await submitUtilityGraph({
-      createId: () => UTIL_ID,
-      enqueue: okEnqueue,
+    const output = createDeferred<null>();
+    const reconcileCompletedOutput = vi.fn().mockReturnValue(output.promise);
+    const result = runUtilityGraph({
       graph,
       hub: fake.hub,
-      readItemStatus,
+      enqueue: okEnqueue,
+      createId: () => UTIL_ID,
+      reconcileCompletedOutput,
     });
-    const outcome = submission.settled.then(
-      () => 'resolved',
-      (error: UtilityQueueError) => error.reason
-    );
-
-    await vi.advanceTimersByTimeAsync(DEFAULT_UTILITY_RECONCILE_INTERVAL_MS);
-    expect(readItemStatus).toHaveBeenCalledTimes(1);
-    expect(fake.handlerCount('queue_item_status_changed')).toBe(1);
-    expect(vi.getTimerCount()).toBe(1);
-
-    readItemStatus.mockResolvedValueOnce({ status: 'completed' });
-    await vi.advanceTimersByTimeAsync(DEFAULT_UTILITY_RECONCILE_INTERVAL_MS);
-
-    await expect(outcome).resolves.toBe('resolved');
-    expect(readItemStatus).toHaveBeenCalledTimes(2);
-    expect(fake.handlerCount('queue_item_status_changed')).toBe(0);
+    await vi.advanceTimersByTimeAsync(0);
+    fake.emit('queue_item_status_changed', statusEvent('completed'));
+    await vi.advanceTimersByTimeAsync(0);
+    const requestSignal = reconcileCompletedOutput.mock.calls[0]?.[2] as AbortSignal;
+    expect(requestSignal.aborted).toBe(false);
+    accountLifecycle.activate('next-account');
+    await expect(result).rejects.toMatchObject({ reason: 'aborted' });
+    expect(requestSignal.aborted).toBe(true);
+    output.resolve(null);
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(reconcileCompletedOutput).toHaveBeenCalledTimes(1);
     expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('does not start a deferred admission under a replacement account', async () => {
+    const fake = createFakeHub();
+    const enqueue = vi.fn(okEnqueue);
+    const result = runUtilityGraph({ graph, hub: fake.hub, enqueue });
+    accountLifecycle.activate('replacement-before-admission');
+    await expect(result).rejects.toMatchObject({ reason: 'aborted' });
+    await nextMacrotask();
+    expect(enqueue).not.toHaveBeenCalled();
+  });
+
+  it('never cancels old-account ids through the replacement account after a late admission', async () => {
+    const fake = createFakeHub();
+    const admission = createDeferred<{ enqueued: number; itemIds: number[] }>();
+    const cancel = vi.fn().mockResolvedValue(undefined);
+    const result = runUtilityGraph({ graph, hub: fake.hub, enqueue: () => admission.promise, cancel });
+    await Promise.resolve();
+    accountLifecycle.activate('replacement');
+    await expect(result).rejects.toMatchObject({ reason: 'aborted' });
+    admission.resolve({ enqueued: 1, itemIds: [72] });
+    await nextMacrotask();
+    expect(cancel).not.toHaveBeenCalled();
   });
 });

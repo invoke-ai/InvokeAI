@@ -2,16 +2,13 @@ import type { MouseEvent } from 'react';
 
 import { Flex, Icon, Text } from '@chakra-ui/react';
 import { Button, IconButton } from '@platform/ui/Button';
+import { measureHiddenEdges, SCROLL_EDGE_TOLERANCE_PX } from '@platform/ui/scrollStripEdges';
 import { Tooltip } from '@platform/ui/Tooltip';
 import { forwardWheelToStrip, wheelScrollsHorizontally } from '@platform/ui/wheelScrollsHorizontally';
 import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
 import { useCallback, useState, useSyncExternalStore } from 'react';
 
-/**
- * A row of top or center chrome that scrolls sideways without a scrollbar, and the cues at the ends that hide content:
- * a fade into the chrome's background with a button that scrolls to that end. Shared by the center's chrome islands
- * and the layout preset strip.
- */
+/** Sideways-scrolling chrome row with end cues; shared by the center islands and the layout preset strip. */
 
 export type OverflowEdge = 'end' | 'start';
 type Edge = OverflowEdge;
@@ -24,9 +21,6 @@ export interface HiddenEdges {
 }
 
 const NO_HIDDEN_EDGES: HiddenEdges = { end: false, endCount: 0, start: false };
-
-// A fractional zoom can leave a sub-pixel remainder at either end of a fully scrolled row; that hides nothing.
-const EDGE_TOLERANCE_PX = 1;
 
 /** Fade plus the cue's button and the island's inline padding beside it. */
 export const CUE_WIDTH = '2.75rem';
@@ -45,24 +39,14 @@ const CUE_CSS: Record<Edge, object> = {
 
 const MIRRORED_IN_RTL = { _rtl: { transform: 'scaleX(-1)' } } as const;
 
-export const HIDDEN_SCROLLBAR_CSS = { '&::-webkit-scrollbar': { display: 'none' }, scrollbarWidth: 'none' } as const;
-
 const prefersReducedMotion = (): boolean =>
   document.documentElement.dataset.reduceMotion === 'true' ||
   globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
 
-/**
- * Keep focus on the control the user was on, whether the press lands on the button or the fade: the cue is a pointer
- * shortcut, and focus already scrolls the row.
- */
+/** Keeps focus on the user's control: the cue is a pointer shortcut, and focus already scrolls the row. */
 const keepFocus = (event: MouseEvent) => event.preventDefault();
 
-/**
- * Which ends of the island's row hide content. Re-measured on scroll, whenever the scrollport or a control changes
- * size, and on any change inside the row: nested text can grow past a control that keeps its size (a counter gaining
- * a digit, a label overflowing its box). A measurement reads three layout values; subscribers hear only a change of
- * either edge.
- */
+/** Which ends of the island's row hide content. */
 const createHiddenEdgesStore = ({ itemSelector, keepInViewSelector }: OverflowEdgesOptions) => {
   let scroller: HTMLElement | null = null;
   let hiddenEdges = NO_HIDDEN_EDGES;
@@ -72,18 +56,16 @@ const createHiddenEdgesStore = ({ itemSelector, keepInViewSelector }: OverflowEd
     if (!scroller) {
       return;
     }
-    // Right-to-left rows scroll toward negative offsets; the distance from the start is the same either way.
-    const offset = Math.abs(scroller.scrollLeft);
-    const range = scroller.scrollWidth - scroller.clientWidth;
-    const start = offset >= EDGE_TOLERANCE_PX;
-    const end = range - offset >= EDGE_TOLERANCE_PX;
+    const { end, start } = measureHiddenEdges(scroller);
     const bounds = end && itemSelector ? scroller.getBoundingClientRect() : null;
     const isRtl = bounds !== null && getComputedStyle(scroller).direction === 'rtl';
     const endCount = bounds
       ? [...scroller.querySelectorAll(itemSelector!)].filter((item) => {
           const rect = item.getBoundingClientRect();
 
-          return isRtl ? rect.left < bounds.left - EDGE_TOLERANCE_PX : rect.right > bounds.right + EDGE_TOLERANCE_PX;
+          return isRtl
+            ? rect.left < bounds.left - SCROLL_EDGE_TOLERANCE_PX
+            : rect.right > bounds.right + SCROLL_EDGE_TOLERANCE_PX;
         }).length
       : 0;
 
@@ -93,10 +75,7 @@ const createHiddenEdgesStore = ({ itemSelector, keepInViewSelector }: OverflowEd
     }
   };
 
-  /**
-   * Scrolls the kept item back into view when the row clips it. Runs when the row resizes or the item changes, never on
-   * scroll, so a row the user scrolled away stays where they put it.
-   */
+  /** Scrolls the kept item back into view on resize or item change, never on scroll. */
   const reveal = () => {
     const item = keepInViewSelector ? scroller?.querySelector<HTMLElement>(keepInViewSelector) : null;
 
@@ -108,18 +87,13 @@ const createHiddenEdgesStore = ({ itemSelector, keepInViewSelector }: OverflowEd
     const bounds = scroller.getBoundingClientRect();
     const rect = item.getBoundingClientRect();
 
-    if (rect.left < bounds.left - EDGE_TOLERANCE_PX || rect.right > bounds.right + EDGE_TOLERANCE_PX) {
+    if (rect.left < bounds.left - SCROLL_EDGE_TOLERANCE_PX || rect.right > bounds.right + SCROLL_EDGE_TOLERANCE_PX) {
       item.scrollIntoView({ behavior: 'instant', block: 'nearest', inline: 'nearest' });
     }
   };
 
   return {
-    /**
-     * Ref callback for the scroller. Controls that cannot shrink further overflow the scroller's box without resizing
-     * it, so each control is observed too, including ones that mount later (a label whose chunk was still loading).
-     * The cues take the pointer over the row's ends, so a wheel over them is forwarded to the row from its parent, which
-     * holds the cues.
-     */
+    /** Observes the scroller and each control, since non-shrinking controls overflow without resizing it. */
     attach: (element: HTMLElement | null) => {
       if (!element) {
         return;
@@ -212,10 +186,6 @@ export const useOverflowEdges = (options: OverflowEdgesOptions = {}) => {
   return { attach, hiddenEdges, scrollTo };
 };
 
-/**
- * The fade and its button. The whole cue takes the pointer, so the half-hidden controls under the fade neither take a
- * click nor show hover; only the button acts.
- */
 export const OverflowCue = ({
   ariaLabel,
   count,
@@ -274,7 +244,8 @@ export const OverflowCue = ({
             aria-label={ariaLabel ?? label}
             color="fg.muted"
             size="sm"
-            // Out of the tab order like other pointer shortcuts: focus already brings every control in the row into view.
+            // Out of the tab order like other pointer shortcuts: focus already brings every control in the row into
+            // view.
             tabIndex={-1}
             variant="ghost"
             onClick={scrollToEdge}

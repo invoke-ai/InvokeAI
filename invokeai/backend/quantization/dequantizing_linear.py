@@ -3,15 +3,16 @@
 Three schemes store their Linears this way, ``int8_convrot``, ``nvfp4`` and Ideogram 4's row-wise fp8
 (``fp8_rowwise``); GGUF keeps a plain Linear but packs its weight in a ``GGMLTensor`` and dequantizes it
 per forward just the same. The code around them
-needs the same two answers about any of these: whether a LoRA has to ride along as a sidecar, and how
-much memory one forward needs on top of the model's resident size. Both are asked of the loaded module
-tree and live here, so callers ask once for every scheme: a module-level scheme answers by subclassing,
-GGUF -- whose quantization lives on the weight, not the module -- is delegated to.
+needs the same three answers about any of these: whether a LoRA has to ride along as a sidecar, how
+much memory one forward needs on top of the model's resident size, and whether FP8 Storage may cast the
+build's other, full-precision layers (`leaves_dense_layers_to_fp8_storage`). The first two are asked of the
+loaded module tree and live here, so callers ask once for every scheme: a module-level scheme answers by
+subclassing, GGUF -- whose quantization lives on the weight, not the module -- is delegated to.
 """
 
 import abc
 import sys
-from typing import Any
+from typing import Any, ClassVar
 
 import torch
 import torch.nn.functional as F
@@ -34,6 +35,11 @@ class DequantizingLinear(torch.nn.Module, abc.ABC):
     Both methods are abstract so that a scheme missing one fails where its modules are built, at load,
     rather than in the denoise node that sizes its working memory from them.
     """
+
+    #: Whether FP8 Storage may cast the other, full-precision layers of a build holding this scheme. By default it
+    #: declines the whole build: those layers keep the precision the build chose. A scheme opts in only where
+    #: measurement showed that casting them costs nothing material.
+    leaves_dense_layers_to_fp8_storage: ClassVar[bool] = False
 
     in_features: int
     out_features: int

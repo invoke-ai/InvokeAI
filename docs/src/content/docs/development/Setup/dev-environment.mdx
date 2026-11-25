@@ -1,6 +1,6 @@
 ---
 title: Development Environment
-lastUpdated: 2026-11-06
+lastUpdated: 2026-11-20
 ---
 
 import { LinkCard, Steps, Tabs, TabItem, FileTree, LinkButton } from '@astrojs/starlight/components'
@@ -89,7 +89,7 @@ import SystemRequirementsLink from '@components/SystemRequirmentsLink.astro'
         pnpm build
         ```
 
-  9. Restart the server and navigate to the URL. You should get a UI. After making changes to the python code, restart the server to see those changes.
+  9. Restart the server and navigate to the URL. You should get a UI. On a new root directory, the first screen is **Set up Invoke**, where you create the administrator account. After making changes to the python code, restart the server to see those changes.
 </Steps>
 
 ## Backend Development
@@ -233,8 +233,7 @@ It's also highly recommended to install the Jupyter extensions if you plan on wo
           "request": "launch",
           "program": "scripts/invokeai-web.py",
           "args": [
-            "--root", "/path/to/invokeai_root",
-            "--host", "0.0.0.0"
+            "--root", "/path/to/invokeai_root"
           ],
           "justMyCode": true
         },

@@ -10,6 +10,7 @@ import {
   dialogSlotRecipe,
   hoverCardSlotRecipe,
   inputRecipe,
+  kbdRecipe,
   menuSlotRecipe,
   numberInputSlotRecipe,
   popoverSlotRecipe,
@@ -27,20 +28,15 @@ import {
 import { CONTROL_HEIGHT_PX } from './scale';
 import { DEFAULT_THEME, DEFAULT_THEME_ID, type NeutralStep, THEMES, type ThemeDefinition } from './themes';
 
-/**
- * Emit theme-varying ramps as semantic tokens; map component tokens and Chakra gray onto them. Root data-theme
- * switches appearance; light elevations are not a reversed dark ramp.
- */
+/** Theme-varying ramps emit as semantic tokens; root data-theme switches appearance. */
 
 const NON_DEFAULT_THEMES = THEMES.filter((theme) => theme.id !== DEFAULT_THEME_ID);
 
-/** `light` -> `themeLight`, `ultradark` -> `themeUltradark`. */
 const conditionName = (id: string): string => `theme${id.charAt(0).toUpperCase()}${id.slice(1)}`;
 
 type TokenValue = { value: Record<string, string> };
 type Compute = (theme: ThemeDefinition) => string;
 
-/** Build a semantic-token value object: default theme as `base`, the rest as `[data-theme]` conditions. */
 const colorToken = (compute: Compute): TokenValue => {
   const value: Record<string, string> = { base: compute(DEFAULT_THEME) };
   for (const theme of NON_DEFAULT_THEMES) {
@@ -49,16 +45,12 @@ const colorToken = (compute: Compute): TokenValue => {
   return { value };
 };
 
-/** Blend `pct`% of one computed color into another — used for derived hover/tint steps. */
 const mix = (top: Compute, pct: number, bottom: Compute): TokenValue =>
   colorToken((theme) => `color-mix(in oklab, ${top(theme)} ${pct}%, ${bottom(theme)})`);
 
 const LIGHT_FALLBACK_THEME = THEMES.find((theme) => theme.colorScheme === 'light') ?? DEFAULT_THEME;
 
-/**
- * Shadow default gray _light/_dark keys because nested palettes deep-merge; explicit root theme selectors must
- * still win.
- */
+/** Shadows Chakra's default gray _light/_dark keys, which nested palettes deep-merge. */
 const grayToken = (compute: Compute): TokenValue => {
   const token = colorToken(compute);
   token.value._light = compute(LIGHT_FALLBACK_THEME);
@@ -78,7 +70,6 @@ const withHighContrast = (token: TokenValue, darkStep: NeutralStep, lightStep: N
   return token;
 };
 
-/** A ramp-step token with a stronger step pair under high contrast. */
 const contrastStepRef = (
   darkStep: NeutralStep,
   lightStep: NeutralStep,
@@ -88,11 +79,9 @@ const contrastStepRef = (
 
 const STEPS: NeutralStep[] = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950];
 
-/** The default panel surface of a theme — `bg.subtle`'s step. Used as the floor for tints. */
 const surface: Compute = (theme) =>
   theme.colorScheme === 'light' ? theme.colors.neutral[50] : theme.colors.neutral[900];
 
-// Seed accessors.
 const danger: Compute = (theme) => theme.colors.danger;
 const success: Compute = (theme) => theme.colors.success;
 const warning: Compute = (theme) => theme.colors.warning;
@@ -104,16 +93,13 @@ const brandFg: Compute = (theme) =>
     ? `color-mix(in oklab, ${theme.colors.brand.solid} 50%, ${theme.colors.neutral[950]})`
     : theme.colors.brand.solid;
 const accentSolid: Compute = (theme) => theme.colors.accent.solid;
-/** Foreground pulled toward accent: the hue of interaction fills, which apply it at low alpha. */
 const hoverTint: Compute = (theme) =>
-  `color-mix(in oklab, ${theme.colors.accent.solid} 55%, ${
+  `color-mix(in oklab, ${theme.colors.accent.solid} ${theme.interactionTint}%, ${
     theme.colorScheme === 'light' ? theme.colors.neutral[950] : theme.colors.neutral[50]
   })`;
 
-/** The neutral ramp, emitted as `neutral.50…neutral.950`, one value per theme. */
 const neutralRamp = Object.fromEntries(STEPS.map((step) => [step, colorToken((theme) => theme.colors.neutral[step])]));
 
-// Darken categorical text seeds for light themes; derive fills from the same hue.
 const categoricalPalettes = Object.fromEntries(
   Object.entries({
     aqua: '#5cc8d8',
@@ -148,10 +134,7 @@ const categoricalPalettes = Object.fromEntries(
   })
 );
 
-/**
- * Reuse Chakra token names so built-ins inherit themes; ramp references and explicit seeds form the semantic
- * contract.
- */
+/** Reuse Chakra token names so built-ins inherit themes. */
 const semanticColors = {
   ...categoricalPalettes,
   neutral: neutralRamp,
@@ -163,18 +146,12 @@ const semanticColors = {
   'bg.panel': stepRef(800, 100),
   'bg.emphasized': colorToken((theme) => theme.colors.control),
   'bg.inset': colorToken((theme) => theme.colors.inset),
-  /**
-   * The pointed or highlighted fill for rows, tabs, and options: a faint accent-tinted foreground, translucent so it
-   * reads on any surface. Matches the ghost/outline button hover (`gray.hoverTint/10`), so an open trigger and its
-   * highlighted option share one fill.
-   */
+  /** Matches the ghost/outline button hover (`gray.hoverTint/10`), so an open trigger and its option match. */
   'bg.hover': mix(hoverTint, 10, () => 'transparent'),
-  // Soft status fills for alerts/banners, mixed into the panel surface.
   'bg.error': mix(danger, 14, surface),
   'bg.success': mix(success, 14, surface),
   'bg.warning': mix(warning, 14, surface),
 
-  // High contrast raises muted text toward fg while preserving its lower emphasis.
   fg: stepRef(50, 950),
   'fg.muted': contrastStepRef(300, 700, 200, 800),
   'fg.subtle': contrastStepRef(400, 500, 300, 700),
@@ -183,7 +160,6 @@ const semanticColors = {
   'fg.success': colorToken(success),
   'fg.warning': colorToken(warning),
 
-  // Borders.
   border: contrastStepRef(600, 300, 300, 500),
   'border.subtle': contrastStepRef(600, 300, 300, 500),
   'border.muted': contrastStepRef(600, 300, 300, 500),
@@ -191,10 +167,7 @@ const semanticColors = {
   'border.error': colorToken(danger),
   'border.image': colorToken((theme) => (theme.colorScheme === 'light' ? 'oklch(0 0 0 / 0.1)' : 'oklch(1 0 0 / 0.1)')),
 
-  /**
-   * Keep palette tokens nested for Chakra's virtual-token map; shadow deep-merged gray _light/_dark defaults via
-   * grayToken.
-   */
+  /** Nested for Chakra's virtual-token map. */
   gray: {
     contrast: grayToken((theme) =>
       theme.colorScheme === 'light' ? theme.colors.neutral[200] : theme.colors.neutral[950]
@@ -214,10 +187,8 @@ const semanticColors = {
       300,
       600
     ),
-    /** Mix foreground toward accent for low-alpha interaction fills. */
     hoverTint: grayToken(hoverTint),
   },
-  // Palette-tinted interaction fills for the non-default palettes buttons use.
   red: { hoverTint: { value: '{colors.red.fg}' } },
   orange: { hoverTint: { value: '{colors.orange.fg}' } },
   green: { hoverTint: { value: '{colors.green.fg}' } },
@@ -234,7 +205,6 @@ const semanticColors = {
     border: colorToken(brandSolid),
     hoverTint: colorToken(brandFg),
   },
-  /** Selection / focus palette (blue). Use via `accent.solid` or `colorPalette="accent"`. */
   accent: {
     solid: colorToken(accentSolid),
     contrast: colorToken((theme) => theme.colors.accent.contrast),
@@ -261,14 +231,15 @@ const highContrastConditions = {
   highContrastLight: `:root[data-high-contrast=true]:is(${lightThemeSelectors})`,
 };
 
+/** 0 before the collapsible measures (0px), so the scale is 1, never infinite or negative. */
+const insetRatio = (inset: string, size: string): string =>
+  `tan(atan2(min(${inset}, ${size} * 1000), max(${size}, ${inset})))`;
+const SECTION_SCALE_INSET = `scale(calc(1 - ${insetRatio('8px', 'var(--width)')}), calc(1 - ${insetRatio('4px', 'var(--height)')}))`;
+
 const motionDurationToken = (base: string): TokenValue => ({ value: { base, _reduceMotion: '1ms' } });
 const motionAnimationToken = (base: string): TokenValue => ({ value: { base, _reduceMotion: 'none' } });
 
-/**
- * Chakra's hover and active exclude only native and `data-disabled` controls. An `aria-disabled` one (kept focusable
- * so it can explain itself) must not respond to the pointer either. Nor may it look expanded: a tooltip marks its
- * trigger expanded while open, and buttons give expanded their hover fill, so showing the reason would tint it.
- */
+/** Chakra excludes only native and `data-disabled` controls; `aria-disabled` ones must not respond or look expanded. */
 const interactionConditions = {
   hover: ['@media (hover: hover)', '&:is(:hover, [data-hover]):not(:disabled, [data-disabled], [aria-disabled=true])'],
   active: '&:is(:active, [data-active]):not(:disabled, [data-disabled], [aria-disabled=true], [data-state=open])',
@@ -292,12 +263,10 @@ const config = defineConfig({
       fontFamily: 'body',
       margin: 0,
       overflow: 'hidden',
-      // Text that names no size reads at the workbench's working size, as controls do. Only the size: the md text
-      // style's line height is absolute and would be inherited as-is by larger text, while html's unitless 1.5 scales.
+      // Only the size: the md text style's absolute line height would be inherited by larger text.
       fontSize: 'md',
     },
-    // Exclude editable comboboxes from arrow cursors. Keep role values unquoted while SamOptions assertions match
-    // quoted markup.
+    // Keep role values unquoted while SamOptions assertions match quoted markup.
     'button, [role=button], [role=menuitem], [role=menuitemcheckbox], [role=menuitemradio], [role=option], [role=tab], [role=radio], [role=checkbox], [role=switch]':
       {
         cursor: 'default',
@@ -328,39 +297,45 @@ const config = defineConfig({
       '--wb-motion-animation-iteration-count': '1',
       scrollBehavior: 'auto !important',
     },
-    // Remove the shine gradient as well as motion so a frozen band does not remain visible.
     ':root[data-reduce-motion="true"] .chakra-skeleton': {
       animation: 'none !important',
       backgroundImage: 'none !important',
     },
-    // Slow loading spinners under reduced motion so they continue conveying activity.
     ':root[data-reduce-motion="true"] .chakra-spinner': {
       animation: 'spin 2s linear infinite !important',
     },
   },
   theme: {
     keyframes: {
-      // A band crossing an indeterminate progress track (StatusWidgetChip).
       'wb-status-sweep': {
         from: { transform: 'translateX(-100%)' },
         to: { transform: 'translateX(300%)' },
       },
+      // Runs on the fields, never the content: Chromium leaves fields unpainted when one element animates a composited
+      // transform and its height under `overflow: hidden`.
+      'wb-section-scale-in': {
+        from: { transform: SECTION_SCALE_INSET },
+        to: { transform: 'scale(1)' },
+      },
+      'wb-section-scale-out': {
+        from: { transform: 'scale(1)' },
+        to: { transform: SECTION_SCALE_INSET },
+      },
     },
     layerStyles: {
-      // The inset dot-grid surface behind previews and the loading splash.
+      // Matches the workflow editor's grid at 100% zoom (1.5px dots every 25px).
       dotGrid: {
         value: {
           backgroundColor: 'bg.inset',
-          backgroundImage: 'radial-gradient(circle, currentColor 1px, transparent 1.5px)',
+          backgroundImage: 'radial-gradient(circle, currentColor 0.4px, transparent 1px)',
           backgroundPosition: 'center',
           backgroundRepeat: 'repeat',
-          backgroundSize: '24px 24px',
+          backgroundSize: '25px 25px',
           color: 'fg.grid',
         },
       },
     },
     tokens: {
-      // Use arrow cursors for controls and pointer for links.
       cursor: {
         button: { value: 'default' },
         switch: { value: 'default' },
@@ -403,6 +378,7 @@ const config = defineConfig({
     recipes: {
       button: buttonRecipe,
       input: inputRecipe,
+      kbd: kbdRecipe,
       skeleton: skeletonRecipe,
       textarea: textareaRecipe,
     },
@@ -430,6 +406,5 @@ const config = defineConfig({
 
 export const system = createSystem(baseConfig, config);
 
-/** Theme metadata re-exported so UI can import a single module. */
 export { THEMES, THEMES_BY_ID, DEFAULT_THEME, DEFAULT_THEME_ID, previewSwatches } from './themes';
 export type { ThemeColors, ThemeDefinition, NeutralStep } from './themes';

@@ -17,12 +17,16 @@ export type AddNodeConnectionFilter =
       targetType: FieldType | null;
     };
 
-/** Bridge transient menu actions to always-mounted workflow dialogs and file input through session UI state. */
+export type WorkflowLibraryTab = 'project' | 'recent' | 'user' | 'default' | 'shared';
 
-/** The library dialog's views: project workflows, bundled templates, owned templates, or public templates. */
-export type WorkflowLibraryTab = 'project' | 'default' | 'user' | 'shared';
+/** How This project orders its workflows: the project's own order, or a key. Client side, kept for the session. */
+export type ProjectWorkflowSort = 'order' | 'name' | 'updated' | 'lastRun';
 
-/** What a surface asked the publication host to do with one project workflow. */
+export interface ProjectWorkflowOrder {
+  direction: 'asc' | 'desc';
+  sort: ProjectWorkflowSort;
+}
+
 export type WorkflowPublicationIntent =
   | { kind: 'save-as-new'; workflowId: string }
   | { kind: 'update-source'; workflowId: string };
@@ -32,26 +36,24 @@ export interface WorkflowUiSnapshot {
   addNodePosition: XYPosition | null;
   isAddNodeOpen: boolean;
   isLibraryOpen: boolean;
-  /** Which view the library dialog shows; remembered for the session. */
+  /** Which place the library dialog shows; remembered for the session. */
   libraryTab: WorkflowLibraryTab;
-  /**
-   * The project workflow selected on the This-project view; only meaningful for the project it was made in, and only
-   * for the opening it was made in. Null shows the active workflow.
-   */
+  /** The library's search text and checked tags. Closing the dialog clears both; a place change clears the tags. */
+  libraryQuery: { search: string; tags: readonly string[] };
+  /** This project's order; the template places' order is an account preference. */
+  libraryProjectOrder: ProjectWorkflowOrder;
+  /** Meaningful only for the project and the opening it was made in; null shows the active workflow. */
   librarySelection: { projectId: string; workflowId: string } | null;
   /** Bumped to ask the dialog host to open the JSON file picker. */
   importRequestCount: number;
-  /** A rename the dialog host should offer; it names the workflow it was asked for. */
   renameRequest: { requestId: number; workflowId: string } | null;
-  /** A workflow a shell surface (command palette, an image's context menu) asked to load; consumed by the widget chrome. */
+  /** Asked for by a shell surface (palette, image menu); consumed by the widget chrome. */
   pendingWorkflowLoad: WorkflowLoadRequest | null;
-  /** A publication the always-mounted host should start a dialog for. */
   publicationIntent: WorkflowPublicationIntent | null;
   /** A template the project already holds copies of; the host asks whether to open, add, or replace a copy. */
   libraryCopyChoice: LibraryCopyChoiceRequest | null;
 }
 
-/** The library template being opened; the name labels the dialog and the undo step. */
 export interface LibraryOpenItem {
   name: string;
   workflow_id: string;
@@ -81,6 +83,8 @@ export interface WorkflowLoadRequest {
 
 let nextWorkflowLoadRequestId = 0;
 
+const EMPTY_LIBRARY_QUERY: WorkflowUiSnapshot['libraryQuery'] = { search: '', tags: [] };
+
 const INITIAL_WORKFLOW_UI_SNAPSHOT: WorkflowUiSnapshot = {
   addNodeConnection: null,
   addNodePosition: null,
@@ -88,6 +92,8 @@ const INITIAL_WORKFLOW_UI_SNAPSHOT: WorkflowUiSnapshot = {
   isAddNodeOpen: false,
   renameRequest: null,
   isLibraryOpen: false,
+  libraryProjectOrder: { direction: 'asc', sort: 'order' },
+  libraryQuery: EMPTY_LIBRARY_QUERY,
   librarySelection: null,
   libraryTab: 'project',
   pendingWorkflowLoad: null,
@@ -105,29 +111,53 @@ registerAccountOwnedResource({
 });
 
 /**
- * Opens or closes the library. An opening that names no workflow starts This project on the active workflow: a
- * selection left from an earlier opening would point the rail's actions (Update library template among them) at a
- * workflow the user has since moved away from.
+ * An opening that names no workflow starts This project on the active workflow, so an old selection never aims the
+ * rail's actions elsewhere. Closing clears the search and tags; the place stays.
  */
 export const setWorkflowLibraryOpen = (isOpen: boolean): void => {
   const wasOpen = workflowUiStore.getSnapshot().isLibraryOpen;
 
   workflowUiStore.patchSnapshot(
-    isOpen && !wasOpen ? { isLibraryOpen: true, librarySelection: null } : { isLibraryOpen: isOpen }
+    isOpen
+      ? wasOpen
+        ? { isLibraryOpen: true }
+        : { isLibraryOpen: true, librarySelection: null }
+      : { isLibraryOpen: false, libraryQuery: EMPTY_LIBRARY_QUERY }
   );
 };
 
+/** Switches place. Tags belong to the place they were checked in, so they clear; the search carries over. */
 export const setWorkflowLibraryTab = (libraryTab: WorkflowLibraryTab): void => {
-  if (workflowUiStore.getSnapshot().libraryTab !== libraryTab) {
-    workflowUiStore.patchSnapshot({ libraryTab });
+  const { libraryQuery, libraryTab: current } = workflowUiStore.getSnapshot();
+
+  if (current !== libraryTab) {
+    workflowUiStore.patchSnapshot({
+      libraryQuery: libraryQuery.tags.length > 0 ? { ...libraryQuery, tags: [] } : libraryQuery,
+      libraryTab,
+    });
   }
+};
+
+export const setWorkflowLibrarySearch = (search: string): void => {
+  const { libraryQuery } = workflowUiStore.getSnapshot();
+
+  if (libraryQuery.search !== search) {
+    workflowUiStore.patchSnapshot({ libraryQuery: { ...libraryQuery, search } });
+  }
+};
+
+export const setWorkflowLibraryTags = (tags: readonly string[]): void => {
+  workflowUiStore.patchSnapshot({ libraryQuery: { ...workflowUiStore.getSnapshot().libraryQuery, tags } });
+};
+
+export const setWorkflowLibraryProjectOrder = (libraryProjectOrder: ProjectWorkflowOrder): void => {
+  workflowUiStore.patchSnapshot({ libraryProjectOrder });
 };
 
 export const setWorkflowLibrarySelection = (selection: { projectId: string; workflowId: string } | null): void => {
   workflowUiStore.patchSnapshot({ librarySelection: selection });
 };
 
-/** Opens the library on the project's own workflows with one of them selected. */
 export const openWorkflowLibraryAtProjectWorkflow = (projectId: string, workflowId: string): void => {
   workflowUiStore.patchSnapshot({
     isLibraryOpen: true,

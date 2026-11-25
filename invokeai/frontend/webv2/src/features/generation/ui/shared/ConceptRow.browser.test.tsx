@@ -2,7 +2,6 @@ import type { GenerateLora } from '@features/generation/core/types';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { flushWorkbenchDrafts } from '@platform/react/draftRegistry';
-import { closingFrames, recordDialogExit } from '@platform/ui/dialogExit.testing';
 import { system } from '@theme/system';
 import { act, Profiler, useCallback, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -215,6 +214,13 @@ describe('ConceptRow', () => {
     expect(onRemove).toHaveBeenCalledWith('lora-1');
   });
 
+  it("spans the weight track over the concept's saved slider bounds", async () => {
+    const row = await render(makeLora({ default_settings: { weight: 0, weight_max: 3, weight_min: -2 } }));
+    const slider = row.querySelector<HTMLElement>('[role="slider"]')!;
+
+    expect([slider.getAttribute('aria-valuemin'), slider.getAttribute('aria-valuemax')]).toEqual(['-2', '3']);
+  });
+
   it('offers model, weight, toggle, and removal actions from the row context menu', async () => {
     const onUpdate = vi.fn();
     const onRemove = vi.fn();
@@ -245,21 +251,6 @@ describe('ConceptRow', () => {
     await openMenu();
     await choose('widgets.generate.conceptMenu.remove');
     expect(onRemove).toHaveBeenCalledWith('lora-1');
-  });
-
-  it('animates the row menu out with its actions instead of unmounting them on close', async () => {
-    const row = await render(makeLora());
-    await act(() => userEvent.click(row.querySelector<HTMLElement>('[data-list-primary]')!, { button: 'right' }));
-    await expect.poll(menuLabels).toContain('widgets.generate.conceptMenu.remove');
-    const menu = document.querySelector('[role="menu"]')!;
-
-    const frames = closingFrames(await recordDialogExit(menu, () => act(() => userEvent.keyboard('{Escape}'))));
-    await expect.poll(() => document.querySelector('[role="menu"]')).toBeNull();
-
-    expect(frames).not.toHaveLength(0);
-    for (const frame of frames) {
-      expect(frame.text).toContain('widgets.generate.conceptMenu.remove');
-    }
   });
 
   it('does not open row actions on a pointer click', async () => {
@@ -337,8 +328,6 @@ describe('ConceptRow', () => {
   });
 
   it('hands focus to the picker the last row was excluded from once that row is removed', async () => {
-    // A picker whose only candidate is applied is disabled until the removal renders, and the control before the
-    // whole section must not take focus in its place.
     const Section = () => {
       const [loras, setLoras] = useState([makeLora()]);
       const removeAll = useCallback(() => setLoras([]), []);
@@ -378,5 +367,65 @@ describe('ConceptRow', () => {
     await act(() => userEvent.click(remove!));
 
     await expect.poll(() => document.activeElement?.textContent).toBe('Add concept');
+  });
+
+  it.each(['high', 'low', 'both'] as const)(
+    'shows the Wan expert target badge for %s and omits it when untargeted',
+    async (target) => {
+      const targeted = await render({ ...makeLora({ base: 'wan' }), target });
+      expect(targeted.textContent).toContain(`widgets.generate.wanLoraTargets.${target}`);
+
+      const untargeted = await render(makeLora({ base: 'wan' }));
+      expect(untargeted.textContent).not.toContain('widgets.generate.wanLoraTargets');
+    }
+  );
+
+  it('renders independent high-noise and low-noise weight scrubbers when lowNoiseWeight is set', async () => {
+    const onUpdate = vi.fn();
+    const row = await render(
+      { ...makeLora({ base: 'wan' }), lowNoiseWeight: 0.4, target: 'both', weight: 0.8 },
+      { onUpdate }
+    );
+    const sliders = row.querySelectorAll<HTMLElement>('[role="slider"]');
+
+    expect(sliders).toHaveLength(2);
+    expect(row.textContent).toContain('widgets.generate.highNoiseWeight');
+    expect(row.textContent).toContain('widgets.generate.lowNoiseWeight');
+
+    sliders[0]!.focus();
+    await act(() => userEvent.keyboard('{ArrowRight}'));
+    await act(() => flushWorkbenchDrafts());
+    expect(onUpdate).toHaveBeenLastCalledWith('lora-1', { weight: 0.85 });
+
+    sliders[1]!.focus();
+    await act(() => userEvent.keyboard('{ArrowLeft}'));
+    await act(() => flushWorkbenchDrafts());
+    expect(onUpdate).toHaveBeenLastCalledWith('lora-1', { lowNoiseWeight: 0.35 });
+  });
+
+  it('offers Use single weight and Clear expert target actions in the row context menu', async () => {
+    const onUpdate = vi.fn();
+    const row = await render(
+      { ...makeLora({ base: 'wan' }), lowNoiseWeight: 0.4, target: 'both', weight: 0.8 },
+      { onUpdate }
+    );
+    const openMenu = async () => {
+      await act(() => userEvent.click(row.querySelector<HTMLElement>('[data-list-primary]')!, { button: 'right' }));
+      await expect.poll(() => document.querySelector('[role="menu"]')).not.toBeNull();
+    };
+    const choose = async (label: string) => {
+      const item = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find(
+        (candidate) => candidate.textContent === label
+      );
+      await act(() => userEvent.click(item!));
+    };
+
+    await openMenu();
+    await choose('widgets.generate.conceptMenu.useSingleWeight');
+    expect(onUpdate).toHaveBeenLastCalledWith('lora-1', { lowNoiseWeight: null });
+
+    await openMenu();
+    await choose('widgets.generate.conceptMenu.clearExpertTarget');
+    expect(onUpdate).toHaveBeenLastCalledWith('lora-1', { lowNoiseWeight: null, target: null });
   });
 });

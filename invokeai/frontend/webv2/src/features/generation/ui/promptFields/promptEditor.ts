@@ -19,9 +19,9 @@ export interface PromptEditor {
 }
 
 /**
- * Hands focus, when a popover closes after writing the prompt, to the prompt (where Ctrl+Z undoes the write), or to
- * the field the user is typing in, rather than back to the popover's trigger. Pass `finalFocusEl` to the popover and
- * call `keepFocusAfterWrite` just before closing it.
+ * Hands focus, when a popover closes after writing the prompt, to the prompt (where Ctrl+Z undoes the write), or to the
+ * field the user is typing in, rather than back to the popover's trigger. Pass `finalFocusEl` to the popover and call
+ * `keepFocusAfterWrite` just before closing it.
  */
 export const useFocusAfterPromptWrite = (editor: Pick<PromptEditor, 'element'>) => {
   const targetRef = useRef<HTMLElement | null>(null);

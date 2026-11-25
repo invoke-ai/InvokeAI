@@ -10,9 +10,9 @@ from invokeai.backend.patches.layers.utils import any_lora_layer_from_state_dict
 from invokeai.backend.patches.lora_conversions.flux3_lora_constants import (
     FLUX3_LORA_TRANSFORMER_PREFIX,
     describe_refusal,
-    peft_scale,
     read_flux3_lora_keys,
 )
+from invokeai.backend.patches.lora_conversions.peft_adapter_utils import peft_scale
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.util.logging import InvokeAILogger
 
@@ -35,7 +35,7 @@ def lora_model_from_flux3_state_dict(
         # Identification refuses these files, so one reaches here only by another path; applying the rest would make a
         # partial LoRA that passes for a whole one.
         raise ValueError(describe_refusal(keys.refused))
-    scale = peft_scale(metadata)
+    scale = peft_scale(metadata, family="FLUX.3")
     if keys.pdd_heads:
         logger.warning(
             f"LoRA '{name}' carries PDD's per-step output heads ({', '.join(keys.pdd_heads)}), which InvokeAI does "

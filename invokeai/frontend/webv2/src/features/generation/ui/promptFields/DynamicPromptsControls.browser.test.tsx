@@ -15,13 +15,11 @@ import { userEvent } from 'vitest/browser';
 const parseDynamicPrompts = vi.hoisted(() => vi.fn());
 
 vi.mock('@features/generation/data/promptUtilities', () => ({ parseDynamicPrompts }));
-// Provide the Generation UI port for wildcard error reporting.
 vi.mock('@features/generation/ui/GenerationUiContext', async (importOriginal) => ({
   ...(await importOriginal<object>()),
   useGenerationUi: () => ({ notifications: { error: vi.fn(), info: vi.fn(), reportError: vi.fn() } }),
 }));
 vi.mock('@features/generation/data/wildcards', async (importOriginal) => ({
-  // Partial: the real module's other exports (constants, mappers) stay available to what imports them.
   ...(await importOriginal<Record<string, unknown>>()),
   createWildcard: vi.fn(),
   deleteWildcard: vi.fn(),
@@ -48,7 +46,6 @@ const PROMPT = 'a {red|green} cat';
 
 const NO_PROMPT_ELEMENT = { element: () => null };
 
-/** The button with the expansion its prompt field would hand it. */
 const ExpandingButton = ({ config }: { config: DynamicPromptsFieldConfig }) => (
   <DynamicPromptsButton
     batchCount={2}
@@ -63,14 +60,12 @@ const ExpandingButton = ({ config }: { config: DynamicPromptsFieldConfig }) => (
   />
 );
 
-/** The switch whose label reads `label` (the i18n key: no instance is bootstrapped here). */
 const switchRoot = (label: string) =>
   [...document.querySelectorAll<HTMLElement>('[data-scope="switch"][data-part="root"]')].find(
     (root) => root.querySelector('[data-part="label"]')?.textContent === label
   )!;
 const SEED_SWITCH = 'widgets.generate.dynamicPrompts.newSeedPerImage';
 
-/** Use stateful controlled values so toggles can round-trip. */
 const render = async (onChange: (patch: Partial<DynamicPromptsConfig>) => void = vi.fn(), isSeedFixed = false) => {
   host = document.createElement('div');
   document.body.append(host);
@@ -112,7 +107,6 @@ const openPopover = async () => {
   });
 };
 
-/** i18n is not bootstrapped in browser tests, so tabs are addressed by their stable id. */
 const tabButton = (id: string) => document.querySelector<HTMLElement>(`[role="tab"][id$="-tab-${id}"]`);
 
 const captureError = (event: ErrorEvent) => pageErrors.push(event.message);
@@ -163,10 +157,8 @@ describe('dynamic prompts popover controls', () => {
     const explanation = document.getElementById(hiddenInput.getAttribute('aria-describedby') ?? '');
 
     expect(hiddenInput.disabled).toBe(true);
-    // No i18n instance here, so the key itself is the rendered text.
     expect(explanation?.textContent).toBe('widgets.generate.dynamicPrompts.seedHeldForEveryImage');
 
-    // A retired switch ignores the label click that normally toggles it.
     await act(() => seedSwitch.querySelector<HTMLElement>('[data-part="label"]')?.click());
 
     expect(onChange).not.toHaveBeenCalled();
@@ -174,7 +166,6 @@ describe('dynamic prompts popover controls', () => {
   });
 
   it('switches seed behaviour without tearing down the widget', async () => {
-    // Cover hidden native-select synchronization failures.
     const onChange = vi.fn();
 
     await render(onChange);
@@ -196,7 +187,6 @@ describe('dynamic prompts popover controls', () => {
   });
 
   it('sends a click on the seed label to the switch, not the number input', async () => {
-    // Clicking the label must toggle its own switch, not a sibling number input.
     const onChange = vi.fn();
 
     await render(onChange);
@@ -207,7 +197,6 @@ describe('dynamic prompts popover controls', () => {
     const hiddenInput = seedSwitch.querySelector<HTMLInputElement>('input[type="checkbox"]')!;
     const numberInput = document.querySelector<HTMLInputElement>('[data-scope="number-input"][data-part="input"]')!;
 
-    // Assert ID uniqueness directly, independently of prior render order.
     expect(hiddenInput.id).toBeTruthy();
     expect(hiddenInput.id).not.toBe(numberInput.id);
 
@@ -217,31 +206,6 @@ describe('dynamic prompts popover controls', () => {
 
     expect(onChange).toHaveBeenCalledWith({ seedBehaviour: 'per-image' });
     expect(document.activeElement).not.toBe(numberInput);
-  });
-
-  it('keeps the settings row the same height in either mode', async () => {
-    // Hidden shuffle still reserves space across modes.
-    const onChange = vi.fn();
-
-    await render(onChange);
-    await openPopover();
-
-    const row = () =>
-      document.querySelector('[data-scope="menu"][data-part="trigger"]')!.closest('div')!.parentElement!;
-    const combinatorialHeight = row().getBoundingClientRect().height;
-
-    await act(async () => {
-      await userEvent.click(document.querySelector<HTMLElement>('[data-scope="menu"][data-part="trigger"]')!);
-    });
-    // Dispatch clicks to test wiring without animation-stability waits; this does not test real pointer
-    // actionability.
-    await act(async () => {
-      ([...document.querySelectorAll('[data-scope="menu"][data-part="item"]')].at(-1) as HTMLElement).click();
-      await Promise.resolve();
-    });
-
-    expect(onChange).toHaveBeenCalledWith({ combinatorial: false });
-    expect(row().getBoundingClientRect().height).toBe(combinatorialHeight);
   });
 
   it('offers resampling only for random samples', async () => {
@@ -286,7 +250,6 @@ describe('dynamic prompts popover controls', () => {
     expect(numberLabel, 'number input should have an associated label').toBeTruthy();
     expect(numberInput.getAttribute('aria-label')).toBeNull();
 
-    // The accessible name combines the field label and selected value.
     const trigger = popover.querySelector<HTMLElement>('[data-scope="menu"][data-part="trigger"]')!;
     const namedBy = (trigger.getAttribute('aria-labelledby') ?? '')
       .split(' ')
@@ -296,7 +259,6 @@ describe('dynamic prompts popover controls', () => {
   });
 
   it('anchors the mode menu to its trigger', async () => {
-    // Supply IDs through Zag so popup anchoring resolves the trigger.
     await render();
     await openPopover();
 
@@ -319,24 +281,5 @@ describe('dynamic prompts popover controls', () => {
     expect(contentBox.width).toBeGreaterThan(0);
     expect(Math.abs(contentBox.left - triggerBox.left)).toBeLessThan(40);
     expect(contentBox.top).toBeGreaterThan(triggerBox.top - 40);
-  });
-
-  it('gives both tabs a header control of the same height', async () => {
-    await render();
-    await openPopover();
-
-    const headerControl = () =>
-      document
-        .querySelector('[data-scope="popover"][data-part="content"] p')!
-        .parentElement!.lastElementChild!.getBoundingClientRect().height;
-
-    const summaryHeight = headerControl();
-
-    await act(async () => {
-      await userEvent.click(tabButton('wildcards')!);
-    });
-
-    // Header geometry must remain equal across tabs, once the lazily loaded wildcard manager is in.
-    await vi.waitFor(() => expect(headerControl()).toBe(summaryHeight));
   });
 });

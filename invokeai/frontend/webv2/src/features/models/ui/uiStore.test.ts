@@ -37,7 +37,6 @@ describe('models ui store', () => {
 
     const snapshot = store.getModelsUiSnapshotForTests();
 
-    // Clear prior scan, repo, and bundle results so the requested starter catalog remains visible.
     expect(snapshot.activeTab).toBe('add');
     expect(snapshot.addModelsQuery).toBe('Juggernaut XL');
     expect(snapshot.hfLookup).toBeNull();
@@ -102,7 +101,6 @@ describe('models ui store', () => {
     expect(snapshot.activeModelKey).toBeNull();
     expect([...snapshot.selectedKeys]).toEqual(['b']);
   });
-  // Which pane a single-pane manager shows follows every opener and clear, without callers naming it.
   it('leaves the pane choice open until the user opens or leaves the detail', async () => {
     const store = await import('./uiStore');
     const detailOpen = () => store.getModelsUiSnapshotForTests().detailOpen;
@@ -112,7 +110,6 @@ describe('models ui store', () => {
     expect(detailOpen()).toBe(true);
     store.closeModelDetail();
     expect(detailOpen()).toBe(false);
-    // Re-opening the same model after Back reveals it again, as do tabs requested from elsewhere.
     store.openModelDetail('a');
     expect(detailOpen()).toBe(true);
     store.closeModelDetail();

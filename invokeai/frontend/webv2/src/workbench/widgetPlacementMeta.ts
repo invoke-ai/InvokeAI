@@ -32,8 +32,8 @@ export const getWidgetPlacementMeta = (
 const NO_FLOATING_PLACEMENTS: Record<WidgetInstanceId, FloatingWidgetPlacement> = {};
 
 /**
- * Only where each window returns to. Geometry, mode, and stacking stay out, so moving, shading, or raising a
- * window leaves this projection equal and its subscribers — the rails among them — do not re-render.
+ * Only where each window returns to. Geometry, mode, and stacking stay out, so moving, shading, or raising a window
+ * leaves this projection equal and its subscribers — the rails among them — do not re-render.
  */
 const getFloatingPlacements = (
   floatingWidgets: Project['floatingWidgets']

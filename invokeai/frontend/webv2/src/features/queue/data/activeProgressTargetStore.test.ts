@@ -4,6 +4,7 @@ import {
   activeProgressTargetStore,
   getActiveProgressTargets,
   getFollowedProgressTargets,
+  getFramedProgressTargets,
 } from './activeProgressTargetStore';
 
 const target = (queueItemId: string, itemIndex: number) => ({ itemIndex, queueItemId });
@@ -27,8 +28,7 @@ describe('activeProgressTargetStore', () => {
 
     activeProgressTargetStore.set(target('queue-1', 1));
 
-    // Progress frames arrive many times a second; a new array per frame would
-    // re-render every consumer.
+    // Progress frames arrive many times a second; a new array per frame would re-render every consumer.
     expect(getActiveProgressTargets()).toBe(first);
   });
 
@@ -69,9 +69,8 @@ describe('activeProgressTargetStore', () => {
   });
 
   it('keeps a settling slot followable but out of the running set', () => {
-    // Completed, result not routed yet: the single-slot preview keeps following
-    // it, while the tile grid must not count it or a single-GPU batch would
-    // flash into two tiles at every item boundary.
+    // Completed, result not routed yet: the single-slot preview keeps following it, while the tile grid must not count
+    // it or a single-GPU batch would flash into two tiles at every item boundary.
     activeProgressTargetStore.set(target('queue-1', 1));
     activeProgressTargetStore.set(target('queue-1', 2));
 
@@ -112,5 +111,31 @@ describe('activeProgressTargetStore', () => {
     activeProgressTargetStore.clear();
 
     expect(getFollowedProgressTargets()).toEqual([]);
+  });
+
+  it('keeps a slot framed through settling, and forgets it with the slot', () => {
+    activeProgressTargetStore.set(target('queue-1', 1));
+    activeProgressTargetStore.set(target('queue-1', 2));
+
+    activeProgressTargetStore.markFramed(target('queue-1', 1));
+    const framed = getFramedProgressTargets();
+    activeProgressTargetStore.markFramed(target('queue-1', 1));
+    activeProgressTargetStore.settle(target('queue-1', 1));
+
+    // Every frame marks it again; only the first changes anything.
+    expect(getFramedProgressTargets()).toBe(framed);
+    expect(getFramedProgressTargets()).toEqual([target('queue-1', 1)]);
+
+    activeProgressTargetStore.clear(target('queue-1', 1));
+
+    expect(getFramedProgressTargets()).toEqual([]);
+    expect(getActiveProgressTargets()).toEqual([target('queue-1', 2)]);
+  });
+
+  it('tracks a slot whose first frame arrives before its start was reported', () => {
+    activeProgressTargetStore.markFramed(target('queue-1', 1));
+
+    expect(getActiveProgressTargets()).toEqual([target('queue-1', 1)]);
+    expect(getFramedProgressTargets()).toEqual([target('queue-1', 1)]);
   });
 });

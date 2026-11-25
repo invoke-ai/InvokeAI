@@ -9,7 +9,8 @@ runner. End-to-end tests against real Wan checkpoints are gated behind
 
 from __future__ import annotations
 
-import os
+import gc
+import weakref
 from collections import Counter
 from contextlib import contextmanager
 from pathlib import Path
@@ -37,6 +38,7 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     ConditioningFieldData,
     WanConditioningInfo,
 )
+from invokeai.backend.util.devices import TorchDevice
 
 
 class _ZeroTransformer(nn.Module):
@@ -283,7 +285,11 @@ class TestWanDenoiseShapes:
         assert _get_wan_transformer_working_mem_bytes(torch.device("cpu"), enabled=True) is None
         assert _get_wan_transformer_working_mem_bytes(torch.device("cuda"), enabled=False) is None
 
-    def test_expert_swapper_passes_aggressive_working_memory_to_model_cache(self) -> None:
+    def test_expert_swapper_passes_aggressive_working_memory_to_model_cache(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        emptied: list[bool] = []
+        monkeypatch.setattr(TorchDevice, "empty_cache", lambda *args, **kwargs: emptied.append(True))
         transformer = _ZeroTransformer()
         loaded = MagicMock()
         loaded.supports_partial_loading = True
@@ -291,6 +297,7 @@ class TestWanDenoiseShapes:
         # here or the swapper's arithmetic compares against a mock.
         loaded.resident_weight_bytes = 5 * 2**30
         loaded.weight_bytes = 14 * 2**30
+        loaded.hold_resident_bytes.return_value = 3 * 2**30
         device_context = MagicMock()
         device_context.__enter__.return_value = (None, transformer)
         loaded.model_on_device.return_value = device_context
@@ -312,7 +319,9 @@ class TestWanDenoiseShapes:
             swapper.close()
 
         loaded.model_on_device.assert_called_once_with(working_mem_bytes=working_mem_bytes)
-        loaded.unload_from_vram.assert_called_once_with(3 * 2**30, keep_required_weights_in_vram=True)
+        loaded.hold_resident_bytes.assert_called_once_with(2 * 2**30)
+        # One flush when the swapper closes, one more for the weights the trim moved to RAM.
+        assert len(emptied) == 2
 
     @pytest.mark.parametrize("packed", [True, False], ids=["gguf", "dense"])
     def test_expert_swapper_reserves_a_gguf_experts_dequant_transient(self, packed: bool) -> None:
@@ -330,6 +339,7 @@ class TestWanDenoiseShapes:
         loaded.model = torch.nn.Sequential(linear)
         loaded.supports_partial_loading = True
         loaded.resident_weight_bytes = 0
+        loaded.hold_resident_bytes.return_value = 0
         loaded.weight_bytes = 0
         device_context = MagicMock()
         device_context.__enter__.return_value = (None, transformer)
@@ -358,11 +368,16 @@ class TestWanDenoiseShapes:
             # Zero, which the cache reads as its default working memory.
             assert kwargs["working_mem_bytes"] == 0
 
-    def test_expert_swapper_does_not_trim_when_residency_is_already_targeted(self) -> None:
+    def test_expert_swapper_does_not_trim_when_residency_is_already_targeted(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        emptied: list[bool] = []
+        monkeypatch.setattr(TorchDevice, "empty_cache", lambda *args, **kwargs: emptied.append(True))
         transformer = _ZeroTransformer()
         loaded = MagicMock()
         loaded.supports_partial_loading = True
         loaded.resident_weight_bytes = 2 * 2**30
+        loaded.hold_resident_bytes.return_value = 0  # Nothing above the limit: the cache moves nothing.
         device_context = MagicMock()
         device_context.__enter__.return_value = (None, transformer)
         loaded.model_on_device.return_value = device_context
@@ -384,7 +399,8 @@ class TestWanDenoiseShapes:
             swapper.close()
 
         loaded.model_on_device.assert_called_once_with(working_mem_bytes=working_mem_bytes)
-        loaded.unload_from_vram.assert_not_called()
+        loaded.hold_resident_bytes.assert_called_once_with(2 * 2**30)
+        assert len(emptied) == 1, "nothing moved to RAM: only the flush of closing the swapper"
 
     def test_expert_swapper_skips_residency_trim_without_partial_loading(self) -> None:
         transformer = _ZeroTransformer()
@@ -413,7 +429,7 @@ class TestWanDenoiseShapes:
         # Not the aggressive budget: without partial loading the expert asks only for its own (here zero)
         # dequantization transient, which the cache reads as its default working memory.
         loaded.model_on_device.assert_called_once_with(working_mem_bytes=0)
-        loaded.unload_from_vram.assert_not_called()
+        loaded.hold_resident_bytes.assert_not_called()
         context.logger.warning.assert_called_once()
 
     def test_cfg_doubles_transformer_calls(self, fake_model_root) -> None:
@@ -798,17 +814,6 @@ class TestWanDenoiseDualExpert:
         assert len(low.timesteps_seen) > 0
         assert all(count == 1 for count in Counter(high.timesteps_seen).values())
         assert all(count == 2 for count in Counter(low.timesteps_seen).values())
-
-
-@pytest.mark.skipif(
-    os.environ.get("INVOKEAI_HEAVY_TESTS") != "1",
-    reason="End-to-end test requires real Wan weights and CUDA; opt in with INVOKEAI_HEAVY_TESTS=1",
-)
-class TestWanDenoiseHeavy:
-    """Placeholder for a real-weights smoke test once CUDA is available."""
-
-    def test_real_ti2v_5b_runs(self) -> None:
-        pytest.skip("Heavy test stub — implement once a TI2V-5B checkpoint is installable.")
 
 
 class TestWanDenoiseRefImage:
@@ -1582,3 +1587,53 @@ class TestWanVideoDenoiseMultiFrame:
             num_latent_frames=t_lat,
         )
         assert torch.allclose(latents[:, :, 1:], expected_noise[:, :, 1:], atol=1e-5)
+
+
+@pytest.mark.parametrize("invocation_type", ["image", "video"])
+def test_outgoing_expert_is_collectable_when_the_denoise_loop_loads_the_next(
+    invocation_type: str, fake_model_root: Path
+) -> None:
+    """The loop's own `transformer` local would keep the high-noise expert alive through the low-noise
+    load, so both experts would be resident during every swap."""
+    ctx = _build_context(
+        nn.Identity(),
+        transformer_low=nn.Identity(),
+        variant=WanVariantType.T2V_A14B,
+        model_root=fake_model_root,
+        pos_cond=_make_conditioning(),
+        neg_cond=None,
+    )
+    high_ref: list[weakref.ref] = []
+    outgoing_collected: list[bool] = []
+
+    def load(model_id) -> MagicMock:
+        if str(getattr(model_id, "submodel_type", None)) == "SubModelType.Transformer2":
+            gc.collect()
+            outgoing_collected.append(high_ref[0]() is None)
+            expert = _ZeroTransformer(label="low")
+        else:
+            expert = _ZeroTransformer(label="high")
+            high_ref.append(weakref.ref(expert))
+        loaded = _make_loaded_model(expert)
+        # A plain int, as on the real LoadedModel: a mock attribute would point back at `loaded`.
+        loaded.weight_bytes = 0
+        return loaded
+
+    ctx.models.load.side_effect = load
+    field = _wan_transformer_field(dual=True, boundary_ratio=0.5)
+    if invocation_type == "image":
+        inv = _make_invocation(
+            field,
+            WanConditioningField(conditioning_name="pos"),
+            None,
+            width=64,
+            height=64,
+            steps=6,
+            guidance_scale=1.0,
+        )
+    else:
+        inv = _make_video_invocation(transformer_field=field, num_frames=5, steps=6)
+
+    inv._run_diffusion(ctx)
+
+    assert outgoing_collected == [True]

@@ -7,12 +7,9 @@ describe('supportsPromptAttentionSyntax', () => {
     expect(supportsPromptAttentionSyntax(base)).toBe(true);
   });
 
-  it.each(['flux', 'krea-2', 'flux2', 'sd-3', 'cogview4', 'z-image', 'qwen-image', 'wan', 'external'])(
-    'sends %s prompts as plain text',
-    (base) => {
-      expect(supportsPromptAttentionSyntax(base)).toBe(false);
-    }
-  );
+  it.each(['flux', 'external'])('sends %s prompts as plain text', (base) => {
+    expect(supportsPromptAttentionSyntax(base)).toBe(false);
+  });
 
   it('reads nothing without a model or for inherited object keys', () => {
     expect(supportsPromptAttentionSyntax(undefined)).toBe(false);

@@ -16,7 +16,6 @@ const parseDynamicPrompts = vi.hoisted(() => vi.fn());
 vi.mock('@features/generation/data/promptUtilities', () => ({ parseDynamicPrompts }));
 
 vi.mock('@features/generation/data/wildcards', async (importOriginal) => ({
-  // Partial: the real module's other exports (constants, mappers) stay available to what imports them.
   ...(await importOriginal<Record<string, unknown>>()),
   createWildcard: vi.fn(),
   deleteWildcard: vi.fn(),
@@ -42,7 +41,6 @@ const config: DynamicPromptsFieldConfig = {
 
 const NO_PROMPT_ELEMENT = { element: () => null };
 
-/** The button with the expansion its prompt field would hand it. */
 const ExpandingButton = ({ onUsePrompt, prompt }: { onUsePrompt: (prompt: string) => void; prompt: string }) => (
   <DynamicPromptsButton
     batchCount={2}
