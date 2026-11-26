@@ -1498,6 +1498,8 @@
     "countToInstall": "{{count}} to install",
     "customizeDefaultField": "Customize {{field}} for this model",
     "customizedForThisModel": "Customized for this model",
+    "dateAddedUnavailable": "Couldn't sort by date added",
+    "dateAddedUnavailableDescription": "Models are listed by name. Choose Date added again to retry.",
     "defaultFieldInherited": {
       "cfgRescale": "App default: 0 (off)",
       "cfgScale": "App default: 7",
@@ -1856,6 +1858,7 @@
     "someCouldNotBeDeleted": "Some models could not be deleted",
     "someCouldNotBeReidentified": "Some models could not be re-identified",
     "sort": {
+      "added": "Date added",
       "base": "Base",
       "catalog": "Catalog order",
       "default": "Default",
