@@ -402,7 +402,10 @@ def test_the_lm_head_in_the_file_is_neither_loaded_nor_reserved_for(
     assert list(model.lm_head.parameters()) == [] and list(model.lm_head.buffers()) == []
     assert not any("lm_head" in key for key in unexpected)
     widened = 4 * (checkpoint.linear_elements + checkpoint.other_elements) + checkpoint.scale_bytes
-    loader._ram_cache.make_room.assert_called_once_with(widened)
+    loader._ram_cache.make_room.assert_called_once()
+    call = loader._ram_cache.make_room.call_args
+    assert call.args == (widened,)
+    assert "host_bytes_needed" in call.kwargs
     with pytest.raises(RuntimeError, match="without its LM head"):
         model(input_ids=IDS)
 
