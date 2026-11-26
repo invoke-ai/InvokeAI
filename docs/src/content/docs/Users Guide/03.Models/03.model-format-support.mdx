@@ -105,8 +105,8 @@ weights packed; only its dequantized embeddings and the per-layer dequantization
 
 Single-file Qwen3 and Qwen2.5-VL (`qwen_2.5_vl_7b_fp8_scaled`) encoders in ComfyUI's scaled fp8 layout also keep their
 Linear layers in fp8, with the file's own scales, on a GPU that can hold fp8: about 4.4 GB instead of about 8.0 GB for
-Qwen3 4B, about 8.2 GB instead of about 15.1 GB for Qwen3 8B, and about the size of the file (9.4 GB) instead of about
-16.6 GB for Qwen2.5-VL. They are dequantized layer by layer on each forward and never multiplied in fp8, whatever
+Qwen3 4B, about 8.2 GB instead of about 15.1 GB for Qwen3 8B, and about 8.3 GB (the file less its unused LM head) instead
+of about 15.5 GB for Qwen2.5-VL. They are dequantized layer by layer on each forward and never multiplied in fp8, whatever
 `fp8_compute` says. Token embeddings are always widened to the compute dtype. On a CPU, and for a Qwen3 encoder set to
 run on the CPU, everything is widened to the dtype the encoder computes in. An MXFP8 encoder file that names its layers
 in its markers or header loads too, decoded to bf16; MX scales that nothing names are refused, as is any scaled fp8 file
