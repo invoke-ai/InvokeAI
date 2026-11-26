@@ -9,6 +9,7 @@ wrong network. Both the values and the kwarg contract are pinned here.
 
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import MagicMock
 
 import accelerate
 import pytest
@@ -121,7 +122,7 @@ def test_failed_ram_admission_stops_before_the_checkpoint_cast(monkeypatch: pyte
     checkpoint = tmp_path / "ernie-image.safetensors"
     _tiny_checkpoint(checkpoint)
     loader, _ = _loader(monkeypatch)
-    loader._ram_cache.make_room.return_value = SimpleNamespace(ram_headroom_satisfied=False)
+    loader._ram_cache.make_room = MagicMock(return_value=SimpleNamespace(ram_headroom_satisfied=False))
     config = Main_Checkpoint_ErnieImage_Config.model_construct(path=str(checkpoint), name="ernie-image")
 
     with pytest.raises(MemoryError, match="host memory"):
