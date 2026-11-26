@@ -150,11 +150,13 @@ kernels.
 - **Memory.** SageAttention needs more memory per call than PyTorch's attention: quantized copies of the query, key
   and value, about 1.7 bytes per element of the three together — around 70 MB for FLUX.1 at 1024×1024, about 1.9 GB
   for Wan 2.2 A14B at 1280×720 with 81 frames. They only live for the call, and at the sizes in the tables other
-  buffers set the peak, so peak VRAM stayed the same. Before each call InvokeAI checks that the copies fit in free
-  VRAM and runs that call on PyTorch's attention when they do not: on Windows the graphics driver would otherwise move
-  them to shared system memory, which is far slower than falling back. When a call runs out of memory anyway, the rest
-  of that generation runs on PyTorch's attention, which needs less, and the log says so; the next generation tries
-  SageAttention again. Wan 2.2 reserves room for the copies when the model is loaded, so they fit.
+  buffers set the peak, so peak VRAM stayed the same; in Wan 2.2 the feed-forward sets it, with room to spare for the
+  copies at 1280×720 and 121 frames. Before each call InvokeAI checks that the copies fit in free VRAM and runs that
+  call on PyTorch's attention when they do not: on Windows the graphics driver would otherwise move them to shared
+  system memory, which is far slower than falling back. Near the GPU's limit one generation can therefore mix both
+  kernels, so the same seed can come out slightly differently between runs. When a call runs out of memory anyway, the
+  rest of that generation runs on PyTorch's attention, which needs less, and the log says so; the next generation
+  tries SageAttention again.
 - **Recall.** `attention_backend` is not stored in an image's metadata, so an image recalled after switching it is
   generated slightly differently.
 - **Black or noisy images** have been reported with SageAttention for some models in other applications. None appeared

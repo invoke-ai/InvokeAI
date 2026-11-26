@@ -121,8 +121,6 @@ def _cuda_build(
     monkeypatch.setattr(sage, "_health", _health_with_validated(_all_variants(capabilities)))
     monkeypatch.setattr(torch.cuda, "device", lambda index: contextlib.nullcontext())
     monkeypatch.setattr(torch.cuda, "mem_get_info", lambda index=None: (2**40, 2**40))
-    monkeypatch.setattr(torch.cuda, "memory_reserved", lambda index=None: 0)
-    monkeypatch.setattr(torch.cuda, "memory_allocated", lambda index=None: 0)
     monkeypatch.setattr(torch.cuda, "memory_stats", lambda index=None: {})
     monkeypatch.setattr(sage.TorchDevice, "cuda_mem_get_info", lambda device: torch.cuda.mem_get_info(device.index))
     return module, torch_calls
@@ -440,24 +438,38 @@ class TestFailures:
         to check first. Memory torch has cached but not allocated counts as free; the next call is checked anew."""
         module, torch_calls = installed
         q, k = _q(1, 2, QUERY_LEN, 64), _q(1, 2, KEY_LEN, 64)
-        needed = sage.SAGE_BYTES_PER_ELEMENT * (q.numel() + 2 * k.numel())
+        needed = sage._QUANTIZED_BYTES_PER_ELEMENT * (q.numel() + 2 * k.numel())
+        stats = {"reserved_bytes.all.current": needed // 2 - 1, "allocated_bytes.all.current": 0}
         monkeypatch.setattr(torch.cuda, "mem_get_info", lambda index=None: (needed // 2, 2**40))
-        monkeypatch.setattr(torch.cuda, "memory_reserved", lambda index=None: needed // 2 - 1)
+        monkeypatch.setattr(torch.cuda, "memory_stats", lambda index=None: dict(stats))
 
         with sage_attention_scope() as usage:
             F.scaled_dot_product_attention(q, k, k)
             assert len(module.calls) == 0 and len(torch_calls) == 1
             assert usage.fell_back["memory"] == 1
             # Free space inside partly used segments cannot hold a contiguous copy.
-            monkeypatch.setattr(torch.cuda, "memory_reserved", lambda index=None: needed // 2 - 1 + 4096)
-            monkeypatch.setattr(
-                torch.cuda, "memory_stats", lambda index=None: {"inactive_split_bytes.all.current": 4096}
+            stats.update(
+                {"reserved_bytes.all.current": needed // 2 - 1 + 4096, "inactive_split_bytes.all.current": 4096}
             )
             F.scaled_dot_product_attention(q, k, k)
             assert len(module.calls) == 0 and usage.fell_back["memory"] == 2
-            monkeypatch.setattr(torch.cuda, "memory_stats", lambda index=None: {})
+            stats["inactive_split_bytes.all.current"] = 0
             F.scaled_dot_product_attention(q, k, k)
         assert len(module.calls) == 1 and usage.served == 1
+
+    def test_free_driver_memory_alone_settles_the_check_without_the_allocators_statistics(self, installed, monkeypatch):
+        """`memory_stats` builds a dict of every allocator counter in Python; asking for it on every attention call
+        would eat into what SageAttention saves."""
+        module, _ = installed
+        q, k = _q(1, 2, QUERY_LEN, 64), _q(1, 2, KEY_LEN, 64)
+
+        def no_stats(index=None):
+            raise AssertionError("the allocator's statistics were read although the driver's free memory sufficed")
+
+        monkeypatch.setattr(torch.cuda, "memory_stats", no_stats)
+        with sage_attention_scope():
+            F.scaled_dot_product_attention(q, k, k)
+        assert len(module.calls) == 1
 
     def test_a_triton_cache_failure_falls_back_for_that_call_only(self, installed, caplog):
         """On Windows two GPUs compiling the same kernel can race for its cache file; that says nothing about it."""

@@ -37,13 +37,11 @@ from invokeai.app.invocations.model import WanTransformerField
 from invokeai.app.invocations.wan.wan_denoise import (
     WAN_MAX_RESIDENT_TRANSFORMER_BYTES,
     WanDenoiseInvocation,
-    _estimate_wan_activation_bytes,
     _ExpertSwapper,
     _get_wan_transformer_working_mem_bytes,
     _resolve_variant,
     _validate_ref_condition_shape,
     _validate_spatial_dimensions,
-    _wan_tokens,
 )
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_manager.taxonomy import BaseModelType, WanVariantType
@@ -351,10 +349,9 @@ class WanVideoDenoiseInvocation(BaseInvocation, WithMetadata):
                 max_resident_model_bytes=(
                     WAN_MAX_RESIDENT_TRANSFORMER_BYTES if working_mem_bytes is not None else None
                 ),
-                activation_bytes=_estimate_wan_activation_bytes(
-                    variant, latents.shape, sage=context.config.get().attention_backend == "sage"
-                ),
-                tokens=_wan_tokens(latents.shape),
+                variant=variant,
+                latent_shape=latents.shape,
+                token_timesteps=first_frame_mask is not None,
             )
             exit_stack.callback(swapper.close)
             exit_stack.enter_context(sage_attention_scope())

@@ -70,7 +70,7 @@ _FIRST_CALL_MAX_ERROR = 0.5
 _FIRST_CALL_ROWS = 1024
 # Bytes SageAttention holds during a call per element of Q, K and V together: quantized copies at ~1 byte per element,
 # measured 1.7x that on an RTX 4090; rounded up.
-SAGE_BYTES_PER_ELEMENT = 2
+_QUANTIZED_BYTES_PER_ELEMENT = 2
 
 # The published page. The old GitHub Pages path under InvokeAI-7 returns 404.
 DOCS_URL = "https://v7.invoke.ai/configuration/optimization/sage-attention/"
@@ -240,12 +240,19 @@ def _copies_fit(index: int, query: torch.Tensor, key: torch.Tensor, value: torch
     """Whether SageAttention's quantized copies fit the device's free VRAM plus the blocks torch has cached unused.
 
     Free space inside partly used segments (inactive splits) is left out: it cannot hold a large contiguous copy.
-    One driver query per eligible call, against kernels that take milliseconds."""
-    device = torch.device("cuda", index)
-    free, _ = TorchDevice.cuda_mem_get_info(device)
-    cached = torch.cuda.memory_reserved(index) - torch.cuda.memory_allocated(index)
-    cached -= torch.cuda.memory_stats(index).get("inactive_split_bytes.all.current", 0)
-    return SAGE_BYTES_PER_ELEMENT * (query.numel() + key.numel() + value.numel()) <= free + max(cached, 0)
+    One driver query per eligible call, against kernels that take milliseconds; the allocator's statistics, a dict of
+    every counter built in Python, only where the driver's free memory alone does not hold the copies."""
+    needed = _QUANTIZED_BYTES_PER_ELEMENT * (query.numel() + key.numel() + value.numel())
+    free, _ = TorchDevice.cuda_mem_get_info(torch.device("cuda", index))
+    if needed <= free:
+        return True
+    stats = torch.cuda.memory_stats(index)
+    cached = (
+        stats.get("reserved_bytes.all.current", 0)
+        - stats.get("allocated_bytes.all.current", 0)
+        - stats.get("inactive_split_bytes.all.current", 0)
+    )
+    return needed <= free + max(cached, 0)
 
 
 def _check_first_result(
