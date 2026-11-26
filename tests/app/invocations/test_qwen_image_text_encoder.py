@@ -33,6 +33,7 @@ from invokeai.backend.patches.lora_conversions.qwen_image_lora_conversion_utils 
     lora_model_from_qwen_image_state_dict,
 )
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
+from invokeai.backend.qwen2_5_vl.headless import HeadlessQwen2_5_VLForConditionalGeneration
 from invokeai.backend.util.devices import TorchDevice
 
 
@@ -852,6 +853,43 @@ class TestQuantizedEncoderLoad:
             writer_reduced.set()
             cache.shutdown()
 
+    def test_neither_reads_nor_builds_the_lm_head(self, tmp_path: Path):
+        """A real read and `from_pretrained`, with only the quantization (which needs a GPU in practice) switched
+        off: the head's 1.09 GB would otherwise go to VRAM with the encoder, and nothing runs it."""
+        torch.manual_seed(0)
+        reference = Qwen2_5_VLForConditionalGeneration(_tiny_config()).to(torch.bfloat16)
+        reference.save_pretrained(tmp_path / "qwen-vl" / "text_encoder")
+        context = MagicMock()
+        context.models.get_absolute_path.return_value = tmp_path / "qwen-vl"
+        invocation = self._make_invocation("nf4")
+        invocation.qwen_vl_encoder.loras = []
+        read: list[str] = []
+
+        def recording_read(encoder_path: Path):
+            state_dict = _read_checkpoint(encoder_path)
+            read.extend(state_dict)
+            return state_dict
+
+        with (
+            patch(
+                "invokeai.app.invocations.text_encoder.qwen_image_text_encoder._read_checkpoint",
+                side_effect=recording_read,
+            ),
+            patch("transformers.BitsAndBytesConfig", return_value=None),
+            patch.object(TorchDevice, "choose_torch_device", return_value=torch.device("cpu")),
+        ):
+            text_encoder, _, cleanup = invocation._load_quantized_encoder(context)
+
+        assert "lm_head.weight" not in read
+        assert list(text_encoder.lm_head.parameters()) == []
+        expected = reference.state_dict()
+        del expected["lm_head.weight"]
+        loaded = text_encoder.state_dict()
+        assert loaded.keys() == expected.keys()
+        assert all(torch.equal(loaded[key], expected[key]) for key in loaded)
+        del text_encoder
+        cleanup()
+
     @pytest.mark.parametrize(
         ("error_type", "error_message"), [(torch.OutOfMemoryError, "CUDA out of memory"), (ValueError, "bad shard")]
     )
@@ -999,7 +1037,7 @@ class TestTransformersLoadPathAssumptions:
     @staticmethod
     def _load(path: Path) -> Qwen2_5_VLForConditionalGeneration:
         # The exact call shape production uses (minus the device map and quantization, which need a GPU).
-        return Qwen2_5_VLForConditionalGeneration.from_pretrained(
+        return HeadlessQwen2_5_VLForConditionalGeneration.from_pretrained(
             None,
             config=Qwen2_5_VLConfig.from_pretrained(str(path), local_files_only=True),
             state_dict=_read_checkpoint(path),
@@ -1068,6 +1106,7 @@ class TestTransformersLoadPathAssumptions:
 
         loaded = self._load(tmp_path).state_dict()
 
+        del source["lm_head.weight"]
         assert set(loaded) == set(source)
         assert all(torch.equal(loaded[name], source[name]) for name in source)
 

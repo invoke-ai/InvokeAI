@@ -67,10 +67,10 @@ _GENERATE_SYSTEM_PROMPT = (
 _GENERATE_DROP_IDX = 34
 
 # Fraction of the on-disk (bf16) encoder that stays resident after BitsAndBytes quantization. Linear weights
-# shrink to 8 or 4 bits, but embeddings, norms, biases and the (excluded) lm_head stay in bf16, and nf4 carries
-# per-block absmax scales, so the ratios sit above the pure 1/2 and 1/4. Over-estimating only offloads a little
-# more of the cached models to RAM, whereas under-estimating leaves the encoder without enough VRAM, so both
-# values are deliberately conservative.
+# shrink to 8 or 4 bits, but embeddings, norms and biases stay in bf16, and nf4 carries per-block absmax scales, so
+# the ratios sit above the pure 1/2 and 1/4. The folder's size also counts the lm_head, which is never loaded.
+# Over-estimating only offloads a little more of the cached models to RAM, whereas under-estimating leaves the
+# encoder without enough VRAM, so both values are deliberately conservative.
 _QUANTIZED_SIZE_RATIO: dict[str, float] = {"int8": 0.6, "nf4": 0.4}
 
 _IMAGE_PLACEHOLDER = "<|vision_start|><|image_pad|><|vision_end|>"
@@ -84,8 +84,8 @@ def _make_bnb_layers_patchable(text_encoder: torch.nn.Module) -> None:
     """Give the BitsAndBytes Linears of a `from_pretrained`-built encoder the sidecar-patch API.
 
     transformers builds plain `bnb.nn.Linear8bitLt` / `Linear4bit` layers, which cannot hold a LoRA. Only this model is
-    converted (the layers share state with the originals), and unconverted Linears such as `lm_head` come along through
-    the standard mapping. Layers without a patch behave as before.
+    converted (the layers share state with the originals), and any Linear BnB left unconverted comes along through the
+    standard mapping. Layers without a patch behave as before.
     Must run before the model's first forward: the plain int8 forward moves CB/SCB off the weight, where the custom
     layer reads them.
     """
@@ -117,6 +117,8 @@ def _read_checkpoint(encoder_path: Path) -> dict[str, torch.Tensor] | None:
     state_dict: dict[str, torch.Tensor] = {}
     for shard_name in shard_names:
         state_dict.update(load_file(encoder_path / shard_name))
+    # The encoder is built without the LM head, so there is no point reading its pages from disk.
+    state_dict.pop("lm_head.weight", None)
     for tensor in state_dict.values():
         # A strided read of one byte per page faults the whole tensor in through the very mapping transformers will
         # read from; the sum itself is discarded.
@@ -493,7 +495,9 @@ class QwenImageTextEncoderInvocation(BaseInvocation):
         layers to the CPU, which BnB int8 refuses with "Some modules are dispatched on
         the CPU or the disk" (issue #9147).
         """
-        from transformers import BitsAndBytesConfig, Qwen2_5_VLConfig, Qwen2_5_VLForConditionalGeneration
+        from transformers import BitsAndBytesConfig, Qwen2_5_VLConfig
+
+        from invokeai.backend.qwen2_5_vl.headless import HeadlessQwen2_5_VLForConditionalGeneration
 
         encoder_config = context.models.get_config(self.qwen_vl_encoder.text_encoder)
         model_root = context.models.get_absolute_path(encoder_config)
@@ -592,7 +596,7 @@ class QwenImageTextEncoderInvocation(BaseInvocation):
                                 f"{quantized_bytes / MB:.0f} MB); refusing construction while shared memory is below "
                                 "the estimated allocation."
                             )
-                    text_encoder = Qwen2_5_VLForConditionalGeneration.from_pretrained(
+                    text_encoder = HeadlessQwen2_5_VLForConditionalGeneration.from_pretrained(
                         None if state_dict is not None else str(encoder_path),
                         config=model_config,
                         state_dict=state_dict,

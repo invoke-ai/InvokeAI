@@ -47,11 +47,9 @@ describe('contextual shortcut resolution', () => {
 
   it('uses platform-normalized display parts for configured chords and preserves bare gesture modifiers', () => {
     const hotkey = applyCustomHotkeys(command, { [command.id]: [' ALT + mOd + J '] });
-    expect(resolveShortcutHints([{ commandId: command.commandId }], [hotkey], context, null)[0]?.parts).toEqual([
-      MOD_KEY_LABEL,
-      IS_MAC_OS ? 'option' : 'alt',
-      'j',
-    ]);
+    expect(resolveShortcutHints([{ commandId: command.commandId }], [hotkey], context, null)[0]?.parts).toEqual(
+      IS_MAC_OS ? ['option', 'cmd', 'j'] : ['ctrl', 'alt', 'j']
+    );
     expect(resolveShortcutHints([{ labelKey: 'hold', parts: ['shift', 'alt'] }], [], context, null)[0]?.parts).toEqual([
       'shift',
       IS_MAC_OS ? 'option' : 'alt',
