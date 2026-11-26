@@ -125,7 +125,18 @@ def test_every_exposed_field_has_a_value_instance_on_its_node(workflow_path: Pat
 CORE_METADATA_FIELDS_ADDED_IN_2_11 = ("vae_precision", "color_compensation", "mistral_source")
 
 
-@pytest.mark.parametrize("workflow_path", WAN_WORKFLOWS, ids=lambda p: p.stem)
+# Found by content, so a bundled workflow of any family that embeds the node is covered.
+CORE_METADATA_WORKFLOWS = sorted(
+    (
+        path
+        for path in WORKFLOW_DIR.glob("*.json")
+        if any(node["data"].get("type") == "core_metadata" for node in json.loads(path.read_text("utf-8"))["nodes"])
+    ),
+    key=lambda p: p.name,
+)
+
+
+@pytest.mark.parametrize("workflow_path", CORE_METADATA_WORKFLOWS, ids=lambda p: p.stem)
 def test_bundled_core_metadata_carries_the_fields_its_version_added(workflow_path: Path) -> None:
     cls = InvocationRegistry.get_invocations_map()["core_metadata"]
     assert cls.UIConfig.version == "2.11.0", "a newer core_metadata version adds fields this test does not know"

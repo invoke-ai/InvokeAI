@@ -116,6 +116,7 @@ CORE_METADATA_REGISTRY: tuple[tuple[str, MetadataType | tuple[MetadataType, ...]
     ("tile_width", T.INTEGER),
     ("tile_height", T.INTEGER),
     ("tile_overlap", T.INTEGER),
+    ("tile_controlnet", T.MODEL),
     ("num_frames", T.INTEGER),
     ("fps", (T.INTEGER, T.FLOAT)),
     ("source_video_start_frame", T.INTEGER),

@@ -833,7 +833,6 @@ describe('executeImageRecall', () => {
       rand_device: 'cpu',
     };
     const recallVae = async () => {
-      queryClient.clear();
       const { commands, setSettings } = createCommands();
 
       galleryApi.galleryImages.metadata.mockResolvedValue(record);
@@ -861,6 +860,34 @@ describe('executeImageRecall', () => {
       galleryApi.galleryImages.workflow.mockResolvedValue({ graph: '{}', workflow: '{"nodes":[]}' });
 
       expect((await recallVae())?.key).toBe(vae.key);
+    });
+
+    it('reads the embedded workflow once per image, whatever the number of recalls', async () => {
+      galleryApi.galleryImages.workflow.mockResolvedValue({ graph: '{}', workflow: null });
+
+      await recallVae();
+      await recallVae();
+
+      expect(galleryApi.galleryImages.workflow).toHaveBeenCalledTimes(1);
+    });
+
+    it('reads no workflow for a record that cannot vouch for its components', async () => {
+      queryClient.clear();
+      const { commands } = createCommands();
+
+      galleryApi.galleryImages.metadata.mockResolvedValue({ positive_prompt: 'p' });
+      await executeImageRecall({
+        queryClient,
+        t,
+        commands,
+        getGenerateValues: () => ({ modelKey: model.key }),
+        image,
+        kind: 'remix',
+        models: [model],
+        projectId: 'project-1',
+      });
+
+      expect(galleryApi.galleryImages.workflow).not.toHaveBeenCalled();
     });
 
     it('keeps the panel VAE when the workflow cannot be read', async () => {

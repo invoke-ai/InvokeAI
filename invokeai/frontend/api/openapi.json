@@ -92848,6 +92848,7 @@
               "tile_width",
               "tile_height",
               "tile_overlap",
+              "tile_controlnet",
               "num_frames",
               "fps",
               "source_video_start_frame",

@@ -12,7 +12,7 @@ import type { WorkbenchCommands } from '@workbench/workbenchStore';
 import type { TFunction } from 'i18next';
 
 import { GALLERY_REQUEST_MAX_NAMES, galleryImages, galleryVideos } from '@features/gallery';
-import { fetchGalleryImageMetadata } from '@features/gallery/queries';
+import { fetchGalleryImageMetadata, galleryKeys } from '@features/gallery/queries';
 import {
   getCompatibleReferenceImages,
   getDefaultGenerateSettings,
@@ -86,20 +86,31 @@ const getSkippedConceptMessage = ({ name, reason }: ImageRecallSkip, t: TFunctio
 };
 
 /**
- * Whether the image ran from a workflow, which only the image itself says: a workflow's loader takes components that
- * its metadata node never names. Asked only where it decides something (a record that would otherwise vouch for its
- * components), and answered for the safe side when the read fails, so the panel keeps its picks.
+ * Whether the image ran from a workflow, which only the embedded workflow itself says: `has_workflow` is set for every
+ * image that stores its graph, so it cannot tell. A workflow's loader takes components that its metadata node never
+ * names. Asked only where it decides something (a record that would otherwise vouch for its components), cached for
+ * good because an image's embedded workflow never changes, and answered for the safe side when the read fails, so the
+ * panel keeps its picks.
  */
-const readMayBeWorkflowRun = async (metadata: unknown, imageName: string, owner: AccountScope): Promise<boolean> => {
+const readMayBeWorkflowRun = async (
+  queryClient: QueryClient,
+  metadata: unknown,
+  imageName: string,
+  owner: AccountScope
+): Promise<boolean> => {
   if (!recordsLoaderSelections(metadata)) {
     return false;
   }
 
   try {
-    return (await galleryImages.workflow(imageName, owner.signal)).workflow !== null;
+    return await queryClient.fetchQuery({
+      queryFn: async ({ signal }) =>
+        (await galleryImages.workflow(imageName, AbortSignal.any([signal, owner.signal]))).workflow !== null,
+      queryKey: galleryKeys.imageEmbedsWorkflow(owner, imageName),
+      retry: false,
+      staleTime: Infinity,
+    });
   } catch {
-    assertAccountScopeCurrent(owner);
-
     return true;
   }
 };
@@ -419,6 +430,11 @@ export const executeImageRecall = async ({
     const metadata =
       kind === 'dimensions' ? null : await fetchGalleryImageMetadata(queryClient, owner, image.imageName);
     // Checked against the record, not the built list, so it precedes the snapshot.
+    // Read beside the reference lookup, not after it.
+    const workflowRun =
+      kind === 'all' || kind === 'remix'
+        ? readMayBeWorkflowRun(queryClient, metadata, image.imageName, owner)
+        : Promise.resolve(false);
     const referenceRecord = kind === 'all' || kind === 'remix' ? readMetadataReferenceImages(metadata) : null;
     let referenceAssets = new Map<string, GalleryImage>();
     let referenceLookupFailed = false;
@@ -443,8 +459,7 @@ export const executeImageRecall = async ({
       }
       referenceLookupFailed = true;
     }
-    const mayBeWorkflowRun =
-      kind === 'all' || kind === 'remix' ? await readMayBeWorkflowRun(metadata, image.imageName, owner) : false;
+    const mayBeWorkflowRun = await workflowRun;
     const hydratedReferences = referenceRecord ? readMetadataReferenceImages(metadata, referenceAssets) : null;
     const recordedReferences = hydratedReferences?.images ?? null;
     const availableReferenceNames = new Set(referenceAssets.keys());

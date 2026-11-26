@@ -240,6 +240,8 @@ export const galleryKeys = {
     [...galleryKeys.itemsRoot(), 'image-metadata', getAccountKey(owner), imageName] as const,
   imageHasWorkflow: (owner: AccountScope, imageName: string) =>
     [...galleryKeys.itemsRoot(), 'image-has-workflow', getAccountKey(owner), imageName] as const,
+  imageEmbedsWorkflow: (owner: AccountScope, imageName: string) =>
+    [...galleryKeys.itemsRoot(), 'image-embeds-workflow', getAccountKey(owner), imageName] as const,
   videoMetadata: (owner: AccountScope, videoName: string) =>
     [...galleryKeys.itemsRoot(), 'video-metadata', getAccountKey(owner), videoName] as const,
   videoHasWorkflow: (owner: AccountScope, videoName: string) =>
