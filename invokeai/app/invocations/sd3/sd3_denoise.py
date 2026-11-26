@@ -297,29 +297,54 @@ class SD3DenoiseInvocation(BaseInvocation, WithMetadata):
             generator=torch.Generator(device=rand_device).manual_seed(seed),
         ).to(device=device, dtype=dtype)
 
-    def _get_sigmas(self, context: InvocationContext) -> list[float]:
-        """`steps + 1` sigmas from 1 to 0, the reference pipeline's schedule: the model's own scheduler config, or for a
-        transformer without one (GGUF) the shift every SD3 / SD3.5 release ships."""
+    def _get_sigmas(self, context: InvocationContext, transformer_config: Any) -> tuple[list[float], int]:
+        """`steps + 1` sigmas from 1 to 0 and the scheduler's `num_train_timesteps`, the reference pipeline's schedule:
+        the model's own scheduler config, or for a transformer without one (GGUF) the shift every SD3 / SD3.5 release
+        ships. A config with `use_dynamic_shifting` gets `mu` from the latent's token count, as diffusers' pipeline
+        computes it."""
         model_path = context.models.get_absolute_path(context.models.get_config(self.transformer.transformer))
         scheduler = load_scheduler(Path(model_path), SD3_SCHEDULER_CONFIG)
-        scheduler.set_timesteps(self.steps)
-        return scheduler.sigmas.tolist()
+        config = scheduler.config
+        if config.get("use_dynamic_shifting", False):
+            # Imported on use: the pipeline module is heavy and only a dynamic-shifting config needs its helper.
+            from diffusers.pipelines.stable_diffusion_3.pipeline_stable_diffusion_3 import calculate_shift
+
+            patch_size = transformer_config.patch_size
+            tokens = (int(self.height) // LATENT_SCALE_FACTOR // patch_size) * (
+                int(self.width) // LATENT_SCALE_FACTOR // patch_size
+            )
+            mu = calculate_shift(
+                tokens,
+                config.get("base_image_seq_len", 256),
+                config.get("max_image_seq_len", 4096),
+                config.get("base_shift", 0.5),
+                config.get("max_shift", 1.16),
+            )
+            scheduler.set_timesteps(self.steps, mu=mu)
+        else:
+            scheduler.set_timesteps(self.steps)
+        return scheduler.sigmas.tolist(), config.num_train_timesteps
 
     def _prepare_cfg_scale(self, num_timesteps: int) -> list[float]:
         """Prepare the CFG scale list.
 
+        A list is a per-step curve over the denoising pass. The shifted schedule and `denoising_start`/`denoising_end`
+        change how many steps run, so a list sized for another count (e.g. a saved image-to-image workflow) is
+        stretched over the active steps instead of rejected; a list of the right length is used as given.
+
         Args:
-            num_timesteps (int): The number of timesteps in the scheduler. Could be different from num_steps depending
-            on the scheduler used (e.g. higher order schedulers).
+            num_timesteps (int): The number of steps that run.
 
         Returns:
-            list[float]: _description_
+            list[float]: One CFG scale per step.
         """
         if isinstance(self.cfg_scale, float):
             cfg_scale = [self.cfg_scale] * num_timesteps
         elif isinstance(self.cfg_scale, list):
-            assert len(self.cfg_scale) == num_timesteps
-            cfg_scale = self.cfg_scale
+            if not self.cfg_scale:
+                raise ValueError("cfg_scale list must not be empty")
+            count = len(self.cfg_scale)
+            cfg_scale = [self.cfg_scale[i * count // num_timesteps] for i in range(num_timesteps)]
         else:
             raise ValueError(f"Invalid CFG scale type: {type(self.cfg_scale)}")
 
@@ -357,9 +382,8 @@ class SD3DenoiseInvocation(BaseInvocation, WithMetadata):
 
         # The shifted sigmas, clipped like FLUX's: `denoising_start` is the noise level an image-to-image pass starts
         # at, and a split chain meets exactly at its boundary.
-        timesteps = clip_timestep_schedule_fractional(
-            self._get_sigmas(context), self.denoising_start, self.denoising_end
-        )
+        sigmas, num_train_timesteps = self._get_sigmas(context, transformer_info.model.config)
+        timesteps = clip_timestep_schedule_fractional(sigmas, self.denoising_start, self.denoising_end)
         total_steps = len(timesteps) - 1
 
         # Prepare the CFG scale list.
@@ -480,8 +504,10 @@ class SD3DenoiseInvocation(BaseInvocation, WithMetadata):
                 # Expand the latents if we are doing CFG.
                 latent_model_input = torch.cat([latents] * 2) if do_classifier_free_guidance else latents
                 # Expand the timestep to match the latent model input.
-                # Multiply by 1000 to match the default FlowMatchEulerDiscreteScheduler num_train_timesteps.
-                timestep = torch.tensor([t_curr * 1000], device=device).expand(latent_model_input.shape[0])
+                # The scheduler's own scale, sigma * num_train_timesteps, as diffusers' pipeline passes it.
+                timestep = torch.tensor([t_curr * num_train_timesteps], device=device).expand(
+                    latent_model_input.shape[0]
+                )
 
                 noise_pred = transformer(
                     hidden_states=latent_model_input,

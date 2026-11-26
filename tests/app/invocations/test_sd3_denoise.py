@@ -7,10 +7,12 @@ from types import SimpleNamespace
 
 import pytest
 import torch
+from diffusers.schedulers.scheduling_flow_match_euler_discrete import FlowMatchEulerDiscreteScheduler
 
 from invokeai.app.invocations.fields import LatentsField, SD3ConditioningField
 from invokeai.app.invocations.model import ModelIdentifierField, TransformerField
 from invokeai.app.invocations.sd3.sd3_denoise import SD3DenoiseInvocation
+from invokeai.backend.flux.sampling_utils import clip_timestep_schedule_fractional
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData, SD3ConditioningInfo
 
@@ -18,7 +20,7 @@ DENOISE = "invokeai.app.invocations.sd3.sd3_denoise"
 
 
 class _Transformer(torch.nn.Module):
-    config = SimpleNamespace(in_channels=16, joint_attention_dim=8)
+    config = SimpleNamespace(in_channels=16, joint_attention_dim=8, patch_size=2)
 
     def __init__(self) -> None:
         super().__init__()
@@ -146,3 +148,71 @@ def test_image_to_image_starts_at_the_noise_level_denoising_start_names(tmp_path
     assert transformer_info.model.timesteps == pytest.approx([700.0, *SHIFTED_4_STEPS[2:]], abs=0.01)
     # The stand-in predicts zero velocity, so the result is the input as noised for the first step.
     assert torch.allclose(result, torch.full((1, 16, 8, 8), 0.7 * 10.0 + 0.3 * 1.0))
+
+
+def _write_scheduler_config(model_dir: Path, **config) -> None:
+    (model_dir / "scheduler").mkdir()
+    (model_dir / "scheduler" / "scheduler_config.json").write_text(
+        json.dumps({"_class_name": "FlowMatchEulerDiscreteScheduler"} | config)
+    )
+
+
+def test_a_cfg_list_sized_for_another_step_count_is_stretched_over_the_active_steps(tmp_path: Path) -> None:
+    """A saved image-to-image workflow whose per-step CFG was sized for the unshifted clip still runs."""
+    invocation = _invocation(steps=30, denoising_start=0.3, cfg_scale=[float(i) for i in range(21)])
+    sigmas, _ = invocation._get_sigmas(_context(_TransformerInfo(), tmp_path / "sd3.gguf"), _Transformer.config)  # type: ignore[arg-type]
+    active = len(clip_timestep_schedule_fractional(sigmas, 0.3, 1.0)) - 1
+
+    scales = invocation._prepare_cfg_scale(active)
+
+    assert active == 14
+    assert len(scales) == 14
+    assert scales[0] == 0.0 and scales[-1] == 19.0 and scales == sorted(scales)
+    assert _invocation(cfg_scale=[1.0, 2.0, 3.0])._prepare_cfg_scale(3) == [1.0, 2.0, 3.0]
+
+
+def test_the_transformer_timestep_scales_by_the_schedulers_num_train_timesteps(tmp_path: Path) -> None:
+    _write_scheduler_config(tmp_path, num_train_timesteps=500, shift=1.0)
+    transformer_info = _TransformerInfo()
+
+    _invocation(steps=4)._run_diffusion(_context(transformer_info, tmp_path))  # type: ignore[arg-type]
+
+    scheduler = FlowMatchEulerDiscreteScheduler(num_train_timesteps=500, shift=1.0)
+    scheduler.set_timesteps(4)
+    assert transformer_info.model.timesteps == pytest.approx(scheduler.timesteps.tolist(), abs=0.01)
+    assert transformer_info.model.timesteps[0] == pytest.approx(500.0)
+
+
+def test_dynamic_shifting_passes_mu_from_the_latent_token_count(tmp_path: Path) -> None:
+    config = {
+        "num_train_timesteps": 1000,
+        "use_dynamic_shifting": True,
+        "base_image_seq_len": 256,
+        "max_image_seq_len": 4096,
+        "base_shift": 0.5,
+        "max_shift": 1.15,
+    }
+    _write_scheduler_config(tmp_path, **config)
+    transformer_info = _TransformerInfo()
+
+    # 1024 px -> 128 latent -> 64 tokens per side with patch size 2: 4096 tokens, mu = max_shift.
+    _invocation(steps=4, width=1024, height=1024)._run_diffusion(_context(transformer_info, tmp_path))  # type: ignore[arg-type]
+
+    scheduler = FlowMatchEulerDiscreteScheduler(**config)
+    scheduler.set_timesteps(4, mu=1.15)
+    assert transformer_info.model.timesteps == pytest.approx(scheduler.timesteps.tolist(), abs=0.01)
+
+
+def test_released_sd3_schedules_are_unchanged(tmp_path: Path) -> None:
+    """Shift-3.0 fallback and a 1000-step config give the sigmas and timesteps the previous code computed."""
+    for model_path in (tmp_path / "sd3.gguf", tmp_path):
+        if model_path == tmp_path:
+            _write_scheduler_config(tmp_path, num_train_timesteps=1000, shift=3.0)
+        transformer_info = _TransformerInfo()
+        _invocation(steps=30)._run_diffusion(_context(transformer_info, model_path))  # type: ignore[arg-type]
+        reference = FlowMatchEulerDiscreteScheduler(num_train_timesteps=1000, shift=3.0)
+        reference.set_timesteps(30)
+        # The loop's exact arithmetic before this change: python float sigma * 1000.
+        assert transformer_info.model.timesteps == [
+            torch.tensor([s * 1000]).item() for s in reference.sigmas.tolist()[:-1]
+        ]
