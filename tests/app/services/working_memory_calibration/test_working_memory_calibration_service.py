@@ -1332,6 +1332,27 @@ def test_a_model_reset_covers_its_submodels_windows(tmp_path: Path, mock_invoker
     assert [point["model_key"] for point in points] == ["vae-key"]
 
 
+def test_a_model_reset_preserves_distinct_records_with_cache_shaped_keys(
+    tmp_path: Path, mock_invoker: Invoker, queue: SessionQueue
+) -> None:
+    service = _service(tmp_path, mock_invoker)
+    run = _create(service, "model-b")
+    role_shaped_key = "studio:as_text_llm"
+    qwen_shaped_key = "studio:text_encoder:float32"
+    service.record_windows(
+        run.run_id,
+        [
+            measured_window(run.run_id, node_id="role_shaped", model_key=role_shaped_key),
+            measured_window(run.run_id, node_id="qwen_shaped", model_key=qwen_shaped_key),
+            measured_window(run.run_id, node_id="other", model_key="studio:vae"),
+        ],
+    )
+
+    assert service.reset_model("studio").points_removed == 1
+    assert service.reset_model(role_shaped_key).points_removed == 1
+    assert service.reset_model(qwen_shaped_key).points_removed == 1
+
+
 ANIMA_LLLITE_GRAPHS = (
     Path(__file__).parents[4]
     / "invokeai"

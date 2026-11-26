@@ -57,6 +57,7 @@ export const getLayeredSettings = (): LayeredSettingsTable =>
         invertBrushSizeScroll: typedBoolean(false),
         outputOnlyMaskedRegions: typedBoolean(true),
         ruleOfThirds: typedBoolean(false),
+        scrollInput: oneOf('auto', ['mouse', 'trackpad']),
         showBbox: typedBoolean(true),
         showCheckerboard: typedBoolean(true),
         showGrid: typedBoolean(false),

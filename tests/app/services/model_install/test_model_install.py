@@ -2166,7 +2166,9 @@ def test_simple_download(mm2_installer: ModelInstallServiceBase, mm2_app_config:
     assert bus is not None
     assert hasattr(bus, "events")  # the dummy event service has this
 
-    job = mm2_installer.import_model(source)
+    job = mm2_installer.import_model(
+        source, config=ModelRecordChanges(source_urls=["https://example.com/model", "https://example.com/quantized"])
+    )
     assert job.source == source
     job_list = mm2_installer.wait_for_installs(timeout=10)
     assert len(job_list) == 1
@@ -2176,6 +2178,8 @@ def test_simple_download(mm2_installer: ModelInstallServiceBase, mm2_app_config:
     key = job.config_out.key
     model_record = store.get_model(key)
     assert (mm2_app_config.models_path / model_record.path).exists()
+    assert model_record.source_urls == ["https://example.com/model", "https://example.com/quantized"]
+    assert model_record.source == "https://www.test.foo/download/test_embedding.safetensors"
 
     assert len(bus.events) == 5
     assert isinstance(bus.events[0], ModelInstallDownloadStartedEvent)  # download starts

@@ -126,3 +126,36 @@ def test_acquire_is_released_if_repoint_fails():
 
     assert store.refcount("m") == 1  # back to just the first device, not leaked at 2
     assert first.uses_shared_weights  # keep the first wrapper alive through the assertions above
+
+
+@pytest.mark.parametrize("partial", [False, True], ids=["full", "partial"])
+def test_repoint_failure_releases_retired_entry_after_replacement(partial):
+    store = SharedCpuWeightsStore()
+    canonical = store.acquire("m", DummyModule().state_dict())
+    canonical_bytes = store.total_bytes_in_use()
+    replacement = DummyModule().state_dict()
+    incoming = DummyModule()
+
+    def replace_and_fail(*args):
+        assert store.peek("m") is canonical
+        assert store.refcount("m") == 2
+        assert store.invalidate("m") == 1
+        store.acquire("m", replacement)
+        raise RuntimeError("re-point failed after replacement")
+
+    incoming.register_load_state_dict_pre_hook(replace_and_fail)
+    kwargs = {"keep_ram_copy": True, "shared_store": store, "cache_key": "m"}
+    with pytest.raises(RuntimeError, match="re-point failed after replacement"):
+        if partial:
+            CachedModelWithPartialLoad(incoming, CPU, **kwargs)
+        else:
+            CachedModelOnlyFullLoad(incoming, CPU, total_bytes=canonical_bytes, **kwargs)
+
+    assert store.peek("m") is replacement
+    assert store.refcount("m") == 1
+    assert store.retired_bytes() == canonical_bytes
+    store.release("m", canonical)
+    assert store.retired_bytes() == 0
+    assert store.peek("m") is replacement
+    store.release("m", replacement)
+    assert store.total_bytes_in_use() == 0

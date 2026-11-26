@@ -4,6 +4,7 @@ import copy
 import itertools
 import re
 from contextlib import nullcontext
+from dataclasses import dataclass
 from logging import Logger
 from pathlib import Path
 from typing import Callable, ContextManager, Optional
@@ -23,6 +24,7 @@ from invokeai.backend.model_manager.load.model_cache.model_cache import (
     ModelCache,
     get_model_cache_key,
 )
+from invokeai.backend.model_manager.load.model_cache.shared_cpu_weights import SharedCpuWeightsPin
 from invokeai.backend.model_manager.load.model_util import calc_model_size_by_fs
 from invokeai.backend.model_manager.load.optimizations import skip_torch_weight_init
 from invokeai.backend.model_manager.taxonomy import (
@@ -265,11 +267,34 @@ def _model_declared_skip_patterns(model: torch.nn.Module) -> tuple[str, ...]:
     return tuple(patterns)
 
 
-# The construction path is not thread-safe on its own; it monkey-patches process-global torch state
-# (see MODEL_LOAD_LOCK). Concurrent callers must hold the MODEL_LOAD_LOCK write lock (see
-# _load_and_cache).
+@dataclass(frozen=True)
+class _LoadDecision:
+    config: AnyModelConfig
+    submodel_type: Optional[SubModelType]
+    device: torch.device
+    dtype: torch.dtype
+    fp8_compute: bool
+    storage_supported: bool
+    layerwise_storage: bool
+    keep_checkpoint_fp8: bool
+
+
+# Construction patches process-global torch state, serialized by MODEL_LOAD_LOCK in _load_and_cache.
 class ModelLoader(ModelLoaderBase):
     """Default implementation of ModelLoaderBase."""
+
+    # Components whose checkpoint decoding can retain float8 even without FP8 Storage.
+    # Other components retain their ordinary keys, including tokenizers and VAEs.
+    _fp8_checkpoint_submodels: frozenset[SubModelType] = frozenset()
+    # Only loaders where None aliases one component declare this. Whole pipelines retain None.
+    _default_submodel_type: Optional[SubModelType] = None
+    _fixed_dtype: Optional[torch.dtype] = None
+    _bfloat16_safe = False
+    # These standalone encoders retain checkpoint fp8 whenever the execution device supports storage,
+    # independently of a denoiser's FP8 Storage setting. Qwen3-VL also casts its dense remainder.
+    _encoder_fp8_storage = False
+    _encoder_layerwise_storage = False
+    _load_decision: Optional[_LoadDecision] = None
 
     # Optionally set on an instance before `load_model()`: on a cache miss, entered with the caller's config
     # before MODEL_LOAD_LOCK is taken (entering may block) and exited after it is released; the callable it
@@ -307,6 +332,8 @@ class ModelLoader(ModelLoaderBase):
         if not model_path.exists():
             raise FileNotFoundError(f"Files for model '{model_config.name}' not found at {model_path}")
 
+        # ModelLoadService creates a fresh loader per load; also bound the snapshot if a caller reuses one.
+        self._load_decision = None
         cache_record, first_use_claim = self._load_and_cache(model_config, submodel_type)
         return LoadedModel(
             config=model_config,
@@ -363,10 +390,95 @@ class ModelLoader(ModelLoaderBase):
 
         Device caches share one canonical CPU copy per key, which a second device adopts instead of rerunning the
         loader. A loader whose stored format depends on the device (float8 where supported, the dtype it computes in)
-        returns the format here, so only devices that build the same weights share a copy. Empty by default. Appended after
-        the role suffix (`:as_<type>`, see `_load_and_cache`).
+        returns the format here, so only devices that build the same weights share a copy. This deliberately
+        partitions by policy before reading the file, even if a particular file has no float8 weights.
         """
-        return ""
+        decision = self._decision(config, submodel_type)
+        use_storage = decision.layerwise_storage
+        checkpoint = submodel_type in self._fp8_checkpoint_submodels
+        if checkpoint:
+            keep, dtype = decision.keep_checkpoint_fp8, decision.dtype
+            use_storage |= self._encoder_layerwise_storage and decision.storage_supported
+        elif (
+            self._fp8_storage_asked_for(config, submodel_type)
+            and fp8_storage_verdict(config.base, config.type, config.format).supported
+        ):
+            keep, dtype = use_storage, decision.dtype
+        elif (
+            self._bfloat16_safe
+            and self._fixed_dtype is None
+            and submodel_type
+            not in {
+                SubModelType.Tokenizer,
+                SubModelType.Tokenizer2,
+                SubModelType.Tokenizer3,
+                SubModelType.PromptEnhancerTokenizer,
+                SubModelType.Processor,
+                SubModelType.Scheduler,
+            }
+        ):
+            keep, dtype = False, decision.dtype
+        else:
+            return ""
+        return f"{'fp8' if keep else 'full'}-{str(dtype).removeprefix('torch.')}{'-layerwise' if use_storage else ''}"
+
+    def _select_model_dtype(
+        self, config: AnyModelConfig, submodel_type: Optional[SubModelType], device: torch.device
+    ) -> torch.dtype:
+        if self._fixed_dtype is not None:
+            return self._fixed_dtype
+        if self._bfloat16_safe or submodel_type in self._fp8_checkpoint_submodels:
+            return TorchDevice.choose_bfloat16_safe_dtype(device)
+        return self._torch_dtype
+
+    def _decision(self, config: AnyModelConfig, submodel_type: Optional[SubModelType]) -> _LoadDecision:
+        """One immutable answer for cache lookup and construction, before either can consume weights.
+
+        Only the active component is retained, not a config-id cache. Single-file pipeline prefetch saves
+        and restores its requested component's snapshot while admitting the other components.
+        """
+        decision = self._load_decision
+        if decision is not None and decision.config is config and decision.submodel_type == submodel_type:
+            return decision
+        device = self._get_execution_device(config, submodel_type) or self._torch_device
+        checkpoint = submodel_type in self._fp8_checkpoint_submodels
+        layerwise_requested = (
+            self._fp8_storage_asked_for(config, submodel_type)
+            and fp8_storage_verdict(config.base, config.type, config.format).supported
+        )
+        compute = checkpoint and should_keep_fp8_weights(device)
+        # Do not initialize accelerator runtimes for unrelated components. A failed probe gives this
+        # load a conservative full-width key; a later load may retry and keep a separate copy until eviction.
+        storage = (layerwise_requested or (checkpoint and self._encoder_fp8_storage)) and _device_supports_fp8_storage(
+            device, self._logger
+        )
+        decision = _LoadDecision(
+            config=config,
+            submodel_type=submodel_type,
+            device=device,
+            dtype=self._select_model_dtype(config, submodel_type, device),
+            fp8_compute=compute,
+            storage_supported=storage,
+            layerwise_storage=layerwise_requested and storage,
+            keep_checkpoint_fp8=compute or storage,
+        )
+        self._load_decision = decision
+        return decision
+
+    def _storage_format(
+        self, config: AnyModelConfig, submodel_type: Optional[SubModelType]
+    ) -> tuple[bool, torch.dtype]:
+        decision = self._decision(config, submodel_type)
+        return decision.keep_checkpoint_fp8, decision.dtype
+
+    def _get_cache_key(self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> str:
+        if submodel_type is None:
+            submodel_type = self._default_submodel_type
+        # A role view loads the same files through a different loader and needs its own cache entry.
+        role = config.type if getattr(config, "role_of", None) is not None else None
+        return get_model_cache_key(
+            config.key, submodel_type, role=role, variant=self._cache_key_variant(config, submodel_type)
+        )
 
     def _load_and_cache(
         self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None
@@ -381,15 +493,10 @@ class ModelLoader(ModelLoaderBase):
         raises after the claim is armed, the claim dies with the frame that holds it and releases
         the hold itself.
         """
+        if submodel_type is None:
+            submodel_type = self._default_submodel_type
         stats_name = ":".join([config.base, config.type, config.name, (submodel_type or "")])
-        cache_key = get_model_cache_key(config.key, submodel_type)
-        if getattr(config, "role_of", None) is not None:
-            # A role view loads the record's files through another config class and loader, so it is its own entry.
-            # The "<key>:" prefix stays, so dropping or offloading the record still covers it.
-            cache_key = f"{cache_key}:as_{config.type.value}"
-        variant = self._cache_key_variant(config, submodel_type)
-        if variant:
-            cache_key = f"{cache_key}:{variant}"
+        cache_key = self._get_cache_key(config, submodel_type)
         try:
             return self._ram_cache.get_with_first_use_claim(key=cache_key, stats_name=stats_name)
         except IndexError:
@@ -432,11 +539,23 @@ class ModelLoader(ModelLoaderBase):
             # clone of the built module. Adopt those weights instead of re-reading the model from
             # disk — this avoids both the redundant disk read and the large transient second copy
             # that would otherwise spike RAM (and, on a RAM-constrained box, drive the system into
-            # swap). Any failure falls back to a normal load, so it can never change the result.
-            loaded_model = self._try_adopt_shared_weights(cache_key)
+            # swap). If the shell cannot be materialized, fall back to the normal disk load.
+            execution_device = self._get_execution_device(config, submodel_type)
+            shared_store = self._ram_cache.shared_cpu_weights
+            selection = shared_store.pin_for_adoption(cache_key) if shared_store is not None else nullcontext(None)
+            with selection as adoption:
+                adopted_model = self._try_adopt_shared_weights(cache_key, adoption) if adoption is not None else None
+                if adopted_model is not None:
+                    admission_claim = self._ram_cache.put(
+                        cache_key,
+                        model=adopted_model,
+                        execution_device=execution_device,
+                        claim_admission=True,
+                        adoption=adoption,
+                    )
 
             shell_to_register: Optional[torch.nn.Module] = None
-            if loaded_model is None:
+            if adopted_model is None:
                 # Optional RAM instrumentation for the cold disk-load path (the only place that runs
                 # `from_pretrained`, whose construction transient can briefly spike RAM past the
                 # cache's retained budget). Gated on `log_memory_usage`; captures process RAM before
@@ -460,19 +579,15 @@ class ModelLoader(ModelLoaderBase):
                 # Snapshot a meta-weight clone now — before put() applies custom layers or any VRAM
                 # move — so the next device to load this model can adopt these weights (see above).
                 # Skipped in single-device setups, where no other cache will ever adopt it.
-                shared_store = self._ram_cache.shared_cpu_weights
                 if shared_store is not None and shared_store.enable_shell_capture:
                     shell_to_register = self._build_meta_shell(loaded_model)
 
-            # Determine execution device from model config, considering submodel type
-            execution_device = self._get_execution_device(config, submodel_type)
-
-            admission_claim = self._ram_cache.put(
-                cache_key,
-                model=loaded_model,
-                execution_device=execution_device,
-                claim_admission=True,
-            )
+                admission_claim = self._ram_cache.put(
+                    cache_key,
+                    model=loaded_model,
+                    execution_device=execution_device,
+                    claim_admission=True,
+                )
             # Retrieve immediately, and hold the admission claim across the retrieval: the claim
             # shields the new record until this frame's own claim takes over, so nothing — a peer's
             # reconcile, another model's make-room, the cache's shutdown() — can evict the model
@@ -486,10 +601,8 @@ class ModelLoader(ModelLoaderBase):
 
             # Register the shell only after put() has created the shared entry (via the wrapper's
             # acquire); it is dropped automatically when that entry's last reference is released.
-            if shell_to_register is not None:
-                shared_store = self._ram_cache.shared_cpu_weights
-                if shared_store is not None:
-                    shared_store.set_shell(cache_key, shell_to_register)
+            if shell_to_register is not None and shared_store is not None:
+                shared_store.set_shell(cache_key, shell_to_register)
 
             return cache_record, first_use_claim
 
@@ -537,20 +650,7 @@ class ModelLoader(ModelLoaderBase):
 
     def _should_use_fp8(self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> bool:
         """Check if FP8 layerwise casting should be applied to a model."""
-        if not self._fp8_storage_asked_for(config, submodel_type):
-            return False
-
-        # Whether the setting can reach a model of this kind at all -- its type, its format, and
-        # whether this loader implements the cast -- is decided in `fp8_capability.py`, because the UI
-        # that offers the control and the identification that enables it have to give the same answer
-        # as this gate. Deciding it here as well is how they came to disagree.
-        if not fp8_storage_verdict(config.base, config.type, config.format).supported:
-            return False
-
-        # Device support is probed last, so it runs only for a model that actually wants FP8 -- not on
-        # the first load of any tokenizer/VAE/scheduler, and not on API or install threads, where it
-        # would force XPU lazy SYCL init on a thread that never generates.
-        return _device_supports_fp8_storage(self._torch_device, self._logger)
+        return self._decision(config, submodel_type).layerwise_storage
 
     def _report_inert_fp8_request(self, config: AnyModelConfig, submodel_type: Optional[SubModelType]) -> None:
         """Say so when a record asks for FP8 Storage that this kind of model cannot take.
@@ -589,7 +689,11 @@ class ModelLoader(ModelLoaderBase):
         memory nobody asked to save. `_should_use_fp8` already requires the device to support fp8
         storage, so an unsupported device keeps the folding path.
         """
-        return should_keep_fp8_weights(self._torch_device) or self._should_use_fp8(config, submodel_type)
+        return self._decision(config, submodel_type).keep_checkpoint_fp8
+
+    def _uses_fp8_compute(self, device: torch.device) -> bool:
+        assert self._load_decision is not None
+        return self._load_decision.device == device and self._load_decision.fp8_compute
 
     def _fp8_kept_reason(self) -> str:
         """Which consumer kept a checkpoint's fp8 weights packed, for the line that reports it.
@@ -599,7 +703,7 @@ class ModelLoader(ModelLoaderBase):
         is the case a reader would most want to tell apart. The storage path also dequantizes on
         each forward instead of running on the tensor cores, so the line says so.
         """
-        if should_keep_fp8_weights(self._torch_device):
+        if self._uses_fp8_compute(self._torch_device):
             return "fp8_compute, on the fp8 tensor cores"
         return "FP8 Storage, dequantized per forward"
 
@@ -885,7 +989,7 @@ class ModelLoader(ModelLoaderBase):
         module.register_forward_pre_hook(pre_hook)
         module.register_forward_hook(post_hook, always_call=True)
 
-    def _try_adopt_shared_weights(self, cache_key: str) -> Optional[AnyModel]:
+    def _try_adopt_shared_weights(self, cache_key: str, adoption: SharedCpuWeightsPin) -> torch.nn.Module | None:
         """Build this model by adopting another device's already-resident CPU weights, skipping the
         disk read entirely.
 
@@ -895,23 +999,15 @@ class ModelLoader(ModelLoaderBase):
         shared canonical weights into the copy — no per-loader architecture knowledge required, and
         fp8 cast hooks carried by the shell are preserved automatically.
 
-        Must be called while holding the MODEL_LOAD_LOCK write lock (as `_load_and_cache` does), so
-        the peeked canonical weights and shell cannot be evicted between the peek and the adopt.
+        The pin protects shell and weights during the clone. Admission keeps the pin only when
+        the cache can use a zero reservation. Peer eviction may run under the model load lock.
         """
-        shared_store = self._ram_cache.shared_cpu_weights
-        if shared_store is None:
-            return None
-        canonical = shared_store.peek(cache_key)
-        shell = shared_store.get_shell(cache_key)
-        if canonical is None or shell is None:
-            return None
-
         try:
             # Independent module per device (its params will be moved to its own GPU); deep-copying an
             # all-meta shell is cheap (no weight data). assign=True then re-points the copy's
             # parameters at the shared canonical tensors with no allocation.
-            model = copy.deepcopy(shell)
-            model.load_state_dict(canonical, assign=True)
+            model = copy.deepcopy(adoption.shell)
+            model.load_state_dict(adoption.state_dict, assign=True)
             # Safety net: if anything is left on the meta device (e.g. a persistent buffer somehow
             # missing from the canonical state dict) the model would silently produce wrong results.
             for tensor in itertools.chain(model.parameters(), model.buffers()):

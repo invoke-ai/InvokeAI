@@ -199,3 +199,7 @@ export const isConvertibleToDiffusers = (model: Pick<ModelConfig, 'base' | 'form
   model.format === 'checkpoint' &&
   model.type === 'main' &&
   Boolean(getModelBaseInfo(model.base).supportsDiffusersConversion);
+
+/** FLUX.1 Fill edits an image under a mask: it needs fill conditioning, so it cannot text-to-image, upscale or take a Control LoRA. */
+export const isFluxFillModel = (model: { base: string; variant?: unknown }): boolean =>
+  model.base === 'flux' && model.variant === 'dev_fill';
