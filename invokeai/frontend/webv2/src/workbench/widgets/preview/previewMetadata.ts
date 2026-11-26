@@ -14,6 +14,39 @@ export interface PreviewMetadataEntry {
   isMultiline?: boolean;
 }
 
+export interface PreviewMetadataGroupItem {
+  key: string;
+  value: string;
+}
+
+/** One row for an array kind; `count` includes items past the display cap, which `truncationNote` mentions. */
+export interface PreviewMetadataGroup {
+  key: string;
+  label: string;
+  count: number;
+  items: PreviewMetadataGroupItem[];
+  /** Present only when the group hides items (or its truncation note) until the user expands it. */
+  collapsedItems?: PreviewMetadataGroupItem[];
+  summary?: string;
+  truncationNote?: string;
+}
+
+export type PreviewMetadataRow = PreviewMetadataEntry | PreviewMetadataGroup;
+
+const ITEM_CAP = 100;
+const GROUP_FULL_MAX = 5;
+const GROUP_COLLAPSED_COUNT = 3;
+const CANVAS_COLLAPSED_COUNT = 3;
+const LAYER_TYPE_LABELS: Record<string, string> = {
+  control: 'widgets.preview.layerTypes.control',
+  control_layer: 'widgets.preview.layerTypes.control',
+  inpaint_mask: 'widgets.preview.layerTypes.inpaint_mask',
+  raster: 'widgets.preview.layerTypes.raster',
+  raster_layer: 'widgets.preview.layerTypes.raster',
+  regional_guidance: 'widgets.preview.layerTypes.regional_guidance',
+  vector: 'widgets.preview.layerTypes.vector',
+};
+
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 
@@ -51,15 +84,20 @@ const getModelName = (metadata: Record<string, unknown>): string | null => {
   return ref?.name || ref?.key || null;
 };
 
+const collapsed = (
+  hidesItems: boolean,
+  collapsedItems: PreviewMetadataGroupItem[]
+): { collapsedItems?: PreviewMetadataGroupItem[] } => (hidesItems ? { collapsedItems } : {});
+
 export const parsePreviewMetadata = (
   metadata: Record<string, unknown> | null,
   { kind, t }: { kind: 'image' | 'video'; t: TFunction }
-): PreviewMetadataEntry[] => {
+): PreviewMetadataRow[] => {
   if (!isRecord(metadata)) {
     return [];
   }
 
-  const entries: PreviewMetadataEntry[] = [];
+  const entries: PreviewMetadataRow[] = [];
   const push = (key: string, label: string | null, value: string | number | null, isMultiline = false): void => {
     if (value !== null && label !== null) {
       entries.push({ key, label, value: String(value), ...(isMultiline ? { isMultiline } : {}) });
@@ -70,6 +108,12 @@ export const parsePreviewMetadata = (
     const lookup = `widgets.preview.metadataLabels.${key}`;
     const label = t(lookup);
     return label === lookup ? null : label;
+  };
+  const truncation = (overflow: number): { truncationNote?: string } =>
+    overflow > 0 ? { truncationNote: t('widgets.preview.metadataMore', { count: overflow }) } : {};
+  const layerTypeName = (type: string): string => {
+    const lookup = Object.hasOwn(LAYER_TYPE_LABELS, type) ? LAYER_TYPE_LABELS[type] : undefined;
+    return lookup ? t(lookup) : type.replaceAll('_', ' ');
   };
   const cfgScale = getNumberOrScheduleDisplay(metadata, 'cfg_scale');
 
@@ -259,7 +303,12 @@ export const parsePreviewMetadata = (
     if (key === 'ipAdapters' && (Array.isArray(metadata.ref_images) || showLegacyReferences)) {
       continue;
     }
-    values.slice(0, 100).forEach((entry, index) => {
+    const label = metadataLabel(key);
+    if (label === null) {
+      continue;
+    }
+    const items: PreviewMetadataGroupItem[] = [];
+    values.slice(0, ITEM_CAP).forEach((entry, index) => {
       if (!isRecord(entry)) {
         return;
       }
@@ -299,26 +348,36 @@ export const parsePreviewMetadata = (
         parts.push(t('widgets.preview.metadataSchedule', { begin, end }));
       }
       if (parts.some(Boolean)) {
-        push(`${key}-${index}`, metadataLabel(key), parts.filter(Boolean).join(' · '), true);
+        items.push({ key: `${key}-${index}`, value: parts.filter(Boolean).join(' · ') });
       }
     });
-    if (values.length > 100) {
-      push(`${key}-count`, metadataLabel(key), t('widgets.preview.metadataMore', { count: values.length - 100 }));
+    const overflow = Math.max(0, values.length - ITEM_CAP);
+    if (items.length > 0 || overflow > 0) {
+      entries.push({
+        key,
+        label,
+        count: items.length + overflow,
+        items,
+        ...collapsed(items.length > GROUP_FULL_MAX || overflow > 0, items.slice(0, GROUP_COLLAPSED_COUNT)),
+        ...truncation(overflow),
+      });
     }
   }
   const canvas = isRecord(metadata.canvas_v3_metadata) ? metadata.canvas_v3_metadata : null;
   const document = canvas && isRecord(canvas.document) ? canvas.document : null;
   const stacks = document && isRecord(document.stacks) ? document.stacks : null;
   const legacyCanvas = isRecord(metadata.canvas_v2_metadata) ? metadata.canvas_v2_metadata : null;
-  if (stacks || legacyCanvas) {
+  const canvasLabel = metadataLabel('canvas_layers');
+  if ((stacks || legacyCanvas) && canvasLabel !== null) {
     const controlModels = canvas && isRecord(canvas.controlModels) ? canvas.controlModels : {};
-    let shown = 0;
+    const layers: (PreviewMetadataGroupItem & { hasSettings: boolean })[] = [];
+    const typeCounts = new Map<string, number>();
+    let leaves = 0;
     let visited = 0;
-    const visit = (nodes: unknown[], depth: number): number => {
+    const visit = (nodes: unknown[], depth: number): void => {
       if (depth > 10) {
-        return 0;
+        return;
       }
-      let count = 0;
       for (const raw of nodes) {
         if (visited >= 10000) {
           break;
@@ -327,44 +386,61 @@ export const parsePreviewMetadata = (
         if (!isRecord(raw)) {
           continue;
         }
-        count += 1;
         if (raw.type === 'group' && Array.isArray(raw.children)) {
-          count += visit(raw.children, depth + 1);
-        } else if (shown < 100) {
-          shown += 1;
-          const adapter = isRecord(raw.adapter)
-            ? raw.adapter
-            : isRecord(raw.controlAdapter)
-              ? raw.controlAdapter
-              : null;
-          const parts = [
-            getString(raw, 'name'),
-            getString(raw, 'type'),
-            adapter ? (modelName(controlModels[String(raw.id)] ?? adapter.model) ?? getString(adapter, 'model')) : null,
-            getString(raw, 'positivePrompt'),
-            getString(raw, 'negativePrompt'),
-          ];
-          if (adapter && typeof adapter.weight === 'number') {
-            parts.push(t('widgets.preview.metadataWeight', { weight: adapter.weight }));
-          }
-          push(
-            `canvas-${String(raw.id)}-${entries.length}`,
-            metadataLabel('canvas_layers'),
-            parts.filter(Boolean).join(' · '),
-            true
-          );
+          visit(raw.children, depth + 1);
+          continue;
+        }
+        leaves += 1;
+        const type = getString(raw, 'type');
+        const typeName = type === null ? null : layerTypeName(type);
+        if (typeName !== null) {
+          typeCounts.set(typeName, (typeCounts.get(typeName) ?? 0) + 1);
+        }
+        if (leaves > ITEM_CAP) {
+          continue;
+        }
+        const adapter = isRecord(raw.adapter) ? raw.adapter : isRecord(raw.controlAdapter) ? raw.controlAdapter : null;
+        const model = adapter
+          ? (modelName(controlModels[String(raw.id)] ?? adapter.model) ?? getString(adapter, 'model'))
+          : null;
+        const weight =
+          adapter && typeof adapter.weight === 'number'
+            ? t('widgets.preview.metadataWeight', { weight: adapter.weight })
+            : null;
+        const prompts = [getString(raw, 'positivePrompt'), getString(raw, 'negativePrompt')];
+        const value = [getString(raw, 'name'), typeName, model, ...prompts, weight].filter(Boolean).join(' · ');
+        if (value) {
+          layers.push({
+            key: `canvas_layers-${leaves}`,
+            value,
+            hasSettings: Boolean(model || weight || prompts.some(Boolean)),
+          });
         }
       }
-      return count;
     };
-    const counts = Object.entries(stacks ?? legacyCanvas!).flatMap(([key, nodes]) =>
-      key !== 'referenceImages' && Array.isArray(nodes) ? [visit(nodes, 0)] : []
-    );
-    push(
-      'canvasLayerCount',
-      metadataLabel('canvas_layers'),
-      t('widgets.preview.metadataLayerCount', { count: counts.reduce((sum, count) => sum + count, 0) })
-    );
+    for (const [key, nodes] of Object.entries(stacks ?? legacyCanvas!)) {
+      if (key !== 'referenceImages' && Array.isArray(nodes)) {
+        visit(nodes, 0);
+      }
+    }
+    const items = layers.map(({ key, value }) => ({ key, value }));
+    const shownCollapsed = layers
+      .filter((layer) => layer.hasSettings)
+      .slice(0, CANVAS_COLLAPSED_COUNT)
+      .map(({ key, value }) => ({ key, value }));
+    const overflow = Math.max(0, leaves - ITEM_CAP);
+    entries.push({
+      key: 'canvas_layers',
+      label: canvasLabel,
+      count: items.length + overflow,
+      items,
+      ...collapsed(shownCollapsed.length < items.length || overflow > 0, shownCollapsed),
+      summary: [
+        t('widgets.preview.metadataLayerCount', { count: leaves }),
+        ...Array.from(typeCounts, ([type, count]) => t('widgets.preview.metadataLayerTypeCount', { count, type })),
+      ].join(' · '),
+      ...truncation(overflow),
+    });
   }
 
   return entries;

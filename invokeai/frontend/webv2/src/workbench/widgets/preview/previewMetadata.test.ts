@@ -3,7 +3,7 @@ import type { TFunction } from 'i18next';
 import i18n from 'i18next';
 import { beforeAll, describe, expect, it } from 'vitest';
 
-import { parsePreviewMetadata } from './previewMetadata';
+import { parsePreviewMetadata, type PreviewMetadataGroup, type PreviewMetadataRow } from './previewMetadata';
 
 const englishCatalog = Object.values(
   import.meta.glob('../../../../public/locales/en.json', { eager: true, import: 'default' })
@@ -22,8 +22,13 @@ beforeAll(async () => {
 
 const image = { kind: 'image', t } as const;
 const video = { kind: 'video', t } as const;
-const values = (entries: ReturnType<typeof parsePreviewMetadata>) =>
-  Object.fromEntries(entries.map((entry) => [entry.key, entry.value]));
+const values = (rows: PreviewMetadataRow[]) =>
+  Object.fromEntries(rows.flatMap((row) => ('items' in row ? [] : [[row.key, row.value]])));
+const group = (rows: PreviewMetadataRow[], key: string): PreviewMetadataGroup | undefined =>
+  rows.find((row): row is PreviewMetadataGroup => 'items' in row && row.key === key);
+const itemValues = (items: readonly { value: string }[] | undefined) => items?.map((item) => item.value);
+const loras = (count: number) =>
+  Array.from({ length: count }, (_, index) => ({ model: { name: `LoRA ${index + 1}` }, weight: 1 }));
 
 describe('parsePreviewMetadata', () => {
   it('parses the common generate metadata shape under localized labels', () => {
@@ -65,7 +70,7 @@ describe('parsePreviewMetadata', () => {
       'CLIP Skip',
       'Size',
     ]);
-    expect(entries.find((entry) => entry.key === 'positivePrompt')?.isMultiline).toBe(true);
+    expect(entries.find((entry) => entry.key === 'positivePrompt')).toMatchObject({ isMultiline: true });
   });
 
   it('skips missing and malformed fields instead of throwing', () => {
@@ -193,13 +198,20 @@ it('shows useful controls, authored layers, adapters and family settings with ra
     refiner_scheduler: 'euler',
     wan_guidance_scale_low_noise: '2.5',
     ideogram4_color_palette: 'green, gold',
-    'control_layers-0': 'Edges · controlnet · edges.png · Weight 0.75',
-    'ref_images-0': 'Style · ip_adapter · style.png · Weight 0.6',
-    'ref_images-1': 'Hero pose · flux2_reference_image · pose.png',
-    'ref_images-2': `${'x'.repeat(80)} · flux2_reference_image · long.png`,
-    canvasLayerCount: '1 layer',
   });
-  expect(entries.some((entry) => entry.value.includes('My edges') && entry.value.includes('Edges'))).toBe(true);
+  expect(itemValues(group(entries, 'control_layers')?.items)).toEqual(['Edges · controlnet · edges.png · Weight 0.75']);
+  expect(group(entries, 'ref_images')).toMatchObject({ label: 'Reference images', count: 3 });
+  expect(itemValues(group(entries, 'ref_images')?.items)).toEqual([
+    'Style · ip_adapter · style.png · Weight 0.6',
+    'Hero pose · flux2_reference_image · pose.png',
+    `${'x'.repeat(80)} · flux2_reference_image · long.png`,
+  ]);
+  expect(group(entries, 'canvas_layers')).toMatchObject({
+    label: 'Canvas layers',
+    summary: '1 layer · 1 control',
+    items: [{ value: 'My edges · control · Edges · Weight 0.75' }],
+  });
+  expect(group(entries, 'canvas_layers')).not.toHaveProperty('collapsedItems');
   expect(metadata.canvas_v3_metadata.document.stacks.control[0]?.id).toBe('c');
 });
 
@@ -215,7 +227,9 @@ it('describes v4 IP-Adapters including model, image, vision, method, weight and 
   };
   const parsed = parsePreviewMetadata({ ipAdapters: [entry] }, image);
   expect(parsed).toHaveLength(1);
-  expect(parsed[0]?.value).toBe('Portrait · portrait.png · ViT-G · style_precise · Weight 0.65 · Steps 0.2–0.9');
+  expect(itemValues(group(parsed, 'ipAdapters')?.items)).toEqual([
+    'Portrait · portrait.png · ViT-G · style_precise · Weight 0.65 · Steps 0.2–0.9',
+  ]);
   expect(parsePreviewMetadata({ ref_images: [], ipAdapters: [entry] }, image)).toEqual([]);
 });
 
@@ -249,15 +263,18 @@ it.each(['array', 'entities'] as const)(
       ipAdapters: [{ ip_adapter_model: { name: 'Duplicate alias' }, image: { image_name: 'style.png' }, weight: 0.6 }],
     };
     const parsed = parsePreviewMetadata(metadata, image);
-    expect(values(parsed)).toMatchObject({
-      'ref_images-0': 'Historical style · ip_adapter · style.png · ViT-L · composition · Weight 0.6 · Steps 0.1–0.8',
-      canvasLayerCount: '1 layer',
+    expect(parsed.map((row) => row.key)).toEqual(['ref_images', 'canvas_layers']);
+    expect(group(parsed, 'ref_images')).toMatchObject({
+      label: 'Reference images',
+      items: [
+        { value: 'Historical style · ip_adapter · style.png · ViT-L · composition · Weight 0.6 · Steps 0.1–0.8' },
+      ],
     });
-    expect(parsed.find((entry) => entry.key === 'ref_images-0')?.label).toBe('Reference images');
-    expect(parsed.filter((entry) => entry.value.includes('Historical style'))).toHaveLength(1);
-    expect(
-      parsed.some((entry) => entry.value.includes('Duplicate alias') || entry.value.includes('Global style'))
-    ).toBe(false);
+    expect(group(parsed, 'canvas_layers')).toMatchObject({
+      summary: '1 layer · 1 raster',
+      items: [{ value: 'Authored raster · raster' }],
+      collapsedItems: [],
+    });
     for (const ref_images of [
       [],
       [
@@ -273,11 +290,9 @@ it.each(['array', 'entities'] as const)(
       ],
     ]) {
       const modern = parsePreviewMetadata({ ...metadata, ref_images }, image);
-      expect(
-        modern.some((entry) => entry.value.includes('Historical style') || entry.value.includes('Duplicate alias'))
-      ).toBe(false);
-      expect(modern.filter((entry) => entry.key.startsWith('ref_images-'))).toHaveLength(ref_images.length);
-      expect(values(modern).canvasLayerCount).toBe('1 layer');
+      expect(JSON.stringify(modern)).not.toMatch(/Historical style|Duplicate alias/);
+      expect(group(modern, 'ref_images')?.items ?? []).toHaveLength(ref_images.length);
+      expect(group(modern, 'canvas_layers')?.summary).toBe('1 layer · 1 raster');
     }
   }
 );
@@ -292,4 +307,75 @@ it('formats CFG schedule arrays cleanly and omits malformed or empty arrays', ()
   expect(values(parsePreviewMetadata({ cfg_scale: [] }, image))).toEqual({});
   expect(values(parsePreviewMetadata({ cfg_scale: [7, 'bad'] }, image))).toEqual({});
   expect(values(parsePreviewMetadata({ cfg_scale: [7, Number.NaN] }, image))).toEqual({});
+});
+
+it('lists up to five items in full and collapses longer groups to their first three', () => {
+  const five = group(parsePreviewMetadata({ loras: loras(5) }, image), 'loras');
+  expect(five).toMatchObject({ label: 'LoRAs', count: 5 });
+  expect(five).not.toHaveProperty('collapsedItems');
+  const six = group(parsePreviewMetadata({ loras: loras(6) }, image), 'loras');
+  expect(six?.count).toBe(6);
+  expect(itemValues(six?.items)).toHaveLength(6);
+  expect(itemValues(six?.collapsedItems)).toEqual(['LoRA 1 · Weight 1', 'LoRA 2 · Weight 1', 'LoRA 3 · Weight 1']);
+});
+
+it('caps a group at 100 items and notes the rest', () => {
+  const capped = group(parsePreviewMetadata({ loras: loras(130) }, image), 'loras');
+  expect(capped).toMatchObject({ count: 130, truncationNote: '30 more (see raw JSON)' });
+  expect(capped?.items).toHaveLength(100);
+  expect(itemValues(capped?.collapsedItems)).toHaveLength(3);
+});
+
+it('summarizes Canvas layers by type and leads the collapsed view with layers that carry settings', () => {
+  const rows = parsePreviewMetadata(
+    {
+      canvas_v3_metadata: {
+        document: {
+          stacks: {
+            raster: [
+              { id: 'sky', type: 'raster', name: 'Sky' },
+              {
+                id: 'folder',
+                type: 'group',
+                name: 'Folder',
+                children: [{ id: 'hills', type: 'raster', name: 'Hills' }],
+              },
+            ],
+            control: [{ id: 'edges', type: 'control', name: 'Edges', adapter: { model: 'edge-key', weight: 0.5 } }],
+            inpaint_mask: [
+              { id: 'mask', type: 'inpaint_mask', name: 'Mask' },
+              { id: 'mask', type: 'inpaint_mask', name: 'Mask copy' },
+            ],
+            regional_guidance: [
+              { id: 'face', type: 'regional_guidance', name: 'Face', positivePrompt: 'smiling' },
+              { id: 'hat', type: 'regional_guidance', name: 'Hat', negativePrompt: 'red' },
+            ],
+            vector: [{ id: 'logo', type: 'custom_shape', name: 'Logo' }],
+          },
+        },
+        controlModels: { edges: { name: 'Lineart' } },
+      },
+    },
+    image
+  );
+  const layers = group(rows, 'canvas_layers');
+  expect(layers?.summary).toBe(
+    '8 layers · 2 raster · 1 control · 2 inpaint mask · 2 regional guidance · 1 custom shape'
+  );
+  expect(itemValues(layers?.collapsedItems)).toEqual([
+    'Edges · control · Lineart · Weight 0.5',
+    'Face · regional guidance · smiling',
+    'Hat · regional guidance · red',
+  ]);
+  expect(itemValues(layers?.items)).toEqual([
+    'Sky · raster',
+    'Hills · raster',
+    'Edges · control · Lineart · Weight 0.5',
+    'Mask · inpaint mask',
+    'Mask copy · inpaint mask',
+    'Face · regional guidance · smiling',
+    'Hat · regional guidance · red',
+    'Logo · custom shape',
+  ]);
+  expect(new Set(layers?.items.map((item) => item.key)).size).toBe(8);
 });

@@ -130,7 +130,7 @@ void i18n.use(initReactI18next).init({
   lng: 'en',
   resources: {
     en: {
-      metadata: { widgets: { preview: { metadataLabels: { generation_mode: 'Generation path' } } } },
+      metadata: { widgets: { preview: { metadataLabels: { generation_mode: 'Generation path', loras: 'LoRAs' } } } },
       translation: {
         common: { countOfTotal: '{{count}} of {{total}}', copy: 'Copy', retry: 'Retry' },
         widgets: {
@@ -167,6 +167,8 @@ void i18n.use(initReactI18next).init({
             metadata: 'Metadata',
             metadataFailed: 'Could not load the metadata',
             metadataJsonLabel: 'Video metadata JSON',
+            metadataShowAll: 'Show all {{count}}',
+            metadataShowLess: 'Show less',
             nextItemInBoard: 'Next item in board',
             previousItemInBoard: 'Previous item in board',
             recallNotAvailable: 'Not recallable for this image',
@@ -201,10 +203,12 @@ const interact = (action: () => void, delay = 100): Promise<void> =>
 const POSITION = { boardItemCount: 2, isLoadingBoard: false, selectedIndex: 0 };
 
 const renderDetails = async ({
+  image = actionImage,
   isOpen,
   item,
   localization = i18n,
 }: {
+  image?: GalleryImage;
   isOpen: boolean;
   item: GalleryImageItem | GalleryVideoItem;
   localization?: typeof i18n;
@@ -216,7 +220,7 @@ const renderDetails = async ({
           <ChakraProvider value={system}>
             <PreviewDetailsPanel
               actions={actions}
-              image={item.kind === 'image' ? actionImage : null}
+              image={item.kind === 'image' ? image : null}
               isOpen={isOpen}
               item={item}
               position={POSITION}
@@ -516,6 +520,41 @@ describe('Preview query-driven Details', () => {
     await vi.waitFor(() => expect(document.activeElement).toBe(getButton('Metadata')));
   });
 
+  it('expands a long group from its toggle and keeps it expanded on the next image', async () => {
+    const loras = (count: number) =>
+      Array.from({ length: count }, (_, index) => ({ model: { name: `Style ${index}` } }));
+    galleryMocks.imageMetadata.mockImplementation((name: string) =>
+      Promise.resolve({ loras: loras(name === 'still.png' ? 6 : 7) })
+    );
+    const toggle = () => getButton(/^Show (all \d+|less)$/);
+    const visibleLines = () => document.getElementById(toggle().getAttribute('aria-controls')!)?.children.length;
+
+    await renderDetails({ isOpen: true, item: imageItem });
+    await act(async () => {
+      await vi.waitFor(() => expect(toggle().textContent).toBe('Show all 6'));
+    });
+    expect(toggle().getAttribute('aria-expanded')).toBe('false');
+    expect(visibleLines()).toBe(3);
+
+    toggle().focus();
+    await interact(() => toggle().click());
+    expect(toggle().getAttribute('aria-expanded')).toBe('true');
+    expect(toggle().textContent).toBe('Show less');
+    expect(visibleLines()).toBe(6);
+    expect(document.activeElement).toBe(toggle());
+
+    const next = { ...imageItem, name: 'next.png' };
+    await renderDetails({ image: { ...actionImage, imageName: 'next.png' }, isOpen: true, item: next });
+    await act(async () => {
+      await vi.waitFor(() => expect(visibleLines()).toBe(7));
+    });
+    expect(toggle().getAttribute('aria-expanded')).toBe('true');
+
+    await interact(() => toggle().click());
+    expect(toggle().textContent).toBe('Show all 7');
+    expect(visibleLines()).toBe(3);
+  });
+
   it('recalls a single field from its metadata row', async () => {
     galleryMocks.imageMetadata.mockResolvedValueOnce({
       model: { name: 'Test Model' },
@@ -544,10 +583,11 @@ describe('Preview query-driven Details', () => {
   });
 });
 
-const getButton = (text: string): HTMLButtonElement => {
-  const button = Array.from(document.querySelectorAll<HTMLButtonElement>('button')).find(
-    (candidate) => candidate.textContent?.trim() === text
-  );
+const getButton = (text: string | RegExp): HTMLButtonElement => {
+  const button = Array.from(document.querySelectorAll<HTMLButtonElement>('button')).find((candidate) => {
+    const content = candidate.textContent?.trim() ?? '';
+    return typeof text === 'string' ? content === text : text.test(content);
+  });
 
   if (!button) {
     throw new Error(`Expected button: ${text}`);
