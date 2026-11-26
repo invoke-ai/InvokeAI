@@ -39,8 +39,7 @@ export const SwatchesPane = () => {
       if (normalizeHex(hex, '') === '') {
         return;
       }
-      // Flattened like the pair itself, so a pick (even of a legacy alpha
-      // recent) records what it actually sets.
+      // Flattened like the pair itself, so a pick (even of a legacy alpha recent) records what it actually sets.
       const opaque = formatHexColor(parseHexColor(hex));
       if (maskTint) {
         maskTint.commit(opaque);

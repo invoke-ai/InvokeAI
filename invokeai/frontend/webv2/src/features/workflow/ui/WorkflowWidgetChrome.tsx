@@ -97,16 +97,9 @@ import {
   workflowUiStore,
 } from './workflowUiStore';
 
-/**
- * Keep dialogs mounted here and drive them through workflowUiStore; manifest slots contribute label, quick
- * actions, and shared menu actions.
- */
+/** Dialogs stay mounted here, driven through workflowUiStore. */
 
-/**
- * The library dialog's chunk (cards, rails, toolbar, detail sheet) stays out of the editor's startup bundle until the
- * library first opens; its entry points preload it on hover or focus so that opening feels immediate. A failed load
- * (an offline moment, a redeploy) retries on the next attempt.
- */
+/** Kept out of the editor's startup bundle; entry points preload it on hover or focus, and a failed load retries. */
 const workflowLibraryDialog = createDeferredModule(() => import('./library/WorkflowLibraryDialog'));
 const preloadWorkflowLibraryDialog = workflowLibraryDialog.preload;
 
@@ -180,10 +173,7 @@ const areWorkflowChoicesEqual = (left: readonly WorkflowChoice[], right: readonl
   left.length === right.length &&
   left.every((choice, index) => choice.id === right[index]?.id && choice.name === right[index].name);
 
-/**
- * A long list opens with the active workflow in view. A frame later, once the positioner has capped the menu to the room
- * beside its trigger; the list's own viewport is the nearest scroller, so only the list moves.
- */
+/** A frame later, once the positioner has capped the menu; the list's viewport is the nearest scroller. */
 const revealActiveChoice = (item: HTMLElement | null) => {
   if (item) {
     requestAnimationFrame(() => item.scrollIntoView({ block: 'nearest' }));
@@ -191,19 +181,12 @@ const revealActiveChoice = (item: HTMLElement | null) => {
 };
 
 /**
- * The list's scroller is the shared scrolling menu list, which lives with the editor's boot code: imported here, it would
- * make this chunk, which a Launchpad manager reaches, reach the editor. It loads on first use instead, already loaded
- * wherever the editor has booted; until then, or if it fails to load, the same rows scroll natively. The rows and the
- * actions are this component's either way, so the menu opens whole and nothing moves under a click when it arrives.
+ * Deferred: a static import would pull the editor's boot code into this chunk, which a Launchpad manager reaches. Until
+ * it loads, the same rows scroll natively.
  */
 const scrollableMenu = createDeferredModule(() => import('@platform/ui/ScrollableMenuContent'));
 const NATIVE_SCROLL_LIST_PROPS = { minH: '0', overflowY: 'auto' } as const;
 
-/**
- * The project's workflows in collection order (the library's "Project order"), the active one checked, then a new
- * workflow and the way on to the library. Choosing one opens it as the library's Open does; the list scrolls, the two
- * actions under it stay.
- */
 const WorkflowSwitcherContent = ({
   activeWorkflowId,
   onOpenLibrary,
@@ -214,7 +197,6 @@ const WorkflowSwitcherContent = ({
   const { t } = useTranslation();
   const choices = useWorkflowProjectSelector(selectWorkflowChoices, areWorkflowChoicesEqual);
   const { createWorkflow, selectWorkflow } = useProjectGraphCommands();
-  // Nothing is replaced: a new workflow is added beside the others and becomes the active one, so nothing asks first.
   const newWorkflow = useCallback(() => createWorkflow(), [createWorkflow]);
   const chooseWorkflow = useCallback(
     (event: { value: string }) => {
@@ -287,7 +269,6 @@ const WorkflowSwitcherContent = ({
   );
 };
 
-/** How the project's own persistence is shown beside the library actions. */
 const PERSISTENCE_VIEW: Record<
   WorkflowProjectPersistence['status'],
   { color: string; icon: ElementType; labelKey: string }
@@ -299,11 +280,7 @@ const PERSISTENCE_VIEW: Record<
   saving: { color: 'fg.subtle', icon: RefreshCwIcon, labelKey: 'widgets.workflow.persistenceSaving' },
 };
 
-/**
- * What the workflow's library link says: the template it updates, a bundled template, another linked template, or
- * none. The template's name is not part of the project; it is read only once asked for, through the query the update
- * confirmation uses.
- */
+/** The template's name is not in the project; it is read on demand through the update confirmation's query. */
 const useTemplateLinkDescription = (
   source: ProjectWorkflowSource | undefined,
   wantsName: boolean,
@@ -330,12 +307,7 @@ const useTemplateLinkDescription = (
       : t('workflowLibrary.sourceNone');
 };
 
-/**
- * The center chrome's label: the workflow's name, with its library link inside the same trigger, so the name pill
- * shrinks as one piece. It opens a menu that switches between the project's workflows or opens the library. The label
- * clips rather than overflows its island: at narrow center widths the actions island beside it would otherwise paint
- * over the name and take its clicks.
- */
+/** Clips rather than overflows: at narrow widths the actions island would paint over the name and take its clicks. */
 export const WorkflowWidgetLabel = ({ region }: WorkflowWidgetLabelProps) => {
   const { t } = useTranslation();
   const workflowName = useWorkflowProjectSelector((project) => project.projectGraph.name);
@@ -373,10 +345,8 @@ export const WorkflowWidgetLabel = ({ region }: WorkflowWidgetLabelProps) => {
     return <Text fontWeight="700">{t('widgets.labels.workflow')}</Text>;
   }
 
-  // Center chrome already names the widget; the workflow name switches between the project's workflows.
   const displayName = workflowName || t('widgets.workflow.untitled');
   const isLinked = isUpdatableSource(source, session);
-  // A source this account cannot update is locked, whether bundled or owned by another account.
   const linkIcon = isLinked ? Link2Icon : source ? LockIcon : Link2OffIcon;
   const linkKind = isLinked
     ? 'linked'
@@ -387,8 +357,7 @@ export const WorkflowWidgetLabel = ({ region }: WorkflowWidgetLabelProps) => {
       : 'none';
 
   return (
-    // Sized by its content, so a narrow center shrinks it and the view menu beside it in proportion; a zero basis
-    // would leave the name only what the view menu does not take.
+    // Sized by content so a narrow center shrinks it and the view menu in proportion; a zero basis starves the name.
     <HStack css={LABEL_CLIP_CSS} flex="1 1 auto" gap="1" minW="0">
       <Text color="fg.subtle" flexShrink={1} minW="0" overflow="hidden">
         /
@@ -447,22 +416,12 @@ export const WorkflowWidgetLabel = ({ region }: WorkflowWidgetLabelProps) => {
 
 const WORKFLOW_SWITCHER_POSITIONING = { placement: 'bottom-start' } as const;
 
-// Clipped, but with room for the name button's focus ring.
 const LABEL_CLIP_CSS = { overflow: 'clip', overflowClipMargin: '4px' } as const;
 
-/**
- * Below the width where every header action fits, Undo and Redo give way rather than the library actions: in the
- * default Workflow layout of a 1280px window the center chrome row is 304px, which held the header before they
- * arrived and no more. Their shortcuts keep working, and the ⋯ menu offers them while the header hides them. Queried
- * on the nearest container: the center chrome row, or a panel header.
- */
+/** Below this width Undo and Redo give way first; the ⋯ menu offers them while they are hidden. */
 const HEADER_HISTORY_CSS = { '@container (width < 24rem)': { display: 'none' } } as const;
 
-/**
- * The headers that have hidden their history steps for want of room, by widget instance and region: the widget can show
- * in several regions at once, each header at its own width, and each ⋯ menu (outside that container) asks after its
- * own header only.
- */
+/** Per widget instance and region: each header has its own width, and each ⋯ menu asks after its own header. */
 const headerHistoryStore = createExternalStore<{ hiddenIn: Readonly<Record<string, true>> }>({ hiddenIn: {} });
 
 const getHeaderKey = ({ region, runtime }: WorkflowWidgetViewProps) => `${runtime.instanceId}\0${region}`;
@@ -500,7 +459,6 @@ const useHeaderHistoryObserver = (key: string) =>
     [key]
   );
 
-/** Undo and Redo in the ⋯ menu, for a header too narrow to show them. */
 const WorkflowHistoryMenuItems = () => {
   const { t } = useTranslation();
   const { CommandShortcut } = useWorkflowUi();
@@ -538,7 +496,6 @@ const WorkflowHistoryMenuItems = () => {
 
 const EXPORT_SUBMENU_POSITIONING = { placement: 'right-start' } as const;
 
-/** Entries contributed to the shared widget actions menu, under its graph actions. */
 export const WorkflowMenuItems = (props: WorkflowWidgetViewProps) => {
   const { t } = useTranslation();
   const session = useAuthSession();
@@ -617,7 +574,7 @@ export const WorkflowMenuItems = (props: WorkflowWidgetViewProps) => {
           value="details"
           onSelect={openDetailsPanel}
         />
-        {/* Saving always creates a template. Beside Update, a linked workflow's save says it makes a new one. */}
+        {/* Saving always creates a template; beside Update, a linked workflow's save says so. */}
         <MenuActionItem
           icon={BookmarkIcon}
           label={t(
@@ -693,7 +650,6 @@ const selectPersistenceView = (persistence: WorkflowProjectPersistence) => ({
   status: persistence.status,
 });
 
-/** Undo and redo for the editor's session history, beside the other header actions as in Canvas's header. */
 const WorkflowHistoryActions = () => {
   const { t } = useTranslation();
   const { CommandShortcut } = useWorkflowUi();
@@ -747,8 +703,7 @@ export const WorkflowHeaderActions = (props: WorkflowWidgetViewProps) => {
   // A pending save without browser recovery has no safety net at all; say so rather than showing the same cloud.
   const persistenceLabel =
     status === 'pending' && !hasLocalRecovery ? t('widgets.workflow.persistencePendingNoRecovery') : t(view.labelKey);
-  // History steps sit wherever the editor renders, as its toolbar did: the center and the expanded bottom panel (the
-  // only bottom presentation with a header). The left region's linear form has no editor and no history keys.
+  // History steps show wherever the editor renders; the left region's linear form has no editor.
   const showsHistory = region !== 'left';
 
   return (
@@ -773,8 +728,7 @@ export const WorkflowHeaderActions = (props: WorkflowWidgetViewProps) => {
           <HeaderActionDivider />
         </HStack>
       ) : null}
-      {/* The center label's menu already opens the library; other regions need this separate trigger and leave
-          publication and persistence to the editor header. */}
+      {/* The center label's menu already opens the library. */}
       {region === 'center' ? null : (
         <Tooltip content={t('widgets.workflow.library')}>
           <IconButton
@@ -852,8 +806,7 @@ export const WorkflowDialogHost = () => {
     setHasOpenedLibrary(true);
   }
   const lastImportRequestRef = useRef(importRequestCount);
-  // A rename request opens the dialog once, for the workflow it named, and only while that workflow is the active
-  // one; closing records the request as handled.
+  // A rename request opens once, only while its workflow is active; closing records it as handled.
   const renameRequest = workflowUiStore.useSelector((snapshot) => snapshot.renameRequest);
   const [handledRenameRequestId, setHandledRenameRequestId] = useState(0);
   const activeWorkflowId = useWorkflowProjectSelector((project) => project.activeWorkflowId);
@@ -917,7 +870,6 @@ export const WorkflowDialogHost = () => {
     // The middle of the editor, wherever its window or panel sits, not of the browser window.
     const center = getWorkflowViewCenter() ?? { x: 0, y: 0 };
 
-    // Slight scatter so repeated inserts do not stack perfectly.
     return { x: center.x + (Math.random() - 0.5) * 80, y: center.y + (Math.random() - 0.5) * 80 };
   }, [addNodePosition]);
 
@@ -1112,8 +1064,7 @@ export const WorkflowDialogHost = () => {
         onAddNote={addNote}
         onOpenChange={setAddNodeOpen}
       />
-      {/* Loaded on the first opening and kept mounted after, so its exit transitions, reset on close and remembered
-          place behave as for an always-mounted dialog. Its own busy overlay covers loading once it shows. */}
+      {/* Kept mounted after the first open, so exit transitions, close reset and remembered place behave as usual. */}
       {hasOpenedLibrary ? <WorkflowLibraryDialogLoader isOpen={isLibraryOpen} /> : null}
       <LibraryCopyChoiceHost />
       <RenameDialog

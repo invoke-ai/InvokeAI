@@ -12,6 +12,8 @@ import {
   getDefaultGenerateSettings,
   getGenerationUiPolicy,
   getGuidanceBoundReason,
+  getGuidanceInputMax,
+  getGuidanceSliderMax,
   getSchedulerOptions,
 } from '@features/generation/core/baseGenerationPolicies';
 import { getEffectivePrompts } from '@features/generation/core/promptTemplates';
@@ -22,6 +24,7 @@ import {
   DEFAULT_TIMESTEP_SHIFT,
   FLUX_DYPE_PRESETS,
   getDynamicPromptsConfig,
+  getEffectiveIdeogram4Sampling,
   IDEOGRAM4_GUIDANCE_MAX,
   IDEOGRAM4_GUIDANCE_MIN,
   IDEOGRAM4_MU_MAX,
@@ -30,6 +33,7 @@ import {
   IDEOGRAM4_STEPS_MAX,
   IDEOGRAM4_STEPS_MIN,
   isFluxDypePreset,
+  isIdeogram4SamplerPreset,
   isValidMossImageSkipLayers,
   MAX_FLUX_DYPE_EXPONENT,
   MAX_FLUX_DYPE_SCALE,
@@ -76,13 +80,6 @@ const TIMESTEP_SHIFT_MARKS = [{ label: String(DEFAULT_TIMESTEP_SHIFT), value: DE
 /** The exponent's `le=1000` bound is far beyond any documented recipe (0.5–2), so the track stops at 10. */
 const DYPE_EXPONENT_SLIDER_MAX = 10;
 const formatPercent = (value: number): string => `${value}%`;
-
-/**
- * Slider tracks are practical ranges, distinct from input/validation bounds; FLUX Fill's default 30 exceeds its
- * track.
- */
-const GUIDANCE_SLIDER_MAX = 10;
-const GUIDANCE_INPUT_MAX = 100;
 
 interface GenerateRenderSectionProps {
   draft: GenerateDraft;
@@ -137,15 +134,17 @@ interface RenderFieldsProps {
   onCommit: GenerateRenderSectionProps['onCommit'];
 }
 
-/** Labels expose step counts hidden in backend preset IDs. */
 const IDEOGRAM4_PRESET_LABELS: Record<Ideogram4SamplerPreset, string> = {
-  V4_DEFAULT_20: 'Default (20 steps)',
-  V4_QUALITY_48: 'Quality (48 steps)',
-  V4_TURBO_12: 'Turbo (12 steps)',
+  V4_DEFAULT_20: 'Default',
+  V4_QUALITY_48: 'Quality',
+  V4_TURBO_12: 'Turbo',
 };
 
 const IDEOGRAM4_PRESET_COLLECTION = createListCollection({
-  items: IDEOGRAM4_SAMPLER_PRESETS.map((value) => ({ label: IDEOGRAM4_PRESET_LABELS[value], value })),
+  items: Object.entries(IDEOGRAM4_SAMPLER_PRESETS).map(([value, { steps }]) => ({
+    label: `${IDEOGRAM4_PRESET_LABELS[value as Ideogram4SamplerPreset]} (${steps} steps)`,
+    value,
+  })),
 });
 
 const Ideogram4SamplingFields = ({ onCommit, settings }: RenderFieldsProps) => {
@@ -161,8 +160,8 @@ const Ideogram4SamplingFields = ({ onCommit, settings }: RenderFieldsProps) => {
           onValueChange={({ value }) => {
             const preset = value[0];
 
-            if (IDEOGRAM4_SAMPLER_PRESETS.includes(preset as Ideogram4SamplerPreset)) {
-              onCommit({ ideogram4SamplerPreset: preset as Ideogram4SamplerPreset });
+            if (isIdeogram4SamplerPreset(preset)) {
+              onCommit({ ideogram4SamplerPreset: preset });
             }
           }}
         />
@@ -248,12 +247,12 @@ interface SkipLayersDraft {
 }
 
 /**
- * The blocks MOSS-Image's negative branch skips. Typing only edits a draft, with its error shown while the text is
- * not a list of blocks; the list commits when the field loses focus or drafts flush before Invoke. Text that is not a
- * list then restores the list from before the edit, so no prefix typed on the way ever commits. Either way the field
- * then shows the stored list unique and ascending: exactly what is sent. A stored list changed from elsewhere
- * (recall, reset, preset) replaces the draft typed over the old one. CFG 1 runs no negative branch, so the field
- * rests disabled there.
+ * The blocks MOSS-Image's negative branch skips. Typing only edits a draft, with its error shown while the text is not
+ * a list of blocks; the list commits when the field loses focus or drafts flush before Invoke. Text that is not a list
+ * then restores the list from before the edit, so no prefix typed on the way ever commits. Either way the field then
+ * shows the stored list unique and ascending: exactly what is sent. A stored list changed from elsewhere (recall,
+ * reset, preset) replaces the draft typed over the old one. CFG 1 runs no negative branch, so the field rests disabled
+ * there.
  */
 const MossImageSkipLayersField = ({
   onCommitImmediate,
@@ -362,8 +361,8 @@ const Flux3PromptUpsamplerField = ({ onCommit, settings }: RenderFieldsProps) =>
 };
 
 /**
- * Perturbs conditioning between seeds — a variation concern, so it sits by the seed. Krea-2 and Z-Image each have
- * their own enhancer node with the same three settings.
+ * Perturbs conditioning between seeds — a variation concern, so it sits by the seed. Krea-2 and Z-Image each have their
+ * own enhancer node with the same three settings.
  */
 const SeedVarianceFields = ({
   enabled,
@@ -547,8 +546,8 @@ const TimestepShiftField = ({
           numberInputMin={MIN_TIMESTEP_SHIFT}
           step={0.1}
           value={shift}
-          // The input reports each keystroke, so typing 0.5 passes through 0. Settings read a shift outside its
-          // bounds as auto, which would drop the override mid-edit; the input clamps it on blur instead.
+          // The input reports each keystroke, so typing 0.5 passes through 0. Settings read a shift outside its bounds
+          // as auto, which would drop the override mid-edit; the input clamps it on blur instead.
           onChange={(next) => {
             if (next >= MIN_TIMESTEP_SHIFT && next <= MAX_TIMESTEP_SHIFT) {
               onChange(next);
@@ -611,7 +610,6 @@ const SeedField = ({ onCommit, settings }: RenderFieldsProps) => {
   );
 };
 
-/** The section reset's wording by where its values come from. */
 const RENDER_RESET_LABEL_KEYS = {
   withScheduler: {
     base: 'widgets.generate.sectionMenu.resetStepsGuidanceAndSchedulerBase',
@@ -637,10 +635,15 @@ export const GenerateRenderSection = ({
   const modelDefaults = selectedModel ? getDefaultGenerateSettings(selectedModel) : null;
   const uiPolicy = getGenerationUiPolicy(selectedModel);
   const familyBase = selectedModel && selectedModel.type !== 'external_image_generator' ? selectedModel.base : null;
+  const isIdeogram4 = familyBase === 'ideogram-4';
+  const sampling = isIdeogram4
+    ? getEffectiveIdeogram4Sampling(settings)
+    : { guidanceScale: settings.cfgScale, steps: settings.steps };
+  const guidanceLabel = isIdeogram4 ? t('widgets.generate.ideogram4GuidanceScale') : uiPolicy.guidanceLabel;
 
   // Cap both input and track at the architecture ceiling without crossing the floor.
-  const guidanceInputMax = uiPolicy.guidanceMax ?? GUIDANCE_INPUT_MAX;
-  const guidanceSliderMax = Math.max(uiPolicy.guidanceMin, Math.min(GUIDANCE_SLIDER_MAX, guidanceInputMax));
+  const guidanceInputMax = getGuidanceInputMax(uiPolicy.guidanceMax);
+  const guidanceSliderMax = getGuidanceSliderMax(uiPolicy.guidanceMin, uiPolicy.guidanceMax);
   // Validate recalled/persisted values inline because they bypass model-selection clamps.
   const guidanceError = selectedModel ? getGuidanceBoundReason(selectedModel, settings.cfgScale) : null;
 
@@ -693,49 +696,53 @@ export const GenerateRenderSection = ({
 
   const renderFields = (strengthField: ReactNode) => (
     <>
-      <GenerateFieldContextMenu
-        fieldLabel={t('widgets.generate.steps')}
-        copyValue={() => String(settings.steps)}
-        isAtDefault={modelDefaults !== null && settings.steps === modelDefaults.steps}
-        resetLabel={resetLabel('steps')}
-        onReset={modelDefaults ? () => onCommit({ steps: modelDefaults.steps }) : undefined}
-      >
-        <ScrubberField
-          defaultValue={modelDefaults?.steps}
-          hint="steps"
-          inputMax={Number.MAX_SAFE_INTEGER}
-          label={t('widgets.generate.steps')}
-          marks={modelDefaults ? [modelDefaults.steps] : undefined}
-          max={STEPS_SLIDER_MAX}
-          min={1}
-          step={1}
-          value={settings.steps}
-          onChange={(steps) => commitNumber('steps', steps)}
-        />
-      </GenerateFieldContextMenu>
-      <GenerateFieldContextMenu
-        fieldLabel={uiPolicy.guidanceLabel}
-        copyValue={() => String(settings.cfgScale)}
-        isAtDefault={modelDefaults !== null && settings.cfgScale === modelDefaults.cfgScale}
-        resetLabel={resetLabel('cfgScale')}
-        onReset={modelDefaults ? () => onCommit({ cfgScale: modelDefaults.cfgScale }) : undefined}
-      >
-        <ScrubberField
-          defaultValue={modelDefaults?.cfgScale}
-          error={guidanceError}
-          hint="guidance"
-          inputMax={guidanceInputMax}
-          label={uiPolicy.guidanceLabel}
-          marks={modelDefaults ? [modelDefaults.cfgScale] : undefined}
-          max={guidanceSliderMax}
-          min={uiPolicy.guidanceMin}
-          step={0.5}
-          value={settings.cfgScale}
-          onChange={(cfgScale) => commitNumber('cfgScale', cfgScale)}
-        />
-      </GenerateFieldContextMenu>
-      {/* The scrubber shows the message; this adds its one-step fix. */}
-      <GenerateIssueNotes field="cfgScale" fixesOnly section="render" />
+      {!isIdeogram4 ? (
+        <>
+          <GenerateFieldContextMenu
+            fieldLabel={t('widgets.generate.steps')}
+            copyValue={() => String(settings.steps)}
+            isAtDefault={modelDefaults !== null && settings.steps === modelDefaults.steps}
+            resetLabel={resetLabel('steps')}
+            onReset={modelDefaults ? () => onCommit({ steps: modelDefaults.steps }) : undefined}
+          >
+            <ScrubberField
+              defaultValue={modelDefaults?.steps}
+              hint="steps"
+              inputMax={Number.MAX_SAFE_INTEGER}
+              label={t('widgets.generate.steps')}
+              marks={modelDefaults ? [modelDefaults.steps] : undefined}
+              max={STEPS_SLIDER_MAX}
+              min={1}
+              step={1}
+              value={settings.steps}
+              onChange={(steps) => commitNumber('steps', steps)}
+            />
+          </GenerateFieldContextMenu>
+          <GenerateFieldContextMenu
+            fieldLabel={uiPolicy.guidanceLabel}
+            copyValue={() => String(settings.cfgScale)}
+            isAtDefault={modelDefaults !== null && settings.cfgScale === modelDefaults.cfgScale}
+            resetLabel={resetLabel('cfgScale')}
+            onReset={modelDefaults ? () => onCommit({ cfgScale: modelDefaults.cfgScale }) : undefined}
+          >
+            <ScrubberField
+              defaultValue={modelDefaults?.cfgScale}
+              error={guidanceError}
+              hint="guidance"
+              inputMax={guidanceInputMax}
+              label={uiPolicy.guidanceLabel}
+              marks={modelDefaults ? [modelDefaults.cfgScale] : undefined}
+              max={guidanceSliderMax}
+              min={uiPolicy.guidanceMin}
+              step={0.5}
+              value={settings.cfgScale}
+              onChange={(cfgScale) => commitNumber('cfgScale', cfgScale)}
+            />
+          </GenerateFieldContextMenu>
+          {/* The scrubber shows the message; this adds its one-step fix. */}
+          <GenerateIssueNotes field="cfgScale" fixesOnly section="render" />
+        </>
+      ) : null}
       {strengthField}
       {familyBase === 'moss-image' ? (
         <MossImageSkipLayersField settings={settings} onCommitImmediate={onCommitImmediate} />
@@ -782,7 +789,7 @@ export const GenerateRenderSection = ({
           </Field>
         </GenerateFieldContextMenu>
       ) : null}
-      {familyBase === 'ideogram-4' ? <Ideogram4SamplingFields settings={settings} onCommit={onCommit} /> : null}
+      {isIdeogram4 ? <Ideogram4SamplingFields settings={settings} onCommit={onCommit} /> : null}
       {uiPolicy.seedVisible ? <SeedField settings={settings} onCommit={onCommit} /> : null}
       {familyBase === 'krea-2' ? <Krea2SeedVarianceFields settings={settings} onCommit={onCommit} /> : null}
       {familyBase === 'z-image' ? <ZImageSeedVarianceFields settings={settings} onCommit={onCommit} /> : null}
@@ -795,7 +802,7 @@ export const GenerateRenderSection = ({
       defaultOpen={false}
       isChanged={modelDefaultsPatch !== null && !isAtModelDefaults}
       sectionId="render"
-      summary={[settings.steps, `${uiPolicy.guidanceLabel} ${settings.cfgScale}`, canvas?.summary, seedSummary]}
+      summary={[sampling.steps, `${guidanceLabel} ${sampling.guidanceScale}`, canvas?.summary, seedSummary]}
       onReset={modelDefaultsPatch ? () => onCommit(modelDefaultsPatch) : undefined}
       // The seed, strength and family fields keep their values: only these have model defaults to return to.
       resetLabel={sectionResetLabel}

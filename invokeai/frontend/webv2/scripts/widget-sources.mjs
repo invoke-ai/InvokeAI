@@ -1,6 +1,6 @@
 /**
- * Registry for deferred widget chunks; the architecture gate checks completeness and measurements derive
- * widget:<id> identifiers.
+ * Registry for deferred widget chunks; the architecture gate checks completeness and measurements derive widget:<id>
+ * identifiers.
  */
 export const WIDGET_IMPLEMENTATION_PATTERN = /^src\/workbench\/widgets\/([^/]+)\/implementation\.ts$/;
 

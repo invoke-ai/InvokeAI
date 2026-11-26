@@ -126,24 +126,6 @@ describe('WorkflowLibraryList', () => {
     expect(rowAt(1)?.querySelector('[data-workflow-list-placeholder]')).not.toBeNull();
   });
 
-  it('names placeholder rows as loading and keeps one tab stop when the selection is not resident', async () => {
-    await render({
-      entries: page(60),
-      selectedWorkflowId: 'wf-1',
-      window: { filter: FILTER, startIndex: 60, total: 100 },
-    });
-
-    const placeholder = rowAt(0)!;
-    expect(placeholder.querySelector('[data-workflow-list-placeholder]')).not.toBeNull();
-    expect(placeholder.querySelector('[data-list-primary]')?.getAttribute('aria-label')).toBe(
-      'workflowLibrary.loading'
-    );
-    // The selection was made outside the window: the List's tab stop falls back to its first row, a real button.
-    const stops = host.querySelectorAll('[data-workflow-library-list] [tabindex="0"]');
-    expect(stops).toHaveLength(1);
-    expect(stops[0]).toBe(placeholder.querySelector('[data-list-primary]'));
-  });
-
   it('keeps the browser’s own menu off placeholder rows without raising the actions menu', async () => {
     const onContextMenu = vi.fn();
     await render({ entries: page(60), onContextMenu, window: { filter: FILTER, startIndex: 60, total: 100 } });

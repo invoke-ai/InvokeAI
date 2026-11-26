@@ -57,7 +57,6 @@ describe('searchCatalog', () => {
   it('matches prose by substring, not fuzzily', () => {
     const item = record('colours', 'crimson');
 
-    // Fuzzy would find these; on free text they are noise.
     expect(searchCatalog([item], 'cmn', getBody)).toEqual([]);
     expect(searchCatalog([item], 'crn', getBody)).toEqual([]);
   });
@@ -66,7 +65,6 @@ describe('searchCatalog', () => {
     const item = record('colours', 'deep red', 'blue steel');
 
     expect(searchCatalog([item], 'redblue', getBody)).toEqual([]);
-    // A space is what a joined haystack would have left matchable here.
     expect(searchCatalog([item], 'red blue', getBody)).toEqual([]);
     expect(searchCatalog([item], 'deep red', getBody)).toEqual([item]);
   });

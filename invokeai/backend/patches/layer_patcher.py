@@ -2,7 +2,7 @@ import re
 from collections import Counter
 from contextlib import AbstractContextManager, ExitStack, contextmanager
 from itertools import chain
-from typing import Dict, Iterable, Optional, Tuple
+from typing import Dict, Iterable, Iterator, Optional, Tuple
 
 import torch
 from transformers import CLIPTextModel
@@ -10,6 +10,7 @@ from transformers import CLIPTextModel
 from invokeai.backend.model_manager.load.model_cache.model_cache import MODEL_LOAD_LOCK
 from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch, sub_patches
 from invokeai.backend.patches.layers.flux_control_lora_layer import FluxControlLoRALayer
+from invokeai.backend.patches.layers.fused_input_dora_layer import FusedInputDoRALayer, UnsupportedFusedInputDoRABase
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.patches.pad_with_zeros import pad_with_zeros
 from invokeai.backend.util import InvokeAILogger
@@ -162,7 +163,45 @@ class LayerPatcher:
 
         prefix_len = len(prefix)
 
+        # Bind all projections before changing any of this adapter's weights. The temporary split
+        # patches own the norm; the CPU-cached adapter remains independent of model and generation.
+        layers: dict[str, BaseLayerPatch] = {}
         for layer_key, layer in patch.layers.items():
+            if layer_key.startswith(prefix) and isinstance(layer, FusedInputDoRALayer):
+                # A fused input-axis norm cannot be calculated from a partial group. Check lookup separately
+                # from bind so an AttributeError in the numerical code is not mistaken for a missing target.
+                missing_key = None
+                for key in layer.keys:
+                    try:
+                        model.get_submodule(key)
+                    except AttributeError:
+                        missing_key = f"{prefix}{key}"
+                        break
+                if missing_key is not None:
+                    if not (suppress_warning_layers and suppress_warning_layers.search(missing_key)):
+                        logger = InvokeAILogger.get_logger(LayerPatcher.__name__)
+                        logger.warning("Failed to find module for LoRA layer key: %s", missing_key)
+                    continue
+                base_dtypes = tuple(
+                    dtype
+                    if LayerPatcher._uses_sidecar(
+                        model.get_submodule(key), force_direct_patching, force_sidecar_patching
+                    )
+                    else None
+                    for key in layer.keys
+                )
+                try:
+                    bound = layer.bind(model, base_dtypes)
+                except UnsupportedFusedInputDoRABase as error:
+                    logger = InvokeAILogger.get_logger(LayerPatcher.__name__)
+                    logger.warning("Skipping fused input-axis DoRA group '%s': %s", layer_key, error)
+                    continue
+                for key, split_layer in bound:
+                    layers[f"{prefix}{key}"] = split_layer
+            else:
+                layers[layer_key] = layer
+
+        for layer_key, layer in layers.items():
             if not layer_key.startswith(prefix):
                 continue
 
@@ -189,25 +228,7 @@ class LayerPatcher:
             # and that the caller will set force_sidecar_patching=True if the layer is quantized.
             # TODO(ryand): Handle the case where we are running without a GPU. Should we set a config flag that allows
             # forcing full patching even on the CPU?
-            use_sidecar_patching = False
-            if force_direct_patching and force_sidecar_patching:
-                raise ValueError("Cannot force both direct and sidecar patching.")
-            elif force_sidecar_patching:
-                use_sidecar_patching = True
-            elif LayerPatcher._is_any_part_of_layer_fp8(module):
-                # FP8 weights (e.g. a model loaded with fp8_storage layerwise casting) cannot be
-                # directly patched: _apply_model_layer_patch does an in-place add on the model weight,
-                # and CUDA has no add kernel for float8 ("ufunc_add_CUDA not implemented for
-                # Float8_e4m3fn"). Sidecar patching dequantizes to the compute dtype before any math,
-                # so it works regardless of the storage dtype. This takes precedence over
-                # force_direct_patching, since direct patching is simply not possible on fp8 weights.
-                use_sidecar_patching = True
-            elif force_direct_patching:
-                use_sidecar_patching = False
-            elif module.get_num_patches() > 0:
-                use_sidecar_patching = True
-            elif LayerPatcher._is_any_part_of_layer_on_cpu(module):
-                use_sidecar_patching = True
+            use_sidecar_patching = LayerPatcher._uses_sidecar(module, force_direct_patching, force_sidecar_patching)
 
             if use_sidecar_patching:
                 LayerPatcher._apply_model_layer_wrapper_patch(
@@ -228,6 +249,16 @@ class LayerPatcher:
                     original_weights=original_weights,
                     shared_storage=shared_storage,
                 )
+
+    @staticmethod
+    def _uses_sidecar(module: torch.nn.Module, force_direct: bool, force_sidecar: bool) -> bool:
+        if force_direct and force_sidecar:
+            raise ValueError("Cannot force both direct and sidecar patching.")
+        if force_sidecar or LayerPatcher._is_any_part_of_layer_fp8(module):
+            return True
+        if force_direct:
+            return False
+        return module.get_num_patches() > 0 or LayerPatcher._is_any_part_of_layer_on_cpu(module)
 
     @staticmethod
     def _storage_ptr(tensor: torch.Tensor) -> int:
@@ -305,11 +336,12 @@ class LayerPatcher:
         # be significantly faster for 16-bit CPU tensors being moved to a CUDA device than doing the
         # same thing in a single call to '.to(...)'.
         #
-        # `patch` is the model cache's own object, not a copy, and `BaseLayerPatch.to()` rebinds its
-        # tensors in place -- so whatever is done here outlives the patch and is what the cache is
-        # left holding. Both moves are undone in the `finally` below, also on the early return and
-        # when a move, `get_parameters` or the weight update raises.
-        leaf_placements = LayerPatcher._leaf_placements(patch)
+        # to() rebinds a leaf's tensors. Keep the original references so that restoring a
+        # cache-owned patch or a shallow application copy needs no transfers or new buffers.
+        original_tensors = [
+            (leaf, {name: value for name, value in vars(leaf).items() if isinstance(value, torch.Tensor)})
+            for leaf in LayerPatcher._patch_leaves(patch)
+        ]
         try:
             patch.to(device=device)
             patch.to(dtype=torch.float32)
@@ -369,11 +401,16 @@ class LayerPatcher:
                 else:
                     module_param.data = module_param.data + param_weight_converted
         finally:
-            # Back exactly as it came: returning the device but leaving the float32 promotion doubled the
-            # cached record's size for the rest of the process, while the cache went on billing the size
-            # it measured at `put()`.
-            for leaf, leaf_device, leaf_dtype in leaf_placements:
-                leaf.to(device=leaf_device, dtype=leaf_dtype)
+            for leaf, tensors in original_tensors:
+                vars(leaf).update(tensors)
+
+    @staticmethod
+    def _patch_leaves(patch: BaseLayerPatch) -> Iterator[BaseLayerPatch]:
+        children = sub_patches(patch)
+        if not children:
+            yield patch
+        for child in children:
+            yield from LayerPatcher._patch_leaves(child)
 
     @staticmethod
     def _leaf_placements(patch: BaseLayerPatch) -> list[tuple[BaseLayerPatch, torch.device, torch.dtype]]:
@@ -385,11 +422,12 @@ class LayerPatcher:
         sub-patches, alone or in a list or tuple, and those need not share a dtype; so the leaves
         under them are recorded and restored one by one. Leaves without tensors have nothing to restore.
         """
-        wrapped = sub_patches(patch)
-        if wrapped:
-            return [leaf for sub_patch in wrapped for leaf in LayerPatcher._leaf_placements(sub_patch)]
-        tensor = next((value for value in vars(patch).values() if isinstance(value, torch.Tensor)), None)
-        return [] if tensor is None else [(patch, tensor.device, tensor.dtype)]
+        placements = []
+        for leaf in LayerPatcher._patch_leaves(patch):
+            tensor = next((value for value in vars(leaf).values() if isinstance(value, torch.Tensor)), None)
+            if tensor is not None:
+                placements.append((leaf, tensor.device, tensor.dtype))
+        return placements
 
     @staticmethod
     @torch.no_grad()

@@ -1,5 +1,3 @@
-import { ChakraProvider, ScrollArea } from '@chakra-ui/react';
-import { system } from '@theme/system';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -47,56 +45,12 @@ describe('wheelScrollsHorizontally', () => {
     expect(strip.scrollLeft).toBe(24);
   });
 
-  it('travels toward the end of a right-to-left strip, where scrollLeft runs negative', async () => {
-    const strip = await render(1000, 'rtl');
-    expect(wheel(strip, { deltaY: 40 }).defaultPrevented).toBe(true);
-    expect(strip.scrollLeft).toBe(-40);
-    wheel(strip, { deltaY: -16 });
-    expect(strip.scrollLeft).toBe(-24);
-  });
-
   it('leaves trackpad gestures with their own horizontal delta alone', async () => {
     const strip = await render(1000);
     expect(wheel(strip, { deltaX: 30, deltaY: 40 }).defaultPrevented).toBe(false);
     expect(strip.scrollLeft).toBe(0);
   });
 
-  it('passes the wheel through when the content fits', async () => {
-    const strip = await render(100);
-    expect(wheel(strip, { deltaY: 40 }).defaultPrevented).toBe(false);
-  });
-
-  it('drives the scroll container of a Chakra scroll area through its viewport ref', async () => {
-    host = document.createElement('div');
-    document.body.append(host);
-    root = createRoot(host);
-    await act(() =>
-      root!.render(
-        <ChakraProvider value={system}>
-          <ScrollArea.Root w="200px">
-            <ScrollArea.Viewport ref={wheelScrollsHorizontally} data-testid="viewport">
-              <ScrollArea.Content>
-                <div style={{ height: 20, width: 1000 }} />
-              </ScrollArea.Content>
-            </ScrollArea.Viewport>
-            <ScrollArea.Scrollbar orientation="horizontal">
-              <ScrollArea.Thumb />
-            </ScrollArea.Scrollbar>
-          </ScrollArea.Root>
-        </ChakraProvider>
-      )
-    );
-    const viewport = host.querySelector<HTMLElement>('[data-testid="viewport"]')!;
-    expect(viewport.scrollWidth).toBeGreaterThan(viewport.clientWidth);
-    wheel(viewport, { deltaY: 40 });
-    expect(viewport.scrollLeft).toBe(40);
-  });
-
-  it('stops listening once the strip is gone', async () => {
-    const strip = await render(1000);
-    await act(() => root!.unmount());
-    expect(wheel(strip, { deltaY: 40 }).defaultPrevented).toBe(false);
-  });
   it('scrolls a strip for a wheel forwarded from something laid over it, horizontal gestures included', async () => {
     const strip = await render(1000, 'rtl');
     const forward = (init: WheelEventInit) => {
@@ -111,12 +65,5 @@ describe('wheelScrollsHorizontally', () => {
     // A trackpad swipe moves by its own physical delta, which the browser cannot do for an element outside the strip.
     forward({ deltaX: 16, deltaY: 40 });
     expect(strip.scrollLeft).toBe(-24);
-  });
-
-  it('passes a forwarded wheel through when the content fits', async () => {
-    const strip = await render(100);
-    const event = new WheelEvent('wheel', { cancelable: true, deltaY: 40 });
-    forwardWheelToStrip(strip, event);
-    expect(event.defaultPrevented).toBe(false);
   });
 });

@@ -1,8 +1,10 @@
 import type { CanvasKeyOwner, CanvasSurfaceAttachOptions } from '@workbench/canvas-engine/capabilities';
-import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
+import type { RasterBackend, RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { RenderScheduler, RenderSchedulerDeps } from '@workbench/canvas-engine/render/scheduler';
 
 import { createRenderScheduler } from '@workbench/canvas-engine/render/scheduler';
+
+import type { RasterMemoryBudgetController, RasterMemoryLease } from './rasterMemoryBudgetController';
 
 import { PreviewStateController } from './previewStateController';
 
@@ -21,8 +23,8 @@ const wrapCanvasSurface = (canvas: HTMLCanvasElement): RasterSurface => {
       canvas.width = width;
       canvas.height = height;
     },
-    // The mounted canvas element must retain identity, so growth copies through a temporary surface instead of
-    // swapping backing stores. Only layer caches currently grow.
+    // The mounted canvas element must retain identity, so growth copies through a temporary surface instead of swapping
+    // backing stores. Only layer caches currently grow.
     resizePreserving(width: number, height: number, dx: number, dy: number) {
       const previous = document.createElement('canvas');
       previous.width = canvas.width;
@@ -39,6 +41,8 @@ const wrapCanvasSurface = (canvas: HTMLCanvasElement): RasterSurface => {
 };
 
 export interface RenderControllerOptions extends RenderSchedulerDeps {
+  readonly backend: Pick<RasterBackend, 'createSurface'>;
+  readonly rasterMemory: Pick<RasterMemoryBudgetController, 'trackDetached'>;
   readonly isEngineDisposed: () => boolean;
   readonly getInputHandlers: () => {
     onPointerDown: (event: PointerEvent) => void;
@@ -49,8 +53,13 @@ export interface RenderControllerOptions extends RenderSchedulerDeps {
     onPointerLeave: (event: PointerEvent) => void;
     onKeyDown: (event: KeyboardEvent) => void;
     onKeyUp: (event: KeyboardEvent) => void;
+    /** Both key events in the capture phase, so no handler that stops propagation hides them. */
+    onKeyCapture: (event: KeyboardEvent) => void;
     onFocusIn: (event: FocusEvent) => void;
+    onWindowFocus: () => void;
     onWheel: (event: WheelEvent) => void;
+    onPinchGestureStart: (event: Event) => void;
+    onPinchGestureChange: (event: Event) => void;
     reset(): void;
   };
   readonly onPageHide: () => void;
@@ -67,6 +76,7 @@ export class RenderController {
   readonly scheduler: RenderScheduler;
   readonly previews = new PreviewStateController();
   private screen: RasterSurface | null = null;
+  private maskScratch: { surface: RasterSurface; lease: RasterMemoryLease } | null = null;
   private overlay: RasterSurface | null = null;
   private input: HTMLCanvasElement | null = null;
   private keyboardRoot: HTMLElement | null = null;
@@ -79,6 +89,36 @@ export class RenderController {
 
   getScreen(): RasterSurface | null {
     return this.screen;
+  }
+
+  readonly getMaskScratch = (width: number, height: number): RasterSurface => {
+    const current = this.maskScratch;
+    if (current) {
+      this.resizeMaskScratch(Math.max(current.surface.width, width), Math.max(current.surface.height, height));
+      return current.surface;
+    }
+    const surface = this.options.backend.createSurface(width, height);
+    this.maskScratch = { surface, lease: this.options.rasterMemory.trackDetached(width * height * 4) };
+    return surface;
+  };
+
+  private resizeMaskScratch(width: number, height: number): void {
+    const current = this.maskScratch;
+    if (!current || (current.surface.width === width && current.surface.height === height)) {
+      return;
+    }
+    current.surface.resize(width, height);
+    current.lease.release();
+    current.lease = this.options.rasterMemory.trackDetached(width * height * 4);
+  }
+
+  releaseMaskScratch(): void {
+    const current = this.maskScratch;
+    if (current) {
+      current.surface.resize(0, 0);
+      current.lease.release();
+      this.maskScratch = null;
+    }
   }
 
   getOverlay(): RasterSurface | null {
@@ -123,10 +163,15 @@ export class RenderController {
     this.input.addEventListener('pointerenter', handlers.onPointerEnter);
     this.input.addEventListener('pointerleave', handlers.onPointerLeave);
     this.input.addEventListener('wheel', handlers.onWheel, { passive: false });
+    this.input.addEventListener('gesturestart', handlers.onPinchGestureStart, { passive: false });
+    this.input.addEventListener('gesturechange', handlers.onPinchGestureChange, { passive: false });
     if (typeof globalThis.addEventListener === 'function') {
       globalThis.addEventListener('keydown', handlers.onKeyDown);
       globalThis.addEventListener('keyup', handlers.onKeyUp);
+      globalThis.addEventListener('keydown', handlers.onKeyCapture, true);
+      globalThis.addEventListener('keyup', handlers.onKeyCapture, true);
       globalThis.addEventListener('focusin', handlers.onFocusIn);
+      globalThis.addEventListener('focus', handlers.onWindowFocus);
       globalThis.addEventListener('pagehide', this.options.onPageHide);
       globalThis.addEventListener('blur', this.options.onWindowBlur);
     }
@@ -150,12 +195,17 @@ export class RenderController {
       this.input.removeEventListener('pointerenter', handlers.onPointerEnter);
       this.input.removeEventListener('pointerleave', handlers.onPointerLeave);
       this.input.removeEventListener('wheel', handlers.onWheel);
+      this.input.removeEventListener('gesturestart', handlers.onPinchGestureStart);
+      this.input.removeEventListener('gesturechange', handlers.onPinchGestureChange);
       this.options.applyCursor('');
     }
     if (typeof globalThis.removeEventListener === 'function') {
       globalThis.removeEventListener('keydown', handlers.onKeyDown);
       globalThis.removeEventListener('keyup', handlers.onKeyUp);
+      globalThis.removeEventListener('keydown', handlers.onKeyCapture, true);
+      globalThis.removeEventListener('keyup', handlers.onKeyCapture, true);
       globalThis.removeEventListener('focusin', handlers.onFocusIn);
+      globalThis.removeEventListener('focus', handlers.onWindowFocus);
       globalThis.removeEventListener('pagehide', this.options.onPageHide);
       globalThis.removeEventListener('blur', this.options.onWindowBlur);
     }
@@ -165,6 +215,7 @@ export class RenderController {
     handlers.reset();
     this.scheduler.pause();
     this.options.setViewportReady(false);
+    this.releaseMaskScratch();
     this.screen = null;
     this.overlay = null;
     this.input = null;
@@ -176,6 +227,14 @@ export class RenderController {
   resize(width: number, height: number): void {
     this.screen?.resize(width, height);
     this.overlay?.resize(width, height);
+    if (this.maskScratch) {
+      const { surface } = this.maskScratch;
+      if (width === 0 || height === 0) {
+        this.releaseMaskScratch();
+      } else {
+        this.resizeMaskScratch(Math.min(width, surface.width), Math.min(height, surface.height));
+      }
+    }
   }
 
   dispose(): void {

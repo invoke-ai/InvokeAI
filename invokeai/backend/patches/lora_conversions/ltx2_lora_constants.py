@@ -29,7 +29,7 @@ LTX2_LORA_TRANSFORMER_PREFIX = "lora_transformer-"
 # would also match nested prefixes like ``diffusion_model.transformer.blocks...``, which the
 # probe would then admit but the converter would map onto nonexistent module paths (the LoRA
 # would silently apply zero layers).
-_PEFT_PREFIX_RE = r"^(?:(?:model\.diffusion_model|diffusion_model|transformer|base_model\.model\.transformer)\.)?"
+_PEFT_PREFIX_RE = r"^(?:(?:model\.diffusion_model|diffusion_model|transformer|base_model\.model(?:\.transformer)?)\.)?"
 
 # Submodules unique to LTX-2 among the supported architectures, in the checkpoint's native
 # naming. All of them exist only because LTX-2 is a *dual-stream* video+audio transformer:
@@ -41,6 +41,11 @@ _PEFT_PREFIX_RE = r"^(?:(?:model\.diffusion_model|diffusion_model|transformer|ba
 # - ``patchify_proj`` alone — earlier LTX-Video releases use it too, so it identifies the
 #   family but not this architecture.
 # Requiring an audio-side or cross-modal marker is what makes this exclusive.
+#
+# A LoRA without such a marker (video stream only) is deliberately not identified as LTX-2, even though the
+# video stream is 4096 wide: LTX-Video 13B (``LTXVideoTransformer3DModel``: 48 blocks, 32 heads of 128, 4096-wide
+# text context) names and shapes ``transformer_blocks.N.attn1/attn2.to_q/to_k/to_v/to_out.0`` identically, as do
+# Cosmos-Predict1 7B LoRAs, so no shape separates them and a wrong claim would apply silently to the wrong model.
 _LTX2_BLOCK_RE = re.compile(
     _PEFT_PREFIX_RE + r"transformer_blocks\.\d+\.(?:audio_attn[12]|audio_to_video_attn|video_to_audio_attn|audio_ff)\."
 )
@@ -49,20 +54,44 @@ _LTX2_CROSS_MODAL_RE = re.compile(
     _PEFT_PREFIX_RE + r"(?:av_ca_(?:a2v_gate|v2a_gate|audio_scale_shift|video_scale_shift)_adaln_single|"
     r"audio_adaln_single|audio_prompt_adaln_single|audio_patchify_proj|audio_proj_out)\."
 )
+# The same heads under the diffusers ``LTX2VideoTransformer3DModel`` names, as a PEFT ``PeftModel``
+# around that class saves them. The runtime transformer uses these names, so the converter must carry
+# them through untouched. ``time_embed`` / ``proj_in`` / ``prompt_adaln`` are accepted the same way
+# but are not markers: LTX-Video's diffusers transformer has ``time_embed`` and ``proj_in`` too.
+_LTX2_DIFFUSERS_TOP_LEVEL_MARKER_RE = re.compile(
+    _PEFT_PREFIX_RE + r"(?:av_cross_attn_(?:video_scale_shift|video_a2v_gate|audio_scale_shift|audio_v2a_gate)|"
+    r"audio_time_embed|audio_prompt_adaln|audio_proj_in)\."
+)
+# Every top-level module the converter must leave alone, matched against prefix-stripped layer paths
+# (``proj_in`` itself is a layer, so this compares the first path component rather than a ``name.`` prefix).
+_LTX2_DIFFUSERS_TOP_LEVEL_MODULES = frozenset(
+    {
+        "time_embed",
+        "audio_time_embed",
+        "prompt_adaln",
+        "audio_prompt_adaln",
+        "proj_in",
+        "audio_proj_in",
+        "av_cross_attn_video_scale_shift",
+        "av_cross_attn_video_a2v_gate",
+        "av_cross_attn_audio_scale_shift",
+        "av_cross_attn_audio_v2a_gate",
+    }
+)
 
 # Any of these indicates a different architecture; an LTX-2 LoRA never carries them.
 #
 # Note what is absent: ``transformer_blocks\.\d+`` cannot be an anti-pattern here because
 # LTX-2 uses it natively. QwenImage is excluded by its own modulation/MLP naming instead.
 _NON_LTX2_ANTI_RES = (
-    re.compile(r"(self_attn|cross_attn)[\._]"),  # Wan / Anima attention naming
+    # Wan / Anima attention naming; LTX-2's diffusers ``av_cross_attn_*`` heads are not it.
+    re.compile(r"(self_attn|(?<!av_)cross_attn)[\._]"),
     re.compile(r"blocks\.\d+\.(?:attn\.qkv_proj|adaln_proj\.linear)"),  # MiniMax H3 fused attention
     re.compile(r"final_layer\.adaln_proj\.linear"),  # MiniMax H3 final layer
     re.compile(r"(^|\.|_)(double_blocks|single_blocks|single_transformer_blocks)[\._]\d+"),  # FLUX
     re.compile(r"(img_mod|txt_mod|img_mlp|txt_mlp|img_attn|txt_attn)[\._]"),  # QwenImage / FLUX-style
     re.compile(r"diffusion_model\.layers\.\d+\."),  # Z-Image
     re.compile(r"mlp[\._]layer|adaln_modulation"),  # Anima / Cosmos
-    re.compile(r"(^|\.)(time_embed|audio_time_embed|av_cross_attn_)"),  # already-converted diffusers keys
 )
 
 # LyCORIS variants the LTX-2 pipeline does NOT support. The conversion maps official layer
@@ -96,18 +125,26 @@ def has_unsupported_ltx2_lora_variant_keys(str_keys: list[str]) -> bool:
 
 
 def has_ltx2_lora_keys(str_keys: list[str]) -> bool:
-    """PEFT-style keys naming LTX-2-exclusive submodules in the checkpoint's native layout.
+    """PEFT-style keys naming LTX-2-exclusive submodules in the checkpoint's native or diffusers layout.
 
     Either an audio-side / cross-modal tower inside a block, or one of the top-level
-    cross-modal modulation heads. Both exist only on a dual-stream video+audio transformer.
+    cross-modal modulation heads under either naming. Both exist only on a dual-stream video+audio transformer.
     """
-    return any(_LTX2_BLOCK_RE.search(k) or _LTX2_CROSS_MODAL_RE.search(k) for k in str_keys)
+    return any(
+        _LTX2_BLOCK_RE.search(k) or _LTX2_CROSS_MODAL_RE.search(k) or _LTX2_DIFFUSERS_TOP_LEVEL_MARKER_RE.search(k)
+        for k in str_keys
+    )
+
+
+def is_ltx2_diffusers_top_level_path(layer_path: str) -> bool:
+    """True if a prefix-stripped layer path already names a top-level module in diffusers form."""
+    return layer_path.split(".", 1)[0] in _LTX2_DIFFUSERS_TOP_LEVEL_MODULES
 
 
 def has_non_ltx2_architecture_keys(str_keys: list[str]) -> bool:
     """True if any key indicates a non-LTX-2 architecture (Wan, H3, FLUX, QwenImage, Z-Image,
-    Anima) or an already-converted diffusers layout.
+    Anima).
 
-    Used as an exclusion guard — an LTX-2 LoRA in its published layout never carries these.
+    Used as an exclusion guard — an LTX-2 LoRA never carries these.
     """
     return any(anti.search(k) for k in str_keys for anti in _NON_LTX2_ANTI_RES)

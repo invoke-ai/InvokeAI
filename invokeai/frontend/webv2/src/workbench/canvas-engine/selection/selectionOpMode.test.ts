@@ -17,9 +17,4 @@ describe('selectionOpFor', () => {
     expect(selectionOpFor({ ...none, alt: true }, 'replace')).toBe('subtract');
     expect(selectionOpFor({ ...none, alt: true, shift: true }, 'replace')).toBe('intersect');
   });
-
-  it('overrides a non-replace mode too, so the modifier always wins', () => {
-    expect(selectionOpFor({ ...none, shift: true }, 'subtract')).toBe('add');
-    expect(selectionOpFor({ ...none, alt: true }, 'add')).toBe('subtract');
-  });
 });

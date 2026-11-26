@@ -31,7 +31,6 @@ const harness = vi.hoisted(() => ({
 }));
 const activeProject = () => harness.store!.getState().projects[0]!;
 
-// Reuse a real project and engine without starting account persistence or the canvas registry.
 vi.mock('@workbench/WorkbenchContext', async (importOriginal) => ({
   ...(await importOriginal<typeof WorkbenchContextModule>()),
   useActiveProjectId: () => activeProject().id,
@@ -39,7 +38,6 @@ vi.mock('@workbench/WorkbenchContext', async (importOriginal) => ({
   useActiveProjectSelector: (selector: (project: Project) => unknown) => selector(activeProject()),
 }));
 vi.mock('@workbench/canvas-operations/react', () => ({ useCanvasEngine: () => harness.engine }));
-// Hold only the expensive export boundary; the controller, status stores, action hook and UI are real.
 vi.mock('@workbench/canvas-engine/export/psdExport', async (importOriginal) => ({
   ...(await importOriginal<typeof PsdExportModule>()),
   executePsdExport: harness.execute,

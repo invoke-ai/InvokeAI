@@ -38,8 +38,8 @@ const sizePatch = (ratio: string, width: number, height: number): Partial<Genera
 });
 
 /**
- * A hosted provider's own size table: named sizes per ratio (Gemini 3's `1K`/`2K`/`4K`), or one fixed size per
- * ratio. Renders nothing for free-form providers and local models. A size typed by hand shows as custom.
+ * A hosted provider's own size table: named sizes per ratio (Gemini 3's `1K`/`2K`/`4K`), or one fixed size per ratio.
+ * Renders nothing for free-form providers and local models. A size typed by hand shows as custom.
  */
 export const ExternalSizeSelect = ({ isCanvasFrame, model, onCommit, settings }: ExternalSizeSelectProps) => {
   const { t } = useTranslation();

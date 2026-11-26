@@ -9,13 +9,13 @@ import type { Project, WorkbenchState } from '@workbench/projectContracts';
 import {
   resetArchitectureCapabilities,
   setArchitectureCapabilities,
-} from '@features/generation/core/architectureCapabilities';
+} from '@features/models/core/architectureCapabilities';
 import {
   architectureCapabilitiesFixture,
   seedArchitectureCapabilities,
-} from '@features/generation/core/architectureCapabilities.testing';
+} from '@features/models/core/architectureCapabilities.testing';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
-import { createControlLayer, getDocumentLeaves } from '@workbench/canvas-engine/api';
+import { createControlLayer, getDocumentLeaves, nextMaskFillColor } from '@workbench/canvas-engine/api';
 import { stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { createTestInsertionAnchorCapture } from '@workbench/canvas-engine/document/insertionAnchors.testStub';
 import {
@@ -24,11 +24,10 @@ import {
   createRegionalGuidanceFromImage,
   createRegionalGuidanceLayerWithRefImage,
   DEFAULT_INPAINT_MASK_FILL,
-  nextRegionalGuidanceFillColor,
 } from '@workbench/widgets/layers/layerOps';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import { createInitialWorkbenchState, workbenchReducer, type WorkbenchAction } from '@workbench/workbenchState.testing';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { importGalleryImagesToCanvas, type GalleryCanvasImportDestination } from './importGalleryImages';
 
@@ -238,7 +237,7 @@ const expectedLayer = (
       };
     case 'inpaint-mask':
       return createInpaintMaskFromImage({
-        fill: DEFAULT_INPAINT_MASK_FILL,
+        fill: { ...DEFAULT_INPAINT_MASK_FILL, color: ['#83d683', '#f59e42'][index]! },
         id: expect.any(String) as string,
         image: ref,
         name: `Inpaint Mask ${index + 1}`,
@@ -246,14 +245,18 @@ const expectedLayer = (
       });
     case 'regional-guidance':
       return createRegionalGuidanceFromImage({
-        fill: { color: nextRegionalGuidanceFillColor(index), style: 'solid' },
+        fill: { color: ['#83d683', '#f59e42'][index]!, style: 'solid' },
         id: expect.any(String) as string,
         image: ref,
         name: `Regional Guidance ${index + 1}`,
         rect: bbox,
       });
     case 'regional-reference': {
-      const layer = createRegionalGuidanceLayerWithRefImage(`Regional Guidance ${index + 1}`, index, base);
+      const layer = createRegionalGuidanceLayerWithRefImage(
+        `Regional Guidance ${index + 1}`,
+        ['#83d683', '#f59e42'][index]!,
+        base
+      );
       const reference = layer.referenceImages[0]!;
       return {
         ...layer,
@@ -269,6 +272,10 @@ const expectedLayer = (
 seedArchitectureCapabilities();
 
 describe('importGalleryImagesToCanvas', () => {
+  beforeEach(() => {
+    accountLifecycle.invalidate();
+    setArchitectureCapabilities(architectureCapabilitiesFixture);
+  });
   it.each<Exclude<GalleryCanvasImportDestination, 'control-resized'>>([
     'raster',
     'control',
@@ -619,6 +626,44 @@ describe('importGalleryImagesToCanvas', () => {
     expect(dispatch).not.toHaveBeenCalled();
   });
 
+  it('reports blocked and keeps the mask colors when the project refuses the ingested layers', async () => {
+    const { project, state } = withProject();
+    const applyCanvasMutation = vi.fn(() => false);
+
+    const result = await importGalleryImagesToCanvas({
+      applyCanvasMutation,
+      destination: 'regional-guidance',
+      engine: null,
+      ...queriesFor(() => state),
+      images: [image('a.png'), image('b.png')],
+      project,
+    });
+
+    expect(result).toEqual({ status: 'blocked' });
+    expect(applyCanvasMutation).toHaveBeenCalledOnce();
+    expect(nextMaskFillColor('regional_guidance')).toBe('#83d683');
+  });
+
+  it('advances the palette across accepted imports and skips a refusal between them', async () => {
+    const { project, state } = withProject();
+    const applyCanvasMutation = vi.fn().mockReturnValueOnce(true).mockReturnValueOnce(false).mockReturnValueOnce(true);
+    const options = {
+      applyCanvasMutation,
+      destination: 'regional-guidance' as const,
+      engine: null,
+      ...queriesFor(() => state),
+      images: [image('a.png')],
+      project,
+    };
+    expect((await importGalleryImagesToCanvas(options)).status).toBe('imported');
+    expect((await importGalleryImagesToCanvas(options)).status).toBe('blocked');
+    expect((await importGalleryImagesToCanvas(options)).status).toBe('imported');
+    const colors = applyCanvasMutation.mock.calls.map(([, mutation]) =>
+      getForwardLayers(mutation).map((layer) => layer.type === 'regional_guidance' && layer.mask.fill.color)
+    );
+    expect(colors).toEqual([['#83d683'], ['#f59e42'], ['#f59e42']]);
+  });
+
   it('returns stale-document when the captured target document identity changes', async () => {
     const { project, state } = withProject();
     let current = state;
@@ -698,8 +743,7 @@ describe('importGalleryImagesToCanvas', () => {
 
   it('does not upload an old account image after local preprocessing crosses an account switch', async () => {
     accountLifecycle.activate('user-a');
-    // Reseed capabilities after the account reset so this test reaches the account fence rather than the resize
-    // gate.
+    // Reseed capabilities after the account reset so this test reaches the account fence rather than the resize gate.
     setArchitectureCapabilities(architectureCapabilitiesFixture);
     const { project, state } = withProject();
     let resolveFetch: ((response: Response) => void) | undefined;

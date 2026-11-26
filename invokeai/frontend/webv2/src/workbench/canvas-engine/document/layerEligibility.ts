@@ -18,10 +18,16 @@ export const isLayerPaintable = (layer: CanvasLayerContract): boolean =>
   isLayerEditable(layer) && layer.type !== 'control';
 
 /** Overlay layers show where an effect applies, so they can be hidden on screen without leaving generation. */
-export type HideableLayer = Extract<CanvasLayerContract, { type: 'control' | 'inpaint_mask' | 'regional_guidance' }>;
+export type HideableLayer = Extract<
+  CanvasLayerContract,
+  { type: 'control' | 'inpaint_mask' | 'regional_guidance' | 'vector' }
+>;
 
 export const isHideableLayer = (layer: CanvasLayerContract): layer is HideableLayer =>
-  layer.type === 'control' || layer.type === 'inpaint_mask' || layer.type === 'regional_guidance';
+  layer.type === 'control' ||
+  layer.type === 'inpaint_mask' ||
+  layer.type === 'regional_guidance' ||
+  layer.type === 'vector';
 
 /** Display only: generation and export never consult it. Groups are hideable in overlay stacks. */
 export const isLayerHidden = (layer: CanvasLayerContract): boolean => isHideableLayer(layer) && layer.isHidden === true;

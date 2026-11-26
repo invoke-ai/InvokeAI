@@ -50,19 +50,36 @@ describe('color sampling with real browser rasterization', () => {
     expect(createColorSampler(backend).sample(doc, caches, { x: 20, y: 0 })).toEqual(EXPECTED_COLOR);
   });
 
-  it('matches a visible paint cache whose local content rectangle is offset', () => {
+  it('picks the document pixel at the pointer beneath a displayed mask', () => {
     const backend = createDomRasterBackend();
     const caches = createLayerCacheStore(backend);
-    const entry = caches.getOrCreateRect('far-layer', { height: 2, width: 2, x: 20, y: 0 });
+    const raster = layer(0);
+    const entry = caches.getOrCreate(raster.id, 8, 8);
+    entry.surface.ctx.fillStyle = '#0000ff';
+    entry.surface.ctx.fillRect(0, 0, 8, 8);
     entry.surface.ctx.fillStyle = '#ef1234';
-    entry.surface.ctx.fillRect(0, 0, 2, 2);
-    caches.publishPixels('far-layer');
-    const doc = documentWith(layer(0), 32);
-    const viewport = backend.createSurface(32, 8);
-    compositeDocument(viewport, doc, caches, IDENTITY, { backend });
-
-    expect([...viewport.ctx.getImageData(20, 0, 1, 1).data]).toEqual(EXPECTED_PIXEL);
-    expect(createColorSampler(backend).sample(doc, caches, { x: 20, y: 0 })).toEqual(EXPECTED_COLOR);
+    entry.surface.ctx.fillRect(0, 0, 1, 8);
+    caches.publishPixels(raster.id);
+    const coverage = caches.getOrCreate('mask', 8, 8);
+    coverage.surface.ctx.fillRect(0, 0, 8, 8);
+    caches.publishPixels('mask');
+    const doc = {
+      ...documentWith(raster),
+      stacks: stacksFrom([
+        {
+          ...raster,
+          id: 'mask',
+          mask: { bitmap: null, fill: { color: '#e07575', style: 'diagonal' } },
+          type: 'inpaint_mask',
+        },
+        raster,
+      ]),
+    };
+    const sampler = createColorSampler(backend);
+    const providers = { showOverlayStacks: { control: true, inpaint_mask: false, regional_guidance: false } };
+    expect(sampler.sample(doc, caches, { x: 0.5, y: 0.5 }, providers)).toEqual(EXPECTED_COLOR);
+    expect(sampler.sample(doc, caches, { x: 1.5, y: 0.5 }, providers)).toEqual({ a: 255, b: 255, g: 0, r: 0 });
+    expect(sampler.sampleArea(doc, caches, { x: 0.5, y: 0.5 }, 3, providers)?.center).toEqual(EXPECTED_COLOR);
   });
 
   it('samples the square around a pixel with the pick at its center and empty canvas transparent', () => {

@@ -13,7 +13,6 @@ import { page } from 'vitest/browser';
 
 import { loadStagingItemRecall, StagingItemContextMenu } from './StagingItemContextMenu';
 
-// Each test starts with the verbs unloaded, as a page does: the loader the module creates is swapped for a fresh one.
 const menuParts = vi.hoisted(() => ({
   loaders: [] as { getSnapshot: () => { status: string }; reset: () => void }[],
 }));
@@ -165,7 +164,6 @@ const render = async (handlers: Partial<Parameters<typeof StagingItemContextMenu
 // The verbs' first load transforms their module graph, which can outlast `vi.waitFor`'s default second.
 const COLD_LOAD = { timeout: 10_000 };
 
-/** Warms the verbs as the staging bar does when a result is pointed at, and waits for them to load. */
 const loadRecall = async () => {
   await act(() => loadStagingItemRecall());
   await vi.waitFor(
@@ -186,11 +184,9 @@ afterEach(async () => {
 
 describe('StagingItemContextMenu', () => {
   it('recalls from the staged result’s own queue item and disables verbs its snapshot cannot back', async () => {
-    // Nothing warmed the verbs first: the menu loads them as it opens.
     await render();
 
     await vi.waitFor(() => expect(mocks.origin).toBe('webv2:p:project-1:q:local-queue-item'), COLD_LOAD);
-    // The executed prompt and seed come from the backend item that produced the result.
     await vi.waitFor(() => expect(mocks.meta).toEqual({ positivePrompt: 'a staged cat', seed: 4242 }));
     expect(menuItem('widgets.gallery.itemActions.recall.verbs.seed').getAttribute('aria-disabled')).toBe('true');
     expect(menuItem('widgets.gallery.itemActions.recall.verbs.clipSkip').getAttribute('aria-disabled')).toBe('true');
@@ -199,14 +195,12 @@ describe('StagingItemContextMenu', () => {
     await activate('widgets.gallery.itemActions.recall.verbs.prompts');
     expect(mocks.recall).toHaveBeenCalledWith('prompts');
 
-    // A greyed verb must stay inert: the row is only visually disabled.
     await activate('widgets.gallery.itemActions.recall.verbs.seed');
     expect(mocks.recall).not.toHaveBeenCalledWith('seed');
   });
 
   it('opens on its recall verbs’ first frame once they have loaded', async () => {
     await loadRecall();
-    // Records whether the placeholder ever mounts while the menu opens.
     const placeholders: Node[] = [];
     const observer = new MutationObserver(() =>
       placeholders.push(...document.querySelectorAll('[data-value="menu-part-placeholder"]'))

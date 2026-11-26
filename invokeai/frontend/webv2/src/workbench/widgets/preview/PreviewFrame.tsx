@@ -206,8 +206,8 @@ const PreviewImageFrame = ({
     },
     [stageRefCallback, swipeStageRefCallback]
   );
-  // Reset zoom in place when the displayed image changes (or goes live) — a
-  // remount would flash the frame on every selection.
+  // Reset zoom in place when the displayed image changes (or goes live) — a remount would flash the frame on every
+  // selection.
   loupe.syncDisplayedSource(displayedSourceToken);
   const loupeStageProps = loupe.stageProps;
   const handleStagePointerDown = useCallback(
@@ -226,8 +226,8 @@ const PreviewImageFrame = ({
     },
     [onContextMenu]
   );
-  // `image-rendering` stays unset while the loupe is enabled so the loupe can
-  // toggle pixelated rendering on the content box (it inherits to the img).
+  // `image-rendering` stays unset while the loupe is enabled so the loupe can toggle pixelated rendering on the content
+  // box (it inherits to the img).
   const imageStyle = useMemo<CSSProperties>(
     () => ({
       display: 'block',
@@ -257,9 +257,8 @@ const PreviewImageFrame = ({
         setLoadedSrc(src);
       }
 
-      // Only tracked while a hold is up: a live frame is a new data URL every
-      // step, and settling each one would re-render the frame per step for
-      // nothing.
+      // Only tracked while a hold is up: a live frame is a new data URL every step, and settling each one would
+      // re-render the frame per step for nothing.
       if (src === null || !holdSource) {
         return;
       }
@@ -276,8 +275,8 @@ const PreviewImageFrame = ({
     },
     [handleSourceSettled, onSourceError]
   );
-  // A hold arriving after the image already decoded (a cached image, or the
-  // element reused across a source swap) would never see a load event.
+  // A hold arriving after the image already decoded (a cached image, or the element reused across a source swap) would
+  // never see a load event.
   useEffect(() => {
     const image = imageRef.current;
 
@@ -362,16 +361,12 @@ const PreviewImageFrame = ({
       fill="flex"
       padding={padding}
       paddingBottom={paddingBottom}
-      // Suppress browser gestures across the loupe's entire stage; live renders without a loupe retain native
-      // behavior.
+      // Suppress browser gestures across the loupe's entire stage; live renders without a loupe retain native behavior.
       touchAction={isLive ? undefined : 'none'}
       {...loupe.stageProps}
       onPointerDown={handleStagePointerDown}
     >
-      {/*
-       * Disable comparison drops over live renders because comparison would pause follow and expose stale
-       * selection.
-       */}
+      {/* No comparison drops over live renders: comparison would pause follow and expose a stale selection. */}
       {isLive ? null : <PreviewCompareDropZone currentImageName={dragItem?.kind === 'image' ? dragItem.name : null} />}
       <FittedFrame
         ref={setContentRef}
@@ -401,11 +396,7 @@ const PreviewImageFrame = ({
   );
 };
 
-/**
- * The player remounts per item, so its audio settings live here for the page session: the first clip starts at half
- * volume (the browser default of full volume is usually too loud) and later clips keep the viewer's last choice.
- * A viewer preference, not account data, so it is deliberately not cleared on account changes.
- */
+/** Audio settings live here for the page session (first clip at half volume); not account data. */
 const previewVideoAudio = { muted: false, volume: 0.5 };
 
 const rememberPreviewVideoAudio = (event: SyntheticEvent<HTMLVideoElement>): void => {
@@ -468,9 +459,7 @@ const PreviewVideo = ({
     navigation: swipeNavigation ?? null,
   });
   const { onPointerDown: handleSwipePointerDown } = swipe;
-  // The control bar owns its touches: seeking and volume must never swipe. So do the player's popups, whose events
-  // reach the stage through their portals. A fullscreen player is out of the carousel entirely; navigating would
-  // unmount it and drop fullscreen.
+  // The control bar owns its touches: seeking and volume must never swipe.
   const handleStagePointerDown = useCallback(
     (event: PointerEvent<HTMLDivElement>) => {
       const target = event.target;
@@ -577,18 +566,17 @@ const PreviewVideo = ({
     return isCurrent() ? { ok: true } : { ok: false, reason: 'stale' };
   }, [isItemCurrent, source.itemKey]);
   const isCopyAvailable = useCallback(() => isVideoFrameCopyAvailable(videoRef.current), []);
-  // The span a request armed, which the player plays as its playback window. Handlers read the ref, which is current
-  // before the render that arms the span.
+  // The span a request armed, which the player plays as its playback window.
   const [span, setSpan] = useState<VideoSpan | null>(null);
   const spanRef = useRef<VideoSpan | null>(null);
   // Expire spans parked before media readiness so retries or hidden remounts cannot start stale audio later.
   const parkedSpanRef = useRef<{ expiresAt: number; span: VideoSpan; token: number } | null>(null);
-  // Keep request identity through pause/hide while the span stays armed; retire it when the playhead leaves or a
-  // newer request arrives.
+  // Keep request identity through pause/hide while the span stays armed; retire it when the playhead leaves or a newer
+  // request arrives.
   const spanTokenRef = useRef<number | null>(null);
   // Where an armed span's playback starts once the player holds its window (see SpanPlaybackStart), until the same
-  // deadline a parked span has: a start that a hide holds up still happens on show while the gesture is fresh, unless
-  // a newer request has superseded it meanwhile.
+  // deadline a parked span has: a start that a hide holds up still happens on show while the gesture is fresh, unless a
+  // newer request has superseded it meanwhile.
   const pendingSpanStartRef = useRef<{ expiresAt: number; startSeconds: number; token: number } | null>(null);
   const [spanStartRequest, setSpanStartRequest] = useState(0);
   const armSpan = useCallback((next: VideoSpan | null) => {
@@ -621,9 +609,9 @@ const PreviewVideo = ({
   const playSpan = useCallback(
     (request: VideoSpan, token: number, expiresAt?: number) => {
       const video = videoRef.current;
-      // The deadline belongs to the gesture, not to this attempt: minting a fresh one on
-      // every re-park would let hide/show cycles on a clip that never loads extend it
-      // indefinitely, which is the one thing the deadline exists to stop.
+      // The deadline belongs to the gesture, not to this attempt: minting a fresh one on every re-park would let
+      // hide/show cycles on a clip that never loads extend it indefinitely, which is the one thing the deadline exists
+      // to stop.
       const deadline = expiresAt ?? Date.now() + PARKED_SPAN_TTL_MS;
 
       // Defer seeks until metadata and element attachment exist; resume from loadedmetadata or remount.
@@ -636,8 +624,7 @@ const PreviewVideo = ({
       const duration = Number.isFinite(video.duration) ? video.duration : null;
       const endSeconds = duration === null ? request.endSeconds : Math.min(request.endSeconds, duration);
       const startSeconds = Math.max(0, Math.min(request.startSeconds, endSeconds));
-      // Arm any nonempty clamped span, including two-frame trims. Collapsed or inverted bounds are no window: the clip
-      // plays from their start as the loop toggle says.
+      // Arm any nonempty clamped span, including two-frame trims.
       const next = endSeconds > startSeconds ? { endSeconds, startSeconds } : null;
 
       // New requests replace prior span ownership; report only an armed span.
@@ -668,14 +655,11 @@ const PreviewVideo = ({
     }
 
     seekVideo(video, pending.startSeconds);
-    // Autoplay policy can refuse an unmuted play(). That leaves the clip parked on the first selected frame with
-    // the span still armed, so pressing play there plays the selection rather than the whole clip.
+    // Autoplay policy can refuse an unmuted play().
     void video.play().catch(() => {});
     publishSpanState();
   }, [publishSpanState]);
-  // Retire spans only when seeks land outside them; own-seek markers fail for no-op or delayed seeks. In-span scrubs,
-  // and the player's own wraps, rests and replays, keep the span. The player never acts on a seek, so the retirement
-  // needs no particular timing.
+  // Retire spans only when seeks land outside them; own-seek markers fail for no-op or delayed seeks.
   const handleSeeking = useCallback(() => {
     const current = spanRef.current;
     const video = videoRef.current;
@@ -712,8 +696,8 @@ const PreviewVideo = ({
         return;
       }
 
-      // Retired whether or not it is still honourable, so a request the user has moved on
-      // from cannot wait around for the next player that shows this clip.
+      // Retired whether or not it is still honourable, so a request the user has moved on from cannot wait around for
+      // the next player that shows this clip.
       consumeVideoSpanPlaybackRequest(request.token);
 
       if (isVideoSpanPlaybackFresh(request.requestedAt)) {
@@ -815,8 +799,8 @@ const PreviewVideo = ({
       return;
     }
 
-    // After load() recovery, restore the armed span's position without starting audio or running a nudge that
-    // would retire it.
+    // After load() recovery, restore the armed span's position without starting audio or running a nudge that would
+    // retire it.
     if (spanRef.current) {
       seekVideo(video, spanRef.current.startSeconds);
       return;
@@ -953,9 +937,7 @@ const PreviewVideo = ({
             ref={setDragHandleRef}
             {...listeners}
             cursor={isDragging ? 'grabbing' : 'grab'}
-            // Top-center, clear of the control bar along the bottom edge. Outside the player, so fullscreen leaves it
-            // behind, where a drag could reach no drop target; above the failure overlay, since a clip that cannot
-            // play can still be dragged into an input, which only needs its name.
+            // Top-center, clear of the control bar along the bottom edge.
             insetInlineStart="50%"
             position="absolute"
             title={t('widgets.preview.dragVideo')}
@@ -1024,16 +1006,7 @@ const seekVideo = (video: HTMLVideoElement, seconds: number): void => {
   }
 };
 
-/**
- * Starts an armed span's playback, for one request: keyed by it, rendered after the player in the same boundary.
- * Playback started before the player holds the span's window is judged against the previous window (a finished span's
- * rest would replay that span over the new one), and the player binds its window in a passive effect.
- *
- * Correctness depends on React's commit order: a commit runs all its passive cleanups (unbinding the previous window)
- * before any passive mount effect, and runs mount effects in tree order, children first, then later siblings. So this
- * must stay a passive effect, rendered after `VideoPlayer`; a layout effect, or an earlier position, would start
- * playback before the window. Re-runs (StrictMode, Activity showing again) do nothing: `onStart` consumes its start.
- */
+/** Must stay a passive effect rendered after `VideoPlayer`, so it runs after the player binds its window. */
 const SpanPlaybackStart = ({ onStart }: { onStart: () => void }) => {
   useMountEffect(() => {
     onStart();
@@ -1048,10 +1021,7 @@ interface VideoSpan {
   startSeconds: number;
 }
 
-/**
- * Allow slight seek undershoot because decoders may not land exactly at span start; the player's own wraps must not
- * retire the span.
- */
+/** Allows slight seek undershoot at span start; the player's own wraps must not retire the span. */
 const SPAN_SEEK_TOLERANCE_SECONDS = 0.05;
 
 /** Fills the fitted frame, which already has the image's aspect ratio. */

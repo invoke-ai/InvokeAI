@@ -49,11 +49,11 @@ from invokeai.backend.quantization.fp8_scaled import (
     Fp8ScaledLayer,
     attach_fp8_scales,
     cast_state_dict,
-    clone_unreplaced_tensors,
     count_fp8_weights,
     dequantize_fp8_scaled,
     extract_comfy_quant_hints,
     extract_fp8_scaled_layers,
+    load_safetensors_checkpoint,
     read_safetensors_metadata,
     split_fp8_scaled_layers,
     translate_torchao_fp8_layers,
@@ -135,7 +135,11 @@ def flux3_transformer_from_single_file(
     """
     log = logger or _logger
     make_room = reserve or _reserve_nothing
-    sd = CheckpointPrefix.detect(sd).strip(sd)
+    stripped = CheckpointPrefix.detect(sd).strip(sd)
+    if stripped is not sd:
+        # The caller still holds `sd`; emptied, it cannot keep the sources alive through the cast.
+        sd.clear()
+    sd = stripped
     header_layers = flux3_header_layers(metadata, sd)
     markers = {
         key[: -len(COMFY_QUANT_SUFFIX)]: parse_comfy_quant_marker(value)
@@ -190,7 +194,6 @@ def flux3_transformer_from_single_file(
             fp8_layers=fp8_layers,
             nvfp4_payloads=nvfp4_payloads,
         )
-        mapped = dict(sd) if fp8_layers and not keep_fp8 else None
         if fp8_layers and not keep_fp8:
             # Kept, they would be dequantized on every forward to save memory nobody asked to save.
             dequantize_fp8_scaled(sd, fp8_layers, dtype)
@@ -199,11 +202,6 @@ def flux3_transformer_from_single_file(
         # layer whose scale `scaled_mm` cannot apply.
         fp8_layers = split_fp8_scaled_layers(sd, fp8_layers, dtype, model=model, skip_patterns=skip_patterns)
         cast_state_dict(sd, dtype, keep_fp8=keep_fp8, model=model, skip_patterns=skip_patterns)
-        if mapped is not None:
-            # Tensors the fold and cast left as they were are slices of the file mapping and would pin it, uncounted.
-            # Only on this path: kept fp8 codes stay mapped, as copying them would defeat the keep.
-            clone_unreplaced_tensors(sd, mapped)
-            mapped.clear()
         if nvfp4_payloads:
             if modelopt:
                 # After the reservation: the copies it makes are what the reservation counts for the packed layers.
@@ -224,6 +222,15 @@ def flux3_transformer_from_single_file(
 class Flux3DiffusersModel(ModelLoader):
     """Loads the submodels of a FLUX.3 Diffusers folder."""
 
+    _bfloat16_safe = True
+
+    def _select_model_dtype(
+        self, config: AnyModelConfig, submodel_type: Optional[SubModelType], device: torch.device
+    ) -> torch.dtype:
+        if submodel_type is SubModelType.VAE:
+            return TorchDevice.dtype_avoiding_float16(self._torch_dtype, device)
+        return super()._select_model_dtype(config, submodel_type, device)
+
     def get_size_fs(
         self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
     ) -> int:
@@ -240,7 +247,7 @@ class Flux3DiffusersModel(ModelLoader):
             raise ValueError("A submodel type must be provided when loading a FLUX.3 Diffusers model.")
 
         model_path = Path(config.path)
-        dtype = TorchDevice.choose_bfloat16_safe_dtype(TorchDevice.choose_torch_device())
+        dtype = self._decision(config, submodel_type).dtype
 
         match submodel_type:
             case SubModelType.Transformer:
@@ -253,9 +260,7 @@ class Flux3DiffusersModel(ModelLoader):
             case SubModelType.VAE:
                 from diffusers import AutoencoderKLFlux2
 
-                return AutoencoderKLFlux2.from_pretrained(
-                    model_path / "vae", torch_dtype=self._torch_dtype_avoiding_float16(), local_files_only=True
-                )
+                return AutoencoderKLFlux2.from_pretrained(model_path / "vae", torch_dtype=dtype, local_files_only=True)
             case SubModelType.TextEncoder:
                 encoder_path = model_path / "text_encoder"
                 encoder_config = normalize_qwen3vl_rope_config(
@@ -284,22 +289,23 @@ class Flux3CheckpointModel(ModelLoader):
     """Loads a FLUX.3 transformer from a single file: bf16 (BFL `model.safetensors`, or its ComfyUI repackage), or one
     of the quantized builds `flux3_transformer_from_single_file` reads."""
 
+    _bfloat16_safe = True
+    _fp8_checkpoint_submodels = frozenset({SubModelType.Transformer})
+
     def _load_model(self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> AnyModel:
         if not isinstance(config, Main_Checkpoint_Flux3_Config):
             raise ValueError(f"Unexpected config type {type(config).__name__} for the FLUX.3 single-file loader.")
         if submodel_type is not SubModelType.Transformer:
             raise ValueError("A single-file FLUX.3 model holds only the transformer.")
 
-        from safetensors.torch import load_file
-
         model_path = Path(config.path)
-        model_dtype = TorchDevice.choose_bfloat16_safe_dtype(TorchDevice.choose_torch_device())
+        decision = self._decision(config, SubModelType.Transformer)
         model = flux3_transformer_from_single_file(
-            load_file(model_path),
-            model_dtype,
+            load_safetensors_checkpoint(model_path),
+            decision.dtype,
             self._ram_cache.make_room,
             metadata=read_safetensors_metadata(model_path, self._logger),
-            keep_fp8=self._keep_fp8_weights(config, SubModelType.Transformer),
+            keep_fp8=decision.keep_checkpoint_fp8,
             logger=self._logger,
         )
         if any(isinstance(module, DequantizingLinear) for module in model.modules()):
@@ -323,13 +329,19 @@ class Flux3CheckpointModel(ModelLoader):
 class Flux3GGUFCheckpointModel(ModelLoader):
     """Loads a GGUF-quantized FLUX.3 transformer; the GGML tensors stay packed and dequantize per forward."""
 
+    _bfloat16_safe = True
+
+    def _cache_key_variant(self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> str:
+        # Packed GGUF weights also carry a compute dtype; only matching devices can share their CPU copy.
+        return str(self._decision(config, submodel_type).dtype).removeprefix("torch.")
+
     def _load_model(self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> AnyModel:
         if not isinstance(config, Main_GGUF_Flux3_Config):
             raise ValueError(f"Unexpected config type {type(config).__name__} for the FLUX.3 GGUF loader.")
         if submodel_type is not SubModelType.Transformer:
             raise ValueError("A GGUF FLUX.3 model holds only the transformer.")
 
-        compute_dtype = TorchDevice.choose_bfloat16_safe_dtype(TorchDevice.choose_torch_device())
+        compute_dtype = self._decision(config, SubModelType.Transformer).dtype
         sd = gguf_sd_loader(Path(config.path), compute_dtype=compute_dtype)
         sd = CheckpointPrefix.detect(sd).strip(sd)
 

@@ -21,7 +21,6 @@ interface CenterAreaTestProject {
 
 const centerAreaMocks = vi.hoisted(() => {
   const icon = () => null;
-  // Use a settled resource so the center icon reads synchronously without suspending.
   const loadedImplementation = () => {
     const promise: Promise<object> & { status?: string; value?: object } = Promise.resolve({});
 
@@ -60,7 +59,6 @@ const centerAreaMocks = vi.hoisted(() => {
 
   return {
     activeItem,
-    /** Real widget chrome to place in the slots instead of the fixed-size stand-ins. */
     chromeSlots: null as null | {
       actions: ComponentType<{ region: 'center' }>;
       label: ComponentType<{ region: 'center' }>;
@@ -70,7 +68,6 @@ const centerAreaMocks = vi.hoisted(() => {
     focusRegion: vi.fn(),
     project,
     revealFloating: vi.fn(),
-    /** The fixed-size actions stand-in's width. */
     trailingActionsWidth: '189px',
   };
 });
@@ -106,7 +103,6 @@ vi.mock('@workbench/focusRegions', () => ({
   }),
 }));
 vi.mock('@workbench/widgetRegionViewModel', () => ({
-  // The center's placed views are exactly its docked members.
   createWidgetRegionViewModelFromState: ({ regionState }: { regionState: { instanceIds: string[] } }) => ({
     placedItems: regionState.instanceIds.length > 0 ? [centerAreaMocks.activeItem] : [],
   }),
@@ -114,7 +110,6 @@ vi.mock('@workbench/widgetRegionViewModel', () => ({
   isRequiredCenterView: () => true,
 }));
 vi.mock('@workbench/widgetRegistry', () => ({
-  // Only the floated-view state resolves a widget by type, for its label.
   getWidgetById: (typeId: string) =>
     typeId === 'preview' ? { manifest: { id: 'preview', label: 'Preview' }, status: 'enabled' } : undefined,
   getWidgetsForRegion: () => [],
@@ -136,8 +131,6 @@ vi.mock('@workbench/WorkbenchContext', () => ({
     selector({ backendConnection: { status: 'connected' } }),
 }));
 vi.mock('@workbench/widget-frame', () => ({
-  // Loading state is not what this suite measures; the real component would
-  // suspend on a chunk that does not exist under the mocked registry.
   WidgetIdentityIcon: () => <Box boxSize="3.5" />,
   WidgetChromeSlotById: ({ slot }: { slot: 'actions' | 'label' | 'icon' }) => {
     if (slot === 'icon') {
@@ -146,7 +139,6 @@ vi.mock('@workbench/widget-frame', () => ({
     const Slot = centerAreaMocks.chromeSlots?.[slot];
 
     if (Slot) {
-      // The frame adds the widget's settings and menu buttons after its own actions.
       return slot === 'actions' ? (
         <>
           <Slot region="center" />
@@ -252,7 +244,6 @@ describe('CenterArea chrome layout', () => {
   });
 
   it('keeps the islands apart and inside the minimum center width, scrolling what does not fit', async () => {
-    // The center's own minimum width; both islands hold more than fits beside each other.
     await render(<CenterArea />, 320);
     // Resize observations, and the cues they set, land before the second frame.
     await act(
@@ -274,12 +265,10 @@ describe('CenterArea chrome layout', () => {
     // The actions give way at the width that leaves the start island its floor: border, row padding, the view menu's
     // 5rem, and the 2.75rem end cue.
     expect(start.width).toBeGreaterThanOrEqual(2 + 4 + 80 + 44);
-    // The compact view menu, icon and chevron only, stays whole and clear of the cue covering the island's end.
     expect(viewMenu.width).toBeGreaterThanOrEqual(30);
     expect(viewMenu.right).toBeLessThanOrEqual(
       startIsland!.querySelector('[data-overflow-cue="end"]')!.getBoundingClientRect().left
     );
-    // Each island scrolls the rest, cueing the end that hides it.
     for (const island of [startIsland!, endIsland!]) {
       const row = island.firstElementChild!;
       expect(row.scrollWidth).toBeGreaterThan(row.clientWidth);
@@ -308,7 +297,6 @@ describe('CenterArea view menu trigger', () => {
 
     expect(viewName().getClientRects().length).toBeGreaterThan(0);
     expect(viewName().getBoundingClientRect().width).toBeGreaterThan(0);
-    // The icon button's own px="0" must not win over the trigger's padding and 5rem floor.
     expect(getComputedStyle(trigger()).paddingInline).toBe('8px');
     expect(trigger().getBoundingClientRect().width).toBeGreaterThanOrEqual(80);
 
@@ -352,7 +340,6 @@ describe('CenterArea view menu beside wide actions', () => {
   });
 
   it('minimises when the room left to the start island is below 18rem, even at a wide center', async () => {
-    // A 600px center, above the 560px rule, whose actions island leaves the start island under 288px.
     centerAreaMocks.trailingActionsWidth = '320px';
     await render(<CenterArea />, 600);
 
@@ -363,7 +350,6 @@ describe('CenterArea view menu beside wide actions', () => {
     expect(startIsland.parentElement!.getBoundingClientRect().width).toBeLessThan(288);
     expect(name.getClientRects().length).toBe(0);
     expect(trigger.getBoundingClientRect().width).toBeLessThanOrEqual(36);
-    // The widget's label keeps the room the name gave up.
     expect(startIsland.textContent).toContain('Panther and the Flask');
   });
 });
@@ -386,7 +372,6 @@ describe('CenterArea with its last view floating', () => {
     centerAreaMocks.project.widgetInstances = {
       'preview-instance': { id: 'preview-instance', typeId: 'preview' },
     };
-    // Emptied, and still naming the view that left.
     centerAreaMocks.project.widgetRegions.center = { ...dockedCenter, instanceIds: [] };
   };
   const button = (name: string) =>
@@ -396,7 +381,6 @@ describe('CenterArea with its last view floating', () => {
     floatLastView();
     await render(<CenterArea />);
 
-    // In the first render: the center never shows blank while its view floats.
     expect(host?.textContent).toContain('Preview is in a floating window');
     expect(button('Show window')).not.toBeUndefined();
     expect(host?.textContent).not.toContain('unavailable');
@@ -407,7 +391,6 @@ describe('CenterArea with its last view floating', () => {
     });
 
     expect(centerAreaMocks.revealFloating).toHaveBeenCalledWith('preview-instance');
-    // Showing the window also moves focus into it.
     expect(centerAreaMocks.focusFloating).toHaveBeenCalledWith('preview-instance');
     expect(centerAreaMocks.dockFloating).not.toHaveBeenCalled();
 
@@ -417,7 +400,6 @@ describe('CenterArea with its last view floating', () => {
     });
 
     expect(centerAreaMocks.dockFloating).toHaveBeenCalledWith('preview-instance');
-    // Docking from here restores the center view, so focus follows it.
     expect(centerAreaMocks.focusRegion).toHaveBeenCalledWith('center', 'preview');
   });
 
@@ -449,7 +431,6 @@ describe('CenterArea with the workflow editor chrome at a narrow width', () => {
     const snapshot = {
       activeWorkflow: { document, source: linkedSource },
       activeWorkflowId: document.id,
-      // A step to undo and one to redo, so both history buttons are live targets.
       canRedo: true,
       canUndo: true,
       id: 'project-1',
@@ -466,7 +447,6 @@ describe('CenterArea with the workflow editor chrome at a narrow width', () => {
       widgets: { open: () => undefined, patchValues: () => undefined },
     } as unknown as Parameters<typeof WorkflowUiProvider>[0]['adapter'];
     const Label = implementation.headerLabel as ComponentType<{ region: 'center' }>;
-    // The frame hands both slots the same instance's runtime; the menu answers for the header beside it.
     const runtime = { instanceId: 'workflow:center', region: 'center', typeId: 'workflow' };
     const HeaderActions = implementation.headerActions as ComponentType<{ region: 'center'; runtime: typeof runtime }>;
     const MenuItems = implementation.headerMenu as ComponentType<{ region: 'center'; runtime: typeof runtime }>;
@@ -474,7 +454,6 @@ describe('CenterArea with the workflow editor chrome at a narrow width', () => {
 
     centerAreaMocks.chromeSlots = { actions: Actions, label: Label };
     centerAreaMocks.activeItem.label = 'Workflow';
-    // The width the project-file journey's default viewport gives the center view.
     await render(
       <QueryClientProvider client={new QueryClient()}>
         <WorkflowUiProvider adapter={adapter}>
@@ -495,7 +474,6 @@ describe('CenterArea with the workflow editor chrome at a narrow width', () => {
     );
   };
 
-  /** Whether a pointer at the element's centre lands on it, rather than on chrome painted over it. */
   const isHitTestable = (element: Element) => {
     const rect = element.getBoundingClientRect();
     const hit = document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2);
@@ -509,14 +487,12 @@ describe('CenterArea with the workflow editor chrome at a narrow width', () => {
   ])('keeps the workflow name and every header action clickable when %s', async (_label, source) => {
     await renderWorkflowChrome(source);
 
-    // Untranslated here: the button is the one carrying the workflow's library link.
     const workflowsButton = host!.querySelector('[data-template-link]')?.closest('button');
     const actions = [
       ...host!.querySelectorAll('[data-hotkey-widget-region="center"] > :last-child :is(button, [role="status"])'),
     ];
 
     expect(workflowsButton).not.toBeNull();
-    // The library actions keep their place; Undo and Redo give way to the ⋯ menu, so nothing overflows into a scroll.
     expect(
       actions.filter((action) => action.checkVisibility()).map((action) => action.getAttribute('aria-label'))
     ).toEqual([

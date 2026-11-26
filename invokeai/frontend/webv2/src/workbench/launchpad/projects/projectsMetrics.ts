@@ -13,7 +13,7 @@ export const PROJECTS_GRID_GAP_PX = 16;
 /** `p="3"` around a name line and a timestamp line. */
 export const PROJECT_CARD_META_HEIGHT_PX = 60;
 
-/** List rows are contiguous — each fills its whole 44px slot: a 35px cover (56px / 16:10) plus breathing room. Dividers were dropped with the softened row hover. */
+/** List rows are contiguous — each fills its whole 44px slot: a 35px cover (56px / 16:10) plus breathing room. */
 export const PROJECT_ROW_HEIGHT_PX = 44;
 
 export const PROJECT_GROUP_HEADER_HEIGHT_PX = 44;
@@ -26,11 +26,7 @@ export const getProjectsColumnCount = (widthPx: number): number => {
   return Math.max(1, Math.min(MAX_COLUMNS, Math.floor(widthPx / MIN_CARD_WIDTH_PX)));
 };
 
-/**
- * A grid row is one card tall: a 16:10 cover over a fixed meta block, plus the
- * gap below it. Derived from the measured width because the cover's height
- * follows the column width.
- */
+/** A grid row is one card tall: a 16:10 cover over a fixed meta block, plus the gap below it. */
 export const getProjectsGridRowHeight = ({
   aspectRatio,
   columnCount,

@@ -14,6 +14,7 @@ from diffusers import AutoencoderKL, AutoencoderKLFlux2
 
 from invokeai.app.services.config import get_config
 from invokeai.app.services.invoker import Invoker
+from invokeai.app.services.model_records.missing_models import is_model_missing
 from invokeai.app.services.working_memory_calibration.working_memory_calibration_default import _vae_dtypes
 from invokeai.app.services.working_memory_calibration.working_memory_calibration_plan import (
     DECODE_LINES,
@@ -25,6 +26,7 @@ from invokeai.app.services.working_memory_calibration.working_memory_calibration
     build_plan,
     case_sides,
 )
+from invokeai.backend.model_manager.configs.base import ModelRole
 from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
 from invokeai.backend.model_manager.load.model_loaders.flux import (
     Flux2DiffusersModel,
@@ -374,6 +376,22 @@ def test_a_flux2_model_without_a_text_encoder_generate_can_use_cannot_be_calibra
 
     assert not plan.supported and plan.cases == [] and plan.device_class is not None
     assert "text encoder" in (plan.reason or "") and f"{encoder} encoder" in (plan.reason or "")
+
+
+def _text_llm_serving_qwen3(key: str, variant: Qwen3VariantType) -> SimpleNamespace:
+    role = ModelRole(type=ModelType.Qwen3Encoder, format=ModelFormat.Qwen3Encoder, variant=variant)
+    return _model(key, BaseModelType.Any, ModelType.TextLLM, roles=[role])
+
+
+def test_a_text_llm_serving_as_the_klein_qwen3_encoder_is_a_standalone_encoder() -> None:
+    """Generate offers such a folder in the Qwen3 Encoder picker, and the loader node asks for it in that role."""
+    right_size = _text_llm_serving_qwen3("llm-8b", Qwen3VariantType.Qwen3_8B)
+    wrong_size = _text_llm_serving_qwen3("llm-4b", Qwen3VariantType.Qwen3_4B)
+
+    assert _plan(GGUF_KLEIN_9B, [FLUX2_VAE, right_size]).supported
+    plan = _plan(GGUF_KLEIN_9B, [FLUX2_VAE, wrong_size])
+    assert not plan.supported and "Qwen3 8B encoder" in (plan.reason or "")
+    assert not _plan(GGUF_KLEIN_9B, [FLUX2_VAE, _model("llm", BaseModelType.Any, ModelType.TextLLM)]).supported
 
 
 def test_a_flux2_vae_is_calibrated_through_a_main_model_whose_graph_compiles() -> None:
@@ -987,6 +1005,8 @@ def test_a_flux2_diffusers_pipelines_own_vae_loads_in_the_dtype_the_plan_sizes_f
     _save_tiny_vae(tmp_path / "vae", AutoencoderKLFlux2, torch.float32)
     (tmp_path / "model_index.json").write_text(json.dumps({"vae": ["diffusers", "AutoencoderKLFlux2"]}))
     loader = Flux2DiffusersModel.__new__(Flux2DiffusersModel)
+    loader._torch_device = torch.device("cpu")
+    loader._torch_dtype = torch.float32
     loader._apply_fp8_layerwise_casting = lambda model, config, submodel_type: model
 
     vae = loader._load_model(SimpleNamespace(path=str(tmp_path), repo_variant=None), SubModelType.VAE)
@@ -1018,3 +1038,80 @@ def test_the_service_tells_an_sdnq_quantized_vae_folder_where_the_loader_looks(t
 
     assert vaes.sdnq_quantized_vae(SimpleNamespace(path="flux-sdnq", submodels=None))
     assert not vaes.sdnq_quantized_vae(SimpleNamespace(path="flux-sdnq-plain", submodels=None))
+
+
+def _with_default_components(model: SimpleNamespace, **components: str) -> SimpleNamespace:
+    return SimpleNamespace(**{**vars(model), "default_settings": SimpleNamespace(vae=None, components=components)})
+
+
+def test_a_z_image_model_decodes_with_the_vae_of_its_default_component_source() -> None:
+    """Selecting the model fills its `component_source` slot (a Z-Image pipeline), whose own VAE the model loader node
+    then takes where no VAE is set: under `precision: float32` the pipeline's VAE loads in bf16 where a standalone FLUX
+    VAE stays fp32, and the case needs no VAE pick."""
+    gguf = _model("z-image-gguf", BaseModelType.ZImage, format="gguf_quantized")
+    pipeline = _model("z-image", BaseModelType.ZImage, format="diffusers")
+    flux_vae = _model("ae", BaseModelType.Flux, ModelType.VAE)
+    with_source = _with_default_components(gguf, component_source="z-image")
+
+    assert _lines_of(_plan(gguf, [pipeline, flux_vae], vae_dtypes=FP32_VAES)) == {("decode_fp32", ())}
+    assert _lines_of(_plan(with_source, [pipeline, flux_vae], vae_dtypes=FP32_VAES)) == {("decode_bf16", ())}
+    # A default VAE is set beside the source and wins, as the loader takes a picked VAE first.
+    with_vae = SimpleNamespace(
+        **{
+            **vars(with_source),
+            "default_settings": SimpleNamespace(vae="ae", components={"component_source": "z-image"}),
+        }
+    )
+    assert _lines_of(_plan(with_vae, [pipeline, flux_vae], vae_dtypes=FP32_VAES)) == {("decode_fp32", ())}
+    # A key that names no installed Z-Image pipeline leaves the model as it was.
+    assert _lines_of(
+        _plan(_with_default_components(gguf, component_source="missing"), [pipeline, flux_vae], vae_dtypes=FP32_VAES)
+    ) == {("decode_fp32", ())}
+
+
+def test_a_self_contained_z_image_pipeline_decodes_with_the_vae_of_its_default_component_source() -> None:
+    """The Z-Image loader takes a source's VAE over the self-contained pipeline's own, and the slot is offered for it."""
+    sdnq = _sdnq_pipeline("z-image-sdnq", BaseModelType.ZImage)
+    pipeline = _model("z-image", BaseModelType.ZImage, format="diffusers")
+
+    assert _lines_of(_plan(sdnq, [pipeline], vae_dtypes=FP32_VAES)) == {("decode_fp32", ())}
+    assert _lines_of(
+        _plan(_with_default_components(sdnq, component_source="z-image"), [pipeline], vae_dtypes=FP32_VAES)
+    ) == {("decode_bf16", ())}
+
+
+def test_a_z_image_default_source_whose_files_are_gone_sizes_no_case(tmp_path: Path, mock_invoker: Invoker) -> None:
+    """Generate skips a registered model whose files moved, so the graph decodes with the VAE it would without it."""
+    models_dir = tmp_path / "models"
+    (models_dir / "z-image").mkdir(parents=True)
+    (models_dir / "z-image-gguf.gguf").touch()
+    (models_dir / "ae.safetensors").touch()
+    gguf = _with_default_components(
+        _model("z-image-gguf", BaseModelType.ZImage, format="gguf_quantized", path="z-image-gguf.gguf"),
+        component_source="z-image",
+    )
+    pipeline = _model("z-image", BaseModelType.ZImage, format="diffusers", path="z-image")
+    flux_vae = _model("ae", BaseModelType.Flux, ModelType.VAE, format="checkpoint", path="ae.safetensors")
+
+    def plan_lines(models: list) -> set:
+        model_manager = MagicMock()
+        model_manager.store.get_model.return_value = gguf
+        model_manager.store.all_models.return_value = [gguf, *models]
+        mock_invoker.services.model_manager = model_manager
+        mock_invoker.services.configuration.models_dir = models_dir
+        service = calibration_service(
+            tmp_path,
+            untiled_decode_reservation=lambda estimator, h, w, dtype, device: 1000 * h * w,
+            vae_dtypes=FP32_VAES,
+            is_model_missing=is_model_missing,
+        )
+        service.start(mock_invoker)
+        try:
+            return {(case.line, tuple(case.components.items())) for case in service.get_plan(gguf.key).cases}
+        finally:
+            service.stop(mock_invoker)
+
+    # The pipeline's own VAE loads in bf16; the standalone FLUX VAE the model falls back to stays fp32.
+    assert plan_lines([pipeline, flux_vae]) == {("decode_bf16", ())}
+    (models_dir / "z-image").rmdir()
+    assert plan_lines([pipeline, flux_vae]) == plan_lines([flux_vae]) == {("decode_fp32", ())}

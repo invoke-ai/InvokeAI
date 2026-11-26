@@ -1,3 +1,5 @@
+import type { ResolvedValues } from '@platform/core/resolvedValues';
+
 import type { GalleryItemKind } from './items';
 import type { GalleryBoardOrderBy, GalleryOrderDir } from './types';
 
@@ -5,27 +7,21 @@ export type GalleryThumbnailFit = 'square' | 'aspect';
 
 export type GalleryPaginationMode = 'infinite' | 'paginated';
 
-/** Which media kinds the gallery lists: both, or only one. */
 export type GalleryMediaFilter = 'all' | 'image' | 'video';
 
-/** Reads only the media filter, for subscribers that run on every Workbench change; unknown values read as both. */
+/** For subscribers that run on every Workbench change; unknown values read as both. */
 export const getGalleryMediaFilter = (values: Record<string, unknown>): GalleryMediaFilter =>
   values.mediaFilter === 'image' || values.mediaFilter === 'video' ? values.mediaFilter : 'all';
 
-/** The listing's media-kind restriction; undefined lists both kinds. */
 export const toGalleryMediaKind = (filter: GalleryMediaFilter): GalleryItemKind | undefined =>
   filter === 'all' ? undefined : filter;
 
-/**
- * Where a search looks: the selected board, or every board the caller may read plus their Uncategorized items. It
- * applies only while a search is active; clearing the search returns it to `board`.
- */
+/** Applies only while a search is active; clearing the search returns it to `board`. */
 export type GallerySearchScope = 'board' | 'all';
 
-/** The most project groups under Other projects whose collapse is remembered; the newest are kept. */
+/** The newest are kept. */
 export const GALLERY_COLLAPSED_PROJECT_GROUPS_LIMIT = 200;
 
-/** The collapsible groups in the board panel, in render order. */
 export const GALLERY_BOARD_SECTION_IDS = [
   'project',
   'library',
@@ -38,53 +34,39 @@ export const GALLERY_BOARD_SECTION_IDS = [
 
 export type GalleryBoardSectionId = (typeof GALLERY_BOARD_SECTION_IDS)[number];
 
-/**
- * Groups that start collapsed, which the panel records as opened rather than collapsed: an admin's view of other
- * users' boards stays out of the way of their own on a busy install.
- */
+/** Recorded as opened rather than collapsed: other users' boards stay out of an admin's way. */
 const GALLERY_BOARD_SECTIONS_COLLAPSED_BY_DEFAULT: readonly GalleryBoardSectionId[] = ['other-users'];
 
-/** Height in the stacked layout, width in the wide one — stored separately. */
+/** Height in the stacked layout, width in the wide one, stored separately. */
 export const GALLERY_BOARD_PANEL_MIN_HEIGHT_PX = 120;
 export const GALLERY_BOARD_PANEL_MAX_HEIGHT_PX = 600;
 export const GALLERY_MIN_GRID_HEIGHT_PX = 128;
 export const GALLERY_BOARD_PANEL_MIN_WIDTH_PX = 180;
 export const GALLERY_BOARD_PANEL_MAX_WIDTH_PX = 420;
 
-/**
- * The stored auto-add value earlier builds wrote for "follow the selected board", their default. It now reads as the
- * default destination: following became the opt-in `followSelectedBoard`, so browsing a board never moves results.
- */
+/** Earlier builds' stored "follow" reads as the default destination; following is now `followSelectedBoard`. */
 const LEGACY_AUTO_ADD_FOLLOW = 'follow';
 
-/** Whether the stored values still hold the legacy follow-the-selected-board auto-add value. */
 export const isLegacyFollowAutoAdd = (values: Readonly<Record<string, unknown>>): boolean =>
   values.autoAddBoardId === LEGACY_AUTO_ADD_FOLLOW;
 
-/** User-tunable gallery settings, persisted in the widget's `values` record. */
 export interface GallerySettings {
-  /**
-   * Where results without a board of their own go: a board id, `none` (Uncategorized), or null for the default, the
-   * project's inbox (Uncategorized where the gallery has none). Workflow nodes set to Auto use it too.
-   */
+  /** `none` is Uncategorized; null is the project's inbox. Workflow nodes set to Auto use it too. */
   autoAddBoardId: string | null;
   boardOrderBy: GalleryBoardOrderBy;
   boardOrderDir: GalleryOrderDir;
-  /** Board panel disclosure controlled by the region-independent widget header. */
   boardPanelCollapsed: boolean;
   boardPanelHeightPx: number;
   boardPanelWidthPx: number;
   collapsedBoardSections: GalleryBoardSectionId[];
-  /** Project groups under Other projects that are collapsed, by project id; oldest first. */
+  /** Oldest first. */
   collapsedProjectGroupIds: string[];
-  /** The groups that start collapsed which have been opened. */
   expandedBoardSections: GalleryBoardSectionId[];
-  /** Opt-in: results go to whichever board the gallery shows, in place of `autoAddBoardId`. */
+  /** Replaces `autoAddBoardId` while on. */
   followSelectedBoard: boolean;
   imageDensityPercent: number;
   imageOrderDir: GalleryOrderDir;
   mediaFilter: GalleryMediaFilter;
-  /** Opt-in: a middle click on a tile opens the media in a new browser tab instead of the browser default. */
   middleClickOpensInNewTab: boolean;
   paginationMode: GalleryPaginationMode;
   showArchivedBoards: boolean;
@@ -95,7 +77,6 @@ export interface GallerySettings {
   showPendingItems: boolean;
   progressSectionCollapsed: boolean;
   searchScope: GallerySearchScope;
-  /** Disclosure of the starred strip at the top of the grid. */
   starredSectionCollapsed: boolean;
   thumbnailFit: GalleryThumbnailFit;
 }
@@ -141,16 +122,13 @@ const getBoundedSize = (
 ): number =>
   typeof value === 'number' && Number.isFinite(value) ? Math.min(max, Math.max(min, Math.round(value))) : fallback;
 
-/** Filtered to known ids: a stale one would close a section with no way back. */
+/** A stale id would close a section with no way back. */
 const getBoardSections = (value: unknown, candidates: readonly GalleryBoardSectionId[]): GalleryBoardSectionId[] =>
   Array.isArray(value)
     ? candidates.filter((sectionId) => value.some((entry) => isBoardSectionId(entry) && entry === sectionId))
     : [];
 
-/**
- * Distinct strings, each at its last occurrence, at most the limit's newest. One pass from the end stops at the
- * limit, so an imported workspace with a huge list costs no more than the ids it keeps.
- */
+/** One pass from the end stops at the limit, so a huge imported list costs no more than the ids kept. */
 const getCollapsedProjectGroupIds = (value: unknown): string[] => {
   if (!Array.isArray(value)) {
     return [];
@@ -169,7 +147,6 @@ const getCollapsedProjectGroupIds = (value: unknown): string[] => {
   return [...kept].reverse();
 };
 
-/** The settings change that collapses or expands one project's group under Other projects. */
 export const toggleGalleryProjectGroup = (
   settings: GallerySettings,
   projectId: string,
@@ -187,7 +164,6 @@ export const isGalleryBoardSectionOpen = (settings: GallerySettings, sectionId: 
     ? settings.expandedBoardSections.includes(sectionId)
     : !settings.collapsedBoardSections.includes(sectionId);
 
-/** The settings change that opens or closes a group. */
 export const toggleGalleryBoardSection = (
   settings: GallerySettings,
   sectionId: GalleryBoardSectionId,
@@ -202,15 +178,18 @@ export const toggleGalleryBoardSection = (
     : { collapsedBoardSections: toggle(settings.collapsedBoardSections, !isOpen) };
 };
 
-export const getGallerySettings = (values: Record<string, unknown>): GallerySettings => {
+/** Not layered, so it reads stored values. */
+export const getGalleryChosenAutoAddBoardId = (values: Readonly<Record<string, unknown>>): string | null =>
+  typeof values.autoAddBoardId === 'string' && values.autoAddBoardId !== '' && !isLegacyFollowAutoAdd(values)
+    ? values.autoAddBoardId
+    : DEFAULT_GALLERY_SETTINGS.autoAddBoardId;
+
+export const getGallerySettings = (values: ResolvedValues): GallerySettings => {
   const paginationMode: GalleryPaginationMode =
     values.paginationMode === 'paginated' ? 'paginated' : DEFAULT_GALLERY_SETTINGS.paginationMode;
 
   return {
-    autoAddBoardId:
-      typeof values.autoAddBoardId === 'string' && values.autoAddBoardId !== '' && !isLegacyFollowAutoAdd(values)
-        ? values.autoAddBoardId
-        : DEFAULT_GALLERY_SETTINGS.autoAddBoardId,
+    autoAddBoardId: getGalleryChosenAutoAddBoardId(values),
     boardOrderBy: isBoardOrderBy(values.boardOrderBy) ? values.boardOrderBy : DEFAULT_GALLERY_SETTINGS.boardOrderBy,
     boardOrderDir: isOrderDir(values.boardOrderDir) ? values.boardOrderDir : DEFAULT_GALLERY_SETTINGS.boardOrderDir,
     boardPanelCollapsed:

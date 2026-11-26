@@ -9,6 +9,7 @@ behaviour under test; a mocked `enable_tiling` would leave nothing behind to lea
 
 from unittest.mock import MagicMock, patch
 
+import pytest
 import torch
 from diffusers.models.autoencoders import AutoencoderKLWan
 
@@ -18,6 +19,7 @@ from invokeai.app.invocations.vae.anima_latents_to_image import (
     ANIMA_VAE_TILE_STRIDE,
     AnimaLatentsToImageInvocation,
 )
+from invokeai.app.invocations.vae.qwen_image_image_to_latents import QwenImageImageToLatentsInvocation
 from invokeai.backend.util.devices import TorchDevice
 
 
@@ -133,6 +135,7 @@ def test_a_tiled_decode_applies_the_calibrated_geometry_and_restores_it():
 def _build_encode_context(vae: AutoencoderKLWan):
     vae_info = MagicMock()
     vae_info.model = vae
+    vae_info.compute_device = torch.device("cpu")
     cm = MagicMock()
     cm.__enter__ = MagicMock(return_value=(None, vae))
     cm.__exit__ = MagicMock(return_value=None)
@@ -144,6 +147,33 @@ def _build_encode_context(vae: AutoencoderKLWan):
     context.config.get.return_value.force_tiled_decode = False
     context.tensors.save.return_value = "test_latents"
     return vae_info, context
+
+
+@pytest.mark.parametrize(
+    ("invocation", "shape"),
+    [
+        (AnimaImageToLatentsInvocation, (1, 16, 4, 4)),
+        (QwenImageImageToLatentsInvocation, (1, 16, 1, 4, 4)),
+    ],
+    ids=["anima", "qwen-image"],
+)
+def test_wan_layout_encode_uses_the_cpu_vae_in_an_accelerator_session(monkeypatch, invocation, shape):
+    vae = _build_tiny_vae()
+    vae_info, _ = _build_encode_context(vae)
+    real_encode = vae.encode
+
+    def encode(pixels, **kwargs):
+        assert pixels.device == torch.device("cpu")
+        assert pixels.dtype == vae.dtype
+        return real_encode(pixels, **kwargs)
+
+    monkeypatch.setattr(vae, "encode", encode)
+    monkeypatch.setattr(TorchDevice, "choose_torch_device", lambda: torch.device("meta"))
+
+    latents = invocation.vae_encode(vae_info, torch.zeros(1, 3, 32, 32, dtype=torch.float64))
+
+    assert latents.shape == shape
+    assert latents.device == torch.device("cpu")
 
 
 def _encode(context, vae, image: torch.Tensor, tiled: bool = False, tile_size: int = 0):

@@ -16,7 +16,6 @@ import { createCanvasMutationContext } from './mutationContext';
 const PERSISTED = { height: 20, imageName: 'persisted-mask', width: 20 };
 const CACHE_RECT = { height: 20, width: 20, x: 0, y: 0 };
 
-/** A real reducer, history, transaction protocol and layer cache around one persisted inpaint mask. */
 const createHarness = (options: { byteBudget?: number } = {}) => {
   const base = createInitialWorkbenchState().projects[0]!;
   const mask = layerContract('mask', 'inpaint_mask');
@@ -31,7 +30,6 @@ const createHarness = (options: { byteBudget?: number } = {}) => {
   let mirrorBroken = false;
   let mirrorDocument = project.canvas.document;
   let reserveFits = true;
-  // Fault injection: edits lock while the operation prepares, so its publication is refused.
   let lockWhilePreparing = false;
   let locked = false;
   const dispatched: CanvasProjectMutation[] = [];

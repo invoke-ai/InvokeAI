@@ -55,6 +55,15 @@ class PreparedGraph:
     """The denoise step count of each node that states the one it runs (`denoise_step_counts`), by node id."""
 
 
+def flag_missing_models(models: list[dict[str, Any]], missing: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The model list with `is_missing` set on registered models whose files are gone, as Generate reads the library.
+
+    The exporter then skips them as default components like Generate does.
+    """
+    missing_keys = {model["key"] for model in missing}
+    return [{**model, "is_missing": True} if model["key"] in missing_keys else model for model in models]
+
+
 def build_export_request(
     cases: list[ResolvedCase],
     models: list[dict[str, Any]],

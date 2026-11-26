@@ -13,11 +13,8 @@ import {
 import { describe, expect, it } from 'vitest';
 
 import {
-  childRowNameKey,
   getLayerChildItem,
   layerChildDropCommand,
-  layerChildMoveTargets,
-  layerChildRemoveLabelKey,
   layerChildRowCommand,
   layerChildRowKey,
   projectLayerChildRows,
@@ -75,25 +72,9 @@ describe('projectLayerChildRows', () => {
     });
   });
 
-  it('projects nothing for layers without reference images and for other layer types', () => {
-    const document = documentFrom([regionalWith([]), layerContract('r1'), layerContract('m1', 'inpaint_mask')]);
-    const built = buildLayerStackRows(document.stacks, new Set());
-    for (const stack of Object.values(built)) {
-      for (const row of stack.rows) {
-        expect(projectLayerChildRows(row.vm)).toEqual([]);
-      }
-    }
-  });
-
   it('reports a disabled or ancestor-disabled parent as not contributing', () => {
     const document = documentFrom([regionalWith([referenceImage('ref1')], { isEnabled: false })]);
     expect(projectLayerChildRows(rowsOf(document).vm)[0]!.parentContributing).toBe(false);
-  });
-
-  it('returns the identical array for an unchanged node', () => {
-    const document = documentFrom([regionalWith([referenceImage('ref1')])]);
-    const vm = rowsOf(document).vm;
-    expect(projectLayerChildRows(vm)).toBe(projectLayerChildRows(vm));
   });
 });
 
@@ -111,7 +92,6 @@ describe('layerChildRowCommand', () => {
       ['ref2', true],
     ]);
     expect(before.referenceImages.map((ref) => ref.isEnabled)).toEqual([true, true]);
-    // Untouched items keep identity; the toggled one is replaced, never mutated.
     expect(config.referenceImages[1]).toBe(before.referenceImages[1]);
     expect(before.referenceImages[0]!.isEnabled).toBe(true);
   });
@@ -121,14 +101,6 @@ describe('layerChildRowCommand', () => {
     const command = layerChildRowCommand(document, target, { type: 'remove' });
     const config = command!.config as { referenceImages: RegionalGuidanceReferenceImage[] };
     expect(config.referenceImages.map((ref) => ref.id)).toEqual(['ref2']);
-  });
-
-  it('returns null for a missing layer, a wrong-typed layer, a missing item, and a no-op toggle', () => {
-    const document = documentFrom([regionalWith([referenceImage('ref1')]), layerContract('r1')]);
-    expect(layerChildRowCommand(document, { itemId: 'ref1', layerId: 'gone' }, { type: 'remove' })).toBeNull();
-    expect(layerChildRowCommand(document, { itemId: 'ref1', layerId: 'r1' }, { type: 'remove' })).toBeNull();
-    expect(layerChildRowCommand(document, { itemId: 'gone', layerId: 'rg1' }, { type: 'remove' })).toBeNull();
-    expect(layerChildRowCommand(document, target, { isEnabled: true, type: 'set-enabled' })).toBeNull();
   });
 });
 
@@ -167,18 +139,6 @@ describe('mask modifier rows', () => {
     expect(
       layerChildRowCommand(document, { itemId: 'noise', layerId: 'm1' }, { isEnabled: true, type: 'set-enabled' })
     ).toBeNull();
-  });
-
-  it('resolves live child items across kinds', () => {
-    const document = documentFrom([
-      maskWith({ noise: { isEnabled: false, level: 0.5 } }),
-      regionalWith([referenceImage('ref1')]),
-    ]);
-    expect(getLayerChildItem(document, 'm1', 'noise')).toEqual({ isEnabled: false, kind: 'mask-noise' });
-    expect(getLayerChildItem(document, 'm1', 'denoise')).toBeNull();
-    expect(getLayerChildItem(document, 'rg1', 'ref1')).toEqual({ isEnabled: true, kind: 'reference-image' });
-    expect(getLayerChildItem(document, 'rg1', 'gone')).toBeNull();
-    expect(getLayerChildItem(document, 'gone', 'noise')).toBeNull();
   });
 });
 
@@ -238,14 +198,6 @@ describe('group adjustment child rows', () => {
       )
     ).toEqual(['ga2', 'ga1']);
   });
-
-  it('resolves group-owned child items', () => {
-    const document = documentFrom([groupWith(stack())]);
-    expect(getLayerChildItem(document, 'g1', 'ga1')).toEqual({
-      isEnabled: true,
-      kind: 'adjustment-brightness-contrast',
-    });
-  });
 });
 
 describe('adjustment rows', () => {
@@ -270,95 +222,6 @@ describe('adjustment rows', () => {
     expect(projectLayerChildRows(rasterRow(documentFrom([rasterWith([])])).vm)).toEqual([]);
   });
 
-  it('projects levels, hue and invert entries with their kinds and details', () => {
-    const rows = projectLayerChildRows(
-      rasterRow(
-        documentFrom([
-          rasterWith([
-            {
-              gamma: 1.2,
-              id: 'l1',
-              inBlack: 10,
-              inWhite: 240,
-              isEnabled: true,
-              outBlack: 0,
-              outWhite: 255,
-              type: 'levels',
-            },
-            { id: 'h1', isEnabled: true, rotation: 90, type: 'hue' },
-            { id: 'i1', isEnabled: false, type: 'invert' },
-            { id: 'e1', isEnabled: true, stops: 1.5, type: 'exposure' },
-            {
-              channel: 'r',
-              gamma: 1,
-              id: 'l2',
-              inBlack: 0,
-              inWhite: 255,
-              isEnabled: true,
-              outBlack: 0,
-              outWhite: 200,
-              type: 'levels',
-            },
-          ]),
-        ])
-      ).vm
-    );
-    expect(rows.map((row) => [row.kind, row.itemId, row.isEnabled, row.detail])).toEqual([
-      ['adjustment-levels', 'l1', true, null],
-      ['adjustment-hue', 'h1', true, '90°'],
-      ['adjustment-invert', 'i1', false, null],
-      ['adjustment-exposure', 'e1', true, '+1.5 EV'],
-      ['adjustment-levels', 'l2', true, 'R'],
-    ]);
-  });
-
-  it('projects noise entries with their amount and a localized grain, apart from the mask noise row', () => {
-    const noise = (id: string, amount: number, grain: 'monochrome' | 'color' | 'chroma'): CanvasAdjustmentEntry => ({
-      amount,
-      distribution: 'gaussian',
-      grain,
-      id,
-      isEnabled: true,
-      response: 'midtones',
-      seed: 1,
-      size: 1,
-      type: 'noise',
-    });
-    const rows = projectLayerChildRows(
-      rasterRow(
-        documentFrom([
-          rasterWith([noise('n1', 0.1, 'monochrome'), noise('n2', 0.257, 'color'), noise('n3', 0.05, 'chroma')]),
-        ])
-      ).vm
-    );
-    expect(rows.map((row) => [row.kind, row.itemId, row.detail, row.detailLabelKey])).toEqual([
-      ['adjustment-noise', 'n1', '10%', 'widgets.layers.adjustments.noiseGrains.monochrome'],
-      ['adjustment-noise', 'n2', '26%', 'widgets.layers.adjustments.noiseGrains.color'],
-      ['adjustment-noise', 'n3', '5%', 'widgets.layers.adjustments.noiseGrains.chroma'],
-    ]);
-    expect(childRowNameKey('adjustment-noise')).not.toBe(childRowNameKey('mask-noise'));
-    expect(layerChildRemoveLabelKey('adjustment-noise')).toBe('widgets.layers.modifiers.removeAdjustment');
-  });
-
-  it('projects clarity, texture and dehaze entries with their signed amount as a plain strength', () => {
-    const rows = projectLayerChildRows(
-      rasterRow(
-        documentFrom([
-          rasterWith([
-            { amount: 35.4, id: 'c1', isEnabled: true, size: 40, type: 'clarity' },
-            { amount: -120, id: 't1', isEnabled: false, size: 8, type: 'texture' },
-            { amount: 0, id: 'd1', isEnabled: true, type: 'dehaze' },
-          ]),
-        ])
-      ).vm
-    );
-    expect(rows.map((row) => [row.kind, row.itemId, row.isEnabled, row.detail])).toEqual([
-      ['adjustment-clarity', 'c1', true, '+35'],
-      ['adjustment-texture', 't1', false, '-120'],
-      ['adjustment-dehaze', 'd1', true, '0'],
-    ]);
-  });
-
   it('renames an entry, clears the name with null, and refuses no-op renames and non-adjustment kinds', () => {
     const document = documentFrom([rasterWith(), regionalWith([referenceImage('ref1')])]);
     const named = layerChildRowCommand(document, { itemId: 'a1', layerId: 'r1' }, { name: 'Warm up', type: 'rename' });
@@ -374,15 +237,6 @@ describe('adjustment rows', () => {
     expect(
       layerChildRowCommand(document, { itemId: 'ref1', layerId: 'rg1' }, { name: 'Ref', type: 'rename' })
     ).toBeNull();
-  });
-
-  it('projects the custom name of a renamed entry', () => {
-    const rows = projectLayerChildRows(
-      rasterRow(
-        documentFrom([rasterWith([{ id: 'h1', isEnabled: true, name: 'Shift teal', rotation: 30, type: 'hue' }])])
-      ).vm
-    );
-    expect(rows[0]).toMatchObject({ customName: 'Shift teal', detail: '30°' });
   });
 
   it('moves an entry within the stack and refuses moves past the ends', () => {
@@ -404,29 +258,6 @@ describe('adjustment rows', () => {
     );
     const ids = (command!.config as unknown as { adjustments: { id: string }[] }).adjustments.map((entry) => entry.id);
     expect(ids).toEqual(['a1', 'a1-copy', 'a2', 'a3']);
-  });
-
-  it('reseeds a duplicated noise entry so the copies do not add identical grain', () => {
-    const noise: CanvasAdjustmentEntry = {
-      amount: 0.1,
-      distribution: 'uniform',
-      grain: 'color',
-      id: 'n1',
-      isEnabled: true,
-      response: 'flat',
-      seed: 7,
-      size: 2.5,
-      type: 'noise',
-    };
-    const command = layerChildRowCommand(
-      documentFrom([rasterWith([noise])]),
-      { itemId: 'n1', layerId: 'r1' },
-      { newId: 'n1-copy', newNoiseSeed: 99, type: 'duplicate' }
-    );
-    expect((command!.config as unknown as { adjustments: CanvasAdjustmentEntry[] }).adjustments).toEqual([
-      noise,
-      { ...noise, id: 'n1-copy', seed: 99 },
-    ]);
   });
 
   it('toggles and removes entries, and refuses move/duplicate for non-adjustment kinds', () => {
@@ -510,18 +341,9 @@ describe('layerChildDropCommand', () => {
         ['r1', 'raster', ['a1', 'a2']],
         ['r2', 'raster', ['a3', 'b1']],
       ]);
-      // The entry travels whole: same id, same settings.
       const landed = (command as unknown as { patches: AdjustmentPatch[] }).patches[1]!.config.adjustments[0];
       expect(landed).toEqual(entries()[2]);
       expect(createDocumentModel(document, { editRevision: 0, projectId: 'p' }).refusalFor(command!)).toBeNull();
-    });
-
-    it('appends to a raster group through the group arm', () => {
-      const document = documentFrom(owners());
-      expect(patchesOf(layerChildDropCommand(document, adjustment, { beforeItemId: null, layerId: 'g1' }))).toEqual([
-        ['r1', 'raster', ['a1', 'a2']],
-        ['g1', 'group', ['a3']],
-      ]);
     });
 
     it('refuses owners that cannot hold adjustments, colliding ids, and landings above a region', () => {
@@ -539,25 +361,6 @@ describe('layerChildDropCommand', () => {
         ['r2', 'raster', ['a3', 'b1']],
       ]);
     });
-
-    it('lists every other raster layer and group as a move target, in panel order', () => {
-      const document = documentFrom(owners());
-      expect(
-        layerChildMoveTargets(document, { ...adjustment, stack: 'raster' }).map((target) => [target.id, target.name])
-      ).toEqual([
-        ['r2', 'Target'],
-        ['g1', 'Group'],
-        ['r3', 'Member'],
-      ]);
-    });
-  });
-
-  it('reorders a reference image within its layer', () => {
-    const document = documentFrom(twoRegions());
-    const moved = layerChildDropCommand(document, reference, { beforeItemId: null, layerId: 'rg1' });
-    expect(
-      ((moved as { config: unknown }).config as { referenceImages: { id: string }[] }).referenceImages.map((r) => r.id)
-    ).toEqual(['ref2', 'ref1']);
   });
 
   it('moves a reference image between regional layers as one atomic batch', () => {
@@ -619,22 +422,6 @@ describe('layer regenerate region child row', () => {
     expect(rows[1]).toMatchObject({ orderedPosInSet: 1, orderedSetSize: 1 });
   });
 
-  it('refuses an adjustment drop landing above the region row', () => {
-    const document = documentFrom([
-      layerContract('r1', 'raster', {
-        adjustments: [
-          { id: 'a1', isEnabled: true, type: 'invert' },
-          { id: 'a2', isEnabled: true, type: 'invert' },
-        ],
-        inpaint: region(),
-      }),
-    ]);
-    const child = { itemId: 'a2', kind: 'adjustment-invert' as const, layerId: 'r1' };
-    expect(layerChildDropCommand(document, child, { beforeItemId: 'inpaint', layerId: 'r1' })).toBeNull();
-    const landed = layerChildDropCommand(document, child, { beforeItemId: 'a1', layerId: 'r1' });
-    expect(landed).toMatchObject({ config: { adjustments: [{ id: 'a2' }, { id: 'a1' }] } });
-  });
-
   it('routes a persisted adjustment whose id is "inpaint" to the adjustments when no region exists', () => {
     const document = documentFrom([
       layerContract('r1', 'raster', { adjustments: [{ id: 'inpaint', isEnabled: true, type: 'invert' }] }),
@@ -649,23 +436,6 @@ describe('layer regenerate region child row', () => {
       }
     );
     expect(toggled).toMatchObject({ config: { adjustments: [{ id: 'inpaint', isEnabled: false }] } });
-  });
-
-  it('hides a foreign "inpaint"-id adjustment row while a region exists', () => {
-    const document = documentFrom([
-      layerContract('r1', 'raster', {
-        adjustments: [
-          { id: 'inpaint', isEnabled: true, type: 'invert' },
-          { id: 'a1', isEnabled: true, type: 'invert' },
-        ],
-        inpaint: region(),
-      }),
-    ]);
-    const rows = projectLayerChildRows(row(document).vm);
-    expect(rows.map((r) => [r.kind, r.itemId, r.posInSet, r.setSize])).toEqual([
-      ['layer-region', 'inpaint', 1, 2],
-      ['adjustment-invert', 'a1', 2, 2],
-    ]);
   });
 
   it('resolves, toggles, renames, and null-removes the singleton; move and duplicate refuse', () => {

@@ -7,16 +7,15 @@ const PATTERN_SPECS: Record<
   Exclude<CanvasMaskFillContract['style'], 'solid'>,
   { size: number; spacing: number; width: number }
 > = {
-  // 6px tile, two parallel 45° lines 3px apart (legacy `pattern-diagonal.svg`).
-  diagonal: { size: 6, spacing: 3, width: 1.3 },
-  // 6px tile, 45° lines in BOTH directions (legacy `pattern-crosshatch.svg`).
-  crosshatch: { size: 6, spacing: 3, width: 1.2 },
+  // Diagonals repeat every 6px along either axis.
+  diagonal: { size: 6, spacing: 6, width: 1.3 },
+  diagonal_left: { size: 6, spacing: 6, width: 1.3 },
+  // Crosshatch repeats both diagonal families every 6px along either axis.
+  crosshatch: { size: 6, spacing: 6, width: 1.2 },
   // 12px tile, 3 vertical + 3 horizontal lines 4px apart (legacy `pattern-grid.svg`).
   grid: { size: 12, spacing: 4, width: 1 },
-  // 9px tile, 3 horizontal lines 3px apart (legacy `pattern-horizontal.svg`).
-  horizontal: { size: 9, spacing: 3, width: 1 },
-  // 9px tile, 3 vertical lines 3px apart (legacy `pattern-vertical.svg`).
-  vertical: { size: 9, spacing: 3, width: 1 },
+  horizontal: { size: 4, spacing: 4, width: 1 },
+  vertical: { size: 4, spacing: 4, width: 1 },
 };
 
 /** Draws the anti-diagonal (`x + y = c`) or main-diagonal (`x - y = c`) line family across the tile. */
@@ -24,11 +23,12 @@ const drawDiagonalLines = (
   ctx: RasterSurface['ctx'],
   size: number,
   spacing: number,
-  direction: 'anti' | 'main'
+  direction: 'anti' | 'main',
+  phase: number
 ): void => {
-  // Sweep `c` well beyond the tile so every crossing line is drawn; the surface
-  // clips to its bounds. `spacing` divides `size`, so the family tiles seamlessly.
-  for (let c = -size; c <= 2 * size; c += spacing) {
+  // Sweep `c` well beyond the tile so every crossing line is drawn; the surface clips to its bounds. `spacing` divides
+  // `size`, so the family tiles seamlessly.
+  for (let c = phase - size; c <= 2 * size; c += spacing) {
     ctx.beginPath();
     if (direction === 'anti') {
       // x + y = c: a long segment crossing the tile.
@@ -62,11 +62,14 @@ export const createMaskPatternTile = (
 
   switch (style) {
     case 'diagonal':
-      drawDiagonalLines(ctx, spec.size, spec.spacing, 'anti');
+      drawDiagonalLines(ctx, spec.size, spec.spacing, 'anti', 4);
+      break;
+    case 'diagonal_left':
+      drawDiagonalLines(ctx, spec.size, spec.spacing, 'main', 2);
       break;
     case 'crosshatch':
-      drawDiagonalLines(ctx, spec.size, spec.spacing, 'anti');
-      drawDiagonalLines(ctx, spec.size, spec.spacing, 'main');
+      drawDiagonalLines(ctx, spec.size, spec.spacing, 'anti', 4);
+      drawDiagonalLines(ctx, spec.size, spec.spacing, 'main', 3);
       break;
     case 'grid':
     case 'horizontal':

@@ -6,7 +6,8 @@ import type { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
 import type { WorkbenchCommands, WorkbenchQueries } from '@workbench/workbenchStore';
 import type { TFunction } from 'i18next';
 
-import { hasArchitectureCapabilities, isSupportedGenerateModel } from '@features/generation/settings';
+import { isSupportedGenerateModel } from '@features/generation/settings';
+import { hasArchitectureCapabilities } from '@features/models/architectures';
 import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { claimCanvasRecall, getCurrentGenerateValues, getImageRecallTitle } from '@workbench/image-actions';
 import { getResolvedProjectWidgetValues } from '@workbench/widgetState';
@@ -31,8 +32,8 @@ export interface QueueItemRecallContext {
 
 /**
  * Recalls a local submission snapshot, or a foreign item's session prompts and seed, into the active project, then
- * reveals the destination panel. An unavailable kind writes nothing and says why. A Canvas recall pressed while
- * another runs says so (see `claimCanvasRecall`).
+ * reveals the destination panel. An unavailable kind writes nothing and says why. A Canvas recall pressed while another
+ * runs says so (see `claimCanvasRecall`).
  */
 export const executeQueueItemRecall = async ({
   context,
@@ -64,6 +65,7 @@ export const executeQueueItemRecall = async ({
     return project
       ? getCurrentGenerateValues({
           generateValues: getResolvedProjectWidgetValues(project, 'generate', queries.getSnapshot().scopedDefaults),
+          models,
           supportedModels,
         })
       : null;

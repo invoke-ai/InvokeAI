@@ -16,7 +16,6 @@ const harness = vi.hoisted(() => ({
   remaining: 0,
 }));
 
-// The frame barrel reaches the whole workbench context; the chip itself is the platform control.
 vi.mock('@workbench/widget-frame', async () => ({
   StatusWidgetChip: (await import('@platform/ui/StatusWidgetChip')).StatusWidgetChip,
 }));

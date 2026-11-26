@@ -22,6 +22,8 @@ import { canCopyImage } from '@platform/browser/clipboard';
 import { IconButton, MenuActionItem, MenuContent, MenuIconItem, RenameDialog, Tooltip } from '@platform/ui';
 import { useQueryClient } from '@tanstack/react-query';
 import {
+  advanceMaskFillColors,
+  getDocumentLeaves,
   canMergeSelectedRasters,
   getDocumentIndex,
   getDocumentLayer,
@@ -33,13 +35,14 @@ import {
   isNodeHidden,
   isOverlayStack,
   lookupDocumentNodeState,
+  nextMaskFillColor,
   renderableSourceOf,
 } from '@workbench/canvas-engine/api';
 import { getCanvasOperations } from '@workbench/canvas-operations/api';
 import { useWorkbenchFocus } from '@workbench/focusRegions';
 import { ShortcutKeycaps } from '@workbench/hotkeys/keyGlyphs';
 import { formatHotkeyForPlatform } from '@workbench/hotkeys/keys';
-import { publishLayerPanelSelection, readLayerPanelState, useLayerPanelState } from '@workbench/layerPanelState';
+import { useLayerPanelState } from '@workbench/layerPanelState';
 import { useNotify } from '@workbench/useNotify';
 import { reportTransformRefusal, showCanvasRefusalNotice } from '@workbench/widgets/canvas/canvasToolCommands';
 import {
@@ -50,6 +53,7 @@ import {
 import {
   describeNamedRefusal,
   reportLayerOperation,
+  reportFlipLayer,
   usePreparedCommit,
 } from '@workbench/widgets/canvas/useStructuralCommit';
 import { useActiveProjectId, useActiveProjectSelector } from '@workbench/WorkbenchContext';
@@ -58,6 +62,7 @@ import {
   ArrowUpDownIcon,
   ChevronRightIcon,
   CopyIcon,
+  TrianglesCenterlineDashedVerticalIcon,
   MergeIcon,
   MoreVerticalIcon,
   PaletteIcon,
@@ -79,6 +84,15 @@ import type {
 } from './layerContextMenuLayout';
 import type { LayerMenuDialogKind, LayerMenuDialogState } from './layerMenuState';
 
+import { clearLayerChildSelection } from './layerChildSelection';
+import {
+  deleteLayers,
+  duplicateLayers,
+  groupLayers,
+  ungroupLayers,
+  useLayerCommandAvailability,
+  useLayerCommandDeps,
+} from './layerCommands';
 import {
   actionTargets,
   enabledToggleLabel,
@@ -98,7 +112,6 @@ import {
   getLayerContextMenuRenderEntries,
 } from './layerContextMenuLayout';
 import { copyLayerToClipboard, saveLayerToBoard } from './layerExportActions';
-import { canGroupSelection, canRemoveFromGroup, groupLayers, removeFromGroup } from './layerGroupCommands';
 import { resolveMenuTargetForRender } from './layerMenuState';
 import {
   DEFAULT_INPAINT_MASK_FILL,
@@ -124,7 +137,7 @@ import {
   needsBakedControlPixels,
 } from './layerOps';
 import { LayerSaveToBoardSubmenu } from './LayerSaveToBoardSubmenu';
-import { useRevealLayerProperties } from './revealLayerProperties';
+import { revealLayerSection, useRevealLayerProperties } from './revealLayerProperties';
 import { RunLayerWorkflowDialog, useLayerWorkflowAvailability } from './RunLayerWorkflowDialog';
 import { useSelectedModelBase } from './useSelectedModelBase';
 
@@ -191,8 +204,7 @@ const hasPureExportableLayerContent = (layer: CanvasLayerContract, document: Can
 interface LayerMenuProps {
   engine: LayerContextMenuEngine | null;
   layer: CanvasLayerContract;
-  /** Where the menu opens: the panel anchors to its trigger; the canvas uses a
-   * virtual rect at the cursor. */
+  /** Where the menu opens: the panel anchors to its trigger; the canvas uses a virtual rect at the cursor. */
   positioning: MenuPositioning;
   /** Render the panel's ⋯ trigger button. Off in the canvas' controlled, anchored
    * mode, where there is no trigger DOM. */
@@ -202,11 +214,7 @@ interface LayerMenuProps {
   onOpenChange?: MenuOpenChange;
   lazyMount?: boolean;
   unmountOnExit?: boolean;
-  /**
-   * Controlled sibling-dialog state. When provided (canvas right-click), the
-   * parent owns it so dialogs survive the menu closing. Undefined means the menu
-   * keeps this state internally (panel).
-   */
+  /** Parent-owned when provided (canvas right-click) so dialogs survive the menu closing. */
   dialogKind?: LayerMenuDialogKind | null;
   onDialogKindChange?: (kind: LayerMenuDialogKind | null) => void;
   /** After a sibling dialog's close animation; a controlling parent may stop retaining its target here. */
@@ -217,10 +225,7 @@ interface LayerMenuProps {
   showGroupLabels?: boolean;
 }
 
-/**
- * Share per-layer actions across panel and canvas menus. Arrange within type groups; merge uses global adjacency.
- * Keep dialogs outside the closing menu portal.
- */
+/** Per-layer actions shared by panel and canvas menus; dialogs live outside the closing menu portal. */
 const LayerMenu = ({
   engine,
   layer,
@@ -291,7 +296,8 @@ const LayerMenu = ({
   );
 
   const targets = actionTargets({ layer, selectedIds });
-  const canGroup = useCanvasEngineRead(engine, () => canGroupSelection(engine?.document.model() ?? null, targets));
+  const commandDeps = useLayerCommandDeps(engine);
+  const available = useLayerCommandAvailability(engine, targets);
   const canMerge = useCanvasEngineRead(engine, () => {
     const model = engine?.document.model() ?? null;
     return (
@@ -311,22 +317,17 @@ const LayerMenu = ({
         )
       : 'ineligible';
   });
-  const canRemoveTargetsFromGroup = useCanvasEngineRead(engine, () =>
-    canRemoveFromGroup(engine?.document.model() ?? null, targets)
-  );
-  const canDeleteSelection = useCanvasEngineRead(
-    engine,
-    () => engine?.document.model()?.refusalFor({ ids: targets, type: 'remove' }) === null
-  );
   const hiddenByAncestor =
     (lookupDocumentNodeState(document, layer.id)?.documentHidden ?? false) && !isNodeHidden(layer);
   const isQuickSwitchBookmark = useLayerQuickSwitch(engine).bookmarkedLayerId === layer.id;
   const actionState = useMemo<LayerContextActionState>(
     () => ({
-      canDeleteSelection,
-      canGroupSelection: canGroup,
+      canDeleteSelection: available.delete,
+      canDuplicateSelection: available.duplicate,
+      canGroupSelection: available.group,
       canMergeSelection: canMerge,
-      canRemoveFromGroup: canRemoveTargetsFromGroup,
+      // The item shows only for leaves of one group, where ungroup is exactly that lift.
+      canRemoveFromGroup: available.ungroup,
       hiddenByAncestor,
       isQuickSwitchBookmark,
       canRunWorkflow: workflowAvailability.canRunWorkflow,
@@ -345,10 +346,8 @@ const LayerMenu = ({
       base,
       hiddenByAncestor,
       isQuickSwitchBookmark,
-      canDeleteSelection,
-      canGroup,
+      available,
       canMerge,
-      canRemoveTargetsFromGroup,
       document,
       engine,
       hasSupportedContent,
@@ -377,57 +376,10 @@ const LayerMenu = ({
     [t]
   );
 
-  const handleDuplicate = useCallback(async () => {
-    if (engine) {
-      const panelSelection = readLayerPanelState(projectId, document.selectedLayerId);
-      const sourceIds = panelSelection.selectedIds.includes(layer.id) ? panelSelection.selectedIds : [layer.id];
-      try {
-        const result = await engine.layers.duplicateLayers(sourceIds);
-        if (result.status === 'duplicated') {
-          publishLayerPanelSelection({
-            primaryId: result.selectedLayerId,
-            projectId,
-            selectedIds: result.duplicateIds,
-          });
-          return;
-        }
-        if (result.status === 'busy') {
-          return;
-        }
-        if (result.status !== 'nothing') {
-          reportLayerOperation(result.status === 'unreadable' ? result : result.status, notify.error, t);
-          return;
-        }
-      } catch {
-        // Report rejected transactions in the menu; the document remains unchanged.
-      }
-      notify.error(t('widgets.layers.actions.actionFailed'), t('widgets.layers.actions.copyFailed'));
-      return;
-    }
-    commitPrepared(t('widgets.layers.actions.duplicate'), (model) =>
-      model.prepare({ createId: createLayerId, ids: [layer.id], type: 'duplicate' })
-    );
-  }, [commitPrepared, document.selectedLayerId, engine, layer.id, notify, projectId, t]);
-
-  const handleDelete = useCallback(() => {
-    const ids = actionTargets({ layer, selectedIds });
-    commitPrepared(getActionLabel('delete'), (model) => model.prepare({ ids, type: 'remove' }));
-  }, [commitPrepared, getActionLabel, layer, selectedIds]);
-
-  const handleGroup = useCallback(() => {
-    const ids = actionTargets({ layer, selectedIds });
-    const outcome = groupLayers(engine, projectId, ids, t('widgets.layers.actions.group'));
-    if (outcome.status === 'refused') {
-      throw makeStatusError(outcome.refusal.status === 'locked' ? 'locked' : 'unsupported');
-    }
-  }, [engine, layer, makeStatusError, projectId, selectedIds, t]);
-
-  const handleRemoveFromGroup = useCallback(() => {
-    const outcome = removeFromGroup(engine, actionTargets({ layer, selectedIds }), getActionLabel('remove-from-group'));
-    if (outcome.status === 'refused') {
-      throw makeStatusError(outcome.refusal.status === 'locked' ? 'locked' : 'unsupported');
-    }
-  }, [engine, getActionLabel, layer, makeStatusError, selectedIds]);
+  const handleDuplicate = useCallback(() => duplicateLayers(commandDeps, targets), [commandDeps, targets]);
+  const handleDelete = useCallback(() => deleteLayers(commandDeps, targets), [commandDeps, targets]);
+  const handleGroup = useCallback(() => groupLayers(commandDeps, targets), [commandDeps, targets]);
+  const handleRemoveFromGroup = useCallback(() => ungroupLayers(commandDeps, targets), [commandDeps, targets]);
 
   const handleMergeMasks = useCallback(async () => {
     if (!engine) {
@@ -517,22 +469,31 @@ const LayerMenu = ({
         layer.type === 'raster' && targetType === 'control'
           ? convertRasterToControl(layer, base)
           : layer.type === 'raster' && targetType === 'inpaint_mask'
-            ? convertRasterToInpaintMask(layer)
+            ? convertRasterToInpaintMask(
+                layer,
+                nextMaskFillColor('inpaint_mask', 0, getDocumentLeaves(canvas.document))
+              )
             : layer.type === 'raster' && targetType === 'regional_guidance'
-              ? convertRasterToRegionalGuidance(layer)
+              ? convertRasterToRegionalGuidance(
+                  layer,
+                  nextMaskFillColor('regional_guidance', 0, getDocumentLeaves(canvas.document))
+                )
               : targetType === 'raster'
                 ? convertRasterControlLayer(layer, 'raster')
                 : null;
       if (!converted) {
         throw makeStatusError('unsupported');
       }
-      // Pass the immutable live object: the engine rejects stale menu actions
-      // by identity and clones the inverse contract internally.
+      // Pass the immutable live object: the engine rejects stale menu actions by identity and clones the inverse
+      // contract internally.
       if (!engine?.layers.commitLayerConversion(label, layer, converted)) {
         throw makeStatusError('not-ready');
       }
+      if (converted.type === 'inpaint_mask' || converted.type === 'regional_guidance') {
+        advanceMaskFillColors(converted.type);
+      }
     },
-    [base, engine, layer, makeStatusError]
+    [base, canvas.document, engine, layer, makeStatusError]
   );
 
   const handleToggleVisibility = useCallback(() => {
@@ -588,8 +549,8 @@ const LayerMenu = ({
 
   const handleSetColorLabel = useCallback(
     (label: CanvasColorLabel | null) => {
-      // `undefined` clears: the reducer writes the key as undefined and
-      // serialization drops it, so "no label" round-trips as absence.
+      // `undefined` clears: the reducer writes the key as undefined and serialization drops it, so "no label"
+      // round-trips as absence.
       patchBase(t('widgets.layers.menu.colorLabel'), { colorLabel: label ?? undefined });
     },
     [patchBase, t]
@@ -661,6 +622,20 @@ const LayerMenu = ({
     }
     patchBase(getActionLabel('fit-to-bbox'), { transform });
   }, [bbox, documentRect, getActionLabel, layer, makeStatusError, patchBase]);
+
+  const handleFlip = useCallback(
+    (direction: 'horizontal' | 'vertical') => {
+      if (!engine) {
+        throw makeStatusError('not-ready');
+      }
+      reportFlipLayer(
+        engine.layers.flipLayer(layer.id, direction, getActionLabel(`flip-${direction}`)),
+        notify.error,
+        t
+      );
+    },
+    [engine, getActionLabel, layer.id, makeStatusError, notify, t]
+  );
 
   const handleSaveToBoard = useCallback(
     async (board: LayerContextBoardChoice) => {
@@ -743,8 +718,11 @@ const LayerMenu = ({
 
   const { focusRegion } = useWorkbenchFocus();
   const handleOpenProperties = useCallback(() => {
+    // A selected child row (reference image, mask modifier, adjustment) would keep its own editor in the pane.
+    clearLayerChildSelection();
     revealProperties(layer.id);
     focusRegion('right', 'layers');
+    revealLayerSection();
   }, [focusRegion, layer.id, revealProperties]);
 
   const handleBooleanRaster = useCallback(
@@ -796,29 +774,37 @@ const LayerMenu = ({
 
   const handleCopyToInpaintMask = useCallback(() => {
     const id = createLayerId();
+    const color = nextMaskFillColor('inpaint_mask', 0, getDocumentLeaves(canvas.document));
     const copied =
       layer.type === 'raster'
-        ? copyRasterToInpaintMask(layer, id)
+        ? copyRasterToInpaintMask(layer, id, color)
         : layer.type === 'control'
-          ? copyControlToInpaintMask(layer, id)
+          ? copyControlToInpaintMask(layer, id, color)
           : layer.type === 'regional_guidance'
             ? copyRegionalGuidanceToInpaintMask(layer, id)
             : null;
     addCopy(copied, getActionLabel('copy-to-inpaint-mask'));
-  }, [addCopy, getActionLabel, layer]);
+    if (layer.type === 'raster' || layer.type === 'control') {
+      advanceMaskFillColors('inpaint_mask');
+    }
+  }, [addCopy, canvas.document, getActionLabel, layer]);
 
   const handleCopyToRegionalGuidance = useCallback(() => {
     const id = createLayerId();
+    const color = nextMaskFillColor('regional_guidance', 0, getDocumentLeaves(canvas.document));
     const copied =
       layer.type === 'raster'
-        ? copyRasterToRegionalGuidance(layer, id)
+        ? copyRasterToRegionalGuidance(layer, id, color)
         : layer.type === 'control'
-          ? copyControlToRegionalGuidance(layer, id)
+          ? copyControlToRegionalGuidance(layer, id, color)
           : layer.type === 'inpaint_mask'
             ? copyMaskToRegionalGuidance(layer, id)
             : null;
     addCopy(copied, getActionLabel('copy-to-regional-guidance'));
-  }, [addCopy, getActionLabel, layer]);
+    if (layer.type === 'raster' || layer.type === 'control') {
+      advanceMaskFillColors('regional_guidance');
+    }
+  }, [addCopy, canvas.document, getActionLabel, layer]);
 
   const handleCopyTo = useCallback(
     (target: LayerType): void | Promise<void> => {
@@ -963,6 +949,7 @@ const LayerMenu = ({
       extractMaskedArea: handleExtractMaskedArea,
       group: handleGroup,
       fitToBbox: handleFitToBbox,
+      flip: handleFlip,
       mergeDown: handleMerge,
       mergeMasks: handleMergeMasks,
       mergeSelected: handleMergeSelected,
@@ -998,6 +985,7 @@ const LayerMenu = ({
       handleDuplicate,
       handleExtractMaskedArea,
       handleFitToBbox,
+      handleFlip,
       handleGroup,
       handleMergeMasks,
       handleMergeSelected,
@@ -1128,17 +1116,13 @@ export const LayerContextMenu = (props: LayerRowMenuProps) => (
   <LayerMenu {...props} positioning={PANEL_POSITIONING} showGroupLabels withTrigger />
 );
 
-/** The layer + pointer position a canvas right-click resolved to. */
 export interface CanvasLayerContextMenuTarget {
   layerId: string;
   x: number;
   y: number;
 }
 
-/**
- * Anchor {@link LayerMenu} at the cursor for the supplied layer id, resolved against the live document. Keep a
- * sticky dialog target after menu closure so sibling dialogs survive; changing layer resets their state.
- */
+/** Keeps a sticky dialog target after the menu closes so sibling dialogs survive. */
 export const CanvasLayerContextMenu = ({
   beforeDangerItems,
   engine,
@@ -1152,11 +1136,9 @@ export const CanvasLayerContextMenu = ({
   showGroupLabels?: boolean;
   onClose: () => void;
 }) => {
-  // The layer a sibling dialog is anchored to. Captured while the live target
-  // still exists, then retained until the dialog has animated out.
+  // The layer a sibling dialog is anchored to.
   const [dialogState, setDialogState] = useState<(LayerMenuDialogState & { isOpen: boolean }) | null>(null);
   // A menu for another layer remounts LayerMenu, cutting the retained dialog short before it reports its exit.
-  // Drop that dialog, or it would resurface as a hidden menu for its layer once this one closes.
   if (target && dialogState && target.layerId !== dialogState.target.layerId) {
     setDialogState(null);
   }
@@ -1237,6 +1219,7 @@ const SUBMENU_META: Record<LayerContextSubmenuId, { defaultLabel: string; icon: 
   'color-label': { defaultLabel: 'Color label', icon: PaletteIcon, labelKey: 'widgets.layers.menu.colorLabel' },
   'convert-to': { defaultLabel: 'Convert to', icon: ArrowRightLeftIcon, labelKey: 'widgets.layers.menu.convertTo' },
   'copy-to': { defaultLabel: 'Copy to', icon: CopyIcon, labelKey: 'widgets.layers.menu.copyTo' },
+  flip: { defaultLabel: 'Flip', icon: TrianglesCenterlineDashedVerticalIcon, labelKey: 'widgets.layers.menu.flip' },
 };
 
 /** Runs a layer action, reporting its failure; a `picker: 'board'` action runs with the board picked for it. */
@@ -1380,10 +1363,7 @@ const LayerMenuSubmenu = ({
 
 type LayerMenuTranslate = (key: string, options: { count?: number; defaultValue: string }) => string;
 
-/**
- * Why the item cannot run: the registry's reason for a disabled action, or, since copying a layer needs the clipboard,
- * which a plain-HTTP origin lacks, that. The item stays reachable by keyboard and says so instead of failing.
- */
+/** The registry's disabled reason, or the missing clipboard on a plain-HTTP origin for copy. */
 const getUnavailableReason = (action: LayerContextAction, t: LayerMenuTranslate): string | undefined =>
   action.id === 'copy-to-clipboard' && !canCopyImage()
     ? t('common.copyUnavailable', { defaultValue: 'Copying needs HTTPS or localhost' })

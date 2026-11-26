@@ -29,7 +29,6 @@ vi.mock('@features/queue', async (importOriginal) => ({
 }));
 const store = () => workbench.store!;
 
-// A real store without the provider's persistence; the view reads and acts through the same hooks.
 vi.mock('@workbench/WorkbenchContext', async (importOriginal) => ({
   ...(await importOriginal<typeof WorkbenchContextModule>()),
   useOptionalWorkbenchCommands: () => workbench.store?.commands ?? null,
@@ -58,7 +57,6 @@ let root: Root | null = null;
 let stopToasts: (() => void) | null = null;
 const popoverProps = { presentation: 'expanded', region: 'popover' } as WidgetViewProps;
 
-/** The list loads with the popover, not with the chip; wait for it rather than for its loading fallback. */
 const listLoaded = () =>
   vi.waitFor(() =>
     expect(
@@ -92,7 +90,6 @@ const toastNamed = (title: string) =>
     (toast) => toast.querySelector('[data-part="title"]')?.textContent === title
   );
 
-/** What `WorkbenchNotificationToaster` runs in the editor: toasts, and keeping undo entries in step with the list. */
 const startToasts = () => {
   stopToasts = startNotificationToasts({
     actionContext: createEditorNotificationActionContext({
@@ -111,7 +108,6 @@ const startToasts = () => {
   });
 };
 
-/** Records an undoable notice the way `useNotify().undoable` does inside the editor. */
 const recordUndoable = (title: string, onUndo: () => void) =>
   store().commands.notifications.add({
     actions: [{ kind: 'undo', undoId: registerNotificationUndo(onUndo) }],
@@ -122,7 +118,6 @@ const recordUndoable = (title: string, onUndo: () => void) =>
 const buttonIn = (element: HTMLElement, name: string) =>
   [...element.querySelectorAll<HTMLButtonElement>('button')].find((candidate) => candidate.textContent === name)!;
 
-/** Lets every open toast go, as its timeout would. */
 const dismissToasts = async () => {
   await act(() => toaster.dismiss());
   await vi.waitFor(() => expect(document.querySelector('[data-scope="toast"][data-part="root"]')).toBeNull());
@@ -197,7 +192,6 @@ describe('notifications widget', () => {
       ).toContain('widgets.queue.retryQueued')
     );
     expect(retryItems).toHaveBeenCalledOnce();
-    // Only its dismiss is left on the failure notice.
     const failureCard = cards().find((card) => card.textContent?.includes('Run failed'))!;
     expect([...failureCard.querySelectorAll('button')].map((candidate) => candidate.textContent)).not.toContain(
       'Retry'
@@ -217,7 +211,6 @@ describe('notifications widget', () => {
         .getSnapshot()
         .notifications.map((notification) => notification.title);
 
-    // Newest first: Third, Second, First.
     dismissOf(0).focus();
     await act(() => userEvent.keyboard('{Enter}'));
     expect(titles()).toEqual(['Second', 'First']);
@@ -230,7 +223,6 @@ describe('notifications widget', () => {
 
     await act(() => userEvent.keyboard('{Enter}'));
     expect(titles()).toEqual([]);
-    // With no notice left, focus rests on the empty state that says so, visibly, not on the page.
     await vi.waitFor(() => expect(document.activeElement?.getAttribute('aria-label')).toBe('No notifications'));
     expect(document.activeElement?.matches(':focus-visible')).toBe(true);
   });
@@ -248,7 +240,6 @@ describe('notifications widget', () => {
     );
     await listLoaded();
 
-    // StrictMode's extra detach must not count as seen.
     expect(store().getSnapshot().notifications[0]?.isRead).toBe(false);
     await vi.waitFor(() => expect(store().getSnapshot().notifications[0]?.isRead).toBe(true), { timeout: 4_000 });
   });
@@ -267,7 +258,6 @@ describe('notifications widget', () => {
         .getSnapshot()
         .notifications.find((notification) => notification.title === title)?.isRead;
 
-    // Newest first: the top of the list is on screen, the oldest is far below it.
     await vi.waitFor(() => expect(isRead('Notice 19')).toBe(true), { timeout: 4_000 });
     expect(isRead('Notice 0')).toBe(false);
   });
@@ -310,7 +300,6 @@ describe('notifications widget', () => {
     await renderPopover();
     await act(() => recordUndoable('Deleted curve', onUndo));
     await vi.waitFor(() => expect(buttonsOf(toastNamed('Deleted curve'))).toContain('Undo'));
-    // The first row of an empty list mounts once the list has measured its viewport.
     await vi.waitFor(() => expect(buttonsOf(cardNamed('Deleted curve'))).toContain('Undo'));
 
     await act(() => userEvent.click(buttonIn(cardNamed('Deleted curve')!, 'Undo')));
@@ -326,11 +315,9 @@ describe('notifications widget', () => {
     store().commands.notifications.add({ kind: 'info', title: 'Kept' });
     await renderPopover();
     await act(() => recordUndoable('Deleted preset', onUndo));
-    // Only the list holds the notice's Undo now, so nothing but Clear's toast keeps it through the clear.
     await dismissToasts();
 
     await act(() => userEvent.click(button('Clear')!));
-    // The clear's own notice stays out of the list it emptied.
     expect(store().getSnapshot().notifications).toEqual([]);
 
     const undo = await vi.waitFor(() => {
@@ -359,11 +346,9 @@ describe('notifications widget', () => {
   it('names each row by its kind and unread state, which Mark read clears', async () => {
     store().commands.notifications.add({ kind: 'success', title: 'Saved' });
     store().commands.notifications.add({ kind: 'error', title: 'Upload failed' });
-    // Checked before the rows have been on screen long enough to count as seen.
     await renderPopover();
     const rowName = (title: string) => cardNamed(title)?.querySelector('[data-list-primary]')?.textContent ?? '';
 
-    // Kind is said in words and drawn as a distinct icon, never by colour alone.
     expect(rowName('Upload failed')).toMatch(/^Unread, Error: Upload failed/);
     expect(rowName('Saved')).toMatch(/^Unread, Success: Saved/);
     const iconOf = (title: string) => cardNamed(title)?.querySelector('svg')?.outerHTML;
@@ -402,7 +387,6 @@ describe('notifications widget', () => {
     const text = [...card.querySelectorAll('span')].find((span) => span.textContent === message)!;
 
     expect(text).toBeDefined();
-    // Several lines tall, inside its row, and no wider than the row.
     expect(text.getBoundingClientRect().height).toBeGreaterThan(40);
     expect(text.getBoundingClientRect().bottom).toBeLessThanOrEqual(card.getBoundingClientRect().bottom);
     expect(text.scrollWidth).toBeLessThanOrEqual(text.clientWidth);
@@ -436,7 +420,6 @@ describe('notifications widget', () => {
     const primaryOf = (title: string) => cardNamed(title)!.querySelector<HTMLElement>('[data-list-primary]')!;
     const focusedRow = () => document.activeElement?.closest('[role="listitem"]')?.textContent ?? '';
 
-    // One tab stop for the rows: the newest.
     expect(
       [...host!.querySelectorAll<HTMLElement>('[data-list-primary]')].filter((primary) => primary.tabIndex === 0)
     ).toEqual([primaryOf('Third')]);
@@ -453,7 +436,6 @@ describe('notifications widget', () => {
     await act(() => userEvent.keyboard('{Tab}'));
     expect(document.activeElement?.textContent).toBe('Retry');
 
-    // Arrows from a row's action move on to the neighbouring row.
     await act(() => userEvent.keyboard('{ArrowUp}'));
     expect(document.activeElement).toBe(primaryOf('Second'));
     await act(() => userEvent.keyboard('{Home}'));
@@ -477,7 +459,6 @@ describe('notifications widget', () => {
         (item) => item.textContent
       );
 
-    // The row's button says it opens a menu, and pressing it does.
     expect(primary.getAttribute('aria-haspopup')).toBe('menu');
     primary.focus();
     await act(() => userEvent.keyboard('{Enter}'));
@@ -494,7 +475,6 @@ describe('notifications widget', () => {
         .getSnapshot()
         .notifications.map((notification) => notification.title)
     ).toEqual(['Older']);
-    // As with the inline Dismiss, focus moves on to the next notice's dismiss.
     await vi.waitFor(() => expect(document.activeElement?.getAttribute('aria-label')).toBe('Dismiss notification'));
     expect(document.activeElement?.closest('[role="listitem"]')?.textContent).toContain('Older');
   });

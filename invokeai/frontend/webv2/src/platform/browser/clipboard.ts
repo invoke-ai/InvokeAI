@@ -1,6 +1,6 @@
 /**
- * The only accessor of the async Clipboard API. Browsers expose it only in a secure context (HTTPS or localhost), so
- * on a plain-HTTP origin `navigator.clipboard` and `ClipboardItem` are absent: callers ask `canCopy*` to disable their
+ * The only accessor of the async Clipboard API. Browsers expose it only in a secure context (HTTPS or localhost), so on
+ * a plain-HTTP origin `navigator.clipboard` and `ClipboardItem` are absent: callers ask `canCopy*` to disable their
  * control, and the operations reject with `ClipboardUnavailableError` instead of throwing a `TypeError`.
  */
 

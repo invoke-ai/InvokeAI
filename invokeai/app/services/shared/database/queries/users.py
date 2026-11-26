@@ -5,11 +5,31 @@ from collections.abc import Collection, Sequence
 from datetime import datetime
 from typing import Any, Optional
 
-from sqlalchemy import Connection, Row, bindparam, delete, func, insert, select, true, update
+from sqlalchemy import (
+    Connection,
+    Row,
+    bindparam,
+    delete,
+    exists,
+    false,
+    func,
+    insert,
+    literal,
+    or_,
+    select,
+    true,
+    update,
+)
 
+from invokeai.app.services.fonts.fonts_common import FontScope, FontSource
 from invokeai.app.services.shared.database.dialect import fixed_limit
 from invokeai.app.services.shared.database.queries.base import IN_CHUNK, QueryModule, mapped, read, write
+from invokeai.app.services.shared.database.schema.fonts import fonts
+from invokeai.app.services.shared.database.schema.projects import projects
+from invokeai.app.services.shared.database.schema.style_presets import style_presets
 from invokeai.app.services.shared.database.schema.users import users
+from invokeai.app.services.shared.database.schema.wildcards import wildcards
+from invokeai.app.services.style_preset_records.style_preset_records_common import PresetType
 from invokeai.app.services.users.users_common import UserDTO
 
 # Every query that yields a `UserDTO` selects these columns and maps them with `_user`. A projection copied
@@ -41,6 +61,24 @@ _PAGE = (
 _COUNT_ACTIVE_ADMINS = select(func.count()).select_from(users).where(*_IS_ACTIVE_ADMIN)
 _FIRST_ACTIVE_ADMIN_EMAIL = (
     select(users.c.email).where(*_IS_ACTIVE_ADMIN).order_by(users.c.created_at, users.c.user_id).limit(fixed_limit(1))
+)
+_OWNS_PRIVATE_WORK = select(
+    or_(
+        exists().where(projects.c.user_id == bindparam("user_id")),
+        exists().where(wildcards.c.user_id == bindparam("user_id")),
+        # Bundled templates are `system`'s too, but every account sees them.
+        exists().where(
+            style_presets.c.user_id == bindparam("user_id"),
+            style_presets.c.type == literal(PresetType.User.value),
+            style_presets.c.is_public == false(),
+        ),
+        # An owner implies a private upload; source and scope are there to match `idx_fonts_uploaded_hash`.
+        exists().where(
+            fonts.c.owner_id == bindparam("user_id"),
+            fonts.c.source == literal(FontSource.UPLOADED.value),
+            fonts.c.scope == literal(FontScope.PRIVATE.value),
+        ),
+    )
 )
 _INSERT = insert(users)
 # An UPDATE reserves bind names that equal column names for its SET clause.
@@ -119,6 +157,12 @@ class UserQueries(QueryModule):
     @read
     def first_active_admin_email(self, conn: Connection) -> Optional[str]:
         return conn.execute(_FIRST_ACTIVE_ADMIN_EMAIL).scalar_one_or_none()
+
+    @read
+    def owns_private_work(self, conn: Connection, user_id: str) -> bool:
+        """Whether the account owns work no other account sees: a project, a wildcard, a private template it made,
+        or a private uploaded font."""
+        return bool(conn.execute(_OWNS_PRIVATE_WORK, {"user_id": user_id}).scalar_one())
 
     @write
     def insert(

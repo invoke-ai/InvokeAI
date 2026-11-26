@@ -86,10 +86,7 @@ const reinsertPreset = <Preset extends { id: string }>(
 
 const EMPTY_QUEUE_INSIGHTS: GenerationQueueInsights = { secondsPerRun: null, seedHistory: [] };
 
-/**
- * Join backend items to local Generate items to exclude other queue sources; use executed session-meta seeds for
- * randomized runs.
- */
+/** Excludes other queue sources; randomized runs use executed session-meta seeds. */
 const getQueueInsights = (
   backendItems: readonly QueueItemReadModel[],
   localQueueItems: readonly QueueItem[]
@@ -140,13 +137,8 @@ const getQueueInsights = (
 };
 
 /**
- * The project's queue read model is observed only while a Generate control subscribes, so a workbench without one
- * neither fetches it nor refetches it on every queue invalidation. Unsubscribed reads use whatever is cached.
- *
- * Insights derive from the read model's items and the local queue alone, keyed on their identities: structural
- * sharing keeps `items` stable across status-only refetches, so those leave the snapshot untouched. Every source
- * change notifies every subscriber; the subscribers' selectors drop the ones that change nothing they read. Comparing
- * against the cached snapshot here instead would miss a change that a render had already pulled into the cache.
+ * Observed only while a Generate control subscribes; structural sharing keeps `items` stable on status refetches.
+ * Comparing against the cached snapshot instead would miss a change a render already pulled in.
  */
 const createQueueInsightsStore = (
   queryClient: QueryClient,
@@ -206,13 +198,11 @@ const createQueueInsightsStore = (
 };
 
 export const GenerationUiAdapterProvider = ({ children }: { children: ReactNode }) => {
-  // Preload the always-needed model picker; leave canvas-only sections lazy.
   useMountEffect(() => {
     void import('@features/models/react');
   });
   const store = useWorkbenchInternalStore();
-  // A model switch waiting for confirmation belongs to the project it was asked in; leaving that project drops it, so
-  // the dialog never pops up later in another context.
+  // A pending model switch belongs to its project; leaving drops it so the dialog never pops up elsewhere.
   useMountEffect(() => {
     let activeProjectId = store.getSnapshot().activeProject.id;
 
@@ -238,7 +228,6 @@ export const GenerationUiAdapterProvider = ({ children }: { children: ReactNode 
     activeProjectId: activeProject.id,
     invocationSourceId: activeProject.invocation.sourceId,
   }));
-  // Syntax highlighting is an account preference, not project data.
   const showPromptSyntaxHighlighting = useWorkbenchPreferenceSelector(
     (preferences) => preferences.showPromptSyntaxHighlighting
   );
@@ -272,11 +261,7 @@ export const GenerationUiAdapterProvider = ({ children }: { children: ReactNode 
     (imageName) => findGalleryItem({ kind: 'image', name: imageName }),
     [findGalleryItem]
   );
-  // Save to Uploads lands where new results do: the auto-add board, judged against the listing of every readable
-  // board, ensured as the upload starts so an archived or revoked board is decided from a listing, not for want of
-  // one, and no listing is read while nothing uploads; a board the listing refuses falls back to the project's inbox.
-  // The board is read from the project before anything is awaited, so a later change cannot redirect an upload
-  // already under way.
+  // Uploads land on the auto-add board, read before any await; a board the listing refuses falls back to the inbox.
   const getUploadBoardId = useCallback<GenerationUiAdapter['gallery']['getUploadBoardId']>(async () => {
     const { activeProject, scopedDefaults } = store.getSnapshot();
     const galleryValues = getResolvedProjectWidgetValues(activeProject, 'gallery', scopedDefaults);
@@ -445,6 +430,13 @@ export const GenerationUiAdapterProvider = ({ children }: { children: ReactNode 
       },
       setIncludePrompts: (includePrompts) => {
         void patchWorkbenchPreferences({ generatePresetsIncludePrompts: includePrompts });
+      },
+      update: (presetId, values) => {
+        void patchWorkbenchPreferences({
+          generatePresets: getWorkbenchPreferences().generatePresets.map((preset) =>
+            preset.id === presetId ? { ...preset, values } : preset
+          ),
+        });
       },
     }),
     [generatePresets, generatePresetsIncludePrompts]

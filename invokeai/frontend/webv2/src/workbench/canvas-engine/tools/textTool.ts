@@ -1,10 +1,10 @@
 /**
- * Text clicks edit the topmost eligible hit layer or open creation at the point. Measured cache bounds fall back
- * to estimates, with inverse-transform hit testing.
+ * Text clicks edit the topmost eligible hit layer or open creation at the point. Measured cache bounds fall back to
+ * estimates, with inverse-transform hit testing.
  *
- * An open session consumes the next canvas press after committing live portal content; blur and Mod+Enter also
- * commit. Escape cancels through the portal or engine ladder. Temporary switches preserve sessions; real switches
- * cancel. Creation adds no layer until its single commit.
+ * An open session consumes the next canvas press after committing live portal content; blur and Mod+Enter also commit.
+ * Escape cancels through the portal or engine ladder. Temporary switches preserve sessions; real switches cancel.
+ * Creation adds no layer until its single commit.
  */
 
 import type {
@@ -27,7 +27,6 @@ import { layerMatrix } from './moveHitTest';
 const PRIMARY_BUTTON = 1;
 
 type TextSource = Extract<CanvasLayerSourceContract, { type: 'text' }>;
-/** A text-sourced raster layer. */
 type TextLayer = Extract<CanvasLayerContract, { type: 'raster' }> & { source: TextSource };
 
 const isTextLayer = (layer: CanvasLayerContract): layer is TextLayer =>

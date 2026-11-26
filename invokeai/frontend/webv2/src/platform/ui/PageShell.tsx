@@ -21,7 +21,6 @@ const PAGE_SCROLL_MEASURE_SX: SystemStyleObject = { ...MEASURE_SX, py: { base: 4
 const CONTENT_SCROLL_HEADER_SX: SystemStyleObject = { ...MEASURE_SX, pb: 4, pt: { base: 4, md: 8 } };
 
 export interface PageShellProps {
-  /** The section's visible heading. */
   title: string;
   /** Override the scroll region's accessible name; ignored for scroll=content, where children own the region. */
   regionLabel?: string;

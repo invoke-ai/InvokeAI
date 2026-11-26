@@ -44,8 +44,8 @@ const createScope = (
 ): AccountScope => Object.freeze({ accountId, epoch, signal, storageSuffix });
 
 /**
- * Identity triggers transitions; App supplies lifecycle ownership and lazy features register cleanup without
- * entering eager bundles.
+ * Identity triggers transitions; App supplies lifecycle ownership and lazy features register cleanup without entering
+ * eager bundles.
  */
 export const createAccountLifecycle = (): AccountLifecycle => {
   let controller = new AbortController();

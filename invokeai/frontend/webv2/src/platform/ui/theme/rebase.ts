@@ -7,12 +7,12 @@ import { TYPE_SCALE } from './scale';
 
 /**
  * Chakra's stock theme, renamed onto the workbench scales (`./scale`). Chakra sizes for marketing pages, so its stock
- * `md` is 36-40px with 16px text; renaming its variants and font references lets `md` mean the workbench's working
- * size while every stock style keeps its pixels. Overrides in `./recipes` build on these renamed recipes and pin the
- * control heights onto the scale.
+ * `md` is 36-40px with 16px text; renaming its variants and font references lets `md` mean the workbench's working size
+ * while every stock style keeps its pixels. Overrides in `./recipes` build on these renamed recipes and pin the control
+ * heights onto the scale.
  *
- * Chakra's `InputElement` (InputGroup start/end slots) hardcodes the stock `sm` font size outside any recipe, so it
- * now computes 11px; give slot content its own size rather than relying on that inherited one.
+ * Chakra's `InputElement` (InputGroup start/end slots) hardcodes the stock `sm` font size outside any recipe, so it now
+ * computes 11px; give slot content its own size rather than relying on that inherited one.
  */
 
 type NameMap = Readonly<Record<string, string>>;
@@ -52,9 +52,9 @@ const TWO_STEPS: NameMap = {
 
 /**
  * Stock size variant names to workbench names, per recipe. Control-height recipes map by pixel height onto
- * `CONTROL_HEIGHT_PX` (after `./recipes` pins the heights it overrides); stock steps off that scale are dropped.
- * Scale names a map omits are dropped; other keys (`inherit`, `full`) pass through. Unlisted recipes keep their
- * names because their sizes are widths or paddings (dialog, popover) or the workbench does not use them.
+ * `CONTROL_HEIGHT_PX` (after `./recipes` pins the heights it overrides); stock steps off that scale are dropped. Scale
+ * names a map omits are dropped; other keys (`inherit`, `full`) pass through. Unlisted recipes keep their names because
+ * their sizes are widths or paddings (dialog, popover) or the workbench does not use them.
  */
 export const SIZE_NAMES: Readonly<Record<string, NameMap>> = {
   alert: ONE_STEP,
@@ -180,8 +180,8 @@ export const rebaseRecipe = <T extends AnyRecipe>(name: string, recipe: T, sizes
 };
 
 /**
- * Rescaled recipes default to `md`, the working size, so a control that names no size is already dense. Heading
- * follows the type scale, and recipes without an `md` step or with a non-scale default (icon's `inherit`) keep theirs.
+ * Rescaled recipes default to `md`, the working size, so a control that names no size is already dense. Heading follows
+ * the type scale, and recipes without an `md` step or with a non-scale default (icon's `inherit`) keep theirs.
  */
 const withWorkingDefault = <T extends AnyRecipe>(name: string, recipe: T): T =>
   name !== 'heading' &&

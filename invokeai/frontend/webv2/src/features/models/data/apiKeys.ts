@@ -1,8 +1,8 @@
 import { getUserStorageScope } from '@features/identity';
 
 /**
- * HuggingFace credentials live server-side; Civitai keys are account-scoped browser storage and become
- * access_token only on matching install URLs.
+ * HuggingFace credentials live server-side; Civitai keys are account-scoped browser storage and become access_token
+ * only on matching install URLs.
  */
 
 const CIVITAI_KEY_BASE_STORAGE_KEY = 'invokeai-webv2-civitai-api-key';
@@ -33,11 +33,14 @@ export const clearCivitaiApiKey = (): void => {
   }
 };
 
+/** Civitai serves the same API and accounts on its .com (SFW) and .red (mature content) domains. */
+const CIVITAI_HOSTS = ['civitai.com', 'civitai.red'];
+
 export const isCivitaiUrl = (source: string): boolean => {
   try {
     const host = new URL(source).hostname;
 
-    return host === 'civitai.com' || host.endsWith('.civitai.com');
+    return CIVITAI_HOSTS.some((civitaiHost) => host === civitaiHost || host.endsWith(`.${civitaiHost}`));
   } catch {
     return false;
   }

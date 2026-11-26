@@ -37,8 +37,8 @@ export const ModelInstallRuntime = () => {
         return;
       }
 
-      // Reconnect only refreshes previously read stores; install completions separately schedule refreshes for
-      // idle stores.
+      // Reconnect only refreshes previously read stores; install completions separately schedule refreshes for idle
+      // stores.
       if (getModelsSnapshot().status !== 'idle') {
         void refreshModels();
       }

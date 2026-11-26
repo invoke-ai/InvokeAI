@@ -14,13 +14,13 @@ import type { CanvasRecallPlan, CanvasRecallTarget } from '@workbench/image-acti
 import type { Project } from '@workbench/projectContracts';
 
 import { galleryImageUrls } from '@features/gallery/utility';
-import { getArchitectureCapabilitiesSnapshot } from '@features/generation/runtime';
 import {
   calculateNewSize,
   getGenerationDimensions,
   isArchitectureDescribed,
   normalizeGenerateWidgetValues,
 } from '@features/generation/settings';
+import { getArchitectureCapabilitiesSnapshot } from '@features/models/architecturesStore';
 import { createItemId } from '@platform/browser/randomUuid';
 import { mapWithConcurrency } from '@platform/core/concurrency';
 import {
@@ -30,10 +30,12 @@ import {
   type AccountScope,
 } from '@platform/state/accountLifecycle';
 import {
+  advanceMaskFillColors,
   captureInsertionAnchor,
   createControlLayer,
   getDocumentLeaves,
   nextControlLayerName,
+  nextMaskFillColor,
 } from '@workbench/canvas-engine/api';
 import { hasPendingCanvasResults } from '@workbench/canvasStagingView';
 import {
@@ -44,7 +46,6 @@ import {
   createRegionalGuidanceLayerWithRefImage,
   DEFAULT_INPAINT_MASK_FILL,
   nextInpaintMaskName,
-  nextRegionalGuidanceFillColor,
   nextRegionalGuidanceName,
 } from '@workbench/widgets/layers/layerOps';
 import { getSelectedModelBase } from '@workbench/widgets/layers/selectedModel';
@@ -77,6 +78,8 @@ interface BuildLayerContext {
   bbox: Project['canvas']['document']['bbox'];
   existingLayers: readonly CanvasLayerContract[];
   modelBase: string | null;
+  colorOffset: number;
+  paletteLayers: readonly CanvasLayerContract[];
 }
 
 type LayerImage = CanvasImageRef | GalleryImage;
@@ -131,16 +134,21 @@ const buildLayer = (
       );
     case 'inpaint-mask':
       return createInpaintMaskFromImage({
-        fill: DEFAULT_INPAINT_MASK_FILL,
+        fill: {
+          ...DEFAULT_INPAINT_MASK_FILL,
+          color: nextMaskFillColor('inpaint_mask', context.colorOffset, context.paletteLayers),
+        },
         id,
         image: ref,
         name: nextInpaintMaskName(names),
         rect: context.bbox,
       });
     case 'regional-guidance': {
-      const regionalGuidanceCount = context.existingLayers.filter((layer) => layer.type === 'regional_guidance').length;
       return createRegionalGuidanceFromImage({
-        fill: { color: nextRegionalGuidanceFillColor(regionalGuidanceCount), style: 'solid' },
+        fill: {
+          color: nextMaskFillColor('regional_guidance', context.colorOffset, context.paletteLayers),
+          style: 'solid',
+        },
         id,
         image: ref,
         name: nextRegionalGuidanceName(names),
@@ -148,10 +156,9 @@ const buildLayer = (
       });
     }
     case 'regional-reference': {
-      const regionalGuidanceCount = context.existingLayers.filter((layer) => layer.type === 'regional_guidance').length;
       const layer = createRegionalGuidanceLayerWithRefImage(
         nextRegionalGuidanceName(names),
-        regionalGuidanceCount,
+        nextMaskFillColor('regional_guidance', context.colorOffset, context.paletteLayers),
         context.modelBase,
         id
       );
@@ -177,11 +184,14 @@ const buildLayers = (
 ): CanvasLayerContract[] => {
   const layers: CanvasLayerContract[] = [];
   const modelBase = getSelectedModelBase(project);
+  const paletteLayers = getDocumentLeaves(project.canvas.document);
   for (const image of images) {
     layers.push(
       buildLayer(image, destination, {
         bbox: project.canvas.document.bbox,
-        existingLayers: [...getDocumentLeaves(project.canvas.document), ...layers],
+        colorOffset: layers.length,
+        existingLayers: [...paletteLayers, ...layers],
+        paletteLayers,
         modelBase,
       })
     );
@@ -355,9 +365,13 @@ export const importGalleryImagesToCanvas = async (options: {
       if (committed.status !== 'committed') {
         return { status: 'blocked' };
       }
-    } else {
-      // Without a live canvas session, import through ingestion.
-      applyCanvasMutation(project.id, forward);
+    } else if (applyCanvasMutation(project.id, forward) === false) {
+      // Without a live canvas session, import through ingestion; `false` means the project refused the layers.
+      return { status: 'blocked' };
+    }
+    const layerKind = layers[0]?.type;
+    if (layerKind === 'inpaint_mask' || layerKind === 'regional_guidance') {
+      advanceMaskFillColors(layerKind, layers.length);
     }
     return { failedImageNames, layerIds: layers.map((layer) => layer.id), status: 'imported' };
   } finally {

@@ -23,12 +23,27 @@ const optionalBoundedNumber = (min: number, max: number, label: string) =>
     .max(max, `${label} must be at most ${max}.`)
     .nullable();
 
+/** Mirrors the backend's rules for `default_settings.components`: the VAE has its own field. */
+const MAX_DEFAULT_COMPONENTS = 16;
+const defaultComponentsSchema = z
+  .record(
+    z.string().regex(/^[a-z0-9_]+$/, 'A component slot name may only hold a-z, 0-9 and _.'),
+    trimmed.min(1, 'Choose a model or clear the component.')
+  )
+  .refine((components) => !('vae' in components), 'Set the VAE in its own field.')
+  .refine(
+    (components) => Object.keys(components).length <= MAX_DEFAULT_COMPONENTS,
+    `At most ${MAX_DEFAULT_COMPONENTS} default components are allowed.`
+  );
+
 /** Null means inherit the app default and corresponds to an unchecked field toggle. */
 export const mainDefaultSettingsSchema = z.object({
   cfgRescaleMultiplier: optionalBoundedNumber(0, 0.99, 'CFG rescale multiplier'),
   cfgScale: optionalBoundedNumber(1, 200, 'CFG scale'),
-  // Record validation permits guidance >=1 without an architecture ceiling; generation owns guidance_max. Accept
-  // FLUX Fill's stored default of 30.
+  // Model keys by slot; null or unset stores none.
+  components: defaultComponentsSchema.nullish(),
+  // Record validation permits guidance >=1 without an architecture ceiling; generation owns guidance_max. Accept FLUX
+  // Fill's stored default of 30.
   guidance: optionalBoundedNumber(1, 200, 'Guidance'),
   height: optionalBoundedNumber(64, 8192, 'Height').refine(
     (value) => value === null || value % 8 === 0,
@@ -36,8 +51,8 @@ export const mainDefaultSettingsSchema = z.object({
   ),
   scheduler: trimmed.nullable(),
   steps: optionalBoundedNumber(1, 10000, 'Steps'),
-  // A VAE model key, or the backend sentinel 'default' for "the compatible
-  // default VAE"; null inherits the app-level setting.
+  // A VAE model key, or the backend sentinel 'default' for "the compatible default VAE"; null inherits the app-level
+  // setting.
   vae: trimmed.min(1, 'Choose a VAE or turn the field off.').nullable(),
   vaePrecision: z.enum(['fp16', 'fp32']).nullable(),
   width: optionalBoundedNumber(64, 8192, 'Width').refine(
@@ -88,8 +103,8 @@ const optionalPositiveInteger = (label: string) =>
     .nullable();
 
 /**
- * The hosted-provider record editor. Null numbers mean "not limited" / "no default"; the modes are flags so the
- * draft store compares flat values.
+ * The hosted-provider record editor. Null numbers mean "not limited" / "no default"; the modes are flags so the draft
+ * store compares flat values.
  */
 export const externalModelSchema = z
   .object({
@@ -131,9 +146,8 @@ export const isAbsoluteModelPath = (path: string): boolean =>
   path.startsWith('/') || path.startsWith('\\\\') || /^[A-Za-z]:[\\/]/.test(path);
 
 /**
- * Mirrors the backend's `models_path / model.path` resolution: managed models
- * store paths relative to the models directory, in-place installs store them
- * absolute. Falls back to the stored path when the directory is unknown.
+ * Mirrors the backend's `models_path / model.path` resolution: managed models store paths relative to the models
+ * directory, in-place installs store them absolute. Falls back to the stored path when the directory is unknown.
  */
 export const resolveModelAbsolutePath = (path: string, modelsDir: string | null): string =>
   isAbsoluteModelPath(path) || !modelsDir ? path : `${modelsDir.replace(/\/+$/, '')}/${path}`;
@@ -170,9 +184,8 @@ export const isInModelsDir = (path: string, modelsDir: string | null): boolean =
 };
 
 /**
- * Replacement path for a relocated model. Only absolute paths are accepted:
- * managed models store paths relative to the models directory and must not be
- * relocated this way.
+ * Replacement path for a relocated model. Only absolute paths are accepted: managed models store paths relative to the
+ * models directory and must not be relocated this way.
  */
 export const modelPathSchema = trimmed
   .min(1, 'Path is required.')

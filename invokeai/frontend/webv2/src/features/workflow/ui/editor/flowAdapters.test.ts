@@ -356,8 +356,7 @@ describe('flowAdapters identity preservation', () => {
 
     expect(highlighted[0]?.animated).toBe(true);
     expect(highlighted[0]?.className).toBe('workflow-selected-node-edge');
-    // Let xyflow elevate selected edges; extra z-index lets wide interaction paths intercept selected-node
-    // controls.
+    // Let xyflow elevate selected edges; extra z-index lets wide interaction paths intercept selected-node controls.
     expect(highlighted[0]?.zIndex).toBeUndefined();
     expect(highlighted[0]?.style).toEqual({ strokeWidth: 2 });
     expect(toFlowEdges(doc, highlighted, 'default', new Set(['a']))[0]).toBe(highlighted[0]);
@@ -472,8 +471,8 @@ describe('collapsed edges', () => {
     ]);
     // Clicking the selected drawn edge again: xyflow reports only the hidden edge's deselect. The group stays.
     expect(withCollapsedGroupSelection(doc, [select('ab2', false)], state(['ab1', 'ab2']))).toEqual([]);
-    // Clicking the drawn edge while the group is half selected (a hidden edge selected with others): xyflow selects it
-    // and deselects the rest, the hidden edge among them. That deselect is dropped: the group is selected, the rest not.
+    // Clicking the drawn edge of a half-selected group (a hidden edge selected with others): xyflow selects it and
+    // deselects the rest, the hidden edge among them. That deselect is dropped: the group is selected, the rest not.
     expect(
       withCollapsedGroupSelection(
         doc,

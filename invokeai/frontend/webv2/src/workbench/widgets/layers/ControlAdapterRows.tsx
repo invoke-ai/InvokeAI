@@ -16,7 +16,8 @@ import { CONTROL_WEIGHT_BOUNDS } from './layerOps';
 
 const STEP_RANGE_STEP = 0.05;
 const PRIORITIES: readonly ControlPriority[] = ['more_prompt', 'balanced', 'more_control'];
-// A layer that stored the retired `unbalanced` mode sees it as a fourth segment, so the value is visible and can be left.
+// A layer that stored the retired `unbalanced` mode sees it as a fourth segment, so the value is visible and can be
+// left.
 const PRIORITIES_WITH_UNBALANCED: readonly (ControlPriority | 'unbalanced')[] = [...PRIORITIES, 'unbalanced'];
 
 const formatWeight = (value: number): string => value.toFixed(2);
@@ -52,8 +53,8 @@ export const ControlAdapterRows = ({
 
   // Previews reach the document, so `adapter` already carries a dragged value: every gesture end commits, and the
   // commit compares with the value the preview replaced, dropping a gesture that changed nothing. Drafts keep the
-  // thumbs on the pointer between previews, which land at most once per frame.
-  // The held gesture's last preview, committed as its release would if the rows unmount mid-gesture.
+  // thumbs on the pointer between previews, which land at most once per frame. The held gesture's last preview,
+  // committed as its release would if the rows unmount mid-gesture.
   const pendingRef = useRef<{ label: string; patch: AdapterPatch } | null>(null);
   const previewGesture = useCallback(
     (patch: AdapterPatch, label: string) => {

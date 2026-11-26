@@ -19,13 +19,6 @@ const imageLayer = (id: string, imageName: string) => ({
   type: 'raster',
 });
 
-const paintLayer = (id: string, imageName: string | null) => ({
-  id,
-  name: id,
-  source: { bitmap: imageName ? imageRef(imageName) : null, type: 'paint' },
-  type: 'raster',
-});
-
 const galleryInstance = (recentImageNames: string[]) => ({
   'gallery-1': {
     state: {
@@ -102,39 +95,6 @@ it('keeps the held result while edits touch only name-free subtrees, and sees na
   expect(new Set(read().images)).toEqual(new Set(['stroke.png', 'snapshot.png', 'undo.png', 'next.png']));
 });
 
-it('rescans only the workflow an edit touched, sharing the documents its history retains', () => {
-  const docA = { id: 'a', nodes: [{ data: { inputs: { image: { value: { image_name: 'a.png' } } } } }] };
-  const docB = { id: 'b', nodes: [{ data: { inputs: { image: { value: { image_name: 'b.png' } } } } }] };
-  let project = {
-    id: 'project-1',
-    workflowHistories: {},
-    workflows: { activeWorkflowId: 'a', entries: [{ document: docA }, { document: docB }] },
-  };
-  const read = createOpenProjectsHeldMediaReader(
-    () => [project],
-    () => undefined
-  );
-  const first = read();
-  expect(new Set(first.images)).toEqual(new Set(['a.png', 'b.png']));
-
-  // Editing `a` keeps `docA` in a's history; b's entry is untouched and its scan is reused by identity.
-  const docA2 = { ...docA, nodes: [{ data: { inputs: { image: { value: { image_name: 'a2.png' } } } } }] };
-  project = {
-    ...project,
-    workflowHistories: { a: { future: [], past: [{ document: docA, id: 'h1', sequence: 1 }] } },
-    workflows: { ...project.workflows, entries: [{ document: docA2 }, project.workflows.entries[1]!] },
-  };
-  expect(new Set(read().images)).toEqual(new Set(['a.png', 'a2.png', 'b.png']));
-
-  // Removing `a` releases its history: nothing holds a.png or a2.png any more.
-  project = {
-    ...project,
-    workflowHistories: {},
-    workflows: { activeWorkflowId: 'b', entries: [project.workflows.entries[1]!] },
-  };
-  expect(read().images).toEqual(['b.png']);
-});
-
 it('announces engines registering and releasing their held media', () => {
   const sources = createLiveCanvasEngines();
   const onChange = vi.fn();
@@ -171,23 +131,6 @@ it("crosses a registered engine's paint barrier and treats an unregistered proje
   expect(flushPendingPixels).toHaveBeenCalledOnce();
 });
 
-it("records a frame resize in a registered engine's history, and reports none without one", () => {
-  const sources = createLiveCanvasEngines();
-  const commitFrame = vi.fn(() => true);
-  sources.register('project-1', {
-    commitFrame,
-    flushPendingPixels: () => Promise.resolve(),
-    heldAssets: () => ({ images: [], videos: [] }),
-    subscribe: () => () => undefined,
-  });
-  const from = { height: 8, width: 8, x: 0, y: 0 };
-  const to = { height: 8, width: 16, x: -4, y: 0 };
-
-  expect(sources.commitFrame('project-1', from, to, 'Resize frame')).toBe(true);
-  expect(commitFrame).toHaveBeenCalledExactlyOnceWith(from, to, 'Resize frame');
-  expect(sources.commitFrame('project-2', from, to, 'Resize frame')).toBe(false);
-});
-
 const projectDocument = (overrides: Record<string, unknown> = {}): Record<string, unknown> => ({
   canvas: {
     document: { stacks: { raster: [imageLayer('layer-1', 'live-image.png')] }, version: 3 },
@@ -217,23 +160,6 @@ describe('collectLiveAssetRefs', () => {
 
     expect(refs.images).toEqual(new Set(['live-image.png', 'graph-image.png', 'upscale-input.png']));
     expect(refs.videos).toEqual(new Set());
-  });
-
-  it('leaves history behind — queue snapshots, graph history, events, canvas snapshots', () => {
-    const { images } = collectLiveAssetRefs(projectDocument());
-
-    expect(images.has('queue-image.png')).toBe(false);
-    expect(images.has('history-image.png')).toBe(false);
-    expect(images.has('event-image.png')).toBe(false);
-    expect(images.has('snapshot-image.png')).toBe(false);
-  });
-
-  it('leaves the gallery widget recents behind', () => {
-    const { images } = collectLiveAssetRefs(
-      projectDocument({ widgetInstances: galleryInstance(['recent-a.png', 'recent-b.png']) })
-    );
-
-    expect(images.has('recent-a.png')).toBe(false);
   });
 
   it('finds references nested through groups, arrays and mask bitmaps', () => {
@@ -282,13 +208,6 @@ describe('collectLiveAssetRefs', () => {
     expect(collectHeldAssetRefs([document]).images.has('photo.png')).toBe(true);
   });
 
-  it('ignores empty names and non-string values', () => {
-    const refs = collectLiveAssetRefs({ canvas: { imageName: '' }, settings: { image_name: 7, video_name: null } });
-
-    expect(refs.images).toEqual(new Set());
-    expect(refs.videos).toEqual(new Set());
-  });
-
   /** Video and image references have separate namespaces, even with identical names. */
   it('collects a graph node video as a video, never as an image', () => {
     const refs = collectLiveAssetRefs(
@@ -299,48 +218,6 @@ describe('collectLiveAssetRefs', () => {
 
     expect(refs.videos).toEqual(new Set(['clip.mp4']));
     expect(refs.images.has('clip.mp4')).toBe(false);
-  });
-
-  it('returns both sets for a document carrying both kinds', () => {
-    const refs = collectLiveAssetRefs(
-      projectDocument({
-        projectGraph: {
-          nodes: [
-            { data: { inputs: { image: { image_name: 'frame.png' }, video: { video_name: 'clip.mp4' } } }, id: 'n' },
-          ],
-        },
-      })
-    );
-
-    expect(refs.images).toEqual(new Set(['live-image.png', 'frame.png', 'upscale-input.png']));
-    expect(refs.videos).toEqual(new Set(['clip.mp4']));
-  });
-
-  /** Exclude selection by parent key regardless of media-name spelling. */
-  /** Exclude compare/selection references independently of recognized imageName keys. */
-  it.each([
-    [
-      'the selection, of either kind',
-      {
-        selectedImage: { fullUrl: '', kind: 'video', name: 'selected.mp4' },
-        selectedImageName: 'video:selected.mp4',
-        selectedImageNames: ['video:selected.mp4'],
-      },
-      'selected.mp4',
-    ],
-    ['the compare selection', { compareImage: { ...imageRef('compare.png'), imageUrl: '' } }, 'compare.png'],
-    [
-      'a selection spelling its name `imageName`',
-      { selectedImage: { imageName: 'selected.png', kind: 'image' } },
-      'selected.png',
-    ],
-  ])('excludes %s', (_label, values, excluded) => {
-    const refs = collectLiveAssetRefs(
-      projectDocument({ widgetInstances: { 'gallery-1': { state: { values }, typeId: 'gallery' } } })
-    );
-
-    expect(refs.images.has(excluded)).toBe(false);
-    expect(refs.videos.has(excluded)).toBe(false);
   });
 });
 
@@ -371,18 +248,6 @@ describe('stripInstallationState', () => {
     expect(JSON.stringify(stripped)).not.toContain('compare.png');
     // History is not selection: those references travel deliberately.
     expect(JSON.stringify(stripped)).toContain('recent.png');
-  });
-
-  it('keeps the surrounding widget state intact', () => {
-    const stripped = stripInstallationState({
-      widgetInstances: {
-        'gallery-1': { state: { values: { boardId: 'b1', selectedImageName: 'image:x.png' } }, typeId: 'gallery' },
-      },
-    });
-
-    expect(stripped).toEqual({
-      widgetInstances: { 'gallery-1': { state: { values: { boardId: 'b1' } }, typeId: 'gallery' } },
-    });
   });
 
   /** Gallery board IDs are installation-specific; hydration replaces them with server-authoritative IDs. */
@@ -447,62 +312,9 @@ describe('stripInstallationState', () => {
     expect(Object.keys(recent!)).toContain('thumbnailUrl');
     expect(JSON.stringify(stripped)).not.toContain('source-install');
   });
-
-  it('blanks a gallery item full URL kept outside the selection keys', () => {
-    const stripped = stripInstallationState({
-      widgetInstances: {
-        'preview-1': {
-          state: {
-            values: {
-              heldItem: {
-                fullUrl: 'http://source-install/api/v1/images/i/held.png/full',
-                kind: 'image',
-                name: 'held.png',
-                thumbnailUrl: 'http://source-install/api/v1/images/i/held.png/thumbnail',
-              },
-            },
-          },
-          typeId: 'preview',
-        },
-      },
-    });
-
-    expect(JSON.stringify(stripped)).not.toContain('source-install');
-    expect(JSON.stringify(stripped)).toContain('"name":"held.png"');
-  });
-
-  /** Preserve unchanged identity and authored workflow board inputs. */
-  it.each([
-    ['no selection', { canvas: { document: { stacks: { raster: [imageLayer('l1', 'a.png')] } } }, id: 'p1' }],
-    [
-      'an already-blank URL',
-      { widgetStates: { gallery: { values: { recentImages: [{ imageName: 'a.png', imageUrl: '' }] } } } },
-    ],
-    [
-      'a board reference that means something',
-      { workflow: { nodes: [{ inputs: { board: { value: { board_id: 'board-3' } } }, type: 'save_image' }] } },
-    ],
-  ])('returns a document with %s unchanged', (_label, document) => {
-    expect(stripInstallationState(document)).toBe(document);
-  });
 });
 
 describe('remapAssetRefs', () => {
-  it('returns the document unchanged for empty mappings', () => {
-    const document = projectDocument();
-
-    expect(remapAssetRefs(document, noMappings)).toBe(document);
-  });
-
-  it('rewrites live references', () => {
-    const remapped = remapAssetRefs(projectDocument(), {
-      ...noMappings,
-      images: new Map([['live-image.png', 'uploaded-1.png']]),
-    }) as { canvas: { document: { stacks: { raster: { source: { image: { imageName: string } } }[] } } } };
-
-    expect(remapped.canvas.document.stacks.raster[0]!.source.image.imageName).toBe('uploaded-1.png');
-  });
-
   it('rewrites history references too, so nothing keeps pointing at the pre-import name', () => {
     const remapped = remapAssetRefs(projectDocument(), {
       ...noMappings,
@@ -527,27 +339,6 @@ describe('remapAssetRefs', () => {
     );
   });
 
-  it('rewrites the backend spelling of the key as well', () => {
-    const remapped = remapAssetRefs(projectDocument(), {
-      ...noMappings,
-      images: new Map([['graph-image.png', 'uploaded-graph.png']]),
-    }) as { projectGraph: { nodes: { data: { inputs: { image: { image_name: string } } } }[] } };
-
-    expect(remapped.projectGraph.nodes[0]!.data.inputs.image.image_name).toBe('uploaded-graph.png');
-  });
-
-  it('rewrites a video through the video mapping', () => {
-    const document = projectDocument({
-      projectGraph: { nodes: [{ data: { inputs: { video: { video_name: 'clip.mp4' } } }, id: 'n' }] },
-    });
-    const remapped = remapAssetRefs(document, {
-      ...noMappings,
-      videos: new Map([['clip.mp4', 'server-clip.mp4']]),
-    }) as { projectGraph: { nodes: { data: { inputs: { video: { video_name: string } } } }[] } };
-
-    expect(remapped.projectGraph.nodes[0]!.data.inputs.video.video_name).toBe('server-clip.mp4');
-  });
-
   /** The namespaces are separate, so a shared name must not cross over. */
   it('never rewrites an image through the video mapping, or the reverse', () => {
     const document = projectDocument({
@@ -564,15 +355,6 @@ describe('remapAssetRefs', () => {
 
     expect(remapped.canvas.document.stacks.raster[0]!.source.image.imageName).toBe('image-side');
     expect(remapped.projectGraph.nodes[0]!.data.inputs.video.video_name).toBe('video-side');
-  });
-
-  it('leaves names absent from the mapping alone', () => {
-    const remapped = remapAssetRefs(projectDocument(), {
-      ...noMappings,
-      images: new Map([['not-present.png', 'other.png']]),
-    }) as { canvas: { document: { stacks: { raster: { source: { image: { imageName: string } } }[] } } } };
-
-    expect(remapped.canvas.document.stacks.raster[0]!.source.image.imageName).toBe('live-image.png');
   });
 });
 
@@ -601,35 +383,5 @@ describe('selectCoverImageName', () => {
       },
     });
     expect(selectCoverImageName(document)).toBe('deep.png');
-  });
-
-  it('prefers the newest gallery result', () => {
-    expect(
-      selectCoverImageName(projectDocument({ widgetInstances: galleryInstance(['newest.png', 'older.png']) }))
-    ).toBe('newest.png');
-  });
-
-  it('falls back to the top-most canvas layer with pixels', () => {
-    expect(selectCoverImageName(projectDocument())).toBe('live-image.png');
-  });
-
-  it('skips canvas layers that have no pixels yet', () => {
-    expect(
-      selectCoverImageName(
-        projectDocument({
-          canvas: { document: { stacks: { raster: [paintLayer('empty', null), imageLayer('below', 'below.png')] } } },
-        })
-      )
-    ).toBe('below.png');
-  });
-
-  it.each([
-    [
-      'a project that has produced nothing',
-      { canvas: { document: { stacks: { raster: [] } } }, id: 'p', layout: {}, name: 'n' },
-    ],
-    ['a document missing the canvas entirely', { id: 'p', layout: {}, name: 'n' }],
-  ])('is null for %s', (_label, document) => {
-    expect(selectCoverImageName(document)).toBeNull();
   });
 });

@@ -108,7 +108,6 @@ export interface PreparedDocumentEdit {
   readonly selectionAfter: string | null;
   /** Nodes the edit changes, including neighbours whose position it displaces. */
   readonly touchedIds: readonly string[];
-  /** Ids the edit brings into the document. */
   readonly createdIds: readonly string[];
   readonly touchedStacks: readonly LayerStackKind[];
   readonly postconditions: readonly EditPostcondition[];

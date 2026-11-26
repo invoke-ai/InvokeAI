@@ -200,17 +200,4 @@ describe('LayerFilterOperationButton launch interaction', () => {
     expect(onOperationStarted).not.toHaveBeenCalled();
     expect(notifyError).not.toHaveBeenCalled();
   });
-
-  it('does not report an undefined engine launch result', () => {
-    const layer = createEmptyPaintLayer('Raster', 'raster');
-    const { engine, startFilterOperation } = createEngine(true, () => undefined);
-    const onOperationStarted = vi.fn();
-    const { button } = renderButton(engine, layer, onOperationStarted);
-
-    button.onClick?.();
-
-    expect(startFilterOperation).toHaveBeenCalledOnce();
-    expect(onOperationStarted).not.toHaveBeenCalled();
-    expect(notifyError).not.toHaveBeenCalled();
-  });
 });

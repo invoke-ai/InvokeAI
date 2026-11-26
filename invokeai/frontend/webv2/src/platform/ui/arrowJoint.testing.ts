@@ -27,9 +27,9 @@ const hex = (pixel: readonly number[]) =>
 /**
  * Finds the pixels where an arrowed surface's edge shows through its arrow's base. At device resolution, it scans the
  * content's edge band (its border and the shading just inside it, 3px deep) across the middle of the tip's base. Each
- * pixel there must be the tip's own fill or what the content shows beyond the band at that point: its background, or
- * a child flush with the edge. Past the first device row inside the border, only the latter, so the tip never paints
- * over the content's children. Returns the offending pixels, described; an empty list is a seamless joint.
+ * pixel there must be the tip's own fill or what the content shows beyond the band at that point: its background, or a
+ * child flush with the edge. Past the first device row inside the border, only the latter, so the tip never paints over
+ * the content's children. Returns the offending pixels, described; an empty list is a seamless joint.
  */
 export const findArrowJointSeams = async (content: HTMLElement, tip: HTMLElement): Promise<string[]> => {
   const side = content.dataset.placement?.split('-')[0] ?? 'bottom';

@@ -271,6 +271,15 @@ def _flux2_sources(main: ModelConfig, models: Sequence[ModelConfig]) -> list[Mod
     return [model for model in models if _is_flux2_source(main, model)]
 
 
+def _qwen3_encoder_variant(model: ModelConfig) -> Optional[str]:
+    """The variant a model serves the Qwen3 encoder in, as filed or by a role (a Qwen3 folder installed as a Text LLM);
+    None when it does not serve it or names no variant. `roles` is read leniently: the configs here are duck-typed."""
+    if model.type == ModelType.Qwen3Encoder:
+        return _variant(model)
+    role = next((r for r in getattr(model, "roles", ()) if r.type == ModelType.Qwen3Encoder), None)
+    return None if role is None or role.variant is None else _value(role.variant)
+
+
 def _has_standalone_encoder(main: ModelConfig, models: Sequence[ModelConfig]) -> bool:
     """Whether a standalone text encoder Generate can fill in for a FLUX.2 main model is installed: a Mistral encoder
     other than the Ministral 3B for [dev] (`isFlux2MistralEncoder`), else a Qwen3 encoder other than the 0.6B, of the
@@ -281,11 +290,12 @@ def _has_standalone_encoder(main: ModelConfig, models: Sequence[ModelConfig]) ->
             for model in models
         )
     required = _KLEIN_QWEN3.get(_variant(main) or "")
+    qwen3_variants = (_qwen3_encoder_variant(model) for model in models)
     return any(
-        model.type == ModelType.Qwen3Encoder
-        and _variant(model) != Qwen3VariantType.Qwen3_06B.value
-        and (required is None or _variant(model) == required)
-        for model in models
+        variant is not None
+        and variant != Qwen3VariantType.Qwen3_06B.value
+        and (required is None or variant == required)
+        for variant in qwen3_variants
     )
 
 
@@ -352,9 +362,26 @@ def _text_encoder_reason(main: ModelConfig, models: Sequence[ModelConfig]) -> st
     )
 
 
+def default_component_source(model: ModelConfig, models: Sequence[ModelConfig]) -> Optional[ModelConfig]:
+    """The Z-Image pipeline a main model's default components name as its `component_source`, which Generate fills the
+    slot with when the model is selected (`getModelDefaultComponents`): an installed pipeline that brings its own VAE
+    (`ships_its_vae`). A self-contained pipeline is offered the slot too, and the model loader node takes a source's
+    VAE over its own. FLUX.2 picks its source on its own (`vae_source`), so a stored one is not read."""
+    if not _is_main(model) or model.base != BaseModelType.ZImage:
+        return None
+    key = getattr(getattr(model, "default_settings", None), "components", None)
+    key = key.get("component_source") if isinstance(key, Mapping) else None
+    if not key:
+        return None
+    return next(
+        (source for source in models if source.key == key and source.base == model.base and ships_its_vae(source)), None
+    )
+
+
 def vae_source(model: ModelConfig, models: Sequence[ModelConfig]) -> Optional[ModelConfig]:
     """The pipeline whose own VAE decodes a main model's generations while its `vae` slot is empty: the model itself
-    (`ships_its_vae`), or for another FLUX.2 model the component source Generate then picks on its own and its graph
+    (`ships_its_vae`), the Z-Image pipeline its default components name (`default_component_source`), or for another
+    FLUX.2 model the component source Generate then picks on its own and its graph
     keeps, whose VAE the FLUX.2 model loader node takes: among the installed pipelines that loader takes components
     from (`_flux2_sources`), the first fitting one, else the first one (`getAutoFlux2ComponentSourceModel`), which the
     graph keeps only beside a standalone text encoder. Generate lists the models in the order the server does, which is
@@ -363,6 +390,8 @@ def vae_source(model: ModelConfig, models: Sequence[ModelConfig]) -> Optional[Mo
     (`_needs_gpu_vae`)."""
     if default_vae(model, models) is not None:
         return None
+    if (source := default_component_source(model, models)) is not None:
+        return source
     if ships_its_vae(model):
         return model
     if not _is_main(model) or model.base != BaseModelType.Flux2:

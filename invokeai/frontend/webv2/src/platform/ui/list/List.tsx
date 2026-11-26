@@ -19,10 +19,6 @@ const ITEM_HEIGHT_PX: Record<ListDensity, number> = { comfortable: 52, compact: 
 const getItemPitch = (density: ListDensity, estimatedRowHeight?: number) =>
   (estimatedRowHeight ?? ITEM_HEIGHT_PX[density]) + ROW_GAP_PX;
 
-/**
- * Total height of a fixed-height list's rows, for callers that size the list to its content up to a cap instead
- * of giving it a fixed box.
- */
 export const getListContentHeight = (rows: readonly Pick<ListRow<unknown>, 'kind'>[], density: ListDensity): number =>
   rows.reduce(
     (total, row) => total + (row.kind === 'header' ? LIST_SECTION_HEADER_HEIGHT_PX : getItemPitch(density)),
@@ -69,11 +65,7 @@ const PINNED_HEADER_WRAPPER_STYLE: CSSProperties = {
   zIndex: 1,
 };
 
-/**
- * The scroll area writes its overflow offsets as inherited custom properties on the viewport at every scroll event,
- * which restyles every element below it. Rows use none of them; pinning them on the row container stops that restyle
- * there, which otherwise costs each scroll frame a style pass over every mounted row.
- */
+/** Pinning the scroll area's inherited overflow properties here stops a per-scroll restyle of every mounted row. */
 const ROW_CONTAINER_CSS = {
   '--scroll-area-overflow-x-start': '0px',
   '--scroll-area-overflow-x-end': '0px',
@@ -84,11 +76,7 @@ const ROW_CONTAINER_WITH_DIVIDERS_CSS = [ROW_CONTAINER_CSS, IN_SLOT_DIVIDER_HIDI
 
 export type ListSurface = 'bg' | 'bg.subtle' | 'bg.panel';
 
-/**
- * Spread onto the ListItem a renderItem returns; the List owns density, focus order and set semantics. A row that
- * is not a ListItem (an inline editor, say) renders `role="listitem"` with the set position itself and keeps its
- * own tab order; the List does not track its focus, so scrolling can still unmount it while it is being edited.
- */
+/** A row that is not a ListItem renders `role="listitem"` itself; the List does not track its focus. */
 export interface ListRowProps {
   density: ListDensity;
   isActive: boolean;
@@ -101,27 +89,18 @@ export interface ListRowProps {
 
 export interface ListProps<T> {
   rows: readonly ListRow<T>[];
-  /** Accessible name of the list. */
   label: string;
   renderItem: (item: T, rowProps: ListRowProps) => ReactNode;
   /** Key of the row whose detail is open; it is the initial keyboard target. */
   activeKey?: string | null;
-  /**
-   * Keyboard target while no row has been focused and none is active, such as the first row that can be used when
-   * earlier ones are disabled; without it, the first row.
-   */
+  /** Keyboard target while no row was focused and none is active; defaults to the first row. */
   defaultFocusKey?: string | null;
   /** Row pitch; fixed for the list's lifetime, so change it with a keyed remount. */
   density?: ListDensity;
-  /**
-   * `measured` sizes each row by its content, for rows that grow (inline editors, wrapped errors); density is then
-   * only the estimate. Fixed rows clip to the density's pitch and never measure.
-   */
+  /** `measured` sizes rows by content (density is then the estimate); fixed rows clip to the density's pitch. */
   rowHeight?: 'fixed' | 'measured';
-  /** Typical measured row height; a close estimate keeps the scrollbar steady before rows are measured. */
   estimatedRowHeight?: number;
   status?: 'loading' | 'error' | 'ready';
-  /** Shown instead of rows while status is error. */
   errorState?: ReactNode;
   /** Shown instead of rows when there are none; the caller decides between empty and no-match copy. */
   emptyState?: ReactNode;
@@ -129,23 +108,14 @@ export interface ListProps<T> {
   isBusy?: boolean;
   /** The background pinned headers paint over rows with; match the surface the list sits on. */
   surface?: ListSurface;
-  /** Hairlines between rows of a section, inset from the edges. */
   dividers?: boolean;
-  /** `none` runs rows and section headers to the list's edges, for a container that already pads them. */
   inset?: ListInset;
   initialScrollOffset?: number;
-  /**
-   * Without an initial offset, open with the active row at the top: for lists reopened after a selection was made
-   * elsewhere. Needs its rows on first render, so it suits lists whose data is already in hand.
-   */
+  /** Needs its rows on first render, so it suits lists whose data is already in hand. */
   revealActiveOnMount?: boolean;
   /** Receives the final scroll offset on unmount; must be referentially stable. */
   onScrollOffsetPersist?: (offset: number) => void;
-  /**
-   * Receives the visible row-index range (headers and items share the index space) on mount and whenever it changes,
-   * never per scrolled pixel; rows within the overscan around it are mounted too. For callers that load rows on
-   * demand, such as a server-windowed collection. Must be referentially stable.
-   */
+  /** Visible row-index range (headers and items share it), never per pixel; must be referentially stable. */
   onRangeChange?: (range: ListRange) => void;
 }
 
@@ -167,18 +137,10 @@ const findItemIndex = <T,>(rows: readonly ListRow<T>[], from: number, step: 1 | 
 const primaryOf = (viewport: HTMLElement, key: string): HTMLElement | null =>
   viewport.querySelector<HTMLElement>(`[data-list-row="${CSS.escape(key)}"] ${PRIMARY_SELECTOR}`);
 
-/**
- * Virtualized list with pinned section headers and a roving tabindex. Headers and items share one flat index
- * space; the header at the top of the visible range renders in flow as a sticky element, pushed out by the next.
- */
 /** Inputs whose arrows, Home and End do nothing of their own: a row's selection checkbox and button-like inputs. */
 const KEYLESS_INPUT_TYPES = new Set(['button', 'checkbox', 'color', 'file', 'image', 'reset', 'submit']);
 
-/**
- * Whether a focused control uses ArrowUp, ArrowDown, Home and End itself: a field in a row (a title editor moves its
- * caret), a select, or a radio or range input. The List leaves those keys to it and moves between rows from anything
- * else, the selection checkbox included.
- */
+/** The List leaves these keys to a row's field, select, radio or range input. */
 const usesNavigationKeys = (target: HTMLElement): boolean => {
   if (target.isContentEditable || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement) {
     return true;
@@ -220,7 +182,6 @@ export const List = <T,>({
   const layout = useMemo(() => {
     const headerIndexes: number[] = [];
     const indexByKey = new Map<string, number>();
-    /** 1-based position among items for aria-posinset; 0 for headers. */
     const ordinals: number[] = [];
     let firstItemKey: string | null = null;
     let itemCount = 0;
@@ -256,8 +217,7 @@ export const List = <T,>({
           : firstItemKey;
   const focusIndex = resolvedFocusKey === null ? -1 : (indexByKey.get(resolvedFocusKey) ?? -1);
 
-  // Keep the pinned header and the focused row mounted whatever the scroll position: focus must never fall off
-  // the list, and the sticky header is the one that scrolled past the top of the visible range.
+  // Keep the pinned header and the focused row mounted: focus must never fall off the list.
   const rangeExtractor = useCallback(
     (range: Range) => extractRangeKeepingPinned(range, headerIndexes, focusIndex),
     [focusIndex, headerIndexes]
@@ -294,8 +254,7 @@ export const List = <T,>({
     },
     [onRangeChange]
   );
-  // A viewport that unmounts (empty or loading state) takes no blur with it; forget ownership so a later remount
-  // cannot pull focus away from wherever the user went meanwhile.
+  // An unmounting viewport takes no blur; forget ownership so a remount cannot pull focus back.
   const attachViewport = useCallback((element: HTMLDivElement | null) => {
     viewportRef.current = element;
 
@@ -313,16 +272,13 @@ export const List = <T,>({
     overscan: OVERSCAN_ROWS,
     rangeExtractor,
     scrollPaddingStart: hasHeaders ? LIST_SECTION_HEADER_HEIGHT_PX : 0,
-    // useSyncExternalStore already commits scroll snapshots synchronously; flushSync would only add a React error
-    // for any scroll event dispatched while React is rendering or flushing effects.
+    // useSyncExternalStore already commits scroll snapshots synchronously; flushSync would only add React errors.
     useFlushSync: false,
   });
   const { scrollToIndex, virtualItems } = virtualizer;
   const scrollOffset = virtualizer.scrollOffset ?? 0;
 
   const pinnedIndex = hasHeaders ? lastHeaderAtOrBefore(headerIndexes, virtualizer.range?.startIndex ?? 0) : null;
-  // The next header can only push the pinned one while it is near the top, which keeps it mounted; its live start
-  // holds for measured rows as well as fixed ones.
   const nextHeaderIndex = pinnedIndex === null ? undefined : headerIndexes[headerIndexes.indexOf(pinnedIndex) + 1];
   const nextHeaderStart = virtualItems.find((virtualRow) => virtualRow.index === nextHeaderIndex)?.start;
   const pinnedStyle = useMemo(() => {
@@ -333,8 +289,7 @@ export const List = <T,>({
       : { ...PINNED_HEADER_WRAPPER_STYLE, transform: `translateY(${shift}px)` };
   }, [nextHeaderStart, scrollOffset]);
 
-  // Focus lands before paint so the ring never lags the scroll that revealed the row. The same pass repairs focus
-  // a vanished row left on the body: keyboard users keep their place when a filter or a delete removes it.
+  // Before paint so the ring never lags the scroll; also repairs focus a vanished row left on the body.
   useLayoutEffect(() => {
     const viewport = viewportRef.current;
 

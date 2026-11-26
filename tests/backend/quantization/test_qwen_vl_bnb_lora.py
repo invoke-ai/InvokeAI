@@ -55,13 +55,15 @@ def checkpoint(tmp_path_factory: pytest.TempPathFactory) -> Path:
 
 def _load(checkpoint: Path, quantization: str):
     """As `_load_quantized_encoder` loads it."""
-    from transformers import BitsAndBytesConfig, Qwen2_5_VLForConditionalGeneration
+    from transformers import BitsAndBytesConfig
+
+    from invokeai.backend.qwen2_5_vl.headless import HeadlessQwen2_5_VLForConditionalGeneration
 
     if quantization == "nf4":
         config = BitsAndBytesConfig(load_in_4bit=True, bnb_4bit_compute_dtype=torch.bfloat16, bnb_4bit_quant_type="nf4")
     else:
         config = BitsAndBytesConfig(load_in_8bit=True)
-    return Qwen2_5_VLForConditionalGeneration.from_pretrained(
+    return HeadlessQwen2_5_VLForConditionalGeneration.from_pretrained(
         str(checkpoint), quantization_config=config, device_map={"": DEVICE}, dtype=torch.bfloat16
     )
 
@@ -86,7 +88,6 @@ def _patch_for(layer_name: str, in_features: int, out_features: int):
     [
         ("model.language_model.layers.0.mlp.down_proj", 128, HIDDEN),
         ("model.language_model.layers.1.self_attn.q_proj", HIDDEN, HIDDEN),
-        ("lm_head", HIDDEN, 512),  # not quantized by transformers: a plain Linear
     ],
 )
 def test_sidecar_lora_on_a_bnb_quantized_encoder(
@@ -110,8 +111,7 @@ def test_sidecar_lora_on_a_bnb_quantized_encoder(
     _make_bnb_layers_patchable(model)
 
     layer = model.get_submodule(layer_name)
-    if layer_name != "lm_head":
-        assert isinstance(layer, (bnb.nn.Linear8bitLt, bnb.nn.Linear4bit)), "wrapping must keep the bnb base class"
+    assert isinstance(layer, (bnb.nn.Linear8bitLt, bnb.nn.Linear4bit)), "wrapping must keep the bnb base class"
     assert hasattr(layer, "add_patch")
     x = torch.randn(1, 5, in_features, device=DEVICE, dtype=torch.bfloat16)
     patch, down, up = _patch_for(layer_name, in_features, out_features)

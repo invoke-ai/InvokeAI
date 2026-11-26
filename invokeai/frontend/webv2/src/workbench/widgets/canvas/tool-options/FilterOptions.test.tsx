@@ -152,16 +152,14 @@ describe('getFilterErrorTranslationKey', () => {
     unsupported: true,
   };
 
-  it.each(Object.keys(codes) as FilterSessionErrorCode[])('has distinct English copy for %s', (code) => {
-    const copy = testI18n.t(getFilterErrorTranslationKey(code));
-    expect(copy).not.toBe(getFilterErrorTranslationKey(code));
-    expect(copy).not.toMatch(/{{/);
-  });
-
-  it('gives every code its own message', () => {
-    const copies = (Object.keys(codes) as FilterSessionErrorCode[]).map((code) =>
-      testI18n.t(getFilterErrorTranslationKey(code))
-    );
+  it('gives every code its own English message', () => {
+    const copies = (Object.keys(codes) as FilterSessionErrorCode[]).map((code) => {
+      const key = getFilterErrorTranslationKey(code);
+      const copy = testI18n.t(key);
+      expect(copy, code).not.toBe(key);
+      expect(copy, code).not.toMatch(/{{/);
+      return copy;
+    });
     expect(new Set(copies).size).toBe(copies.length);
   });
 });
@@ -202,7 +200,6 @@ describe('filter operation form', () => {
       state({ draft: { settings: { high_threshold: 200, low_threshold: 100 }, type: 'canny_edge_detection' } })
     );
 
-    // The select names itself through a real (visually hidden) label part.
     expect(choose).toContain('>Filter</label>');
     expect(choose).toContain('>Auto-update preview<');
     expect(choose).not.toContain('>Process<');
@@ -210,7 +207,6 @@ describe('filter operation form', () => {
     expect(params).not.toContain('>Filter</label>');
     expect(params).toContain('Low threshold');
 
-    // Auto-update on: no Process verb; Reset, then Cancel, then Apply. Status lives in the section, not in the row.
     expect(actions).not.toContain('Portrait');
     expect(actions).not.toContain('role="status"');
     expect(actions).not.toContain('>Process<');
@@ -242,7 +238,6 @@ describe('filter operation form', () => {
   });
 
   it('assigns every filter a picker category covered by the display order', () => {
-    // The grouped select renders in a portal, so the taxonomy is asserted here.
     for (const filter of CONTROL_FILTERS) {
       expect(FILTER_CATEGORY_ORDER, filter.type).toContain(filter.category);
     }

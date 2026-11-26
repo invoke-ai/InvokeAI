@@ -1,3 +1,4 @@
+import { resolvedValues } from '@platform/core/resolvedValues.testing';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -14,6 +15,7 @@ import {
   CANVAS_SNAP_TO_GRID_KEY,
   canvasSettingsEqual,
   readCanvasBooleanSetting,
+  readCanvasScrollInput,
   resolveCanvasSettings,
 } from './canvasSettings';
 
@@ -28,10 +30,8 @@ const settingByKey = (key: string) => {
 const DEFAULTS = {
   [CANVAS_BBOX_OVERLAY_KEY]: false,
   [CANVAS_CHECKERBOARD_KEY]: true,
-  // Off by default, matching legacy — strokes are unclipped until asked.
   [CANVAS_CLIP_TO_BBOX_KEY]: false,
   [CANVAS_INVERT_BRUSH_SCROLL_KEY]: false,
-  // Legacy default: keep the generation result transparent outside the mask.
   [CANVAS_OUTPUT_ONLY_MASKED_REGIONS_KEY]: true,
   [CANVAS_RULE_OF_THIRDS_KEY]: false,
   [CANVAS_SHOW_BBOX_KEY]: true,
@@ -43,22 +43,24 @@ const DEFAULTS = {
 describe('canvasSettings persistence mapping', () => {
   it('applies each setting default when values are missing', () => {
     expect(resolveCanvasSettings(undefined)).toEqual(DEFAULTS);
-    expect(resolveCanvasSettings({})).toEqual(DEFAULTS);
+    expect(resolveCanvasSettings(resolvedValues({}))).toEqual(DEFAULTS);
   });
 
   it('reads persisted booleans over the defaults', () => {
-    const resolved = resolveCanvasSettings({
-      [CANVAS_BBOX_OVERLAY_KEY]: true,
-      [CANVAS_CHECKERBOARD_KEY]: false,
-      [CANVAS_CLIP_TO_BBOX_KEY]: true,
-      [CANVAS_INVERT_BRUSH_SCROLL_KEY]: true,
-      [CANVAS_OUTPUT_ONLY_MASKED_REGIONS_KEY]: false,
-      [CANVAS_RULE_OF_THIRDS_KEY]: true,
-      [CANVAS_SHOW_BBOX_KEY]: false,
-      [CANVAS_SHOW_GRID_KEY]: true,
-      [CANVAS_SHOW_PROGRESS_KEY]: false,
-      [CANVAS_SNAP_TO_GRID_KEY]: false,
-    });
+    const resolved = resolveCanvasSettings(
+      resolvedValues({
+        [CANVAS_BBOX_OVERLAY_KEY]: true,
+        [CANVAS_CHECKERBOARD_KEY]: false,
+        [CANVAS_CLIP_TO_BBOX_KEY]: true,
+        [CANVAS_INVERT_BRUSH_SCROLL_KEY]: true,
+        [CANVAS_OUTPUT_ONLY_MASKED_REGIONS_KEY]: false,
+        [CANVAS_RULE_OF_THIRDS_KEY]: true,
+        [CANVAS_SHOW_BBOX_KEY]: false,
+        [CANVAS_SHOW_GRID_KEY]: true,
+        [CANVAS_SHOW_PROGRESS_KEY]: false,
+        [CANVAS_SNAP_TO_GRID_KEY]: false,
+      })
+    );
     expect(resolved).toEqual({
       [CANVAS_BBOX_OVERLAY_KEY]: true,
       [CANVAS_CHECKERBOARD_KEY]: false,
@@ -74,10 +76,21 @@ describe('canvasSettings persistence mapping', () => {
   });
 
   it('falls back to the default for a non-boolean persisted value', () => {
-    expect(readCanvasBooleanSetting({ [CANVAS_CHECKERBOARD_KEY]: 'nope' }, settingByKey(CANVAS_CHECKERBOARD_KEY))).toBe(
-      true
-    );
-    expect(readCanvasBooleanSetting({ [CANVAS_SHOW_GRID_KEY]: 1 }, settingByKey(CANVAS_SHOW_GRID_KEY))).toBe(false);
+    expect(
+      readCanvasBooleanSetting(
+        resolvedValues({ [CANVAS_CHECKERBOARD_KEY]: 'nope' }),
+        settingByKey(CANVAS_CHECKERBOARD_KEY)
+      )
+    ).toBe(true);
+    expect(
+      readCanvasBooleanSetting(resolvedValues({ [CANVAS_SHOW_GRID_KEY]: 1 }), settingByKey(CANVAS_SHOW_GRID_KEY))
+    ).toBe(false);
+  });
+
+  it('reads the scroll input, falling back to auto-detection for anything unknown', () => {
+    expect(readCanvasScrollInput(resolvedValues({ scrollInput: 'trackpad' }))).toBe('trackpad');
+    expect(readCanvasScrollInput(resolvedValues({ scrollInput: true }))).toBe('auto');
+    expect(readCanvasScrollInput(undefined)).toBe('auto');
   });
 
   it('maps every setting to a unique persisted key', () => {
@@ -88,7 +101,6 @@ describe('canvasSettings persistence mapping', () => {
   it('gives every engine-backed store a distinct store id (other frontend-consumed settings have none)', () => {
     const stores = CANVAS_SETTINGS.map((s) => s.store).filter((s): s is NonNullable<typeof s> => s !== undefined);
     expect(new Set(stores).size).toBe(stores.length);
-    // These are consumed outside the engine and intentionally have no store.
     expect(settingByKey(CANVAS_SHOW_PROGRESS_KEY).store).toBeUndefined();
     expect(settingByKey(CANVAS_OUTPUT_ONLY_MASKED_REGIONS_KEY).store).toBeUndefined();
   });
@@ -96,9 +108,13 @@ describe('canvasSettings persistence mapping', () => {
 
 describe('canvasSettingsEqual', () => {
   it('is true for equal maps and false when any setting differs', () => {
-    const base = resolveCanvasSettings({});
-    expect(canvasSettingsEqual(base, resolveCanvasSettings({}))).toBe(true);
-    expect(canvasSettingsEqual(base, resolveCanvasSettings({ [CANVAS_SHOW_GRID_KEY]: true }))).toBe(false);
-    expect(canvasSettingsEqual(base, resolveCanvasSettings({ [CANVAS_SHOW_BBOX_KEY]: false }))).toBe(false);
+    const base = resolveCanvasSettings(resolvedValues({}));
+    expect(canvasSettingsEqual(base, resolveCanvasSettings(resolvedValues({})))).toBe(true);
+    expect(canvasSettingsEqual(base, resolveCanvasSettings(resolvedValues({ [CANVAS_SHOW_GRID_KEY]: true })))).toBe(
+      false
+    );
+    expect(canvasSettingsEqual(base, resolveCanvasSettings(resolvedValues({ [CANVAS_SHOW_BBOX_KEY]: false })))).toBe(
+      false
+    );
   });
 });

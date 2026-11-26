@@ -15,10 +15,7 @@ import { listModelInstalls } from './api';
 import { refreshModels } from './modelsStore';
 import { refreshStartersIfLoaded } from './startersStore';
 
-/**
- * REST owns install jobs; lifecycle events refresh them. High-frequency progress bypasses the list and subscribes
- * per job to limit renders.
- */
+/** REST owns install jobs; progress subscribes per job to limit renders. */
 
 export interface InstallsSnapshot {
   jobs: ModelInstallJob[];
@@ -35,7 +32,6 @@ export interface InstallDownloadProgress {
   bytesPerSecond: number | null;
 }
 
-/** A just-settled install, surfaced so the UI can toast success/failure. */
 export interface InstallOutcome {
   id: number;
   jobId: number;
@@ -45,10 +41,7 @@ export interface InstallOutcome {
   error: string | null;
 }
 
-/**
- * Normalize typed and socket source labels identically for matching; colocate here to keep taxonomy out of eager
- * chunks.
- */
+/** Colocated here to keep model taxonomy out of eager chunks. */
 export const getInstallSourceLabel = (source: unknown): string => {
   if (typeof source === 'string') {
     return source;
@@ -91,13 +84,8 @@ let nextOutcomeId = 1;
 const progressByJobId = createKeyedTransientStore<number, InstallDownloadProgress>();
 const rateSamplesByJobId = new Map<number, { bytes: number; at: number }>();
 /**
- * Latest locally known status per job, from a socket event or an action result, stamped with a sequence. A list
- * request that started before the stamp may predate that status, so it must not overwrite it; the first list request
- * started after it is authoritative and clears the fence. Starting earlier does not prove the backend served it
- * earlier, though, and some transitions emit no event (cancelling a download, pruning settled jobs). So a final list
- * status always wins, and a stale response may drop a job whose fence is settled, since pruning removes only those,
- * but only when this client knew the job before the request started; otherwise the backend may have served it before
- * the job existed.
+ * Latest locally known status per job, fencing out list responses that started before it. A final list status
+ * always wins; a stale response may drop a settled-fence job only if this client knew it before the request.
  */
 const statusFenceByJobId = new Map<number, { sequence: number; status: ModelInstallStatus }>();
 /** Sequence at which this client first saw each job, from a list response, a socket event, or a creation result. */
@@ -163,8 +151,8 @@ export const refreshInstalls = (owner: AccountScope = captureAccountScope()): Pr
           }
 
           if (fence.status === 'cancelled' && CANCELLATION_ACTIVE_STATUSES.has(job.status)) {
-            // DELETE can succeed before the worker observes cancellation. Keep the optimistic result until REST
-            // reports a terminal state; otherwise a successful refresh can revive the row if its socket was missed.
+            // DELETE can succeed before the worker observes cancellation. Keep the optimistic result until REST reports
+            // a terminal state; otherwise a successful refresh can revive the row if its socket was missed.
             const current = store.getSnapshot().jobs.find((candidate) => candidate.id === job.id) ?? job;
             return current.status === 'cancelled' ? current : { ...current, status: 'cancelled' };
           }
@@ -314,8 +302,7 @@ export const replaceInstallJob = (job: ModelInstallJob): void => {
   patchJob(job);
 };
 
-/** Project a successful cancel action: the cancel route returns no job, and cancelling a job that is not downloading
- * emits no event. Cancelling a completed job succeeds as a no-op, so a known completion stands. */
+/** The cancel route returns no job and may emit no event; a known completion stands. */
 export const projectInstallCancelled = (jobId: number, owner: AccountScope = captureAccountScope()): void => {
   if (!isAccountScopeCurrent(owner)) {
     return;
@@ -346,7 +333,6 @@ export const dismissInstallJobs = (ids: number[]): void => {
   }
 };
 
-/** Optimistically add a freshly created job so the queue updates instantly. */
 export const addInstallJob = (job: ModelInstallJob): void => {
   if (store.getSnapshot().jobs.some((existing) => existing.id === job.id)) {
     replaceInstallJob(job);
@@ -487,21 +473,17 @@ export const handleModelInstallSocketEvent = (
     }
 
     if (!job) {
-      // The first progress tick may arrive for a job created in another
-      // client; make sure the row exists without refetching on every tick.
+      // The first tick may be for a job created elsewhere; ensure the row exists without refetching each tick.
       scheduleRefresh();
     } else if (job.status === 'waiting' && (fence === undefined || fence.status === 'waiting')) {
-      // Bytes are flowing, so the REST snapshot's `waiting` is stale. Patch
-      // locally so download controls (pause/cancel) appear immediately.
+      // Flowing bytes make REST's `waiting` stale; patch so pause/cancel appear immediately.
       patchJob({ ...job, status: 'downloading' });
     }
 
     return;
   }
 
-  // Project the status each event implies (the backend's job status when it emits) and fence it, so a list response
-  // that started before the event cannot replace it with an older status. The scheduled refresh then fills in the
-  // fields events omit, such as a paused job's download_parts naming the part whose failure auto-paused it.
+  // Fence the implied status against older list responses; the refresh fills fields events omit.
   projectJobStatus(data.id, EVENT_STATUS[event]);
 
   if (event === 'model_install_complete' || event === 'model_install_error' || event === 'model_install_cancelled') {
@@ -548,7 +530,6 @@ export const useInstallsSelector = store.useSelector;
 
 export const getInstallsSnapshot = (): InstallsSnapshot => store.getSnapshot();
 
-/** Cache active source strings by jobs-array identity for installing affordances. */
 const areSetsEqual = <Value>(left: ReadonlySet<Value>, right: ReadonlySet<Value>): boolean =>
   left.size === right.size && Array.from(left).every((value) => right.has(value));
 

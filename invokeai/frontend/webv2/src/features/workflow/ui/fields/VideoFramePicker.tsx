@@ -4,7 +4,7 @@ import { Button, useUnavailableControl } from '@platform/ui/Button';
 import { Tooltip } from '@platform/ui/Tooltip';
 import { VideoPlayer } from '@platform/ui/video-player/VideoPlayer';
 import { getFrameAtTime, getFrameTime } from '@platform/ui/video-player/videoTimeline';
-import { useCallback, useMemo, useState, type SyntheticEvent } from 'react';
+import { useCallback, useMemo, useState, type MouseEventHandler, type SyntheticEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 export interface VideoFramePickerProps {
@@ -13,6 +13,7 @@ export interface VideoFramePickerProps {
   fps: number;
   frameCount: number;
   onChange: (value: unknown) => void;
+  onContextMenu?: MouseEventHandler<HTMLElement>;
   posterUrl: string;
   resolvedIndex: number;
   videoUrl: string;
@@ -52,14 +53,15 @@ const FieldFrameSeek = ({ time, video }: { time: number; video: HTMLVideoElement
 
 /**
  * A player that follows the field: it opens on the field's frame and returns to it whenever the field changes, while
- * playing, looping and scrubbing leave the field alone. "Use this frame" commits the frame the player is paused on.
- * Key it by the source: its media state belongs to one video.
+ * playing, looping and scrubbing leave the field alone. "Use this frame" commits the frame the player is paused on. Key
+ * it by the source: its media state belongs to one video.
  */
 export const VideoFramePicker = ({
   fieldValue,
   fps,
   frameCount,
   onChange,
+  onContextMenu,
   posterUrl,
   resolvedIndex,
   videoUrl,
@@ -95,8 +97,8 @@ export const VideoFramePicker = ({
     [hasMediaError, t]
   );
   const canUseFrame = pausedFrame !== null && pausedFrame !== resolvedIndex;
-  // Unavailable rather than disabled: a commit makes the button unavailable while it holds focus, and a disabled
-  // button would drop that focus to the page.
+  // Unavailable rather than disabled: a commit makes the button unavailable while it holds focus, and a disabled button
+  // would drop that focus to the page.
   const unavailable = useUnavailableControl(canUseFrame ? undefined : t('nodes.useThisFrameUnavailable'), undefined);
   // Read from the element, not the last event, so the commit is the frame on screen.
   const commitPlayerFrame = useCallback(() => {
@@ -114,7 +116,7 @@ export const VideoFramePicker = ({
   return (
     // `nodrag` keeps pointer drags on the scrubber from moving the node; `nokey` keeps its arrow keys from nudging it.
     <Flex className="nodrag nokey" direction="column" gap="1" w="full">
-      <Box borderWidth="1px" h="32" overflow="hidden" rounded="sm" w="full">
+      <Box borderWidth="1px" h="32" overflow="hidden" rounded="sm" w="full" onContextMenu={onContextMenu}>
         <VideoPlayer
           ref={setVideo}
           aria-label={t('nodes.framePreview')}

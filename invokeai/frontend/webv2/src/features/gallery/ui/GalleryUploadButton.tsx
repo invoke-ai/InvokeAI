@@ -13,10 +13,7 @@ import { useTranslation } from 'react-i18next';
 
 import { useGalleryUploadInput } from './useGalleryUploadInput';
 
-/**
- * Tooltip/aria text for an upload control, given the board the listing reads; unavailable when it cannot receive
- * uploads.
- */
+/** Tooltip/aria text for an upload control on the listing's board; unavailable when it takes no uploads. */
 export const getGalleryUploadTargetLabel = (
   boards: readonly GalleryBoard[],
   selectedBoardId: string,

@@ -1,6 +1,6 @@
 /**
- * Masked fill/erase primitives; engine callers own guards, history and persistence. Scratch compositing confines
- * edits to selection coverage. `rect` and the target live in the layer's local space; the mask is placed through
+ * Masked fill/erase primitives; engine callers own guards, history and persistence. Scratch compositing confines edits
+ * to selection coverage. `rect` and the target live in the layer's local space; the mask is placed through
  * `maskToLocal`, so a moved, scaled or rotated layer is edited where the selection covers it.
  */
 
