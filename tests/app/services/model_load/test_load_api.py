@@ -1,4 +1,3 @@
-import gc
 from pathlib import Path
 
 import pytest
@@ -64,25 +63,24 @@ def test_load_from_path(mock_context: InvocationContext, embedding_file: Path) -
     assert torch.equal(loaded_model_1.model["emb_params"], loaded_model_3.model["emb_params"])
 
 
-def test_a_local_model_keyed_under_a_model_is_dropped_with_it(
-    mock_context: InvocationContext, embedding_file: Path
-) -> None:
+def test_a_part_of_a_model_is_dropped_with_it(mock_context: InvocationContext, embedding_file: Path) -> None:
     """A part of an installed model read from its file (the Anima IP-Adapter's bundled LoRA) must not outlive a
     re-identify or delete of that model, which drop its cached entries by model key."""
     model_key = "aaaaaaaa-1111-2222-3333-444444444444"
 
-    def load(cache_key=None):
-        # Only the model is kept: a live wrapper holds its entry in a first-use window, which a drop defers.
-        model = mock_context.models.load_local_model(embedding_file, cache_key=cache_key).model
-        gc.collect()
-        return model
+    def load(part_of=None):
+        loaded = mock_context.models.load_local_model(embedding_file, part_of=part_of)
+        # Locking once ends the first-use window now; a drop would otherwise only mark the entry stale.
+        with loaded.model_in_ram() as model:
+            return model
 
-    part = load(f"{model_key}:part")
-    assert load(f"{model_key}:part") is part
+    part = load((model_key, "part"))
+    assert load((model_key, "part")) is part
     assert load() is not part, "the path key is separate"
+    assert load((model_key, "other")) is not part, "each part of a model has its own entry"
 
-    assert mock_context._services.model_manager.load.drop_cached_models([model_key]) == 1
-    assert load(f"{model_key}:part") is not part
+    assert mock_context._services.model_manager.load.drop_cached_models([model_key]) == 2
+    assert load((model_key, "part")) is not part
 
 
 def test_download_and_load(mock_context: InvocationContext) -> None:

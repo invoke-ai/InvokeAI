@@ -1240,8 +1240,9 @@ class ModelCache:
         models are already warm on the claiming device. Two properties matter to that caller:
 
         - Entries keyed by `get_model_cache_key` are reported without their optional submodel, role,
-          and storage suffixes so they match plain model keys. Entries keyed by
-          filesystem path (`load_model_from_path`) are excluded: a path - or the bare Windows
+          and storage suffixes so they match plain model keys; a part of a model loaded from its file
+          (`get_model_part_cache_key`) reports its model. Entries keyed by
+          filesystem path alone (`load_model_from_path`) are excluded: a path - or the bare Windows
           drive letter that splitting ``C:\\...`` on ``:`` would leave - is not a model key, and
           such short strings would corrupt substring-based affinity scoring.
         - Non-blocking: the cache lock is held across long operations (VRAM transfers, cache
@@ -3152,7 +3153,7 @@ class ModelCache:
         """Drop all cache entries belonging to a model so the next load rebuilds them.
 
         Cache keys start with `<model_key>` and may have submodel, role, and storage suffixes
-        (see `get_model_cache_key`). Locked entries and entries inside a first-use window are marked
+        (see `get_model_cache_key`), or name a part of the model read from its file (`get_model_part_cache_key`). Locked entries and entries inside a first-use window are marked
         `is_stale` and evicted as soon as the last lock (or the window) releases - without that,
         a setting toggled during an in-flight generation would survive on the locked entry and quietly
         get reused by the next generation.

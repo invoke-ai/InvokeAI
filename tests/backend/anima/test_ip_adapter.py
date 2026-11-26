@@ -345,6 +345,17 @@ def test_the_bundled_lora_is_its_cross_attention_part_on_real_linears() -> None:
         assert layer.scale() == 1.0
 
 
+def test_the_bundled_lora_reads_peft_default_keys_and_skips_a_layer_missing_a_half() -> None:
+    prefix = "lora.base_model.model.blocks.0.cross_attn"
+    sd = {
+        f"{prefix}.q_proj.lora_A.default.weight": torch.zeros(_LORA_RANK, 64),
+        f"{prefix}.q_proj.lora_B.default.weight": torch.zeros(64, _LORA_RANK),
+        f"{prefix}.k_proj.lora_A.weight": torch.zeros(_LORA_RANK, 32),
+    }
+
+    assert set(anima_ip_adapter_lora(sd).layers) == {f"{ANIMA_LORA_TRANSFORMER_PREFIX}blocks.0.cross_attn.q_proj"}
+
+
 @pytest.mark.parametrize(
     ("extra_key", "extra_metadata", "message"),
     [

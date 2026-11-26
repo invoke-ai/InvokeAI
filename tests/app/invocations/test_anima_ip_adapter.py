@@ -4,22 +4,34 @@ Denoise follows the reference node's default CFG mode: the positive pass gets th
 gets none, and the bundled LoRA is applied once for the whole run. The transformer here records what it is handed.
 """
 
-from contextlib import contextmanager, nullcontext
+from contextlib import ExitStack, contextmanager, nullcontext
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
 import torch
+from safetensors.torch import save_file
 
 from invokeai.app.invocations.anima.anima_denoise import AnimaDenoiseInvocation
 from invokeai.app.invocations.anima.anima_ip_adapter import AnimaIPAdapterField, AnimaIPAdapterInvocation
 from invokeai.app.invocations.fields import AnimaConditioningField
 from invokeai.app.invocations.model import ModelIdentifierField
+from invokeai.app.services.config import InvokeAIAppConfig
+from invokeai.app.services.invocation_services import InvocationServices
+from invokeai.app.services.model_manager import ModelManagerServiceBase
+from invokeai.app.services.shared.invocation_context import (
+    InvocationContext,
+    InvocationContextData,
+    build_invocation_context,
+)
 from invokeai.backend.anima.ip_adapter import AnimaIPAdapter, anima_ip_adapter_lora, load_anima_ip_adapter_lora
+from invokeai.backend.model_manager.configs.ip_adapter import IPAdapter_Checkpoint_Anima_Config
 from invokeai.backend.model_manager.starter_models.common import siglip, siglip2_base_512
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import AnimaConditioningInfo, ConditioningFieldData
+from tests.backend.model_manager.model_manager_fixtures import *  # noqa F403
 
 _DEPTH = 28
 
@@ -132,11 +144,11 @@ def _denoise(
             adapters.setdefault(identifier.key, AnimaIPAdapter.from_state_dict(_checkpoint())), identifier.key
         )
 
-    def load_local_model(path, loader, cache_key):
-        # The bundled LoRA, as its own cache entry read from the adapter's file, dropped along with the adapter's.
+    def load_local_model(path, loader, part_of):
+        # The bundled LoRA, as its own cache entry read from the adapter's file (see the real-cache test below).
         assert loader is load_anima_ip_adapter_lora
         key = path.removeprefix("/models/")
-        assert cache_key == f"{key}:bundled_lora:{path}"
+        assert part_of == (key, "bundled_lora")
         assert key in adapters and key not in lora_loads, f"LoRA of '{path}' loaded twice or without its adapter"
         return lora_loads.setdefault(key, _Loaded(anima_ip_adapter_lora(_checkpoint())))
 
@@ -440,3 +452,43 @@ def test_in_multiuser_mode_only_an_administrator_installs_a_missing_encoder(is_a
             AnimaIPAdapterInvocation._get_siglip_model(context)
     assert context._services.model_manager.install.heuristic_import.called is installs
     context._services.users.get.assert_called_once_with(context._data.queue_item.user_id)
+
+
+@pytest.fixture()
+def real_context(
+    mock_services: InvocationServices, mm2_model_manager: ModelManagerServiceBase, mm2_app_config: InvokeAIAppConfig
+) -> InvocationContext:
+    # The temporary root's config, so the test's checkpoint lands there rather than in the real InvokeAI root.
+    mock_services.configuration = mm2_app_config
+    mock_services.model_manager = mm2_model_manager
+    return build_invocation_context(
+        services=mock_services,
+        data=InvocationContextData(queue_item=None, invocation=None, source_invocation_id=None),  # type: ignore
+        is_canceled=None,  # type: ignore
+    )
+
+
+def test_the_bundled_lora_is_read_from_the_adapter_file_and_dropped_with_the_adapter(real_context) -> None:
+    """Through the real model-load service: the record's models-relative path is resolved, the LoRA lands in the
+    cache sized as a LoRA, and dropping the adapter's entries drops it."""
+    sd = _checkpoint()
+    relative = Path("anima/ipa.safetensors")
+    (real_context._services.configuration.models_path / relative).parent.mkdir(parents=True, exist_ok=True)
+    save_file(sd, real_context._services.configuration.models_path / relative)
+    key = "bbbbbbbb-1111-2222-3333-444444444444"
+    config = IPAdapter_Checkpoint_Anima_Config.model_construct(key=key, path=str(relative))
+    load = real_context._services.model_manager.load
+    expected = anima_ip_adapter_lora(sd)
+
+    with ExitStack() as pins:
+        specs = list(AnimaDenoiseInvocation.model_construct(transformer=SimpleNamespace(loras=[]))._lora_iterator(
+            real_context, _DEPTH, [config]
+        ))  # fmt: skip
+        for *_, pin in specs:
+            pins.enter_context(pin)
+        ((patch, weight, _),) = specs
+        assert weight == 1.0 and patch.layers.keys() == expected.layers.keys()
+        (entry,) = [record for k, record in load.ram_cache._cached_models.items() if k.startswith(f"{key}:")]
+        assert entry.cached_model.total_bytes() == expected.calc_size()
+
+    assert load.drop_cached_models([key]) == 1

@@ -18,7 +18,6 @@ Key differences from Z-Image denoise:
 
 import math
 from contextlib import ExitStack
-from pathlib import Path
 from typing import Any, Callable, Iterator, Optional
 
 import torch
@@ -76,6 +75,7 @@ from invokeai.backend.flux.schedulers import (
     ANIMA_SCHEDULER_NAME_VALUES,
     ANIMA_SHIFT,
 )
+from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.taxonomy import BaseModelType
 from invokeai.backend.patches.layer_patcher import LayerPatcher, PatchSpec
 from invokeai.backend.patches.lora_conversions.anima_lora_constants import ANIMA_LORA_TRANSFORMER_PREFIX
@@ -867,7 +867,7 @@ class AnimaDenoiseInvocation(BaseInvocation, WithMetadata):
 
             # Loaded before the LoRA patching, which applies each one's bundled LoRA with the user's.
             ip_adapters: list[tuple[list[AnimaIPAdapterField], AnimaIPAdapter]] = []
-            ip_adapter_files: list[tuple[str, Path]] = []
+            ip_adapter_configs: list[AnyModelConfig] = []
             for ip_adapter_group in ip_adapter_groups:
                 ip_adapter_field = ip_adapter_group[0]
                 ip_adapter_info = context.models.load(ip_adapter_field.ip_adapter_model)
@@ -886,16 +886,15 @@ class AnimaDenoiseInvocation(BaseInvocation, WithMetadata):
                     )
                 ip_adapters.append((ip_adapter_group, ip_adapter_model))
                 # The record this adapter was built from, so its bundled LoRA is read from the same file.
-                ip_adapter_config = ip_adapter_info.config
-                assert ip_adapter_config is not None, "a model loaded by identifier has its config"
-                ip_adapter_files.append((ip_adapter_config.key, context.models.get_absolute_path(ip_adapter_config)))
+                assert ip_adapter_info.config is not None, "a model loaded by identifier has its config"
+                ip_adapter_configs.append(ip_adapter_info.config)
 
             # Apply LoRA models to the transformer.
             # Note: We apply the LoRA after the transformer has been moved to its target device for faster patching.
             exit_stack.enter_context(
                 LayerPatcher.apply_smart_model_patches(
                     model=transformer,
-                    patches=self._lora_iterator(context, len(transformer.blocks), ip_adapter_files),
+                    patches=self._lora_iterator(context, len(transformer.blocks), ip_adapter_configs),
                     prefix=ANIMA_LORA_TRANSFORMER_PREFIX,
                     dtype=inference_dtype,
                     cached_weights=cached_weights,
@@ -1181,7 +1180,7 @@ class AnimaDenoiseInvocation(BaseInvocation, WithMetadata):
         return step_callback
 
     def _lora_iterator(
-        self, context: InvocationContext, transformer_depth: int, ip_adapter_files: list[tuple[str, Path]]
+        self, context: InvocationContext, transformer_depth: int, ip_adapter_configs: list[AnyModelConfig]
     ) -> Iterator[PatchSpec]:
         """LoRA models to apply to the transformer: the user's, then each IP-Adapter model's own at 1.0, once per model.
 
@@ -1203,12 +1202,12 @@ class AnimaDenoiseInvocation(BaseInvocation, WithMetadata):
                     f"matching blocks of this {transformer_depth}-block model."
                 )
             yield (patch, lora.weight, lora_info.model_in_ram())
-        # Each bundled LoRA is its own cache entry, so the cache sizes it as a LoRA rather than as part of the adapter.
-        # Keyed under the adapter's model key, so dropping the adapter's entries (delete, re-identify) drops it too;
-        # the path in the key keeps a record repointed mid-generation from pairing the old file's LoRA with the new.
-        for model_key, path in ip_adapter_files:
+        # Each bundled LoRA is its own cache entry, so the cache sizes it as a LoRA rather than as part of the adapter;
+        # as a part of the adapter (see `get_model_part_cache_key`) it is dropped with the adapter's entries.
+        for config in ip_adapter_configs:
+            path = context.models.get_absolute_path(config)
             bundled = context.models.load_local_model(
-                path, load_anima_ip_adapter_lora, cache_key=f"{model_key}:bundled_lora:{path}"
+                path, load_anima_ip_adapter_lora, part_of=(config.key, "bundled_lora")
             )
             if not isinstance(bundled.model, ModelPatchRaw):
                 raise TypeError(f"Expected the bundled LoRA of '{path.name}', got {type(bundled.model).__name__}.")

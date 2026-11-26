@@ -1,6 +1,7 @@
 """Model cache identity and measurement ownership, without importing the cache runtime."""
 
 import re
+from pathlib import Path
 from typing import Optional
 
 from invokeai.backend.model_manager.taxonomy import ModelType, SubModelType
@@ -22,6 +23,15 @@ def get_model_cache_key(
     if role is not None:
         key = f"{key}:as_{role.value}"
     return f"{key}:storage={variant}" if variant else key
+
+
+def get_model_part_cache_key(model_key: str, part: str, path: Path) -> str:
+    """The key of a part of an installed model that is read from the model's file by its own loader.
+
+    The `<model_key>:` prefix makes `drop_model` drop it with the model. The `part:` infix keeps it apart from the
+    loader's submodel, role and storage entries. The path keeps a record repointed to another file from reusing it.
+    """
+    return f"{model_key}:part:{part}:{path}"
 
 
 def model_key_from_cache_key(cache_key: str) -> str:

@@ -23,7 +23,6 @@ import accelerate
 import torch
 import torch.nn.functional as F
 from PIL import Image
-from safetensors import safe_open
 from torch import nn
 from torchvision.transforms.functional import to_tensor
 
@@ -177,8 +176,13 @@ def anima_ip_adapter_lora(sd: Mapping[str, torch.Tensor]) -> ModelPatchRaw:
 def load_anima_ip_adapter_lora(path: Path) -> ModelPatchRaw:
     """Read only the bundled LoRA from an IP-Adapter checkpoint, for the model cache to hold as its own entry: the
     adapter module's partial-load size counts only its state dict, which a LoRA held beside it is not part of."""
-    with safe_open(path, framework="pt", device="cpu") as f:
-        return anima_ip_adapter_lora({key: f.get_tensor(key) for key in f.keys() if _CROSS_ATTN_LORA_KEY_RE.match(key)})
+    from invokeai.backend.quantization.fp8_scaled import load_safetensors_checkpoint
+
+    # Owned: the cache entry keeps these tensors as read, so they must not stay views of the file mapping.
+    sd = load_safetensors_checkpoint(
+        path, select=lambda names: {k: v for k, v in names.items() if _CROSS_ATTN_LORA_KEY_RE.match(k)}, owned=True
+    )
+    return anima_ip_adapter_lora(sd)
 
 
 class AnimaIPAdapterExtension:
