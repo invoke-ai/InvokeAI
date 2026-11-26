@@ -9,6 +9,7 @@ Paths and commands are relative to this package. This map links user vocabulary 
   - `anima-lllite`, `spandrel`: adapters and upscalers installed before their channels or scale were recorded; re-identify fills those fields.
   - `control-sdxl`: SDXL ControlNets naming their preprocessor in both id forms, a Union, an unpurposed model, and a T2I-Adapter.
   - `control-flux`: FLUX dev with a depth Control LoRA and a Union ControlNet.
+  - `control-krea2`: Krea-2 Turbo with a depth Control LoRA.
   - `model-roles`: single-file MOSS-Image and Z-Image mains with VAEs, a Text LLM that is also the Qwen3.5 9B encoder, a Qwen3.5 9B encoder that is also a Text LLM, and a Qwen3 4B Text LLM folder that is also the Qwen3 encoder (`roles`).
 - Image metadata: `POST /__image-metadata` with `{"image_name": "<name>", "metadata": {...}}` makes `GET /api/v1/images/i/<name>/metadata` serve that record (an object; every image serves `{}` otherwise), so the Preview details panel and image recall can be checked against a record. An unknown image returns 404. `/__reset` drops it.
 - The mock serves in-memory HTTP without Socket.IO. It proves nothing about real authorization, persistence, or model execution.

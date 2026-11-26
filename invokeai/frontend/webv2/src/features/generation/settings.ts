@@ -57,7 +57,12 @@ export {
   getComponentSlotsSuppliedByRecord,
   getDefaultGenerateSettings,
   addReferenceImages,
+  getDefaultComponentSlotPolicies,
+  isDefaultVaeLoaded,
+  pruneClosedDefaultComponents,
   getGenerateModelSelectionResult,
+  getModelDefaultComponents,
+  getModelDefaultFills,
   isComponentCompatibleWithModel,
   getDimensionGrid,
   getGenerationDimensions,
@@ -72,6 +77,7 @@ export {
   resolveModelDefaultVae,
   isArchitectureDescribed,
   isGenerateModelSelectable,
+  pickFallbackGenerateModel,
   isKnownScheduler,
   isLossyModelSwitch,
   isSupportedGenerateModel,
@@ -91,6 +97,7 @@ export {
   type GenerationIssue,
   type GenerationIssueFix,
 } from './core/generationIssues';
+export { DEFAULT_COMPONENT_SLOTS, type DefaultComponentSlot } from './core/componentDefaults';
 export {
   describeExternalCanvasRefusal,
   GEMINI_TEMPERATURE_MAX,

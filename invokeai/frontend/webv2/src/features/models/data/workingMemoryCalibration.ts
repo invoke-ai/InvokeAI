@@ -27,7 +27,7 @@ import { createExternalStore } from '@platform/state/externalStore';
 import { ApiError, getApiErrorCode, getApiErrorMessage, sleep } from '@platform/transport/http';
 import { socketHub } from '@platform/transport/socketHub';
 
-import { listModels } from './api';
+import { listModelsWithAvailability } from './modelsStore';
 import {
   acknowledgeCalibrationEnqueue,
   calibrateWorkingMemory,
@@ -171,8 +171,8 @@ export const compileWorkingMemoryPlan = async (
   const compileSignal = signal ? AbortSignal.any([owner.signal, signal]) : owner.signal;
 
   compileSignal.throwIfAborted();
-  // Not this tab's models store: another tab may have changed a record. Records only, without missing-file stats.
-  const records = listModels(compileSignal);
+  // Not this tab's models store: another tab may have changed a record. Records with current file availability.
+  const records = listModelsWithAvailability(compileSignal);
   // The compiler awaits the records only once it has loaded; until then a failed read must not count as unhandled.
   void records.catch(() => undefined);
 

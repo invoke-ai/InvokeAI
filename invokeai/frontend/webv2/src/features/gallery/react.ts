@@ -5,9 +5,11 @@ export {
   type GalleryItemActions,
   type GalleryItemActionsOptions,
   type GalleryItemContextMenuProps,
+  type GalleryItemContextMenuRequest,
   type GalleryItemContextMenuTarget,
   type GalleryHostProjectContext,
   type GalleryUiAdapter,
+  useGalleryItemContextMenu,
   useHostGalleryBoards,
   useOptionalGalleryHostProjectContext,
 } from './ui/GalleryUiContext';

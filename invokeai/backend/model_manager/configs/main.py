@@ -2078,12 +2078,26 @@ class Main_Checkpoint_MiniMaxH3_Config(Checkpoint_Config_Base, Main_Config_Base,
         if _has_ggml_tensors(state_dict):
             raise NotAMatchError("GGUF-quantized MiniMax H3 checkpoints are not supported yet")
 
-        variant = override_fields.pop("variant", None) or (
-            MiniMaxH3VariantType.REF2VA if "ref2va" in mod.path.name.lower() else MiniMaxH3VariantType.FL2VA
-        )
+        variant = MiniMaxH3VariantType(override_fields.pop("variant", None) or cls._get_variant(mod))
         pruned = "adaln_t_table" in state_dict
 
         return cls(**override_fields, variant=variant, pruned=pruned)
+
+    @classmethod
+    def _get_variant(cls, mod: ModelOnDisk) -> MiniMaxH3VariantType:
+        """Determine the task variant from the file name, the only signal these files carry.
+
+        A community hybrid merge (``minimax_h3_hybrid_fl2va_ref2va_b25-49``) keeps FL2VA's body
+        but takes the AdaLN projections of blocks X..49 - the ones that route reference modality -
+        from Ref2VA, so it needs Ref2VA's reference rows and identifies as REF2VA. Under FL2VA the
+        reference workflow it exists for stays locked away.
+        """
+        name = mod.path.name.lower()
+        return (
+            MiniMaxH3VariantType.REF2VA
+            if any(marker in name for marker in ("ref2va", "hybrid"))
+            else MiniMaxH3VariantType.FL2VA
+        )
 
 
 # ---------------------------------------------------------------------------------------------

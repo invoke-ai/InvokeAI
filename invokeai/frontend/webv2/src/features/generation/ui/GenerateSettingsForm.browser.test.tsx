@@ -316,6 +316,58 @@ afterEach(async () => {
   accountLifecycle.invalidate();
 });
 
+describe('Canvas hosted-provider preflight', () => {
+  it('shows a conditional Canvas budget hint without a blocking issue', async () => {
+    const model = {
+      ...MODEL,
+      base: 'external',
+      type: 'external_image_generator',
+      key: 'seedream',
+      name: 'Seedream',
+      provider_id: 'seedream',
+      provider_model_id: 'seedream-4-5-251128',
+      capabilities: { modes: ['txt2img', 'img2img'], supports_reference_images: true, max_reference_images: 14 },
+    } as unknown as GenerationModelCatalogItem;
+    stableGroups.models.catalog = [model];
+    await settle(() =>
+      storedValues().patchSnapshot({
+        ...getDefaultGenerateSettings(model as never),
+        modelKey: model.key,
+        referenceImages: Array.from({ length: 14 }, (_, i) => ({
+          id: `ref-${i}`,
+          isEnabled: true,
+          config: {
+            type: 'external_reference_image',
+            image: {
+              imageName: `ref-${i}.png`,
+              width: 512,
+              height: 512,
+              original: { image: { image_name: `ref-${i}.png`, width: 512, height: 512 } },
+            },
+          },
+        })),
+      })
+    );
+    const adapter = buildAdapter();
+    adapter.project = { ...adapter.project, invocationSourceId: 'canvas' };
+    await renderAdapter(adapter);
+    const hint = 'widgets.generate.canvasReferenceImageBudgetHint';
+    const issue = 'Seedream supports at most 15 images total (reference + init + output), got 16.';
+    expect(host!.textContent).toContain(hint);
+    expect(host!.textContent).not.toContain(issue);
+    await renderAdapter(buildAdapter());
+    expect(host!.textContent).not.toContain(hint);
+    await renderAdapter(adapter);
+    await settle(() => {
+      const references = storedValues().getSnapshot().referenceImages as { isEnabled: boolean }[];
+      storedValues().patchSnapshot({
+        referenceImages: references.map((ref, i) => (i === 0 ? { ...ref, isEnabled: false } : ref)),
+      });
+    });
+    expect(host!.textContent).not.toContain(hint);
+  });
+});
+
 describe('GenerateSettingsForm Anima inpaint adapter', () => {
   const adapterSlot = () => host!.querySelector<HTMLElement>('[data-component-types="controlnet"]');
   const weightLabel = 'widgets.generate.animaInpaintAdapterWeight';

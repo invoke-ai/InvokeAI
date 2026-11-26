@@ -663,6 +663,31 @@ def delete_images_from_list(
         raise HTTPException(status_code=500, detail="Failed to delete images")
 
 
+@images_router.post("/gone", operation_id="get_gone_images", response_model=list[str])
+def get_gone_images(
+    current_user: CurrentUserOrDefault,
+    image_names: list[ImageName] = Body(
+        description="The names of images to check", embed=True, max_length=MAX_IMAGE_BATCH_SIZE
+    ),
+) -> list[str]:
+    """Returns the requested names whose image records are positively absent.
+
+    Lets a client whose delete response was lost learn which deletions committed, so it can drop
+    its references to them. A name is listed only when the record is confirmed missing: a name
+    that exists (readable by the caller or not) or that storage could not check is left out, so
+    an unavailable database prunes nothing. Revealing absence matches the 404 the per-image
+    routes already answer for a gone image (see `_assert_image_record_exists`).
+    """
+    gone: list[str] = []
+    for image_name in dict.fromkeys(image_names):
+        try:
+            if not ApiDependencies.invoker.services.image_records.exists(image_name):
+                gone.append(image_name)
+        except Exception:
+            continue
+    return gone
+
+
 @images_router.delete("/uncategorized", operation_id="delete_uncategorized_images", response_model=DeleteImagesResult)
 def delete_uncategorized_images(
     current_user: CurrentUserOrDefault,

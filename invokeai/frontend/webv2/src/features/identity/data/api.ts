@@ -20,6 +20,7 @@ export interface AuthStatus {
   multiuser_enabled: boolean;
   strict_password_checking: boolean;
   admin_email: string | null;
+  has_single_user_work: boolean;
 }
 
 export interface LoginRequest {

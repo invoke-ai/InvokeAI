@@ -119,8 +119,15 @@ const IMAGE_RECALL_CONTRACT = {
 
   // Sampling. Recall restores CFG rescale and seamless tiling on every family; the fixtures carry their defaults where
   // the panel hides them.
-  steps: { restores: ['steps'] },
-  cfg_scale: { restores: ['cfgScale'] },
+  // Ideogram records effective sampling in these shared fields and keeps its overrides in separate fields below.
+  steps: {
+    expected: (written, tuned) => (tuned.model?.base === 'ideogram-4' ? { steps: Number(written.steps) } : {}),
+    restores: ['steps'],
+  },
+  cfg_scale: {
+    expected: (written, tuned) => (tuned.model?.base === 'ideogram-4' ? { cfgScale: Number(written.cfg_scale) } : {}),
+    restores: ['cfgScale'],
+  },
   guidance: { restores: ['cfgScale'], when: (model) => getGenerationUiPolicy(model).guidanceLabel === 'Guidance' },
   cfg_rescale_multiplier: {
     restores: ['cfgRescaleMultiplier'],

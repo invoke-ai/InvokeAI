@@ -22,6 +22,7 @@ const sd2Model: MainModelConfig = { base: 'sd-2', key: 'sd2-model', name: 'SD 2'
 const sdxlModel: MainModelConfig = { base: 'sdxl', key: 'sdxl-model', name: 'SDXL', type: 'main' };
 const sd3Model: MainModelConfig = { base: 'sd-3', format: 'diffusers', key: 'sd3-model', name: 'SD3', type: 'main' };
 const fluxModel: MainModelConfig = { base: 'flux', key: 'flux-model', name: 'FLUX dev', type: 'main' };
+const fluxFillModel: MainModelConfig = { ...fluxModel, key: 'flux-fill-model', name: 'FLUX Fill', variant: 'dev_fill' };
 const flux2Model: MainModelConfig = {
   base: 'flux2',
   format: 'diffusers',
@@ -655,6 +656,94 @@ describe('compileCanvasGraph — outpaint per base', () => {
   });
 });
 
+describe('compileCanvasGraph — FLUX Fill', () => {
+  const noLatentNodes = (graph: BackendGraphContract) =>
+    Object.values(graph.nodes).filter((node) => ['flux_vae_encode', 'create_gradient_mask'].includes(node.type));
+
+  it('inpaints from the composite and mask conditioning, with no latents or denoise mask', () => {
+    const { backendGraph, mode } = compile(fluxFillModel, 'inpaint', { strength: 0.5 });
+    expect(mode).toBe('inpaint');
+
+    expect(noLatentNodes(backendGraph)).toEqual([]);
+    expect(getEdge(backendGraph, 'denoise_latents', 'denoise_mask')).toBeUndefined();
+    expect(getEdge(backendGraph, 'denoise_latents', 'latents')).toBeUndefined();
+    expect(backendGraph.nodes.denoise_latents).toMatchObject({ denoising_end: 1, denoising_start: 0 });
+
+    expect(backendGraph.nodes.flux_fill).toMatchObject({
+      image: { image_name: 'canvas-composite.png' },
+      type: 'flux_fill',
+    });
+    // Only a white pixel is kept, so a mask layer's gray denoise limit still regenerates.
+    expect(backendGraph.nodes.flux_fill_mask_tensor).toMatchObject({
+      cutoff: 255,
+      image: { image_name: 'canvas-mask.png' },
+      type: 'image_mask_to_tensor',
+    });
+    expect(getEdge(backendGraph, 'flux_fill', 'mask')?.source.node_id).toBe('flux_fill_mask_tensor');
+    expect(getEdge(backendGraph, 'denoise_latents', 'fill_conditioning')?.source).toEqual({
+      field: 'fill_cond',
+      node_id: 'flux_fill',
+    });
+
+    expect(getEdge(backendGraph, 'flux_fill_keep_tensor', 'mask')?.source.node_id).toBe('flux_fill_mask_tensor');
+    expect(getEdge(backendGraph, 'flux_fill_keep_mask', 'mask')?.source.node_id).toBe('flux_fill_keep_tensor');
+    expect(backendGraph.nodes.expand_mask).toMatchObject({ fade_size_px: 16 });
+    expect(backendGraph.nodes.expand_mask?.mask).toBeUndefined();
+    expect(getEdge(backendGraph, 'expand_mask', 'mask')?.source.node_id).toBe('flux_fill_keep_mask');
+    expect(backendGraph.nodes.canvas_output).toMatchObject({
+      layer_base: { image_name: 'canvas-composite.png' },
+      type: 'invokeai_img_blend',
+    });
+    expect(getEdge(backendGraph, 'canvas_output', 'layer_upper')?.source.node_id).toBe('canvas_l2i');
+    expect(getEdge(backendGraph, 'canvas_output', 'mask')?.source.node_id).toBe('expand_mask');
+    expect(getNodeByType(backendGraph, 'core_metadata')?.generation_mode).toBe('flux_inpaint');
+  });
+
+  it('outpaints from the alpha mask combined with the explicit mask, without infill', () => {
+    const { backendGraph } = compile(fluxFillModel, 'outpaint', { maskImageName: 'canvas-mask.png' });
+
+    expect(backendGraph.nodes.infill).toBeUndefined();
+    expect(noLatentNodes(backendGraph)).toEqual([]);
+    expect(backendGraph.nodes.mask_combine).toMatchObject({ mask1: { image_name: 'canvas-mask.png' } });
+    expect(getEdge(backendGraph, 'mask_combine', 'mask2')?.source.node_id).toBe('image_alpha_to_mask');
+    expect(getEdge(backendGraph, 'flux_fill_mask_tensor', 'image')?.source.node_id).toBe('mask_combine');
+    expect(backendGraph.nodes.flux_fill_mask_tensor).toMatchObject({ cutoff: 255 });
+    expect(getEdge(backendGraph, 'flux_fill_keep_tensor', 'mask')?.source.node_id).toBe('flux_fill_mask_tensor');
+    expect(getEdge(backendGraph, 'expand_mask', 'mask')?.source.node_id).toBe('flux_fill_keep_mask');
+    expect(backendGraph.nodes.flux_fill?.image).toEqual({ image_name: 'canvas-composite.png' });
+    expect(getNodeByType(backendGraph, 'core_metadata')?.generation_mode).toBe('flux_outpaint');
+  });
+
+  it('outpaints from the alpha mask alone and applies the mask when only masked regions are kept', () => {
+    const { backendGraph } = compile(fluxFillModel, 'outpaint', { maskImageName: null, outputOnlyMaskedRegions: true });
+
+    expect(getEdge(backendGraph, 'flux_fill_mask_tensor', 'image')?.source.node_id).toBe('image_alpha_to_mask');
+    expect(backendGraph.nodes.canvas_output).toMatchObject({ invert_mask: true, type: 'apply_mask_to_image' });
+  });
+
+  it('feeds the fill inputs at the bbox and restores only the generated image when processing differs', () => {
+    const { backendGraph } = compile(fluxFillModel, 'inpaint', {
+      bbox: { height: 512, width: 512, x: 0, y: 0 },
+      scaling: { height: 768, method: 'manual', width: 1024 },
+    });
+
+    expect(backendGraph.nodes.denoise_latents).toMatchObject({ height: 768, width: 1024 });
+    expect(backendGraph.nodes.canvas_resize_initial_to_processing).toBeUndefined();
+    expect(backendGraph.nodes.canvas_resize_generated_to_bbox).toMatchObject({ height: 512, width: 512 });
+    expect(backendGraph.nodes.canvas_resize_output_mask_to_bbox).toBeUndefined();
+    expect(getEdge(backendGraph, 'canvas_output', 'layer_upper')?.source.node_id).toBe(
+      'canvas_resize_generated_to_bbox'
+    );
+    expect(getEdge(backendGraph, 'canvas_output', 'mask')?.source.node_id).toBe('expand_mask');
+  });
+
+  it('rejects the modes without an image to edit', () => {
+    for (const mode of ['txt2img', 'img2img'] as const) {
+      expect(() => compile(fluxFillModel, mode)).toThrow('FLUX Fill only inpaints and outpaints');
+    }
+  });
+});
+
 describe('compileCanvasGraph — control layers (integration)', () => {
   const controlNetLayer: ControlLayerGraphInput = {
     beginEndStepPct: [0.1, 0.85],
@@ -786,6 +875,75 @@ describe('compileCanvasGraph — FLUX.2 [dev] ControlNet (integration)', () => {
     };
     await expect(`${JSON.stringify(fixture, null, 2)}
 `).toMatchFileSnapshot('../__snapshots__/flux2ControlCanvasGraphs.json');
+  });
+});
+
+describe('compileCanvasGraph — Krea-2 Control LoRA (integration)', () => {
+  const layer: ControlLayerGraphInput = {
+    beginEndStepPct: [0, 1],
+    controlMode: null,
+    id: 'k-control',
+    imageName: 'k-control.png',
+    kind: 'control_lora',
+    model: { base: 'krea-2', key: 'krea2-depth', name: 'Krea-2 Depth Control LoRA', type: 'control_lora' },
+    weight: 0.8,
+  };
+
+  it('encodes the control image with the graph VAE at the size the denoise runs at, not the bbox', () => {
+    // 700x1000 is off the 16px grid, so processing rounds it.
+    const { backendGraph } = compile(krea2Model, 'img2img', {
+      bbox: { height: 1000, width: 700, x: 0, y: 0 },
+      controlLayers: [layer],
+    });
+    const denoise = backendGraph.nodes.denoise_latents;
+    const encode = backendGraph.nodes['control_lora_i2l_k-control'];
+
+    expect(denoise?.type).toBe('krea2_denoise');
+    expect(denoise?.width).not.toBe(700);
+    expect(encode).toMatchObject({
+      height: denoise?.height,
+      image: { image_name: 'k-control.png' },
+      type: 'qwen_image_i2l',
+      width: denoise?.width,
+    });
+    expect(getEdge(backendGraph, 'control_lora_i2l_k-control', 'vae')?.source).toEqual(
+      getEdge(backendGraph, 'canvas_i2l', 'vae')?.source
+    );
+    expect(getEdge(backendGraph, 'control_lora_k-control', 'control_latents')?.source.node_id).toBe(
+      'control_lora_i2l_k-control'
+    );
+    expect(getEdge(backendGraph, 'denoise_latents', 'control_lora')?.source).toEqual({
+      field: 'control_lora',
+      node_id: 'control_lora_k-control',
+    });
+  });
+
+  it('writes the graphs the backend validates against its invocations', async () => {
+    // Ids minted from the clock and Math.random are pinned so the fixture changes only when the graph does.
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(0);
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    // Installed models always carry a hash, which the backend's model identifier requires.
+    const hashed = <T extends object>(config: T, hash: string): T => ({ ...config, hash });
+    const model = hashed(krea2Model, 'blake3:krea2');
+    const controlLayers = [{ ...layer, model: hashed(layer.model, 'blake3:depth') }];
+    let txt2img: BackendGraphContract;
+    let inpaint: BackendGraphContract;
+    try {
+      txt2img = compile(model, 'txt2img', { controlLayers }).backendGraph;
+      inpaint = compile(model, 'inpaint', { controlLayers }).backendGraph;
+    } finally {
+      clock.mockRestore();
+      random.mockRestore();
+    }
+    const fixture = {
+      _comment:
+        'Generated by compileCanvasGraph.test.ts; regenerate with `vitest -u`. Consumed by tests/app/invocations/test_frontend_krea2_control_lora_graphs.py, which validates the graphs against the backend invocations.',
+      inpaint_control_lora: { ...inpaint, id: 'krea2_control_lora_canvas_inpaint' },
+      txt2img_control_lora: { ...txt2img, id: 'krea2_control_lora_canvas_txt2img' },
+    };
+    await expect(`${JSON.stringify(fixture, null, 2)}\n`).toMatchFileSnapshot(
+      '../__snapshots__/krea2ControlLoraCanvasGraphs.json'
+    );
   });
 });
 

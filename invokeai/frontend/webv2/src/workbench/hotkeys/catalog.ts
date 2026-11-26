@@ -200,6 +200,7 @@ export const firstPartyHotkeyCatalog: HotkeyDefinition[] = [
   hotkey('canvas', 'nudgeRightLarge', ['shift+arrowright']),
   hotkey('canvas', 'nudgeUpLarge', ['shift+arrowup']),
   hotkey('canvas', 'nudgeDownLarge', ['shift+arrowdown']),
+  hotkey('canvas', 'newRasterLayer', [], { ignoreRepeat: true }),
   hotkey('canvas', 'duplicateLayer', ['mod+j']),
   hotkey('canvas', 'groupLayers', ['mod+g']),
   hotkey('canvas', 'ungroupLayers', ['mod+shift+g']),
@@ -209,6 +210,8 @@ export const firstPartyHotkeyCatalog: HotkeyDefinition[] = [
   hotkey('canvas', 'layerToFront', ['mod+shift+]']),
   hotkey('canvas', 'layerToBack', ['mod+shift+[']),
   hotkey('canvas', 'cropAllLayersToFrame', []),
+  hotkey('canvas', 'flipHorizontal', []),
+  hotkey('canvas', 'flipVertical', []),
   hotkey('canvas', 'fitBboxToLayers', ['shift+n'], { title: 'Fit Frame To Layers' }),
   hotkey('canvas', 'fitBboxToMasks', ['shift+b'], { title: 'Fit Frame To Masks' }),
   // The gallery saves have no default keys; they are assignable through the hotkeys settings.

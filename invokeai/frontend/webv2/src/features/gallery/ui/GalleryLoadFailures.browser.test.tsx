@@ -176,6 +176,7 @@ const Harness = ({
       getItemLabel: () => Promise.resolve(null),
       liveFollowEnabled: false,
       notifications: { add: noop, reportError: noop },
+      openItemContextMenu: noop,
       pinnedProgressSessionId: null,
       progressSessions,
       projectId: 'project-1',

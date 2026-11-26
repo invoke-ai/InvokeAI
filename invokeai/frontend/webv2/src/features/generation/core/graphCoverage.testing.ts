@@ -367,7 +367,7 @@ const withRecallTuning = (
     ideogram4GuidanceScale: 5,
     ideogram4Mu: 1,
     ideogram4SamplerPreset: 'V4_TURBO_12',
-    ideogram4Steps: 30,
+    ideogram4Steps: 31,
     krea2RebalanceEnabled: true,
     krea2RebalanceMultiplier: 3,
     krea2RebalanceWeights: '1.0,1.0,1.0,1.0,1.0,1.0,1.0,2.0,4.0,1.0,3.0,1.0',

@@ -328,6 +328,7 @@ const STARTER_MODEL = {
   is_installed: false,
   name: 'Fixture Starter',
   source: 'https://example.invalid/fixture-starter.safetensors',
+  source_urls: ['https://example.invalid/models/fixture-starter'],
   type: 'main',
 };
 
@@ -347,7 +348,17 @@ const STARTER_MODELS_RESPONSE = {
   starter_bundles: {
     'sd-1': { models: [STARTER_MODEL], name: 'Stable Diffusion 1.5' },
     sdxl: {
-      models: [{ ...STARTER_MODEL, base: 'sdxl', name: 'Fixture Starter XL' }],
+      models: [
+        {
+          ...STARTER_MODEL,
+          base: 'sdxl',
+          name: 'Fixture Starter XL',
+          source_urls: [
+            'https://example.invalid/models/fixture-starter-xl',
+            'https://example.invalid/models/fixture-starter-xl-quantized',
+          ],
+        },
+      ],
       name: 'SDXL',
     },
   },
@@ -1466,6 +1477,7 @@ export const startMockBackend = async (port, { clock = Date.now, profile = 'empt
       if (method === 'GET' && path === '/api/v1/auth/status') {
         return json(200, {
           admin_email: null,
+          has_single_user_work: false,
           multiuser_enabled: isMultiuserCaller(faults),
           setup_required: false,
           strict_password_checking: false,

@@ -2,7 +2,12 @@
 import { Icon } from '@chakra-ui/react';
 import { collectBases, collectTypes, filterModels } from '@features/models/core/library';
 import { bulkDeleteModels, bulkReidentifyModels } from '@features/models/data/api';
-import { refreshModels, removeModelsFromStore, useModelsSelector } from '@features/models/data/modelsStore';
+import {
+  ensureDateAddedOrderLoaded,
+  refreshModels,
+  removeModelsFromStore,
+  useModelsSelector,
+} from '@features/models/data/modelsStore';
 import { refreshStartersIfLoaded } from '@features/models/data/startersStore';
 import { MaintenanceMenu } from '@features/models/ui/library/MaintenanceMenu';
 import { ModelFilterBar } from '@features/models/ui/library/ModelFilterBar';
@@ -16,7 +21,11 @@ import {
 } from '@features/models/ui/uiStore';
 import { useNotify } from '@features/models/ui/useModelsNotify';
 import { useScopedAction } from '@platform/react/useScopedAction';
-import { assertAccountScopeCurrent } from '@platform/state/accountLifecycle';
+import {
+  assertAccountScopeCurrent,
+  captureAccountScope,
+  isAccountScopeCurrent,
+} from '@platform/state/accountLifecycle';
 import { Button, IconButton, ConfirmDialog } from '@platform/ui';
 import { ListSelectionBar } from '@platform/ui/list/ListSelectionBar';
 import { ManagerColumn, type ManagerAddAction } from '@platform/ui/ManagerLayout';
@@ -161,7 +170,23 @@ export const LibraryColumn = ({ addAction }: { addAction: ManagerAddAction }) =>
         availableTypes={availableTypes}
         filters={filters}
         missingCount={missingCount}
-        onChange={(nextFilters) => updateModelsUi({ filters: nextFilters })}
+        onChange={(nextFilters) => {
+          updateModelsUi({ filters: nextFilters });
+          // Only a sort pick asks: a search keystroke under this sort must not refresh the library while the order
+          // is still loading or failing. Re-picking flips the direction, which is the retry.
+          if (
+            nextFilters.sortField === 'added' &&
+            (nextFilters.sortField !== filters.sortField || nextFilters.sortDirection !== filters.sortDirection)
+          ) {
+            const owner = captureAccountScope();
+
+            void ensureDateAddedOrderLoaded().then((loaded) => {
+              if (!loaded && isAccountScopeCurrent(owner)) {
+                notify.error(t('models.dateAddedUnavailable'), t('models.dateAddedUnavailableDescription'));
+              }
+            });
+          }
+        }}
       />
 
       <ListSelectionBar

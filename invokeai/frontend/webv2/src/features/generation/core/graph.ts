@@ -45,6 +45,7 @@ import {
   isMossImageQwen35Encoder,
   isQwen3Vl4bEncoder,
   isVisionTextLlm,
+  hasWanLowNoiseSlot,
   isSelfContainedSDNQFlux1Pipeline,
   isVaeCompatibleWithGenerateModel,
   isZImageQwen3Encoder,
@@ -73,6 +74,7 @@ import { getCompelPromptNodeType } from './prompt/compel';
 import { getEffectiveReferenceImage, getEnabledReferenceImages } from './referenceImage';
 import { getActiveRefiner, getBaseDenoisingRange } from './sdxlRefiner';
 import { addSDXLRefinerStage, getRefinerMetadata } from './sdxlRefinerGraph';
+import { getEffectiveIdeogram4Sampling } from './settings';
 
 const getCompatibleComponentSource = (
   settings: GenerateSettings,
@@ -728,10 +730,6 @@ const buildFluxGraph = (
   outputIsIntermediate: boolean,
   projectSettings: GenerationProjectSettings
 ): FamilyGraph => {
-  if (model.variant === 'dev_fill') {
-    throw new Error('FLUX Fill models do not support text-to-image generation.');
-  }
-
   const graph: BackendGraphContract = { edges: [], id: createId('flux_graph'), nodes: {} };
   const { positivePrompt, seed } = addPromptAndSeedNodes(graph);
   const hasBundledComponents = isSelfContainedSDNQFlux1Pipeline(model);
@@ -2034,7 +2032,10 @@ const buildIdeogram4Graph = (
   addEdge(graph, posCond, 'conditioning', denoise, 'positive_conditioning');
   addEdge(graph, seed, 'value', denoise, 'seed');
   addEdge(graph, denoise, 'latents', output, 'latents');
+  const sampling = getEffectiveIdeogram4Sampling(settings);
   const metadata = addMetadata(graph, output, settings, model, 'ideogram4_txt2img', projectSettings, {
+    cfg_scale: sampling.guidanceScale,
+    steps: sampling.steps,
     ideogram4_color_palette: settings.ideogram4ColorPalette,
     ideogram4_guidance_scale: settings.ideogram4GuidanceScale ?? null,
     ideogram4_mu: settings.ideogram4Mu ?? null,
@@ -2063,6 +2064,8 @@ const buildWanGraph = (
   const sourceModel = getDiffusersSource(settings, model);
   const vaeModel = getCompatibleVae(settings, model);
   const wanT5EncoderModel = settings.wanT5EncoderModel;
+  // The loader reads the second expert only for a single-file A14B model, so a stale pick never reaches the graph.
+  const lowNoiseModel = hasWanLowNoiseSlot(model) ? settings.wanLowNoiseModel : null;
 
   if (!sourceModel && (!vaeModel || !wanT5EncoderModel)) {
     throw new Error('Wan models require a VAE and Wan T5 Encoder, or a Diffusers component source.');
@@ -2076,7 +2079,7 @@ const buildWanGraph = (
     id: 'model_loader',
     model,
     // The second A14B expert. Omitted, the high-noise expert covers the whole schedule.
-    transformer_low_noise_model: settings.wanLowNoiseModel ?? undefined,
+    transformer_low_noise_model: lowNoiseModel ?? undefined,
     type: 'wan_model_loader',
     vae_model: vaeModel ?? undefined,
     wan_t5_encoder_model: wanT5EncoderModel ?? undefined,

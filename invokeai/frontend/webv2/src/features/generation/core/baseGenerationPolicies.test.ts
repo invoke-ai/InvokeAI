@@ -20,18 +20,27 @@ import type {
 
 import {
   addReferenceImages,
-  coerceSchedulerForGraph,
   getAutoFlux2ComponentSourceModel,
+  pickFallbackGenerateModel,
+  coerceSchedulerForGraph,
   getComponentPolicyContext,
   getComponentSectionPolicy,
+  getDefaultComponentSlotPolicies,
   getDefaultGenerateSettings,
+  getGenerateInvocationIssues,
   getGenerateModelSelectionResult,
+  getGenerationDefaults,
   getGenerationDimensions,
+  getGuidanceBoundReason,
+  getGuidanceSliderMax,
   getGenerationModelAvailabilityReasons,
   getGenerationUiPolicy,
   getGenerationValidationIssues,
   getGenerationValidationReasons,
   getCompatibleReferenceImages,
+  getModelDefaultComponents,
+  getModelDefaultFills,
+  pruneClosedDefaultComponents,
   getReferenceImageRoom,
   getReferenceImageUnavailableReason,
   getPromptPolicy,
@@ -43,6 +52,7 @@ import {
   isLossyModelSwitch,
   isModelFromRepo,
   isSupportedGenerateModel,
+  needsEmptyCanvasFrameForReferenceBudget,
   type NewReferenceImage,
   type ReferenceVisionComponents,
 } from './baseGenerationPolicies';
@@ -272,6 +282,16 @@ describe('architecture policy, read from the backend capability table', () => {
       expect(isGenerateModelSelectable(createModel('ideogram-4', { format: 'diffusers' }))).toBe(true);
       expect(isGenerateModelSelectable(createModel('wan', { variant: 'a14b' }))).toBe(true);
     });
+
+    it('starts on a selectable main model whose files are present, never on a standalone branch', () => {
+      const gone = { ...createModel('sdxl', { key: 'gone' }), is_missing: true } as MainModelConfig;
+      const sdxl = createModel('sdxl', { key: 'sdxl-ok' });
+
+      expect(pickFallbackGenerateModel([gone, unconditional, sdxl])).toBe(sdxl);
+      // All unusable by file: the first selectable one, not the branch.
+      expect(pickFallbackGenerateModel([unconditional, gone])).toBe(gone);
+      expect(pickFallbackGenerateModel([unconditional])).toBeUndefined();
+    });
   });
 });
 
@@ -351,6 +371,26 @@ describe('component policies', () => {
     expect(
       getGenerationValidationReasons(model, createSettings(model, { qwen3EncoderModel: qwen3Encoder, vae: flux2Vae }))
     ).toEqual([]);
+  });
+
+  it('picks no FLUX.2 component source whose files are missing, whatever the catalog order', () => {
+    const klein = createModel('flux2', { format: 'checkpoint', key: 'klein-single', variant: 'klein_9b' });
+    const pipeline = (key: string, missing: boolean) => ({
+      ...createModel('flux2', { format: 'diffusers', key, name: key, variant: 'klein_9b' }),
+      ...(missing ? { is_missing: true } : {}),
+    });
+    const gone = pipeline('pipeline-gone', true);
+    const working = pipeline('pipeline-ok', false);
+    const pick = (models: unknown[]) =>
+      getAutoFlux2ComponentSourceModel(
+        klein,
+        { mistralEncoderModel: null, qwen3EncoderModel: null, vae: null },
+        models as never
+      );
+
+    expect(pick([gone, working])?.key).toBe('pipeline-ok');
+    expect(pick([working, gone])?.key).toBe('pipeline-ok');
+    expect(pick([gone])).toBeNull();
   });
 
   describe('FLUX.2 [dev] component sources', () => {
@@ -545,6 +585,113 @@ describe('component policies', () => {
         'External Model supports at most 2048×1536.'
       );
     }
+  });
+
+  it('warns when only visible Canvas content would exceed the reference budget', () => {
+    const model: GenerateModelConfig = {
+      ...externalModel,
+      provider_id: 'seedream',
+      provider_model_id: 'seedream-4-5-251128',
+      capabilities: { modes: ['txt2img', 'img2img'], supports_reference_images: true, max_reference_images: 14 },
+    };
+    const settings = createSettings(model, {
+      referenceImages: Array.from({ length: 14 }, (_, i) => ({
+        id: `reference-${i}`,
+        isEnabled: true,
+        config: {
+          type: 'external_reference_image',
+          image: {
+            imageName: `reference-${i}.png`,
+            width: 512,
+            height: 512,
+            original: { image: { image_name: `reference-${i}.png`, width: 512, height: 512 } },
+          },
+        },
+      })),
+    });
+    const values = { ...settings, model };
+    expect(needsEmptyCanvasFrameForReferenceBudget(model, settings)).toBe(true);
+    expect(getGenerateInvocationIssues(values, { canvasFrame: { height: 512, width: 512 } })).toEqual([]);
+    expect(getGenerateInvocationIssues(values)).toEqual([]);
+    expect(getGenerationValidationReasons(model, settings, 'img2img')).toEqual([
+      'External Model supports at most 15 images total (reference + init + output), got 16.',
+    ]);
+    expect(needsEmptyCanvasFrameForReferenceBudget({ ...model, capabilities: { modes: ['txt2img'] } }, settings)).toBe(
+      false
+    );
+    settings.referenceImages[0]!.isEnabled = false;
+    expect(needsEmptyCanvasFrameForReferenceBudget(model, settings)).toBe(false);
+    settings.referenceImages.push(
+      { ...settings.referenceImages[1]!, id: 'extra-1' },
+      { ...settings.referenceImages[2]!, id: 'extra-2' }
+    );
+    expect(needsEmptyCanvasFrameForReferenceBudget(model, settings)).toBe(false);
+    expect(getGenerateInvocationIssues({ ...settings, model }).map(({ message }) => message)).toContain(
+      'External Model supports at most 15 images total (reference + init + output), got 16.'
+    );
+  });
+
+  it('blocks FLUX Fill outside inpaint and outpaint, but not while a Canvas frame decides the mode', () => {
+    const model = createModel('flux', { variant: 'dev_fill' });
+    const settings = {
+      ...createSettings(model),
+      clipEmbedModel: clipEmbed,
+      t5EncoderModel: t5Encoder,
+      vae: fluxVae,
+    };
+    const reasons = (mode?: Parameters<typeof getGenerationValidationReasons>[2]) =>
+      getGenerationValidationReasons(model, settings, mode).filter((reason) => reason.startsWith('FLUX Fill only'));
+
+    expect(reasons()).toHaveLength(1);
+    expect(reasons('img2img')).toHaveLength(1);
+    expect(reasons('inpaint')).toEqual([]);
+    expect(reasons('outpaint')).toEqual([]);
+    expect(getGenerateInvocationIssues({ ...settings, model }).map(({ message }) => message)).toEqual(reasons());
+    expect(
+      getGenerateInvocationIssues({ ...settings, model }, { canvasFrame: { height: 512, width: 512 } }).map(
+        ({ message }) => message
+      )
+    ).not.toContain(reasons()[0]);
+  });
+
+  it('holds FLUX Fill to a guidance floor of 25 with the field reason and a one-step fix', () => {
+    const model = createModel('flux', { variant: 'dev_fill' });
+    const settings = { ...createSettings(model), clipEmbedModel: clipEmbed, t5EncoderModel: t5Encoder, vae: fluxVae };
+    const guidanceIssues = (cfgScale: number) =>
+      getGenerationValidationIssues(model, { ...settings, cfgScale }, 'inpaint').filter(
+        ({ target }) => target.field === 'cfgScale'
+      );
+
+    expect(getGuidanceBoundReason(model, 3.5)).toBe(`Guidance must be at least 25 for ${model.name}.`);
+    expect(guidanceIssues(3.5)).toEqual([
+      expect.objectContaining({
+        fix: { kind: 'clampGuidance', value: 25 },
+        message: getGuidanceBoundReason(model, 3.5),
+      }),
+    ]);
+    expect(getGuidanceBoundReason(model, 25)).toBeNull();
+    expect(guidanceIssues(25)).toEqual([]);
+    expect(guidanceIssues(30)).toEqual([]);
+    expect(getGenerationUiPolicy(model).guidanceMin).toBe(25);
+  });
+
+  it('lands on the FLUX Fill floor when switching from FLUX dev at its default guidance', () => {
+    const dev = createModel('flux', { key: 'flux-dev', variant: 'dev' });
+    const fill = createModel('flux', { key: 'flux-fill', variant: 'dev_fill' });
+    const currentValues = createSettings(dev, { cfgScale: 3.5 });
+
+    const { settings } = getGenerateModelSelectionResult({ currentValues, model: fill, models: [dev, fill] });
+
+    expect(settings.cfgScale).toBeGreaterThanOrEqual(25);
+  });
+
+  it('raises a FLUX Fill model default saved below the floor to the floor', () => {
+    const fill = createModel('flux', { variant: 'dev_fill', default_settings: { guidance: 3.5 } });
+
+    expect(getGenerationDefaults(fill).cfgScale).toBe(25);
+    expect(
+      getGenerationDefaults(createModel('flux', { variant: 'dev', default_settings: { guidance: 3.5 } })).cfgScale
+    ).toBe(3.5);
   });
 
   it('keeps concepts but clears incompatible selections when the selected model changes', () => {
@@ -1364,6 +1511,15 @@ describe('Anima IP-Adapter references', () => {
     isEnabled: true,
   });
 
+  it('retargets an adapter-less reference only when a present IP-Adapter could take it', () => {
+    const empty = { ...animaReference('ref-1'), config: { ...animaReference('ref-1').config, model: null } };
+    const missing = { ...animaIpAdapter, is_missing: true } as ComponentModelConfig;
+    const referenceImages = [empty];
+
+    expect(getCompatibleReferenceImages(referenceImages, animaQwen3, [missing])).toBe(referenceImages);
+    expect(getCompatibleReferenceImages(referenceImages, animaQwen3, [animaIpAdapter])).not.toBe(referenceImages);
+  });
+
   it('accepts four references sharing one Anima IP-Adapter and rejects a fifth', () => {
     const reasons = (count: number) =>
       getGenerationValidationReasons(
@@ -1448,12 +1604,15 @@ describe('the guidance range the architecture declares', () => {
     for (const row of architectureCapabilitiesFixture) {
       const model = createModel(row.base, { variant: row.variant ?? undefined } as Partial<MainModelConfig>);
 
-      if (!isSupportedGenerateModel(model)) {
+      // Ideogram's separate sampler override is validated with its own denoise bounds above.
+      if (!isSupportedGenerateModel(model) || model.base === 'ideogram-4') {
         continue;
       }
 
       const where = `${row.base}/${row.variant ?? '-'}`;
-      const { guidance_max: max, guidance_min: min } = row.features;
+      const { guidance_max: max } = row.features;
+      // FLUX Fill is the one deliberate exception: a product floor above the served node minimum.
+      const min = where === 'flux/dev_fill' ? 25 : row.features.guidance_min;
 
       expect(guidanceReasons(model, min), `${where} rejected its own floor`).toEqual([]);
 
@@ -1672,5 +1831,515 @@ describe('a stored FLUX.2 component source', () => {
     expect(
       getAutoFlux2ComponentSourceModel(model, { ...settings, componentSourceModel: smaller }, [smaller, first])?.key
     ).toBe(first.key);
+  });
+});
+
+describe("a main model's default components", () => {
+  const withDefaults = (base: string, components: Record<string, string>, overrides: Partial<MainModelConfig> = {}) =>
+    createModel(base, {
+      default_settings: { components },
+      format: 'checkpoint',
+      key: `${base}-with-defaults`,
+      ...overrides,
+    });
+  const switchTo = (model: GenerateModelConfig, models: unknown[], currentValues?: GenerateSettings) =>
+    getGenerateModelSelectionResult({
+      currentValues: currentValues ?? createSettings(createModel('sd-1')),
+      model,
+      models: models as ComponentModelConfig[],
+    });
+  const otherT5: ComponentModelConfig = { base: 'any', key: 't5-other', name: 'Other T5', type: 't5_encoder' };
+
+  it('fills the empty slots on a switch without counting them as a loss', () => {
+    const model = withDefaults('flux', { clip_embed_model: clipEmbed.key, t5_encoder: t5Encoder.key });
+    const result = switchTo(model, [t5Encoder, clipEmbed]);
+
+    expect(result.settings.t5EncoderModel).toBe(t5Encoder);
+    expect(result.settings.clipEmbedModel).toBe(clipEmbed);
+    expect(result.changes).toEqual([]);
+    expect(isLossyModelSwitch(result)).toBe(false);
+  });
+
+  it('offers a Text LLM that serves as the encoder through a role in the Model Manager', () => {
+    const model = createModel('z-image', { format: 'checkpoint' });
+    const llm = {
+      base: 'any',
+      format: 'checkpoint',
+      key: 'qwen3-llm',
+      name: 'Qwen3 4B',
+      roles: [{ type: 'qwen3_encoder', variant: 'qwen3_4b' }],
+      type: 'text_llm',
+    } as unknown as ComponentModelConfig;
+    const slot = getDefaultComponentSlotPolicies(model, [llm]).find(
+      (candidate) => candidate.persistenceKey === 'qwen3_encoder'
+    );
+
+    expect(slot?.filter(llm)).toBe(true);
+  });
+
+  it('takes no default whose files are missing on a switch, and replaces a pick that went missing', () => {
+    const model = withDefaults('flux', { t5_encoder: t5Encoder.key });
+    const missingT5 = { ...t5Encoder, is_missing: true };
+    const picked = createSettings(createModel('sd-1'), { t5EncoderModel: otherT5 });
+
+    expect(switchTo(model, [missingT5]).settings.t5EncoderModel).toBeNull();
+    expect(switchTo(model, [missingT5, otherT5], picked).settings.t5EncoderModel).toBe(otherT5);
+    expect(switchTo(model, [t5Encoder, { ...otherT5, is_missing: true }], picked).settings.t5EncoderModel).toBe(
+      t5Encoder
+    );
+  });
+
+  it('keeps a selection that already fits the new model', () => {
+    const model = withDefaults('flux', { t5_encoder: t5Encoder.key });
+    const current = createSettings(createModel('flux', { key: 'flux-other' }), { t5EncoderModel: otherT5 });
+
+    expect(switchTo(model, [t5Encoder, otherT5], current).settings.t5EncoderModel).toBe(otherT5);
+  });
+
+  it('fills a slot the switch cleared as incompatible, and still reports the loss', () => {
+    const model = withDefaults('flux', { t5_encoder: t5Encoder.key });
+    // A Qwen VL encoder fits no FLUX slot, so a stale one is cleared; the T5 default is not what it held.
+    const current = createSettings(createModel('qwen-image', { format: 'diffusers' }), {
+      qwenVLEncoderModel: qwenVlEncoder,
+    });
+    const result = switchTo(model, [t5Encoder, qwenVlEncoder], current);
+
+    expect(result.settings.qwenVLEncoderModel).toBeNull();
+    expect(result.settings.t5EncoderModel).toBe(t5Encoder);
+    expect(isLossyModelSwitch(result)).toBe(true);
+  });
+
+  it('skips unknown slot names, models that are not installed and models the slot rejects', () => {
+    const model = withDefaults('flux', {
+      clip_embed_model: t5Encoder.key,
+      not_a_slot: clipEmbed.key,
+      t5_encoder: 'uninstalled',
+    });
+    const { settings } = switchTo(model, [t5Encoder, clipEmbed]);
+
+    expect(settings.t5EncoderModel).toBeNull();
+    expect(settings.clipEmbedModel).toBeNull();
+  });
+
+  it('changes nothing when the model is selected again', () => {
+    const model = withDefaults('flux', { t5_encoder: t5Encoder.key });
+    const current = createSettings(model);
+
+    expect(switchTo(model, [t5Encoder], current).settings.t5EncoderModel).toBeNull();
+  });
+
+  it('skips the FLUX.2 component source, which the family offers no slot for and picks automatically', () => {
+    const source = createModel('flux2', { format: 'diffusers', key: 'klein-a', variant: 'klein_9b' });
+    const model = createModel('flux2', {
+      default_settings: { components: { component_source: source.key } },
+      format: 'gguf_quantized',
+      key: 'klein-default',
+      variant: 'klein_9b',
+    });
+
+    expect(getModelDefaultComponents(model, createSettings(model), [source] as ComponentModelConfig[])).toEqual({});
+  });
+
+  it('opens a dependent slot once the slot it hangs on is filled, whatever order they are stored in', () => {
+    const encoder = {
+      base: 'any',
+      format: 'gguf_quantized',
+      key: 'qwen3-vl-8b-gguf',
+      name: 'Qwen3-VL 8B',
+      type: 'qwen3_vl_encoder',
+      variant: 'qwen3_vl_8b',
+    };
+    const tower = { ...encoder, key: 'mmproj', name: 'mmproj', type: 'qwen3_vl_vision_tower' };
+    const model = withDefaults('qwen-image-2-1', { qwen3_vl_vision_tower: tower.key, qwen3_vl_encoder: encoder.key });
+    const current = createSettings(model);
+
+    expect(getModelDefaultComponents(model, current, [tower, encoder] as ComponentModelConfig[])).toEqual({
+      qwen3VLEncoderModel: encoder,
+      qwen3VLVisionTowerModel: tower,
+    });
+    // Without the encoder default the tower has no slot to fill.
+    expect(
+      getModelDefaultComponents(withDefaults('qwen-image-2-1', { qwen3_vl_vision_tower: tower.key }), current, [
+        tower,
+      ] as ComponentModelConfig[])
+    ).toEqual({});
+    // The component list the Model Manager offers follows the same rule.
+    const offered = (components: Record<string, string>) =>
+      getDefaultComponentSlotPolicies(withDefaults('qwen-image-2-1', components), [
+        encoder,
+        tower,
+      ] as ComponentModelConfig[]).map((slot) => slot.persistenceKey);
+
+    expect(offered({})).not.toContain('qwen3_vl_vision_tower');
+    expect(offered({ qwen3_vl_encoder: encoder.key })).toContain('qwen3_vl_vision_tower');
+  });
+
+  it('does not keep a selection that is no longer installed over the default of the new model', () => {
+    const model = withDefaults('flux', { t5_encoder: t5Encoder.key });
+    const removed = createSettings(createModel('flux', { key: 'flux-other' }), { t5EncoderModel: otherT5 });
+
+    expect(switchTo(model, [t5Encoder], removed).settings.t5EncoderModel).toBe(t5Encoder);
+  });
+
+  it('clears a vision tower whose slot a reset to the default encoder closes', () => {
+    const gguf = {
+      base: 'any',
+      format: 'gguf_quantized',
+      key: 'encoder-gguf',
+      name: 'GGUF encoder',
+      type: 'qwen3_vl_encoder',
+      variant: 'qwen3_vl_8b',
+    };
+    const checkpoint = { ...gguf, format: 'checkpoint', key: 'encoder-st', name: 'Checkpoint encoder' };
+    const tower = { ...gguf, key: 'mmproj', name: 'mmproj', type: 'qwen3_vl_vision_tower' };
+    const model = withDefaults('qwen-image-2-1', { qwen3_vl_encoder: checkpoint.key });
+    const current = createSettings(model, {
+      qwen3VLEncoderModel: gguf as ComponentModelConfig,
+      qwen3VLVisionTowerModel: tower as ComponentModelConfig,
+    });
+    const models = [gguf, checkpoint, tower] as ComponentModelConfig[];
+
+    expect(getModelDefaultComponents(model, current, models, { replace: true })).toEqual({
+      qwen3VLEncoderModel: checkpoint,
+      qwen3VLVisionTowerModel: null,
+    });
+    // A fitting selection that stays closes nothing.
+    expect(getModelDefaultComponents(model, current, models)).toEqual({});
+  });
+
+  it('offers and fills no encoder default for a self-contained FLUX.1 SDNQ pipeline, whose graph loads its own', () => {
+    const pipeline = { text_encoder: {}, text_encoder_2: {}, tokenizer: {}, tokenizer_2: {}, transformer: {}, vae: {} };
+    const components = { clip_embed_model: clipEmbed.key, t5_encoder: t5Encoder.key };
+    const sdnq = withDefaults('flux', components, { format: 'sdnq_quantized', submodels: pipeline } as never);
+    const standalone = withDefaults('flux', components);
+    const installed = [t5Encoder, clipEmbed] as ComponentModelConfig[];
+    const offered = (model: GenerateModelConfig) =>
+      getDefaultComponentSlotPolicies(model, installed).map((slot) => slot.persistenceKey);
+
+    expect(offered(standalone)).toEqual(expect.arrayContaining(['t5_encoder', 'clip_embed_model']));
+    expect(offered(sdnq)).not.toContain('t5_encoder');
+    expect(offered(sdnq)).not.toContain('clip_embed_model');
+    expect(getModelDefaultComponents(sdnq, createSettings(sdnq), installed)).toEqual({});
+  });
+
+  it.each([
+    ['ideogram-4', 'ideogram4_unconditional_model'],
+    ['wan', 'component_source'],
+    ['qwen-image', 'component_source'],
+  ])('offers and fills no %s default for the %s a Diffusers pipeline never loads', (base, persistenceKey) => {
+    const main = (key: string, format: string) =>
+      ({
+        base,
+        format,
+        key,
+        name: key,
+        type: 'main',
+        ...(base === 'wan' ? { variant: 't2v_a14b' } : {}),
+      }) as MainModelConfig;
+    const other = main('other', 'diffusers');
+    const installed = [other] as ComponentModelConfig[];
+    const offered = (model: GenerateModelConfig) =>
+      getDefaultComponentSlotPolicies(model, installed).map((slot) => slot.persistenceKey);
+    const diffusers = {
+      ...main('pipeline', 'diffusers'),
+      default_settings: { components: { [persistenceKey]: 'other' } },
+    };
+    const singleFile = { ...main('single-file', 'gguf_quantized'), default_settings: diffusers.default_settings };
+
+    expect(offered(singleFile)).toContain(persistenceKey);
+    expect(offered(diffusers)).not.toContain(persistenceKey);
+    expect(getModelDefaultComponents(diffusers, createSettings(diffusers), installed)).toEqual({});
+  });
+
+  it('prunes a stored vision tower once the encoder it hangs on is gone, or no longer opens it', () => {
+    const gguf = {
+      base: 'any',
+      format: 'gguf_quantized',
+      key: 'encoder-gguf',
+      name: 'GGUF encoder',
+      type: 'qwen3_vl_encoder',
+      variant: 'qwen3_vl_8b',
+    };
+    const checkpoint = { ...gguf, format: 'checkpoint', key: 'encoder-st', name: 'Checkpoint encoder' };
+    const tower = { ...gguf, key: 'mmproj', name: 'mmproj', type: 'qwen3_vl_vision_tower' };
+    const installed = [gguf, checkpoint, tower] as ComponentModelConfig[];
+    const prune = (components: Record<string, string>) =>
+      pruneClosedDefaultComponents(withDefaults('qwen-image-2-1', components), installed);
+
+    expect(prune({ qwen3_vl_encoder: gguf.key, qwen3_vl_vision_tower: tower.key })).toEqual({
+      qwen3_vl_encoder: gguf.key,
+      qwen3_vl_vision_tower: tower.key,
+    });
+    // Cleared encoder; replaced by one with no tower slot.
+    expect(prune({ qwen3_vl_vision_tower: tower.key })).toEqual({});
+    expect(prune({ qwen3_vl_encoder: checkpoint.key, qwen3_vl_vision_tower: tower.key })).toEqual({
+      qwen3_vl_encoder: checkpoint.key,
+    });
+    // An encoder that is no longer installed is the user's to see and clear first; keys of unknown slots stay.
+    expect(prune({ qwen3_vl_encoder: 'deleted', qwen3_vl_vision_tower: tower.key, unknown_slot: 'x' })).toEqual({
+      qwen3_vl_encoder: 'deleted',
+      qwen3_vl_vision_tower: tower.key,
+      unknown_slot: 'x',
+    });
+  });
+
+  describe('dependent slots are judged against the final settings', () => {
+    const gguf = {
+      base: 'any',
+      format: 'gguf_quantized',
+      key: 'encoder-gguf',
+      name: 'GGUF encoder',
+      type: 'qwen3_vl_encoder',
+      variant: 'qwen3_vl_8b',
+    };
+    const checkpoint = { ...gguf, format: 'checkpoint', key: 'encoder-st', name: 'Checkpoint encoder' };
+    const tower = { ...gguf, key: 'mmproj', name: 'mmproj', type: 'qwen3_vl_vision_tower' };
+    const installed = [gguf, checkpoint, tower] as ComponentModelConfig[];
+
+    it.each([
+      ['tower before encoder', { qwen3_vl_vision_tower: tower.key, qwen3_vl_encoder: checkpoint.key }],
+      ['encoder before tower', { qwen3_vl_encoder: checkpoint.key, qwen3_vl_vision_tower: tower.key }],
+    ])('leaves no hidden tower whatever the stored order (%s)', (_name, components) => {
+      const model = withDefaults('qwen-image-2-1', components);
+      const current = createSettings(model, {
+        qwen3VLEncoderModel: gguf as ComponentModelConfig,
+        qwen3VLVisionTowerModel: tower as ComponentModelConfig,
+      });
+
+      expect(getModelDefaultComponents(model, current, installed, { replace: true })).toEqual({
+        qwen3VLEncoderModel: checkpoint,
+        qwen3VLVisionTowerModel: null,
+      });
+    });
+  });
+
+  describe('the Wan low-noise expert', () => {
+    const wan = (key: string, extra: Record<string, unknown> = {}) =>
+      createModel('wan', { format: 'gguf_quantized', key, name: key, variant: 't2v_a14b', ...extra } as never);
+    const high = wan('high');
+    const low = wan('low');
+    const offered = (model: GenerateModelConfig, models: unknown[]) =>
+      getDefaultComponentSlotPolicies(model, models as ComponentModelConfig[]).find(
+        (slot) => slot.persistenceKey === 'wan_transformer_low_noise'
+      );
+
+    it('accepts only a different single-file expert of the same variant for a single-file A14B model', () => {
+      const slot = offered(high, [high, low])!;
+
+      expect(slot.filter(low as never)).toBe(true);
+      expect(slot.filter(wan('low-st', { format: 'checkpoint' }) as never)).toBe(true);
+      expect(slot.filter(high as never)).toBe(false);
+      expect(slot.filter(wan('pipeline', { format: 'diffusers' }) as never)).toBe(false);
+      expect(slot.filter(wan('other-variant', { variant: 'i2v_a14b' }) as never)).toBe(false);
+    });
+
+    it("refuses two experts the loader's tags name for the same role, and accepts untagged ones", () => {
+      const tagged = (key: string, expert: string) => wan(key, { expert });
+      const slotOf = (main: GenerateModelConfig) => offered(main, [main])!;
+
+      expect(slotOf(tagged('high-a', 'high')).filter(tagged('high-b', 'high') as never)).toBe(false);
+      expect(slotOf(tagged('low-a', 'low')).filter(tagged('low-b', 'low') as never)).toBe(false);
+      expect(slotOf(tagged('high-a', 'high')).filter(tagged('low-b', 'low') as never)).toBe(true);
+      expect(slotOf(tagged('none-a', 'none')).filter(tagged('none-b', 'none') as never)).toBe(true);
+      expect(slotOf(tagged('high-a', 'high')).filter(wan('untagged') as never)).toBe(true);
+    });
+
+    it('reports a saved expert the loader would reject, which the picker no longer lists', () => {
+      const pipeline = wan('pipeline', { format: 'diffusers' });
+      const reasons = (expert: unknown) =>
+        getGenerationValidationReasons(
+          high,
+          createSettings(high, { componentSourceModel: pipeline, wanLowNoiseModel: expert as never })
+        );
+
+      expect(reasons(null)).toEqual([]);
+      expect(reasons(low)).toEqual([]);
+      expect(reasons(pipeline)).toEqual([
+        'The selected low-noise expert is not a different single-file model of this variant. Select one or clear it.',
+      ]);
+    });
+
+    it('lets a Diffusers component source supply the VAE only when its VAE width fits the model', () => {
+      const a14bPipeline = wan('a14b-pipeline', { format: 'diffusers' });
+      const smallPipeline = wan('small-pipeline', { format: 'diffusers', variant: 'ti2v_5b' });
+      const wanVae = {
+        base: 'wan',
+        key: 'wan-vae-16',
+        latent_channels: 16,
+        name: 'Wan VAE',
+        type: 'vae',
+      } as VaeModelConfig;
+      const reasons = (source: unknown, vae: VaeModelConfig | null = null) =>
+        getGenerationValidationReasons(
+          high,
+          createSettings(high, { componentSourceModel: source as never, vae, wanT5EncoderModel: null })
+        );
+
+      expect(reasons(a14bPipeline)).toEqual([]);
+      // The source still supplies the text encoder beside a VAE that fits.
+      expect(reasons(smallPipeline, wanVae)).toEqual([]);
+      expect(reasons(smallPipeline)).toEqual([
+        'Generate needs a VAE for Wan models: a component source supplies one only when it is the same variant family.',
+      ]);
+    });
+
+    it('is no default of a Diffusers or TI2V-5B model, whose loader ignores or reads the pair itself', () => {
+      expect(offered(wan('pipeline', { format: 'diffusers' }), [low])).toBeUndefined();
+      expect(offered(wan('small', { variant: 'ti2v_5b' }), [low])).toBeUndefined();
+    });
+
+    it('offers no slot to a model whose loader never reads it, and a switch clears a stale pick', () => {
+      const pipeline = wan('pipeline', { format: 'diffusers' });
+      const slotKeys = (model: GenerateModelConfig) =>
+        getComponentSectionPolicy(model, createSettings(model)).slots.map((candidate) => candidate.key);
+
+      expect(slotKeys(high)).toContain('wanLowNoiseModel');
+      expect(slotKeys(pipeline)).not.toContain('wanLowNoiseModel');
+      expect(slotKeys(wan('small', { variant: 'ti2v_5b' }))).not.toContain('wanLowNoiseModel');
+
+      const current = createSettings(high, { wanLowNoiseModel: low });
+      const result = getGenerateModelSelectionResult({
+        currentValues: current,
+        model: pipeline,
+        models: [high, low, pipeline] as ComponentModelConfig[],
+      });
+
+      expect(result.settings.wanLowNoiseModel).toBeNull();
+    });
+
+    it('judges a kept expert by the catalog record, so a valid default replaces one reclassified since', () => {
+      const model = withDefaults('wan', { wan_transformer_low_noise: low.key }, {
+        format: 'gguf_quantized',
+        key: high.key,
+        variant: 't2v_a14b',
+      } as never);
+      // The project saved this pick while it was still a T2V expert; the catalog has since reclassified it.
+      const old = wan('old');
+      const reclassified = wan('old', { variant: 'i2v_a14b' });
+      const saved = createSettings(model, { wanLowNoiseModel: old as never });
+
+      expect(getModelDefaultComponents(model, saved, [model, low, reclassified] as never)).toEqual({
+        wanLowNoiseModel: low,
+      });
+      // Still a T2V expert in the catalog: it stays.
+      expect(getModelDefaultComponents(model, saved, [model, low, old] as never)).toEqual({});
+    });
+
+    it('skips a stored default the loader would reject', () => {
+      const model = withDefaults('wan', { wan_transformer_low_noise: high.key }, {
+        format: 'gguf_quantized',
+        key: high.key,
+        variant: 't2v_a14b',
+      } as never);
+
+      expect(getModelDefaultComponents(model, createSettings(model), [model, low] as never)).toEqual({});
+    });
+  });
+
+  describe('the default VAE', () => {
+    it('fills an empty VAE of a family with a VAE slot', () => {
+      const model = createModel('flux', { default_settings: { vae: fluxVae.key }, format: 'checkpoint' });
+
+      expect(switchTo(model, [fluxVae]).settings.vae).toBe(fluxVae);
+    });
+
+    it('fills the FLUX.2 VAE a single-file MOSS-Image takes as its default', () => {
+      const model = createModel('moss-image', { default_settings: { vae: flux2Vae.key }, format: 'checkpoint' });
+
+      expect(isComponentCompatibleWithModel(model, createSettings(model), 'vae', flux2Vae)).toBe(true);
+      expect(switchTo(model, [flux2Vae]).settings.vae).toBe(flux2Vae);
+      // SDXL's VAE is not among the ones MOSS-Image accepts.
+      expect(
+        switchTo(createModel('moss-image', { default_settings: { vae: sdxlVae.key }, format: 'checkpoint' }), [sdxlVae])
+          .settings.vae
+      ).toBeNull();
+    });
+
+    it('replaces a VAE of another family, as left behind by a fallback from an unsupported model', () => {
+      const model = createModel('flux', { default_settings: { vae: fluxVae.key }, format: 'checkpoint' });
+      const stale = createSettings(createModel('sdxl'), { vae: sdxlVae });
+
+      expect(getModelDefaultFills(model, stale, [fluxVae, sdxlVae]).vae).toBe(fluxVae);
+    });
+
+    it('judges a kept VAE by the catalog record, so a default replaces one reclassified since', () => {
+      const defaultVae: VaeModelConfig = { base: 'flux', key: 'flux-vae-default', name: 'FLUX VAE 2', type: 'vae' };
+      const model = createModel('flux', { default_settings: { vae: defaultVae.key }, format: 'checkpoint' });
+      // The project saved the pick as a FLUX VAE; the catalog now classifies the same key as SD3's.
+      const saved = createSettings(model, { vae: fluxVae });
+      const reclassified: VaeModelConfig = { ...fluxVae, base: 'sd-3' };
+
+      expect(getModelDefaultFills(model, saved, [defaultVae, reclassified]).vae).toBe(defaultVae);
+      expect(getModelDefaultFills(model, saved, [defaultVae, fluxVae]).vae).toBeUndefined();
+    });
+
+    it('fills no VAE for a self-contained FLUX.1 SDNQ pipeline, whose graph decodes with its own', () => {
+      const pipeline = {
+        text_encoder: {},
+        text_encoder_2: {},
+        tokenizer: {},
+        tokenizer_2: {},
+        transformer: {},
+        vae: {},
+      };
+      const model = createModel('flux', {
+        default_settings: { vae: fluxVae.key },
+        format: 'sdnq_quantized',
+        submodels: pipeline,
+      } as never);
+
+      expect(switchTo(model, [fluxVae]).settings.vae).toBeNull();
+    });
+
+    it('keeps an installed VAE that fits when the model defaults to the bundled one', () => {
+      const model = createModel('sdxl', { default_settings: { vae: 'default' } });
+      const chosen = createSettings(createModel('sdxl', { key: 'sdxl-other' }), { vae: sdxlVae });
+
+      expect(switchTo(model, [sdxlVae], chosen).settings.vae).toBe(sdxlVae);
+    });
+
+    it('clears a VAE that is gone when the model defaults to the bundled one', () => {
+      const model = createModel('sdxl', { default_settings: { vae: 'default' } });
+      const gone = createSettings(createModel('sdxl', { key: 'sdxl-other' }), { vae: sdxlVae });
+
+      expect(switchTo(model, [], gone).settings.vae).toBeNull();
+    });
+
+    it('fills the SD VAE picker, and leaves a VAE the user chose', () => {
+      const model = createModel('sdxl', { default_settings: { vae: sdxlVae.key } });
+      const chosen: VaeModelConfig = { ...sdxlVae, key: 'chosen', name: 'Chosen' };
+      const current = createSettings(createModel('sdxl', { key: 'sdxl-other' }), { vae: chosen });
+
+      expect(switchTo(model, [sdxlVae]).settings.vae).toBe(sdxlVae);
+      expect(switchTo(model, [sdxlVae, chosen], current).settings.vae).toBe(chosen);
+    });
+
+    it('leaves the bundled VAE for the "default" sentinel, and skips a VAE of another base', () => {
+      expect(
+        switchTo(createModel('sdxl', { default_settings: { vae: 'default' } }), [sdxlVae]).settings.vae
+      ).toBeNull();
+      expect(
+        switchTo(createModel('sdxl', { default_settings: { vae: fluxVae.key } }), [fluxVae]).settings.vae
+      ).toBeNull();
+    });
+  });
+});
+
+describe('getGuidanceSliderMax', () => {
+  it('keeps the 10-wide track for floors below it', () => {
+    expect(getGuidanceSliderMax(1, null)).toBe(10);
+    expect(getGuidanceSliderMax(1, 20)).toBe(10);
+    expect(getGuidanceSliderMax(1, 6)).toBe(6);
+    expect(getGuidanceSliderMax(0, 100)).toBe(10);
+  });
+
+  it('spans a usable range above a floor at or beyond the track, so FLUX Fill runs from 25 to 35', () => {
+    expect(getGuidanceSliderMax(25, null)).toBe(35);
+    expect(getGuidanceSliderMax(10, null)).toBe(20);
+  });
+
+  it('never crosses the input ceiling or drops below the floor', () => {
+    expect(getGuidanceSliderMax(25, 30)).toBe(30);
+    expect(getGuidanceSliderMax(25, 25)).toBe(25);
   });
 });

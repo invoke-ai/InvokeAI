@@ -401,8 +401,8 @@ const cloudProviders = [
 
     <div class="ways__panel" data-way="docker">
       <h3 class="ways__heading">Run with Docker</h3>
-      <p class="ways__lede">Run Invoke in a container, without installing its dependencies on your system.</p>
-      <pre class="ways__code"><code>docker run --runtime=nvidia --gpus=all --publish 9090:9090 ghcr.io/invoke-ai/invokeai</code></pre>
+      <p class="ways__lede">Use the <code>invokeai-data</code> volume for a new installation. For an existing installation, use the volume or host directory that holds your InvokeAI data.</p>
+      <pre class="ways__code"><code>docker run --runtime=nvidia --gpus=all --volume invokeai-data:/invokeai --publish 127.0.0.1:9090:9090 ghcr.io/invoke-ai/invokeai</code></pre>
       <div class="ways__cards">
         <a class="docs-link-card way-card" href={href('/configuration/docker/')}>
           <Container class="docs-link-card__icon" aria-hidden="true" />
@@ -414,7 +414,7 @@ const cloudProviders = [
 
     <div class="ways__panel" data-way="cloud">
       <h3 class="ways__heading">No GPU? Run it on a rented one</h3>
-      <p class="ways__lede">These services run Invoke on their GPUs and bill you for the time you use.</p>
+      <p class="ways__lede">These services run Invoke on their GPUs and bill you for the time you use. Before opening public access, <a href={href('/configuration/multi-user-mode/admin-guide/#set-up-multi-user-mode')}>create the first administrator privately</a>.</p>
       <div class="ways__cards ways__cards--three">
         {
           cloudProviders.map(({ title, description, href: providerHref }) => (
@@ -432,7 +432,7 @@ const cloudProviders = [
   <ul class="trust" aria-label="About Invoke">
     <li><Scale aria-hidden="true" /> Apache 2.0 licensed</li>
     <li><WifiOff aria-hidden="true" /> Runs offline</li>
-    <li><UserRoundX aria-hidden="true" /> No account needed</li>
+    <li><UserRoundX aria-hidden="true" /> No cloud account needed</li>
     <li>
       <a href="https://github.com/invoke-ai/InvokeAI"><CodeXml aria-hidden="true" /> Source on GitHub</a>
     </li>

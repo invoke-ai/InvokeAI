@@ -224,6 +224,10 @@ class UserService(UserServiceBase):
         """Get the email address of the first active admin user."""
         return self._queries.users.first_active_admin_email()
 
+    def has_single_user_work(self) -> bool:
+        """Whether work made in single-user mode exists that no signed-in account sees."""
+        return self._queries.users.owns_private_work(SYSTEM_USER_ID)
+
     def count_admins(self) -> int:
         """Count active admin users."""
         return self._queries.users.count_active_admins()

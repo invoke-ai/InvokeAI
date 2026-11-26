@@ -4,7 +4,7 @@ import type { VideoUiAdapter } from '@features/video/ui/VideoUiContext';
 import { ChakraProvider } from '@chakra-ui/react';
 import { seedArchitectureCapabilities } from '@features/models/core/architectureCapabilities.testing';
 import { setModelsSnapshotForTests } from '@features/models/data/modelsStore';
-import { ModelsUiProvider, NO_SCHEDULER_POLICY } from '@features/models/ui/ModelsUiContext';
+import { ModelsUiProvider, NO_DEFAULTS_RULES } from '@features/models/ui/ModelsUiContext';
 import { createDefaultVideoWidgetValues } from '@features/video';
 import { VideoModelField } from '@features/video/ui/VideoModelField';
 import { VideoUiProvider } from '@features/video/ui/VideoUiContext';
@@ -44,7 +44,7 @@ const modelsAdapter = {
   installInPlace: true,
   isProjectActive: () => true,
   managerProjectId: null,
-  schedulerPolicy: NO_SCHEDULER_POLICY,
+  defaultsRules: NO_DEFAULTS_RULES,
   setInstallInPlace: () => undefined,
 };
 

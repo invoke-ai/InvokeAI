@@ -499,6 +499,48 @@ describe('runCanvasInvocation', () => {
     expect(submitted[0]?.graph.backendGraph?.nodes.canvas_processing_output).not.toHaveProperty('init_image');
   });
 
+  it('uses actual frame alpha for a hosted-provider init image budget with identical layer geometry', async () => {
+    const model: GenerateModelConfig = {
+      ...externalModel,
+      name: 'Seedream',
+      provider_id: 'seedream',
+      provider_model_id: 'seedream-4-5-251128',
+      capabilities: { modes: ['txt2img', 'img2img'], supports_reference_images: true, max_reference_images: 14 },
+    };
+    const generateValues = {
+      referenceImages: Array.from({ length: 14 }, (_, i) => ({
+        id: `ref-${i}`,
+        isEnabled: true,
+        config: {
+          type: 'external_reference_image',
+          image: {
+            imageName: `ref-${i}.png`,
+            width: 512,
+            height: 512,
+            original: { image: { image_name: `ref-${i}.png`, width: 512, height: 512 } },
+          },
+        },
+      })),
+    };
+    const document = makeDoc([rasterLayer('same-layer')]);
+    const transparent = makeHarness({ alpha: 0, document, generateValues, model });
+    await runCanvasInvocation(transparent.deps);
+
+    expect(transparent.notices()).toEqual([]);
+    expect(transparent.submittedGraphs()).toHaveLength(1);
+    const output = transparent.submittedGraphs()[0]?.graph.backendGraph?.nodes.canvas_processing_output;
+    expect(output).toMatchObject({ mode: 'txt2img' });
+    expect(output).not.toHaveProperty('init_image');
+
+    const opaque = makeHarness({ alpha: 255, document, generateValues, model });
+    await runCanvasInvocation(opaque.deps);
+
+    expect(opaque.submittedGraphs()).toEqual([]);
+    expect(opaque.notices()).toMatchObject([
+      { message: 'Seedream supports at most 15 images total (reference + init + output), got 16.' },
+    ]);
+  });
+
   it('discards provisional dedupe entries when synchronous queue dispatch fails', async () => {
     const dispatch = vi.fn((action: WorkbenchAction) => {
       if (action.type === 'submitCanvasInvocationSnapshot') {
