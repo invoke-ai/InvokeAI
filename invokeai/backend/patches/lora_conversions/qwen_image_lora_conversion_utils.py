@@ -49,7 +49,8 @@ _DIFFUSERS_TEXT_ENCODER_PREFIXES = (
 _MLP: ParsingTree = {"gate_proj": {}, "up_proj": {}, "down_proj": {}}
 
 # Linear modules of Qwen2_5_VLForConditionalGeneration (transformers >= 4.52 layout). Kohya keys flatten the dots to
-# underscores, and some module names contain underscores themselves, so the tree is what tells them apart.
+# underscores, and some module names contain underscores themselves, so the tree is what tells them apart. `lm_head` is
+# left out: the encoder is loaded without it, so its LoRA layers have nothing to patch.
 _KOHYA_TEXT_ENCODER_TREE: ParsingTree = {
     "model": {
         "language_model": {
@@ -65,7 +66,6 @@ _KOHYA_TEXT_ENCODER_TREE: ParsingTree = {
             "merger": {"mlp": {"0": {}, "2": {}}},
         },
     },
-    "lm_head": {},
 }
 
 # Prefixes of the flattened (Kohya-style) spellings: Kohya's, LyCORIS' own, and ai-toolkit's.

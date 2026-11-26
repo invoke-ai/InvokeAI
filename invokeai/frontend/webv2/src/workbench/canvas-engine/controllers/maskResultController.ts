@@ -2,11 +2,12 @@ import type { CommitMaskImageResult, CommitMaskImageResultOptions } from '@workb
 
 import { getDocumentLayer, getDocumentLeaves } from '@workbench/canvas-engine/document/documentIndex';
 import {
+  advanceMaskFillColors,
   createInpaintMaskFromImage,
   createRegionalGuidanceFromImage,
   DEFAULT_INPAINT_MASK_FILL,
   nextInpaintMaskName,
-  nextRegionalGuidanceFillColor,
+  nextMaskFillColor,
   nextRegionalGuidanceName,
 } from '@workbench/canvas-engine/document/layerFactories';
 import { collectHistoryMediaRefs, HISTORY_ENTRY_OVERHEAD_BYTES } from '@workbench/canvas-engine/history/history';
@@ -73,12 +74,13 @@ export class MaskResultController {
     if (options.signal?.aborted) {
       return Promise.resolve({ status: 'aborted' });
     }
-    const names = getDocumentLeaves(document).map((layer) => layer.name);
+    const layers = getDocumentLeaves(document);
+    const names = layers.map((layer) => layer.name);
     const layerId = o.ctx.createLayerId();
     const layer =
       options.target === 'inpaint_mask'
         ? createInpaintMaskFromImage({
-            fill: DEFAULT_INPAINT_MASK_FILL,
+            fill: { ...DEFAULT_INPAINT_MASK_FILL, color: nextMaskFillColor('inpaint_mask', 0, layers) },
             id: layerId,
             image: options.image,
             name: nextInpaintMaskName(names),
@@ -86,9 +88,7 @@ export class MaskResultController {
           })
         : createRegionalGuidanceFromImage({
             fill: {
-              color: nextRegionalGuidanceFillColor(
-                getDocumentLeaves(document).filter((candidate) => candidate.type === 'regional_guidance').length
-              ),
+              color: nextMaskFillColor('regional_guidance', 0, layers),
               style: 'solid',
             },
             id: layerId,
@@ -115,9 +115,11 @@ export class MaskResultController {
           undo: () => o.ctx.applyStep(removeLayerStep(layerId, selectedLayerId)),
         }
       );
-      return Promise.resolve(
-        result.status === 'committed' ? { layerId, status: 'committed' } : { status: guardedResultRefusal(result) }
-      );
+      if (result.status === 'committed') {
+        advanceMaskFillColors(layer.type);
+        return Promise.resolve({ layerId, status: 'committed' });
+      }
+      return Promise.resolve({ status: guardedResultRefusal(result) });
     } finally {
       txn.end();
     }

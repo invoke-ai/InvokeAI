@@ -996,6 +996,15 @@ describe('Color pane', () => {
     await expect.element(foreground).toHaveAttribute('aria-pressed', 'false');
   });
 
+  it('marks a picked default mask swatch as selected', async () => {
+    await mount(SwatchesPane);
+    const swatch = page.getByRole('button', { exact: true, name: '#f59e42' }).first();
+    await act(async () => {
+      await userEvent.click(swatch);
+    });
+    await expect.element(swatch).toHaveAttribute('aria-pressed', 'true');
+  });
+
   it('adds the current color to the project palette and removes it by right-click', async () => {
     await mount(SwatchesPane);
     await act(async () => {
