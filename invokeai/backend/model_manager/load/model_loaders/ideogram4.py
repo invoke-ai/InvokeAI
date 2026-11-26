@@ -57,7 +57,6 @@ from invokeai.backend.quantization.fp8_scaled import (
     read_safetensors_metadata,
     reject_quantized_side_channel,
     safetensors_backend,
-    should_keep_fp8_weights,
     split_fp8_scaled_layers,
     warn_on_unattached_scales,
 )
@@ -416,6 +415,8 @@ class Ideogram4CheckpointModel(ModelLoader):
     nvfp4 is refused at identification, not here.
     """
 
+    _fp8_checkpoint_submodels = frozenset({SubModelType.Transformer})
+
     def _load_model(
         self,
         config: AnyModelConfig,
@@ -435,8 +436,7 @@ class Ideogram4CheckpointModel(ModelLoader):
 
         model_path = Path(config.path)
         source_tensors_mapped = safetensors_backend(model_path) == "mmap"
-        target_device = TorchDevice.choose_torch_device()
-        model_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
+        _keep, model_dtype = self._storage_format(config, SubModelType.Transformer)
 
         sd: dict[str, torch.Tensor] = load_safetensors_checkpoint(model_path)
 
@@ -567,7 +567,7 @@ class Ideogram4CheckpointModel(ModelLoader):
             # Only where the matmul is what runs. Kept for FP8 Storage alone, *every* layer
             # dequantizes per forward, so the hint decides nothing and the advice below would send a
             # user to override the checkpoint producer for a speedup that cannot happen.
-            if marked and should_keep_fp8_weights(self._torch_device):
+            if marked and self._uses_fp8_compute(self._torch_device):
                 if full_precision_hints_respected():
                     self._logger.info(
                         f"Ideogram 4: {marked} of {len(fp8_layers)} layer(s) are marked "

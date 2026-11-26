@@ -24,7 +24,6 @@ from invokeai.backend.quantization.fp8_scaled import (
     safetensors_backend,
 )
 from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader, unpack_ggml_at_load
-from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.ram import require_ram_headroom, state_dict_cast_bytes
 
 # The geometry of the released ERNIE-Image transformer, from the pipeline's `transformer/config.json`.
@@ -52,6 +51,8 @@ class ErnieImageDiffusersModel(GenericDiffusersLoader):
     from a diffusers pipeline directory.
     """
 
+    _bfloat16_safe = True
+
     def _load_model(
         self,
         config: AnyModelConfig,
@@ -78,8 +79,7 @@ class ErnieImageDiffusersModel(GenericDiffusersLoader):
             result: AnyModel = load_class.from_pretrained(model_path, local_files_only=True)
             return result
 
-        target_device = TorchDevice.choose_torch_device()
-        dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
+        dtype = self._decision(config, submodel_type).dtype
         try:
             result = load_class.from_pretrained(model_path, torch_dtype=dtype, variant=variant, local_files_only=True)
         except OSError as e:
@@ -99,6 +99,10 @@ class ErnieImageCheckpointModel(ModelLoader):
     encoder, VAE and (optional) prompt enhancer are separate models, chosen on the loader node.
     """
 
+    _default_submodel_type = SubModelType.Transformer
+
+    _bfloat16_safe = True
+
     def _load_model(
         self,
         config: AnyModelConfig,
@@ -114,8 +118,7 @@ class ErnieImageCheckpointModel(ModelLoader):
 
         from diffusers import ErnieImageTransformer2DModel
 
-        target_device = TorchDevice.choose_torch_device()
-        model_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
+        model_dtype = self._decision(config, SubModelType.Transformer).dtype
 
         model_path = Path(config.path)
         source_tensors_mapped = safetensors_backend(model_path) == "mmap"
@@ -153,6 +156,9 @@ class ErnieImageGGUFModel(ModelLoader):
     No `fp8_storage` declaration: FP8 Storage is refused for every quantized format by rule.
     """
 
+    _default_submodel_type = SubModelType.Transformer
+    _bfloat16_safe = True
+
     def _load_model(
         self,
         config: AnyModelConfig,
@@ -168,8 +174,7 @@ class ErnieImageGGUFModel(ModelLoader):
 
         from diffusers import ErnieImageTransformer2DModel
 
-        target_device = TorchDevice.choose_torch_device()
-        compute_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
+        compute_dtype = self._decision(config, SubModelType.Transformer).dtype
 
         sd = gguf_sd_loader(Path(config.path), compute_dtype=compute_dtype)
 

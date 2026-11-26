@@ -201,9 +201,9 @@ class _AdmissionModel(torch.nn.Module):
 
 class _FileLoader(ModelLoader):
     def __init__(self, cache, path, layout):
-        self._ram_cache = cache
-        self._logger = logging.getLogger(__name__)
-        self._app_config = SimpleNamespace(log_memory_usage=False, models_path=path.parent)
+        super().__init__(
+            SimpleNamespace(log_memory_usage=False, models_path=path.parent), logging.getLogger(__name__), cache
+        )
         self.layout = layout
         self.disk_loads = 0
 

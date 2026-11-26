@@ -625,11 +625,26 @@ class TestTorchaoFp8Checkpoint:
         monkeypatch.setattr(
             loader_module.TorchDevice, "choose_bfloat16_safe_dtype", staticmethod(lambda _device: dtype)
         )
-        loader._should_use_fp8 = lambda _config, _submodel=None: keep_fp8
-        if fp8_compute_only:
-            loader._keep_fp8_weights = lambda _config, _submodel=None: True
-        config = Main_Checkpoint_MossImage_Config.model_construct(path=str(path), name="moss")
+        monkeypatch.setattr(load_default, "_device_supports_fp8_storage", lambda *_args: True)
+        monkeypatch.setattr(load_default, "should_keep_fp8_weights", lambda _device: fp8_compute_only)
+        config = Main_Checkpoint_MossImage_Config.model_construct(
+            path=str(path), name="moss", default_settings=MainModelDefaultSettings(fp8_storage=keep_fp8)
+        )
         return loader._load_model(config, SubModelType.Transformer), loader, loaded
+
+    @pytest.mark.parametrize(
+        ("storage", "compute", "expected"),
+        [(False, False, "full-float32"), (False, True, "fp8-float32"), (True, False, "fp8-float32-layerwise")],
+    )
+    def test_checkpoint_cache_identity_matches_the_loaded_fp8_format(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, storage: bool, compute: bool, expected: str
+    ) -> None:
+        path, _, _ = self._file(tmp_path)
+        model, loader, _ = self._load(monkeypatch, path, keep_fp8=storage, fp8_compute_only=compute)
+        config = loader._load_decision.config
+        key = loader._get_cache_key(config, SubModelType.Transformer)
+        assert key.endswith(f":transformer:storage={expected}")
+        assert (model.layers[0].proj["k"].weight.dtype is torch.float8_e4m3fn) == (storage or compute)
 
     @pytest.mark.parametrize("prefix", ["", "model.diffusion_model."])
     def test_with_fp8_storage_the_file_keeps_its_fp8_layers_and_the_dense_remainder_stays_dense(

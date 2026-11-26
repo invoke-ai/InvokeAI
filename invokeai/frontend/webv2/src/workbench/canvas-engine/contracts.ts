@@ -266,7 +266,7 @@ export interface CanvasControlAdapterContract {
 }
 
 export interface CanvasMaskFillContract {
-  style: 'solid' | 'grid' | 'crosshatch' | 'diagonal' | 'horizontal' | 'vertical';
+  style: 'solid' | 'grid' | 'crosshatch' | 'diagonal' | 'diagonal_left' | 'horizontal' | 'vertical';
   color: string;
 }
 
@@ -453,12 +453,12 @@ export interface CanvasDocumentContractV3 {
   /**
    * Schema this document needs: 3 for plain content, 4 for custom-font typography, 5 for noise or spatial
    * (clarity, texture, dehaze) adjustments, 6 for control-layer derivation fields, 7 for vector geometry and
-   * layer appearance. Each mutation
+   * layer appearance, 8 for a Diagonal Left regenerate region on a raster layer. Each mutation
    * raises it to the newer of its content's need and the canvas state's version. A restored snapshot keeps its own,
    * possibly lower, version until the next mutation; the state's version and the project's compatibility floor stay
    * put meanwhile.
    */
-  version: 3 | 4 | 5 | 6 | 7;
+  version: 3 | 4 | 5 | 6 | 7 | 8;
   width: number;
   height: number;
   background: 'transparent' | { color: string };
@@ -489,10 +489,10 @@ export interface CanvasStateContractV3 {
   /**
    * Newest schema the state needs: the newest of its previous version, the live document's and every snapshot's
    * (3 plain, 4 custom-font typography, 5 noise or spatial adjustments, 6 control-layer derivation fields,
-   * 7 vector geometry and layer appearance). Sticky:
+   * 7 vector geometry and layer appearance, 8 Diagonal Left raster regenerate regions). Sticky:
    * removing that content never lowers it.
    */
-  version: 3 | 4 | 5 | 6 | 7;
+  version: 3 | 4 | 5 | 6 | 7 | 8;
   document: CanvasDocumentContractV3;
   /** Wholesale-replacement counter; the mirror clears pixel history on change, even with reused ids. */
   documentRevision: number;

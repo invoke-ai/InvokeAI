@@ -72,7 +72,6 @@ from invokeai.backend.model_manager.configs.vae import VAE_Checkpoint_Config_Bas
 from invokeai.backend.model_manager.load.fp8_capability import Unimplemented
 from invokeai.backend.model_manager.load.load_default import (
     ModelLoader,
-    _device_supports_fp8_storage,
     _model_declared_skip_patterns,
     resolve_submodel_path,
 )
@@ -121,7 +120,6 @@ from invokeai.backend.quantization.fp8_scaled import (
     read_safetensors_metadata,
     reject_quantized_side_channel,
     safetensors_backend,
-    should_keep_fp8_weights,
     split_fp8_scaled_layers,
     strip_layer_path_prefix,
     warn_on_unattached_scales,
@@ -805,24 +803,16 @@ class T5EncoderSingleFileLoader(ModelLoader):
             return _bundled_t5_tokenizer_size()
         return super().get_size_fs(config, model_path, submodel_type)
 
-    def _storage_format(
-        self, config: AnyModelConfig, submodel_type: Optional[SubModelType]
-    ) -> tuple[bool, torch.dtype]:
-        """Whether Linear weights stay float8, and the dtype everything else is held and computed in.
+    _fp8_checkpoint_submodels = frozenset({SubModelType.TextEncoder2, SubModelType.TextEncoder3})
+    _encoder_fp8_storage = True
 
-        Decided once per loader (a fresh one serves each load): the cache key and the stored format must agree,
-        and the capability probes can flip between the key computation and the build under the load lock.
-        """
-        device = self._get_execution_device(config, submodel_type) or self._torch_device
-        decisions = self.__dict__.setdefault("_storage_format_decisions", {})
-        if device not in decisions:
-            keep_fp8 = should_keep_fp8_weights(device) or _device_supports_fp8_storage(device, self._logger)
-            decisions[device] = (keep_fp8, t5_dtype_for_device(device))
-        return decisions[device]
+    def _select_model_dtype(
+        self, config: AnyModelConfig, submodel_type: Optional[SubModelType], device: torch.device
+    ) -> torch.dtype:
+        return t5_dtype_for_device(device)
 
     def _cache_key_variant(self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> str:
-        # Both the float8 decision and the dtype depend on the device, and device caches share one canonical CPU
-        # copy per key: a device must not adopt a format or dtype it would not have built itself.
+        # Both the float8 decision and dtype depend on the device, and the cache must match the selected storage.
         if submodel_type in (SubModelType.TextEncoder2, SubModelType.TextEncoder3):
             keep_fp8, dtype = self._storage_format(config, submodel_type)
             return f"{'fp8-' if keep_fp8 else ''}{str(dtype).removeprefix('torch.')}"
@@ -936,6 +926,10 @@ def _transformer_of_flux_bundle(names: dict[str, str]) -> dict[str, str]:
 @ModelLoaderRegistry.register(base=BaseModelType.Flux, type=ModelType.Main, format=ModelFormat.Checkpoint)
 class FluxCheckpointModel(ModelLoader):
     """Class to load main models."""
+
+    _fp8_checkpoint_submodels = frozenset({SubModelType.Transformer})
+
+    _fixed_dtype = torch.bfloat16
 
     def _load_model(
         self,
@@ -1217,6 +1211,8 @@ class FluxBnbQuantizednf4bCheckpointModel(ModelLoader):
 class FluxDiffusersModel(GenericDiffusersLoader):
     """Class to load FLUX.1 main models in diffusers format."""
 
+    _fixed_dtype = torch.bfloat16
+
     def _load_model(
         self,
         config: AnyModelConfig,
@@ -1235,7 +1231,7 @@ class FluxDiffusersModel(GenericDiffusersLoader):
         model_path = model_path / submodel_type.value
 
         # We force bfloat16 for FLUX models. This is required for correct inference.
-        dtype = torch.bfloat16
+        dtype = self._decision(config, submodel_type).dtype
         try:
             result: AnyModel = load_class.from_pretrained(
                 model_path,
@@ -1258,6 +1254,8 @@ class FluxDiffusersModel(GenericDiffusersLoader):
 @ModelLoaderRegistry.register(base=BaseModelType.Flux2, type=ModelType.Main, format=ModelFormat.Diffusers)
 class Flux2DiffusersModel(GenericDiffusersLoader):
     """Class to load FLUX.2 main models in diffusers format (e.g. FLUX.2 Klein)."""
+
+    _fixed_dtype = torch.bfloat16
 
     def _load_model(
         self,
@@ -1282,7 +1280,7 @@ class Flux2DiffusersModel(GenericDiffusersLoader):
         # won't be in the checkpoint but the model class still creates them.
         # We use SilenceWarnings to suppress the "guidance_embeds is not expected" warning
         # from diffusers Flux2Transformer2DModel.
-        dtype = torch.bfloat16
+        dtype = self._decision(config, submodel_type).dtype
         with SilenceWarnings():
             try:
                 result: AnyModel = load_class.from_pretrained(
@@ -1335,6 +1333,10 @@ class Flux2DiffusersModel(GenericDiffusersLoader):
 @ModelLoaderRegistry.register(base=BaseModelType.Flux2, type=ModelType.Main, format=ModelFormat.Checkpoint)
 class Flux2CheckpointModel(ModelLoader):
     """Class to load FLUX.2 transformer models from single-file checkpoints (safetensors)."""
+
+    _fp8_checkpoint_submodels = frozenset({SubModelType.Transformer})
+
+    _fixed_dtype = torch.bfloat16
 
     def _load_model(
         self,

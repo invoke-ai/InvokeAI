@@ -17,6 +17,7 @@ import torch
 from safetensors.torch import load_file, save_file
 
 from invokeai.backend.model_manager.configs.mistral_encoder import MistralEncoder_Checkpoint_Config
+from invokeai.backend.model_manager.load import load_default
 from invokeai.backend.model_manager.load.model_loaders import mistral_encoder
 from invokeai.backend.model_manager.load.model_loaders.mistral_encoder import MistralEncoderCheckpointLoader
 from invokeai.backend.model_manager.taxonomy import MistralVariantType
@@ -136,7 +137,7 @@ def _fp8_matmul(available: bool):
     asking stay green."""
 
     def geometry(patch):
-        patch.setattr(mistral_encoder, "should_keep_fp8_weights", lambda _device: available)
+        patch.setattr(load_default, "should_keep_fp8_weights", lambda _device: available)
 
     return geometry
 

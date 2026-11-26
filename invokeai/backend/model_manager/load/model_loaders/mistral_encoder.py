@@ -46,7 +46,6 @@ from invokeai.backend.model_manager.configs.mistral_encoder import (
 )
 from invokeai.backend.model_manager.load.load_default import (
     ModelLoader,
-    _device_supports_fp8_storage,
     _model_declared_skip_patterns,
 )
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
@@ -87,7 +86,6 @@ from invokeai.backend.quantization.fp8_scaled import (
     read_safetensors_metadata,
     reject_undecoded_mx_scale,
     safetensors_backend,
-    should_keep_fp8_weights,
     split_fp8_scaled_layers,
     strip_layer_path_prefix,
     warn_on_unattached_scales,
@@ -1261,6 +1259,9 @@ class MistralEncoderCheckpointLoader(ModelLoader):
             return _mistral_tokenizer_host_bytes_needed(model_path)
         return super()._get_host_bytes_needed(config, model_path, submodel_type)
 
+    _fp8_checkpoint_submodels = frozenset({SubModelType.TextEncoder})
+    _encoder_fp8_storage = True
+
     def _load_model(
         self,
         config: AnyModelConfig,
@@ -1283,8 +1284,7 @@ class MistralEncoderCheckpointLoader(ModelLoader):
 
     def _load_text_encoder(self, config: MistralEncoder_Checkpoint_Config) -> AnyModel:
         logger = InvokeAILogger.get_logger(self.__class__.__name__)
-        target_device = TorchDevice.choose_torch_device()
-        model_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
+        keep_fp8, model_dtype = self._storage_format(config, SubModelType.TextEncoder)
 
         model_path = Path(config.path)
 
@@ -1343,7 +1343,6 @@ class MistralEncoderCheckpointLoader(ModelLoader):
         # placed after it would never run on the device almost everyone loads on.
         reject_int8_layers_a_plain_fold_cannot_decode(sd, "This Mistral encoder checkpoint")
 
-        keep_fp8 = should_keep_fp8_weights(target_device) or _device_supports_fp8_storage(target_device, logger)
         fp8_layers: dict[str, Any] = {}
         if keep_fp8:
             layer_hints = {**extract_comfy_quant_hints(sd), **header_hints}

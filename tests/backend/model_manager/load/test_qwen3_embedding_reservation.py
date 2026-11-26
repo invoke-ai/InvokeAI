@@ -95,7 +95,7 @@ def test_qwen3_loader_reserves_live_storage_before_embedding_decode(monkeypatch,
         else:
             loader = object.__new__(z_image.ZImageDiffusersModel)
             loader._ram_cache = cache
-            model = loader._load_sdnq_text_encoder(path)
+            model = loader._load_sdnq_text_encoder(path, torch.float32)
 
         output_bytes = VOCAB * HIDDEN * torch.float32.itemsize
         decode_budget = 7 * output_bytes if kind == "gguf" else 6 * output_bytes

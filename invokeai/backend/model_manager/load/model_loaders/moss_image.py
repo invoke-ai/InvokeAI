@@ -208,6 +208,8 @@ def _reject_other_quantization_beside_torchao(sd: Mapping[str, Any], what: str) 
 class _MossImageTransformerLoading(ModelLoader):
     """The transformer load both MOSS-Image formats share, once each has a state dict and a geometry."""
 
+    _bfloat16_safe = True
+
     def _load_transformer(
         self,
         config: AnyModelConfig,
@@ -224,7 +226,7 @@ class _MossImageTransformerLoading(ModelLoader):
         markers = extract_int8_convrot_markers(sd)
         # Outside the int8 branch, so an int8 weight whose marker is missing or unreadable is refused, not cast as codes.
         reject_unmarked_int8_weights(sd, markers, "MOSS-Image")
-        dtype = TorchDevice.choose_bfloat16_safe_dtype(TorchDevice.choose_torch_device())
+        dtype = self._decision(config, SubModelType.Transformer).dtype
 
         with accelerate.init_empty_weights():
             model = MOSSImageTransformer(**geometry)
@@ -307,6 +309,15 @@ class _MossImageTransformerLoading(ModelLoader):
 class MossImageDiffusersModel(_MossImageTransformerLoading):
     """Loads MOSS-Image submodels from a diffusers pipeline folder (MOSS-Image Base or SFT)."""
 
+    _fp8_checkpoint_submodels = frozenset({SubModelType.TextEncoder})
+
+    def _select_model_dtype(
+        self, config: AnyModelConfig, submodel_type: Optional[SubModelType], device: torch.device
+    ) -> torch.dtype:
+        if submodel_type is SubModelType.VAE:
+            return TorchDevice.dtype_avoiding_float16(self._torch_dtype, device)
+        return super()._select_model_dtype(config, submodel_type, device)
+
     def _load_model(self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> AnyModel:
         if not isinstance(config, Main_Diffusers_MossImage_Config):
             raise ValueError(f"Expected Main_Diffusers_MossImage_Config, got {type(config).__name__}.")
@@ -338,7 +349,7 @@ class MossImageDiffusersModel(_MossImageTransformerLoading):
 
                 # The FLUX.2 VAE loaders' dtype: never float16, in which the FLUX autoencoders break.
                 return AutoencoderKLFlux2.from_pretrained(
-                    model_path / "vae", torch_dtype=self._torch_dtype_avoiding_float16(), local_files_only=True
+                    model_path / "vae", torch_dtype=self._decision(config, submodel_type).dtype, local_files_only=True
                 )
 
         raise ValueError(
@@ -356,14 +367,16 @@ class MossImageDiffusersModel(_MossImageTransformerLoading):
         shards = list(moss_image_component_shards(text_encoder_dir))
         # No FP8 Storage cast follows: text encoders never take it (`_FP8_EXCLUDED_SUBMODEL_TYPES`). `keep_fp8` only
         # keeps a raw-fp8 checkpoint packed for the fp8 matmul.
+        keep_fp8, model_dtype = self._storage_format(config, SubModelType.TextEncoder)
         return load_qwen3_5_text_encoder(
             self,
             shards,
             text_config,
             # MOSS-Image reads the last hidden state, after the final norm.
             final_norm=True,
-            keep_fp8=self._keep_fp8_weights(config, SubModelType.TextEncoder),
+            keep_fp8=keep_fp8,
             what=f"MOSS-Image text encoder in {Path(config.path).name}",
+            model_dtype=model_dtype,
         )
 
 
@@ -374,6 +387,9 @@ class MossImageCheckpointModel(_MossImageTransformerLoading):
     The file holds the transformer alone, under the diffusers checkpoint's keys. Its text encoder and VAE are separate
     models, chosen on the loader node.
     """
+
+    _default_submodel_type = SubModelType.Transformer
+    _fp8_checkpoint_submodels = frozenset({SubModelType.Transformer})
 
     def _load_model(self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> AnyModel:
         if not isinstance(config, Main_Checkpoint_MossImage_Config):

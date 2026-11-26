@@ -4,6 +4,8 @@ Paths are relative to the webv2 `src/` directory.
 
 `features/models/data/modelsStore.ts` owns the shared catalog snapshot and by-key index. List refreshes are single-flight with at most one queued trailing read. Local model replacement, narrow patches (including optimistic rollback), deletion, and cover changes advance a mutation generation. A read started before that generation cannot replace the catalog or publish an obsolete error; it queues an authoritative trailing read so unrelated server changes remain visible. Cover URL versions remain local cache-busting state. Only successful mutation callers apply confirmed changes; a failed request alone does not supersede a valid read.
 
+The catalog keeps the server's order, because features read `models` and take the first match. Install order is a separate read of the same listing (`order_by=created_at`) into `dateAddedRanks`, a key-to-rank map. It starts once the library's Date added sort asks for it (`ensureDateAddedOrderLoaded`) and then runs inside each refresh, so the ranks and the catalog come from the same refresh; a failed order read keeps the previous ranks and is reported to whoever asked. A model the ranks do not list sorts as the newest, and until the ranks load that sort lists by name.
+
 Account reset clears the catalog and flight state. Responses from an earlier account lifetime cannot update the current catalog or schedule reads for it.
 
 ## Architecture table

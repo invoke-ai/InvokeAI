@@ -63,8 +63,7 @@ def _load_standalone(root: Path) -> torch.nn.Module:
 def _load_from_main_model(root: Path) -> torch.nn.Module:
     index = {"text_encoder": ["transformers", "Qwen2_5_VLForConditionalGeneration"]}
     (root / "model_index.json").write_text(json.dumps(index))
-    loader = object.__new__(QwenImageDiffusersModel)
-    loader._logger = MagicMock()
+    loader = QwenImageDiffusersModel(MagicMock(), MagicMock(), MagicMock())
     config = Main_Diffusers_QwenImage_Config.model_construct(path=str(root), repo_variant=None)
     return loader._load_model(config, SubModelType.TextEncoder)
 
