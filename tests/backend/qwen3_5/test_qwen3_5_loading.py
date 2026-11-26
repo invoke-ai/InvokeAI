@@ -478,7 +478,12 @@ def test_a_shard_with_float8_weights_is_read_into_owned_storage_and_a_plain_shar
     assert backends == {fp8_shard: "pread", plain_shard: "mmap"}
 
 
-def test_the_bundled_tokenizer_is_not_sized_as_the_whole_file(tmp_path: Path, loader) -> None:
+def test_the_bundled_tokenizer_is_not_sized_as_the_whole_file(
+    tmp_path: Path, loader, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from invokeai.backend.qwen3_5.qwen3_5_encoder import load_bundled_qwen3_5_tokenizer
+
+    monkeypatch.setattr(load_bundled_qwen3_5_tokenizer, "cache_info", lambda: MagicMock(currsize=0))
     path = tmp_path / "encoder.safetensors"
     save_file(_random({"language_model.embed_tokens.weight": [64, 32]}), path)
     config = Qwen35Encoder_Checkpoint_Config.model_construct(path=str(path), name="encoder")
