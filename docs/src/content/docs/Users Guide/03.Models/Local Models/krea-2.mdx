@@ -195,9 +195,11 @@ feeding the **Style Reference** input of **Denoise - Krea-2**.
 
 ## LoRA
 
-Krea-2 LoRAs (diffusers PEFT format) are supported and apply to both the transformer and — where the
-LoRA includes text-encoder layers — the Qwen3-VL encoder. On quantized builds (GGUF, int8, int4, NVFP4) the LoRA
-is applied alongside the packed weights rather than merged into them. LoRAs trained to edit an input image
+Krea-2 LoRAs are supported in the diffusers PEFT, ComfyUI (`diffusion_model.`), fal trainer
+(`base_model.model.` on the native module names) and kohya/LyCORIS layouts, including LoKR and DoRA. Full (`diff`)
+layers and `diff_b` bias deltas, as in Comfy-Org's Turbo LoRA, are applied too. LoRAs apply to both the transformer
+and — where the LoRA includes text-encoder layers — the Qwen3-VL encoder. On quantized builds (GGUF, int8, int4,
+NVFP4) the LoRA is applied alongside the packed weights rather than merged into them. LoRAs trained to edit an input image
 need reference images; see [Edit LoRAs](#edit-loras-and-reference-images).
 
 ## Edit LoRAs and reference images

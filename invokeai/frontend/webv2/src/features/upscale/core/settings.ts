@@ -44,7 +44,7 @@ import {
   sanitizeBatchCount,
   servesAsType,
 } from '@features/generation/settings';
-import { hasArchitectureCapabilities } from '@features/models/architectures';
+import { hasArchitectureCapabilities, isFluxFillModel } from '@features/models/architectures';
 import { isSeedMode, SEED_MAX } from '@platform/core/seed';
 
 import type { SpandrelModelConfig, TileControlNetModelConfig, UpscaleMode, UpscaleWidgetValues } from './types';
@@ -847,7 +847,7 @@ export const getUpscaleValidationIssues = (
   }
 
   // `flux_denoise` refuses a Fill model without fill conditioning, which an upscale never supplies.
-  if (values.model?.base === 'flux' && values.model.variant === 'dev_fill') {
+  if (values.model && isFluxFillModel(values.model)) {
     issues.push({ message: 'Upscale cannot use a FLUX Fill model.', section: 'generation' });
   }
   // Without a reference, `qwen_image_denoise` gives Edit a zero reference doubling image tokens: ~3x time for nothing.

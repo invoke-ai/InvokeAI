@@ -12,6 +12,8 @@ import {
   getDefaultGenerateSettings,
   getGenerationUiPolicy,
   getGuidanceBoundReason,
+  getGuidanceInputMax,
+  getGuidanceSliderMax,
   getSchedulerOptions,
 } from '@features/generation/core/baseGenerationPolicies';
 import { getEffectivePrompts } from '@features/generation/core/promptTemplates';
@@ -78,10 +80,6 @@ const TIMESTEP_SHIFT_MARKS = [{ label: String(DEFAULT_TIMESTEP_SHIFT), value: DE
 /** The exponent's `le=1000` bound is far beyond any documented recipe (0.5–2), so the track stops at 10. */
 const DYPE_EXPONENT_SLIDER_MAX = 10;
 const formatPercent = (value: number): string => `${value}%`;
-
-/** Slider tracks are practical ranges, not input bounds: FLUX Fill's default of 30 exceeds its track. */
-const GUIDANCE_SLIDER_MAX = 10;
-const GUIDANCE_INPUT_MAX = 100;
 
 interface GenerateRenderSectionProps {
   draft: GenerateDraft;
@@ -644,8 +642,8 @@ export const GenerateRenderSection = ({
   const guidanceLabel = isIdeogram4 ? t('widgets.generate.ideogram4GuidanceScale') : uiPolicy.guidanceLabel;
 
   // Cap both input and track at the architecture ceiling without crossing the floor.
-  const guidanceInputMax = uiPolicy.guidanceMax ?? GUIDANCE_INPUT_MAX;
-  const guidanceSliderMax = Math.max(uiPolicy.guidanceMin, Math.min(GUIDANCE_SLIDER_MAX, guidanceInputMax));
+  const guidanceInputMax = getGuidanceInputMax(uiPolicy.guidanceMax);
+  const guidanceSliderMax = getGuidanceSliderMax(uiPolicy.guidanceMin, uiPolicy.guidanceMax);
   // Validate recalled/persisted values inline because they bypass model-selection clamps.
   const guidanceError = selectedModel ? getGuidanceBoundReason(selectedModel, settings.cfgScale) : null;
 
