@@ -79,6 +79,8 @@ def test_gguf_adaln_conversion_is_admitted_before_decode_and_concat(monkeypatch,
         )
     )
     loader = object.__new__(Flux3GGUFCheckpointModel)
+    loader._torch_device = torch.device("cpu")
+    loader._torch_dtype = torch.float32
     loader._ram_cache = SimpleNamespace(make_room=make_room)
     loader._logger = MagicMock()
     config = Main_GGUF_Flux3_Config.model_construct(path=str(path), name="flux3", variant=_variant(True))

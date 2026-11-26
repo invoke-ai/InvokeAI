@@ -120,8 +120,8 @@ def test_failed_ram_admission_stops_before_the_checkpoint_cast(monkeypatch: pyte
     monkeypatch.setattr(loader_module, "ERNIE_IMAGE_TRANSFORMER_CONFIG", TINY_TRANSFORMER_CONFIG)
     checkpoint = tmp_path / "ernie-image.safetensors"
     _tiny_checkpoint(checkpoint)
-    loader, ram_cache = _loader(monkeypatch)
-    ram_cache.make_room.return_value = SimpleNamespace(ram_headroom_satisfied=False)
+    loader, _ = _loader(monkeypatch)
+    loader._ram_cache.make_room.return_value = SimpleNamespace(ram_headroom_satisfied=False)
     config = Main_Checkpoint_ErnieImage_Config.model_construct(path=str(checkpoint), name="ernie-image")
 
     with pytest.raises(MemoryError, match="host memory"):

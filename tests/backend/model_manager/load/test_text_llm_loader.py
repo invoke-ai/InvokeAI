@@ -597,6 +597,7 @@ class TestTheFolderLoader:
         loader._app_config = SimpleNamespace(log_memory_usage=False)
         loader._logger = MagicMock()
         loader._torch_device = torch.device("cpu")
+        loader._torch_dtype = torch.float32
         loader._ram_cache = MagicMock()
         loader._ram_cache.get_with_first_use_claim.side_effect = IndexError
         loader._ram_cache.shared_cpu_weights = None

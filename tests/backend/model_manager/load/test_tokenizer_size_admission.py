@@ -48,7 +48,10 @@ def _file_of_size(path: Path, size: int) -> Path:
 
 
 def _loader(cls: type):
-    return object.__new__(cls)
+    loader = object.__new__(cls)
+    loader._torch_dtype = torch.float32
+    loader._torch_device = torch.device("cpu")
+    return loader
 
 
 @pytest.mark.parametrize(

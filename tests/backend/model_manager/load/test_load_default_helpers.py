@@ -168,7 +168,10 @@ class TestGetSizeFs:
     def _loader(self):
         from invokeai.backend.model_manager.load.load_default import ModelLoader
 
-        return ModelLoader.__new__(ModelLoader)
+        loader = ModelLoader.__new__(ModelLoader)
+        loader._torch_dtype = torch.float32
+        loader._torch_device = torch.device("cpu")
+        return loader
 
     def _component(self, root: Path, name: str, size: int) -> Path:
         folder = root / name
@@ -366,6 +369,8 @@ def test_cold_load_refuses_before_model_construction_when_host_headroom_is_insuf
         logger=MagicMock(),
     )
     loader = ModelLoader.__new__(ModelLoader)
+    loader._torch_dtype = torch.float32
+    loader._torch_device = torch.device("cpu")
     loader._ram_cache = cache
     loader._app_config = SimpleNamespace(log_memory_usage=False)
     loader._logger = MagicMock()
