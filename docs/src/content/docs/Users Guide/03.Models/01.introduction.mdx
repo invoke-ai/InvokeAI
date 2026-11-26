@@ -1,7 +1,7 @@
 ---
 title: Managing media generation models
 description: Install, add API keys for, edit and maintain image and video models in the Model Manager.
-lastUpdated: 2026-10-26
+lastUpdated: 2026-11-10
 ---
 
 import { Card, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
@@ -81,6 +81,8 @@ The Model Manager is for administrators: in [multi-user mode](/configuration/mul
 
 </Steps>
 
+Use **Visit source** on a starter model to open its model page in a new tab. If it has several source pages, choose one from the menu. These links stay in the installed model's details after downloading, including for dependencies installed with it.
+
 Until a model that can generate is installed, the Launchpad's **Home** page says so. Administrators can install the recommended starter bundle there in one click (it says what the bundle suits and links the hardware requirements) or open another bundle in the Model Manager; other users see a notice to ask an administrator. Home also counts installs that failed or need attention, with **Review** to open the install queue.
 
 ## Other ways to install
@@ -105,7 +107,7 @@ Add `::` and the subfolder to the repo ID. For the model in the `v2` folder of `
 :::
 
 :::note[Gated and login-only downloads]
-Some HuggingFace repos are gated and some Civitai models need a login. Add a **HuggingFace** token (stored on the server and checked with HuggingFace) or a **Civitai** key (stored in this browser only, attached to civitai.com downloads) under **API Keys**, and accept the model's license on its download page if asked. An install that is missing a token offers **Add token** in the install queue.
+Some HuggingFace repos are gated and some Civitai models need a login. Add a **HuggingFace** token (stored on the server and checked with HuggingFace) or a **Civitai** key (stored in this browser only, attached to civitai.com and civitai.red downloads) under **API Keys**, and accept the model's license on its download page if asked. An install that is missing a token offers **Add token** in the install queue.
 :::
 
 ## External models

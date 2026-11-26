@@ -33,8 +33,6 @@ import {
 import { lazy, Suspense, useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import type { VectorPathMenuTarget } from './VectorPathContextMenu';
-
 import { useModelGridSize } from './bboxGrid';
 import { CanvasBottomOverlay } from './CanvasBottomOverlay';
 import { copyCanvasSelection, decodeImageBlob, readClipboardImage } from './canvasClipboard';
@@ -54,6 +52,7 @@ import { CANVAS_ONLY_HOTKEYS, executeCanvasHotkeyCommand } from './canvasHotkeyC
 import { findCanvasImageDropDestination, resolveCanvasImageDrop, type CanvasImageDropData } from './canvasImageDnd';
 import { CanvasImageDropOverlay } from './CanvasImageDropOverlay';
 import { CanvasSaveToGallerySubmenu } from './CanvasSaveToGallerySubmenu';
+import { CanvasScrollInputFeed } from './CanvasScrollInputFeed';
 import {
   CANVAS_SETTINGS,
   CANVAS_SHOW_PROGRESS_KEY,
@@ -87,10 +86,7 @@ import { useStagingRecovery } from './useCanvasRecovery';
 import { useCreateFromBbox } from './useCreateFromBbox';
 import { useStagedResultGallerySave } from './useStagedResultGallerySave';
 import { reportLayerOperation, reportPreparedCommit, reportStructuralCommit } from './useStructuralCommit';
-
-const VectorPathContextMenu = lazy(() =>
-  import('./VectorPathContextMenu').then((module) => ({ default: module.VectorPathContextMenu }))
-);
+import { VectorPathContextMenu, type VectorPathMenuTarget } from './VectorPathContextMenu';
 
 const MissingFontsDialog = lazy(() =>
   import('./MissingFontsDialog').then((module) => ({ default: module.MissingFontsDialog }))
@@ -674,6 +670,9 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
       ) : null}
       <CanvasColorFeed engine={engine} />
       {engine ? <CanvasFrameLockFeed key={`${projectId}:frame-lock`} engine={engine} projectId={projectId} /> : null}
+      {engine ? (
+        <CanvasScrollInputFeed key={`${projectId}:scroll-input`} engine={engine} projectId={projectId} />
+      ) : null}
       {engine ? <CanvasEditRefusalNotices key={`${projectId}:edit-refusals`} engine={engine} /> : null}
       {engine ? (
         <CanvasStagedRegionsFeed key={`${projectId}:staged-regions`} engine={engine} projectId={projectId} />
@@ -698,9 +697,7 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
           <>
             <ToolStrip engine={engine} />
             {vectorMenuTarget ? (
-              <Suspense fallback={null}>
-                <VectorPathContextMenu engine={engine} target={vectorMenuTarget} onClose={closeVectorMenu} />
-              </Suspense>
+              <VectorPathContextMenu engine={engine} target={vectorMenuTarget} onClose={closeVectorMenu} />
             ) : null}
             <CanvasFrameSizeReadout engine={engine} />
             <ControlLayerCanvasOverlay engine={engine} isFileDragActive={fileDrag !== null} />

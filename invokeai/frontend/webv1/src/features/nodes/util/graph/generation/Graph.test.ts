@@ -658,6 +658,7 @@ describe('Graph', () => {
           source_type: 'path',
           source_api_response: null,
           source_url: null,
+          source_urls: [],
           cover_image: null,
           type: 'main',
           trigger_phrases: null,

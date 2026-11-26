@@ -145,6 +145,38 @@ const sdxlCanvasCase = (colorCompensation: boolean) => {
   return { base: 'sdxl' as const, filled, graph, shape };
 };
 
+const fluxFillCanvasCase = () => {
+  const shape: ModelShape = {
+    label: 'canvas-fill-outpaint-masked',
+    overrides: { format: 'checkpoint', variant: 'dev_fill' },
+  };
+  const { filled, model, settings } = satisfiedSettingsFor('flux', shape);
+  const { backendGraph: graph } = compileCanvasGraph({
+    bbox: { height: 1024, width: 1024, x: 0, y: 0 },
+    compositeImageName: 'canvas-input.png',
+    compositing: {
+      coherenceEdgeSize: 16,
+      coherenceMinDenoise: 0,
+      coherenceMode: 'Gaussian Blur',
+      infillColorValue: { a: 1, b: 0, g: 0, r: 0 },
+      infillMethod: 'lama',
+      infillPatchmatchDownscaleSize: 1,
+      infillTileSize: 32,
+      maskBlur: 16,
+      outputOnlyMaskedRegions: false,
+    },
+    destination: 'canvas',
+    maskImageName: 'canvas-mask.png',
+    mode: 'outpaint',
+    model,
+    projectSettings: { useCpuNoise: true, useNsfwChecker: false, useWatermark: false },
+    settings,
+    strength: 1,
+  });
+
+  return { base: 'flux' as const, filled, graph, shape };
+};
+
 const krea2EditCase = () => {
   const { filled, model, settings } = satisfiedSettingsFor('krea-2', KREA2_EDIT_SHAPE);
   const image = { original: { image: { height: 1024, image_name: 'edit-reference.png', width: 1024 } } };
@@ -338,6 +370,7 @@ describe('generate graph coverage', () => {
       refinerCase(),
       sdxlCanvasCase(false),
       sdxlCanvasCase(true),
+      fluxFillCanvasCase(),
       krea2EditCase(),
     ];
 

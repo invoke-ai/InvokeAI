@@ -15,6 +15,7 @@ from invokeai.backend.model_manager.taxonomy import (
 
 # region VAE
 sdxl_fp16_vae_fix = StarterModel(
+    source_urls=["https://huggingface.co/madebyollin/sdxl-vae-fp16-fix"],
     name="sdxl-vae-fp16-fix",
     base=BaseModelType.StableDiffusionXL,
     source="madebyollin/sdxl-vae-fp16-fix",
@@ -23,6 +24,7 @@ sdxl_fp16_vae_fix = StarterModel(
 )
 
 taesdxl = StarterModel(
+    source_urls=["https://huggingface.co/madebyollin/taesdxl"],
     name="TAESDXL (SDXL preview decoder)",
     base=BaseModelType.StableDiffusionXL,
     source="https://huggingface.co/madebyollin/taesdxl/resolve/b20258aaef75ef61e659c1e0f14f251cf0ad153e/taesdxl_decoder.safetensors",
@@ -34,6 +36,7 @@ taesdxl = StarterModel(
 # SDXL uses a 4-channel latent, which is unambiguous (no FLUX/SD3-style directory-name disambiguation needed).
 # NVIDIA ships only the 2K-to-4K preset for SDXL (no plain 2K checkpoint).
 pid_decoder_sdxl_2kto4k = StarterModel(
+    source_urls=["https://huggingface.co/nvidia/PiD"],
     name="PiD Decoder SDXL (2K to 4K)",
     base=BaseModelType.StableDiffusionXL,
     source="nvidia/PiD::checkpoints/PiD_res2kto4k_sr4x_official_sdxl_distill_4step/model_ema_bf16.pth",
@@ -45,6 +48,7 @@ pid_decoder_sdxl_2kto4k = StarterModel(
 )
 
 juggernaut_sdxl = StarterModel(
+    source_urls=["https://huggingface.co/RunDiffusion/Juggernaut-XL-v9"],
     name="Juggernaut XL v9",
     base=BaseModelType.StableDiffusionXL,
     source="RunDiffusion/Juggernaut-XL-v9",
@@ -54,6 +58,7 @@ juggernaut_sdxl = StarterModel(
 )
 
 dreamshaper_sdxl = StarterModel(
+    source_urls=["https://huggingface.co/Lykon/dreamshaper-xl-v2-turbo"],
     name="Dreamshaper XL v2 Turbo",
     base=BaseModelType.StableDiffusionXL,
     source="Lykon/dreamshaper-xl-v2-turbo",
@@ -63,6 +68,7 @@ dreamshaper_sdxl = StarterModel(
 )
 
 archvis_sdxl = StarterModel(
+    source_urls=["https://huggingface.co/SG161222/RealVisXL_V5.0"],
     name="Architecture (RealVisXL5)",
     base=BaseModelType.StableDiffusionXL,
     source="SG161222/RealVisXL_V5.0",
@@ -73,6 +79,7 @@ archvis_sdxl = StarterModel(
 
 # region LoRA
 alien_lora_sdxl = StarterModel(
+    source_urls=["https://huggingface.co/RalFinger/alien-style-lora-sdxl"],
     name="Alien Style",
     base=BaseModelType.StableDiffusionXL,
     source="https://huggingface.co/RalFinger/alien-style-lora-sdxl/resolve/main/alienzkin-sdxl.safetensors",
@@ -81,6 +88,7 @@ alien_lora_sdxl = StarterModel(
 )
 
 noodle_lora_sdxl = StarterModel(
+    source_urls=["https://huggingface.co/RalFinger/noodles-lora-sdxl"],
     name="Noodles Style",
     base=BaseModelType.StableDiffusionXL,
     source="https://huggingface.co/RalFinger/noodles-lora-sdxl/resolve/main/noodlez-sdxl.safetensors",
@@ -89,6 +97,7 @@ noodle_lora_sdxl = StarterModel(
 )
 
 ip_adapter_sdxl = StarterModel(
+    source_urls=["https://huggingface.co/InvokeAI/ip_adapter_sdxl_vit_h"],
     name="Standard Reference (IP Adapter ViT-H)",
     base=BaseModelType.StableDiffusionXL,
     source="https://huggingface.co/InvokeAI/ip_adapter_sdxl_vit_h/resolve/main/ip-adapter_sdxl_vit-h.safetensors",
@@ -99,6 +108,7 @@ ip_adapter_sdxl = StarterModel(
 )
 
 ip_adapter_plus_sdxl = StarterModel(
+    source_urls=["https://huggingface.co/InvokeAI/ip-adapter-plus_sdxl_vit-h"],
     name="Precise Reference (IP Adapter Plus ViT-H)",
     base=BaseModelType.StableDiffusionXL,
     source="https://huggingface.co/InvokeAI/ip-adapter-plus_sdxl_vit-h/resolve/main/ip-adapter-plus_sdxl_vit-h.safetensors",
@@ -109,6 +119,7 @@ ip_adapter_plus_sdxl = StarterModel(
 )
 
 qr_code_cnet_sdxl = StarterModel(
+    source_urls=["https://huggingface.co/monster-labs/control_v1p_sdxl_qrcode_monster"],
     name="QRCode Monster (SDXL)",
     base=BaseModelType.StableDiffusionXL,
     source="monster-labs/control_v1p_sdxl_qrcode_monster",
@@ -117,6 +128,7 @@ qr_code_cnet_sdxl = StarterModel(
 )
 
 canny_sdxl = StarterModel(
+    source_urls=["https://huggingface.co/xinsir/controlNet-canny-sdxl-1.0"],
     name="Hard Edge Detection (canny)",
     base=BaseModelType.StableDiffusionXL,
     source="xinsir/controlNet-canny-sdxl-1.0",
@@ -126,6 +138,7 @@ canny_sdxl = StarterModel(
 )
 
 depth_sdxl = StarterModel(
+    source_urls=["https://huggingface.co/diffusers/controlNet-depth-sdxl-1.0"],
     name="Depth Map",
     base=BaseModelType.StableDiffusionXL,
     source="diffusers/controlNet-depth-sdxl-1.0",
@@ -135,6 +148,7 @@ depth_sdxl = StarterModel(
 )
 
 softedge_sdxl = StarterModel(
+    source_urls=["https://huggingface.co/SargeZT/controlNet-sd-xl-1.0-softedge-dexined"],
     name="Soft Edge Detection (softedge)",
     base=BaseModelType.StableDiffusionXL,
     source="SargeZT/controlNet-sd-xl-1.0-softedge-dexined",
@@ -144,6 +158,7 @@ softedge_sdxl = StarterModel(
 )
 
 openpose_sdxl = StarterModel(
+    source_urls=["https://huggingface.co/xinsir/controlNet-openpose-sdxl-1.0"],
     name="Pose Detection (openpose)",
     base=BaseModelType.StableDiffusionXL,
     source="xinsir/controlNet-openpose-sdxl-1.0",
@@ -153,6 +168,7 @@ openpose_sdxl = StarterModel(
 )
 
 scribble_sdxl = StarterModel(
+    source_urls=["https://huggingface.co/xinsir/controlNet-scribble-sdxl-1.0"],
     name="Contour Detection (scribble)",
     base=BaseModelType.StableDiffusionXL,
     source="xinsir/controlNet-scribble-sdxl-1.0",
@@ -162,6 +178,7 @@ scribble_sdxl = StarterModel(
 )
 
 tile_sdxl = StarterModel(
+    source_urls=["https://huggingface.co/xinsir/controlNet-tile-sdxl-1.0"],
     name="Tile",
     base=BaseModelType.StableDiffusionXL,
     source="xinsir/controlNet-tile-sdxl-1.0",
@@ -171,6 +188,7 @@ tile_sdxl = StarterModel(
 )
 
 union_cnet_sdxl = StarterModel(
+    source_urls=["https://huggingface.co/InvokeAI/Xinsir-SDXL_Controlnet_Union"],
     name="Multi-Guidance Detection (Union Pro)",
     base=BaseModelType.StableDiffusionXL,
     source="InvokeAI/Xinsir-SDXL_Controlnet_Union",
@@ -179,6 +197,7 @@ union_cnet_sdxl = StarterModel(
 )
 
 t2i_canny_sdxl = StarterModel(
+    source_urls=["https://huggingface.co/TencentARC/t2i-adapter-canny-sdxl-1.0"],
     name="Hard Edge Detection (canny)",
     base=BaseModelType.StableDiffusionXL,
     source="TencentARC/t2i-adapter-canny-sdxl-1.0",
@@ -188,6 +207,7 @@ t2i_canny_sdxl = StarterModel(
 )
 
 t2i_lineart_sdxl = StarterModel(
+    source_urls=["https://huggingface.co/TencentARC/t2i-adapter-lineart-sdxl-1.0"],
     name="Lineart",
     base=BaseModelType.StableDiffusionXL,
     source="TencentARC/t2i-adapter-lineart-sdxl-1.0",
@@ -197,6 +217,7 @@ t2i_lineart_sdxl = StarterModel(
 )
 
 t2i_sketch_sdxl = StarterModel(
+    source_urls=["https://huggingface.co/TencentARC/t2i-adapter-sketch-sdxl-1.0"],
     name="Sketch",
     base=BaseModelType.StableDiffusionXL,
     source="TencentARC/t2i-adapter-sketch-sdxl-1.0",

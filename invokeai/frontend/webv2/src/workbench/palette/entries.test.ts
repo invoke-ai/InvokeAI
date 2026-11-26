@@ -144,7 +144,8 @@ describe('buildCatalogCommandEntries', () => {
       catalog: firstPartyHotkeyCatalog,
       customHotkeys: { 'app.clearQueue': ['mod+shift+q'] },
       execute,
-      formatHotkey: formatHotkeyForPlatform,
+      // Pinned so the result does not depend on the machine; keys.test.ts owns the macOS order.
+      formatHotkey: (hotkey) => formatHotkeyForPlatform(hotkey, false),
       presentWidgetTypeIds: new Set(),
       t,
     });

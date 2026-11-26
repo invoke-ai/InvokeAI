@@ -1432,7 +1432,12 @@ class MistralEncoderGGUFLoader(ModelLoader):
                 f"Mistral encoder (GGUF): {len(missing)} keys missing from state dict (first 5: {missing[:5]})"
             )
 
-        materialize_quantized_embedding(model.embed_tokens, ram_cache=self._ram_cache)
+        materialize_quantized_embedding(
+            model.embed_tokens,
+            ram_cache=self._ram_cache,
+            model=model,
+            state_dict=sd,
+        )
 
         _reinit_inv_freq(model, mistral_config, compute_dtype)
 

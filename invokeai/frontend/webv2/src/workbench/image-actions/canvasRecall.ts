@@ -18,6 +18,7 @@ import { assertAccountScopeCurrent, isAccountScopeCurrent, type AccountScope } f
 import { ApiError } from '@platform/transport/http';
 import { prepareLegacyCanvasMetadata, getCanvasEngine } from '@workbench/canvas-operations/api';
 import { createEmptyCanvasState, isRecord, loadCanvasState } from '@workbench/canvasMigration';
+import { isCanvasSchemaVersionSupported } from '@workbench/canvasSchemaVersion';
 import { deriveControlKind, isStorableControlWeight, isStorableControlStepRange } from '@workbench/controlAdapters';
 import {
   readCanvasCompositingSettings,
@@ -381,7 +382,12 @@ export const prepareCanvasRecall = async ({
     }));
   }
   const rawDocument = record.document;
-  if (!isRecord(rawDocument) || ![3, 4, 5, 6].includes(Number(rawDocument.version))) {
+  if (
+    !isRecord(rawDocument) ||
+    typeof rawDocument.version !== 'number' ||
+    !Number.isInteger(rawDocument.version) ||
+    !isCanvasSchemaVersionSupported(rawDocument.version)
+  ) {
     plan.problems.push('invalid-document');
     return plan;
   }

@@ -33,11 +33,14 @@ export const clearCivitaiApiKey = (): void => {
   }
 };
 
+/** Civitai serves the same API and accounts on its .com (SFW) and .red (mature content) domains. */
+const CIVITAI_HOSTS = ['civitai.com', 'civitai.red'];
+
 export const isCivitaiUrl = (source: string): boolean => {
   try {
     const host = new URL(source).hostname;
 
-    return host === 'civitai.com' || host.endsWith('.civitai.com');
+    return CIVITAI_HOSTS.some((civitaiHost) => host === civitaiHost || host.endsWith(`.${civitaiHost}`));
   } catch {
     return false;
   }

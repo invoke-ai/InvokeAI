@@ -24,6 +24,7 @@ from invokeai.backend.model_manager.load.model_cache.model_cache import (
     ModelCache,
     get_model_cache_key,
 )
+from invokeai.backend.model_manager.load.model_cache.shared_cpu_weights import SharedCpuWeightsPin
 from invokeai.backend.model_manager.load.model_util import calc_model_size_by_fs
 from invokeai.backend.model_manager.load.optimizations import skip_torch_weight_init
 from invokeai.backend.model_manager.taxonomy import (
@@ -538,11 +539,23 @@ class ModelLoader(ModelLoaderBase):
             # clone of the built module. Adopt those weights instead of re-reading the model from
             # disk — this avoids both the redundant disk read and the large transient second copy
             # that would otherwise spike RAM (and, on a RAM-constrained box, drive the system into
-            # swap). Any failure falls back to a normal load, so it can never change the result.
-            loaded_model = self._try_adopt_shared_weights(cache_key)
+            # swap). If the shell cannot be materialized, fall back to the normal disk load.
+            execution_device = self._get_execution_device(config, submodel_type)
+            shared_store = self._ram_cache.shared_cpu_weights
+            selection = shared_store.pin_for_adoption(cache_key) if shared_store is not None else nullcontext(None)
+            with selection as adoption:
+                adopted_model = self._try_adopt_shared_weights(cache_key, adoption) if adoption is not None else None
+                if adopted_model is not None:
+                    admission_claim = self._ram_cache.put(
+                        cache_key,
+                        model=adopted_model,
+                        execution_device=execution_device,
+                        claim_admission=True,
+                        adoption=adoption,
+                    )
 
             shell_to_register: Optional[torch.nn.Module] = None
-            if loaded_model is None:
+            if adopted_model is None:
                 # Optional RAM instrumentation for the cold disk-load path (the only place that runs
                 # `from_pretrained`, whose construction transient can briefly spike RAM past the
                 # cache's retained budget). Gated on `log_memory_usage`; captures process RAM before
@@ -566,19 +579,15 @@ class ModelLoader(ModelLoaderBase):
                 # Snapshot a meta-weight clone now — before put() applies custom layers or any VRAM
                 # move — so the next device to load this model can adopt these weights (see above).
                 # Skipped in single-device setups, where no other cache will ever adopt it.
-                shared_store = self._ram_cache.shared_cpu_weights
                 if shared_store is not None and shared_store.enable_shell_capture:
                     shell_to_register = self._build_meta_shell(loaded_model)
 
-            # Determine execution device from model config, considering submodel type
-            execution_device = self._get_execution_device(config, submodel_type)
-
-            admission_claim = self._ram_cache.put(
-                cache_key,
-                model=loaded_model,
-                execution_device=execution_device,
-                claim_admission=True,
-            )
+                admission_claim = self._ram_cache.put(
+                    cache_key,
+                    model=loaded_model,
+                    execution_device=execution_device,
+                    claim_admission=True,
+                )
             # Retrieve immediately, and hold the admission claim across the retrieval: the claim
             # shields the new record until this frame's own claim takes over, so nothing — a peer's
             # reconcile, another model's make-room, the cache's shutdown() — can evict the model
@@ -592,10 +601,8 @@ class ModelLoader(ModelLoaderBase):
 
             # Register the shell only after put() has created the shared entry (via the wrapper's
             # acquire); it is dropped automatically when that entry's last reference is released.
-            if shell_to_register is not None:
-                shared_store = self._ram_cache.shared_cpu_weights
-                if shared_store is not None:
-                    shared_store.set_shell(cache_key, shell_to_register)
+            if shell_to_register is not None and shared_store is not None:
+                shared_store.set_shell(cache_key, shell_to_register)
 
             return cache_record, first_use_claim
 
@@ -982,7 +989,7 @@ class ModelLoader(ModelLoaderBase):
         module.register_forward_pre_hook(pre_hook)
         module.register_forward_hook(post_hook, always_call=True)
 
-    def _try_adopt_shared_weights(self, cache_key: str) -> Optional[AnyModel]:
+    def _try_adopt_shared_weights(self, cache_key: str, adoption: SharedCpuWeightsPin) -> torch.nn.Module | None:
         """Build this model by adopting another device's already-resident CPU weights, skipping the
         disk read entirely.
 
@@ -992,23 +999,15 @@ class ModelLoader(ModelLoaderBase):
         shared canonical weights into the copy — no per-loader architecture knowledge required, and
         fp8 cast hooks carried by the shell are preserved automatically.
 
-        Must be called while holding the MODEL_LOAD_LOCK write lock (as `_load_and_cache` does), so
-        the peeked canonical weights and shell cannot be evicted between the peek and the adopt.
+        The pin protects shell and weights during the clone. Admission keeps the pin only when
+        the cache can use a zero reservation. Peer eviction may run under the model load lock.
         """
-        shared_store = self._ram_cache.shared_cpu_weights
-        if shared_store is None:
-            return None
-        canonical = shared_store.peek(cache_key)
-        shell = shared_store.get_shell(cache_key)
-        if canonical is None or shell is None:
-            return None
-
         try:
             # Independent module per device (its params will be moved to its own GPU); deep-copying an
             # all-meta shell is cheap (no weight data). assign=True then re-points the copy's
             # parameters at the shared canonical tensors with no allocation.
-            model = copy.deepcopy(shell)
-            model.load_state_dict(canonical, assign=True)
+            model = copy.deepcopy(adoption.shell)
+            model.load_state_dict(adoption.state_dict, assign=True)
             # Safety net: if anything is left on the meta device (e.g. a persistent buffer somehow
             # missing from the canonical state dict) the model would silently produce wrong results.
             for tensor in itertools.chain(model.parameters(), model.buffers()):

@@ -247,14 +247,15 @@ def test_the_encoder_keeps_marker_named_nvfp4_layers_packed_under_their_transfor
         state_dict[f"{legacy}.comfy_quant"] = _marker("nvfp4")
         expected[legacy.replace("model.", "model.language_model.", 1)] = weight
     state_dict["model.layers.0.self_attn.q_proj.bias"] = torch.randn(128)
-    fp8_values = torch.randint(-8, 9, (32, 64)).float()
     fp8_marker = _marker("float8_e4m3fn")
-    # The fp8_scaled encoder's own scale spelling, beside the marker the nvfp4 build adds.
-    state_dict["lm_head.weight"] = fp8_values.to(torch.float8_e4m3fn)
-    state_dict["lm_head.scale_weight"] = torch.tensor(0.5)
-    state_dict["lm_head.scale_input"] = torch.tensor(1.0)
-    state_dict["lm_head.comfy_quant"] = fp8_marker
-    state_dict["visual.proj.weight"] = torch.randn(4, 8)
+    # The fp8_scaled encoder's own scale spelling, beside the marker the nvfp4 build adds. The released nvfp4 file ships
+    # the LM head in scaled fp8; it is not loaded.
+    fp8_values = torch.randint(-8, 9, (4, 8)).float()
+    for legacy, weight in (("visual.proj", fp8_values), ("lm_head", torch.randint(-8, 9, (32, 64)).float())):
+        state_dict[f"{legacy}.weight"] = weight.to(torch.float8_e4m3fn)
+        state_dict[f"{legacy}.scale_weight"] = torch.tensor(0.5)
+        state_dict[f"{legacy}.scale_input"] = torch.tensor(1.0)
+        state_dict[f"{legacy}.comfy_quant"] = fp8_marker
     state_dict["visual.proj.bias"] = torch.randn(4)
 
     log = _patch_common(monkeypatch, state_dict, {})
@@ -271,7 +272,6 @@ def test_the_encoder_keeps_marker_named_nvfp4_layers_packed_under_their_transfor
     loader._torch_device, loader._logger = torch.device("cpu"), MagicMock()
     _record_fold(monkeypatch, loader, log)
     q_bias = state_dict["model.layers.0.self_attn.q_proj.bias"]
-    visual_weight = state_dict["visual.proj.weight"]
 
     model = loader._load_text_encoder_from_singlefile(
         QwenVLEncoder_Checkpoint_Config.model_construct(path=str(checkpoint))
@@ -286,15 +286,15 @@ def test_the_encoder_keeps_marker_named_nvfp4_layers_packed_under_their_transfor
         x = torch.randn(3, module.in_features, dtype=torch.float32)
         bias = q_bias.to(COMPUTE_DTYPE).float() if module.bias is not None else None
         torch.testing.assert_close(module(x), torch.nn.functional.linear(x, weight, bias))
-    assert torch.equal(model.lm_head.weight, (fp8_values * 0.5).to(COMPUTE_DTYPE))
-    assert torch.equal(model.model.visual.proj.weight, visual_weight.to(COMPUTE_DTYPE))
+    assert list(model.lm_head.parameters()) == []
+    assert torch.equal(model.model.visual.proj.weight, (fp8_values * 0.5).to(COMPUTE_DTYPE))
     assert log == [True]
 
-    # Counted by hand: the packed layers as stored, the q_proj bias, the folded LM head and the vision projection at
-    # bf16, and the LM head's recovered scale (the 1.0 `scale_input` is an uncalibrated placeholder, charged nothing).
-    # Its marker is consumed by the extraction before the reservation.
+    # Counted by hand: the packed layers as stored, the q_proj bias and the folded vision projection at bf16, and that
+    # projection's recovered scale (the 1.0 `scale_input` is an uncalibrated placeholder, charged nothing). Its marker
+    # is consumed by the extraction before the reservation. The LM head, scales and marker included, costs nothing.
     packed = 2 * _packed_bytes(128, 64)
-    widened = 128 + 32 * 64 + (4 * 8 + 4)
+    widened = 128 + (4 * 8 + 4)
     recovered_scale = torch.tensor(0.5).element_size()
     loader._ram_cache.make_room.assert_called_once_with(packed + widened * COMPUTE_DTYPE.itemsize + recovered_scale)
 
@@ -373,13 +373,13 @@ def test_the_encoder_keeps_int8_layers_int8_under_their_transformers_paths(monke
         torch.testing.assert_close(layer(x), torch.nn.functional.linear(x, weight, bias), rtol=1e-4, atol=1e-4)
         # The W8A8 activation scale has nothing to attach to.
         assert not hasattr(layer, "input_scale")
-    assert model.lm_head.weight.dtype is COMPUTE_DTYPE
+    assert list(model.lm_head.parameters()) == []
     assert model.model.visual.proj.weight.dtype is COMPUTE_DTYPE
-    # Counted by hand: the int8 weights as stored, their fp32 scales, and the bias, `lm_head` and vision projection at
+    # Counted by hand: the int8 weights as stored, their fp32 scales, and the bias and vision projection at
     # bf16. Markers and activation scales are dropped and cost nothing.
     int8 = 2 * 128 * 64
     scales = (2 * 128 * 4) if rotated else 2 * 4
-    dense = 128 + 32 * 64 + (4 * 8 + 4)
+    dense = 128 + (4 * 8 + 4)
     assert run.reserved == [int8 + scales + dense * COMPUTE_DTYPE.itemsize]
 
 
@@ -452,9 +452,9 @@ def test_an_encoder_file_mixing_int8_and_nvfp4_layers_loads_both_under_one_reser
     assert isinstance(packed, NVFP4Linear)
     x = torch.randn(3, 64)
     torch.testing.assert_close(packed(x), torch.nn.functional.linear(x, nvfp4_weight))
-    # The int8 q_proj with its fp32 scale, the packed layer as stored, and the dense bias, `lm_head` and vision
-    # projection at bf16: one call that covers both schemes.
-    dense = 128 + 32 * 64 + (4 * 8 + 4)
+    # The int8 q_proj with its fp32 scale, the packed layer as stored, and the dense bias and vision projection at
+    # bf16: one call that covers both schemes.
+    dense = 128 + (4 * 8 + 4)
     assert run.reserved == [128 * 64 + 128 * 4 + _packed_bytes(128, 64) + dense * COMPUTE_DTYPE.itemsize]
 
 

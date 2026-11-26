@@ -853,6 +853,7 @@ def test_every_image_names_body_is_bounded(client: TestClient) -> None:
         "/api/v1/images/copy",
         "/api/v1/images/delete",
         "/api/v1/images/download",
+        "/api/v1/images/gone",
         "/api/v1/images/images_by_names",
         "/api/v1/images/star",
         "/api/v1/images/unstar",
@@ -949,3 +950,23 @@ def test_image_workflow_file_missing_answers_404(monkeypatch: Any, mock_invoker:
     monkeypatch.setattr(mock_invoker.services.images, "get_workflow", MagicMock(side_effect=ImageFileNotFoundException))
 
     assert client.get("/api/v1/images/i/test.png/workflow").status_code == 404
+
+
+def test_gone_lists_only_positively_absent_names(monkeypatch: Any, mock_invoker: Invoker, client: TestClient) -> None:
+    """A storage error is "could not look", never "gone": it must not prune a client's references."""
+    prepare_image_batch_test(monkeypatch, mock_invoker)
+
+    def exists(image_name: str) -> bool:
+        if image_name == "unreadable.png":
+            raise LockTimeoutError("database is locked")
+        return image_name == "present.png"
+
+    monkeypatch.setattr(mock_invoker.services.image_records, "exists", MagicMock(side_effect=exists))
+
+    response = client.post(
+        "/api/v1/images/gone",
+        json={"image_names": ["present.png", "deleted.png", "unreadable.png", "deleted.png"]},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == ["deleted.png"]
