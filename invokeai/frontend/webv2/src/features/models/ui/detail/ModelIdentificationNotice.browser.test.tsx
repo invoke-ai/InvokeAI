@@ -2,7 +2,7 @@ import type { ModelConfig, ModelIdentification } from '@features/models/core/typ
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { getModelsSnapshot, setModelsSnapshotForTests } from '@features/models/data/modelsStore';
-import { type ModelsUiAdapter, ModelsUiProvider, NO_SCHEDULER_POLICY } from '@features/models/ui/ModelsUiContext';
+import { type ModelsUiAdapter, ModelsUiProvider, NO_DEFAULTS_RULES } from '@features/models/ui/ModelsUiContext';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
@@ -62,7 +62,7 @@ const adapter = (canManageModels: boolean): ModelsUiAdapter => ({
   installInPlace: true,
   isProjectActive: () => false,
   managerProjectId: null,
-  schedulerPolicy: NO_SCHEDULER_POLICY,
+  defaultsRules: NO_DEFAULTS_RULES,
   setInstallInPlace: () => undefined,
 });
 
