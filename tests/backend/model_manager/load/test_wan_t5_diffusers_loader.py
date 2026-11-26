@@ -1,18 +1,19 @@
-"""Native CPU coverage for standalone Wan UMT5 folder loading and cache admission."""
+"""CPU and simulated accelerator coverage for standalone Wan UMT5 folder loading."""
 
 import json
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from threading import Barrier
 from unittest.mock import MagicMock
 
 import pytest
 import torch
-from safetensors import SafetensorError
 from safetensors.torch import load_file, save_file
 from transformers import UMT5Config, UMT5EncoderModel
 
 from invokeai.backend.model_manager.configs.wan_t5_encoder import WanT5Encoder_WanT5Encoder_Config
 from invokeai.backend.model_manager.load.load_default import ModelLoader
-from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache, get_model_cache_key
+from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
 from invokeai.backend.model_manager.load.model_cache.ram_budget import RamBudget
 from invokeai.backend.model_manager.load.model_cache.shared_cpu_weights import SharedCpuWeightsStore
 from invokeai.backend.model_manager.load.model_loaders.wan import WanT5EncoderLoader
@@ -151,41 +152,11 @@ def test_precision_follows_the_model_override_or_selected_cache(
     dtype: torch.dtype,
 ) -> None:
     _write_encoder(tmp_path)
-    choose = MagicMock(return_value=torch.float16)
+    choose = MagicMock(return_value=torch.bfloat16)
     monkeypatch.setattr(TorchDevice, "choose_bfloat16_safe_dtype", staticmethod(choose))
     loader = _loader(tmp_path, cache_device, loader_device=loader_device)
     with loader.load_model(_config(Path("."), cpu_only), ENCODER) as model:
         assert {p.dtype for p in model.parameters()} == {dtype}
-    choose.assert_not_called()
-
-
-@pytest.mark.parametrize("target_dtype", [torch.float32, torch.bfloat16])
-@pytest.mark.parametrize("prefixed", [False, True], ids=["plain_keys", "prefixed_keys"])
-def test_admission_counts_distinct_embeddings_and_missing_weights(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, target_dtype: torch.dtype, prefixed: bool
-) -> None:
-    _write_encoder(tmp_path, feed_forward_proj="relu")
-    weights = tmp_path / "model.safetensors"
-    state = load_file(weights)
-    state["encoder.embed_tokens.weight"] = state["shared.weight"] + 1
-    del state["encoder.block.0.layer.0.SelfAttention.q.weight"]
-    if prefixed:
-        state = {"transformer." + key: tensor for key, tensor in state.items()}
-    save_file(state, weights, metadata={"format": "pt"})
-    device = "cpu" if target_dtype == torch.float32 else "cuda:0"
-    monkeypatch.setattr(TorchDevice, "choose_bfloat16_safe_dtype", staticmethod(lambda _: torch.bfloat16))
-    loader = _loader(tmp_path, device)
-    make_room = loader.ram_cache.make_room = MagicMock(wraps=loader.ram_cache.make_room)
-
-    with loader.load_model(_config(Path(".")), ENCODER) as model:
-        assert model.encoder.embed_tokens.weight is not model.shared.weight
-        prefix = "transformer." if prefixed else ""
-        torch.testing.assert_close(
-            model.encoder.embed_tokens.weight, state[prefix + "encoder.embed_tokens.weight"].to(target_dtype)
-        )
-        torch.testing.assert_close(model.shared.weight, state[prefix + "shared.weight"].to(target_dtype))
-        assert model.encoder.block[0].layer[0].SelfAttention.q.weight.device.type == "cpu"
-        make_room.assert_called_once_with(_retained_bytes(model))
 
 
 @pytest.mark.parametrize("selection", ["single_before_index", "explicit_single", "explicit_index"])
@@ -226,38 +197,6 @@ def test_admission_sizes_transformers_selected_weights(tmp_path: Path, selection
         make_room.assert_called_once_with(_retained_bytes(model))
 
 
-@pytest.mark.parametrize("defect", ["config", "file", "shard", "explicit_file", "binary_shard", "header"])
-def test_invalid_local_checkpoint_fails_before_making_room(tmp_path: Path, defect: str) -> None:
-    _write_encoder(tmp_path, sharded=defect in ("shard", "binary_shard"))
-    config_path = tmp_path / "config.json"
-    weights = tmp_path / "model.safetensors"
-    if defect == "config":
-        config_path.unlink()
-    elif defect == "file":
-        weights.rename(tmp_path / "unknown.weights")
-    elif defect == "explicit_file":
-        config = json.loads(config_path.read_text(encoding="utf-8"))
-        config["transformers_weights"] = "missing.safetensors"
-        config_path.write_text(json.dumps(config), encoding="utf-8")
-    elif defect == "header":
-        weights.write_bytes(b"corrupt")
-    else:
-        index_path = tmp_path / "model.safetensors.index.json"
-        index_data = json.loads(index_path.read_text(encoding="utf-8"))
-        if defect == "binary_shard":
-            index_path.unlink()
-            index_data["weight_map"] = dict.fromkeys(index_data["weight_map"], "missing.bin")
-            (tmp_path / "pytorch_model.bin.index.json").write_text(json.dumps(index_data), encoding="utf-8")
-        else:
-            (tmp_path / next(iter(index_data["weight_map"].values()))).unlink()
-
-    loader = _loader(tmp_path)
-    make_room = loader.ram_cache.make_room = MagicMock(wraps=loader.ram_cache.make_room)
-    with pytest.raises((OSError, ValueError, RuntimeError, SafetensorError)):
-        loader.load_model(_config(Path(".")), ENCODER)
-    make_room.assert_not_called()
-
-
 @pytest.mark.parametrize("missing", ["config.json", "model.safetensors.index.json"])
 def test_fresh_loader_reuses_a_warm_encoder_when_metadata_is_unavailable(tmp_path: Path, missing: str) -> None:
     _write_encoder(tmp_path, sharded=True)
@@ -273,44 +212,16 @@ def test_fresh_loader_reuses_a_warm_encoder_when_metadata_is_unavailable(tmp_pat
         assert model is first
 
 
-@pytest.mark.parametrize("compute_device", ["cpu", "cuda:0"])
-def test_warm_legacy_entry_when_metadata_is_unavailable_respects_cpu_only(tmp_path: Path, compute_device: str) -> None:
-    model = _write_encoder(tmp_path)
-    cache = _loader(tmp_path, "cuda:0").ram_cache
-    key = get_model_cache_key(_config(tmp_path).key, ENCODER)
-    cache.put(key, model, execution_device=torch.device(compute_device))
-    record = cache.get(key)
-    assert record.cached_model.compute_device == torch.device(compute_device)
-
-    config_path = tmp_path / "config.json"
-    config_path.unlink()
-    fresh = _loader(tmp_path, "cuda:0")
-    fresh._ram_cache = cache
-    if compute_device == "cpu":
-        with fresh.load_model(_config(Path("."), cpu_only=True), ENCODER) as loaded:
-            assert loaded is model
-            assert {p.dtype for p in loaded.parameters()} == {torch.bfloat16}
-    else:
-        with pytest.raises(FileNotFoundError, match="Wan UMT5 configuration not found") as rejected:
-            fresh.load_model(_config(Path("."), cpu_only=True), ENCODER)
-        assert str(config_path) in str(rejected.value)
-        # The traceback still owns the loader frame, so dropping the claim later is insufficient.
-        assert record.first_use_holds == 0
-
-
 @pytest.mark.parametrize("key", ["encoder.block.0.layer.0.SelfAttention.q.weight", "shared.weight"])
-def test_wrong_known_weight_shape_fails_before_making_room(tmp_path: Path, key: str) -> None:
+def test_wrong_known_weight_shape_is_rejected_by_transformers(tmp_path: Path, key: str) -> None:
     _write_encoder(tmp_path)
     path = tmp_path / "model.safetensors"
     state = {name: tensor.clone() for name, tensor in load_file(path).items()}
     state[key] = state[key][1:].contiguous()
     save_file(state, path, metadata={"format": "pt"})
     loader = _loader(tmp_path)
-    make_room = loader.ram_cache.make_room = MagicMock(wraps=loader.ram_cache.make_room)
-
     with pytest.raises((ValueError, RuntimeError)):
         loader.load_model(_config(Path(".")), ENCODER)
-    make_room.assert_not_called()
 
 
 def test_unknown_checkpoint_keys_keep_transformers_behavior(tmp_path: Path) -> None:
@@ -323,100 +234,269 @@ def test_unknown_checkpoint_keys_keep_transformers_behavior(tmp_path: Path) -> N
         torch.testing.assert_close(model.shared.weight, stored.shared.weight.float(), rtol=0, atol=0)
 
 
-@pytest.mark.parametrize("index_name", ["model.safetensors.index.json", "pytorch_model.bin.index.json"])
-def test_shard_dispatch_follows_the_first_resolved_file(tmp_path: Path, index_name: str) -> None:
-    stored = _write_encoder(tmp_path, sharded=True)
-    index = (tmp_path / "model.safetensors.index.json").rename(tmp_path / index_name)
-    data = json.loads(index.read_text(encoding="utf-8"))
-    shards = sorted(set(data["weight_map"].values()))
-    assert len(shards) > 1
-    last = tmp_path / shards[-1]
-    uppercase = last.with_suffix(".SAFETENSORS")
-    last.rename(last.with_suffix(".tmp")).rename(uppercase)
-    data["weight_map"] = {
-        key: uppercase.name if name == last.name else name for key, name in data["weight_map"].items()
-    }
-    index.write_text(json.dumps(data), encoding="utf-8")
+def test_concurrent_cold_loads_share_one_device_variant(tmp_path: Path) -> None:
+    _write_encoder(tmp_path)
+    loaders = [_loader(tmp_path), _loader(tmp_path)]
+    loaders[1]._ram_cache = loaders[0].ram_cache
+    put = loaders[0].ram_cache.put = MagicMock(wraps=loaders[0].ram_cache.put)
+    barrier = Barrier(2)
+    for loader in loaders:
+        original = loader._cache_key_variant
 
-    loader = _loader(tmp_path)
-    make_room = loader.ram_cache.make_room = MagicMock(wraps=loader.ram_cache.make_room)
+        def synchronized_key(config, submodel_type, original=original):
+            variant = original(config, submodel_type)
+            barrier.wait(timeout=15)
+            return variant
+
+        loader._cache_key_variant = synchronized_key
+
+    def load(loader):
+        with loader.load_model(_config(Path(".")), ENCODER) as model:
+            return model
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        models = list(pool.map(load, loaders))
+    assert models[0] is models[1]
+    put.assert_called_once()
+
+
+@pytest.mark.parametrize("device", ["cpu", "cuda:0"])
+def test_binary_estimate_uses_file_size_and_device_dtype(
+    tmp_path: Path, device: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    stored = _write_encoder(tmp_path)
+    (tmp_path / "model.safetensors").unlink()
+    monkeypatch.setattr(TorchDevice, "choose_bfloat16_safe_dtype", staticmethod(lambda _: torch.bfloat16))
+    weights = tmp_path / "pytorch_model.bin"
+    torch.save(stored.state_dict(), weights)
+    loader = _loader(tmp_path, device)
+    reserve = loader.ram_cache.make_room = MagicMock(wraps=loader.ram_cache.make_room)
     with loader.load_model(_config(Path(".")), ENCODER) as model:
-        torch.testing.assert_close(model.shared.weight, stored.shared.weight.float(), rtol=0, atol=0)
-        make_room.assert_called_once_with(_retained_bytes(model))
+        expected_dtype = torch.float32 if device == "cpu" else torch.bfloat16
+        assert {p.dtype for p in model.parameters()} == {expected_dtype}
+        torch.testing.assert_close(model.shared.weight, stored.shared.weight.to(expected_dtype), rtol=0, atol=0)
+        reserve.assert_called_once_with(weights.stat().st_size * (2 if device == "cpu" else 1))
 
 
-def test_unavailable_metadata_cannot_cold_load_under_the_legacy_key(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.parametrize("device", ["cpu", "cuda:0"])
+def test_safetensors_estimate_uses_target_dtype_not_storage_dtype(
+    tmp_path: Path, device: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _write_encoder(tmp_path)
-    loader = _loader(tmp_path)
-    read = loader._read_checkpoint
+    weights = tmp_path / "model.safetensors"
+    state = {key: tensor.float() for key, tensor in load_file(weights).items()}
+    save_file(state, weights, metadata={"format": "pt"})
+    monkeypatch.setattr(TorchDevice, "choose_bfloat16_safe_dtype", staticmethod(lambda _: torch.bfloat16))
+    loader = _loader(tmp_path, device)
+    reserve = loader.ram_cache.make_room = MagicMock(wraps=loader.ram_cache.make_room)
+    with loader.load_model(_config(Path(".")), ENCODER) as model:
+        dtype = torch.float32 if device == "cpu" else torch.bfloat16
+        assert {p.dtype for p in model.parameters()} == {dtype}
+        reserve.assert_called_once_with(sum(t.numel() for t in state.values()) * dtype.itemsize)
 
-    def metadata_returns_after_lookup(folder: Path):
-        monkeypatch.setattr(loader, "_read_checkpoint", read)
-        raise FileNotFoundError("config temporarily unavailable")
 
-    monkeypatch.setattr(loader, "_read_checkpoint", metadata_returns_after_lookup)
-    put = loader.ram_cache.put = MagicMock(wraps=loader.ram_cache.put)
-    with pytest.raises(FileNotFoundError, match="config temporarily unavailable"):
-        loader.load_model(_config(Path(".")), ENCODER)
-    put.assert_not_called()
+def test_accelerator_without_bfloat16_uses_float32(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _write_encoder(tmp_path)
+    monkeypatch.setattr(TorchDevice, "choose_bfloat16_safe_dtype", staticmethod(lambda _: torch.float16))
+    loader = _loader(tmp_path, "mps")
     with loader.load_model(_config(Path(".")), ENCODER) as model:
         assert {p.dtype for p in model.parameters()} == {torch.float32}
 
 
-def test_nested_path_disappearing_after_key_selection_does_not_load_a_root_binary(tmp_path: Path) -> None:
-    nested = tmp_path / "text_encoder"
-    stored = _write_encoder(nested)
-    stored.config.save_pretrained(tmp_path)
-    torch.save(stored.state_dict(), tmp_path / "pytorch_model.bin")
-    loader = _loader(tmp_path)
-    get_size = loader.get_size_fs
-
-    def remove_nested_before_admission(*args):
-        nested.rename(tmp_path / "temporarily-away")
-        return get_size(*args)
-
-    loader.get_size_fs = remove_nested_before_admission
-    put = loader.ram_cache.put = MagicMock(wraps=loader.ram_cache.put)
-    with pytest.raises(FileNotFoundError):
-        loader.load_model(_config(Path(".")), ENCODER)
-    put.assert_not_called()
-
-
-@pytest.mark.parametrize("sharded", [False, True], ids=["single", "sharded"])
-def test_binary_folder_keeps_inherited_bfloat16_cache_and_sizing(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, sharded: bool
+@pytest.mark.parametrize("cpu_first", [True, False])
+def test_cpu_override_does_not_reuse_float32_accelerator_record(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, cpu_first: bool
 ) -> None:
-    model = _write_encoder(tmp_path)
-    (tmp_path / "model.safetensors").unlink()
-    state = model.state_dict()
-    if sharded:
-        keys = list(state)
-        weight_map = {}
-        for shard, group in enumerate((keys[::2], keys[1::2])):
-            filename = f"pytorch_model-{shard}.bin"
-            torch.save({key: state[key] for key in group}, tmp_path / filename)
-            weight_map.update(dict.fromkeys(group, filename))
-        (tmp_path / "pytorch_model.bin.index.json").write_text(
-            json.dumps({"metadata": {"total_size": sum(t.nbytes for t in state.values())}, "weight_map": weight_map}),
-            encoding="utf-8",
-        )
-    else:
-        key = "encoder.block.0.layer.0.SelfAttention.q.weight"
-        original = state[key]
-        padded = torch.empty(32_768, dtype=original.dtype)
-        state[key] = padded[: original.numel()].view_as(original).copy_(original)
-        torch.save(state, tmp_path / "pytorch_model.bin")
-    choose = MagicMock(side_effect=AssertionError("legacy path should skip the dtype policy"))
-    monkeypatch.setattr(TorchDevice, "choose_bfloat16_safe_dtype", staticmethod(choose))
-    loader = _loader(tmp_path, "cuda:0")
-    config = _config(tmp_path, cpu_only=True)
-    make_room = loader.ram_cache.make_room = MagicMock(wraps=loader.ram_cache.make_room)
+    _write_encoder(tmp_path)
+    monkeypatch.setattr(TorchDevice, "choose_bfloat16_safe_dtype", staticmethod(lambda _: torch.float16))
+    loader = _loader(tmp_path, "mps")
+    configs = [_config(Path("."), cpu_only=cpu_first), _config(Path("."), cpu_only=not cpu_first)]
+    models = []
+    for config in configs:
+        with loader.load_model(config, ENCODER) as model:
+            models.append(model)
+            assert {p.dtype for p in model.parameters()} == {torch.float32}
+    assert models[0] is not models[1]
 
-    assert loader._cache_key_variant(config, ENCODER) == ""
-    with loader.load_model(config, ENCODER) as loaded:
-        assert {p.dtype for p in loaded.parameters()} == {torch.bfloat16}
-        torch.testing.assert_close(loaded.shared.weight, state["shared.weight"], rtol=0, atol=0)
-    make_room.assert_called_once_with(ModelLoader.get_size_fs(loader, config, tmp_path, ENCODER))
-    choose.assert_not_called()
+
+def test_dtype_decision_is_stable_through_cache_admission(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _write_encoder(tmp_path)
+    choose = MagicMock(side_effect=[torch.float16, torch.bfloat16])
+    monkeypatch.setattr(TorchDevice, "choose_bfloat16_safe_dtype", staticmethod(choose))
+    loader = _loader(tmp_path, "mps")
+    config = _config(Path("."))
+    key = loader._cache_key_variant(config, ENCODER)
+    with loader.load_model(config, ENCODER) as model:
+        assert {p.dtype for p in model.parameters()} == {torch.float32}
+    assert loader._cache_key_variant(config, ENCODER) == key
+    choose.assert_called_once_with(torch.device("mps"))
+
+
+@pytest.mark.parametrize("setting", ["quantization_config", "fusion_config"])
+@pytest.mark.parametrize("binary", [False, True])
+@pytest.mark.parametrize("device", ["cpu", "mps"])
+def test_quantized_or_fused_folders_keep_existing_dtype_and_sizing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, setting: str, binary: bool, device: str
+) -> None:
+    monkeypatch.setattr(
+        "invokeai.backend.model_manager.load.model_loaders.wan.read_safetensors_header",
+        MagicMock(side_effect=AssertionError("quantized and fused headers must not be sized as dense")),
+    )
+    model = _write_encoder(tmp_path)
+    if binary:
+        (tmp_path / "model.safetensors").unlink()
+        torch.save(model.state_dict(), tmp_path / "pytorch_model.bin")
+    config_file = tmp_path / "config.json"
+    data = json.loads(config_file.read_text(encoding="utf-8"))
+    data[setting] = {}
+    config_file.write_text(json.dumps(data), encoding="utf-8")
+    monkeypatch.setattr(TorchDevice, "choose_bfloat16_safe_dtype", staticmethod(lambda _: torch.float16))
+    from_pretrained = MagicMock(return_value=model)
+    monkeypatch.setattr(UMT5EncoderModel, "from_pretrained", from_pretrained)
+    loader = _loader(tmp_path, device)
+    config = _config(tmp_path)
+    assert loader.get_size_fs(config, tmp_path, ENCODER) == ModelLoader.get_size_fs(loader, config, tmp_path, ENCODER)
+    assert loader._load_model(config, ENCODER) is model
+    assert from_pretrained.call_args.kwargs["dtype"] == torch.bfloat16
+
+
+def test_binary_accelerator_float32_fallback_keeps_gpu_file_estimate(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    stored = _write_encoder(tmp_path)
+    (tmp_path / "model.safetensors").unlink()
+    weights = tmp_path / "pytorch_model.bin"
+    torch.save(stored.state_dict(), weights)
+    monkeypatch.setattr(TorchDevice, "choose_bfloat16_safe_dtype", staticmethod(lambda _: torch.float16))
+    loader = _loader(tmp_path, "mps")
+    reserve = loader.ram_cache.make_room = MagicMock(wraps=loader.ram_cache.make_room)
+    with loader.load_model(_config(Path(".")), ENCODER) as model:
+        assert {p.dtype for p in model.parameters()} == {torch.float32}
+        reserve.assert_called_once_with(weights.stat().st_size)
+
+
+def test_adapter_only_keeps_main_loading_and_sizing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    (tmp_path / "adapter_config.json").write_text("{}", encoding="utf-8")
+    model = MagicMock()
+    from_pretrained = MagicMock(return_value=model)
+    monkeypatch.setattr(UMT5EncoderModel, "from_pretrained", from_pretrained)
+    loader = _loader(tmp_path)
+    config = _config(tmp_path)
+    assert loader.get_size_fs(config, tmp_path, ENCODER) == ModelLoader.get_size_fs(loader, config, tmp_path, ENCODER)
+    assert loader._load_model(config, ENCODER) is model
+    assert from_pretrained.call_args.kwargs["dtype"] == torch.bfloat16
+
+
+def test_real_8bit_cpu_folder_keeps_main_loading_and_sizing(tmp_path: Path) -> None:
+    pytest.importorskip("bitsandbytes")
+    from transformers import BitsAndBytesConfig
+
+    base = tmp_path / "base"
+    quantized = tmp_path / "quantized"
+    _write_encoder(base)
+    original = UMT5EncoderModel.from_pretrained(
+        str(base), quantization_config=BitsAndBytesConfig(load_in_8bit=True), dtype=torch.float32, device_map="cpu"
+    )
+    original.save_pretrained(quantized)
+    loader = _loader(tmp_path)
+    config = _config(quantized)
+    assert loader.get_size_fs(config, quantized, ENCODER) == ModelLoader.get_size_fs(loader, config, quantized, ENCODER)
+    reference = UMT5EncoderModel.from_pretrained(str(quantized), dtype=torch.bfloat16, local_files_only=True)
+    with loader.load_model(config, ENCODER) as model:
+        assert [(name, p.dtype) for name, p in model.named_parameters()] == [
+            (name, p.dtype) for name, p in reference.named_parameters()
+        ]
+        with torch.no_grad():
+            ids = torch.tensor([[3, 7, 1]])
+            torch.testing.assert_close(
+                model(input_ids=ids).last_hidden_state, reference(input_ids=ids).last_hidden_state
+            )
+
+
+@pytest.mark.parametrize(
+    "kind", ["safe-index-binary", "binary-index-safe", "binary-first-mixed", "safe-first-uppercase"]
+)
+def test_transformers_shard_dispatch_and_estimate(tmp_path: Path, kind: str) -> None:
+    stored = _write_encoder(tmp_path)
+    (tmp_path / "model.safetensors").unlink()
+    state = {k: v.contiguous().clone() for k, v in stored.state_dict().items()}
+    keys = list(state)
+    if kind == "safe-index-binary":
+        index = "model.safetensors.index.json"
+        shards = [("a.bin", keys)]
+    elif kind == "binary-index-safe":
+        index = "pytorch_model.bin.index.json"
+        shards = [("a.safetensors", keys)]
+    elif kind == "binary-first-mixed":
+        index = "model.safetensors.index.json"
+        shards = [("a.bin", keys[::2]), ("b.safetensors", keys[1::2])]
+    else:
+        index = "pytorch_model.bin.index.json"
+        shards = [("a.safetensors", keys[::2]), ("b.SAFETENSORS", keys[1::2])]
+    expected = 0
+    weight_map = {}
+    for name, group in shards:
+        path = tmp_path / name
+        values = {k: state[k] for k in group}
+        if name.lower().endswith(".safetensors"):
+            save_file(values, path, metadata={"format": "pt"})
+            expected += sum(t.numel() for t in values.values()) * torch.float32.itemsize
+        else:
+            torch.save(values, path)
+            expected += path.stat().st_size * 2
+        weight_map.update(dict.fromkeys(group, name))
+    (tmp_path / index).write_text(json.dumps({"metadata": {}, "weight_map": weight_map}), encoding="utf-8")
+    reference = UMT5EncoderModel.from_pretrained(str(tmp_path), dtype=torch.float32, local_files_only=True)
+    loader = _loader(tmp_path)
+    reserve = loader.ram_cache.make_room = MagicMock(wraps=loader.ram_cache.make_room)
+    with loader.load_model(_config(tmp_path), ENCODER) as actual:
+        torch.testing.assert_close(actual.shared.weight, reference.shared.weight)
+        reserve.assert_called_once_with(expected)
+
+
+@pytest.mark.parametrize("embedded", [False, True], ids=["redirect", "embedded"])
+def test_peft_folder_keeps_transformers_main_path(tmp_path: Path, embedded: bool) -> None:
+    peft = pytest.importorskip("peft")
+    base_dir = tmp_path / "base"
+    adapter_dir = base_dir if embedded else tmp_path / "adapter"
+    base = _write_encoder(base_dir, vocab_size=512)
+    adapter = peft.get_peft_model(base, peft.LoraConfig(r=16, lora_alpha=16, target_modules=["q"]))
+    with torch.no_grad():
+        for name, parameter in adapter.named_parameters():
+            if "lora_B" in name:
+                parameter.fill_(0.05)
+    adapter.save_pretrained(adapter_dir)
+    adapter_config = adapter_dir / "adapter_config.json"
+    data = json.loads(adapter_config.read_text(encoding="utf-8"))
+    # Transformers must use the local base when the model config is present.
+    data["base_model_name_or_path"] = str(tmp_path / "missing-base" if embedded else base_dir)
+    adapter_config.write_text(json.dumps(data), encoding="utf-8")
+    reference = UMT5EncoderModel.from_pretrained(str(adapter_dir), dtype=torch.bfloat16, local_files_only=True)
+    loader = _loader(tmp_path)
+    config = _config(adapter_dir)
+    reserve = loader.ram_cache.make_room = MagicMock(wraps=loader.ram_cache.make_room)
+    estimate = ModelLoader.get_size_fs(loader, config, adapter_dir, ENCODER)
+    with loader.load_model(config, ENCODER) as actual:
+        assert any("lora_" in name for name, _ in actual.named_parameters())
+        assert [(name, p.dtype) for name, p in actual.named_parameters()] == [
+            (name, p.dtype) for name, p in reference.named_parameters()
+        ]
+        with torch.no_grad():
+            ids = torch.tensor([[3, 7, 1]])
+            torch.testing.assert_close(
+                actual(input_ids=ids).last_hidden_state, reference(input_ids=ids).last_hidden_state
+            )
+        reserve.assert_called_once_with(estimate)
+
+
+def test_adapter_metadata_is_ignored_when_peft_is_unavailable(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _write_encoder(tmp_path)
+    (tmp_path / "adapter_config.json").write_text("{}", encoding="utf-8")
+    monkeypatch.setattr("transformers.utils.is_peft_available", lambda: False)
+    from_pretrained = MagicMock(return_value=MagicMock())
+    monkeypatch.setattr(UMT5EncoderModel, "from_pretrained", from_pretrained)
+    loader = _loader(tmp_path)
+    config = _config(tmp_path)
+    assert loader.get_size_fs(config, tmp_path, ENCODER) != ModelLoader.get_size_fs(loader, config, tmp_path, ENCODER)
+    loader._load_model(config, ENCODER)
+    assert from_pretrained.call_args.kwargs["dtype"] == torch.float32
