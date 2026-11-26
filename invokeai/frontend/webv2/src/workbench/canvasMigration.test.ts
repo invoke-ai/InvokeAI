@@ -247,7 +247,7 @@ describe('loadCanvasState', () => {
       control: [groupContract('cg', [createControlLayer({ id: 'control', name: 'Control' })], { isHidden: true })],
       inpaint_mask: [createInpaintMaskLayer('Mask', 'mask')],
       raster: [groupContract('rg', [createEmptyPaintLayer('Raster', 'raster'), groupContract('inner', [])])],
-      regional_guidance: [createRegionalGuidanceLayer('Region', 0, 'region')],
+      regional_guidance: [createRegionalGuidanceLayer('Region', undefined, 'region')],
     };
     const snapshot = {
       createdAt: 'now',
@@ -525,6 +525,25 @@ describe('loadCanvasState', () => {
       expect(loaded.document.version).toBe(3);
       expect(loaded.snapshots[0]?.document.version).toBe(6);
     });
+  });
+
+  it('writes version 8 for a Diagonal Left raster regenerate region in the live document or a snapshot', () => {
+    const region = (style: 'diagonal' | 'diagonal_left') => ({
+      ...createEmptyPaintLayer('Layer 1', 'layer-1'),
+      inpaint: { fill: { color: '#e07575', style }, isEnabled: true, name: 'Region' },
+    });
+    const live = load(withNodes([groupContract('group', [region('diagonal_left') as never])]));
+    expect(live.version).toBe(8);
+    expect(live.document.version).toBe(8);
+    expect(load(withNodes([region('diagonal')])).version).toBe(3);
+
+    const snapshotOnly = load({
+      ...createEmptyCanvasState(),
+      snapshots: [{ createdAt: 'now', document: withNodes([region('diagonal_left')]).document, id: 's', name: 'S' }],
+    });
+    expect(snapshotOnly.version).toBe(8);
+    expect(snapshotOnly.document.version).toBe(3);
+    expect(snapshotOnly.snapshots[0]?.document.version).toBe(8);
   });
 
   it('passes a valid state through normalized, keeping every persisted field', () => {

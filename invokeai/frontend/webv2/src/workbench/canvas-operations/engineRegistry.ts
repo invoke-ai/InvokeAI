@@ -8,7 +8,7 @@ import type {
 import type { LiveCanvasEngines } from '@workbench/projects/projectAssets';
 
 import { registerAccountOwnedResource } from '@platform/state/accountLifecycle';
-import { getDocumentLeaves } from '@workbench/canvas-engine/api';
+import { getDocumentLeaves, resetMaskFillColors } from '@workbench/canvas-engine/api';
 
 import type { createCanvasEngine, CanvasEngine, CanvasEngineOptions } from './createCanvasEngine';
 
@@ -217,6 +217,7 @@ registerAccountOwnedResource({
   clear: defaultRegistry.disposeAll,
   name: 'canvas-engine-registry',
 });
+registerAccountOwnedResource({ clear: resetMaskFillColors, name: 'canvas-mask-fill-colors' });
 
 export const getOrCreateEngine = defaultRegistry.getOrCreateEngine;
 export const releaseEngine = defaultRegistry.releaseEngine;
