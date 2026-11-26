@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from collections.abc import Iterable, Mapping
+from contextlib import AbstractContextManager
 from typing import Optional
 
 from invokeai.app.services.session_queue.session_queue_common import RetriedQueueItem, SessionQueueItem
@@ -33,12 +34,22 @@ class WorkingMemoryCalibrationServiceBase(ABC):
         """Called by the session runner before a calibration item runs: None to run it, or why it must fail."""
 
     @abstractmethod
+    def retry_admission(self, sources: Mapping[int, tuple[Optional[str], int]]) -> AbstractContextManager[None]:
+        """Held by the session queue from `retries_starting` through the commit of the retries, `sources` as there:
+        when an item is a calibration's, the lock every calibration attempt's creation holds from its checks through
+        its enqueue, so that no attempt is created between a retry's checks and its commit. A retry of generations
+        alone takes nothing. Raises `CalibrationStoreError` when the lock cannot be taken: the queue retries nothing."""
+
+    @abstractmethod
     def retries_starting(self, sources: Mapping[int, tuple[Optional[str], int]]) -> Optional[RetriesInFlight]:
         """Called by the session queue before it commits retries: per item a retry is made of, that item's origin and
         the item its lineage started from. Counts the retries in flight on the runs of the calibration items among
         them, in the store, so that a retry the store then fails to record keeps its attempt from feeding a fit. None
-        when no item is a calibration's, which touches no store file. Raises `CalibrationStoreError` when the store
-        cannot be written: the queue then retries nothing."""
+        when no item is a calibration's, which touches no store file. Raises `CalibrationAttemptBusyError` or
+        `CalibrationAttemptInterleavedError` when retrying one of the calibration items would break attempt exclusivity
+        (also an item of a run without an attempt, retried between another attempt's steps), and
+        `CalibrationStoreError` when the store cannot be written: the queue then retries nothing, the request's other
+        items included."""
 
     @abstractmethod
     def retries_committed(self, in_flight: RetriesInFlight, retried: Optional[Iterable[RetriedQueueItem]]) -> None:

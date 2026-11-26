@@ -50,12 +50,11 @@ class ZImageImageToLatentsInvocation(BaseInvocation, WithMetadata, WithBoard):
         image_tensor: torch.Tensor,
         tiled: bool = False,
         tile_size: int = 0,
-        deterministic: bool = False,
     ) -> torch.Tensor:
-        """Encode an image to a Z-Image latent: a sample of the encoder's distribution, or its mode when
-        ``deterministic``.
+        """Encode an image to a Z-Image latent: the mode of the encoder's distribution, so the same image always
+        encodes to the same latent.
 
-        `z_image_denoise` also encodes its control image here, deterministically as VideoX-Fun does, at
+        `z_image_denoise` also encodes its control image here, as VideoX-Fun does, at
         generation resolution. That is usually small enough to encode whole, but an upscale's generation
         resolution is the enlarged frame, so the control field carries its own `tiled` and `tile_size`.
         """
@@ -90,9 +89,7 @@ class ZImageImageToLatentsInvocation(BaseInvocation, WithMetadata, WithBoard):
             # state is scoped and restored rather than switched off by hand and left behind.
             with torch.inference_mode(), scoped_vae_tiling(vae, effective_tile_size):
                 latent_dist = vae.encode(image_tensor).latent_dist
-                latents: torch.Tensor = (latent_dist.mode() if deterministic else latent_dist.sample()).to(
-                    dtype=vae_dtype
-                )
+                latents: torch.Tensor = latent_dist.mode().to(dtype=vae_dtype)
 
             # Apply scaling_factor and shift_factor from VAE config.
             # Z-Image uses: latents = (latents - shift_factor) * scaling_factor

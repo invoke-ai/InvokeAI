@@ -51,8 +51,7 @@ class CogView4ImageToLatentsInvocation(BaseInvocation, WithMetadata, WithBoard):
             image_tensor = image_tensor.to(device=vae_info.compute_device, dtype=vae_dtype)
             with torch.inference_mode():
                 image_tensor_dist = vae.encode(image_tensor).latent_dist
-                # TODO: Use seed to make sampling reproducible.
-                latents: torch.Tensor = image_tensor_dist.sample().to(dtype=vae_dtype)
+                latents: torch.Tensor = image_tensor_dist.mode().to(dtype=vae_dtype)
 
             latents = vae.config.scaling_factor * latents
 

@@ -16,4 +16,7 @@ def encode_image_base64(image: PILImageType, format: str = "PNG") -> str:
 def decode_image_base64(encoded: str) -> PILImageType:
     data = base64.b64decode(encoded)
     image = Image.open(io.BytesIO(data))
+    # Keep transparency (e.g. a "transparent" background request) instead of flattening it away.
+    if image.mode in ("RGBA", "LA") or (image.mode == "P" and "transparency" in image.info):
+        return image.convert("RGBA")
     return image.convert("RGB")

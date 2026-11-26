@@ -680,7 +680,9 @@
       "guidance_max": null,
       "scheduler_set": "flow",
       "scheduler_applies_to_graph": false,
-      "control_kinds": [],
+      "control_kinds": [
+        "control_lora"
+      ],
       "max_reference_images": 3,
       "reference_images_require_variant": null,
       "reference_images_require_vision_tower": false,
@@ -733,7 +735,9 @@
       "guidance_max": null,
       "scheduler_set": "flow",
       "scheduler_applies_to_graph": false,
-      "control_kinds": [],
+      "control_kinds": [
+        "control_lora"
+      ],
       "max_reference_images": 3,
       "reference_images_require_variant": null,
       "reference_images_require_vision_tower": false,

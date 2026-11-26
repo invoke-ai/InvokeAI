@@ -573,7 +573,7 @@ def preflight(manifest: Manifest, gpu: Gpu) -> None:
         if not path.is_file():
             raise RunnerError(f"{path} does not exist")
     template_root = spec.template_root
-    settings = read_template_settings(template_root)
+    settings = read_template_settings(spec)
     pending = pending_installs(template_root, settings)
     if pending:
         raise RunnerError(
@@ -883,7 +883,7 @@ class _Session:
         survivors = "its stop did not finish"
         try:
             pin = device_env(self.gpu.adapter, self.manifest.server.env)
-            build_scratch_root(self.manifest.server.template_root, root, log_path, free_port(), bool(pin))
+            build_scratch_root(self.manifest.server, root, log_path, free_port(), bool(pin))
             self.heartbeat("starting the server")
             try:
                 self.server = launch_server(

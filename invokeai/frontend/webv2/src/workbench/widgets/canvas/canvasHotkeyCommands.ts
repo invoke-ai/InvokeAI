@@ -37,6 +37,7 @@ import {
   deleteLayers,
   duplicateLayers,
   groupLayers,
+  prepareNewRasterLayer,
   ungroupLayers,
   type LayerCommandDeps,
 } from '@workbench/widgets/layers/layerCommands';
@@ -67,6 +68,8 @@ export const CANVAS_ONLY_HOTKEYS = [
   ['canvas.nudgeRightLarge', 'widgets.canvas.commands.nudgeRightLarge', ['shift+arrowright']],
   ['canvas.nudgeUpLarge', 'widgets.canvas.commands.nudgeUpLarge', ['shift+arrowup']],
   ['canvas.nudgeDownLarge', 'widgets.canvas.commands.nudgeDownLarge', ['shift+arrowdown']],
+  // Mod+Shift+N is reserved by browsers; creation stays unbound until customized.
+  ['canvas.newRasterLayer', 'widgets.canvas.commands.newRasterLayer', [], { ignoreRepeat: true }],
   ['canvas.duplicateLayer', 'widgets.canvas.commands.duplicateLayer', ['mod+j']],
   ['canvas.groupLayers', 'widgets.canvas.commands.groupLayers', ['mod+g']],
   ['canvas.ungroupLayers', 'widgets.canvas.commands.ungroupLayers', ['mod+shift+g']],
@@ -246,6 +249,10 @@ export const executeCanvasHotkeyCommand = (commandId: string, ctx: CanvasHotkeyC
     ctx.copySelection(commandId === 'canvas.cutSelection');
   } else if (commandId === 'canvas.pasteImage') {
     ctx.pasteFromClipboard();
+  } else if (commandId === 'canvas.newRasterLayer') {
+    ctx.reportPreparedCommit(
+      commitPreparedEdit(engine, t('widgets.layers.actions.addRasterLayer'), prepareNewRasterLayer)
+    );
   } else if (commandId === 'canvas.cropAllLayersToFrame') {
     ctx.cropAllLayers();
   } else if (commandId === 'canvas.flipHorizontal' || commandId === 'canvas.flipVertical') {

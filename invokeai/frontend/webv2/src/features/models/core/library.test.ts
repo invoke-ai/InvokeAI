@@ -318,4 +318,27 @@ describe('sort fields', () => {
 
     expect(sorted).toEqual(['main', 'main', 'lora', 'vae']);
   });
+
+  it('sorts by install order, newest for a model the order does not list, and by name until the order loads', () => {
+    const ranks = new Map([
+      ['c', 0],
+      ['a', 1],
+      ['d', 2],
+    ]);
+    const sortedKeys = (sortDirection: 'asc' | 'desc') =>
+      filterModels(library, { ...DEFAULT_LIBRARY_FILTERS, sortDirection, sortField: 'added' }, NO_MISSING, ranks).map(
+        (m) => m.key
+      );
+
+    expect(sortedKeys('asc')).toEqual(['c', 'a', 'd', 'b']);
+    expect(sortedKeys('desc')).toEqual(['b', 'd', 'a', 'c']);
+    expect(
+      filterModels(
+        library,
+        { ...DEFAULT_LIBRARY_FILTERS, sortDirection: 'desc', sortField: 'added' },
+        NO_MISSING,
+        null
+      ).map((m) => m.key)
+    ).toEqual(['c', 'b', 'a', 'd']);
+  });
 });

@@ -48,7 +48,7 @@ A pick that changes a layer is one undoable step. Gradient stops are not picked 
 
 ### Tool options
 
-* **Brush** — **Size**, **Opacity** and **Hardness**; the **Foreground** color; and, under **Dynamics**, whether pen pressure affects the width or the opacity. **[** and **]** make the brush smaller or larger, and so does **Ctrl**+scroll. Painting on an image layer, such as an accepted result or an added picture, paints on that layer itself instead of adding a new one; one undo restores the original image. **Shift**-click joins the click to the end of the last Brush or Eraser stroke on the same layer with a straight line. The line follows the selection and the frame clipping like any stroke, and one undo removes it. Undo, redo or deleting the layer clears the remembered point, so the next **Shift**-click paints a dot.
+* **Brush** — **Size**, **Opacity** and **Hardness**; the **Foreground** color; and, under **Dynamics**, whether pen pressure affects the width or the opacity. **[** and **]** make the brush smaller or larger, and so does **Ctrl**+scroll with a mouse wheel. On a trackpad, **Ctrl**+scroll zooms instead. Painting on an image layer, such as an accepted result or an added picture, paints on that layer itself instead of adding a new one; one undo restores the original image. **Shift**-click joins the click to the end of the last Brush or Eraser stroke on the same layer with a straight line. The line follows the selection and the frame clipping like any stroke, and one undo removes it. Undo, redo or deleting the layer clears the remembered point, so the next **Shift**-click paints a dot.
 * **Eraser** — **Size**, **Opacity** and **Hardness**; and, under **Dynamics**, whether pen pressure affects the width. Pressure never changes how strongly the eraser erases.
 
 The Brush, Eraser, Shape and Text options are remembered for your account, so they are the same in every project and after a reload. Colors are the project's own.
@@ -95,7 +95,7 @@ In InvokeAI 6, the Lasso drew directly into an inpaint mask, and created one if 
 
 ## Navigating the canvas
 
-* **Zoom** with the mouse wheel, which zooms around the pointer, or choose a level from the zoom menu in the header (25% to 500%). **Ctrl+1**, **Ctrl+2**, **Ctrl+3** and **Ctrl+4** zoom to 100%, 200%, 400% and 800% around the center of the view. Many browsers use these keys to switch tabs and do not pass them to the page; there, choose **Zoom to 100%**, **Zoom to 200%**, **Zoom to 400%** or **Zoom to 800%** from the command palette (**Ctrl+K**), or assign other keys in **Settings → Hotkeys**.
+* **Zoom** with the mouse wheel, which zooms around the pointer, or choose a level from the zoom menu in the header (25% to 500%). **Ctrl+1**, **Ctrl+2**, **Ctrl+3** and **Ctrl+4** zoom to 100%, 200%, 400% and 800% around the center of the view. Many browsers use these keys to switch tabs and do not pass them to the page; there, choose **Zoom to 100%**, **Zoom to 200%**, **Zoom to 400%** or **Zoom to 800%** from the command palette (**Ctrl+K**), or assign other keys in **Settings → Hotkeys**. On a trackpad, two-finger scrolling pans the view and pinching zooms around the pointer. The canvas recognizes a trackpad the first time you pinch or scroll diagonally on it, and remembers it in that browser; a mouse wheel keeps zooming. If it gets your device wrong, set **Scroll input** in the canvas settings.
 * **Pan** with the Pan tool, by holding **Space**, or by dragging with the middle mouse button.
 * **Fit to view**, at the top of the header's zoom menu, fits the generation frame and all layers into the window.
 
@@ -213,6 +213,7 @@ The gear button in the header opens the canvas settings. They are saved with the
 <Image src={canvasSettings} alt="The Canvas settings popover with Behavior, Display and Grid options." width={420} />
 
 * **Behavior**
+  * **Scroll input** — **Auto-detect** (the default) zooms with a mouse wheel, and pans and pinch-zooms with a trackpad. If your device is misread, choose it: a mouse with smooth scrolling can look like a trackpad once one was recognized. With **Mouse wheel**, scrolling zooms and **Ctrl**+scroll resizes the brush. With **Trackpad**, scrolling pans and **Ctrl**+scroll zooms. **[** and **]** resize the brush in every mode.
   * **Invert scroll for brush size** — reverses **Ctrl**+scroll brush sizing.
   * **Clip strokes to frame** — keeps painting inside the generation frame.
   * **Output only generated regions** — when on, an inpainting or outpainting result contains only the regenerated area, with the rest transparent; when off, it includes the whole frame.
@@ -241,6 +242,8 @@ The canvas belongs to its project and is saved with it automatically. To keep a 
 These shortcuts work while the canvas has focus; then they take the key from a workbench shortcut that shares it, such as **T** and **G** for the side panels, as **Settings → Hotkeys** notes. On macOS, use **Cmd** in place of **Ctrl**. The canvas's shortcut hints show the gestures of the active tool.
 
 The tool keys, **Shift+T**, **[** and **]**, and **X** and **D** also work after you click in the Layers panel or its Color pane, so you can pick a layer or a color and switch tools without clicking back on the canvas. **Escape** and holding or tapping **C** work from the Layers panel too, but **Enter** applies a transform, text or filter only while the canvas has focus. None of these keys act while you type in a text field.
+
+To create a raster layer from the keyboard, assign a shortcut to **New raster layer** under **Settings → Keyboard shortcuts → Canvas**. It has no default binding, leaving browser-reserved shortcuts untouched. With the canvas focused, it adds and selects an empty raster layer using the same insertion and undo behavior as the Layers panel.
 
 | Shortcut | Action |
 |---|---|

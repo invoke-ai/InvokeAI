@@ -2,7 +2,7 @@
 
 import type { ArchitectureCapabilitiesRow } from '@features/models/architectures';
 
-import { getArchitectureCapabilityRow } from '@features/models/architectures';
+import { getArchitectureCapabilityRow, isFluxFillModel } from '@features/models/architectures';
 
 import type { BaseGenerationConfig, GuidanceLabel } from './generationConfig';
 
@@ -10,6 +10,12 @@ const FALLBACK_STEPS = 30;
 const FALLBACK_CFG_SCALE = 7;
 const FALLBACK_SCHEDULER = 'euler_a';
 const FALLBACK_OPTIMAL_SIDE = 1024;
+
+/**
+ * `flux_denoise` warns below this: FLUX Fill was trained on guidance of about 30 and degrades at the FLUX dev default.
+ * A frontend product floor, stricter than the node-enforced `guidance_min` the backend serves.
+ */
+const FLUX_FILL_MIN_GUIDANCE = 25;
 
 /** guidance_label selects the field; CFG-off markers are not guidance values. */
 const guidanceValue = (defaults: NonNullable<ArchitectureCapabilitiesRow['defaults']>, label: GuidanceLabel): number =>
@@ -45,7 +51,10 @@ export const toBaseGenerationConfig = (row: ArchitectureCapabilitiesRow): BaseGe
     schedulerAppliesToGraph: features.scheduler_applies_to_graph,
     guidanceLabel,
     // Nullish fallbacks support older backend fields without producing NaN bounds.
-    guidance: { min: features.guidance_min ?? 1, max: features.guidance_max ?? null },
+    guidance: {
+      min: Math.max(features.guidance_min ?? 1, isFluxFillModel(row) ? FLUX_FILL_MIN_GUIDANCE : 0),
+      max: features.guidance_max ?? null,
+    },
     negativePrompt: features.negative_prompt,
     ui: {
       sdVaeOverride: features.sd_vae_override,

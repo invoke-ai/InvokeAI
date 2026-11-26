@@ -24,16 +24,13 @@ import { MaskModifierSettings } from '@workbench/widgets/layers/MaskModifierSett
 import { RasterLayerFilterSection } from '@workbench/widgets/layers/RasterLayerFilterSection';
 import { ReferenceImageSettings } from '@workbench/widgets/layers/ReferenceImageSettings';
 import { RegionalGuidanceSettings } from '@workbench/widgets/layers/RegionalGuidanceSettings';
+import { VectorLayerSettings } from '@workbench/widgets/layers/VectorLayerSettings';
 import { useActiveProjectId, useActiveProjectSelector } from '@workbench/WorkbenchContext';
-import { lazy, Suspense, useCallback, useMemo } from 'react';
+import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { GroupSelectedNotice } from './GroupSelectedNotice';
 import { PropertiesSection } from './PropertiesSection';
-
-const VectorLayerSettings = lazy(() =>
-  import('@workbench/widgets/layers/VectorLayerSettings').then((module) => ({ default: module.VectorLayerSettings }))
-);
 
 type LayerSectionEngine = Pick<
   CanvasEngineHandle,
@@ -59,6 +56,7 @@ export const LayerSection = ({ disabled }: { disabled: boolean }) => {
   return (
     <PropertiesSection
       disabled={disabled}
+      sectionId="layer"
       subtitle={child ? child.subtitle : (node?.name ?? t('widgets.transform.noSelection'))}
       title={t('widgets.properties.sections.layer')}
     >
@@ -156,15 +154,9 @@ const LayerTypeSettings = ({
   engine: LayerSectionEngine | null;
   layer: CanvasLayerContract;
 }) => {
-  const { t } = useTranslation();
-  const loading = useMemo(() => <Text>{t('common.loading')}</Text>, [t]);
   switch (layer.type) {
     case 'vector':
-      return (
-        <Suspense fallback={loading}>
-          <VectorLayerSettings key={layer.id} engine={engine} layer={layer} />
-        </Suspense>
-      );
+      return <VectorLayerSettings key={layer.id} engine={engine} layer={layer} />;
     case 'inpaint_mask':
       return <InpaintMaskSettings key={layer.id} engine={engine} layer={layer} />;
     case 'regional_guidance':

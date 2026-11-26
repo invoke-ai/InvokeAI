@@ -15,6 +15,7 @@ import {
   CANVAS_SNAP_TO_GRID_KEY,
   canvasSettingsEqual,
   readCanvasBooleanSetting,
+  readCanvasScrollInput,
   resolveCanvasSettings,
 } from './canvasSettings';
 
@@ -84,6 +85,12 @@ describe('canvasSettings persistence mapping', () => {
     expect(
       readCanvasBooleanSetting(resolvedValues({ [CANVAS_SHOW_GRID_KEY]: 1 }), settingByKey(CANVAS_SHOW_GRID_KEY))
     ).toBe(false);
+  });
+
+  it('reads the scroll input, falling back to auto-detection for anything unknown', () => {
+    expect(readCanvasScrollInput(resolvedValues({ scrollInput: 'trackpad' }))).toBe('trackpad');
+    expect(readCanvasScrollInput(resolvedValues({ scrollInput: true }))).toBe('auto');
+    expect(readCanvasScrollInput(undefined)).toBe('auto');
   });
 
   it('maps every setting to a unique persisted key', () => {

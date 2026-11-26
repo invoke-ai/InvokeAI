@@ -35,7 +35,6 @@ const ROOT_PROP_NAMES = new Set([
   'onOpenChange',
   'open',
   'openDelay',
-  'positioning',
   'present',
   'unmountOnExit',
 ]);
@@ -106,7 +105,28 @@ const POINTER_EVENTS = ['onPointerMove', 'onPointerOver'] as const;
 const ARRIVAL_EVENTS = ['onFocus', 'onPointerMove', 'onPointerOver'] as const;
 const alwaysHidden = () => true;
 
-type TooltipPlacement = NonNullable<NonNullable<ChakraTooltip.RootProps['positioning']>['placement']>;
+type TooltipPositioning = NonNullable<ChakraTooltip.RootProps['positioning']>;
+type TooltipPlacement = NonNullable<TooltipPositioning['placement']>;
+type UpdatePosition = NonNullable<TooltipPositioning['updatePosition']>;
+
+/**
+ * A tip takes the z-index of the overlay holding its trigger (the recipe's page value otherwise), plus one when it
+ * precedes that overlay in the DOM. A placement can run before Zag assigns the overlay's layer index; autoUpdate's
+ * first observer callback, a frame later, places it again with the final value.
+ */
+const stackInTriggerLayer = (tip: HTMLElement | null, tooltipId: string): void => {
+  // Zag marks the trigger with its tooltip's id, ref or not; a shared menu or popover trigger lists both owners and may
+  // carry the other's data-scope, so only the owner word is matched.
+  const owned = `[data-ownedby~="${CSS.escape(tooltipId)}"]`;
+  const layer = tip && (tip.getRootNode() as ParentNode).querySelector(owned)?.closest('[data-part="positioner"]');
+  const layerContent = layer?.firstElementChild;
+  const zIndex = layerContent ? Number(getComputedStyle(layerContent).zIndex) : Number.NaN;
+  if (tip && layer && Number.isFinite(zIndex)) {
+    const precedesLayer = layer.compareDocumentPosition(tip) & Node.DOCUMENT_POSITION_PRECEDING;
+    // An inline value of its own keeps Zag from copying the content's.
+    tip.style.zIndex = String(precedesLayer ? zIndex + 1 : zIndex);
+  }
+};
 
 export interface TooltipProps extends ChakraTooltip.RootProps {
   showArrow?: boolean;
@@ -141,15 +161,24 @@ export const Tooltip = (props: TooltipProps) => {
     contentRef,
     placement,
     portalRef,
+    positioning: callerPositioning,
     ref,
     triggerProps,
     ...rest
   } = props;
   const { rootProps, triggerProps: triggerPassthroughProps } = splitTooltipProps(rest);
-
-  if (placement) {
-    rootProps.positioning = { placement, ...(rootProps.positioning as object | undefined) };
-  }
+  const tooltipId = useId();
+  const updatePosition = useCallback<UpdatePosition>(
+    (details) => {
+      stackInTriggerLayer(details.floatingElement, tooltipId);
+      return callerPositioning?.updatePosition ? callerPositioning.updatePosition(details) : details.updatePosition();
+    },
+    [callerPositioning, tooltipId]
+  );
+  const positioning = useMemo(
+    () => ({ ...(placement ? { placement } : {}), ...callerPositioning, updatePosition }),
+    [callerPositioning, placement, updatePosition]
+  );
   const { ref: explicitTriggerRef, ...explicitTriggerProps } = triggerProps ?? {};
   const mergedTriggerProps = { ...triggerPassthroughProps, ...explicitTriggerProps };
   const hasTriggerPassthrough = ref || explicitTriggerRef || Object.keys(mergedTriggerProps).length > 0;
@@ -179,7 +208,12 @@ export const Tooltip = (props: TooltipProps) => {
 
   // Shut through the controlled prop; the gate above keeps the pointer from opening around it.
   return (
-    <ChakraTooltip.Root {...(rootProps as ChakraTooltip.RootProps)} {...(isKeptShut ? { open: false } : {})}>
+    <ChakraTooltip.Root
+      {...(rootProps as ChakraTooltip.RootProps)}
+      id={tooltipId}
+      positioning={positioning}
+      {...(isKeptShut ? { open: false } : {})}
+    >
       <ChakraTooltip.Trigger asChild>{triggerChild}</ChakraTooltip.Trigger>
       <Portal disabled={!portalled} container={portalRef}>
         <ChakraTooltip.Positioner>
@@ -300,6 +334,17 @@ const TooltipGroupRoot = ({
   }
 
   const ids = useMemo(() => ({ trigger: (triggerValue?: string) => getTriggerId(triggerValue ?? '') }), [getTriggerId]);
+  const tooltipId = useId();
+  // All triggers share one layer, so whichever the lookup finds places the tip.
+  const positioning = useMemo<TooltipPositioning>(
+    () => ({
+      updatePosition: (details) => {
+        stackInTriggerLayer(details.floatingElement, tooltipId);
+        return details.updatePosition();
+      },
+    }),
+    [tooltipId]
+  );
   const handleOpenChange = useCallback(
     (details: { open: boolean }) => dispatch({ type: details.open ? 'open' : 'close' }),
     []
@@ -314,8 +359,10 @@ const TooltipGroupRoot = ({
   return (
     <ChakraTooltip.Root
       closeOnScroll={closeOnScroll}
+      id={tooltipId}
       ids={ids}
       open={isShown}
+      positioning={positioning}
       onOpenChange={handleOpenChange}
       onTriggerValueChange={handleTriggerValueChange}
     >
