@@ -233,6 +233,7 @@ def test_valid_tekken_file_is_read_before_transformers_sees_the_dir(
     assert isinstance(tokenizer, mistral_encoder._TekkenRawTextAdapter)
     assert tokenizer is not probe_result
     assert probe.calls == [], "the directory must never be handed to transformers"
+    assert mistral_encoder._mistral_tokenizer_host_bytes_needed(tekken_model_dir) == 102 * 2**20
 
 
 def test_tekken_markers_encode_as_single_special_ids(tekken_model_dir: Path) -> None:
