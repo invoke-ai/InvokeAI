@@ -176,7 +176,7 @@ def test_mistral_local_tekken_admission_covers_parser_peak(tmp_path: Path, locat
     loader = _loader(MistralEncoderDiffusersLoader)
 
     assert loader.get_size_fs(SimpleNamespace(), tmp_path, SubModelType.Tokenizer) == 18 * 2**20
-    assert loader._get_host_bytes_needed(SimpleNamespace(), tmp_path, SubModelType.Tokenizer) == 102 * 2**20
+    assert loader._get_host_bytes_needed(SimpleNamespace(), tmp_path, SubModelType.Tokenizer) == 104 * 2**20
 
 
 def test_qwen3_5_encoder_cached_tokenizer_has_no_second_cold_charge(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
@@ -399,7 +399,7 @@ def test_mistral_diffusers_without_local_vocabulary_admits_hf_fallback_before_pa
     hf_fallback_parser.assert_called_once()
     hf_fallback_parser.reset_mock()
 
-    expected_cold_fallback_bytes = max(calc_tokenizer_size_by_fs(model_dir, include_runtime_overhead=True), 102 * 2**20)
+    expected_cold_fallback_bytes = max(calc_tokenizer_size_by_fs(model_dir, include_runtime_overhead=True), 104 * 2**20)
     assert loader._get_host_bytes_needed(config, model_dir, SubModelType.Tokenizer) == expected_cold_fallback_bytes
 
     def make_room(_size: int, *, host_bytes_needed: int = 0):

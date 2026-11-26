@@ -825,13 +825,13 @@ def _mistral_tokenizer_host_bytes_needed(model_path: Path) -> int:
             return embedded_size * TOKENIZER_EMBEDDED_RUNTIME_MULTIPLIER
         # A single-file checkpoint without Tekken falls through to the canonical HF tokenizer. It
         # still parses that tokenizer before returning, even though the checkpoint owns no vocab.
-        return 102 * 2**20
+        return _TEKKEN_PARSE_HEADROOM_BYTES
     tokenizer_dir = model_path / "tokenizer"
     if tokenizer_dir.is_dir() and (tokenizer_dir / _TEKKEN_FILENAME).is_file():
-        return max((tokenizer_dir / _TEKKEN_FILENAME).stat().st_size, 102 * 2**20)
+        return max((tokenizer_dir / _TEKKEN_FILENAME).stat().st_size, _TEKKEN_PARSE_HEADROOM_BYTES)
     root_tekken = model_path / _TEKKEN_FILENAME
     if root_tekken.is_file():
-        return max(root_tekken.stat().st_size, 102 * 2**20)
+        return max(root_tekken.stat().st_size, _TEKKEN_PARSE_HEADROOM_BYTES)
     if tokenizer_dir.is_dir() and _has_hf_tokenizer_vocabulary(tokenizer_dir):
         return calc_tokenizer_size_by_fs(tokenizer_dir, include_runtime_overhead=True)
     for checkpoint in sorted((model_path / "text_encoder").glob("*.safetensors")):
@@ -844,7 +844,7 @@ def _mistral_tokenizer_host_bytes_needed(model_path: Path) -> int:
     # With no local vocabulary, the wrapper probes metadata at the root and then parses the
     # canonical HF tokenizer. The directory scan alone can be zero (or count only metadata), so
     # retain a cold parse allowance for that fallback.
-    return max(local_tokenizer_bytes, 102 * 2**20)
+    return max(local_tokenizer_bytes, _TEKKEN_PARSE_HEADROOM_BYTES)
 
 
 def _try_load_embedded_tekken(model_path: Path, logger: Any, *, flux2_template: bool) -> Optional[AnyModel]:
@@ -907,6 +907,8 @@ def _try_load_embedded_tekken(model_path: Path, logger: Any, *, flux2_template: 
 # Filename of the standalone Tekken vocab shipped by official mistralai downloads and by the
 # BFL-style standalone-encoder layouts these loaders accept.
 _TEKKEN_FILENAME = "tekken.json"
+# A real 18.4 MiB Tekken file peaked at 102.3 MiB while parsing; round up for admission.
+_TEKKEN_PARSE_HEADROOM_BYTES = 104 * 2**20
 
 
 def _tekken_adapter_from_file(tekken_path: Path, description: str, logger: Any) -> Optional[AnyModel]:
