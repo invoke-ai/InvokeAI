@@ -15,8 +15,10 @@ import type { TFunction } from 'i18next';
 import { createControlLayer, createDocumentModel } from '@workbench/canvas-engine/api';
 import { groupContract, stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { stackTopAnchor } from '@workbench/canvas-engine/document/insertionAnchors.testStub';
+import { applyCanvasProjectMutation } from '@workbench/canvasProjectMutations';
 import { firstPartyHotkeyCatalog } from '@workbench/hotkeys/catalog';
 import { deleteLayers, duplicateLayers, groupLayers, ungroupLayers } from '@workbench/widgets/layers/layerCommands';
+import { createInitialWorkbenchState } from '@workbench/workbenchState';
 import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 
 // The layer commands own their eligibility, labels and feedback (see layerCommands tests); here only routing counts.
@@ -30,7 +32,7 @@ vi.mock('@workbench/widgets/layers/layerCommands', async (importOriginal) => ({
 
 import { CANVAS_HEADER_HOTKEYS } from './canvasHeaderCommands';
 import { CANVAS_ONLY_HOTKEYS, executeCanvasHotkeyCommand, type CanvasHotkeyContext } from './canvasHotkeyCommands';
-import { CANVAS_COMPANION_HOTKEYS, reportMergeDownRefusal } from './canvasToolCommands';
+import { CANVAS_COMPANION_HOTKEYS, type HotkeyTableEntry, reportMergeDownRefusal } from './canvasToolCommands';
 
 const rasterLayer = (id: string, overrides: Partial<CanvasLayerContract> = {}): CanvasLayerContract =>
   ({
@@ -431,16 +433,58 @@ describe('group selection', () => {
   });
 });
 
+describe('new raster layer', () => {
+  it('inserts and selects a layer above a group child with a reversible prepared edit', () => {
+    const project = { ...createInitialWorkbenchState().projects[0]!, id: 'project' };
+    const before = applyCanvasProjectMutation(project, {
+      document: {
+        ...documentOf([], 'paint'),
+        stacks: stacksFrom([groupContract('group', [rasterLayer('paint')])]),
+      },
+      type: 'replaceCanvasDocument',
+    });
+    const engine = run('canvas.newRasterLayer', { document: before.canvas.document });
+    const commit = engine.layers.commitPrepared as Mock<CanvasEngine['layers']['commitPrepared']>;
+    expect(commit).toHaveBeenCalledOnce();
+    const [label, edit] = commit.mock.calls[0]!;
+    expect(label).toBe('widgets.layers.actions.addRasterLayer');
+
+    const after = applyCanvasProjectMutation(before, edit.forward);
+    const group = after.canvas.document.stacks.raster[0]!;
+    expect(group.type).toBe('group');
+    if (group.type !== 'group') {
+      throw new Error('Expected the existing group');
+    }
+    expect(group.children).toHaveLength(2);
+    expect(group.children[0]).toMatchObject({
+      id: after.canvas.document.selectedLayerId,
+      name: 'Layer 1',
+      source: { bitmap: null, type: 'paint' },
+      type: 'raster',
+    });
+    expect(group.children[1]!.id).toBe('paint');
+
+    const restored = applyCanvasProjectMutation(after, edit.inverse);
+    expect(restored.canvas.document).toEqual(before.canvas.document);
+    expect(applyCanvasProjectMutation(restored, edit.forward).canvas.document).toEqual(after.canvas.document);
+  });
+});
+
 describe('registration tables', () => {
   const allEntries = [...CANVAS_COMPANION_HOTKEYS, ...CANVAS_ONLY_HOTKEYS, ...CANVAS_HEADER_HOTKEYS];
 
-  it('mirrors every registered key in the hotkey catalog with the same defaults, under Canvas', () => {
+  it('mirrors registered defaults and repeat policy in the Canvas catalog', () => {
     const catalogDefaults = Object.fromEntries(
       firstPartyHotkeyCatalog
         .filter((hotkey) => hotkey.category === 'canvas')
-        .map((hotkey) => [hotkey.id, hotkey.defaultKeys])
+        .map((hotkey) => [hotkey.id, { defaultKeys: hotkey.defaultKeys, ignoreRepeat: hotkey.ignoreRepeat }])
     );
-    const registeredDefaults = Object.fromEntries(allEntries.map(([id, , keys]) => [id, [...keys]]));
+    const registeredDefaults = Object.fromEntries(
+      (allEntries as readonly HotkeyTableEntry[]).map(([id, , keys, options]) => [
+        id,
+        { defaultKeys: [...keys], ignoreRepeat: options?.ignoreRepeat },
+      ])
+    );
 
     expect(registeredDefaults).toEqual(catalogDefaults);
   });

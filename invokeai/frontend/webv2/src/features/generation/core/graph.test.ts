@@ -923,12 +923,91 @@ describe('Krea-2, Ideogram 4 and Wan graphs', () => {
     expect(getEdge(graph, 'denoise_latents', 'negative_conditioning')).toBeUndefined();
   });
 
+  it.each([
+    ['V4_QUALITY_48', 48],
+    ['V4_DEFAULT_20', 20],
+    ['V4_TURBO_12', 12],
+  ] as const)('records Ideogram 4 preset %s without sending unset overrides', (preset, steps) => {
+    const graph = compile(ideogram4Model, { cfgScale: 0, ideogram4SamplerPreset: preset, steps: 99 });
+
+    expect(graph.nodes.denoise_latents).toMatchObject({ sampler_preset: preset });
+    expect(graph.nodes.denoise_latents).not.toHaveProperty('steps');
+    expect(graph.nodes.denoise_latents).not.toHaveProperty('guidance_scale');
+    expect(graph.nodes.denoise_latents).not.toHaveProperty('mu');
+    expect(getNodeByType(graph, 'core_metadata')).toMatchObject({
+      cfg_scale: 7,
+      ideogram4_guidance_scale: null,
+      ideogram4_sampler_preset: preset,
+      ideogram4_steps: null,
+      steps,
+    });
+  });
+
+  it('sends and records explicit Ideogram 4 overrides', () => {
+    const graph = compile(ideogram4Model, {
+      ideogram4GuidanceScale: 6,
+      ideogram4Mu: 1.5,
+      ideogram4SamplerPreset: 'V4_TURBO_12',
+      ideogram4Steps: 18,
+    });
+
+    expect(graph.nodes.denoise_latents).toMatchObject({
+      guidance_scale: 6,
+      mu: 1.5,
+      sampler_preset: 'V4_TURBO_12',
+      steps: 18,
+    });
+    expect(getNodeByType(graph, 'core_metadata')).toMatchObject({
+      cfg_scale: 6,
+      ideogram4_guidance_scale: 6,
+      ideogram4_mu: 1.5,
+      ideogram4_steps: 18,
+      steps: 18,
+    });
+  });
+
   it('emits a single-frame image output for Wan, not a video', () => {
     const graph = compile(wanDiffusers);
 
     expect(graph.nodes.model_loader?.type).toBe('wan_model_loader');
     expect(graph.nodes.canvas_output?.type).toBe('wan_l2i');
     expect(getNodeByType(graph, 'wan_l2v')).toBeUndefined();
+  });
+
+  it('passes the optional Wan low-noise expert to a single-file A14B model, and to no other', () => {
+    const wanHigh: MainModelConfig = {
+      base: 'wan',
+      format: 'gguf_quantized',
+      key: 'wan-high',
+      name: 'Wan high noise',
+      type: 'main',
+      variant: 't2v_a14b',
+    };
+    const wanLow: MainModelConfig = { ...wanHigh, key: 'wan-low-gguf', name: 'Wan low noise' };
+    // The loader takes the VAE of a component source only beside the same variant family.
+    const source = {
+      componentSourceModel: { ...wanDiffusers, key: 'wan-a14b-diffusers', variant: 't2v_a14b' } as const,
+    };
+
+    // Omit undefined optional fields instead of serializing null.
+    expect(compile(wanHigh, source).nodes.model_loader?.transformer_low_noise_model).toBeUndefined();
+    expect(compile(wanHigh, { ...source, wanLowNoiseModel: wanLow }).nodes.model_loader).toMatchObject({
+      transformer_low_noise_model: wanLow,
+    });
+    // The loader ignores it for a Diffusers or TI2V-5B model, so a stale pick never reaches the graph.
+    const wanLowNoise: MainModelConfig = {
+      ...wanDiffusers,
+      key: 'wan-low',
+      name: 'Wan low noise',
+      variant: 'i2v_a14b',
+    };
+    const stale = compile(wanDiffusers, { wanLowNoiseModel: wanLowNoise });
+
+    expect(stale.nodes.model_loader?.transformer_low_noise_model).toBeUndefined();
+    // A project saved before the picker listed single-file experts only can hold a Diffusers pipeline for an A14B
+    // model: Generate names it instead of sending what the loader rejects.
+    expect(() => compile(wanHigh, { ...source, wanLowNoiseModel: wanLowNoise })).toThrow(/low-noise expert/);
+    expect(JSON.stringify(stale)).not.toContain('wan_transformer_low_noise');
   });
 
   it('routes Wan LoRAs through the transformer only, leaving the text encoder unpatched', () => {

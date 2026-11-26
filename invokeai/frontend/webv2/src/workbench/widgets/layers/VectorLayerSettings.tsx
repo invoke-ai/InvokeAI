@@ -8,8 +8,11 @@ import { ScrubberField } from '@platform/ui/ScrubberField';
 import { DEFAULT_VECTOR_GUIDE_COLOR, DEFAULT_VECTOR_STROKE_WIDTH } from '@workbench/canvas-engine/api';
 import { PropertyControlRow, PropertySwitchRow } from '@workbench/widgets/canvas/tool-presentation/PropertyPrimitives';
 import { useColorSampler } from '@workbench/widgets/canvas/useColorSampler';
-import { baselineConfig, useStructuralPreview } from '@workbench/widgets/canvas/useStructuralCommit';
-import { vectorTraceErrorKey } from '@workbench/widgets/canvas/vectorTraceNotice';
+import {
+  baselineConfig,
+  useStructuralPreview,
+  vectorTraceErrorKey,
+} from '@workbench/widgets/canvas/useStructuralCommit';
 import { PaintBucketIcon, SquareIcon } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';

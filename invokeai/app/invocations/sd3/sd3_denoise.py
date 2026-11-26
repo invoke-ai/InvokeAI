@@ -1,3 +1,4 @@
+import math
 from contextlib import ExitStack
 from pathlib import Path
 from typing import Any, Callable, Optional, Tuple
@@ -348,8 +349,8 @@ class SD3DenoiseInvocation(BaseInvocation, WithMetadata):
         transformer_info = context.models.load(self.transformer.transformer)
 
         # Load/process the conditioning data.
-        # TODO(ryand): Make CFG optional.
-        do_classifier_free_guidance = True
+        cfg_scales = [self.cfg_scale] if isinstance(self.cfg_scale, float) else self.cfg_scale
+        any_cfg = self.negative_conditioning is not None and any(not math.isclose(s, 1.0) for s in cfg_scales)
         pos_prompt_embeds, pos_pooled_prompt_embeds = self._load_text_conditioning(
             context=context,
             conditioning_name=self.positive_conditioning.conditioning_name,
@@ -357,16 +358,20 @@ class SD3DenoiseInvocation(BaseInvocation, WithMetadata):
             dtype=inference_dtype,
             device=device,
         )
-        neg_prompt_embeds, neg_pooled_prompt_embeds = self._load_text_conditioning(
-            context=context,
-            conditioning_name=self.negative_conditioning.conditioning_name,
-            joint_attention_dim=transformer_info.model.config.joint_attention_dim,
-            dtype=inference_dtype,
-            device=device,
-        )
-        # TODO(ryand): Support both sequential and batched CFG inference.
-        prompt_embeds = torch.cat([neg_prompt_embeds, pos_prompt_embeds], dim=0)
-        pooled_prompt_embeds = torch.cat([neg_pooled_prompt_embeds, pos_pooled_prompt_embeds], dim=0)
+        if any_cfg:
+            neg_prompt_embeds, neg_pooled_prompt_embeds = self._load_text_conditioning(
+                context=context,
+                conditioning_name=self.negative_conditioning.conditioning_name,
+                joint_attention_dim=transformer_info.model.config.joint_attention_dim,
+                dtype=inference_dtype,
+                device=device,
+            )
+            # TODO(ryand): Support both sequential and batched CFG inference.
+            prompt_embeds = torch.cat([neg_prompt_embeds, pos_prompt_embeds], dim=0)
+            pooled_prompt_embeds = torch.cat([neg_pooled_prompt_embeds, pos_pooled_prompt_embeds], dim=0)
+        else:
+            prompt_embeds = pos_prompt_embeds
+            pooled_prompt_embeds = pos_pooled_prompt_embeds
 
         # The shifted sigmas, clipped like FLUX's: `denoising_start` is the noise level an image-to-image pass starts
         # at, and a split chain meets exactly at its boundary.
@@ -489,6 +494,7 @@ class SD3DenoiseInvocation(BaseInvocation, WithMetadata):
                 list(enumerate(zip(timesteps[:-1], timesteps[1:], strict=True))),
                 desc=f"Denoising{TorchDevice.get_session_device_label()}",
             ):
+                do_classifier_free_guidance = any_cfg and not math.isclose(cfg_scale[step_idx], 1.0)
                 # Expand the latents if we are doing CFG.
                 latent_model_input = torch.cat([latents] * 2) if do_classifier_free_guidance else latents
                 # Expand the timestep to match the latent model input.
@@ -500,8 +506,10 @@ class SD3DenoiseInvocation(BaseInvocation, WithMetadata):
                 noise_pred = transformer(
                     hidden_states=latent_model_input,
                     timestep=timestep,
-                    encoder_hidden_states=prompt_embeds,
-                    pooled_projections=pooled_prompt_embeds,
+                    encoder_hidden_states=prompt_embeds if do_classifier_free_guidance else pos_prompt_embeds,
+                    pooled_projections=(
+                        pooled_prompt_embeds if do_classifier_free_guidance else pos_pooled_prompt_embeds
+                    ),
                     joint_attention_kwargs=None,
                     return_dict=False,
                 )[0]

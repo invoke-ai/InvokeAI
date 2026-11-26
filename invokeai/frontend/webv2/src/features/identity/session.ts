@@ -33,6 +33,8 @@ export interface AuthSession {
   phase: 'unknown' | 'unavailable' | 'ready';
   multiuserEnabled: boolean;
   setupRequired: boolean;
+  /** During setup only: work made without an account exists, which the account being created will not see. */
+  hasSingleUserWork: boolean;
   strictPasswordChecking: boolean;
   user: UserDTO | null;
   sessionExpired: boolean;
@@ -46,6 +48,7 @@ const store = createExternalStore<AuthSession>({
   accountEpoch: 0,
   multiuserEnabled: false,
   expiredUserId: null,
+  hasSingleUserWork: false,
   phase: 'unknown',
   sessionExpired: false,
   setupRequired: false,
@@ -614,6 +617,7 @@ const publishUnavailableSession = (): AuthSession => {
   const accountEpoch = endLifetime();
   store.patchSnapshot({
     accountEpoch,
+    hasSingleUserWork: false,
     multiuserEnabled: false,
     phase: 'unavailable',
     setupRequired: false,
@@ -733,6 +737,7 @@ const resolveSession = async (): Promise<AuthSession> => {
     accountEpoch,
     multiuserEnabled: status.multiuser_enabled,
     expiredUserId: user === null ? expiredUserId : null,
+    hasSingleUserWork: status.has_single_user_work,
     phase: 'ready',
     sessionExpired,
     setupRequired: status.setup_required,
@@ -798,6 +803,7 @@ const followStoredPrincipal = async (token: string): Promise<void> => {
     const accountEpoch = activateAccount(principal.user, token);
     store.patchSnapshot({
       accountEpoch,
+      hasSingleUserWork: false,
       sessionExpired: false,
       setupRequired: false,
       switchingAccount: false,
@@ -994,7 +1000,7 @@ export const completeAdminSetup = async (
   password: string
 ): Promise<void> => {
   await setupAdmin({ display_name: displayName, email, password });
-  store.patchSnapshot({ setupRequired: false });
+  store.patchSnapshot({ hasSingleUserWork: false, setupRequired: false });
   await loginWithCredentials(email, password, false);
 };
 

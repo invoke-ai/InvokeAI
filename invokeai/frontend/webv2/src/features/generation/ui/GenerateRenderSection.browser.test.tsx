@@ -129,6 +129,13 @@ const flux2Model: MainModelConfig = {
   type: 'main',
   variant: 'dev',
 };
+const ideogram4Model: MainModelConfig = {
+  base: 'ideogram-4',
+  format: 'diffusers',
+  key: 'ideogram-4',
+  name: 'Ideogram 4',
+  type: 'main',
+};
 
 const sd1Model: MainModelConfig = { base: 'sd-1', key: 'sd1', name: 'SD 1.5', type: 'main' };
 const mossImageModel: MainModelConfig = {
@@ -201,6 +208,10 @@ const menuItem = (label: string) =>
   [...document.querySelectorAll<HTMLElement>('[role="menuitemradio"]')].find((item) =>
     item.textContent?.startsWith(label)
   ) ?? null;
+// Summary separators are CSS-drawn, so join the items as the section's copy action does.
+const summaryText = () =>
+  [...(host?.querySelectorAll('[data-section-summary] > *') ?? [])].map((item) => item.textContent?.trim()).join(' · ');
+
 afterEach(async () => {
   harness.invocationSourceId = 'generate';
   await settle(() => root?.unmount());
@@ -304,6 +315,31 @@ describe('GenerateRenderSection guidance field', () => {
     await openAndBlurEditor();
 
     expect(onCommit).toHaveBeenCalledWith({ cfgScale: 20 });
+  });
+
+  it('summarizes Ideogram 4 sampling and offers only the preset overrides', async () => {
+    await render(ideogram4Model, { cfgScale: 3, ideogram4SamplerPreset: 'V4_TURBO_12', steps: 99 });
+    const ranges = (label: string) =>
+      slidersNamed(label).map((slider) => [slider.getAttribute('aria-valuemin'), slider.getAttribute('aria-valuemax')]);
+
+    expect(summaryText()).toContain('12 · Guidance 7');
+    expect(ranges('Guidance')).toEqual([]);
+    expect(ranges('Steps')).toEqual([]);
+
+    await settle(() => draftStore?.patchSnapshot({ ideogram4GuidanceScale: 5, ideogram4Mu: 1, ideogram4Steps: 18 }));
+
+    expect(summaryText()).toContain('18 · Guidance 5');
+    expect(ranges('Guidance')).toEqual([['1', '20']]);
+    expect(ranges('Steps')).toEqual([['2', '100']]);
+    expect(ranges('Mu')).toEqual([['-4', '4']]);
+
+    // Off hands Mu to the sampler preset, and its description says so.
+    const muInput = [...(host?.querySelectorAll<HTMLInputElement>('input[type="checkbox"]') ?? [])].find(
+      (input) => document.getElementById(input.getAttribute('aria-labelledby') ?? '')?.textContent === 'Mu'
+    );
+    expect(document.getElementById(muInput?.getAttribute('aria-describedby') ?? '')?.textContent).toContain(
+      'Set by the sampler preset unless overridden.'
+    );
   });
 });
 

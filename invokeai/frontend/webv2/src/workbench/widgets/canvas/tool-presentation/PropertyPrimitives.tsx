@@ -12,7 +12,7 @@ import { setPropertyGroupCollapsed, usePropertyGroupCollapsed } from './property
 const GROUP_HEADER_HOVER = { color: 'fg' } as const;
 
 /** A row label with a tooltip only while hovered and truncated, so rows at rest mount no portal. */
-const PropertyRowLabel = ({ label, labelId }: { label: string; labelId?: string }) => {
+export const PropertyRowLabel = ({ label, labelId }: { label: string; labelId?: string }) => {
   const [isTipShown, setIsTipShown] = useState(false);
   const showIfCut = useCallback((event: ReactPointerEvent<HTMLParagraphElement>) => {
     const element = event.currentTarget;

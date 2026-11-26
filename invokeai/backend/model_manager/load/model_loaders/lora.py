@@ -8,6 +8,7 @@ import torch
 from safetensors.torch import load_file
 
 from invokeai.app.services.config import InvokeAIAppConfig
+from invokeai.backend.krea2.control_lora import krea2_control_lora_from_state_dict
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.load.load_default import ModelLoader
 from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
@@ -70,6 +71,10 @@ from invokeai.backend.patches.lora_conversions.krea2_lora_conversion_utils impor
     lora_model_from_krea2_state_dict,
 )
 from invokeai.backend.patches.lora_conversions.ltx2_lora_conversion_utils import lora_model_from_ltx2_state_dict
+from invokeai.backend.patches.lora_conversions.lycoris_flat_lora_constants import lycoris_flat_family
+from invokeai.backend.patches.lora_conversions.lycoris_flat_lora_conversion_utils import (
+    lora_model_from_lycoris_flat_state_dict,
+)
 from invokeai.backend.patches.lora_conversions.minimax_h3_lora_conversion_utils import (
     lora_model_from_minimax_h3_state_dict,
 )
@@ -116,6 +121,7 @@ def _count_factorized_layers_with_dora_magnitude(state_dict: dict[str, torch.Ten
 @ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.LoRA, format=ModelFormat.LyCORIS)
 @ModelLoaderRegistry.register(base=BaseModelType.Flux, type=ModelType.ControlLoRa, format=ModelFormat.LyCORIS)
 @ModelLoaderRegistry.register(base=BaseModelType.Flux, type=ModelType.ControlLoRa, format=ModelFormat.Diffusers)
+@ModelLoaderRegistry.register(base=BaseModelType.Krea2, type=ModelType.ControlLoRa, format=ModelFormat.LyCORIS)
 class LoRALoader(ModelLoader):
     """Class to load LoRA models."""
 
@@ -163,8 +169,13 @@ class LoRALoader(ModelLoader):
 
         factorized_dora_layers = _count_factorized_layers_with_dora_magnitude(state_dict)
 
+        # SimpleTuner's LyCORIS flattens the model's own module names behind `lycoris_` (#10174); map them back and
+        # hand each family its own converter. State dicts this layout does not claim (SD 3's flat spelling, which
+        # `lora_model_from_sd3_state_dict` resolves already, and every other format) fall through to the dispatch.
+        if lycoris_flat_family(state_dict) is not None:
+            model = lora_model_from_lycoris_flat_state_dict(state_dict, base=self._model_base)
         # Apply state_dict key conversions, if necessary.
-        if self._model_base == BaseModelType.StableDiffusionXL:
+        elif self._model_base == BaseModelType.StableDiffusionXL:
             state_dict = convert_sdxl_keys_to_diffusers_format(state_dict)
             model = lora_model_from_sd_state_dict(state_dict=state_dict)
         elif self._model_base in (BaseModelType.Flux, BaseModelType.Flux2):
@@ -248,6 +259,8 @@ class LoRALoader(ModelLoader):
         elif self._model_base == BaseModelType.QwenImage21:
             # ComfyUI, diffusers/PEFT or Kohya keys; ComfyUI's fused gate_up is split for diffusers.
             model = lora_model_from_qwen_image_21_state_dict(state_dict=state_dict)
+        elif self._model_base == BaseModelType.Krea2 and config.type is ModelType.ControlLoRa:
+            model = krea2_control_lora_from_state_dict(state_dict)
         elif self._model_base == BaseModelType.Krea2:
             # Krea-2 LoRAs use diffusers PEFT format targeting the Krea2 transformer (and optionally
             # the Qwen3-VL text encoder). alpha=None → alpha=rank (common diffusers default).

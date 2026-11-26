@@ -286,6 +286,14 @@ class SDNQTensor(torch.Tensor):
         """Whether this tensor has SVD correction components."""
         return self._svd_up is not None and self._svd_down is not None
 
+    def storage_tensors(self) -> tuple[torch.Tensor, ...]:
+        """Packed data and auxiliary tensors retained by this wrapper."""
+        return tuple(
+            t
+            for t in (self.quantized_data, self._scale, self._zero_point, self._svd_up, self._svd_down)
+            if isinstance(t, torch.Tensor)
+        )
+
     def sdnq_storage_nbytes(self) -> int:
         """Actual in-memory storage of this quantized tensor, in bytes.
 
@@ -296,11 +304,7 @@ class SDNQTensor(torch.Tensor):
         the real storage — the packed data plus every auxiliary tensor — so cache eviction and
         partial-load budgets operate on true sizes.
         """
-        total = self.quantized_data.nelement() * self.quantized_data.element_size()
-        for aux in (self._scale, self._zero_point, self._svd_up, self._svd_down):
-            if isinstance(aux, torch.Tensor):
-                total += aux.nelement() * aux.element_size()
-        return total
+        return sum(t.nelement() * t.element_size() for t in self.storage_tensors())
 
     def requires_grad_(self, mode: bool = True) -> torch.Tensor:
         """SDNQTensor is only for inference, not training. This is a no-op."""
