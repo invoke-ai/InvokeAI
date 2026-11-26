@@ -3109,7 +3109,7 @@ const KREA2_GGUF_VISION_TOWER_REASON =
 const getReferenceImageValidationIssues = (
   model: GenerateModelConfig,
   settings: GenerateSettings,
-  mode: ExternalGenerationMode
+  mode: GenerationValidationMode
 ): GenerationIssue[] => {
   const issues: GenerationIssue[] = [];
   // MiniMax counts the Canvas composite against the same limit as the additional references.
