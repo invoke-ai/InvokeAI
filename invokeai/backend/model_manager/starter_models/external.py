@@ -791,10 +791,10 @@ seedream_4_0 = StarterModel(
     panel_schema=SEEDREAM_PANEL_SCHEMA,
 )
 
-# UberLLM serves many image models behind one OpenAI-style endpoint, and every one of them
+# MartLLM serves many image models behind one OpenAI-style endpoint, and every one of them
 # takes the same explicit pixel sizes. Each size is an exact multiple of its ratio, so a
 # capability check reduces it back to the listed ratio.
-UBERLLM_ASPECT_RATIO_SIZES = {
+MARTLLM_ASPECT_RATIO_SIZES = {
     "1:1": ExternalImageSize(width=1024, height=1024),
     "4:3": ExternalImageSize(width=1024, height=768),
     "3:4": ExternalImageSize(width=768, height=1024),
@@ -802,11 +802,11 @@ UBERLLM_ASPECT_RATIO_SIZES = {
     "2:3": ExternalImageSize(width=1024, height=1536),
 }
 
-uberllm_z_image_turbo = StarterModel(
-    name="UberLLM Z-Image Turbo",
+martllm_z_image_turbo = StarterModel(
+    name="MartLLM Z-Image Turbo",
     base=BaseModelType.External,
-    source="external://uberllm/venice/z-image-turbo",
-    description="Z-Image Turbo text-to-image generation through the UberLLM image API. Dimensions are mapped to the closest supported size. Requires a configured UberLLM API key and may incur provider usage costs.",
+    source="external://martllm/venice/z-image-turbo",
+    description="Z-Image Turbo text-to-image generation through the MartLLM image API. Dimensions are mapped to the closest supported size. Requires a configured MartLLM API key and may incur provider usage costs.",
     type=ModelType.ExternalImageGenerator,
     format=ModelFormat.ExternalApi,
     capabilities=ExternalModelCapabilities(
@@ -814,18 +814,18 @@ uberllm_z_image_turbo = StarterModel(
         supports_negative_prompt=False,
         supports_seed=False,
         max_images_per_request=4,
-        allowed_aspect_ratios=list(UBERLLM_ASPECT_RATIO_SIZES),
-        aspect_ratio_sizes=UBERLLM_ASPECT_RATIO_SIZES,
+        allowed_aspect_ratios=list(MARTLLM_ASPECT_RATIO_SIZES),
+        aspect_ratio_sizes=MARTLLM_ASPECT_RATIO_SIZES,
     ),
     default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
     panel_schema=ExternalModelPanelSchema(image=[{"name": "dimensions"}]),
 )
 
-uberllm_flux_2_klein_4b = StarterModel(
-    name="UberLLM FLUX.2 Klein 4B",
+martllm_flux_2_klein_4b = StarterModel(
+    name="MartLLM FLUX.2 Klein 4B",
     base=BaseModelType.External,
-    source="external://uberllm/black-forest-labs/flux.2-klein-4b",
-    description="FLUX.2 Klein 4B text-to-image generation through the UberLLM image API. Dimensions are mapped to the closest supported size. Requires a configured UberLLM API key and may incur provider usage costs.",
+    source="external://martllm/black-forest-labs/flux.2-klein-4b",
+    description="FLUX.2 Klein 4B text-to-image generation through the MartLLM image API. Dimensions are mapped to the closest supported size. Requires a configured MartLLM API key and may incur provider usage costs.",
     type=ModelType.ExternalImageGenerator,
     format=ModelFormat.ExternalApi,
     capabilities=ExternalModelCapabilities(
@@ -833,18 +833,18 @@ uberllm_flux_2_klein_4b = StarterModel(
         supports_negative_prompt=False,
         supports_seed=False,
         max_images_per_request=4,
-        allowed_aspect_ratios=list(UBERLLM_ASPECT_RATIO_SIZES),
-        aspect_ratio_sizes=UBERLLM_ASPECT_RATIO_SIZES,
+        allowed_aspect_ratios=list(MARTLLM_ASPECT_RATIO_SIZES),
+        aspect_ratio_sizes=MARTLLM_ASPECT_RATIO_SIZES,
     ),
     default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
     panel_schema=ExternalModelPanelSchema(image=[{"name": "dimensions"}]),
 )
 
-uberllm_flux_2_pro = StarterModel(
-    name="UberLLM FLUX.2 Pro",
+martllm_flux_2_pro = StarterModel(
+    name="MartLLM FLUX.2 Pro",
     base=BaseModelType.External,
-    source="external://uberllm/venice/flux-2-pro",
-    description="FLUX.2 Pro text-to-image generation through the UberLLM image API. Dimensions are mapped to the closest supported size. Requires a configured UberLLM API key and may incur provider usage costs.",
+    source="external://martllm/venice/flux-2-pro",
+    description="FLUX.2 Pro text-to-image generation through the MartLLM image API. Dimensions are mapped to the closest supported size. Requires a configured MartLLM API key and may incur provider usage costs.",
     type=ModelType.ExternalImageGenerator,
     format=ModelFormat.ExternalApi,
     capabilities=ExternalModelCapabilities(
@@ -852,18 +852,18 @@ uberllm_flux_2_pro = StarterModel(
         supports_negative_prompt=False,
         supports_seed=False,
         max_images_per_request=4,
-        allowed_aspect_ratios=list(UBERLLM_ASPECT_RATIO_SIZES),
-        aspect_ratio_sizes=UBERLLM_ASPECT_RATIO_SIZES,
+        allowed_aspect_ratios=list(MARTLLM_ASPECT_RATIO_SIZES),
+        aspect_ratio_sizes=MARTLLM_ASPECT_RATIO_SIZES,
     ),
     default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
     panel_schema=ExternalModelPanelSchema(image=[{"name": "dimensions"}]),
 )
 
-uberllm_qwen_image_3 = StarterModel(
-    name="UberLLM Qwen Image 3",
+martllm_qwen_image_3 = StarterModel(
+    name="MartLLM Qwen Image 3",
     base=BaseModelType.External,
-    source="external://uberllm/venice/qwen-image-3",
-    description="Qwen Image 3 text-to-image generation through the UberLLM image API. Dimensions are mapped to the closest supported size. Requires a configured UberLLM API key and may incur provider usage costs.",
+    source="external://martllm/venice/qwen-image-3",
+    description="Qwen Image 3 text-to-image generation through the MartLLM image API. Dimensions are mapped to the closest supported size. Requires a configured MartLLM API key and may incur provider usage costs.",
     type=ModelType.ExternalImageGenerator,
     format=ModelFormat.ExternalApi,
     capabilities=ExternalModelCapabilities(
@@ -871,18 +871,18 @@ uberllm_qwen_image_3 = StarterModel(
         supports_negative_prompt=False,
         supports_seed=False,
         max_images_per_request=4,
-        allowed_aspect_ratios=list(UBERLLM_ASPECT_RATIO_SIZES),
-        aspect_ratio_sizes=UBERLLM_ASPECT_RATIO_SIZES,
+        allowed_aspect_ratios=list(MARTLLM_ASPECT_RATIO_SIZES),
+        aspect_ratio_sizes=MARTLLM_ASPECT_RATIO_SIZES,
     ),
     default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
     panel_schema=ExternalModelPanelSchema(image=[{"name": "dimensions"}]),
 )
 
-uberllm_seedream_4_5 = StarterModel(
-    name="UberLLM Seedream 4.5",
+martllm_seedream_4_5 = StarterModel(
+    name="MartLLM Seedream 4.5",
     base=BaseModelType.External,
-    source="external://uberllm/bytedance/seedream-4.5",
-    description="ByteDance Seedream 4.5 text-to-image generation through the UberLLM image API. Dimensions are mapped to the closest supported size. Requires a configured UberLLM API key and may incur provider usage costs.",
+    source="external://martllm/bytedance/seedream-4.5",
+    description="ByteDance Seedream 4.5 text-to-image generation through the MartLLM image API. Dimensions are mapped to the closest supported size. Requires a configured MartLLM API key and may incur provider usage costs.",
     type=ModelType.ExternalImageGenerator,
     format=ModelFormat.ExternalApi,
     capabilities=ExternalModelCapabilities(
@@ -890,18 +890,18 @@ uberllm_seedream_4_5 = StarterModel(
         supports_negative_prompt=False,
         supports_seed=False,
         max_images_per_request=4,
-        allowed_aspect_ratios=list(UBERLLM_ASPECT_RATIO_SIZES),
-        aspect_ratio_sizes=UBERLLM_ASPECT_RATIO_SIZES,
+        allowed_aspect_ratios=list(MARTLLM_ASPECT_RATIO_SIZES),
+        aspect_ratio_sizes=MARTLLM_ASPECT_RATIO_SIZES,
     ),
     default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
     panel_schema=ExternalModelPanelSchema(image=[{"name": "dimensions"}]),
 )
 
-uberllm_krea_2_turbo = StarterModel(
-    name="UberLLM Krea 2 Turbo",
+martllm_krea_2_turbo = StarterModel(
+    name="MartLLM Krea 2 Turbo",
     base=BaseModelType.External,
-    source="external://uberllm/krea/venice-krea-2-turbo",
-    description="Krea 2 Turbo text-to-image generation through the UberLLM image API. Dimensions are mapped to the closest supported size. Requires a configured UberLLM API key and may incur provider usage costs.",
+    source="external://martllm/krea/venice-krea-2-turbo",
+    description="Krea 2 Turbo text-to-image generation through the MartLLM image API. Dimensions are mapped to the closest supported size. Requires a configured MartLLM API key and may incur provider usage costs.",
     type=ModelType.ExternalImageGenerator,
     format=ModelFormat.ExternalApi,
     capabilities=ExternalModelCapabilities(
@@ -909,18 +909,18 @@ uberllm_krea_2_turbo = StarterModel(
         supports_negative_prompt=False,
         supports_seed=False,
         max_images_per_request=4,
-        allowed_aspect_ratios=list(UBERLLM_ASPECT_RATIO_SIZES),
-        aspect_ratio_sizes=UBERLLM_ASPECT_RATIO_SIZES,
+        allowed_aspect_ratios=list(MARTLLM_ASPECT_RATIO_SIZES),
+        aspect_ratio_sizes=MARTLLM_ASPECT_RATIO_SIZES,
     ),
     default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
     panel_schema=ExternalModelPanelSchema(image=[{"name": "dimensions"}]),
 )
 
-uberllm_ideogram_v4 = StarterModel(
-    name="UberLLM Ideogram V4",
+martllm_ideogram_v4 = StarterModel(
+    name="MartLLM Ideogram V4",
     base=BaseModelType.External,
-    source="external://uberllm/ideogram/venice-ideogram-v4",
-    description="Ideogram V4 text-to-image generation through the UberLLM image API. Dimensions are mapped to the closest supported size. Requires a configured UberLLM API key and may incur provider usage costs.",
+    source="external://martllm/ideogram/venice-ideogram-v4",
+    description="Ideogram V4 text-to-image generation through the MartLLM image API. Dimensions are mapped to the closest supported size. Requires a configured MartLLM API key and may incur provider usage costs.",
     type=ModelType.ExternalImageGenerator,
     format=ModelFormat.ExternalApi,
     capabilities=ExternalModelCapabilities(
@@ -928,18 +928,18 @@ uberllm_ideogram_v4 = StarterModel(
         supports_negative_prompt=False,
         supports_seed=False,
         max_images_per_request=4,
-        allowed_aspect_ratios=list(UBERLLM_ASPECT_RATIO_SIZES),
-        aspect_ratio_sizes=UBERLLM_ASPECT_RATIO_SIZES,
+        allowed_aspect_ratios=list(MARTLLM_ASPECT_RATIO_SIZES),
+        aspect_ratio_sizes=MARTLLM_ASPECT_RATIO_SIZES,
     ),
     default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
     panel_schema=ExternalModelPanelSchema(image=[{"name": "dimensions"}]),
 )
 
-uberllm_nano_banana_2 = StarterModel(
-    name="UberLLM Nano Banana 2",
+martllm_nano_banana_2 = StarterModel(
+    name="MartLLM Nano Banana 2",
     base=BaseModelType.External,
-    source="external://uberllm/venice/nano-banana-2",
-    description="Google Nano Banana 2 text-to-image generation through the UberLLM image API. Dimensions are mapped to the closest supported size. Requires a configured UberLLM API key and may incur provider usage costs.",
+    source="external://martllm/venice/nano-banana-2",
+    description="Google Nano Banana 2 text-to-image generation through the MartLLM image API. Dimensions are mapped to the closest supported size. Requires a configured MartLLM API key and may incur provider usage costs.",
     type=ModelType.ExternalImageGenerator,
     format=ModelFormat.ExternalApi,
     capabilities=ExternalModelCapabilities(
@@ -947,8 +947,8 @@ uberllm_nano_banana_2 = StarterModel(
         supports_negative_prompt=False,
         supports_seed=False,
         max_images_per_request=4,
-        allowed_aspect_ratios=list(UBERLLM_ASPECT_RATIO_SIZES),
-        aspect_ratio_sizes=UBERLLM_ASPECT_RATIO_SIZES,
+        allowed_aspect_ratios=list(MARTLLM_ASPECT_RATIO_SIZES),
+        aspect_ratio_sizes=MARTLLM_ASPECT_RATIO_SIZES,
     ),
     default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
     panel_schema=ExternalModelPanelSchema(image=[{"name": "dimensions"}]),

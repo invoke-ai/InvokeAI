@@ -13,12 +13,12 @@ from invokeai.app.services.external_generation.errors import (
 )
 from invokeai.app.services.external_generation.external_generation_common import ExternalGenerationRequest
 from invokeai.app.services.external_generation.external_generation_default import ExternalGenerationService
-from invokeai.app.services.external_generation.providers.uberllm import UberLLMProvider
+from invokeai.app.services.external_generation.providers.martllm import MartLLMProvider
 from invokeai.backend.model_manager.configs.external_api import ExternalApiModelConfig
 from invokeai.backend.model_manager.starter_models import STARTER_MODELS
 
-# The `size` values every UberLLM image model accepts (from each model's request schema).
-UBERLLM_ACCEPTED_SIZES = {"1024x1024", "1024x768", "768x1024", "1536x1024", "1024x1536"}
+# The `size` values every MartLLM image model accepts (from each model's request schema).
+MARTLLM_ACCEPTED_SIZES = {"1024x1024", "1024x768", "768x1024", "1536x1024", "1024x1536"}
 
 
 class DummyResponse:
@@ -50,13 +50,13 @@ def _png_base64(width: int = 16, height: int = 16) -> str:
 
 
 def _starter_config(provider_model_id: str) -> ExternalApiModelConfig:
-    source = f"external://uberllm/{provider_model_id}"
+    source = f"external://martllm/{provider_model_id}"
     starter = next(model for model in STARTER_MODELS if model.source == source)
     assert starter.capabilities is not None
     return ExternalApiModelConfig(
         key=provider_model_id,
         name=starter.name,
-        provider_id="uberllm",
+        provider_id="martllm",
         provider_model_id=provider_model_id,
         capabilities=starter.capabilities,
     )
@@ -79,34 +79,34 @@ def _request(width: int = 1024, height: int = 768, num_images: int = 2) -> Exter
     )
 
 
-def _provider(**config: str) -> UberLLMProvider:
-    return UberLLMProvider(
-        InvokeAIAppConfig(external_uberllm_api_key="ull-key", **config),
+def _provider(**config: str) -> MartLLMProvider:
+    return MartLLMProvider(
+        InvokeAIAppConfig(external_martllm_api_key="ull-key", **config),
         logging.getLogger("test"),
     )
 
 
-def test_uberllm_registration() -> None:
-    assert "external_uberllm_api_key" in EXTERNAL_PROVIDER_CONFIG_FIELDS
-    assert "external_uberllm_base_url" in EXTERNAL_PROVIDER_CONFIG_FIELDS
-    assert UberLLMProvider(
-        InvokeAIAppConfig(external_uberllm_api_key="ull-key"), logging.getLogger("test")
+def test_martllm_registration() -> None:
+    assert "external_martllm_api_key" in EXTERNAL_PROVIDER_CONFIG_FIELDS
+    assert "external_martllm_base_url" in EXTERNAL_PROVIDER_CONFIG_FIELDS
+    assert MartLLMProvider(
+        InvokeAIAppConfig(external_martllm_api_key="ull-key"), logging.getLogger("test")
     ).is_configured()
-    assert not UberLLMProvider(InvokeAIAppConfig(), logging.getLogger("test")).is_configured()
+    assert not MartLLMProvider(InvokeAIAppConfig(), logging.getLogger("test")).is_configured()
 
 
-def test_uberllm_starter_models_only_offer_sizes_uberllm_accepts() -> None:
-    uberllm_models = [model for model in STARTER_MODELS if model.source.startswith("external://uberllm/")]
-    assert len(uberllm_models) > 1
-    for model in uberllm_models:
+def test_martllm_starter_models_only_offer_sizes_martllm_accepts() -> None:
+    martllm_models = [model for model in STARTER_MODELS if model.source.startswith("external://martllm/")]
+    assert len(martllm_models) > 1
+    for model in martllm_models:
         assert model.capabilities is not None
         assert model.capabilities.modes == ["txt2img"]
         assert model.capabilities.aspect_ratio_sizes is not None
         offered = {f"{size.width}x{size.height}" for size in model.capabilities.aspect_ratio_sizes.values()}
-        assert offered <= UBERLLM_ACCEPTED_SIZES
+        assert offered <= MARTLLM_ACCEPTED_SIZES
 
 
-def test_uberllm_generates_and_decodes_images(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_martllm_generates_and_decodes_images(monkeypatch: pytest.MonkeyPatch) -> None:
     captured: dict[str, Any] = {}
 
     def fake_post(url: str, headers: dict[str, str], json: dict[str, object], timeout: int) -> DummyResponse:
@@ -125,7 +125,7 @@ def test_uberllm_generates_and_decodes_images(monkeypatch: pytest.MonkeyPatch) -
 
     result = _provider().generate(_request())
 
-    assert captured["url"] == "https://api.uberllm.dev/v1/images/generations"
+    assert captured["url"] == "https://api.martllm.com/v1/images/generations"
     assert captured["headers"] == {"Authorization": "Bearer ull-key", "Content-Type": "application/json"}
     assert captured["json"] == {
         "model": "venice/z-image-turbo",
@@ -139,7 +139,7 @@ def test_uberllm_generates_and_decodes_images(monkeypatch: pytest.MonkeyPatch) -
     assert result.provider_metadata == {"model": "venice/z-image-turbo", "cost_usd": 0.008}
 
 
-def test_uberllm_uses_custom_base_url(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_martllm_uses_custom_base_url(monkeypatch: pytest.MonkeyPatch) -> None:
     requested_urls: list[str] = []
 
     def fake_post(url: str, **_kwargs: Any) -> DummyResponse:
@@ -148,12 +148,12 @@ def test_uberllm_uses_custom_base_url(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr("requests.post", fake_post)
 
-    _provider(external_uberllm_base_url="https://proxy.uberllm.test/").generate(_request(num_images=1))
+    _provider(external_martllm_base_url="https://proxy.martllm.test/").generate(_request(num_images=1))
 
-    assert requested_urls == ["https://proxy.uberllm.test/v1/images/generations"]
+    assert requested_urls == ["https://proxy.martllm.test/v1/images/generations"]
 
 
-def test_uberllm_rate_limit(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_martllm_rate_limit(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         "requests.post",
         lambda *_args, **_kwargs: DummyResponse(ok=False, status_code=429, headers={"Retry-After": "3"}),
@@ -165,7 +165,7 @@ def test_uberllm_rate_limit(monkeypatch: pytest.MonkeyPatch) -> None:
     assert error.value.retry_after == 3.0
 
 
-def test_uberllm_error_message_is_surfaced(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_martllm_error_message_is_surfaced(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         "requests.post",
         lambda *_args, **_kwargs: DummyResponse(
@@ -179,7 +179,7 @@ def test_uberllm_error_message_is_surfaced(monkeypatch: pytest.MonkeyPatch) -> N
         _provider().generate(_request())
 
 
-def test_uberllm_response_without_images_fails(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_martllm_response_without_images_fails(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         "requests.post",
         lambda *_args, **_kwargs: DummyResponse(ok=True, json_data={"data": [{"url": "https://example.test/0"}]}),
@@ -189,8 +189,8 @@ def test_uberllm_response_without_images_fails(monkeypatch: pytest.MonkeyPatch) 
         _provider().generate(_request())
 
 
-def test_uberllm_requires_api_key() -> None:
-    provider = UberLLMProvider(InvokeAIAppConfig(), logging.getLogger("test"))
+def test_martllm_requires_api_key() -> None:
+    provider = MartLLMProvider(InvokeAIAppConfig(), logging.getLogger("test"))
 
     with pytest.raises(ExternalProviderRequestError, match="API key is not configured"):
         provider.generate(_request())
@@ -204,16 +204,16 @@ def test_uberllm_requires_api_key() -> None:
         (768, 1024, "768x1024"),
         (1536, 1024, "1536x1024"),
         (1024, 1536, "1024x1536"),
-        # Sizes off the listed ratios snap to the closest size UberLLM accepts.
+        # Sizes off the listed ratios snap to the closest size MartLLM accepts.
         (1368, 768, "1536x1024"),
         (512, 512, "1024x1024"),
         (832, 1216, "1024x1536"),
     ],
 )
-def test_uberllm_service_requests_land_on_accepted_sizes(
+def test_martllm_service_requests_land_on_accepted_sizes(
     monkeypatch: pytest.MonkeyPatch, width: int, height: int, expected_size: str
 ) -> None:
-    """The generation service buckets each request to a size the model takes before UberLLM sees it."""
+    """The generation service buckets each request to a size the model takes before MartLLM sees it."""
     submitted: list[dict[str, object]] = []
 
     def fake_post(url: str, json: dict[str, object], **_kwargs: Any) -> DummyResponse:
@@ -221,7 +221,7 @@ def test_uberllm_service_requests_land_on_accepted_sizes(
         return DummyResponse(ok=True, json_data={"data": [{"b64_json": _png_base64()}]})
 
     monkeypatch.setattr("requests.post", fake_post)
-    service = ExternalGenerationService({"uberllm": _provider()}, logging.getLogger("test"))
+    service = ExternalGenerationService({"martllm": _provider()}, logging.getLogger("test"))
 
     service.generate(_request(width=width, height=height, num_images=1))
 

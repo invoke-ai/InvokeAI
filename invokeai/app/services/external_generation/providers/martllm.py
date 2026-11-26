@@ -16,25 +16,25 @@ from invokeai.app.services.external_generation.external_generation_common import
 )
 from invokeai.app.services.external_generation.image_utils import decode_image_base64
 
-_DEFAULT_BASE_URL = "https://api.uberllm.dev"
+_DEFAULT_BASE_URL = "https://api.martllm.com"
 # Image requests are answered synchronously, so the timeout covers the whole generation.
 _REQUEST_TIMEOUT = 300
 
 
-class UberLLMProvider(ExternalProvider):
-    provider_id = "uberllm"
+class MartLLMProvider(ExternalProvider):
+    provider_id = "martllm"
 
     def is_configured(self) -> bool:
-        return bool(self._app_config.external_uberllm_api_key)
+        return bool(self._app_config.external_martllm_api_key)
 
     def generate(self, request: ExternalGenerationRequest) -> ExternalGenerationResult:
-        api_key = self._app_config.external_uberllm_api_key
+        api_key = self._app_config.external_martllm_api_key
         if not api_key:
-            raise ExternalProviderRequestError("UberLLM API key is not configured")
+            raise ExternalProviderRequestError("MartLLM API key is not configured")
 
-        base_url = (self._app_config.external_uberllm_base_url or _DEFAULT_BASE_URL).rstrip("/")
+        base_url = (self._app_config.external_martllm_base_url or _DEFAULT_BASE_URL).rstrip("/")
         model_id = request.model.provider_model_id
-        # Every UberLLM image model takes an explicit "<width>x<height>" size; the starter models
+        # Every MartLLM image model takes an explicit "<width>x<height>" size; the starter models
         # declare those sizes as aspect-ratio buckets, so the service has already snapped to one.
         payload: dict[str, object] = {
             "model": model_id,
@@ -52,24 +52,24 @@ class UberLLMProvider(ExternalProvider):
                 timeout=_REQUEST_TIMEOUT,
             )
         except requests.RequestException as exc:
-            raise ExternalProviderRequestError(f"UberLLM image request failed: {exc}") from exc
+            raise ExternalProviderRequestError(f"MartLLM image request failed: {exc}") from exc
 
         if not response.ok:
             if response.status_code == 429:
                 raise ExternalProviderRateLimitError(
-                    "UberLLM rate limit exceeded", retry_after=_parse_retry_after(response.headers.get("Retry-After"))
+                    "MartLLM rate limit exceeded", retry_after=_parse_retry_after(response.headers.get("Retry-After"))
                 )
             raise ExternalProviderRequestError(
-                f"UberLLM image request failed with status {response.status_code}: {_error_detail(response)}"
+                f"MartLLM image request failed with status {response.status_code}: {_error_detail(response)}"
             )
 
         try:
             response_payload = response.json()
         except ValueError as exc:
-            raise ExternalProviderRequestError("UberLLM image response was not valid JSON") from exc
+            raise ExternalProviderRequestError("MartLLM image response was not valid JSON") from exc
         data_items = response_payload.get("data") if isinstance(response_payload, dict) else None
         if not isinstance(data_items, list):
-            raise ExternalProviderRequestError("UberLLM image response missing image data")
+            raise ExternalProviderRequestError("MartLLM image response missing image data")
 
         images: list[ExternalGeneratedImage] = []
         for item in data_items:
@@ -79,10 +79,10 @@ class UberLLMProvider(ExternalProvider):
             try:
                 images.append(ExternalGeneratedImage(image=decode_image_base64(encoded), seed=request.seed))
             except Exception as exc:
-                raise ExternalProviderRequestError("UberLLM output was not a valid image") from exc
+                raise ExternalProviderRequestError("MartLLM output was not a valid image") from exc
 
         if not images:
-            raise ExternalProviderRequestError("UberLLM response contained no images")
+            raise ExternalProviderRequestError("MartLLM response contained no images")
 
         usage = response_payload.get("usage")
         cost_usd = usage.get("cost_usd") if isinstance(usage, dict) else None
@@ -95,7 +95,7 @@ class UberLLMProvider(ExternalProvider):
 
 
 def _error_detail(response: requests.Response) -> str:
-    """UberLLM errors use the OpenAI shape, `{"error": {"message": ...}}`; fall back to the raw body."""
+    """MartLLM errors use the OpenAI shape, `{"error": {"message": ...}}`; fall back to the raw body."""
     try:
         payload: Any = response.json()
     except ValueError:

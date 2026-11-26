@@ -2237,7 +2237,7 @@ test('hosted-provider credentials and the starter catalog agree with the hosted 
     // Every backend provider is listed; those the hosted records route to have a key.
     assert.deepEqual(
       configs.map((config) => config.provider_id),
-      ['alibabacloud', 'atlascloud', 'gemini', 'openai', 'seedream', 'uberllm']
+      ['alibabacloud', 'atlascloud', 'gemini', 'openai', 'seedream', 'martllm']
     );
     assert.deepEqual(
       configs.filter((config) => config.api_key_configured).map((config) => config.provider_id),
