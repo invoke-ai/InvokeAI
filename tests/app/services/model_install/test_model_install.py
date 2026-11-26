@@ -3914,43 +3914,46 @@ def test_restart_clears_partials_before_retry(
     )
     download_job = MultiFileDownloadJob(id=123, dest=tmp_path, download_parts={part})
     job = ModelInstallJob(id=99999, source=source, config_in=ModelRecordChanges(), local_path=tmp_path)
-    _stage(job, tmp_path)
+    staging = _stage(job, tmp_path)
     remote_file = RemoteModelFile(url=source.url, path=Path("model.safetensors"), size=8)
 
     monkeypatch.setattr(mm2_installer, "_multifile_download", lambda **_: download_job)
     submit_multifile_download = MagicMock()
     monkeypatch.setattr(mm2_installer._download_queue, "submit_multifile_download", submit_multifile_download)
-    mm2_installer._enqueue_remote_download(
-        job=job,
-        source=source,
-        remote_files=[remote_file],
-        metadata=None,
-    )
+    try:
+        mm2_installer._enqueue_remote_download(
+            job=job,
+            source=source,
+            remote_files=[remote_file],
+            metadata=None,
+        )
 
-    part.resume_required = True
-    mm2_installer._download_cancelled_callback(download_job)
+        part.resume_required = True
+        mm2_installer._download_cancelled_callback(download_job)
 
-    assert job.status == InstallStatus.PAUSED
-    assert job.model_dump(mode="json")["download_parts"][0]["resume_required"] is True
-    marker = _read_marker(tmp_path)
-    assert marker is not None
-    assert marker["files"][0]["etag"] == '"model-etag"'
-    assert marker["files"][0]["resume_required"] is True
-    submit_multifile_download.assert_called_once_with(download_job)
+        assert job.status == InstallStatus.PAUSED
+        assert job.model_dump(mode="json")["download_parts"][0]["resume_required"] is True
+        marker = _read_marker(tmp_path)
+        assert marker is not None
+        assert marker["files"][0]["etag"] == '"model-etag"'
+        assert marker["files"][0]["resume_required"] is True
+        submit_multifile_download.assert_called_once_with(download_job)
 
-    monkeypatch.setattr(
-        mm2_installer, "_remote_files_from_source", lambda _source, revision=None: ([remote_file], None)
-    )
-    enqueue_remote_download = MagicMock()
-    monkeypatch.setattr(mm2_installer, "_enqueue_remote_download", enqueue_remote_download)
-    if operation == "restart_failed":
-        mm2_installer.restart_failed(job)
-    else:
-        mm2_installer.restart_file(job, str(source.url))
+        monkeypatch.setattr(
+            mm2_installer, "_remote_files_from_source", lambda _source, revision=None: ([remote_file], None)
+        )
+        enqueue_remote_download = MagicMock()
+        monkeypatch.setattr(mm2_installer, "_enqueue_remote_download", enqueue_remote_download)
+        if operation == "restart_failed":
+            mm2_installer.restart_failed(job)
+        else:
+            mm2_installer.restart_file(job, str(source.url))
 
-    assert job.status == InstallStatus.WAITING
-    enqueue_remote_download.assert_called_once()
-    assert enqueue_remote_download.call_args.kwargs["restart_from_zero"] == {str(source.url)}
+        assert job.status == InstallStatus.WAITING
+        enqueue_remote_download.assert_called_once()
+        assert enqueue_remote_download.call_args.kwargs["restart_from_zero"] == {str(source.url)}
+    finally:
+        staging.release_claim()
 
 
 @pytest.mark.parametrize(
@@ -5119,7 +5122,7 @@ def test_resume_reports_restart_from_scratch_on_fresh_parts(
     old_part.bytes = 4
     old_part.download_path = tmp_path / "model.safetensors"  # no .downloading file on disk
     job = ModelInstallJob(id=4242, source=source, config_in=ModelRecordChanges(), local_path=tmp_path)
-    _stage(job, tmp_path)
+    staging = _stage(job, tmp_path)
     job.download_parts = {old_part}
     job.status = InstallStatus.PAUSED
     remote_file = RemoteModelFile(url=source.url, path=Path("model.safetensors"), size=8)
@@ -5129,14 +5132,17 @@ def test_resume_reports_restart_from_scratch_on_fresh_parts(
     submit_multifile_download = MagicMock()
     monkeypatch.setattr(mm2_installer._download_queue, "submit_multifile_download", submit_multifile_download)
 
-    mm2_installer.resume_job(job)
+    try:
+        mm2_installer.resume_job(job)
 
-    submit_multifile_download.assert_called_once()
-    assert old_part not in job.download_parts
-    parts = job.model_dump(mode="json")["download_parts"]
-    assert len(parts) == 1
-    assert parts[0]["resume_from_scratch"] is True
-    assert "Partial file missing" in parts[0]["resume_message"]
+        submit_multifile_download.assert_called_once()
+        assert old_part not in job.download_parts
+        parts = job.model_dump(mode="json")["download_parts"]
+        assert len(parts) == 1
+        assert parts[0]["resume_from_scratch"] is True
+        assert "Partial file missing" in parts[0]["resume_message"]
+    finally:
+        staging.release_claim()
 
 
 @pytest.mark.parametrize("etag", ['"v1"', None], ids=["validated", "unvalidated"])
@@ -5151,7 +5157,7 @@ def test_resume_reports_restart_from_scratch_only_for_a_partial_it_cannot_valida
     partial = tmp_path / "model.safetensors.downloading"
     partial.write_bytes(b"1234")
     job = ModelInstallJob(id=4243, source=source, config_in=ModelRecordChanges(), local_path=tmp_path)
-    _stage(job, tmp_path)
+    staging = _stage(job, tmp_path)
     job.download_parts = {old_part}
     job.status = InstallStatus.PAUSED
     remote_file = RemoteModelFile(url=source.url, path=Path("model.safetensors"), size=8)
@@ -5160,18 +5166,21 @@ def test_resume_reports_restart_from_scratch_only_for_a_partial_it_cannot_valida
     )
     monkeypatch.setattr(mm2_installer._download_queue, "submit_multifile_download", MagicMock())
 
-    mm2_installer.resume_job(job)
+    try:
+        mm2_installer.resume_job(job)
 
-    parts = job.model_dump(mode="json")["download_parts"]
-    assert len(parts) == 1
-    if etag is not None:
-        assert parts[0]["resume_from_scratch"] is False
-        assert parts[0]["etag"] == etag
-        assert partial.read_bytes() == b"1234"
-    else:
-        assert parts[0]["resume_from_scratch"] is True
-        assert parts[0]["resume_message"]
-        assert not partial.exists()
+        parts = job.model_dump(mode="json")["download_parts"]
+        assert len(parts) == 1
+        if etag is not None:
+            assert parts[0]["resume_from_scratch"] is False
+            assert parts[0]["etag"] == etag
+            assert partial.read_bytes() == b"1234"
+        else:
+            assert parts[0]["resume_from_scratch"] is True
+            assert parts[0]["resume_message"]
+            assert not partial.exists()
+    finally:
+        staging.release_claim()
 
 
 def test_404_download(mm2_installer: ModelInstallServiceBase, mm2_app_config: InvokeAIAppConfig) -> None:
