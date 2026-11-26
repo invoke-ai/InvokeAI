@@ -49,9 +49,6 @@ def _mark_sparse(file: Any) -> None:
     import msvcrt
     from ctypes import wintypes
 
-    class _FileSetSparseBuffer(ctypes.Structure):
-        _fields_ = [("set_sparse", wintypes.BOOLEAN)]
-
     device_io_control = ctypes.WinDLL("kernel32", use_last_error=True).DeviceIoControl
     device_io_control.argtypes = [
         wintypes.HANDLE,
@@ -64,13 +61,12 @@ def _mark_sparse(file: Any) -> None:
         wintypes.LPVOID,
     ]
     device_io_control.restype = wintypes.BOOL
-    sparse = _FileSetSparseBuffer(1)
     returned = wintypes.DWORD()
     if not device_io_control(
         wintypes.HANDLE(msvcrt.get_osfhandle(file.fileno())),
         0x000900C4,  # FSCTL_SET_SPARSE
-        ctypes.byref(sparse),
-        ctypes.sizeof(sparse),
+        None,
+        0,
         None,
         0,
         ctypes.byref(returned),

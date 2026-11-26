@@ -2,6 +2,7 @@
 
 import builtins
 import json
+import sys
 from pathlib import Path
 
 import gguf
@@ -128,6 +129,23 @@ def test_header_only_safetensors_has_a_complete_logical_data_section(tmp_path: P
     marker_start, marker_end = header["layer.comfy_quant"]["data_offsets"]
     assert raw[8 + header_length + marker_start : 8 + header_length + marker_end] == json.dumps(marker).encode()
     assert path.stat().st_size >= 8 + header_length + logical_end
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows sparse-file allocation")
+def test_header_only_safetensors_does_not_allocate_its_logical_tensor_data(tmp_path: Path) -> None:
+    import ctypes
+    from ctypes import wintypes
+
+    path = write_header_only_safetensors(tmp_path / "sparse.safetensors", {"weight": ([16 * 1024 * 1024], "U8")})
+    allocated_size_high = wintypes.DWORD()
+    get_compressed_file_size = ctypes.WinDLL("kernel32", use_last_error=True).GetCompressedFileSizeW
+    get_compressed_file_size.argtypes = [wintypes.LPCWSTR, ctypes.POINTER(wintypes.DWORD)]
+    get_compressed_file_size.restype = wintypes.DWORD
+    allocated_size_low = get_compressed_file_size(str(path), ctypes.byref(allocated_size_high))
+
+    assert path.stat().st_size >= 16 * 1024 * 1024
+    assert allocated_size_low != 0xFFFFFFFF or ctypes.get_last_error() == 0
+    assert (allocated_size_high.value << 32) | allocated_size_low < 1024 * 1024
 
 
 def test_a_header_cannot_request_more_than_the_safetensors_limit(
