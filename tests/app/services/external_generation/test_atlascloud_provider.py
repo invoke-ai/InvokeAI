@@ -274,6 +274,7 @@ def test_atlascloud_failed_prediction(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_atlascloud_refuses_non_public_result_url(monkeypatch: pytest.MonkeyPatch) -> None:
     provider = AtlasCloudProvider(InvokeAIAppConfig(external_atlascloud_api_key="atlas-key"), logging.getLogger("test"))
+    _ImageHandler.requests_served = 0
     server = http.server.HTTPServer(("127.0.0.1", 0), _ImageHandler)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     result_url = f"http://127.0.0.1:{server.server_address[1]}/x.png"
