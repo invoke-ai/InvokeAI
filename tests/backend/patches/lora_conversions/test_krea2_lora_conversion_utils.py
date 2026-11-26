@@ -5,6 +5,7 @@ from diffusers import Krea2Transformer2DModel
 
 from invokeai.backend.model_manager.load.model_loaders.krea2 import KREA2_TRANSFORMER_CONFIG
 from invokeai.backend.patches.layers.dora_layer import DoRALayer
+from invokeai.backend.patches.layers.full_layer import FullLayer
 from invokeai.backend.patches.layers.lokr_layer import LoKRLayer
 from invokeai.backend.patches.layers.lora_layer import LoRALayer
 from invokeai.backend.patches.lora_conversions.krea2_lora_constants import (
@@ -373,11 +374,11 @@ def test_unrecognized_kohya_flattened_keys_are_left_untouched(flat_module: str) 
 @pytest.mark.parametrize(
     ("lycoris_suffixes", "expected_second_layer"),
     [
-        # LoKr is a layout this converter understands, so its module un-flattens like any other and the
-        # adapter actually applies. The other algorithms below have no handler, so they stay verbatim.
+        # LoKr and full (`diff`) are layouts this converter understands, so the module un-flattens like any other
+        # and the adapter actually applies. LoHa has no handler, so it stays verbatim.
         (("lokr_w1", "lokr_w2"), "transformer_blocks.6.attn.to_q"),
         (("hada_w1_a", "hada_w1_b", "hada_w2_a", "hada_w2_b"), "lora_unet_blocks_6_attn_wq"),
-        (("diff", "diff_b"), "lora_unet_blocks_6_attn_wq"),
+        (("diff", "diff_b"), "transformer_blocks.6.attn.to_q"),
         # LyCORIS saves an `alpha` per module, so this is the realistic on-disk shape rather than an
         # edge case — see this repo's own captured fixtures. `.alpha` is a suffix the converter knows,
         # so deciding per key rewrote it while its siblings stayed verbatim, splitting one module into
@@ -592,3 +593,108 @@ def test_kohya_flattened_lokr_converts_onto_its_real_module() -> None:
     assert isinstance(layer, LoKRLayer)
     torch.testing.assert_close(layer.get_weight(torch.empty(6, 8)), torch.kron(w1, w2_a @ w2_b))
     assert layer.scale() == 4.0 / w2_b.shape[0]
+
+
+def test_native_lora_with_diff_b_applies_the_bias_delta_unscaled() -> None:
+    # ComfyUI-saved LoRAs (e.g. the Krea-2 Turbo LoRA) carry a `diff_b` bias delta next to the low-rank pair.
+    # The delta is stored as is, so the layer's `alpha / rank` scale must not apply to it.
+    diff_b = torch.arange(4, dtype=torch.float32)
+    state_dict = {
+        "diffusion_model.first.lora_down.weight": torch.ones(2, 3),
+        "diffusion_model.first.lora_up.weight": torch.ones(4, 2),
+        "diffusion_model.first.alpha": torch.tensor(1.0),
+        "diffusion_model.first.diff_b": diff_b,
+    }
+
+    model = lora_model_from_krea2_state_dict(state_dict)
+
+    layer = model.layers[f"{KREA2_LORA_TRANSFORMER_PREFIX}img_in"]
+    assert isinstance(layer, LoRALayer)
+    params = layer.get_parameters({"weight": torch.zeros(4, 3), "bias": torch.zeros(4)}, weight=0.5)
+    assert torch.allclose(params["weight"], torch.full((4, 3), 0.5))
+    assert torch.allclose(params["bias"], diff_b * 0.5)
+
+
+def test_native_diff_b_only_module_patches_only_the_bias() -> None:
+    diff_b = torch.arange(4, dtype=torch.float32)
+    state_dict = {
+        "diffusion_model.blocks.0.attn.wq.lora_down.weight": torch.ones(2, 3),
+        "diffusion_model.blocks.0.attn.wq.lora_up.weight": torch.ones(4, 2),
+        "diffusion_model.first.diff_b": diff_b,
+    }
+
+    model = lora_model_from_krea2_state_dict(state_dict)
+
+    layer = model.layers[f"{KREA2_LORA_TRANSFORMER_PREFIX}img_in"]
+    params = layer.get_parameters({"weight": torch.ones(4, 3), "bias": torch.ones(4)}, weight=0.5)
+    assert torch.equal(params["weight"], torch.zeros(4, 3))
+    assert torch.allclose(params["bias"], diff_b * 0.5)
+
+
+def test_native_diff_module_loads_as_a_full_layer() -> None:
+    diff = torch.ones(4, 3)
+    diff_b = torch.ones(4)
+    model = lora_model_from_krea2_state_dict(
+        {"diffusion_model.blocks.0.attn.wq.diff": diff, "diffusion_model.blocks.0.attn.wq.diff_b": diff_b}
+    )
+
+    layer = model.layers[f"{KREA2_LORA_TRANSFORMER_PREFIX}transformer_blocks.0.attn.to_q"]
+    assert isinstance(layer, FullLayer)
+    assert torch.equal(layer.weight, diff)
+    assert layer.bias is not None and torch.equal(layer.bias, diff_b)
+
+
+def test_fal_peft_keys_on_native_modules_match_the_diffusers_layout() -> None:
+    # The fal / Krea trainer writes PEFT keys on the native module names under `base_model.model.`.
+    modules = {"first": "img_in", "blocks.0.attn.wq": "transformer_blocks.0.attn.to_q"}
+    state_dict = {
+        f"base_model.model.{native}.{suffix}.weight": torch.ones(2, 2)
+        for native in modules
+        for suffix in ("lora_A", "lora_B")
+    }
+
+    model = lora_model_from_krea2_state_dict(state_dict)
+
+    assert set(model.layers) == {f"{KREA2_LORA_TRANSFORMER_PREFIX}{diffusers}" for diffusers in modules.values()}
+
+
+@pytest.mark.parametrize(
+    ("module", "layer_key"),
+    [
+        ("diffusion_model.first", "img_in"),
+        ("transformer.transformer_blocks.0.attn.to_q", "transformer_blocks.0.attn.to_q"),
+        ("base_model.model.first", "img_in"),
+    ],
+)
+def test_peft_lora_with_diff_b_keeps_the_bias_delta(module: str, layer_key: str) -> None:
+    diff_b = torch.arange(4, dtype=torch.float32)
+    state_dict = {
+        f"{module}.lora_A.weight": torch.ones(2, 3),
+        f"{module}.lora_B.weight": torch.ones(4, 2),
+        f"{module}.alpha": torch.tensor(1.0),
+        f"{module}.diff_b": diff_b,
+    }
+
+    model = lora_model_from_krea2_state_dict(state_dict)
+
+    layer = model.layers[f"{KREA2_LORA_TRANSFORMER_PREFIX}{layer_key}"]
+    assert isinstance(layer, LoRALayer)
+    params = layer.get_parameters({"weight": torch.zeros(4, 3), "bias": torch.zeros(4)}, weight=0.5)
+    assert torch.allclose(params["weight"], torch.full((4, 3), 0.5))
+    assert torch.allclose(params["bias"], diff_b * 0.5)
+
+
+def test_peft_dora_with_diff_b_keeps_the_bias_delta() -> None:
+    diff_b = torch.arange(4, dtype=torch.float32)
+    state_dict = {
+        "diffusion_model.first.lora_A.weight": torch.ones(2, 3),
+        "diffusion_model.first.lora_B.weight": torch.ones(4, 2),
+        "diffusion_model.first.lora_magnitude_vector.weight": torch.ones(4),
+        "diffusion_model.first.diff_b": diff_b,
+    }
+
+    model = lora_model_from_krea2_state_dict(state_dict)
+
+    layer = model.layers[f"{KREA2_LORA_TRANSFORMER_PREFIX}img_in"]
+    assert isinstance(layer, DoRALayer)
+    assert layer.bias is not None and torch.equal(layer.bias, diff_b)

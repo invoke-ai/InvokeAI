@@ -14,6 +14,7 @@ import { CpuOnlySetting } from './CpuOnlySetting';
 const api = vi.hoisted(() => ({
   getModelsDir: vi.fn(),
   listMissingModels: vi.fn(),
+  listModelKeysByDateAdded: vi.fn(),
   listModels: vi.fn(),
   updateModel: vi.fn(),
 }));

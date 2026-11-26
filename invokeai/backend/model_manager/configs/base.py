@@ -3,6 +3,7 @@ from enum import Enum
 from inspect import isabstract
 from typing import (
     TYPE_CHECKING,
+    Annotated,
     Any,
     ClassVar,
     Literal,
@@ -10,7 +11,7 @@ from typing import (
     Type,
 )
 
-from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, Tag, ValidationError, field_validator
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, StringConstraints, Tag, ValidationError, field_validator
 from pydantic_core import PydanticUndefined
 
 from invokeai.app.util.misc import uuid_string
@@ -26,6 +27,9 @@ from invokeai.backend.model_manager.taxonomy import (
 
 if TYPE_CHECKING:
     pass
+
+
+SourceURL = Annotated[str, StringConstraints(pattern=r"^https?://[^\s/?#]+(?:[/?#][^\s]*)?$")]
 
 
 class ModelRole(BaseModel):
@@ -97,7 +101,11 @@ class Config_Base(ABC, BaseModel):
     )
     source_url: str | None = Field(
         default=None,
-        description="Optional URL for the model (e.g. download page or model page).",
+        description="User-editable URL for the model (e.g. download page or model page).",
+    )
+    source_urls: list[SourceURL] = Field(
+        default_factory=list,
+        description="Web pages about the model, set by starters and installs. Users edit source_url instead.",
     )
 
     @field_validator("source_url", mode="before")
