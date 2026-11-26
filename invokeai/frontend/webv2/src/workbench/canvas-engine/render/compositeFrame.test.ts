@@ -88,6 +88,7 @@ const makeHarness = (): Harness => {
       getCheckerboardTile: () => surface(8, 8),
       getControlView: () => harness.controlView,
       getMaskPatternTile: () => null,
+      maskScratch: { getMaskScratch: () => surface(8, 8), releaseMaskScratch: vi.fn() },
       isEditingStagingHiddenStack: () => harness.editingHiddenStack,
       layerCache: {
         byteSize: () => 0,
@@ -101,7 +102,7 @@ const makeHarness = (): Harness => {
       stores,
       transformOverrides: overrides,
       viewport: {
-        getDpr: () => 1,
+        getDpr: () => 2,
         getViewportSize: () => ({ height: 64, width: 64 }),
         getZoom: () => 1,
         screenToDocument: ({ x, y }: { x: number; y: number }) => ({ x, y }),
@@ -129,6 +130,14 @@ const lastCompositeOptions = () => composite.mock.calls.at(-1)?.[4] as Record<st
 beforeEach(() => {
   harness = makeHarness();
   composite = vi.spyOn(compositor, 'compositeDocument').mockImplementation(() => undefined);
+});
+
+it('passes the viewport DPR and its mask scratch to the screen compositor', () => {
+  draw();
+  expect(lastCompositeOptions().screenMask).toEqual({
+    dpr: 2,
+    getScratch: expect.any(Function),
+  });
 });
 
 describe('cache preparation', () => {
@@ -331,6 +340,21 @@ describe('the surface budget', () => {
   it('enforces the budget after compositing, never before', () => {
     draw();
     expect(composite.mock.invocationCallOrder[0]).toBeLessThan(harness.enforce.mock.invocationCallOrder[0]!);
+  });
+
+  it('releases mask scratch after a full repaint without patterns and retains it across bounded damage', () => {
+    const doc = documentOf([layer('a')]);
+    const frame = createCompositeFrame(harness.deps);
+    const screen = surface();
+    const release = harness.deps.maskScratch.releaseMaskScratch;
+    composite.mockImplementationOnce((...[, , , , options]: Parameters<typeof compositor.compositeDocument>) => {
+      options.screenMask!.getScratch(8, 8);
+    });
+    frame.draw(screen, doc, VIEW, null, null);
+    frame.draw(screen, doc, VIEW, null, null, { kind: 'regions', regions: [{ layerId: 'a', rect: entryFor().rect }] });
+    expect(release).not.toHaveBeenCalled();
+    frame.draw(screen, doc, VIEW, null, null);
+    expect(release).toHaveBeenCalledOnce();
   });
 });
 

@@ -8,12 +8,9 @@ import type {
 import type { LiveCanvasEngines } from '@workbench/projects/projectAssets';
 
 import { registerAccountOwnedResource } from '@platform/state/accountLifecycle';
-import { getDocumentLeaves } from '@workbench/canvas-engine/api';
-import {
-  createCanvasEngine,
-  type CanvasEngine,
-  type CanvasEngineOptions,
-} from '@workbench/canvas-operations/createCanvasEngine';
+import { getDocumentLeaves, resetMaskFillColors } from '@workbench/canvas-engine/api';
+
+import type { createCanvasEngine, CanvasEngine, CanvasEngineOptions } from './createCanvasEngine';
 
 export type EngineDeps = Omit<CanvasEngineOptions, 'droppedHistorySteps' | 'projectId'> & {
   /** Identifies the Workbench: a released engine is replaced rather than reused by the next one. */
@@ -44,7 +41,7 @@ export interface RegistryTimers {
 
 export interface EngineRegistry {
   disposeAll(): void;
-  getOrCreateEngine(projectId: string, deps: EngineDeps): CanvasEngine;
+  getOrCreateEngine(projectId: string, deps: EngineDeps, createEngine: typeof createCanvasEngine): CanvasEngine;
   getEngine(projectId: string): CanvasEngine | undefined;
   releaseEngine(projectId: string): void;
 }
@@ -141,7 +138,7 @@ export const createEngineRegistry = (
       }
     },
     getEngine: (projectId) => entries.get(projectId)?.engine,
-    getOrCreateEngine: (projectId, { liveEngines, ...deps }) => {
+    getOrCreateEngine: (projectId, { liveEngines, ...deps }, createEngine) => {
       const existing = entries.get(projectId);
       if (existing && existing.liveEngines !== liveEngines && existing.refCount > 0) {
         // Its edits and held media belong to the Workbench still using it; sharing it would cross that boundary.
@@ -165,7 +162,7 @@ export const createEngineRegistry = (
       }
       const carry = carries.get(projectId);
       carries.delete(projectId);
-      const engine = createCanvasEngine({ projectId, ...deps, droppedHistorySteps: carry?.droppedHistorySteps ?? 0 });
+      const engine = createEngine({ projectId, ...deps, droppedHistorySteps: carry?.droppedHistorySteps ?? 0 });
       engine.tools.setTool(initialTool(carry, engine.document.getDocument()));
       if (carry?.bookmarkedLayerId) {
         engine.interaction.set('layerQuickSwitch', {
@@ -220,6 +217,7 @@ registerAccountOwnedResource({
   clear: defaultRegistry.disposeAll,
   name: 'canvas-engine-registry',
 });
+registerAccountOwnedResource({ clear: resetMaskFillColors, name: 'canvas-mask-fill-colors' });
 
 export const getOrCreateEngine = defaultRegistry.getOrCreateEngine;
 export const releaseEngine = defaultRegistry.releaseEngine;

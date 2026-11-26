@@ -10,4 +10,4 @@ export {
   withArchitectureCapabilities,
   type ArchitectureCapabilitiesRow,
 } from './core/architectureCapabilities';
-export { getModelBaseLabel } from './core/baseIdentity';
+export { getModelBaseLabel, isFluxFillModel } from './core/baseIdentity';

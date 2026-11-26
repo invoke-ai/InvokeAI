@@ -47,6 +47,7 @@ import {
   reportMaskEdit,
   useStructuralPreview,
 } from '@workbench/widgets/canvas/useStructuralCommit';
+import { MASK_FILL_STYLES } from '@workbench/widgets/layers/layerOps';
 import { PaletteIcon } from 'lucide-react';
 import { useCallback, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -61,16 +62,6 @@ interface RegionalConfigPatch {
   autoNegative?: boolean;
   layout?: CanvasRegionalLayoutContract | null;
 }
-
-/** The six mask fill styles, matching `CanvasMaskFillContract['style']` / legacy `zFillStyle`. */
-const MASK_FILL_STYLES: readonly CanvasMaskFillContract['style'][] = [
-  'solid',
-  'grid',
-  'crosshatch',
-  'diagonal',
-  'horizontal',
-  'vertical',
-];
 
 const SELECT_POSITIONING = { placement: 'bottom-end', sameWidth: true } as const;
 
