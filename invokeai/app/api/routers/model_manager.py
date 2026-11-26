@@ -44,6 +44,7 @@ from invokeai.app.services.model_records import (
     ModelRecordOrderBy,
     UnknownModelException,
 )
+from invokeai.app.services.model_records.missing_models import find_missing_models
 from invokeai.app.services.orphaned_models import CONVERSION_SCRATCH_DIRNAME, OrphanedModelInfo
 from invokeai.app.services.shared.pagination import SQLiteDirection
 from invokeai.app.util.path_safety import is_plain_filename
@@ -374,14 +375,7 @@ def list_missing_models(current_user: CurrentUserOrDefault) -> ModelsList:
     record_store = ApiDependencies.invoker.services.model_manager.store
     models_path = ApiDependencies.invoker.services.configuration.models_path
 
-    missing_models: list[AnyModelConfig] = []
-    for model_config in record_store.all_models():
-        if model_config.base == BaseModelType.External or model_config.format == ModelFormat.ExternalApi:
-            continue
-        if not (models_path / model_config.path).resolve().exists():
-            missing_models.append(model_config)
-
-    return ModelsList(models=missing_models)
+    return ModelsList(models=find_missing_models(record_store.all_models(), models_path))
 
 
 @model_manager_router.get(
@@ -1537,6 +1531,7 @@ def _convert_model(key: str, user_id: str) -> AnyModelConfig:
                             description=model_config.description,
                             hash=model_config.hash,
                             source=model_config.source,
+                            source_urls=model_config.source_urls,
                         ),
                     )
                 )

@@ -1,5 +1,7 @@
+import http.server
 import io
 import logging
+import threading
 from typing import Any, Iterator
 
 import pytest
@@ -16,6 +18,7 @@ from invokeai.app.services.external_generation.external_generation_common import
 )
 from invokeai.app.services.external_generation.external_generation_default import ExternalGenerationService
 from invokeai.app.services.external_generation.providers.atlascloud import AtlasCloudProvider
+from invokeai.app.util.ssrf import UnsafeDownloadURLException
 from invokeai.backend.model_manager.configs.external_api import ExternalApiModelConfig, ExternalModelCapabilities
 from invokeai.backend.model_manager.starter_models import STARTER_MODELS
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType
@@ -57,6 +60,22 @@ def _png_bytes() -> bytes:
     buffer = io.BytesIO()
     Image.new("RGB", (16, 16), color="blue").save(buffer, format="PNG")
     return buffer.getvalue()
+
+
+class _ImageHandler(http.server.BaseHTTPRequestHandler):
+    requests_served = 0
+
+    def do_GET(self) -> None:  # noqa: N802
+        type(self).requests_served += 1
+        body = _png_bytes()
+        self.send_response(200)
+        self.send_header("Content-Type", "image/png")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, *_args: Any) -> None:
+        pass
 
 
 def _model() -> ExternalApiModelConfig:
@@ -139,21 +158,24 @@ def test_atlascloud_submit_poll_and_download(monkeypatch: pytest.MonkeyPatch) ->
         )
 
     def fake_get(url: str, **kwargs: Any) -> DummyResponse:
-        if url.endswith("/api/v1/model/result/prediction-1"):
-            captured["poll_headers"] = kwargs["headers"]
-            return DummyResponse(
-                ok=True,
-                json_data={
-                    "code": 200,
-                    "data": {"id": "prediction-1", "status": "completed", "outputs": [image_url]},
-                },
-            )
+        assert url.endswith("/api/v1/model/result/prediction-1")
+        captured["poll_headers"] = kwargs["headers"]
+        return DummyResponse(
+            ok=True,
+            json_data={
+                "code": 200,
+                "data": {"id": "prediction-1", "status": "completed", "outputs": [image_url]},
+            },
+        )
+
+    def fake_download(_session: Any, url: str, **kwargs: Any) -> DummyResponse:
         assert url == image_url
         assert kwargs["stream"] is True
         return DummyResponse(ok=True, content=_png_bytes())
 
     monkeypatch.setattr("requests.post", fake_post)
     monkeypatch.setattr("requests.get", fake_get)
+    monkeypatch.setattr("requests.Session.get", fake_download)
 
     result = provider.generate(_request())
 
@@ -192,21 +214,25 @@ def test_atlascloud_uses_custom_base_url_and_fallback_poll_url(monkeypatch: pyte
 
     def fake_get(url: str, **_kwargs: Any) -> DummyResponse:
         requested_urls.append(url)
-        if url.endswith("/result/prediction-2"):
-            return DummyResponse(
-                ok=True,
-                json_data={"id": "prediction-2", "status": "succeeded", "output": ["https://cdn.test/image.png"]},
-            )
+        return DummyResponse(
+            ok=True,
+            json_data={"id": "prediction-2", "status": "succeeded", "output": ["https://cdn.test/image.png"]},
+        )
+
+    def fake_download(_session: Any, url: str, **_kwargs: Any) -> DummyResponse:
+        requested_urls.append(url)
         return DummyResponse(ok=True, content=_png_bytes())
 
     monkeypatch.setattr("requests.post", fake_post)
     monkeypatch.setattr("requests.get", fake_get)
+    monkeypatch.setattr("requests.Session.get", fake_download)
 
     provider.generate(_request())
 
-    assert requested_urls[:2] == [
+    assert requested_urls == [
         "https://proxy.atlas.test/api/v1/model/generateImage",
         "https://proxy.atlas.test/api/v1/model/result/prediction-2",
+        "https://cdn.test/image.png",
     ]
 
 
@@ -244,6 +270,34 @@ def test_atlascloud_failed_prediction(monkeypatch: pytest.MonkeyPatch) -> None:
 
     with pytest.raises(ExternalProviderRequestError, match="content rejected"):
         provider.generate(_request())
+
+
+def test_atlascloud_refuses_non_public_result_url(monkeypatch: pytest.MonkeyPatch) -> None:
+    provider = AtlasCloudProvider(InvokeAIAppConfig(external_atlascloud_api_key="atlas-key"), logging.getLogger("test"))
+    _ImageHandler.requests_served = 0
+    server = http.server.HTTPServer(("127.0.0.1", 0), _ImageHandler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    result_url = f"http://127.0.0.1:{server.server_address[1]}/x.png"
+    monkeypatch.setattr(
+        "requests.post",
+        lambda *_args, **_kwargs: DummyResponse(ok=True, json_data={"id": "prediction-4", "status": "queued"}),
+    )
+    monkeypatch.setattr(
+        "requests.get",
+        lambda *_args, **_kwargs: DummyResponse(
+            ok=True, json_data={"id": "prediction-4", "status": "completed", "outputs": [result_url]}
+        ),
+    )
+
+    try:
+        with pytest.raises(ExternalProviderRequestError, match="^Atlas Cloud returned an unsafe image URL$") as error:
+            provider.generate(_request())
+    finally:
+        server.shutdown()
+        server.server_close()
+
+    assert isinstance(error.value.__cause__, UnsafeDownloadURLException)
+    assert _ImageHandler.requests_served == 0
 
 
 def test_atlascloud_requires_api_key() -> None:

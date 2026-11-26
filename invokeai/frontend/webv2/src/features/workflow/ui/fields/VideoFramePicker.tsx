@@ -4,7 +4,7 @@ import { Button, useUnavailableControl } from '@platform/ui/Button';
 import { Tooltip } from '@platform/ui/Tooltip';
 import { VideoPlayer } from '@platform/ui/video-player/VideoPlayer';
 import { getFrameAtTime, getFrameTime } from '@platform/ui/video-player/videoTimeline';
-import { useCallback, useMemo, useState, type SyntheticEvent } from 'react';
+import { useCallback, useMemo, useState, type MouseEventHandler, type SyntheticEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 export interface VideoFramePickerProps {
@@ -13,6 +13,7 @@ export interface VideoFramePickerProps {
   fps: number;
   frameCount: number;
   onChange: (value: unknown) => void;
+  onContextMenu?: MouseEventHandler<HTMLElement>;
   posterUrl: string;
   resolvedIndex: number;
   videoUrl: string;
@@ -60,6 +61,7 @@ export const VideoFramePicker = ({
   fps,
   frameCount,
   onChange,
+  onContextMenu,
   posterUrl,
   resolvedIndex,
   videoUrl,
@@ -114,7 +116,7 @@ export const VideoFramePicker = ({
   return (
     // `nodrag` keeps pointer drags on the scrubber from moving the node; `nokey` keeps its arrow keys from nudging it.
     <Flex className="nodrag nokey" direction="column" gap="1" w="full">
-      <Box borderWidth="1px" h="32" overflow="hidden" rounded="sm" w="full">
+      <Box borderWidth="1px" h="32" overflow="hidden" rounded="sm" w="full" onContextMenu={onContextMenu}>
         <VideoPlayer
           ref={setVideo}
           aria-label={t('nodes.framePreview')}

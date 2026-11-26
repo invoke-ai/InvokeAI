@@ -48,6 +48,7 @@ const library = vi.hoisted(() => ({ models: [] as unknown[] }));
 
 vi.mock('./api', async (importOriginal) => ({
   ...(await importOriginal<typeof ModelsApi>()),
+  listMissingModels: () => Promise.resolve([]),
   listModels: () => Promise.resolve(library.models),
 }));
 

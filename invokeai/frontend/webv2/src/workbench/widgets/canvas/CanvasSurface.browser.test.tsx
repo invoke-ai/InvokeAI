@@ -1,5 +1,4 @@
 import type { CanvasStateContractV3 } from '@workbench/canvas-engine/contracts';
-import type { CanvasEngine } from '@workbench/canvas-operations/createCanvasEngine';
 import type { EngineDeps, EngineRegistry } from '@workbench/canvas-operations/engineRegistry';
 import type { CanvasProjectMutationPort } from '@workbench/canvasProjectMutationPort';
 import type * as WorkbenchContextModule from '@workbench/WorkbenchContext';
@@ -9,6 +8,7 @@ import type { ReactNode } from 'react';
 import { ChakraProvider } from '@chakra-ui/react';
 import { ResizeHandle } from '@platform/ui/ResizeHandle';
 import { system } from '@theme/system';
+import { createCanvasEngine, type CanvasEngine } from '@workbench/canvas-operations/createCanvasEngine';
 import { createEngineRegistry } from '@workbench/canvas-operations/engineRegistry';
 import { createEmptyCanvasState } from '@workbench/canvasMigration';
 import { FocusRegionProvider, useFocusRegionProps } from '@workbench/focusRegions';
@@ -64,7 +64,7 @@ const acquireTrackedEngine = (
   projectId: string,
   deps: EngineDeps
 ): { engine: CanvasEngine; release: () => void } => {
-  const engine = registry.getOrCreateEngine(projectId, deps);
+  const engine = registry.getOrCreateEngine(projectId, deps, createCanvasEngine);
   let isHeld = true;
   const release = (): void => {
     if (!isHeld) {

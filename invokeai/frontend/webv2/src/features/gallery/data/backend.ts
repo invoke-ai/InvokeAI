@@ -1319,19 +1319,74 @@ export const starGalleryImages = (imageNames: string[], signal?: AbortSignal): P
 export const unstarGalleryImages = (imageNames: string[], signal?: AbortSignal): Promise<string[]> =>
   setGalleryImageItemsStarred(imageNames, false, signal).then((result) => result.succeededNames);
 
+/** Names the server positively finds absent; storage errors and existing names are never listed. */
+const findGoneImageNames = async (names: string[], signal?: AbortSignal): Promise<Set<string>> => {
+  if (names.length === 0) {
+    return new Set();
+  }
+
+  const body = await apiFetchJson<unknown>('/api/v1/images/gone', {
+    body: JSON.stringify({ image_names: names }),
+    method: 'POST',
+    signal,
+  });
+
+  signal?.throwIfAborted();
+  return new Set(Array.isArray(body) ? body.filter((name) => typeof name === 'string') : []);
+};
+
+/**
+ * Confirmed-absent names take the normal deletion cleanup, references included, in two cases the delete response
+ * cannot report: a lost response, and names the route skips because they were already gone (deleted by another
+ * session, or by an earlier request whose response was lost), which a retry would otherwise leave failed forever.
+ */
 export const deleteGalleryImageItems = (imageNames: string[], signal?: AbortSignal): Promise<GalleryNameBatchResult> =>
   mutateInNameBatches(imageNames, signal, async (batch) => {
-    const body = await apiFetchJson<unknown>('/api/v1/images/delete', {
-      body: JSON.stringify({ image_names: batch }),
-      method: 'POST',
-      signal,
-    });
-    signal?.throwIfAborted();
+    let result: GalleryNameBatchResult;
 
-    return {
-      ...mapGalleryItemOrganizationTransportResult(body, 'deleted_images'),
-      failedNames: getOptionalStringArray(body, 'failed_images'),
-    };
+    try {
+      const body = await apiFetchJson<unknown>('/api/v1/images/delete', {
+        body: JSON.stringify({ image_names: batch }),
+        method: 'POST',
+        signal,
+      });
+      signal?.throwIfAborted();
+
+      result = {
+        ...mapGalleryItemOrganizationTransportResult(body, 'deleted_images'),
+        failedNames: getOptionalStringArray(body, 'failed_images'),
+      };
+    } catch (error: unknown) {
+      // A 4xx refused the whole batch, so nothing committed and the server's reason must reach the user.
+      if (signal?.aborted || (error instanceof ApiError && error.status >= 400 && error.status < 500)) {
+        throw error;
+      }
+
+      const gone = await findGoneImageNames(batch, signal).catch(() => new Set<string>());
+
+      if (signal?.aborted || gone.size === 0) {
+        throw error;
+      }
+      batchLogger.debug({
+        context: { gone: gone.size, unconfirmed: batch.length - gone.size },
+        error,
+        message: 'A lost gallery delete response was reconciled against the server',
+        name: 'gallery.delete-response-reconciled',
+      });
+
+      return {
+        affectedBoardIds: [],
+        failedNames: batch.filter((name) => !gone.has(name)),
+        succeededNames: batch.filter((name) => gone.has(name)),
+      };
+    }
+
+    const reported = new Set([...result.succeededNames, ...result.failedNames]);
+    const skipped = batch.filter((name) => !reported.has(name));
+    // An abort here keeps what the delete response already confirmed.
+    const gone = await findGoneImageNames(skipped, signal).catch(() => new Set<string>());
+
+    return { ...result, succeededNames: [...result.succeededNames, ...skipped.filter((name) => gone.has(name))] };
   });
 
 /** Evict only deletedImageNames; other names may still exist on the server. */

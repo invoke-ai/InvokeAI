@@ -20,6 +20,7 @@ const { api, pending } = vi.hoisted(() => ({
   api: {
     getModelsDir: vi.fn(() => Promise.resolve('/models')),
     listMissingModels: vi.fn(() => Promise.resolve([])),
+    listModelKeysByDateAdded: vi.fn(),
     deleteModel: vi.fn(),
     listModels: vi.fn(),
     updateModel: vi.fn(),
@@ -356,6 +357,64 @@ describe('model manager in a single pane', () => {
     await expect.element(library()).toBeVisible();
     await vi.waitFor(() => expect(document.activeElement).toBe(row(A.key)));
     expect(api.deleteModel).toHaveBeenCalledWith(B.key, expect.anything());
+  });
+});
+describe('model library sorted by date added', () => {
+  let host: HTMLDivElement;
+  let root: Root;
+
+  beforeEach(async () => {
+    api.listModels.mockReset().mockResolvedValue([A, B]);
+    api.listModelKeysByDateAdded.mockReset();
+    accountLifecycle.activate('model-library-sort-test', ':user:model-library-sort-test');
+    setModelsSnapshotForTests({ models: [A, B], status: 'loaded' });
+    host = document.createElement('div');
+    host.style.cssText = 'display:flex;height:900px;width:1200px;';
+    document.body.append(host);
+    root = createRoot(host);
+    await act(() =>
+      root.render(
+        <ChakraProvider value={system}>
+          <ModelManagerView />
+        </ChakraProvider>
+      )
+    );
+  });
+
+  afterEach(async () => {
+    await act(() => root.unmount());
+    host.remove();
+    accountLifecycle.invalidate();
+  });
+
+  it('reads the install order on the sort pick, not on a search keystroke, and lists the newest first', async () => {
+    let finishOrderRead!: (keys: string[]) => void;
+    api.listModelKeysByDateAdded.mockReturnValueOnce(
+      new Promise((resolve) => {
+        finishOrderRead = resolve;
+      })
+    );
+    const rowKeys = () =>
+      [...host.querySelectorAll('[data-list-row]')]
+        .map((row) => row.getAttribute('data-list-row')!)
+        .filter((key) => !key.startsWith('header:'));
+
+    expect(rowKeys()).toEqual([A.key, B.key]);
+
+    await page.getByRole('button', { name: 'models.filterAndSort', exact: true }).click();
+    await page.getByRole('menuitem', { name: /models\.sortBy/ }).click();
+    await page.getByRole('menuitemcheckbox', { name: 'models.sort.added' }).click();
+    expect(api.listModelKeysByDateAdded).toHaveBeenCalledOnce();
+
+    // Typed while the read is still open: a keystroke that asked again would queue a second read behind it.
+    await page.getByRole('textbox', { name: 'models.searchModels' }).fill('Lora');
+    await act(async () => {
+      finishOrderRead([A.key, B.key]);
+      await Promise.resolve();
+    });
+
+    await expect.poll(rowKeys).toEqual([B.key, A.key]);
+    expect(api.listModelKeysByDateAdded).toHaveBeenCalledOnce();
   });
 });
 const buttonContaining = (text: string) =>
