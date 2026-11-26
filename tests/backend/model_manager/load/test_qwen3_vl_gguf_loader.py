@@ -5,6 +5,7 @@ matrices and the production ``gguf_sd_loader`` reads it, so the tensors arrive a
 wrappers the loader has to cope with. See ``qwen3vl_gguf_fixture`` for what is and is not simulated.
 """
 
+from types import SimpleNamespace
 from unittest.mock import call, create_autospec
 
 import gguf
@@ -100,9 +101,15 @@ def test_the_bundled_tokenizer_is_sized_from_its_assets(monkeypatch, tmp_path) -
         path=str(tmp_path / "qwen3vl_tiny.gguf"), variant=Qwen3VLVariantType.Qwen3VL_4B, name="tiny"
     )
 
-    assert loader.get_size_fs(config, tmp_path / "qwen3vl_tiny.gguf", SubModelType.Tokenizer) == (
-        calc_tokenizer_size_by_fs(QWEN3_VL_TOKENIZER_DIR, include_runtime_overhead=True)
-    )
+    from invokeai.backend.qwen3_vl.qwen3_vl_assets import load_bundled_qwen3_vl_tokenizer
+
+    monkeypatch.setattr(load_bundled_qwen3_vl_tokenizer, "cache_info", lambda: SimpleNamespace(currsize=0))
+    assert loader.get_size_fs(
+        config, tmp_path / "qwen3vl_tiny.gguf", SubModelType.Tokenizer
+    ) == calc_tokenizer_size_by_fs(QWEN3_VL_TOKENIZER_DIR)
+    assert loader._get_host_bytes_needed(
+        config, tmp_path / "qwen3vl_tiny.gguf", SubModelType.Tokenizer
+    ) == calc_tokenizer_size_by_fs(QWEN3_VL_TOKENIZER_DIR, include_runtime_overhead=True)
 
 
 def test_a_krea2_shaped_forward_produces_hidden_states(loaded_encoder) -> None:

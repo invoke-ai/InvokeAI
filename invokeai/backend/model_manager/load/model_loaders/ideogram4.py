@@ -52,6 +52,7 @@ from invokeai.backend.quantization.fp8_scaled import (
     extract_fp8_scaled_layers,
     full_precision_hints_respected,
     load_safetensors_checkpoint,
+    mxfp8_scale_decode_host_bytes,
     parse_quantization_metadata,
     read_safetensors_metadata,
     reject_quantized_side_channel,
@@ -459,6 +460,13 @@ class Ideogram4CheckpointModel(ModelLoader):
                 **extract_comfy_quant_hints(sd),
                 **parse_quantization_metadata(read_safetensors_metadata(model_path, self._logger)),
             }
+
+            mxfp8_decode_host_bytes = mxfp8_scale_decode_host_bytes(sd, layer_hints)
+            if mxfp8_decode_host_bytes:
+                require_ram_headroom(
+                    self._ram_cache.make_room(0, host_bytes_needed=mxfp8_decode_host_bytes),
+                    mxfp8_decode_host_bytes,
+                )
 
             fp8_layers = extract_fp8_scaled_layers(sd, layer_hints=layer_hints)
             # Two consumers want these packed and either is enough: the fp8 matmul, which runs on

@@ -545,7 +545,8 @@ class PinnedStorageRegistry:
 
     def host_memory_available(self, sample: Callable[[], int] | None = None) -> int:
         """Host headroom available to another allocation while registrations are in flight."""
-        with self._registration_lock:
+        with self._registering():
+            self._drain_deferred_locked()
             sample = _host_memory_available if sample is None else sample
             return max(sample() - self._host_reserved_bytes, 0)
 

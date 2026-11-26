@@ -41,6 +41,7 @@ from invokeai.backend.quantization.fp8_scaled import (
     extract_fp8_scaled_layers,
     full_precision_hints_respected,
     load_safetensors_checkpoint,
+    mxfp8_scale_decode_host_bytes,
     parse_quantization_metadata,
     read_safetensors_metadata,
     reject_quantized_side_channel,
@@ -60,6 +61,7 @@ from invokeai.backend.quantization.int8_convrot import (
 from invokeai.backend.quantization.load_plan import reserve_for_load
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
+from invokeai.backend.util.ram import require_ram_headroom
 from invokeai.backend.util.state_dict_loading import (
     load_state_dict_ignoring_extras,
     log_unexpected_keys,
@@ -169,6 +171,12 @@ class AnimaCheckpointModel(ModelLoader):
                 **extract_comfy_quant_hints(sd),
                 **strip_layer_path_prefix(header_hints),
             }
+            mxfp8_decode_host_bytes = mxfp8_scale_decode_host_bytes(sd, layer_hints)
+            if mxfp8_decode_host_bytes:
+                require_ram_headroom(
+                    self._ram_cache.make_room(0, host_bytes_needed=mxfp8_decode_host_bytes),
+                    mxfp8_decode_host_bytes,
+                )
             fp8_layers = extract_fp8_scaled_layers(sd, layer_hints=layer_hints)
 
         # Build at the checkpoint's own depth: 28 blocks for the official release, more for the

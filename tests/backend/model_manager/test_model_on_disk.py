@@ -15,6 +15,7 @@ from invokeai.backend.model_manager.model_on_disk import (
     read_safetensors_header,
     safetensors_meta_state_dict,
 )
+from tests.backend.model_manager.load.state_dicts.utils import write_header_only_safetensors
 
 
 def test_gguf_metadata_keeps_scalar_fields_with_their_types_and_leaves_arrays_out(tmp_path: Path) -> None:
@@ -110,6 +111,23 @@ def test_a_file_shorter_than_a_header_length_is_refused(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="is not a safetensors file"):
         read_safetensors_header(path)
+
+
+def test_header_only_safetensors_has_a_complete_logical_data_section(tmp_path: Path) -> None:
+    marker = {"format": "int8_tensorwise"}
+    path = write_header_only_safetensors(
+        tmp_path / "header_only.safetensors", {"layer.weight": ([4], "U8")}, {"layer": marker}
+    )
+
+    header = read_safetensors_header(path)
+    raw = path.read_bytes()
+    header_length = int.from_bytes(raw[:8], "little")
+    logical_end = max(entry["data_offsets"][1] for entry in header.values())
+
+    assert header["layer.weight"]["shape"] == [4]
+    marker_start, marker_end = header["layer.comfy_quant"]["data_offsets"]
+    assert raw[8 + header_length + marker_start : 8 + header_length + marker_end] == json.dumps(marker).encode()
+    assert path.stat().st_size >= 8 + header_length + logical_end
 
 
 def test_a_header_cannot_request_more_than_the_safetensors_limit(

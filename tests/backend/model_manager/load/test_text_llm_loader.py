@@ -7,8 +7,9 @@ through the loader's own entry point, with the vendored config swapped for the t
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, call
 
 import pytest
 import torch
@@ -562,8 +563,51 @@ class TestTheFolderLoader:
         folder.mkdir()
         (folder / "config.json").write_text("{}")
         (folder / "model.safetensors").write_bytes(b"\0" * 1024)
+        (folder / "tokenizer.json").write_bytes(b"tokenizer")
+        (folder / "tokenizer_config.json").write_bytes(b"config")
         config = _folder_config(folder)
         loader = prepare(FOLDER_SEAM, monkeypatch).loader
 
-        assert loader.get_size_fs(config, folder, submodel) == 0
+        tokenizer_bytes = (folder / "tokenizer.json").stat().st_size + (folder / "tokenizer_config.json").stat().st_size
+        assert loader.get_size_fs(config, folder, submodel) == tokenizer_bytes
         assert loader.get_size_fs(config, folder, None) == 1024
+
+    @pytest.mark.parametrize(
+        ("submodel", "factory"),
+        [(SubModelType.Tokenizer, "AutoTokenizer"), (SubModelType.Processor, "AutoProcessor")],
+    )
+    def test_the_text_side_is_admitted_before_cold_construction(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, submodel: SubModelType, factory: str
+    ) -> None:
+        folder = tmp_path / "llm"
+        folder.mkdir()
+        (folder / "tokenizer.json.gz").write_bytes(b"compressed")
+        config = _folder_config(folder)
+        tokenizer_bytes = (folder / "tokenizer.json.gz").stat().st_size
+        runtime_bytes = 130 * 2**20
+        constructed = False
+
+        def construct(*_args: Any, **_kwargs: Any) -> object:
+            nonlocal constructed
+            constructed = True
+            return object()
+
+        monkeypatch.setattr(getattr(loader_module, factory), "from_pretrained", construct)
+        loader = object.__new__(TextLLMModelLoader)
+        loader._app_config = SimpleNamespace(log_memory_usage=False)
+        loader._logger = MagicMock()
+        loader._torch_device = torch.device("cpu")
+        loader._ram_cache = MagicMock()
+        loader._ram_cache.get_with_first_use_claim.side_effect = IndexError
+        loader._ram_cache.shared_cpu_weights = None
+        loader._ram_cache.make_room.return_value = SimpleNamespace(ram_headroom_satisfied=False)
+        monkeypatch.setattr(loader, "_get_model_path", lambda _config: folder)
+        monkeypatch.setattr(loader, "_load_model", construct)
+
+        with pytest.raises(MemoryError, match="Insufficient host memory"):
+            loader._load_and_cache(config, submodel)
+
+        assert loader._ram_cache.make_room.call_args_list == [
+            call(tokenizer_bytes, host_bytes_needed=tokenizer_bytes + runtime_bytes)
+        ]
+        assert not constructed

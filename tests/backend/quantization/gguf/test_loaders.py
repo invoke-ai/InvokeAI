@@ -578,6 +578,63 @@ def test_dtype_conversion_reserves_the_new_output_bytes():
     ]
 
 
+def test_many_f16_gguf_tensors_only_need_one_bf16_output_headroom(tmp_path):
+    path = tmp_path / "model.gguf"
+    tensors = {f"tensor.{i}": torch.arange(8, dtype=torch.float16) + i for i in range(32)}
+    write_gguf(path, tensors)
+    sd = gguf_sd_loader(path, compute_dtype=torch.bfloat16)
+    output_bytes = tensors["tensor.0"].numel() * torch.bfloat16.itemsize
+    reserved: list[tuple[int, int]] = []
+
+    def reserve(_reserved_bytes: int, *, host_bytes_needed: int):
+        reserved.append((_reserved_bytes, host_bytes_needed))
+        return SimpleNamespace(ram_headroom_satisfied=host_bytes_needed <= output_bytes)
+
+    unpack_ggml_at_load(sd, torch.nn.Embedding(8, 1, device="meta"), (), reserve)
+
+    assert reserved[0][1] == output_bytes
+    assert all(value.dtype is torch.bfloat16 for value in sd.values())
+    for name, tensor in tensors.items():
+        torch.testing.assert_close(sd[name], tensor.to(torch.bfloat16))
+
+
+def test_shared_gguf_source_storage_is_released_after_last_alias():
+    elements = 8
+    source = torch.arange(elements * 2, dtype=torch.float16)
+    other_source = torch.arange(elements * 2, dtype=torch.float16)
+    first = GGMLTensor(
+        source[:elements],
+        ggml_quantization_type=gguf.GGMLQuantizationType.F16,
+        tensor_shape=torch.Size((elements,)),
+        compute_dtype=torch.bfloat16,
+    )
+    second = GGMLTensor(
+        source[:elements],
+        ggml_quantization_type=gguf.GGMLQuantizationType.F16,
+        tensor_shape=torch.Size((elements,)),
+        compute_dtype=torch.bfloat16,
+    )
+    third = GGMLTensor(
+        other_source[:elements],
+        ggml_quantization_type=gguf.GGMLQuantizationType.F16,
+        tensor_shape=torch.Size((elements,)),
+        compute_dtype=torch.bfloat16,
+    )
+    reserved: list[tuple[int, int]] = []
+
+    def reserve(_reserved_bytes: int, *, host_bytes_needed: int):
+        reserved.append((_reserved_bytes, host_bytes_needed))
+        return SimpleNamespace(ram_headroom_satisfied=True)
+
+    sd = {"first": first, "second": second, "third": third}
+    del first, second, third, source, other_source
+    unpack_ggml_at_load(sd, torch.nn.Embedding(elements, 1, device="meta"), (), reserve)
+
+    output_bytes = elements * torch.bfloat16.itemsize
+    assert reserved == [(output_bytes * 3 + output_bytes, output_bytes * 2)]
+    assert all(value.dtype is torch.bfloat16 for value in sd.values())
+
+
 def test_a_packed_linear_that_stays_packed_requests_no_incremental_host_bytes():
     weight = _quantized_embedding(gguf.GGMLQuantizationType.Q4_K)
     reserved: list[tuple[int, dict[str, int]]] = []

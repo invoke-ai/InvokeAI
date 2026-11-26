@@ -178,6 +178,29 @@ def _config(checkpoint: _Checkpoint, cpu_only: bool | None = None) -> Qwen3Encod
     )
 
 
+def test_mxfp8_decode_headroom_is_checked_before_extraction(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    checkpoint = _write(tmp_path, evidence="marker")
+    _decide(monkeypatch, matmul=True, device="cuda:0")
+    loader = _loader()
+    loader._ram_cache.make_room = MagicMock(return_value=SimpleNamespace(ram_headroom_satisfied=False))
+    monkeypatch.setattr(z_image, "mxfp8_scale_decode_host_bytes", lambda _sd, _hints: 1234)
+    extracted = False
+    original_extract = z_image.extract_fp8_scaled_layers
+
+    def observe_extract(*args, **kwargs):
+        nonlocal extracted
+        extracted = True
+        return original_extract(*args, **kwargs)
+
+    monkeypatch.setattr(z_image, "extract_fp8_scaled_layers", observe_extract)
+
+    with pytest.raises(MemoryError, match="Insufficient host memory"):
+        loader._load_from_singlefile(_config(checkpoint))
+
+    assert extracted is False
+    loader._ram_cache.make_room.assert_called_once_with(0, host_bytes_needed=1234)
+
+
 @pytest.mark.parametrize("evidence", ["marker", "header", "none"])
 @pytest.mark.parametrize("reason", ["fp8_compute", "fp8_storage"])
 def test_a_device_that_holds_float8_keeps_the_projections_scaled_and_encodes_like_the_decoded_weights(

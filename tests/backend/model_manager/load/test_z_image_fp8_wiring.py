@@ -10,6 +10,8 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import diffusers
+import pytest
+import safetensors.torch
 import torch
 
 from invokeai.backend.model_manager.configs.main import Main_Checkpoint_ZImage_Config
@@ -27,7 +29,7 @@ class _TinyZImageTransformer(torch.nn.Module):
 
 def _prepare_loader(monkeypatch, tmp_path, state_dict: dict[str, torch.Tensor]):
     checkpoint_path = tmp_path / "z_image.safetensors"
-    checkpoint_path.touch()
+    safetensors.torch.save_file({"_fixture": torch.zeros(1, dtype=torch.int8)}, checkpoint_path)
     config = Main_Checkpoint_ZImage_Config.model_construct(
         path=str(checkpoint_path), variant=ZImageVariantType.Turbo, fp8_storage=True
     )
@@ -70,6 +72,29 @@ def test_single_file_loader_applies_fp8_layerwise_casting(monkeypatch, tmp_path)
     assert isinstance(model, _TinyZImageTransformer)
     assert torch.equal(model.x_pad_token, torch.ones(2, 2))
     assert cast_calls == [(config, SubModelType.Transformer)]
+
+
+def test_mxfp8_decode_headroom_is_checked_before_extraction(monkeypatch, tmp_path) -> None:
+    from invokeai.backend.model_manager.load.model_loaders import z_image
+
+    loader, config = _prepare_loader(monkeypatch, tmp_path, {"x_pad_token": torch.ones(2, 2)})
+    monkeypatch.setattr(z_image, "mxfp8_scale_decode_host_bytes", lambda _sd, _hints: 1234)
+    loader._ram_cache.make_room = MagicMock(return_value=SimpleNamespace(ram_headroom_satisfied=False))
+    extracted = False
+    original_extract = z_image.extract_fp8_scaled_layers
+
+    def observe_extract(*args, **kwargs):
+        nonlocal extracted
+        extracted = True
+        return original_extract(*args, **kwargs)
+
+    monkeypatch.setattr(z_image, "extract_fp8_scaled_layers", observe_extract)
+
+    with pytest.raises(MemoryError, match="Insufficient host memory"):
+        loader._load_from_singlefile(config)
+
+    assert extracted is False
+    loader._ram_cache.make_room.assert_called_once_with(0, host_bytes_needed=1234)
 
 
 def test_state_dict_is_released_before_the_fp8_cast(monkeypatch, tmp_path) -> None:

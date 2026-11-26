@@ -530,29 +530,16 @@ def test_update_model_record_sets_keeps_and_clears_source_links(client: TestClie
 
 
 def test_reidentify_model_answers_with_the_service_outcome(
-    client: TestClient, model_record_routes: Any, mm2_app_config: Any
+    client: TestClient, model_record_routes: Any, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from invokeai.backend.model_manager.configs.main import Main_Checkpoint_SD1_Config
-    from tests.backend.model_manager.load.state_dicts import clip_g_comfy_keys
-    from tests.backend.model_manager.load.state_dicts.utils import write_header_only_safetensors
+    from invokeai.app.services.model_records import InvalidModelException, UnknownModelException
 
-    # A CLIP-G without the projection SD 3 needs: recognised, and refused as unusable.
-    keys = dict(clip_g_comfy_keys.state_dict_keys)
-    del keys["text_projection.weight"]
-    write_header_only_safetensors(mm2_app_config.models_path / "clip-g.safetensors", keys)
-    model_record_routes.store.add_model(
-        Main_Checkpoint_SD1_Config(
-            key="unusable",
-            path="clip-g.safetensors",
-            name="unusable",
-            hash="hash",
-            file_size=1,
-            source="local-source",
-            source_type=ModelSourceType.Path,
-            prediction_type="epsilon",
-            variant="normal",
-        )
-    )
+    def reidentify_model(key: str) -> None:
+        if key == "unusable":
+            raise InvalidModelException(key)
+        raise UnknownModelException(key)
+
+    monkeypatch.setattr(model_record_routes, "reidentify_model", reidentify_model)
 
     unusable = client.post("/api/v2/models/i/unusable/reidentify")
     unknown = client.post("/api/v2/models/i/no-such-model/reidentify")

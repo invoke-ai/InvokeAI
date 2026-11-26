@@ -470,7 +470,6 @@ def unpack_ggml_at_load(
     )
     in_flight = max((sd[key].quantized_data.nbytes + ggml_unpack_temp_bytes(sd[key]) for key in keys), default=0)
     reserved_bytes = kept + sum(unpacked.values()) + in_flight
-    unpack_scratch = max((ggml_unpack_temp_bytes(sd[key]) for key in keys), default=0)
     # Same-dtype F16/F32 and BF16 unpacking are views of the mapped payload, so they add no host allocation.
     zero_copy = {
         key
@@ -484,8 +483,38 @@ def unpack_ggml_at_load(
             and sd[key].compute_dtype is sd[key].quantized_data.dtype
         )
     }
-    host_bytes_needed = sum(bytes_needed for key, bytes_needed in unpacked.items() if key not in zero_copy)
-    host_bytes_needed += unpack_scratch
+    source_counts: dict[int, int] = {}
+    source_bytes: dict[int, int] = {}
+    source_storage_ids: dict[str, int] = {}
+    for value in sd.values():
+        source = (
+            value.quantized_data
+            if isinstance(value, GGMLTensor)
+            else value
+            if isinstance(value, torch.Tensor)
+            else None
+        )
+        if source is None or source.is_meta:
+            continue
+        storage = source.untyped_storage()
+        storage_id = storage.data_ptr()
+        source_counts[storage_id] = source_counts.get(storage_id, 0) + 1
+        source_bytes[storage_id] = storage.nbytes()
+    for key in keys:
+        source_storage_ids[key] = sd[key].quantized_data.untyped_storage().data_ptr()
+
+    # Outputs replace the copied GGUF sources in order; only the last alias releases a backing storage.
+    host_bytes_needed = 0
+    incremental_host_bytes = 0
+    for key in keys:
+        unpack_bytes = 0 if key in zero_copy else unpacked[key]
+        incremental_host_bytes += unpack_bytes
+        host_bytes_needed = max(host_bytes_needed, incremental_host_bytes + ggml_unpack_temp_bytes(sd[key]))
+        if key not in zero_copy:
+            storage_id = source_storage_ids[key]
+            source_counts[storage_id] -= 1
+            if source_counts[storage_id] == 0:
+                incremental_host_bytes -= source_bytes[storage_id]
     require_ram_headroom(_reserve(reserve, reserved_bytes, host_bytes_needed), host_bytes_needed)
     # One at a time, so each packed original is released as its replacement lands.
     for key in keys:

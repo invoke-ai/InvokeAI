@@ -1318,12 +1318,15 @@ def install_int8_convrot_layers(
                 if isinstance(tensor, torch.Tensor) and _source_is_mapped(tensor, source_tensors_mapped):
                     mapped_dequant_source_bytes += tensor.nelement() * tensor.element_size()
         cast_final_delta = 0
+        mapped_unchanged_cast_bytes = 0
         for key, tensor in sd.items():
             if key not in pinned and isinstance(tensor, torch.Tensor) and is_castable_float(tensor):
                 target_bytes = tensor.nelement() * dtype.itemsize
                 if _source_is_mapped(tensor, source_tensors_mapped):
                     if tensor.dtype != dtype:
                         cast_final_delta += target_bytes
+                    else:
+                        mapped_unchanged_cast_bytes += target_bytes
                 else:
                     cast_final_delta += target_bytes - tensor.nelement() * tensor.element_size()
             del tensor
@@ -1338,7 +1341,7 @@ def install_int8_convrot_layers(
         host_bytes_needed = max(
             0,
             mixed_peak - anonymous_source_bytes,
-            int8_target_bytes - anonymous_source_bytes - mapped_pinned_bytes,
+            int8_target_bytes - anonymous_source_bytes - mapped_pinned_bytes - mapped_unchanged_cast_bytes,
         )
     else:
         host_peak = max(int8_target_bytes, dequant_peak, cast_peak)

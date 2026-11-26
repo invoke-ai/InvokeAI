@@ -26,7 +26,7 @@ from invokeai.backend.model_manager.load.model_cache.model_cache import (
     get_model_cache_key,
 )
 from invokeai.backend.model_manager.load.model_cache.shared_cpu_weights import SharedCpuWeightsPin
-from invokeai.backend.model_manager.load.model_util import calc_model_size_by_fs
+from invokeai.backend.model_manager.load.model_util import calc_model_size_by_fs, calc_tokenizer_size_by_fs
 from invokeai.backend.model_manager.load.optimizations import skip_torch_weight_init
 from invokeai.backend.model_manager.model_on_disk import read_safetensors_header
 from invokeai.backend.model_manager.taxonomy import (
@@ -533,13 +533,13 @@ class ModelLoader(ModelLoaderBase):
                 selected = _transformer_of_flux_bundle(header)
                 if _FLUX_BUNDLE_MARKER_KEY in header:
                     return sum(end - start for entry in selected.values() for start, end in [entry["data_offsets"]])
-        # Single-file Qwen2.5-VL checkpoints use InvokeAI's vendored tokenizer. The tokenizer
-        # request never reads the checkpoint itself, so charging this file here can refuse a
-        # prompt-only load despite the actual tokenizer having no checkpoint-sized allocation.
+        # Single-file Qwen2.5-VL checkpoints and GGUFs use InvokeAI's vendored tokenizer. The
+        # tokenizer request never reads the model file itself, so charging it here can refuse a
+        # prompt-only load despite the tokenizer having no model-file-sized allocation.
         if (
             submodel_type == SubModelType.Tokenizer
             and getattr(config, "type", None) == ModelType.QwenVLEncoder
-            and getattr(config, "format", None) == ModelFormat.Checkpoint
+            and getattr(config, "format", None) in (ModelFormat.Checkpoint, ModelFormat.GGUFQuantized)
         ):
             return 0
         # Size the folder the model will actually be loaded from. This has to track
@@ -568,6 +568,19 @@ class ModelLoader(ModelLoaderBase):
         self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
     ) -> int:
         """Total cold-load host peak for work done before a loader can make its normal reservation."""
+        if (
+            submodel_type is SubModelType.Tokenizer
+            and getattr(config, "type", None) == ModelType.QwenVLEncoder
+            and getattr(config, "format", None) in (ModelFormat.Checkpoint, ModelFormat.GGUFQuantized)
+        ):
+            from invokeai.backend.qwen2_5_vl.qwen2_5_vl_assets import (
+                _TOKENIZER_DIR,
+                load_bundled_qwen2_5_vl_tokenizer,
+            )
+
+            if load_bundled_qwen2_5_vl_tokenizer.cache_info().currsize:
+                return 0
+            return calc_tokenizer_size_by_fs(_TOKENIZER_DIR, include_runtime_overhead=True)
         if submodel_type is not SubModelType.Transformer or not isinstance(config, Main_Checkpoint_FLUX_Config):
             return 0
         if not model_path.is_file() or model_path.suffix != ".safetensors":

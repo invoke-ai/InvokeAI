@@ -218,6 +218,37 @@ class TestGetSizeFs:
         assert self._loader().get_size_fs(config, checkpoint, SubModelType.Tokenizer) == 0
         assert self._loader().get_size_fs(config, checkpoint, SubModelType.TextEncoder) == checkpoint.stat().st_size
 
+    @pytest.mark.parametrize("model_format", [ModelFormat.Checkpoint, ModelFormat.GGUFQuantized])
+    def test_qwen_vl_single_file_admits_cold_vendored_tokenizer_parse_then_skips_warm_parse(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, model_format: ModelFormat
+    ) -> None:
+        from invokeai.backend.model_manager.load.model_util import calc_tokenizer_size_by_fs
+        from invokeai.backend.qwen2_5_vl import qwen2_5_vl_assets
+
+        checkpoint = tmp_path / "qwen_vl.safetensors"
+        checkpoint.write_bytes(b"\x00" * 8192)
+        config = SimpleNamespace(
+            path=str(checkpoint),
+            repo_variant=None,
+            type=ModelType.QwenVLEncoder,
+            format=model_format,
+        )
+        loader = self._loader()
+        cold_parse_bytes = calc_tokenizer_size_by_fs(qwen2_5_vl_assets._TOKENIZER_DIR, include_runtime_overhead=True)
+        monkeypatch.setattr(
+            qwen2_5_vl_assets.load_bundled_qwen2_5_vl_tokenizer, "cache_info", lambda: SimpleNamespace(currsize=0)
+        )
+
+        assert cold_parse_bytes > 100 * 2**20
+        assert loader.get_size_fs(config, checkpoint, SubModelType.Tokenizer) == 0
+        assert loader._get_host_bytes_needed(config, checkpoint, SubModelType.Tokenizer) == cold_parse_bytes
+
+        monkeypatch.setattr(
+            qwen2_5_vl_assets.load_bundled_qwen2_5_vl_tokenizer, "cache_info", lambda: SimpleNamespace(currsize=1)
+        )
+        assert loader.get_size_fs(config, checkpoint, SubModelType.Tokenizer) == 0
+        assert loader._get_host_bytes_needed(config, checkpoint, SubModelType.Tokenizer) == 0
+
     def test_flux_bundle_sizes_only_the_selected_transformer_payload(self, tmp_path: Path) -> None:
         checkpoint = tmp_path / "flux-bundle.safetensors"
         marker = "model.diffusion_model.double_blocks.0.img_attn.norm.key_norm.scale"

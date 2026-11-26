@@ -466,6 +466,33 @@ class TestTheSharedInstall:
         scale = 4 * 4
         assert asked == [(codes + scale, {"host_bytes_needed": 0})]
 
+    def test_mapped_unchanged_dense_tensor_does_not_add_host_demand(self) -> None:
+        def host_bytes_needed(use_storage_ids: bool) -> int:
+            model = self._model()
+            model.dense = torch.nn.Linear(1024, 1024, bias=False, dtype=torch.bfloat16)
+            sd = {
+                **self._int8_layer("keeps"),
+                "dense.weight": torch.empty(1024, 1024, dtype=torch.bfloat16),
+            }
+            mapped = {tensor.untyped_storage().data_ptr() for tensor in sd.values()}
+            asked: list[tuple[int, dict[str, int]]] = []
+
+            def reserve(bytes_needed: int, **kwargs: int) -> None:
+                asked.append((bytes_needed, kwargs))
+
+            install_int8_convrot_layers(
+                model,
+                sd,
+                {"keeps": MARKER},
+                torch.bfloat16,
+                architecture="mixed-storage",
+                reserve=reserve,
+                source_tensors_mapped=mapped if use_storage_ids else True,
+            )
+            return asked[0][1]["host_bytes_needed"]
+
+        assert host_bytes_needed(use_storage_ids=True) == host_bytes_needed(use_storage_ids=False) == 0
+
     def test_mixed_mapped_storage_releases_owned_sources_after_each_decode(self) -> None:
         sd = {
             f"layer_{index}.{suffix}": tensor

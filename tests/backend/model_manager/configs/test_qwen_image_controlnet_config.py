@@ -116,7 +116,9 @@ def _instantx_inpainting_keys() -> Keys:
 def test_each_released_file_is_a_qwen_image_controlnet_of_its_design_and_nothing_else(
     tmp_path: Path, name: str, keys: Keys, architecture: str
 ) -> None:
-    result = ModelConfigFactory.from_model_on_disk(_write(tmp_path, name, keys), allow_unknown=False)
+    result = ModelConfigFactory.from_model_on_disk(
+        _write(tmp_path, name, keys), hash_algo="random", allow_unknown=False
+    )
 
     assert type(result.config) is ControlNet_Checkpoint_QwenImage_Config, result.details
     assert result.match_count == 1, result.details
@@ -129,7 +131,7 @@ def test_each_released_file_is_a_qwen_image_controlnet_of_its_design_and_nothing
 def test_the_flux_instantx_controlnet_is_still_a_flux_controlnet_and_not_a_qwen_image_one(tmp_path: Path) -> None:
     path = _write(tmp_path, "FLUX.1-dev-Controlnet-Union.safetensors", FLUX_INSTANTX_KEYS)
 
-    result = ModelConfigFactory.from_model_on_disk(path, allow_unknown=False)
+    result = ModelConfigFactory.from_model_on_disk(path, hash_algo="random", allow_unknown=False)
 
     assert type(result.config) is ControlNet_Checkpoint_FLUX_Config, result.details
     assert result.match_count == 1, result.details
@@ -141,7 +143,8 @@ def test_the_instantx_inpainting_layout_is_refused_with_a_reason_rather_than_reg
     """Recognised and unusable, so nothing is registered -- not even as an unknown model -- and the reason is the
     installer's message."""
     result = ModelConfigFactory.from_model_on_disk(
-        _write(tmp_path, "Qwen-Image-InstantX-ControlNet-Inpainting.safetensors", _instantx_inpainting_keys())
+        _write(tmp_path, "Qwen-Image-InstantX-ControlNet-Inpainting.safetensors", _instantx_inpainting_keys()),
+        hash_algo="random",
     )
 
     assert result.config is None
@@ -171,7 +174,9 @@ def test_the_preprocessor_is_chosen_from_the_name_as_for_every_controlnet(
     tmp_path: Path, name: str, preprocessor: str | None
 ) -> None:
     """A union adapter takes any control image, so none is pre-selected; a single-condition build picks its own."""
-    config = ModelConfigFactory.from_model_on_disk(_write(tmp_path, name, _fun_keys()), allow_unknown=False).config
+    config = ModelConfigFactory.from_model_on_disk(
+        _write(tmp_path, name, _fun_keys()), hash_algo="random", allow_unknown=False
+    ).config
 
     assert isinstance(config, ControlNet_Checkpoint_QwenImage_Config)
     assert config.default_settings is not None
@@ -184,7 +189,9 @@ def test_the_preprocessor_is_chosen_from_the_name_as_for_every_controlnet(
 def test_a_stored_record_reads_back_as_the_same_qwen_image_controlnet(tmp_path: Path, name: str, keys: Keys) -> None:
     """The record crosses the database and the API as a plain dict, so the config has to be a member of
     `AnyModelConfig` under a discriminator of its own, and the design has to survive the round trip."""
-    identified = ModelConfigFactory.from_model_on_disk(_write(tmp_path, name, keys), allow_unknown=False).config
+    identified = ModelConfigFactory.from_model_on_disk(
+        _write(tmp_path, name, keys), hash_algo="random", allow_unknown=False
+    ).config
     assert identified is not None
 
     restored = TypeAdapter(AnyModelConfig).validate_python(identified.model_dump(mode="json"))
@@ -197,7 +204,7 @@ def test_a_stored_record_reads_back_as_the_same_qwen_image_controlnet(tmp_path: 
 def test_a_record_stored_before_the_design_was_recorded_reads_back_as_the_fun_union(tmp_path: Path) -> None:
     """Every Qwen-Image ControlNet installed until now is a Fun-ControlNet: no other design was identified."""
     identified = ModelConfigFactory.from_model_on_disk(
-        _write(tmp_path, FUN_FILE_NAME, _fun_keys()), allow_unknown=False
+        _write(tmp_path, FUN_FILE_NAME, _fun_keys()), hash_algo="random", allow_unknown=False
     ).config
     assert identified is not None
     stored = identified.model_dump(mode="json")

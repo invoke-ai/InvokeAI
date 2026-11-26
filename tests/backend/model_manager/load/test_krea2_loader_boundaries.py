@@ -517,6 +517,124 @@ def test_checkpoint_encoder_loader_decodes_int8_and_does_not_call_it_fp8(monkeyp
     assert fp8_calls == [], "an int8 encoder must not be treated as an fp8 one"
 
 
+def test_checkpoint_encoder_refuses_mxfp8_decode_before_expanding_scales(monkeypatch, tmp_path) -> None:
+    import transformers
+    from safetensors import torch as safetensors_torch
+
+    from invokeai.backend.quantization.block_scale_tiles import block_scale_grid
+    from invokeai.backend.quantization.fp8_scaled import FP8_DTYPE
+    from tests.fixtures.quantized_payloads import comfy_quant_marker
+
+    class _TinyLanguageModel(torch.nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.proj = torch.nn.Linear(128, 128, bias=False)
+
+    class _TinyEncoder(torch.nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.language_model = _TinyLanguageModel()
+            self.visual = _TinyVisionTower()
+
+        @classmethod
+        def _from_config(cls, _config):
+            return cls()
+
+    rows, columns = 128, 128
+    state_dict = {
+        "proj.weight": torch.ones(rows, columns, dtype=FP8_DTYPE),
+        "proj.weight_scale": block_scale_grid(torch.full((rows, columns // 32), 127, dtype=torch.uint8)),
+        "proj.comfy_quant": comfy_quant_marker({"format": "mxfp8"}),
+    }
+    checkpoint_path = tmp_path / "qwen3vl_mxfp8.safetensors"
+    safetensors_torch.save_file(state_dict, str(checkpoint_path))
+    config = Qwen3VLEncoder_Checkpoint_Config.model_construct(path=str(checkpoint_path), name="encoder")
+    loader = object.__new__(Qwen3VLEncoderCheckpointLoader)
+    loader._ram_cache = SimpleNamespace(make_room=MagicMock())
+    loader._torch_device = torch.device("cpu")
+    loader._logger = MagicMock()
+    loader._load_te_config = lambda _config: SimpleNamespace()
+    monkeypatch.setattr(transformers, "Qwen3VLModel", _TinyEncoder, raising=False)
+    monkeypatch.setattr(krea2_module.TorchDevice, "choose_torch_device", lambda: torch.device("cpu"))
+    monkeypatch.setattr(krea2_module.TorchDevice, "choose_bfloat16_safe_dtype", lambda _device: torch.float32)
+    decoded_bytes = (
+        rows
+        * (columns // 32)
+        * (torch.float32.itemsize + torch.uint8.itemsize + 2 * torch.int32.itemsize + torch.float32.itemsize)
+    )
+
+    def make_room(_reserved: int, *, host_bytes_needed: int | None = None):
+        return SimpleNamespace(ram_headroom_satisfied=host_bytes_needed != decoded_bytes)
+
+    loader._ram_cache.make_room = MagicMock(side_effect=make_room)
+    extracted = False
+    original_extract = krea2_module.extract_fp8_scaled_layers
+
+    def observe_extract(*args, **kwargs):
+        nonlocal extracted
+        extracted = True
+        return original_extract(*args, **kwargs)
+
+    monkeypatch.setattr(krea2_module, "extract_fp8_scaled_layers", observe_extract)
+
+    with pytest.raises(MemoryError, match="Insufficient host memory"):
+        loader._load_text_encoder(config)
+
+    assert extracted is False
+    assert loader._ram_cache.make_room.call_args.kwargs == {"host_bytes_needed": decoded_bytes}
+
+
+@pytest.mark.parametrize(
+    ("weight_shape", "scale_shape", "decoder_error"),
+    [
+        ((128, 128), (127, 4), "MXFP8 scale must be a 2-D"),
+        ((127, 128), (127, 4), "not in the cuBLAS tile layout"),
+        ((128, 96), (128, 3), "not in the cuBLAS tile layout"),
+    ],
+)
+def test_checkpoint_encoder_refuses_malformed_mxfp8_before_cache_admission(
+    monkeypatch, tmp_path, weight_shape, scale_shape, decoder_error
+) -> None:
+    import transformers
+    from safetensors import torch as safetensors_torch
+
+    from invokeai.backend.quantization.fp8_scaled import FP8_DTYPE
+    from tests.fixtures.quantized_payloads import comfy_quant_marker
+
+    class _TinyEncoder(torch.nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.language_model = torch.nn.Module()
+            self.language_model.proj = torch.nn.Linear(128, 128, bias=False)
+            self.visual = _TinyVisionTower()
+
+        @classmethod
+        def _from_config(cls, _config):
+            return cls()
+
+    state_dict = {
+        "proj.weight": torch.ones(weight_shape, dtype=FP8_DTYPE),
+        "proj.weight_scale": torch.zeros(scale_shape, dtype=torch.uint8),
+        "proj.comfy_quant": comfy_quant_marker({"format": "mxfp8"}),
+    }
+    checkpoint_path = tmp_path / "qwen3vl_malformed_mxfp8.safetensors"
+    safetensors_torch.save_file(state_dict, str(checkpoint_path))
+    config = Qwen3VLEncoder_Checkpoint_Config.model_construct(path=str(checkpoint_path), name="encoder")
+    loader = object.__new__(Qwen3VLEncoderCheckpointLoader)
+    loader._ram_cache = SimpleNamespace(make_room=MagicMock())
+    loader._torch_device = torch.device("cpu")
+    loader._logger = MagicMock()
+    loader._load_te_config = lambda _config: SimpleNamespace()
+    monkeypatch.setattr(transformers, "Qwen3VLModel", _TinyEncoder, raising=False)
+    monkeypatch.setattr(krea2_module.TorchDevice, "choose_torch_device", lambda: torch.device("cpu"))
+    monkeypatch.setattr(krea2_module.TorchDevice, "choose_bfloat16_safe_dtype", lambda _device: torch.float32)
+
+    with pytest.raises(ValueError, match=decoder_error):
+        loader._load_text_encoder(config)
+
+    loader._ram_cache.make_room.assert_not_called()
+
+
 def test_directory_encoder_loader_reaches_transformers_from_pretrained(monkeypatch, tmp_path) -> None:
     import transformers
 

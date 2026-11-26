@@ -411,9 +411,9 @@ class CachedModelWithPartialLoad:
         asynchronously (`async_weight_streaming`), and mark them as streamed by this lock. What earlier locks pinned
         stays pinned (see `PinnedStorageRegistry`): models that take turns in VRAM pay for registration once.
 
-        Called by the holder of a settled lock, outside the global load lock and the cache's lock: page-locking
-        weights that are still only mapped from their file reads them into RAM (about 2.5 s/GiB measured), which
-        must not stall other models' construction or this device's cache. The lock keeps the residency fixed.
+        Called by the holder of a settled lock, under the global read lock and host-transfer admission but outside
+        the cache lock. Page-locking weights still mapped from their file reads them into RAM (about 2.5 s/GiB
+        measured), so it shares admission with integrated-device transfers that allocate in host RAM.
 
         Only with a RAM copy: its tensors are the ones the parameters point to while offloaded, and they stay put
         across loads and unloads. Without one, offloaded weights are fresh allocations on every unload.

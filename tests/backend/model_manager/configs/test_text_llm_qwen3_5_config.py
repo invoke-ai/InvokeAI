@@ -44,7 +44,7 @@ _LAYER = "model.language_model.layers.0.mlp.gate_proj"
 
 
 def _identify(path: Path, override_fields: dict[str, Any] | None = None) -> ModelClassificationResult:
-    return ModelConfigFactory.from_model_on_disk(path, override_fields, allow_unknown=False)
+    return ModelConfigFactory.from_model_on_disk(path, override_fields, hash_algo="random", allow_unknown=False)
 
 
 def _matches(result: ModelClassificationResult) -> list[str]:
@@ -128,7 +128,9 @@ class TestComfyUISingleFiles:
         self, tmp_path: Path, keys: Keys, scheme: str
     ) -> None:
         result = ModelConfigFactory.from_model_on_disk(
-            write_header_only_safetensors(tmp_path / "upsampler.safetensors", keys), allow_unknown=True
+            write_header_only_safetensors(tmp_path / "upsampler.safetensors", keys),
+            hash_algo="random",
+            allow_unknown=True,
         )
 
         # Final, not "unknown": nothing is written to the database.
@@ -313,6 +315,7 @@ class TestQuantizedQwen3_5Encoders:
         result = ModelConfigFactory.from_model_on_disk(
             write_header_only_safetensors(tmp_path / "encoder.safetensors", keys),
             self._starter_fields(),
+            hash_algo="random",
             allow_unknown=True,
         )
 

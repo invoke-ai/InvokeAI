@@ -1,7 +1,7 @@
 """Class for Krea-2 model loading in InvokeAI."""
 
 from abc import abstractmethod
-from collections.abc import Callable, Mapping
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any, Generic, Optional, TypeVar
 
@@ -50,9 +50,7 @@ from invokeai.backend.model_manager.util.qwen3_vl import (
     read_qwen3vl_visual_tower_tensors,
 )
 from invokeai.backend.quantization.fp8_scaled import (
-    FP8_WEIGHT_DTYPES,
     INPUT_SCALE_SUFFIXES,
-    MXFP8_FORMAT,
     attach_fp8_scales,
     cast_state_dict,
     count_fp8_weights,
@@ -62,6 +60,7 @@ from invokeai.backend.quantization.fp8_scaled import (
     extract_fp8_scaled_layers,
     full_precision_hints_respected,
     load_safetensors_checkpoint,
+    mxfp8_scale_decode_host_bytes,
     parse_quantization_metadata,
     read_safetensors_metadata,
     reattach_layer_sidechannel,
@@ -112,38 +111,6 @@ def _to_plain_tensor(value: Any) -> Any:
     if hasattr(value, "get_dequantized_tensor"):
         return value.get_dequantized_tensor()
     return value
-
-
-def _mxfp8_scale_decode_host_bytes(sd: Mapping[str, Any], layer_hints: Mapping[str, Any]) -> int:
-    """Return extra host bytes needed while extraction expands MXFP8 grids.
-
-    The file-sized admission already covers the compact grids. Extraction keeps the decoded float32 grids and
-    briefly holds one layer's integer and float temporaries, so this is the additional peak above the source file.
-    """
-    decoded_bytes = 0
-    largest_grid_bytes = 0
-    mxfp8_scale_dtypes = (torch.uint8, getattr(torch, "float8_e8m0fnu", torch.uint8))
-    for path, hints in layer_hints.items():
-        if not isinstance(hints, Mapping) or hints.get("format") != MXFP8_FORMAT:
-            continue
-        weight = sd.get(f"{path}.weight")
-        scale = sd.get(f"{path}.weight_scale")
-        if scale is None:
-            scale = sd.get(f"{path}.scale_weight")
-        if (
-            getattr(weight, "dtype", None) not in FP8_WEIGHT_DTYPES
-            or getattr(scale, "dtype", None) not in mxfp8_scale_dtypes
-            or getattr(scale, "dim", lambda: 0)() != 2
-        ):
-            continue
-        grid_bytes = scale.nelement()
-        decoded_bytes += grid_bytes * torch.float32.itemsize
-        largest_grid_bytes = max(largest_grid_bytes, grid_bytes)
-    # `decode_mx_block_scales` also materializes the unblocked uint8 view, an int32 exponent grid, the
-    # subtraction result and its float32 cast while producing the final float32 grid.
-    return decoded_bytes + largest_grid_bytes * (
-        torch.uint8.itemsize + 2 * torch.int32.itemsize + torch.float32.itemsize
-    )
 
 
 def _put_unique_key(
@@ -471,9 +438,16 @@ class Krea2DiffusersModel(GenericDiffusersLoader):
     ) -> int:
         if submodel_type is SubModelType.VisionEncoder:
             return qwen3vl_visual_tower_nbytes(qwen3vl_visual_tower_files(model_path / SubModelType.TextEncoder.value))
-        if submodel_type is SubModelType.Processor:
-            return 0
+        if submodel_type in (SubModelType.Tokenizer, SubModelType.Processor):
+            return calc_tokenizer_size_by_fs(model_path / SubModelType.Tokenizer.value)
         return super().get_size_fs(config, model_path, submodel_type)
+
+    def _get_host_bytes_needed(
+        self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
+    ) -> int:
+        if submodel_type in (SubModelType.Tokenizer, SubModelType.Processor):
+            return calc_tokenizer_size_by_fs(model_path / SubModelType.Tokenizer.value, include_runtime_overhead=True)
+        return super()._get_host_bytes_needed(config, model_path, submodel_type)
 
     def _load_model(
         self,
@@ -688,7 +662,7 @@ class Krea2CheckpointModel(ModelLoader):
 
             # MXFP8 extraction widens compact scale grids before the regular reservation below can account for
             # them. Admit that decode peak first; the file-sized reservation already covers the compact source grids.
-            mxfp8_decode_host_bytes = _mxfp8_scale_decode_host_bytes(sd, layer_hints)
+            mxfp8_decode_host_bytes = mxfp8_scale_decode_host_bytes(sd, layer_hints)
             if mxfp8_decode_host_bytes:
                 require_ram_headroom(
                     self._ram_cache.make_room(0, host_bytes_needed=mxfp8_decode_host_bytes),
@@ -943,9 +917,16 @@ class Qwen3VLEncoderLoader(ModelLoader):
     ) -> int:
         if submodel_type is SubModelType.VisionEncoder:
             return qwen3vl_visual_tower_nbytes(qwen3vl_visual_tower_files(self._component_paths(model_path)[0]))
-        if submodel_type is SubModelType.Processor:
-            return 0
+        if submodel_type in (SubModelType.Tokenizer, SubModelType.Processor):
+            return calc_tokenizer_size_by_fs(self._component_paths(model_path)[1])
         return super().get_size_fs(config, model_path, submodel_type)
+
+    def _get_host_bytes_needed(
+        self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
+    ) -> int:
+        if submodel_type in (SubModelType.Tokenizer, SubModelType.Processor):
+            return calc_tokenizer_size_by_fs(self._component_paths(model_path)[1], include_runtime_overhead=True)
+        return super()._get_host_bytes_needed(config, model_path, submodel_type)
 
     def _load_model(
         self,
@@ -1086,13 +1067,26 @@ class _Qwen3VLEncoderSingleFileLoader(ModelLoader, Generic[_Qwen3VLSingleFileCon
     def get_size_fs(
         self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
     ) -> int:
-        if submodel_type is SubModelType.Tokenizer:
-            return calc_tokenizer_size_by_fs(_QWEN3_VL_TOKENIZER_DIR, include_runtime_overhead=True)
-        if submodel_type is SubModelType.Processor:
-            return 0
+        if submodel_type in (SubModelType.Tokenizer, SubModelType.Processor):
+            from invokeai.backend.qwen3_vl.qwen3_vl_assets import load_bundled_qwen3_vl_tokenizer
+
+            if load_bundled_qwen3_vl_tokenizer.cache_info().currsize:
+                return 0
+            return calc_tokenizer_size_by_fs(_QWEN3_VL_TOKENIZER_DIR)
         if submodel_type is SubModelType.VisionEncoder:
             return self._vision_encoder_nbytes(model_path)
         return super().get_size_fs(config, model_path, submodel_type)
+
+    def _get_host_bytes_needed(
+        self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
+    ) -> int:
+        if submodel_type in (SubModelType.Tokenizer, SubModelType.Processor):
+            from invokeai.backend.qwen3_vl.qwen3_vl_assets import load_bundled_qwen3_vl_tokenizer
+
+            if load_bundled_qwen3_vl_tokenizer.cache_info().currsize:
+                return 0
+            return calc_tokenizer_size_by_fs(_QWEN3_VL_TOKENIZER_DIR, include_runtime_overhead=True)
+        return super()._get_host_bytes_needed(config, model_path, submodel_type)
 
     @abstractmethod
     def _load_text_encoder(self, config: _Qwen3VLSingleFileConfig) -> AnyModel:
@@ -1204,6 +1198,12 @@ class Qwen3VLEncoderCheckpointLoader(_Qwen3VLEncoderSingleFileLoader[Qwen3VLEnco
             # model's module paths — which is what attach_fp8_scales() resolves them against.
             sd = _remap_qwen3vl_singlefile_keys(sd)
             layer_hints = {qwen3vl_target_key(path): hints for path, hints in layer_hints.items()}
+
+            mxfp8_decode_host_bytes = mxfp8_scale_decode_host_bytes(sd, layer_hints)
+            if mxfp8_decode_host_bytes:
+                require_ram_headroom(
+                    self._ram_cache.make_room(0, host_bytes_needed=mxfp8_decode_host_bytes), mxfp8_decode_host_bytes
+                )
 
             # ComfyUI 'scaled fp8' (fp8 weight + .weight_scale). Only the language-model linears are
             # quantized in the checkpoints seen so far.

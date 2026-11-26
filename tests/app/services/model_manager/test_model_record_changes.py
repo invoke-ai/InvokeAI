@@ -37,6 +37,7 @@ from invokeai.backend.model_manager.configs.spandrel import Spandrel_Checkpoint_
 from invokeai.backend.model_manager.configs.text_llm import TextLLM_Checkpoint_Config, TextLLM_Diffusers_Config
 from invokeai.backend.model_manager.load import LoadedModel, ModelCache, ModelLoader
 from invokeai.backend.model_manager.load.model_cache.model_cache import MODEL_LOAD_LOCK
+from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.model_manager.starter_models import STARTER_MODELS, StarterModel
 from invokeai.backend.model_manager.taxonomy import (
     AnyModel,
@@ -217,6 +218,18 @@ def _identify(model_file: Path, overrides: Optional[dict[str, object]] = None, /
     for field, value in record_fields.items():
         setattr(config, field, value)
     return config
+
+
+@pytest.fixture
+def test_hash_for_reidentify(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep re-identification tests from reading multi-GB sparse fixture extents just to build a test hash."""
+    from invokeai.app.services.model_manager import model_manager_default
+
+    class _TestModelOnDisk(ModelOnDisk):
+        def hash(self) -> str:
+            return "test-hash"
+
+    monkeypatch.setattr(model_manager_default, "ModelOnDisk", _TestModelOnDisk)
 
 
 @pytest.mark.parametrize(
@@ -441,7 +454,9 @@ def test_reidentify_whose_probe_has_no_defaults_keeps_the_curated_fields(
     )
 
 
-def test_reidentify_of_a_file_the_probes_refuse_says_why_and_keeps_the_record(harness: _Harness) -> None:
+def test_reidentify_of_a_file_the_probes_refuse_says_why_and_keeps_the_record(
+    harness: _Harness, test_hash_for_reidentify: None
+) -> None:
     """A CLIP-G without the projection SD 3 needs is recognised and refused as unusable; the record is not touched."""
     keys = dict(clip_g_comfy_keys.state_dict_keys)
     del keys["text_projection.weight"]
@@ -516,10 +531,12 @@ def test_reidentify_that_changes_nothing_that_loads_keeps_cached_instances(harne
 
 
 @pytest.mark.parametrize("cpu_only", [True, False])
-def test_reidentify_keeps_a_cpu_only_choice_held_on_the_config_itself(harness: _Harness, cpu_only: bool) -> None:
+def test_reidentify_keeps_a_cpu_only_choice_held_on_the_config_itself(
+    harness: _Harness, test_hash_for_reidentify: None, cpu_only: bool
+) -> None:
     """Text encoders keep `cpu_only` beside their other fields rather than in default settings."""
     path = write_header_only_safetensors(harness.models_path / "clip-l.safetensors", clip_l_comfy_keys.state_dict_keys)
-    installed = _identify(path, key=KEY, path="clip-l.safetensors", name="CLIP-L")
+    installed = _identify(path, {"hash": "test-hash"}, key=KEY, path="clip-l.safetensors", name="CLIP-L")
     assert isinstance(installed, CLIPEmbed_Checkpoint_L_Config)
     installed.cpu_only = cpu_only
     harness.store.add_model(installed)
@@ -542,13 +559,13 @@ def _write_moss_int8_encoder(path: Path) -> Path:
     )
 
 
-def test_reidentify_keeps_a_local_qwen3_5_encoder_an_encoder(harness: _Harness) -> None:
+def test_reidentify_keeps_a_local_qwen3_5_encoder_an_encoder(harness: _Harness, test_hash_for_reidentify: None) -> None:
     """The weights cannot tell the encoder from the upsampler, so the type it was installed with stays; the file
     gains the Text LLM role."""
     path = _write_moss_int8_encoder(harness.models_path / "encoder.safetensors")
     installed = _identify(
         path,
-        {"type": ModelType.Qwen35Encoder, "variant": Qwen35VariantType.Qwen35_9B},
+        {"hash": "test-hash", "type": ModelType.Qwen35Encoder, "variant": Qwen35VariantType.Qwen35_9B},
         key=KEY,
         path="encoder.safetensors",
         name="Qwen3.5 9B (int8)",
@@ -564,10 +581,10 @@ def test_reidentify_keeps_a_local_qwen3_5_encoder_an_encoder(harness: _Harness) 
 
 
 def test_reidentify_keeps_a_text_llm_from_comfy_orgs_encoder_url_a_text_llm_serving_as_the_encoder(
-    harness: _Harness,
+    harness: _Harness, test_hash_for_reidentify: None
 ) -> None:
     path = _write_moss_int8_encoder(harness.models_path / "encoder.safetensors")
-    installed = _identify(path, key=KEY, path="encoder.safetensors", name="encoder")
+    installed = _identify(path, {"hash": "test-hash"}, key=KEY, path="encoder.safetensors", name="encoder")
     assert isinstance(installed, TextLLM_Checkpoint_Config)
     installed.source, installed.source_type = _COMFY_MOSS_INT8_URL, ModelSourceType.Url
     harness.store.add_model(installed)
@@ -581,10 +598,12 @@ def test_reidentify_keeps_a_text_llm_from_comfy_orgs_encoder_url_a_text_llm_serv
     ]
 
 
-def test_reidentify_gives_a_record_stored_without_roles_the_roles_of_its_files(harness: _Harness) -> None:
+def test_reidentify_gives_a_record_stored_without_roles_the_roles_of_its_files(
+    harness: _Harness, test_hash_for_reidentify: None
+) -> None:
     """Records written before roles existed carry none; Re-identify is how they gain them."""
     path = _write_moss_int8_encoder(harness.models_path / "encoder.safetensors")
-    llm = _identify(path, key=KEY, path="encoder.safetensors", name="llm")
+    llm = _identify(path, {"hash": "test-hash"}, key=KEY, path="encoder.safetensors", name="llm")
     assert isinstance(llm, TextLLM_Checkpoint_Config)
     llm.roles = []
     harness.store.add_model(llm)
@@ -598,7 +617,7 @@ def test_reidentify_gives_a_record_stored_without_roles_the_roles_of_its_files(h
 
     encoder = _identify(
         path,
-        {"type": ModelType.Qwen35Encoder, "variant": Qwen35VariantType.Qwen35_9B},
+        {"hash": "test-hash", "type": ModelType.Qwen35Encoder, "variant": Qwen35VariantType.Qwen35_9B},
         key=KEY,
         path="encoder.safetensors",
         name="encoder",
@@ -791,7 +810,9 @@ def test_a_tiny_autoencoders_cpu_only_switch_is_stored_and_drops_its_cached_inst
     assert not harness.is_cached()
 
 
-def test_reidentify_of_files_no_config_accepts_raises_and_keeps_the_record(harness: _Harness) -> None:
+def test_reidentify_of_files_no_config_accepts_raises_and_keeps_the_record(
+    harness: _Harness, test_hash_for_reidentify: None
+) -> None:
     keys = dict(clip_g_comfy_keys.state_dict_keys)
     del keys["text_projection.weight"]
     write_header_only_safetensors(harness.models_path / "clip-g.safetensors", keys)

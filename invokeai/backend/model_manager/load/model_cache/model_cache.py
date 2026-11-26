@@ -555,10 +555,17 @@ _INTEGRATED_CUDA_ADMISSION_LOCK = threading.RLock()
 
 
 @contextmanager
+def host_transfer_admission_lock() -> Generator[None, None, None]:
+    """Serialize allocations in shared host RAM from integrated-device moves and page pinning."""
+    with _INTEGRATED_CUDA_ADMISSION_LOCK:
+        yield
+
+
+@contextmanager
 def integrated_cuda_admission_lock(device: torch.device) -> Generator[None, None, None]:
-    """Serialize model admission on integrated native CUDA, where device memory is system RAM."""
+    """Serialize integrated-CUDA transfers that allocate in shared host RAM."""
     if _is_integrated_cuda(device):
-        with _INTEGRATED_CUDA_ADMISSION_LOCK:
+        with host_transfer_admission_lock():
             yield
     else:
         yield
@@ -3432,7 +3439,11 @@ class ModelCache:
         evicted while the worker is delayed; detached entries are strongly owned by the cache until
         this work completes.
         """
-        self._dispatch_deferred(_DetachedHandleRelease(self, weakref.ref(cache_entry)))
+        # Attached entries need no per-handle cleanup. This unsynchronized read is safe with
+        # _delete_cache_entry's detached-publication then live_handles recheck: either eviction
+        # sees this finalizer's WeakSet removal and deletes normally, or this sees detached=True.
+        if cache_entry.detached:
+            self._dispatch_deferred(_DetachedHandleRelease(self, weakref.ref(cache_entry)))
 
     @synchronized
     def _release_detached_model_handle(self, cache_entry: CacheRecord) -> None:

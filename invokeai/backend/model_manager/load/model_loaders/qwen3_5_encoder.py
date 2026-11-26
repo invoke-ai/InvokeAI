@@ -21,6 +21,7 @@ from invokeai.backend.model_manager.configs.qwen3_5_encoder import (
 )
 from invokeai.backend.model_manager.load.load_default import ModelLoader, _model_declared_skip_patterns
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
+from invokeai.backend.model_manager.load.model_util import calc_tokenizer_size_by_fs
 from invokeai.backend.model_manager.taxonomy import AnyModel, BaseModelType, ModelFormat, ModelType, SubModelType
 from invokeai.backend.quantization.fp8_scaled import cast_state_dict, reject_quantized_side_channel, safetensors_backend
 from invokeai.backend.quantization.int8_convrot import (
@@ -184,10 +185,30 @@ class Qwen35EncoderCheckpointLoader(ModelLoader):
     def get_size_fs(
         self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
     ) -> int:
-        # A few small tokenizer files, or the vendored one: the generic sizing would charge the whole model.
         if submodel_type is SubModelType.Tokenizer:
-            return 0
+            from invokeai.backend.qwen3_5.qwen3_5_encoder import (
+                _TOKENIZER_DIR,
+                load_bundled_qwen3_5_tokenizer,
+            )
+
+            if load_bundled_qwen3_5_tokenizer.cache_info().currsize:
+                return 0
+            return calc_tokenizer_size_by_fs(_TOKENIZER_DIR)
         return super().get_size_fs(config, model_path, submodel_type)
+
+    def _get_host_bytes_needed(
+        self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
+    ) -> int:
+        if submodel_type is SubModelType.Tokenizer:
+            from invokeai.backend.qwen3_5.qwen3_5_encoder import (
+                _TOKENIZER_DIR,
+                load_bundled_qwen3_5_tokenizer,
+            )
+
+            if load_bundled_qwen3_5_tokenizer.cache_info().currsize:
+                return 0
+            return calc_tokenizer_size_by_fs(_TOKENIZER_DIR, include_runtime_overhead=True)
+        return super()._get_host_bytes_needed(config, model_path, submodel_type)
 
     def _load_model(self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> AnyModel:
         if not isinstance(config, Qwen35Encoder_Checkpoint_Config):

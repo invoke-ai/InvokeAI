@@ -23,6 +23,7 @@ from invokeai.backend.model_manager.load.model_cache.model_cache import (
     VRAM_MOVE_PASS_BYTES,
     FirstUseClaim,
     ModelCache,
+    host_transfer_admission_lock,
     integrated_cuda_admission_lock,
 )
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast import weight_streaming
@@ -227,8 +228,11 @@ class LoadedModelWithoutConfig:
             self.repair_required_tensors_on_device()
             cached_model = self._cache_record.cached_model
             if isinstance(cached_model, CachedModelWithPartialLoad):
-                # Outside the global load lock and the cache's lock, see `pin_streamed_weights`.
-                cached_model.pin_streamed_weights()
+                # Pinning faults mapped weights into host RAM, so keep it behind the same read/admission locks as
+                # cache transfers. This lets a cold-load writer finish materialization before pinning starts.
+                with MODEL_LOAD_LOCK.read_lock():
+                    with host_transfer_admission_lock():
+                        cached_model.pin_streamed_weights()
         except BaseException:
             if locked:
                 self._cache.unlock(self._cache_record)
@@ -396,8 +400,10 @@ class LoadedModelWithoutConfig:
         cached_model = self._cache_record.cached_model
         if freed and self._cache_record.is_locked and isinstance(cached_model, CachedModelWithPartialLoad):
             # A node that makes room within its lock (a second expert or branch) runs on: what this moved to RAM
-            # streams from now on. Outside the locks, as in `_lock_on_device`.
-            cached_model.pin_streamed_weights()
+            # streams from now on. Keep the pinning under the same locks as the transfer itself.
+            with MODEL_LOAD_LOCK.read_lock():
+                with host_transfer_admission_lock():
+                    cached_model.pin_streamed_weights()
 
 
 class LoadedModel(LoadedModelWithoutConfig):

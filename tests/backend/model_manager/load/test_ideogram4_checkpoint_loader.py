@@ -10,6 +10,9 @@ A tiny `Ideogram4Config` stands in for the released geometry: same module tree, 
 of 458.
 """
 
+from types import SimpleNamespace
+from unittest.mock import MagicMock
+
 import pytest
 import torch
 from safetensors.torch import save_file
@@ -256,6 +259,29 @@ def test_fp8_storage_alone_keeps_the_checkpoint_in_its_own_scaled_form(monkeypat
     )
     assert recovered_scales > 0, "otherwise this cell would not notice the plan dropping the term"
     assert run.reserved[-1] == kept_codes + dense + recovered_scales
+
+
+def test_mxfp8_decode_headroom_is_checked_before_extraction(monkeypatch, tmp_path) -> None:
+    state_dict, _ = _checkpoint(())
+    run, config = _driver(monkeypatch, tmp_path, state_dict, keep_fp8=False)
+    monkeypatch.setattr(ideogram4, "mxfp8_scale_decode_host_bytes", lambda _sd, _hints: 1234)
+    make_room = MagicMock(return_value=SimpleNamespace(ram_headroom_satisfied=False))
+    run.loader._ram_cache.make_room = make_room
+    extracted = False
+    original_extract = ideogram4.extract_fp8_scaled_layers
+
+    def observe_extract(*args, **kwargs):
+        nonlocal extracted
+        extracted = True
+        return original_extract(*args, **kwargs)
+
+    monkeypatch.setattr(ideogram4, "extract_fp8_scaled_layers", observe_extract)
+
+    with pytest.raises(MemoryError, match="Insufficient host memory"):
+        run.load(config, SubModelType.Transformer)
+
+    assert extracted is False
+    make_room.assert_called_once_with(0, host_bytes_needed=1234)
 
 
 def test_with_the_fp8_matmul_the_codes_stay_and_the_scales_are_attached(monkeypatch, tmp_path) -> None:

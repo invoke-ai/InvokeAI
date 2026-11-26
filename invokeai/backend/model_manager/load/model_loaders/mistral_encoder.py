@@ -71,15 +71,18 @@ from invokeai.backend.model_manager.util.llamacpp_keys import (
 )
 from invokeai.backend.quantization.fp8_scaled import (
     TRANSFORMER_KEY_PREFIXES,
+    Fp8ScaledLayer,
     attach_fp8_scales,
     cast_state_dict,
-    expand_weight_scale,
+    dequantize_fp8_scaled,
     extract_comfy_quant_hints,
     extract_fp8_scaled_layers,
+    fold_transient_bytes,
     full_precision_hints_respected,
     is_scale_metadata_key,
     iter_weight_scale_pairs,
     load_safetensors_checkpoint,
+    mxfp8_scale_decode_host_bytes,
     parse_quantization_metadata,
     read_safetensors_metadata,
     reject_undecoded_mx_scale,
@@ -102,6 +105,7 @@ from invokeai.backend.quantization.nvfp4 import (
 )
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
+from invokeai.backend.util.ram import require_ram_headroom
 from invokeai.backend.util.state_dict_loading import log_unexpected_keys
 
 # Architecture constants for the 30-layer cow-mistral3-small build.
@@ -556,13 +560,11 @@ def _drop_quantization_metadata(sd: dict[str, Any], logger, target_dtype: torch.
         # wherever fp8 cannot be held at all. Without this the exponent bytes are folded as linear
         # multipliers -- around 120-135 -- at the right shape and dtype, with nothing logged.
         reject_undecoded_mx_scale(weight_key[: -len(".weight")], sd[scale_key])
-        weight = sd[weight_key].float()
-        # `expand_weight_scale` rather than a local broadcast: a per-output-channel scale is 1-D of
-        # length `out`, and `(out, in) * (out,)` aligns on the *last* axis, so it scales input
-        # channels instead of output channels -- wrong on a square weight, a shape error otherwise.
-        scale = expand_weight_scale(weight, sd[scale_key].float(), weight_key)
-        result = weight * scale
-        sd[weight_key] = result.to(target_dtype) if target_dtype is not None else result
+        dequantize_fp8_scaled(
+            sd,
+            {weight_key[: -len(".weight")]: Fp8ScaledLayer(weight_scale=sd[scale_key].float())},
+            dtype=target_dtype or torch.float32,
+        )
         dequantized += 1
     if dequantized:
         logger.info(f"Dequantized {dequantized} Comfy-Org-style quantized weights")
@@ -797,7 +799,7 @@ def _has_hf_tokenizer_vocabulary(tokenizer_dir: Path) -> bool:
 def _mistral_tokenizer_size(model_path: Path) -> int:
     """Size only the tokenizer asset selected by the loader's local probes."""
     if model_path.is_file():
-        return _embedded_tekken_size(model_path) * TOKENIZER_EMBEDDED_RUNTIME_MULTIPLIER
+        return _embedded_tekken_size(model_path)
     tokenizer_dir = model_path / "tokenizer"
     if tokenizer_dir.is_dir():
         sibling_tekken = tokenizer_dir / _TEKKEN_FILENAME
@@ -813,8 +815,38 @@ def _mistral_tokenizer_size(model_path: Path) -> int:
     for checkpoint in sorted((model_path / "text_encoder").glob("*.safetensors")):
         embedded = _embedded_tekken_size(checkpoint)
         if embedded:
-            return embedded * TOKENIZER_EMBEDDED_RUNTIME_MULTIPLIER
+            return embedded
     return calc_tokenizer_size_by_fs(model_path)
+
+
+def _mistral_tokenizer_host_bytes_needed(model_path: Path) -> int:
+    """Cold peak for the selected tokenizer: Tekken parsing is the dominant allocation."""
+    if model_path.is_file():
+        embedded_size = _embedded_tekken_size(model_path)
+        if embedded_size:
+            return embedded_size * TOKENIZER_EMBEDDED_RUNTIME_MULTIPLIER
+        # A single-file checkpoint without Tekken falls through to the canonical HF tokenizer. It
+        # still parses that tokenizer before returning, even though the checkpoint owns no vocab.
+        return 102 * 2**20
+    tokenizer_dir = model_path / "tokenizer"
+    if tokenizer_dir.is_dir() and (tokenizer_dir / _TEKKEN_FILENAME).is_file():
+        return max((tokenizer_dir / _TEKKEN_FILENAME).stat().st_size, 102 * 2**20)
+    root_tekken = model_path / _TEKKEN_FILENAME
+    if root_tekken.is_file():
+        return max(root_tekken.stat().st_size, 102 * 2**20)
+    if tokenizer_dir.is_dir() and _has_hf_tokenizer_vocabulary(tokenizer_dir):
+        return calc_tokenizer_size_by_fs(tokenizer_dir, include_runtime_overhead=True)
+    for checkpoint in sorted((model_path / "text_encoder").glob("*.safetensors")):
+        embedded = _embedded_tekken_size(checkpoint)
+        if embedded:
+            return embedded * TOKENIZER_EMBEDDED_RUNTIME_MULTIPLIER
+    local_tokenizer_bytes = calc_tokenizer_size_by_fs(model_path, include_runtime_overhead=True)
+    if _has_hf_tokenizer_vocabulary(model_path):
+        return local_tokenizer_bytes
+    # With no local vocabulary, the wrapper probes metadata at the root and then parses the
+    # canonical HF tokenizer. The directory scan alone can be zero (or count only metadata), so
+    # retain a cold parse allowance for that fallback.
+    return max(local_tokenizer_bytes, 102 * 2**20)
 
 
 def _try_load_embedded_tekken(model_path: Path, logger: Any, *, flux2_template: bool) -> Optional[AnyModel]:
@@ -1141,6 +1173,13 @@ class MistralEncoderDiffusersLoader(ModelLoader):
             return _mistral_tokenizer_size(model_path)
         return super().get_size_fs(config, model_path, submodel_type)
 
+    def _get_host_bytes_needed(
+        self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
+    ) -> int:
+        if submodel_type is SubModelType.Tokenizer:
+            return _mistral_tokenizer_host_bytes_needed(model_path)
+        return super()._get_host_bytes_needed(config, model_path, submodel_type)
+
     def _load_model(
         self,
         config: AnyModelConfig,
@@ -1214,6 +1253,13 @@ class MistralEncoderCheckpointLoader(ModelLoader):
         if submodel_type is SubModelType.Tokenizer:
             return _mistral_tokenizer_size(model_path)
         return super().get_size_fs(config, model_path, submodel_type)
+
+    def _get_host_bytes_needed(
+        self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
+    ) -> int:
+        if submodel_type is SubModelType.Tokenizer:
+            return _mistral_tokenizer_host_bytes_needed(model_path)
+        return super()._get_host_bytes_needed(config, model_path, submodel_type)
 
     def _load_model(
         self,
@@ -1301,6 +1347,12 @@ class MistralEncoderCheckpointLoader(ModelLoader):
         fp8_layers: dict[str, Any] = {}
         if keep_fp8:
             layer_hints = {**extract_comfy_quant_hints(sd), **header_hints}
+            mxfp8_decode_host_bytes = mxfp8_scale_decode_host_bytes(sd, layer_hints)
+            if mxfp8_decode_host_bytes:
+                require_ram_headroom(
+                    self._ram_cache.make_room(0, host_bytes_needed=mxfp8_decode_host_bytes),
+                    mxfp8_decode_host_bytes,
+                )
             fp8_layers = extract_fp8_scaled_layers(sd, layer_hints=layer_hints)
 
         # Ministral 3B is a different architecture, not a smaller Mistral Small 3: YaRN RoPE and a
@@ -1353,6 +1405,34 @@ class MistralEncoderCheckpointLoader(ModelLoader):
         # One reservation, before the dequantizing branch or the split widens a single weight -- `make_room` makes
         # that much room rather than adding to an earlier one. The state dict is sized by the predicate the split and
         # the cast below decide with, the nvfp4 layers as they will be held.
+        fold_host_bytes = 0
+        fold_output_bytes = 0
+        folded_keys: set[str] = set()
+        source_tensors_mapped = safetensors_backend(model_path) == "mmap"
+        if not fp8_layers:
+            fold_delta = 0
+            weight: torch.Tensor | None = None
+            scale: torch.Tensor | None = None
+            for weight_key, scale_key in iter_weight_scale_pairs(sd):
+                weight = sd[weight_key]
+                scale = sd[scale_key]
+                if not isinstance(weight, torch.Tensor) or not isinstance(scale, torch.Tensor) or weight.is_meta:
+                    continue
+                folded_keys.update((weight_key, scale_key))
+                output_bytes = weight.nelement() * model_dtype.itemsize
+                scale_copy_bytes = scale.nelement() * torch.float32.itemsize if scale.dtype != torch.float32 else 0
+                fold_host_bytes = max(
+                    fold_host_bytes,
+                    fold_delta + output_bytes + fold_transient_bytes(weight, scale) + scale_copy_bytes,
+                )
+                fold_output_bytes += output_bytes
+                fold_delta += output_bytes - (0 if source_tensors_mapped else weight.nelement() * weight.element_size())
+            folded_keys.update(
+                key
+                for key in sd
+                if isinstance(key, str)
+                and (is_scale_metadata_key(key) or key.endswith(".scale") or key.startswith("scaled_fp8"))
+            )
         reserve_for_load(
             self._ram_cache.make_room,
             sd,
@@ -1362,8 +1442,14 @@ class MistralEncoderCheckpointLoader(ModelLoader):
             skip_patterns=skip_patterns,
             fp8_layers=fp8_layers,
             nvfp4_payloads=nvfp4_payloads,
-            source_tensors_mapped=safetensors_backend(model_path) == "mmap",
+            source_tensors_mapped=source_tensors_mapped,
+            extra_host_bytes=fold_host_bytes,
+            folded_keys=folded_keys,
+            folded_output_bytes=fold_output_bytes,
         )
+
+        # The sizing pass must not keep its final source tensor alive while the fold replaces it.
+        weight = scale = None
 
         if not fp8_layers:
             # Dequantize straight to the compute dtype (per-tensor peak, not whole-dict fp32).
@@ -1440,6 +1526,13 @@ class MistralEncoderGGUFLoader(ModelLoader):
         if submodel_type is SubModelType.Tokenizer:
             return _mistral_tokenizer_size(model_path)
         return super().get_size_fs(config, model_path, submodel_type)
+
+    def _get_host_bytes_needed(
+        self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
+    ) -> int:
+        if submodel_type is SubModelType.Tokenizer:
+            return _mistral_tokenizer_host_bytes_needed(model_path)
+        return super()._get_host_bytes_needed(config, model_path, submodel_type)
 
     def _load_model(
         self,

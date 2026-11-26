@@ -43,6 +43,7 @@ from invokeai.backend.quantization.fp8_scaled import (
     extract_comfy_quant_hints,
     extract_fp8_scaled_layers,
     load_safetensors_checkpoint,
+    mxfp8_scale_decode_host_bytes,
     parse_quantization_metadata,
     read_safetensors_metadata,
     safetensors_backend,
@@ -71,6 +72,7 @@ from invokeai.backend.qwen2_5_vl.qwen2_5_vl_assets import (
     load_bundled_qwen2_5_vl_tokenizer,
 )
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.ram import require_ram_headroom
 from invokeai.backend.util.state_dict_loading import (
     load_state_dict_ignoring_extras,
     log_unexpected_keys,
@@ -338,7 +340,13 @@ class QwenImageCheckpointModel(ModelLoader):
             keep_fp8 = False
         else:
             # ComfyUI 'scaled fp8': an fp8 weight plus its `weight_scale`, named in the header or by a per-layer marker.
-            fp8_layers = extract_fp8_scaled_layers(sd, layer_hints={**extract_comfy_quant_hints(sd), **header_layers})
+            layer_hints = {**extract_comfy_quant_hints(sd), **header_layers}
+            mxfp8_decode_host_bytes = mxfp8_scale_decode_host_bytes(sd, layer_hints)
+            if mxfp8_decode_host_bytes:
+                require_ram_headroom(
+                    self._ram_cache.make_room(0, host_bytes_needed=mxfp8_decode_host_bytes), mxfp8_decode_host_bytes
+                )
+            fp8_layers = extract_fp8_scaled_layers(sd, layer_hints=layer_hints)
             # Kept fp8 only when something uses them: the fp8 matmul, or fp8 storage the user asked of this model. For
             # storage the checkpoint's own scale is exact, where the layerwise cast of a folded weight has none.
             # Without either, a dequantize per forward would cost speed for memory nobody asked to save, so they are
@@ -599,9 +607,13 @@ class QwenVLEncoderCheckpointLoader(ModelLoader):
             # Extracted after the key remap so each scale travels with its weight and the recovered paths match the
             # model's modules. Pops every scale and marker, and refuses an unparsed scale spelling beside an fp8
             # weight rather than casting it unscaled.
-            fp8_layers = extract_fp8_scaled_layers(
-                sd, layer_hints={**extract_comfy_quant_hints(sd), **_remap_qwen_vl_checkpoint_keys(header_layers)}
-            )
+            layer_hints = {**extract_comfy_quant_hints(sd), **_remap_qwen_vl_checkpoint_keys(header_layers)}
+            mxfp8_decode_host_bytes = mxfp8_scale_decode_host_bytes(sd, layer_hints)
+            if mxfp8_decode_host_bytes:
+                require_ram_headroom(
+                    self._ram_cache.make_room(0, host_bytes_needed=mxfp8_decode_host_bytes), mxfp8_decode_host_bytes
+                )
+            fp8_layers = extract_fp8_scaled_layers(sd, layer_hints=layer_hints)
             # Text encoders have no FP8 Storage setting, so the device decides (`_storage_format`), as for the other
             # encoders: float8 where the device can hold it or multiply in it, folded into the compute dtype elsewhere.
             source_is_fp8 = bool(fp8_layers) or any(

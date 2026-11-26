@@ -116,6 +116,7 @@ from invokeai.backend.quantization.fp8_scaled import (
     is_scale_metadata_key,
     iter_weight_scale_pairs,
     load_safetensors_checkpoint,
+    mxfp8_scale_decode_host_bytes,
     parse_quantization_metadata,
     read_safetensors_metadata,
     reject_quantized_side_channel,
@@ -145,6 +146,7 @@ from invokeai.backend.t5.t5_encoder import (
 )
 from invokeai.backend.t5.t5_tokenizer import _TOKENIZER_DIR as _T5_TOKENIZER_DIR
 from invokeai.backend.util.logging import InvokeAILogger
+from invokeai.backend.util.ram import require_ram_headroom
 from invokeai.backend.util.silence_warnings import SilenceWarnings
 from invokeai.backend.util.state_dict_loading import load_state_dict_ignoring_extras
 
@@ -863,6 +865,11 @@ class T5EncoderSingleFileLoader(ModelLoader):
             **extract_comfy_quant_hints(sd),
             **parse_quantization_metadata(read_safetensors_metadata(model_path, self._logger)),
         }
+        mxfp8_decode_host_bytes = mxfp8_scale_decode_host_bytes(sd, layer_hints)
+        if mxfp8_decode_host_bytes:
+            require_ram_headroom(
+                self._ram_cache.make_room(0, host_bytes_needed=mxfp8_decode_host_bytes), mxfp8_decode_host_bytes
+            )
         # Pops every scale and the `scaled_fp8` marker, so what is left loads into a model that knows no fp8.
         fp8_layers = extract_fp8_scaled_layers(sd, layer_hints=layer_hints)
 
@@ -1032,6 +1039,11 @@ class FluxCheckpointModel(ModelLoader):
         fp8_layers: dict[str, Fp8ScaledLayer] = {}
         if not int8_markers:
             layer_hints = {**extract_comfy_quant_hints(sd), **header_hints}
+            mxfp8_decode_host_bytes = mxfp8_scale_decode_host_bytes(sd, layer_hints)
+            if mxfp8_decode_host_bytes:
+                require_ram_headroom(
+                    self._ram_cache.make_room(0, host_bytes_needed=mxfp8_decode_host_bytes), mxfp8_decode_host_bytes
+                )
             fp8_layers = extract_fp8_scaled_layers(sd, layer_hints=layer_hints)
 
         # The `match` above admits only the transformer, so that is the submodel the cast will be
@@ -1451,6 +1463,11 @@ class Flux2CheckpointModel(ModelLoader):
                 renamed: hints for name, hints in layer_hints.items() for renamed in (flux2_modules.get(name) or [name])
             }
 
+            mxfp8_decode_host_bytes = mxfp8_scale_decode_host_bytes(converted_sd, layer_hints)
+            if mxfp8_decode_host_bytes:
+                require_ram_headroom(
+                    self._ram_cache.make_room(0, host_bytes_needed=mxfp8_decode_host_bytes), mxfp8_decode_host_bytes
+                )
             fp8_layers = extract_fp8_scaled_layers(converted_sd, layer_hints=layer_hints)
 
             if not keep_fp8:

@@ -666,7 +666,7 @@ def test_integrated_cuda_pressure_offloads_live_handle_with_cpu_shadow(mock_logg
 
 
 def test_integrated_cuda_attached_handle_work_does_not_pin_evicted_model(mock_logger: MagicMock):
-    """A finalizer queued before WeakSet removal must not keep an evicted attached record alive."""
+    """Dropping a handle on an attached record needs no deferred release work."""
     cache = _make_cuda_cache(mock_logger, keep_ram_copy=False)
     queued: list[object] = []
     try:
@@ -678,12 +678,46 @@ def test_integrated_cuda_attached_handle_work_does_not_pin_evicted_model(mock_lo
             entry.awaiting_first_use = False
             model_ref = weakref.ref(entry.cached_model)
             cache._release_loaded_model_handle(entry)
+            assert not queued
             entry.live_handles.clear()
             cache._delete_cache_entry(entry)
             del loaded, entry
             gc.collect()
-        assert queued
+        assert not queued
         assert model_ref() is None
+    finally:
+        cache.shutdown()
+
+
+def test_integrated_cuda_attached_handle_finalizers_do_not_grow_failed_cleanup_queue(
+    mock_logger: MagicMock, monkeypatch: pytest.MonkeyPatch
+):
+    """Repeated warm handle drops must not enqueue detached cleanup for an attached entry."""
+    cache = _make_cuda_cache(mock_logger, keep_ram_copy=False)
+    try:
+        with _patch_integrated_cuda():
+            cache.put("m", DummyModule())
+            entry = _entry(cache, "m")
+            entry.awaiting_first_use = False
+            real_start = threading.Thread.start
+
+            def fail_shutdown_worker(thread: threading.Thread) -> None:
+                if thread.name == "model-cache-shutdown-deferred-work":
+                    raise RuntimeError("forced cleanup worker start failure")
+                real_start(thread)
+
+            monkeypatch.setattr(threading.Thread, "start", fail_shutdown_worker)
+            handles = [LoadedModelWithoutConfig(entry, cache) for _ in range(25)]
+            for loaded in handles:
+                loaded._end_first_use_window()
+            del handles, loaded
+            gc.collect()
+
+            assert not entry.live_handles
+            assert not entry.detached
+            assert cache._shutdown_deferred_work_thread is None
+            assert cache._shutdown_deferred_work_queue.qsize() == 0
+            assert cache._cached_models["m"] is entry
     finally:
         cache.shutdown()
 

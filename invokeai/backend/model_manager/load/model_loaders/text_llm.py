@@ -29,6 +29,7 @@ from invokeai.backend.model_manager.configs.text_llm import (
 )
 from invokeai.backend.model_manager.load.load_default import ModelLoader, _model_declared_skip_patterns
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
+from invokeai.backend.model_manager.load.model_util import calc_tokenizer_size_by_fs
 from invokeai.backend.model_manager.taxonomy import AnyModel, BaseModelType, ModelFormat, ModelType, SubModelType
 from invokeai.backend.quantization.fp8_scaled import (
     cast_state_dict,
@@ -75,10 +76,17 @@ class _TextLLMLoader(ModelLoader):
     def get_size_fs(
         self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
     ) -> int:
-        # A few small files, or none at all: the generic sizing would charge them the whole model.
+        # The text side is loaded from the model folder but must not reserve its weight files.
         if submodel_type in (SubModelType.Tokenizer, SubModelType.Processor):
-            return 0
+            return calc_tokenizer_size_by_fs(model_path)
         return super().get_size_fs(config, model_path, submodel_type)
+
+    def _get_host_bytes_needed(
+        self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
+    ) -> int:
+        if submodel_type in (SubModelType.Tokenizer, SubModelType.Processor):
+            return calc_tokenizer_size_by_fs(model_path, include_runtime_overhead=True)
+        return super()._get_host_bytes_needed(config, model_path, submodel_type)
 
     def _without_mtp_head(self, names: dict[str, str], what: str) -> dict[str, str]:
         """What of a single file is worth reading: not the multi-token-prediction head, which is never read at all."""
@@ -138,6 +146,24 @@ class TextLLMModelLoader(_TextLLMLoader):
 class TextLLMCheckpointLoader(_TextLLMLoader):
     """Loads a single-file Qwen3.5 vision-language model, and serves its own instances of the vendored Qwen3.5
     tokenizer and processor."""
+
+    def get_size_fs(
+        self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
+    ) -> int:
+        if submodel_type in (SubModelType.Tokenizer, SubModelType.Processor):
+            from invokeai.backend.qwen3_5.qwen3_5_encoder import _TOKENIZER_DIR
+
+            return calc_tokenizer_size_by_fs(_TOKENIZER_DIR)
+        return super().get_size_fs(config, model_path, submodel_type)
+
+    def _get_host_bytes_needed(
+        self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
+    ) -> int:
+        if submodel_type in (SubModelType.Tokenizer, SubModelType.Processor):
+            from invokeai.backend.qwen3_5.qwen3_5_encoder import _TOKENIZER_DIR
+
+            return calc_tokenizer_size_by_fs(_TOKENIZER_DIR, include_runtime_overhead=True)
+        return super()._get_host_bytes_needed(config, model_path, submodel_type)
 
     def _load_model(
         self,

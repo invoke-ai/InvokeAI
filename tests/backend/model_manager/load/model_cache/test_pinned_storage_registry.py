@@ -111,6 +111,45 @@ def test_a_storage_registered_again_while_its_release_is_pending_is_not_register
     assert not runtime.registered and registry._pinned_bytes == 0
 
 
+def test_host_memory_available_drains_a_pending_release_after_a_lost_drain(
+    fake_streaming, monkeypatch: pytest.MonkeyPatch
+):
+    registry, runtime = fake_streaming
+    storage = _storage()
+    keys = storage_keys([storage])
+    holder = PinHolder(CUDA0)
+    registry.update(holder, [storage])
+    registry.lock(keys)
+    registry.release(holder)
+
+    sample_entered, release_sample = threading.Event(), threading.Event()
+
+    def sample() -> int:
+        sample_entered.set()
+        assert release_sample.wait(timeout=30)
+        return MB
+
+    monkeypatch.setattr(weight_streaming, "_host_memory_available", sample)
+    result: list[int] = []
+    accessor = threading.Thread(target=lambda: result.append(registry.host_memory_available()))
+    accessor.start()
+    assert sample_entered.wait(timeout=30)
+    registry.unlock(keys)
+
+    # The deferred drain loses the registration lock held by the accessor. The _registering() finally block must
+    # retry it after the sampler returns, or this storage remains pinned until another registry call.
+    drain = threading.Thread(target=registry.drain_deferred)
+    drain.start()
+    drain.join(timeout=30)
+    release_sample.set()
+    accessor.join(timeout=30)
+
+    assert not accessor.is_alive() and not drain.is_alive()
+    assert result == [MB]
+    assert not runtime.registered
+    assert registry._pinned_bytes == 0
+
+
 def test_a_lock_waits_for_an_unregistration_in_progress(fake_streaming, monkeypatch: pytest.MonkeyPatch):
     """The copies a lock issues must not start while the range is being unregistered: they would race it."""
     registry, runtime = fake_streaming
@@ -689,6 +728,19 @@ def test_pending_pin_reservation_is_visible_to_host_admission(fake_streaming, mo
     thread.join(timeout=30)
     assert not thread.is_alive()
     registry.release(holder)
+
+
+def test_host_memory_available_drains_queued_pin_release(fake_streaming, monkeypatch: pytest.MonkeyPatch):
+    registry, runtime = fake_streaming
+    holder = PinHolder(CUDA0)
+    storage = _storage()
+    monkeypatch.setattr(weight_streaming, "_host_memory_available", lambda: MB)
+    registry.update(holder, [storage])
+    registry.release_deferred(holder)
+
+    assert registry.host_memory_available() == MB
+    assert not registry.holds_registrations()
+    assert not runtime.registered
 
 
 def test_registration_headroom_failure_releases_reservation(fake_streaming, monkeypatch: pytest.MonkeyPatch):

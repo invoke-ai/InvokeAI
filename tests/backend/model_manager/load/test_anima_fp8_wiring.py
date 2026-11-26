@@ -15,6 +15,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import accelerate
+import pytest
 import safetensors.torch
 import torch
 
@@ -171,6 +172,40 @@ def test_single_file_loader_applies_fp8_layerwise_casting(monkeypatch, tmp_path)
     assert torch.equal(model.weight, torch.ones(2, 2))
     assert cast_calls == [(config, SubModelType.Transformer)]
     assert reservations[0]["source_tensors_mapped"] is True
+
+
+def test_mxfp8_decode_headroom_is_checked_before_extraction(monkeypatch, tmp_path) -> None:
+    import invokeai.backend.anima.anima_transformer as anima_transformer_module
+    import invokeai.backend.model_manager.load.model_loaders.anima as loader_module
+
+    checkpoint_path = tmp_path / "anima_mxfp8.safetensors"
+    safetensors.torch.save_file({"_fixture": torch.ones(1)}, checkpoint_path)
+    config = Main_Checkpoint_Anima_Config.model_construct(path=str(checkpoint_path))
+    monkeypatch.setattr(anima_transformer_module, "AnimaTransformer", _TinyAnimaTransformer)
+    monkeypatch.setattr(loader_module, "anima_transformer_config", lambda _sd: {})
+    monkeypatch.setattr(loader_module, "load_safetensors_checkpoint", served_checkpoint({"weight": torch.ones(2, 2)}))
+    monkeypatch.setattr(loader_module.TorchDevice, "choose_torch_device", lambda: torch.device("cpu"))
+    monkeypatch.setattr(loader_module.TorchDevice, "choose_anima_inference_dtype", lambda _device: torch.float32)
+    monkeypatch.setattr(loader_module, "mxfp8_scale_decode_host_bytes", lambda _sd, _hints: 1234)
+
+    loader = object.__new__(AnimaCheckpointModel)
+    make_room = MagicMock(return_value=SimpleNamespace(ram_headroom_satisfied=False))
+    loader._ram_cache = SimpleNamespace(make_room=make_room)
+    loader._torch_device = torch.device("cpu")
+    loader._logger = MagicMock()
+    extracted = False
+
+    def observe_extract(*args, **kwargs):
+        nonlocal extracted
+        extracted = True
+        return {}
+
+    monkeypatch.setattr(loader_module, "extract_fp8_scaled_layers", observe_extract)
+    with pytest.raises(MemoryError, match="Insufficient host memory"):
+        loader._load_from_singlefile(config)
+
+    assert extracted is False
+    make_room.assert_called_once_with(0, host_bytes_needed=1234)
 
 
 def test_single_file_loader_passes_mapped_source_to_int8_installer(monkeypatch, tmp_path) -> None:

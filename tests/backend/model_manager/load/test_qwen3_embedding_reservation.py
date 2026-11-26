@@ -99,7 +99,10 @@ def test_qwen3_loader_reserves_live_storage_before_embedding_decode(monkeypatch,
 
         output_bytes = VOCAB * HIDDEN * torch.float32.itemsize
         decode_budget = 7 * output_bytes if kind == "gguf" else 6 * output_bytes
-        cache.make_room.assert_called_once_with(checkpoint_bytes + 19 * 4 + observed_buffers[0] + decode_budget)
+        cache.make_room.assert_called_once_with(
+            checkpoint_bytes + 19 * 4 + observed_buffers[0] + decode_budget,
+            host_bytes_needed=decode_budget,
+        )
         assert model.lm_head.weight is model.model.embed_tokens.weight
         assert model.model.embed_tokens(torch.tensor([[0, 1]])).shape == (1, 2, HIDDEN)
     finally:

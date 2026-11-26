@@ -10,6 +10,7 @@ mock state dict with `keys_to_mock_state_dict()`, or write it back as a header w
 import json
 import math
 import struct
+import sys
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
@@ -39,14 +40,53 @@ def token_extents(shape: list[int]) -> list[int]:
 _SAFETENSORS_DTYPE_BYTES = {"F32": 4, "F16": 2, "BF16": 2, "F8_E4M3": 1, "F8_E5M2": 1, "I64": 8, "I8": 1, "U8": 1}
 
 
+def _mark_sparse(file: Any) -> None:
+    """Declare a Windows file sparse before extending it past the bytes written."""
+    if sys.platform != "win32":
+        return
+
+    import ctypes
+    import msvcrt
+    from ctypes import wintypes
+
+    class _FileSetSparseBuffer(ctypes.Structure):
+        _fields_ = [("set_sparse", wintypes.BOOLEAN)]
+
+    device_io_control = ctypes.WinDLL("kernel32", use_last_error=True).DeviceIoControl
+    device_io_control.argtypes = [
+        wintypes.HANDLE,
+        wintypes.DWORD,
+        ctypes.c_void_p,
+        wintypes.DWORD,
+        ctypes.c_void_p,
+        wintypes.DWORD,
+        ctypes.POINTER(wintypes.DWORD),
+        wintypes.LPVOID,
+    ]
+    device_io_control.restype = wintypes.BOOL
+    sparse = _FileSetSparseBuffer(1)
+    returned = wintypes.DWORD()
+    if not device_io_control(
+        wintypes.HANDLE(msvcrt.get_osfhandle(file.fileno())),
+        0x000900C4,  # FSCTL_SET_SPARSE
+        ctypes.byref(sparse),
+        ctypes.sizeof(sparse),
+        None,
+        0,
+        ctypes.byref(returned),
+        None,
+    ):
+        raise ctypes.WinError(ctypes.get_last_error())
+
+
 def write_header_only_safetensors(
     path: Path, keys: dict[str, tuple[list[int], str]], markers: Mapping[str, Mapping[str, Any]] | None = None
 ) -> Path:
-    """Write a safetensors file that has a fixture's real header and none of its data.
+    """Write a safetensors file with a fixture's real header and a sparse, zero-filled data section.
 
     Identification reads a safetensors file's header and nothing else, so a captured layout can be probed at its
-    real shapes -- a T5-XXL is told from a smaller T5 by its width -- without writing gigabytes. Anything that
-    reads tensor data from such a file fails, which is the point: identification must not.
+    real shapes -- a T5-XXL is told from a smaller T5 by its width -- without physically writing gigabytes. Tensor
+    data is logically present as zeroes, so use `write_shrunk_safetensors` when a test needs real tensor values.
 
     The one exception is `markers`, a fixture's decoded `.comfy_quant` markers by layer: identification reads those
     blobs to tell int8_tensorwise from other schemes that share its layout. They are written with their bytes, first
@@ -65,7 +105,11 @@ def write_header_only_safetensors(
         offset += nbytes
     encoded = json.dumps(header).encode("utf-8")
     encoded += b" " * (-len(encoded) % 8)
-    path.write_bytes(struct.pack("<Q", len(encoded)) + encoded + b"".join(blobs.values()))
+    payload = b"".join(blobs.values())
+    with path.open("wb") as file:
+        file.write(struct.pack("<Q", len(encoded)) + encoded + payload)
+        _mark_sparse(file)
+        file.truncate(8 + len(encoded) + offset)
     return path
 
 

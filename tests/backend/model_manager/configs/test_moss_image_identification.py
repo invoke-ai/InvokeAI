@@ -16,6 +16,7 @@ import numpy as np
 import pytest
 import torch
 
+from invokeai.backend.model_hash.model_hash import ModelHash
 from invokeai.backend.model_manager.configs.factory import ModelConfigFactory
 from invokeai.backend.model_manager.configs.identification_utils import InvalidMatchError, NotAMatchError
 from invokeai.backend.model_manager.configs.lora import LoRA_LyCORIS_MossImage_Config
@@ -36,7 +37,16 @@ Keys = dict[str, tuple[list[int], str]]
 
 
 def _identify(path: Path) -> Any:
-    return ModelConfigFactory.from_model_on_disk(path, allow_unknown=False)
+    return ModelConfigFactory.from_model_on_disk(path, hash_algo="random", allow_unknown=False)
+
+
+def test_identification_does_not_hash_the_sparse_payload(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Header-only fixtures have a large logical payload, but identification only needs their header."""
+    monkeypatch.setattr(ModelHash, "_feed", lambda *_args: pytest.fail("hashed sparse fixture payload"))
+
+    result = _identify(write_header_only_safetensors(tmp_path / "moss-image-dit.safetensors", _dit()))
+
+    assert type(result.config) is Main_Checkpoint_MossImage_Config
 
 
 def _dit() -> Keys:
@@ -134,7 +144,7 @@ def test_a_comfyui_gguf_convrot_build_is_refused_with_its_reason(tmp_path: Path)
         architecture="moss_image",
     )
 
-    result = ModelConfigFactory.from_model_on_disk(path, allow_unknown=True)
+    result = ModelConfigFactory.from_model_on_disk(path, hash_algo="random", allow_unknown=True)
 
     assert result.config is None
     assert any("Q8_CR" in str(reason) for reason in result.invalid_matches)
@@ -172,7 +182,7 @@ def test_a_lora_for_the_transformer_is_a_moss_image_lora_not_a_main_model(tmp_pa
         keys[f"diffusion_model.{module}.weight"] = ([rows, columns], "BF16")
 
     result = ModelConfigFactory.from_model_on_disk(
-        write_header_only_safetensors(tmp_path / "moss-lora.safetensors", keys), allow_unknown=True
+        write_header_only_safetensors(tmp_path / "moss-lora.safetensors", keys), hash_algo="random", allow_unknown=True
     )
 
     assert isinstance(result.details[Main_Checkpoint_MossImage_Config.__name__], NotAMatchError)
@@ -287,7 +297,9 @@ def test_an_unsupported_quantized_transformer_is_refused_not_registered(
     quantize(keys)
 
     result = ModelConfigFactory.from_model_on_disk(
-        write_header_only_safetensors(tmp_path / "moss-quantized.safetensors", keys), allow_unknown=True
+        write_header_only_safetensors(tmp_path / "moss-quantized.safetensors", keys),
+        hash_algo="random",
+        allow_unknown=True,
     )
 
     # Final, not "unknown": nothing is written to the database.
@@ -307,7 +319,9 @@ def test_a_prefixed_stray_scaled_fp8_marker_beside_torchao_layers_is_refused_lik
     keys["model.diffusion_model.scaled_fp8"] = ([0], "F8_E4M3")
 
     result = ModelConfigFactory.from_model_on_disk(
-        write_header_only_safetensors(tmp_path / "moss-prefixed.safetensors", keys), allow_unknown=True
+        write_header_only_safetensors(tmp_path / "moss-prefixed.safetensors", keys),
+        hash_algo="random",
+        allow_unknown=True,
     )
 
     assert result.config is None
@@ -327,6 +341,7 @@ def test_a_file_mixing_torchao_fp8_and_int8_convrot_layers_is_refused_at_install
         write_header_only_safetensors(
             tmp_path / "moss-mixed.safetensors", keys, {"text_embedder.blocks.0.qkv": dict(CONVROT_MARKER)}
         ),
+        hash_algo="random",
         allow_unknown=True,
     )
 
@@ -351,6 +366,7 @@ def test_a_w4a8_build_is_refused_naming_what_does_load(tmp_path: Path) -> None:
         write_header_only_safetensors(
             tmp_path / "moss-w4a8.safetensors", keys, {"layers.0.proj.q": {"format": "w4a8"}}
         ),
+        hash_algo="random",
         allow_unknown=True,
     )
 
@@ -366,7 +382,9 @@ def test_an_int8_build_of_another_format_than_int8_tensorwise_is_refused(tmp_pat
     markers["layers.0.proj.o"] = {"format": "int4_tensorwise", "convrot": True, "convrot_groupsize": 256}
 
     result = ModelConfigFactory.from_model_on_disk(
-        write_header_only_safetensors(tmp_path / "moss-int8-mixed.safetensors", keys, markers), allow_unknown=True
+        write_header_only_safetensors(tmp_path / "moss-int8-mixed.safetensors", keys, markers),
+        hash_algo="random",
+        allow_unknown=True,
     )
 
     assert result.config is None
@@ -444,7 +462,7 @@ def test_the_pipeline_folder_is_a_moss_image_diffusers_model(tmp_path: Path) -> 
 )
 def test_an_incomplete_pipeline_folder_names_what_is_missing(tmp_path: Path, missing: str) -> None:
     result = ModelConfigFactory.from_model_on_disk(
-        _pipeline_folder(tmp_path / "MOSS-Image-Base", skip=missing), allow_unknown=True
+        _pipeline_folder(tmp_path / "MOSS-Image-Base", skip=missing), hash_algo="random", allow_unknown=True
     )
 
     assert result.config is None
@@ -455,7 +473,9 @@ def test_an_incomplete_pipeline_folder_names_what_is_missing(tmp_path: Path, mis
 
 def test_a_pipeline_folder_with_another_transformer_is_refused(tmp_path: Path) -> None:
     result = ModelConfigFactory.from_model_on_disk(
-        _pipeline_folder(tmp_path / "MOSS-Image-Base", transformer_class="SomethingElse"), allow_unknown=True
+        _pipeline_folder(tmp_path / "MOSS-Image-Base", transformer_class="SomethingElse"),
+        hash_algo="random",
+        allow_unknown=True,
     )
 
     refusal = result.details[Main_Diffusers_MossImage_Config.__name__]

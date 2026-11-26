@@ -5,6 +5,8 @@ end state of the module: the layer keeps its fp8 codes with a flat per-row scale
 to exactly `codes * scale` when nothing does.
 """
 
+from types import SimpleNamespace
+
 import pytest
 import safetensors.torch
 import torch
@@ -167,10 +169,38 @@ def test_a_pread_fp8_load_fits_a_32k_host_admission(monkeypatch, tmp_path) -> No
     _model, _loaded, run, read_log = _load(monkeypatch, tmp_path, keep_fp8=False, make_room=admit)
 
     assert read_log.backends == ["pread"]
-    assert requested == [6_656]
+    # The conversion peak is seven BF16 copies of one 32x16 fixture output.
+    expected_host_bytes = 7 * _TinyTransformer().img_in.weight.numel() * torch.bfloat16.itemsize
+    assert requested == [expected_host_bytes]
     assert run.reservation_kwargs[-1]["source_tensors_mapped"] is False
     assert run.reservation_kwargs[-1].get("source_tensors_retained", False) is False
     assert run.reservation_kwargs[-1].get("source_tensors_cloned", False) is False
+
+
+def test_mxfp8_decode_admission_precedes_scale_extraction(monkeypatch, tmp_path) -> None:
+    """The decoder's host estimate must be admitted before extraction expands a compact scale grid."""
+    requested: list[tuple[int, int]] = []
+
+    def admit(reserved: int, *, host_bytes_needed: int = 0):
+        requested.append((reserved, host_bytes_needed))
+        return SimpleNamespace(ram_headroom_satisfied=False)
+
+    extracted = False
+    original_extract = qwen_image_2_1.extract_fp8_scaled_layers
+
+    def observe_extract(*args, **kwargs):
+        nonlocal extracted
+        extracted = True
+        return original_extract(*args, **kwargs)
+
+    monkeypatch.setattr(qwen_image_2_1, "mxfp8_scale_decode_host_bytes", lambda _sd, _hints: 1234)
+    monkeypatch.setattr(qwen_image_2_1, "extract_fp8_scaled_layers", observe_extract)
+
+    with pytest.raises(MemoryError, match="Insufficient host memory"):
+        _load(monkeypatch, tmp_path, keep_fp8=False, make_room=admit)
+
+    assert requested == [(0, 1234)]
+    assert extracted is False
 
 
 def test_a_kept_fp8_load_does_not_copy_the_codes(monkeypatch, tmp_path) -> None:

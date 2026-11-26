@@ -45,7 +45,9 @@ def _write(tmp_path: Path, name: str, keys: Keys) -> Path:
 
 
 def test_the_released_file_is_a_flux2_controlnet_and_nothing_else(tmp_path: Path) -> None:
-    result = ModelConfigFactory.from_model_on_disk(_write(tmp_path, FILE_NAME, _keys()), allow_unknown=False)
+    result = ModelConfigFactory.from_model_on_disk(
+        _write(tmp_path, FILE_NAME, _keys()), hash_algo="random", allow_unknown=False
+    )
 
     assert type(result.config) is ControlNet_Checkpoint_Flux2_Config, result.details
     assert result.match_count == 1, result.details
@@ -58,7 +60,7 @@ def test_a_stored_record_reads_back_as_a_flux2_controlnet(tmp_path: Path) -> Non
     """The record crosses the database and the API as a plain dict, so the config has to be a member of
     `AnyModelConfig` under a discriminator of its own."""
     stored = ModelConfigFactory.from_model_on_disk(
-        _write(tmp_path, FILE_NAME, _keys()), allow_unknown=False
+        _write(tmp_path, FILE_NAME, _keys()), hash_algo="random", allow_unknown=False
     ).config.model_dump(mode="json")
 
     restored = TypeAdapter(AnyModelConfig).validate_python(stored)

@@ -1,9 +1,12 @@
 import logging
+import threading
+from unittest.mock import patch
 
 import pytest
 import torch
 
 from invokeai.backend.model_manager.load.load_base import LoadedModelWithoutConfig
+from invokeai.backend.model_manager.load.model_cache import model_cache as model_cache_module
 from invokeai.backend.model_manager.load.model_cache.cache_record import CacheRecord
 from invokeai.backend.model_manager.load.model_cache.cached_model.cached_model_only_full_load import (
     CachedModelOnlyFullLoad,
@@ -11,6 +14,7 @@ from invokeai.backend.model_manager.load.model_cache.cached_model.cached_model_o
 from invokeai.backend.model_manager.load.model_cache.cached_model.cached_model_with_partial_load import (
     CachedModelWithPartialLoad,
 )
+from invokeai.backend.model_manager.load.model_cache.model_cache import MODEL_LOAD_LOCK, integrated_cuda_admission_lock
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch_module_autocast import (
     apply_custom_layers_to_model,
 )
@@ -138,6 +142,162 @@ def test_supports_partial_loading_reflects_cached_model_type():
     assert not LoadedModelWithoutConfig(
         CacheRecord(key="full", cached_model=full_model), cache=None
     ).supports_partial_loading
+
+
+def test_model_lock_pin_waits_for_cold_load_writer():
+    writer_holding = threading.Event()
+    release_writer = threading.Event()
+
+    def writer() -> None:
+        with MODEL_LOAD_LOCK.write_lock():
+            writer_holding.set()
+            release_writer.wait(timeout=10)
+
+    class CacheThatStartsWriter(FakeCache):
+        def lock(self, cache_record, working_mem_bytes, max_move_bytes=None):
+            del cache_record, working_mem_bytes, max_move_bytes
+            self.lock_calls += 1
+            self.writer_thread = threading.Thread(target=writer)
+            self.writer_thread.start()
+            return True
+
+    cached_model = CachedModelWithPartialLoad(
+        model=torch.nn.Linear(4, 4), compute_device=torch.device("cpu"), keep_ram_copy=False
+    )
+    record = CacheRecord(key="partial", cached_model=cached_model)
+    cache = CacheThatStartsWriter()
+    loaded_model = LoadedModelWithoutConfig(record, cache=cache)
+    pin_started = threading.Event()
+    with (
+        patch.object(loaded_model, "repair_required_tensors_on_device", side_effect=writer_holding.wait),
+        patch.object(cached_model, "pin_streamed_weights", side_effect=pin_started.set),
+    ):
+        pin_thread = threading.Thread(target=loaded_model._lock_on_device, args=(None,))
+        pin_thread.start()
+        try:
+            assert writer_holding.wait(timeout=10)
+            assert not pin_started.wait(timeout=0.1), "pin registration raced a cold-load writer"
+        finally:
+            release_writer.set()
+            pin_thread.join(timeout=10)
+    cache.writer_thread.join(timeout=10)
+    assert not pin_thread.is_alive() and not cache.writer_thread.is_alive()
+    assert pin_started.is_set()
+    loaded_model._unlock()
+
+
+def test_pin_waits_for_integrated_cuda_transfer_admission(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(model_cache_module, "_is_integrated_cuda", lambda _device: True)
+    cached_model = CachedModelWithPartialLoad(
+        model=torch.nn.Linear(4, 4), compute_device=torch.device("cuda"), keep_ram_copy=False
+    )
+    record = CacheRecord(key="partial", cached_model=cached_model)
+    record.lock()
+    loaded_model = LoadedModelWithoutConfig(record, cache=None)
+    transfer_holding = threading.Event()
+    release_transfer = threading.Event()
+    pin_started = threading.Event()
+
+    def transfer() -> None:
+        with integrated_cuda_admission_lock(torch.device("cuda")):
+            transfer_holding.set()
+            release_transfer.wait(timeout=10)
+
+    transfer_thread = threading.Thread(target=transfer)
+    transfer_thread.start()
+    assert transfer_holding.wait(timeout=10)
+    with patch.object(cached_model, "pin_streamed_weights", side_effect=pin_started.set):
+        pin_thread = threading.Thread(target=loaded_model._pin_streamed_weights_of_a_trimmed_lock, args=(1,))
+        pin_thread.start()
+        try:
+            assert not pin_started.wait(timeout=0.1), "pin registration raced an integrated transfer"
+        finally:
+            release_transfer.set()
+            pin_thread.join(timeout=10)
+    transfer_thread.join(timeout=10)
+    assert not pin_thread.is_alive() and not transfer_thread.is_alive()
+    assert pin_started.is_set()
+
+
+@pytest.mark.parametrize("first_operation", ["pin", "transfer"])
+def test_discrete_pin_and_integrated_transfer_resample_shared_host_headroom(
+    first_operation: str, monkeypatch: pytest.MonkeyPatch
+):
+    """A discrete-device pin and integrated offload cannot spend the same host headroom concurrently."""
+    monkeypatch.setattr(model_cache_module, "_is_integrated_cuda", lambda device: device.index == 0)
+    cached_model = CachedModelWithPartialLoad(
+        model=torch.nn.Linear(4, 4), compute_device=torch.device("cuda:1"), keep_ram_copy=False
+    )
+    record = CacheRecord(key="discrete", cached_model=cached_model)
+    record.lock()
+    loaded_model = LoadedModelWithoutConfig(record, cache=None)
+    available = [10]
+    samples: list[tuple[str, int]] = []
+    first_started = threading.Event()
+    release_first = threading.Event()
+    second_attempted = threading.Event()
+    second_sampled = threading.Event()
+    second_refused = threading.Event()
+    errors: list[BaseException] = []
+
+    def spend_headroom(operation: str) -> None:
+        observed = available[0]
+        samples.append((operation, observed))
+        if operation != first_operation:
+            second_sampled.set()
+        if operation == first_operation:
+            first_started.set()
+            assert release_first.wait(timeout=5), "first host allocation was not released"
+        if observed < 7:
+            second_refused.set()
+            return
+        available[0] -= 7
+
+    def pin(is_second: bool = False) -> None:
+        try:
+            if is_second:
+                second_attempted.set()
+            loaded_model._pin_streamed_weights_of_a_trimmed_lock(1)
+        except BaseException as error:
+            errors.append(error)
+
+    def integrated_transfer(is_second: bool = False) -> None:
+        try:
+            if is_second:
+                second_attempted.set()
+            with MODEL_LOAD_LOCK.read_lock(), integrated_cuda_admission_lock(torch.device("cuda:0")):
+                spend_headroom("transfer")
+        except BaseException as error:
+            errors.append(error)
+
+    monkeypatch.setattr(cached_model, "pin_streamed_weights", lambda: spend_headroom("pin"))
+    first = threading.Thread(target=pin if first_operation == "pin" else integrated_transfer)
+    second = threading.Thread(
+        target=integrated_transfer if first_operation == "pin" else pin,
+        kwargs={"is_second": True},
+    )
+    try:
+        first.start()
+        assert first_started.wait(timeout=5)
+        second.start()
+        assert second_attempted.wait(timeout=1)
+        assert not second_sampled.wait(timeout=0.1), "second host allocation sampled before the first completed"
+        release_first.set()
+        first.join(timeout=5)
+        second.join(timeout=5)
+    finally:
+        release_first.set()
+        first.join(timeout=5)
+        if second.ident is not None:
+            second.join(timeout=5)
+
+    assert not first.is_alive() and not second.is_alive()
+    assert not errors
+    assert len(samples) == 2
+    assert samples[0][0] == first_operation and samples[0][1] == 10
+    assert samples[1][0] != first_operation and samples[1][1] == 3
+    assert second_refused.is_set()
+    record.unlock()
 
 
 def test_enter_unlocks_if_repair_raises():

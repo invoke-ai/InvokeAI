@@ -57,6 +57,7 @@ from invokeai.backend.quantization.fp8_scaled import (
     extract_fp8_scaled_layers,
     full_precision_hints_respected,
     load_safetensors_checkpoint,
+    mxfp8_scale_decode_host_bytes,
     parse_quantization_metadata,
     read_safetensors_metadata,
     reject_quantized_side_channel,
@@ -87,7 +88,14 @@ from invokeai.backend.quantization.sdnq.detection import is_sdnq_folder
 from invokeai.backend.quantization.sdnq.loaders import raise_on_incomplete_sdnq_load, sdnq_sd_loader
 from invokeai.backend.qwen3.qwen3_tokenizer import _TOKENIZER_DIR, load_bundled_qwen3_tokenizer
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.ram import require_ram_headroom
 from invokeai.backend.util.state_dict_loading import load_state_dict_ignoring_extras
+
+
+def _qwen3_tokenizer_size(*, cold_peak: bool) -> int:
+    if load_bundled_qwen3_tokenizer.cache_info().currsize:
+        return 0
+    return calc_tokenizer_size_by_fs(_TOKENIZER_DIR, include_runtime_overhead=cold_peak)
 
 
 def _remap_z_image_layer_paths(layer_names: Any) -> dict[str, list[str]]:
@@ -649,6 +657,12 @@ class ZImageCheckpointModel(ModelLoader):
             # deleted those scales and cast the weight — silently producing a weight off by
             # 1/weight_scale — and had no way to tell such a checkpoint from a raw fp8 one.
             layer_hints = {**extract_comfy_quant_hints(sd), **header_hints}
+            mxfp8_decode_host_bytes = mxfp8_scale_decode_host_bytes(sd, layer_hints)
+            if mxfp8_decode_host_bytes:
+                require_ram_headroom(
+                    self._ram_cache.make_room(0, host_bytes_needed=mxfp8_decode_host_bytes),
+                    mxfp8_decode_host_bytes,
+                )
             fp8_layers = extract_fp8_scaled_layers(sd, layer_hints=layer_hints)
 
             # Handle memory management and dtype conversion. Casting fp8 weights here would discard
@@ -1074,8 +1088,15 @@ class Qwen3EncoderCheckpointLoader(ModelLoader):
         self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
     ) -> int:
         if submodel_type is SubModelType.Tokenizer:
-            return calc_tokenizer_size_by_fs(_TOKENIZER_DIR, include_runtime_overhead=True)
+            return _qwen3_tokenizer_size(cold_peak=False)
         return super().get_size_fs(config, model_path, submodel_type)
+
+    def _get_host_bytes_needed(self, config, model_path, submodel_type=None) -> int:
+        return (
+            _qwen3_tokenizer_size(cold_peak=True)
+            if submodel_type is SubModelType.Tokenizer
+            else super()._get_host_bytes_needed(config, model_path, submodel_type)
+        )
 
     def _storage_format(self, config: AnyModelConfig) -> tuple[bool, torch.dtype]:
         """Whether float8 Linear weights stay float8, and the compute dtype everything else is held in.
@@ -1317,7 +1338,14 @@ class Qwen3EncoderCheckpointLoader(ModelLoader):
         else:
             # Pops every scale and marker, so what is left loads into a model that knows no fp8. An unparsed scale
             # spelling beside an fp8 weight is refused here rather than cast unscaled.
-            fp8_layers = extract_fp8_scaled_layers(sd, layer_hints={**extract_comfy_quant_hints(sd), **header_layers})
+            layer_hints = {**extract_comfy_quant_hints(sd), **header_layers}
+            mxfp8_decode_host_bytes = mxfp8_scale_decode_host_bytes(sd, layer_hints)
+            if mxfp8_decode_host_bytes:
+                require_ram_headroom(
+                    self._ram_cache.make_room(0, host_bytes_needed=mxfp8_decode_host_bytes),
+                    mxfp8_decode_host_bytes,
+                )
+            fp8_layers = extract_fp8_scaled_layers(sd, layer_hints=layer_hints)
             # `lm_head` is tied to the embeddings below, which replaces whatever it was loaded with.
             fp8_layers.pop("lm_head", None)
             sd.pop("lm_head.weight", None)
@@ -1423,8 +1451,15 @@ class Qwen3EncoderGGUFLoader(ModelLoader):
         self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
     ) -> int:
         if submodel_type is SubModelType.Tokenizer:
-            return calc_tokenizer_size_by_fs(_TOKENIZER_DIR, include_runtime_overhead=True)
+            return _qwen3_tokenizer_size(cold_peak=False)
         return super().get_size_fs(config, model_path, submodel_type)
+
+    def _get_host_bytes_needed(self, config, model_path, submodel_type=None) -> int:
+        return (
+            _qwen3_tokenizer_size(cold_peak=True)
+            if submodel_type is SubModelType.Tokenizer
+            else super()._get_host_bytes_needed(config, model_path, submodel_type)
+        )
 
     def _load_model(
         self,
@@ -1650,8 +1685,15 @@ class Qwen3EncoderSDNQLoader(ModelLoader):
         self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
     ) -> int:
         if submodel_type is SubModelType.Tokenizer:
-            return calc_tokenizer_size_by_fs(_TOKENIZER_DIR, include_runtime_overhead=True)
+            return _qwen3_tokenizer_size(cold_peak=False)
         return super().get_size_fs(config, model_path, submodel_type)
+
+    def _get_host_bytes_needed(self, config, model_path, submodel_type=None) -> int:
+        return (
+            _qwen3_tokenizer_size(cold_peak=True)
+            if submodel_type is SubModelType.Tokenizer
+            else super()._get_host_bytes_needed(config, model_path, submodel_type)
+        )
 
     def _load_model(
         self,

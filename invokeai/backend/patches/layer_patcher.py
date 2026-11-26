@@ -106,27 +106,34 @@ class LayerPatcher:
             yield
         finally:
             try:
-                # Restore directly patched layers.
-                for param_key, weight in original_weights.get_changed_weights():
-                    cur_param = model.get_parameter(param_key)
-                    # In place for the same reason as the patch step; a shape-expanded parameter is replaced.
-                    if cur_param.shape == weight.shape and LayerPatcher._can_update_in_place(
-                        cur_param, shared_storage, weight
-                    ):
-                        cur_param.data.copy_(weight)
-                    else:
-                        cur_param.data = weight.to(dtype=cur_param.dtype, device=cur_param.device, copy=True)
+                model_load_lock = (
+                    MODEL_LOAD_LOCK.write_lock() if exclusive_model_load_lock else MODEL_LOAD_LOCK.read_lock()
+                )
+                admission = (
+                    integrated_cuda_admission_lock(admission_device) if admission_device is not None else nullcontext()
+                )
+                with model_load_lock, admission:
+                    # Restore directly patched layers.
+                    for param_key, weight in original_weights.get_changed_weights():
+                        cur_param = model.get_parameter(param_key)
+                        # In place for the same reason as the patch step; a shape-expanded parameter is replaced.
+                        if cur_param.shape == weight.shape and LayerPatcher._can_update_in_place(
+                            cur_param, shared_storage, weight
+                        ):
+                            cur_param.data.copy_(weight)
+                        else:
+                            cur_param.data = weight.to(dtype=cur_param.dtype, device=cur_param.device, copy=True)
 
-                # Clear patches from all patched modules.
-                # Note: This logic assumes no nested modules in original_modules.
-                for orig_module in original_modules.values():
-                    orig_module.clear_patches()
+                    # Clear patches from all patched modules.
+                    # Note: This logic assumes no nested modules in original_modules.
+                    for orig_module in original_modules.values():
+                        orig_module.clear_patches()
 
-                # Return every sidecar-applied patch to where it came from. `clear_patches()` only
-                # drops the module's reference; without this the tensors stay on the device, inside
-                # an object the model cache owns and believes is in RAM.
-                for leaf, leaf_device, leaf_dtype in patch_placements.values():
-                    leaf.to(device=leaf_device, dtype=leaf_dtype)
+                    # Return every sidecar-applied patch to where it came from. `clear_patches()` only
+                    # drops the module's reference; without this the tensors stay on the device, inside
+                    # an object the model cache owns and believes is in RAM.
+                    for leaf, leaf_device, leaf_dtype in patch_placements.values():
+                        leaf.to(device=leaf_device, dtype=leaf_dtype)
             finally:
                 cache_pins.close()
 
