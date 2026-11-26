@@ -1,6 +1,7 @@
 """The SD3 denoise node, run against stand-ins for the transformer and the context."""
 
 import json
+import math
 from contextlib import contextmanager
 from pathlib import Path
 from types import SimpleNamespace
@@ -12,7 +13,6 @@ from diffusers.schedulers.scheduling_flow_match_euler_discrete import FlowMatchE
 from invokeai.app.invocations.fields import LatentsField, SD3ConditioningField
 from invokeai.app.invocations.model import ModelIdentifierField, TransformerField
 from invokeai.app.invocations.sd3.sd3_denoise import SD3DenoiseInvocation
-from invokeai.backend.flux.sampling_utils import clip_timestep_schedule_fractional
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData, SD3ConditioningInfo
 
@@ -26,9 +26,13 @@ class _Transformer(torch.nn.Module):
         super().__init__()
         self.timesteps: list[float] = []
 
-    def forward(self, *, hidden_states: torch.Tensor, timestep: torch.Tensor, **_kwargs) -> tuple[torch.Tensor]:
+    def forward(
+        self, *, hidden_states: torch.Tensor, timestep: torch.Tensor, encoder_hidden_states: torch.Tensor, **_kwargs
+    ) -> tuple[torch.Tensor]:
         self.timesteps.append(timestep[0].item())
-        return (torch.zeros_like(hidden_states),)
+        # Zero for the negative row, one for the positive row: the guided prediction is then the CFG scale itself.
+        positive = (encoder_hidden_states.flatten(1).amax(1) > 0).to(hidden_states.dtype)
+        return (torch.ones_like(hidden_states) * positive.view(-1, 1, 1, 1),)
 
 
 class _TransformerInfo:
@@ -43,13 +47,13 @@ class _TransformerInfo:
         self.events.append("unlock")
 
 
-def _conditioning() -> ConditioningFieldData:
+def _conditioning(fill: float = 0.0) -> ConditioningFieldData:
     info = SD3ConditioningInfo(
         clip_l_pooled_embeds=torch.zeros(1, 4),
         clip_l_embeds=torch.zeros(1, 2, 4),
         clip_g_pooled_embeds=torch.zeros(1, 4),
         clip_g_embeds=torch.zeros(1, 2, 4),
-        t5_embeds=torch.zeros(1, 3, 8),
+        t5_embeds=torch.full((1, 3, 8), fill),
     )
     return ConditioningFieldData(conditionings=[info])
 
@@ -68,7 +72,7 @@ def _context(transformer_info: _TransformerInfo, model_path: Path, **namespaces:
             get_config=lambda _identifier: SimpleNamespace(path=str(model_path)),
             get_absolute_path=lambda config: Path(config.path),
         ),
-        conditioning=SimpleNamespace(load=lambda _name: _conditioning()),
+        conditioning=SimpleNamespace(load=lambda name: _conditioning(1.0 if name == "pos" else 0.0)),
         util=SimpleNamespace(sd_step_callback=lambda *_args: transformer_info.events.append("preview")),
         **namespaces,
     )
@@ -138,6 +142,7 @@ def test_image_to_image_starts_at_the_noise_level_denoising_start_names(tmp_path
     context = _context(transformer_info, tmp_path / "sd3.gguf", tensors=SimpleNamespace(load=tensors.__getitem__))
     invocation = _invocation(
         steps=4,
+        cfg_scale=0.0,
         denoising_start=0.3,
         latents=LatentsField(latents_name="init"),
         noise=LatentsField(latents_name="noise"),
@@ -146,7 +151,7 @@ def test_image_to_image_starts_at_the_noise_level_denoising_start_names(tmp_path
     result = invocation._run_diffusion(context)  # type: ignore[arg-type]
 
     assert transformer_info.model.timesteps == pytest.approx([700.0, *SHIFTED_4_STEPS[2:]], abs=0.01)
-    # The stand-in predicts zero velocity, so the result is the input as noised for the first step.
+    # Guidance 0 keeps the stand-in's velocity at zero, so the result is the input as noised for the first step.
     assert torch.allclose(result, torch.full((1, 16, 8, 8), 0.7 * 10.0 + 0.3 * 1.0))
 
 
@@ -157,18 +162,20 @@ def _write_scheduler_config(model_dir: Path, **config) -> None:
     )
 
 
-def test_a_cfg_list_sized_for_another_step_count_is_stretched_over_the_active_steps(tmp_path: Path) -> None:
-    """A saved image-to-image workflow whose per-step CFG was sized for the unshifted clip still runs."""
-    invocation = _invocation(steps=30, denoising_start=0.3, cfg_scale=[float(i) for i in range(21)])
-    sigmas, _ = invocation._get_sigmas(_context(_TransformerInfo(), tmp_path / "sd3.gguf"), _Transformer.config)  # type: ignore[arg-type]
-    active = len(clip_timestep_schedule_fractional(sigmas, 0.3, 1.0)) - 1
+def _write_scheduler_config(model_dir: Path, **config) -> None:
+    (model_dir / "scheduler").mkdir()
+    (model_dir / "scheduler" / "scheduler_config.json").write_text(
+        json.dumps({"_class_name": "FlowMatchEulerDiscreteScheduler"} | config)
+    )
 
-    scales = invocation._prepare_cfg_scale(active)
 
-    assert active == 14
-    assert len(scales) == 14
-    assert scales[0] == 0.0 and scales[-1] == 19.0 and scales == sorted(scales)
-    assert _invocation(cfg_scale=[1.0, 2.0, 3.0])._prepare_cfg_scale(3) == [1.0, 2.0, 3.0]
+def test_a_diffusers_folder_with_shift_3_samples_the_sd35_schedule(tmp_path: Path) -> None:
+    _write_scheduler_config(tmp_path, num_train_timesteps=1000, shift=3.0)
+    transformer_info = _TransformerInfo()
+
+    _invocation(steps=4)._run_diffusion(_context(transformer_info, tmp_path))  # type: ignore[arg-type]
+
+    assert transformer_info.model.timesteps == pytest.approx(SHIFTED_4_STEPS, abs=0.01)
 
 
 def test_the_transformer_timestep_scales_by_the_schedulers_num_train_timesteps(tmp_path: Path) -> None:
@@ -183,36 +190,103 @@ def test_the_transformer_timestep_scales_by_the_schedulers_num_train_timesteps(t
     assert transformer_info.model.timesteps[0] == pytest.approx(500.0)
 
 
-def test_dynamic_shifting_passes_mu_from_the_latent_token_count(tmp_path: Path) -> None:
-    config = {
-        "num_train_timesteps": 1000,
-        "use_dynamic_shifting": True,
-        "base_image_seq_len": 256,
-        "max_image_seq_len": 4096,
-        "base_shift": 0.5,
-        "max_shift": 1.15,
-    }
-    _write_scheduler_config(tmp_path, **config)
+DYNAMIC_SHIFT_CONFIG = {
+    "num_train_timesteps": 1000,
+    "use_dynamic_shifting": True,
+    "base_image_seq_len": 64,
+    "max_image_seq_len": 1024,
+    "base_shift": 0.4,
+    "max_shift": 0.9,
+}
+
+
+def _dynamic_timesteps(mu: float, steps: int) -> list[float]:
+    """The exponential time shift `e^mu / (e^mu + 1/s - 1)` of sigmas evenly spaced from 1 to 1/1000."""
+    sigmas = [1.0 + (0.001 - 1.0) * i / (steps - 1) for i in range(steps)]
+    return [1000.0 * math.exp(mu) / (math.exp(mu) + 1 / s - 1) for s in sigmas]
+
+
+@pytest.mark.parametrize(
+    ("width", "height", "mu"),
+    [
+        # 256x384 px -> 32x48 latent -> 16x24 = 384 tokens, on the line from (64, 0.4) to (1024, 0.9).
+        (256, 384, 0.4 + (384 - 64) / (1024 - 64) * (0.9 - 0.4)),
+        # 1536x1536 px -> 96x96 = 9216 tokens, past the largest image size: held at max_shift.
+        (1536, 1536, 0.9),
+    ],
+)
+def test_dynamic_shifting_takes_mu_from_the_token_count_held_at_the_largest_size(
+    tmp_path: Path, width: int, height: int, mu: float
+) -> None:
+    _write_scheduler_config(tmp_path, **DYNAMIC_SHIFT_CONFIG)
     transformer_info = _TransformerInfo()
 
-    # 1024 px -> 128 latent -> 64 tokens per side with patch size 2: 4096 tokens, mu = max_shift.
-    _invocation(steps=4, width=1024, height=1024)._run_diffusion(_context(transformer_info, tmp_path))  # type: ignore[arg-type]
+    _invocation(steps=4, width=width, height=height)._run_diffusion(_context(transformer_info, tmp_path))  # type: ignore[arg-type]
 
-    scheduler = FlowMatchEulerDiscreteScheduler(**config)
-    scheduler.set_timesteps(4, mu=1.15)
-    assert transformer_info.model.timesteps == pytest.approx(scheduler.timesteps.tolist(), abs=0.01)
+    assert transformer_info.model.timesteps == pytest.approx(_dynamic_timesteps(mu, 4)[:4], abs=0.01)
 
 
-def test_released_sd3_schedules_are_unchanged(tmp_path: Path) -> None:
-    """Shift-3.0 fallback and a 1000-step config give the sigmas and timesteps the previous code computed."""
-    for model_path in (tmp_path / "sd3.gguf", tmp_path):
-        if model_path == tmp_path:
-            _write_scheduler_config(tmp_path, num_train_timesteps=1000, shift=3.0)
-        transformer_info = _TransformerInfo()
-        _invocation(steps=30)._run_diffusion(_context(transformer_info, model_path))  # type: ignore[arg-type]
-        reference = FlowMatchEulerDiscreteScheduler(num_train_timesteps=1000, shift=3.0)
-        reference.set_timesteps(30)
-        # The loop's exact arithmetic before this change: python float sigma * 1000.
-        assert transformer_info.model.timesteps == [
-            torch.tensor([s * 1000]).item() for s in reference.sigmas.tolist()[:-1]
-        ]
+def _step_scales(
+    tmp_path: Path, steps: int, cfg_scale: list[float], start: float = 0.0, end: float = 1.0
+) -> list[float]:
+    """The CFG scale each step applied, read back from how far it moved the latents.
+
+    The stand-in transformer predicts 0 for the negative prompt and 1 for the positive one, so a step moves every
+    latent by `(t_prev - t_curr) * scale`.
+    """
+    _write_scheduler_config(tmp_path, num_train_timesteps=1000, shift=1.0)
+    transformer_info = _TransformerInfo()
+    means: list[float] = []
+    context = _context(
+        transformer_info,
+        tmp_path,
+        tensors=SimpleNamespace(load=lambda _name: torch.zeros(1, 16, 8, 8)),
+    )
+    context.util.sd_step_callback = lambda state, *_args: means.append(state.latents.mean().item())
+    invocation = _invocation(
+        steps=steps,
+        cfg_scale=cfg_scale,
+        denoising_start=start,
+        denoising_end=end,
+        latents=LatentsField(latents_name="init") if start > 0 else None,
+    )
+
+    invocation._run_diffusion(context)  # type: ignore[arg-type]
+
+    sigmas = [t / 1000 for t in transformer_info.model.timesteps] + [1.0 - end]
+    return [
+        (after - before) / (t_prev - t_curr)
+        for before, after, t_curr, t_prev in zip(means[:-1], means[1:], sigmas[:-1], sigmas[1:], strict=True)
+    ]
+
+
+# With shift 1.0 and 6 steps the sigmas fall evenly from 1 to 0.001, then 0: 0.8002, 0.6004, 0.4006, 0.2008 between.
+PER_STEP = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
+
+
+@pytest.mark.parametrize(
+    ("start", "end", "expected"),
+    [
+        (0.0, 1.0, PER_STEP),
+        # Starts inside the second step: runs steps 2..6 of the configured ones.
+        (0.3, 1.0, PER_STEP[1:]),
+        # A split chain: the third step straddles the 0.5 boundary, so both nodes run it, each with its value.
+        (0.0, 0.5, PER_STEP[:3]),
+        (0.5, 1.0, PER_STEP[2:]),
+    ],
+)
+def test_a_per_step_cfg_list_gives_each_run_the_values_of_its_own_steps(
+    tmp_path: Path, start: float, end: float, expected: list[float]
+) -> None:
+    assert _step_scales(tmp_path, 6, PER_STEP, start, end) == pytest.approx(expected, rel=1e-3)
+
+
+def test_a_cfg_list_with_one_value_per_step_that_runs_is_used_as_given(tmp_path: Path) -> None:
+    assert _step_scales(tmp_path, 6, [9.0, 8.0, 7.0, 6.0, 5.0], start=0.3) == pytest.approx(
+        [9.0, 8.0, 7.0, 6.0, 5.0], rel=1e-3
+    )
+
+
+def test_a_cfg_list_of_another_length_is_rejected(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="cfg_scale list has 4 values but this node runs 5 of 6 steps"):
+        _step_scales(tmp_path, 6, [1.0, 2.0, 3.0, 4.0], start=0.3)

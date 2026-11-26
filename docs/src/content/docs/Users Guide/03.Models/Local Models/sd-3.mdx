@@ -121,8 +121,9 @@ SD3 samples on Stability's noise schedule, shifted by 3.0 toward high noise. A D
 shift in its own `scheduler` folder; a GGUF build has none and uses 3.0, the value of every SD3 and SD3.5
 release. Image-to-image and inpainting start at a noise level set by the denoising strength and run the
 shifted steps below it, so a low strength runs fewer steps than the step count. A scheduler that sets
-`use_dynamic_shifting` gets its shift from the image size, as in Diffusers. A per-step CFG list is stretched
-over the steps that run.
+`use_dynamic_shifting` gets its shift from the image size as in Diffusers, capped at the config's largest image size.
+A per-step CFG list has one value per step (Steps). Image-to-image and split chains use the part of the list for the
+steps they run; a list with exactly as many values as steps that run is used as given, and other lengths are rejected.
 
 - **CFG Scale** applies true classifier-free guidance. The SD3.5 Large model card's example is about
   **28 steps at CFG 3.5**. Large gets Medium's defaults, so use that as a starting point when you
