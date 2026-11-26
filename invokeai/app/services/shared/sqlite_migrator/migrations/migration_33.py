@@ -22,7 +22,7 @@ class Migration33Callback:
             """--sql
             CREATE TABLE IF NOT EXISTS image_subfolder_move_items (
                 job_id INTEGER NOT NULL REFERENCES image_subfolder_move_jobs(id),
-                image_name TEXT NOT NULL REFERENCES images(image_name),
+                image_name TEXT NOT NULL REFERENCES images(image_name) ON DELETE CASCADE,
                 old_subfolder TEXT NOT NULL,
                 new_subfolder TEXT NOT NULL,
                 is_intermediate BOOLEAN NOT NULL DEFAULT FALSE,
