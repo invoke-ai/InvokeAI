@@ -1,4 +1,4 @@
-import { getArchitectureFeatures, hasArchitectureCapabilities } from '@features/models/architectures';
+import { getArchitectureFeatures, hasArchitectureCapabilities, isFluxFillModel } from '@features/models/architectures';
 
 /** Every adapter kind a control layer can carry, in the order pickers list them. */
 export const CONTROL_ADAPTER_KINDS = [
@@ -180,7 +180,7 @@ export const getControlValidationReason = (params: {
   if (kind === 'anima_lllite' && lliteModelInUse) {
     return 'duplicate_lllite_model';
   }
-  if (kind === 'control_lora' && mainBase === 'flux' && mainVariant === 'dev_fill') {
+  if (kind === 'control_lora' && isFluxFillModel({ base: mainBase, variant: mainVariant })) {
     return 'flux_fill_control_lora';
   }
   if (kind === 'qwen_image_control' && mainBase === 'qwen-image' && mainVariant === 'edit') {

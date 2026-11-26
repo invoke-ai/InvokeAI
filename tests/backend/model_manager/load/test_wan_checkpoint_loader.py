@@ -28,7 +28,7 @@ from invokeai.backend.model_manager.load.model_loaders.wan import (
     WanCheckpointModel,
     _build_wan_transformer_config,
 )
-from invokeai.backend.model_manager.taxonomy import SubModelType, WanVariantType
+from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType, SubModelType, WanVariantType
 from invokeai.backend.quantization.fp8_scaled import is_scale_metadata_key, set_full_precision_hints_respected
 from invokeai.backend.quantization.int8_convrot import Int8ConvrotLinear
 from tests.fixtures.loader_seams import assert_fp8_storage_declined, logged_info
@@ -106,6 +106,7 @@ def _recording_model() -> tuple[MagicMock, dict[str, torch.Tensor]]:
 def _make_loader() -> WanCheckpointModel:
     loader = object.__new__(WanCheckpointModel)
     loader._ram_cache = MagicMock()
+    loader._logger = MagicMock()
     loader._torch_device = torch.device("cpu")
     return loader
 
@@ -121,6 +122,8 @@ def _load(
         config = MagicMock()
         config.path = str(path)
         config.variant = variant
+        config.base, config.type, config.format = BaseModelType.Wan, ModelType.Main, ModelFormat.Checkpoint
+        config.default_settings.fp8_storage = getattr(loader, "_test_fp8_storage", False)
 
     with (
         patch("invokeai.backend.model_manager.load.model_loaders.wan.TorchDevice.choose_torch_device"),
@@ -918,8 +921,9 @@ def _mxfp8_checkpoint(layers: list[str]) -> tuple[torch.nn.Module, dict[str, tor
 def _storage_loader(monkeypatch: pytest.MonkeyPatch, *, storage: bool, fp8_matmul: bool = False) -> WanCheckpointModel:
     """A loader whose settings are as given and whose FP8 Storage cast is the real one."""
     loader = _make_loader()
-    loader._should_use_fp8 = lambda *_args: storage
+    loader._test_fp8_storage = storage
     monkeypatch.setattr(load_default, "should_keep_fp8_weights", lambda _device: fp8_matmul)
+    monkeypatch.setattr(load_default, "_device_supports_fp8_storage", lambda *_args: storage)
     return loader
 
 

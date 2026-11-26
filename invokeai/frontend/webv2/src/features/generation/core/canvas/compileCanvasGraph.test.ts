@@ -22,6 +22,7 @@ const sd2Model: MainModelConfig = { base: 'sd-2', key: 'sd2-model', name: 'SD 2'
 const sdxlModel: MainModelConfig = { base: 'sdxl', key: 'sdxl-model', name: 'SDXL', type: 'main' };
 const sd3Model: MainModelConfig = { base: 'sd-3', format: 'diffusers', key: 'sd3-model', name: 'SD3', type: 'main' };
 const fluxModel: MainModelConfig = { base: 'flux', key: 'flux-model', name: 'FLUX dev', type: 'main' };
+const fluxFillModel: MainModelConfig = { ...fluxModel, key: 'flux-fill-model', name: 'FLUX Fill', variant: 'dev_fill' };
 const flux2Model: MainModelConfig = {
   base: 'flux2',
   format: 'diffusers',
@@ -692,6 +693,94 @@ describe('compileCanvasGraph — outpaint per base', () => {
     expect(combine?.mask1).toEqual({ image_name: 'canvas-mask.png' });
     expect(getEdge(backendGraph, 'mask_combine', 'mask2')?.source.node_id).toBe('image_alpha_to_mask');
     expect(getEdge(backendGraph, 'create_gradient_mask', 'mask')?.source.node_id).toBe('mask_combine');
+  });
+});
+
+describe('compileCanvasGraph — FLUX Fill', () => {
+  const noLatentNodes = (graph: BackendGraphContract) =>
+    Object.values(graph.nodes).filter((node) => ['flux_vae_encode', 'create_gradient_mask'].includes(node.type));
+
+  it('inpaints from the composite and mask conditioning, with no latents or denoise mask', () => {
+    const { backendGraph, mode } = compile(fluxFillModel, 'inpaint', { strength: 0.5 });
+    expect(mode).toBe('inpaint');
+
+    expect(noLatentNodes(backendGraph)).toEqual([]);
+    expect(getEdge(backendGraph, 'denoise_latents', 'denoise_mask')).toBeUndefined();
+    expect(getEdge(backendGraph, 'denoise_latents', 'latents')).toBeUndefined();
+    expect(backendGraph.nodes.denoise_latents).toMatchObject({ denoising_end: 1, denoising_start: 0 });
+
+    expect(backendGraph.nodes.flux_fill).toMatchObject({
+      image: { image_name: 'canvas-composite.png' },
+      type: 'flux_fill',
+    });
+    // Only a white pixel is kept, so a mask layer's gray denoise limit still regenerates.
+    expect(backendGraph.nodes.flux_fill_mask_tensor).toMatchObject({
+      cutoff: 255,
+      image: { image_name: 'canvas-mask.png' },
+      type: 'image_mask_to_tensor',
+    });
+    expect(getEdge(backendGraph, 'flux_fill', 'mask')?.source.node_id).toBe('flux_fill_mask_tensor');
+    expect(getEdge(backendGraph, 'denoise_latents', 'fill_conditioning')?.source).toEqual({
+      field: 'fill_cond',
+      node_id: 'flux_fill',
+    });
+
+    expect(getEdge(backendGraph, 'flux_fill_keep_tensor', 'mask')?.source.node_id).toBe('flux_fill_mask_tensor');
+    expect(getEdge(backendGraph, 'flux_fill_keep_mask', 'mask')?.source.node_id).toBe('flux_fill_keep_tensor');
+    expect(backendGraph.nodes.expand_mask).toMatchObject({ fade_size_px: 16 });
+    expect(backendGraph.nodes.expand_mask?.mask).toBeUndefined();
+    expect(getEdge(backendGraph, 'expand_mask', 'mask')?.source.node_id).toBe('flux_fill_keep_mask');
+    expect(backendGraph.nodes.canvas_output).toMatchObject({
+      layer_base: { image_name: 'canvas-composite.png' },
+      type: 'invokeai_img_blend',
+    });
+    expect(getEdge(backendGraph, 'canvas_output', 'layer_upper')?.source.node_id).toBe('canvas_l2i');
+    expect(getEdge(backendGraph, 'canvas_output', 'mask')?.source.node_id).toBe('expand_mask');
+    expect(getNodeByType(backendGraph, 'core_metadata')?.generation_mode).toBe('flux_inpaint');
+  });
+
+  it('outpaints from the alpha mask combined with the explicit mask, without infill', () => {
+    const { backendGraph } = compile(fluxFillModel, 'outpaint', { maskImageName: 'canvas-mask.png' });
+
+    expect(backendGraph.nodes.infill).toBeUndefined();
+    expect(noLatentNodes(backendGraph)).toEqual([]);
+    expect(backendGraph.nodes.mask_combine).toMatchObject({ mask1: { image_name: 'canvas-mask.png' } });
+    expect(getEdge(backendGraph, 'mask_combine', 'mask2')?.source.node_id).toBe('image_alpha_to_mask');
+    expect(getEdge(backendGraph, 'flux_fill_mask_tensor', 'image')?.source.node_id).toBe('mask_combine');
+    expect(backendGraph.nodes.flux_fill_mask_tensor).toMatchObject({ cutoff: 255 });
+    expect(getEdge(backendGraph, 'flux_fill_keep_tensor', 'mask')?.source.node_id).toBe('flux_fill_mask_tensor');
+    expect(getEdge(backendGraph, 'expand_mask', 'mask')?.source.node_id).toBe('flux_fill_keep_mask');
+    expect(backendGraph.nodes.flux_fill?.image).toEqual({ image_name: 'canvas-composite.png' });
+    expect(getNodeByType(backendGraph, 'core_metadata')?.generation_mode).toBe('flux_outpaint');
+  });
+
+  it('outpaints from the alpha mask alone and applies the mask when only masked regions are kept', () => {
+    const { backendGraph } = compile(fluxFillModel, 'outpaint', { maskImageName: null, outputOnlyMaskedRegions: true });
+
+    expect(getEdge(backendGraph, 'flux_fill_mask_tensor', 'image')?.source.node_id).toBe('image_alpha_to_mask');
+    expect(backendGraph.nodes.canvas_output).toMatchObject({ invert_mask: true, type: 'apply_mask_to_image' });
+  });
+
+  it('feeds the fill inputs at the bbox and restores only the generated image when processing differs', () => {
+    const { backendGraph } = compile(fluxFillModel, 'inpaint', {
+      bbox: { height: 512, width: 512, x: 0, y: 0 },
+      scaling: { height: 768, method: 'manual', width: 1024 },
+    });
+
+    expect(backendGraph.nodes.denoise_latents).toMatchObject({ height: 768, width: 1024 });
+    expect(backendGraph.nodes.canvas_resize_initial_to_processing).toBeUndefined();
+    expect(backendGraph.nodes.canvas_resize_generated_to_bbox).toMatchObject({ height: 512, width: 512 });
+    expect(backendGraph.nodes.canvas_resize_output_mask_to_bbox).toBeUndefined();
+    expect(getEdge(backendGraph, 'canvas_output', 'layer_upper')?.source.node_id).toBe(
+      'canvas_resize_generated_to_bbox'
+    );
+    expect(getEdge(backendGraph, 'canvas_output', 'mask')?.source.node_id).toBe('expand_mask');
+  });
+
+  it('rejects the modes without an image to edit', () => {
+    for (const mode of ['txt2img', 'img2img'] as const) {
+      expect(() => compile(fluxFillModel, mode)).toThrow('FLUX Fill only inpaints and outpaints');
+    }
   });
 });
 

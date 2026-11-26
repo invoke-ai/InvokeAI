@@ -125,8 +125,10 @@ class StringReplaceInvocation(BaseInvocation):
         pattern = self.search_string or ""
         new_string = self.string or ""
         if len(pattern) > 0:
-            if not self.use_regex:
-                # None regex so make case insensitve
-                pattern = "(?i)" + re.escape(pattern)
-            new_string = re.sub(pattern, (self.replace_string or ""), new_string)
+            replacement = self.replace_string or ""
+            if self.use_regex:
+                new_string = re.sub(pattern, replacement, new_string)
+            else:
+                # Plain text: case-insensitive match, and a callable so backslashes in the replacement stay literal.
+                new_string = re.sub("(?i)" + re.escape(pattern), lambda _match: replacement, new_string)
         return StringOutput(value=new_string)

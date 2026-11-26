@@ -1,10 +1,11 @@
 """Test the queued download facility"""
 
 import re
+import socket
 import time
 from contextlib import contextmanager
 from pathlib import Path
-from threading import Event
+from threading import Event, Thread
 from typing import Any, Generator, Optional
 from unittest.mock import MagicMock, patch
 
@@ -16,7 +17,13 @@ from requests_testadapter import TestAdapter, TestSession
 
 from invokeai.app.services.config import InvokeAIAppConfig, get_config
 from invokeai.app.services.config.config_default import URLRegexTokenPair
-from invokeai.app.services.download import DownloadJob, DownloadJobStatus, DownloadQueueService, MultiFileDownloadJob
+from invokeai.app.services.download import (
+    DownloadJob,
+    DownloadJobStatus,
+    DownloadQueueService,
+    MultiFileDownloadJob,
+    download_default,
+)
 from invokeai.app.services.events.events_common import (
     DownloadCancelledEvent,
     DownloadCompleteEvent,
@@ -815,6 +822,42 @@ def test_head_request_is_sent_like_a_download(monkeypatch: Any) -> None:
     )
     with pytest.raises(UnsafeDownloadURLException):
         guarded.head("http://127.0.0.1:19191/file")
+
+
+@pytest.mark.timeout(timeout=10, method="thread")
+def test_download_from_a_server_that_stalls_mid_body_errors_instead_of_hanging(
+    tmp_path: Path, monkeypatch: Any
+) -> None:
+    """A server that sends part of the body and then goes silent must not hold the worker forever."""
+    monkeypatch.setattr(download_default, "DOWNLOAD_TIMEOUT", (2, 0.5))
+    # Talk to the local server directly: an ambient proxy would fail the request for an unrelated reason.
+    monkeypatch.setenv("NO_PROXY", "*")
+    monkeypatch.setenv("no_proxy", "*")
+    release = Event()
+    listener = socket.create_server(("127.0.0.1", 0))
+    port = listener.getsockname()[1]
+
+    def stall() -> None:
+        conn, _ = listener.accept()
+        with conn:
+            conn.recv(65536)
+            conn.sendall(b"HTTP/1.1 200 OK\r\nContent-Length: 1000000\r\n\r\n" + b"x" * 1000)
+            release.wait(timeout=10)
+
+    server = Thread(target=stall, daemon=True)
+    server.start()
+    queue = DownloadQueueService(app_config=InvokeAIAppConfig(allow_private_download_urls=True))
+    queue.start()
+    try:
+        job = queue.download(source=AnyHttpUrl(f"http://127.0.0.1:{port}/model.safetensors"), dest=tmp_path)
+        queue.wait_for_job(job, timeout=5)
+        assert job.status == DownloadJobStatus.ERROR
+        assert "Read timed out" in (job.error_type or "")
+    finally:
+        release.set()
+        queue.stop()
+        server.join(timeout=5)
+        listener.close()
 
 
 @pytest.mark.timeout(timeout=10, method="thread")

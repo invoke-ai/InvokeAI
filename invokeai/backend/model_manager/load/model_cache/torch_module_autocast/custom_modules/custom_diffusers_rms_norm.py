@@ -1,10 +1,10 @@
 import torch
 from diffusers.models.normalization import RMSNorm as DiffusersRMSNorm
 
-from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.cast_to_device import cast_to_device
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custom_modules.custom_module_mixin import (
     CustomModuleMixin,
 )
+from invokeai.backend.util.cast_to_device import cast_to_device
 
 
 class CustomDiffusersRMSNorm(DiffusersRMSNorm, CustomModuleMixin):

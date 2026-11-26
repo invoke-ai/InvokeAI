@@ -10,17 +10,9 @@ import {
   type CanvasPreparedEngine,
   useStructuralPreview,
 } from '@workbench/widgets/canvas/useStructuralCommit';
+import { MASK_FILL_STYLES } from '@workbench/widgets/layers/layerOps';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-
-const MASK_FILL_STYLES: readonly CanvasMaskFillContract['style'][] = [
-  'solid',
-  'grid',
-  'crosshatch',
-  'diagonal',
-  'horizontal',
-  'vertical',
-];
 
 const SELECT_POSITIONING = { placement: 'bottom-end', sameWidth: true } as const;
 

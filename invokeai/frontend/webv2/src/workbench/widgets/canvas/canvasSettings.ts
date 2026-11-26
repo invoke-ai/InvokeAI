@@ -1,6 +1,7 @@
 /** Per-project canvas preferences, outside undo history; engine-backed ones feed stores one way. */
 
 import type { ResolvedValues } from '@platform/core/resolvedValues';
+import type { ScrollInput } from '@workbench/canvas-engine/api';
 
 import { CANVAS_COMPOSITING_KEYS, DEFAULT_CANVAS_COMPOSITING } from './invoke/canvasCompositing';
 
@@ -118,6 +119,18 @@ export const CANVAS_SETTINGS: readonly CanvasBooleanSetting[] = [
     store: 'ruleOfThirds',
   },
 ];
+
+/** Feeds the engine's `scrollInput` store; a select, so it stays outside `CANVAS_SETTINGS`. */
+export const CANVAS_SCROLL_INPUT_KEY = 'scrollInput';
+export const CANVAS_SCROLL_INPUTS = ['auto', 'mouse', 'trackpad'] as const satisfies readonly ScrollInput[];
+
+export const isCanvasScrollInput = (value: unknown): value is ScrollInput =>
+  (CANVAS_SCROLL_INPUTS as readonly unknown[]).includes(value);
+
+export const readCanvasScrollInput = (values: ResolvedValues | undefined): ScrollInput => {
+  const raw = values?.[CANVAS_SCROLL_INPUT_KEY];
+  return isCanvasScrollInput(raw) ? raw : 'auto';
+};
 
 /** Resolved settings, keyed by persisted setting key (default-applied). */
 export type ResolvedCanvasSettings = Record<string, boolean>;
