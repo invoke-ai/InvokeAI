@@ -52,6 +52,7 @@ export const createQueueRealtimeRuntime = ({
 }): QueueRealtimeRuntime => {
   const owner = captureAccountScope();
   const detachers: Array<() => void> = [];
+  const latestStatusSequences = new Map<number, number>();
   let invalidationTimer: ReturnType<typeof setTimeout> | null = null;
   let isStarted = false;
   const isActive = (): boolean => isStarted && isAccountScopeCurrent(owner);
@@ -86,12 +87,25 @@ export const createQueueRealtimeRuntime = ({
         }
 
         const event = payload as unknown as QueueItemStatusChangedEvent;
+        const sequence = event.status_sequence ?? null;
+        const previousSequence = latestStatusSequences.get(event.item_id);
+        const isStaleStatusSequence =
+          sequence !== null && previousSequence !== undefined && sequence < previousSequence;
 
-        // Requeued items must not keep a prior attempt's percentage; saved-workflow calls report child progress via the coordinator.
+        if (!isStaleStatusSequence && sequence !== null) {
+          if (isTerminalBackendStatus(event.status)) {
+            latestStatusSequences.delete(event.item_id);
+          } else {
+            latestStatusSequences.set(event.item_id, sequence);
+          }
+        }
+
+        // Requeued items must not keep a prior attempt's percentage; skip older status sequences so late pending events cannot blank active progress.
         if (
-          (isTerminalBackendStatus(event.status) && event.status !== 'completed') ||
-          event.status === 'pending' ||
-          event.status === 'waiting'
+          !isStaleStatusSequence &&
+          ((isTerminalBackendStatus(event.status) && event.status !== 'completed') ||
+            event.status === 'pending' ||
+            event.status === 'waiting')
         ) {
           progress.clear(event.item_id);
         }
@@ -142,6 +156,7 @@ export const createQueueRealtimeRuntime = ({
         }
 
         if (status === 'connected') {
+          latestStatusSequences.clear();
           progress.clearAll();
           scheduleInvalidation();
           void refreshModelCache();
@@ -162,6 +177,7 @@ export const createQueueRealtimeRuntime = ({
       invalidationTimer = null;
     }
 
+    latestStatusSequences.clear();
     progress.clearAll();
   };
 

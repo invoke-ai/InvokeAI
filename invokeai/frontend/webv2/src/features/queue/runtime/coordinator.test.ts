@@ -592,9 +592,19 @@ describe('queueCoordinator', () => {
       totalItemCount: 2,
     });
 
+    // Starting the next invocation (e.g. VAE decode after denoise) resets that slot's percentage to null.
+    harness.socket.fire('invocation_started', {
+      ...createStatusEvent({ item_id: 801 }),
+      invocation_source_id: 'vae_decode',
+      root_item_id: 701,
+      session_id: 'child-1',
+      workflow_call_parent_source_id: 'call',
+    });
+    expect(harness.progressEntries.get('local-wf')?.slotPercentages).toEqual({ 1: null, 2: 0.72 });
+
     // Completing slot 2 removes its per-slot entry while keeping slot 1 intact.
     harness.socket.fire('queue_item_status_changed', createStatusEvent({ item_id: 702, status: 'completed' }));
-    expect(harness.progressEntries.get('local-wf')?.slotPercentages).toEqual({ 1: 0.5 });
+    expect(harness.progressEntries.get('local-wf')?.slotPercentages).toEqual({ 1: null });
   });
 
   it("signals each slot's first frame of its own once, after the frame is stored", async () => {

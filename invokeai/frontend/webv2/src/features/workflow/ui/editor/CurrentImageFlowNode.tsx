@@ -56,11 +56,11 @@ import {
   memo,
   Suspense,
   useCallback,
-  useEffect,
   useId,
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type KeyboardEvent,
   type MouseEvent,
   type PointerEvent,
@@ -74,7 +74,7 @@ import type { CurrentImageFlowNode as CurrentImageFlowNodeType } from './flowAda
 const KEYBOARD_RESIZE_STEP_PX = 32;
 /** Ignore sub-3px pointer jitter (such as the first click of a double-click) before committing a resize. */
 const RESIZE_DRAG_THRESHOLD_PX = 3;
-/** Below this width, collapse the dimension pill to an icon so the node title keeps readable room at 200 px. */
+/** Below this width, collapse the dimension pill to an icon and hide the "Generating" label so the title stays readable. */
 const COMPACT_HEADER_WIDTH = 280;
 /** Switch VideoPlayer to compact controls when the box is too tight for full transport + volume + fullscreen. */
 const COMPACT_VIDEO_MIN_WIDTH = 280;
@@ -86,6 +86,16 @@ interface DisplayedGalleryMedia {
   item: GalleryItem;
   /** Full selected GalleryItem opens the menu without refetching; legacy recentImages fall back to a ref. */
   menuTarget: GalleryItem | GalleryItemRef;
+}
+
+interface DragLayoutThresholds {
+  isCompactHeader: boolean;
+  videoPlayerSize: 'compact' | 'full';
+}
+
+interface DragLayoutState extends DragLayoutThresholds {
+  nodeId: string;
+  projectId: string;
 }
 
 /**
@@ -166,6 +176,11 @@ const isSameDisplayedGalleryMedia = (a: DisplayedGalleryMedia | null, b: Display
 const isTargetInFullscreen = (target: EventTarget | null): boolean =>
   target instanceof Node && Boolean(target.ownerDocument?.fullscreenElement?.contains(target));
 
+const getLayoutThresholds = (width: number, height: number): DragLayoutThresholds => ({
+  isCompactHeader: width < COMPACT_HEADER_WIDTH,
+  videoPlayerSize: width < COMPACT_VIDEO_MIN_WIDTH || height < COMPACT_VIDEO_MIN_HEIGHT ? 'compact' : 'full',
+});
+
 const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNodeType>) => {
   const { t } = useTranslation();
   const { editGraph } = useProjectGraphCommands();
@@ -179,6 +194,7 @@ const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNo
   );
   const displayedItem = displayedMedia?.item ?? null;
   const projectId = useWorkflowProjectSelector((project) => project.id);
+  const workflowId = useWorkflowProjectSelector((project) => project.activeWorkflowId);
   const isWorkflowRunning = useWorkflowProjectSelector((project) => project.isWorkflowRunning);
   const queueItems = useWorkflowProjectSelector((project) => project.queueItems);
 
@@ -227,39 +243,34 @@ const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNo
   const node = data.documentNode;
   const savedWidth = clampCurrentImageWidth(node.data.width);
   const savedHeight = clampCurrentImageHeight(node.data.height);
-  const [liveSizeState, setLiveSizeState] = useState<{
-    height: number;
-    nodeId: string;
-    projectId: string;
-    width: number;
-  } | null>(null);
-  const liveSize =
-    liveSizeState && liveSizeState.nodeId === node.id && liveSizeState.projectId === projectId ? liveSizeState : null;
-  const displayWidth = liveSize?.width ?? savedWidth;
-  const displayHeight = liveSize?.height ?? savedHeight;
-  const isCustomSize = displayWidth !== CURRENT_IMAGE_DEFAULT_WIDTH || displayHeight !== CURRENT_IMAGE_DEFAULT_HEIGHT;
-  const isCompactHeader = displayWidth < COMPACT_HEADER_WIDTH;
-  const videoPlayerSize =
-    displayWidth < COMPACT_VIDEO_MIN_WIDTH || displayHeight < COMPACT_VIDEO_MIN_HEIGHT ? 'compact' : 'full';
+  const isCustomSize = savedWidth !== CURRENT_IMAGE_DEFAULT_WIDTH || savedHeight !== CURRENT_IMAGE_DEFAULT_HEIGHT;
+  const [dragLayout, setDragLayout] = useState<DragLayoutState | null>(null);
+  const activeDragLayout =
+    dragLayout && dragLayout.nodeId === node.id && dragLayout.projectId === projectId ? dragLayout : null;
+  const committedLayout = getLayoutThresholds(savedWidth, savedHeight);
+  const isCompactHeader = activeDragLayout?.isCompactHeader ?? committedLayout.isCompactHeader;
+  const videoPlayerSize = activeDragLayout?.videoPlayerSize ?? committedLayout.videoPlayerSize;
+  const dragOwnerKey = `${projectId}:${node.id}`;
 
+  const shellRef = useRef<HTMLDivElement | null>(null);
   const videoControllerRef = useRef<CurrentImageVideoController | null>(null);
   const resizeHandleRef = useRef<HTMLDivElement | null>(null);
   const activeDragRef = useRef<AbortController | null>(null);
   const [copyReadyVideoKey, setCopyReadyVideoKey] = useState<string | null>(null);
   const canCopyVideoFrame = isShowingVideo && videoSurfaceKey !== null && copyReadyVideoKey === videoSurfaceKey;
 
-  // Cancel any in-flight resize drag on unmount or if the node or active project changes underneath it.
-  useEffect(() => {
-    activeDragRef.current?.abort();
-    activeDragRef.current = null;
-    return () => {
-      activeDragRef.current?.abort();
-      activeDragRef.current = null;
-    };
-  }, [node.id, projectId]);
-
-  const handleVideoControllerChange = useCallback((controller: CurrentImageVideoController | null) => {
-    videoControllerRef.current = controller;
+  const writeShellPreview = useCallback((width: number | null, height: number | null) => {
+    const shell = shellRef.current;
+    if (!shell) {
+      return;
+    }
+    if (width === null || height === null) {
+      shell.style.removeProperty('--ci-preview-w');
+      shell.style.removeProperty('--ci-preview-h');
+      return;
+    }
+    shell.style.setProperty('--ci-preview-w', `${width}px`);
+    shell.style.setProperty('--ci-preview-h', `${height}px`);
   }, []);
 
   const handleVideoCopyAvailabilityChange = useCallback((surfaceKey: string, isAvailable: boolean) => {
@@ -278,11 +289,15 @@ const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNo
       event.stopPropagation();
       activeDragRef.current?.abort();
       activeDragRef.current = null;
-      setLiveSizeState(null);
-      editGraph({ height: undefined, nodeId: node.id, type: 'setCurrentImageNodeSize', width: undefined });
+      writeShellPreview(null, null);
+      setDragLayout(null);
+      editGraph(
+        { height: undefined, nodeId: node.id, type: 'setCurrentImageNodeSize', width: undefined },
+        { projectId, workflowId }
+      );
       resizeHandleRef.current?.focus();
     },
-    [editGraph, node.id]
+    [editGraph, node.id, projectId, setDragLayout, workflowId, writeShellPreview]
   );
 
   const handleResizePointerDown = useCallback(
@@ -294,10 +309,12 @@ const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNo
       activeDragRef.current?.abort();
 
       const handle = event.currentTarget;
+      const target = { projectId, workflowId };
       const zoom = flowStore.getState().transform[2] || 1;
       const startWidth = savedWidth;
       const startHeight = savedHeight;
       let hasCrossedThreshold = false;
+      let hasEnded = false;
       let liveWidth = startWidth;
       let liveHeight = startHeight;
 
@@ -308,12 +325,24 @@ const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNo
             return;
           }
           activeDragRef.current = null;
-          setLiveSizeState(null);
+          hasEnded = true;
+          const clear = () => {
+            writeShellPreview(null, null);
+            setDragLayout(null);
+          };
           if (reason !== 'release' || !hasCrossedThreshold) {
+            clear();
             return;
           }
           if (liveWidth !== startWidth || liveHeight !== startHeight) {
-            editGraph({ height: liveHeight, nodeId: node.id, type: 'setCurrentImageNodeSize', width: liveWidth });
+            // Hold the live DOM size one frame so the committed render replaces it without flashing.
+            requestAnimationFrame(clear);
+            editGraph(
+              { height: liveHeight, nodeId: node.id, type: 'setCurrentImageNodeSize', width: liveWidth },
+              target
+            );
+          } else {
+            clear();
           }
         },
         onMove: (deltaX, deltaY) => {
@@ -326,7 +355,21 @@ const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNo
           hasCrossedThreshold = true;
           liveWidth = clampCurrentImageWidth(startWidth + deltaX / zoom);
           liveHeight = clampCurrentImageHeight(startHeight + deltaY / zoom);
-          setLiveSizeState({ height: liveHeight, nodeId: node.id, projectId, width: liveWidth });
+          if (shellRef.current?.dataset.dragOwner === dragOwnerKey) {
+            writeShellPreview(liveWidth, liveHeight);
+          } else {
+            writeShellPreview(null, null);
+          }
+          const nextLayout = getLayoutThresholds(liveWidth, liveHeight);
+          setDragLayout((prev) =>
+            prev &&
+            prev.nodeId === node.id &&
+            prev.projectId === projectId &&
+            prev.isCompactHeader === nextLayout.isCompactHeader &&
+            prev.videoPlayerSize === nextLayout.videoPlayerSize
+              ? prev
+              : { ...nextLayout, nodeId: node.id, projectId }
+          );
         },
       });
 
@@ -337,11 +380,26 @@ const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNo
         handle.removeAttribute('data-dragging');
         if (activeDragRef.current === session) {
           activeDragRef.current = null;
-          setLiveSizeState(null);
+        }
+        if (!hasEnded) {
+          writeShellPreview(null, null);
+          setDragLayout(null);
         }
       });
     },
-    [editGraph, flowStore, node.id, projectId, savedHeight, savedWidth, startDrag]
+    [
+      dragOwnerKey,
+      editGraph,
+      flowStore,
+      node.id,
+      projectId,
+      savedHeight,
+      savedWidth,
+      setDragLayout,
+      startDrag,
+      workflowId,
+      writeShellPreview,
+    ]
   );
 
   const handleResizeKeyDown = useCallback(
@@ -364,10 +422,13 @@ const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNo
       const nextWidth = clampCurrentImageWidth(target[0]);
       const nextHeight = clampCurrentImageHeight(target[1]);
       if (nextWidth !== savedWidth || nextHeight !== savedHeight) {
-        editGraph({ height: nextHeight, nodeId: node.id, type: 'setCurrentImageNodeSize', width: nextWidth });
+        editGraph(
+          { height: nextHeight, nodeId: node.id, type: 'setCurrentImageNodeSize', width: nextWidth },
+          { projectId, workflowId }
+        );
       }
     },
-    [editGraph, node.id, savedHeight, savedWidth]
+    [editGraph, node.id, projectId, savedHeight, savedWidth, workflowId]
   );
 
   const title = node.data.label || t('widgets.workflow.addNodeDialog.currentImageTitle');
@@ -422,6 +483,10 @@ const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNo
     );
   }, [displayedItem]);
   const liveImage = useMemo(() => progressImageToStreamingSource(projectProgressImage), [projectProgressImage]);
+  const shellSizeStyle = useMemo(
+    () => ({ '--ci-h': `${savedHeight}px`, '--ci-w': `${savedWidth}px` }) as CSSProperties,
+    [savedHeight, savedWidth]
+  );
 
   const copyUnavailableReason = !canCopyImage()
     ? t('common.copyUnavailable')
@@ -429,29 +494,32 @@ const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNo
       ? t('widgets.preview.copyCurrentFrameNotReady')
       : undefined;
   const resetSizeLabel = t('widgets.workflow.currentImageResetSize', {
-    height: displayHeight,
-    width: displayWidth,
+    height: savedHeight,
+    width: savedWidth,
   });
   const showItemMenuButton = Boolean(openItemMenu);
   const endsWithHeaderButton = showItemMenuButton || (isCustomSize ? isCompactHeader : isShowingVideo);
 
   return (
     <Box
+      ref={shellRef}
+      data-drag-owner={dragOwnerKey}
       data-is-selected={selected}
       data-workflow-node-shell="true"
       display="flex"
       flexDirection="column"
-      h={`${displayHeight}px`}
+      h="var(--ci-preview-h, var(--ci-h))"
       overflow="hidden"
       position="relative"
-      w={`${displayWidth}px`}
+      style={shellSizeStyle}
+      w="var(--ci-preview-w, var(--ci-w))"
       {...getWorkflowNodeShellProps({ selected })}
     >
       <Flex {...getWorkflowNodeHeaderProps({ endsWithButton: endsWithHeaderButton })} flexShrink={0} gap="1.5">
         <MiddleTruncate data-testid="current-image-node-title" flex="1" fontWeight="600" minW="0" text={title} />
         <HStack className="nodrag nopan" flexShrink={0} gap="1" ms="auto">
-          {isGenerating ? (
-            // Keep header compact at 200 px min-width; exact percentage is already displayed in the progress badge.
+          {isGenerating && !isCompactHeader ? (
+            // Hide text below 280 px where the progress strip and corner badge already convey generating state.
             <Text color="brand.solid" data-node-status-indicator="true" fontSize="xs">
               {t('widgets.workflow.generating')}
             </Text>
@@ -498,7 +566,7 @@ const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNo
                   variant="subtle"
                   onClick={resetSize}
                 >
-                  {`${displayWidth}×${displayHeight} ↺`}
+                  {`${savedWidth}×${savedHeight} ↺`}
                 </Button>
               </Tooltip>
             )
@@ -552,12 +620,12 @@ const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNo
           <Suspense fallback={videoPosterFallback}>
             <LazyCurrentImageVideoSurface
               key={videoSurfaceKey}
+              controllerRef={videoControllerRef}
               item={displayedItem}
               nodeId={node.id}
               playerSize={videoPlayerSize}
               surfaceKey={videoSurfaceKey}
               videoDragRef={videoDragRef}
-              onControllerChange={handleVideoControllerChange}
               onCopyAvailabilityChange={handleVideoCopyAvailabilityChange}
             />
           </Suspense>
@@ -627,8 +695,8 @@ const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNo
           label={t('widgets.workflow.currentImageResizeHandle')}
           valueMax={CURRENT_IMAGE_MAX_SIZE}
           valueMin={CURRENT_IMAGE_MIN_WIDTH}
-          valueNow={displayWidth}
-          valueText={t('widgets.floating.resizeValue', { height: displayHeight, width: displayWidth })}
+          valueNow={savedWidth}
+          valueText={t('widgets.floating.resizeValue', { height: savedHeight, width: savedWidth })}
           onDoubleClick={resetSize}
           onKeyDown={handleResizeKeyDown}
           onPointerDown={handleResizePointerDown}

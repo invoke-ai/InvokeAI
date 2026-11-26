@@ -160,11 +160,17 @@ describe('queue realtime runtime', () => {
       expect(itemProgressStore.get(52)?.percentage).toBe(0.4);
       expect(getActiveProgressItemIds()).toEqual([51, 52]);
 
-      handlers.get('queue_item_status_changed')?.({ item_id: 51, status: 'pending' } as never);
+      handlers.get('queue_item_status_changed')?.({ item_id: 51, status: 'pending', status_sequence: 2 } as never);
       expect(itemProgressStore.get(51)).toBeNull();
       expect(getActiveProgressItemIds()).toEqual([52]);
 
-      handlers.get('queue_item_status_changed')?.({ item_id: 52, status: 'waiting' } as never);
+      // A late pending event with an older status_sequence must not blank an active item's progress.
+      handlers.get('queue_item_status_changed')?.({ item_id: 52, status: 'in_progress', status_sequence: 3 } as never);
+      handlers.get('queue_item_status_changed')?.({ item_id: 52, status: 'pending', status_sequence: 2 } as never);
+      expect(itemProgressStore.get(52)?.percentage).toBe(0.4);
+      expect(getActiveProgressItemIds()).toEqual([52]);
+
+      handlers.get('queue_item_status_changed')?.({ item_id: 52, status: 'waiting', status_sequence: 4 } as never);
       expect(itemProgressStore.get(52)).toBeNull();
       expect(getActiveProgressItemIds()).toEqual([]);
     } finally {

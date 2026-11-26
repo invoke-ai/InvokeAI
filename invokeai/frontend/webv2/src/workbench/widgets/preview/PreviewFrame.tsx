@@ -3,8 +3,10 @@ import type { GalleryItemKey, GalleryItemRef } from '@features/gallery';
 import type { StreamingImageSource } from '@platform/ui/streaming-image/streamingImageSource';
 import type { VideoFrameCopyFailureReason, VideoFrameCopyResult } from '@platform/ui/video-player/videoFrameUtils';
 
+import { Badge } from '@chakra-ui/react';
 import { useDraggable } from '@dnd-kit/core';
 import { getGalleryItemDragData, getGalleryItemDragId } from '@features/gallery/utility';
+import { GripHorizontalIcon } from 'lucide-react';
 import {
   lazy,
   Suspense,
@@ -21,6 +23,7 @@ import {
   type Ref,
   type SyntheticEvent,
 } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { PreviewCompareDropZone } from './PreviewCompareDropZone';
 import { FittedFrame, PreviewStage } from './PreviewStage';
@@ -28,9 +31,9 @@ import { PreviewSwipeNeighbors } from './PreviewSwipeNeighbor';
 import { usePreviewLoupe, type PreviewLoupeControls, type PreviewZoomState } from './usePreviewLoupe';
 import { usePreviewSwipe, type PreviewSwipeNavigation } from './usePreviewSwipe';
 
-// Most selections are images, and other surfaces share the player: load the video surface (along with VideoPlayer and
-// videoFrameUtils) only with the first video shown, so it costs Preview's initial load no request.
-const LazyPreviewVideoFrame = lazy(() => import('./PreviewVideoFrame'));
+// Most selections are images, and other surfaces share the player: keep the video shell (drag grip, context menu,
+// swipe) eager and lazy-load only the inner player (VideoPlayer + videoFrameUtils) on the first video shown.
+const LazyPreviewVideoPlayer = lazy(() => import('./PreviewVideoFrame'));
 
 export type PreviewMediaSource =
   | { itemKey: GalleryItemKey; kind: 'image'; source: StreamingImageSource }
@@ -78,75 +81,29 @@ interface PreviewFrameProps {
   variant: 'framed' | 'inset';
 }
 
-const PreviewVideoFallback = ({
-  frameHeight,
-  frameWidth,
-  padding,
-  paddingBottom,
-  poster,
-}: {
-  frameHeight: number;
-  frameWidth: number;
-  padding?: string;
-  paddingBottom?: string;
-  poster: string;
-}) => (
-  <PreviewStage fill="flex" padding={padding} paddingBottom={paddingBottom}>
-    <FittedFrame bg="black" frameHeight={frameHeight} frameWidth={frameWidth}>
-      <img
-        aria-hidden="true"
-        alt=""
-        draggable={false}
-        height={frameHeight}
-        src={poster}
-        style={VIDEO_PLAYER_FALLBACK_STYLE}
-        width={frameWidth}
-      />
-    </FittedFrame>
-  </PreviewStage>
-);
-
 export const PreviewFrame = (props: PreviewFrameProps) => {
-  const { frameHeight, frameWidth, padding, paddingBottom, source } = props;
-  const videoPoster = source?.kind === 'video' ? source.poster : null;
-  const videoFallback = useMemo(
-    () =>
-      videoPoster !== null ? (
-        <PreviewVideoFallback
-          frameHeight={frameHeight}
-          frameWidth={frameWidth}
-          padding={padding}
-          paddingBottom={paddingBottom}
-          poster={videoPoster}
-        />
-      ) : null,
-    [frameHeight, frameWidth, padding, paddingBottom, videoPoster]
-  );
-
-  if (source?.kind === 'video') {
+  if (props.source?.kind === 'video') {
     return (
-      <Suspense fallback={videoFallback}>
-        <LazyPreviewVideoFrame
-          key={source.itemKey}
-          dragItem={props.dragItem}
-          frameHeight={frameHeight}
-          frameWidth={frameWidth}
-          isItemCurrent={props.isItemCurrent}
-          loop={props.videoLoop}
-          padding={padding}
-          paddingBottom={paddingBottom}
-          source={source}
-          swipe={props.swipe}
-          videoControllerRef={props.videoControllerRef}
-          onContextMenu={props.onContextMenu}
-          onCopyAvailabilityChange={props.onVideoCopyAvailabilityChange}
-          onLoopChange={props.onVideoLoopChange}
-        />
-      </Suspense>
+      <PreviewVideo
+        key={props.source.itemKey}
+        dragItem={props.dragItem}
+        frameHeight={props.frameHeight}
+        frameWidth={props.frameWidth}
+        isItemCurrent={props.isItemCurrent}
+        loop={props.videoLoop}
+        padding={props.padding}
+        paddingBottom={props.paddingBottom}
+        source={props.source}
+        swipe={props.swipe}
+        videoControllerRef={props.videoControllerRef}
+        onContextMenu={props.onContextMenu}
+        onCopyAvailabilityChange={props.onVideoCopyAvailabilityChange}
+        onLoopChange={props.onVideoLoopChange}
+      />
     );
   }
 
-  return <PreviewImageFrame {...props} source={source?.source ?? null} />;
+  return <PreviewImageFrame {...props} source={props.source?.source ?? null} />;
 };
 
 const PreviewImageFrame = ({
@@ -416,6 +373,168 @@ const PreviewImageFrame = ({
         {media}
       </FittedFrame>
       {isSwipeEnabled && swipe.showsNeighbors ? (
+        <PreviewSwipeNeighbors
+          neighbors={swipeNavigation.neighbors}
+          nextTrackRef={swipe.nextTrackRef}
+          previousTrackRef={swipe.previousTrackRef}
+          restStyle={swipe.restStyle}
+        />
+      ) : null}
+    </PreviewStage>
+  );
+};
+
+const PreviewVideo = ({
+  dragItem,
+  frameHeight,
+  frameWidth,
+  isItemCurrent,
+  loop: loopPreference,
+  onContextMenu,
+  onCopyAvailabilityChange,
+  onLoopChange,
+  padding,
+  paddingBottom,
+  source,
+  swipe: swipeNavigation,
+  videoControllerRef,
+}: {
+  dragItem?: GalleryItemRef;
+  frameHeight: number;
+  frameWidth: number;
+  isItemCurrent?: (itemKey: GalleryItemKey) => boolean;
+  loop?: boolean;
+  onContextMenu?: (x: number, y: number) => void;
+  onCopyAvailabilityChange?: (itemKey: GalleryItemKey, isAvailable: boolean) => void;
+  onLoopChange?: (loop: boolean) => void;
+  padding?: string;
+  paddingBottom?: string;
+  source: Extract<PreviewMediaSource, { kind: 'video' }>;
+  swipe?: PreviewSwipeNavigation;
+  videoControllerRef?: Ref<PreviewVideoFrameController>;
+}) => {
+  const { t } = useTranslation();
+  const isControlsTargetRef = useRef<((target: Element) => boolean) | null>(null);
+  // Use a grip for video so scrubbing the player cannot activate gallery dragging.
+  const dragData = useMemo(() => (dragItem ? getGalleryItemDragData([dragItem]) : undefined), [dragItem]);
+  const disabledDragId = useId();
+  const dragId = dragItem
+    ? getGalleryItemDragId(dragItem, 'preview-frame')
+    : `preview-frame:disabled:${disabledDragId}`;
+  const {
+    isDragging,
+    listeners,
+    setNodeRef: setDragHandleRef,
+  } = useDraggable({
+    data: dragData,
+    disabled: !dragItem,
+    id: dragId,
+  });
+  // Each clip mounts its own player, so a landed swipe simply unmounts this one at rest.
+  const swipe = usePreviewSwipe({
+    displayedSourceToken: source.src,
+    dragId,
+    enabled: swipeNavigation !== undefined,
+    isZoomed: false,
+    navigation: swipeNavigation ?? null,
+  });
+  const { onPointerDown: handleSwipePointerDown } = swipe;
+  // The control bar owns its touches: seeking and volume must never swipe.
+  const handleStagePointerDown = useCallback(
+    (event: PointerEvent<HTMLDivElement>) => {
+      const target = event.target;
+
+      if (
+        !(target instanceof Element) ||
+        !event.currentTarget.contains(target) ||
+        isControlsTargetRef.current?.(target) ||
+        target.ownerDocument.fullscreenElement?.contains(target)
+      ) {
+        return;
+      }
+
+      handleSwipePointerDown(event);
+    },
+    [handleSwipePointerDown]
+  );
+  const handleContextMenu = useCallback(
+    (event: MouseEvent<HTMLDivElement>) => {
+      if (onContextMenu) {
+        event.preventDefault();
+        onContextMenu(event.clientX, event.clientY);
+      }
+    },
+    [onContextMenu]
+  );
+  const playerFallback = useMemo(
+    () => (
+      <img
+        aria-hidden="true"
+        alt=""
+        draggable={false}
+        height={frameHeight}
+        src={source.poster}
+        style={VIDEO_PLAYER_FALLBACK_STYLE}
+        width={frameWidth}
+      />
+    ),
+    [frameHeight, frameWidth, source.poster]
+  );
+
+  return (
+    <PreviewStage
+      ref={swipe.stageRefCallback}
+      fill="flex"
+      padding={padding}
+      paddingBottom={paddingBottom}
+      // One-finger travel is the swipe's, exactly as on the image stage: any native pan left available here lets the
+      // browser (or the player's own controls) claim a swipe midway and cancel it. Without a swipe the browser keeps
+      // its native gestures.
+      touchAction={swipeNavigation ? 'none' : undefined}
+      onPointerDown={swipeNavigation ? handleStagePointerDown : undefined}
+    >
+      <FittedFrame
+        ref={swipe.contentTrackRef}
+        bg="black"
+        frameHeight={frameHeight}
+        frameWidth={frameWidth}
+        opacity={isDragging ? 0.55 : undefined}
+        style={swipe.restStyle}
+        onContextMenu={onContextMenu ? handleContextMenu : undefined}
+      >
+        <Suspense fallback={playerFallback}>
+          <LazyPreviewVideoPlayer
+            frameHeight={frameHeight}
+            frameWidth={frameWidth}
+            isControlsTargetRef={isControlsTargetRef}
+            isItemCurrent={isItemCurrent}
+            loop={loopPreference}
+            source={source}
+            videoControllerRef={videoControllerRef}
+            onCopyAvailabilityChange={onCopyAvailabilityChange}
+            onLoopChange={onLoopChange}
+          />
+        </Suspense>
+        {dragItem ? (
+          // Keep drag grips unfocusable so KeyboardSensor cannot start invisible Enter/Space drags.
+          <Badge
+            ref={setDragHandleRef}
+            {...listeners}
+            cursor={isDragging ? 'grabbing' : 'grab'}
+            // Top-center, clear of the control bar along the bottom edge.
+            insetInlineStart="50%"
+            position="absolute"
+            title={t('widgets.preview.dragVideo')}
+            top="2"
+            touchAction="none"
+            transform="translateX(-50%)"
+            variant="solid"
+          >
+            <GripHorizontalIcon aria-hidden="true" size={12} />
+          </Badge>
+        ) : null}
+      </FittedFrame>
+      {swipeNavigation && swipe.showsNeighbors ? (
         <PreviewSwipeNeighbors
           neighbors={swipeNavigation.neighbors}
           nextTrackRef={swipe.nextTrackRef}

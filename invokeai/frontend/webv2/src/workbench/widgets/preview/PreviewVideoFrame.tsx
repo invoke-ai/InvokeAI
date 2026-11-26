@@ -1,10 +1,8 @@
 /* eslint-disable react/refs, react/immutability */
-import type { GalleryItemKey, GalleryItemRef } from '@features/gallery';
+import type { GalleryItemKey } from '@features/gallery';
 import type { VideoErrorRecovery } from '@platform/ui/video-player/videoFrameUtils';
 
-import { Badge, Flex, Text } from '@chakra-ui/react';
-import { useDraggable } from '@dnd-kit/core';
-import { getGalleryItemDragData, getGalleryItemDragId } from '@features/gallery/utility';
+import { Flex, Text } from '@chakra-ui/react';
 import { getAuthSession, refreshProtectedMediaCookie } from '@features/identity';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { Button } from '@platform/ui/Button';
@@ -17,26 +15,20 @@ import {
 } from '@platform/ui/video-player/videoFrameUtils';
 import { isVideoPlayerControlsTarget, VideoPlayer } from '@platform/ui/video-player/VideoPlayer';
 import { releaseFocusOnRemoval } from '@workbench/focusRegions';
-import { GripHorizontalIcon } from 'lucide-react';
 import {
   useCallback,
-  useId,
   useImperativeHandle,
-  useMemo,
   useRef,
   useState,
   type CSSProperties,
-  type MouseEvent,
-  type PointerEvent,
   type Ref,
+  type RefObject,
   type SyntheticEvent,
 } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { PreviewMediaSource, PreviewVideoFrameController, PreviewVideoFrameCopyResult } from './PreviewFrame';
 
-import { FittedFrame, PreviewStage } from './PreviewStage';
-import { PreviewSwipeNeighbors } from './PreviewSwipeNeighbor';
 import {
   clearVideoSpanPlaybackState,
   consumeVideoSpanPlaybackRequest,
@@ -45,7 +37,6 @@ import {
   publishVideoSpanPlaybackState,
   subscribeVideoSpanPlaybackRequests,
 } from './spanPlaybackRequest';
-import { usePreviewSwipe, type PreviewSwipeNavigation } from './usePreviewSwipe';
 
 /** Audio settings live here for the page session (first clip at half volume); not account data. */
 const previewVideoAudio = { muted: false, volume: 0.5 };
@@ -84,83 +75,42 @@ const SpanPlaybackStart = ({ onStart }: { onStart: () => void }) => {
   return null;
 };
 
-export interface PreviewVideoFrameProps {
-  dragItem?: GalleryItemRef;
+export interface PreviewVideoPlayerProps {
   frameHeight: number;
   frameWidth: number;
+  isControlsTargetRef: RefObject<((target: Element) => boolean) | null>;
   isItemCurrent?: (itemKey: GalleryItemKey) => boolean;
   loop?: boolean;
-  onContextMenu?: (x: number, y: number) => void;
   onCopyAvailabilityChange?: (itemKey: GalleryItemKey, isAvailable: boolean) => void;
   onLoopChange?: (loop: boolean) => void;
-  padding?: string;
-  paddingBottom?: string;
   source: Extract<PreviewMediaSource, { kind: 'video' }>;
-  swipe?: PreviewSwipeNavigation;
   videoControllerRef?: Ref<PreviewVideoFrameController>;
 }
 
-export const PreviewVideoFrame = ({
-  dragItem,
+/** Lazy inner player loaded inside PreviewFrame's eager video shell on first video display. */
+export const PreviewVideoPlayer = ({
   frameHeight,
   frameWidth,
+  isControlsTargetRef,
   isItemCurrent,
   loop: loopPreference,
-  onContextMenu,
   onCopyAvailabilityChange,
   onLoopChange,
-  padding,
-  paddingBottom,
   source,
-  swipe: swipeNavigation,
   videoControllerRef,
-}: PreviewVideoFrameProps) => {
+}: PreviewVideoPlayerProps) => {
   const { t } = useTranslation();
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  // Use a grip for video so scrubbing the player cannot activate gallery dragging.
-  const dragData = useMemo(() => (dragItem ? getGalleryItemDragData([dragItem]) : undefined), [dragItem]);
-  const disabledDragId = useId();
-  const dragId = dragItem
-    ? getGalleryItemDragId(dragItem, 'preview-frame')
-    : `preview-frame:disabled:${disabledDragId}`;
-  const {
-    isDragging,
-    listeners,
-    setNodeRef: setDragHandleRef,
-  } = useDraggable({
-    data: dragData,
-    disabled: !dragItem,
-    id: dragId,
-  });
-  // Each clip mounts its own player, so a landed swipe simply unmounts this one at rest.
-  const swipe = usePreviewSwipe({
-    displayedSourceToken: source.src,
-    dragId,
-    enabled: swipeNavigation !== undefined,
-    isZoomed: false,
-    navigation: swipeNavigation ?? null,
-  });
-  const { onPointerDown: handleSwipePointerDown } = swipe;
-  // The control bar owns its touches: seeking and volume must never swipe.
-  const handleStagePointerDown = useCallback(
-    (event: PointerEvent<HTMLDivElement>) => {
-      const target = event.target;
-
-      if (
-        !(target instanceof Element) ||
-        !event.currentTarget.contains(target) ||
-        isVideoPlayerControlsTarget(target) ||
-        target.ownerDocument.fullscreenElement?.contains(target)
-      ) {
-        return;
-      }
-
-      handleSwipePointerDown(event);
-    },
-    [handleSwipePointerDown]
-  );
   const [hasFailed, setHasFailed] = useState(false);
   const recoveryRef = useRef<VideoErrorRecovery | null>(null);
+
+  useMountEffect(() => {
+    isControlsTargetRef.current = isVideoPlayerControlsTarget;
+    return () => {
+      isControlsTargetRef.current = null;
+    };
+  });
+
   const getRecovery = useCallback(() => {
     if (!recoveryRef.current) {
       recoveryRef.current = createVideoErrorRecovery({
@@ -428,15 +378,6 @@ export const PreviewVideoFrame = ({
     getRecovery().retry(videoRef.current);
     publishCopyAvailability();
   }, [getRecovery, publishCopyAvailability]);
-  const handleContextMenu = useCallback(
-    (event: MouseEvent<HTMLDivElement>) => {
-      if (onContextMenu) {
-        event.preventDefault();
-        onContextMenu(event.clientX, event.clientY);
-      }
-    },
-    [onContextMenu]
-  );
   const failure = hasFailed ? (
     <>
       <img
@@ -468,84 +409,38 @@ export const PreviewVideoFrame = ({
   ) : null;
 
   return (
-    <PreviewStage
-      ref={swipe.stageRefCallback}
-      fill="flex"
-      padding={padding}
-      paddingBottom={paddingBottom}
-      // One-finger travel is the swipe's, exactly as on the image stage: any native pan left available here lets the
-      // browser (or the player's own controls) claim a swipe midway and cancel it. Without a swipe the browser keeps
-      // its native gestures.
-      touchAction={swipeNavigation ? 'none' : undefined}
-      onPointerDown={swipeNavigation ? handleStagePointerDown : undefined}
-    >
-      <FittedFrame
-        ref={swipe.contentTrackRef}
-        bg="black"
-        frameHeight={frameHeight}
-        frameWidth={frameWidth}
-        opacity={isDragging ? 0.55 : undefined}
-        style={swipe.restStyle}
-        onContextMenu={onContextMenu ? handleContextMenu : undefined}
-      >
-        <VideoPlayer
-          ref={setVideoRef}
-          aria-label={source.label}
-          fps={source.fps}
-          loop={loopPreference}
-          overlay={failure}
-          playbackWindow={span}
-          poster={source.poster}
-          size="full"
-          src={source.src}
-          onCanPlay={publishCopyAvailability}
-          onEmptied={handleEmptied}
-          // The player wraps a span ending on the clip's end in the same task as this; reporting here keeps the Video
-          // panel's control from blinking to play on every pass.
-          onEnded={publishSpanState}
-          onError={handleVideoError}
-          onLoadedData={publishCopyAvailability}
-          onLoadedMetadata={handleLoadedMetadata}
-          onLoopChange={onLoopChange}
-          onPause={publishSpanState}
-          onPlay={publishSpanState}
-          onPlaying={publishCopyAvailability}
-          onResize={publishCopyAvailability}
-          onSeeked={publishCopyAvailability}
-          onSeeking={handleSeeking}
-          onVolumeChange={rememberPreviewVideoAudio}
-          onWaiting={publishCopyAvailability}
-        />
-        {spanStartRequest > 0 ? <SpanPlaybackStart key={spanStartRequest} onStart={startPendingSpan} /> : null}
-        {dragItem ? (
-          // Keep drag grips unfocusable so KeyboardSensor cannot start invisible Enter/Space drags.
-          <Badge
-            ref={setDragHandleRef}
-            {...listeners}
-            cursor={isDragging ? 'grabbing' : 'grab'}
-            // Top-center, clear of the control bar along the bottom edge.
-            insetInlineStart="50%"
-            position="absolute"
-            title={t('widgets.preview.dragVideo')}
-            top="2"
-            touchAction="none"
-            transform="translateX(-50%)"
-            variant="solid"
-          >
-            <GripHorizontalIcon aria-hidden="true" size={12} />
-          </Badge>
-        ) : null}
-      </FittedFrame>
-      {swipeNavigation && swipe.showsNeighbors ? (
-        <PreviewSwipeNeighbors
-          neighbors={swipeNavigation.neighbors}
-          nextTrackRef={swipe.nextTrackRef}
-          previousTrackRef={swipe.previousTrackRef}
-          restStyle={swipe.restStyle}
-        />
-      ) : null}
-    </PreviewStage>
+    <>
+      <VideoPlayer
+        ref={setVideoRef}
+        aria-label={source.label}
+        fps={source.fps}
+        loop={loopPreference}
+        overlay={failure}
+        playbackWindow={span}
+        poster={source.poster}
+        size="full"
+        src={source.src}
+        onCanPlay={publishCopyAvailability}
+        onEmptied={handleEmptied}
+        // The player wraps a span ending on the clip's end in the same task as this; reporting here keeps the Video
+        // panel's control from blinking to play on every pass.
+        onEnded={publishSpanState}
+        onError={handleVideoError}
+        onLoadedData={publishCopyAvailability}
+        onLoadedMetadata={handleLoadedMetadata}
+        onLoopChange={onLoopChange}
+        onPause={publishSpanState}
+        onPlay={publishSpanState}
+        onPlaying={publishCopyAvailability}
+        onResize={publishCopyAvailability}
+        onSeeked={publishCopyAvailability}
+        onSeeking={handleSeeking}
+        onVolumeChange={rememberPreviewVideoAudio}
+        onWaiting={publishCopyAvailability}
+      />
+      {spanStartRequest > 0 ? <SpanPlaybackStart key={spanStartRequest} onStart={startPendingSpan} /> : null}
+    </>
   );
 };
 
-export default PreviewVideoFrame;
+export default PreviewVideoPlayer;

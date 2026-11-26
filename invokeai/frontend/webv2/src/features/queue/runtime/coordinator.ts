@@ -444,7 +444,23 @@ export const createQueueCoordinator = (
         const routedEvent = routeNodeEvent(nodeEvent.event, backendItemId, invocationSourceId);
         const wait = waits.get(backendItemId);
         if (wait) {
-          activeProgressTarget.set(getProgressImageTarget(wait.localQueueItemId, backendItemId));
+          const target = getProgressImageTarget(wait.localQueueItemId, backendItemId);
+          activeProgressTarget.set(target);
+          const state = runProgress.get(wait.localQueueItemId);
+          if (state) {
+            const previous = state.slotPercentages.get(target.itemIndex);
+            const hadSlotPercentage = previous !== undefined && previous !== null;
+            const clearedActive =
+              state.activeBackendItemId === backendItemId && (state.percentage !== null || state.message !== '');
+            state.slotPercentages.set(target.itemIndex, null);
+            if (state.activeBackendItemId === backendItemId) {
+              state.message = '';
+              state.percentage = null;
+            }
+            if (hadSlotPercentage || clearedActive) {
+              publishRunProgress(wait.localQueueItemId);
+            }
+          }
         }
         nodeExecution.started(routedEvent);
         return;

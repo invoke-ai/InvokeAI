@@ -5,6 +5,7 @@ import { useDraggable } from '@dnd-kit/core';
 import { getGalleryItemDragData, getGalleryItemDragId } from '@features/gallery/utility';
 import { getAuthSession, refreshProtectedMediaCookie } from '@features/identity';
 import { useWorkflowNotifications } from '@features/workflow/ui/WorkflowUiContext';
+import { useMountEffect } from '@platform/react/useMountEffect';
 import { Button } from '@platform/ui/Button';
 import { Tooltip } from '@platform/ui/Tooltip';
 import {
@@ -18,7 +19,17 @@ import {
 } from '@platform/ui/video-player/videoFrameUtils';
 import { VideoPlayer } from '@platform/ui/video-player/VideoPlayer';
 import { GripHorizontalIcon } from 'lucide-react';
-import { memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent } from 'react';
+import {
+  memo,
+  useCallback,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type MouseEvent,
+  type Ref,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 
 const VIDEO_FAILURE_POSTER_STYLE: CSSProperties = {
@@ -44,9 +55,9 @@ export interface CurrentImageVideoController {
 }
 
 export interface CurrentImageVideoSurfaceProps {
+  controllerRef: Ref<CurrentImageVideoController>;
   item: GalleryVideoItem;
   nodeId: string;
-  onControllerChange: (controller: CurrentImageVideoController | null) => void;
   onCopyAvailabilityChange: (surfaceKey: string, isAvailable: boolean) => void;
   playerSize: 'compact' | 'full';
   surfaceKey: string;
@@ -54,9 +65,9 @@ export interface CurrentImageVideoSurfaceProps {
 }
 
 const CurrentImageVideoSurfaceComponent = ({
+  controllerRef,
   item,
   nodeId,
-  onControllerChange,
   onCopyAvailabilityChange,
   playerSize,
   surfaceKey,
@@ -110,19 +121,12 @@ const CurrentImageVideoSurfaceComponent = ({
     notifications.error(t(VIDEO_FRAME_COPY_FAILURE_KEYS[result.reason]));
   }, [notifications, t]);
 
-  useEffect(() => {
-    onControllerChange({ copyCurrentFrame });
-    return () => {
-      onControllerChange(null);
-    };
-  }, [copyCurrentFrame, onControllerChange]);
+  useImperativeHandle(controllerRef, () => ({ copyCurrentFrame }), [copyCurrentFrame]);
 
-  useEffect(
-    () => () => {
-      onCopyAvailabilityChange(surfaceKey, false);
-    },
-    [onCopyAvailabilityChange, surfaceKey]
-  );
+  // Surface is keyed by `videoSurfaceKey`; guarantee availability resets on unmount even if the video ref never attached.
+  useMountEffect(() => () => {
+    onCopyAvailabilityChange(surfaceKey, false);
+  });
 
   const handleVideoError = useCallback(() => {
     publishCopyAvailability();

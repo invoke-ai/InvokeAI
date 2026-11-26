@@ -45,9 +45,12 @@ const SOURCE = {
   src: '/scripts/mock-assets/fixture-video.mp4',
 } as const;
 
-it('shows the poster while the player loads, then the player in its place', async () => {
+const DRAG_ITEM = { kind: 'video', name: 'clip.mp4' } as const;
+
+it('shows the poster while the player loads while keeping drag grip and context menu eager', async () => {
   const host = document.body.appendChild(document.createElement('div'));
   const root = createRoot(host);
+  const onContextMenu = vi.fn();
 
   try {
     await act(async () => {
@@ -57,12 +60,14 @@ it('shows the poster while the player loads, then the player in its place', asyn
             <DndContext>
               <div style={{ display: 'flex', height: 260, width: 420 }}>
                 <PreviewFrame
+                  dragItem={DRAG_ITEM}
                   frameHeight={1080}
                   frameWidth={1920}
                   isLive={false}
                   shouldAntialiasLiveImage
                   source={SOURCE}
                   variant="framed"
+                  onContextMenu={onContextMenu}
                 />
               </div>
             </DndContext>
@@ -74,8 +79,17 @@ it('shows the poster while the player loads, then the player in its place', asyn
       });
     });
 
+    const poster = host.querySelector<HTMLImageElement>(`img[src="${POSTER}"]`);
     expect(host.querySelector('video')).toBeNull();
-    expect(host.querySelector(`img[src="${POSTER}"]`)?.getAttribute('aria-hidden')).toBe('true');
+    expect(poster?.getAttribute('aria-hidden')).toBe('true');
+    // Drag grip and right-click context menu must already work before the lazy player chunk resolves.
+    expect(host.querySelector('[title="widgets.preview.dragVideo"]')).not.toBeNull();
+    await act(() => {
+      poster!.dispatchEvent(
+        new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 50, clientY: 60 })
+      );
+    });
+    expect(onContextMenu).toHaveBeenCalledExactlyOnceWith(50, 60);
 
     playerModule.release();
 

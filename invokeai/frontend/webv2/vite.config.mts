@@ -483,10 +483,12 @@ const CANVAS_PROCESSING_SIZE_MODULES = [
   '/features/generation/core/canvas/canvasProcessingSize.ts',
 ];
 
-/** Lazy video surfaces share VideoPlayer and its frame/recovery utilities in one on-demand chunk. */
+/** Lazy video surfaces share VideoPlayer and its frame/timeline/store utilities in one on-demand chunk. */
 const VIDEO_PLAYER_MODULES = [
   '/platform/ui/video-player/VideoPlayer.tsx',
+  '/platform/ui/video-player/mediaElementStore.ts',
   '/platform/ui/video-player/videoFrameUtils.ts',
+  '/platform/ui/video-player/videoTimeline.ts',
 ] as const;
 
 const matchesAnySuffix = (id: string, suffixes: readonly string[]) => suffixes.some((suffix) => id.endsWith(suffix));
