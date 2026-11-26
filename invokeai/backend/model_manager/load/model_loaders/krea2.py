@@ -157,6 +157,22 @@ def _keep_rms_norms_in_fp32(model: torch.nn.Module) -> None:
         module.weight = torch.nn.Parameter(weight.detach().to(torch.float32), requires_grad=False)
 
 
+def _stored_rms_norm_weights(model: torch.nn.Module, sd: dict[str, Any], dtype: torch.dtype) -> dict[str, torch.Tensor]:
+    """Float32 copies of the `Krea2RMSNorm` weights in `sd` that a cast to `dtype` would round: 16- or 32-bit floats of
+    another dtype. Copies, because an mmap-backed view would pin the whole checkpoint file for the model's lifetime."""
+    from diffusers.models.transformers.transformer_krea2 import Krea2RMSNorm
+
+    keys = (f"{name}.weight" for name, module in model.named_modules() if isinstance(module, Krea2RMSNorm))
+    return {
+        key: tensor.to(torch.float32, copy=True)
+        for key in keys
+        if isinstance(tensor := sd.get(key), torch.Tensor)
+        and tensor.is_floating_point()
+        and tensor.element_size() >= 2
+        and tensor.dtype != dtype
+    }
+
+
 def _is_native_krea2_format(sd: dict[str, Any]) -> bool:
     """Detect the native/ComfyUI Krea-2 key naming (e.g. GGUF) vs. the diffusers naming."""
     return any(
@@ -679,6 +695,9 @@ class Krea2CheckpointModel(ModelLoader):
         modules = {name for name, _ in model.named_children()}
         nvfp4_payloads = {path: payload for path, payload in nvfp4_payloads.items() if path.split(".", 1)[0] in modules}
         nvfp4_bytes = predict_nvfp4_install_size(model, nvfp4_payloads, model_dtype, skip_patterns)
+        # The casts below round every float to `model_dtype` before `_keep_rms_norms_in_fp32` widens the norms, so
+        # hold back their stored copies or they arrive rounded (#10117). They are vectors; no reservation needed.
+        stored_norms = _stored_rms_norm_weights(model, sd, model_dtype)
 
         if int8_markers:
             # A merged file's bundled submodels are in `sd` too -- this loader does not
@@ -748,6 +767,7 @@ class Krea2CheckpointModel(ModelLoader):
             packed = install_nvfp4_layers(model, sd, nvfp4_payloads, model_dtype, skip_patterns)
             self._logger.info(f"Krea-2: kept {packed} of {len(nvfp4_payloads)} nvfp4 layer(s) packed.")
 
+        sd.update(stored_norms)
         load_state_dict_ignoring_extras(
             model, sd, source="Krea-2 single-file checkpoint", assign=True, allow_missing=True
         )
