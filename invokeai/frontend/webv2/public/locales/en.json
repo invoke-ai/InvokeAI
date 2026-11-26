@@ -1477,7 +1477,7 @@
     "cancelInstall": "Cancel install",
     "changedElsewhere": "This model changed elsewhere; your unsaved edits are kept.",
     "civitaiKey": "Civitai key",
-    "civitaiKeyDescription": "Attached automatically when installing civitai.com models that require login. Stored in this browser only.",
+    "civitaiKeyDescription": "Attached automatically when installing civitai.com or civitai.red models that require login. Stored in this browser only.",
     "civitaiKeyPlaceholder": "32-character key from civitai.com/user/account",
     "cleanupOrphaned": "Clean up orphaned models…",
     "clearSelectedModel": "Clear selected model",
@@ -1498,6 +1498,8 @@
     "countToInstall": "{{count}} to install",
     "customizeDefaultField": "Customize {{field}} for this model",
     "customizedForThisModel": "Customized for this model",
+    "dateAddedUnavailable": "Couldn't sort by date added",
+    "dateAddedUnavailableDescription": "Models are listed by name. Choose Date added again to retry.",
     "defaultFieldInherited": {
       "cfgRescale": "App default: 0 (off)",
       "cfgScale": "App default: 7",
@@ -1856,6 +1858,7 @@
     "someCouldNotBeDeleted": "Some models could not be deleted",
     "someCouldNotBeReidentified": "Some models could not be re-identified",
     "sort": {
+      "added": "Date added",
       "base": "Base",
       "catalog": "Catalog order",
       "default": "Default",
@@ -1873,6 +1876,10 @@
       "hfRepo": "Hugging Face repo",
       "url": "URL"
     },
+    "visitSource": "Visit source",
+    "visitModelSource": "Visit source for {{name}}",
+    "modelPage_one": "Model page",
+    "modelPage_other": "Model pages",
     "sourceUrl": "Source URL",
     "sourceUrlHelp": "Model page or download URL.",
     "statusCancelled": "Cancelled",
@@ -3724,6 +3731,7 @@
         "capabilitiesUnavailable": "Model capabilities are not available. Generation is blocked until they load; if this persists, retry from the Generate panel.",
         "componentNotInstalled": "$t(widgets.generate.switchSubjects.{{component}}) \"{{name}}\" is not installed. Choose another, or clear it.",
         "conceptNotInstalled": "Concept \"{{name}}\" is not installed. Remove it, or reinstall it.",
+        "fluxFillMode": "FLUX Fill only inpaints and outpaints: add an inpaint mask on the Canvas, or move the frame past the image edge.",
         "heightGrid": "Height must be a multiple of {{grid}}.",
         "heightRange": "Height must be between {{min}} and {{max}}.",
         "modelNotInstalled": "{{name}} is not installed. Choose another model, or reinstall it.",
@@ -4662,6 +4670,13 @@
         "logDebugInfo": "Log debug info",
         "outputOnlyMaskedRegions": "Output only generated regions",
         "ruleOfThirds": "Rule of thirds",
+        "scrollInput": "Scroll input",
+        "scrollInputDescription": "Auto-detect zooms with a mouse wheel, and pans and pinch-zooms with a trackpad. Once a trackpad has been used in this browser, a smooth-scrolling mouse wheel pans too; choose Mouse wheel if yours does.",
+        "scrollInputOptions": {
+          "auto": "Auto-detect",
+          "mouse": "Mouse wheel",
+          "trackpad": "Trackpad"
+        },
         "sections": {
           "behavior": "Behavior",
           "debug": "Debug",
@@ -5829,7 +5844,8 @@
         "style": "Fill style",
         "styles": {
           "crosshatch": "Crosshatch",
-          "diagonal": "Diagonal",
+          "diagonal": "Diagonal Right",
+          "diagonal_left": "Diagonal Left",
           "grid": "Grid",
           "horizontal": "Horizontal",
           "solid": "Solid",

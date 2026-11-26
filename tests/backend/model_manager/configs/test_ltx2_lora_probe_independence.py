@@ -250,12 +250,35 @@ def test_the_ltx2_probe_rejects_nested_prefixes() -> None:
     assert not matched
 
 
-def test_the_ltx2_probe_rejects_already_converted_keys() -> None:
-    """A state dict already in diffusers naming has been through the conversion once; running it
-    through again would rename nothing and resolve nothing."""
-    sd = _ltx2_distilled_keys()
-    sd["diffusion_model.time_embed.linear.lora_A.weight"] = _z(450, 4096)
-    sd["diffusion_model.time_embed.linear.lora_B.weight"] = _z(36864, 450)
+def _ltx2_diffusers_top_level_keys(prefix: str) -> dict[str, torch.Tensor]:
+    """The modulation heads under the diffusers names a PEFT ``PeftModel`` around
+    ``LTX2VideoTransformer3DModel`` saves, with no block-level marker to lean on."""
+    sd: dict[str, torch.Tensor] = {}
+    for name, (in_f, out_f) in {
+        "time_embed.linear": (4096, 36864),
+        "audio_time_embed.linear": (2048, 18432),
+        "av_cross_attn_video_a2v_gate.linear": (4096, 4096),
+    }.items():
+        sd[f"{prefix}{name}.lora_A.weight"] = _z(8, in_f)
+        sd[f"{prefix}{name}.lora_B.weight"] = _z(out_f, 8)
+    return sd
+
+
+@pytest.mark.parametrize("prefix", ALL_PREFIXES)
+def test_diffusers_named_modulation_heads_identify_as_ltx2(prefix: str) -> None:
+    """The runtime transformer uses these names, so the converter carries them through as-is."""
+    for sd in (
+        _ltx2_distilled_keys(prefix) | _ltx2_diffusers_top_level_keys(prefix),
+        _ltx2_diffusers_top_level_keys(prefix),
+    ):
+        probes = [cls for cls in Config_Base.CONFIG_CLASSES if cls.__name__.startswith("LoRA_")]
+        assert [cls.__name__ for cls in probes if _probe(cls, sd)[0]] == [LoRA_LyCORIS_LTX2_Config.__name__]
+
+
+def test_a_diffusers_time_embed_alone_is_not_an_ltx2_marker() -> None:
+    """LTX-Video's diffusers transformer has ``time_embed`` too."""
+    sd = _ltx2_diffusers_top_level_keys("transformer.")
+    sd = {k: v for k, v in sd.items() if ".time_embed." in f".{k}"}
 
     matched, _ = _probe(LoRA_LyCORIS_LTX2_Config, sd)
 

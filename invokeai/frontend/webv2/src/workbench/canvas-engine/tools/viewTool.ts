@@ -1,6 +1,6 @@
 /** Per-engine view tool: pans and zooms the viewport without document dispatch; also the temporary Space tool. */
 
-import type { PointerInput, PointerModifiers, Vec2 } from '@workbench/canvas-engine/types';
+import type { PointerInput, Vec2 } from '@workbench/canvas-engine/types';
 
 import type { Tool, ToolContext } from './tool';
 
@@ -41,9 +41,5 @@ export const createViewTool = (): Tool => {
     onPointerDown: (_ctx, input) => begin(input),
     onPointerMove: move,
     onPointerUp: end,
-    onWheel: (ctx: ToolContext, deltaY: number, screenAnchor: Vec2, _modifiers: PointerModifiers) => {
-      ctx.viewport.wheelZoom(deltaY, screenAnchor);
-      ctx.invalidate({ view: true });
-    },
   };
 };

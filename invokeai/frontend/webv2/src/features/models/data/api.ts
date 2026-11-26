@@ -28,6 +28,15 @@ export const listModels = async (signal?: AbortSignal): Promise<ModelConfig[]> =
   return body.models ?? [];
 };
 
+/** Model keys in install order, oldest first. Records carry no timestamp, so this listing's order is the only source. */
+export const listModelKeysByDateAdded = async (signal?: AbortSignal): Promise<string[]> => {
+  const body = await requestJson<{ models?: Pick<ModelConfig, 'key'>[] }>(`${MODELS_BASE}/?order_by=created_at`, {
+    signal,
+  });
+
+  return (body.models ?? []).map((model) => model.key);
+};
+
 /** Models whose database record points at a file that no longer exists. */
 export const listMissingModels = async (signal?: AbortSignal): Promise<ModelConfig[]> => {
   const body = await requestJson<{ models?: ModelConfig[] }>(`${MODELS_BASE}/missing`, { signal });

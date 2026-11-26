@@ -37,8 +37,6 @@ import {
   isAutoControlLayerName,
   isMergeableRasterLayer,
   nextControlTypeLayerName,
-  nextRegionalGuidanceFillColor,
-  REGIONAL_GUIDANCE_FILL_COLORS,
 } from './layerOps';
 
 seedArchitectureCapabilities();
@@ -115,17 +113,6 @@ describe('createAdjustmentEntry', () => {
       expect(Number.isInteger(seed) && seed >= 0 && seed <= 0xffffffff).toBe(true);
     }
     expect(first.id).not.toBe(second.id);
-  });
-});
-
-describe('nextRegionalGuidanceFillColor', () => {
-  it('derives the colour purely from the existing regional-guidance count (no session state)', () => {
-    expect(nextRegionalGuidanceFillColor(0)).toBe(REGIONAL_GUIDANCE_FILL_COLORS[1]);
-    expect(nextRegionalGuidanceFillColor(1)).toBe(REGIONAL_GUIDANCE_FILL_COLORS[2]);
-    expect(nextRegionalGuidanceFillColor(REGIONAL_GUIDANCE_FILL_COLORS.length - 1)).toBe(
-      REGIONAL_GUIDANCE_FILL_COLORS[0]
-    );
-    expect(nextRegionalGuidanceFillColor(0)).toBe(nextRegionalGuidanceFillColor(0));
   });
 });
 
@@ -428,13 +415,13 @@ describe('layer copy and conversion parity', () => {
       type: 'control',
       withTransparencyEffect: true,
     });
-    expect(copyRasterToInpaintMask(raster, 'm-copy')).toMatchObject({
+    expect(copyRasterToInpaintMask(raster, 'm-copy', '#38C9C5')).toMatchObject({
       id: 'm-copy',
-      mask: { bitmap: raster.source.bitmap, offset: raster.source.offset },
+      mask: { bitmap: raster.source.bitmap, fill: { color: '#38C9C5' }, offset: raster.source.offset },
       name: 'Raster copy',
       type: 'inpaint_mask',
     });
-    expect(copyRasterToRegionalGuidance(raster, 'rg-copy')).toMatchObject({
+    expect(copyRasterToRegionalGuidance(raster, 'rg-copy', '#38C9C5')).toMatchObject({
       autoNegative: false,
       id: 'rg-copy',
       mask: { bitmap: raster.source.bitmap, offset: raster.source.offset },
@@ -446,14 +433,14 @@ describe('layer copy and conversion parity', () => {
     });
 
     expect(convertRasterToControl(raster)).toMatchObject({ id: 'r1', source: raster.source, type: 'control' });
-    expect(convertRasterToInpaintMask(raster)).toMatchObject({
+    expect(convertRasterToInpaintMask(raster, '#38C9C5')).toMatchObject({
       id: 'r1',
       mask: { bitmap: raster.source.bitmap, offset: raster.source.offset },
       type: 'inpaint_mask',
     });
-    expect(convertRasterToRegionalGuidance(raster)).toMatchObject({
+    expect(convertRasterToRegionalGuidance(raster, '#38C9C5')).toMatchObject({
       id: 'r1',
-      mask: { bitmap: raster.source.bitmap, offset: raster.source.offset },
+      mask: { bitmap: raster.source.bitmap, fill: { color: '#38C9C5' }, offset: raster.source.offset },
       type: 'regional_guidance',
     });
   });
@@ -468,12 +455,12 @@ describe('layer copy and conversion parity', () => {
       transform,
       type: 'raster',
     });
-    expect(copyControlToInpaintMask(control, 'm-copy')).toMatchObject({
+    expect(copyControlToInpaintMask(control, 'm-copy', '#38C9C5')).toMatchObject({
       id: 'm-copy',
       mask: { bitmap: raster.source.bitmap, offset: raster.source.offset },
       type: 'inpaint_mask',
     });
-    expect(copyControlToRegionalGuidance(control, 'rg-copy')).toMatchObject({
+    expect(copyControlToRegionalGuidance(control, 'rg-copy', '#38C9C5')).toMatchObject({
       id: 'rg-copy',
       mask: { bitmap: raster.source.bitmap, offset: raster.source.offset },
       type: 'regional_guidance',
@@ -518,11 +505,11 @@ describe('layer copy and conversion parity', () => {
     };
 
     expect(copyRasterToControl(text, 'copy')).toBeNull();
-    expect(copyRasterToInpaintMask(text, 'copy')).toBeNull();
-    expect(copyRasterToRegionalGuidance(text, 'copy')).toBeNull();
+    expect(copyRasterToInpaintMask(text, 'copy', '#38C9C5')).toBeNull();
+    expect(copyRasterToRegionalGuidance(text, 'copy', '#38C9C5')).toBeNull();
     expect(convertRasterToControl(text)).toBeNull();
-    expect(convertRasterToInpaintMask(text)).toBeNull();
-    expect(convertRasterToRegionalGuidance(text)).toBeNull();
+    expect(convertRasterToInpaintMask(text, '#38C9C5')).toBeNull();
+    expect(convertRasterToRegionalGuidance(text, '#38C9C5')).toBeNull();
   });
 });
 
@@ -539,7 +526,7 @@ describe('createRegionalReferenceImage', () => {
 
 describe('createRegionalGuidanceLayerWithRefImage', () => {
   it('is a regional guidance layer pre-seeded with exactly one empty reference image', () => {
-    const layer = createRegionalGuidanceLayerWithRefImage('Region 1', 0, 'sdxl', 'rg-1');
+    const layer = createRegionalGuidanceLayerWithRefImage('Region 1', undefined, 'sdxl', 'rg-1');
     expect(layer.type).toBe('regional_guidance');
     expect(layer.id).toBe('rg-1');
     expect(layer.referenceImages).toHaveLength(1);

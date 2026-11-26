@@ -21,6 +21,7 @@ from invokeai.app.services.external_generation.external_generation_common import
     ExternalGenerationRequest,
     ExternalGenerationResult,
 )
+from invokeai.app.util.ssrf import UnsafeDownloadURLException, build_guarded_session
 
 _DEFAULT_BASE_URL = "https://api.atlascloud.ai"
 _REQUEST_TIMEOUT = 30
@@ -270,31 +271,38 @@ class AtlasCloudProvider(ExternalProvider):
 
     def _download_image(self, url: str) -> PILImageType:
         try:
-            response = requests.get(url, timeout=_DOWNLOAD_TIMEOUT, stream=True)
+            with build_guarded_session() as session:
+                response = session.get(url, timeout=_DOWNLOAD_TIMEOUT, stream=True)
+
+                with response:
+                    if not response.ok:
+                        raise ExternalProviderRequestError(
+                            f"Failed to download image from Atlas Cloud (status {response.status_code})"
+                        )
+
+                    content_length = response.headers.get("Content-Length")
+                    if content_length is not None:
+                        try:
+                            if int(content_length) > _DOWNLOAD_MAX_BYTES:
+                                raise ExternalProviderRequestError(
+                                    f"Atlas Cloud image exceeds {_DOWNLOAD_MAX_BYTES} byte cap"
+                                )
+                        except ValueError:
+                            pass
+
+                    buffer = bytearray()
+                    for chunk in response.iter_content(chunk_size=64 * 1024):
+                        if not chunk:
+                            continue
+                        buffer.extend(chunk)
+                        if len(buffer) > _DOWNLOAD_MAX_BYTES:
+                            raise ExternalProviderRequestError(
+                                f"Atlas Cloud image exceeds {_DOWNLOAD_MAX_BYTES} byte cap"
+                            )
+        except UnsafeDownloadURLException as exc:
+            raise ExternalProviderRequestError("Atlas Cloud returned an unsafe image URL") from exc
         except requests.RequestException as exc:
             raise ExternalProviderRequestError(f"Failed to download image from Atlas Cloud: {exc}") from exc
-
-        with response:
-            if not response.ok:
-                raise ExternalProviderRequestError(
-                    f"Failed to download image from Atlas Cloud (status {response.status_code})"
-                )
-
-            content_length = response.headers.get("Content-Length")
-            if content_length is not None:
-                try:
-                    if int(content_length) > _DOWNLOAD_MAX_BYTES:
-                        raise ExternalProviderRequestError(f"Atlas Cloud image exceeds {_DOWNLOAD_MAX_BYTES} byte cap")
-                except ValueError:
-                    pass
-
-            buffer = bytearray()
-            for chunk in response.iter_content(chunk_size=64 * 1024):
-                if not chunk:
-                    continue
-                buffer.extend(chunk)
-                if len(buffer) > _DOWNLOAD_MAX_BYTES:
-                    raise ExternalProviderRequestError(f"Atlas Cloud image exceeds {_DOWNLOAD_MAX_BYTES} byte cap")
 
         try:
             return Image.open(io.BytesIO(bytes(buffer))).convert("RGB")

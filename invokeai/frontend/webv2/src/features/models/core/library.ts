@@ -3,7 +3,7 @@ import type { ModelConfig, ModelTaxonomyType } from './types';
 import { getModelBaseLabel, KNOWN_MODEL_BASES } from './baseIdentity';
 import { getModelCategoryRank, getModelTypePluralLabel } from './taxonomy';
 
-export type ModelSortField = 'default' | 'name' | 'base' | 'size' | 'format' | 'type' | 'path';
+export type ModelSortField = 'default' | 'name' | 'base' | 'size' | 'added' | 'format' | 'type' | 'path';
 
 export interface ModelLibraryFilters {
   searchTerm: string;
@@ -81,22 +81,33 @@ const matchesSearchTerms = (model: ModelConfig, terms: readonly string[]): boole
   return terms.every((term) => haystack.includes(term));
 };
 
-const compareBySortField = (a: ModelConfig, b: ModelConfig, field: ModelSortField): number => {
+const compareByName = (a: ModelConfig, b: ModelConfig): number =>
+  a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+
+const compareBySortField = (
+  a: ModelConfig,
+  b: ModelConfig,
+  field: ModelSortField,
+  dateAddedRanks: ReadonlyMap<string, number> | null
+): number => {
   switch (field) {
     case 'name':
     case 'default':
-      return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+      return compareByName(a, b);
     case 'base':
       return getModelBaseLabel(a.base).localeCompare(getModelBaseLabel(b.base));
     case 'size':
       return a.file_size - b.file_size;
+    case 'added': {
+      // An unlisted model was installed after the order was read, so it is the newest.
+      const newest = dateAddedRanks?.size ?? 0;
+
+      return (dateAddedRanks?.get(a.key) ?? newest) - (dateAddedRanks?.get(b.key) ?? newest) || compareByName(a, b);
+    }
     case 'format':
       return String(a.format).localeCompare(String(b.format));
     case 'type':
-      return (
-        getModelCategoryRank(a.type) - getModelCategoryRank(b.type) ||
-        a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
-      );
+      return getModelCategoryRank(a.type) - getModelCategoryRank(b.type) || compareByName(a, b);
     case 'path':
       return a.path.localeCompare(b.path);
   }
@@ -105,11 +116,16 @@ const compareBySortField = (a: ModelConfig, b: ModelConfig, field: ModelSortFiel
 export const filterModels = (
   models: ModelConfig[],
   filters: ModelLibraryFilters,
-  missingModelKeys: ReadonlySet<string>
+  missingModelKeys: ReadonlySet<string>,
+  /** Install-order ranks for the `added` sort, oldest first; until they load that sort lists by name, ascending. */
+  dateAddedRanks: ReadonlyMap<string, number> | null = null
 ): ModelConfig[] => {
   // Split once per pass, not once per model.
   const terms = filters.searchTerm.trim().toLowerCase().split(/\s+/).filter(Boolean);
-  const directionFactor = filters.sortDirection === 'desc' ? -1 : 1;
+  // The direction waits for the install order: applied to the name fallback, it would flip the list and then
+  // reorder it again when the ranks land.
+  const isDescending = filters.sortDirection === 'desc' && (filters.sortField !== 'added' || dateAddedRanks !== null);
+  const directionFactor = isDescending ? -1 : 1;
 
   return models
     .filter(
@@ -119,7 +135,7 @@ export const filterModels = (
         (filters.baseFilter === null || model.base === filters.baseFilter) &&
         matchesSearchTerms(model, terms)
     )
-    .sort((a, b) => compareBySortField(a, b, filters.sortField) * directionFactor);
+    .sort((a, b) => compareBySortField(a, b, filters.sortField, dateAddedRanks) * directionFactor);
 };
 
 /**
