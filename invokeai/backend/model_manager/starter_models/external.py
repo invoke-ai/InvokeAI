@@ -854,28 +854,28 @@ worldrouter_gpt_image_2 = _worldrouter_text_to_image(
 worldrouter_gpt_image_2_5_flare = _worldrouter_text_to_image(
     "GPT Image 2.5 Flare",
     "gpt-image-2.5-flare",
-    "GPT Image 2.5 Flare, billed per image.",
+    "GPT Image 2.5 Flare, billed per request.",
     max_images=2,
     aspect_ratio_sizes=OPENAI_GPT_IMAGE_ASPECT_RATIO_SIZES,
 )
 worldrouter_gpt_image_2_5_sunburst = _worldrouter_text_to_image(
     "GPT Image 2.5 Sunburst",
     "gpt-image-2.5-sunburst",
-    "GPT Image 2.5 Sunburst, billed per image.",
+    "GPT Image 2.5 Sunburst, billed per request.",
     max_images=2,
     aspect_ratio_sizes=OPENAI_GPT_IMAGE_ASPECT_RATIO_SIZES,
 )
 worldrouter_gpt_image_2_6_flare = _worldrouter_text_to_image(
     "GPT Image 2.6 Flare",
     "gpt-image-2.6-flare",
-    "GPT Image 2.6 Flare, billed per image.",
+    "GPT Image 2.6 Flare, billed per request.",
     max_images=2,
     aspect_ratio_sizes=OPENAI_GPT_IMAGE_ASPECT_RATIO_SIZES,
 )
 worldrouter_gpt_image_2_6_sunburst = _worldrouter_text_to_image(
     "GPT Image 2.6 Sunburst",
     "gpt-image-2.6-sunburst",
-    "GPT Image 2.6 Sunburst, billed per image.",
+    "GPT Image 2.6 Sunburst, billed per request.",
     max_images=2,
     aspect_ratio_sizes=OPENAI_GPT_IMAGE_ASPECT_RATIO_SIZES,
 )

@@ -1,0 +1,46 @@
+---
+title: WorldRouter
+---
+
+import { Steps } from '@astrojs/starlight/components'
+
+Invoke supports [WorldRouter](https://www.worldrouter.ai), an OpenAI-compatible gateway whose Images API serves **GPT Image 2** and the **GPT Image 2.5 / 2.6 Flare and Sunburst** models under one API key.
+
+## Getting an API Key
+
+<Steps>
+1. Sign in at [worldrouter.ai](https://www.worldrouter.ai).
+2. Create an API key on the [API Keys](https://www.worldrouter.ai/dashboard/api-keys) page and add credit to the account.
+</Steps>
+
+## Configuration
+
+Add your key to `api_keys.yaml` in your Invoke root directory:
+
+```yaml
+external_worldrouter_api_key: "your-worldrouter-api-key"
+
+# Optional — default shown:
+external_worldrouter_base_url: "https://inference-api.worldrouter.ai"
+```
+
+Restart Invoke for the change to take effect.
+
+## Available Models
+
+| Model | Modes | Aspect Ratios | Batch | Notes |
+| --- | --- | --- | --- | --- |
+| **GPT Image 2** | txt2img | 3:2 | 1 | WorldRouter's route returns one 1536×1024 image per request. Billed per token. |
+| **GPT Image 2.6 Flare** | txt2img | 1:1, 3:2, 2:3 | up to 2 | Billed per request. |
+| **GPT Image 2.6 Sunburst** | txt2img | 1:1, 3:2, 2:3 | up to 2 | Billed per request. |
+| **GPT Image 2.5 Flare** | txt2img | 1:1, 3:2, 2:3 | up to 2 | Billed per request. |
+| **GPT Image 2.5 Sunburst** | txt2img | 1:1, 3:2, 2:3 | up to 2 | Billed per request. |
+
+All WorldRouter models are text-to-image only: reference images, img2img and inpaint are not supported, and seed and negative prompt are not sent. Current prices are listed on the [WorldRouter model catalog](https://www.worldrouter.ai/models).
+
+## Tips
+
+<Steps>
+1. GPT Image 2 returns base64 data; the 2.5 / 2.6 models return a download URL, which Invoke fetches through its SSRF-guarded downloader with a 32 MiB cap.
+2. If one image in a batch fails to download, the other images are still returned.
+</Steps>

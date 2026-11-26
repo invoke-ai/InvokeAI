@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-import io
+import binascii
 
 import requests
-from PIL import Image
+from PIL import UnidentifiedImageError
 from PIL.Image import Image as PILImageType
 
 from invokeai.app.services.external_generation.errors import (
@@ -16,13 +16,16 @@ from invokeai.app.services.external_generation.external_generation_common import
     ExternalGenerationRequest,
     ExternalGenerationResult,
 )
-from invokeai.app.services.external_generation.image_utils import decode_image_base64
+from invokeai.app.services.external_generation.image_utils import decode_image_base64, decode_image_bytes
+from invokeai.app.util.ssrf import UnsafeDownloadURLException, build_guarded_session
 
 _DEFAULT_BASE_URL = "https://inference-api.worldrouter.ai"
 # GPT Image requests routinely take more than a minute; the OpenAI provider allows the same.
 _REQUEST_TIMEOUT = 300
 _DOWNLOAD_TIMEOUT = 60
 _DOWNLOAD_MAX_BYTES = 32 * 1024 * 1024
+# Error bodies come from upstream services; keep enough to diagnose without echoing a whole page.
+_ERROR_BODY_MAX_CHARS = 500
 
 
 class WorldRouterProvider(ExternalProvider):
@@ -63,7 +66,8 @@ class WorldRouterProvider(ExternalProvider):
                     retry_after=_parse_retry_after(response.headers.get("retry-after")),
                 )
             raise ExternalProviderRequestError(
-                f"WorldRouter request failed with status {response.status_code}: {response.text}"
+                f"WorldRouter request failed with status {response.status_code}: "
+                f"{response.text[:_ERROR_BODY_MAX_CHARS]}"
             )
 
         try:
@@ -75,22 +79,25 @@ class WorldRouterProvider(ExternalProvider):
             raise ExternalProviderRequestError("WorldRouter response payload missing image data")
 
         # The gateway forwards each upstream's Images API response, which carries either inline
-        # base64 data or a temporary download URL depending on the model.
+        # base64 data or a temporary download URL depending on the model. The images are already
+        # billed, so one failed download does not discard the others.
         images: list[ExternalGeneratedImage] = []
+        first_error: ExternalProviderRequestError | None = None
         for item in data_items:
             if not isinstance(item, dict):
                 continue
-            encoded = item.get("b64_json")
-            url = item.get("url")
-            if isinstance(encoded, str) and encoded:
-                image = decode_image_base64(encoded)
-            elif isinstance(url, str) and url:
-                image = _download_image(url)
-            else:
+            try:
+                image = _decode_item(item)
+            except ExternalProviderRequestError as exc:
+                self._logger.warning("Skipping a WorldRouter image: %s", exc)
+                first_error = first_error or exc
                 continue
-            images.append(ExternalGeneratedImage(image=image, seed=request.seed))
+            if image is not None:
+                images.append(ExternalGeneratedImage(image=image, seed=request.seed))
 
         if not images:
+            if first_error is not None:
+                raise first_error
             raise ExternalProviderRequestError("WorldRouter response contained no images")
 
         return ExternalGenerationResult(
@@ -101,26 +108,46 @@ class WorldRouterProvider(ExternalProvider):
         )
 
 
+def _decode_item(item: dict[str, object]) -> PILImageType | None:
+    encoded = item.get("b64_json")
+    url = item.get("url")
+    if isinstance(encoded, str) and encoded:
+        try:
+            return decode_image_base64(encoded)
+        except (binascii.Error, ValueError, UnidentifiedImageError) as exc:
+            raise ExternalProviderRequestError("WorldRouter returned invalid base64 image data") from exc
+    if isinstance(url, str) and url:
+        return _download_image(url)
+    return None
+
+
 def _download_image(url: str) -> PILImageType:
+    """Download a result image through the SSRF-guarded session, with a size cap."""
     try:
-        response = requests.get(url, timeout=_DOWNLOAD_TIMEOUT, stream=True)
+        with build_guarded_session() as session:
+            response = session.get(url, timeout=_DOWNLOAD_TIMEOUT, stream=True)
+            with response:
+                if not response.ok:
+                    raise ExternalProviderRequestError(
+                        f"Failed to download image from WorldRouter (status {response.status_code})"
+                    )
+                content_length = response.headers.get("Content-Length")
+                if content_length is not None and content_length.isdigit():
+                    if int(content_length) > _DOWNLOAD_MAX_BYTES:
+                        raise ExternalProviderRequestError(f"WorldRouter image exceeds {_DOWNLOAD_MAX_BYTES} byte cap")
+                buffer = bytearray()
+                for chunk in response.iter_content(chunk_size=64 * 1024):
+                    buffer.extend(chunk)
+                    if len(buffer) > _DOWNLOAD_MAX_BYTES:
+                        raise ExternalProviderRequestError(f"WorldRouter image exceeds {_DOWNLOAD_MAX_BYTES} byte cap")
+    except UnsafeDownloadURLException as exc:
+        raise ExternalProviderRequestError("WorldRouter returned an unsafe image URL") from exc
     except requests.RequestException as exc:
-        raise ExternalProviderRequestError(f"Failed to download image from WorldRouter: {exc}") from exc
-
-    with response:
-        if not response.ok:
-            raise ExternalProviderRequestError(
-                f"Failed to download image from WorldRouter (status {response.status_code})"
-            )
-        buffer = bytearray()
-        for chunk in response.iter_content(chunk_size=64 * 1024):
-            buffer.extend(chunk)
-            if len(buffer) > _DOWNLOAD_MAX_BYTES:
-                raise ExternalProviderRequestError(f"WorldRouter image exceeds {_DOWNLOAD_MAX_BYTES} byte cap")
+        raise ExternalProviderRequestError("Failed to download image from WorldRouter") from exc
 
     try:
-        return Image.open(io.BytesIO(bytes(buffer))).convert("RGB")
-    except Exception as exc:
+        return decode_image_bytes(bytes(buffer))
+    except (UnidentifiedImageError, OSError) as exc:
         raise ExternalProviderRequestError("WorldRouter output was not a valid image") from exc
 
 

@@ -1,6 +1,8 @@
 import base64
+import http.server
 import io
 import logging
+import threading
 from typing import Any, Iterator
 
 import pytest
@@ -137,28 +139,151 @@ def test_worldrouter_posts_images_generation_and_decodes_base64(monkeypatch: pyt
     assert result.provider_metadata == {"model": "gpt-image-2.6-sunburst"}
 
 
+def _rgba_png_bytes() -> bytes:
+    buffer = io.BytesIO()
+    Image.new("RGBA", (16, 16), color=(255, 0, 0, 0)).save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
+def _guarded_downloads(monkeypatch: pytest.MonkeyPatch, responses: dict[str, DummyResponse]) -> list[str]:
+    """Serve result-image URLs through the guarded session; the plain `requests.get` path must not be used."""
+    fetched: list[str] = []
+
+    def fail_unguarded_get(*_args: Any, **_kwargs: Any) -> DummyResponse:
+        pytest.fail("result image URLs must not use the unguarded requests.get path")
+
+    def session_get(_session: Any, url: str, **kwargs: Any) -> DummyResponse:
+        assert kwargs["stream"] is True
+        fetched.append(url)
+        return responses[url]
+
+    monkeypatch.setattr("requests.get", fail_unguarded_get)
+    monkeypatch.setattr("requests.Session.get", session_get)
+    return fetched
+
+
+def _respond_with(monkeypatch: pytest.MonkeyPatch, data: list[dict[str, str]]) -> None:
+    monkeypatch.setattr("requests.post", lambda *_args, **_kwargs: DummyResponse(json_data={"data": data}))
+
+
 def test_worldrouter_downloads_url_results_from_custom_base_url(monkeypatch: pytest.MonkeyPatch) -> None:
-    requested: list[str] = []
+    posted: list[str] = []
     image_url = "https://cdn.example.test/output.png"
 
     def fake_post(url: str, **_kwargs: Any) -> DummyResponse:
-        requested.append(url)
+        posted.append(url)
         return DummyResponse(json_data={"data": [{"url": image_url}]})
 
-    def fake_get(url: str, **kwargs: Any) -> DummyResponse:
-        requested.append(url)
-        assert kwargs["stream"] is True
-        return DummyResponse(content=_png_bytes("red"))
-
     monkeypatch.setattr("requests.post", fake_post)
-    monkeypatch.setattr("requests.get", fake_get)
+    fetched = _guarded_downloads(monkeypatch, {image_url: DummyResponse(content=_png_bytes("red"))})
 
     result = _provider(external_worldrouter_base_url="https://gateway.example.test/").generate(
         _request("gpt-image-2.6-flare")
     )
 
-    assert requested == ["https://gateway.example.test/v1/images/generations", image_url]
+    assert posted == ["https://gateway.example.test/v1/images/generations"]
+    assert fetched == [image_url]
     assert result.images[0].image.getpixel((0, 0)) == (255, 0, 0)
+
+
+def test_worldrouter_url_results_keep_transparency(monkeypatch: pytest.MonkeyPatch) -> None:
+    image_url = "https://cdn.example.test/transparent.png"
+    _respond_with(monkeypatch, [{"url": image_url}])
+    _guarded_downloads(monkeypatch, {image_url: DummyResponse(content=_rgba_png_bytes())})
+
+    result = _provider().generate(_request("gpt-image-2.6-flare"))
+
+    assert result.images[0].image.mode == "RGBA"
+    assert result.images[0].image.getpixel((0, 0)) == (255, 0, 0, 0)
+
+
+def test_worldrouter_refuses_result_urls_on_private_addresses(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Exercises the real guard: a listener on loopback must never be reached."""
+    hits: list[str] = []
+
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def do_GET(self) -> None:  # noqa: N802
+            hits.append(self.path)
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(_png_bytes())
+
+        def log_message(self, *_args: Any) -> None:
+            pass
+
+    server = http.server.HTTPServer(("127.0.0.1", 0), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        _respond_with(monkeypatch, [{"url": f"http://127.0.0.1:{server.server_port}/latest/meta-data"}])
+        with pytest.raises(ExternalProviderRequestError, match="unsafe image URL"):
+            _provider().generate(_request("gpt-image-2.6-flare"))
+    finally:
+        server.shutdown()
+        server.server_close()
+
+    assert hits == []
+
+
+@pytest.mark.parametrize(
+    "response",
+    [
+        DummyResponse(content=b"x", headers={"Content-Length": str(64 * 1024 * 1024)}),
+        DummyResponse(content=b"x" * (32 * 1024 * 1024 + 1)),
+    ],
+    ids=["declared-length", "streamed-bytes"],
+)
+def test_worldrouter_caps_downloaded_image_size(monkeypatch: pytest.MonkeyPatch, response: DummyResponse) -> None:
+    image_url = "https://cdn.example.test/huge.png"
+    _respond_with(monkeypatch, [{"url": image_url}])
+    _guarded_downloads(monkeypatch, {image_url: response})
+
+    with pytest.raises(ExternalProviderRequestError, match="byte cap"):
+        _provider().generate(_request("gpt-image-2.6-flare"))
+
+
+@pytest.mark.parametrize(
+    ("item", "download", "message"),
+    [
+        ({"url": "https://cdn.example.test/missing.png"}, DummyResponse(ok=False, status_code=404), "status 404"),
+        ({"url": "https://cdn.example.test/broken.png"}, DummyResponse(content=b"not an image"), "not a valid image"),
+        ({"b64_json": "!!!not-base64!!!"}, None, "invalid base64"),
+        ({"b64_json": base64.b64encode(b"not an image").decode()}, None, "invalid base64"),
+    ],
+    ids=["download-failed", "invalid-bytes", "bad-base64", "base64-not-an-image"],
+)
+def test_worldrouter_reports_unusable_images(
+    monkeypatch: pytest.MonkeyPatch, item: dict[str, str], download: DummyResponse | None, message: str
+) -> None:
+    _respond_with(monkeypatch, [item])
+    _guarded_downloads(monkeypatch, {item["url"]: download} if download is not None else {})
+
+    with pytest.raises(ExternalProviderRequestError, match=message):
+        _provider().generate(_request("gpt-image-2.6-flare", num_images=1))
+
+
+def test_worldrouter_keeps_billed_images_when_one_download_fails(monkeypatch: pytest.MonkeyPatch) -> None:
+    good_url, bad_url = "https://cdn.example.test/good.png", "https://cdn.example.test/bad.png"
+    _respond_with(monkeypatch, [{"url": bad_url}, {"url": good_url}])
+    _guarded_downloads(
+        monkeypatch,
+        {bad_url: DummyResponse(ok=False, status_code=500), good_url: DummyResponse(content=_png_bytes("red"))},
+    )
+
+    result = _provider().generate(_request("gpt-image-2.6-flare", num_images=2))
+
+    assert [image.image.getpixel((0, 0)) for image in result.images] == [(255, 0, 0)]
+
+
+def test_worldrouter_truncates_provider_error_bodies(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "requests.post", lambda *_args, **_kwargs: DummyResponse(ok=False, status_code=502, text="x" * 5000)
+    )
+
+    with pytest.raises(ExternalProviderRequestError) as exc_info:
+        _provider().generate(_request())
+
+    assert len(str(exc_info.value)) < 600
 
 
 def test_worldrouter_rate_limit_reports_retry_after(monkeypatch: pytest.MonkeyPatch) -> None:
