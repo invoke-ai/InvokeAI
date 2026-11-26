@@ -135,9 +135,8 @@ def test_bundled_t5_tokenizer_admission_is_sized_from_bundled_assets(
     tmp_path: Path, submodel_type: SubModelType
 ) -> None:
     path = tmp_path / "t5-xxl.gguf"
-    path_size = 4 * 2**30
-    with path.open("wb") as file:
-        file.truncate(path_size)
+    path_size = 8192
+    path.write_bytes(b"\x00" * path_size)
     loader = _t5_loader()
     config = _gguf_config(path)
 

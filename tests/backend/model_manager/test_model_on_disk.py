@@ -133,12 +133,10 @@ def test_header_only_safetensors_has_a_complete_logical_data_section(tmp_path: P
 def test_a_header_cannot_request_more_than_the_safetensors_limit(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """A sparse file must not make header parsing request a 100 MB allocation."""
+    """Reject an oversized declared header before attempting to read its bytes."""
     max_header_length = 100_000_000
     path = tmp_path / "huge.safetensors"
-    with path.open("wb") as file:
-        file.write((max_header_length + 1).to_bytes(8, "little"))
-        file.truncate(8 + max_header_length + 1)
+    path.write_bytes((max_header_length + 1).to_bytes(8, "little"))
 
     reads: list[int] = []
     original_open = builtins.open
