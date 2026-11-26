@@ -8,7 +8,9 @@ from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch
     apply_custom_layers_to_model,
 )
 from invokeai.backend.patches.layer_patcher import LayerPatcher
-from invokeai.backend.patches.layers.dora_layer import DoRALayer
+from invokeai.backend.patches.layers.dora_layer import DoRALayer, FactorizedDoRALayer
+from invokeai.backend.patches.layers.loha_layer import LoHALayer
+from invokeai.backend.patches.layers.lokr_layer import LoKRLayer
 from invokeai.backend.patches.lora_conversions.flux_bfl_peft_lora_conversion_utils import (
     convert_bfl_lora_patch_to_diffusers,
 )
@@ -154,6 +156,74 @@ def test_dora_budget_covers_live_cpu_tensor_allocations(tmp_path, sidecar):
     ):
         if sidecar:
             attention["to_q"](x)
+    assert 0 < allocation.peak <= budget
+
+
+def _factorized_dora_layer(kind: str, dtype: torch.dtype) -> FactorizedDoRALayer:
+    """A LoKr or LoHa with an output-axis magnitude for a Linear(7, 4)."""
+    generator = torch.Generator().manual_seed(11)
+
+    def randn(*shape: int) -> torch.Tensor:
+        return (torch.randn(*shape, generator=generator) * 0.3).to(dtype)
+
+    if kind == "lokr":
+        factors: LoKRLayer | LoHALayer = LoKRLayer(
+            w1=randn(2, 1), w1_a=None, w1_b=None, w2=randn(2, 7), w2_a=None, w2_b=None, t2=None, alpha=None, bias=None
+        )
+    else:
+        factors = LoHALayer(
+            w1_a=randn(4, 2),
+            w1_b=randn(2, 7),
+            w2_a=randn(4, 2),
+            w2_b=randn(2, 7),
+            t1=None,
+            t2=None,
+            alpha=None,
+            bias=None,
+        )
+    return FactorizedDoRALayer(factors, dora_scale=randn(4, 1).abs() + 0.5, magnitude_is_out_dim=True)
+
+
+@pytest.mark.parametrize("sidecar", [False, True])
+@pytest.mark.parametrize("kind", ["lokr", "loha"])
+@torch.no_grad()
+def test_factorized_dora_budget_covers_live_cpu_tensor_allocations(kind, sidecar):
+    model = SplitAttention(14)
+    attention = model.transformer_blocks[0]["attn"]
+    for module in attention.values():
+        module.weight.data = module.weight.data.to(torch.float8_e4m3fn if sidecar else torch.bfloat16)
+        if sidecar:
+            module.register_buffer("weight_scale", torch.linspace(0.6, 1.0, 4))
+    patches = [
+        (
+            ModelPatchRaw(
+                {
+                    f"{FLUX_LORA_TRANSFORMER_PREFIX}transformer_blocks.0.attn.{name}": _factorized_dora_layer(
+                        kind, torch.bfloat16
+                    )
+                    for name in ("to_q", "to_k")
+                }
+            ),
+            strength,
+        )
+        for strength in (0.5, -0.6)
+    ]
+    x = torch.randn(5, 7)
+    budget = flux2_dora_patch_bytes(model, patches, dtype=x.dtype, rows=x.shape[0])
+    allocation = _PeakAllocation()
+    with (
+        allocation,
+        LayerPatcher.apply_smart_model_patches(
+            model=model,
+            patches=patches,
+            prefix=FLUX_LORA_TRANSFORMER_PREFIX,
+            dtype=x.dtype,
+            force_direct_patching=not sidecar,
+        ),
+    ):
+        if sidecar:
+            attention["to_q"](x)
+            attention["to_k"](x)
     assert 0 < allocation.peak <= budget
 
 

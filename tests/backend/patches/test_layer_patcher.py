@@ -12,8 +12,10 @@ from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch
     apply_custom_layers_to_model,
 )
 from invokeai.backend.patches.layer_patcher import LayerPatcher
-from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch
+from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch, patch_tensors
+from invokeai.backend.patches.layers.dora_layer import FactorizedDoRALayer
 from invokeai.backend.patches.layers.flux_control_lora_layer import FluxControlLoRALayer
+from invokeai.backend.patches.layers.lokr_layer import LoKRLayer
 from invokeai.backend.patches.layers.lora_layer import LoRALayer
 from invokeai.backend.patches.layers.merged_layer_patch import MergedLayerPatch, Range
 from invokeai.backend.patches.layers.swapped_halves_layer_patch import SwappedHalvesLayerPatch
@@ -713,29 +715,38 @@ def _swapped_halves_layer(in_features: int, out_features: int) -> SwappedHalvesL
     return SwappedHalvesLayerPatch(_lora_layer(in_features, out_features))
 
 
-def _innermost_loras(layer: BaseLayerPatch) -> list[LoRALayer]:
-    if isinstance(layer, MergedLayerPatch):
-        return [lora for sub_layer in layer.lora_layers for lora in _innermost_loras(sub_layer)]
-    if isinstance(layer, SwappedHalvesLayerPatch):
-        return _innermost_loras(layer.layer)
-    assert isinstance(layer, LoRALayer)
-    return [layer]
+def _factorized_dora_layer(in_features: int, out_features: int) -> FactorizedDoRALayer:
+    # The magnitude is a tensor of the wrapper itself, beside the LoKr sub-patch.
+    lokr = LoKRLayer(
+        w1=torch.ones(2, 2, dtype=torch.float16),
+        w1_a=None,
+        w1_b=None,
+        w2=torch.ones(out_features // 2, in_features // 2, dtype=torch.float16),
+        w2_a=None,
+        w2_b=None,
+        t2=None,
+        alpha=None,
+        bias=None,
+    )
+    return FactorizedDoRALayer(
+        lokr, dora_scale=torch.ones(out_features, 1, dtype=torch.float16), magnitude_is_out_dim=True
+    )
+
+
+def _tensors(patch: ModelPatchRaw) -> list[torch.Tensor]:
+    """Every tensor of every layer and sub-layer, in order."""
+    return [tensor for layer in patch.layers.values() for _, _, tensor in patch_tensors(layer)]
 
 
 def _placements(patch: ModelPatchRaw) -> list[tuple[torch.device, torch.dtype]]:
-    """The (device, dtype) of each innermost LoRA factor, in order, so each sub-layer is checked on its own."""
-    return [
-        (tensor.device, tensor.dtype)
-        for layer in patch.layers.values()
-        for lora in _innermost_loras(layer)
-        for tensor in (lora.up, lora.down)
-    ]
+    """The (device, dtype) of each tensor, in order, so each sub-layer is checked on its own."""
+    return [(tensor.device, tensor.dtype) for tensor in _tensors(patch)]
 
 
 @pytest.mark.parametrize(
     "make_layer",
-    [_lora_layer, _merged_layer, _mixed_dtype_merged_layer, _swapped_halves_layer],
-    ids=["lora", "merged", "mixed_dtype_merged", "swapped_halves"],
+    [_lora_layer, _merged_layer, _mixed_dtype_merged_layer, _swapped_halves_layer, _factorized_dora_layer],
+    ids=["lora", "merged", "mixed_dtype_merged", "swapped_halves", "factorized_dora"],
 )
 @pytest.mark.parametrize("force_sidecar", [False, True], ids=["direct", "sidecar"])
 @pytest.mark.parametrize(
@@ -757,13 +768,15 @@ def test_patching_leaves_the_cached_patch_where_it_found_it(
     early-returns, so the cache could not reclaim what it could not see. At a few tens of MB that was
     invisible; at LTX-2's 8.9 GB step-distillation LoRA it is a first-order VRAM consumer.
 
-    Wrapper patches hold their tensors only in sub-patches, so their placement has to be read from
-    there too, or the restore is a no-op that strands the inner layers.
+    A wrapper's tensors can sit in sub-patches (`MergedLayerPatch`, `SwappedHalvesLayerPatch`) or beside
+    them (a weight-decomposed LoKr's magnitude), so every node of the tree is restored, to the identical
+    tensor objects it held.
     """
     model = DummyModuleWithOneLayer(in_features=8, out_features=16, device=device, dtype=torch.bfloat16)
     apply_custom_layers_to_model(model)
     patch = ModelPatchRaw(layers={"linear_layer_1": make_layer(8, 16)})
     before = _placements(patch)
+    before_tensors = _tensors(patch)
     before_bytes = patch.calc_size()
 
     with LayerPatcher.apply_smart_model_patches(
@@ -781,6 +794,7 @@ def test_patching_leaves_the_cached_patch_where_it_found_it(
             assert {placement_dtype for _, placement_dtype in _placements(patch)} == {torch.bfloat16}
 
     assert _placements(patch) == before
+    assert all(now is original for now, original in zip(_tensors(patch), before_tensors, strict=True))
     assert patch.calc_size() == before_bytes
 
 
@@ -829,7 +843,7 @@ def test_direct_patching_that_fails_still_returns_the_cached_patch(
     # 12 output rows cannot be reshaped onto the module's 16.
     patch = ModelPatchRaw(layers={"linear_layer_1": make_layer(8, 12)})
     before = _placements(patch)
-    [(leaf, _, _)] = LayerPatcher._leaf_placements(patch.layers["linear_layer_1"])
+    [(leaf, _)] = LayerPatcher.tensor_placements(patch.layers["linear_layer_1"])
     up, down = leaf.up, leaf.down
 
     with pytest.raises(RuntimeError, match="is invalid for input of size"):

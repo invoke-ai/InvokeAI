@@ -4,7 +4,7 @@ import torch
 from diffusers import Krea2Transformer2DModel
 
 from invokeai.backend.model_manager.load.model_loaders.krea2 import KREA2_TRANSFORMER_CONFIG
-from invokeai.backend.patches.layers.dora_layer import DoRALayer
+from invokeai.backend.patches.layers.dora_layer import DoRALayer, FactorizedDoRALayer
 from invokeai.backend.patches.layers.lokr_layer import LoKRLayer
 from invokeai.backend.patches.layers.lora_layer import LoRALayer
 from invokeai.backend.patches.lora_conversions.krea2_lora_constants import (
@@ -384,13 +384,8 @@ def test_unrecognized_kohya_flattened_keys_are_left_untouched(flat_module: str) 
         # two groups and aborting the load on the orphaned `{'alpha'}`.
         (("lokr_w1", "lokr_w2", "alpha"), "transformer_blocks.6.attn.to_q"),
         (("hada_w1_a", "hada_w1_b", "hada_w2_a", "hada_w2_b", "alpha"), "lora_unet_blocks_6_attn_wq"),
-        # A weight-decomposed LoKr also saves a `dora_scale`. The converter drops it (there is no DoRA+LoKr
-        # layer), so the module still converts and applies as plain LoKr.
+        # A weight-decomposed LoKr also saves a `dora_scale`, which belongs to the same module.
         (("lokr_w1", "lokr_w2", "alpha", "dora_scale"), "transformer_blocks.6.attn.to_q"),
-        # `dora_scale` is deliberately not combined with LoHa or full here: it would orphan the same way, but
-        # even grouped correctly `any_lora_layer_from_state_dict` tests `dora_scale` before `hada_w1_a`, so
-        # the module dispatches to DoRALayer and dies on a missing `lora_up.weight`. That precedence is shared
-        # code, predates this branch, and is not what the per-module gate below is about.
     ],
 )
 def test_kohya_lycoris_algorithm_keys_do_not_abort_the_load(
@@ -557,21 +552,31 @@ def test_native_lokr_keys_are_renamed_to_diffusers_layout() -> None:
 
 
 @pytest.mark.parametrize("magnitude_suffix", ["dora_scale", "magnitude"])
-def test_lokr_layer_drops_a_dora_magnitude(magnitude_suffix: str) -> None:
-    # A weight-decomposed LoKr also saves a DoRA magnitude. Kept, it would dispatch the layer to DoRALayer,
-    # which fails on the missing lora_up/lora_down. There is no DoRA+LoKr layer, so it applies as plain LoKr.
+def test_lokr_layer_keeps_its_dora_magnitude(magnitude_suffix: str) -> None:
+    # A weight-decomposed LoKr also saves a DoRA magnitude, which the layer applies. `.dora_scale` of 1-D shape
+    # reads as input-axis, ai-toolkit's `.magnitude` as output-axis.
     w1, w2 = torch.randn(2, 2), torch.randn(3, 4)
+    magnitude = torch.rand(8 if magnitude_suffix == "dora_scale" else 6) + 0.5
     state_dict = {
         "transformer.text_fusion.0.attn.to_q.lokr_w1": w1,
         "transformer.text_fusion.0.attn.to_q.lokr_w2": w2,
-        f"transformer.text_fusion.0.attn.to_q.{magnitude_suffix}": torch.ones(8),
+        f"transformer.text_fusion.0.attn.to_q.{magnitude_suffix}": magnitude,
     }
 
     model = lora_model_from_krea2_state_dict(state_dict)
 
     layer = model.layers[f"{KREA2_LORA_TRANSFORMER_PREFIX}text_fusion.0.attn.to_q"]
-    assert isinstance(layer, LoKRLayer)
-    torch.testing.assert_close(layer.get_weight(torch.empty(6, 8)), torch.kron(w1, w2))
+    assert isinstance(layer, FactorizedDoRALayer)
+    assert isinstance(layer.layer, LoKRLayer)
+    assert layer.dora_scale is magnitude
+    assert layer.magnitude_is_out_dim is (magnitude_suffix == "magnitude")
+    weight = torch.randn(6, 8)
+    update = torch.kron(w1, w2)
+    norm_dim = 1 if layer.magnitude_is_out_dim else 0
+    direction = weight + update
+    scale = magnitude.reshape(-1, 1) if layer.magnitude_is_out_dim else magnitude.reshape(1, -1)
+    expected = scale * direction / direction.norm(dim=norm_dim, keepdim=True) - weight
+    torch.testing.assert_close(layer.get_parameters({"weight": weight}, 1.0)["weight"], expected)
 
 
 def test_kohya_flattened_lokr_converts_onto_its_real_module() -> None:

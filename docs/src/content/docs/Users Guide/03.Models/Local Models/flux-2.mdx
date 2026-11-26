@@ -222,6 +222,11 @@ normalization uses all Q, K and V base rows together before applying strength. O
 axis by default; its **Apply on output axis (DoRA Only)** setting is off by default. Both orientations
 preserve their normalization when Q, K and V are split, including when the fused weight is square.
 
+LyCORIS LoKr and LoHa layers that carry a DoRA magnitude ("DoKr" and "DoHa") apply it too. On a fused QKV
+projection an output-axis magnitude splits exactly across Q, K and V. An input-axis magnitude would need the
+rows of all three projections at once, which a LoKr or LoHa update split by rows cannot supply, so that layer
+applies as a plain LoKr or LoHa and the conversion logs one warning with the number of such layers.
+
 Output-axis DoRA also works on supported FLUX.2 int8 checkpoints. For fused QKV
 input-axis DoRA, the shared norm currently requires ordinary floating-point Q/K/V weights (including native
 FP8 storage). For packed modules and GGUF or SDNQ tensor subclasses, the fused QKV group is skipped with a

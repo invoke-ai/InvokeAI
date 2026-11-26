@@ -35,6 +35,10 @@ class LoHALayer(LoRALayerBase):
     def _rank(self) -> int | None:
         return self.w1_b.shape[0]
 
+    def out_features(self) -> int:
+        """The output rows of the update. A Tucker core's `w1_a` is (rank, rows)."""
+        return self.w1_a.shape[1] if self.t1 is not None else self.w1_a.shape[0]
+
     @classmethod
     def from_state_dict_values(
         cls,

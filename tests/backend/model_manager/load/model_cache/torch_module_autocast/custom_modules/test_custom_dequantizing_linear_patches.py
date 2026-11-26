@@ -21,7 +21,7 @@ from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch
 )
 from invokeai.backend.patches.layer_patcher import LayerPatcher
 from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch
-from invokeai.backend.patches.layers.dora_layer import DoRALayer
+from invokeai.backend.patches.layers.dora_layer import DoRALayer, FactorizedDoRALayer
 from invokeai.backend.patches.layers.full_layer import FullLayer
 from invokeai.backend.patches.layers.loha_layer import LoHALayer
 from invokeai.backend.patches.layers.lokr_layer import LoKRLayer
@@ -149,6 +149,27 @@ def _lora(out_features: int, in_features: int) -> LoRALayer:
     )
 
 
+def _dokr_or_doha(kind: str, out_features: int, in_features: int, *, out_axis: bool) -> FactorizedDoRALayer:
+    magnitude = torch.rand(out_features, 1) + 0.5 if out_axis else torch.rand(1, in_features) + 0.5
+    factors = _lokr(out_features, in_features) if kind == "lokr" else _loha(out_features, in_features)
+    return FactorizedDoRALayer(factors, dora_scale=magnitude * 3, magnitude_is_out_dim=out_axis)
+
+
+def _factorized_dora_delta(w: torch.Tensor, layer: FactorizedDoRALayer, out_axis: bool) -> torch.Tensor:
+    """The update written from the paper with the factors' own product, independently of the layer."""
+    factors = layer.layer
+    if isinstance(factors, LoKRLayer):
+        assert factors.w1 is not None and factors.w2 is not None
+        update = torch.einsum("ij,kl->ikjl", factors.w1, factors.w2).reshape(w.shape)
+    else:
+        assert isinstance(factors, LoHALayer)
+        update = (factors.w1_a @ factors.w1_b) * (factors.w2_a @ factors.w2_b)
+    direction = w + update
+    if out_axis:
+        return layer.dora_scale * direction / torch.sqrt((direction**2).sum(dim=1, keepdim=True)) - w
+    return layer.dora_scale * direction / torch.sqrt((direction**2).sum(dim=0, keepdim=True)) - w
+
+
 def _apply(model: torch.nn.Module, layers_and_weights: list[tuple[BaseLayerPatch, float]]):
     patches = [(ModelPatchRaw(layers={"p-proj": layer}), weight) for layer, weight in layers_and_weights]
     return LayerPatcher.apply_smart_model_patches(
@@ -168,6 +189,25 @@ def test_dora_on_a_quantized_linear_equals_dora_on_its_dequantized_weight(name: 
         patched = model.proj(x)
 
     expected = F.linear(x, dense + 0.8 * _dora_delta(dense, layer, out_axis))
+    assert torch.allclose(patched, expected, atol=1e-4, rtol=1e-4)
+    assert not torch.allclose(patched, F.linear(x, dense), atol=1e-2)
+
+
+@pytest.mark.parametrize("out_axis", [True, False], ids=["out_axis", "in_axis"])
+@pytest.mark.parametrize("kind", ["lokr", "loha"])
+@pytest.mark.parametrize("name", BUILDERS)
+def test_a_lokr_or_loha_with_a_magnitude_on_a_quantized_linear_decomposes_its_dequantized_weight(
+    name: str, kind: str, out_axis: bool
+) -> None:
+    model, dense = _wrapped(name)
+    out_features, in_features = dense.shape
+    layer = _dokr_or_doha(kind, out_features, in_features, out_axis=out_axis)
+    x = torch.randn(5, in_features)
+
+    with _apply(model, [(layer, 0.8)]):
+        patched = model.proj(x)
+
+    expected = F.linear(x, dense + 0.8 * _factorized_dora_delta(dense, layer, out_axis))
     assert torch.allclose(patched, expected, atol=1e-4, rtol=1e-4)
     assert not torch.allclose(patched, F.linear(x, dense), atol=1e-2)
 
@@ -249,10 +289,16 @@ def test_patches_that_only_need_the_weight_shape_do_not_dequantize_it(name: str)
         model.proj(x)
     assert spy.calls == forward_calls
 
-    spy.calls = 0
-    with _apply(model, [*shape_only, (_dora(out_features, in_features, out_axis=True), 0.5)]):
-        model.proj(x)
-    assert spy.calls == forward_calls + 1
+    value_reading = [
+        _dora(out_features, in_features, out_axis=True),
+        _dokr_or_doha("lokr", out_features, in_features, out_axis=True),
+        _dokr_or_doha("loha", out_features, in_features, out_axis=False),
+    ]
+    for layer in value_reading:
+        spy.calls = 0
+        with _apply(model, [*shape_only, (layer, 0.5)]):
+            model.proj(x)
+        assert spy.calls == forward_calls + 1
 
 
 def test_leaving_the_patch_scope_keeps_no_dequantized_weight_and_changes_nothing() -> None:

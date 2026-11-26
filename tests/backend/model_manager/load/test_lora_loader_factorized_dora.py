@@ -7,12 +7,12 @@ import torch
 import invokeai.backend.model_manager.load.model_loaders.lora as lora_loader_module
 from invokeai.backend.model_manager.load.model_loaders.lora import LoRALoader
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat
-from invokeai.backend.patches.layers.dora_layer import DoRALayer
+from invokeai.backend.patches.layers.dora_layer import DoRALayer, FactorizedDoRALayer
 from invokeai.backend.patches.layers.loha_layer import LoHALayer
 from invokeai.backend.patches.layers.lokr_layer import LoKRLayer
 
 
-def test_factorized_dora_layers_warn_once_per_lora_with_name_and_count(tmp_path, monkeypatch) -> None:
+def test_loader_keeps_the_magnitudes_of_weight_decomposed_lokr_and_loha_layers(tmp_path, monkeypatch) -> None:
     state_dict = {
         "lokr.lokr_w1": torch.randn(2, 2),
         "lokr.lokr_w2": torch.randn(3, 3),
@@ -22,17 +22,13 @@ def test_factorized_dora_layers_warn_once_per_lora_with_name_and_count(tmp_path,
         "loha.hada_w2_a": torch.randn(6, 2),
         "loha.hada_w2_b": torch.randn(2, 6),
         "loha.dora_magnitude": torch.ones(6, 1),
-        "peft_lokr.lokr_w1": torch.randn(2, 2),
-        "peft_lokr.lokr_w2": torch.randn(3, 3),
-        "peft_lokr.lora_magnitude_vector": torch.ones(6),
         "dora.lora_down.weight": torch.randn(2, 6),
         "dora.lora_up.weight": torch.randn(6, 2),
         "dora.dora_scale": torch.ones(6, 1),
     }
     monkeypatch.setattr(lora_loader_module, "load_file", lambda *_args, **_kwargs: state_dict)
-    logger = MagicMock(spec=Logger)
     loader = LoRALoader.__new__(LoRALoader)
-    loader._logger = logger
+    loader._logger = MagicMock(spec=Logger)
     loader._model_base = BaseModelType.StableDiffusion1
     loader._torch_dtype = torch.float32
     config = SimpleNamespace(
@@ -44,11 +40,10 @@ def test_factorized_dora_layers_warn_once_per_lora_with_name_and_count(tmp_path,
 
     model = loader._load_model(config)  # type: ignore[arg-type]
 
-    assert isinstance(model.layers["lokr"], LoKRLayer)
-    assert isinstance(model.layers["peft_lokr"], LoKRLayer)
-    assert isinstance(model.layers["loha"], LoHALayer)
+    lokr, loha = model.layers["lokr"], model.layers["loha"]
+    assert isinstance(lokr, FactorizedDoRALayer) and isinstance(lokr.layer, LoKRLayer)
+    assert isinstance(loha, FactorizedDoRALayer) and isinstance(loha.layer, LoHALayer)
     assert isinstance(model.layers["dora"], DoRALayer)
-    logger.warning.assert_called_once_with(
-        "LoRA 'factorized-dora' contains 3 LoKr/LoHa layers with unsupported DoRA magnitudes; "
-        "applying those layers as plain LoKr/LoHa."
-    )
+    assert lokr.magnitude_is_out_dim and loha.magnitude_is_out_dim
+    assert torch.equal(lokr.dora_scale, state_dict["lokr.dora_scale"])
+    assert torch.equal(loha.dora_scale, state_dict["loha.dora_magnitude"])

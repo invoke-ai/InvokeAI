@@ -1,5 +1,6 @@
 import copy
 from abc import ABC, abstractmethod
+from collections.abc import Iterator
 
 import torch
 
@@ -55,3 +56,16 @@ def _copy_sub_patches(value: object) -> object:
 def sub_patches(patch: BaseLayerPatch) -> list[BaseLayerPatch]:
     """The direct sub-patches of a wrapper patch: attributes that are patches, alone or in a list or tuple."""
     return [item for value in vars(patch).values() for item in _held_patches(value)]
+
+
+def patch_tensors(patch: BaseLayerPatch) -> Iterator[tuple[BaseLayerPatch, str, torch.Tensor]]:
+    """Every tensor a patch and its sub-patches hold as an attribute, with the patch that holds it and the attribute.
+
+    A patch can hold tensors beside sub-patches (a weight-decomposed LoKr holds its magnitude next to the LoKr),
+    so walking only the leaves misses them. This is the one walk for sizing, placing and restoring a patch tree.
+    """
+    for name, value in vars(patch).items():
+        if isinstance(value, torch.Tensor):
+            yield patch, name, value
+    for sub in sub_patches(patch):
+        yield from patch_tensors(sub)

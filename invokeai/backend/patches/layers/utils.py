@@ -3,7 +3,7 @@ from typing import Dict
 import torch
 
 from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch
-from invokeai.backend.patches.layers.dora_layer import DoRALayer
+from invokeai.backend.patches.layers.dora_layer import DoRALayer, FactorizedDoRALayer
 from invokeai.backend.patches.layers.full_layer import FullLayer
 from invokeai.backend.patches.layers.ia3_layer import IA3Layer
 from invokeai.backend.patches.layers.loha_layer import LoHALayer
@@ -12,22 +12,24 @@ from invokeai.backend.patches.layers.lora_layer import LoRALayer
 from invokeai.backend.patches.layers.norm_layer import NormLayer
 
 
-def _without_unsupported_magnitude(state_dict: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
-    magnitude_keys = {"dora_scale", "dora_magnitude"} & state_dict.keys()
-    return (
-        state_dict
-        if not magnitude_keys
-        else {key: value for key, value in state_dict.items() if key not in magnitude_keys}
-    )
+def _factorized_layer_from_state_dict(
+    layer_class: type[LoHALayer] | type[LoKRLayer], state_dict: Dict[str, torch.Tensor]
+) -> BaseLayerPatch:
+    """A LoHa or LoKr layer, weight-decomposed (DoKr / DoHa) when the state dict carries a DoRA magnitude."""
+    magnitude_keys = {"dora_scale", "dora_magnitude"}
+    layer = layer_class.from_state_dict_values({k: v for k, v in state_dict.items() if k not in magnitude_keys})
+    if magnitude_keys & state_dict.keys():
+        return FactorizedDoRALayer.from_state_dict_values(layer, state_dict)
+    return layer
 
 
 def any_lora_layer_from_state_dict(state_dict: Dict[str, torch.Tensor]) -> BaseLayerPatch:
     # Detect layers according to LyCORIS detection logic(`weight_list_det`)
     # https://github.com/KohakuBlueleaf/LyCORIS/tree/8ad8000efb79e2b879054da8c9356e6143591bad/lycoris/modules
     if "hada_w1_a" in state_dict:
-        return LoHALayer.from_state_dict_values(_without_unsupported_magnitude(state_dict))
+        return _factorized_layer_from_state_dict(LoHALayer, state_dict)
     elif "lokr_w1" in state_dict or "lokr_w1_a" in state_dict:
-        return LoKRLayer.from_state_dict_values(_without_unsupported_magnitude(state_dict))
+        return _factorized_layer_from_state_dict(LoKRLayer, state_dict)
     elif "dora_scale" in state_dict or "dora_magnitude" in state_dict:
         # ``dora_scale`` is the LyCORIS magnitude, on either axis; ``dora_magnitude`` the PEFT/ai-toolkit out-dim one.
         return DoRALayer.from_state_dict_values(state_dict)

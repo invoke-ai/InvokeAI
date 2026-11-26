@@ -2,13 +2,13 @@ import re
 from collections import Counter
 from contextlib import AbstractContextManager, ExitStack, contextmanager
 from itertools import chain
-from typing import Dict, Iterable, Iterator, Optional, Tuple
+from typing import Dict, Iterable, Optional, Tuple
 
 import torch
 from transformers import CLIPTextModel
 
 from invokeai.backend.model_manager.load.model_cache.model_cache import MODEL_LOAD_LOCK
-from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch, sub_patches
+from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch, patch_tensors
 from invokeai.backend.patches.layers.flux_control_lora_layer import FluxControlLoRALayer
 from invokeai.backend.patches.layers.fused_input_dora_layer import FusedInputDoRALayer, UnsupportedFusedInputDoRABase
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
@@ -44,10 +44,10 @@ class LayerPatcher:
         original_weights = OriginalWeightsStorage(cached_weights)
         # original_modules are stored for unpatching layers that are wrapped.
         original_modules: dict[str, torch.nn.Module] = {}
-        # Where each sidecar-applied leaf patch's tensors lived before they were moved onto the device,
-        # so the `finally` can put them back. Keyed by identity: one patch object can be applied to many
-        # modules, and only its first, pre-move placement is the one to restore.
-        patch_placements: dict[int, tuple[BaseLayerPatch, torch.device, torch.dtype]] = {}
+        # The tensors each sidecar-applied patch held before they were moved onto the device, so the `finally`
+        # can put them back. Keyed by identity: one patch object can be applied to many modules, and only its
+        # first, pre-move tensors are the ones to restore.
+        patch_placements: dict[int, tuple[BaseLayerPatch, dict[str, torch.Tensor]]] = {}
         cache_pins = ExitStack()
         # Storage shared with another parameter or buffer, as of before the first patch of this scope.
         shared_storage: set[int] = set()
@@ -117,8 +117,7 @@ class LayerPatcher:
                 # Return every sidecar-applied patch to where it came from. `clear_patches()` only
                 # drops the module's reference; without this the tensors stay on the device, inside
                 # an object the model cache owns and believes is in RAM.
-                for leaf, leaf_device, leaf_dtype in patch_placements.values():
-                    leaf.to(device=leaf_device, dtype=leaf_dtype)
+                LayerPatcher.restore_tensors(patch_placements)
             finally:
                 cache_pins.close()
 
@@ -131,7 +130,7 @@ class LayerPatcher:
         patch_weight: float,
         original_weights: OriginalWeightsStorage,
         original_modules: dict[str, torch.nn.Module],
-        patch_placements: dict[int, tuple[BaseLayerPatch, torch.device, torch.dtype]],
+        patch_placements: dict[int, tuple[BaseLayerPatch, dict[str, torch.Tensor]]],
         dtype: torch.dtype,
         force_direct_patching: bool,
         force_sidecar_patching: bool,
@@ -336,12 +335,9 @@ class LayerPatcher:
         # be significantly faster for 16-bit CPU tensors being moved to a CUDA device than doing the
         # same thing in a single call to '.to(...)'.
         #
-        # to() rebinds a leaf's tensors. Keep the original references so that restoring a
+        # to() rebinds a patch's tensors. Keep the original references so that restoring a
         # cache-owned patch or a shallow application copy needs no transfers or new buffers.
-        original_tensors = [
-            (leaf, {name: value for name, value in vars(leaf).items() if isinstance(value, torch.Tensor)})
-            for leaf in LayerPatcher._patch_leaves(patch)
-        ]
+        original_tensors = LayerPatcher.tensor_placements(patch)
         try:
             patch.to(device=device)
             patch.to(dtype=torch.float32)
@@ -401,33 +397,28 @@ class LayerPatcher:
                 else:
                     module_param.data = module_param.data + param_weight_converted
         finally:
-            for leaf, tensors in original_tensors:
-                vars(leaf).update(tensors)
+            LayerPatcher.restore_tensors(dict(enumerate(original_tensors)))
 
     @staticmethod
-    def _patch_leaves(patch: BaseLayerPatch) -> Iterator[BaseLayerPatch]:
-        children = sub_patches(patch)
-        if not children:
-            yield patch
-        for child in children:
-            yield from LayerPatcher._patch_leaves(child)
+    def tensor_placements(patch: BaseLayerPatch) -> list[tuple[BaseLayerPatch, dict[str, torch.Tensor]]]:
+        """The tensors every node of a patch tree holds, node by node, so they can be put back.
 
-    @staticmethod
-    def _leaf_placements(patch: BaseLayerPatch) -> list[tuple[BaseLayerPatch, torch.device, torch.dtype]]:
-        """The device and dtype each leaf patch's tensors currently sit on, so they can be put back.
-
-        Patches carry their tensors in subclass-specific attributes rather than as registered
-        parameters, so a leaf's placement is read from its first real tensor instead of from
-        `nn.Module` state. Wrapper patches (`MergedLayerPatch`, `SwappedHalvesLayerPatch`) hold only
-        sub-patches, alone or in a list or tuple, and those need not share a dtype; so the leaves
-        under them are recorded and restored one by one. Leaves without tensors have nothing to restore.
+        Patches carry their tensors in subclass-specific attributes rather than as registered parameters, and a
+        node may hold tensors beside sub-patches (a weight-decomposed LoKr's magnitude), so every node that holds
+        a tensor is recorded, not only the leaves. `BaseLayerPatch.to()` rebinds these attributes; keeping the
+        originals lets `restore_tensors` rebind them back with no transfer, and without the `to()` of a wrapper
+        recasting its sub-patches, which need not share a dtype.
         """
-        placements = []
-        for leaf in LayerPatcher._patch_leaves(patch):
-            tensor = next((value for value in vars(leaf).values() if isinstance(value, torch.Tensor)), None)
-            if tensor is not None:
-                placements.append((leaf, tensor.device, tensor.dtype))
-        return placements
+        holders: dict[int, tuple[BaseLayerPatch, dict[str, torch.Tensor]]] = {}
+        for owner, name, tensor in patch_tensors(patch):
+            holders.setdefault(id(owner), (owner, {}))[1][name] = tensor
+        return list(holders.values())
+
+    @staticmethod
+    def restore_tensors(placements: dict[int, tuple[BaseLayerPatch, dict[str, torch.Tensor]]]) -> None:
+        """Rebind each recorded patch's attributes to the tensors `tensor_placements` found."""
+        for holder, tensors in placements.values():
+            vars(holder).update(tensors)
 
     @staticmethod
     @torch.no_grad()
@@ -453,8 +444,8 @@ class LayerPatcher:
         # device. The record is RAM-pinned, so `cur_vram_bytes()` reports zero for it and
         # `full_unload_from_vram()` early-returns -- the cache cannot reclaim what it cannot see.
         # Recorded here and restored in the `finally`.
-        for leaf_placement in LayerPatcher._leaf_placements(patch):
-            patch_placements.setdefault(id(leaf_placement[0]), leaf_placement)
+        for placement in LayerPatcher.tensor_placements(patch):
+            patch_placements.setdefault(id(placement[0]), placement)
         patch.to(device=device, dtype=dtype)
 
         if module_to_patch_key not in original_modules:

@@ -47,6 +47,18 @@ class LoKRLayer(LoRALayerBase):
         else:
             return None
 
+    def out_features(self) -> int:
+        """The output rows of the update: those of kron(w1, w2), whose first operand's rows multiply the second's."""
+        w1_rows = self.w1.shape[0] if self.w1 is not None else self.w1_a.shape[0]  # type: ignore[union-attr]
+        if self.w2 is not None:
+            w2_rows = self.w2.shape[0]
+        elif self.t2 is not None:
+            # Tucker core: w2_a is (rank, rows).
+            w2_rows = self.w2_a.shape[1]  # type: ignore[union-attr]
+        else:
+            w2_rows = self.w2_a.shape[0]  # type: ignore[union-attr]
+        return w1_rows * w2_rows
+
     @classmethod
     def from_state_dict_values(
         cls,

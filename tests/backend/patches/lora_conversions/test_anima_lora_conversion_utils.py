@@ -4,6 +4,8 @@ import torch
 
 from invokeai.backend.anima.anima_transformer import AnimaTransformer
 from invokeai.backend.anima.checkpoint_layout import ANIMA_TRANSFORMER_CONFIG
+from invokeai.backend.patches.layers.dora_layer import FactorizedDoRALayer
+from invokeai.backend.patches.layers.lokr_layer import LoKRLayer
 from invokeai.backend.patches.layers.lora_layer import LoRALayer
 from invokeai.backend.patches.lora_conversions.anima_lora_constants import (
     ANIMA_LORA_QWEN3_PREFIX,
@@ -336,16 +338,14 @@ def test_qwen3_keys_include_model_prefix():
             )
 
 
-def test_lokr_dora_keys_dont_crash():
-    """Test that LoKR layers with dora_scale don't cause a KeyError.
-
-    Some Anima LoRAs combine DoRA (dora_scale) with LoKR (lokr_w1/lokr_w2).
-    The dora_scale should be stripped from LoKR layers since shared code
-    doesn't support DoRA+LoKR combination.
-    """
+def test_lokr_dora_keys_make_weight_decomposed_lokr_layers():
+    """Some Anima LoRAs combine DoRA (dora_scale) with LoKR (lokr_w1/lokr_w2); each such layer keeps its magnitude."""
     state_dict = keys_to_mock_state_dict(anima_lokr_keys)
     lora_model = lora_model_from_anima_state_dict(state_dict)
-    assert len(lora_model.layers) > 0
+    decomposed = [layer for layer in lora_model.layers.values() if isinstance(layer, FactorizedDoRALayer)]
+    assert len(decomposed) == sum(key.endswith(".dora_scale") for key in anima_lokr_keys) > 0
+    assert all(isinstance(layer.layer, LoKRLayer) and layer.dora_scale.shape == (2048,) for layer in decomposed)
+    assert all(isinstance(layer, LoKRLayer) for layer in lora_model.layers.values() if layer not in decomposed)
 
 
 def test_peft_keys_get_transformer_prefix():

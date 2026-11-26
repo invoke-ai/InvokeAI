@@ -103,7 +103,7 @@ from typing import Final, Optional, cast
 import torch
 
 from invokeai.backend.patches.layer_patcher import LayerPatcher
-from invokeai.backend.patches.layers.dora_layer import DoRALayer
+from invokeai.backend.patches.layers.dora_layer import DoRALayer, WeightDecomposedLayer
 from invokeai.backend.patches.layers.fused_input_dora_layer import FusedInputDoRALayer
 from invokeai.backend.patches.layers.swapped_halves_layer_patch import SwappedHalvesLayerPatch
 from invokeai.backend.patches.lora_conversions.flux_lora_constants import FLUX_LORA_TRANSFORMER_PREFIX
@@ -252,7 +252,7 @@ def flux2_dora_patch_bytes(
 
             wrapped = isinstance(layer, SwappedHalvesLayerPatch)
             dora = layer.layer if wrapped else layer
-            if not isinstance(dora, DoRALayer):
+            if not isinstance(dora, WeightDecomposedLayer):
                 continue
             try:
                 _, module = LayerPatcher._get_submodule(
@@ -262,9 +262,7 @@ def flux2_dora_patch_bytes(
                 continue
             if not isinstance(module, (torch.nn.Linear, DequantizingLinear)):
                 continue
-            retained += _patch_tensor_bytes(
-                (dora.up, dora.down, dora.dora_scale, dora.bias, dora.direction_norm), dtype
-            )
+            retained += _patch_tensor_bytes(dora.tensors(), dtype)
             scratch = max(scratch, _dora_projection_workspace_bytes(module, dora, dtype, rows, wrapped=wrapped))
     return retained + scratch
 
@@ -284,7 +282,7 @@ def _patch_tensor_bytes(tensors: Iterable[torch.Tensor | None], dtype: torch.dty
 
 def _dora_projection_workspace_bytes(
     module: torch.nn.Linear | DequantizingLinear,
-    layer: DoRALayer,
+    layer: WeightDecomposedLayer,
     dtype: torch.dtype,
     rows: int,
     *,
@@ -304,13 +302,14 @@ def _dora_projection_workspace_bytes(
     # Factor promotion is per projection. Fused input DoRA keeps its stored dtype and promotes
     # only for the math; ordinary DoRA may move first and allocate the FP32 factors on-device.
     if fused:
+        assert isinstance(layer, DoRALayer)
         factor_bytes = (
             _patch_tensor_bytes((layer.up,), torch.float32) // 3
             + _patch_tensor_bytes((layer.down, layer.dora_scale), torch.float32)
             + (layer.bias.numel() * torch.float32.itemsize // 3 if layer.bias is not None else 0)
         )
     else:
-        factor_bytes = _patch_tensor_bytes((layer.up, layer.down, layer.dora_scale, layer.bias), torch.float32)
+        factor_bytes = _patch_tensor_bytes(layer.tensors(), torch.float32)
     # A streamed FP8 base can expand its scales with index tensors, and broadcasting a magnitude
     # or applying a bias can hold extra input/output-width vectors.
     vector_bytes = (in_features + out_features) * (2 * torch.int64.itemsize + 4 * compute_dtype_bytes)

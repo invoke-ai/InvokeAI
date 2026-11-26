@@ -1,6 +1,6 @@
 # A sample state dict in the LoKR Anima LoRA format (with DoRA).
 # Some Anima LoRAs use LoKR weights (lokr_w1/lokr_w2) combined with DoRA (dora_scale).
-# The dora_scale should be stripped from LoKR layers during conversion.
+# Conversion keeps the dora_scale: each such layer is a weight-decomposed LoKR.
 state_dict_keys: dict[str, list[int]] = {
     # Block 0 - cross attention with LoKR + DoRA
     "diffusion_model.blocks.0.cross_attn.k_proj.lokr_w1": [2048, 8],

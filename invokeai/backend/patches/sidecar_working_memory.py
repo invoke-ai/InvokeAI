@@ -5,8 +5,8 @@ from collections.abc import Iterable, Mapping
 import torch
 
 from invokeai.backend.model_manager.taxonomy import ModelFormat
-from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch
-from invokeai.backend.patches.layers.dora_layer import DoRALayer
+from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch, patch_tensors
+from invokeai.backend.patches.layers.dora_layer import DoRALayer, FactorizedDoRALayer, WeightDecomposedLayer
 from invokeai.backend.patches.layers.full_layer import FullLayer
 from invokeai.backend.patches.layers.loha_layer import LoHALayer
 from invokeai.backend.patches.layers.lokr_layer import LoKRLayer
@@ -22,8 +22,10 @@ from invokeai.backend.quantization.fp8_scaled import count_fp8_weights
 # layer's own. A full layer scales its diff into a new tensor; LoKR builds kron(w1, w2), then scales it; LoHA holds
 # its two products and theirs. DoRA holds its scaled delta, the updated weight and their difference, 4 in all; the
 # input-dim (LyCORIS) magnitude's column norm, over a transposed view, measured another third of a copy on CUDA
-# (gate_layer, bf16), so DoRA is priced at 5 before accounting for FP32 promotion. A low-rank layer
-# forms none: it adds its output only.
+# (gate_layer, bf16), so DoRA is priced at 5 before accounting for FP32 promotion. A LoKr or LoHa with a magnitude
+# is priced as DoRA: its sidecar peak measured on the CPU with a bf16 base at the same 8 weight copies as a low-rank
+# DoRA's, the product it forms taking the place of the low-rank one. A low-rank layer forms
+# none: it adds its output only.
 _SIDECAR_WEIGHT_COPIES: dict[type[BaseLayerPatch], int] = {
     FullLayer: 2,
     LoKRLayer: 3,
@@ -45,16 +47,17 @@ _SWAPPED_SIDECAR_WEIGHT_COPIES: dict[type[BaseLayerPatch], int] = {
 
 def _elements(layer: BaseLayerPatch) -> int:
     """Elements of a patch layer's tensors, which a sidecar holds in the compute dtype whatever it was loaded in."""
-    if isinstance(layer, SwappedHalvesLayerPatch):
-        layer = layer.layer
-    if isinstance(layer, MergedLayerPatch):
-        return sum(_elements(sub_layer) for sub_layer in layer.lora_layers)
-    return sum(value.numel() for value in vars(layer).values() if isinstance(value, torch.Tensor))
+    return sum(tensor.numel() for _, _, tensor in patch_tensors(layer))
+
+
+def _priced_type(layer: BaseLayerPatch) -> type[BaseLayerPatch]:
+    """The type whose copy count prices `layer`: any weight-decomposed layer is priced as DoRA."""
+    return DoRALayer if isinstance(layer, WeightDecomposedLayer) else type(layer)
 
 
 def _weight_copies(layer: BaseLayerPatch) -> int:
     if isinstance(layer, SwappedHalvesLayerPatch):
-        return _SWAPPED_SIDECAR_WEIGHT_COPIES[type(layer.layer)]
+        return _SWAPPED_SIDECAR_WEIGHT_COPIES[_priced_type(layer.layer)]
     if isinstance(layer, MergedLayerPatch):
         # The merge adds each sub-layer's update to a zero tensor of the whole weight, beside the largest sub-layer's
         # own tensors; only MOSS-Image's LoKr on a fused qkv makes one, of LoKR pieces. Measured on the CPU with an
@@ -62,7 +65,7 @@ def _weight_copies(layer: BaseLayerPatch) -> int:
         # the lower for more, smaller ranges. One copy for the merge plus a piece's 3 is a copy over the highest
         # measure and over-reserves by up to two copies where the rows are cut small.
         return 1 + max(_weight_copies(sub_layer) for sub_layer in layer.lora_layers)
-    return _SIDECAR_WEIGHT_COPIES[type(layer)]
+    return _SIDECAR_WEIGHT_COPIES[_priced_type(layer)]
 
 
 def _weight_workspace_bytes(layer: BaseLayerPatch, weight_elements: int, dtype: torch.dtype) -> tuple[int, int]:
@@ -70,7 +73,7 @@ def _weight_workspace_bytes(layer: BaseLayerPatch, weight_elements: int, dtype: 
     copies = _weight_copies(layer)
     wrapped = isinstance(layer, SwappedHalvesLayerPatch)
     leaf = layer.layer if wrapped else layer
-    if not isinstance(leaf, DoRALayer) or dtype not in (torch.bfloat16, torch.float16):
+    if not isinstance(leaf, WeightDecomposedLayer) or dtype not in (torch.bfloat16, torch.float16):
         return copies * weight_elements * dtype.itemsize, dtype.itemsize
 
     # The sidecar's original base and any swapped input are still in the inference dtype.
@@ -79,7 +82,12 @@ def _weight_workspace_bytes(layer: BaseLayerPatch, weight_elements: int, dtype: 
     base_copies = 1 + wrapped
     fp32 = torch.float32.itemsize
     matrix_bytes = weight_elements * (base_copies * dtype.itemsize + (copies - base_copies + 1) * fp32)
-    factor_bytes = (leaf.up.numel() + leaf.down.numel()) * fp32
+    if isinstance(leaf, FactorizedDoRALayer):
+        factor_elements = _elements(leaf.layer)
+    else:
+        assert isinstance(leaf, DoRALayer)
+        factor_elements = leaf.up.numel() + leaf.down.numel()
+    factor_bytes = factor_elements * fp32
     return matrix_bytes + factor_bytes, fp32
 
 
