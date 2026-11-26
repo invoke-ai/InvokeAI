@@ -366,6 +366,7 @@ export const VideoWidgetView = ({ instance }: { instance?: { id: string } }) => 
         maxVideos: maxVideoReferences,
         numFrames: values.numFrames,
         referenceExtend,
+        referenceFrames: Boolean(policy.references?.frames),
         references: referencesRef.current.references,
         sourceVideo,
       });
@@ -382,7 +383,7 @@ export const VideoWidgetView = ({ instance }: { instance?: { id: string } }) => 
       }
       patch(placement);
     },
-    [maxVideoReferences, patch, projectId, referenceExtend, t, values.numFrames]
+    [maxVideoReferences, patch, policy.references?.frames, projectId, referenceExtend, t, values.numFrames]
   );
   const setReferences = useCallback(
     (update: (current: VideoReferenceItem[]) => VideoReferenceItem[]) => {

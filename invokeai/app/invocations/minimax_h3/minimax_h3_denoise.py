@@ -325,9 +325,12 @@ class MiniMaxH3DenoiseInvocation(BaseInvocation, WithMetadata):
             clean_condition_rows=clean_condition_rows,
         )
 
-    def _build_metadata(self) -> MetadataField:
+    def _upstream_generation_mode(self) -> Any:
         existing = getattr(self, "metadata", None)
-        existing_mode = existing.root.get("generation_mode") if isinstance(existing, MetadataField) else None
+        return existing.root.get("generation_mode") if isinstance(existing, MetadataField) else None
+
+    def _build_metadata(self) -> MetadataField:
+        existing_mode = self._upstream_generation_mode()
         if int(self.num_frames) == 5:
             gen_mode = "minimax_h3_txt2img"
         elif existing_mode == "minimax_h3_extend_video":
@@ -377,6 +380,15 @@ class MiniMaxH3DenoiseInvocation(BaseInvocation, WithMetadata):
         num_frames = int(self.num_frames)
         validate_num_frames(num_frames)
         validate_canvas(self.height, self.width)
+        if (
+            self.frame_conditioning is not None
+            and self.reference_conditioning is not None
+            and self._upstream_generation_mode() == "minimax_h3_extend_video"
+        ):
+            raise ValueError(
+                "First/last frames cannot be combined with an extended video: an extension continues from its "
+                "source clip, which leaves no room for keyframes. Remove Frame Conditioning - MiniMax H3."
+            )
 
         device = TorchDevice.choose_torch_device()
 

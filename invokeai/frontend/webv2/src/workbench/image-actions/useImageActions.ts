@@ -341,7 +341,7 @@ export const useImageActions = ({
       return diffGalleryWidgetKeyValues(before, queries.getSnapshot().projects);
     };
     const restoreGalleryItemRemoval = (entries: GalleryWidgetKeySnapshotEntry[]) => {
-      const patches = selectRestorableGalleryWidgetPatches(entries, queries.getSnapshot().projects);
+      const patches = selectRestorableGalleryWidgetPatches(entries, queries.getSnapshot().projects, models);
 
       for (const patch of patches) {
         // CAS-guarded system patch: widget patches are not undoable, and user-origin patches would auto-route.

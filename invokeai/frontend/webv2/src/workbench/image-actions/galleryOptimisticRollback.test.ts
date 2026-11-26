@@ -1,4 +1,5 @@
 import type { GalleryItem } from '@features/gallery';
+import type { ModelConfig } from '@features/models';
 import type { Project, WorkbenchState } from '@workbench/projectContracts';
 
 import { getProjectWidgetValues } from '@workbench/widgetState';
@@ -38,6 +39,17 @@ const recentImage = {
   thumbnailUrl: galleryItem.thumbnailUrl,
   width: 512,
 };
+
+const h3Model = (variant: 'fl2va' | 'ref2va') =>
+  ({
+    base: 'minimax-h3',
+    format: 'diffusers',
+    key: `h3-${variant}`,
+    name: 'MiniMax H3',
+    path: '/models/h3',
+    type: 'main',
+    variant,
+  }) as unknown as ModelConfig;
 
 const upscaleInputImage = { height: 512, image_name: 'a.png', width: 512 };
 
@@ -112,7 +124,7 @@ describe('gallery optimistic rollback against the real reducer', () => {
 
     expect(entries.length).toBeGreaterThan(0);
 
-    const patches = selectRestorableGalleryWidgetPatches(entries, afterRemoval.projects);
+    const patches = selectRestorableGalleryWidgetPatches(entries, afterRemoval.projects, []);
     const restored = applyRestorePatches(afterRemoval, patches);
 
     const restoredGalleryValues = getProjectWidgetValues(getProject(restored, projectId), 'gallery');
@@ -143,7 +155,7 @@ describe('gallery optimistic rollback against the real reducer', () => {
       widgetId: 'gallery',
     });
 
-    const patches = selectRestorableGalleryWidgetPatches(entries, concurrentlyChanged.projects);
+    const patches = selectRestorableGalleryWidgetPatches(entries, concurrentlyChanged.projects, []);
     const restored = applyRestorePatches(concurrentlyChanged, patches);
 
     const restoredGalleryValues = getProjectWidgetValues(getProject(restored, projectId), 'gallery');
@@ -195,7 +207,7 @@ describe('gallery optimistic rollback against the real reducer', () => {
       widgetId: 'video',
     });
 
-    const patches = selectRestorableGalleryWidgetPatches(entries, claimed.projects);
+    const patches = selectRestorableGalleryWidgetPatches(entries, claimed.projects, []);
     const restored = applyRestorePatches(claimed, patches);
     const videoValues = getProjectWidgetValues(getProject(restored, projectId), 'video');
 
@@ -222,7 +234,12 @@ describe('gallery optimistic rollback against the real reducer', () => {
     const state = workbenchReducer(seeded.state, {
       projectId,
       type: 'patchWidgetValues',
-      values: { references: [imageReference], sourceVideo: sourceClip },
+      values: {
+        model: h3Model('ref2va'),
+        modelKey: 'h3-ref2va',
+        references: [imageReference],
+        sourceVideo: sourceClip,
+      },
       widgetId: 'video',
     });
 
@@ -232,7 +249,7 @@ describe('gallery optimistic rollback against the real reducer', () => {
     expect(getProjectWidgetValues(getProject(afterRemoval, projectId), 'video').references).toEqual([]);
 
     const entries = diffGalleryWidgetKeyValues(before, afterRemoval.projects);
-    const patches = selectRestorableGalleryWidgetPatches(entries, afterRemoval.projects);
+    const patches = selectRestorableGalleryWidgetPatches(entries, afterRemoval.projects, [h3Model('ref2va')]);
     const restored = applyRestorePatches(afterRemoval, patches);
     const videoValues = getProjectWidgetValues(getProject(restored, projectId), 'video');
 
@@ -248,14 +265,19 @@ describe('gallery optimistic rollback against the real reducer', () => {
     const state = workbenchReducer(seeded.state, {
       projectId,
       type: 'patchWidgetValues',
-      values: { firstFrameImage: firstFrame, references: [imageReference] },
+      values: {
+        firstFrameImage: firstFrame,
+        model: h3Model('ref2va'),
+        modelKey: 'h3-ref2va',
+        references: [imageReference],
+      },
       widgetId: 'video',
     });
 
     const before = captureGalleryWidgetKeyValues(state.projects);
     const afterRemoval = workbenchReducer(state, { itemKeys: ['image:a.png'], type: 'removeGalleryItems' });
     const entries = diffGalleryWidgetKeyValues(before, afterRemoval.projects);
-    const patches = selectRestorableGalleryWidgetPatches(entries, afterRemoval.projects);
+    const patches = selectRestorableGalleryWidgetPatches(entries, afterRemoval.projects, [h3Model('ref2va')]);
     const videoValues = getProjectWidgetValues(
       getProject(applyRestorePatches(afterRemoval, patches), projectId),
       'video'
@@ -263,6 +285,56 @@ describe('gallery optimistic rollback against the real reducer', () => {
 
     expect(videoValues.firstFrameImage).toEqual(firstFrame);
     expect(videoValues.references).toEqual([imageReference]);
+  });
+
+  it('skips a restored frame or references that the panel model cannot hold beside the other', () => {
+    const seeded = seedProjectWithItem();
+    const projectId = seeded.projectId;
+    const frame = { height: 480, image_name: 'a.png', width: 832 };
+    const imageReference = { detail: 'max', image: { height: 512, image_name: 'b.png', width: 512 }, kind: 'image' };
+    const sourceClip = {
+      endFrame: 79,
+      fps: 16,
+      height: 480,
+      numFrames: 81,
+      startFrame: 0,
+      video_name: 'clip.mp4',
+      width: 832,
+    };
+    const restoreOnto = (removed: Record<string, unknown>, later: Record<string, unknown>, model: ModelConfig) => {
+      const state = workbenchReducer(seeded.state, {
+        projectId,
+        type: 'patchWidgetValues',
+        values: { model, modelKey: model.key, ...removed },
+        widgetId: 'video',
+      });
+      const before = captureGalleryWidgetKeyValues(state.projects);
+      const afterRemoval = workbenchReducer(state, { itemKeys: ['image:a.png'], type: 'removeGalleryItems' });
+      const entries = diffGalleryWidgetKeyValues(before, afterRemoval.projects);
+      const changed = workbenchReducer(afterRemoval, {
+        projectId,
+        type: 'patchWidgetValues',
+        values: later,
+        widgetId: 'video',
+      });
+
+      return getProjectWidgetValues(
+        getProject(
+          applyRestorePatches(changed, selectRestorableGalleryWidgetPatches(entries, changed.projects, [model])),
+          projectId
+        ),
+        'video'
+      );
+    };
+
+    // FL2VA: references added after the frame was swept must not return beside it.
+    expect(
+      restoreOnto({ firstFrameImage: frame }, { references: [imageReference] }, h3Model('fl2va')).firstFrameImage
+    ).toBeNull();
+    // Ref2VA: a last frame swept before an Initial Video was placed would be hidden beside it.
+    expect(
+      restoreOnto({ lastFrameImage: frame }, { sourceVideo: sourceClip }, h3Model('ref2va')).lastFrameImage
+    ).toBeNull();
   });
 
   it('still restores a cleared video slot when its rival stayed empty', () => {
@@ -279,7 +351,7 @@ describe('gallery optimistic rollback against the real reducer', () => {
     const before = captureGalleryWidgetKeyValues(state.projects);
     const afterRemoval = workbenchReducer(state, { itemKeys: ['image:a.png'], type: 'removeGalleryItems' });
     const entries = diffGalleryWidgetKeyValues(before, afterRemoval.projects);
-    const patches = selectRestorableGalleryWidgetPatches(entries, afterRemoval.projects);
+    const patches = selectRestorableGalleryWidgetPatches(entries, afterRemoval.projects, []);
     const restored = applyRestorePatches(afterRemoval, patches);
 
     expect(getProjectWidgetValues(getProject(restored, projectId), 'video').firstFrameImage).toEqual(firstFrame);
@@ -294,6 +366,6 @@ describe('gallery optimistic rollback against the real reducer', () => {
     const entries = diffGalleryWidgetKeyValues(before, afterRemoval.projects);
 
     expect(entries).toEqual([]);
-    expect(selectRestorableGalleryWidgetPatches(entries, afterRemoval.projects)).toEqual([]);
+    expect(selectRestorableGalleryWidgetPatches(entries, afterRemoval.projects, [])).toEqual([]);
   });
 });

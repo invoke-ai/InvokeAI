@@ -14,6 +14,7 @@ from PIL import Image
 
 from invokeai.app.invocations.fields import (
     ImageField,
+    MetadataField,
     MiniMaxH3ConditioningField,
     MiniMaxH3EncodedReferenceField,
     MiniMaxH3FrameConditioningField,
@@ -244,6 +245,18 @@ class TestDenoiseGuards:
         with pytest.raises(ValueError, match="FL2VA task checkpoint"):
             node.invoke(_context_with_conditioning(_cond_info()))
 
+    def test_rejects_frames_with_references_on_an_extend_video_graph(self):
+        node = _denoise_with_frames(_reference_conditioning(["image:a:max:64x64"]))
+        node.metadata = MetadataField.model_validate({"generation_mode": "minimax_h3_extend_video"})
+        with pytest.raises(ValueError, match="cannot be combined with an extended video"):
+            node.invoke(_context_with_conditioning(_cond_info()))
+
+    def test_extend_video_with_references_only_is_not_rejected_as_frames(self):
+        node = _denoise(_reference_conditioning(["image:a:max:64x64"]))
+        node.metadata = MetadataField.model_validate({"generation_mode": "minimax_h3_extend_video"})
+        with pytest.raises(ValueError, match="Connect the same ordered references to Prompt"):
+            node.invoke(_context_with_conditioning(_cond_info()))
+
     def test_ref2va_transformer_still_requires_references_when_frames_are_wired(self):
         node = _denoise_with_frames(None, variant="ref2va")
         with pytest.raises(ValueError, match="requires reference conditioning"):
@@ -390,6 +403,11 @@ class TestTextEncoderGuards:
         assert (info.width, info.height) == (node.width, node.height)
         assert len(info.reference_signature) == 1
         assert info.reference_num_frames == 124
+
+    def test_keyframes_with_references_still_reject_a_missing_image(self):
+        node = self._node(references=_image_ref("ref"), num_frames=124, last_image=ImageField(image_name="gone"))
+        with pytest.raises(KeyError, match="gone"):
+            self._encode(node, {"ref": Image.new("RGB", (64, 64))})
 
     def test_rejects_an_empty_reference_list_with_keyframes(self):
         # The empty list is rejected like everywhere else; it must not fall back to a prompt that

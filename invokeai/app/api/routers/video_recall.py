@@ -30,7 +30,7 @@ from invokeai.app.services.video_records.video_records_common import VideoRecord
 from invokeai.app.services.videos.videos_common import VideoDTO
 from invokeai.app.util.misc import SEED_MAX
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
-from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
+from invokeai.backend.model_manager.taxonomy import BaseModelType, MiniMaxH3VariantType, ModelType
 
 video_recall_router = APIRouter(prefix="/v1/recall/video", tags=["recall"])
 
@@ -371,15 +371,28 @@ MEDIA_QUALIFIERS: dict[str, tuple[str, ...]] = {
 }
 
 
+def _is_ref2va_model(identifier: Optional[dict[str, Any]]) -> bool:
+    """Whether a resolved `model` identifier is a MiniMax H3 Ref2VA model, the one task that keeps frames beside references."""
+    if identifier is None:
+        return False
+    try:
+        config = ApiDependencies.invoker.services.model_manager.store.get_model(identifier["key"])
+    except UnknownModelException:
+        return False
+    return getattr(config, "variant", None) == MiniMaxH3VariantType.REF2VA
+
+
 def apply_media_precedence(resolved: dict[str, Any]) -> dict[str, str]:
     """Drop media a higher-precedence medium in the same request excludes; returns {dropped field: winner}.
 
     Mirrors the Video panel's reading of a record: a whole-generation conditioning clip excludes every other slot,
-    except that a held soundtrack keeps the frames that anchor the picture generated for it; Ref2VA references
-    replace the frame slots (an initial video rides alongside them); an initial video replaces the first frame,
-    which extend mode extracts from the clip itself.
+    except that a held soundtrack keeps the frames that anchor the picture generated for it; references
+    replace the frame slots (an initial video rides alongside them), except on a Ref2VA `model`, which keeps the
+    frames unless an initial video is also present. An initial video replaces the first frame, which extend mode
+    extracts from the clip itself.
     """
     clip_holds_picture = resolved.get("ltx2_conditioning_role") == "video"
+    references_replace_frames = not _is_ref2va_model(resolved.get("model")) or "source_video" in resolved
     rules: list[tuple[str, bool, tuple[str, ...]]] = [
         (
             "ltx2_conditioning_video",
@@ -390,7 +403,7 @@ def apply_media_precedence(resolved: dict[str, Any]) -> dict[str, str]:
         (
             "minimax_h3_references",
             bool(resolved.get("minimax_h3_references")),
-            ("first_frame_image", "last_frame_image"),
+            ("first_frame_image", "last_frame_image") if references_replace_frames else (),
         ),
         ("source_video", "source_video" in resolved, ("first_frame_image",)),
     ]

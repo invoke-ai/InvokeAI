@@ -27,7 +27,7 @@ from invokeai.app.services.model_records.model_records_base import UnknownModelE
 from invokeai.app.services.users.users_common import UserCreateRequest
 from invokeai.app.services.video_records.video_records_common import VideoRecordNotFoundException
 from invokeai.app.services.videos.videos_common import VideoDTO
-from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
+from invokeai.backend.model_manager.taxonomy import BaseModelType, MiniMaxH3VariantType, ModelType
 
 MP4_BYTES = b"\x00\x00\x00\x18ftypmp42" + b"\x00" * 12
 
@@ -39,8 +39,8 @@ class MockApiDependencies(ApiDependencies):
         self.invoker = invoker
 
 
-def _model(key: str, name: str, base: BaseModelType, model_type: ModelType) -> SimpleNamespace:
-    return SimpleNamespace(key=key, hash=f"blake3:{key}", name=name, base=base, type=model_type)
+def _model(key: str, name: str, base: BaseModelType, model_type: ModelType, **extra: Any) -> SimpleNamespace:
+    return SimpleNamespace(key=key, hash=f"blake3:{key}", name=name, base=base, type=model_type, **extra)
 
 
 class FakeModelStore:
@@ -65,7 +65,10 @@ CATALOG = [
     _model("wan-lora", "detail", BaseModelType.Wan, ModelType.LoRA),
     _model("wan-main", "Wan 2.2 I2V", BaseModelType.Wan, ModelType.Main),
     _model("wan-t5", "UMT5 XXL", BaseModelType.Any, ModelType.WanT5Encoder),
-    _model("h3-ref2va", "MiniMax H3 Ref2VA", BaseModelType.MiniMaxH3, ModelType.Main),
+    _model(
+        "h3-ref2va", "MiniMax H3 Ref2VA", BaseModelType.MiniMaxH3, ModelType.Main, variant=MiniMaxH3VariantType.REF2VA
+    ),
+    _model("h3-fl2va", "MiniMax H3 FL2VA", BaseModelType.MiniMaxH3, ModelType.Main, variant=MiniMaxH3VariantType.FL2VA),
     _model("h3-qwen", "Qwen3-VL", BaseModelType.MiniMaxH3, ModelType.Qwen3VLEncoder),
     # Generic encoders install as base "any"; the H3 and LTX-2 slots must not take them.
     _model("any-qwen", "Qwen3-VL Generic", BaseModelType.Any, ModelType.Qwen3VLEncoder),
@@ -531,6 +534,55 @@ class TestParameterRecall:
 
         assert response.json()["overridden"] == overridden
         assert response.json()["skipped"] == []
+        assert set(_only_recall_event(invoker).parameters) == sent
+
+    @pytest.mark.parametrize(
+        ("model", "with_video", "sent", "overridden"),
+        [
+            ("h3-ref2va", False, {"model", "first_frame_image", "last_frame_image", "minimax_h3_references"}, {}),
+            (
+                "h3-ref2va",
+                True,
+                {"model", "source_video", "minimax_h3_references"},
+                {"first_frame_image": "minimax_h3_references", "last_frame_image": "minimax_h3_references"},
+            ),
+            (
+                "h3-fl2va",
+                False,
+                {"model", "minimax_h3_references"},
+                {"first_frame_image": "minimax_h3_references", "last_frame_image": "minimax_h3_references"},
+            ),
+        ],
+        ids=[
+            "ref2va-keeps-frames",
+            "ref2va-initial-video-drops-frames",
+            "fl2va-drops-frames",
+        ],
+    )
+    def test_references_replace_frames_except_on_a_ref2va_model_without_an_initial_video(
+        self,
+        invoker: Invoker,
+        client: TestClient,
+        model: str,
+        with_video: bool,
+        sent: set[str],
+        overridden: dict[str, str],
+    ) -> None:
+        for image_name in ("first.png", "last.png", "ref.png"):
+            _save_image(invoker, image_name)
+        _save_video(invoker, "clip.mp4")
+        body: dict[str, Any] = {
+            "first_frame_image": {"image_name": "first.png"},
+            "last_frame_image": {"image_name": "last.png"},
+            "minimax_h3_references": [{"kind": "image", "image_name": "ref.png"}],
+            "model": model,
+        }
+        if with_video:
+            body["source_video"] = {"video_name": "clip.mp4"}
+
+        response = client.post("/api/v1/recall/video/default", json=body)
+
+        assert response.json()["overridden"] == overridden
         assert set(_only_recall_event(invoker).parameters) == sent
 
     def test_a_missing_winner_overrides_nothing(self, invoker: Invoker, client: TestClient) -> None:

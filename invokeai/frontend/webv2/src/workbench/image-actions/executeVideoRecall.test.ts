@@ -25,9 +25,9 @@ vi.mock('@features/gallery/data/backend', async (importOriginal) => ({
 }));
 
 import { galleryVideoMetadataOptions } from '@features/gallery/queries';
-import { createDefaultVideoWidgetValues } from '@features/video';
+import { createDefaultVideoWidgetValues, createVideoSourceClip } from '@features/video';
 
-import { applyVideoRecallMetadata, executeVideoRecall } from './executeVideoRecall';
+import { applyVideoRecallMetadata, executeVideoRecall, getCurrentVideoValues } from './executeVideoRecall';
 
 const t = ((key: string) => key) as unknown as TFunction;
 
@@ -1015,6 +1015,10 @@ describe('Ref2VA references with first/last frames on recall', () => {
     width: 1344,
     ...extra,
   });
+  // Echoes the field keys a notice names, so assertions read which fields were reported.
+  const fieldKeys = ((key: string, values?: { fields?: string[] }) =>
+    values?.fields ? values.fields.join(',') : key) as unknown as TFunction;
+  let lastCommands: ReturnType<typeof createCommands>['commands'];
   const recall = async ({
     metadata,
     model = h3Model,
@@ -1030,6 +1034,7 @@ describe('Ref2VA references with first/last frames on recall', () => {
     galleryApi.galleryItems.resolve.mockResolvedValue({ ...item, durationSeconds: 4, fps: 24, name: 'source.mp4' });
     const { commands, patchValues } = createCommands();
 
+    lastCommands = commands;
     await applyVideoRecallMetadata({
       commands,
       emptyNotice: { message: 'nothing', title: 'nothing' },
@@ -1039,7 +1044,7 @@ describe('Ref2VA references with first/last frames on recall', () => {
       models: [model],
       owner: accountLifecycle.capture(),
       partial,
-      t,
+      t: fieldKeys,
     });
 
     return patchValues.mock.calls.at(-1)?.[1] as Record<string, unknown> | undefined;
@@ -1086,6 +1091,49 @@ describe('Ref2VA references with first/last frames on recall', () => {
 
     expect(written).toMatchObject({ firstFrameImage: null, lastFrameImage: null });
     expect(written?.sourceVideo).toMatchObject({ video_name: 'source.mp4' });
+  });
+
+  describe('onto a panel holding an Initial Video', () => {
+    const heldVideo = createVideoSourceClip({
+      durationSeconds: 4,
+      fps: 24,
+      height: 768,
+      name: 'held.mp4',
+      width: 1344,
+    });
+    const held = getCurrentVideoValues({
+      models: [h3Model],
+      videoValues: { ...createDefaultVideoWidgetValues([h3Model]), sourceVideo: heldVideo },
+    });
+    const panel = { references: held.references, sourceVideo: held.sourceVideo };
+    // A recalled first frame displaces the held Initial Video like setting it by hand; a last frame cannot.
+    const frames = { last_frame_image: { image_name: 'last.png' } };
+
+    const reportedFields = () => {
+      const [notice] = vi.mocked(lastCommands.notifications.add).mock.calls.at(-1) ?? [];
+
+      return (notice as { message: string }).message;
+    };
+
+    it('does not report media when the only recalled media is a last frame the Initial Video displaces', async () => {
+      const written = await recall({
+        metadata: recorded({ ...frames, minimax_h3_references: undefined }),
+        panel,
+        partial: true,
+      });
+
+      expect(written).toMatchObject({ lastFrameImage: null, sourceVideo: panel.sourceVideo });
+      expect(reportedFields()).not.toContain('widgets.gallery.itemActions.recall.fields.media');
+      expect(reportedFields()).toContain('widgets.gallery.itemActions.recall.fields.prompts');
+    });
+
+    it('reports media when recalled references apply while the displaced frames are dropped', async () => {
+      const written = await recall({ metadata: recorded(frames), panel, partial: true });
+
+      expect(written).toMatchObject({ lastFrameImage: null, sourceVideo: panel.sourceVideo });
+      expect(written?.references).toContainEqual(expect.objectContaining({ kind: 'image' }));
+      expect(reportedFields()).toContain('widgets.gallery.itemActions.recall.fields.media');
+    });
   });
 
   it('clears the frames a panel holds when an older references-only record is recalled', async () => {

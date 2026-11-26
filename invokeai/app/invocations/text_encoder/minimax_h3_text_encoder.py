@@ -136,20 +136,16 @@ class MiniMaxH3TextEncoderInvocation(BaseInvocation):
         anchors: tuple[str, ...] = ()
         text_references: list[MiniMaxH3TextReference] = []
         reference_signature: tuple[str, ...] = ()
-        if has_keyframes and self.references is not None:
-            # With references the keyframes stay out of the vision context: ComfyUI's combined
-            # keyframe + Ref2VA conditioning presents only the references to the text encoder, and the
-            # keyframes act through the VAE condition rows alone. The anchors are still recorded so the
-            # denoise node can check them against the Frame Conditioning node.
-            anchors = tuple(
-                anchor
-                for anchor, image in (("first", self.first_image), ("last", self.last_image))
-                if image is not None
-            )
-        elif has_keyframes:
+        if has_keyframes:
             first = context.images.get_pil(self.first_image.image_name) if self.first_image else None
             last = context.images.get_pil(self.last_image.image_name) if self.last_image else None
             keyframes, anchors = prepare_keyframes(first, last, self.height, self.width)
+            if self.references is not None:
+                # With references the keyframes stay out of the vision context: ComfyUI's combined
+                # keyframe + Ref2VA conditioning presents only the references to the text encoder, and the
+                # keyframes act through the VAE condition rows alone. The anchors are still recorded so the
+                # denoise node can check them against the Frame Conditioning node.
+                keyframes = []
         if self.references is not None:
             if self.num_frames is None:
                 raise ValueError(

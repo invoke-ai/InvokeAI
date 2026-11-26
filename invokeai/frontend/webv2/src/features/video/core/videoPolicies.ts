@@ -1859,7 +1859,7 @@ export const getVideoModelSelectionResult = ({
   if (next.lastFrameImage) {
     // The end-frame anchor rides FLF2V with a first frame or source video; alone it needs the last-frame mode.
     const lastFrameSupported =
-      framesWithReferences ||
+      (framesWithReferences && !next.sourceVideo) ||
       (next.firstFrameImage || next.sourceVideo ? modes.includes('first-last') : modes.includes('last-frame'));
 
     if (!lastFrameSupported) {

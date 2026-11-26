@@ -871,16 +871,21 @@ export const getInitialVideoPatch = ({
   maxVideos,
   numFrames,
   referenceExtend,
+  referenceFrames = false,
   references,
   sourceVideo,
 }: {
   maxVideos: number;
   numFrames: number;
   referenceExtend: boolean;
+  /** Frames beside references never sit under an Initial Video (the panel hides them), so placing one clears the last frame. */
+  referenceFrames?: boolean;
   references: VideoReferenceItem[];
   sourceVideo: VideoSourceClip | null;
 }): Partial<VideoWidgetValues> | null => {
-  const displaced = sourceVideo ? { conditioningClip: null, firstFrameImage: null } : {};
+  const displaced = sourceVideo
+    ? { conditioningClip: null, firstFrameImage: null, ...(referenceFrames ? { lastFrameImage: null } : {}) }
+    : {};
 
   if (!referenceExtend) {
     return { sourceVideo, ...displaced };

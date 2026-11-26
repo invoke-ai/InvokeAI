@@ -712,6 +712,31 @@ describe('H3 task switches through the top model selection', () => {
     expect(lossKeys(backToFl)).toContain('references');
   });
 
+  it('reports the last frame lost when FL2VA with an Initial Video switches to Ref2VA', () => {
+    const flModel = h3Model();
+    const sourceVideo = {
+      endFrame: 30,
+      fps: 24,
+      height: 4,
+      numFrames: 31,
+      startFrame: 0,
+      video_name: 's.mp4',
+      width: 4,
+    };
+    const result = getVideoModelSelectionResult({
+      currentSettings: settingsFor(fl2vaTransformer(), {
+        lastFrameImage: { height: 4, image_name: 'lf.png', width: 4 },
+        modelKey: fl2vaTransformer().key,
+        sourceVideo,
+      }),
+      model: ref2vaTransformer(),
+      models: [flModel],
+    });
+
+    expect(result.settings.lastFrameImage).toBeNull();
+    expect(lossKeys(result)).toContain('lastFrame');
+  });
+
   it('keeps frames beside references across both switch directions, losing only the references leaving Ref2VA', () => {
     const flModel = h3Model();
     const frames = {

@@ -17,6 +17,7 @@ import {
   formatReferencePromptLabels,
   getDefaultReferenceClip,
   getDefaultReferenceConditioning,
+  getInitialVideoPatch,
   getReferencesPatch,
   isVideoSettings,
   createFrameImageSetter,
@@ -822,6 +823,37 @@ describe('panel patches shared by the Video panel and gallery/API placement', ()
     image: { height: 512, image_name: 'ref.png', width: 512 },
     kind: 'image',
   };
+
+  it('clears the last frame under a placed Initial Video only where frames can sit beside references', () => {
+    const sourceVideo = createVideoSourceClip({ durationSeconds: 4, fps: 24, height: 768, name: 's.mp4', width: 1344 });
+    const patch = (referenceFrames: boolean) =>
+      getInitialVideoPatch({
+        maxVideos: 3,
+        numFrames: 97,
+        referenceExtend: false,
+        referenceFrames,
+        references: [],
+        sourceVideo,
+      });
+
+    expect(patch(true)).toMatchObject({ firstFrameImage: null, lastFrameImage: null });
+    expect(patch(false)).not.toHaveProperty('lastFrameImage');
+  });
+
+  it('displaces the frames on a reference-extend panel too, beside the linked tail reference', () => {
+    const sourceVideo = createVideoSourceClip({ durationSeconds: 4, fps: 24, height: 768, name: 's.mp4', width: 1344 });
+    const placed = getInitialVideoPatch({
+      maxVideos: 3,
+      numFrames: 97,
+      referenceExtend: true,
+      referenceFrames: true,
+      references: [],
+      sourceVideo,
+    });
+
+    expect(placed).toMatchObject({ firstFrameImage: null, lastFrameImage: null, sourceVideo });
+    expect(placed?.references).toHaveLength(1);
+  });
 
   it('lets references displace the initial video only on a panel that does not extend from it', () => {
     expect(

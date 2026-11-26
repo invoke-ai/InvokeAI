@@ -345,11 +345,17 @@ export const applyVideoRecallMetadata = async ({
     }
 
     if (result.fields.includes('media')) {
-      // A full recall that cleared held media changed the panel even if nothing hydrates.
-      const clearedMedia = (
-        ['conditioningClip', 'firstFrameImage', 'lastFrameImage', 'references', 'sourceVideo'] as const
-      ).some((slot) => result.values[slot] !== currentValues[slot]);
-      let recalledMedia = false;
+      const mediaSlots = [
+        'conditioningClip',
+        'firstFrameImage',
+        'lastFrameImage',
+        'references',
+        'sourceVideo',
+      ] as const;
+      const isHeld = (value: unknown): boolean => (Array.isArray(value) ? value.length > 0 : Boolean(value));
+      // A recall that emptied a held slot changed the panel even if nothing hydrates.
+      const clearedMedia = mediaSlots.some((slot) => isHeld(currentValues[slot]) && !isHeld(result.values[slot]));
+      const recalledSlots = new Set<(typeof mediaSlots)[number]>();
       const { firstFrameName, lastFrameName, sourceVideoName } = result.mediaNames;
       const firstFrame = firstFrameName ? resolved.images.get(firstFrameName) : undefined;
       const lastFrame = lastFrameName ? resolved.images.get(lastFrameName) : undefined;
@@ -364,7 +370,7 @@ export const applyVideoRecallMetadata = async ({
             result.values.conditioningClip
           ),
         };
-        recalledMedia = true;
+        recalledSlots.add('firstFrameImage');
       }
       if (lastFrame) {
         result.values = {
@@ -375,7 +381,7 @@ export const applyVideoRecallMetadata = async ({
             result.values.conditioningClip
           ),
         };
-        recalledMedia = true;
+        recalledSlots.add('lastFrameImage');
       }
 
       const { conditioningClip } = result.mediaNames;
@@ -403,7 +409,7 @@ export const applyVideoRecallMetadata = async ({
           references: [],
           sourceVideo: null,
         };
-        recalledMedia = true;
+        recalledSlots.add('conditioningClip');
       }
 
       const sourceItem = sourceVideoName ? resolved.videos.get(sourceVideoName) : undefined;
@@ -430,7 +436,7 @@ export const applyVideoRecallMetadata = async ({
           firstFrameImage: null,
           sourceVideo: { ...rebuiltClip, endFrame, startFrame },
         };
-        recalledMedia = true;
+        recalledSlots.add('sourceVideo');
       }
 
       if (result.mediaNames.references.length > 0) {
@@ -480,12 +486,8 @@ export const applyVideoRecallMetadata = async ({
             // A source video recorded alongside references is reference-extend state; clear only a leftover.
             sourceVideo: result.mediaNames.sourceVideoName || partial ? result.values.sourceVideo : null,
           };
-          recalledMedia = true;
+          recalledSlots.add('references');
         }
-      }
-
-      if (!recalledMedia && !clearedMedia) {
-        result.fields = result.fields.filter((field) => field !== 'media');
       }
 
       // Deleted frames or unavailable models must not leave an ungeneratable panel.
@@ -503,6 +505,7 @@ export const applyVideoRecallMetadata = async ({
             maxVideos: policy.references?.maxVideos ?? 0,
             numFrames: result.values.numFrames,
             referenceExtend,
+            referenceFrames,
             references: result.values.references,
             sourceVideo: result.values.sourceVideo,
           });
@@ -557,6 +560,13 @@ export const applyVideoRecallMetadata = async ({
         ) {
           result.values = { ...result.values, firstFrameImage, lastFrameImage, references, sourceVideo };
         }
+      }
+
+      // Report media only if a recalled slot survived reconciliation or a full recall cleared held media.
+      const survived = [...recalledSlots].some((slot) => isHeld(result.values[slot]));
+
+      if (!survived && !clearedMedia) {
+        result.fields = result.fields.filter((field) => field !== 'media');
       }
     }
 
@@ -629,6 +639,7 @@ export const placeInitialVideo = ({
     maxVideos: policy?.references?.maxVideos ?? 0,
     numFrames: values.numFrames,
     referenceExtend,
+    referenceFrames: Boolean(policy?.references?.frames),
     references: values.references,
     sourceVideo: createVideoSourceClip(video),
   });

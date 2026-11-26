@@ -77,8 +77,9 @@ Media fields in one request are read in the Video panel's precedence, highest fi
    other medium, except that in the `audio` role `first_frame_image` and
    `last_frame_image` ride alongside it to anchor the generated picture.
 2. `minimax_h3_references` (non-empty) — references replace the frame slots, and a
-   `source_video` rides alongside them. MiniMax H3 Ref2VA is the exception: it keeps
-   `first_frame_image` and `last_frame_image` alongside the references.
+   `source_video` rides alongside them. MiniMax H3 Ref2VA is the exception: when the
+   request's `model` is a Ref2VA model, it keeps `first_frame_image` and
+   `last_frame_image` alongside the references unless a `source_video` is also sent.
 3. `source_video` — an initial video replaces `first_frame_image`, which extend
    mode takes from the clip itself.
 4. `first_frame_image`, `last_frame_image`.
