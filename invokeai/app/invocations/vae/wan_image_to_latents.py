@@ -74,7 +74,7 @@ class WanImageToLatentsInvocation(BaseInvocation, WithMetadata, WithBoard):
                     image_tensor = image_tensor.unsqueeze(2)  # [B, C, H, W] -> [B, C, 1, H, W]
 
                 encoded = vae.encode(image_tensor, return_dict=False)[0]
-                latents = encoded.sample().to(dtype=vae_dtype)
+                latents = encoded.mode().to(dtype=vae_dtype)
 
                 # Normalise to the denoiser's expected zero-centred space:
                 #   (latents - mean) / std

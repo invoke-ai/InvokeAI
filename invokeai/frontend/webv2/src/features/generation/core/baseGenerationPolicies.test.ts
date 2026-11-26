@@ -27,8 +27,12 @@ import {
   getComponentSectionPolicy,
   getDefaultComponentSlotPolicies,
   getDefaultGenerateSettings,
+  getGenerateInvocationIssues,
   getGenerateModelSelectionResult,
+  getGenerationDefaults,
   getGenerationDimensions,
+  getGuidanceBoundReason,
+  getGuidanceSliderMax,
   getGenerationModelAvailabilityReasons,
   getGenerationUiPolicy,
   getGenerationValidationIssues,
@@ -48,6 +52,7 @@ import {
   isLossyModelSwitch,
   isModelFromRepo,
   isSupportedGenerateModel,
+  needsEmptyCanvasFrameForReferenceBudget,
   type NewReferenceImage,
   type ReferenceVisionComponents,
 } from './baseGenerationPolicies';
@@ -580,6 +585,113 @@ describe('component policies', () => {
         'External Model supports at most 2048×1536.'
       );
     }
+  });
+
+  it('warns when only visible Canvas content would exceed the reference budget', () => {
+    const model: GenerateModelConfig = {
+      ...externalModel,
+      provider_id: 'seedream',
+      provider_model_id: 'seedream-4-5-251128',
+      capabilities: { modes: ['txt2img', 'img2img'], supports_reference_images: true, max_reference_images: 14 },
+    };
+    const settings = createSettings(model, {
+      referenceImages: Array.from({ length: 14 }, (_, i) => ({
+        id: `reference-${i}`,
+        isEnabled: true,
+        config: {
+          type: 'external_reference_image',
+          image: {
+            imageName: `reference-${i}.png`,
+            width: 512,
+            height: 512,
+            original: { image: { image_name: `reference-${i}.png`, width: 512, height: 512 } },
+          },
+        },
+      })),
+    });
+    const values = { ...settings, model };
+    expect(needsEmptyCanvasFrameForReferenceBudget(model, settings)).toBe(true);
+    expect(getGenerateInvocationIssues(values, { canvasFrame: { height: 512, width: 512 } })).toEqual([]);
+    expect(getGenerateInvocationIssues(values)).toEqual([]);
+    expect(getGenerationValidationReasons(model, settings, 'img2img')).toEqual([
+      'External Model supports at most 15 images total (reference + init + output), got 16.',
+    ]);
+    expect(needsEmptyCanvasFrameForReferenceBudget({ ...model, capabilities: { modes: ['txt2img'] } }, settings)).toBe(
+      false
+    );
+    settings.referenceImages[0]!.isEnabled = false;
+    expect(needsEmptyCanvasFrameForReferenceBudget(model, settings)).toBe(false);
+    settings.referenceImages.push(
+      { ...settings.referenceImages[1]!, id: 'extra-1' },
+      { ...settings.referenceImages[2]!, id: 'extra-2' }
+    );
+    expect(needsEmptyCanvasFrameForReferenceBudget(model, settings)).toBe(false);
+    expect(getGenerateInvocationIssues({ ...settings, model }).map(({ message }) => message)).toContain(
+      'External Model supports at most 15 images total (reference + init + output), got 16.'
+    );
+  });
+
+  it('blocks FLUX Fill outside inpaint and outpaint, but not while a Canvas frame decides the mode', () => {
+    const model = createModel('flux', { variant: 'dev_fill' });
+    const settings = {
+      ...createSettings(model),
+      clipEmbedModel: clipEmbed,
+      t5EncoderModel: t5Encoder,
+      vae: fluxVae,
+    };
+    const reasons = (mode?: Parameters<typeof getGenerationValidationReasons>[2]) =>
+      getGenerationValidationReasons(model, settings, mode).filter((reason) => reason.startsWith('FLUX Fill only'));
+
+    expect(reasons()).toHaveLength(1);
+    expect(reasons('img2img')).toHaveLength(1);
+    expect(reasons('inpaint')).toEqual([]);
+    expect(reasons('outpaint')).toEqual([]);
+    expect(getGenerateInvocationIssues({ ...settings, model }).map(({ message }) => message)).toEqual(reasons());
+    expect(
+      getGenerateInvocationIssues({ ...settings, model }, { canvasFrame: { height: 512, width: 512 } }).map(
+        ({ message }) => message
+      )
+    ).not.toContain(reasons()[0]);
+  });
+
+  it('holds FLUX Fill to a guidance floor of 25 with the field reason and a one-step fix', () => {
+    const model = createModel('flux', { variant: 'dev_fill' });
+    const settings = { ...createSettings(model), clipEmbedModel: clipEmbed, t5EncoderModel: t5Encoder, vae: fluxVae };
+    const guidanceIssues = (cfgScale: number) =>
+      getGenerationValidationIssues(model, { ...settings, cfgScale }, 'inpaint').filter(
+        ({ target }) => target.field === 'cfgScale'
+      );
+
+    expect(getGuidanceBoundReason(model, 3.5)).toBe(`Guidance must be at least 25 for ${model.name}.`);
+    expect(guidanceIssues(3.5)).toEqual([
+      expect.objectContaining({
+        fix: { kind: 'clampGuidance', value: 25 },
+        message: getGuidanceBoundReason(model, 3.5),
+      }),
+    ]);
+    expect(getGuidanceBoundReason(model, 25)).toBeNull();
+    expect(guidanceIssues(25)).toEqual([]);
+    expect(guidanceIssues(30)).toEqual([]);
+    expect(getGenerationUiPolicy(model).guidanceMin).toBe(25);
+  });
+
+  it('lands on the FLUX Fill floor when switching from FLUX dev at its default guidance', () => {
+    const dev = createModel('flux', { key: 'flux-dev', variant: 'dev' });
+    const fill = createModel('flux', { key: 'flux-fill', variant: 'dev_fill' });
+    const currentValues = createSettings(dev, { cfgScale: 3.5 });
+
+    const { settings } = getGenerateModelSelectionResult({ currentValues, model: fill, models: [dev, fill] });
+
+    expect(settings.cfgScale).toBeGreaterThanOrEqual(25);
+  });
+
+  it('raises a FLUX Fill model default saved below the floor to the floor', () => {
+    const fill = createModel('flux', { variant: 'dev_fill', default_settings: { guidance: 3.5 } });
+
+    expect(getGenerationDefaults(fill).cfgScale).toBe(25);
+    expect(
+      getGenerationDefaults(createModel('flux', { variant: 'dev', default_settings: { guidance: 3.5 } })).cfgScale
+    ).toBe(3.5);
   });
 
   it('keeps concepts but clears incompatible selections when the selected model changes', () => {
@@ -1492,12 +1604,15 @@ describe('the guidance range the architecture declares', () => {
     for (const row of architectureCapabilitiesFixture) {
       const model = createModel(row.base, { variant: row.variant ?? undefined } as Partial<MainModelConfig>);
 
-      if (!isSupportedGenerateModel(model)) {
+      // Ideogram's separate sampler override is validated with its own denoise bounds above.
+      if (!isSupportedGenerateModel(model) || model.base === 'ideogram-4') {
         continue;
       }
 
       const where = `${row.base}/${row.variant ?? '-'}`;
-      const { guidance_max: max, guidance_min: min } = row.features;
+      const { guidance_max: max } = row.features;
+      // FLUX Fill is the one deliberate exception: a product floor above the served node minimum.
+      const min = where === 'flux/dev_fill' ? 25 : row.features.guidance_min;
 
       expect(guidanceReasons(model, min), `${where} rejected its own floor`).toEqual([]);
 
@@ -2161,5 +2276,24 @@ describe("a main model's default components", () => {
         switchTo(createModel('sdxl', { default_settings: { vae: fluxVae.key } }), [fluxVae]).settings.vae
       ).toBeNull();
     });
+  });
+});
+
+describe('getGuidanceSliderMax', () => {
+  it('keeps the 10-wide track for floors below it', () => {
+    expect(getGuidanceSliderMax(1, null)).toBe(10);
+    expect(getGuidanceSliderMax(1, 20)).toBe(10);
+    expect(getGuidanceSliderMax(1, 6)).toBe(6);
+    expect(getGuidanceSliderMax(0, 100)).toBe(10);
+  });
+
+  it('spans a usable range above a floor at or beyond the track, so FLUX Fill runs from 25 to 35', () => {
+    expect(getGuidanceSliderMax(25, null)).toBe(35);
+    expect(getGuidanceSliderMax(10, null)).toBe(20);
+  });
+
+  it('never crosses the input ceiling or drops below the floor', () => {
+    expect(getGuidanceSliderMax(25, 30)).toBe(30);
+    expect(getGuidanceSliderMax(25, 25)).toBe(25);
   });
 });

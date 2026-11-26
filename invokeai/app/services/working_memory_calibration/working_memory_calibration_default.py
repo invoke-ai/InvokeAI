@@ -7,14 +7,14 @@ import threading
 import uuid
 import weakref
 from bisect import bisect_left, bisect_right
-from collections.abc import AsyncIterator, Callable, Iterable, Mapping
-from contextlib import AbstractContextManager, ExitStack, asynccontextmanager
+from collections.abc import AsyncIterator, Callable, Iterable, Iterator, Mapping
+from contextlib import AbstractContextManager, ExitStack, asynccontextmanager, contextmanager
 from dataclasses import dataclass
 from functools import partial
 from itertools import chain
 from pathlib import Path
 from types import SimpleNamespace
-from typing import TYPE_CHECKING, Any, Final, NamedTuple, Optional
+from typing import TYPE_CHECKING, Any, Final, Literal, NamedTuple, Optional
 
 import torch
 
@@ -143,17 +143,34 @@ finished, within seconds; a step that runs long (a large model's largest decode)
 observation, as the runner settles them, starts the wait. Past it the attempt is taken for abandoned: a client that
 went away. It no longer blocks another attempt, and it never feeds a fit, being short of steps."""
 
-_RUNNING_ELSEWHERE: Final = (
-    "Another calibration is still running on this GPU. Wait until it has finished, or stop it, then calibrate again."
-)
+_Busy = Literal["running", "between_steps"]
+"""Why another attempt holds the device class (`_attempt_blocks`): one of its runs is running, or it is open between
+its steps."""
 
-_BETWEEN_STEPS: Final = (
-    "Another calibration on this GPU is between its steps. Try again in a moment, or once it has finished."
-)
+_BUSY: Final[Mapping[_Busy, str]] = {
+    "running": "Another calibration is still running on this GPU. Wait until it has finished, or stop it, then "
+    "calibrate again.",
+    "between_steps": "Another calibration on this GPU is between its steps. Try again in a moment, or once it has "
+    "finished.",
+}
+"""The refusals of a new run of an attempt (`create_run`), by why another attempt holds the device class."""
+
+_RETRY_BUSY: Final[Mapping[_Busy, str]] = {
+    "running": "Another calibration is still running on this GPU, and this item would measure in the middle of it. "
+    "Retry it once that calibration has finished, or stop it.",
+    "between_steps": "Another calibration on this GPU is between its steps, and this item would measure in the middle "
+    "of it. Retry it once that calibration has finished.",
+}
+"""The refusals of a retry of calibration items (`retries_starting`), shown where the queue's retry failed."""
 
 _INTERLEAVED: Final = (
     "Another calibration ran on this GPU after this calibration started, so its measurements can no longer be "
     "combined. Calibrate again."
+)
+
+_RETRY_INTERLEAVED: Final = (
+    "Another calibration ran on this GPU after this item's calibration started, so a retry could no longer be "
+    "combined with that calibration's measurements. Calibrate the model again instead."
 )
 
 _ATTEMPTS_LOCK: Final = "calibration-attempts"
@@ -373,11 +390,15 @@ def _lineage_outcomes(
 
 
 def _count_retries(run_ids: frozenset[str], file: CalibrationStoreFile) -> tuple[bool, frozenset[str]]:
-    """A store change: count one more retry in flight on each run of `run_ids` the file holds. Returns those."""
+    """A store change: count one more retry in flight on each run of `run_ids` the file holds, and note on each of
+    them without an attempt that a retry of it began now (`retried_at`, `_started_at`). Returns those."""
     counted = frozenset(run.run_id for run in file.runs if run.run_id in run_ids)
+    now = _now()
     for run in file.runs:
         if run.run_id in counted:
             run.retries_in_flight += 1
+            if run.attempt_id is None:
+                run.retried_at = now
     return bool(counted), counted
 
 
@@ -411,19 +432,33 @@ def _last_activity(runs: Iterable[CalibrationRun]) -> datetime.datetime:
     )
 
 
+def _started_at(run: CalibrationRun) -> datetime.datetime:
+    """When the run last began to measure the GPU on its own account: its creation, or for a run without an attempt
+    the latest retry of its items that began since (`retried_at`). A retry of an attempt's run needs no such note: it
+    is refused once another run began after the attempt's first (`_cut_off`), and an attempt begun after it is cut
+    off by its own first run."""
+    return max(run.created_at, run.retried_at) if run.retried_at is not None else run.created_at
+
+
 def _cut_off(file: CalibrationStoreFile, key: AttemptKey) -> bool:
-    """Whether another run (another attempt's, or one without an attempt: a script, the family E2E tool) was created
-    on the device class after the first run of attempt `key`: a later step of it would measure the GPU after that run,
-    so none is accepted (`CalibrationAttemptInterleavedError`)."""
+    """Whether another run (another attempt's, or one without an attempt: a script, the family E2E tool) began on the
+    device class after the first run of attempt `key`, created or, without an attempt, retried (`_started_at`): a
+    later step of it, or a retry of one of its steps, would measure the GPU after that run, so none is accepted
+    (`CalibrationAttemptInterleavedError`)."""
     own = [run.created_at for run in file.runs if _attempt_key(run) == key]
-    return bool(own) and any(_attempt_key(run) != key and run.created_at > min(own) for run in file.runs)
+    return bool(own) and any(_attempt_key(run) != key and _started_at(run) > min(own) for run in file.runs)
 
 
 def _interleaved_attempts(file: CalibrationStoreFile) -> set[AttemptKey]:
-    """The attempts another run was created between the first and the last run of: their later steps measured the GPU
-    after that run, not after their own earlier steps. The calibrate route refuses such a step
-    (`CalibrationAttemptInterleavedError`), so only a store written otherwise holds one."""
-    created = sorted(run.created_at for run in file.runs)
+    """The attempts another run was created, or retried without an attempt (`retried_at`), between the first and the
+    last run of: their later steps measured the GPU after that run, not after their own earlier steps. The calibrate
+    route refuses such a step (`CalibrationAttemptInterleavedError`), so only a store written otherwise holds one."""
+    created = sorted(
+        chain(
+            (run.created_at for run in file.runs),
+            (run.retried_at for run in file.runs if run.attempt_id is None and run.retried_at is not None),
+        )
+    )
     spans: dict[AttemptKey, list[datetime.datetime]] = {}
     for run in file.runs:
         if (key := _attempt_key(run)) is not None:
@@ -711,7 +746,8 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
         """For a run of an attempt, hold the lock every attempt's creation takes, from the run's record through its
         enqueue to the record of its items, in every process serving the root: the next attempt's creation finds the
         items of the last one in the queue, and refuses while they run (`CalibrationAttemptBusyError`). The runs of one
-        attempt are posted one after the other, so they barely wait. A run without an attempt takes no lock."""
+        attempt are posted one after the other, so they barely wait. A run without an attempt takes no lock. A retry of
+        calibration items holds it too, from its checks through its commit (`retry_admission`)."""
         if request.attempt_id is None:
             yield
             return
@@ -928,7 +964,7 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
                     raise CalibrationAttemptInterleavedError(_INTERLEAVED)
                 # The queue is read under the file's lock; the queue takes it only outside its transactions.
                 if (busy := self._attempt_blocks(file, key)) is not None:
-                    raise CalibrationAttemptBusyError(busy)
+                    raise CalibrationAttemptBusyError(_BUSY[busy])
                 # The attempt's earlier steps measured the models as they were then: the model calibrated, and every
                 # model their graphs named, hash included, which a graph compiled since names as it is now.
                 for known in file.runs:
@@ -963,11 +999,15 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
         self._run_files[run_id] = device_class.id
         return _Enqueue(batch, device_class.id, created=created, marks=created)
 
-    def _attempt_blocks(self, file: CalibrationStoreFile, key: AttemptKey) -> Optional[str]:
+    def _attempt_blocks(self, file: CalibrationStoreFile, key: Optional[AttemptKey]) -> Optional[_Busy]:
         """Why another attempt than `key` holds the device class, or None: one of its runs is running (an item pending,
         in progress or waiting), or another owner's attempt is open. One attempt runs on a device class at a time: its
         runs measure the GPU back to back, each step on what the last one left, and another attempt's items in between
         would measure neither.
+
+        `key` None judges a retry of a run without an attempt (a script's, the family E2E tool's): every attempt counts
+        then, its owner's too. The retry would measure between the open attempt's steps and cut it off (`retried_at`,
+        `_cut_off`), where its owner's client means to go on with it.
 
         Open: between its steps, short of `attempt_steps` runs (those resets removed included), not aborted (no item
         of it canceled or failed for a changed model, no reset that stopped it, no other run since its first), its
@@ -979,7 +1019,9 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
         aborted, and a later step of it is refused (`_cut_off`).
 
         The grace is measured on the stored times against the clock now: a jump of the wall clock lengthens or
-        shortens it once."""
+        shortens it once.
+
+        Called under `_fits_lock` (`_canceled_runs`), and the file's lock."""
         origins = self._services.session_queue.get_unfinished_origins(DEFAULT_QUEUE_ID, CALIBRATION_ORIGIN_PREFIX)
         running = {run_id for origin in origins if (run_id := calibration_run_id(origin)) is not None}
         attempts: dict[AttemptKey, list[CalibrationRun]] = {}
@@ -992,11 +1034,11 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
         between_steps: list[list[CalibrationRun]] = []
         for other, runs in attempts.items():
             if any(run.run_id in running for run in runs):
-                return _RUNNING_ELSEWHERE
+                return "running"
             removed = notes.get(other)
             queued, planned = _queued_runs(runs, removed)
             if (
-                other[0] == key[0]
+                (key is not None and other[0] == key[0])
                 or queued >= planned
                 or (removed is not None and removed.aborted)
                 or other in interleaved
@@ -1010,9 +1052,9 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
         canceled, started = self._canceled_runs([run for runs in between_steps for run in runs])
         for runs in between_steps:
             if any(run.run_id in started for run in runs):
-                return _RUNNING_ELSEWHERE
+                return "running"
             if not any(run.run_id in canceled for run in runs):
-                return _BETWEEN_STEPS
+                return "between_steps"
         return None
 
     def _can_continue(self, runs: list[CalibrationRun]) -> bool:
@@ -1247,9 +1289,35 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
             ),
         )
 
+    @contextmanager
+    def retry_admission(self, sources: Mapping[int, tuple[Optional[str], int]]) -> Iterator[None]:
+        """While a retry of calibration items is checked (`retries_starting`) and committed, hold the lock every
+        attempt's creation holds from its checks through its enqueue (`_attempt_lock`), in every process serving the
+        root: a creation then finds the retry queued and refuses while it runs, or the retry finds the run created and
+        is refused as `retries_starting` says. A retry of generations alone takes no lock. Raises
+        `CalibrationStoreError` when the lock cannot be taken (an unwritable root, a timeout)."""
+        if not any(calibration_run_id(origin) is not None for origin, _ in sources.values()):
+            yield
+            return
+        with self._store.attempts_lock():
+            yield
+
     def retries_starting(self, sources: Mapping[int, tuple[Optional[str], int]]) -> Optional[RetriesInFlight]:
         """Count a retry in flight on each run one of whose items the queue is about to retry, before it commits the
         retries: the store then records every retry of a calibration item, or keeps its attempt out of every fit.
+
+        Refuse the whole retry when one of its runs no longer owns an exclusive measurement sequence on the device
+        class: the run's attempt was cut off by another run created since its first
+        (`CalibrationAttemptInterleavedError`), or another attempt holds the device class
+        (`CalibrationAttemptBusyError`, `_attempt_blocks`), which also refuses the retry of a run without an attempt
+        between another attempt's steps. A count left over in `retries_in_flight` refuses nothing: it would refuse for
+        good. The queue calls this under `retry_admission`.
+
+        A run without an attempt notes that a retry of it began (`retried_at`), as it is counted: the retry measures
+        the GPU after every attempt begun before it, so it cuts those off as a run created now would (`_cut_off`), and
+        a later step or retry of theirs is refused. An attempt whose last step failed is not open, and its own retry
+        is the only thing that would go on with it: without the note, a script's retry admitted first, then that
+        retry, would let the attempt feed a window measured after the script's.
 
         A retry inherits its source's origin, which names the run: a recreated or restored database that gave a
         recorded id to an unrelated item cannot make that item's retry the run's, and a bulk retry of generations
@@ -1264,10 +1332,24 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
             return None
         run_ids = frozenset(run_id for run_id, _ in lineages.values())
         counted: dict[str, frozenset[str]] = {}
+
+        def count(file: CalibrationStoreFile) -> tuple[bool, frozenset[str]]:
+            # Every run retried, in the file's order; None stands for the runs without an attempt.
+            keys = dict.fromkeys(_attempt_key(run) for run in file.runs if run.run_id in run_ids)
+            for key in keys:
+                if key is not None and _cut_off(file, key):
+                    raise CalibrationAttemptInterleavedError(_RETRY_INTERLEAVED)
+                if (busy := self._attempt_blocks(file, key)) is not None:
+                    raise CalibrationAttemptBusyError(_RETRY_BUSY[busy])
+            return _count_retries(run_ids, file)
+
         try:
             for device_class_id in self._store.device_class_ids():
                 try:
-                    marked = self._store.change(device_class_id, partial(_count_retries, run_ids))
+                    # The attempt check judges other runs' items (`_attempt_blocks`) under the lock that orders those
+                    # judgements with removals, taken before the file's lock as every holder of both takes them.
+                    with self._fits_lock:
+                        marked = self._store.change(device_class_id, count)
                 except CalibrationStoreUnusableError:
                     # Kept as it is and never written: it holds no run a calibration item can be admitted for.
                     continue

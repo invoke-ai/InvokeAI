@@ -45,7 +45,6 @@ import type {
 } from '@workbench/canvas-engine/rasterTransactions';
 
 import type { TransformResampler } from './controllers/transformEditingController';
-import type * as VectorRuntimeModule from './vectorRuntime';
 export type {
   BooleanRasterResult,
   CanvasDiagnosticsCapability,
@@ -99,7 +98,6 @@ import type { SpatialAdjustmentExecutor } from '@workbench/canvas-engine/render/
 import type { SamVisualInput } from '@workbench/canvas-engine/samInteraction';
 import type { LayerTransform } from '@workbench/canvas-engine/transform/transformMath';
 import type { Rect, RenderFlags, ToolId, Vec2 } from '@workbench/canvas-engine/types';
-import type { VectorRuntime } from '@workbench/canvas-engine/vectorRuntime';
 import type { CanvasProjectMutationPort } from '@workbench/canvasProjectMutationPort';
 
 import { createItemId } from '@platform/browser/randomUuid';
@@ -161,7 +159,7 @@ import {
   type RasterCompositeExportSnapshot,
 } from '@workbench/canvas-engine/exportRasterComposite';
 import { createPointerPipeline, type PointerPipeline } from '@workbench/canvas-engine/input/pointerPipeline';
-import { createWheelHandler } from '@workbench/canvas-engine/input/wheel';
+import { createWheelInput } from '@workbench/canvas-engine/input/wheel';
 import { isEmpty, union } from '@workbench/canvas-engine/math/rect';
 import { hasSpatialAdjustments } from '@workbench/canvas-engine/render/adjustments';
 import { createColorSampler } from '@workbench/canvas-engine/render/colorSample';
@@ -201,6 +199,7 @@ import { createShapeTool } from '@workbench/canvas-engine/tools/shapeTool';
 import { createTextTool } from '@workbench/canvas-engine/tools/textTool';
 import { createTransformTool } from '@workbench/canvas-engine/tools/transformTool';
 import { FULL_DAMAGE } from '@workbench/canvas-engine/types';
+import { createVectorRuntime } from '@workbench/canvas-engine/vectorRuntime';
 import { createViewport, type Viewport } from '@workbench/canvas-engine/viewport';
 
 import type { ImagePatchApply } from './history/imagePatch';
@@ -255,7 +254,6 @@ export interface CanvasEngineErrorReport {
   area: 'canvas-engine';
   context: { error: unknown; layerId?: string; label?: string };
   message:
-    | 'Vector tools could not be loaded'
     | 'PSD export failed'
     | 'Layer thumbnail rasterization failed'
     | 'Bitmap persistence failed'
@@ -274,7 +272,6 @@ export interface CanvasEngineErrorReport {
 export interface CanvasEngineOptions {
   resampleTransform?: TransformResampler;
   projectId: string;
-  loadVectorRuntime?: () => Promise<typeof VectorRuntimeModule>;
   /** Undo steps the project's previous engine was disposed with; History reports them until it is next cleared. */
   droppedHistorySteps?: number;
   mutationPort: CanvasProjectMutationPort;
@@ -393,6 +390,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     layerPixelEpoch: stores.layerPixelEpoch,
     documentEpoch: stores.documentEpoch,
     ruleOfThirds: stores.ruleOfThirds,
+    scrollInput: stores.scrollInput,
     shapeOptions: stores.shapeOptions,
     showBbox: stores.showBbox,
     showGrid: stores.showGrid,
@@ -400,8 +398,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     stagingHidesOverlays: stores.stagingHidesOverlays,
     textEditSession: stores.textEditSession,
     vectorEditSession: stores.vectorEditSession,
-    vectorToolsStatus: stores.vectorToolsStatus,
     textOptions: stores.textOptions,
+    trackpadDetected: stores.trackpadDetected,
     transformOptions: stores.transformOptions,
     transformSession: stores.transformSession,
     pendingTransformLayerId: stores.pendingTransformLayerId,
@@ -431,14 +429,14 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       {
         id: 'spline',
         usesAltKey: true,
-        cursor: () => vectorRuntime?.editor.cursor() ?? 'crosshair',
-        onActivate: () => vectorRuntime?.editor.onActivate(),
-        onDeactivate: (ctx, options) => vectorRuntime?.editor.onDeactivate(ctx, options),
-        onPointerDown: (ctx, input) => vectorRuntime?.editor.onPointerDown(ctx, input),
-        onPointerMove: (ctx, input) => vectorRuntime?.editor.onPointerMove(ctx, input),
-        onPointerUp: () => vectorRuntime?.editor.onPointerUp(),
-        onPointerCancel: () => vectorRuntime?.editor.onPointerCancel(),
-        onKeyCommand: (ctx, command) => vectorRuntime?.editor.onKeyCommand(ctx, command) ?? false,
+        cursor: () => vectorRuntime.editor.cursor(),
+        onActivate: () => vectorRuntime.editor.onActivate(),
+        onDeactivate: (ctx, options) => vectorRuntime.editor.onDeactivate(ctx, options),
+        onPointerDown: (ctx, input) => vectorRuntime.editor.onPointerDown(ctx, input),
+        onPointerMove: (ctx, input) => vectorRuntime.editor.onPointerMove(ctx, input),
+        onPointerUp: () => vectorRuntime.editor.onPointerUp(),
+        onPointerCancel: () => vectorRuntime.editor.onPointerCancel(),
+        onKeyCommand: (ctx, command) => vectorRuntime.editor.onKeyCommand(ctx, command),
       },
     ],
     ['transform', createTransformTool()],
@@ -446,7 +444,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     ['colorPicker', createColorPickerTool()],
     ['lasso', createLassoTool()],
     ['marquee', createMarqueeTool()],
-    ['shape', createShapeTool({ getVectorTool: () => vectorRuntime?.shape ?? null })],
+    ['shape', createShapeTool({ getVectorTool: () => vectorRuntime.shape })],
     ['gradient', createGradientTool()],
     ['text', createTextTool()],
     ['sam', createSamTool()],
@@ -465,7 +463,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   let disposed = false;
   let lifecycleState: 'active' | 'cooling' | 'cool' | 'disposed' = 'active';
   let lifecycleGeneration = 0;
-  let vectorWorkEpoch = 0;
   let cooldownPromise: Promise<'cooled' | 'dirty'> | null = null;
 
   let overlayCursor: OverlayCursor | null = null;
@@ -498,11 +495,12 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   const groupSurfaces = rasterController.groups;
   const getGroupSurface: NonNullable<CompositeOptions['groupSurface']> = (scope, members, matrices, content) =>
     groupSurfaces.get(scope, members, matrices, content);
-  /** Picking and the picker's loupe see the same adjusted, derived and grouped pixels as the display. */
+  /** Picking and the loupe sample the image underneath the mask overlays. */
   const colorSampleProviders: ColorSampleProviders = {
     adjustedSurface: getAdjustedSurface,
     derivedSurfaces: derivedSurfaceCache,
     groupSurface: getGroupSurface,
+    showOverlayStacks: { control: true, inpaint_mask: false, regional_guidance: false, vector: true },
   };
 
   const strokeListeners = new Set<(event: StrokeCommittedEvent) => void>();
@@ -977,6 +975,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       getDocument: () => mirror.getDocument(),
       getUserToolId: () => pipeline.heldRestoreToolId() ?? interactionController.getActiveToolId(),
       hasFloatingSelection: () => floatingSelection.has(),
+      getFloatingSelection: () => floatingSelection.get(),
+      setFloatingTransform: (transform) => floatingSelection.setTransform(transform),
       invalidate: (payload) => scheduler.invalidate(payload),
       isGestureActive: () => pipeline.isGestureActive(),
       peekCacheRect: (layerId) => layerCache.peek(layerId)?.rect,
@@ -1286,75 +1286,26 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   const canEditDocument = (owner?: symbol): boolean => mutationContext.canEdit(owner);
 
   let vectorTraceAbort: AbortController | null = null;
-  let vectorRuntime: VectorRuntime | null = null;
-  let vectorPreparation: Promise<boolean> | null = null;
-  const prepareVectors = (): Promise<boolean> => {
-    if (disposed) {
-      return Promise.resolve(false);
-    }
-    if (vectorRuntime) {
-      return Promise.resolve(true);
-    }
-    if (vectorPreparation) {
-      return vectorPreparation;
-    }
-    vectorPreparation = Promise.resolve()
-      .then(() => (opts.loadVectorRuntime ? opts.loadVectorRuntime() : import('./vectorRuntime')))
-      .then(({ createVectorRuntime }) => {
-        if (disposed) {
-          return false;
-        }
-        vectorRuntime = createVectorRuntime({
-          captureInsertionAnchor: (layerId) => captureInsertionAnchor('vector', layerId),
-          session: {
-            get: () => stores.vectorEditSession.get(),
-            set: (value) => {
-              stores.vectorEditSession.set(value);
-              stores.canUndo.set(history.canUndo());
-              stores.canRedo.set(history.canRedo());
-            },
-          },
-          getDocument: () => mirror.getDocument(),
-          canEdit: () => canEditDocument(),
-          isGestureActive: () => pipeline.isGestureActive(),
-          getToolId: () => interactionController.getActiveToolId(),
-          commit: (label, forward, inverse) => commitToolStructural(label, forward, inverse),
-          invalidate: () => scheduler.invalidate({ overlay: true }),
-          createId: createLayerId,
-          reportRefusal: reportEditRefusal,
-          viewport,
-        });
-        if (lifecycleState === 'active') {
-          if (interactionController.getActiveToolId() === 'spline') {
-            vectorRuntime?.editor.onActivate();
-          } else {
-            vectorRuntime?.editor.refreshAvailability();
-          }
-        }
-        stores.vectorToolsStatus.set('ready');
-        scheduler.invalidate({ overlay: true });
-        return true;
-      })
-      .catch((error: unknown) => {
-        if (!disposed) {
-          stores.vectorToolsStatus.set('failed');
-          opts.reportError({
-            area: 'canvas-engine',
-            namespace: 'canvas',
-            projectId,
-            message: 'Vector tools could not be loaded',
-            context: { error },
-          });
-        }
-        return false;
-      })
-      .finally(() => {
-        vectorPreparation = null;
-      });
-    stores.vectorToolsStatus.set('loading');
-    return vectorPreparation;
-  };
-
+  const vectorRuntime = createVectorRuntime({
+    captureInsertionAnchor: (layerId) => captureInsertionAnchor('vector', layerId),
+    session: {
+      get: () => stores.vectorEditSession.get(),
+      set: (value) => {
+        stores.vectorEditSession.set(value);
+        stores.canUndo.set(history.canUndo());
+        stores.canRedo.set(history.canRedo());
+      },
+    },
+    getDocument: () => mirror.getDocument(),
+    canEdit: () => canEditDocument(),
+    isGestureActive: () => pipeline.isGestureActive(),
+    getToolId: () => interactionController.getActiveToolId(),
+    commit: (label, forward, inverse) => commitToolStructural(label, forward, inverse),
+    invalidate: () => scheduler.invalidate({ overlay: true }),
+    createId: createLayerId,
+    reportRefusal: reportEditRefusal,
+    viewport,
+  });
   const rasterExportController = new RasterExportController({
     backend,
     captureGuard: captureLayerExportGuard,
@@ -1476,6 +1427,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     const view = viewport.viewMatrix(dpr);
 
     if (!doc) {
+      renderController.releaseMaskScratch();
       clearSurface(screen);
       clearSurface(overlay);
       return;
@@ -1494,13 +1446,15 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     renderOverlay(
       overlay,
       overlayFrame.describe(doc, { dpr, view: viewport.viewMatrix(1), viewportSize }, floatRender, samPreview),
-      vectorRuntime?.render
+      vectorRuntime.render
     );
   };
 
   const renderController = new RenderController({
     applyCursor: (value) => applyCursorToInput(value),
-    getInputHandlers: () => ({ ...pipeline, onPointerLeave: onCanvasPointerLeave, onWheel, reset: resetInput }),
+    backend,
+    rasterMemory: rasterController.memory,
+    getInputHandlers: () => ({ ...pipeline, ...wheelInput, onPointerLeave: onCanvasPointerLeave, reset: resetInput }),
     isEngineDisposed: () => disposed,
     onPageHide: () => onPageHide(),
     onVisibilityChange: () => onVisibilityChange(),
@@ -1559,6 +1513,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     isEditingStagingHiddenStack: () => gestureEditsStagingHiddenStack || sessionEditsStagingHiddenStack,
     layerCache,
     previews: renderController.previews,
+    maskScratch: renderController,
     raster: rasterController,
     // A failed source waits out its retry backoff instead of failing every frame.
     rasterizeLayer: (layer, doc) => {
@@ -1637,7 +1592,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       stores.documentEpoch.set(stores.documentEpoch.get() + 1);
       // Skipped until the interaction controller exists; the cursor reads it.
       if (toolsReady) {
-        vectorRuntime?.editor.onDocumentChanged();
+        vectorRuntime.editor.onDocumentChanged();
         tools.get('shape')?.onDocumentChanged?.(toolContext);
         updateCursor();
       }
@@ -1646,7 +1601,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     onBboxChanged: () => scheduler.invalidate({ overlay: true }),
     onDocumentReplaced: () => {
       const cleanup = createCleanupAccumulator();
-      cleanup.run(() => vectorRuntime?.editor.discard());
+      cleanup.run(() => renderController.releaseMaskScratch());
+      cleanup.run(() => vectorRuntime.editor.discard());
       cleanup.run(() => groupSurfaces.clear());
       cleanup.run(() => editingController.invalidateDocument());
       cleanup.run(() => pipeline.cancelActiveGesture());
@@ -1867,7 +1823,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
 
   const unsubscribeViewport = viewport.subscribe(() => {
     stores.zoom.set(viewport.getZoom());
-    vectorRuntime?.editor.refreshAvailability();
+    vectorRuntime.editor.refreshAvailability();
     if (!suppressViewportInvalidate) {
       scheduler.invalidate({ view: true });
     }
@@ -1942,24 +1898,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       updateCursor();
     }
   });
-  let toolRequest = 0;
   const setTool = (toolId: ToolId, options?: { temporary?: boolean }): void => {
-    const request = ++toolRequest;
-    if (toolId === 'spline' && !vectorRuntime) {
-      const generation = vectorWorkEpoch;
-      void prepareVectors().then((ready) => {
-        if (
-          ready &&
-          !disposed &&
-          request === toolRequest &&
-          vectorWorkEpoch === generation &&
-          lifecycleState === 'active'
-        ) {
-          setTool(toolId, options);
-        }
-      });
-      return;
-    }
     colorSamples.onToolChange(toolId);
     interactionController.setTool(toolId, options);
   };
@@ -1974,8 +1913,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       tools.get('shape')?.onKeyCommand?.(toolContext, 'cancel');
       return;
     }
-    if (vectorRuntime?.editor.hasSession()) {
-      vectorRuntime?.editor.onKeyCommand(toolContext, 'cancel');
+    if (vectorRuntime.editor.hasSession()) {
+      vectorRuntime.editor.onKeyCommand(toolContext, 'cancel');
       return;
     }
     if (colorSamples.onEscape()) {
@@ -2017,6 +1956,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     getKeyOwnerResolver: () => renderController.getKeyOwnerResolver(),
     getToolContext: () => toolContext,
     handleEscape: handleEscapePriority,
+    hasFocus: () => typeof document === 'undefined' || document.hasFocus(),
     hasTool: (id) => tools.has(id),
     isReplaying: () => history.isReplaying(),
     maybeCommitModalSession: () => commitOpenTextSession(),
@@ -2026,13 +1966,20 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     viewport,
   });
 
-  const onWheel = createWheelHandler({
+  // A view change under a still pointer moves the document beneath it; hover-derived tool state must follow.
+  const unsubscribeHoverRefresh = viewport.subscribe(() => pipeline.refreshHover());
+
+  const wheelInput = createWheelInput({
     getActiveTool: activeTool,
+    getControlKeyState: () => pipeline.controlKeyState(),
     getInputElement: () => renderController.getInputElement(),
     getInvertBrushSizeScroll: () => stores.invertBrushSizeScroll.get(),
-    getToolContext: () => toolContext,
+    getScrollInput: () => stores.scrollInput.get(),
     invalidate: (payload) => scheduler.invalidate(payload),
+    isGestureActive: () => pipeline.isGestureActive(),
+    onWheelWithoutControl: () => pipeline.onWheelWithoutControl(),
     stepActiveBrushSize,
+    trackpadDetected: stores.trackpadDetected,
     viewport,
   });
 
@@ -2047,6 +1994,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   const onVisibilityChange = (): void => {
     if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
       kickPendingFlush();
+      // Key releases while hidden never arrive; held keys (Space, Alt, Control) must not outlive the page.
+      onWindowBlur();
     }
   };
   const onWindowBlur = (): void => {
@@ -2085,12 +2034,11 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     lifecycleGeneration += 1;
     lifecycleState = 'active';
     editingController.activate();
-    vectorRuntime?.editor.onDocumentChanged();
+    vectorRuntime.editor.onDocumentChanged();
     cooldownPromise = null;
   };
 
   const beginCooldown = (): Promise<'cooled' | 'dirty'> => {
-    vectorWorkEpoch += 1;
     if (disposed) {
       return Promise.resolve('cooled');
     }
@@ -2106,7 +2054,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     const generation = lifecycleGeneration;
     lifecycleState = 'cooling';
     vectorTraceAbort?.abort();
-    vectorRuntime?.editor.discard();
+    vectorRuntime.editor.discard();
     editingController.cooldown();
     clearStagedPreview();
     clearStagedPreviewCache();
@@ -2598,7 +2546,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       return;
     }
     disposed = true;
-    vectorWorkEpoch += 1;
     paintLineEnds.dispose();
     disposeLayerRasterizer();
     releaseActiveSnapshots();
@@ -2615,7 +2562,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     cleanup.run(() => stagedResultController.dispose());
     cleanup.run(() => editingController.dispose());
     cleanup.run(() => vectorTraceAbort?.abort());
-    cleanup.run(() => vectorRuntime?.editor.discard());
+    cleanup.run(() => vectorRuntime.editor.discard());
     cleanup.run(() => layerController.dispose());
     cleanup.run(() => layerMutationController.dispose());
     cleanup.run(() => maskResultController.dispose());
@@ -2629,6 +2576,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     cleanup.run(() => colorSamples.dispose());
     cleanup.run(() => activeTool()?.onDeactivate?.(toolContext));
     cleanup.run(unsubscribeViewport);
+    cleanup.run(unsubscribeHoverRefresh);
     cleanup.run(unsubscribeBrushOptions);
     cleanup.run(unsubscribeEraserOptions);
     cleanup.run(unsubscribeCheckerboard);
@@ -2689,6 +2637,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     }
     checkerboardTile = null;
     maskPatternTiles.clear();
+    renderController.releaseMaskScratch();
     scheduler.invalidate({ all: true });
   };
 
@@ -2713,7 +2662,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   /** Right-click belongs to gestures, transforms and text editing, so menus are suppressed then. */
   const canTargetLayerFromContextMenu = (): boolean =>
     !pipeline.isGestureActive() &&
-    !vectorRuntime?.editor.hasSession() &&
+    !vectorRuntime.editor.hasSession() &&
     !stores.transformSession.get() &&
     !stores.textEditSession.get() &&
     mirror.getDocument() !== null;
@@ -2976,9 +2925,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       if (!document) {
         return { status: 'not-ready' as const };
       }
-      if (!(await prepareVectors()) || !vectorRuntime) {
-        return { status: 'not-ready' as const };
-      }
       return await vectorRuntime.trace({
         document,
         layerId,
@@ -3005,21 +2951,9 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     traceFillVectorLayer: (layerId) => runVectorTrace(layerId, 'appearance'),
     cancelVectorTrace: () => vectorTraceAbort?.abort(),
     vectorEdit: {
-      prepare: prepareVectors,
-      createLayer: async (input) => {
+      createLayer: (input) => {
         const document = mirror.getDocument();
-        const generation = vectorWorkEpoch;
-        if (!document) {
-          return null;
-        }
-        if (
-          !(await prepareVectors()) ||
-          !vectorRuntime ||
-          disposed ||
-          lifecycleState !== 'active' ||
-          vectorWorkEpoch !== generation ||
-          mirror.getDocument() !== document
-        ) {
+        if (!document || disposed || lifecycleState !== 'active') {
           return null;
         }
         return vectorRuntime.createLayer({
@@ -3028,22 +2962,23 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
             input.name || vectorRuntime.nextLayerName(getDocumentIndex(document).nodes.map((entry) => entry.node.name)),
         });
       },
-      setPointType: (type) => vectorRuntime?.editor.setPointType(type),
-      targetContextMenu: (point) => vectorRuntime?.editor.targetContextMenu(point) ?? false,
-      deletePath: () => vectorRuntime?.editor.deletePath(),
-      nudge: (dx, dy) => vectorRuntime?.editor.nudge(dx, dy),
-      smooth: (selectedOnly) => vectorRuntime?.editor.smooth(selectedOnly),
-      deleteSelection: () => vectorRuntime?.editor.deleteSelection(),
-      copyPath: () => vectorRuntime?.editor.copyPath(),
-      extractPath: () => vectorRuntime?.editor.extractPath(),
-      transformPath: () => vectorRuntime?.editor.transformPath(),
-      split: () => vectorRuntime?.editor.split(),
-      join: () => vectorRuntime?.editor.join(),
-      canSplit: () => vectorRuntime?.editor.canSplit() ?? false,
-      canJoin: () => vectorRuntime?.editor.canJoin() ?? false,
+      setPointType: (type) => vectorRuntime.editor.setPointType(type),
+      targetContextMenu: (point) => vectorRuntime.editor.targetContextMenu(point),
+      deletePath: () => vectorRuntime.editor.deletePath(),
+      nudge: (dx, dy) => vectorRuntime.editor.nudge(dx, dy),
+      smooth: (selectedOnly) => vectorRuntime.editor.smooth(selectedOnly),
+      deleteSelection: () => vectorRuntime.editor.deleteSelection(),
+      copyPath: () => vectorRuntime.editor.copyPath(),
+      extractPath: () => vectorRuntime.editor.extractPath(),
+      transformPath: () => vectorRuntime.editor.transformPath(),
+      split: () => vectorRuntime.editor.split(),
+      join: () => vectorRuntime.editor.join(),
+      canSplit: () => vectorRuntime.editor.canSplit(),
+      canJoin: () => vectorRuntime.editor.canJoin(),
     },
     applyTransform,
     beginTransform: (layerId) => editingController.transform.request(layerId),
+    flipLayer: (layerId, direction, label) => editingController.transform.flip(layerId, direction, label),
     booleanMergeRasterLayers,
     cancelTextEdit,
     cancelTransform,

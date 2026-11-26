@@ -23,6 +23,7 @@
     "collect collection krea2_denoise positive_conditioning",
     "collect collection krea2_lora_collection_loader loras",
     "collect collection lora_collection_loader loras",
+    "collect collection moss_image_lora_collection_loader loras",
     "collect collection qwen_image_lora_collection_loader loras",
     "collect collection sdxl_lora_collection_loader loras",
     "collect collection tiled_multi_diffusion_denoise_latents control",
@@ -105,8 +106,9 @@
     "main_model_loader vae i2l vae",
     "main_model_loader vae l2i vae",
     "moss_image_denoise latents flux2_vae_decode latents",
+    "moss_image_lora_collection_loader transformer moss_image_denoise transformer",
     "moss_image_model_loader qwen3_5_encoder moss_image_text_encoder qwen3_5_encoder",
-    "moss_image_model_loader transformer moss_image_denoise transformer",
+    "moss_image_model_loader transformer moss_image_lora_collection_loader transformer",
     "moss_image_model_loader vae flux2_vae_decode vae",
     "moss_image_model_loader vae flux2_vae_encode vae",
     "moss_image_model_loader vae moss_image_denoise vae",
@@ -305,12 +307,15 @@
     },
     "moss-image": {
       "nodeTypes": [
+        "collect",
         "core_metadata",
         "flux2_vae_decode",
         "flux2_vae_encode",
         "img_resize",
         "integer",
+        "lora_selector",
         "moss_image_denoise",
+        "moss_image_lora_collection_loader",
         "moss_image_model_loader",
         "moss_image_text_encoder",
         "spandrel_image_to_image_autoscale",
@@ -1266,6 +1271,23 @@
       },
       "outputs": [
         "latents"
+      ]
+    },
+    "moss_image_lora_collection_loader": {
+      "inputs": [
+        "loras",
+        "transformer"
+      ],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "transformer"
       ]
     },
     "moss_image_model_loader": {

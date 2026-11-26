@@ -6,7 +6,7 @@ import accelerate
 import pytest
 import torch
 from diffusers.models.transformers.transformer_qwenimage import QwenImageTransformer2DModel
-from transformers import Qwen2_5_VLConfig, Qwen2_5_VLForConditionalGeneration
+from transformers import Qwen2_5_VLConfig
 
 from invokeai.backend.patches.layer_patcher import LayerPatcher
 from invokeai.backend.patches.layers.loha_layer import LoHALayer
@@ -20,6 +20,7 @@ from invokeai.backend.patches.lora_conversions.qwen_image_lora_conversion_utils 
     is_state_dict_likely_kohya_qwen_image,
     lora_model_from_qwen_image_state_dict,
 )
+from invokeai.backend.qwen2_5_vl.headless import HeadlessQwen2_5_VLForConditionalGeneration
 from tests.backend.patches.lora_conversions.lora_state_dicts.qwen_image_lora_aitoolkit_loha_format import (
     state_dict_keys as aitoolkit_loha_state_dict_keys,
 )
@@ -371,8 +372,8 @@ def test_lora_scalar_scales_the_update(prefix: str, form: str):
 
 
 def test_kohya_text_encoder_layers_are_routed_to_the_qwen_vl_prefix():
-    """`lora_te_*` layers name Qwen2.5-VL modules (language tower, vision tower, merger, lm_head); the transformer's
-    layers in the same file keep their prefix."""
+    """`lora_te_*` layers name Qwen2.5-VL modules (language tower, vision tower, merger); the transformer's layers in
+    the same file keep their prefix. The file's `lora_te_lm_head` is dropped: encoders are loaded without that head."""
     state_dict = keys_to_mock_state_dict(kohya_with_te_state_dict_keys)
     model = lora_model_from_qwen_image_state_dict(state_dict, alpha=None)
 
@@ -393,7 +394,6 @@ def test_kohya_text_encoder_layers_are_routed_to_the_qwen_vl_prefix():
         f"{te}model.visual.blocks.0.mlp.gate_proj",
         f"{te}model.visual.blocks.0.mlp.down_proj",
         f"{te}model.visual.merger.mlp.2",
-        f"{te}lm_head",
     }
 
 
@@ -444,7 +444,7 @@ def test_unmapped_kohya_layers_produce_one_warning_with_the_count(caplog: pytest
 
 
 def test_every_linear_of_a_qwen2_5_vl_encoder_is_reachable_from_its_onetrainer_key():
-    """The Kohya key of each Linear in the real module tree converts to a path the patcher resolves to that very
+    """The Kohya key of each Linear in the loaded module tree converts to a path the patcher resolves to that very
     module. Built from the model's own names, so a module missing from the parsing tree fails here."""
     config = Qwen2_5_VLConfig(
         text_config={
@@ -466,7 +466,7 @@ def test_every_linear_of_a_qwen2_5_vl_encoder_is_reachable_from_its_onetrainer_k
         },
     )
     with torch.device("meta"):
-        encoder = Qwen2_5_VLForConditionalGeneration(config)
+        encoder = HeadlessQwen2_5_VLForConditionalGeneration(config)
     linears = {name: module for name, module in encoder.named_modules() if isinstance(module, torch.nn.Linear)}
     assert any(name.startswith("model.visual.merger") for name in linears)
 
@@ -494,8 +494,9 @@ def test_every_linear_of_a_qwen2_5_vl_encoder_is_reachable_from_its_onetrainer_k
 def test_diffusers_text_encoder_layers_that_are_not_encoder_linears_are_skipped_with_one_warning(
     prefix: str, caplog: pytest.LogCaptureFixture
 ):
-    """A Conv3d (`patch_embed`) cannot hold a patch and would crash the patcher, and the transformers < 4.52 layout
-    (`model.layers.N`) names nothing in the current encoder. Both join the single counted warning."""
+    """A Conv3d (`patch_embed`) cannot hold a patch and would crash the patcher, as would the weightless stand-in for
+    `lm_head`; the transformers < 4.52 layout (`model.layers.N`) names nothing in the current encoder. All join the
+    single counted warning."""
     state_dict = {
         f"{prefix}model.language_model.layers.0.mlp.down_proj.lora_A.weight": torch.empty(8, 18944),
         f"{prefix}model.language_model.layers.0.mlp.down_proj.lora_B.weight": torch.empty(3584, 8),
@@ -505,6 +506,8 @@ def test_diffusers_text_encoder_layers_that_are_not_encoder_linears_are_skipped_
         f"{prefix}model.layers.0.mlp.down_proj.lora_B.weight": torch.empty(3584, 8),
         f"{prefix}model.language_model.layers.0.mlp.lora_A.weight": torch.empty(8, 16),
         f"{prefix}model.language_model.layers.0.mlp.lora_B.weight": torch.empty(16, 8),
+        f"{prefix}lm_head.lora_A.weight": torch.empty(8, 3584),
+        f"{prefix}lm_head.lora_B.weight": torch.empty(152064, 8),
     }
 
     with caplog.at_level(logging.WARNING):
@@ -513,7 +516,7 @@ def test_diffusers_text_encoder_layers_that_are_not_encoder_linears_are_skipped_
     assert set(model.layers) == {f"{QWEN_IMAGE_LORA_QWEN_VL_PREFIX}model.language_model.layers.0.mlp.down_proj"}
     warnings = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
     assert len(warnings) == 1
-    assert "Skipped 3 " in warnings[0]
+    assert "Skipped 4 " in warnings[0]
 
 
 def test_onetrainer_comfy_text_encoder_keys_are_routed_beside_diffusion_model_transformer_keys(
@@ -542,6 +545,7 @@ def test_onetrainer_comfy_text_encoder_keys_are_routed_beside_diffusion_model_tr
         f"{v}model.language_model.layers.0.mlp.down_proj",
         f"{v}model.visual.blocks.0.attn.qkv",
         f"{v}model.visual.merger.mlp.0",
-        f"{v}lm_head",
     }
-    assert not [r for r in caplog.records if r.levelno == logging.WARNING]
+    warnings = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
+    assert len(warnings) == 1
+    assert "Skipped 1 " in warnings[0]

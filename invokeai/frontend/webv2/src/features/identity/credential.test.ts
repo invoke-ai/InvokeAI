@@ -123,6 +123,7 @@ const authRoutes = (request: SentRequest): Response => {
     case '/api/v1/auth/status':
       return json({
         admin_email: null,
+        has_single_user_work: false,
         multiuser_enabled: true,
         setup_required: false,
         strict_password_checking: false,

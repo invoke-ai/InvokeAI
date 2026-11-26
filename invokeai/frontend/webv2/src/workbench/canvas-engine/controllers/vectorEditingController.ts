@@ -40,6 +40,7 @@ import {
   applyMove,
   applyRotate,
   applyScale,
+  isCornerHandle,
   layerTransformMatrix,
   resizeCursorForHandle,
   transformTargetAt,
@@ -851,7 +852,13 @@ export class VectorEditingController implements Tool {
               0
             )
           : gesture.target.kind === 'scale'
-            ? applyScale({ ...args, handle: gesture.target.handle, alt: input.modifiers.alt, grid: 0 })
+            ? applyScale({
+                ...args,
+                alt: input.modifiers.alt,
+                constrain: input.modifiers.shift && isCornerHandle(gesture.target.handle),
+                grid: 0,
+                handle: gesture.target.handle,
+              })
             : applyRotate(args);
       const matrix = layerTransformMatrix(transform);
       const path = transformBezierPath(this.transformOrigin, matrix);

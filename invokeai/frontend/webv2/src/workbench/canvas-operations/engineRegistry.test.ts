@@ -31,14 +31,26 @@ import { describe, expect, it, vi } from 'vitest';
 
 import type { EngineDeps, RegistryTimers } from './engineRegistry';
 
+import { createCanvasEngine } from './createCanvasEngine';
 import {
-  createEngineRegistry,
+  createEngineRegistry as createRegistry,
   getCanvasEngine,
-  getOrCreateEngine,
+  getOrCreateEngine as acquireDefault,
   isBlankCanvasDocument,
   releaseEngine,
 } from './engineRegistry';
 import { TOOL_MEMORY_WRITE_DELAY_MS } from './toolMemory';
+
+const getOrCreateEngine = (projectId: string, deps: EngineDeps) => acquireDefault(projectId, deps, createCanvasEngine);
+
+const createEngineRegistry = (options?: Parameters<typeof createRegistry>[0]) => {
+  const registry = createRegistry(options);
+  return {
+    ...registry,
+    getOrCreateEngine: (projectId: string, deps: EngineDeps) =>
+      registry.getOrCreateEngine(projectId, deps, createCanvasEngine),
+  };
+};
 
 const createDeferred = <T>() => {
   let resolve!: (value: T) => void;

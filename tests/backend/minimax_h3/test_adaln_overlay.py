@@ -24,6 +24,7 @@ from invokeai.backend.patches.layer_patcher import LayerPatcher
 from invokeai.backend.patches.layers.lora_layer import LoRALayer
 from invokeai.backend.patches.lora_conversions.minimax_h3_lora_constants import MINIMAX_H3_LORA_TRANSFORMER_PREFIX
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
+from tests.fixtures.safetensors_files import needs_mapping_that_shows_file_writes, tensors_reading_the_file
 
 # Two DiT blocks so a block range can exclude one; latent channel counts are the real 24/32 so
 # the denoise loop's packing accepts the model.
@@ -159,6 +160,14 @@ def test_load_reads_only_the_selected_projections(tmp_path: Path, overlay_sd) ->
     assert torch.equal(
         with_final.tensors_for(None)["norm_out.linear.weight"], overlay_sd["final_layer.adaln_proj.linear.weight"]
     )
+
+
+@needs_mapping_that_shows_file_writes
+def test_load_keeps_no_view_of_the_transformer_file(tmp_path: Path, overlay_sd) -> None:
+    path = _save(tmp_path / "ref2va.safetensors", overlay_sd)
+    overlay = MiniMaxH3AdaLNOverlay.load_model(MiniMaxH3AdaLNOverlay.selection_path(path, 0, 49, True))
+
+    assert tensors_reading_the_file(overlay, path) == []
 
 
 def test_selection_paths_round_trip_and_an_empty_selection_is_refused(tmp_path: Path, overlay_sd) -> None:

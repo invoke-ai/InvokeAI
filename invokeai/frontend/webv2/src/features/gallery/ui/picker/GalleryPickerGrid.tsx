@@ -1,13 +1,14 @@
 import type { SystemStyleObject } from '@chakra-ui/react';
 import type { GalleryItem, GalleryItemKey } from '@features/gallery/core/items';
 import type { GallerySparsePageState } from '@features/gallery/ui/useGalleryData';
-import type { CSSProperties, MouseEvent } from 'react';
+import type { ComponentProps, CSSProperties, MouseEvent } from 'react';
 
 import { Box, Icon, Skeleton, Stack, Text } from '@chakra-ui/react';
 import { toGalleryItemKey } from '@features/gallery/core/items';
 import { GALLERY_PAGE_SIZE } from '@features/gallery/data/queries';
 import { getGalleryColumnCountForCell } from '@features/gallery/ui/galleryGridLayout';
 import { GalleryTileFrame, GalleryTileMedia } from '@features/gallery/ui/GalleryTileFrame';
+import { useGalleryItemContextMenu } from '@features/gallery/ui/GalleryUiContext';
 import { Button } from '@platform/ui/Button';
 import { Scrollable } from '@platform/ui/Scrollable';
 import { CheckIcon } from 'lucide-react';
@@ -53,6 +54,24 @@ const getTileCss = (state: GalleryPickerTileState, isActive: boolean): SystemSty
 
 export const galleryPickerOptionId = (idBase: string, index: number): string => `${idBase}-slot-${index}`;
 
+const VIEWPORT_PROPS: ComponentProps<typeof Scrollable>['viewportProps'] & { 'data-gallery-picker-viewport': '' } = {
+  'data-gallery-picker-viewport': '',
+};
+
+/** The option's tile while its bottom edge, where a menu anchors, is in view; overscan keeps hidden rows mounted. */
+export const getShownGalleryPickerOption = (idBase: string, index: number): HTMLElement | null => {
+  const tile = document.getElementById(galleryPickerOptionId(idBase, index));
+  const viewport = tile?.closest('[data-gallery-picker-viewport]')?.getBoundingClientRect();
+
+  if (!tile || !viewport) {
+    return null;
+  }
+
+  const rect = tile.getBoundingClientRect();
+
+  return rect.bottom > viewport.top && rect.bottom <= viewport.bottom ? tile : null;
+};
+
 const GalleryPickerTile = memo(function GalleryPickerTile({
   activeIndex,
   currentKey,
@@ -75,6 +94,7 @@ const GalleryPickerTile = memo(function GalleryPickerTile({
   const { t } = useTranslation();
   const key = toGalleryItemKey(item);
   const css = useMemo(() => getTileCss(state, index === activeIndex), [activeIndex, index, state]);
+  const onContextMenu = useGalleryItemContextMenu(item);
   const unsupportedLabel =
     state === 'unsupported'
       ? t(item.kind === 'video' ? 'widgets.gallery.picker.unsupportedVideo' : 'widgets.gallery.picker.unsupportedImage')
@@ -94,6 +114,7 @@ const GalleryPickerTile = memo(function GalleryPickerTile({
       item={item}
       role="option"
       title={unsupportedLabel}
+      onContextMenu={onContextMenu}
     >
       <GalleryTileMedia
         fit="square"
@@ -351,7 +372,7 @@ export const GalleryPickerGrid = ({
   );
 
   return (
-    <Scrollable flex="1" minH="0" viewportRef={viewportRef}>
+    <Scrollable flex="1" minH="0" viewportProps={VIEWPORT_PROPS} viewportRef={viewportRef}>
       <Box
         ref={measureRef}
         aria-busy={isStale || (total === null && !isInitialPageFailed) || isAnyPageLoading || undefined}
