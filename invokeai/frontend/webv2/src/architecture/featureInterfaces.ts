@@ -4,6 +4,7 @@
  */
 export const FEATURE_PUBLIC_INTERFACES: Readonly<Record<string, readonly string[]>> = {
   gallery: [
+    'archiveRecovery',
     'settingsContribution',
     'contracts',
     'launchpad',

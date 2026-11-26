@@ -83,10 +83,10 @@ class BulkDownloadService(BulkDownloadBase):
             BulkDownloadException,
             BulkDownloadParametersException,
         ) as e:
-            self.forget(bulk_download_item_name)
+            self._forget(bulk_download_item_name)
             self._signal_job_failed(bulk_download_id, bulk_download_item_id, bulk_download_item_name, e, user_id)
         except Exception as e:
-            self.forget(bulk_download_item_name)
+            self._forget(bulk_download_item_name)
             self._signal_job_failed(bulk_download_id, bulk_download_item_id, bulk_download_item_name, e, user_id)
             self._invoker.services.logger.error("Problem bulk downloading images.")
             raise e
@@ -205,11 +205,19 @@ class BulkDownloadService(BulkDownloadBase):
             record = self._downloads.get(bulk_download_item_name)
             return record.owner if record else None
 
-    def renew_lease(self, bulk_download_item_name: str) -> None:
+    def take_ready(self, bulk_download_item_name: str) -> Optional[str]:
         with self._lock:
             record = self._downloads.get(bulk_download_item_name)
-            if record:
-                record.last_seen = monotonic()
+            if record is None:
+                return None
+            record.last_seen = monotonic()
+            try:
+                path = self.get_path(bulk_download_item_name)
+            except BulkDownloadTargetException:
+                return None
+            # Served from here on: one taker only, and a transfer outlasting the lease cannot be claimed.
+            del self._downloads[bulk_download_item_name]
+            return path
 
     def claim_orphaned(self, user_id: str) -> list[str]:
         with self._lock:
@@ -225,13 +233,13 @@ class BulkDownloadService(BulkDownloadBase):
                 self._downloads[name].last_seen = now
             return claimed
 
-    def forget(self, bulk_download_item_name: str) -> None:
+    def _forget(self, bulk_download_item_name: str) -> None:
         with self._lock:
             self._downloads.pop(bulk_download_item_name, None)
 
     def delete(self, bulk_download_item_name: str) -> None:
         path = self.get_path(bulk_download_item_name)
-        self.forget(bulk_download_item_name)
+        self._forget(bulk_download_item_name)
         Path(path).unlink()
 
     def get_path(self, bulk_download_item_name: str) -> str:

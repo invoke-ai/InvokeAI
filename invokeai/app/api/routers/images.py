@@ -994,11 +994,9 @@ def get_bulk_download_item(
             raise HTTPException(status_code=410, detail="This download is no longer available")
         if owner != current_user.user_id and not current_user.is_admin:
             raise HTTPException(status_code=403, detail="Not authorized to access this download")
-        bulk_download.renew_lease(bulk_download_item_name)
-
-        path = bulk_download.get_path(bulk_download_item_name)
-        # Served from here on: a transfer outlasting the lease must not become claimable by another client.
-        bulk_download.forget(bulk_download_item_name)
+        path = bulk_download.take_ready(bulk_download_item_name)
+        if path is None:
+            raise HTTPException(status_code=404, detail="This download is not ready yet")
 
         response = FileResponse(
             path,

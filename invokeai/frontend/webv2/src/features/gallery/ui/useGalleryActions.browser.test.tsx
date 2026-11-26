@@ -37,10 +37,13 @@ const mocks = vi.hoisted(() => ({
   uploadGalleryVideo: vi.fn(),
 }));
 
+vi.mock('@features/gallery/data/archives', () => ({
+  downloadGalleryArchive: (...args: unknown[]) => mocks.downloadGalleryArchive(...args),
+}));
+
 vi.mock('@features/gallery/data/backend', () => ({
   createGalleryBoard: (...args: unknown[]) => mocks.createGalleryBoard(...args),
   deleteGalleryBoard: (...args: unknown[]) => mocks.deleteGalleryBoard(...args),
-  downloadGalleryArchive: (...args: unknown[]) => mocks.downloadGalleryArchive(...args),
   isDateBoardId: (boardId: string) => boardId.startsWith('by_date:'),
   isInvalidGalleryBoardDestination: (boardId: string) => boardId.startsWith('by_date:'),
   updateGalleryBoard: (...args: unknown[]) => mocks.updateGalleryBoard(...args),

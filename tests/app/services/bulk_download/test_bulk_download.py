@@ -556,7 +556,7 @@ def test_handler_keeps_the_registered_owner_and_lease(
     service = BulkDownloadService()
     service.start(mock_invoker)
     service.register("test.zip", "user-a")
-    service.renew_lease("test.zip")
+    service.take_ready("test.zip")
 
     clock.now += ORPHAN_AFTER_SECONDS + 1
     service.handler([mock_image_dto.image_name], None, "test", user_id="user-a")
@@ -570,12 +570,12 @@ def test_claim_orphaned_takes_only_the_callers_idle_downloads_once(monkeypatch: 
     service = BulkDownloadService()
     for name, owner in (("a-idle.zip", "user-a"), ("a-polled.zip", "user-a"), ("b-idle.zip", "user-b")):
         service.register(name, owner)
-        service.renew_lease(name)
+        service.take_ready(name)
     # Its client waits for the completion event instead of polling, so it is never an orphan.
     service.register("a-never-polled.zip", "user-a")
 
     clock.now += ORPHAN_AFTER_SECONDS - 1
-    service.renew_lease("a-polled.zip")
+    service.take_ready("a-polled.zip")
     clock.now += 2
 
     assert service.claim_orphaned("user-a") == ["a-idle.zip"]
@@ -589,12 +589,26 @@ def test_claim_orphaned_takes_only_the_callers_idle_downloads_once(monkeypatch: 
 def test_delete_forgets_the_download(tmp_path: Path, monkeypatch: Any):
     clock = FakeClock(monkeypatch)
     service = BulkDownloadService()
-    (tmp_path / "bulk_downloads" / "test.zip").write_text("contents")
     service.register("test.zip", "user-a")
-    service.renew_lease("test.zip")
+    service.take_ready("test.zip")
+    (tmp_path / "bulk_downloads" / "test.zip").write_text("contents")
 
     service.delete("test.zip")
 
     clock.now += ORPHAN_AFTER_SECONDS + 1
     assert service.get_owner("test.zip") is None
     assert service.claim_orphaned("user-a") == []
+
+
+def test_a_ready_download_is_taken_once(tmp_path: Path):
+    service = BulkDownloadService()
+    service.register("test.zip", "user-a")
+    assert service.take_ready("test.zip") is None  # not ready yet, still known
+    assert service.get_owner("test.zip") == "user-a"
+    zip_path = tmp_path / "bulk_downloads" / "test.zip"
+    zip_path.write_text("contents")
+
+    assert service.take_ready("test.zip") == str(zip_path)
+
+    assert service.take_ready("test.zip") is None
+    assert service.get_owner("test.zip") is None  # the route answers 410

@@ -37,13 +37,13 @@ import {
   type GalleryItemMutationResult as ItemMutationResult,
   type GalleryItemRef as ItemRef,
 } from './core/items';
+import { downloadGalleryArchive } from './data/archives';
 import {
   addGalleryImageItemsToBoard,
   addImagesToGalleryBoard,
   deleteGalleryImageItems,
   deleteGalleryImages,
   deleteGalleryVideoItems,
-  downloadGalleryArchive,
   getGalleryImageByName,
   getGalleryImageMetadata,
   getGalleryImagesByNames,
@@ -56,7 +56,6 @@ import {
   moveGalleryVideoItemsToBoard,
   removeGalleryImageItemsFromBoard,
   removeImagesFromGalleryBoard,
-  resumeGalleryArchives,
   saveImageToGallery,
   setGalleryImageItemsStarred,
   setGalleryVideoItemsStarred,
@@ -91,7 +90,6 @@ export const galleryVideos = {
 /** Import/export intents shared by image-producing and image-consuming features. */
 export const galleryTransfers = {
   downloadArchive: downloadGalleryArchive,
-  resumeArchives: resumeGalleryArchives,
   upload: uploadGalleryImage,
   uploadVideo: uploadGalleryVideo,
 } as const;

@@ -69,19 +69,14 @@ class BulkDownloadBase(ABC):
         """
 
     @abstractmethod
-    def renew_lease(self, bulk_download_item_name: str) -> None:
+    def take_ready(self, bulk_download_item_name: str) -> Optional[str]:
         """
-        Mark a tracked download as polled now. Only a download polled at least once can be claimed as orphaned.
+        Record a poll of a tracked download; if its zip is ready, stop tracking it and return its path, atomically.
+
+        Only a download polled at least once can be claimed as orphaned. Once taken, it is gone for every other caller.
 
         :param bulk_download_item_name: The name of the bulk download item.
-        """
-
-    @abstractmethod
-    def forget(self, bulk_download_item_name: str) -> None:
-        """
-        Stop tracking a download, so it is reported gone and can no longer be claimed. Its file is left alone.
-
-        :param bulk_download_item_name: The name of the bulk download item.
+        :return: The path to serve, or None if the download is unknown or not ready yet.
         """
 
     @abstractmethod
