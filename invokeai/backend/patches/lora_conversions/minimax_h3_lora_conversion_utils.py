@@ -20,6 +20,9 @@ state-dict converter in
 - ``mlp.fc2``                       -> ``ff.net.2``
 - ``adaln_proj.linear``             -> unchanged (module exists under the same path)
 - ``final_layer.adaln_proj.linear`` -> ``norm_out.linear``
+- top-level projections, as in the base converter: ``video_patch_proj`` -> ``proj_in``,
+  ``audio_patch_proj`` -> ``audio_proj_in``, ``condition_proj`` -> ``context_embedder``,
+  ``final_layer.video_out`` -> ``proj_out``, ``final_layer.audio_out`` -> ``audio_proj_out``
 
 Note on AdaLN layers: on the *full* transformer these convert to ordinary weight
 patches. The AdaLN-pruned transformer has no full-width AdaLN projections to patch —
@@ -61,6 +64,11 @@ _PREFIX_RENAMES: tuple[tuple[str, str], ...] = (
     ("token_refiner.blocks.", "token_refiner.refiner_blocks."),
     ("blocks.", "transformer_blocks."),
     ("final_layer.adaln_proj.linear", MINIMAX_H3_NORM_OUT_LINEAR_PATH),
+    ("final_layer.video_out", "proj_out"),
+    ("final_layer.audio_out", "audio_proj_out"),
+    ("video_patch_proj", "proj_in"),
+    ("audio_patch_proj", "audio_proj_in"),
+    ("condition_proj", "context_embedder"),
 )
 
 _SUBKEY_RENAMES: tuple[tuple[str, str], ...] = (

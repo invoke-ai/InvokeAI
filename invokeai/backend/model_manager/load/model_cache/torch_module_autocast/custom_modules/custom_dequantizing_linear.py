@@ -1,6 +1,5 @@
 import torch
 
-from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.cast_to_device import cast_to_device
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custom_modules.custom_linear import (
     autocast_linear_forward_sidecar_patches,
 )
@@ -15,6 +14,7 @@ from invokeai.backend.quantization.dequantizing_linear import DequantizingLinear
 from invokeai.backend.quantization.fp8_rowwise import Fp8Linear
 from invokeai.backend.quantization.int8_convrot import Int4ConvrotLinear, Int8ConvrotLinear
 from invokeai.backend.quantization.nvfp4 import NVFP4Linear
+from invokeai.backend.util.cast_to_device import cast_to_device
 
 
 def _reads_weight_values(patch: BaseLayerPatch) -> bool:
