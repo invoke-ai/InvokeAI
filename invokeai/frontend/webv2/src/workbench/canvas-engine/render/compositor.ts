@@ -297,14 +297,6 @@ const isMaskLayer = (
 ): layer is Extract<CanvasLayerContract, { type: 'regional_guidance' | 'inpaint_mask' }> =>
   layer.type === 'regional_guidance' || layer.type === 'inpaint_mask';
 
-const maskPhaseHash = (layerId: string): number => {
-  let hash = 2166136261;
-  for (let index = 0; index < layerId.length; index += 1) {
-    hash = Math.imul(hash ^ layerId.charCodeAt(index), 16777619);
-  }
-  return hash;
-};
-
 type DrawMaskFill = (
   layerId: string,
   fill: CanvasMaskFillContract,
@@ -454,6 +446,24 @@ export const compositeDocument = (
   const ctx = target.ctx;
   opts.diagnostics?.increment('compositeFrames');
   const repaint = damage.kind === 'rect' ? damage.rect : targetRect;
+  const hatchPhases = new Map<string, number>();
+  if (opts.screenMask && opts.maskPatternTile) {
+    const nextPhase = new Map<CanvasMaskFillContract['style'], number>();
+    // Assign before culling so partial repaints use the same phases as full frames.
+    for (const { layer } of plan.leaves) {
+      const fill = isMaskLayer(layer)
+        ? layer.mask.fill
+        : opts.regionOverlays && !isIsolated(opts) && layer.type === 'raster' && layer.inpaint?.isEnabled
+          ? layer.inpaint.fill
+          : undefined;
+      if (!fill || fill.style === 'solid') {
+        continue;
+      }
+      const phase = nextPhase.get(fill.style) ?? 0;
+      hatchPhases.set(layer.id, phase);
+      nextPhase.set(fill.style, phase + 1);
+    }
+  }
   const drawMaskFill: DrawMaskFill = (layerId, fill, coverage, matrix, kind) => {
     const { surface, rect, version } = coverage;
     const tile = opts.maskPatternTile?.(fill.style, fill.color) ?? null;
@@ -477,10 +487,9 @@ export const compositeDocument = (
       setTransformFromMat(stencil, { ...matrix, e: matrix.e - area.x, f: matrix.f - area.y });
       stencil.drawImage(surface.canvas, rect.x, rect.y);
 
-      // Give each layer a stable phase in viewport CSS coordinates, independent of damage and transforms.
-      const phase = maskPhaseHash(layerId);
-      const offsetX = Math.round(((phase & 0xffff) / 0x10000) * tile.width * dpr);
-      const offsetY = Math.round(((phase >>> 16) / 0x10000) * tile.height * dpr);
+      const phase = hatchPhases.get(layerId) ?? 0;
+      const offsetX = fill.style === 'horizontal' ? 0 : phase;
+      const offsetY = fill.style === 'horizontal' || fill.style === 'grid' ? phase : 0;
       stencil.imageSmoothingEnabled = true;
       stencil.setTransform(dpr, 0, 0, dpr, offsetX - area.x, offsetY - area.y);
       stencil.globalCompositeOperation = 'source-in';
