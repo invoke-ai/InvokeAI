@@ -125,7 +125,7 @@ describe('getLayerContextMenuLayout', () => {
 
   it('keeps the primary section lean now the panes own the per-type additions', () => {
     const inpaint = createInpaintMaskLayer('Mask', 'mask');
-    const regional = createRegionalGuidanceLayer('Region', 0, 'region');
+    const regional = createRegionalGuidanceLayer('Region', undefined, 'region');
 
     expect(summarize(inpaint)[1]).toEqual({
       id: 'primary',

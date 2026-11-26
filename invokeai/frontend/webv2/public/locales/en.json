@@ -5860,7 +5860,8 @@
         "style": "Fill style",
         "styles": {
           "crosshatch": "Crosshatch",
-          "diagonal": "Diagonal",
+          "diagonal": "Diagonal Right",
+          "diagonal_left": "Diagonal Left",
           "grid": "Grid",
           "horizontal": "Horizontal",
           "solid": "Solid",

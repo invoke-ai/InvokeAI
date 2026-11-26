@@ -1562,6 +1562,14 @@ _KREA2_SUPPORTED_LORA_PREFIXES = (
     "diffusion_model.txtmlp.",
     "diffusion_model.last.linear.",
     "base_model.model.transformer.transformer_blocks.",
+    # The fal / Krea trainer's PEFT keys on the native module names.
+    "base_model.model.blocks.",
+    "base_model.model.txtfusion.",
+    "base_model.model.first.",
+    "base_model.model.tmlp.",
+    "base_model.model.tproj.",
+    "base_model.model.txtmlp.",
+    "base_model.model.last.linear.",
     "text_encoder.",
     "base_model.model.text_encoder.",
 )
