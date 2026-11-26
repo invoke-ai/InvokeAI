@@ -138,7 +138,8 @@ vi.mock('@features/workflow/preview', async () => {
   return { storedGraphToDocument };
 });
 
-vi.mock('@features/gallery/queries', () => ({
+vi.mock('@features/gallery/queries', async (importOriginal) => ({
+  galleryKeys: (await importOriginal<typeof import('@features/gallery/queries')>()).galleryKeys,
   canAddToCachedGalleryBoard: (...args: unknown[]) => mocks.canAddToCachedGalleryBoard(...args),
   ensureGalleryBoardDestinations: () => mocks.ensureGalleryBoardDestinations(),
   fetchGalleryImageMetadata: (_client: unknown, _owner: unknown, imageName: string) => mocks.imageMetadata(imageName),
