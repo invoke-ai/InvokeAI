@@ -2527,7 +2527,8 @@ describe('recall onto a panel holding unused standalone components', () => {
       recorded: GenerateSettings,
       panel: GenerateSettings,
       stripped: readonly string[],
-      appVersion: string
+      appVersion: string,
+      options: { kind?: 'all' | 'remix'; mayBeWorkflowRun?: boolean } = {}
     ) => {
       const original = compileGenerateGraph(recorded, model, 'gallery', PROJECT_SETTINGS).backendGraph;
       const metadata: Record<string, unknown> = {
@@ -2544,7 +2545,8 @@ describe('recall onto a panel holding unused standalone components', () => {
       return buildImageRecallSettings({
         currentValues: createValues({ ...panel, model, modelKey: model.key }),
         image,
-        kind: 'all',
+        kind: options.kind ?? 'all',
+        mayBeWorkflowRun: options.mayBeWorkflowRun,
         metadata,
         models: catalogs.flatMap((catalog) => catalog.models),
         supportedModels: [model],
@@ -2639,6 +2641,24 @@ describe('recall onto a panel holding unused standalone components', () => {
 
       expect(encoders.map((key) => values[key]?.key ?? null)).toEqual(encoders.map((key) => filled[key]!.key));
     });
+
+    // A workflow opened from a Generate graph keeps its metadata node (`rand_device` and all) while the user picks
+    // components on its loader, so the record omits an encoder the run used.
+    it.each(['all', 'remix'] as const)(
+      'keeps the standalone SD 3 encoders for a %s of a run that embeds a workflow',
+      (kind) => {
+        const shape = { label: 'diffusers', overrides: { format: 'diffusers' } };
+        const { model } = satisfiedSettingsFor('sd-3', shape);
+        const { settings: filled } = fullyFilledSettingsFor('sd-3', shape);
+        const encoders = ['clipGEmbedModel', 'clipLEmbedModel', 't5EncoderModel'] as const;
+        const recorded = { ...filled, ...Object.fromEntries(encoders.map((key) => [key, null])) } as GenerateSettings;
+        const graphRun = recallStripped(model, recorded, filled, [], '7.0.0', { kind });
+        const workflowRun = recallStripped(model, recorded, filled, [], '7.0.0', { kind, mayBeWorkflowRun: true });
+
+        expect(encoders.map((key) => graphRun[key]?.key ?? null)).toEqual(encoders.map(() => null));
+        expect(encoders.map((key) => workflowRun[key]?.key ?? null)).toEqual(encoders.map((key) => filled[key]!.key));
+      }
+    );
 
     it.each(['krea-2', 'qwen-image-2-1'] as const)(
       'clears the Vision Tower a %s panel holds when the recorded run used none',

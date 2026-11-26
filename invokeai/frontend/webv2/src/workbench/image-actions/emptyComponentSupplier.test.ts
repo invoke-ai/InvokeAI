@@ -334,6 +334,28 @@ describe('empty component supplier', () => {
     ).toBeNull();
   });
 
+  // The loader rejects a Diffusers source whose VAE is not the width the main decodes with: TI2V-5B decodes with the
+  // 48-channel VAE, the A14B variants with the 16-channel one. The same source can still supply the text encoder.
+  it.each([
+    ['ti2v_5b', 't2v_a14b', null],
+    ['t2v_a14b', 'ti2v_5b', null],
+    ['t2v_a14b', 'i2v_a14b', 'wan-source'],
+    ['ti2v_5b', 'ti2v_5b', 'wan-source'],
+  ] as const)(
+    'names a %s Wan main with a %s source as the VAE supplier: %s',
+    (mainVariant, sourceVariant, supplierKey) => {
+      const wan = (format: string, key: string, variant: string) =>
+        ({ base: 'wan', format, key, name: key, type: 'main', variant }) as unknown as MainModelConfig;
+      const main = wan('gguf_quantized', 'wan-main', mainVariant);
+      const source = wan('diffusers', 'wan-source', sourceVariant);
+
+      expect(getEmptyComponentSupplier(main, { componentSourceModel: source }, 'vae')?.key ?? null).toBe(supplierKey);
+      expect(getEmptyComponentSupplier(main, { componentSourceModel: source }, 'wanT5EncoderModel')?.key).toBe(
+        source.key
+      );
+    }
+  );
+
   it.each([
     ['gguf_quantized', null],
     ['diffusers', 'sd3-main'],

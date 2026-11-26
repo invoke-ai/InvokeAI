@@ -173,7 +173,9 @@ graph builders write only the canonical ones.
   standalone picks for those slots, so the rerun loads the same components. It trusts only generation
   and upscale records that carry `rand_device`, which webv2 graphs and the legacy SD 1.x/SDXL builders
   always write. A record a denoise node writes on its own, a Canvas save, or another legacy builder's
-  record may leave a used component out, so recall keeps the panel's picks.
+  record may leave a used component out, so recall keeps the panel's picks. So does the record of
+  a run that embeds a workflow: a workflow opened from a Generate graph keeps that graph's metadata
+  node while its loader takes other components.
 - **Media references** (`image_name`, `video_name`) are names in the originating gallery, exactly
   as an image record's `init_image` is. Recall restores everything else and clears media it
   cannot find rather than substituting.

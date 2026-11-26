@@ -1012,11 +1012,12 @@ const buildErnieImageGraph = (
   const modelLoader = addNode(graph, {
     id: 'model_loader',
     model,
-    text_encoder_model: mistralEncoderModel ?? undefined,
+    // A Diffusers pipeline loads both from itself, so a pick left in the panel never reaches the loader.
+    text_encoder_model: isDiffusers ? undefined : (mistralEncoderModel ?? undefined),
     type: 'ernie_image_model_loader',
     // Unload the unused enhancer because it cannot idle-offload.
     use_prompt_enhancer: false,
-    vae_model: vaeModel ?? undefined,
+    vae_model: isDiffusers ? undefined : (vaeModel ?? undefined),
   });
   // ERNIE-Image LoRAs train the transformer only; the Ministral encoder field carries none.
   const loraSource = activeLoras.length

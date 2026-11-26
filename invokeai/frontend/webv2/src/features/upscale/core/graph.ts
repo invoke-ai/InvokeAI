@@ -106,6 +106,7 @@ const addUpscaleMetadata = (
   }
 
   const architecture = upscaleArchitectureFor(settings.model);
+  const tileControlModel = (graph.nodes.controlnet_1 ?? graph.nodes.tile_control)?.control_model;
   // FLUX calls this guidance, not CFG.
   const guidanceField =
     architecture?.negativePrompt === 'never' ? { guidance: settings.cfgScale } : { cfg_scale: settings.cfgScale };
@@ -124,6 +125,8 @@ const addUpscaleMetadata = (
     scheduler: coerceUpscaleScheduler(settings.model, settings.scheduler),
     steps: settings.steps,
     structure: settings.structure,
+    // The ControlNet node the path added: the architecture's own tile control, when it takes one.
+    ...(tileControlModel ? { tile_controlnet: tileControlModel } : {}),
     tile_overlap: settings.tileOverlap,
     tile_size: settings.tileSize,
     type: 'core_metadata',

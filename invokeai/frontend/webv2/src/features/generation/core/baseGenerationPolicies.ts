@@ -1208,7 +1208,13 @@ export const getEmptyComponentSupplier = (
   }
 
   if (SOURCED_SLOTS[model.base]?.includes(key)) {
-    const source = getCompatibleDiffusersComponentSource(model, components.componentSourceModel);
+    const compatibleSource = getCompatibleDiffusersComponentSource(model, components.componentSourceModel);
+    // The Wan loader rejects a source whose VAE is not the width the main decodes with (`doesWanSourceSupplyVae`), so
+    // such a source can still supply the encoder but never the VAE.
+    const source =
+      compatibleSource && key === 'vae' && model.base === 'wan' && !doesWanSourceSupplyVae(model, compatibleSource)
+        ? null
+        : compatibleSource;
     const main = isBundledMainForBase(model.base)(model) ? model : null;
 
     return SOURCE_FIRST_BASES.has(model.base) ? (source ?? main) : (main ?? source ?? null);

@@ -349,6 +349,24 @@
             "label": "",
             "description": "",
             "value": "minimax_h3_extend_video"
+          },
+          "vae_precision": {
+            "name": "vae_precision",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "color_compensation": {
+            "name": "color_compensation",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "mistral_source": {
+            "name": "mistral_source",
+            "label": "",
+            "description": "",
+            "value": null
           }
         },
         "isOpen": true,

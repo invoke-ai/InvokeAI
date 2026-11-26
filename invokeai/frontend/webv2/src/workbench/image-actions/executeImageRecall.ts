@@ -46,6 +46,7 @@ import {
   readMetadataReferenceImages,
   getImageRecallTitle,
   isImageRecallKindAvailable,
+  recordsLoaderSelections,
   type ImageRecallKind,
   type ImageRecallSkip,
 } from './imageRecall';
@@ -81,6 +82,25 @@ const getSkippedConceptMessage = ({ name, reason }: ImageRecallSkip, t: TFunctio
       return t('widgets.gallery.itemActions.recall.skippedConcept.modelUnavailable', values);
     case 'unresolved':
       return t('widgets.gallery.itemActions.recall.skippedConcept.unresolved', values);
+  }
+};
+
+/**
+ * Whether the image ran from a workflow, which only the image itself says: a workflow's loader takes components that
+ * its metadata node never names. Asked only where it decides something (a record that would otherwise vouch for its
+ * components), and answered for the safe side when the read fails, so the panel keeps its picks.
+ */
+const readMayBeWorkflowRun = async (metadata: unknown, imageName: string, owner: AccountScope): Promise<boolean> => {
+  if (!recordsLoaderSelections(metadata)) {
+    return false;
+  }
+
+  try {
+    return (await galleryImages.workflow(imageName, owner.signal)).workflow !== null;
+  } catch {
+    assertAccountScopeCurrent(owner);
+
+    return true;
   }
 };
 
@@ -423,6 +443,8 @@ export const executeImageRecall = async ({
       }
       referenceLookupFailed = true;
     }
+    const mayBeWorkflowRun =
+      kind === 'all' || kind === 'remix' ? await readMayBeWorkflowRun(metadata, image.imageName, owner) : false;
     const hydratedReferences = referenceRecord ? readMetadataReferenceImages(metadata, referenceAssets) : null;
     const recordedReferences = hydratedReferences?.images ?? null;
     const availableReferenceNames = new Set(referenceAssets.keys());
@@ -463,6 +485,7 @@ export const executeImageRecall = async ({
           image,
           isCanvasFrame,
           kind,
+          mayBeWorkflowRun,
           metadata,
           referenceAssets,
           models,
@@ -500,6 +523,7 @@ export const executeImageRecall = async ({
       image,
       isCanvasFrame,
       kind,
+      mayBeWorkflowRun,
       metadata,
       referenceAssets,
       models,

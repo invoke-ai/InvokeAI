@@ -196,6 +196,10 @@ export const parsePreviewMetadata = (
     if (Array.isArray(value) && value.length > 0 && value.every((item) => typeof item === 'number')) {
       push(key, metadataLabel(key), value.join(', '));
     }
+    // MOSS-Image skips a default block unless the field was cleared, which the record keeps as an empty list.
+    if (key === 'moss_image_uncond_skip_layers' && Array.isArray(value) && value.length === 0) {
+      push(key, metadataLabel(key), t('common.none'));
+    }
     if (value === null && automaticFields.has(key)) {
       push(key, metadataLabel(key), t('common.auto'));
     }

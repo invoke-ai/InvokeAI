@@ -318,6 +318,15 @@ describe('record rows of newer keys', () => {
     });
   });
 
+  it('shows an explicitly empty MOSS skip-layer list as None, and no row where the record has no list', () => {
+    expect(values(parsePreviewMetadata({ moss_image_uncond_skip_layers: [] }, image))).toEqual({
+      moss_image_uncond_skip_layers: 'None',
+    });
+    expect(values(parsePreviewMetadata({ positive_prompt: 'p' }, image))).not.toHaveProperty(
+      'moss_image_uncond_skip_layers'
+    );
+  });
+
   it('labels the VAE precision as the requested one, since the backend can decode in fp32 regardless', () => {
     const entries = parsePreviewMetadata({ vae_precision: 'fp16' }, image);
 

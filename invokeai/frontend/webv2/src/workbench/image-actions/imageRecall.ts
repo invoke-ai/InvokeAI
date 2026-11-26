@@ -584,10 +584,11 @@ const isGenerationRecord = (metadata: unknown): boolean => getString(metadata, '
  * Upscale graphs always write it, as do the legacy frontend's SD-1 and SDXL builders. Other writers name the model but
  * not every component: a Canvas save records only the panel's model and VAE, a denoise node that a workflow wires
  * straight to its decoder writes `generation_mode` and `model` but none of the loader's components, and the legacy
- * SD 3 and Z-Image builders left some out. None of them writes `rand_device`; a workflow's record carries it only
- * where the workflow sets it on its own metadata node.
+ * SD 3 and Z-Image builders left some out. None of them writes `rand_device`. A workflow opened from a Generate graph
+ * keeps that graph's metadata node, `rand_device` included, while the user picks components on its loader, so a record
+ * of a run that embeds a workflow is no evidence either (`mayBeWorkflowRun`).
  */
-const recordsLoaderSelections = (metadata: unknown): boolean =>
+export const recordsLoaderSelections = (metadata: unknown): boolean =>
   (isGenerationRecord(metadata) || getNumber(metadata, 'creativity') !== null) &&
   isRecord(metadata) &&
   'rand_device' in metadata;
@@ -1572,6 +1573,7 @@ export const buildImageRecallSettings = ({
   image,
   isCanvasFrame = false,
   kind,
+  mayBeWorkflowRun = false,
   metadata,
   referenceAssets,
   supportedModels,
@@ -1584,6 +1586,11 @@ export const buildImageRecallSettings = ({
   isCanvasFrame?: boolean;
   kind: ImageRecallKind;
   metadata: unknown;
+  /**
+   * The image embeds the workflow it ran from, or that could not be read. A workflow's loader takes components its
+   * metadata node never names, so an absent key then says nothing about what the run used and the panel keeps its picks.
+   */
+  mayBeWorkflowRun?: boolean;
   referenceAssets?: ReadonlyMap<string, Pick<GalleryImage, 'width' | 'height'>>;
   supportedModels: GenerateModelConfig[];
   models: ComponentModelConfig[];
@@ -1652,7 +1659,7 @@ export const buildImageRecallSettings = ({
     // whose writer may have left components out (a Canvas save, a workflow's denoise node) says nothing about them, so
     // the panel keeps its picks. The encoders judged are the ones that survive recall: a recorded one that is gone
     // leaves the panel's, and with it the question whether the source still supplies the VAE.
-    const judgedModel = model && recordsLoaderSelections(metadata) ? model : undefined;
+    const judgedModel = model && !mayBeWorkflowRun && recordsLoaderSelections(metadata) ? model : undefined;
     const { componentSourceModel } = componentPatch;
     // A writer that may have used a source without recording it leaves the question open, like an unresolved one.
     const recordedSource = !recordsComponent('componentSourceModel')

@@ -1308,6 +1308,43 @@ describe('ERNIE-Image graphs', () => {
   });
 });
 
+describe('ERNIE-Image loader components', () => {
+  const ernie = (format: string): MainModelConfig =>
+    ({ base: 'ernie-image', format, key: `ernie-${format}`, name: 'ERNIE-Image', type: 'main' }) as MainModelConfig;
+  const picks = {
+    mistralEncoderModel: {
+      base: 'any',
+      key: 'ministral',
+      name: 'Ministral 3B',
+      type: 'mistral_encoder',
+      variant: 'ministral3_3b',
+    },
+    vae: { base: 'flux2', key: 'flux2-vae', name: 'FLUX.2 VAE', type: 'vae' },
+  } as unknown as Partial<GenerateSettings>;
+  const coreMetadata = (graph: ReturnType<typeof compile>) => getNodeByType(graph, 'core_metadata');
+
+  // `ErnieImageModelLoaderInvocation` takes both from the pipeline of a Diffusers main and ignores the fields, so the
+  // graph and the image record must not name models that did not run.
+  it('sends and records no standalone encoder or VAE for a Diffusers main', () => {
+    const graph = compile(ernie('diffusers'), picks);
+
+    expect(graph.nodes.model_loader?.text_encoder_model).toBeUndefined();
+    expect(graph.nodes.model_loader?.vae_model).toBeUndefined();
+    expect(coreMetadata(graph)).not.toHaveProperty('mistral_encoder');
+    expect(coreMetadata(graph)).not.toHaveProperty('vae');
+  });
+
+  it('sends and records the standalone encoder and VAE a single-file main loads', () => {
+    const graph = compile(ernie('checkpoint'), picks);
+
+    expect(graph.nodes.model_loader).toMatchObject({
+      text_encoder_model: picks.mistralEncoderModel,
+      vae_model: picks.vae,
+    });
+    expect(coreMetadata(graph)).toMatchObject({ mistral_encoder: picks.mistralEncoderModel, vae: picks.vae });
+  });
+});
+
 describe('MOSS-Image graphs', () => {
   const mossDiffusers: MainModelConfig = {
     base: 'moss-image',

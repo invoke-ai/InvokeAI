@@ -311,6 +311,7 @@ const IMAGE_RECALL_CONTRACT = {
   // Upscale.
   creativity: { ignored: UPSCALE_SETTING },
   structure: { ignored: UPSCALE_SETTING },
+  tile_controlnet: { ignored: UPSCALE_SETTING },
   tile_overlap: { ignored: UPSCALE_SETTING },
   tile_size: { ignored: UPSCALE_SETTING },
   upscale_initial_image: { ignored: UPSCALE_SETTING },

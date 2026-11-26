@@ -38,7 +38,7 @@ const EXCLUDED: Readonly<Record<string, string>> = {
   'anima_lllite.control_model': 'The Anima inpaint adapter, which the Canvas records as `anima_inpaint_adapter`.',
   'anima_ip_adapter.ip_adapter_model': REFERENCE,
   'controlnet.control_model':
-    'A Canvas control layer records its model with the layer; the Upscale tile ControlNet is an Upscale panel setting no record holds.',
+    'A Canvas control layer records its model with the layer; the Upscale tile ControlNet is recorded as `tile_controlnet`.',
   'flux_ip_adapter.ip_adapter_model': REFERENCE,
   'flux_redux.redux_model': REFERENCE,
   'gemini_image_generation.model': PROVIDER,
@@ -48,7 +48,7 @@ const EXCLUDED: Readonly<Record<string, string>> = {
   'seedream_image_generation.model': PROVIDER,
   'spandrel_image_to_image_autoscale.image_to_image_model': 'An Upscale panel setting, recorded as `upscale_model`.',
   't2i_adapter.t2i_adapter_model': 'A Canvas control layer records its model with the layer.',
-  'z_image_control.control_model': 'The Upscale tile control is an Upscale panel setting no record holds.',
+  'z_image_control.control_model': 'The Upscale tile control, recorded as `tile_controlnet`.',
 };
 
 interface GraphCase {
@@ -197,6 +197,42 @@ describe('recorded components', () => {
     }
 
     expect(failures).toEqual([]);
+  });
+
+  it('records the tile ControlNet an Upscale graph loads, so another pick changes the record', () => {
+    const tileCases = UPSCALE_CASES.filter((testCase) => {
+      const { values } = valuesForCase(testCase);
+
+      return Object.keys(compileUpscaleGraph(values, 'gallery', { useCpuNoise: true }).backendGraph.nodes).some(
+        (id) => id === 'controlnet_1' || id === 'tile_control'
+      );
+    });
+    const record = (values: ReturnType<typeof valuesForCase>['values']) => {
+      const compiled = compileUpscaleGraph(values, 'gallery', { useCpuNoise: true });
+      const tileNode = Object.values(compiled.backendGraph.nodes).find(
+        ({ id }) => id === 'controlnet_1' || id === 'tile_control'
+      );
+
+      return { loaded: tileNode?.control_model, recorded: recordOf(compiled, values).tile_controlnet };
+    };
+
+    // SDXL (two ControlNet nodes) and Z-Image (its own control node) cover both builders.
+    expect(tileCases.map(({ label }) => label)).toEqual(expect.arrayContaining(['sdxl', 'z-image']));
+
+    for (const testCase of tileCases) {
+      const { values } = valuesForCase(testCase);
+      const other = {
+        ...values.tileControlnetModel!,
+        key: `${values.tileControlnetModel!.key}-other`,
+        name: `${values.tileControlnetModel!.name} other`,
+      };
+      const first = record(values);
+      const second = record({ ...values, tileControlnetModel: other });
+
+      expect(first.recorded, testCase.label).toEqual(first.loaded);
+      expect(second.recorded, testCase.label).toEqual(second.loaded);
+      expect(second.recorded, testCase.label).not.toEqual(first.recorded);
+    }
   });
 
   it('does not record a panel VAE the graph does not load', () => {

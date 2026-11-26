@@ -118,3 +118,22 @@ def test_every_exposed_field_has_a_value_instance_on_its_node(workflow_path: Pat
             f"{workflow_path.name}: exposes '{field_name}' on node {node_id}, which stores no value "
             f"instance for it — the control is dropped on load and the field never reaches the graph"
         )
+
+
+# Fields core_metadata 2.11.0 added. An embed that already carries the current version skips the editor's node
+# migration, so a field it lacks has no value instance and renders as a "Missing field" row.
+CORE_METADATA_FIELDS_ADDED_IN_2_11 = ("vae_precision", "color_compensation", "mistral_source")
+
+
+@pytest.mark.parametrize("workflow_path", WAN_WORKFLOWS, ids=lambda p: p.stem)
+def test_bundled_core_metadata_carries_the_fields_its_version_added(workflow_path: Path) -> None:
+    cls = InvocationRegistry.get_invocations_map()["core_metadata"]
+    assert cls.UIConfig.version == "2.11.0", "a newer core_metadata version adds fields this test does not know"
+    assert all(field in cls.model_fields for field in CORE_METADATA_FIELDS_ADDED_IN_2_11)
+
+    workflow = json.loads(workflow_path.read_text(encoding="utf-8"))
+    nodes = [node["data"] for node in workflow["nodes"] if node["data"]["type"] == "core_metadata"]
+
+    for data in nodes:
+        missing = [field for field in CORE_METADATA_FIELDS_ADDED_IN_2_11 if field not in data["inputs"]]
+        assert not missing, f"{workflow_path.name}: core_metadata {data['version']} embeds no input for {missing}"

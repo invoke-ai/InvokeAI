@@ -624,6 +624,7 @@
           0
         ],
         "t5_encoder": [],
+        "tile_controlnet": [],
         "tile_overlap": [
           128
         ],
