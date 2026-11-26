@@ -1,8 +1,7 @@
-"""Identifying MOSS-Image's transformer, VAE and pipeline folder, through the whole config factory.
+"""Identifying MOSS-Image's transformer, VAE and pipeline folder through the whole config factory.
 
-The single files are captured headers written back without their data (`write_header_only_safetensors`):
-identification reads nothing else, so every config class sees the real key names, shapes and dtypes, and a second
-config claiming the file shows up as a second match.
+Single-file fixtures have captured headers and sparse, zero-filled data sections (`write_header_only_safetensors`).
+The factory sees the real keys, shapes and dtypes; its unrelated Spandrel full-tensor fallback is stubbed.
 """
 
 import json
@@ -37,8 +36,14 @@ from tests.fixtures.quantized_payloads import q8_cr_marker, quantize_convrot, wr
 Keys = dict[str, tuple[list[int], str]]
 
 
-def _identify(path: Path) -> Any:
-    return ModelConfigFactory.from_model_on_disk(path, hash_algo="random", allow_unknown=False)
+def _identify(path: Path, *, allow_unknown: bool = False) -> Any:
+    # Header-only fixtures cannot satisfy Spandrel's full tensor load.
+    def reject_spandrel(_mod) -> None:
+        raise NotAMatchError("not a Spandrel model")
+
+    with pytest.MonkeyPatch.context() as monkeypatch:
+        monkeypatch.setattr(Spandrel_Checkpoint_Config, "_load_spandrel_model", staticmethod(reject_spandrel))
+        return ModelConfigFactory.from_model_on_disk(path, hash_algo="random", allow_unknown=allow_unknown)
 
 
 def test_identification_does_not_hash_the_sparse_payload(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -182,9 +187,7 @@ def test_a_lora_for_the_transformer_is_a_moss_image_lora_not_a_main_model(tmp_pa
         keys[f"diffusion_model.{module}.lora_B.weight"] = ([rows, 16], "BF16")
         keys[f"diffusion_model.{module}.weight"] = ([rows, columns], "BF16")
 
-    result = ModelConfigFactory.from_model_on_disk(
-        write_header_only_safetensors(tmp_path / "moss-lora.safetensors", keys), hash_algo="random", allow_unknown=True
-    )
+    result = _identify(write_header_only_safetensors(tmp_path / "moss-lora.safetensors", keys), allow_unknown=True)
 
     assert isinstance(result.details[Main_Checkpoint_MossImage_Config.__name__], NotAMatchError)
     # Its weights are no LoRA parameter, so the file is refused for them instead of installing as a partial LoRA.
@@ -292,25 +295,12 @@ def test_unsloths_torchao_fp8_build_installs_with_fp8_storage_on(tmp_path: Path)
     ],
 )
 def test_an_unsupported_quantized_transformer_is_refused_not_registered(
-    tmp_path: Path, quantize: Any, message: str, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, quantize: Any, message: str
 ) -> None:
-    # This fixture has a sparse, huge logical payload. Keep the unrelated Spandrel fallback on its header-only seam.
-    def reject_spandrel(_mod) -> None:
-        raise NotAMatchError("not a Spandrel model")
-
-    monkeypatch.setattr(
-        Spandrel_Checkpoint_Config,
-        "_load_spandrel_model",
-        staticmethod(reject_spandrel),
-    )
     keys = _dit()
     quantize(keys)
 
-    result = ModelConfigFactory.from_model_on_disk(
-        write_header_only_safetensors(tmp_path / "moss-quantized.safetensors", keys),
-        hash_algo="random",
-        allow_unknown=True,
-    )
+    result = _identify(write_header_only_safetensors(tmp_path / "moss-quantized.safetensors", keys), allow_unknown=True)
 
     # Final, not "unknown": nothing is written to the database.
     assert result.config is None
@@ -328,11 +318,7 @@ def test_a_prefixed_stray_scaled_fp8_marker_beside_torchao_layers_is_refused_lik
     keys = {f"model.diffusion_model.{key}": value for key, value in keys.items()}
     keys["model.diffusion_model.scaled_fp8"] = ([0], "F8_E4M3")
 
-    result = ModelConfigFactory.from_model_on_disk(
-        write_header_only_safetensors(tmp_path / "moss-prefixed.safetensors", keys),
-        hash_algo="random",
-        allow_unknown=True,
-    )
+    result = _identify(write_header_only_safetensors(tmp_path / "moss-prefixed.safetensors", keys), allow_unknown=True)
 
     assert result.config is None
     refusal = result.details[Main_Checkpoint_MossImage_Config.__name__]
@@ -347,11 +333,10 @@ def test_a_file_mixing_torchao_fp8_and_int8_convrot_layers_is_refused_at_install
     keys["text_embedder.blocks.0.qkv.weight"] = ([192, 4096], "I8")
     keys["text_embedder.blocks.0.qkv.weight_scale"] = ([192, 1], "F32")
 
-    result = ModelConfigFactory.from_model_on_disk(
+    result = _identify(
         write_header_only_safetensors(
             tmp_path / "moss-mixed.safetensors", keys, {"text_embedder.blocks.0.qkv": dict(CONVROT_MARKER)}
         ),
-        hash_algo="random",
         allow_unknown=True,
     )
 
@@ -372,11 +357,10 @@ def test_a_w4a8_build_is_refused_naming_what_does_load(tmp_path: Path) -> None:
         }
     )
 
-    result = ModelConfigFactory.from_model_on_disk(
+    result = _identify(
         write_header_only_safetensors(
             tmp_path / "moss-w4a8.safetensors", keys, {"layers.0.proj.q": {"format": "w4a8"}}
         ),
-        hash_algo="random",
         allow_unknown=True,
     )
 
@@ -391,10 +375,8 @@ def test_an_int8_build_of_another_format_than_int8_tensorwise_is_refused(tmp_pat
     keys, markers = int8_convrot_keys(_dit())
     markers["layers.0.proj.o"] = {"format": "int4_tensorwise", "convrot": True, "convrot_groupsize": 256}
 
-    result = ModelConfigFactory.from_model_on_disk(
-        write_header_only_safetensors(tmp_path / "moss-int8-mixed.safetensors", keys, markers),
-        hash_algo="random",
-        allow_unknown=True,
+    result = _identify(
+        write_header_only_safetensors(tmp_path / "moss-int8-mixed.safetensors", keys, markers), allow_unknown=True
     )
 
     assert result.config is None
