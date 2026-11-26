@@ -19,6 +19,7 @@ from invokeai.backend.model_manager.configs.factory import ModelClassificationRe
 from invokeai.backend.model_manager.configs.identification_utils import InvalidMatchError, NotAMatchError
 from invokeai.backend.model_manager.configs.qwen3_5_encoder import Qwen35Encoder_Checkpoint_Config
 from invokeai.backend.model_manager.configs.qwen3_vl_encoder import Qwen3VLEncoder_Checkpoint_Config
+from invokeai.backend.model_manager.configs.spandrel import Spandrel_Checkpoint_Config
 from invokeai.backend.model_manager.configs.text_llm import TextLLM_Checkpoint_Config, TextLLM_Diffusers_Config
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.model_manager.starter_models import STARTER_MODELS
@@ -43,8 +44,18 @@ _INT8: Keys = flux3_pup_int8_convrot_keys.state_dict_keys
 _LAYER = "model.language_model.layers.0.mlp.gate_proj"
 
 
-def _identify(path: Path, override_fields: dict[str, Any] | None = None) -> ModelClassificationResult:
-    return ModelConfigFactory.from_model_on_disk(path, override_fields, hash_algo="random", allow_unknown=False)
+def _identify(
+    path: Path, override_fields: dict[str, Any] | None = None, *, allow_unknown: bool = False
+) -> ModelClassificationResult:
+    # Header-only fixtures cannot satisfy Spandrel's full tensor load.
+    def reject_spandrel(_mod) -> None:
+        raise NotAMatchError("not a Spandrel model")
+
+    with pytest.MonkeyPatch.context() as monkeypatch:
+        monkeypatch.setattr(Spandrel_Checkpoint_Config, "_load_spandrel_model", staticmethod(reject_spandrel))
+        return ModelConfigFactory.from_model_on_disk(
+            path, override_fields, hash_algo="random", allow_unknown=allow_unknown
+        )
 
 
 def _matches(result: ModelClassificationResult) -> list[str]:
@@ -127,11 +138,7 @@ class TestComfyUISingleFiles:
     def test_a_build_the_loader_cannot_decode_is_refused_naming_its_scheme(
         self, tmp_path: Path, keys: Keys, scheme: str
     ) -> None:
-        result = ModelConfigFactory.from_model_on_disk(
-            write_header_only_safetensors(tmp_path / "upsampler.safetensors", keys),
-            hash_algo="random",
-            allow_unknown=True,
-        )
+        result = _identify(write_header_only_safetensors(tmp_path / "upsampler.safetensors", keys), allow_unknown=True)
 
         # Final, not "unknown": nothing is written to the database.
         assert result.config is None
@@ -312,10 +319,9 @@ class TestQuantizedQwen3_5Encoders:
     def test_a_build_the_loader_cannot_decode_is_refused_naming_its_scheme(
         self, tmp_path: Path, keys: Keys, scheme: str
     ) -> None:
-        result = ModelConfigFactory.from_model_on_disk(
+        result = _identify(
             write_header_only_safetensors(tmp_path / "encoder.safetensors", keys),
             self._starter_fields(),
-            hash_algo="random",
             allow_unknown=True,
         )
 
