@@ -47,9 +47,10 @@ export const ModelLibraryList = ({
   selectedKeys: ReadonlySet<string>;
 }) => {
   const { t } = useTranslation();
-  const { coverImageVersions, error, missingModelKeys, models, status } = useModelsSelector(
+  const { coverImageVersions, dateAddedRanks, error, missingModelKeys, models, status } = useModelsSelector(
     (snapshot) => ({
       coverImageVersions: snapshot.coverImageVersions,
+      dateAddedRanks: snapshot.dateAddedRanks,
       error: snapshot.error,
       missingModelKeys: snapshot.missingModelKeys,
       models: snapshot.models,
@@ -57,6 +58,7 @@ export const ModelLibraryList = ({
     }),
     (left, right) =>
       left.coverImageVersions === right.coverImageVersions &&
+      left.dateAddedRanks === right.dateAddedRanks &&
       left.error === right.error &&
       left.missingModelKeys === right.missingModelKeys &&
       left.models === right.models &&
@@ -82,16 +84,17 @@ export const ModelLibraryList = ({
   const rows = useMemo(
     () =>
       listRowsFromSections(
-        groupModelsByType(filterModels(models, deferredFilters, missingModelKeys), deferredFilters.typeFilter).map(
-          (group) => ({
-            items: group.entries,
-            key: group.type,
-            label: group.label,
-          })
-        ),
+        groupModelsByType(
+          filterModels(models, deferredFilters, missingModelKeys, dateAddedRanks),
+          deferredFilters.typeFilter
+        ).map((group) => ({
+          items: group.entries,
+          key: group.type,
+          label: group.label,
+        })),
         getRowKey
       ),
-    [deferredFilters, missingModelKeys, models]
+    [dateAddedRanks, deferredFilters, missingModelKeys, models]
   );
 
   // Persist the offset so switching tabs/regions and coming back lands here.

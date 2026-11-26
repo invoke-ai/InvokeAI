@@ -11,7 +11,7 @@ import type { LayerStackKind } from '@workbench/canvas-engine/document/layerStac
 import type { EngineStores } from '@workbench/canvas-engine/engineStores';
 import type { CreatePath2D } from '@workbench/canvas-engine/freehand';
 import type { CanvasProjectMutation } from '@workbench/canvas-engine/mutationContracts';
-import type { CompositeOptions } from '@workbench/canvas-engine/render/compositor';
+import type { ColorSampleProviders } from '@workbench/canvas-engine/render/colorSample';
 import type { LayerCacheStore } from '@workbench/canvas-engine/render/layerCache';
 import type { OverlayCursor } from '@workbench/canvas-engine/render/overlayRenderer';
 import type { RasterBackend } from '@workbench/canvas-engine/render/raster';
@@ -20,7 +20,7 @@ import type { SamInteractionState, SamVisualInput } from '@workbench/canvas-engi
 import type { FloatingSelection, FloatLiftResult } from '@workbench/canvas-engine/selection/floatingSelection';
 import type { SelectionCommit } from '@workbench/canvas-engine/selection/selectionState';
 import type { LayerTransform } from '@workbench/canvas-engine/transform/transformMath';
-import type { PlacedSurface, PointerInput, PointerModifiers, Rect, ToolId, Vec2 } from '@workbench/canvas-engine/types';
+import type { PlacedSurface, PointerInput, Rect, ToolId, Vec2 } from '@workbench/canvas-engine/types';
 import type { Viewport } from '@workbench/canvas-engine/viewport';
 
 /** Before/after images sized to `dirtyRect`, for exact undo/redo and persistence. */
@@ -111,7 +111,7 @@ export interface ToolContext {
   /** `commit` fires on pointer up only, so a structural commit in the continuation is not `gesture-active`. */
   resolveColorSample?(hex: string, phase: ColorSamplePhase): boolean;
   /** Absent samples raw cached pixels. */
-  sampleProviders?: Pick<CompositeOptions, 'adjustedSurface' | 'derivedSurfaces' | 'groupSurface'>;
+  sampleProviders?: ColorSampleProviders;
   /** Layer-local, so moving the layer carries it; the engine forgets entries on replay, replacement and removal. */
   paintLineEnds?: PaintLineEnds;
   /** Ordinary pointermove does not reevaluate it. */
@@ -163,9 +163,6 @@ export interface Tool {
   onModifierKey?(ctx: ToolContext, code: 'Space' | 'Alt' | 'Shift', pressed: boolean): boolean;
   /** Drop or reconcile an unfinished gesture when its document target changes. Never dispatch from this hook. */
   onDocumentChanged?(ctx: ToolContext): void;
-
-  /** Wheel over the canvas; `screenAnchor` is the CSS-pixel cursor position. */
-  onWheel?(ctx: ToolContext, deltaY: number, screenAnchor: { x: number; y: number }, modifiers: PointerModifiers): void;
   cursor?(ctx: ToolContext): string;
   /** The pointer pipeline must not turn this tool's alt-hold into the temporary color picker. */
   readonly usesAltKey?: boolean;

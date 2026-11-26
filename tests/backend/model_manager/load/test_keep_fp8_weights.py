@@ -15,13 +15,14 @@ import torch
 from invokeai.backend.model_manager.configs.default_settings import MainModelDefaultSettings
 from invokeai.backend.model_manager.configs.main import Main_Checkpoint_FLUX_Config
 from invokeai.backend.model_manager.load import load_default
-from invokeai.backend.model_manager.load.load_default import ModelLoader
+from invokeai.backend.model_manager.load.model_loaders.flux import FluxCheckpointModel
 from invokeai.backend.model_manager.taxonomy import SubModelType
 
 
-def _loader() -> ModelLoader:
-    loader = object.__new__(ModelLoader)
+def _loader() -> FluxCheckpointModel:
+    loader = object.__new__(FluxCheckpointModel)
     loader._torch_device = torch.device("cuda")
+    loader._torch_dtype = torch.float16
     loader._logger = MagicMock()
     return loader
 
