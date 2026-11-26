@@ -44,6 +44,7 @@ from invokeai.app.services.users.users_common import UserCreateRequest
 from invokeai.app.services.video_files.video_files_common import VideoFileNotFoundException
 from invokeai.app.services.video_records.video_records_common import VideoRecordNotFoundException
 from invokeai.app.services.videos.videos_common import VideoDTO
+from invokeai.app.util import video_thumbnails
 from invokeai.app.util.video_ingest import MediaProbe
 from tests.fixtures.sqlite_database import sqlite_cursor
 
@@ -660,7 +661,7 @@ def test_upload_video_malformed_mp4_returns_415_and_cleans_up_tmp(
     with (
         patch("invokeai.app.api.routers.videos.tempfile.NamedTemporaryFile", side_effect=spying_named_tmp),
         patch(
-            "invokeai.app.api.routers.videos.probe_video_with_codec",
+            "invokeai.app.util.video_thumbnails.probe_video_with_codec",
             side_effect=RuntimeError("not a decodable mp4"),
         ),
     ):
@@ -1050,14 +1051,12 @@ def test_uploaded_video_codec_must_be_browser_compatible(
     path = tmp_path / "video.mp4"
     path.write_bytes(b"video")
     monkeypatch.setattr(
-        videos_router_module,
+        video_thumbnails,
         "probe_video_with_codec",
         lambda _path: (64, 64, 1.0, 8.0, codec),
         raising=False,
     )
-    monkeypatch.setattr(
-        videos_router_module, "extract_representative_video_frame", lambda *_args, **_kwargs: MagicMock()
-    )
+    monkeypatch.setattr(video_thumbnails, "extract_representative_video_frame", lambda *_args, **_kwargs: MagicMock())
 
     if is_supported:
         metadata, _frame = videos_router_module._probe_decodable_video(path)

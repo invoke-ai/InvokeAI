@@ -322,3 +322,11 @@ def write_mp4_tags(
             raise Mp4MetadataError(f"ffmpeg produced no output for {dst.name}") from e
     finally:
         ffmeta_path.unlink(missing_ok=True)
+
+
+def is_mp4_file(path: Path) -> bool:
+    try:
+        major_brand = read_ftyp_major_brand(path)
+    except OSError:
+        return False
+    return major_brand is not None and major_brand != b"qt  "

@@ -24,6 +24,7 @@ import {
   getVideoModelSelectionResult,
   getVideoTargetResolutionOptions,
   getVideoValidationReasons,
+  HOSTED_H3_MODELS,
   isConditioningClipExcludingFrames,
   isSupportedVideoModel,
   isValidVideoNumFrames,
@@ -551,7 +552,21 @@ export const deriveAcceleratorRecallState = (
 };
 
 /** Read from the same parsed record the recall applies, so a verb is offered exactly when it writes something. */
+const getHostedH3Prompt = (metadata: unknown): string | null => {
+  if (
+    !isRecord(metadata) ||
+    metadata.external_provider !== 'minimax' ||
+    !HOSTED_H3_MODELS.some((model) => model === metadata.external_model_id)
+  ) {
+    return null;
+  }
+  return getString(metadata, 'positive_prompt');
+};
+
 export const getVideoRecallCapabilities = (metadata: unknown): VideoRecallCapabilities => {
+  if (getHostedH3Prompt(metadata) !== null) {
+    return { ...EMPTY_VIDEO_RECALL_CAPABILITIES, prompts: true };
+  }
   const record = parseVideoRecallRecord(metadata);
 
   if (!record?.isVideoGeneration) {
@@ -642,6 +657,16 @@ export const buildVideoRecallSettings = ({
   /** Require video generation metadata; the recall API sends no `generation_mode`. */
   requireGenerationMode?: boolean;
 }): (VideoRecallResult & { mediaNames: VideoRecallMediaNames }) | null => {
+  const hostedPrompt = getHostedH3Prompt(metadata);
+  if (hostedPrompt !== null) {
+    return kind === 'prompts'
+      ? {
+          fields: ['prompts'],
+          mediaNames: createEmptyMediaNames(),
+          values: { ...currentValues, positivePrompt: hostedPrompt },
+        }
+      : null;
+  }
   const record = parseVideoRecallRecord(metadata);
 
   if (!record || (requireGenerationMode && !record.isVideoGeneration)) {
@@ -710,8 +735,9 @@ export const buildVideoRecallSettings = ({
       model: recalledModel,
       negativePrompt: carriedNegativePrompt,
     };
-    fields.push('model');
-  } else if (recalledModel) {
+  }
+  if (recalledModel) {
+    values.hostedH3 = undefined;
     fields.push('model');
   }
 

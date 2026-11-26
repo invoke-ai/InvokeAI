@@ -18,12 +18,15 @@ import {
 import { SEED_MAX } from '@platform/core/seed';
 
 import type {
+  HostedH3Settings,
+  HostedH3Status,
   Ltx2TargetResolution,
   MiniMaxH3TargetResolution,
   VideoAspectRatioId,
   VideoGenerationMode,
   VideoSettings,
   VideoTargetResolution,
+  VideoWidgetValues,
 } from './types';
 
 import {
@@ -2499,3 +2502,95 @@ export const getVideoValidationIssues = (model: MainModelConfig, settings: Video
 
 export const getVideoValidationReasons = (model: MainModelConfig, settings: VideoSettings): string[] =>
   getVideoValidationIssues(model, settings).map((issue) => issue.message);
+
+export const HOSTED_H3_MODELS = [
+  'MiniMax-H3',
+  'MiniMax-H3-Highspeed',
+  'MiniMax-H3-Lite',
+  'MiniMax-H3-Max',
+  'MiniMax-H3-Max-Turbo',
+  'MiniMax-H3-MG',
+  'MiniMax-H3-NC',
+] as const;
+
+export const getHostedH3Models = (region: HostedH3Status['region']) =>
+  region === 'global' ? HOSTED_H3_MODELS : HOSTED_H3_MODELS.slice(0, 4);
+
+export const getHostedH3Resolutions = (model: string, region: HostedH3Status['region']): readonly string[] => {
+  if (model === 'MiniMax-H3') {
+    return region === 'global' ? ['480P', '768P', '2K'] : ['768P', '2K'];
+  }
+  return model === 'MiniMax-H3-MG' ? ['768P', '2K'] : ['480P', '768P'];
+};
+export const getHostedH3MinDuration = (model: string) => (model.startsWith('MiniMax-H3-Max') ? 5 : 4);
+
+const FIXED_RATIOS = ['21:9', '16:9', '4:3', '1:1', '3:4', '9:16'];
+export const getHostedH3Ratios = ({ model, input }: HostedH3Settings): readonly string[] => {
+  if (input === 'frames') {
+    return ['adaptive'];
+  }
+  return input === 'references' && model !== 'MiniMax-H3-Lite' && model !== 'MiniMax-H3-NC'
+    ? ['adaptive', ...FIXED_RATIOS]
+    : FIXED_RATIOS;
+};
+
+export const getHostedH3ProviderIssue = (hosted: HostedH3Settings, status: HostedH3Status | null | undefined) => {
+  if (!status?.configured) {
+    return 'MiniMax video requires a configured API key in Model Manager → API Keys.';
+  }
+  if (!status.region) {
+    return 'Select a supported MiniMax API region in Model Manager → API Keys.';
+  }
+  if (!getHostedH3Models(status.region).some((model) => model === hosted.model)) {
+    return 'Select a MiniMax model offered in the configured API region.';
+  }
+  if (!getHostedH3Resolutions(hosted.model, status.region).includes(hosted.resolution)) {
+    return 'Select a resolution offered by this model in the configured MiniMax API region.';
+  }
+  return null;
+};
+export const getHostedH3InputIssue = (settings: VideoWidgetValues, hosted: HostedH3Settings) => {
+  if (!settings.positivePrompt.trim() || Array.from(settings.positivePrompt).length > 7000) {
+    return 'MiniMax video requires a prompt of 1 to 7,000 characters.';
+  }
+  if (
+    !Number.isInteger(hosted.duration) ||
+    hosted.duration < getHostedH3MinDuration(hosted.model) ||
+    hosted.duration > 15
+  ) {
+    return 'Select a supported MiniMax video duration.';
+  }
+  if (!getHostedH3Ratios(hosted).includes(hosted.input === 'frames' ? 'adaptive' : hosted.ratio)) {
+    return 'Select an aspect ratio supported for these MiniMax inputs.';
+  }
+  if (hosted.input === 'frames' && !settings.firstFrameImage && !settings.lastFrameImage) {
+    return 'Select a first or last frame for MiniMax video.';
+  }
+  if (
+    hosted.input === 'references' &&
+    (!settings.references.length ||
+      settings.references.length > 9 ||
+      settings.references.some((entry) => entry.kind !== 'image'))
+  ) {
+    return 'Select one to nine reference images for MiniMax video.';
+  }
+  const images =
+    hosted.input === 'frames'
+      ? [settings.firstFrameImage, settings.lastFrameImage]
+      : hosted.input === 'references'
+        ? settings.references.flatMap((ref) => (ref.kind === 'image' ? [ref.image] : []))
+        : [];
+  if (
+    images.some(
+      (image) =>
+        image &&
+        (Math.min(image.width, image.height) < 256 ||
+          Math.max(image.width, image.height) > 5760 ||
+          image.width / image.height < 0.4 ||
+          image.width / image.height > 2.5)
+    )
+  ) {
+    return 'MiniMax images must be 256–5,760 pixels per side with an aspect ratio between 0.4 and 2.5.';
+  }
+  return null;
+};

@@ -28,6 +28,7 @@ export const areVideoValuesEqual = (left: VideoWidgetValues, right: VideoWidgetV
   }
 
   return (
+    stableStringify(left.hostedH3) === stableStringify(right.hostedH3) &&
     left.modelKey === right.modelKey &&
     left.h3TaskOverride === right.h3TaskOverride &&
     left.model?.variant === right.model?.variant &&

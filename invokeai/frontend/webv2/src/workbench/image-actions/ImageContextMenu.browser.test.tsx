@@ -116,6 +116,7 @@ const image = (imageName: string): GalleryImage => ({
 const createActions = (deleteItems: ImageActions['deleteItems']): ImageActions => ({
   canUseAsConditioningClip: { audio: false, video: false },
   canUseAsReferenceImage: false,
+  canUseAsInitialVideo: true,
   canUseAsReferenceVideo: false,
   copyImage: vi.fn(() => Promise.resolve()),
   createCanvasFromImages: vi.fn(() => Promise.resolve()),

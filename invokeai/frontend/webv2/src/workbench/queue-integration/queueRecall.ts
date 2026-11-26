@@ -30,7 +30,7 @@ export const getVideoQueueRecallCapabilities = (
   dimensions: false,
   prompts: snapshot !== null || meta.positivePrompt !== undefined,
   remix: snapshot !== null,
-  seed: meta.seed !== undefined || (snapshot !== null && snapshot.seedMode !== 'random'),
+  seed: !snapshot?.hostedH3 && (meta.seed !== undefined || (snapshot !== null && snapshot.seedMode !== 'random')),
   workflow: false,
 });
 
@@ -268,6 +268,9 @@ export const buildVideoQueueRecallPatch = (
   }
 
   if (kind === 'seed') {
+    if (snapshot?.hostedH3) {
+      return null;
+    }
     const seed = meta.seed ?? (snapshot && snapshot.seedMode !== 'random' ? snapshot.seed : undefined);
     return seed === undefined ? null : { seed, seedMode: 'fixed' };
   }

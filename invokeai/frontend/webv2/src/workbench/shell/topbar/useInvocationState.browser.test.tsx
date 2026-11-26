@@ -80,6 +80,8 @@ const preferences = vi.hoisted(() => {
 vi.mock('@features/generation/react', () => ({ useDynamicPrompts: harness.useDynamicPrompts }));
 vi.mock('@features/models', () => ({
   ensureModelsLoaded: () => Promise.resolve(),
+  getMiniMaxStatus: () => null,
+  useMiniMaxStatus: () => ({ isSuccess: false }),
   // One snapshot object, as the real store hands out. A fresh `models` array per render would change an input React
   // Compiler memoises the route on, and re-resolve it by accident.
   useModelsSelector: (selector: (snapshot: unknown) => unknown) => selector(modelsSnapshot),

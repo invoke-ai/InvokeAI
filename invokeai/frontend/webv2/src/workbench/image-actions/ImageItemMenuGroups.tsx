@@ -471,6 +471,7 @@ export const VideoUseGroups = ({
       <Menu.ItemGroup>
         <Menu.ItemGroupLabel>{t('widgets.gallery.itemMenu.useVideoAs')}</Menu.ItemGroupLabel>
         <MenuActionItem
+          disabled={!actions.canUseAsInitialVideo}
           icon={ClapperboardIcon}
           label={t('widgets.gallery.itemMenu.extendInVideo')}
           value="extend-in-video"

@@ -2,7 +2,7 @@ import type { ExternalProviderConfig } from '@features/models/data/api';
 /* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
 import type { ElementType } from 'react';
 
-import { HStack, Input, Stack, Switch, Text } from '@chakra-ui/react';
+import { HStack, Input, NativeSelect, Stack, Switch, Text } from '@chakra-ui/react';
 import {
   clearExternalProviderConfig,
   ensureExternalProvidersLoaded,
@@ -23,6 +23,10 @@ import { BotIcon, CloudIcon, HexagonIcon } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+const MINIMAX_GLOBAL_URL = 'https://api.minimax.io';
+const MINIMAX_CHINA_URL = 'https://api.minimax.cn';
+const normalizedProviderUrl = (url: string) => url.trim().replace(/\/+$/, '');
+
 interface ProviderPresentation {
   icon: ElementType;
   /** Literal key-shape hint; `placeholderKey` (an i18n key) wins when set. */
@@ -35,6 +39,7 @@ const EXTERNAL_PROVIDER_PRESENTATION: Record<string, ProviderPresentation> = {
   alibabacloud: { icon: AlibabaCloudIcon, placeholder: 'sk-…', title: 'Alibaba Cloud (Qwen)' },
   atlascloud: { icon: CloudIcon, title: 'Atlas Cloud' },
   gemini: { icon: GoogleGeminiIcon, placeholder: 'AIza…', title: 'Google Gemini' },
+  minimax: { icon: CloudIcon, title: 'MiniMax' },
   openai: { icon: BotIcon, placeholder: 'sk-…', title: 'OpenAI' },
   seedream: { icon: ByteDanceIcon, placeholderKey: 'models.bytePlusApiKeyPlaceholder', title: 'Seedream' },
 };
@@ -142,6 +147,16 @@ const ExternalProviderKeyCard = ({
   const hasApiKeyDraft = apiKeyDraft.trim().length > 0;
   const hasBaseUrlChange = overrideBaseUrl ? baseUrlDraft.trim() !== (config.base_url ?? '') : config.base_url !== null;
 
+  const isMiniMax = config.provider_id === 'minimax';
+  const effectiveUrl = overrideBaseUrl ? normalizedProviderUrl(baseUrlDraft) : MINIMAX_GLOBAL_URL;
+  const miniMaxEndpoint = [MINIMAX_GLOBAL_URL, MINIMAX_CHINA_URL].includes(effectiveUrl) ? effectiveUrl : 'custom';
+  const newEndpointNeedsKey =
+    isMiniMax &&
+    config.api_key_configured &&
+    !hasApiKeyDraft &&
+    effectiveUrl !== normalizedProviderUrl(config.base_url || MINIMAX_GLOBAL_URL);
+  const canSave = (hasApiKeyDraft || hasBaseUrlChange) && !newEndpointNeedsKey && !(isMiniMax && !effectiveUrl);
+
   const runProviderAction = (
     action: () => Promise<ExternalProviderConfig>,
     onSuccess?: (next: ExternalProviderConfig, owner: AccountScope) => void
@@ -160,6 +175,9 @@ const ExternalProviderKeyCard = ({
     );
 
   const handleSave = async () => {
+    if (!canSave || isBusy) {
+      return;
+    }
     const apiKey = apiKeyDraft.trim();
     const baseUrl = baseUrlDraft.trim();
     const nextConfig: { api_key?: string; base_url?: string | null } = {};
@@ -168,7 +186,10 @@ const ExternalProviderKeyCard = ({
       nextConfig.api_key = apiKey;
     }
 
-    if (!overrideBaseUrl && config.base_url !== null) {
+    if (isMiniMax && apiKey) {
+      // Pair the typed secret with the destination shown here even if another admin changes it before Save.
+      nextConfig.base_url = overrideBaseUrl ? baseUrl : MINIMAX_GLOBAL_URL;
+    } else if (!overrideBaseUrl && config.base_url !== null) {
       nextConfig.base_url = '';
     } else if (overrideBaseUrl && baseUrl !== (config.base_url ?? '')) {
       nextConfig.base_url = baseUrl;
@@ -224,28 +245,52 @@ const ExternalProviderKeyCard = ({
             }}
           />
         </HStack>
-        <Switch.Root
-          checked={overrideBaseUrl}
-          disabled={isBusy}
-          onCheckedChange={(event) => {
-            const checked = event.checked === true;
+        {isMiniMax ? (
+          <Stack gap="1">
+            <Text fontSize="sm" color="fg.muted">
+              {t('models.miniMaxRegion')}
+            </Text>
+            <NativeSelect.Root disabled={isBusy}>
+              <NativeSelect.Field
+                aria-label={t('models.miniMaxRegion')}
+                value={miniMaxEndpoint}
+                onChange={(event) => {
+                  const next = event.currentTarget.value;
+                  setOverrideBaseUrl(next !== MINIMAX_GLOBAL_URL);
+                  setBaseUrlDraft(next === MINIMAX_CHINA_URL ? next : '');
+                }}
+              >
+                <option value={MINIMAX_GLOBAL_URL}>{t('models.miniMaxGlobal')}</option>
+                <option value={MINIMAX_CHINA_URL}>{t('models.miniMaxChina')}</option>
+                <option value="custom">{t('models.miniMaxCustom')}</option>
+              </NativeSelect.Field>
+              <NativeSelect.Indicator />
+            </NativeSelect.Root>
+          </Stack>
+        ) : (
+          <Switch.Root
+            checked={overrideBaseUrl}
+            disabled={isBusy}
+            onCheckedChange={(event) => {
+              const checked = event.checked === true;
 
-            setOverrideBaseUrl(checked);
+              setOverrideBaseUrl(checked);
 
-            if (!checked) {
-              setBaseUrlDraft('');
-            }
-          }}
-        >
-          <Switch.HiddenInput />
-          <Switch.Control _checked={{ bg: 'accent.solid' }}>
-            <Switch.Thumb />
-          </Switch.Control>
-          <Switch.Label color="fg.muted" fontSize="xs">
-            {t('models.overrideBaseUrl')}
-          </Switch.Label>
-        </Switch.Root>
-        {overrideBaseUrl ? (
+              if (!checked) {
+                setBaseUrlDraft('');
+              }
+            }}
+          >
+            <Switch.HiddenInput />
+            <Switch.Control _checked={{ bg: 'accent.solid' }}>
+              <Switch.Thumb />
+            </Switch.Control>
+            <Switch.Label color="fg.muted" fontSize="xs">
+              {t('models.overrideBaseUrl')}
+            </Switch.Label>
+          </Switch.Root>
+        )}
+        {overrideBaseUrl && (!isMiniMax || miniMaxEndpoint === 'custom') ? (
           <Input
             aria-label={t('models.baseUrlFor', { title })}
             disabled={isBusy}
@@ -260,15 +305,15 @@ const ExternalProviderKeyCard = ({
             }}
           />
         ) : null}
+        {newEndpointNeedsKey && (
+          <Text fontSize="sm" color="fg.muted">
+            {t('models.miniMaxNewEndpointKey')}
+          </Text>
+        )}
       </Stack>
 
       <HStack gap="1.5">
-        <Button
-          disabled={(!hasApiKeyDraft && !hasBaseUrlChange) || isBusy}
-          loading={isBusy}
-          variant="solid"
-          onClick={() => void handleSave()}
-        >
+        <Button disabled={!canSave || isBusy} loading={isBusy} variant="solid" onClick={() => void handleSave()}>
           {t('common.save')}
         </Button>
         {canClear ? (

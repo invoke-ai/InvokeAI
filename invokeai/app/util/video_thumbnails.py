@@ -648,6 +648,36 @@ def probe_video(
     return width, height, duration, fps
 
 
+def probe_decodable_video(
+    path: Path, *, is_canceled: Optional[Callable[[], bool]] = None
+) -> tuple[tuple[int, int, float, Optional[float]], Optional[Image.Image]]:
+    """Probes metadata and proves the video has a decodable frame.
+
+    Returns the metadata plus the decoded frame so the save path can reuse it as the
+    thumbnail source instead of spawning another decode worker. The frame comes from the
+    thumbnail seek ladder (see extract_representative_video_frame): the first informative
+    frame found starting ~1s in, else the best-scoring one, with frame 0 as the last rung.
+    Acceptance is thereby slightly WIDER than a frame-0 check: a file whose frame 0 is
+    corrupt but whose later frame decodes is accepted rather than 415'd. A decode timeout
+    is contention on a loaded server, not evidence the video is bad — probe_video already
+    succeeded — so it yields (metadata, None) and the upload proceeds, with save-time
+    thumbnail extraction as the backstop.
+    """
+    width, height, duration, fps, codec = probe_video_with_codec(path)
+    if codec is None or codec.lower() not in {"h264", "avc", "avc1", "libx264"}:
+        raise ValueError("Video must use a browser-compatible H.264/AVC codec")
+    metadata = (width, height, duration, fps)
+    if is_canceled is not None and is_canceled():
+        raise CanceledException
+    try:
+        first_frame = extract_representative_video_frame(path, duration, fps, raise_on_timeout=True)
+    except VideoDecodeTimeoutError:
+        return metadata, None
+    if first_frame is None:
+        raise ValueError("Video has no decodable frame")
+    return metadata, first_frame
+
+
 def decoder_frame_count(video_path: Path, timeout: float = VIDEO_DECODE_TIMEOUT_SECONDS) -> Optional[int]:
     """Returns the exact decoded frame count, or None if it cannot be determined in time.
 

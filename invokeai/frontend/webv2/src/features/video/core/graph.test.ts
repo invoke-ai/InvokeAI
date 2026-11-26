@@ -4,8 +4,10 @@ import { describe, expect, it } from 'vitest';
 
 import type { VideoSettings } from './types';
 
-import { compileVideoGraph } from './graph';
+import { compileHostedH3Graph, compileVideoGraph } from './graph';
+import { DEFAULT_HOSTED_H3 } from './settings';
 import { getDefaultVideoSettings } from './videoPolicies';
+import { createDefaultVideoWidgetValues } from './widgetValues';
 
 const wanModel = (variant: string, format = 'diffusers', key = `wan-${variant}-${format}`): MainModelConfig => ({
   base: 'wan',
@@ -39,6 +41,22 @@ const settingsFor = (model: MainModelConfig, overrides: Partial<VideoSettings> =
   ...getDefaultVideoSettings(model),
   positivePrompt: 'a red fox',
   ...overrides,
+});
+
+it('only sends hosted input images from the chosen mode, preserving the reference order', () => {
+  const refs = ['second.png', 'first.png'].map((image_name) => ({
+    kind: 'image' as const,
+    detail: 'match' as const,
+    image: { image_name, width: 1024, height: 768 },
+  }));
+  const values = { ...createDefaultVideoWidgetValues(), references: refs, firstFrameImage: FIRST_FRAME };
+  const output = (input: 'text' | 'frames' | 'references') =>
+    compileHostedH3Graph(values, { ...DEFAULT_HOSTED_H3, input }, 'cn', null).backendGraph!.nodes.video_output;
+  expect(output('text')).not.toHaveProperty('first_frame');
+  expect(output('text')).not.toHaveProperty('reference_images');
+  expect(output('frames')).not.toHaveProperty('reference_images');
+  expect(output('references')).not.toHaveProperty('first_frame');
+  expect(output('references').reference_images).toEqual([{ image_name: 'second.png' }, { image_name: 'first.png' }]);
 });
 
 const nodesOfType = (graph: BackendGraphContract, type: string) =>

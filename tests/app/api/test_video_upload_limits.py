@@ -36,6 +36,7 @@ from invokeai.app.api_app import (
 from invokeai.app.services.auth.token_service import TokenData, create_access_token, set_jwt_secret
 from invokeai.app.services.board_access.board_access_common import BoardAccess, BoardRole
 from invokeai.app.services.image_records.image_records_common import ImageCategory
+from invokeai.app.util import video_thumbnails
 from invokeai.app.util.video_ingest import VideoIngestError
 from invokeai.app.util.video_thumbnails import VideoDecodeTimeoutError
 
@@ -55,9 +56,11 @@ def test_configured_upload_slots_bound_peak_temp_storage_usage() -> None:
 
 
 def test_upload_probe_requires_a_decodable_frame(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr(videos, "probe_video_with_codec", lambda path: (48, 32, 1.0, 8.0, "h264"))
+    monkeypatch.setattr(video_thumbnails, "probe_video_with_codec", lambda path: (48, 32, 1.0, 8.0, "h264"))
     monkeypatch.setattr(
-        videos, "extract_representative_video_frame", lambda path, duration=None, fps=None, raise_on_timeout=False: None
+        video_thumbnails,
+        "extract_representative_video_frame",
+        lambda path, duration=None, fps=None, raise_on_timeout=False: None,
     )
 
     with pytest.raises(ValueError, match="decodable frame"):
@@ -66,9 +69,9 @@ def test_upload_probe_requires_a_decodable_frame(monkeypatch: pytest.MonkeyPatch
 
 def test_upload_probe_accepts_valid_metadata_and_frame(monkeypatch: pytest.MonkeyPatch):
     frame = MagicMock()
-    monkeypatch.setattr(videos, "probe_video_with_codec", lambda path: (48, 32, 1.0, 8.0, "h264"))
+    monkeypatch.setattr(video_thumbnails, "probe_video_with_codec", lambda path: (48, 32, 1.0, 8.0, "h264"))
     monkeypatch.setattr(
-        videos,
+        video_thumbnails,
         "extract_representative_video_frame",
         lambda path, duration=None, fps=None, raise_on_timeout=False: frame,
     )
@@ -83,8 +86,8 @@ def test_upload_probe_timeout_is_inconclusive_not_a_rejection(monkeypatch: pytes
     def _timeout(path, duration=None, fps=None, raise_on_timeout=False):
         raise VideoDecodeTimeoutError("decode worker timed out")
 
-    monkeypatch.setattr(videos, "probe_video_with_codec", lambda path: (48, 32, 1.0, 8.0, "h264"))
-    monkeypatch.setattr(videos, "extract_representative_video_frame", _timeout)
+    monkeypatch.setattr(video_thumbnails, "probe_video_with_codec", lambda path: (48, 32, 1.0, 8.0, "h264"))
+    monkeypatch.setattr(video_thumbnails, "extract_representative_video_frame", _timeout)
 
     assert videos._probe_decodable_video(Path("busy-server.mp4")) == ((48, 32, 1.0, 8.0), None)
 

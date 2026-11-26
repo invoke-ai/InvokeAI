@@ -439,7 +439,11 @@ export const InvokeButton = ({
               </ProgressCircle.Root>
             )}
           </Box>
-          {showsIssues ? t('topbar.invoke.issueCount', { count: issues.length }) : t('topbar.invoke.invoke')}
+          {showsIssues
+            ? t('topbar.invoke.issueCount', { count: issues.length })
+            : state.invocation.sourceId === 'video' && state.sourceValues?.hostedH3
+              ? t('widgets.video.hosted.invoke')
+              : t('topbar.invoke.invoke')}
           <span hidden id={routeDescriptionId}>
             {routeDescription}
           </span>

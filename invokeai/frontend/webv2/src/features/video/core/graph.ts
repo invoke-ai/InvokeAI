@@ -23,6 +23,7 @@ import type {
   VideoReferenceItem,
   VideoSettings,
   VideoSourceClip,
+  VideoWidgetValues,
 } from './types';
 import type { SupportedVideoBase } from './videoPolicies';
 
@@ -1028,6 +1029,45 @@ const buildLtx2VideoGraph = (settings: VideoSettings, model: MainModelConfig): B
   }
 
   return graph;
+};
+
+export const compileHostedH3Graph = (
+  settings: VideoWidgetValues,
+  hosted: NonNullable<VideoWidgetValues['hostedH3']>,
+  region: 'cn' | 'global',
+  boardId: string | null
+): GraphContract => {
+  const graph: BackendGraphContract = { edges: [], id: createId('hosted_h3_video_graph'), nodes: {} };
+  // The shared Video batch writer addresses all three nodes; only the positive prompt is a provider input.
+  const { positivePrompt } = addPromptAndSeedNodes(graph);
+  const output = addNode(graph, {
+    id: 'video_output',
+    type: 'minimax_h3_video_generation',
+    expected_region: region,
+    ...(boardId && boardId !== 'none' ? { board: { board_id: boardId } } : {}),
+    is_intermediate: false,
+    use_cache: false,
+    model: hosted.model,
+    duration: hosted.duration,
+    resolution: hosted.resolution,
+    ratio: hosted.input === 'frames' ? 'adaptive' : hosted.ratio,
+    generate_audio: hosted.generateAudio,
+    ...(hosted.input === 'frames' && settings.firstFrameImage
+      ? { first_frame: toImageField(settings.firstFrameImage) }
+      : {}),
+    ...(hosted.input === 'frames' && settings.lastFrameImage
+      ? { last_frame: toImageField(settings.lastFrameImage) }
+      : {}),
+    ...(hosted.input === 'references'
+      ? {
+          reference_images: settings.references.flatMap((entry) =>
+            entry.kind === 'image' ? [toImageField(entry.image)] : []
+          ),
+        }
+      : {}),
+  });
+  addEdge(graph, positivePrompt, 'value', output, 'prompt');
+  return toGraphContract(graph, `${hosted.model} API video`);
 };
 
 /** A record rather than a conditional, so a new family cannot compile without its builder. */

@@ -600,7 +600,8 @@ export type InitialVideoPlacement =
       /** The slot is filled either way. */
       usable: boolean;
     }
-  | { status: 'full' };
+  | { status: 'full' }
+  | { status: 'unsupported' };
 
 /** Exactly as the panel's own Initial Video field would. */
 export const placeInitialVideo = ({
@@ -613,7 +614,10 @@ export const placeInitialVideo = ({
   videoValues: Record<string, unknown>;
 }): InitialVideoPlacement => {
   const values = getCurrentVideoValues({ models, videoValues });
-  const policy = values.model ? getVideoModelPolicy(values.model, values) : null;
+  if (values.hostedH3) {
+    return { status: 'unsupported' };
+  }
+  const policy = !values.hostedH3 && values.model ? getVideoModelPolicy(values.model, values) : null;
   const referenceExtend = Boolean(policy?.references?.extend);
   const patch = getInitialVideoPatch({
     maxVideos: policy?.references?.maxVideos ?? 0,
@@ -634,7 +638,7 @@ export type ReferenceVideoPlacement =
 
 const getReferenceVideoRoom = (
   values: VideoWidgetValues,
-  policy = values.model ? getVideoModelPolicy(values.model, values) : null
+  policy = !values.hostedH3 && values.model ? getVideoModelPolicy(values.model, values) : null
 ): 'available' | 'full' | 'unsupported' => {
   if (!policy?.references || !policy.modes.includes('reference')) {
     return 'unsupported';
@@ -695,7 +699,41 @@ export const placeVideoImage = ({
   videoValues: Record<string, unknown>;
 }): VideoImagePlacement => {
   const values = getCurrentVideoValues({ models, videoValues });
-  const policy = values.model ? getVideoModelPolicy(values.model, values) : null;
+  if (values.hostedH3) {
+    if (values.hostedH3.input === 'references') {
+      const kept = append ? values.references : [];
+      if (kept.length >= 9) {
+        return { status: 'full' };
+      }
+      return {
+        displaced: Boolean(values.sourceVideo || values.conditioningClip),
+        patch: getReferencesPatch({
+          referenceExtend: false,
+          references: [...kept, { detail: DEFAULT_REFERENCE_IMAGE_DETAIL, image, kind: 'image' }],
+        }),
+        slot: 'reference',
+        status: 'placed',
+      };
+    }
+    if (append && values.firstFrameImage && values.lastFrameImage) {
+      return { status: 'full' };
+    }
+    const last = append && values.firstFrameImage !== null;
+    return {
+      displaced: Boolean(values.sourceVideo || values.conditioningClip || values.references.length),
+      patch: {
+        hostedH3: { ...values.hostedH3, input: 'frames' },
+        references: [],
+        sourceVideo: null,
+        conditioningClip: null,
+        firstFrameImage: last ? values.firstFrameImage : image,
+        lastFrameImage: last ? image : append ? values.lastFrameImage : null,
+      },
+      slot: last ? 'lastFrame' : 'firstFrame',
+      status: 'placed',
+    };
+  }
+  const policy = !values.hostedH3 && values.model ? getVideoModelPolicy(values.model, values) : null;
 
   if (!policy) {
     return { status: 'unsupported' };
@@ -802,7 +840,7 @@ export const placeConditioningClip = ({
 
   const values = getCurrentVideoValues({ models, videoValues });
 
-  if (!canConditionInRole(values.model ? getVideoModelPolicy(values.model, values) : null, role)) {
+  if (values.hostedH3 || !canConditionInRole(values.model ? getVideoModelPolicy(values.model, values) : null, role)) {
     return { status: 'unsupported' };
   }
 
@@ -820,6 +858,7 @@ export const placeConditioningClip = ({
 };
 
 export interface VideoPlacementRoom {
+  initialVideo: boolean;
   conditioningAudio: boolean;
   conditioningVideo: boolean;
   referenceVideo: boolean;
@@ -833,9 +872,10 @@ export const getVideoPlacementRoom = ({
   videoValues: Record<string, unknown>;
 }): VideoPlacementRoom => {
   const values = getCurrentVideoValues({ models, videoValues });
-  const policy = values.model ? getVideoModelPolicy(values.model, values) : null;
+  const policy = !values.hostedH3 && values.model ? getVideoModelPolicy(values.model, values) : null;
 
   return {
+    initialVideo: !values.hostedH3,
     conditioningAudio: canConditionInRole(policy, 'audio'),
     conditioningVideo: canConditionInRole(policy, 'video'),
     referenceVideo: getReferenceVideoRoom(values, policy) === 'available',

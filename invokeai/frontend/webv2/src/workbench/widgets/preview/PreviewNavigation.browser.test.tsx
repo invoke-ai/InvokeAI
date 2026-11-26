@@ -2048,6 +2048,7 @@ describe('preview deletion confirmation', () => {
 const createItemMenuActions = (overrides: Partial<ImageActions>): ImageActions => ({
   canUseAsConditioningClip: { audio: false, video: false },
   canUseAsReferenceImage: false,
+  canUseAsInitialVideo: true,
   canUseAsReferenceVideo: false,
   copyImage: vi.fn(() => Promise.resolve()),
   createCanvasFromImages: vi.fn(() => Promise.resolve()),

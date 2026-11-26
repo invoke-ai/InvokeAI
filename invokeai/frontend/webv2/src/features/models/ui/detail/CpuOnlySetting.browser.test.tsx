@@ -1,4 +1,5 @@
 import type { ModelConfig } from '@features/models/core/types';
+import type * as ModelsApi from '@features/models/data/api';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { getModelsSnapshot, setModelsSnapshotForTests, useModelsSelector } from '@features/models/data/modelsStore';
@@ -18,7 +19,10 @@ const api = vi.hoisted(() => ({
   updateModel: vi.fn(),
 }));
 
-vi.mock('@features/models/data/api', () => api);
+vi.mock('@features/models/data/api', async (importOriginal) => ({
+  ...(await importOriginal<typeof ModelsApi>()),
+  ...api,
+}));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;

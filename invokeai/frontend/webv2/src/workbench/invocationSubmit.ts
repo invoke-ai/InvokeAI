@@ -361,6 +361,7 @@ const dispatchResolvedInvocation = async (
 
   commands.generation.submitResolved({
     runtime: captureInvocationRuntimeInputs(route.sourceId),
+    ...(route.expectedMiniMaxRegion ? { expectedMiniMaxRegion: route.expectedMiniMaxRegion } : {}),
     backendSupportsCancellation: true,
     models,
     ...expansion,

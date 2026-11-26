@@ -382,7 +382,7 @@ const getStarterModelsResponse = (state) => {
 };
 
 /** The backend's `EXTERNAL_PROVIDER_FIELDS`, in its order: the config route lists each, configured or not. */
-const EXTERNAL_PROVIDER_IDS = ['alibabacloud', 'atlascloud', 'gemini', 'openai', 'seedream'];
+const EXTERNAL_PROVIDER_IDS = ['alibabacloud', 'atlascloud', 'gemini', 'minimax', 'openai', 'seedream'];
 
 /** The backend removes a provider's records with its key, so providers the hosted records route to have one. */
 const createExternalProviderConfigs = (models) => {
@@ -1667,6 +1667,26 @@ export const startMockBackend = async (port, { clock = Date.now, profile = 'empt
         }
       }
 
+      if (method === 'GET' && path === '/api/v1/app/external_providers/status') {
+        return json(
+          200,
+          [...state.externalProviders.values()].map((config) => ({
+            provider_id: config.provider_id,
+            configured: config.api_key_configured,
+            message: null,
+            ...(config.provider_id === 'minimax'
+              ? {
+                  region:
+                    !config.base_url || config.base_url === 'https://api.minimax.io'
+                      ? 'global'
+                      : config.base_url === 'https://api.minimax.cn'
+                        ? 'cn'
+                        : null,
+                }
+              : {}),
+          }))
+        );
+      }
       if (method === 'GET' && path === '/api/v1/app/external_providers/config') {
         return json(200, [...state.externalProviders.values()].map(clone));
       }

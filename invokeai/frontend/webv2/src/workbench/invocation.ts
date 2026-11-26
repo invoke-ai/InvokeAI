@@ -31,7 +31,12 @@ import {
   sanitizeBatchCount,
 } from '@features/generation/settings';
 import { getUpscaleValidationReasons, normalizeUpscaleWidgetValues, readsUpscalePrompt } from '@features/upscale';
-import { getVideoWidgetValidationReasons, normalizeVideoWidgetValues } from '@features/video';
+import {
+  getHostedH3ProviderIssue,
+  getVideoWidgetValidationReasons,
+  normalizeVideoWidgetValues,
+  type HostedH3Status,
+} from '@features/video';
 import { getProjectGraphReadiness } from '@features/workflow/graph';
 import { getInvocationTemplatesSnapshot } from '@features/workflow/react';
 import { localizeWorkflowReadinessReason } from '@features/workflow/utility';
@@ -337,7 +342,8 @@ export const resolveInvocationRoute = (
   route: InvocationRoute = project.invocation,
   models?: readonly ModelConfig[],
   workflowDocument?: ProjectGraphState,
-  templates?: Readonly<InvocationTemplatesSnapshot>
+  templates?: Readonly<InvocationTemplatesSnapshot>,
+  miniMaxStatus?: HostedH3Status | null
 ): ResolvedInvocationRoute =>
   resolveInvocationRouteInput(
     workflowDocument
@@ -346,7 +352,8 @@ export const resolveInvocationRoute = (
     mode,
     route,
     models,
-    templates
+    templates,
+    miniMaxStatus
   );
 
 export const resolveInvocationRouteInput = (
@@ -354,7 +361,8 @@ export const resolveInvocationRouteInput = (
   mode: InvocationMode = 'global',
   route: InvocationRoute = input.invocation,
   models?: readonly ModelConfig[],
-  templates?: Readonly<InvocationTemplatesSnapshot>
+  templates?: Readonly<InvocationTemplatesSnapshot>,
+  miniMaxStatus?: HostedH3Status | null
 ): ResolvedInvocationRoute => {
   const sourceId = route.sourceId;
   const destination = route.destination;
@@ -386,8 +394,16 @@ export const resolveInvocationRouteInput = (
     );
   }
 
+  let expectedMiniMaxRegion: NonNullable<HostedH3Status['region']> | undefined;
   if (sourceId === 'video') {
     const values = normalizeVideoWidgetValues(input.videoValues);
+    if (values?.hostedH3) {
+      expectedMiniMaxRegion = miniMaxStatus?.region ?? undefined;
+      const issue = getHostedH3ProviderIssue(values.hostedH3, miniMaxStatus);
+      if (issue) {
+        validationReasons.push(issue);
+      }
+    }
 
     validationReasons.push(
       ...(values ? getVideoWidgetValidationReasons(values, models) : ['Video settings are incomplete.'])
@@ -441,6 +457,7 @@ export const resolveInvocationRouteInput = (
     mode,
     sourceId,
     sourceValid,
+    ...(expectedMiniMaxRegion ? { expectedMiniMaxRegion } : {}),
     validationMessage: validationReasons[0],
     validationReasons,
     ...(projectGraphReadiness?.batch ? { workflowBatch: projectGraphReadiness.batch } : {}),

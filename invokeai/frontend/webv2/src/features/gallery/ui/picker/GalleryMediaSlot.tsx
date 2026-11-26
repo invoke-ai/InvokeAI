@@ -290,8 +290,8 @@ export const GalleryMediaSlot = ({
             as="button"
             aria-busy={isBusy || undefined}
             aria-disabled={isInert || undefined}
-            // Only the bare thumbnail tile needs a label; every other face names itself with its visible text.
-            aria-label={isTile && value ? labels.replace : undefined}
+            // A filled row normally names itself with its filename. A slot-specific replacement label can name both.
+            aria-label={value && (isTile || labelOverrides?.replace) ? labels.replace : undefined}
             aspectRatio={isTile ? 1 : undefined}
             cursor={disabled ? 'not-allowed' : undefined}
             // Busy stays focusable (`aria-disabled`): Remove hands focus here while the action runs.

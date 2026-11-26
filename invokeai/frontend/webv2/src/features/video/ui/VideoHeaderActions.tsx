@@ -24,6 +24,9 @@ export const VideoHeaderActions = ({ instance }: { instance?: { id: string } }) 
   // Match the panel's reconciled model; raw state may still reference an uninstalled model.
   const normalized = normalizeVideoWidgetValues(rawValues);
   const values = normalized && modelsLoaded ? syncVideoWidgetValuesWithModels(normalized, models) : normalized;
+  if (values?.hostedH3) {
+    return null;
+  }
   const model = values?.model ?? null;
   const defaults =
     modelsLoaded && values && model ? { ...getVideoSettingsWithModelDefaults(values, model, models), model } : null;

@@ -2482,6 +2482,88 @@ describe('workbenchReducer Phase 5 generation flow', () => {
       });
     };
 
+    it('queues a paid MiniMax video on the gallery board without installed models and refuses incompatible regions or a missing key', () => {
+      let state = workbenchReducer(createInitialWorkbenchState(), {
+        region: 'left',
+        type: 'toggleRegionWidget',
+        widgetId: 'video',
+      });
+      state = workbenchReducer(state, {
+        type: 'patchWidgetValues',
+        widgetId: 'gallery',
+        values: { autoAddBoardId: 'board-h3' },
+      });
+      state = workbenchReducer(state, {
+        type: 'patchWidgetValues',
+        widgetId: 'video',
+        values: {
+          positivePrompt: 'A fox in the snow',
+          firstFrameImage: { image_name: 'fox.png', width: 1024, height: 768 },
+          hostedH3: {
+            model: 'MiniMax-H3-Max-Turbo',
+            resolution: '768P',
+            duration: 8,
+            generateAudio: false,
+            ratio: '16:9',
+            input: 'frames',
+          },
+        },
+      });
+      const submit = (configured: boolean, region: 'cn' | 'global' | null, expectedMiniMaxRegion?: 'cn' | 'global') =>
+        getActiveProject(
+          workbenchReducer(state, {
+            backendSupportsCancellation: true,
+            expectedMiniMaxRegion,
+            models: [],
+            projectId: state.activeProjectId,
+            route: { destination: 'gallery', destinationLocked: false, sourceId: 'video', sourceLocked: false },
+            runtime: {
+              ...captureInvocationRuntimeInputs('video'),
+              miniMaxStatus: region ? { configured, region } : null,
+              boardDestinationIds: ['board-h3'],
+            },
+            type: 'submitResolvedInvocationSnapshot',
+          })
+        ).queue.items;
+      expect(submit(true, 'cn', 'cn')).toHaveLength(0);
+      expect(submit(false, 'global', 'global')).toHaveLength(0);
+      expect(submit(true, null, 'global')).toHaveLength(0);
+      expect(submit(true, 'global')).toHaveLength(0);
+      expect(submit(true, 'global', 'cn')).toHaveLength(0);
+      const [run] = submit(true, 'global', 'global');
+      expect(run?.snapshot).toMatchObject({
+        resultNodeIds: ['video_output'],
+        galleryBoardId: 'board-h3',
+        backendSubmission: {
+          kind: 'generate',
+          positivePrompt: 'A fox in the snow',
+          graph: {
+            nodes: {
+              video_output: {
+                type: 'minimax_h3_video_generation',
+                expected_region: 'global',
+                board: { board_id: 'board-h3' },
+                model: 'MiniMax-H3-Max-Turbo',
+                generate_audio: false,
+                resolution: '768P',
+                duration: 8,
+                ratio: 'adaptive',
+                first_frame: { image_name: 'fox.png' },
+                use_cache: false,
+                is_intermediate: false,
+              },
+            },
+            edges: [
+              {
+                source: { node_id: 'positive_prompt', field: 'value' },
+                destination: { node_id: 'video_output', field: 'prompt' },
+              },
+            ],
+          },
+        },
+      });
+    });
+
     it('queues one video per expanded prompt', () => {
       const queueItem = getActiveProject(submitVideo({}, ['a red fox', 'a green fox'])).queue.items[0];
 

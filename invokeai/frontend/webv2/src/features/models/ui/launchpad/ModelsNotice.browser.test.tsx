@@ -25,6 +25,7 @@ import { page, userEvent } from 'vitest/browser';
 import { ModelsNotice, ModelsRequiredHint } from './ModelsNotice';
 
 const api = vi.hoisted(() => ({
+  fetchMiniMaxStatus: vi.fn(),
   getModelsDir: vi.fn(),
   getStarterModels: vi.fn(),
   installModel: vi.fn(),
@@ -150,6 +151,8 @@ describe('Home models notice', () => {
     await expect.element(page.getByText(i18n.t('models.launchpad.noModelsAskAdmin'))).toBeVisible();
     await expect.element(page.getByText(i18n.t('models.launchpad.startNeedsModelAskAdmin'))).toBeVisible();
     expect(page.getByRole('button').query()).toBeNull();
+    await expect.element(page.getByText(i18n.t('models.launchpad.startHostedVideo'))).toBeVisible();
+    expect(api.fetchMiniMaxStatus).not.toHaveBeenCalled();
     expect(api.getStarterModels).not.toHaveBeenCalled();
     expect(api.listModelInstalls).not.toHaveBeenCalled();
   });
