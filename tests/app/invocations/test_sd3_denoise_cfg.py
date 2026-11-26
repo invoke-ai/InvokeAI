@@ -1,6 +1,7 @@
 """CFG handling in SD3DenoiseInvocation._run_diffusion."""
 
 from contextlib import contextmanager
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -16,7 +17,7 @@ DENOISE = "invokeai.app.invocations.sd3.sd3_denoise"
 
 
 class _RecordingTransformer(torch.nn.Module):
-    config = SimpleNamespace(in_channels=16, joint_attention_dim=8)
+    config = SimpleNamespace(in_channels=16, joint_attention_dim=8, patch_size=2)
 
     def __init__(self) -> None:
         super().__init__()
@@ -70,8 +71,13 @@ def _cpu(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(f"{DENOISE}.SD3Transformer2DModel", _RecordingTransformer)
 
 
+# The SD3.5 shift-3.0 schedule at two steps runs sigma 1 -> 1/112 -> 0 (the GGUF stand-in has no scheduler config).
+FIRST_STEP = -111 / 112
+SECOND_STEP = -1 / 112
+
+
 def _run_denoise(
-    cfg_scale: float | list[float], steps: int = 2
+    cfg_scale: float | list[float], steps: int = 2, **fields
 ) -> tuple[_RecordingTransformer, list[str], torch.Tensor, torch.Tensor]:
     transformer = _RecordingTransformer()
     loaded: list[str] = []
@@ -81,7 +87,11 @@ def _run_denoise(
         return _conditioning(1.0 if name == "pos" else -1.0)
 
     context = SimpleNamespace(
-        models=SimpleNamespace(load=lambda _identifier: _TransformerInfo(transformer)),
+        models=SimpleNamespace(
+            load=lambda _identifier: _TransformerInfo(transformer),
+            get_config=lambda _identifier: SimpleNamespace(path="sd3.gguf"),
+            get_absolute_path=lambda config: Path(config.path),
+        ),
         conditioning=SimpleNamespace(load=_load_cond),
         util=SimpleNamespace(sd_step_callback=lambda *_args: None),
     )
@@ -111,7 +121,7 @@ def test_cfg_scale_one_skips_negative_conditioning_and_unconditional_pass() -> N
     assert loaded == ["pos"]
     assert [c["hidden_states"].shape[0] for c in transformer.calls] == [1, 1]
     assert all(c["timestep"].shape == (1,) and torch.all(c["pooled_projections"] == 1.0) for c in transformer.calls)
-    assert torch.allclose(latents, initial_noise - 1.0)
+    assert torch.allclose(latents, initial_noise + (FIRST_STEP + SECOND_STEP), atol=1e-5)
 
 
 def test_cfg_scale_above_one_loads_negative_conditioning_and_batches_uncond_with_cond() -> None:
@@ -122,7 +132,7 @@ def test_cfg_scale_above_one_loads_negative_conditioning_and_batches_uncond_with
         torch.all(c["pooled_projections"][0] == -1.0) and torch.all(c["pooled_projections"][1] == 1.0)
         for c in transformer.calls
     )
-    assert torch.allclose(latents, initial_noise - 6.0)
+    assert torch.allclose(latents, initial_noise + 6.0 * (FIRST_STEP + SECOND_STEP), atol=1e-5)
 
 
 def test_per_step_cfg_scale_skips_unconditional_pass_only_on_cfg_one_steps() -> None:
@@ -131,4 +141,5 @@ def test_per_step_cfg_scale_skips_unconditional_pass_only_on_cfg_one_steps() -> 
     assert [c["hidden_states"].shape[0] for c in transformer.calls] == [2, 1]
     assert [c["encoder_hidden_states"].shape[0] for c in transformer.calls] == [2, 1]
     assert torch.all(transformer.calls[1]["pooled_projections"] == 1.0)
-    assert torch.allclose(latents, initial_noise - 3.5)
+    # The guided step predicts -1 + 3.5 * 2 = 6; the CFG 1 step predicts the positive prompt's 1.
+    assert torch.allclose(latents, initial_noise + 6.0 * FIRST_STEP + 1.0 * SECOND_STEP, atol=1e-5)

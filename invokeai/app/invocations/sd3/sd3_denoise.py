@@ -348,9 +348,17 @@ class SD3DenoiseInvocation(BaseInvocation, WithMetadata):
 
         transformer_info = context.models.load(self.transformer.transformer)
 
+        # The shifted sigmas, clipped like FLUX's: `denoising_start` is the noise level an image-to-image pass starts
+        # at, and a split chain meets exactly at its boundary.
+        sigmas, num_train_timesteps = self._get_sigmas(context, transformer_info.model.config.patch_size)
+        timesteps = clip_timestep_schedule_fractional(sigmas, self.denoising_start, self.denoising_end)
+        total_steps = len(timesteps) - 1
+
+        # The CFG of each step this node runs; the negative prompt is only needed if one of them guides.
+        cfg_scale = self._active_cfg_scale(sigmas, total_steps)
+
         # Load/process the conditioning data.
-        cfg_scales = [self.cfg_scale] if isinstance(self.cfg_scale, float) else self.cfg_scale
-        any_cfg = self.negative_conditioning is not None and any(not math.isclose(s, 1.0) for s in cfg_scales)
+        any_cfg = self.negative_conditioning is not None and any(not math.isclose(s, 1.0) for s in cfg_scale)
         pos_prompt_embeds, pos_pooled_prompt_embeds = self._load_text_conditioning(
             context=context,
             conditioning_name=self.positive_conditioning.conditioning_name,
@@ -372,15 +380,6 @@ class SD3DenoiseInvocation(BaseInvocation, WithMetadata):
         else:
             prompt_embeds = pos_prompt_embeds
             pooled_prompt_embeds = pos_pooled_prompt_embeds
-
-        # The shifted sigmas, clipped like FLUX's: `denoising_start` is the noise level an image-to-image pass starts
-        # at, and a split chain meets exactly at its boundary.
-        sigmas, num_train_timesteps = self._get_sigmas(context, transformer_info.model.config.patch_size)
-        timesteps = clip_timestep_schedule_fractional(sigmas, self.denoising_start, self.denoising_end)
-        total_steps = len(timesteps) - 1
-
-        # Prepare the CFG scale list.
-        cfg_scale = self._active_cfg_scale(sigmas, total_steps)
 
         # Load the input latents, if provided.
         init_latents = context.tensors.load(self.latents.latents_name) if self.latents else None
