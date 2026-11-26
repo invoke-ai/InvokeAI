@@ -25,6 +25,7 @@ from invokeai.backend.model_manager.configs.main import (
     Main_Diffusers_MossImage_Config,
     Main_GGUF_MossImage_Config,
 )
+from invokeai.backend.model_manager.configs.spandrel import Spandrel_Checkpoint_Config
 from invokeai.backend.model_manager.configs.vae import VAE_Checkpoint_Flux2_Config
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
@@ -291,8 +292,17 @@ def test_unsloths_torchao_fp8_build_installs_with_fp8_storage_on(tmp_path: Path)
     ],
 )
 def test_an_unsupported_quantized_transformer_is_refused_not_registered(
-    tmp_path: Path, quantize: Any, message: str
+    tmp_path: Path, quantize: Any, message: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    # This fixture has a sparse, huge logical payload. Keep the unrelated Spandrel fallback on its header-only seam.
+    def reject_spandrel(_mod) -> None:
+        raise NotAMatchError("not a Spandrel model")
+
+    monkeypatch.setattr(
+        Spandrel_Checkpoint_Config,
+        "_load_spandrel_model",
+        staticmethod(reject_spandrel),
+    )
     keys = _dit()
     quantize(keys)
 

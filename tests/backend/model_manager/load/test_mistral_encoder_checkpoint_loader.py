@@ -297,7 +297,7 @@ def test_mistral_fp8_fallback_folds_in_bounded_slabs(monkeypatch: pytest.MonkeyP
     with LiveBytes() as live:
         mistral_encoder._drop_quantization_metadata(sd, logger=MagicMock(), target_dtype=torch.bfloat16)
 
-    assert torch.equal(sd["layer.weight"], expected)
+    torch.testing.assert_close(sd["layer.weight"], expected, rtol=0, atol=0, equal_nan=True)
     assert sd["layer.weight"].dtype is torch.bfloat16
     assert "layer.weight_scale" not in sd
     target_bytes = weight.numel() * torch.bfloat16.itemsize

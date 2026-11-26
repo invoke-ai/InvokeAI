@@ -25,7 +25,11 @@ from invokeai.backend.model_manager.load.model_loaders.qwen3_5_encoder import (
 )
 from invokeai.backend.model_manager.taxonomy import ModelType, Qwen35VariantType, SubModelType
 from invokeai.backend.quantization.int8_convrot import Int8ConvrotLinear
-from invokeai.backend.qwen3_5.qwen3_5_encoder import Qwen35Encoder, qwen3_5_text_config_from_config_json
+from invokeai.backend.qwen3_5.qwen3_5_encoder import (
+    _TOKENIZER_DIR,
+    Qwen35Encoder,
+    qwen3_5_text_config_from_config_json,
+)
 from tests.fixtures.model_roles import text_llm_file
 from tests.fixtures.quantized_payloads import comfy_quant_marker, quantize_convrot
 
@@ -429,5 +433,9 @@ def test_the_bundled_tokenizer_is_not_sized_as_the_whole_file(tmp_path: Path, lo
     save_file(_random({"language_model.embed_tokens.weight": [64, 32]}), path)
     config = Qwen35Encoder_Checkpoint_Config.model_construct(path=str(path), name="encoder")
 
-    assert loader.get_size_fs(config, path, SubModelType.Tokenizer) == 0
+    tokenizer_bytes = sum(
+        (_TOKENIZER_DIR / name).stat().st_size for name in ("tokenizer.json.gz", "tokenizer_config.json")
+    )
+    assert loader.get_size_fs(config, path, SubModelType.Tokenizer) == tokenizer_bytes
+    assert tokenizer_bytes != path.stat().st_size
     assert loader.get_size_fs(config, path, SubModelType.TextEncoder) == path.stat().st_size
