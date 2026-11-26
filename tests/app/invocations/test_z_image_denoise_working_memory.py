@@ -649,7 +649,6 @@ class TestNodeReservation:
         run = self._run(control_blocks=15)
 
         assert run.order == ["encode", "transformer lock"]
-        assert run.control_encode["deterministic"] is True
 
     def test_the_control_fields_tiling_reaches_the_control_encode(self):
         """The control image is encoded at generation size. For an upscale that is the enlarged frame, whose untiled

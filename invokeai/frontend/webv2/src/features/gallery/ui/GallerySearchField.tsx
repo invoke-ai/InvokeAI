@@ -81,8 +81,11 @@ export const GallerySearchField = ({
   ariaLabel: string;
   describedById?: string;
   endElement?: ReactNode;
-  /** Listbox wiring (`aria-controls`, `aria-activedescendant`) for hosts that drive a list from the field. */
-  inputProps?: Pick<React.ComponentProps<typeof Input>, 'aria-activedescendant' | 'aria-controls' | 'role'>;
+  /** Listbox wiring (`aria-controls`, `aria-activedescendant`, the highlight's menu) for hosts driving a list from it. */
+  inputProps?: Pick<
+    React.ComponentProps<typeof Input>,
+    'aria-activedescendant' | 'aria-controls' | 'onContextMenu' | 'onPointerDown' | 'role'
+  >;
   isInvalid?: boolean;
   mode?: 'metadata' | 'semantic';
   placeholder: string;

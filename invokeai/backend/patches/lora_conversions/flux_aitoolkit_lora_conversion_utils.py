@@ -47,8 +47,13 @@ def is_state_dict_likely_in_flux_aitoolkit_format(
         "hada_w2_b",
         "hada_t1",
         "hada_t2",
+        "dora_scale",
     )
-    if any(k.endswith(_LYCORIS_SUFFIXES) for k in state_dict.keys() if isinstance(k, str)):
+    if any(
+        k.endswith((*_LYCORIS_SUFFIXES, "lora_magnitude_vector.weight", "lora_magnitude_vector", ".magnitude"))
+        for k in state_dict.keys()
+        if isinstance(k, str)
+    ):
         return False
 
     if metadata:

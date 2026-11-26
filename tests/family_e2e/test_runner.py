@@ -256,7 +256,7 @@ def test_preflight_refuses_a_template_with_an_unfinished_model_install(
     template = tmp_path / "template"
     (template / "my-models").mkdir(parents=True)
     (template / "invokeai.yaml").write_text(
-        yaml.safe_dump({"schema_version": "4.0.3", "port": free, "models_dir": "my-models"})
+        yaml.safe_dump({"schema_version": "4.0.3", "multiuser": False, "port": free, "models_dir": "my-models"})
     )
     code_dir = tmp_path / "code"
     (code_dir / "scripts").mkdir(parents=True)
@@ -341,7 +341,9 @@ def killed_run(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
         s.bind(("127.0.0.1", 0))
         free = s.getsockname()[1]
     (tmp_path / "template").mkdir()
-    (tmp_path / "template" / "invokeai.yaml").write_text(yaml.safe_dump({"schema_version": "4.0.3", "port": free}))
+    (tmp_path / "template" / "invokeai.yaml").write_text(
+        yaml.safe_dump({"schema_version": "4.0.3", "multiuser": False, "port": free})
+    )
     manifest = tmp_path / "manifest.yaml"
     manifest.write_text(
         yaml.safe_dump(

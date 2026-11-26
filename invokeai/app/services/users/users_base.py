@@ -158,6 +158,15 @@ class UserServiceBase(ABC):
         pass
 
     @abstractmethod
+    def has_single_user_work(self) -> bool:
+        """Whether work made in single-user mode exists that no signed-in account sees.
+
+        Returns:
+            True if the internal `system` account owns a project, wildcard, private template or private font
+        """
+        pass
+
+    @abstractmethod
     def count_admins(self) -> int:
         """Count active admin users.
 

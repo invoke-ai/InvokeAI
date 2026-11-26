@@ -55,6 +55,7 @@ from invokeai.backend.quantization.fp8_scaled import (
     extract_comfy_quant_hints,
     extract_fp8_scaled_layers,
     full_precision_hints_respected,
+    load_safetensors_checkpoint,
     parse_quantization_metadata,
     read_safetensors_metadata,
     reject_quantized_side_channel,
@@ -380,7 +381,12 @@ class ZImageDiffusersModel(GenericDiffusersLoader):
             "SDNQ Z-Image Qwen3 text encoder", missing, unexpected, allowed_missing={"lm_head.weight"}
         )
 
-        if materialize_quantized_embedding(model.model.embed_tokens, ram_cache=self._ram_cache):
+        if materialize_quantized_embedding(
+            model.model.embed_tokens,
+            ram_cache=self._ram_cache,
+            model=model,
+            state_dict=sd,
+        ):
             logger.info("Dequantized embed_tokens weight for embedding lookups")
 
         # Handle tied weights
@@ -484,7 +490,6 @@ class ZImageCheckpointModel(ModelLoader):
         config: AnyModelConfig,
     ) -> AnyModel:
         from diffusers import ZImageTransformer2DModel
-        from safetensors.torch import load_file
 
         if not isinstance(config, Main_Checkpoint_ZImage_Config):
             raise TypeError(
@@ -494,7 +499,7 @@ class ZImageCheckpointModel(ModelLoader):
         model_path = Path(config.path)
 
         # Load the state dict from safetensors/checkpoint file
-        sd = load_file(model_path)
+        sd = load_safetensors_checkpoint(model_path)
 
         # Some Z-Image checkpoint files have keys prefixed with "diffusion_model." or
         # "model.diffusion_model." (ComfyUI-style format). Check if we need to strip this prefix.
@@ -1115,7 +1120,6 @@ class Qwen3EncoderCheckpointLoader(ModelLoader):
         self,
         config: AnyModelConfig,
     ) -> AnyModel:
-        from safetensors.torch import load_file
         from transformers import Qwen3Config, Qwen3ForCausalLM
 
         from invokeai.backend.util.logging import InvokeAILogger
@@ -1132,7 +1136,7 @@ class Qwen3EncoderCheckpointLoader(ModelLoader):
         device_keeps_fp8, model_dtype = self._storage_format(config)
 
         # Load the state dict from safetensors file
-        sd = load_file(model_path)
+        sd = load_safetensors_checkpoint(model_path)
         original_key_count = len(sd)
 
         # Three ComfyUI side channels reach this loader and a file carries one of them. int8 is
@@ -1553,7 +1557,12 @@ class Qwen3EncoderGGUFLoader(ModelLoader):
         # GGMLTensor wrappers will be dequantized on-the-fly during inference
         load_state_dict_ignoring_extras(model, sd, source="Qwen3 GGUF text encoder", assign=True, allow_missing=True)
 
-        if materialize_quantized_embedding(model.model.embed_tokens, ram_cache=self._ram_cache):
+        if materialize_quantized_embedding(
+            model.model.embed_tokens,
+            ram_cache=self._ram_cache,
+            model=model,
+            state_dict=sd,
+        ):
             logger.info("Dequantized embed_tokens weight for embedding lookups")
 
         # Handle tied weights - llama.cpp GGUF doesn't include lm_head.weight when embeddings are tied
@@ -1740,7 +1749,12 @@ class Qwen3EncoderSDNQLoader(ModelLoader):
         missing, unexpected = model.load_state_dict(sd, strict=False, assign=True)
         raise_on_incomplete_sdnq_load("SDNQ Qwen3 encoder", missing, unexpected, allowed_missing={"lm_head.weight"})
 
-        if materialize_quantized_embedding(model.model.embed_tokens, ram_cache=self._ram_cache):
+        if materialize_quantized_embedding(
+            model.model.embed_tokens,
+            ram_cache=self._ram_cache,
+            model=model,
+            state_dict=sd,
+        ):
             logger.info("Dequantized embed_tokens weight for embedding lookups")
 
         # Handle tied weights

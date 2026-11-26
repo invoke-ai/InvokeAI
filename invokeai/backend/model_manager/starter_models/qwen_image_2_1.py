@@ -11,6 +11,7 @@ from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, 
 _LICENSE = "Qwen Research License: non-commercial use only."
 
 qwen_image_2_1_vae = StarterModel(
+    source_urls=["https://huggingface.co/Comfy-Org/Qwen-Image-2.1"],
     name="Qwen-Image-2.1 VAE",
     base=BaseModelType.QwenImage21,
     source="https://huggingface.co/Comfy-Org/Qwen-Image-2.1/resolve/main/vae/qwen_image_2.1_vae_bf16.safetensors",
@@ -19,6 +20,7 @@ qwen_image_2_1_vae = StarterModel(
 )
 
 taeqi2_1 = StarterModel(
+    source_urls=["https://huggingface.co/madebyollin/taeqi2_1"],
     name="TAEQI2.1 (Qwen-Image-2.1 preview decoder)",
     base=BaseModelType.QwenImage21,
     source="https://huggingface.co/madebyollin/taeqi2_1/resolve/5d62f11fee0068b4df7bd699ddab685e32174010/taeqi2_1.safetensors",
@@ -28,6 +30,7 @@ taeqi2_1 = StarterModel(
 )
 
 qwen_image_2_1 = StarterModel(
+    source_urls=["https://huggingface.co/Qwen/Qwen-Image-2.1"],
     name="Qwen-Image-2.1",
     base=BaseModelType.QwenImage21,
     source="Qwen/Qwen-Image-2.1",
@@ -38,6 +41,7 @@ qwen_image_2_1 = StarterModel(
 )
 
 qwen_image_2_1_turbo = StarterModel(
+    source_urls=["https://huggingface.co/Qwen/Qwen-Image-2.1-Turbo"],
     name="Qwen-Image-2.1 Turbo",
     base=BaseModelType.QwenImage21,
     source="Qwen/Qwen-Image-2.1-Turbo",
@@ -48,6 +52,7 @@ qwen_image_2_1_turbo = StarterModel(
 )
 
 qwen_image_2_1_gguf_q4_k_m = StarterModel(
+    source_urls=["https://huggingface.co/unsloth/Qwen-Image-2.1-GGUF"],
     name="Qwen-Image-2.1 (Q4_K_M GGUF)",
     base=BaseModelType.QwenImage21,
     source="https://huggingface.co/unsloth/Qwen-Image-2.1-GGUF/resolve/main/qwen-image-2.1-Q4_K_M.gguf",
@@ -60,6 +65,7 @@ qwen_image_2_1_gguf_q4_k_m = StarterModel(
 )
 
 qwen_image_2_1_int8 = StarterModel(
+    source_urls=["https://huggingface.co/Comfy-Org/Qwen-Image-2.1"],
     name="Qwen-Image-2.1 (int8)",
     base=BaseModelType.QwenImage21,
     source="https://huggingface.co/Comfy-Org/Qwen-Image-2.1/resolve/aacf31a6d48e707f352ecba714cee0680da3479b/diffusion_models/qwen_image_2.1_int8_convrot.safetensors",
@@ -73,6 +79,7 @@ qwen_image_2_1_int8 = StarterModel(
 )
 
 qwen_image_2_1_turbo_int8 = StarterModel(
+    source_urls=["https://huggingface.co/Comfy-Org/Qwen-Image-2.1"],
     name="Qwen-Image-2.1 Turbo (int8)",
     base=BaseModelType.QwenImage21,
     source="https://huggingface.co/Comfy-Org/Qwen-Image-2.1/resolve/aacf31a6d48e707f352ecba714cee0680da3479b/diffusion_models/qwen_image_2.1_turbo_int8_convrot.safetensors",

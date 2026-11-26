@@ -8,7 +8,7 @@ import { drawVectorEditOverlay } from './render/vectorEditOverlay';
 import { drawVectorGuides } from './render/vectorGuides';
 import { createVectorShapeTool } from './tools/vectorShapeTool';
 
-/** Per-engine vector state, instantiated only after its implementation has loaded. */
+/** Vector controllers, tools and rendering share the engine lifetime. */
 export const createVectorRuntime = (options: ConstructorParameters<typeof VectorEditingController>[0]) => ({
   editor: new VectorEditingController(options),
   shape: createVectorShapeTool(),

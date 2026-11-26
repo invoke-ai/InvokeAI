@@ -40,6 +40,7 @@ from invokeai.backend.quantization.fp8_scaled import (
     extract_comfy_quant_hints,
     extract_fp8_scaled_layers,
     full_precision_hints_respected,
+    load_safetensors_checkpoint,
     parse_quantization_metadata,
     read_safetensors_metadata,
     reject_quantized_side_channel,
@@ -96,8 +97,6 @@ class AnimaCheckpointModel(ModelLoader):
         self,
         config: AnyModelConfig,
     ) -> AnyModel:
-        from safetensors.torch import load_file
-
         from invokeai.backend.anima.anima_transformer import AnimaTransformer
         from invokeai.backend.anima.semantic_connector import AnimaSemanticConnectorConfig
 
@@ -115,14 +114,15 @@ class AnimaCheckpointModel(ModelLoader):
                 "Use 'Re-identify model' in the Model Manager to load it as a GGUF model."
             )
 
-        # Load the state dict from safetensors
-        sd = load_file(model_path)
+        # Only the transformer's tensors are read: an all-in-one's bundled VAE and text encoder, and the runtime-derived
+        # buffers and exporter metadata that aren't model weights, are dropped by name before any payload is read.
+        sd = load_safetensors_checkpoint(
+            model_path,
+            select=lambda names: filter_non_model_keys(strip_anima_bundle_prefix(names)),
+        )
 
         # Strip the transformer-key prefix (`net.` or bundled `model.diffusion_model.`).
         sd = strip_anima_bundle_prefix(sd)
-
-        # Drop runtime-derived buffers and exporter metadata that aren't model weights.
-        sd = filter_non_model_keys(sd)
 
         target_device = TorchDevice.choose_torch_device()
         model_dtype = TorchDevice.choose_anima_inference_dtype(target_device)

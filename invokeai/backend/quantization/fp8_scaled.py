@@ -20,7 +20,7 @@ that :class:`CustomLinear` can decide per forward what to do with it.
 from dataclasses import dataclass
 from logging import Logger
 from pathlib import Path
-from typing import Any, Iterable, Mapping
+from typing import Any, Callable, Iterable, Literal, Mapping
 
 import torch
 
@@ -97,6 +97,69 @@ def read_safetensors_metadata(path: Path, logger: Logger | None = None) -> dict[
                 f"Could not read safetensors metadata from {path.name} ({e}); per-layer quantization hints unavailable."
             )
         return None
+
+
+def _backend_for(header: Mapping[str, Any]) -> Literal["pread", "mmap"]:
+    weights = (".weight", TORCHAO_QDATA_SUFFIX)
+    return "pread" if any(k.endswith(weights) and v["dtype"].startswith("F8_") for k, v in header.items()) else "mmap"
+
+
+def safetensors_backend(path: Path | str) -> Literal["pread", "mmap"]:
+    """The ``backend`` to read ``path``'s tensors with, so that widening its float8 weights releases the file.
+
+    The default mmap backend maps the whole file and every tensor is a slice of that mapping. A loader that
+    widens float8 weights to bf16 replaces the float8 sources, but tensors already in the target dtype (norms,
+    biases) stay views because ``.to`` is a no-op for them, and those few views pin the entire file for the
+    model's lifetime, uncounted by the RAM cache. A float8 weight is the trigger because that is what gets
+    widened while its neighbours stay views: ``.weight``, or torchao's ``._weight_qdata``. A load that keeps its fp8
+    codes is read this way all the same: the codes and the dense layers the cast leaves alone would otherwise pin the
+    file just as well. With ``pread`` every tensor owns its storage.
+
+    Only those float8 weights trigger it. A file without one keeps the lazy mmap load, and so keeps pinning its file
+    through whatever dtype-matching tensors a loader leaves as views: that covers the empty ``scaled_fp8`` marker, a
+    file whose only float8 tensors are nvfp4 block scales (``.weight_scale``), and the modelopt nvfp4 FLUX.3 builds,
+    whose bf16 tensors (see ``relayout_modelopt_nvfp4_payloads``) stay views of the file.
+    """
+    from invokeai.backend.model_manager.model_on_disk import read_safetensors_header
+
+    header = read_safetensors_header(Path(path))
+    return _backend_for(header)
+
+
+def load_safetensors_checkpoint(
+    path: Path | str,
+    *,
+    select: Callable[[dict[str, str]], Mapping[str, str]] | None = None,
+    owned: bool = False,
+) -> dict[str, torch.Tensor]:
+    """Load a single-file checkpoint with the backend :func:`safetensors_backend` picks for it.
+
+    ``select`` names what is worth reading, from the header alone: it is called with ``{key: key}`` for every tensor
+    in the file and returns the part to read (a loader passes its own key rename and drop functions, which only look
+    at names; the values of what comes back name the file's keys). A tensor it leaves out is never read, which is what
+    a bundled VAE or vision tower costs under ``pread``: with mmap an unused tensor was never paged in. The result is
+    keyed by the file's own names, whatever ``select`` renamed.
+
+    ``owned`` reads with ``pread`` whatever the file stores, for a caller whose tensors stay views of the file even
+    though it holds no float8 weight: a bf16 tower, whose cast to bf16 returns the tensor itself.
+
+    The RAM cache's room for the read is not made here: the loader base class asks ``make_room`` for the file's size
+    (``get_size_fs``) before ``_load_model`` runs, and a read is never larger than the file.
+    """
+    from safetensors import safe_open
+
+    from invokeai.backend.model_manager.model_on_disk import read_safetensors_header
+
+    header = read_safetensors_header(Path(path))
+    names = {key: key for key in header}
+    if select is not None:
+        names = {key: key for key in select(names).values()}
+    absent = [key for key in names if key not in header]
+    if absent:
+        raise ValueError(f"{Path(path).name} has no tensor '{absent[0]}'.")
+    backend = "pread" if owned else _backend_for(header)
+    with safe_open(str(path), framework="pt", device="cpu", backend=backend) as f:
+        return {key: f.get_tensor(key) for key in names}
 
 
 def parse_quantization_metadata(metadata: Mapping[str, Any] | None) -> dict[str, dict[str, Any]]:
@@ -625,23 +688,6 @@ def translate_torchao_fp8_layers(sd: dict[Any, Any]) -> int:
         # layer to bf16. Flat `[out]` is the per-output-channel form.
         sd[f"{layer}.weight_scale"] = sd.pop(layer + TORCHAO_SCALE_SUFFIX).reshape(-1)
     return len(layers)
-
-
-def clone_unreplaced_tensors(sd: dict[Any, Any], before: Mapping[Any, Any]) -> int:
-    """Clone every tensor in ``sd`` that is still the very object ``before`` held; return how many.
-
-    ``before`` is a shallow ``dict(sd)`` taken ahead of a fold and cast. Those leave a tensor in place when
-    nothing needed changing (a bf16 weight cast to bf16 is the same object), and ``load_file`` tensors are slices of
-    one file mapping, so each kept one pins the whole mapping for the model's cached life without the cache's size
-    calculation seeing it. Tensors the fold or cast replaced are already fresh and are not copied again. Their
-    storage cannot tell the two apart: every ``load_file`` tensor reports its own storage and size.
-    """
-    cloned = 0
-    for key, tensor in sd.items():
-        if before.get(key) is tensor and isinstance(tensor, torch.Tensor):
-            sd[key] = tensor.clone()
-            cloned += 1
-    return cloned
 
 
 def reject_undecoded_mx_scale(path: str, scale: Any) -> None:

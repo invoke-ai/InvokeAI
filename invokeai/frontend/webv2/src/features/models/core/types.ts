@@ -109,6 +109,8 @@ export interface MainModelDefaultSettings {
   height?: number | null;
   guidance?: number | null;
   fp8_storage?: boolean | null;
+  /** Default component models by slot name (`generation/core/componentDefaults`), each a model key; null when none. */
+  components?: Record<string, string> | null;
 }
 
 export interface LoraModelDefaultSettings {
@@ -183,11 +185,14 @@ export interface ModelConfig {
   source: string;
   source_type: 'path' | 'url' | 'hf_repo_id' | (string & {});
   source_url?: string | null;
+  source_urls?: string[];
   cover_image?: string | null;
   base: ModelBase;
   type: ModelTaxonomyType;
   format: ModelFileFormat;
   variant?: string | null;
+  /** Set by the library on a registered model whose files are gone; the backend never sends it. */
+  is_missing?: boolean;
   /** Other types these files serve as. The backend always sends it; older fixtures may omit it. */
   roles?: ModelRole[];
   prediction_type?: PredictionType | null;
@@ -221,6 +226,7 @@ export interface ModelRecordChanges {
   path?: string;
   description?: string | null;
   source_url?: string | null;
+  source_urls?: string[];
   base?: ModelBase;
   type?: ModelTaxonomyType;
   format?: ModelFileFormat;
@@ -308,6 +314,7 @@ export interface HuggingFaceModels {
 }
 
 export interface StarterModel {
+  source_urls?: string[];
   name: string;
   description: string;
   source: string;

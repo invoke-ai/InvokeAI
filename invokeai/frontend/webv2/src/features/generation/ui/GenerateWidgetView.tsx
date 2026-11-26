@@ -4,6 +4,7 @@ import type { GenerateModelConfig, GenerateSettings, LoraModelConfig } from '@fe
 import {
   getDefaultGenerateSettings,
   isGenerateModelSelectable,
+  pickFallbackGenerateModel,
 } from '@features/generation/core/baseGenerationPolicies';
 import { isLoraModelConfig, normalizeGenerateSettings } from '@features/generation/core/settings';
 import { resolveGenerateWidgetValues } from '@features/generation/settings';
@@ -39,7 +40,9 @@ export const GenerateWidgetView = ({ instance }: { instance?: { id: string } }) 
     [capabilitiesStatus, models, storedValues]
   );
   const settings =
-    resolved?.values ?? normalizeGenerateSettings(storedValues) ?? getDefaultGenerateSettings(supportedModels[0]);
+    resolved?.values ??
+    normalizeGenerateSettings(storedValues) ??
+    getDefaultGenerateSettings(pickFallbackGenerateModel(supportedModels));
   const selectedModel = resolved?.values.model;
   const gateLabels = useMemo(
     () => ({

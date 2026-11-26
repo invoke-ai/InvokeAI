@@ -144,11 +144,17 @@ def test_the_official_names_the_2_0_map_misses_are_still_renamed() -> None:
     assert "proj_in" in renamed
 
 
-@pytest.mark.parametrize("prefix", ["", "diffusion_model.", "transformer.", "base_model.model.transformer."])
+@pytest.mark.parametrize(
+    "prefix",
+    ["", "diffusion_model.", "transformer.", "base_model.model.", "base_model.model.transformer."],
+)
 def test_the_peft_prefixes_seen_in_the_wild_all_strip(prefix: str) -> None:
     patch = lora_model_from_ltx2_state_dict(_published_state_dict(prefix=prefix))
+    bare = lora_model_from_ltx2_state_dict(_published_state_dict(prefix=""))
 
     assert len(patch.layers) == len(PUBLISHED_LAYER_PATHS)
+    # Stripped, not carried through: a left-over prefix would resolve onto no module.
+    assert patch.layers.keys() == bare.layers.keys()
 
 
 def test_an_unknown_layer_keeps_its_own_name_so_the_patcher_can_report_it() -> None:
@@ -200,3 +206,57 @@ def test_lycoris_variants_are_refused_by_name() -> None:
 
 def test_the_published_layout_is_recognized_as_ltx2() -> None:
     assert is_state_dict_likely_in_ltx2_format(_published_state_dict())
+
+
+# (diffusers path, in_features, out_features) as a PEFT `PeftModel` around `LTX2VideoTransformer3DModel` names them.
+DIFFUSERS_TOP_LEVEL_LAYERS = (
+    ("time_embed.linear", 4096, 36864),
+    ("audio_time_embed.linear", 2048, 18432),
+    ("av_cross_attn_video_a2v_gate.linear", 4096, 4096),
+    ("av_cross_attn_audio_v2a_gate.linear", 2048, 2048),
+    ("av_cross_attn_video_scale_shift.linear", 4096, 16384),
+    ("av_cross_attn_audio_scale_shift.linear", 2048, 8192),
+    ("prompt_adaln.linear", 4096, 8192),
+    ("audio_prompt_adaln.linear", 2048, 4096),
+    ("proj_in", 128, 4096),
+    ("audio_proj_in", 128, 2048),
+)
+
+
+@pytest.mark.parametrize("prefix", ["", "transformer.", "base_model.model.", "base_model.model.transformer."])
+def test_diffusers_named_layers_keep_their_names_and_resolve(prefix: str) -> None:
+    """Already the runtime names: the official -> diffusers rename must not touch them a second time."""
+    modules = _transformer_modules()
+    state_dict: dict[str, torch.Tensor] = {}
+    for path, in_features, out_features in DIFFUSERS_TOP_LEVEL_LAYERS:
+        state_dict[f"{prefix}{path}.lora_A.weight"] = _z(8, in_features)
+        state_dict[f"{prefix}{path}.lora_B.weight"] = _z(out_features, 8)
+
+    assert is_state_dict_likely_in_ltx2_format(state_dict)
+    patch = lora_model_from_ltx2_state_dict(state_dict)
+
+    paths = [name[len(LTX2_LORA_TRANSFORMER_PREFIX) :] for name in patch.layers]
+    assert paths == [path for path, _in, _out in DIFFUSERS_TOP_LEVEL_LAYERS]
+    for path, layer in zip(paths, patch.layers.values(), strict=True):
+        module = modules.get(path)
+        assert isinstance(module, torch.nn.Linear), f"{path!r} is not a Linear on the transformer"
+        assert layer.up.shape[0] == module.out_features, path
+        assert layer.down.shape[1] == module.in_features, path
+
+
+def test_diffusers_named_layers_are_kept_out_of_the_rename(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The current rename tables happen to leave these names alone; the guard must not rely on that."""
+    import diffusers.loaders.single_file_utils as single_file_utils
+
+    def rename_everything(sd: dict[str, str]) -> dict[str, str]:
+        return {f"renamed.{key}": value for key, value in sd.items()}
+
+    monkeypatch.setattr(single_file_utils, "convert_ltx2_transformer_to_diffusers", rename_everything)
+    official = "transformer_blocks.0.audio_attn1.to_q"
+    state_dict: dict[str, torch.Tensor] = {}
+    for path in (official, *(path for path, _in, _out in DIFFUSERS_TOP_LEVEL_LAYERS)):
+        state_dict[f"base_model.model.{path}.lora_A.weight"] = _z(8, 16)
+        state_dict[f"base_model.model.{path}.lora_B.weight"] = _z(16, 8)
+
+    paths = [name[len(LTX2_LORA_TRANSFORMER_PREFIX) :] for name in lora_model_from_ltx2_state_dict(state_dict).layers]
+    assert paths == [f"renamed.{official}", *(path for path, _in, _out in DIFFUSERS_TOP_LEVEL_LAYERS)]

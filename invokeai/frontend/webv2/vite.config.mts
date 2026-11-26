@@ -190,9 +190,9 @@ const EDITOR_BOOT_SHARED_MODULES = [
 
 // Editor runtime the workbench store reaches; ungrouped, Rolldown splits it by importer set into extra boot requests.
 const WORKBENCH_RUNTIME_SHARED_MODULES = [
-  // Layer factories are shared with lazy vector creation; keep the adapter helper in the existing boot request.
+  // Layer factories and engine actions share the adapter helper; keep it in the existing boot request.
   '/workbench/controlAdapters.ts',
-  // The boot document model and lazy vector runtime share these already-eager primitives.
+  // The document model and engine actions share these boot primitives.
   '/workbench/canvas-engine/contracts.ts',
   '/workbench/canvas-engine/document-model/documentModel.ts',
   '/workbench/canvas-engine/document-model/postconditions.ts',
@@ -351,6 +351,7 @@ const GALLERY_STATE_MODULES = [
   '/features/gallery/core/settings.ts',
   '/features/gallery/react.ts',
   '/features/gallery/ui/GalleryUiContext.tsx',
+  '/platform/react/contextMenuPoint.ts',
   '/features/gallery/ui/GalleryMediaUsagePanel.tsx',
   '/features/gallery/ui/galleryStateView.ts',
   '/features/queue/contracts.ts',
@@ -385,6 +386,9 @@ const IMAGE_ACTIONS_MODULES = [
   '/workbench/image-actions/appendReferenceImage.ts',
   '/workbench/image-actions/canvasImportError.ts',
   '/workbench/image-actions/executeVideoRecall.ts',
+  '/workbench/image-actions/executeImageRecall.ts',
+  '/workbench/image-actions/imageRecall.ts',
+  '/workbench/image-actions/recordedModel.ts',
   '/workbench/image-actions/galleryOptimisticRollback.ts',
   '/workbench/image-actions/index.ts',
   '/workbench/image-actions/pbrMapsGraph.ts',
@@ -403,6 +407,18 @@ const IMAGE_MAP_DATA_MODULES = [
 
 // Group Canvas/Layer interaction dependencies to avoid extra text-tool activation requests.
 const CANVAS_LAYER_SHARED_MODULES = [
+  '/workbench/canvas-operations/ControlDetectionCoordinator.ts',
+  '/workbench/canvas-operations/FilterOperationCoordinator.ts',
+  '/workbench/canvas-operations/SelectObjectCoordinator.ts',
+  '/workbench/canvas-operations/applicationPort.ts',
+  '/workbench/canvas-operations/controlDetectionRunner.ts',
+  '/workbench/canvas-operations/controlLayerIntents.ts',
+  '/workbench/canvas-operations/createCanvasEngine.ts',
+  '/workbench/canvas-operations/filterOperationSession.ts',
+  '/workbench/canvas-operations/layerFilterRunner.ts',
+  '/workbench/canvas-operations/operationController.ts',
+  '/workbench/canvas-operations/operationStores.ts',
+  '/workbench/canvas-operations/toolMemory.ts',
   '/features/workflow/core/layerWorkflow.ts',
   '/workbench/canvas-operations/react.ts',
   '/workbench/canvas-operations/useCanvasEngine.ts',
@@ -429,12 +445,34 @@ const CANVAS_LAYER_SHARED_MODULES = [
   '/workbench/widgets/layers/colorLabels.ts',
   '/workbench/widgets/layers/layerCommands.ts',
   '/workbench/widgets/layers/layerActionSession.ts',
+  '/workbench/widgets/layers/layerChildRows.ts',
+  '/workbench/widgets/layers/layerChildSelection.ts',
   '/workbench/widgets/layers/layerContextActions.ts',
   '/workbench/widgets/layers/layerContextMenuLayout.ts',
   '/workbench/widgets/layers/layerExportActions.ts',
   '/workbench/widgets/layers/layerMenuState.ts',
   '/workbench/widgets/layers/runLayerWorkflow.ts',
   '/workbench/widgets/layers/useSelectedModelBase.ts',
+];
+
+// These engine primitives also serve document hydration or image actions before Canvas opens.
+const CANVAS_ENGINE_BOOT_MODULES = [
+  '/workbench/canvas-engine/api.ts',
+  '/workbench/canvas-engine/capabilities.ts',
+  '/workbench/canvas-engine/document-model/screenComposition.ts',
+  '/workbench/canvas-engine/document/controlDerivation.ts',
+  '/workbench/canvas-engine/document/layerFactories.ts',
+  '/workbench/canvas-engine/document/mergeVisible.ts',
+  '/workbench/canvas-engine/engineStores.ts',
+  '/workbench/canvas-engine/render/adjustments.ts',
+  '/workbench/canvas-engine/render/alphaBounds.ts',
+  '/workbench/canvas-engine/render/compositor.ts',
+  '/workbench/canvas-engine/render/controlTransparency.ts',
+  '/workbench/canvas-engine/render/exactAdjustments.ts',
+  '/workbench/canvas-engine/render/groupCompositeScopes.ts',
+  '/workbench/canvas-engine/render/maskFill.ts',
+  '/workbench/canvas-engine/render/rasterComposite.ts',
+  '/workbench/canvas-engine/samCoordinates.ts',
 ];
 
 /** The public entry only re-exports the policy, so it rides in the policy's chunk; alone it costs a request. */
@@ -531,7 +569,11 @@ export default defineConfig({
               includeDependenciesRecursively: false,
               name: 'canvas-layer-shared',
               priority: 30,
-              test: (id) => matchesAnySuffix(id, CANVAS_LAYER_SHARED_MODULES),
+              test: (id) =>
+                matchesAnySuffix(id, CANVAS_LAYER_SHARED_MODULES) ||
+                (id.includes('/src/workbench/canvas-engine/') &&
+                  !matchesAnySuffix(id, WORKBENCH_RUNTIME_SHARED_MODULES) &&
+                  !matchesAnySuffix(id, CANVAS_ENGINE_BOOT_MODULES)),
             },
             {
               includeDependenciesRecursively: false,
