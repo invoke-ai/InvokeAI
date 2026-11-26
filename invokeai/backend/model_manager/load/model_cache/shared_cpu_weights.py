@@ -1,13 +1,16 @@
+import itertools
 import queue
 import threading
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 
 import torch
 
-from invokeai.backend.model_manager.load.model_cache.tensor_aliases import analyze_state_dict
+from invokeai.backend.model_manager.load.model_cache.tensor_aliases import analyze_state_dict, storage_key
 
 
-@dataclass
+@dataclass(eq=False)
 class _SharedWeightsEntry:
     """A single canonical CPU state dict shared across per-device caches."""
 
@@ -21,6 +24,23 @@ class _SharedWeightsEntry:
     # for entries whose model isn't an nn.Module). Holds ~no real RAM: its weights are on `meta`.
     shell: object | None = None
     _key_bytes: dict[str, int] = field(default_factory=dict)
+
+
+@dataclass(eq=False)
+class SharedCpuWeightsPin:
+    """Temporary custody of the entry while its shell is cloned and admitted."""
+
+    _entry: _SharedWeightsEntry | None
+
+    @property
+    def state_dict(self) -> dict[str, torch.Tensor]:
+        assert self._entry is not None
+        return self._entry.state_dict
+
+    @property
+    def shell(self) -> torch.nn.Module:
+        assert self._entry is not None and isinstance(self._entry.shell, torch.nn.Module)
+        return self._entry.shell
 
 
 class SharedCpuWeightsStore:
@@ -46,7 +66,9 @@ class SharedCpuWeightsStore:
     Thread-safety: `acquire()`/`release()` are guarded by an internal lock. Note that model
     construction (where `acquire()` is normally called) is already serialized process-globally by
     `MODEL_LOAD_LOCK.write_lock()`; the internal lock here additionally protects `release()`, which
-    runs under a per-cache lock off the global construction lock.
+    runs under a per-cache lock off the global construction lock. Callers must serialize an entire
+    load/admission against invalidation with that write lock; the store lock protects individual
+    operations, not the transaction across cloning, admission and invalidation.
     """
 
     def __init__(self) -> None:
@@ -97,18 +119,88 @@ class SharedCpuWeightsStore:
             entry.refcount += 1
             return entry.state_dict
 
+    @contextmanager
+    def pin_for_adoption(self, key: str) -> Iterator[SharedCpuWeightsPin | None]:
+        """Select and pin the canonical and shell together for cloning and admission."""
+        adoption = None
+        with self._lock:
+            self._drain_deferred_locked()
+            entry = self._entries.get(key)
+            if entry is not None and isinstance(entry.shell, torch.nn.Module):
+                adoption = SharedCpuWeightsPin(entry)
+                entry.refcount += 1
+        del entry  # The pin must not retain the shell after custody is dropped.
+        try:
+            yield adoption
+        finally:
+            if adoption is not None:
+                with self._lock:
+                    self._release_adoption_pin_locked(key, adoption)
+
+    def _release_adoption_pin_locked(self, key: str, adoption: SharedCpuWeightsPin) -> None:
+        if (entry := adoption._entry) is not None:
+            adoption._entry = None
+            self._release_entry_locked(key, entry)
+
     def peek(self, key: str) -> dict[str, torch.Tensor] | None:
         """Return the canonical state dict for `key` WITHOUT changing its refcount, or None if absent.
 
-        Used by the loader to adopt already-resident weights at construction time (skipping the disk
-        read) when another device has already loaded this model. The reference is taken later, in the
-        cached-model wrapper's `acquire()`, exactly as for a normal load — so this peek must not
-        itself increment the count.
+        For inspection. Use pin_for_adoption() to select the shell and weights together.
         """
         with self._lock:
             self._drain_deferred_locked()
             entry = self._entries.get(key)
             return entry.state_dict if entry is not None else None
+
+    @contextmanager
+    def pin_for_admission(
+        self,
+        key: str,
+        model: torch.nn.Module | None,
+        total_bytes: int,
+        adoption: SharedCpuWeightsPin | None,
+    ) -> Iterator[bool]:
+        """Keep custody only when the conservative matcher allows zero reservation.
+
+        The cache supplies a module only when it keeps a CPU copy and its budget counts this store.
+        An adoption that needs the full reservation releases its pin before eviction starts.
+        Zero reservation requires the complete module to alias the canonical state, with matching
+        keys and size. Packed tensors, tied weights, private or non-persistent buffers, and data
+        outside the module can prevent a match and therefore still require a full reservation.
+        """
+        state_dict = None
+        if model is not None:
+            candidate = model.state_dict()
+            model_tensors = {storage_key(t) for t in itertools.chain(model.parameters(), model.buffers())}
+            if model_tensors == {storage_key(t) for t in candidate.values()}:
+                state_dict = candidate
+
+        with self._lock:
+            self._drain_deferred_locked()
+            pinned = self._entries.get(key)
+            if (
+                pinned is None
+                or (adoption is not None and pinned is not adoption._entry)
+                or state_dict is None
+                or pinned.total_bytes != total_bytes
+                or pinned.state_dict.keys() != state_dict.keys()
+                or any(
+                    tensor.device.type != "cpu" or storage_key(tensor) != storage_key(pinned.state_dict[name])
+                    for name, tensor in state_dict.items()
+                )
+            ):
+                pinned = None
+                if adoption is not None:
+                    self._release_adoption_pin_locked(key, adoption)
+            elif adoption is None:
+                pinned.refcount += 1
+
+        try:
+            yield pinned is not None
+        finally:
+            if pinned is not None and adoption is None:
+                with self._lock:
+                    self._release_entry_locked(key, pinned)
 
     def set_shell(self, key: str, shell: object) -> None:
         """Register the empty (meta-weight) structural clone for `key`, if an entry exists and none
@@ -169,19 +261,23 @@ class SharedCpuWeightsStore:
         """The body of release(). Caller must hold self._lock."""
         entry = self._entries.get(key)
         if entry is not None and (state_dict is None or entry.state_dict is state_dict):
-            entry.refcount -= 1
-            if entry.refcount <= 0:
-                del self._entries[key]
+            self._release_entry_locked(key, entry)
             return
         # Not the live canonical for `key` — it may be a retired (invalidated) entry whose
         # tensors are still being counted against the RAM budget.
         if state_dict is not None:
-            for i, retired in enumerate(self._retired):
+            for retired in self._retired:
                 if retired.state_dict is state_dict:
-                    retired.refcount -= 1
-                    if retired.refcount <= 0:
-                        del self._retired[i]
+                    self._release_entry_locked(key, retired)
                     return
+
+    def _release_entry_locked(self, key: str, entry: _SharedWeightsEntry) -> None:
+        entry.refcount -= 1
+        if entry.refcount == 0:
+            if self._entries.get(key) is entry:
+                del self._entries[key]
+            else:
+                self._retired.remove(entry)
 
     def invalidate(self, model_key: str) -> int:
         """Forget the canonical entries (and shells) for `model_key` and all of its submodels, so no

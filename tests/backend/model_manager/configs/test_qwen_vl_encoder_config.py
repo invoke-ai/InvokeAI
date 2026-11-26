@@ -99,3 +99,24 @@ def test_checkpoint_config_rejects_non_safetensors_extension() -> None:
 
         with pytest.raises(NotAMatchError, match="expected a .safetensors file"):
             QwenVLEncoder_Checkpoint_Config.from_model_on_disk(mod, dict(_OVERRIDE_FIELDS))
+
+
+def test_checkpoint_config_rejects_qwen3_vl_safetensors() -> None:
+    """A Qwen3-VL single file (e.g. MiniMax H3's 32B encoder) has the same LM + visual layout but QK-norm."""
+    with TemporaryDirectory() as tmpdir:
+        path = Path(tmpdir) / "qwen3vl_32b_minimax_h3_int8_convrot.safetensors"
+        _write_safetensors(
+            path,
+            [
+                "model.embed_tokens.weight",
+                "model.layers.0.self_attn.q_proj.weight",
+                "model.layers.0.self_attn.q_norm.weight",
+                "visual.blocks.0.attn.qkv.weight",
+            ],
+        )
+
+        mod = MagicMock()
+        mod.path = path
+
+        with pytest.raises(NotAMatchError, match="Qwen3-VL"):
+            QwenVLEncoder_Checkpoint_Config.from_model_on_disk(mod, dict(_OVERRIDE_FIELDS))

@@ -628,6 +628,55 @@ describe('deleteGalleryImages partial failures', () => {
       failedImageNames: ['locked.png'],
     });
   });
+
+  it('treats names the server confirms absent as deleted when the delete response is lost', async () => {
+    mocks.apiFetchJson.mockImplementation((url: string) =>
+      url === '/api/v1/images/gone'
+        ? Promise.resolve(['committed.png'])
+        : Promise.reject(new TypeError('Failed to fetch'))
+    );
+
+    await expect(deleteGalleryImages(['committed.png', 'kept.png'])).resolves.toEqual({
+      deletedImageNames: ['committed.png'],
+      failedImageNames: ['kept.png'],
+    });
+  });
+
+  it('keeps the lost response’s error when the server cannot confirm any absence', async () => {
+    const lost = new TypeError('Failed to fetch');
+    mocks.apiFetchJson.mockImplementation((url: string) =>
+      url === '/api/v1/images/gone' ? Promise.resolve([]) : Promise.reject(lost)
+    );
+
+    await expect(deleteGalleryImages(['a.png'])).rejects.toBe(lost);
+
+    mocks.apiFetchJson.mockRejectedValue(lost);
+
+    await expect(deleteGalleryImages(['a.png'])).rejects.toBe(lost);
+  });
+
+  it('reports a whole-batch refusal as is, without asking what is gone', async () => {
+    const refused = new ApiError('{"detail":"Image maintenance is running"}', 409);
+    mocks.apiFetchJson.mockRejectedValue(refused);
+
+    await expect(deleteGalleryImages(['a.png'])).rejects.toBe(refused);
+    expect(mocks.apiFetchJson).toHaveBeenCalledTimes(1);
+  });
+
+  it('counts names the route skipped as deleted once the server confirms them absent', async () => {
+    mocks.apiFetchJson.mockImplementation((url: string, init: { body: string }) => {
+      if (url === '/api/v1/images/gone') {
+        expect(JSON.parse(init.body)).toEqual({ image_names: ['already-gone.png', 'foreign.png'] });
+        return Promise.resolve(['already-gone.png']);
+      }
+      return Promise.resolve({ affected_boards: [], deleted_images: ['live.png'], failed_images: [] });
+    });
+
+    await expect(deleteGalleryImages(['live.png', 'already-gone.png', 'foreign.png'])).resolves.toEqual({
+      deletedImageNames: ['live.png', 'already-gone.png'],
+      failedImageNames: [],
+    });
+  });
 });
 
 describe('name lists past the server’s per-request cap', () => {
@@ -680,7 +729,7 @@ describe('name lists past the server’s per-request cap', () => {
     const result = await deleteGalleryImages(requested);
 
     // The third batch is never sent, and the cause is kept in the log.
-    expect(mocks.apiFetchJson).toHaveBeenCalledTimes(2);
+    expect(mocks.apiFetchJson.mock.calls.filter(([url]) => url === '/api/v1/images/delete')).toHaveLength(2);
     expect(getLogSnapshot().entries).toContainEqual(
       expect.objectContaining({ level: 'debug', name: 'gallery.batch-request-failed' })
     );

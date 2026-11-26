@@ -13,6 +13,7 @@ from invokeai.backend.model_manager.configs.identification_utils import (
     raise_if_not_dir,
     raise_if_not_file,
 )
+from invokeai.backend.model_manager.configs.qwen3_encoder import _has_qwen3_specific_keys
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType
 
@@ -152,6 +153,10 @@ class QwenVLEncoder_Checkpoint_Config(Checkpoint_Config_Base, Config_Base):
 
         if not _has_qwen_vl_keys(keys):
             raise NotAMatchError("state dict does not look like a Qwen2.5-VL/Qwen2-VL checkpoint")
+        # Qwen3-VL single files (Krea-2, Ideogram 4, MiniMax H3) share this LM + visual-tower layout; only
+        # Qwen3's QK-norm tells them apart. Both configs would otherwise match, leaving the pick to set order.
+        if _has_qwen3_specific_keys(keys):
+            raise NotAMatchError("state dict has Qwen3 QK-norm weights; this is a Qwen3-VL checkpoint, not Qwen2.5-VL")
 
         return cls(**override_fields)
 

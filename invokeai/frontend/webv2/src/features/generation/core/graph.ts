@@ -734,10 +734,6 @@ const buildFluxGraph = (
   outputIsIntermediate: boolean,
   projectSettings: GenerationProjectSettings
 ): FamilyGraph => {
-  if (model.variant === 'dev_fill') {
-    throw new Error('FLUX Fill models do not support text-to-image generation.');
-  }
-
   const graph: BackendGraphContract = { edges: [], id: createId('flux_graph'), nodes: {} };
   const { positivePrompt, seed } = addPromptAndSeedNodes(graph);
   const hasBundledComponents = isSelfContainedSDNQFlux1Pipeline(model);

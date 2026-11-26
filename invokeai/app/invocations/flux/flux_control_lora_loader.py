@@ -24,7 +24,7 @@ class FluxControlLoRALoaderOutput(BaseInvocationOutput):
     title="Control LoRA - FLUX",
     tags=["lora", "model", "flux"],
     category="model",
-    version="1.1.1",
+    version="1.1.2",
 )
 class FluxControlLoRALoaderInvocation(BaseInvocation):
     """LoRA model and Image to use with FLUX transformer generation."""
@@ -41,6 +41,11 @@ class FluxControlLoRALoaderInvocation(BaseInvocation):
     def invoke(self, context: InvocationContext) -> FluxControlLoRALoaderOutput:
         if not context.models.exists(self.lora.key):
             raise ValueError(f"Unknown lora: {self.lora.key}!")
+        config = context.models.get_config(self.lora)
+        if config.base is not BaseModelType.Flux or config.type is not ModelType.ControlLoRa:
+            raise ValueError(
+                f"'{config.name}' is a {config.base.value} {config.type.value} model, not a FLUX Control LoRA."
+            )
 
         return FluxControlLoRALoaderOutput(
             control_lora=ControlLoRAField(

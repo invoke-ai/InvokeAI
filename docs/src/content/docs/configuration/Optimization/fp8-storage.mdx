@@ -76,7 +76,7 @@ The rows describe full-precision files, unless a row says otherwise. Quantized s
 | Wan (checkpoint and Diffusers) | Yes |
 | ControlNet (SD1, SD2, SDXL), T2I-Adapter | Yes |
 | VAE | No: visible decode-quality regression |
-| Text encoders, tokenizers | No: small models, and FP8 rounding costs text quality. Scaled fp8 single-file encoders (T5-XXL, Qwen3, Qwen3-VL, Qwen2.5-VL, and the FLUX.2 Mistral encoder) keep their fp8 Linear weights packed, with their scales, on any GPU that passes the FP8 test, with no setting. |
+| Text encoders, tokenizers | No: small models, and FP8 rounding costs text quality. Scaled fp8 single-file encoders (T5-XXL, Qwen3, Qwen3-VL, Qwen2.5-VL, and the FLUX.2 Mistral encoder) keep their fp8 Linear weights packed, with their scales, on a GPU that passes the FP8 test, with no setting. CPU-only loads unpack them using the CPU's dtype policy (see [Sharing across devices and CPU encoders](#sharing-across-devices-and-cpu-encoders)). |
 | Anima ControlNet-LLLite | No: the adapter is only tens of MB |
 | FLUX.1, FLUX.2, Z-Image and Qwen-Image ControlNets | No: not implemented yet |
 | MiniMax H3 | No: not implemented yet |
@@ -142,9 +142,20 @@ without FP8 and the log warns once: `FP8 storage probe failed on <device> (…);
 <TabItem label="CPU and Apple silicon">
 Not used. PyTorch can hold FP8 on the CPU, but casting is emulated in software and costs more than the memory saves.
 With the setting on, the loader returns the model unchanged, without a log line (FLUX.1 and FLUX.2 still log their skip line
-for int8 builds, FLUX.3 for int8 and nvfp4 builds). Checkpoints that store FP8 weights are unpacked to BF16 here.
+for int8 builds, FLUX.3 for int8 and nvfp4 builds). Checkpoints that store FP8 weights are unpacked using the device's dtype policy: BF16 where supported, otherwise FP32. See
+[Sharing across devices and CPU encoders](#sharing-across-devices-and-cpu-encoders).
 </TabItem>
 </Tabs>
+
+## Sharing across devices and CPU encoders
+
+For the FP8-aware checkpoint and encoder loaders, device caches distinguish policies that retain FP8 weights from those that unpack them, and distinguish their compute dtypes. The ERNIE-Image and SD3 GGUF transformer loaders also distinguish compute dtypes. When PyTorch rejects BF16, loaders using the BF16-safe policy fall back to FP16 on CUDA and FP32 on other devices. Matching policies can reuse the same CPU allocation without another checkpoint read.
+
+For int8 and int4 builds that decline FP8 Storage, mixed-capability devices can also retain separate CPU copies even though the resulting weights are identical.
+
+This choice is made before reading the checkpoint. With `fp8_compute` enabled (off by default), a mixed-capability setup can therefore retain two CPU copies and read a checkpoint twice even when that file contains only BF16 weights. FP8 Storage can likewise separate device caches when its device support differs. This conservative policy avoids reading large files just to decide whether their cached weights can be shared. A transient FP8 probe failure uses the unpacked policy for that load; a later successful probe can leave both copies resident until normal eviction.
+
+**CPU-only Mistral and Qwen3-VL encoders unpack FP8 weights using the CPU's dtype policy**, even on a machine with an FP8-capable GPU. This saves VRAM but increases system RAM compared with retaining the packed weights: approximately 16.8 to 32.3 GiB for the scaled-FP8 Mistral 24B encoder, and 4.4 to 8.9 GiB for Qwen3-VL 4B when unpacked to BF16. Allow more RAM where BF16 is unsupported and FP32 is required. The CPU-only encoder can share its unpacked CPU copy with another load using the same policy; the GPU's packed copy stays separate.
 
 ## Turning it on
 
