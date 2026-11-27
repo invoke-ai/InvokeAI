@@ -15,8 +15,9 @@ import pytest
 import torch
 from safetensors.torch import save_file
 
-from invokeai.backend.model_manager.configs.factory import ModelConfigFactory, _denoiser_stores_float8_weights
-from invokeai.backend.model_manager.configs.main import Main_Checkpoint_QwenImage_Config
+from invokeai.backend.model_manager.configs.default_settings import MainModelDefaultSettings
+from invokeai.backend.model_manager.configs.factory import ModelConfigFactory, _identified_default_settings
+from invokeai.backend.model_manager.configs.main import Main_Checkpoint_QwenImage_Config, Main_Checkpoint_Wan_Config
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.model_manager.taxonomy import ModelType
 from tests.fixtures.quantized_payloads import (
@@ -139,9 +140,14 @@ def test_wan_keeps_fp8_storage_on_for_an_mxfp8_file(tmp_path: Path) -> None:
     """Wan's loader leaves every layer it unpacked with its scale at the compute dtype, so FP8 Storage re-encodes none
     of the MX layers there and the default stays on."""
     mod = ModelOnDisk(_mxfp8_only_checkpoint(tmp_path / "wan_mxfp8.safetensors"))
+    wan = Main_Checkpoint_Wan_Config.model_construct(name="wan_mxfp8")
+    qwen = Main_Checkpoint_QwenImage_Config.model_construct(name="qwen_mxfp8")
 
-    assert _denoiser_stores_float8_weights(mod) is False
-    assert _denoiser_stores_float8_weights(mod, mxfp8_is_lossy=False) is True
+    wan_settings = _identified_default_settings(None, MainModelDefaultSettings, mod, None, config=wan)
+    qwen_settings = _identified_default_settings(None, MainModelDefaultSettings, mod, None, config=qwen)
+
+    assert wan_settings is not None and wan_settings.fp8_storage is True
+    assert qwen_settings is None or qwen_settings.fp8_storage is None
 
 
 def test_a_file_mixing_mxfp8_and_scaled_fp8_layers_keeps_fp8_storage_on(tmp_path: Path) -> None:

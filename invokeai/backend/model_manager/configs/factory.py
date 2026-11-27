@@ -359,7 +359,10 @@ def _identified_default_settings(
     if not fp8_storage_verdict(config.base, config.type, config.format).supported:
         update.pop("fp8_storage", None)
     elif "fp8_storage" not in update and _denoiser_stores_float8_weights(
-        mod, mxfp8_is_lossy=config.base != BaseModelType.Wan
+        # Wan is lossless: `_load_from_singlefile` in load/model_loaders/wan.py passes a `skip=` that keeps every scaled
+        # layer out of the cast.
+        mod,
+        mxfp8_is_lossy=config.base != BaseModelType.Wan,
     ):
         logger.info(f"{mod.name}: denoiser weights are stored in float8, enabling FP8 Storage by default")
         update["fp8_storage"] = True
