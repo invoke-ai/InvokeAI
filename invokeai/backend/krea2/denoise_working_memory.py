@@ -117,8 +117,9 @@ The analytic terms:
   largest area is priced as the smallest square that holds it. The probe answers for the process-wide policy, so a
   kernel forced through the `INVOKE_KREA2_SDPA_BACKEND` debugging switch is not priced.
 - Regional prompting's masks, their construction scratch and SDPA's additive bias, as the node sizes them
-  (`Krea2DenoiseInvocation._regional_attention_mask_bytes`); with a style reference, also the masks padded to the
-  appended keys (`pad_attention_mask`) and a bias that wide. Not measured.
+  (`Krea2DenoiseInvocation._regional_attention_mask_bytes`); where a styled block also receives a regional mask (the
+  even main blocks), also the masks padded to the appended keys (`pad_attention_mask`) and a bias that wide. Not
+  measured.
 - The reference K/V cache, an exact size (`reference_edit.reference_kv_cache_bytes`): one key and one value per block at
   the K/V heads, plus one block's references expanded to the query heads. On the RTX 4090 the real model's K/V-cache
   denoises (1152x1536 with one and three references) followed that structure: the larger of the step's and the

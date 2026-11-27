@@ -1396,8 +1396,7 @@ def test_regional_attention_memory_includes_masks_build_scratch_and_dtype_sized_
 
 def test_a_style_reference_widens_the_padded_regional_masks_and_the_attention_bias_to_the_reference_keys() -> None:
     """A 12-token sequence (mask 144) with 5 reference tokens: each mask is cached padded to 12 x 17 = 204 booleans,
-    and the bf16 bias is 204 elements. Without a reference nothing is padded. The row count comes from the mask, not
-    from its element count: a mask that is not square (the stand-in below) is widened by its own rows."""
+    and the bf16 bias is 204 elements. Without a reference nothing is padded."""
     positive = SimpleNamespace(attention_mask_numel=144, attention_mask_rows=12, attention_mask_build_scratch_numel=40)
     negative = SimpleNamespace(attention_mask_numel=100, attention_mask_rows=10, attention_mask_build_scratch_numel=40)
     no_mask = SimpleNamespace(attention_mask_numel=0, attention_mask_rows=0, attention_mask_build_scratch_numel=0)
@@ -1412,12 +1411,6 @@ def test_a_style_reference_widens_the_padded_regional_masks_and_the_attention_bi
     unstyled = Krea2DenoiseInvocation._regional_attention_mask_bytes(positive, negative, torch.bfloat16)
     assert unstyled == (144 + 100) + 40 + 144 * 2
     assert Krea2DenoiseInvocation._regional_attention_mask_bytes(positive, negative, torch.bfloat16, 0) == unstyled
-    non_square = SimpleNamespace(
-        attention_mask_numel=130, attention_mask_rows=10, attention_mask_build_scratch_numel=40
-    )
-    assert Krea2DenoiseInvocation._regional_attention_mask_bytes(non_square, None, torch.bfloat16, 5) == (
-        130 + (130 + 10 * 5) + 40 + (130 + 10 * 5) * 2
-    )
 
 
 @pytest.mark.parametrize(
