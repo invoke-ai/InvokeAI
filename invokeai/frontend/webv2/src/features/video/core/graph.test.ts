@@ -394,6 +394,78 @@ describe('compileVideoGraph — MiniMax H3 Ref2VA', () => {
     expect(nodeOfType(baseline.backendGraph, 'minimax_h3_model_loader').task_variant_override).toBeUndefined();
   });
 
+  it('wires first/last frames beside the references into the prompt, frame and denoise nodes', () => {
+    const first = { height: 480, image_name: 'first.png', width: 832 };
+    const last = { height: 480, image_name: 'last.png', width: 832 };
+    const { backendGraph } = compileVideoGraph(
+      { ...referenceSettings, firstFrameImage: first, lastFrameImage: last },
+      model
+    );
+    const literals = { first_image: { image_name: 'first.png' }, last_image: { image_name: 'last.png' } };
+
+    expect(nodeOfType(backendGraph, 'minimax_h3_text_encoder')).toMatchObject({
+      ...literals,
+      width: 1344,
+      height: 768,
+    });
+    expect(nodeOfType(backendGraph, 'minimax_h3_frame_conditioning')).toMatchObject(literals);
+    expect(
+      hasEdge(backendGraph, 'frame_conditioning', 'frame_conditioning', 'denoise_latents', 'frame_conditioning')
+    ).toBe(true);
+    expect(hasEdge(backendGraph, 'reference_collect_2', 'collection', 'pos_cond', 'references')).toBe(true);
+    expect(
+      hasEdge(
+        backendGraph,
+        'reference_conditioning',
+        'reference_conditioning',
+        'denoise_latents',
+        'reference_conditioning'
+      )
+    ).toBe(true);
+    expect(nodeOfType(backendGraph, 'core_metadata')).toMatchObject({
+      first_frame_image: { image_name: 'first.png' },
+      generation_mode: 'minimax_h3_ref2v_frames',
+      last_frame_image: { image_name: 'last.png' },
+    });
+  });
+
+  it.each([
+    ['first', { firstFrameImage: { height: 480, image_name: 'first.png', width: 832 } }, 'first_image', 'last_image'],
+    ['last', { lastFrameImage: { height: 480, image_name: 'last.png', width: 832 } }, 'last_image', 'first_image'],
+  ])('conditions a %s frame alone beside the references', (_label, frames, present, absent) => {
+    const { backendGraph } = compileVideoGraph({ ...referenceSettings, ...frames }, model);
+
+    for (const type of ['minimax_h3_text_encoder', 'minimax_h3_frame_conditioning']) {
+      const node = nodeOfType(backendGraph, type);
+
+      expect(node).toHaveProperty(present);
+      expect(node).not.toHaveProperty(absent);
+    }
+    expect(
+      hasEdge(backendGraph, 'frame_conditioning', 'frame_conditioning', 'denoise_latents', 'frame_conditioning')
+    ).toBe(true);
+    expect(nodeOfType(backendGraph, 'core_metadata').generation_mode).toBe('minimax_h3_ref2v_frames');
+  });
+
+  it('refuses frames beside reference extension instead of conditioning them', () => {
+    const sourceVideo = {
+      endFrame: 47,
+      fps: 24,
+      height: 480,
+      numFrames: 48,
+      startFrame: 0,
+      video_name: 'source.mp4',
+      width: 832,
+    };
+
+    expect(() =>
+      compileVideoGraph(
+        { ...referenceSettings, lastFrameImage: { height: 480, image_name: 'last.png', width: 832 }, sourceVideo },
+        model
+      )
+    ).toThrow('First/last frames cannot be combined with an initial video');
+  });
+
   it('builds the reference graph: ordered chained collect into conditioning AND prompt, no frame conditioning', () => {
     const { backendGraph } = compileVideoGraph(referenceSettings, model);
 

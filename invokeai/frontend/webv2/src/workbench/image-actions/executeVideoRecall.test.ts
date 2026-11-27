@@ -25,9 +25,9 @@ vi.mock('@features/gallery/data/backend', async (importOriginal) => ({
 }));
 
 import { galleryVideoMetadataOptions } from '@features/gallery/queries';
-import { createDefaultVideoWidgetValues } from '@features/video';
+import { createDefaultVideoWidgetValues, createVideoSourceClip } from '@features/video';
 
-import { applyVideoRecallMetadata, executeVideoRecall } from './executeVideoRecall';
+import { applyVideoRecallMetadata, executeVideoRecall, getCurrentVideoValues } from './executeVideoRecall';
 
 const t = ((key: string) => key) as unknown as TFunction;
 
@@ -996,5 +996,171 @@ describe('reading the media a recall names', () => {
     // The dropped clip leaves only the prompt to apply.
     expect(patchValues.mock.calls.at(-1)?.[1]).toEqual(expect.objectContaining({ positivePrompt: 'a heron' }));
     expect(patchValues.mock.calls.at(-1)?.[1]).not.toHaveProperty('sourceVideo');
+  });
+});
+
+describe('Ref2VA references with first/last frames on recall', () => {
+  const fl2vaModel = { ...h3Model, key: 'h3-fl2va', variant: 'fl2va' } as unknown as ModelConfig;
+  const images = [
+    { height: 768, imageName: 'first.png', width: 1344 },
+    { height: 768, imageName: 'last.png', width: 1344 },
+    { height: 512, imageName: 'ref.png', width: 512 },
+  ];
+  const recorded = (extra: Record<string, unknown>) => ({
+    generation_mode: 'minimax_h3_ref2v_frames',
+    height: 768,
+    minimax_h3_references: [{ detail: 'max', image_name: 'ref.png', kind: 'image' }],
+    model: { base: 'minimax-h3', key: 'h3-main', name: 'MiniMax H3', type: 'main' },
+    positive_prompt: 'a red fox',
+    width: 1344,
+    ...extra,
+  });
+  // Echoes the field keys a notice names, so assertions read which fields were reported.
+  const fieldKeys = ((key: string, values?: { fields?: string[] }) =>
+    values?.fields ? values.fields.join(',') : key) as unknown as TFunction;
+  let lastCommands: ReturnType<typeof createCommands>['commands'];
+  const recall = async ({
+    metadata,
+    model = h3Model,
+    panel = {},
+    partial = false,
+  }: {
+    metadata: Record<string, unknown>;
+    model?: ModelConfig;
+    panel?: Record<string, unknown>;
+    partial?: boolean;
+  }) => {
+    galleryApi.galleryImages.resolveMany.mockResolvedValue(images);
+    galleryApi.galleryItems.resolve.mockResolvedValue({ ...item, durationSeconds: 4, fps: 24, name: 'source.mp4' });
+    const { commands, patchValues } = createCommands();
+
+    lastCommands = commands;
+    await applyVideoRecallMetadata({
+      commands,
+      emptyNotice: { message: 'nothing', title: 'nothing' },
+      getVideoValues: () => ({ ...createDefaultVideoWidgetValues([model]), ...panel }),
+      kind: 'all',
+      metadata,
+      models: [model],
+      owner: accountLifecycle.capture(),
+      partial,
+      t: fieldKeys,
+    });
+
+    return patchValues.mock.calls.at(-1)?.[1] as Record<string, unknown> | undefined;
+  };
+
+  beforeEach(() => {
+    accountLifecycle.activate('test-account');
+    galleryApi.galleryImages.resolveMany.mockReset();
+    galleryApi.galleryItems.resolve.mockReset();
+  });
+
+  it('hydrates both frames and the references of a combined record', async () => {
+    const written = await recall({
+      metadata: recorded({
+        first_frame_image: { image_name: 'first.png' },
+        last_frame_image: { image_name: 'last.png' },
+      }),
+    });
+
+    expect(written).toMatchObject({
+      firstFrameImage: { image_name: 'first.png' },
+      lastFrameImage: { image_name: 'last.png' },
+      references: [{ image: { image_name: 'ref.png' }, kind: 'image' }],
+    });
+  });
+
+  it('hydrates a first-only and a last-only combined record', async () => {
+    const first = await recall({ metadata: recorded({ first_frame_image: { image_name: 'first.png' } }) });
+    const last = await recall({ metadata: recorded({ last_frame_image: { image_name: 'last.png' } }) });
+
+    expect(first).toMatchObject({ firstFrameImage: { image_name: 'first.png' }, lastFrameImage: null });
+    expect(last).toMatchObject({ firstFrameImage: null, lastFrameImage: { image_name: 'last.png' } });
+    expect(first?.references).toHaveLength(1);
+  });
+
+  it('drops frames recorded beside a source video', async () => {
+    const written = await recall({
+      metadata: recorded({
+        first_frame_image: { image_name: 'first.png' },
+        last_frame_image: { image_name: 'last.png' },
+        source_video: { video_name: 'source.mp4' },
+      }),
+    });
+
+    expect(written).toMatchObject({ firstFrameImage: null, lastFrameImage: null });
+    expect(written?.sourceVideo).toMatchObject({ video_name: 'source.mp4' });
+  });
+
+  describe('onto a panel holding an Initial Video', () => {
+    const heldVideo = createVideoSourceClip({
+      durationSeconds: 4,
+      fps: 24,
+      height: 768,
+      name: 'held.mp4',
+      width: 1344,
+    });
+    const held = getCurrentVideoValues({
+      models: [h3Model],
+      videoValues: { ...createDefaultVideoWidgetValues([h3Model]), sourceVideo: heldVideo },
+    });
+    const panel = { references: held.references, sourceVideo: held.sourceVideo };
+    // A recalled first frame displaces the held Initial Video like setting it by hand; a last frame cannot.
+    const frames = { last_frame_image: { image_name: 'last.png' } };
+
+    const reportedFields = () => {
+      const [notice] = vi.mocked(lastCommands.notifications.add).mock.calls.at(-1) ?? [];
+
+      return (notice as { message: string }).message;
+    };
+
+    it('does not report media when the only recalled media is a last frame the Initial Video displaces', async () => {
+      const written = await recall({
+        metadata: recorded({ ...frames, minimax_h3_references: undefined }),
+        panel,
+        partial: true,
+      });
+
+      expect(written).toMatchObject({ lastFrameImage: null, sourceVideo: panel.sourceVideo });
+      expect(reportedFields()).not.toContain('widgets.gallery.itemActions.recall.fields.media');
+      expect(reportedFields()).toContain('widgets.gallery.itemActions.recall.fields.prompts');
+    });
+
+    it('reports media when recalled references apply while the displaced frames are dropped', async () => {
+      const written = await recall({ metadata: recorded(frames), panel, partial: true });
+
+      expect(written).toMatchObject({ lastFrameImage: null, sourceVideo: panel.sourceVideo });
+      expect(written?.references).toContainEqual(expect.objectContaining({ kind: 'image' }));
+      expect(reportedFields()).toContain('widgets.gallery.itemActions.recall.fields.media');
+    });
+  });
+
+  it('clears the frames a panel holds when an older references-only record is recalled', async () => {
+    const frame = { height: 768, image_name: 'old.png', width: 1344 };
+    const written = await recall({
+      metadata: recorded({ generation_mode: 'minimax_h3_ref2v' }),
+      panel: { firstFrameImage: frame, lastFrameImage: frame },
+    });
+
+    expect(written).toMatchObject({ firstFrameImage: null, lastFrameImage: null });
+    expect(written?.references).toHaveLength(1);
+  });
+
+  it('keeps the frames and drops the references on a model that cannot take references', async () => {
+    const metadata = recorded({
+      first_frame_image: { image_name: 'first.png' },
+      last_frame_image: { image_name: 'last.png' },
+    });
+    const full = await recall({ metadata, model: fl2vaModel });
+    const partial = await recall({ metadata, model: fl2vaModel, partial: true });
+
+    for (const written of [full, partial]) {
+      expect(written).toMatchObject({
+        firstFrameImage: { image_name: 'first.png' },
+        lastFrameImage: { image_name: 'last.png' },
+        references: [],
+      });
+    }
   });
 });

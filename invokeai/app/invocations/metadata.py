@@ -409,6 +409,7 @@ GENERATION_MODES = Literal[
     "minimax_h3_flf2v",
     "minimax_h3_extend_video",
     "minimax_h3_ref2v",
+    "minimax_h3_ref2v_frames",
     "minimax_h3_txt2img",
 ]
 

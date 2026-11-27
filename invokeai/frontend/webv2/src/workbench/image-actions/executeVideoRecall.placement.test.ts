@@ -271,6 +271,23 @@ describe('placeVideoImage', () => {
   describe('on a model that takes reference images', () => {
     const held = [imageReference('a.png'), videoReference('dance.mp4'), imageReference('b.png')];
 
+    it('keeps the held first/last frames when a reference image is placed, unlike frame-less models', () => {
+      const placement = placeVideoImage({
+        append: true,
+        image: still('new.png'),
+        models: [REF2VA],
+        videoValues: panel(REF2VA, {
+          firstFrameImage: still('first.png'),
+          lastFrameImage: still('last.png'),
+          references: held,
+        }),
+      });
+
+      expect(placement).toMatchObject({ slot: 'reference', status: 'placed' });
+      expect(placement.status === 'placed' && placement.patch).not.toHaveProperty('firstFrameImage');
+      expect(placement.status === 'placed' && placement.patch).not.toHaveProperty('lastFrameImage');
+    });
+
     it('replaces the reference images, keeping the reference videos', () => {
       const placement = placeVideoImage({
         append: false,

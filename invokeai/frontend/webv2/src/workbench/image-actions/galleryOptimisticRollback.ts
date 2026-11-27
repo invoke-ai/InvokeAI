@@ -5,6 +5,7 @@ import type {
   GalleryItemRef,
   GeneratedImageContract,
 } from '@features/gallery';
+import type { ModelConfig } from '@features/models';
 import type { Project } from '@workbench/projectContracts';
 import type { WidgetTypeId } from '@workbench/widgetContracts';
 
@@ -14,8 +15,11 @@ import {
   getGalleryCompareImage,
   getSelectedGalleryItemFromValues,
 } from '@features/gallery/contracts';
+import { getVideoModelPolicy } from '@features/video';
 import { isSlotUnclaimed, selectUnclaimedEntries } from '@platform/state/compareAndSwapRollback';
 import { getProjectWidgetValues } from '@workbench/widgetState';
+
+import { getCurrentVideoValues } from './executeVideoRecall';
 
 /**
  * Track project selections, recent generations, and locked upscale inputs cleared by removal; query-cache rollback
@@ -34,19 +38,30 @@ const TRACKED_GALLERY_REMOVAL_FIELDS: ReadonlyArray<{ key: string; widgetId: Wid
   { key: 'sourceVideo', widgetId: 'video' },
 ];
 
+type RivalField = { key: string; rivalKey: string };
+
+const rivalPairs = (pairs: ReadonlyArray<readonly [string, string]>): RivalField[] =>
+  pairs.flatMap(([a, b]) => [
+    { key: a, rivalKey: b },
+    { key: b, rivalKey: a },
+  ]);
+
 /**
  * Skip restoration when a mutually exclusive rival slot was filled after optimistic removal; bypassing setters must not
- * recreate an invalid pair.
+ * recreate an invalid pair. Ref2VA takes frames beside references and references beside an Initial Video, but hides
+ * frames under an Initial Video; every other model takes neither pairing with references.
  */
-const EXCLUSIVE_RIVAL_FIELDS: ReadonlyArray<{ key: string; rivalKey: string; widgetId: WidgetTypeId }> = [
-  { key: 'firstFrameImage', rivalKey: 'sourceVideo', widgetId: 'video' },
-  { key: 'firstFrameImage', rivalKey: 'references', widgetId: 'video' },
-  { key: 'lastFrameImage', rivalKey: 'references', widgetId: 'video' },
-  { key: 'sourceVideo', rivalKey: 'firstFrameImage', widgetId: 'video' },
-  { key: 'references', rivalKey: 'firstFrameImage', widgetId: 'video' },
-  { key: 'references', rivalKey: 'lastFrameImage', widgetId: 'video' },
-  // sourceVideo and references coexist for Ref2VA reference-extend; as rivals, rollback would lose valid data.
-];
+const EXCLUSIVE_RIVALS = {
+  default: rivalPairs([
+    ['firstFrameImage', 'sourceVideo'],
+    ['firstFrameImage', 'references'],
+    ['lastFrameImage', 'references'],
+  ]),
+  referenceFrames: rivalPairs([
+    ['firstFrameImage', 'sourceVideo'],
+    ['lastFrameImage', 'sourceVideo'],
+  ]),
+};
 
 const trackedFieldKey = (projectId: string, widgetId: WidgetTypeId, key: string): string =>
   `${projectId}:${widgetId}:${key}`;
@@ -122,25 +137,44 @@ export interface GalleryWidgetRestorePatch {
   widgetId: WidgetTypeId;
 }
 
+const hasReferenceFrames = (videoValues: Record<string, unknown>, models: readonly ModelConfig[]): boolean => {
+  const values = getCurrentVideoValues({ models, videoValues });
+
+  return Boolean(values.model && getVideoModelPolicy(values.model, values).references?.frames);
+};
+
 /**
  * Restore only values still equal to the optimistic mutation's output, merging patches per project/widget. Drop
  * disappeared projects before comparison so undefined cannot falsely match.
  */
 export const selectRestorableGalleryWidgetPatches = (
   entries: readonly GalleryWidgetKeySnapshotEntry[],
-  projects: readonly Project[]
+  projects: readonly Project[],
+  models: readonly ModelConfig[]
 ): GalleryWidgetRestorePatch[] => {
   const projectsById = new Map(projects.map((project) => [project.id, project]));
   const patchesByGroup = new Map<string, GalleryWidgetRestorePatch>();
+  const referenceFramesByProject = new Map<string, boolean>();
   const liveEntries = entries.filter((entry) => projectsById.has(entry.projectId));
 
   for (const entry of selectUnclaimedEntries(
     liveEntries,
     (candidate) => getProjectWidgetValues(projectsById.get(candidate.projectId)!, candidate.widgetId)[candidate.key]
   )) {
-    const rivals = EXCLUSIVE_RIVAL_FIELDS.filter(
-      (field) => field.widgetId === entry.widgetId && field.key === entry.key
-    );
+    const entryValues = getProjectWidgetValues(projectsById.get(entry.projectId)!, entry.widgetId);
+    let rivals: RivalField[] = [];
+
+    if (entry.widgetId === 'video') {
+      let referenceFrames = referenceFramesByProject.get(entry.projectId);
+
+      if (referenceFrames === undefined) {
+        referenceFrames = hasReferenceFrames(entryValues, models);
+        referenceFramesByProject.set(entry.projectId, referenceFrames);
+      }
+      rivals = EXCLUSIVE_RIVALS[referenceFrames ? 'referenceFrames' : 'default'].filter(
+        (field) => field.key === entry.key
+      );
+    }
     // An ordered-list slot (the video references) is "occupied" only when non-empty; a nullable slot when non-null.
     const isOccupied = (value: unknown): boolean =>
       Array.isArray(value) ? value.length > 0 : value !== null && value !== undefined;
@@ -148,9 +182,7 @@ export const selectRestorableGalleryWidgetPatches = (
     if (
       rivals.length > 0 &&
       isOccupied(entry.before) &&
-      rivals.some((rival) =>
-        isOccupied(getProjectWidgetValues(projectsById.get(entry.projectId)!, entry.widgetId)[rival.rivalKey])
-      )
+      rivals.some((rival) => isOccupied(entryValues[rival.rivalKey]))
     ) {
       continue;
     }

@@ -23,6 +23,13 @@ The panel defaults to the transformer's detected task: select a Ref2VA single-fi
 
 A video reference can contribute its image track, its soundtrack, or both; soundtrack-only references can be used on their own. New image references use "Match generation size", which is several times faster than the high-detail 2048 px encoding ("Max detail") at some fidelity cost; switch a reference to "Max detail" when its fine detail matters.
 
+**Experimental:** a Ref2VA generation can also take a **first frame**, a **last frame**, or both, alongside its references. The frames pin the start and end of the clip while the references steer identity, motion and sound. Constraints:
+
+* The prompt sees only the references. The frames act through the video conditioning, not the text, so you cannot name them as `<Picture N>`; address the references as usual.
+* Frames alone are not supported on Ref2VA. Use the FL2VA transformer for frame-only generations; the combination needs at least one reference, and the FL2VA transformer cannot take references.
+* Frames cannot be combined with an initial video or reference-extend.
+* This combination is unvalidated against the real MiniMax weights. The row layout follows the community ComfyUI implementation, but nobody has confirmed that the model follows both kinds of conditioning well, or that it matches ComfyUI's output at the same seed (noise draws differ).
+
 What makes it different from Wan in practice:
 
 * **Guidance-distilled** — there is no CFG and no negative

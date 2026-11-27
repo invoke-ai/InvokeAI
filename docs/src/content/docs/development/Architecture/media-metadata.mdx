@@ -100,7 +100,7 @@ The current value is `CORE_METADATA_VERSION` in `invokeai/app/invocations/metada
 
 | Key | Type |
 |---|---|
-| `generation_mode` | string. Video values: `wan_t2v`, `wan_i2v`, `wan_interpolate`, `wan_extend_video`, `minimax_h3_t2v`, `minimax_h3_i2v`, `minimax_h3_lf2v`, `minimax_h3_flf2v`, `minimax_h3_extend_video`, `minimax_h3_ref2v`. A record is video metadata iff this is one of them. |
+| `generation_mode` | string. Video values: `wan_t2v`, `wan_i2v`, `wan_interpolate`, `wan_extend_video`, `minimax_h3_t2v`, `minimax_h3_i2v`, `minimax_h3_lf2v`, `minimax_h3_flf2v`, `minimax_h3_extend_video`, `minimax_h3_ref2v`, `minimax_h3_ref2v_frames` (references together with a first and/or last frame). A record is video metadata iff this is one of them; builds older than the one that added `minimax_h3_ref2v_frames` do not recognize it as a video record. |
 | `positive_prompt`, `negative_prompt` | string; `negative_prompt` is absent for MiniMax H3, which has no CFG |
 | `positive_prompts`, `negative_prompts` | `string[]`: complete list of prompts when multiple conditionings are collected, e.g. via `Collect` node |
 | `positive_style_prompt`, `negative_style_prompt` | `string`: SDXL style prompts |

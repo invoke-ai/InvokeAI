@@ -17,6 +17,7 @@ import {
   formatReferencePromptLabels,
   getDefaultReferenceClip,
   getDefaultReferenceConditioning,
+  getInitialVideoPatch,
   getReferencesPatch,
   isVideoSettings,
   createFrameImageSetter,
@@ -115,6 +116,44 @@ describe('createVideoConditioningClip', () => {
 });
 
 describe('normalizeVideoSettings', () => {
+  const imageReference: VideoReferenceItem = {
+    detail: 'max',
+    image: { height: 512, image_name: 'ref.png', width: 512 },
+    kind: 'image',
+  };
+
+  it('round-trips references beside first/last frames; the model decides validity, not the stored record', () => {
+    const settings = createSettings({
+      firstFrameImage: FIRST_FRAME,
+      lastFrameImage: LAST_FRAME,
+      references: [imageReference],
+    });
+
+    expect(isVideoSettings(settings)).toBe(true);
+    expect(normalizeVideoSettings(settings)).toMatchObject({
+      firstFrameImage: FIRST_FRAME,
+      lastFrameImage: LAST_FRAME,
+      references: [imageReference],
+    });
+    expect(resolveVideoMode(settings)).toBe('reference');
+  });
+
+  it('keeps the source video and drops frames from a stale reference-extension record', () => {
+    const stale = createSettings({
+      firstFrameImage: FIRST_FRAME,
+      lastFrameImage: LAST_FRAME,
+      references: [imageReference],
+      sourceVideo: SOURCE_VIDEO,
+    });
+
+    expect(isVideoSettings(stale)).toBe(false);
+    expect(normalizeVideoSettings(stale)).toMatchObject({
+      firstFrameImage: null,
+      lastFrameImage: null,
+      sourceVideo: SOURCE_VIDEO,
+    });
+  });
+
   it('reads the seed mode saved before modes existed from the random toggle', () => {
     const legacy = { ...createSettings({}), seedMode: undefined };
 
@@ -785,17 +824,59 @@ describe('panel patches shared by the Video panel and gallery/API placement', ()
     kind: 'image',
   };
 
+  it('clears the last frame under a placed Initial Video only where frames can sit beside references', () => {
+    const sourceVideo = createVideoSourceClip({ durationSeconds: 4, fps: 24, height: 768, name: 's.mp4', width: 1344 });
+    const patch = (referenceFrames: boolean) =>
+      getInitialVideoPatch({
+        maxVideos: 3,
+        numFrames: 97,
+        referenceExtend: false,
+        referenceFrames,
+        references: [],
+        sourceVideo,
+      });
+
+    expect(patch(true)).toMatchObject({ firstFrameImage: null, lastFrameImage: null });
+    expect(patch(false)).not.toHaveProperty('lastFrameImage');
+  });
+
+  it('displaces the frames on a reference-extend panel too, beside the linked tail reference', () => {
+    const sourceVideo = createVideoSourceClip({ durationSeconds: 4, fps: 24, height: 768, name: 's.mp4', width: 1344 });
+    const placed = getInitialVideoPatch({
+      maxVideos: 3,
+      numFrames: 97,
+      referenceExtend: true,
+      referenceFrames: true,
+      references: [],
+      sourceVideo,
+    });
+
+    expect(placed).toMatchObject({ firstFrameImage: null, lastFrameImage: null, sourceVideo });
+    expect(placed?.references).toHaveLength(1);
+  });
+
   it('lets references displace the initial video only on a panel that does not extend from it', () => {
-    expect(getReferencesPatch({ referenceExtend: false, references: [imageReference] })).toEqual({
+    expect(
+      getReferencesPatch({ referenceExtend: false, referenceFrames: false, references: [imageReference] })
+    ).toEqual({
       conditioningClip: null,
       firstFrameImage: null,
       lastFrameImage: null,
       references: [imageReference],
       sourceVideo: null,
     });
-    expect(getReferencesPatch({ referenceExtend: true, references: [imageReference] })).not.toHaveProperty(
-      'sourceVideo'
+    expect(getReferencesPatch({ referenceExtend: false, referenceFrames: true, references: [imageReference] })).toEqual(
+      {
+        conditioningClip: null,
+        references: [imageReference],
+        sourceVideo: null,
+      }
     );
-    expect(getReferencesPatch({ referenceExtend: false, references: [] })).toEqual({ references: [] });
+    expect(
+      getReferencesPatch({ referenceExtend: true, referenceFrames: false, references: [imageReference] })
+    ).not.toHaveProperty('sourceVideo');
+    expect(getReferencesPatch({ referenceExtend: false, referenceFrames: false, references: [] })).toEqual({
+      references: [],
+    });
   });
 });

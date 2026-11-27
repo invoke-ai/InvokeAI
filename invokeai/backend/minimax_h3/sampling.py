@@ -297,14 +297,21 @@ def build_ref2va_denoise_state(
     num_inference_steps: int,
     seed: int,
     device: torch.device,
+    keyframe_anchors: tuple[str, ...] = (),
+    clean_condition_rows: torch.Tensor | None = None,
 ) -> MiniMaxH3DenoiseState:
     """Build the packed layout, the noise, and the schedules of one Ref2VA request.
+
+    Optional first/last keyframes (``keyframe_anchors`` with their clean ``clean_condition_rows``, as for
+    :func:`build_denoise_state`) ride in front of the references, and their noise draws come first.
 
     Mirrors upstream's block order exactly, because the request's single generator reproduces the
     draw sequence: one visual-condition noise draw per image/video reference in packed order, then
     the video noise as a 5D latent tensor, then the audio noise in row layout. Reference soundtrack
     rows are concatenated clean — never noised.
     """
+    if (clean_condition_rows is None) != (len(keyframe_anchors) == 0):
+        raise ValueError("clean_condition_rows and keyframe_anchors must be provided together.")
     validate_reference_kinds([reference.kind for reference in references])
     for index, reference in enumerate(references):
         if reference.kind == "audio":
@@ -346,22 +353,39 @@ def build_ref2va_denoise_state(
         latent_width,
         num_audio_latents,
         MINIMAX_H3_PATCH_SIZE,
+        keyframe_anchors,
     )
 
     generator = torch.Generator(device="cpu").manual_seed(seed)
 
-    # Draw 1: visual-condition noise, one draw per image/video reference, in packed order — drawn
-    # before the generated rows' noise, exactly as upstream's condition-latents block runs first.
+    # Draw 1: visual-condition noise, one draw per keyframe then per image/video reference, in packed order —
+    # drawn before the generated rows' noise, exactly as upstream's condition-latents block runs first.
     condition_rows: torch.Tensor | None = None
-    if visual_references:
+    keyframe_shapes = ((1, latent_height, latent_width),) * len(keyframe_anchors)
+    if clean_condition_rows is not None:
+        expected_rows = (
+            len(keyframe_anchors)
+            * (latent_height // MINIMAX_H3_PATCH_SIZE[1])
+            * (latent_width // MINIMAX_H3_PATCH_SIZE[2])
+        )
+        if clean_condition_rows.shape[0] != expected_rows:
+            raise ValueError(
+                f"Keyframe conditioning carries {clean_condition_rows.shape[0]} rows but the layout "
+                f"expects {expected_rows}. The frame-conditioning node must be run with the same "
+                "width/height as the denoise node."
+            )
+    if visual_references or clean_condition_rows is not None:
         noise = keyframe_condition_noise(
-            condition_latent_shapes,
+            keyframe_shapes + condition_latent_shapes,
             MINIMAX_H3_PATCH_SIZE,
             MINIMAX_H3_VAE_LATENT_CHANNELS,
             generator=generator,
             device=device,
         )
-        clean_rows = torch.cat([r.video_rows for r in visual_references if r.video_rows is not None])
+        clean_rows = torch.cat(
+            ([clean_condition_rows] if clean_condition_rows is not None else [])
+            + [r.video_rows for r in visual_references if r.video_rows is not None]
+        )
         scale_noise_scheduler = MiniMaxH3Scheduler(shift=MINIMAX_H3_VIDEO_FLOW_SHIFT)
         condition_rows = scale_noise_scheduler.scale_noise(
             clean_rows.to(device=device, dtype=torch.float32), MINIMAX_H3_KEYFRAME_NOISE_AUG, noise

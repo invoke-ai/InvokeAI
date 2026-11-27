@@ -11,7 +11,7 @@ from invokeai.backend.model_manager.taxonomy import BaseModelType
 
 def test_the_declarations_reconstruct_generation_modes() -> None:
     """The gate. `GENERATION_MODES` is a type pydantic validates metadata against; this proves the
-    architecture declarations and that literal describe the same 50 strings.
+    architecture declarations and that literal describe the same 51 strings.
 
     Compared rather than generated from the declarations, deliberately: the literal has to stay a
     literal to be a type, and a mismatch in either direction is a bug worth naming. A string missing
@@ -80,7 +80,7 @@ def test_the_video_architectures() -> None:
     assert wan is not None and h3 is not None
 
     assert "i2v" in wan.modes and "inpaint" in wan.modes
-    assert h3.modes == frozenset({"txt2img", "t2v", "i2v", "lf2v", "flf2v", "extend_video", "ref2v"}), (
+    assert h3.modes == frozenset({"txt2img", "t2v", "i2v", "lf2v", "flf2v", "extend_video", "ref2v", "ref2v_frames"}), (
         "H3 has no img2img, inpaint or outpaint, but does have three keyframe-conditioned video modes "
-        "and a reference-conditioned one"
+        "and two reference-conditioned ones"
     )

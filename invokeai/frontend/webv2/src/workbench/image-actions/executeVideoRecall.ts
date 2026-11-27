@@ -144,10 +144,12 @@ const pruneUnusablePartialMedia = ({
   if (!modes.includes('reference')) {
     names.references = [];
   }
-  if (!modes.includes('first-frame') && !modes.includes('first-last')) {
+  const framesWithReferences = Boolean(policy.references?.frames) && names.references.length > 0;
+
+  if (!framesWithReferences && !modes.includes('first-frame') && !modes.includes('first-last')) {
     names.firstFrameName = null;
   }
-  if (!modes.includes('last-frame') && !modes.includes('first-last')) {
+  if (!framesWithReferences && !modes.includes('last-frame') && !modes.includes('first-last')) {
     names.lastFrameName = null;
   }
   if (!modes.includes('extend') && !policy.references?.extend) {
@@ -343,11 +345,17 @@ export const applyVideoRecallMetadata = async ({
     }
 
     if (result.fields.includes('media')) {
-      // A full recall that cleared held media changed the panel even if nothing hydrates.
-      const clearedMedia = (
-        ['conditioningClip', 'firstFrameImage', 'lastFrameImage', 'references', 'sourceVideo'] as const
-      ).some((slot) => result.values[slot] !== currentValues[slot]);
-      let recalledMedia = false;
+      const mediaSlots = [
+        'conditioningClip',
+        'firstFrameImage',
+        'lastFrameImage',
+        'references',
+        'sourceVideo',
+      ] as const;
+      const isHeld = (value: unknown): boolean => (Array.isArray(value) ? value.length > 0 : Boolean(value));
+      // A recall that emptied a held slot changed the panel even if nothing hydrates.
+      const clearedMedia = mediaSlots.some((slot) => isHeld(currentValues[slot]) && !isHeld(result.values[slot]));
+      const recalledSlots = new Set<(typeof mediaSlots)[number]>();
       const { firstFrameName, lastFrameName, sourceVideoName } = result.mediaNames;
       const firstFrame = firstFrameName ? resolved.images.get(firstFrameName) : undefined;
       const lastFrame = lastFrameName ? resolved.images.get(lastFrameName) : undefined;
@@ -362,7 +370,7 @@ export const applyVideoRecallMetadata = async ({
             result.values.conditioningClip
           ),
         };
-        recalledMedia = true;
+        recalledSlots.add('firstFrameImage');
       }
       if (lastFrame) {
         result.values = {
@@ -373,7 +381,7 @@ export const applyVideoRecallMetadata = async ({
             result.values.conditioningClip
           ),
         };
-        recalledMedia = true;
+        recalledSlots.add('lastFrameImage');
       }
 
       const { conditioningClip } = result.mediaNames;
@@ -401,7 +409,7 @@ export const applyVideoRecallMetadata = async ({
           references: [],
           sourceVideo: null,
         };
-        recalledMedia = true;
+        recalledSlots.add('conditioningClip');
       }
 
       const sourceItem = sourceVideoName ? resolved.videos.get(sourceVideoName) : undefined;
@@ -428,7 +436,7 @@ export const applyVideoRecallMetadata = async ({
           firstFrameImage: null,
           sourceVideo: { ...rebuiltClip, endFrame, startFrame },
         };
-        recalledMedia = true;
+        recalledSlots.add('sourceVideo');
       }
 
       if (result.mediaNames.references.length > 0) {
@@ -474,18 +482,12 @@ export const applyVideoRecallMetadata = async ({
         if (references.length > 0) {
           result.values = {
             ...result.values,
-            firstFrameImage: null,
-            lastFrameImage: null,
             references,
             // A source video recorded alongside references is reference-extend state; clear only a leftover.
             sourceVideo: result.mediaNames.sourceVideoName || partial ? result.values.sourceVideo : null,
           };
-          recalledMedia = true;
+          recalledSlots.add('references');
         }
-      }
-
-      if (!recalledMedia && !clearedMedia) {
-        result.fields = result.fields.filter((field) => field !== 'media');
       }
 
       // Deleted frames or unavailable models must not leave an ungeneratable panel.
@@ -495,6 +497,7 @@ export const applyVideoRecallMetadata = async ({
         const policy = getVideoModelPolicy(effectiveModel, result.values);
         const modes = policy.modes;
         const referenceExtend = Boolean(policy.references?.extend);
+        const referenceFrames = Boolean(policy.references?.frames);
 
         // A partial recall could orphan a reference-extend clip's continuity reference; relink it like Initial Video.
         if (partial && referenceExtend && result.values.sourceVideo) {
@@ -502,6 +505,7 @@ export const applyVideoRecallMetadata = async ({
             maxVideos: policy.references?.maxVideos ?? 0,
             numFrames: result.values.numFrames,
             referenceExtend,
+            referenceFrames,
             references: result.values.references,
             sourceVideo: result.values.sourceVideo,
           });
@@ -516,23 +520,32 @@ export const applyVideoRecallMetadata = async ({
           references = [];
         }
         if (references.length > 0) {
-          // The source video survives only on a reference-extend panel.
-          firstFrameImage = null;
-          lastFrameImage = null;
+          // The source video survives only on a reference-extend panel, and never beside frames.
+          if (!referenceFrames || sourceVideo) {
+            firstFrameImage = null;
+            lastFrameImage = null;
+          }
           if (!referenceExtend) {
             sourceVideo = null;
           }
         }
+        const framesWithReferences = references.length > 0 && referenceFrames;
 
         if (sourceVideo && !modes.includes('extend') && !(references.length > 0 && referenceExtend)) {
           sourceVideo = null;
         }
-        if (firstFrameImage && !modes.includes('first-frame') && !modes.includes('first-last')) {
+        if (
+          firstFrameImage &&
+          !framesWithReferences &&
+          !modes.includes('first-frame') &&
+          !modes.includes('first-last')
+        ) {
           firstFrameImage = null;
         }
         if (lastFrameImage) {
           const lastFrameSupported =
-            firstFrameImage || sourceVideo ? modes.includes('first-last') : modes.includes('last-frame');
+            framesWithReferences ||
+            (firstFrameImage || sourceVideo ? modes.includes('first-last') : modes.includes('last-frame'));
 
           if (!lastFrameSupported) {
             lastFrameImage = null;
@@ -547,6 +560,13 @@ export const applyVideoRecallMetadata = async ({
         ) {
           result.values = { ...result.values, firstFrameImage, lastFrameImage, references, sourceVideo };
         }
+      }
+
+      // Report media only if a recalled slot survived reconciliation or a full recall cleared held media.
+      const survived = [...recalledSlots].some((slot) => isHeld(result.values[slot]));
+
+      if (!survived && !clearedMedia) {
+        result.fields = result.fields.filter((field) => field !== 'media');
       }
     }
 
@@ -619,6 +639,7 @@ export const placeInitialVideo = ({
     maxVideos: policy?.references?.maxVideos ?? 0,
     numFrames: values.numFrames,
     referenceExtend,
+    referenceFrames: Boolean(policy?.references?.frames),
     references: values.references,
     sourceVideo: createVideoSourceClip(video),
   });
@@ -662,11 +683,12 @@ export const appendReferenceVideo = ({
     return { status: room };
   }
 
-  const referenceExtend = Boolean(values.model && getVideoModelPolicy(values.model, values).references?.extend);
+  const referencePolicy = values.model ? getVideoModelPolicy(values.model, values).references : null;
 
   return {
     patch: getReferencesPatch({
-      referenceExtend,
+      referenceExtend: Boolean(referencePolicy?.extend),
+      referenceFrames: Boolean(referencePolicy?.frames),
       references: [...values.references, createVideoReferenceEntry(video)],
     }),
     status: 'appended',
@@ -713,6 +735,7 @@ export const placeVideoImage = ({
       displaced: Boolean(values.conditioningClip || (values.sourceVideo && !referenceExtend)),
       patch: getReferencesPatch({
         referenceExtend,
+        referenceFrames: Boolean(policy.references.frames),
         references: [...kept, { detail: DEFAULT_REFERENCE_IMAGE_DETAIL, image, kind: 'image' }],
       }),
       slot: 'reference',
@@ -721,6 +744,7 @@ export const placeVideoImage = ({
   }
 
   const takesFirstFrame = policy.modes.includes('first-frame') || policy.modes.includes('first-last');
+  const hasStoredReferences = Array.isArray(videoValues.references) && videoValues.references.length > 0;
 
   if (!takesFirstFrame) {
     return { status: 'unsupported' };
@@ -748,7 +772,7 @@ export const placeVideoImage = ({
       // A last frame hidden behind stale references is cleared rather than resurfaced.
       patch: {
         ...getFrameImagePatch('firstFrameImage', image, storedClip),
-        lastFrameImage: values.lastFrameImage,
+        lastFrameImage: hasStoredReferences ? null : values.lastFrameImage,
         references: [],
       },
       slot: 'firstFrame',

@@ -19,6 +19,7 @@ from invokeai.backend.minimax_h3.packing import (
     MINIMAX_H3_VIDEO_TAG,
     MiniMaxH3ReferenceLayoutEntry,
     _temporal_position_span,
+    build_packed_sequence,
     build_ref2va_packed_sequence,
     validate_reference_kinds,
 )
@@ -203,6 +204,89 @@ class TestRef2VALayout:
         assert _temporal_position_span(18) != _sequential_span(18)
 
 
+# Two keyframes of one 4x4-latent frame each (2x2 patches: 4 rows apiece), and the 1x6x2-latent image reference.
+KEYFRAME_ROWS = 2 * 4
+IMAGE_REF_ROWS = 3
+
+
+class TestKeyframesWithReferencesLayout:
+    """`[text | keyframes | references | target audio | target video]` (ComfyUI's PackedLayout order)."""
+
+    def _combined(self, anchors=("first", "last")):
+        return build_ref2va_packed_sequence(
+            TEXT_TAGS,
+            [IMAGE],
+            ((1, 6, 2),),
+            (),
+            patch_size=(1, 2, 2),
+            keyframe_anchors=anchors,
+            **TARGET,
+        )
+
+    def test_keyframes_precede_references_in_rows_and_condition_order(self):
+        layout = self._combined()
+
+        # text 3 | keyframes 2x4 rows (3..10) | image ref 3 rows (11..13) | audio 16 | video 8.
+        assert layout.sequence_length == 3 + 8 + 3 + 16 + 8
+        assert layout.num_condition_video_rows == KEYFRAME_ROWS + IMAGE_REF_ROWS
+        assert layout.num_condition_audio_rows == 0
+        assert layout.video_indices.tolist() == list(range(3, 14)) + list(range(30, 38))
+        assert layout.audio_indices.tolist() == list(range(14, 30))
+        assert layout.token_tags[:3].tolist() == TEXT_TAGS.tolist()
+        assert torch.all(layout.token_tags[3:14] == MINIMAX_H3_VIDEO_TAG)
+        assert torch.all(layout.token_tags[14:30] == MINIMAX_H3_AUDIO_TAG)
+
+    def test_references_keep_their_clock_and_keyframes_anchor_on_the_target_origin(self):
+        layout = self._combined()
+        times = layout.position_ids[:, 0]
+
+        # The image reference still sits at the end of the text and advances the clock by one slot.
+        assert torch.all(times[11:14] == 3.0)
+        target_origin = 4.0
+        assert torch.all(times[30:34] == target_origin)
+        # The first keyframe is on the target's first latent frame, the last on the keyframe-only layout's
+        # last-frame offset, both measured from the target origin rather than from the text length.
+        keyframe_only = build_packed_sequence(
+            TEXT_TAGS, patch_size=(1, 2, 2), keyframe_anchors=("first", "last"), **TARGET
+        )
+        kf_times = keyframe_only.position_ids[3:11, 0] - 3.0
+        assert torch.equal(times[3:11], kf_times + target_origin)
+        assert torch.all(times[3:7] == target_origin)
+        assert float(times[7]) > float(times[3])
+        # Keyframes share the target's spatial grid, the reference its own.
+        assert torch.equal(layout.position_ids[3:7, 1:], layout.position_ids[30:34, 1:])
+        assert torch.equal(layout.position_ids[7:11, 1:], layout.position_ids[30:34, 1:])
+        assert len(set(layout.position_ids[11:14, 1].tolist())) == 3
+
+    def test_without_keyframes_the_layout_is_the_reference_only_layout(self):
+        plain = _layout([IMAGE], ((1, 6, 2),), ())
+        explicit = self._combined(anchors=())
+
+        for name in ("position_ids", "token_tags", "video_indices", "audio_indices", "text_indices"):
+            assert torch.equal(getattr(plain, name), getattr(explicit, name))
+        assert plain.sequence_length == explicit.sequence_length
+        assert plain.num_condition_video_rows == explicit.num_condition_video_rows
+
+    def test_a_video_reference_with_sound_pushes_the_keyframe_anchor_past_its_span(self):
+        layout = build_ref2va_packed_sequence(
+            TEXT_TAGS,
+            [VIDEO_AUDIO],
+            ((3, 2, 4),),
+            (8,),
+            patch_size=(1, 2, 2),
+            keyframe_anchors=("first",),
+            **TARGET,
+        )
+        target_origin = 3.0 + max(4.0, _sequential_span(3))
+        assert float(layout.position_ids[3, 0]) == pytest.approx(target_origin)
+        assert layout.num_condition_video_rows == 4 + 6
+        assert layout.num_condition_audio_rows == 8
+
+    def test_rejects_an_unknown_anchor(self):
+        with pytest.raises(ValueError, match="'first' or 'last'"):
+            self._combined(anchors=("middle",))
+
+
 def _encoded_references(kinds=("image",)):
     """Build consistent encoded references for the state builder at the micro geometry."""
     refs = []
@@ -234,6 +318,88 @@ def _build_ref_state(seed: int, kinds=("image",)):
         device=torch.device("cpu"),
         **TARGET,
     )
+
+
+def _keyframe_rows():
+    """Clean rows of a first and a last keyframe on the 4x4 target canvas (4 rows each)."""
+    return torch.cat([torch.full((4, 96), 0.5), torch.full((4, 96), -0.5)])
+
+
+def _build_combined_state(seed: int, kinds=("image",)):
+    return build_ref2va_denoise_state(
+        text_token_tags=TEXT_TAGS,
+        references=_encoded_references(kinds),
+        num_inference_steps=4,
+        seed=seed,
+        device=torch.device("cpu"),
+        keyframe_anchors=("first", "last"),
+        clean_condition_rows=_keyframe_rows(),
+        **TARGET,
+    )
+
+
+class TestKeyframesWithReferencesState:
+    def test_shapes_and_condition_rows_lead_with_keyframes(self):
+        state = _build_combined_state(1, kinds=("image", "video"))
+
+        assert state.layout.num_condition_video_rows == 8 + 3 + 6
+        assert state.video_rows.shape == (8 + 3 + 6 + 8, 96)
+
+    def test_keyframe_noise_comes_off_the_generator_first(self):
+        # Keyframe draws lead the request's generator exactly as in a keyframe-only request, so the
+        # noised keyframe rows are identical to FL2VA's at the same seed.
+        combined = _build_combined_state(7)
+        frames_only = build_denoise_state(
+            text_token_tags=TEXT_TAGS,
+            num_inference_steps=4,
+            seed=7,
+            device=torch.device("cpu"),
+            keyframe_anchors=("first", "last"),
+            clean_condition_rows=_keyframe_rows(),
+            **TARGET,
+        )
+
+        assert torch.equal(combined.video_rows[:8], frames_only.video_rows[:8])
+        # The reference draws come next, so the generated rows differ from the keyframe-only request's.
+        assert not torch.equal(
+            combined.video_rows[KEYFRAME_ROWS + IMAGE_REF_ROWS :], frames_only.video_rows[KEYFRAME_ROWS:]
+        )
+
+    def test_every_condition_row_is_pinned_at_the_augmentation_level(self):
+        state = _build_combined_state(2, kinds=("image",))
+
+        for unique_timesteps, timestep_indices in state.row_timestep_plan:
+            row_timesteps = unique_timesteps[timestep_indices]
+            assert torch.all(row_timesteps[state.video_indices[: KEYFRAME_ROWS + IMAGE_REF_ROWS]] >= 0.999)
+
+    def test_rejects_rows_that_do_not_match_the_anchors(self):
+        with pytest.raises(ValueError, match="carries 4 rows"):
+            build_ref2va_denoise_state(
+                text_token_tags=TEXT_TAGS,
+                references=_encoded_references(),
+                num_inference_steps=4,
+                seed=0,
+                device=torch.device("cpu"),
+                keyframe_anchors=("first", "last"),
+                clean_condition_rows=torch.zeros(4, 96),
+                **TARGET,
+            )
+
+    def test_rejects_anchors_without_rows_and_rows_without_anchors(self):
+        for kwargs in (
+            {"keyframe_anchors": ("first",), "clean_condition_rows": None},
+            {"keyframe_anchors": (), "clean_condition_rows": torch.zeros(4, 96)},
+        ):
+            with pytest.raises(ValueError, match="provided together"):
+                build_ref2va_denoise_state(
+                    text_token_tags=TEXT_TAGS,
+                    references=_encoded_references(),
+                    num_inference_steps=4,
+                    seed=0,
+                    device=torch.device("cpu"),
+                    **kwargs,
+                    **TARGET,
+                )
 
 
 class TestRef2VADenoiseState:

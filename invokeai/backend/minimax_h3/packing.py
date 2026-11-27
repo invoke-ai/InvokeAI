@@ -565,9 +565,16 @@ def build_ref2va_packed_sequence(
     latent_width: int,
     num_audio_latents: int,
     patch_size: tuple[int, int, int],
+    keyframe_anchors: tuple[str, ...] = (),
 ) -> MiniMaxH3PackedSequence:
     r"""
-    Build the `[text | reference blocks | target audio | target video]` layout of the `ref2va` task.
+    Build the `[text | keyframe conditions | reference blocks | target audio | target video]` layout of the `ref2va`
+    task. With no `keyframe_anchors` it is the plain `[text | reference blocks | target audio | target video]` layout.
+
+    Keyframe blocks (first/last frame, as in the `fl2va` task) come right after the text and before every reference,
+    the order of ComfyUI's `PackedLayout`. The references keep their own clock, which starts at the end of the text; a
+    keyframe is anchored on the *target* timeline, so its rotary time is the origin the references left behind (the
+    time at which the target audio and video start), plus the target's last-latent-frame offset for a `"last"` keyframe.
 
     Args:
         text_token_tags (`torch.Tensor` of shape `(num_text_tokens,)`):
@@ -586,12 +593,19 @@ def build_ref2va_packed_sequence(
         latent_width (`int`): Target latent width.
         num_audio_latents (`int`): Number of target audio latents per channel.
         patch_size (`tuple[int, int, int]`): The transformer's `(t, h, w)` patch.
+        keyframe_anchors (`tuple[str, ...]`):
+            One entry (`"first"` or `"last"`) per keyframe conditioning block, in packed order. Each block is one
+            latent frame on the target canvas.
 
     Returns:
         [`MiniMaxH3PackedSequence`]
     """
     _, patch_h, patch_w = patch_size
     num_text_tokens = text_token_tags.shape[0]
+    for anchor in keyframe_anchors:
+        if anchor not in ("first", "last"):
+            raise ValueError(f"A keyframe anchor must be 'first' or 'last', got {anchor!r}.")
+    num_keyframe_rows = len(keyframe_anchors) * (latent_height // patch_h) * (latent_width // patch_w)
     num_target_video_rows = num_latent_frames * (latent_height // patch_h) * (latent_width // patch_w)
     num_target_audio_rows = num_audio_latents * MINIMAX_H3_AUDIO_CHANNELS
 
@@ -606,6 +620,7 @@ def build_ref2va_packed_sequence(
     num_reference_audio_rows = sum(audio_condition_row_counts)
     sequence_length = (
         num_text_tokens
+        + num_keyframe_rows
         + num_reference_video_rows
         + num_reference_audio_rows
         + num_target_audio_rows
@@ -619,7 +634,8 @@ def build_ref2va_packed_sequence(
     # Reference blocks, in request order. `rotary_time` is the shared audio/video clock: it starts where the text
     # rows end and every block pushes it forward by the time that block occupies.
     video_indices, audio_indices = [], []
-    cursor = num_text_tokens
+    keyframe_rows = slice(num_text_tokens, num_text_tokens + num_keyframe_rows)
+    cursor = keyframe_rows.stop
     rotary_time = float(num_text_tokens)
     for reference in references:
         if reference.kind == "image":
@@ -675,6 +691,17 @@ def build_ref2va_packed_sequence(
         else:
             raise ValueError(f"A reference must be an 'image', a 'video' or an 'audio', got {reference.kind!r}.")
 
+    # Keyframe blocks sit on the target timeline, whose origin is where the reference blocks left the clock.
+    rows_per_frame = target_frame_grid.shape[0]
+    for index, anchor in enumerate(keyframe_anchors):
+        anchor_time = rotary_time
+        if anchor == "last":
+            anchor_time += _temporal_position_span(num_latent_frames) - _ROPE_FRAME_RESCALE
+        rows = slice(keyframe_rows.start + index * rows_per_frame, keyframe_rows.start + (index + 1) * rows_per_frame)
+        position_ids[rows, 0] = anchor_time
+        position_ids[rows, 1:] = target_frame_grid
+    keyframe_indices = torch.arange(keyframe_rows.start, keyframe_rows.stop)
+
     # The generated rows. Target audio and target video share the origin the reference blocks left behind.
     audio_start = cursor
     video_start = audio_start + num_target_audio_rows
@@ -690,7 +717,7 @@ def build_ref2va_packed_sequence(
     position_ids[video_start:, 0] = frame_time.repeat_interleave(target_frame_grid.shape[0])
     position_ids[video_start:, 1:] = target_frame_grid.repeat(num_latent_frames, 1)
 
-    video_indices = torch.cat(video_indices + [torch.arange(video_start, sequence_length)])
+    video_indices = torch.cat([keyframe_indices] + video_indices + [torch.arange(video_start, sequence_length)])
     audio_indices = torch.cat(audio_indices + [torch.arange(audio_start, video_start)])
     text_indices = torch.arange(num_text_tokens)
 
@@ -706,7 +733,7 @@ def build_ref2va_packed_sequence(
         video_indices=video_indices,
         audio_indices=audio_indices,
         text_indices=text_indices,
-        num_condition_video_rows=num_reference_video_rows,
+        num_condition_video_rows=num_keyframe_rows + num_reference_video_rows,
         num_condition_audio_rows=num_reference_audio_rows,
     )
 

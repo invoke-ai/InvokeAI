@@ -32311,6 +32311,7 @@
                   "minimax_h3_flf2v",
                   "minimax_h3_extend_video",
                   "minimax_h3_ref2v",
+                  "minimax_h3_ref2v_frames",
                   "minimax_h3_txt2img"
                 ],
                 "type": "string"
@@ -97346,7 +97347,7 @@
         "category": "conditioning",
         "class": "invocation",
         "classification": "prototype",
-        "description": "Encodes a prompt (and optional first/last keyframes, or Ref2VA references) for MiniMax H3.\n\nThe conditioning is Qwen3-VL-32B's *unnormalized* layer-50 hidden state. H3 is\nguidance-distilled: there is no negative prompt. For first/last-frame video, the keyframes\nare ALSO part of the text conditioning (a \"<Picture i>: \" label plus a vision block per\nkeyframe), so the same images must be wired here and to the Frame Conditioning node, with\nthe same width/height as the denoise node. For reference-to-video (Ref2VA), the same\nordered references must be wired here and to the Reference Conditioning node, with the\nsame Number of Frames \u2014 the references appear in the conditioning as per-modality labels\nand vision blocks (a reference video is read at 2 fps).",
+        "description": "Encodes a prompt (and optional first/last keyframes, or Ref2VA references) for MiniMax H3.\n\nThe conditioning is Qwen3-VL-32B's *unnormalized* layer-50 hidden state. H3 is\nguidance-distilled: there is no negative prompt. For first/last-frame video, the keyframes\nare ALSO part of the text conditioning (a \"<Picture i>: \" label plus a vision block per\nkeyframe), so the same images must be wired here and to the Frame Conditioning node, with\nthe same width/height as the denoise node. For reference-to-video (Ref2VA), the same\nordered references must be wired here and to the Reference Conditioning node, with the\nsame Number of Frames \u2014 the references appear in the conditioning as per-modality labels\nand vision blocks (a reference video is read at 2 fps). Both can be combined on a Ref2VA\ntransformer: the text conditioning then carries the references only, and the keyframes act\nthrough the Frame Conditioning rows (their images are still wired here to record the anchors).",
         "node_pack": "invokeai",
         "properties": {
           "id": {
@@ -97454,7 +97455,7 @@
               }
             ],
             "default": null,
-            "description": "Ref2VA references, in conditioning order (must match Reference Conditioning - MiniMax H3). Mutually exclusive with keyframes.",
+            "description": "Ref2VA references, in conditioning order (must match Reference Conditioning - MiniMax H3). May be combined with keyframes (Ref2VA transformer).",
             "field_kind": "input",
             "input": "connection",
             "orig_default": null,

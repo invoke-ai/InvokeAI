@@ -22,7 +22,7 @@ register(
     # lf2v / flf2v / extend_video are H3's keyframe-conditioned video modes: continue from a last
     # frame, interpolate between a first and last frame, and extend an existing clip.
     ModalityFacet(
-        frozenset({"txt2img", "t2v", "i2v", "lf2v", "flf2v", "extend_video", "ref2v"}),
+        frozenset({"txt2img", "t2v", "i2v", "lf2v", "flf2v", "extend_video", "ref2v", "ref2v_frames"}),
         metadata_slug="minimax_h3",
     ),
     # minimax_h3_denoise is explicit: 'guidance-distilled: no negative prompt, no CFG, one

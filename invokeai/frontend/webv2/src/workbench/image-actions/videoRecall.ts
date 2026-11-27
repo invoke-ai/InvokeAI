@@ -65,6 +65,7 @@ const VIDEO_GENERATION_MODE_IDS: ReadonlySet<string> = new Set([
   'minimax_h3_flf2v',
   'minimax_h3_extend_video',
   'minimax_h3_ref2v',
+  'minimax_h3_ref2v_frames',
   'ltx2_t2v',
   'ltx2_i2v',
   'ltx2_a2v',
@@ -609,8 +610,11 @@ export const getVideoRecallMediaNames = (record: VideoRecallRecord): VideoRecall
       mediaNames.lastFrameName = media.lastFrameName;
     }
   } else if (references.length > 0) {
-    // References replace frame slots, but a recorded source video rides ALONGSIDE: reference-extend appends to it.
+    // Frames are recorded only by a combined references-and-frames run; a recorded source video rides ALONGSIDE:
+    // reference-extend appends to it.
     mediaNames.references = [...references];
+    mediaNames.firstFrameName = media.firstFrameName;
+    mediaNames.lastFrameName = media.lastFrameName;
     if (media.sourceVideoName) {
       mediaNames.sourceVideoName = media.sourceVideoName;
       mediaNames.sourceVideoTrim = record.sourceVideoTrim;
@@ -728,7 +732,7 @@ export const buildVideoRecallSettings = ({
     recalledModel &&
     recordedMode?.startsWith('minimax_h3_')
   ) {
-    const task = recordedMode === 'minimax_h3_ref2v' ? 'ref2va' : 'fl2va';
+    const task = recordedMode === 'minimax_h3_ref2v' || recordedMode === 'minimax_h3_ref2v_frames' ? 'ref2va' : 'fl2va';
     const h3TaskOverride = task !== getEffectiveVideoModel(recalledModel, {}).variant ? task : undefined;
     values = { ...values, model: recalledModel, h3TaskOverride };
   }
