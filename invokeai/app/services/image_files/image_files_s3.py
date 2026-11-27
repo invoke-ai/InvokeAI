@@ -2,6 +2,8 @@
 import io
 import json
 import os
+from collections.abc import Collection, Iterator, Sequence
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, BinaryIO, Optional, cast
 
@@ -29,6 +31,7 @@ _USER_AGENT_SUFFIX = "invokeai"
 _META_INVOKEAI_METADATA = "invokeai-metadata"
 _META_INVOKEAI_WORKFLOW = "invokeai-workflow"
 _META_INVOKEAI_GRAPH = "invokeai-graph"
+_META_INVOKEAI_RESOLVED_INPUTS = "invokeai-resolved-inputs"
 
 # S3 user-metadata is capped by providers (AWS: ~2 KB total across all keys and
 # values). Budget under 2048 so key names and per-header overhead still fit beneath
@@ -44,6 +47,30 @@ _S3_NOT_FOUND_CODES = frozenset({"404", "NoSuchKey", "NotFound"})
 def _is_not_found_error(error: "ClientError") -> bool:
     """True when a botocore ClientError denotes a missing object/key."""
     return error.response.get("Error", {}).get("Code", "") in _S3_NOT_FOUND_CODES
+
+
+class _S3ObjectStream:
+    """Thin BinaryIO-compatible wrapper that preserves S3 response metadata."""
+
+    def __init__(self, body: Any, content_length: Optional[int]) -> None:
+        self._body = body
+        self.content_length = content_length
+
+    def read(self, size: int = -1) -> bytes:
+        if size is None or size < 0:
+            return self._body.read()
+        return self._body.read(size)
+
+    def close(self) -> None:
+        self._body.close()
+
+
+@dataclass(frozen=True)
+class _S3DeleteToken:
+    """Objects to remove on commit. S3 has no rename, so nothing leaves service before commit."""
+
+    images: tuple[tuple[str, str], ...]
+    staged: bool
 
 
 class S3CompatibleImageFileStorage(ImageFileStorageBase):
@@ -157,6 +184,121 @@ class S3CompatibleImageFileStorage(ImageFileStorageBase):
         """
         pass
 
+    def iter_image_paths(self) -> Iterator[Path]:
+        """Yields nothing: gallery maintenance is filesystem-only and disabled for the S3 backend."""
+        return iter(())
+
+    def iter_thumbnail_paths(self) -> Iterator[Path]:
+        """Yields nothing: gallery maintenance is filesystem-only and disabled for the S3 backend."""
+        return iter(())
+
+    def _head_content_length(self, key: str) -> Optional[int]:
+        """Object size from HEAD, or None when the object does not exist."""
+        from botocore.exceptions import ClientError
+
+        try:
+            response = self._client.head_object(Bucket=self._bucket, Key=key)
+        except ClientError as e:
+            if _is_not_found_error(e):
+                return None
+            raise
+        content_length = response.get("ContentLength")
+        return content_length if isinstance(content_length, int) else None
+
+    def generate_thumbnail_if_missing(
+        self, image_name: str, image_subfolder: str = "", thumbnail_size: int = 256
+    ) -> bool:
+        from botocore.exceptions import ClientError
+
+        thumb_key = self._object_key(image_name, thumbnail=True, image_subfolder=image_subfolder)
+        if self._head_content_length(thumb_key) is not None:
+            return False
+        with self.get(image_name, image_subfolder=image_subfolder) as source_image:
+            thumbnail = make_thumbnail(source_image, thumbnail_size)
+        try:
+            with io.BytesIO() as thumb_buffer:
+                thumbnail.save(thumb_buffer, format="WEBP")
+                thumb_buffer.seek(0)
+                # Create-only, so a thumbnail another writer created meanwhile is never replaced.
+                self._client.put_object(
+                    Bucket=self._bucket,
+                    Key=thumb_key,
+                    Body=thumb_buffer,
+                    ContentType="image/webp",
+                    IfNoneMatch="*",
+                )
+        except ClientError as e:
+            if e.response.get("Error", {}).get("Code", "") in ("PreconditionFailed", "412"):
+                return False
+            raise
+        finally:
+            thumbnail.close()
+        return True
+
+    def copy(
+        self,
+        source_image_name: str,
+        image_name: str,
+        source_subfolder: str = "",
+        image_subfolder: str = "",
+        thumbnail_size: int = 256,
+    ) -> None:
+        """Server-side copy, so every PNG chunk and the object metadata travel unchanged."""
+        copied: list[str] = []
+        try:
+            source_key = self._object_key(source_image_name, image_subfolder=source_subfolder)
+            key = self._object_key(image_name, image_subfolder=image_subfolder)
+            self._client.copy_object(
+                Bucket=self._bucket, Key=key, CopySource={"Bucket": self._bucket, "Key": source_key}
+            )
+            copied.append(key)
+
+            source_thumb_key = self._object_key(source_image_name, thumbnail=True, image_subfolder=source_subfolder)
+            thumb_key = self._object_key(image_name, thumbnail=True, image_subfolder=image_subfolder)
+            if self._head_content_length(source_thumb_key) is not None:
+                self._client.copy_object(
+                    Bucket=self._bucket, Key=thumb_key, CopySource={"Bucket": self._bucket, "Key": source_thumb_key}
+                )
+                copied.append(thumb_key)
+            elif self.generate_thumbnail_if_missing(
+                image_name, image_subfolder=image_subfolder, thumbnail_size=thumbnail_size
+            ):
+                copied.append(thumb_key)
+        except Exception as e:
+            self._delete_quietly(*copied)
+            raise ImageFileSaveException from e
+
+    def get_file_size_bytes(self, image_name: str, image_subfolder: str = "") -> Optional[int]:
+        size = self._head_content_length(self._object_key(image_name, image_subfolder=image_subfolder))
+        if size is None:
+            return None
+        thumb_size = self._head_content_length(
+            self._object_key(image_name, thumbnail=True, image_subfolder=image_subfolder)
+        )
+        return size + (thumb_size or 0)
+
+    def stage_delete(self, image_name: str, image_subfolder: str = "") -> object:
+        return _S3DeleteToken(images=((image_name, image_subfolder),), staged=True)
+
+    def begin_delete(self, images: Sequence[tuple[str, str]]) -> object:
+        # No durable journal: if the process dies between deleting the records and commit, the
+        # objects stay behind as orphans. Nothing a surviving record points to is ever removed.
+        return _S3DeleteToken(images=tuple(images), staged=False)
+
+    def commit_delete(self, token: object, image_names: Optional[Collection[str]] = None) -> None:
+        assert isinstance(token, _S3DeleteToken)
+        for image_name, image_subfolder in token.images:
+            if not token.staged and image_names is not None and image_name not in image_names:
+                continue
+            self.delete(image_name, image_subfolder=image_subfolder)
+
+    def abandon_delete(self, token: object) -> None:
+        assert isinstance(token, _S3DeleteToken)
+
+    def rollback_delete(self, token: object) -> None:
+        # Staging leaves the objects in place, so there is nothing to restore.
+        assert isinstance(token, _S3DeleteToken)
+
     def get(self, image_name: str, image_subfolder: str = "") -> PILImageType:
         body = self.get_bytes(image_name, image_subfolder=image_subfolder)
         image = Image.open(io.BytesIO(body))
@@ -178,9 +320,23 @@ class S3CompatibleImageFileStorage(ImageFileStorageBase):
             if _is_not_found_error(e):
                 raise ImageFileNotFoundException from e
             raise
-        # boto3's StreamingBody is a readable binary stream; the cast aligns it
-        # with the BinaryIO contract declared on the base class.
-        return cast(BinaryIO, response["Body"])
+        # boto3's StreamingBody is a readable binary stream; wrap it so callers
+        # can also use ContentLength for HTTP Content-Length without another HEAD.
+        return cast(BinaryIO, _S3ObjectStream(response["Body"], response.get("ContentLength")))
+
+    def get_content_length(self, image_name: str, thumbnail: bool = False, image_subfolder: str = "") -> Optional[int]:
+        """Return object size using S3 HEAD, without downloading the body."""
+        from botocore.exceptions import ClientError
+
+        key = self._object_key(image_name, thumbnail=thumbnail, image_subfolder=image_subfolder)
+        try:
+            response = self._client.head_object(Bucket=self._bucket, Key=key)
+        except ClientError as e:
+            if _is_not_found_error(e):
+                raise ImageFileNotFoundException from e
+            raise
+        content_length = response.get("ContentLength")
+        return content_length if isinstance(content_length, int) else None
 
     def get_bytes(self, image_name: str, thumbnail: bool = False, image_subfolder: str = "") -> bytes:
         """Return the raw object bytes for the given image (or its thumbnail).
@@ -206,9 +362,9 @@ class S3CompatibleImageFileStorage(ImageFileStorageBase):
         graph: Optional[str] = None,
         thumbnail_size: int = 256,
         image_subfolder: str = "",
+        resolved_inputs: Optional[str] = None,
     ) -> None:
-        key: Optional[str] = None
-        thumb_key: Optional[str] = None
+        uploaded_keys: list[str] = []
         try:
             key = self._object_key(image_name, image_subfolder=image_subfolder)
             thumb_key = self._object_key(image_name, thumbnail=True, image_subfolder=image_subfolder)
@@ -226,6 +382,7 @@ class S3CompatibleImageFileStorage(ImageFileStorageBase):
                 ("invokeai_metadata", _META_INVOKEAI_METADATA, metadata),
                 ("invokeai_workflow", _META_INVOKEAI_WORKFLOW, workflow),
                 ("invokeai_graph", _META_INVOKEAI_GRAPH, graph),
+                ("invokeai_resolved_inputs", _META_INVOKEAI_RESOLVED_INPUTS, resolved_inputs),
             ):
                 if value is None:
                     continue
@@ -252,10 +409,15 @@ class S3CompatibleImageFileStorage(ImageFileStorageBase):
                     # rather than copying the whole buffer to bytes.
                     "Body": png_buffer,
                     "ContentType": "image/png",
+                    # Image names are expected to be unique. Make the write
+                    # create-only so rollback can never delete a pre-existing
+                    # object after an accidental same-name save attempt.
+                    "IfNoneMatch": "*",
                 }
                 if obj_metadata:
                     put_kwargs["Metadata"] = obj_metadata
                 self._client.put_object(**put_kwargs)
+                uploaded_keys.append(key)
 
             thumbnail_image = make_thumbnail(image, thumbnail_size)
             with io.BytesIO() as thumb_buffer:
@@ -266,11 +428,14 @@ class S3CompatibleImageFileStorage(ImageFileStorageBase):
                     Key=thumb_key,
                     Body=thumb_buffer,
                     ContentType="image/webp",
+                    IfNoneMatch="*",
                 )
+                uploaded_keys.append(thumb_key)
         except Exception as e:
             # Best-effort rollback so a partial failure (e.g. the image uploaded
-            # but the thumbnail did not) doesn't leave an orphaned object.
-            self._delete_quietly(key, thumb_key)
+            # but the thumbnail did not) doesn't leave an orphaned object. Only
+            # delete keys that this save call definitely created.
+            self._delete_quietly(*uploaded_keys)
             raise ImageFileSaveException from e
 
     def _delete_quietly(self, *keys: Optional[str]) -> None:
@@ -341,6 +506,11 @@ class S3CompatibleImageFileStorage(ImageFileStorageBase):
     def get_graph(self, image_name: str, image_subfolder: str = "") -> str | None:
         return self._get_text_metadata(
             image_name, _META_INVOKEAI_GRAPH, "invokeai_graph", image_subfolder=image_subfolder
+        )
+
+    def get_resolved_inputs(self, image_name: str, image_subfolder: str = "") -> str | None:
+        return self._get_text_metadata(
+            image_name, _META_INVOKEAI_RESOLVED_INPUTS, "invokeai_resolved_inputs", image_subfolder=image_subfolder
         )
 
     def _get_text_metadata(

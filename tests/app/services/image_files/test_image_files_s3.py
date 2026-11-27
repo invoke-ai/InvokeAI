@@ -26,6 +26,8 @@ class _FakeS3Client:
         self.bodies: list[_BodyStream] = []
 
     def put_object(self, Bucket: str, Key: str, Body: Any, **kwargs: Any) -> dict:
+        if kwargs.get("IfNoneMatch") == "*" and Key in self.store:
+            raise _client_error("PreconditionFailed")
         # Mirror boto3: a file-like Body is read to bytes for storage/upload.
         data = Body.read() if hasattr(Body, "read") else Body
         self.store[Key] = {
@@ -41,15 +43,21 @@ class _FakeS3Client:
         record = self.store[Key]
         body = _BodyStream(record["Body"])
         self.bodies.append(body)
-        return {"Body": body, "Metadata": record["Metadata"]}
+        return {"Body": body, "Metadata": record["Metadata"], "ContentLength": len(record["Body"])}
 
     def head_object(self, Bucket: str, Key: str) -> dict:
         if Key not in self.store:
             raise _client_error("404")
-        return {"Metadata": self.store[Key]["Metadata"]}
+        return {"Metadata": self.store[Key]["Metadata"], "ContentLength": len(self.store[Key]["Body"])}
 
     def delete_object(self, Bucket: str, Key: str) -> dict:
         self.store.pop(Key, None)
+        return {}
+
+    def copy_object(self, Bucket: str, Key: str, CopySource: dict[str, str]) -> dict:
+        if CopySource["Key"] not in self.store:
+            raise _client_error("NoSuchKey")
+        self.store[Key] = dict(self.store[CopySource["Key"]])
         return {}
 
 
@@ -158,6 +166,33 @@ def test_save_rolls_back_image_when_thumbnail_upload_fails() -> None:
     assert "images/rollback.png" not in fake.store  # rolled back
 
 
+def test_save_same_name_does_not_overwrite_or_delete_existing_objects() -> None:
+    storage, fake = _make_storage()
+    storage.save(_solid_png(), "existing.png")
+    image_key = "images/existing.png"
+    thumb_key = f"thumbnails/{get_thumbnail_name('existing.png')}"
+    original_image = fake.store[image_key]["Body"]
+    original_thumb = fake.store[thumb_key]["Body"]
+
+    with pytest.raises(ImageFileSaveException):
+        storage.save(Image.new("RGB", (8, 8), color=(0, 0, 255)), "existing.png")
+
+    assert fake.store[image_key]["Body"] == original_image
+    assert fake.store[thumb_key]["Body"] == original_thumb
+
+
+def test_save_rolls_back_only_objects_created_by_current_save() -> None:
+    storage, fake = _make_storage()
+    thumb_key = f"thumbnails/{get_thumbnail_name('partial.png')}"
+    fake.store[thumb_key] = {"Body": b"existing-thumb", "Metadata": {}, "ContentType": "image/webp"}
+
+    with pytest.raises(ImageFileSaveException):
+        storage.save(_solid_png(), "partial.png")
+
+    assert "images/partial.png" not in fake.store
+    assert fake.store[thumb_key]["Body"] == b"existing-thumb"
+
+
 def test_body_stream_supports_chunked_read() -> None:
     # The fake StreamingBody must accept read(amt) like boto3, so streaming
     # consumers (e.g. shutil.copyfileobj) are exercised faithfully.
@@ -211,15 +246,42 @@ def test_open_stream_returns_readable_body() -> None:
     storage.save(_solid_png(), "stream.png")
     body = storage.open_stream("stream.png")
     try:
+        assert body.content_length == len(fake.store["images/stream.png"]["Body"])
         assert body.read() == fake.store["images/stream.png"]["Body"]
     finally:
         body.close()
+
+
+def test_get_content_length_uses_head_object() -> None:
+    storage, fake = _make_storage()
+    storage.save(_solid_png(), "length.png")
+
+    assert storage.get_content_length("length.png") == len(fake.store["images/length.png"]["Body"])
+    assert storage.get_content_length("length.png", thumbnail=True) == len(
+        fake.store[f"thumbnails/{get_thumbnail_name('length.png')}"]["Body"]
+    )
 
 
 def test_open_stream_missing_raises_image_file_not_found() -> None:
     storage, _ = _make_storage()
     with pytest.raises(ImageFileNotFoundException):
         storage.open_stream("missing.png")
+
+
+def test_get_content_length_missing_raises_image_file_not_found() -> None:
+    storage, _ = _make_storage()
+    with pytest.raises(ImageFileNotFoundException):
+        storage.get_content_length("missing.png")
+
+
+def test_rebased_storage_interface_methods_are_supported() -> None:
+    storage, _ = _make_storage()
+
+    assert "test-bucket" in str(storage.image_root)
+    assert "images" in str(storage.image_root)
+    assert "test-bucket" in str(storage.thumbnail_root)
+    assert "thumbnails" in str(storage.thumbnail_root)
+    storage.evict_cache_paths([storage.image_root])
 
 
 def test_pil_compress_level_is_passed_to_image_save() -> None:
@@ -416,3 +478,58 @@ def test_constructor_requires_bucket(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("INVOKEAI_S3_BUCKET", raising=False)
     with pytest.raises(ValueError, match="bucket"):
         S3CompatibleImageFileStorage(client=_FakeS3Client())
+
+
+def test_copy_is_byte_identical_and_keeps_metadata() -> None:
+    storage, fake = _make_storage()
+    storage.save(_solid_png(), "src.png", workflow='{"w": 1}')
+    storage.copy("src.png", "dst.png")
+    assert fake.store["images/dst.png"] == fake.store["images/src.png"]
+    assert fake.store[f"thumbnails/{get_thumbnail_name('dst.png')}"]["Body"]
+    assert storage.get_workflow("dst.png") == '{"w": 1}'
+
+
+def test_generate_thumbnail_if_missing_only_creates_absent_thumbnail() -> None:
+    storage, fake = _make_storage()
+    storage.save(_solid_png(), "img.png")
+    assert not storage.generate_thumbnail_if_missing("img.png")
+    del fake.store[f"thumbnails/{get_thumbnail_name('img.png')}"]
+    assert storage.generate_thumbnail_if_missing("img.png")
+    assert f"thumbnails/{get_thumbnail_name('img.png')}" in fake.store
+
+
+def test_get_file_size_bytes_sums_image_and_thumbnail() -> None:
+    storage, fake = _make_storage()
+    storage.save(_solid_png(), "img.png")
+    expected = len(fake.store["images/img.png"]["Body"]) + len(
+        fake.store[f"thumbnails/{get_thumbnail_name('img.png')}"]["Body"]
+    )
+    assert storage.get_file_size_bytes("img.png") == expected
+    assert storage.get_file_size_bytes("missing.png") is None
+
+
+def test_staged_delete_rolls_back_or_commits() -> None:
+    storage, fake = _make_storage()
+    storage.save(_solid_png(), "img.png")
+    storage.rollback_delete(storage.stage_delete("img.png"))
+    assert "images/img.png" in fake.store
+    storage.commit_delete(storage.stage_delete("img.png"))
+    assert fake.store == {}
+
+
+def test_pending_delete_commits_only_deleted_records() -> None:
+    storage, fake = _make_storage()
+    storage.save(_solid_png(), "a.png")
+    storage.save(_solid_png(), "b.png")
+    token = storage.begin_delete([("a.png", ""), ("b.png", "")])
+    storage.commit_delete(token, image_names={"a.png"})
+    assert "images/a.png" not in fake.store
+    assert "images/b.png" in fake.store
+    storage.abandon_delete(storage.begin_delete([("b.png", "")]))
+    assert "images/b.png" in fake.store
+
+
+def test_resolved_inputs_round_trip() -> None:
+    storage, _ = _make_storage()
+    storage.save(_solid_png(), "img.png", resolved_inputs='{"inputs": []}')
+    assert storage.get_resolved_inputs("img.png") == '{"inputs": []}'

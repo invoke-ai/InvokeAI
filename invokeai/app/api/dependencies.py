@@ -191,7 +191,11 @@ class ApiDependencies:
         videos = VideoService()
         board_video_records = BoardVideoRecordStorage(database)
         gallery = GalleryService(database)
-        gallery_maintenance = GalleryMaintenanceService()
+        # Gallery maintenance compares records against files with filesystem stat() calls, so on S3
+        # every image would look missing. Its API reports unavailable (503) when it is not created.
+        gallery_maintenance: "GalleryMaintenanceService | None" = (
+            None if config.storage_backend == "s3" else GalleryMaintenanceService()
+        )
         invocation_cache = MemoryInvocationCache(max_cache_size=config.node_cache_size)
         tensors = ObjectSerializerForwardCache(
             ObjectSerializerDisk[torch.Tensor](
